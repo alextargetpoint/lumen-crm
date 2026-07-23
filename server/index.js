@@ -54,6 +54,17 @@ const DEFAULT_PASS = 'lumen2026';
   for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
   /* правила авто-отключения ИИ (перехват человеком) */
   if (!db.settings.ai.autoOff) db.settings.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
+  /* автоматизации агентства */
+  if (!db.settings.automations) db.settings.automations = {
+    assignMode: 'load',        // load | roundrobin | shift
+    autoHandover: false,       // 4/4 закрыто → авто-передача брокеру
+    meetingReminderHrs: 3,     // напоминание клиенту за N часов (0 = выкл)
+    noShowMessage: true,       // «не пришёл» → мягкое сообщение + вернуть ИИ
+    rrCursor: 0,
+  };
+  if (!db.settings.customFields) db.settings.customFields = [];
+  for (const b of db.brokers) if (!b.schedule) b.schedule = { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' };
+  for (const l of db.leads) if (!l.custom) l.custom = {};
   store.save();
 }
 
@@ -357,6 +368,7 @@ const server = http.createServer(async (req, res) => {
           Object.assign(lead.ai, b.ai);
         }
         if (b.name) lead.name = b.name;
+        if (b.custom) { lead.custom = lead.custom || {}; Object.assign(lead.custom, b.custom); }
         if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
         store.save();
         return json(res, 200, leadView(db, lead));
@@ -440,6 +452,16 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, cmp);
     }
 
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'PATCH') {
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.schedule) br.schedule = { days: (b.schedule.days || []).map(Number).filter(d => d >= 1 && d <= 7), from: String(b.schedule.from || '09:00'), to: String(b.schedule.to || '20:00') };
+      if (b.capacity != null) br.capacity = +b.capacity;
+      store.save();
+      return json(res, 200, br);
+    }
+
     if ((m = p.match(/^\/api\/numbers\/([^/]+)$/)) && req.method === 'PATCH') {
       const num = db.numbers.find(n => n.id === m[1]);
       if (!num) return json(res, 404, { error: 'not found' });
@@ -479,7 +501,8 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
-      for (const k of ['agency', 'wa', 'ai', 'demo']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
@@ -524,7 +547,15 @@ const server = http.createServer(async (req, res) => {
       if (!mt) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (b.status) mt.status = b.status;
-      if (b.at) mt.at = +b.at;
+      if (b.at) { mt.at = +b.at; mt.reminded = false; }
+      if (b.status === 'no_show' && db.settings.automations.noShowMessage) {
+        const lead = db.leads.find(l => l.id === mt.leadId);
+        if (lead && !['deal', 'lost'].includes(lead.stage)) {
+          lead.ai.enabled = true;
+          engine.send(db, lead, `${lead.name.split(' ')[0]}, не получилось созвониться — ничего страшного. Предложить пару новых слотов или удобнее написать сюда, когда будете готовы?`, 'ai');
+          ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `${lead.name}: не пришёл на встречу — ИИ мягко возвращает в диалог` });
+        }
+      }
       store.save();
       return json(res, 200, mt);
     }

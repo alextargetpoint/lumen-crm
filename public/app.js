@@ -80,8 +80,10 @@ function closePop() {
   CUR_POP.wrap.classList.remove('open');
   CUR_POP = null;
 }
+let POP_GUARD = 0;
 function openPop(wrap, btn, pop) {
   closePop();
+  POP_GUARD = Date.now();
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
   Object.assign(pop.style, { position: 'fixed', zIndex: 400, minWidth: r.width + 'px', visibility: 'hidden' });
@@ -98,7 +100,7 @@ function openPop(wrap, btn, pop) {
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.cs, .dtp, .cs-list, .dtp-pop')) closePop();
 });
-window.addEventListener('scroll', (e) => { if (CUR_POP && !e.target.closest?.('.cs-list, .dtp-pop')) closePop(); }, true);
+window.addEventListener('scroll', (e) => { if (CUR_POP && Date.now() - POP_GUARD > 350 && !e.target.closest?.('.cs-list, .dtp-pop')) closePop(); }, true);
 window.addEventListener('resize', closePop);
 
 function enhanceControls(root) {
@@ -226,6 +228,7 @@ const NAV = {
   sequences: { name: 'Цепочки касаний', icon: I.chain, sub: '7 касаний / 18 дней для молчунов' },
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
   meetings:  { name: 'Встречи', icon: I.cal, sub: 'Слоты с экспертами · WhatsApp-подтверждения' },
+  automations: { name: 'Автоматизации', icon: I.bolt, sub: 'Библиотека автоматизаций агентства: распределение, напоминания, ИИ' },
   ads:       { name: 'Реклама', icon: I.target, sub: 'Мост приёма лидов (Albato) · атрибуция к объявлениям' },
   numbers:   { name: 'Номера', icon: I.sim, sub: 'Пул WhatsApp-номеров: качество, лимиты, прогрев' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: 'Utility и Marketing шаблоны Cloud API' },
@@ -786,6 +789,10 @@ async function openLeadModal(id) {
           ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
           <div class="axr-list">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}"><span class="axr-k">${axName[a]}</span><span class="axr-v">${q ? esc(q.value) : '—'}</span>${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}</div>`; }).join('')}</div>
+          ${(STATE.settings.customFields || []).length ? `<div class="lp-sec">Свои поля</div>
+          <div class="lc-3sel">${STATE.settings.customFields.map(f => `<div><label class="lc-lbl">${esc(f.label)}</label>
+            ${f.type === 'select' ? `<select data-cf="${esc(f.key)}"><option value="">—</option>${(f.options || []).map(o => `<option ${((l.custom || {})[f.key] === o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+            : `<input data-cf="${esc(f.key)}" value="${esc((l.custom || {})[f.key] || '')}" placeholder="—">`}</div>`).join('')}</div>` : ''}
           ${l.summary ? `<div class="lp-sec">Сводка${l.summaryAt ? ` <span style="text-transform:none;letter-spacing:0">· ${ago(l.summaryAt)}</span>` : ''}</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
           <div class="lp-sec">Контакты</div>
           <div id="lcContacts">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
@@ -822,6 +829,9 @@ async function openLeadModal(id) {
     await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });
     openLeadModal(id);
   });
+  $$('[data-cf]', bd).forEach(inp => inp.addEventListener('change', async () => {
+    await api.patch('/leads/' + l.id, { custom: { [inp.dataset.cf]: inp.value } });
+  }));
   $$('[data-mtst]', bd).forEach(b => b.addEventListener('click', async () => {
     const [mid, st] = b.dataset.mtst.split('|');
     await api.patch('/meetings/' + mid, { status: st });
@@ -1196,6 +1206,80 @@ function newCampaignModal() {
   });
 }
 
+/* ---------------- АВТОМАТИЗАЦИИ ---------------- */
+PAGES.automations = async (root) => {
+  const s = STATE.settings;
+  const a = s.automations || {};
+  const swRow = (t, d, inner) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div>${inner}</div>`;
+  const sw = (key, on) => `<label class="switch"><input type="checkbox" data-auto="${key}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+  const link = (page, label) => `<button class="btn btn-sm" data-go="${page}">${label}</button>`;
+  root.innerHTML = `
+    <div class="two-col">
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.users)}Распределение по брокерам</div>
+          ${swRow('Режим распределения', 'Кому уходит квалифицированный лид нужного гео', `<select data-auto-sel="assignMode" style="width:190px">
+            <option value="load" ${a.assignMode === 'load' ? 'selected' : ''}>По загрузке (меньше — берёт)</option>
+            <option value="roundrobin" ${a.assignMode === 'roundrobin' ? 'selected' : ''}>По очереди</option>
+            <option value="shift" ${a.assignMode === 'shift' ? 'selected' : ''}>По сменам + загрузке</option>
+          </select>`)}
+          ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
+          ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.cal)}Встречи</div>
+          ${swRow('Напоминание клиенту', 'WhatsApp-напоминание до встречи (со ссылкой на видео-комнату)', `<select data-auto-sel="meetingReminderHrs" style="width:150px">
+            ${[0, 1, 2, 3, 6, 24].map(h => `<option value="${h}" ${+a.meetingReminderHrs === h ? 'selected' : ''}>${h === 0 ? 'Выключено' : 'за ' + h + ' ч'}</option>`).join('')}
+          </select>`)}
+          ${swRow('«Не пришёл» — вернуть в работу', 'Мягкое сообщение клиенту + ИИ снова ведёт диалог, лид не теряется', sw('noShowMessage', a.noShowMessage))}
+        </div>
+        <div class="glass card">
+          <div class="card-title">${ic(I.spark)}Первая линия и ИИ</div>
+          ${swRow('Мгновенный ответ + цепочка касаний', '7 касаний / 18 дней, пока клиент не ответил', link('sequences', 'Настроить'))}
+          ${swRow('ИИ-квалификатор и правила отключения', 'Критерии по гео, стоп-слова, перехват человеком', link('qualifier', 'Настроить'))}
+          ${swRow('Реанимация спящих', 'Скоринг + безопасные кампании пачками', link('wake', 'Настроить'))}
+        </div>
+      </div>
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.link)}Поток лидов</div>
+          ${swRow('Приём из рекламы + дедупликация', 'Вебхук Albato/Make, повторные заявки не плодят дубли', link('ads', 'Настроить'))}
+          ${swRow('Атрибуция к объявлениям', 'Мэтчинг ad_id на базу объявлений', link('ads', 'К базе'))}
+          ${swRow('Исходящий мост', 'Квал/передача уходят POST-ом во внешнюю CRM', link('ads', 'Настроить'))}
+        </div>
+        <div class="glass card">
+          <div class="card-title">${ic(I.doc)}Свои поля карточки лида</div>
+          <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. Тип «выбор» — свои варианты через запятую.</div>
+          <div id="cfList">${(s.customFields || []).map((f, i) => `<div class="set-row"><div class="sp"><div class="sl">${esc(f.label)}</div><div class="sd">${f.type === 'select' ? 'выбор: ' + esc((f.options || []).join(', ')) : 'текст'}</div></div><button class="btn-ghost" data-cfdel="${i}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;padding:6px 0">Полей пока нет</div>'}</div>
+          <div class="lc-note-row" style="margin-top:10px">
+            <input id="cfLabel" placeholder="Название поля (напр. Паспорт/ВНЖ)">
+            <select id="cfType" style="width:110px;flex:0 0 110px"><option value="text">Текст</option><option value="select">Выбор</option></select>
+          </div>
+          <input id="cfOptions" placeholder="Варианты через запятую (для типа «выбор»)" style="width:100%;margin-top:8px;display:none">
+          <button class="btn btn-accent btn-sm" id="cfAdd" style="margin-top:10px">${ic(I.plus)}Добавить поле</button>
+        </div>
+      </div>
+    </div>`;
+  $$('[data-go]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+  const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
+  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => saveAuto({ [sw2.dataset.auto]: sw2.checked })));
+  $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  $('#cfType').addEventListener('change', (e) => { $('#cfOptions').style.display = e.target.value === 'select' ? '' : 'none'; });
+  $('#cfAdd').addEventListener('click', async () => {
+    const label = $('#cfLabel').value.trim();
+    if (!label) return;
+    const f = { key: 'cf_' + label.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '_').slice(0, 30), label, type: $('#cfType').value, options: $('#cfOptions').value.split(',').map(x => x.trim()).filter(Boolean) };
+    await api.patch('/settings', { customFields: [...(s.customFields || []), f] });
+    await loadState();
+    render();
+  });
+  $$('[data-cfdel]', root).forEach(b => b.addEventListener('click', async () => {
+    await api.patch('/settings', { customFields: (s.customFields || []).filter((_, i) => i !== +b.dataset.cfdel) });
+    await loadState();
+    render();
+  }));
+};
+
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   const d = await api.get('/ads');
@@ -1351,16 +1435,59 @@ PAGES.brokers = async (root) => {
           <div class="nm">${esc(b.name)}</div>
           <div class="gl">${STATE.settings.geoNames[b.geo]} · ${b.langs.join(' / ')} · сделок за 90 дн: ${b.deals90}</div>
           <div class="load-track"><i style="width:${pct}%"></i></div>
-          <div class="muted" style="font-size:11px;margin-top:5px">загрузка ${b.load}/${b.capacity} · сейчас в работе от ИИ: ${hot}</div>
+          <div class="muted" style="font-size:11px;margin-top:5px">загрузка ${b.load}/${b.capacity} · в работе от ИИ: ${hot}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:9px">
+            <span class="badge ${isOnShift(b) ? 'ok' : ''}">${isOnShift(b) ? 'на смене' : 'не на смене'}</span>
+            <span class="muted" style="font-size:10.5px">${(b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ')} · ${b.schedule?.from || ''}–${b.schedule?.to || ''}</span>
+            <span class="tb-spacer"></span>
+            <button class="btn btn-sm" data-sched="${b.id}">${ic(I.clock)}</button>
+          </div>
         </div>
       </div>`;
     }).join('')}
   </div>
   <div class="glass card" style="margin-top:16px">
     <div class="card-title">${ic(I.handover)}Как ИИ выбирает брокера</div>
-    <div class="muted" style="font-size:12.8px;line-height:1.6">Передача идёт брокеру нужного гео с минимальной относительной загрузкой. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога. Клиенту в тот же момент уходит сообщение-мост с именем эксперта и слотом созвона — без «повисания» между линиями.</div>
+    <div class="muted" style="font-size:12.8px;line-height:1.6">Режим распределения настраивается в «Автоматизациях»: по загрузке, по очереди или по сменам. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога. Клиенту в тот же момент уходит сообщение-мост с именем эксперта и слотом созвона — без «повисания» между линиями.</div>
   </div>`;
+  $$('[data-sched]', root).forEach(btn => btn.addEventListener('click', () => {
+    const b = STATE.brokers.find(x => x.id === btn.dataset.sched);
+    const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+    modal({
+      title: 'Расписание · ' + b.name,
+      sub: 'Смены учитываются автораспределением в режиме «по сменам»',
+      body: `
+        <div class="lp-sec" style="margin-top:0">Рабочие дни</div>
+        <div style="display:flex;gap:6px;margin-bottom:14px">${days.map((d, i) => `<button type="button" class="btn btn-sm day-chip ${(b.schedule?.days || []).includes(i + 1) ? 'btn-accent' : ''}" data-d="${i + 1}">${d}</button>`).join('')}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>С</label><input id="schFrom" type="time" value="${b.schedule?.from || '09:00'}"></div>
+          <div class="form-row"><label>До</label><input id="schTo" type="time" value="${b.schedule?.to || '20:00'}"></div>
+        </div>
+        <div class="form-row"><label>Лимит лидов в работе</label><input id="schCap" type="number" value="${b.capacity}"></div>`,
+      actions: [
+        { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+          const daysSel = $$('.day-chip.btn-accent', bd).map(x => +x.dataset.d);
+          await api.patch('/brokers/' + b.id, { schedule: { days: daysSel, from: $('#schFrom', bd).value, to: $('#schTo', bd).value }, capacity: +$('#schCap', bd).value });
+          await loadState();
+          render();
+        } },
+        { label: 'Отмена' },
+      ],
+    });
+    $$('.day-chip').forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('btn-accent')));
+  }));
 };
+
+/* брокер на смене? (зеркало серверной логики) */
+function isOnShift(b) {
+  const now = new Date();
+  const day = now.getDay() === 0 ? 7 : now.getDay();
+  const sch = b.schedule || {};
+  if (sch.days && !sch.days.includes(day)) return false;
+  const hm = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
+  return !(sch.from && hm < toMin(sch.from)) && !(sch.to && hm >= toMin(sch.to));
+}
 
 /* ---------------- АНАЛИТИКА ---------------- */
 PAGES.analytics = async (root) => {

@@ -62,14 +62,39 @@ function send(db, lead, text, via, opts = {}) {
   return m;
 }
 
+/* ---------- автораспределение по брокерам ---------- */
+function brokerOnShift(b) {
+  const now = new Date();
+  const day = now.getDay() === 0 ? 7 : now.getDay(); // 1..7, пн=1
+  const s = b.schedule || {};
+  if (s.days && !s.days.includes(day)) return false;
+  const hm = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
+  if (s.from && hm < toMin(s.from)) return false;
+  if (s.to && hm >= toMin(s.to)) return false;
+  return true;
+}
+
+function pickBroker(db, lead) {
+  const mode = (db.settings.automations || {}).assignMode || 'load';
+  let pool = db.brokers.filter(b => b.geo === lead.geo);
+  if (!pool.length) pool = db.brokers.slice();
+  if (mode === 'shift') {
+    const onShift = pool.filter(brokerOnShift);
+    if (onShift.length) pool = onShift; // вне смен — fallback на всех, лид не виснет
+  }
+  if (mode === 'roundrobin') {
+    const a = db.settings.automations;
+    a.rrCursor = (a.rrCursor + 1) % pool.length;
+    return pool[a.rrCursor];
+  }
+  return pool.sort((a, b) => (a.load / a.capacity) - (b.load / b.capacity))[0];
+}
+
 /* ---------- передача брокеру ---------- */
 function handover(db, lead, brokerId) {
   let broker = brokerId ? db.brokers.find(b => b.id === brokerId) : null;
-  if (!broker) {
-    broker = db.brokers
-      .filter(b => b.geo === lead.geo)
-      .sort((a, b) => (a.load / a.capacity) - (b.load / b.capacity))[0] || db.brokers[0];
-  }
+  if (!broker) broker = pickBroker(db, lead);
   lead.broker = broker.id;
   lead.stage = 'handover';
   broker.load += 1;
@@ -176,6 +201,25 @@ function startCampaign(db, cmp) {
   store.save();
 }
 
+/* ---------- напоминания о встречах ---------- */
+function tickMeetings(db) {
+  const hrs = (db.settings.automations || {}).meetingReminderHrs;
+  if (!hrs) return;
+  const nowT = Date.now();
+  for (const mt of db.meetings || []) {
+    if (mt.status !== 'scheduled' || mt.reminded) continue;
+    if (mt.at - nowT > 0 && mt.at - nowT <= hrs * 3600e3) {
+      const lead = db.leads.find(l => l.id === mt.leadId);
+      if (!lead) continue;
+      const broker = db.brokers.find(b => b.id === mt.brokerId);
+      const when = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      send(db, lead, `${lead.name.split(' ')[0]}, напоминаю: сегодня в ${when} — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${mt.link ? ' Ссылка: ' + mt.link : ''} До связи!`, 'ai');
+      mt.reminded = true;
+      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Напоминание о встрече отправлено: ${lead.name} (${when})` });
+    }
+  }
+}
+
 function tickCampaigns(db) {
   const nowT = Date.now();
   for (const cmp of db.campaigns) {
@@ -251,7 +295,10 @@ function inbound(db, lead, text, opts = {}) {
   }
   const wasQualified = ['qualified', 'handover', 'viewing', 'deal'].includes(lead.stage);
   const { reply } = ai.onInbound(db, lead, text);
-  if (!wasQualified && lead.stage === 'qualified' && module.exports.onQualified) module.exports.onQualified(db, lead);
+  if (!wasQualified && lead.stage === 'qualified') {
+    if (module.exports.onQualified) module.exports.onQualified(db, lead);
+    if ((db.settings.automations || {}).autoHandover) handover(db, lead); // авто-распределение на брокера
+  }
   if (reply) {
     /* LLM: 'auto' — только реальные входящие (симуляция не жжёт токены),
        'llm' — всегда, 'core' — никогда. Ошибка/таймаут → скрипт ядра. */
@@ -300,10 +347,11 @@ function startLoop() {
       const db = store.get();
       tickChains(db);
       tickCampaigns(db);
+      tickMeetings(db);
       tickSimulator(db);
       store.save();
     } catch (e) { console.error('[engine]', e); }
   }, 5000);
 }
 
-module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop };
+module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift };
