@@ -43,7 +43,45 @@ const DEFAULT_PASS = 'lumen2026';
     console.log(`[auth] пароль по умолчанию: ${DEFAULT_PASS} — смените в «Подключениях»`);
   }
   if (db.settings.ai.provider === 'mock') { db.settings.ai.provider = 'auto'; store.save(); }
+  /* миграция: мост лидов + база рекламных объявлений */
+  if (!db.settings.hooks) db.settings.hooks = { secret: crypto.randomBytes(10).toString('hex'), outboundUrl: '' };
+  if (!db.ads) db.ads = [
+    { adId: '120211478921230508', name: 'Дубай · Мортгейдж 0% · видео-тур JVC', adsetName: 'RU 30-55 инвесторы', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
+    { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', adsetName: 'RU широкая', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
+    { adId: '120209934110255019', name: 'Бали · виллы под сдачу · рилс', adsetName: 'RU номады', campaignName: 'Bali CTWA Август', geo: 'bali' },
+  ];
+  if (!db.intakeLog) db.intakeLog = [];
+  store.save();
 }
+
+/* мэтчинг лида на объявление по ad_id из вебхука */
+function matchAd(db, lead) {
+  if (!lead.ads || !lead.ads.adId) return;
+  const ad = db.ads.find(a => String(a.adId) === String(lead.ads.adId));
+  if (ad) {
+    lead.ads.adName = ad.name;
+    lead.ads.adsetName = ad.adsetName;
+    lead.ads.campaignName = ad.campaignName;
+    lead.ads.matched = true;
+    if (ad.geo && !lead.geoLocked) lead.geo = ad.geo;
+  } else lead.ads.matched = false;
+}
+
+/* исходящий мост: квал/передача → POST наружу (Albato примет и разнесёт дальше) */
+function notifyOutbound(db, lead, event) {
+  const url = db.settings.hooks.outboundUrl;
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event, at: Date.now(),
+      lead: { id: lead.id, name: lead.name, phone: lead.phone, geo: lead.geo, stage: lead.stage, score: lead.score, quals: lead.quals, summary: lead.summary, ads: lead.ads || null, source: lead.source },
+    }),
+  }).catch(e => console.error('[outbound]', e.message));
+}
+engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
+engine.onHandover = (db, lead) => notifyOutbound(db, lead, 'lead.handover');
 
 function getSession(req) {
   const cookie = req.headers.cookie || '';
@@ -144,14 +182,65 @@ const server = http.createServer(async (req, res) => {
           const phone = '+' + wam.from.replace(/\D/g, '');
           let lead = db.leads.find(l => l.phone.replace(/\D/g, '') === wam.from.replace(/\D/g, ''));
           if (!lead) {
-            lead = { id: store.nextId('ld'), name: changes.contacts?.[0]?.profile?.name || phone, phone, geo: db.settings.agency.geos[0], lang: 'ru', tz: 4, stage: 'new', score: 0, source: 'wa_inbound', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['входящий'], numberId: null };
+            lead = { id: store.nextId('ld'), name: changes.contacts?.[0]?.profile?.name || phone, phone, geo: db.settings.agency.geos[0], lang: 'ru', tz: 4, stage: 'new', score: 0, source: 'wa_inbound', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['входящий'], numberId: null, ads: null };
+            /* CTWA: реферал несёт id объявления — атрибуция из коробки */
+            const ref = wam.referral;
+            if (ref && (ref.source_id || ref.ctwa_clid)) {
+              lead.source = 'ctwa';
+              lead.ads = { adId: ref.source_id || null, ctwaClid: ref.ctwa_clid || null, headline: ref.headline || null };
+              matchAd(db, lead);
+            }
             db.leads.push(lead);
-            ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Входящий WhatsApp: ${lead.name}` });
+            ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Входящий WhatsApp: ${lead.name}${lead.ads && lead.ads.matched ? ' · ' + lead.ads.adName : ''}` });
           }
           engine.inbound(db, lead, wam.text.body);
         }
       } catch (e) { console.error('[webhook]', e); }
       json(res, 200, { ok: true }); return;
+    }
+
+    /* ---------------- мост приёма лидов (Albato / Make / любой интегратор) ---------------- */
+    if (p === '/hooks/lead' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      /* гибкий маппинг полей — интеграторы шлют по-разному */
+      const pick = (...keys) => { for (const k of keys) { if (b[k] != null && String(b[k]).trim()) return String(b[k]).trim(); } return null; };
+      const name = pick('name', 'full_name', 'fullName', 'first_name', 'имя') || 'Без имени';
+      const phone = pick('phone', 'phone_number', 'phoneNumber', 'tel', 'телефон');
+      if (!phone) return json(res, 400, { error: 'phone required' });
+      const adId = pick('ad_id', 'adId', 'ad', 'utm_content');
+      const entry = { at: Date.now(), name, phone, adId, raw: Object.keys(b).slice(0, 20) };
+
+      const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      let lead = db.leads.find(l => norm(l.phone) === norm(phone));
+      if (lead) {
+        entry.result = 'repeat';
+        lead.tags = [...new Set([...(lead.tags || []), 'повторная заявка'])];
+        if (adId && !(lead.ads && lead.ads.adId)) { lead.ads = { adId, adsetId: pick('adset_id'), campaignId: pick('campaign_id') }; matchAd(db, lead); }
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка: ${lead.name} — дубль не создан, карточка обогащена` });
+      } else {
+        lead = {
+          id: store.nextId('ld'), name, phone,
+          geo: pick('geo', 'direction') || db.settings.agency.geos[0],
+          lang: pick('lang', 'language') || 'ru', tz: 4, stage: 'new', score: 0,
+          source: pick('source', 'src') || 'meta_form',
+          createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+          quals: { purpose: null, timeline: null, budget: null, type: null },
+          ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
+          broker: null, summary: null, tags: ['интегратор'], numberId: null,
+          ads: adId ? { adId, adsetId: pick('adset_id', 'adsetId'), campaignId: pick('campaign_id', 'campaignId'), formName: pick('form_name', 'form') } : null,
+        };
+        matchAd(db, lead);
+        db.leads.push(lead);
+        entry.result = 'created';
+        entry.leadId = lead.id;
+        const adTxt = lead.ads && lead.ads.matched ? ` · объявление: ${lead.ads.adName}` : (adId ? ' · объявление не в базе' : '');
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Лид из интегратора: ${lead.name} · ${db.settings.geoNames[lead.geo] || lead.geo}${adTxt}` });
+      }
+      db.intakeLog.unshift(entry);
+      if (db.intakeLog.length > 200) db.intakeLog.length = 200;
+      store.save();
+      return json(res, 200, { ok: true, leadId: lead.id, result: entry.result, adMatched: !!(lead.ads && lead.ads.matched) });
     }
 
     /* ---------------- auth ---------------- */
@@ -372,6 +461,65 @@ const server = http.createServer(async (req, res) => {
       if (b.at) mt.at = +b.at;
       store.save();
       return json(res, 200, mt);
+    }
+
+    /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
+    if (p === '/api/ads' && req.method === 'GET') {
+      const stats = db.ads.map(ad => {
+        const mine = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
+        return Object.assign({}, ad, {
+          leads: mine.length,
+          qualified: mine.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage)).length,
+          deals: mine.filter(l => l.stage === 'deal').length,
+        });
+      });
+      const unmatched = db.leads.filter(l => l.ads && l.ads.adId && !l.ads.matched)
+        .map(l => ({ leadId: l.id, name: l.name, adId: l.ads.adId }));
+      return json(res, 200, { ads: stats, unmatched, intakeLog: db.intakeLog.slice(0, 30), hooks: { secret: db.settings.hooks.secret, outboundUrl: db.settings.hooks.outboundUrl } });
+    }
+    if (p === '/api/ads/import' && req.method === 'POST') {
+      const b = await readBody(req);
+      /* принимаем rows: [{adId,name,adsetName,campaignName,geo}] ИЛИ csv-текст */
+      let rows = b.rows || [];
+      if (!rows.length && b.csv) {
+        const lines = b.csv.split('\n').map(x => x.trim()).filter(Boolean);
+        const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+        const head = lines[0].toLowerCase().split(sep).map(h => h.trim());
+        const col = (names) => head.findIndex(h => names.some(n => h.includes(n)));
+        const ci = { adId: col(['ad_id', 'adid', 'id объявления', 'ад id']), name: col(['name', 'объявлени', 'ad name']), adset: col(['adset', 'группа']), camp: col(['campaign', 'кампани']), geo: col(['geo', 'гео', 'направлени']) };
+        for (const line of lines.slice(1)) {
+          const c = line.split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
+          if (ci.adId < 0 || !c[ci.adId]) continue;
+          rows.push({ adId: c[ci.adId], name: ci.name >= 0 ? c[ci.name] : '', adsetName: ci.adset >= 0 ? c[ci.adset] : '', campaignName: ci.camp >= 0 ? c[ci.camp] : '', geo: ci.geo >= 0 ? (c[ci.geo] || '').toLowerCase() : '' });
+        }
+      }
+      let added = 0, updated = 0;
+      for (const r of rows) {
+        if (!r.adId) continue;
+        const ex = db.ads.find(a => String(a.adId) === String(r.adId));
+        if (ex) { Object.assign(ex, { name: r.name || ex.name, adsetName: r.adsetName || ex.adsetName, campaignName: r.campaignName || ex.campaignName, geo: r.geo || ex.geo }); updated++; }
+        else { db.ads.push({ adId: String(r.adId), name: r.name || 'Объявление ' + r.adId, adsetName: r.adsetName || '', campaignName: r.campaignName || '', geo: r.geo || '' }); added++; }
+      }
+      /* ре-мэтчинг всех лидов с атрибуцией */
+      let rematched = 0;
+      for (const l of db.leads) {
+        if (l.ads && l.ads.adId) { const was = l.ads.matched; matchAd(db, l); if (!was && l.ads.matched) rematched++; }
+      }
+      ai.pushEvent(db, { type: 'merge', text: `База объявлений: +${added} новых, ${updated} обновлено, домэтчено лидов: ${rematched}` });
+      store.save();
+      return json(res, 200, { added, updated, rematched, total: db.ads.length });
+    }
+    if ((m = p.match(/^\/api\/ads\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.ads = db.ads.filter(a => String(a.adId) !== m[1]);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (p === '/api/hooks' && req.method === 'PATCH') {
+      const b = await readBody(req);
+      if (b.outboundUrl !== undefined) db.settings.hooks.outboundUrl = String(b.outboundUrl).trim();
+      if (b.rotateSecret) db.settings.hooks.secret = crypto.randomBytes(10).toString('hex');
+      store.save();
+      return json(res, 200, { secret: db.settings.hooks.secret, outboundUrl: db.settings.hooks.outboundUrl });
     }
 
     /* ---------------- дубли ---------------- */

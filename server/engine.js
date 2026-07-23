@@ -74,6 +74,7 @@ function handover(db, lead, brokerId) {
   lead.stage = 'handover';
   broker.load += 1;
   if (!lead.summary) lead.summary = ai.buildSummary(db, lead);
+  if (module.exports.onHandover) module.exports.onHandover(db, lead);
   const tpl = db.templates.find(t => t.id === 'tpl_slot');
   if (tpl) send(db, lead, renderTemplate(db, tpl, lead), 'ai');
   ai.pushEvent(db, { type: 'handover', leadId: lead.id, text: `${lead.name} передан брокеру: ${broker.name} (саммари готово)` });
@@ -248,7 +249,9 @@ function inbound(db, lead, text, opts = {}) {
   if (wasWake) {
     for (const cmp of db.campaigns) if (cmp.recipients.includes(lead.id)) cmp.stats.replied += 1;
   }
+  const wasQualified = ['qualified', 'handover', 'viewing', 'deal'].includes(lead.stage);
   const { reply } = ai.onInbound(db, lead, text);
+  if (!wasQualified && lead.stage === 'qualified' && module.exports.onQualified) module.exports.onQualified(db, lead);
   if (reply) {
     /* LLM: 'auto' — только реальные входящие (симуляция не жжёт токены),
        'llm' — всегда, 'core' — никогда. Ошибка/таймаут → скрипт ядра. */
@@ -268,11 +271,13 @@ function inbound(db, lead, text, opts = {}) {
           if (!l2.quals[axis]) { l2.quals[axis] = v; applied++; }
         }
         if (applied) {
+          const was = ['qualified', 'handover', 'viewing', 'deal'].includes(l2.stage);
           ai.screen(fresh, l2);
           if (l2.stage === 'qualified' && !l2.summary) {
             l2.summary = ai.buildSummary(fresh, l2);
             ai.pushEvent(fresh, { type: 'qualified', leadId: l2.id, text: `${l2.name} квалифицирован ИИ (LLM) — готов к передаче брокеру` });
           }
+          if (!was && l2.stage === 'qualified' && module.exports.onQualified) module.exports.onQualified(fresh, l2);
         }
         send(fresh, l2, out.text, 'ai');
       } else {

@@ -39,6 +39,8 @@ const I = {
   cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   chev: '<path d="M9 6l6 6-6 6"/>',
 };
@@ -60,6 +62,136 @@ document.addEventListener('click', (e) => {
   if (h) h.parentElement.classList.toggle('open');
 });
 
+/* ============================================================
+   Кастомные контролы (золотое правило: никаких нативных
+   дропдаунов/календарей — всё в стилистике продукта)
+   ============================================================ */
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const MONTHS_N = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+function closeAllPickers(except) {
+  $$('.cs.open, .dtp.open').forEach(x => { if (x !== except) x.classList.remove('open'); });
+}
+document.addEventListener('mousedown', (e) => { if (!e.target.closest('.cs') && !e.target.closest('.dtp')) closeAllPickers(); });
+
+function enhanceControls(root) {
+  /* селекты → стилизованный дропдаун (нативный остаётся хранителем значения) */
+  $$('select', root).forEach(sel => {
+    if (sel.dataset.enh || sel.closest('.cs')) return;
+    sel.dataset.enh = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'cs';
+    if (sel.style.width) { wrap.style.width = sel.style.width; sel.style.width = ''; }
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.chev, 2)}</span></button>`);
+    const list = el('<div class="cs-list"></div>');
+    wrap.append(btn, list);
+    const sync = () => { btn.querySelector('.cs-val').textContent = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.trim() : ''; };
+    const build = () => {
+      list.innerHTML = Array.from(sel.options).map((o, i) =>
+        `<div class="cs-opt ${o.selected ? 'sel' : ''} ${o.disabled ? 'dis' : ''}" data-i="${i}">${esc(o.textContent.trim())}${o.selected ? ic(I.check) : ''}</div>`).join('');
+      $$('.cs-opt', list).forEach(x => x.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const o = sel.options[+x.dataset.i];
+        if (o.disabled) return;
+        sel.value = o.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        sync();
+        wrap.classList.remove('open');
+      }));
+    };
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (wrap.classList.contains('open')) wrap.classList.remove('open');
+      else { closeAllPickers(wrap); build(); wrap.classList.add('open'); }
+    });
+    sync();
+  });
+
+  /* дата → свой календарь */
+  $$('input[type="date"]', root).forEach(inp => {
+    if (inp.dataset.enh) return;
+    inp.dataset.enh = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'dtp';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.cal)}</span></button>`);
+    const pop = el('<div class="dtp-pop"></div>');
+    wrap.append(btn, pop);
+    const label = () => {
+      const [y, mo, d] = (inp.value || '').split('-').map(Number);
+      btn.querySelector('.cs-val').textContent = d ? `${d} ${MONTHS[mo - 1]} ${y}` : 'Выбрать дату';
+    };
+    let view = null;
+    const build = () => {
+      const cur = inp.value ? new Date(inp.value + 'T12:00') : new Date();
+      if (!view) view = { y: cur.getFullYear(), m: cur.getMonth() };
+      const first = new Date(view.y, view.m, 1);
+      const shift = (first.getDay() + 6) % 7;
+      const days = new Date(view.y, view.m + 1, 0).getDate();
+      const today = new Date();
+      const isSel = (d) => inp.value === `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isToday = (d) => today.getFullYear() === view.y && today.getMonth() === view.m && today.getDate() === d;
+      pop.innerHTML = `
+        <div class="dtp-head">
+          <button type="button" class="dtp-nav" data-d="-1">${ic(I.chev, 2)}</button>
+          <b>${MONTHS_N[view.m]} ${view.y}</b>
+          <button type="button" class="dtp-nav" data-d="1">${ic(I.chev, 2)}</button>
+        </div>
+        <div class="dtp-grid">
+          ${DOW.map(d => `<span class="dtp-dow">${d}</span>`).join('')}
+          ${Array.from({ length: shift }, () => '<span></span>').join('')}
+          ${Array.from({ length: days }, (_, i) => `<button type="button" class="dtp-day ${isSel(i + 1) ? 'sel' : ''} ${isToday(i + 1) ? 'today' : ''}" data-day="${i + 1}">${i + 1}</button>`).join('')}
+        </div>`;
+      $$('.dtp-nav', pop).forEach(b => b.addEventListener('click', () => { view.m += +b.dataset.d; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } build(); }));
+      $$('.dtp-day', pop).forEach(b => b.addEventListener('click', () => {
+        inp.value = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(b.dataset.day).padStart(2, '0')}`;
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        label();
+        wrap.classList.remove('open');
+      }));
+    };
+    btn.addEventListener('click', () => {
+      if (wrap.classList.contains('open')) wrap.classList.remove('open');
+      else { closeAllPickers(wrap); view = null; build(); wrap.classList.add('open'); }
+    });
+    label();
+  });
+
+  /* время → слоты по 30 минут */
+  $$('input[type="time"]', root).forEach(inp => {
+    if (inp.dataset.enh) return;
+    inp.dataset.enh = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'dtp';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.clock)}</span></button>`);
+    const pop = el('<div class="dtp-pop dtp-time"></div>');
+    wrap.append(btn, pop);
+    const label = () => { btn.querySelector('.cs-val').textContent = inp.value || 'Время'; };
+    const build = () => {
+      const slots = [];
+      for (let h = 8; h <= 21; h++) for (const mm of ['00', '30']) slots.push(`${String(h).padStart(2, '0')}:${mm}`);
+      pop.innerHTML = slots.map(s => `<button type="button" class="dtp-slot ${inp.value === s ? 'sel' : ''}">${s}</button>`).join('');
+      $$('.dtp-slot', pop).forEach(b => b.addEventListener('click', () => {
+        inp.value = b.textContent;
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        label();
+        wrap.classList.remove('open');
+      }));
+    };
+    btn.addEventListener('click', () => {
+      if (wrap.classList.contains('open')) wrap.classList.remove('open');
+      else { closeAllPickers(wrap); build(); wrap.classList.add('open'); const sel = pop.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'center' }); }
+    });
+    label();
+  });
+}
+
 const NAV = {
   overview:  { name: 'Обзор', icon: I.grid, sub: 'Живая картина отдела продаж' },
   funnel:    { name: 'Воронка', icon: I.funnel, sub: 'Канбан лидов по стадиям' },
@@ -68,6 +200,7 @@ const NAV = {
   sequences: { name: 'Цепочки касаний', icon: I.chain, sub: '7 касаний / 18 дней для молчунов' },
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
   meetings:  { name: 'Встречи', icon: I.cal, sub: 'Слоты с экспертами · WhatsApp-подтверждения' },
+  ads:       { name: 'Реклама', icon: I.target, sub: 'Мост приёма лидов (Albato) · атрибуция к объявлениям' },
   numbers:   { name: 'Номера', icon: I.sim, sub: 'Пул WhatsApp-номеров: качество, лимиты, прогрев' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: 'Utility и Marketing шаблоны Cloud API' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: 'Команда экспертов и загрузка' },
@@ -164,6 +297,7 @@ function modal({ title, sub, body, actions, wide }) {
   });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) closeModal(); });
   document.body.appendChild(bd);
+  enhanceControls(bd);
   requestAnimationFrame(() => bd.classList.add('show'));
   return bd;
 }
@@ -218,6 +352,7 @@ function go(page) {
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
+  $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
   /* волна входа: анимации только при смене раздела, фоновые обновления без replay */
   const c = $('#content');
   c.classList.add('anim');
@@ -247,6 +382,7 @@ async function render() {
   if (!fn) return;
   try {
     await fn($('#content'));
+    enhanceControls($('#content'));
     if ($('#content').classList.contains('anim')) countUp($('#content'));
   } catch (e) {
     if (e.message === 'auth') return; // гейт уже показан
@@ -439,7 +575,6 @@ function wireKanbanDrag(root) {
       $$('.kb-col', board).forEach(c => c.classList.remove('drop'));
       if (col && col.dataset.stage && col.dataset.stage !== card.dataset.stage) {
         await api.patch('/leads/' + card.dataset.id, { stage: col.dataset.stage });
-        toast('Стадия обновлена', stageName(col.dataset.stage), true);
         render();
       }
       setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 50);
@@ -471,7 +606,6 @@ function openDupesModal(groups) {
   $$('.modal [data-merge]').forEach(b => b.addEventListener('click', async () => {
     const g = groups[+b.dataset.merge];
     await api.post('/duplicates/merge', { keepId: g[0].id, mergeIds: g.slice(1).map(x => x.id) });
-    toast('Дубли объединены', 'Переписка перенесена в основную карточку', true);
     closeModal();
     render();
   }));
@@ -512,8 +646,7 @@ PAGES.meetings = async (root) => {
     </div>`;
   $$('[data-mt]', root).forEach(b => b.addEventListener('click', async () => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
-    toast('Статус встречи обновлён', null, true);
-    PAGES.meetings(root);
+    render();
   }));
 };
 
@@ -566,7 +699,7 @@ async function openLeadModal(id) {
       <select id="mStage" style="width:100%">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select>`,
     actions: [
       { label: 'Открыть диалог', cls: 'btn-accent', onClick: () => { PAGE_STATE.inboxLead = l.id; go('inbox'); } },
-      { label: 'Сохранить стадию', onClick: async (bd) => { await api.patch('/leads/' + l.id, { stage: $('#mStage', bd).value }); toast('Стадия обновлена', null, true); render(); } },
+      { label: 'Сохранить стадию', onClick: async (bd) => { await api.patch('/leads/' + l.id, { stage: $('#mStage', bd).value }); render(); } },
       { label: 'Закрыть' },
     ],
   });
@@ -652,23 +785,46 @@ async function renderChat(id, rebuild) {
   });
 
   const panel = $('#leadPanel');
+  /* карточка «для ленивых»: одно главное действие по контексту, всё остальное — в один клик */
+  const primary = l.stage === 'qualified'
+    ? `<button class="btn btn-accent lp-primary" id="handoverBtn">${ic(I.handover)}Передать брокеру</button>`
+    : ['handover', 'viewing'].includes(l.stage)
+      ? `<button class="btn btn-accent lp-primary" id="meetBtn">${ic(I.cal)}Назначить встречу</button>`
+      : l.stage === 'deal'
+        ? `<div class="badge ok lp-primary" style="justify-content:center">${ic(I.flame)}Сделка закрыта</div>`
+        : `<div class="lp-ai-state">${ic(I.spark)}<div><b>ИИ ведёт диалог</b><span>${4 - l.axesFilled ? `осталось выяснить: ${4 - l.axesFilled} из 4` : 'готовит передачу'}</span></div></div>`;
+  const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   panel.innerHTML = `
-    <div class="lp-name">${esc(l.name)}</div>
-    <div class="lp-sub">${l.geoName} · score ${l.score} · ${stageName(l.stage)}</div>
-    <div class="set-row" style="padding:8px 0">
-      <div class="sp"><div class="sl" style="font-size:12.5px">Автопилот ИИ</div><div class="sd">первая линия отвечает сама</div></div>
-      <label class="switch"><input type="checkbox" id="aiToggle" ${l.ai.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+    <div style="display:flex;align-items:center;gap:11px">
+      <div style="flex:1;min-width:0"><div class="lp-name">${esc(l.name)}</div>
+      <div class="lp-sub" style="margin-bottom:0"><span class="lp-phone" id="copyPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName}</div></div>
+      ${scoreRing(l.score)}
+    </div>
+    ${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
+    <div style="margin:14px 0 10px">${primary}</div>
+    <div class="lp-quick">
+      <a class="btn btn-sm" href="https://wa.me/${l.phone.replace(/\D/g, '')}" target="_blank" title="Открыть в WhatsApp">${ic(I.chat)}WA</a>
+      ${!['handover', 'viewing', 'deal'].includes(l.stage) ? `<button class="btn btn-sm" id="meetBtn" title="Назначить встречу">${ic(I.cal)}</button>` : ''}
+      ${l.stage === 'qualified' ? '' : !['deal'].includes(l.stage) && l.axesFilled === 4 ? `<button class="btn btn-sm" id="handoverBtn">${ic(I.handover)}</button>` : ''}
+      ${STATE.settings.demo.simulateReplies ? `<button class="btn btn-sm" id="simBtn" title="Демо: ответ клиента">${ic(I.bolt)}</button>` : ''}
+      <button class="btn btn-sm btn-ghost" id="reScreenBtn" title="Перечитать переписку">${ic(I.eye)}</button>
+      <span class="tb-spacer"></span>
+      <label class="switch" title="Автопилот ИИ"><input type="checkbox" id="aiToggle" ${l.ai.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
     </div>
     <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
-    ${axesHtml(l)}
+    <div class="axr-list">
+      ${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}">
+        <span class="axr-k">${axName[a]}</span>
+        <span class="axr-v">${q ? esc(q.value) : '—'}</span>
+        ${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}
+      </div>`; }).join('')}
+    </div>
+    ${Object.values(l.quals).some(q => q && q.quote) ? coll('Цитаты клиента', Object.keys(axName).map(a => { const q = l.quals[a]; return q && q.quote ? `<div class="axis done" style="margin-top:8px"><div class="ax-name" style="font-size:10.5px;color:var(--ink-3);font-weight:600">${axName[a]}</div><div class="ax-quote">«${esc(q.quote)}»</div></div>` : ''; }).join(''), { open: false, icon: I.chat }) : ''}
     ${l.summary ? `<div class="lp-sec">Саммари для брокера</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
-    <div class="lp-actions">
-      ${!['handover', 'viewing', 'deal'].includes(l.stage) ? `<button class="btn btn-accent" id="handoverBtn">${ic(I.handover)}Передать брокеру</button>` : `<div class="badge ok" style="justify-content:center">${ic(I.check)}У брокера: ${esc(l.brokerName || '')}</div>`}
-      <button class="btn" id="meetBtn">${ic(I.cal)}Назначить встречу</button>
-      ${STATE.settings.demo.simulateReplies ? `<button class="btn" id="simBtn">${ic(I.chat)}Демо: ответ клиента</button>` : ''}
-      <button class="btn btn-ghost" id="reScreenBtn">Перечитать переписку (скрининг)</button>
-    </div>`;
-  $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); toast(e.target.checked ? 'ИИ снова ведёт диалог' : 'ИИ на паузе — лид на менеджере', null, true); });
+    ${l.brokerName ? `<div class="badge ok" style="margin-top:12px">${ic(I.check)}У брокера: ${esc(l.brokerName)}</div>` : ''}`;
+  const cp = $('#copyPhone');
+  if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
+  $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); });
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', async () => { await api.post(`/leads/${id}/handover`); toast('Лид передан брокеру', 'Саммари и слот отправлены', true); renderChat(id, true); });
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));
@@ -678,7 +834,7 @@ async function renderChat(id, rebuild) {
     await api.post(`/leads/${id}/inbound`, { text: pool[Math.floor(Math.random() * pool.length)] });
     renderChat(id, false);
   });
-  $('#reScreenBtn').addEventListener('click', async () => { await api.post(`/leads/${id}/analyze`); toast('Скрининг перечитал переписку', null, true); renderChat(id, false); });
+  $('#reScreenBtn').addEventListener('click', async () => { await api.post(`/leads/${id}/analyze`); renderChat(id, false); });
 }
 
 /* ---------------- ИИ-КВАЛИФИКАТОР ---------------- */
@@ -775,7 +931,6 @@ PAGES.sequences = async (root) => {
   $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => {
     seq.steps[+sw.dataset.step].active = sw.checked;
     await api.patch('/sequences/' + seq.id, { steps: seq.steps });
-    toast('Цепочка обновлена', null, true);
   }));
 };
 
@@ -846,7 +1001,6 @@ function wireCampaigns(root) {
   $$('[data-cmp] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-cmp]').dataset.cmp;
     await api.post(`/campaigns/${id}/${b.dataset.act}`);
-    toast({ start: 'Кампания запущена', pause: 'Пауза', resume: 'Продолжаем', stop: 'Остановлена' }[b.dataset.act], null, true);
     PAGES.wake.refresh();
   }));
 }
@@ -877,13 +1031,69 @@ function newCampaignModal() {
           batchSize: +$('#cBatch', bd).value, pauseMin: [+$('#cP1', bd).value, +$('#cP2', bd).value],
           window: [+$('#cW1', bd).value, +$('#cW2', bd).value],
         });
-        toast('Кампания создана', 'Запустите её, когда будете готовы', true);
         PAGES.wake.refresh();
       } },
       { label: 'Отмена' },
     ],
   });
 }
+
+/* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
+PAGES.ads = async (root) => {
+  const d = await api.get('/ads');
+  const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
+  root.innerHTML = `
+    <div class="two-col">
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.link)}Мост приёма лидов<span class="sub">Albato / Make / любой интегратор</span></div>
+          <div class="form-row"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
+            <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${hookUrl}</code>
+            <button class="btn btn-sm" id="copyHook">${ic(I.copy)}</button></div></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin:4px 0 12px">
+            Поля (гибкий маппинг): <b>name</b>, <b>phone</b> (обязательно), geo, source, <b>ad_id</b>, adset_id, campaign_id, form_name.
+            Дубли по телефону не создаются — карточка обогащается. Лид с ad_id мэтчится на базу объявлений автоматически.
+          </div>
+          <div class="form-row"><label>Исходящий мост: квал/передача → POST на URL (в Albato → любая CRM клиента)</label>
+            <input id="outUrl" placeholder="https://h.albato.ru/wh/…" value="${esc(d.hooks.outboundUrl || '')}"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-accent btn-sm" id="saveOut">Сохранить</button>
+            <button class="btn btn-sm" id="rotateKey">Сменить секрет</button>
+          </div>
+        </div>
+        <div class="glass card">
+          <div class="card-title">${ic(I.doc)}Загрузка объявлений таблицей</div>
+          <div class="muted" style="font-size:11.8px;margin-bottom:8px">Вставь строки из таблицы (CSV / из Excel). Колонки: <code class="pill">ad_id</code> <code class="pill">name</code> <code class="pill">adset</code> <code class="pill">campaign</code> <code class="pill">geo</code> — порядок любой, определяется по заголовку.</div>
+          <textarea id="adsCsv" style="min-height:110px;font-family:Menlo,monospace;font-size:11.5px" placeholder="ad_id,name,adset,campaign,geo
+120211478921230508,Дубай · видео-тур JVC,RU 30-55,DXB Sept,dubai"></textarea>
+          <button class="btn btn-accent" id="importAds" style="margin-top:10px">Импортировать и смэтчить</button>
+        </div>
+      </div>
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.target)}Объявления · лиды · квалы<span class="sub">${d.ads.length} в базе</span></div>
+          <table class="tbl"><thead><tr><th>Объявление</th><th>Лиды</th><th>Квалы</th><th>Сделки</th></tr></thead><tbody>
+            ${d.ads.map(a => `<tr>
+              <td><b>${esc(a.name)}</b><div class="muted" style="font-size:10.5px">${esc(a.campaignName || '')}${a.adsetName ? ' · ' + esc(a.adsetName) : ''} · <code class="pill" style="font-size:9.5px">${esc(a.adId)}</code></div></td>
+              <td><b>${a.leads}</b></td>
+              <td>${a.qualified}${a.leads ? ` <span class="muted" style="font-size:10px">(${Math.round(a.qualified / a.leads * 100)}%)</span>` : ''}</td>
+              <td>${a.deals}</td>
+            </tr>`).join('') || '<tr><td colspan="4" class="empty">Объявлений нет — загрузите таблицей слева</td></tr>'}
+          </tbody></table>
+          ${d.unmatched.length ? coll('Лиды с неизвестным ad_id', d.unmatched.map(x => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(x.name)}</div><div class="sd">ad_id: ${esc(x.adId)} — добавьте объявление в базу, мэтчинг пройдёт сам</div></div></div>`).join(''), { open: false, count: d.unmatched.length, icon: I.x }) : ''}
+        </div>
+        ${coll('Журнал приёма', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: true, count: d.intakeLog.length, icon: I.bolt })}
+      </div>
+    </div>`;
+  $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
+  $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
+  $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });
+  $('#importAds').addEventListener('click', async () => {
+    const r = await api.post('/ads/import', { csv: $('#adsCsv').value });
+    toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
+    render();
+  });
+};
 
 /* ---------------- НОМЕРА ---------------- */
 PAGES.numbers = async (root) => {
@@ -929,8 +1139,7 @@ PAGES.numbers = async (root) => {
     </div>`;
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     await api.patch('/numbers/' + b.closest('[data-num]').dataset.num, { state: b.dataset.act });
-    toast('Статус номера обновлён', null, true);
-    PAGES.numbers(root);
+    render();
   }));
 };
 
@@ -957,8 +1166,7 @@ PAGES.templates = async (root) => {
     actions: [
       { label: 'Отправить на модерацию', cls: 'btn-accent', onClick: async (bd) => {
         await api.post('/templates', { name: $('#tName', bd).value, category: $('#tCat', bd).value, body: $('#tBody', bd).value });
-        toast('Шаблон отправлен на модерацию', null, true);
-        PAGES.templates(root);
+        render();
       } },
       { label: 'Отмена' },
     ],
@@ -1108,7 +1316,7 @@ PAGES.settings = async (root) => {
     await loadState();
     render();
   });
-  $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); toast('Режим ИИ обновлён', null, true); loadState(); });
+  $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); loadState(); });
   $('#pwSave').addEventListener('click', async () => {
     const r = await fetch('/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current: $('#pwCur').value, next: $('#pwNext').value }) });
     const j = await r.json();
@@ -1143,7 +1351,6 @@ $('#newLeadBtn').addEventListener('click', () => {
         const name = $('#nlName', bd).value.trim();
         if (!name) { toast('Укажите имя'); return false; }
         await api.post('/leads', { name, phone: $('#nlPhone', bd).value.trim(), geo: $('#nlGeo', bd).value, source: $('#nlSrc', bd).value });
-        toast('Лид создан', 'Первое касание уйдёт автоматически', true);
         render();
       } },
       { label: 'Отмена' },
