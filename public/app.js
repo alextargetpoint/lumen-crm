@@ -43,6 +43,8 @@ const I = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   chev: '<path d="M9 6l6 6-6 6"/>',
+  building: '<path d="M3 21V5l7-3v19M10 21V8l8 2v11M3 21h18M6 8h1M6 12h1M6 16h1M14 13h1M14 17h1"/>',
+  layers: '<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
 };
 
 /* ---------- сворачиваемые группы (стекло-стиль, spring-раскрытие) ---------- */
@@ -224,6 +226,8 @@ const NAV = {
   overview:  { name: 'Обзор', icon: I.grid, sub: 'Живая картина отдела продаж' },
   funnel:    { name: 'Воронка', icon: I.funnel, sub: 'Канбан лидов по стадиям' },
   inbox:     { name: 'Диалоги', icon: I.chat, sub: 'WhatsApp-инбокс · ИИ-первая линия' },
+  properties: { name: 'Объекты', icon: I.building, sub: 'Библиотека проектов и материалов · источники данных' },
+  collections: { name: 'Подборки', icon: I.layers, sub: 'Веб-страница и PDF под клиента · отправка в чат' },
   qualifier: { name: 'ИИ-квалификатор', icon: I.spark, sub: 'Критерии, регламент и автопилот первой линии' },
   sequences: { name: 'Цепочки касаний', icon: I.chain, sub: '7 касаний / 18 дней для молчунов' },
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
@@ -313,7 +317,7 @@ function tmm(ts) { return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-di
 /* ---------- модалки/тосты ---------- */
 function modal({ title, sub, body, actions, wide }) {
   closeModal();
-  const bd = el(`<div class="modal-bd"><div class="modal glass" ${wide === 'card' ? 'style="width:980px"' : wide ? 'style="width:680px"' : ''}>
+  const bd = el(`<div class="modal-bd"><div class="modal glass ${wide === 'card' ? 'modal-card' : ''}" ${wide === 'card' ? 'style="width:980px"' : wide ? 'style="width:680px"' : ''}>
     <h3>${esc(title)}</h3>${sub ? `<div class="m-sub">${sub}</div>` : ''}
     <div class="m-body">${body || ''}</div>
     <div class="m-actions"></div>
@@ -644,6 +648,32 @@ function openDupesModal(groups) {
 /* ---------- встречи ---------- */
 PAGES.meetings = async (root) => {
   const list = await api.get('/meetings');
+  /* неделя календаря: смещение хранится в PAGE_STATE.calWeek */
+  const wk = PAGE_STATE.calWeek || 0;
+  const mon = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day + wk * 7); d.setHours(0, 0, 0, 0); return d; })();
+  const H0 = 9, H1 = 21, HPX = 44;
+  const dayCols = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  const calBlocks = (d) => list.filter(mt => { const t = new Date(mt.at); return t.toDateString() === d.toDateString(); })
+    .map(mt => { const t = new Date(mt.at); const top = Math.max(0, (t.getHours() + t.getMinutes() / 60 - H0) * HPX);
+      return `<div class="cal-ev st-${mt.status}" style="top:${top}px" data-mtid="${mt.id}" title="${esc(mt.leadName)}"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span></div>`; }).join('');
+  const calHtml = `
+    <div class="glass card mb">
+      <div class="card-title">${ic(I.cal)}Календарь недели
+        <span class="sub" style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm" id="calPrev">${ic(I.chev)}</button>
+          <b style="color:var(--navy-900)">${mon.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${dayCols[6].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</b>
+          <button class="btn btn-sm" id="calNext" style="transform:none">${ic(I.chev)}</button>
+        </span></div>
+      <div class="cal-grid" style="--hpx:${HPX}px">
+        <div class="cal-hours">${Array.from({ length: H1 - H0 }, (_, i) => `<div>${H0 + i}:00</div>`).join('')}</div>
+        ${dayCols.map(d => `<div class="cal-day ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" data-day="${d.toISOString().slice(0, 10)}">
+          <div class="cal-dhead">${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][(d.getDay() + 6) % 7]} <b>${d.getDate()}</b></div>
+          <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${calBlocks(d)}
+            ${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cal-slot" style="top:${i * HPX}px" data-h="${H0 + i}"></div>`).join('')}</div>
+        </div>`).join('')}
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:8px">Клик по пустому слоту — новая встреча в это время; клик по встрече — карточка лида</div>
+    </div>`;
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' };
   const stBadge = { scheduled: '<span class="badge acc">назначена</span>', done: '<span class="badge ok">прошла</span>', no_show: '<span class="badge bad">не пришёл</span>', canceled: '<span class="badge">отменена</span>' };
   const byDay = {};
@@ -651,7 +681,7 @@ PAGES.meetings = async (root) => {
     const d = new Date(mt.at).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
     (byDay[d] = byDay[d] || []).push(mt);
   }
-  root.innerHTML = `
+  root.innerHTML = calHtml + `
     <div class="two-col">
       <div>
         ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items], di) => coll(day, items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
@@ -677,6 +707,29 @@ PAGES.meetings = async (root) => {
   $$('[data-mt]', root).forEach(b => b.addEventListener('click', async () => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
     render();
+  }));
+  $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
+  $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
+  $$('.cal-ev', root).forEach(ev => ev.addEventListener('click', () => { const mt = list.find(x => x.id === ev.dataset.mtid); if (mt) openLeadModal(mt.leadId); }));
+  $$('.cal-slot', root).forEach(slot => slot.addEventListener('click', async () => {
+    const day = slot.closest('.cal-day').dataset.day;
+    const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
+    modal({
+      title: 'Встреча · ' + new Date(day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + slot.dataset.h + ':00',
+      sub: 'Клиент получит WhatsApp-подтверждение (для видео — со ссылкой на комнату)',
+      body: `
+        <div class="form-row"><label>Лид</label><select id="csLead">${leads.map(l => `<option value="${l.id}">${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Тип</label><select id="csKind"><option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option></select></div>
+        <div class="form-row"><label>Время</label><input id="csTime" type="time" value="${String(slot.dataset.h).padStart(2, '0')}:00"></div>`,
+      actions: [
+        { label: 'Назначить', cls: 'btn-accent', onClick: async (bd) => {
+          const at = new Date(day + 'T' + $('#csTime', bd).value).getTime();
+          await api.post('/meetings', { leadId: $('#csLead', bd).value, kind: $('#csKind', bd).value, at });
+          render();
+        } },
+        { label: 'Отмена' },
+      ],
+    });
   }));
 };
 
@@ -808,6 +861,7 @@ async function openLeadModal(id) {
       </div>`,
     actions: [
       { label: 'Открыть диалог', cls: 'btn-accent', onClick: () => { PAGE_STATE.inboxLead = l.id; go('inbox'); } },
+      { label: 'Собрать подборку', onClick: () => { PAGE_STATE.collLead = l.id; go('collections'); } },
       { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
       { label: 'Закрыть' },
     ],
@@ -1099,6 +1153,153 @@ PAGES.sequences = async (root) => {
   $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => {
     seq.steps[+sw.dataset.step].active = sw.checked;
     await api.patch('/sequences/' + seq.id, { steps: seq.steps });
+  }));
+};
+
+/* ---------------- ОБЪЕКТЫ ---------------- */
+PAGES.properties = async (root) => {
+  const props = await api.get('/properties');
+  const st = STATE.settings;
+  const geoF = PAGE_STATE.propGeo || '';
+  const list = props.filter(pr => !geoF || pr.geo === geoF);
+  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+  root.innerHTML = `
+    <div class="filters">
+      <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+      <span class="muted" style="font-size:12px">${list.length} объектов</span>
+      <span class="tb-spacer"></span>
+      <button class="btn btn-accent" id="prAdd">${ic(I.plus)}Объект</button>
+    </div>
+    <div class="prop-grid">
+      ${list.map(pr => `<div class="glass prop-card" data-pr="${pr.id}">
+        <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
+          <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
+          <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
+        <div class="prop-price">от ${fmt(pr)}</div>
+        <div class="prop-meta"><span>${esc(pr.type)}</span><span>сдача: ${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
+        ${pr.tags.length ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">${pr.tags.map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${pr.note ? `<div class="muted" style="font-size:11.5px;margin-top:7px">${esc(pr.note)}</div>` : ''}
+        <div class="prop-mats">${(pr.materials || []).map(m2 => `<a class="link" href="${esc(m2.url)}" target="_blank">${esc(m2.label)}</a>`).join('')}
+          <button class="btn-ghost prop-mat-add" title="Добавить материал">${ic(I.plus)}</button></div>
+        <div style="display:flex;gap:6px;margin-top:11px">
+          <button class="btn btn-sm prop-edit">${ic(I.edit || I.doc)}Изменить</button>
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost prop-del" title="Удалить">${ic(I.x)}</button>
+        </div>
+      </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
+    </div>
+    <div style="margin-top:16px">${coll('Источники данных · рынок Дубая', `
+      <div class="muted" style="font-size:11.8px;margin:8px 0 12px">Слоты под API порталов первички и вторички. Вставьте ключ — статус обновится; синк листингов включается после проверки ключа.</div>
+      ${Object.entries(st.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
+        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
+        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
+      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
+  $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
+  const propModal = (pr) => modal({
+    title: pr ? 'Объект · ' + pr.name : 'Новый объект', wide: true,
+    body: `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Название</label><input id="pName" value="${esc(pr?.name || '')}"></div>
+        <div class="form-row"><label>Район</label><input id="pArea" value="${esc(pr?.area || '')}"></div>
+        <div class="form-row"><label>Застройщик</label><input id="pDev" value="${esc(pr?.developer || '')}"></div>
+        <div class="form-row"><label>Рынок</label><select id="pMarket"><option value="offplan" ${pr?.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr?.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select></div>
+        <div class="form-row"><label>Формат (Studio/1BR/Villa…)</label><input id="pType" value="${esc(pr?.type || '')}"></div>
+        <div class="form-row"><label>Цена от</label><input id="pPrice" type="number" value="${pr?.priceFrom || ''}"></div>
+        <div class="form-row"><label>Сдача</label><input id="pHand" value="${esc(pr?.handover || '')}"></div>
+        <div class="form-row"><label>Оплата</label><input id="pPay" value="${esc(pr?.payment || '')}"></div>
+        <div class="form-row"><label>Направление</label><select id="pGeo">${st.agency.geos.map(g => `<option value="${g}" ${pr?.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Теги (через запятую)</label><input id="pTags" value="${esc((pr?.tags || []).join(', '))}"></div>
+      </div>
+      <div class="form-row"><label>Заметка (видна клиенту в подборке)</label><input id="pNote" value="${esc(pr?.note || '')}"></div>`,
+    actions: [
+      { label: pr ? 'Сохранить' : 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
+        const body = { name: $('#pName', bd).value, area: $('#pArea', bd).value, developer: $('#pDev', bd).value, market: $('#pMarket', bd).value, type: $('#pType', bd).value, priceFrom: +$('#pPrice', bd).value, handover: $('#pHand', bd).value, payment: $('#pPay', bd).value, geo: $('#pGeo', bd).value, tags: $('#pTags', bd).value.split(',').map(x => x.trim()).filter(Boolean), note: $('#pNote', bd).value };
+        if (pr) await api.patch('/properties/' + pr.id, body); else await api.post('/properties', body);
+        render();
+      } },
+      { label: 'Отмена' },
+    ],
+  });
+  $('#prAdd').addEventListener('click', () => propModal(null));
+  $$('.prop-card', root).forEach(card => {
+    const pr = props.find(x => x.id === card.dataset.pr);
+    card.querySelector('.prop-edit').addEventListener('click', () => propModal(pr));
+    card.querySelector('.prop-del').addEventListener('click', () => modal({
+      title: 'Удалить объект?', sub: pr.name + ' исчезнет из библиотеки (в собранных подборках останется)',
+      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); render(); } }, { label: 'Отмена' }],
+    }));
+    card.querySelector('.prop-mat-add').addEventListener('click', () => modal({
+      title: 'Материал · ' + pr.name, sub: 'Брошюра, планировки, видео-тур — ссылка попадёт в подборки клиентам',
+      body: `<div class="form-row"><label>Название</label><input id="mLabel" placeholder="Брошюра"></div>
+             <div class="form-row"><label>Ссылка</label><input id="mUrl" placeholder="https://…"></div>`,
+      actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
+        await api.patch('/properties/' + pr.id, { materials: [...(pr.materials || []), { label: $('#mLabel', bd).value || 'Материал', url: $('#mUrl', bd).value }] });
+        render();
+      } }, { label: 'Отмена' }],
+    }));
+  });
+  $('#portalSave')?.addEventListener('click', async () => {
+    const body = {};
+    $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
+    await api.patch('/portals', body);
+    toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
+    await loadState(); render();
+  });
+};
+
+/* ---------------- ПОДБОРКИ ---------------- */
+PAGES.collections = async (root) => {
+  const [cols, props, leads] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads')]);
+  const active = leads.filter(l => !['lost'].includes(l.stage));
+  const selLead = PAGE_STATE.collLead || '';
+  let suggest = [];
+  if (selLead) { try { suggest = await api.get(`/leads/${selLead}/suggest-properties`); } catch (e) {} }
+  const ordered = selLead && suggest.length ? suggest : props;
+  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+  root.innerHTML = `
+    <div class="two-col">
+      <div class="glass card">
+        <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
+        <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
+        <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
+        <div class="cl-props">
+          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 ? 'checked' : ''}>
+            <span class="cl-chk"></span>
+            <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
+            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>`).join('')}
+        </div>
+        <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
+      </div>
+      <div>
+        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}">
+          <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
+          <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
+          <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
+            <a class="btn btn-sm" href="/p/${c.id}" target="_blank">${ic(I.eye)}Открыть</a>
+            <button class="btn btn-sm" data-act="copy">${ic(I.copy)}Ссылка</button>
+            <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank">${ic(I.doc)}PDF</a>
+            ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат лиду</button>` : ''}
+            <span class="tb-spacer"></span>
+            <button class="btn-ghost" data-act="del">${ic(I.x)}</button>
+          </div>
+        </div>`).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
+      </div>
+    </div>`;
+  $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
+  $('#clCreate').addEventListener('click', async () => {
+    const ids = $$('.cl-prop input:checked', root).map(x => x.value);
+    if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
+    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, propertyIds: ids });
+    render();
+  });
+  $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]');
+    if (!act) return;
+    const id = card.dataset.cl;
+    if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
+    if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
+    if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
   }));
 };
 

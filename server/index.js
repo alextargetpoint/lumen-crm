@@ -63,6 +63,22 @@ const DEFAULT_PASS = 'lumen2026';
     rrCursor: 0,
   };
   if (!db.settings.customFields) db.settings.customFields = [];
+  if (!db.settings.portals) db.settings.portals = {
+    property_finder: { name: 'Property Finder', key: '', status: 'off' },
+    bayut: { name: 'Bayut / Dubizzle', key: '', status: 'off' },
+    dld: { name: 'DLD (Dubai Land Department)', key: '', status: 'off' },
+    property_monitor: { name: 'Property Monitor', key: '', status: 'off' },
+    reidin: { name: 'REIDIN', key: '', status: 'off' },
+  };
+  if (!db.properties) db.properties = [
+    { id: 'pr_jvc1', name: 'Binghatti Amber', area: 'JVC', developer: 'Binghatti', market: 'offplan', type: '1BR', beds: 1, priceFrom: 190000, currency: 'USD', handover: 'Q2 2027', payment: '70/30, 1%/мес', geo: 'dubai', tags: ['рассрочка', 'высокий ROI'], materials: [{ label: 'Брошюра', url: 'https://example.com/brochure.pdf' }], note: 'Флагман JVC, аренда 7-8%' },
+    { id: 'pr_mar1', name: 'Marina Shores', area: 'Dubai Marina', developer: 'Emaar', market: 'offplan', type: '1-2BR', beds: 2, priceFrom: 380000, currency: 'USD', handover: 'Q4 2026', payment: '60/40', geo: 'dubai', tags: ['вид на марину'], materials: [], note: '' },
+    { id: 'pr_jvc2', name: 'Studio One JVC (вторичка)', area: 'JVC', developer: '—', market: 'secondary', type: 'Studio', beds: 0, priceFrom: 145000, currency: 'USD', handover: 'готово', payment: '100% / ипотека', geo: 'dubai', tags: ['готово', 'под сдачу'], materials: [], note: 'Арендатор внутри, 7.4% net' },
+    { id: 'pr_dt1', name: 'Peninsula Four', area: 'Business Bay', developer: 'Select Group', market: 'secondary', type: '1BR', beds: 1, priceFrom: 310000, currency: 'USD', handover: 'готово', payment: '100% / ипотека', geo: 'dubai', tags: ['канал', 'готово'], materials: [], note: '' },
+    { id: 'pr_jvt1', name: 'Red Square Tower', area: 'JVT', developer: 'Tiger', market: 'offplan', type: 'Studio-1BR', beds: 1, priceFrom: 160000, currency: 'USD', handover: 'Q1 2027', payment: '1%/мес до сдачи', geo: 'dubai', tags: ['рассрочка'], materials: [], note: '' },
+    { id: 'pr_bali1', name: 'Nuanu Ecoverse Villas', area: 'Берава', developer: 'Nuanu', market: 'offplan', type: 'Villa 2BR', beds: 2, priceFrom: 250000, currency: 'USD', handover: 'Q3 2026', payment: '50/50', geo: 'bali', tags: ['вилла', 'управление'], materials: [], note: 'Лизхолд 30 лет' },
+  ];
+  if (!db.collections) db.collections = [];
   for (const b of db.brokers) if (!b.schedule) b.schedule = { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' };
   for (const l of db.leads) if (!l.custom) l.custom = {};
   store.save();
@@ -619,6 +635,78 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { secret: db.settings.hooks.secret, outboundUrl: db.settings.hooks.outboundUrl });
     }
 
+    /* ---------------- объекты (библиотека) ---------------- */
+    if (p === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);
+    if (p === '/api/properties' && req.method === 'POST') {
+      const b = await readBody(req);
+      const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '' };
+      db.properties.push(pr); store.save();
+      return json(res, 200, pr);
+    }
+    if ((m = p.match(/^\/api\/properties\/([^/]+)$/))) {
+      const pr = db.properties.find(x => x.id === m[1]);
+      if (!pr) return json(res, 404, { error: 'not found' });
+      if (req.method === 'PATCH') {
+        const b = await readBody(req);
+        for (const k of ['name', 'area', 'developer', 'market', 'type', 'handover', 'payment', 'geo', 'note', 'currency']) if (b[k] !== undefined) pr[k] = b[k];
+        for (const k of ['beds', 'priceFrom']) if (b[k] !== undefined) pr[k] = +b[k];
+        if (b.tags) pr.tags = b.tags;
+        if (b.materials) pr.materials = b.materials.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
+        store.save();
+        return json(res, 200, pr);
+      }
+      if (req.method === 'DELETE') { db.properties = db.properties.filter(x => x.id !== pr.id); store.save(); return json(res, 200, { ok: true }); }
+    }
+    /* подсказка объектов под лида: гео + бюджет ±30% + тип */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/suggest-properties$/)) && req.method === 'GET') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const budget = (lead.quals.budget || {}).num || null;
+      const typeStr = ((lead.quals.type || {}).value || '').toLowerCase();
+      const list = db.properties
+        .filter(pr => pr.geo === lead.geo)
+        .map(pr => {
+          let score = 0;
+          if (budget && pr.priceFrom) { const r = pr.priceFrom / budget; if (r >= 0.7 && r <= 1.3) score += 2; else if (r < 0.7) score += 1; }
+          if (typeStr && (typeStr.includes('вилл') ? /villa|вилл/i.test(pr.type + pr.name) : typeStr.includes('студи') ? /studio/i.test(pr.type) : /br/i.test(pr.type))) score += 1;
+          return { pr, score };
+        })
+        .sort((a, b) => b.score - a.score)
+        .map(x => Object.assign({ matchScore: x.score }, x.pr));
+      return json(res, 200, list);
+    }
+
+    /* ---------------- подборки ---------------- */
+    if (p === '/api/collections' && req.method === 'GET') {
+      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null })));
+    }
+    if (p === '/api/collections' && req.method === 'POST') {
+      const b = await readBody(req);
+      const c = { id: crypto.randomBytes(5).toString('hex'), leadId: b.leadId || null, title: b.title || 'Подборка', propertyIds: (b.propertyIds || []).slice(0, 30), createdAt: Date.now(), views: 0 };
+      db.collections.unshift(c); store.save();
+      return json(res, 200, c);
+    }
+    if ((m = p.match(/^\/api\/collections\/([^/]+)\/send$/)) && req.method === 'POST') {
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c || !c.leadId) return json(res, 400, { error: 'нет лида' });
+      const lead = db.leads.find(l => l.id === c.leadId);
+      const url = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/p/${c.id}`;
+      engine.send(db, lead, `${lead.name.split(' ')[0]}, собрал для вас подборку под ваш запрос — посмотрите: ${url} Внутри ${c.propertyIds.length} вариант(а) с ценами и условиями. Что откликается — обсудим.`, 'human');
+      ai.pushEvent(db, { type: 'msg_in', leadId: lead.id, text: `Подборка «${c.title}» отправлена в чат: ${lead.name}` });
+      store.save();
+      return json(res, 200, { ok: true, url });
+    }
+    if ((m = p.match(/^\/api\/collections\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.collections = db.collections.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (p === '/api/portals' && req.method === 'PATCH') {
+      const b = await readBody(req);
+      for (const [k, v] of Object.entries(b)) if (db.settings.portals[k] && typeof v === 'object') { if (v.key !== undefined) { db.settings.portals[k].key = String(v.key); db.settings.portals[k].status = v.key ? 'key_saved' : 'off'; } }
+      store.save();
+      return json(res, 200, db.settings.portals);
+    }
+
     /* ---------------- дубли ---------------- */
     if (p === '/api/duplicates' && req.method === 'GET') {
       const norm = (ph) => (ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
@@ -655,6 +743,51 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
+
+    if ((m = p.match(/^\/p\/([a-f0-9]+)$/)) && req.method === 'GET') {
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) { res.writeHead(404); res.end('not found'); return; }
+      c.views = (c.views || 0) + 1; store.save();
+      const props = c.propertyIds.map(id => db.properties.find(x => x.id === id)).filter(Boolean);
+      const lead = db.leads.find(l => l.id === c.leadId);
+      const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
+      const isPrint = u.searchParams.get('print') === '1';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${c.title} — ${db.settings.agency.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#F4F7FB;color:#111827}
+.hero{background:radial-gradient(600px 300px at 85% -20%,rgba(47,107,255,.4),transparent 60%),linear-gradient(155deg,#102B5C,#061126 80%);color:#fff;padding:44px 24px 38px;text-align:center}
+.hero .logo{width:34px;height:41px;margin:0 auto 12px}.hero h1{font-size:24px;letter-spacing:-.3px}.hero .sub{color:#86AFFF;font-size:13px;margin-top:6px}
+.wrap{max-width:860px;margin:-18px auto 40px;padding:0 16px}
+.card{background:#fff;border:1px solid #DCE3ED;border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 8px 24px -12px rgba(16,43,92,.12)}
+.card h2{font-size:17px;color:#0A1833}.meta{color:#667085;font-size:12.5px;margin-top:3px}
+.row{display:flex;gap:22px;flex-wrap:wrap;margin-top:13px}.m .v{font-weight:700;font-size:14.5px;color:#0A1833}.m .k{font-size:10.5px;color:#667085;text-transform:uppercase;letter-spacing:.06em}
+.price{color:#2563EB!important}.tags{margin-top:11px;display:flex;gap:6px;flex-wrap:wrap}.tag{font-size:11px;font-weight:600;background:#DCE8FF;color:#102B5C;border-radius:14px;padding:3px 10px}
+.note{margin-top:10px;font-size:12.5px;color:#3D4A63;background:#F4F7FB;border-radius:9px;padding:9px 12px}
+.mats{margin-top:10px;font-size:12.5px}.mats a{color:#2563EB;margin-right:12px}
+.foot{text-align:center;color:#667085;font-size:12px;padding:20px}
+.cta{display:block;text-align:center;background:#2563EB;color:#fff;text-decoration:none;font-weight:600;border-radius:12px;padding:14px;margin:18px 0}
+@media print{.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cta{display:none}.card{break-inside:avoid;box-shadow:none}}
+</style></head><body>
+<div class="hero"><svg class="logo" viewBox="0 0 100 120"><defs><linearGradient id="g" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#g)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
+<h1>${c.title}</h1><div class="sub">${db.settings.agency.name}${lead ? ' · персонально для ' + lead.name.split(' ')[0] : ''} · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+<div class="wrap">
+${props.map((pr2, idx) => `<div class="card"><h2>${idx + 1}. ${pr2.name}</h2><div class="meta">${pr2.area} · ${pr2.developer !== '—' ? pr2.developer + ' · ' : ''}${pr2.market === 'offplan' ? 'первичка' : 'вторичка'}</div>
+<div class="row"><div class="m"><div class="v price">от ${fmt(pr2.priceFrom, pr2.currency)}</div><div class="k">цена</div></div>
+<div class="m"><div class="v">${pr2.type}</div><div class="k">формат</div></div>
+<div class="m"><div class="v">${pr2.handover}</div><div class="k">сдача</div></div>
+<div class="m"><div class="v">${pr2.payment}</div><div class="k">оплата</div></div></div>
+${pr2.tags.length ? '<div class="tags">' + pr2.tags.map(t => '<span class="tag">' + t + '</span>').join('') + '</div>' : ''}
+${pr2.note ? '<div class="note">' + pr2.note + '</div>' : ''}
+${(pr2.materials || []).length ? '<div class="mats">' + pr2.materials.map(mt2 => '<a href="' + mt2.url + '" target="_blank">' + mt2.label + ' →</a>').join('') + '</div>' : ''}
+</div>`).join('')}
+<a class="cta" href="https://wa.me/?text=${encodeURIComponent('Здравствуйте! Смотрю подборку «' + c.title + '»')}">Обсудить в WhatsApp</a>
+</div><div class="foot">${db.settings.agency.name} · подборка собрана в Lumen CRM</div>
+${isPrint ? '<script>window.print()</script>' : ''}</body></html>`);
+      return;
+    }
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 

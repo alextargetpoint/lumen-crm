@@ -740,3 +740,55 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
   .inbox { grid-template-columns: 1fr; }
   .conv-list { display: none; }
 }
+
+/* ---------- объекты ---------- */
+.prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.prop-card { padding: 17px 18px; }
+.prop-top { display: flex; gap: 10px; align-items: flex-start; }
+.prop-top > div { flex: 1; min-width: 0; }
+.prop-name { font-size: 14.5px; font-weight: 700; color: var(--navy-900); }
+.prop-price { font-size: 19px; font-weight: 700; color: var(--accent); margin-top: 9px; font-variant-numeric: tabular-nums; }
+.prop-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-3); margin-top: 5px; }
+.prop-mats { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 9px; font-size: 12px; }
+.prop-mats .btn-ghost svg { width: 13px; height: 13px; color: var(--ink-3); }
+
+/* ---------- конструктор подборок ---------- */
+.cl-props { max-height: 320px; overflow-y: auto; border: 1px solid var(--stroke-soft); border-radius: var(--r-md); }
+.cl-prop { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--stroke-soft); cursor: pointer; font-size: 12.8px; }
+.cl-prop:last-child { border-bottom: none; }
+.cl-prop:hover { background: var(--bg); }
+.cl-prop input { display: none; }
+.cl-chk { width: 17px; height: 17px; flex: 0 0 17px; border-radius: 5px; border: 1.5px solid #C6D0DF; background: #fff; position: relative; transition: all var(--dur-fast); }
+.cl-prop input:checked + .cl-chk { background: var(--accent); border-color: var(--accent); }
+.cl-prop input:checked + .cl-chk::after { content: ''; position: absolute; inset: 3px 4px 5px; border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg) translateY(-1px); }
+
+/* ---------- календарь недели ---------- */
+.cal-grid { display: grid; grid-template-columns: 44px repeat(7, 1fr); gap: 0; border: 1px solid var(--stroke); border-radius: var(--r-md); overflow: hidden; }
+.cal-hours { padding-top: 34px; }
+.cal-hours div { height: var(--hpx); font-size: 9.5px; color: var(--ink-3); text-align: right; padding-right: 6px; transform: translateY(-6px); }
+.cal-day { border-left: 1px solid var(--stroke-soft); min-width: 0; }
+.cal-day.today .cal-dhead { background: var(--blue-100); color: var(--accent); }
+.cal-dhead { height: 34px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; color: var(--ink-3); border-bottom: 1px solid var(--stroke); background: var(--bg); }
+.cal-dhead b { color: var(--navy-900); font-size: 12.5px; }
+.cal-body { position: relative; }
+.cal-slot { position: absolute; left: 0; right: 0; height: var(--hpx); border-bottom: 1px solid var(--stroke-soft); cursor: pointer; }
+.cal-slot:hover { background: var(--blue-100); opacity: .55; }
+.cal-ev {
+  position: absolute; left: 3px; right: 3px; z-index: 2; height: 40px; overflow: hidden;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #fff;
+  border-radius: 8px; padding: 4px 7px; font-size: 10px; cursor: pointer; line-height: 1.3;
+  box-shadow: 0 4px 10px -4px rgba(37, 99, 235, .5);
+}
+.cal-ev b { font-size: 10px; }
+.cal-ev span { display: block; opacity: .75; font-size: 9px; }
+.cal-ev.st-done { background: var(--ok-bg); color: var(--ok); box-shadow: none; border: 1px solid #C4E6D6; }
+.cal-ev.st-no_show { background: var(--bad-bg); color: var(--bad); box-shadow: none; border: 1px solid #EDC5C0; }
+
+/* ---------- карточка лида: независимый скролл колонок (фикс обрезания) ---------- */
+.modal-card { display: flex; flex-direction: column; height: 90vh; max-height: 90vh; overflow: hidden; }
+.modal-card .m-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.modal-card .lc-grid { flex: 1; min-height: 0; }
+.modal-card .lc-left { display: flex; flex-direction: column; min-height: 0; }
+.modal-card .lc-timeline { flex: 1; max-height: none; }
+.modal-card .lc-right { overflow-y: auto; padding-right: 4px; }
+@media (max-width: 1000px) { .modal-card { height: auto; max-height: 92vh; overflow-y: auto; } .modal-card .lc-timeline { max-height: 40vh; } .modal-card .lc-right { overflow: visible; } }
