@@ -206,8 +206,8 @@ section[data-bid]:hover .btool{opacity:1}
   }
 
   /* ---------- палитра блоков ---------- */
-  const PALETTE = ['text', 'image', 'gallery', 'video', 'quote', 'stats', 'faq', 'steps', 'sep', 'cta', 'proj'];
-  const PICONS = { text: '📄', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', faq: '❔', steps: '🧭', sep: '▬', cta: '📣', proj: '🏙' };
+  const PALETTE = ['text', 'textimg', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta', 'proj'];
+  const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦' };
   function openPalette(afterSec, x, y) {
     const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi" data-add="${t}"><i>${PICONS[t] || '▢'}</i>${TYPE(t).name}</div>`).join('');
     const el = openPop(`<div class="psec">Добавить блок</div>${items}`, x, y);
@@ -387,6 +387,81 @@ section[data-bid]:hover .btool{opacity:1}
       });
     });
   }
+
+  /* ---------- мини-навигатор страниц: визуальный ряд + drag-порядок ---------- */
+  const rail = document.createElement('div');
+  rail.className = 'perail';
+  document.body.appendChild(rail);
+  function buildRail() {
+    rail.innerHTML = '<div class="perail-hd">Страницы</div>' + $$('section[data-bid]').map((sec, i) => {
+      const t = sec.dataset.bt;
+      return `<div class="peth ${sec.dataset.bhid === '1' ? 'hid' : ''}" data-peth="${sec.dataset.bid}">
+        <span class="peth-n">${i + 1}</span><span class="peth-i">${PICONS[t] || '▢'}</span>
+        <span class="peth-t">${TYPE(t).name}</span>
+        <span class="peth-grip">⠿</span>
+      </div>`;
+    }).join('');
+    $$('.peth', rail).forEach((th) => {
+      let ghost = null, downY = 0, moved = false;
+      th.addEventListener('pointerdown', (e) => {
+        if (!e.target.closest('.peth-grip')) return;
+        e.preventDefault();
+        downY = e.clientY;
+        const onMove = (e2) => {
+          if (!ghost && Math.abs(e2.clientY - downY) < 5) return;
+          if (!ghost) { ghost = true; th.classList.add('drag'); }
+          moved = true;
+          const over = document.elementFromPoint(e2.clientX, e2.clientY);
+          const tgt = over && over.closest('.peth');
+          if (tgt && tgt !== th) {
+            const list = $$('.peth', rail);
+            if (list.indexOf(tgt) < list.indexOf(th)) tgt.before(th); else tgt.after(th);
+          }
+        };
+        const onUp = () => {
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          th.classList.remove('drag');
+          if (moved) {
+            /* применяем порядок рельсы к реальным секциям */
+            const order = $$('.peth', rail).map((x) => x.dataset.peth);
+            const secs = {};
+            $$('section[data-bid]').forEach((s2) => { secs[s2.dataset.bid] = s2; });
+            const anchor = document.querySelector('.book .foot') || null;
+            order.forEach((bid) => { const s2 = secs[bid]; if (s2) (anchor ? anchor.before(s2) : document.querySelector('.book').appendChild(s2)); });
+            renumber(); buildRail(); dirty = true; flash('Порядок изменён — не забудьте сохранить');
+          }
+          moved = false; ghost = null;
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+      th.addEventListener('click', (e) => {
+        if (e.target.closest('.peth-grip')) return;
+        const sec = document.querySelector(`section[data-bid="${th.dataset.peth}"]`);
+        if (sec) { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); sec.classList.add('peflash'); setTimeout(() => sec.classList.remove('peflash'), 1200); }
+      });
+    });
+  }
+  buildRail();
+  const railCss = document.createElement('style');
+  railCss.textContent = `
+.perail{position:fixed;right:14px;top:70px;bottom:20px;width:158px;z-index:890;background:rgba(11,11,15,.92);backdrop-filter:blur(8px);border-radius:14px;padding:10px 8px;overflow-y:auto;font-family:Inter,sans-serif;scrollbar-width:thin}
+.perail-hd{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a90a0;padding:2px 8px 8px;font-weight:700}
+.peth{display:flex;gap:7px;align-items:center;padding:8px 8px;border-radius:9px;cursor:pointer;color:#D5DBEA;font-size:11px;font-weight:650;transition:background .15s}
+.peth:hover{background:rgba(29,52,216,.35)}
+.peth.hid{opacity:.4}
+.peth.drag{background:#1D34D8}
+.peth-n{color:#5E6470;font-size:9.5px;width:14px;flex:0 0 14px}
+.peth-i{width:16px;flex:0 0 16px;text-align:center}
+.peth-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peth-grip{color:#5E6470;cursor:grab;touch-action:none}
+.peth-grip:active{cursor:grabbing}
+section.peflash{outline:3px solid rgba(29,52,216,.55);outline-offset:-3px}
+@media(max-width:1080px){.perail{display:none}}
+.book{margin-right:190px}
+@media(max-width:1080px){.book{margin-right:auto}}`;
+  document.head.appendChild(railCss);
 
   renumber();
 })();

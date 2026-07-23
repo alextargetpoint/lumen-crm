@@ -322,22 +322,34 @@ function startCampaign(db, cmp) {
   store.save();
 }
 
-/* ---------- напоминания о встречах ---------- */
+/* ---------- напоминания о встречах: ЦЕПОЧКА порогов (часы до встречи) ----------
+   settings.automations.meetRemindChain = [24, 3, 0.5]; legacy meetingReminderHrs — фолбэк.
+   Каждый порог шлётся один раз (mt.rem[i]); перенос встречи сбрасывает mt.rem. */
 function tickMeetings(db) {
-  const hrs = (db.settings.automations || {}).meetingReminderHrs;
-  if (!hrs) return;
+  const a = db.settings.automations || {};
+  const chain = Array.isArray(a.meetRemindChain) && a.meetRemindChain.length ? a.meetRemindChain
+    : (a.meetingReminderHrs ? [a.meetingReminderHrs] : []);
+  if (!chain.length) return;
   const nowT = Date.now();
   for (const mt of db.meetings || []) {
-    if (mt.status !== 'scheduled' || mt.reminded) continue;
-    if (mt.at - nowT > 0 && mt.at - nowT <= hrs * 3600e3) {
-      const lead = db.leads.find(l => l.id === mt.leadId);
-      if (!lead) continue;
-      const broker = db.brokers.find(b => b.id === mt.brokerId);
-      const when = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      send(db, lead, `${lead.name.split(' ')[0]}, напоминаю: сегодня в ${when} — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${mt.link ? ' Ссылка: ' + mt.link : ''} До связи!`, 'ai');
-      mt.reminded = true;
-      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Напоминание о встрече отправлено: ${lead.name} (${when})` });
-    }
+    if (mt.status !== 'scheduled') continue;
+    mt.rem = mt.rem || {};
+    chain.forEach((hrs, i) => {
+      if (mt.rem[i]) return;
+      if (mt.at - nowT > 0 && mt.at - nowT <= hrs * 3600e3) {
+        const lead = db.leads.find(l => l.id === mt.leadId);
+        if (!lead) return;
+        const broker = db.brokers.find(b => b.id === mt.brokerId);
+        const when = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        const soon = hrs <= 1;
+        const pageUrl = global.LUMEN_BASE ? ` Вся информация: ${global.LUMEN_BASE}/m/${mt.id}` : (mt.link ? ' Ссылка: ' + mt.link : '');
+        send(db, lead, soon
+          ? `${lead.name.split(' ')[0]}, через ${Math.round(hrs * 60)} минут начинаем — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${pageUrl}`
+          : `${lead.name.split(' ')[0]}, напоминаю: ${new Date(mt.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} в ${when} — ${{ call: 'созвон', video: 'видео-показ', tour: 'показ' }[mt.kind] || 'встреча'} с ${broker ? broker.name : 'экспертом'}.${pageUrl} Если время не подходит — напишите, перенесём.`, 'ai');
+        mt.rem[i] = true;
+        ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Напоминание (${hrs >= 1 ? 'за ' + hrs + ' ч' : 'за ' + Math.round(hrs * 60) + ' мин'}) отправлено: ${lead.name}` });
+      }
+    });
   }
 }
 

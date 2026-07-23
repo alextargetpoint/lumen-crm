@@ -456,21 +456,29 @@ function analytics(db) {
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 const PB_TYPES = {
-  cover: { name: 'Обложка', variants: ['blue', 'photo', 'light'], std: true },
+  cover: { name: 'Обложка', variants: ['blue', 'photo', 'light', 'split'], std: true },
   hello: { name: 'Привет + об агентстве', variants: ['std'], std: true },
   sep: { name: 'Разделитель', variants: ['blue', 'photo', 'light'], std: true },
   proj: { name: 'Объект', variants: ['full', 'compact', 'gallery'], std: true },
-  cta: { name: 'Призыв (CTA)', variants: ['blue', 'card'], std: true },
+  cta: { name: 'Призыв (CTA)', variants: ['blue', 'card', 'photo'], std: true },
   why: { name: 'Почему мы + офис', variants: ['std'], std: true },
   final: { name: 'Финальная страница', variants: ['blue'], std: true },
   text: { name: 'Текст', variants: ['plain', 'panel', 'blue'] },
   image: { name: 'Картинка', variants: ['full', 'inset'] },
-  gallery: { name: 'Галерея', variants: ['grid', 'rows'] },
+  gallery: { name: 'Галерея', variants: ['grid', 'rows', 'masonry'] },
   video: { name: 'Видео', variants: ['std'] },
-  quote: { name: 'Отзыв / цитата', variants: ['card', 'blue'] },
+  quote: { name: 'Отзыв / цитата', variants: ['card', 'blue', 'big'] },
   stats: { name: 'Цифры', variants: ['row', 'cards', 'blue'] },
   faq: { name: 'Вопрос-ответ', variants: ['std'] },
-  steps: { name: 'Как мы работаем', variants: ['std'] },
+  steps: { name: 'Как мы работаем', variants: ['std', 'row'] },
+  benefits: { name: 'Преимущества', variants: ['grid', 'list', 'blue'] },
+  compare: { name: 'Сравнение', variants: ['table', 'cards'] },
+  timeline: { name: 'Таймлайн', variants: ['vertical', 'horizontal'] },
+  pricecards: { name: 'Пакеты · тарифы', variants: ['cards', 'minimal'] },
+  bignum: { name: 'Крупная цифра', variants: ['plain', 'blue'] },
+  checklist: { name: 'Чек-лист', variants: ['single', 'cols'] },
+  textimg: { name: 'Текст + фото', variants: ['imgright', 'imgleft'] },
+  team: { name: 'Команда', variants: ['cards', 'strip'] },
 };
 
 function pbDefaults(t) {
@@ -483,6 +491,14 @@ function pbDefaults(t) {
     case 'stats': return { items: [{ k: 'лет на рынке', v: '7' }, { k: 'сделок закрыто', v: '340+' }, { k: 'доходность клиентов', v: '8–11%' }] };
     case 'faq': return { items: [{ q: 'Какой первый шаг?', a: 'Короткий созвон: уточняем задачу и бюджет, дальше присылаем расчёт.' }, { q: 'Есть ли комиссия?', a: 'Для покупателя наши услуги бесплатны — комиссию платит застройщик.' }] };
     case 'steps': return { items: [{ title: 'Созвон 10 минут', text: 'Уточняем цель, бюджет и сроки.' }, { title: 'Подборка и расчёт', text: 'Присылаем варианты с цифрами доходности.' }, { title: 'Показ и сделка', text: 'Онлайн или лично — сопровождаем до ключей.' }] };
+    case 'benefits': return { title: 'Что вы получаете', items: [{ icon: '🔑', title: 'Доступ до старта продаж', text: 'Юниты по ценам застройщика — раньше рынка.' }, { icon: '📊', title: 'Честные цифры', text: 'Расчёт доходности по каждому варианту, не «на глаз».' }, { icon: '🛡', title: 'Сопровождение', text: 'Договор, платежи, регистрация — берём на себя.' }] };
+    case 'compare': return { title: 'Сравним варианты', headA: 'Вариант A', headB: 'Вариант B', items: [{ k: 'Цена входа', a: 'от $145 000', b: 'от $190 000' }, { k: 'Сдача', a: 'Q4 2026', b: 'готов' }, { k: 'Доходность', a: '8–9%', b: '6–7%' }] };
+    case 'timeline': return { title: 'Как пройдёт покупка', items: [{ when: 'Неделя 1', title: 'Выбор юнита', text: 'Показ, расчёт, бронирование.' }, { when: 'Неделя 2', title: 'Договор и взнос', text: 'SPA с застройщиком, первый платёж.' }, { when: 'Далее', title: 'Рассрочка до ключей', text: 'Платежи по плану, мы сопровождаем.' }] };
+    case 'pricecards': return { title: 'Форматы работы', items: [{ name: 'Подбор', price: 'Бесплатно', text: 'Комиссию платит застройщик.\nПодборка + показы + сделка.' }, { name: 'Под ключ', price: 'По запросу', text: 'Плюс: мебель, аренда, управление.\nПассивный доход без забот.' }] };
+    case 'bignum': return { v: '8–11%', k: 'годовых в долларах приносят квартиры под аренду у наших клиентов' };
+    case 'checklist': return { title: 'Проверим за вас', bullets: ['Репутация застройщика и история сдач', 'Юридическая чистота юнита', 'Реальная аренда в районе, а не обещанная', 'Скрытые платежи и сервисные сборы'] };
+    case 'textimg': return { title: 'Заголовок раздела', body: 'Пара абзацев текста рядом с фотографией — район, концепция проекта или история клиента.', img: '' };
+    case 'team': return { title: 'Кто будет с вами на связи', items: [{ name: 'Ваш менеджер', role: 'подбор и переговоры' }, { name: 'Юрист', role: 'договор и проверка' }, { name: 'После сделки', role: 'аренда и управление' }] };
     default: return {};
   }
 }
@@ -539,8 +555,13 @@ function sanitizeBlocks(raw) {
     if (b.t === 'gallery') putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; });
     if (b.t === 'stats') putList('items', (x) => x && (x.k || x.v) ? { k: str(x.k, 120), v: str(x.v, 60) } : null);
     if (b.t === 'faq') putList('items', (x) => x && (x.q || x.a) ? { q: str(x.q, 300), a: str(x.a, 1000) } : null);
-    if (b.t === 'steps') putList('items', (x) => x && (x.title || x.text) ? { title: str(x.title, 200), text: str(x.text, 600) } : null);
-    if (b.t === 'hello' || b.t === 'why') putList('bullets', (x) => str(x, 400).trim() || null);
+    if (b.t === 'steps' || b.t === 'benefits') putList('items', (x) => x && (x.title || x.text) ? { icon: str(x.icon, 8), title: str(x.title, 200), text: str(x.text, 600) } : null);
+    if (b.t === 'compare') { put('headA', 120); put('headB', 120); putList('items', (x) => x && (x.k || x.a || x.b) ? { k: str(x.k, 160), a: str(x.a, 200), b: str(x.b, 200) } : null); }
+    if (b.t === 'timeline') putList('items', (x) => x && (x.when || x.title) ? { when: str(x.when, 80), title: str(x.title, 200), text: str(x.text, 500) } : null);
+    if (b.t === 'pricecards') putList('items', (x) => x && (x.name || x.price) ? { name: str(x.name, 120), price: str(x.price, 80), text: str(x.text, 600) } : null);
+    if (b.t === 'team') putList('items', (x) => x && (x.name || x.role) ? { name: str(x.name, 120), role: str(x.role, 200) } : null);
+    if (b.t === 'bignum') { put('v', 60); put('k', 300); }
+    if (b.t === 'hello' || b.t === 'why' || b.t === 'checklist') putList('bullets', (x) => str(x, 400).trim() || null);
     out.push(nb);
   }
   return out.length ? out : null;
@@ -550,6 +571,8 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
   const db = store.get();
+  /* базовый URL для ссылок в сообщениях (страницы встреч/подборок) — engine берёт из global */
+  if (req.headers.host && !p.startsWith('/wa/')) global.LUMEN_BASE = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
 
   try {
     /* ---------------- WhatsApp Cloud API webhook ---------------- */
@@ -1068,7 +1091,8 @@ const server = http.createServer(async (req, res) => {
       if (b.confirm !== false) {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
         const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}.${mt.link ? ` Ссылка на видеовстречу: ${mt.link}` : ''} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
+        const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}. Вся информация, напоминание и кнопка подключения: ${base}/m/${mt.id} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
       }
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name} + ${broker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
       store.save();
@@ -1079,7 +1103,7 @@ const server = http.createServer(async (req, res) => {
       if (!mt) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (b.status) mt.status = b.status;
-      if (b.at) { mt.at = +b.at; mt.reminded = false; }
+      if (b.at) { mt.at = +b.at; mt.reminded = false; mt.rem = {}; }
       if (b.status === 'no_show' && db.settings.automations.noShowMessage) {
         const lead = db.leads.find(l => l.id === mt.leadId);
         if (lead && !['deal', 'lost'].includes(lead.stage)) {
@@ -1518,6 +1542,114 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
 
+    /* ================= страница встречи для клиента: /m/:id ================= */
+    if ((m = p.match(/^\/m\/(mt_[\w]+)$/)) && req.method === 'GET') {
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (!mt) { res.writeHead(404); res.end('not found'); return; }
+      const lead = db.leads.find(l => l.id === mt.leadId) || {};
+      const broker = db.brokers.find(b => b.id === mt.brokerId) || {};
+      const AG = db.settings.agency.name;
+      const logo = db.settings.agency.logo;
+      mt.pageViews = (mt.pageViews || 0) + 1;
+      if (mt.pageViews === 1 && lead.id) ai.pushEvent(db, { type: 'view', leadId: lead.id, text: `${lead.name} открыл страницу встречи — помнит и готовится` });
+      store.save();
+      const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' }[mt.kind] || 'Встреча';
+      const dt = new Date(mt.at);
+      const when = dt.toLocaleString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const gcalDate = (t) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(kindRu + ' · ' + AG)}&dates=${gcalDate(mt.at)}/${gcalDate(mt.at + 3600e3)}&details=${encodeURIComponent((broker.name ? 'Эксперт: ' + broker.name + '. ' : '') + (mt.link ? 'Видеовстреча: ' + mt.link : ''))}`;
+      const star2 = logo ? `<img src="${esc(logo)}" style="max-width:170px;max-height:64px;object-fit:contain">` : '<svg viewBox="0 0 100 120" style="width:34px;height:41px"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${kindRu} · ${esc(AG)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 400px at 20% 10%,rgba(37,99,235,.25),transparent 60%),radial-gradient(700px 500px at 85% 90%,rgba(91,43,216,.2),transparent 60%)}
+.card{position:relative;max-width:440px;width:100%;background:rgba(10,24,51,.75);backdrop-filter:blur(14px);border:1px solid rgba(122,158,255,.2);border-radius:22px;padding:34px 30px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.brand{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:26px;font-weight:700;letter-spacing:.06em}
+.kind{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#9DB8FF;margin-bottom:10px}
+h1{font-size:25px;font-weight:800;line-height:1.25}
+.when{margin-top:16px;font-size:17px;font-weight:700;color:#CFE0FF;text-transform:capitalize}
+.cd{display:flex;gap:10px;justify-content:center;margin:22px 0}
+.cd div{background:rgba(255,255,255,.07);border:1px solid rgba(122,158,255,.2);border-radius:12px;padding:10px 0;width:74px}
+.cd b{font-size:22px;font-weight:800;display:block}
+.cd span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#8FA3C8}
+.who{font-size:13.5px;color:#B9C7E8;margin-bottom:22px}
+.note{font-size:13px;color:#8FA3C8;margin-bottom:18px;white-space:pre-line}
+.btn{display:block;width:100%;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:10px;text-decoration:none;color:#fff}
+.b-video{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
+.b-ok{background:rgba(35,179,131,.18);border:1.5px solid rgba(35,179,131,.5);color:#7BE8C3}
+.b-ok.done{background:rgba(35,179,131,.35);pointer-events:none}
+.b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF;font-weight:650}
+.cal-row{display:flex;gap:10px;margin-top:14px}
+.cal-row a{flex:1;font-size:12.5px;padding:12px}
+.foot{margin-top:22px;font-size:11px;color:#5E6E96}
+@media(max-width:420px){.cd div{width:64px}}
+</style></head><body>
+<div class="card">
+  <div class="brand">${star2}${logo ? '' : esc(AG)}</div>
+  <div class="kind">${kindRu}</div>
+  <h1>${esc(lead.name ? lead.name.split(' ')[0] + ', ждём вас' : 'Ждём вас')}</h1>
+  <div class="when">${esc(when)}</div>
+  <div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>
+  <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note" style="margin-top:10px">${esc(mt.note)}</div>` : ''}</div>
+  ${mt.link ? `<a class="btn b-video" href="${esc(mt.link)}" target="_blank">▶ Подключиться к видеовстрече</a>` : ''}
+  <button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
+  <button class="btn b-ghost" id="moveBtn">Попросить перенос</button>
+  <div class="cal-row">
+    <a class="btn b-ghost" href="${gcal}" target="_blank">+ Google Календарь</a>
+    <a class="btn b-ghost" href="/m/${mt.id}/ics">+ iPhone / Outlook</a>
+  </div>
+  <div class="foot">${esc(AG)}${broker.phone ? ' · ' + esc(broker.phone) : ''}</div>
+</div>
+<script>
+const AT=${mt.at};
+const tick=()=>{const d=Math.max(0,AT-Date.now());document.getElementById('cdD').textContent=Math.floor(d/864e5);document.getElementById('cdH').textContent=Math.floor(d%864e5/36e5);document.getElementById('cdM').textContent=Math.floor(d%36e5/6e4);};
+tick();setInterval(tick,15000);
+document.getElementById('okBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/confirm',{method:'POST'});e.target.textContent='✓ Вы подтвердили участие';e.target.classList.add('done');});
+document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/reschedule',{method:'POST'});e.target.textContent='Передали менеджеру — свяжемся с вами';e.target.disabled=true;});
+</${'script'}></body></html>`);
+      return;
+    }
+    if ((m = p.match(/^\/m\/(mt_[\w]+)\/confirm$/)) && req.method === 'POST') {
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (mt && !mt.clientConfirmed) {
+        mt.clientConfirmed = true;
+        const lead = db.leads.find(l => l.id === mt.leadId);
+        if (lead) ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `${lead.name} подтвердил встречу со страницы — придёт` });
+        store.save();
+      }
+      return json(res, 200, { ok: true });
+    }
+    if ((m = p.match(/^\/m\/(mt_[\w]+)\/reschedule$/)) && req.method === 'POST') {
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (mt) {
+        const lead = db.leads.find(l => l.id === mt.leadId);
+        if (lead) {
+          lead.tags = [...new Set([...(lead.tags || []), 'нужен человек'])];
+          ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `⚠️ ${lead.name} просит перенести встречу — свяжитесь и предложите слоты` });
+        }
+        store.save();
+      }
+      return json(res, 200, { ok: true });
+    }
+    if ((m = p.match(/^\/m\/(mt_[\w]+)\/ics$/)) && req.method === 'GET') {
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (!mt) { res.writeHead(404); res.end(); return; }
+      const broker = db.brokers.find(b => b.id === mt.brokerId) || {};
+      const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' }[mt.kind] || 'Встреча';
+      const fmtT = (t) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'attachment; filename="meeting.ics"' });
+      res.end(['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Lumen CRM//RU', 'BEGIN:VEVENT',
+        `UID:${mt.id}@lumen`, `DTSTAMP:${fmtT(Date.now())}`, `DTSTART:${fmtT(mt.at)}`, `DTEND:${fmtT(mt.at + 3600e3)}`,
+        `SUMMARY:${kindRu} · ${db.settings.agency.name}`,
+        `DESCRIPTION:${(broker.name ? 'Эксперт: ' + broker.name + '. ' : '') + (mt.link ? 'Видео: ' + mt.link : '')}`,
+        mt.link ? `URL:${mt.link}` : '', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n'));
+      return;
+    }
+
     if ((m = p.match(/^\/p\/([a-f0-9]+)$/)) && req.method === 'GET') {
       const c = db.collections.find(x => x.id === m[1]);
       if (!c) { res.writeHead(404); res.end('not found'); return; }
@@ -1570,6 +1702,7 @@ const server = http.createServer(async (req, res) => {
   <h1${be(b.id, 'title')}>${esc(title)}</h1>
   ${d.sub || isEdit ? `<p class="csub"${be(b.id, 'sub')}>${esc(d.sub || '')}</p>` : ''}
   ${badge || isEdit ? `<div class="badge"${be(b.id, 'badge')}>${esc(badge)}</div>` : ''}`;
+          if (b.v === 'split') return `<section class="cover csplit"><div class="cs-l blue">${inner}</div><div class="cs-r" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div></section>`;
           if (b.v === 'photo') return `<section class="cover cphoto" ${bg(img)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</section>`;
           if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : ''}</section>`;
           return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
@@ -1660,7 +1793,7 @@ const server = http.createServer(async (req, res) => {
         gallery(b) {
           const imgs = (b.data.imgs || []).slice(0, 12);
           const cells = (imgs.length ? imgs : ['', '', '']).map((u2, i2) => `<div class="gcell" ${bg(u2)}>${u2 ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, u2)}>🖼</div>` : ''}</div>`).join('');
-          return `<section class="pg"><div class="ggrid ${b.v === 'rows' ? 'rows' : ''}" data-plist="${b.id}:imgs">${cells}</div></section>`;
+          return `<section class="pg"><div class="ggrid ${b.v === 'rows' ? 'rows' : b.v === 'masonry' ? 'masonry' : ''}" data-plist="${b.id}:imgs">${cells}</div></section>`;
         },
         video(b) {
           const d = b.data;
@@ -1677,6 +1810,7 @@ const server = http.createServer(async (req, res) => {
           const d = b.data;
           const inner = `<div class="qmark">“</div><div class="qtext"${be(b.id, 'text')}>${esc(d.text || '')}</div><div class="qwho"><b${be(b.id, 'author')}>${esc(d.author || '')}</b><span${be(b.id, 'role')}>${esc(d.role || '')}</span></div>`;
           if (b.v === 'blue') return `<section class="pg blue qblk">${inner}</section>`;
+          if (b.v === 'big') return `<section class="pg qbig">${inner}</section>`;
           return `<section class="pg"><div class="qcard">${inner}</div></section>`;
         },
         stats(b) {
@@ -1698,7 +1832,89 @@ const server = http.createServer(async (req, res) => {
           const items = b.data.items || [];
           return `<section class="pg">
   <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Как мы работаем')}</h2>
-  <div class="steps" data-plist="${b.id}:items">${items.map((it, i2) => `<div class="step"><i>${i2 + 1}</i><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title)}</b><span${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</span></div>`).join('')}</div>
+  <div class="steps ${b.v === 'row' ? 'rowv' : ''}" data-plist="${b.id}:items">${items.map((it, i2) => `<div class="step"><i>${i2 + 1}</i><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title)}</b><span${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</span></div>`).join('')}</div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        benefits(b) {
+          const items = b.data.items || [];
+          const cell = (it, i2) => `<div class="bft"><span class="bft-i"${be(b.id, 'items', i2 + ':icon')}>${esc(it.icon || '✦')}</span><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title)}</b><span class="bft-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</span></div>`;
+          const inner = `<h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Что вы получаете')}</h2>
+  <div class="bfts ${b.v === 'list' ? 'list' : ''}" data-plist="${b.id}:items">${items.map(cell).join('')}</div>`;
+          return `<section class="pg ${b.v === 'blue' ? 'blue' : ''}">${inner}<div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div></section>`;
+        },
+        compare(b) {
+          const d = b.data;
+          const items = d.items || [];
+          if (b.v === 'cards') return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(d.title || 'Сравним варианты')}</h2>
+  <div class="cmp2" data-plist="${b.id}:items">
+    ${['a', 'b'].map((side) => `<div class="cmp2-c ${side === 'a' ? 'acc' : ''}"><div class="cmp2-h"${be(b.id, side === 'a' ? 'headA' : 'headB')}>${esc(side === 'a' ? (d.headA || 'Вариант A') : (d.headB || 'Вариант B'))}</div>
+      ${items.map((it, i2) => `<div class="cmp2-r"><span${be(b.id, 'items', i2 + ':k')}>${esc(it.k)}</span><b${be(b.id, 'items', i2 + ':' + side)}>${esc(it[side])}</b></div>`).join('')}</div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(d.title || 'Сравним варианты')}</h2>
+  <div class="uwrap"><table class="units cmpt" data-plist="${b.id}:items"><tr><th></th><th${be(b.id, 'headA')}>${esc(d.headA || 'Вариант A')}</th><th${be(b.id, 'headB')}>${esc(d.headB || 'Вариант B')}</th></tr>
+    ${items.map((it, i2) => `<tr><td class="cmpk"${be(b.id, 'items', i2 + ':k')}>${esc(it.k)}</td><td${be(b.id, 'items', i2 + ':a')}>${esc(it.a)}</td><td${be(b.id, 'items', i2 + ':b')}>${esc(it.b)}</td></tr>`).join('')}</table></div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        timeline(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Как пройдёт покупка')}</h2>
+  <div class="tl ${b.v === 'horizontal' ? 'hz' : ''}" data-plist="${b.id}:items">
+    ${items.map((it, i2) => `<div class="tl-i"><span class="tl-dot"></span><i class="tl-when"${be(b.id, 'items', i2 + ':when')}>${esc(it.when)}</i><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title)}</b><span class="tl-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</span></div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        pricecards(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Форматы работы')}</h2>
+  <div class="pcards ${b.v === 'minimal' ? 'min' : ''}" data-plist="${b.id}:items">
+    ${items.map((it, i2) => `<div class="pcard ${i2 === 0 ? 'acc' : ''}"><b${be(b.id, 'items', i2 + ':name')}>${esc(it.name)}</b><div class="pc-price"${be(b.id, 'items', i2 + ':price')}>${esc(it.price)}</div><div class="pc-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</div></div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        bignum(b) {
+          const d = b.data;
+          return `<section class="pg bignum ${b.v === 'blue' ? 'blue' : ''}">
+  <div class="bn-v"${be(b.id, 'v')}>${esc(d.v || '')}</div>
+  <div class="bn-k"${be(b.id, 'k')}>${esc(d.k || '')}</div>
+</section>`;
+        },
+        checklist(b) {
+          const items = b.data.bullets || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Чек-лист')}</h2>
+  <div class="ckl ${b.v === 'cols' ? 'cols' : ''}" data-plist="${b.id}:bullets">
+    ${items.map((it, i2) => `<div class="ck"><span class="ck-m">✓</span><span${be(b.id, 'bullets', i2)}>${esc(it)}</span></div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        textimg(b) {
+          const d = b.data;
+          return `<section class="pg">
+  <div class="tximg ${b.v === 'imgleft' ? 'flip' : ''}">
+    <div class="tx-side">${d.title || isEdit ? `<h2 class="ph2"${be(b.id, 'title')}>${esc(d.title || '')}</h2>` : ''}<div class="tbody"${be(b.id, 'body')}>${esc(d.body || '')}</div></div>
+    <div class="tx-img" ${bg(d.img)}>${d.img ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼</div>` : ''}</div>
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        team(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Команда')}</h2>
+  <div class="tmm ${b.v === 'strip' ? 'strip' : ''}" data-plist="${b.id}:items">
+    ${items.map((it, i2) => `<div class="tm"><span class="tm-a">${esc((it.name || '·').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</span><b${be(b.id, 'items', i2 + ':name')}>${esc(it.name)}</b><span class="tm-r"${be(b.id, 'items', i2 + ':role')}>${esc(it.role)}</span></div>`).join('')}
+  </div>
   <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
         },
@@ -1709,6 +1925,7 @@ const server = http.createServer(async (req, res) => {
   <p${be(b.id, 'sub')}>${esc(d.sub || 'чтобы получить подробности, планировки и расчёт доходности по нему')}</p>
   <a class="ctabtn" href="${waHref}"><span${be(b.id, 'btn')}>${esc(d.btn || 'Написать в WhatsApp')}</span></a>`;
           if (b.v === 'card') return `<section class="pg"><div class="ctacard">${inner}</div></section>`;
+          if (b.v === 'photo') return `<section class="cta ctaphoto" ${bg(d.img || heroImg)}><div class="cshade"></div><div class="cta-in">${inner}</div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img || heroImg)}>🖼</div>` : ''}</section>`;
           return `<section class="cta">${inner}</section>`;
         },
         why(b) {
@@ -1862,7 +2079,78 @@ table.units{width:100%;border-collapse:collapse;font-size:13.5px;min-width:430px
 .step span{display:block;font-size:13.5px;line-height:1.5;color:var(--mut);margin-top:5px}
 .freenote{font-weight:700;margin-top:22px;font-size:15px}
 .officetxt{margin-top:12px;font-size:15px;line-height:1.6}
+.cover.csplit{flex-direction:row;padding:0;min-height:88vh}
+.cs-l{flex:1.15;padding:44px 34px;display:flex;flex-direction:column;justify-content:center}
+.cs-r{flex:1;background-size:cover;background-position:center;position:relative;background-image:linear-gradient(160deg,#3F5BE8,#0E1B8C)}
+.cta.ctaphoto{position:relative;background-size:cover;background-position:center;color:#fff}
+.cta.ctaphoto .cta-in{position:relative}
+.cta.ctaphoto p{color:rgba(255,255,255,.85)}
+.qbig{text-align:center;padding:80px 38px}
+.qbig .qmark{margin:0 auto 20px}
+.qbig .qtext{font-size:26px;line-height:1.45;font-weight:700;letter-spacing:-.3px}
+.qbig .qwho{margin-top:24px}
+.ggrid.masonry{columns:3;column-gap:10px;display:block}
+.ggrid.masonry .gcell{margin-bottom:10px;break-inside:avoid;min-height:150px}
+.steps.rowv{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.bfts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:8px}
+.bfts.list{grid-template-columns:1fr}
+.bft{background:var(--bg);border-radius:12px;padding:20px 18px}
+.blue .bft{background:rgba(255,255,255,.1)}
+.bfts.list .bft{display:flex;gap:14px;align-items:center;padding:14px 18px}
+.bft-i{font-size:22px;display:block;margin-bottom:10px}
+.bfts.list .bft-i{margin:0}
+.bft b{display:block;font-size:15px}
+.bft-t{display:block;font-size:13.5px;line-height:1.5;color:var(--mut);margin-top:4px}
+.blue .bft-t{color:rgba(255,255,255,.75)}
+.cmp2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cmp2-c{border:1.5px solid #E2E2E6;border-radius:12px;padding:18px}
+.cmp2-c.acc{border-color:var(--blue);box-shadow:0 8px 24px rgba(29,52,216,.1)}
+.cmp2-h{font-weight:800;font-size:15px;margin-bottom:12px}
+.cmp2-r{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-top:1px solid #EEE}
+.cmp2-r b{font-weight:750}
+.cmpt .cmpk{color:var(--mut)}
+.tl{position:relative;margin-top:10px;padding-left:24px}
+.tl::before{content:'';position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:#E2E2E6}
+.tl-i{position:relative;padding:0 0 22px}
+.tl-dot{position:absolute;left:-24px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 3px #E6EBFF}
+.tl-when{display:block;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.tl-i b{display:block;font-size:15.5px;margin-top:3px}
+.tl-t{display:block;font-size:13.5px;color:var(--mut);line-height:1.5;margin-top:3px}
+.tl.hz{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;padding-left:0}
+.tl.hz::before{display:none}
+.tl.hz .tl-dot{position:static;display:inline-block;margin-bottom:8px}
+.tl.hz .tl-i{padding:0}
+.pcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:8px}
+.pcard{border:1.5px solid #E2E2E6;border-radius:14px;padding:24px 22px}
+.pcard.acc{border-color:var(--blue);background:linear-gradient(170deg,#F6F8FF,#fff)}
+.pcard b{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.pc-price{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:8px 0 12px}
+.pcard.acc .pc-price{color:var(--blue)}
+.pc-t{font-size:13.5px;line-height:1.55;color:#2A2E3A;white-space:pre-line}
+.pcards.min .pcard{border:none;border-left:3px solid var(--blue);border-radius:4px;padding:6px 0 6px 18px}
+.bignum{text-align:center;padding:70px 38px}
+.bn-v{font-size:64px;font-weight:800;letter-spacing:-2px;color:var(--blue)}
+.blue .bn-v,.bignum.blue .bn-v{color:#fff}
+.bn-k{font-size:15.5px;line-height:1.55;color:var(--mut);max-width:420px;margin:14px auto 0}
+.bignum.blue .bn-k{color:rgba(255,255,255,.8)}
+.ckl{margin-top:6px}
+.ckl.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+.ck{display:flex;gap:12px;align-items:flex-start;padding:9px 0;font-size:14.5px;line-height:1.5}
+.ck-m{flex:0 0 22px;height:22px;border-radius:50%;background:#E4F7EC;color:#148A4E;font-weight:800;font-size:12px;display:grid;place-items:center;margin-top:1px}
+.tximg{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:stretch}
+.tximg.flip .tx-side{order:2}
+.tximg.flip .tx-img{order:1}
+.tx-img{border-radius:10px;background:linear-gradient(160deg,#E8EAF2,#D5D9E8) center/cover;min-height:260px;position:relative}
+.tmm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:8px}
+.tm{background:var(--bg);border-radius:12px;padding:20px 18px;text-align:center}
+.tm-a{width:52px;height:52px;border-radius:50%;background:linear-gradient(140deg,#3F5BE8,#0E1B8C);color:#fff;font-weight:800;display:grid;place-items:center;margin:0 auto 12px;font-size:16px}
+.tm b{display:block;font-size:14.5px}
+.tm-r{display:block;font-size:12.5px;color:var(--mut);margin-top:3px}
+.tmm.strip{grid-template-columns:1fr}
+.tmm.strip .tm{display:flex;gap:14px;align-items:center;text-align:left;padding:12px 16px}
+.tmm.strip .tm-a{margin:0;width:42px;height:42px;font-size:13px}
 .imghot{display:none}
+@media(max-width:560px){.cover.csplit{flex-direction:column}.cs-r{min-height:220px}.cmp2{grid-template-columns:1fr}.ckl.cols{grid-template-columns:1fr}.tximg{grid-template-columns:1fr}.ggrid.masonry{columns:2}.bn-v{font-size:44px}}
 @media print{body{background:#fff}.book{box-shadow:none;max-width:none}.blue,.rec,.shot.grad,.coverimg.grad,.mgrph,.sepimg,.dmap,.step i,.cshade{-webkit-print-color-adjust:exact;print-color-adjust:exact}.ctabtn{display:none}.uwrap{overflow:visible}}
 @media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.mt b{white-space:normal}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}.bigimg.inset{margin:0}.stats{flex-direction:column}}
 </style></head><body><div class="book">
