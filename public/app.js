@@ -556,42 +556,104 @@ PAGES.overview = async (root) => {
 
 /* ---------------- ВОРОНКА (канбан) ---------------- */
 PAGES.funnel = async (root) => {
-  const leads = await api.get('/leads' + (PAGE_STATE.funnelGeo ? '?geo=' + PAGE_STATE.funnelGeo : ''));
+  const all = await api.get('/leads');
+  const F = PAGE_STATE;
   const geos = STATE.settings.agency.geos;
-  const dupes = await api.get('/duplicates');
+  const q = (F.funnelQ || '').toLowerCase();
+  const leads = all.filter(l =>
+    (!F.funnelGeo || l.geo === F.funnelGeo) &&
+    (!F.funnelSrc || l.source === F.funnelSrc) &&
+    (!F.funnelBroker || l.broker === F.funnelBroker) &&
+    (!q || l.name.toLowerCase().includes(q) || l.phone.includes(q)) &&
+    (!F.funnelFlag ||
+      (F.funnelFlag === 'overdue' && l.nextAction && l.nextAction.at && l.nextAction.at < Date.now()) ||
+      (F.funnelFlag === 'human' && (l.tags || []).includes('нужен человек')) ||
+      (F.funnelFlag === 'hot' && l.hint && l.hint.kind === 'act') ||
+      (F.funnelFlag === 'ai' && l.ai && l.ai.enabled)));
+  const srcs = [...new Set(all.map(l => l.source))];
+  const view = F.funnelView || 'kanban';
+  const srcName = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA' };
+
   root.innerHTML = `
     <div class="filters">
-      <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${PAGE_STATE.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
-      <span class="muted" style="font-size:12px">${leads.length} лидов · карточки можно перетаскивать между стадиями</span>
+      <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:180px">
+      <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${F.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
+      <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
+      <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+      <div class="seg-toggle">
+        ${[['', 'Все'], ['hot', '🔥 Горячие'], ['overdue', '⏰ Просрочка'], ['human', '✋ Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
+      </div>
       <span class="tb-spacer"></span>
-      ${dupes.length ? `<button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли: <b style="color:var(--bad)">&nbsp;${dupes.length}</b></button>` : `<span class="badge ok">${ic(I.check)}дублей нет</span>`}
+      <button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли</button>
+      <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
+      <div class="seg-toggle">
+        <button class="seg-btn ${view === 'kanban' ? 'on' : ''}" data-view="kanban" title="Канбан">${ic(I.grid)}</button>
+        <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
+      </div>
     </div>
+    ${view === 'kanban' ? `
     <div class="kanban">
-      ${STAGES.map(s => {
-        const items = leads.filter(l => l.stage === s.id);
-        return `<div class="kb-col" data-stage="${s.id}">
-          <div class="kb-head"><span class="kb-ic">${ic(I[s.icon])}</span><span class="nm">${s.name}</span><span class="ct">${items.length}</span></div>
+      ${STAGES.map(st => {
+        const items = leads.filter(l => l.stage === st.id);
+        return `<div class="kb-col" data-stage="${st.id}">
+          <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct">${items.length}</span></div>
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass" data-id="${l.id}" data-stage="${l.stage}">
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
-              <div class="axes">${Object.keys(AXIS_NAMES).map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
+              <div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
               <div class="foot">
-                ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ ведёт</span>' : ''}
+                ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ</span>' : ''}
                 ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
                 ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
                 ${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? '<span class="mini-badge warn">просрочен шаг</span>' : ''}
+                ${(l.tags || []).includes('нужен человек') ? '<span class="mini-badge warn">✋</span>' : ''}
                 <span class="tm">${ago(l.lastMsgAt || l.createdAt)}</span>
               </div>
             </div>`).join('') || '<div class="empty" style="padding:14px;font-size:11.5px">пусто</div>'}
           </div>
         </div>`;
       }).join('')}
-    </div>`;
-  $('#fGeo').addEventListener('change', (e) => { PAGE_STATE.funnelGeo = e.target.value; render(); });
+    </div>` : `
+    <div class="glass card" style="padding:8px 0">
+      <table class="tbl lead-tbl"><thead><tr>
+        ${[['name', 'Лид'], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['broker', 'Брокер'], ['last', 'Контакт'], ['next', 'Следующий шаг']].map(([k, n]) => `<th data-sort="${k}" style="cursor:pointer">${n}${F.funnelSort === k ? ' ↓' : ''}</th>`).join('')}
+      </tr></thead><tbody>
+        ${leads.sort((a, b) => {
+          const k = F.funnelSort;
+          if (k === 'budget') return ((b.quals.budget || {}).num || 0) - ((a.quals.budget || {}).num || 0);
+          if (k === 'axes') return b.axesFilled - a.axesFilled;
+          if (k === 'stage') return STAGES.findIndex(x => x.id === a.stage) - STAGES.findIndex(x => x.id === b.stage);
+          if (k === 'last') return (b.lastMsgAt || 0) - (a.lastMsgAt || 0);
+          if (k === 'broker') return (a.brokerName || 'я').localeCompare(b.brokerName || 'я');
+          if (k === 'geo') return a.geo.localeCompare(b.geo);
+          if (k === 'next') return ((a.nextAction || {}).at || Infinity) - ((b.nextAction || {}).at || Infinity);
+          return a.name.localeCompare(b.name);
+        }).map(l => `<tr data-row="${l.id}" style="cursor:pointer">
+          <td><div style="display:flex;gap:9px;align-items:center">${avaHtml(l, 28)}<div><b>${esc(l.name)}</b><div class="muted" style="font-size:10.5px">${esc(l.phone)}</div></div></div></td>
+          <td><span class="badge ${['qualified', 'handover', 'deal'].includes(l.stage) ? 'ok' : l.stage === 'sleeping' ? '' : 'acc'}">${stageName(l.stage)}</span></td>
+          <td>${l.geoName}</td>
+          <td>${(l.quals.budget || {}).value || '—'}</td>
+          <td><div class="axes" style="width:52px;margin:0">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div></td>
+          <td>${l.brokerName ? esc(l.brokerName.split(' ')[0]) : '—'}</td>
+          <td class="muted" style="font-size:11.5px">${ago(l.lastMsgAt || l.createdAt)}</td>
+          <td style="font-size:11.5px;${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? 'color:var(--bad);font-weight:650' : ''}">${l.nextAction ? esc(l.nextAction.text.slice(0, 34)) : '—'}</td>
+        </tr>`).join('')}
+      </tbody></table>
+    </div>`}`;
+
+  const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
+  $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
+  $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
+  $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
+  $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
+  $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
+  $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
+  $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
+  $$('[data-row]', root).forEach(r => r.addEventListener('click', () => openLeadModal(r.dataset.row)));
   $$('.lead-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) openLeadModal(c.dataset.id); }));
   const db = $('#dupesBtn');
-  if (db) db.addEventListener('click', () => openDupesModal(dupes));
+  if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
 };
 
@@ -938,10 +1000,7 @@ function openMeetingModal(lead, after) {
   });
 }
 
-/* ============================================================
-   Полная карточка лида: хронология (переписка+события+заметки),
-   комментарии, доп-контакты, встречи с видео-ссылкой
-   ============================================================ */
+
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
