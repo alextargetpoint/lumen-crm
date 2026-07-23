@@ -473,6 +473,90 @@ function inbound(db, lead, text, opts = {}) {
   return m;
 }
 
+/* ---------- отчёты владельцу в мессенджер ---------- */
+function buildReport(db, period) {
+  const now = Date.now();
+  const span = period === 'monthly' ? 30 : period === 'weekly' ? 7 : 1;
+  const from = now - span * 24 * 3600e3;
+  const L = db.leads;
+  const inPeriod = (t) => t && t >= from;
+  const newLeads = L.filter(l => inPeriod(l.createdAt));
+  const quals = L.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage) && inPeriod(l.lastMsgAt));
+  const deals = L.filter(l => l.stage === 'deal');
+  const meets = (db.meetings || []).filter(mt => inPeriod(mt.at) || (mt.at > now && mt.at < now + 2 * 24 * 3600e3));
+  const views = (db.collections || []).filter(c => inPeriod(c.lastViewAt));
+  const waiting = L.filter(l => (l.tags || []).includes('нужен человек'));
+  const overdue = L.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < now && !['deal', 'lost'].includes(l.stage));
+  const pName = { daily: 'за сутки', weekly: 'за неделю', monthly: 'за месяц' }[period];
+  const lines = [
+    `📊 ${db.settings.agency.name} — сводка ${pName}`,
+    ``,
+    `Новые лиды: ${newLeads.length}`,
+    `Квалифицировано: ${quals.length}`,
+    `Сделки (всего в работе): ${deals.length}`,
+    `Встречи (прошедшие/ближайшие): ${meets.length}`,
+    views.length ? `🔥 Смотрели подборки: ${views.map(c => (db.leads.find(l => l.id === c.leadId) || {}).name).filter(Boolean).join(', ')}` : null,
+    waiting.length ? `⚠️ Ждут живого менеджера: ${waiting.map(l => l.name).join(', ')}` : null,
+    overdue.length ? `⏰ Просроченные шаги: ${overdue.slice(0, 5).map(l => l.name + ' — ' + l.nextAction.text).join('; ')}` : null,
+    ``,
+    `Открыть CRM: ${tunnelBase() || 'http://localhost:' + (process.env.PORT || 5077)}`,
+  ].filter(x => x !== null);
+  return lines.join('\n');
+}
+
+function tunnelBase() {
+  try {
+    const log = require('fs').readFileSync('/tmp/lumen-tunnel.log', 'utf8');
+    const m = log.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g);
+    return m ? m[m.length - 1] : null;
+  } catch { return null; }
+}
+
+async function sendReport(db, text) {
+  const rp = db.settings.reports || {};
+  const ch = db.settings.channels || {};
+  if (rp.channel === 'tg' && ch.tg?.botToken && rp.tgChatId) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${ch.tg.botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: rp.tgChatId, text }),
+      });
+      return r.ok ? 'tg' : 'tg_error';
+    } catch { return 'tg_error'; }
+  }
+  ai.pushEvent(db, { type: 'msg_in', text: 'Сводка готова (подключите Telegram-бот и chat_id в «Автоматизациях», чтобы получать её в мессенджер)' });
+  return 'event_only';
+}
+
+function tickReports(db) {
+  const rp = db.settings.reports;
+  if (!rp) return;
+  const now = new Date();
+  const [hh, mm] = String(rp.dailyAt || '09:00').split(':').map(Number);
+  const key = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  const fire = async (period, lastKey) => {
+    if (rp[lastKey] === key) return;
+    rp[lastKey] = key;
+    const text = buildReport(db, period);
+    await sendReport(db, text);
+    ai.pushEvent(db, { type: 'msg_in', text: `Сводка ${period === 'daily' ? 'за сутки' : period === 'weekly' ? 'за неделю' : 'за месяц'} отправлена` });
+  };
+  if (now.getHours() === hh && now.getMinutes() >= mm && now.getMinutes() < mm + 6) {
+    if (rp.daily) fire('daily', 'lastDaily');
+    if (rp.weekly && now.getDay() === 1) fire('weekly', 'lastWeekly');
+    if (rp.monthly && now.getDate() === 1) fire('monthly', 'lastMonthly');
+  }
+}
+
+/* мгновенные уведомления о важном: обёртка pushEvent-типов */
+function maybeInstantNotify(db, e) {
+  const rp = db.settings.reports || {};
+  const inst = rp.instant || {};
+  const map = { view: 'hotView', qualified: 'qualified', ai_off: 'aiOff', deal: 'deal' };
+  const k = map[e.type];
+  if (k && inst[k]) sendReport(db, '🔔 ' + e.text);
+}
+
 /* ---------- основной цикл ---------- */
 function startLoop() {
   setInterval(() => {
@@ -481,10 +565,11 @@ function startLoop() {
       tickChains(db);
       tickCampaigns(db);
       tickMeetings(db);
+      tickReports(db);
       tickSimulator(db);
       store.save();
     } catch (e) { console.error('[engine]', e); }
   }, 5000);
 }
 
-module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift };
+module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify };

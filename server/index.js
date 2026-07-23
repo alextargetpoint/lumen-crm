@@ -69,6 +69,12 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
   if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
+  if (!db.settings.reports) db.settings.reports = {
+    channel: 'tg', tgChatId: '',
+    daily: true, dailyAt: '09:00', weekly: true, monthly: true,
+    instant: { hotView: true, qualified: true, aiOff: true, deal: true },
+    lastDaily: 0, lastWeekly: 0, lastMonthly: 0,
+  };
   if (!db.settings.channels) db.settings.channels = {
     priority: ['wa', 'tg', 'viber', 'email'],
     enabled: { wa: true, tg: false, viber: false, email: false },
@@ -82,6 +88,33 @@ const DEFAULT_PASS = 'lumen2026';
     if (!l.avatarUrl) l.avatarUrl = null;
   }
   for (const sq of db.sequences) if (!sq.geo) sq.geo = 'all';
+  if (!db.settings.chainV4) {
+    db.settings.chainV4 = true;
+    const std = db.sequences.find(sq => sq.id === 'seq_default');
+    if (std) {
+      std.name = 'Стандартная · RU-нативная';
+      std.steps = [
+        { day: 0, channel: 'wa', mode: 'text', label: '1 · мгновенно, по конкретной заявке', active: true,
+          text: '{name}, добрый день! Видел вашу заявку по {ad}.\n{priceLine}Есть 2–3 сильных варианта в этой вилке, пока их не разобрали по брони. Скинуть сюда коротко, без простыни?' },
+        { day: 0.15, channel: 'wa', mode: 'text', label: '2 · знакомство + развилка цели (~3 ч)', active: true,
+          text: 'И сразу представлюсь — {agency}. Чтобы не заваливать вас лишним: смотрите под переезд или под доход? От этого зависит, что покажу первым.' },
+        { day: 1, channel: 'wa', mode: 'text', label: '3 · конкретика вместо рекламы (день 2)', active: true,
+          text: '{name}, чтобы предметно: могу прислать расчёт по конкретному юниту — цена, план платежей, что реально по аренде. Не общие слова, а цифры, по которым можно решать.\nНадо?' },
+        { day: 2, channel: 'wa', mode: 'text', label: '4 · подборка под запрос (день 3)', active: true,
+          text: 'Могу собрать под ваш запрос подборку: 3–4 юнита по {geo}, по каждому план платежей и картинка по аренде.\nЕсли такой формат заходит — соберу сегодня и пришлю ссылкой.' },
+        { day: 3, channel: 'wa', mode: 'text', label: '5 · голосом проще (день 4)', active: true,
+          text: 'Слушайте, проще один раз голосом: за 10 минут покажу, что реально стоит брать в вашей вилке, и отвечу на вопросы.\n{countryQ}' },
+        { day: 6, channel: 'wa', mode: 'text', label: '6 · прямой вопрос, без обид (день 7)', active: true,
+          text: '{name}, не буду доставать сообщениями. Скажите прямо: тема ещё актуальна или отложили?\nЕсли отложили — тоже нормально: закреплю за вами контакт и вернусь, когда скажете.' },
+      ];
+    }
+    const b2c = db.sequences.find(sq => sq.id === 'seq_b2c_2025');
+    if (b2c && b2c.steps[1]) {
+      b2c.steps[1].text = 'И сразу представлюсь — {agency}. Работаем с застройщиками напрямую, так что цены у нас те же, что в офисе продаж, а вот выбор юнитов — до открытия общих продаж.\nВы под переезд смотрите или под доход?';
+    }
+    const t1 = db.templates.find(t => t.id === 'tpl_first_ru');
+    if (t1) t1.body = '{name}, добрый день! Видел вашу заявку по {ad}. {priceLine}Есть 2–3 сильных варианта в этой вилке — скинуть сюда коротко?';
+  }
   if (!db.settings.chainV3) {
     db.settings.chainV3 = true;
     const std = db.sequences.find(sq => sq.id === 'seq_default');
@@ -524,6 +557,14 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { logo: db.settings.agency.logo });
     }
 
+    /* ---------------- отчёты: тестовая сводка ---------------- */
+    if (p === '/api/reports/test' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const text = engine.buildReport(db, 'daily');
+      const sent = await engine.sendReport(db, text);
+      return json(res, 200, { text, sent });
+    }
+
     /* ---------------- голос ElevenLabs: тест генерации ---------------- */
     if (p === '/api/voice/test' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -875,6 +916,7 @@ const server = http.createServer(async (req, res) => {
         if (b.channels.secondRound != null) ch.secondRound = b.channels.secondRound;
         delete b.channels;
       }
+      if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение

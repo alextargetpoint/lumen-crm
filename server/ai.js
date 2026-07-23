@@ -166,8 +166,10 @@ function onInbound(db, lead, text) {
 }
 
 function pushEvent(db, e) {
-  db.events.unshift(Object.assign({ at: Date.now() }, e));
+  const ev = Object.assign({ at: Date.now() }, e);
+  db.events.unshift(ev);
   if (db.events.length > 300) db.events.length = 300;
+  try { require('./engine').maybeInstantNotify(db, ev); } catch (_) {}
 }
 
 module.exports = { screen, onInbound, nextQuestion, buildSummary, pushEvent, AXES, extractBudget };

@@ -608,16 +608,20 @@ function wireShelfDrag(root, itemSel, onDrop) {
         DRAG.moved = true; DRAG.active = true;
         const r = card.getBoundingClientRect();
         ghost = card.cloneNode(true);
-        ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${Math.min(r.width, 260)}px;z-index:400;pointer-events:none;opacity:.9;transform:rotate(2deg) scale(.9);box-shadow:var(--shadow-lift)`;
+        ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${Math.min(r.width, 260)}px;z-index:400;pointer-events:none;opacity:.92;box-shadow:var(--shadow-lift);transition:transform .25s var(--ease-spring);transform:rotate(0) scale(1)`;
         document.body.appendChild(ghost);
-        card.style.opacity = '.4';
+        requestAnimationFrame(() => { ghost.style.transform = 'rotate(2.5deg) scale(.88)'; });
+        card.style.opacity = '.35';
+        card.style.transition = 'opacity .2s';
       }
       ghost.style.left = (ev.clientX - 60) + 'px';
       ghost.style.top = (ev.clientY - 30) + 'px';
       $$('.fold', root).forEach(f => f.classList.remove('drop'));
+      $$(itemSel, root).forEach(x => x.classList.remove('stack-target'));
       const under = document.elementFromPoint(ev.clientX, ev.clientY);
       const fold = under && under.closest('.fold[data-fid], .fold[data-cfid]');
       if (fold) fold.classList.add('drop');
+      else { const ov = under && under.closest(itemSel); if (ov && ov !== card && card.dataset.dragprop) ov.classList.add('stack-target'); }
     };
     const onUp = async (ev) => {
       document.removeEventListener('pointermove', onMove);
@@ -628,10 +632,38 @@ function wireShelfDrag(root, itemSel, onDrop) {
       const under = document.elementFromPoint(ev.clientX, ev.clientY);
       const fold = under && under.closest('.fold[data-fid], .fold[data-cfid]');
       $$('.fold', root).forEach(f => f.classList.remove('drop'));
+      $$(itemSel, root).forEach(x => x.classList.remove('stack-target'));
       setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
       if (fold) {
         await onDrop(card.dataset.dragprop || card.dataset.dragcoll, fold.dataset.fid || fold.dataset.cfid);
         toast('Разложено в папку', null, true);
+        return;
+      }
+      /* наслоение объекта на объект → предложить собрать из них подборку/папку (iOS-паттерн) */
+      const other = under && under.closest(itemSel);
+      if (other && other !== card && card.dataset.dragprop) {
+        const a = card.dataset.dragprop, b2 = other.dataset.dragprop;
+        other.classList.add('stack-pop');
+        setTimeout(() => other.classList.remove('stack-pop'), 500);
+        modal({
+          title: 'Два объекта вместе',
+          sub: 'Вы наложили один объект на другой — собрать из них что-то?',
+          actions: [
+            { label: 'Подборку из двух', cls: 'btn-accent', onClick: async () => {
+              await api.post('/collections', { title: 'Подборка · 2 объекта', propertyIds: [b2, a] });
+              toast('Подборка создана', 'Открываю «Подборки»', true);
+              PAGE_STATE.collLead = '';
+              go('collections');
+            } },
+            { label: 'Папку с ними', onClick: async () => {
+              const f = await api.post('/folders', { name: 'Новая папка', kind: 'prop' });
+              await api.patch('/properties/' + a, { folderId: f.id });
+              await api.patch('/properties/' + b2, { folderId: f.id });
+              render();
+            } },
+            { label: 'Отмена' },
+          ],
+        });
       }
     };
     document.addEventListener('pointermove', onMove);
@@ -726,13 +758,16 @@ PAGES.meetings = async (root) => {
   const mon = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day + wk * 7); d.setHours(0, 0, 0, 0); return d; })();
   const H0 = 9, H1 = 21, HPX = 44;
   const dayCols = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
-  const calBlocks = (d) => list.filter(mt => { const t = new Date(mt.at); return t.toDateString() === d.toDateString(); })
+  const brF = PAGE_STATE.calBroker || '';
+  const listF = brF ? list.filter(mt => mt.brokerId === brF) : list;
+  const calBlocks = (d) => listF.filter(mt => { const t = new Date(mt.at); return t.toDateString() === d.toDateString(); })
     .map(mt => { const t = new Date(mt.at); const top = Math.max(0, (t.getHours() + t.getMinutes() / 60 - H0) * HPX);
-      return `<div class="cal-ev st-${mt.status}" style="top:${top}px" data-mtid="${mt.id}" title="${esc(mt.leadName)}"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span></div>`; }).join('');
+      return `<div class="cal-ev st-${mt.status}" style="top:${top}px" data-mtid="${mt.id}" data-mtdrag="${mt.id}" title="${esc(mt.leadName)} · перетащите для переноса"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span></div>`; }).join('');
   const calHtml = `
     <div class="glass card mb">
       <div class="card-title">${ic(I.cal)}Календарь недели
         <span class="sub" style="display:flex;gap:8px;align-items:center">
+          <select id="calBroker" style="width:150px"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${brF === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
           <button class="btn btn-sm" id="calPrev">${ic(I.chev)}</button>
           <b style="color:var(--navy-900)">${mon.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${dayCols[6].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</b>
           <button class="btn btn-sm" id="calNext" style="transform:none">${ic(I.chev)}</button>
@@ -741,7 +776,7 @@ PAGES.meetings = async (root) => {
         <div class="cal-hours">${Array.from({ length: H1 - H0 }, (_, i) => `<div>${H0 + i}:00</div>`).join('')}</div>
         ${dayCols.map(d => `<div class="cal-day ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" data-day="${d.toISOString().slice(0, 10)}">
           <div class="cal-dhead">${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][(d.getDay() + 6) % 7]} <b>${d.getDate()}</b></div>
-          <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${calBlocks(d)}
+          <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${d.toDateString() === new Date().toDateString() && new Date().getHours() >= H0 && new Date().getHours() < H1 ? `<div class="cal-now" style="top:${(new Date().getHours() + new Date().getMinutes() / 60 - H0) * HPX}px"></div>` : ''}${calBlocks(d)}
             ${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cal-slot" style="top:${i * HPX}px" data-h="${H0 + i}"></div>`).join('')}</div>
         </div>`).join('')}
       </div>
@@ -783,7 +818,74 @@ PAGES.meetings = async (root) => {
   }));
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
-  $$('.cal-ev', root).forEach(ev => ev.addEventListener('click', () => { const mt = list.find(x => x.id === ev.dataset.mtid); if (mt) openLeadModal(mt.leadId); }));
+  $('#calBroker').addEventListener('change', (e) => { PAGE_STATE.calBroker = e.target.value; render(); });
+  $$('.cal-ev', root).forEach(evEl => {
+    /* клик — быстрый редактор; drag — перенос на другой слот */
+    let dragGhost = null, downAt = null;
+    evEl.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      downAt = { x: e.clientX, y: e.clientY };
+      const mt = list.find(x => x.id === evEl.dataset.mtid);
+      const onMove = (ev2) => {
+        if (!dragGhost && Math.hypot(ev2.clientX - downAt.x, ev2.clientY - downAt.y) < 7) return;
+        if (!dragGhost) {
+          DRAG.moved = true; DRAG.active = true;
+          const r = evEl.getBoundingClientRect();
+          dragGhost = evEl.cloneNode(true);
+          dragGhost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:400;pointer-events:none;opacity:.9`;
+          document.body.appendChild(dragGhost);
+          evEl.style.opacity = '.3';
+        }
+        dragGhost.style.left = (ev2.clientX - 50) + 'px';
+        dragGhost.style.top = (ev2.clientY - 18) + 'px';
+        $$('.cal-slot', root).forEach(x => x.classList.remove('cal-hot'));
+        const under = document.elementFromPoint(ev2.clientX, ev2.clientY);
+        const slot = under && under.closest('.cal-slot');
+        if (slot) slot.classList.add('cal-hot');
+      };
+      const onUp = async (ev2) => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        $$('.cal-slot', root).forEach(x => x.classList.remove('cal-hot'));
+        setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
+        if (!dragGhost) {
+          /* клик: быстрый редактор встречи */
+          modal({
+            title: 'Встреча · ' + esc(mt.leadName),
+            sub: `${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${esc(mt.brokerName)}${mt.link ? ' · есть видео-комната' : ''}`,
+            body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="form-row"><label>Дата</label><input id="emDate" type="date" value="${(d2 => `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}-${String(d2.getDate()).padStart(2, '0')}`)(new Date(mt.at))}"></div>
+              <div class="form-row"><label>Время</label><input id="emTime" type="time" value="${tmm(mt.at)}"></div></div>`,
+            actions: [
+              { label: 'Перенести', cls: 'btn-accent', onClick: async (bd) => {
+                const at = new Date($('#emDate', bd).value + 'T' + $('#emTime', bd).value).getTime();
+                await api.patch('/meetings/' + mt.id, { at });
+                render();
+              } },
+              { label: 'Карточка лида', onClick: () => openLeadModal(mt.leadId) },
+              { label: 'Закрыть' },
+            ],
+          });
+          dragGhost = null;
+          return;
+        }
+        dragGhost.remove();
+        evEl.style.opacity = '';
+        const under = document.elementFromPoint(ev2.clientX, ev2.clientY);
+        const slot = under && under.closest('.cal-slot');
+        if (slot) {
+          const day = slot.closest('.cal-day').dataset.day;
+          const at = new Date(day + 'T' + String(slot.dataset.h).padStart(2, '0') + ':00').getTime();
+          await api.patch('/meetings/' + mt.id, { at });
+          toast('Встреча перенесена', new Date(at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), true);
+          render();
+        }
+        dragGhost = null;
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  });
   $$('.cal-slot', root).forEach(slot => slot.addEventListener('click', async () => {
     const day = slot.closest('.cal-day').dataset.day;
     const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
@@ -1673,10 +1775,10 @@ PAGES.properties = async (root) => {
     </div>
     <div class="shelf">
       <div class="fold ${!folderF ? 'active' : ''}" data-fopen="">
-        <img src="assets/folder.jpg"><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
+        <img src="assets/folder.png"><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
       </div>
       ${folders.map(f => `<div class="fold ${folderF === f.id ? 'active' : ''}" data-fopen="${f.id}" data-fid="${f.id}">
-        <img src="assets/folder.jpg">
+        <img src="assets/folder.png">
         <div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count} объект(ов)</i></div>
         <div class="fold-acts">
           <button class="btn-ghost" data-fcoll="${f.id}" title="Собрать подборку из папки">${ic(I.layers)}</button>
@@ -1775,9 +1877,9 @@ PAGES.collections = async (root) => {
       </div>
       <div>
         <div class="shelf shelf-sm">
-          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><img src="assets/folder.jpg"><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
+          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><img src="assets/folder.png"><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
           ${cFolders.map(f => `<div class="fold ${cFolderF === f.id ? 'active' : ''}" data-cfopen="${f.id}" data-cfid="${f.id}">
-            <img src="assets/folder.jpg"><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
+            <img src="assets/folder.png"><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
             <div class="fold-acts"><button class="btn-ghost" data-cfdel2="${f.id}">${ic(I.x)}</button></div>
           </div>`).join('')}
           <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
@@ -1951,6 +2053,18 @@ PAGES.automations = async (root) => {
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
+          ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
+          ${swRow('Еженедельная (пн) и ежемесячная (1-е)', 'Расширенные сводки по периодам', sw('rep_weekly', (s.reports || {}).weekly) + sw('rep_monthly', (s.reports || {}).monthly))}
+          ${swRow('Мгновенные уведомления', 'Смотрит подборку · квалифицирован · нужен человек · сделка', sw('rep_instant', Object.values((s.reports || {}).instant || {}).some(Boolean)))}
+          <div style="display:flex;gap:10px;align-items:flex-end;margin-top:8px">
+            <div class="form-row" style="flex:1;margin:0"><label>Telegram chat_id владельца (бот: токен в каскаде ниже; chat_id — напишите боту и возьмите из @userinfobot)</label>
+              <input id="repChat" value="${esc((s.reports || {}).tgChatId || '')}" placeholder="например 123456789"></div>
+            <button class="btn btn-sm" id="repSave">Сохранить</button>
+            <button class="btn btn-sm" id="repTest">${ic(I.send)}Тест-сводка</button>
+          </div>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.send)}Омниканальный каскад</div>
           <div class="muted" style="font-size:11.8px;margin-bottom:10px">Система сама решает, куда писать: идёт по приоритету сверху вниз, пропуская каналы, которых у клиента нет. Молчит весь круг — переключается на следующий канал и делает второй круг касаний.</div>
           <div id="chPrio">${(a2 => (s.channels?.priority || ['wa', 'tg', 'viber', 'email']).map((ch, i2) => {
@@ -2007,6 +2121,20 @@ PAGES.automations = async (root) => {
     </div>`;
   $$('[data-go]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
+  const repPatch = () => ({
+    daily: root.querySelector('[data-auto="rep_daily"]').checked,
+    weekly: root.querySelector('[data-auto="rep_weekly"]').checked,
+    monthly: root.querySelector('[data-auto="rep_monthly"]').checked,
+    dailyAt: root.querySelector('[data-rep-sel="dailyAt"]').value,
+    tgChatId: $('#repChat').value.trim(),
+    instant: (on => ({ hotView: on, qualified: on, aiOff: on, deal: on }))(root.querySelector('[data-auto="rep_instant"]').checked),
+  });
+  $('#repSave').addEventListener('click', async () => { await api.patch('/settings', { reports: repPatch() }); toast('Отчёты настроены', null, true); loadState(); });
+  $('#repTest').addEventListener('click', async () => {
+    await api.patch('/settings', { reports: repPatch() });
+    const r = await api.post('/reports/test');
+    modal({ title: 'Тестовая сводка', sub: r.sent === 'tg' ? 'Отправлена в Telegram' : 'Telegram не подключён — вот как она выглядит:', body: `<pre style="white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:var(--bg);border-radius:10px;padding:14px">${esc(r.text)}</pre>`, wide: true });
+  });
   $$('[data-chmv]', root).forEach(b => b.addEventListener('click', () => {
     const row = b.closest('.ch-prio');
     const sib = +b.dataset.chmv < 0 ? row.previousElementSibling : row.nextElementSibling;
@@ -2027,7 +2155,7 @@ PAGES.automations = async (root) => {
     toast('Каскад сохранён', 'Порядок и каналы применены', true);
     loadState();
   });
-  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (sw2.dataset.auto !== 'chSecond') saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
+  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
   $('#cfType').addEventListener('change', (e) => { $('#cfOptions').style.display = e.target.value === 'select' ? '' : 'none'; });
   $('#cfAdd').addEventListener('click', async () => {
@@ -2253,7 +2381,7 @@ PAGES.brokers = async (root) => {
         </div>
         <div class="form-row"><label>Языки (через запятую)</label><input data-be="langs" value="${esc(b.langs.join(', '))}"></div>
         <label class="lc-lbl">Смены</label>
-        <div style="display:flex;gap:5px;margin:4px 0 10px">${days.map((d, i3) => `<button type="button" class="btn btn-sm day-chip ${(b.schedule?.days || []).includes(i3 + 1) ? 'btn-accent' : ''}" data-d="${i3 + 1}">${d}</button>`).join('')}</div>
+        <div style="display:flex;gap:4px;margin:4px 0 10px;flex-wrap:wrap">${days.map((d, i3) => `<button type="button" class="btn btn-sm day-chip ${(b.schedule?.days || []).includes(i3 + 1) ? 'btn-accent' : ''}" data-d="${i3 + 1}">${d}</button>`).join('')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="form-row"><label>С</label><input data-be="from" type="time" value="${b.schedule?.from || '09:00'}"></div>
           <div class="form-row"><label>До</label><input data-be="to" type="time" value="${b.schedule?.to || '20:00'}"></div>
