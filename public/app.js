@@ -38,7 +38,27 @@ const I = {
   eye: '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
 };
+
+/* ---------- сворачиваемые группы (стекло-стиль, spring-раскрытие) ---------- */
+function coll(title, bodyHtml, opts = {}) {
+  return `<div class="coll ${opts.open === false ? '' : 'open'}">
+    <button class="coll-head" type="button">
+      ${opts.icon ? `<span class="ch-ic">${ic(opts.icon)}</span>` : ''}
+      <span class="ch-t">${title}</span>
+      ${opts.count != null ? `<span class="ch-cnt">${opts.count}</span>` : ''}
+      <span class="chev">${ic(I.chev, 2)}</span>
+    </button>
+    <div class="coll-body"><div class="coll-inner">${bodyHtml}</div></div>
+  </div>`;
+}
+document.addEventListener('click', (e) => {
+  const h = e.target.closest('.coll-head');
+  if (h) h.parentElement.classList.toggle('open');
+});
 
 const NAV = {
   overview:  { name: 'Обзор', icon: I.grid, sub: 'Живая картина отдела продаж' },
@@ -56,15 +76,15 @@ const NAV = {
 };
 
 const STAGES = [
-  { id: 'new', name: 'Новые', color: 'var(--accent-2)' },
-  { id: 'touch', name: 'Первое касание', color: 'var(--accent-2)' },
-  { id: 'dialog', name: 'В диалоге с ИИ', color: 'var(--violet)' },
-  { id: 'qualified', name: 'Квалифицирован', color: 'var(--ok)' },
-  { id: 'handover', name: 'У брокера', color: 'var(--ok)' },
-  { id: 'viewing', name: 'Показ', color: 'var(--warn)' },
-  { id: 'deal', name: 'Сделка', color: 'var(--ok)' },
-  { id: 'sleeping', name: 'Спящие', color: 'var(--ink-3)' },
-  { id: 'lost', name: 'Закрыт', color: 'var(--ink-3)' },
+  { id: 'new', name: 'Новые', icon: 'plus' },
+  { id: 'touch', name: 'Первое касание', icon: 'chain' },
+  { id: 'dialog', name: 'В диалоге с ИИ', icon: 'chat' },
+  { id: 'qualified', name: 'Квалифицирован', icon: 'spark' },
+  { id: 'handover', name: 'У брокера', icon: 'handover' },
+  { id: 'viewing', name: 'Показ', icon: 'eye' },
+  { id: 'deal', name: 'Сделка', icon: 'flame' },
+  { id: 'sleeping', name: 'Спящие', icon: 'moon' },
+  { id: 'lost', name: 'Закрыт', icon: 'x' },
 ];
 const stageName = (id) => (STAGES.find(s => s.id === id) || {}).name || id;
 
@@ -86,16 +106,18 @@ const api = {
 
 /* ---------- экран входа (тёмный, по бренду) ---------- */
 function renderLogin() {
+  hidePreloader();
   if ($('#loginScreen')) return;
-  const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;
-      background:radial-gradient(900px 600px at 80% -10%,rgba(47,107,255,.25),transparent 60%),
-                 radial-gradient(700px 500px at 10% 110%,rgba(16,43,92,.5),transparent 55%),
-                 linear-gradient(160deg,#0A1833,#061126 70%)">
-    <div style="width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
-        background:rgba(255,255,255,.06);border:1px solid rgba(134,175,255,.18);
-        backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-        box-shadow:0 30px 80px -20px rgba(3,8,25,.8);text-align:center">
-      <img src="logo.svg" style="width:44px;height:53px;margin:0 auto 14px;filter:drop-shadow(0 4px 14px rgba(78,130,255,.5))">
+  const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
+    <video autoplay muted loop playsinline src="assets/nebula-bg.mp4"
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
+    <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
+    <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
+        background:rgba(10,24,51,.5);border:1px solid rgba(134,175,255,.2);
+        backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
+        box-shadow:0 30px 80px -20px rgba(3,8,25,.85);text-align:center;
+        animation:reveal .8s var(--ease-spring) both">
+      <img src="logo.svg" class="pl-logo" style="width:44px;height:53px;margin:0 auto 14px">
       <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
       <div style="font-size:10px;letter-spacing:.16em;color:#86AFFF;margin:4px 0 26px">REAL ESTATE CRM</div>
       <input id="loginPass" type="password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);
@@ -163,6 +185,24 @@ async function loadState() {
   $('#agencyName').textContent = STATE.settings.agency.name;
   $('#agencyAva').textContent = STATE.settings.agency.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   $('#demoChip').style.display = STATE.settings.demo.simulateReplies ? 'flex' : 'none';
+  /* живые счётчики в меню: непрочитанные диалоги и активные лиды */
+  const an = STATE.analytics || {};
+  const setCnt = (page, v) => {
+    const b = $$('.nav-item').find(x => x.dataset.page === page);
+    if (!b) return;
+    const c = b.querySelector('[data-cnt]');
+    if (c) { c.textContent = v; c.style.display = v ? '' : 'none'; }
+  };
+  setCnt('inbox', an.unread || 0);
+  setCnt('funnel', an.totalActive || 0);
+}
+
+function hidePreloader() {
+  const p = $('#preloader');
+  if (p && !p.classList.contains('hide')) {
+    p.classList.add('hide');
+    setTimeout(() => p.remove(), 700);
+  }
 }
 
 /* ---------- навигация ---------- */
@@ -178,13 +218,36 @@ function go(page) {
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
+  /* волна входа: анимации только при смене раздела, фоновые обновления без replay */
+  const c = $('#content');
+  c.classList.add('anim');
+  clearTimeout(go._t);
+  go._t = setTimeout(() => c.classList.remove('anim'), 1400);
   render();
+}
+
+/* count-up крупных цифр в волну входа */
+function countUp(root) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('.kpi .val, .cmp-stat .v, .seg .sg-num', root).forEach(el => {
+    const raw = el.textContent.trim();
+    const target = parseInt(raw.replace(/\s/g, ''), 10);
+    if (!Number.isFinite(target) || String(target) !== raw || target === 0) return;
+    const t0 = performance.now(), dur = 650;
+    const tick = (t) => {
+      const p = Math.min((t - t0) / dur, 1);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 async function render() {
   const fn = PAGES[CUR];
   if (!fn) return;
   try {
     await fn($('#content'));
+    if ($('#content').classList.contains('anim')) countUp($('#content'));
   } catch (e) {
     if (e.message === 'auth') return; // гейт уже показан
     /* инвариант: раздел никогда не остаётся молча пустым */
@@ -286,8 +349,9 @@ PAGES.overview = async (root) => {
       <div class="glass card">
         <div class="card-title">${ic(I.bolt)}Живая лента<span class="sub">обновляется сама</span></div>
         <div class="feed">
-          ${events.map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join('') || '<div class="empty">Событий пока нет</div>'}
+          ${events.slice(0, 8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join('') || '<div class="empty">Событий пока нет</div>'}
         </div>
+        ${events.length > 8 ? coll(`Раньше`, events.slice(8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join(''), { open: false, count: events.length - 8, icon: I.clock }) : ''}
       </div>
     </div>`;
 };
@@ -308,7 +372,7 @@ PAGES.funnel = async (root) => {
       ${STAGES.map(s => {
         const items = leads.filter(l => l.stage === s.id);
         return `<div class="kb-col" data-stage="${s.id}">
-          <div class="kb-head"><span class="nm">${s.name}</span><span class="ct">${items.length}</span></div>
+          <div class="kb-head"><span class="kb-ic">${ic(I[s.icon])}</span><span class="nm">${s.name}</span><span class="ct">${items.length}</span></div>
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass" data-id="${l.id}" data-stage="${l.stage}">
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
@@ -426,9 +490,7 @@ PAGES.meetings = async (root) => {
   root.innerHTML = `
     <div class="two-col">
       <div>
-        ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items]) => `
-          <div class="nav-label" style="padding-left:2px">${day}</div>
-          ${items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
+        ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items], di) => coll(day, items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
             <div style="font-size:15px;font-weight:700;color:var(--navy-900);min-width:48px">${tmm(mt.at)}</div>
             <div style="flex:1">
               <div style="font-size:13.5px;font-weight:650;color:var(--navy-900)">${esc(mt.leadName)} <span class="muted" style="font-weight:400">· ${kindRu[mt.kind] || mt.kind}</span></div>
@@ -437,7 +499,7 @@ PAGES.meetings = async (root) => {
             ${stBadge[mt.status] || ''}
             ${mt.status === 'scheduled' ? `<button class="btn btn-sm" data-mt="${mt.id}" data-st="done">Прошла</button>
             <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>` : ''}
-          </div>`).join('')}`).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
+          </div>`).join(''), { open: di < 3, count: items.length, icon: I.cal })).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
       </div>
       <div class="glass card" style="align-self:start">
         <div class="card-title">${ic(I.cal)}Как работают встречи</div>
@@ -545,15 +607,22 @@ async function renderChat(id, rebuild) {
   const draft = $('#composerText') ? $('#composerText').value : '';
   const viaName = { ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер', template: 'Шаблон' };
   let lastDay = '';
-  const msgs = (l.messages || []).map(m => {
+  const lastMsg = (l.messages || []).slice(-1)[0];
+  const isNewMsg = lastMsg && PAGE_STATE['lm_' + l.id] && PAGE_STATE['lm_' + l.id] !== lastMsg.id;
+  if (lastMsg) PAGE_STATE['lm_' + l.id] = lastMsg.id;
+  const msgs = (l.messages || []).map((m, i, arr) => {
     const day = new Date(m.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     const sep = day !== lastDay ? `<div class="day-sep">${day}</div>` : '';
     lastDay = day;
-    return sep + `<div class="bubble ${m.dir}">
+    return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
       ${esc(m.text)}
       <div class="bmeta">${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
     </div>`;
   }).join('');
+  /* «ИИ печатает» — клиент написал, автопилот готовит ответ */
+  const typing = l.lastDir === 'in' && l.ai.enabled && STATE.settings.ai.autopilot
+    && !['handover', 'viewing', 'deal', 'lost'].includes(l.stage)
+    ? '<div class="bubble in typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>' : '';
 
   pane.innerHTML = `
     <div class="chat-head">
@@ -563,7 +632,7 @@ async function renderChat(id, rebuild) {
       <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
       <span class="badge acc">${stageName(l.stage)}</span>
     </div>
-    <div class="chat-body" id="chatBody">${msgs || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
+    <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -578,7 +647,9 @@ async function renderChat(id, rebuild) {
     await api.post(`/leads/${id}/message`, { text: t });
     renderChat(id, false);
   });
-  $('#composerText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('#sendBtn').click(); });
+  $('#composerText').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#sendBtn').click(); } // Shift+Enter — перенос строки
+  });
 
   const panel = $('#leadPanel');
   panel.innerHTML = `
@@ -639,14 +710,13 @@ PAGES.qualifier = async (root) => {
       </div>
       <div class="glass card">
         <div class="card-title">${ic(I.gear)}Критерии по направлениям<span class="sub">порог бюджета и down-sell</span></div>
-        ${Object.keys(s.criteria).map(g => {
+        ${Object.keys(s.criteria).map((g, i) => {
           const c = s.criteria[g];
-          return `<div style="margin-bottom:18px">
-            <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><b style="font-size:13.5px">${s.geoNames[g]}</b><span class="badge">${c.currency}</span></div>
-            <div class="form-row"><label>Минимальный бюджет (${c.currency})</label><input data-crit="${g}" data-k="budgetMin" type="number" value="${c.budgetMin}"></div>
+          return coll(`${s.geoNames[g]} <span class="badge" style="margin-left:6px">${c.currency}</span>`, `
+            <div class="form-row" style="margin-top:10px"><label>Минимальный бюджет (${c.currency})</label><input data-crit="${g}" data-k="budgetMin" type="number" value="${c.budgetMin}"></div>
             <div class="form-row"><label>Down-sell при бюджете ниже порога</label><textarea data-crit="${g}" data-k="downsell">${esc(c.downsell)}</textarea></div>
-            <div class="form-row"><label>Заметки регламента</label><input data-crit="${g}" data-k="notes" value="${esc(c.notes)}"></div>
-          </div>`;
+            <div class="form-row"><label>Заметки регламента</label><input data-crit="${g}" data-k="notes" value="${esc(c.notes)}"></div>`,
+            { open: i === 0, icon: I.gear });
         }).join('')}
         <button class="btn btn-accent" id="saveCrit" style="width:100%;justify-content:center">Сохранить критерии</button>
       </div>
@@ -723,10 +793,15 @@ PAGES.wake = async (root) => {
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.wake)}Скоринг спящих<span class="sub">кого разбудить сначала</span></div>
-        <table class="tbl"><thead><tr><th>Лид</th><th>Гео</th><th>Молчит</th><th>Score</th></tr></thead><tbody>
-          ${preview.map(p => `<tr><td><b>${esc(p.name)}</b><div class="muted" style="font-size:11px">${esc(p.note || '')}</div></td><td>${STATE.settings.geoNames[p.geo] || p.geo}</td><td>${ago(p.lastMsgAt)}</td>
-            <td><span class="wake-score"><span class="wake-bar"><i style="width:${p.wakeScore}%"></i></span>${p.wakeScore}</span></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Спящих нет</td></tr>'}
-        </tbody></table>
+        ${(() => {
+          const row = (p) => `<tr><td><b>${esc(p.name)}</b><div class="muted" style="font-size:11px">${esc(p.note || '')}</div></td><td>${STATE.settings.geoNames[p.geo] || p.geo}</td><td>${ago(p.lastMsgAt)}</td>
+            <td><span class="wake-score"><span class="wake-bar"><i style="width:${p.wakeScore}%"></i></span>${p.wakeScore}</span></td></tr>`;
+          const head = '<thead><tr><th>Лид</th><th>Гео</th><th>Молчит</th><th>Score</th></tr></thead>';
+          if (!preview.length) return '<div class="empty">Спящих нет</div>';
+          const top = preview.slice(0, 6), rest = preview.slice(6);
+          return `<table class="tbl">${head}<tbody>${top.map(row).join('')}</tbody></table>
+            ${rest.length ? coll('Остальные', `<table class="tbl"><tbody>${rest.map(row).join('')}</tbody></table>`, { open: false, count: rest.length, icon: I.moon }) : ''}`;
+        })()}
       </div>
       <div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-accent" id="newCmp">${ic(I.plus)}Новая кампания</button></div>
@@ -764,7 +839,7 @@ function cmpCard(c) {
       ${c.state === 'paused' ? `<button class="btn btn-accent btn-sm" data-act="resume">${ic(I.play)}Продолжить</button>` : ''}
       ${['running', 'paused'].includes(c.state) ? `<button class="btn btn-danger btn-sm" data-act="stop">Остановить</button>` : ''}
     </div>
-    ${c.log.length ? `<div class="cmp-log" style="margin-top:12px">${c.log.slice(0, 5).map(x => `${tmm(x.at)} — ${esc(x.text)}`).join('<br>')}</div>` : ''}
+    ${c.log.length ? `<div style="margin-top:12px">${coll('Журнал кампании', `<div class="cmp-log" style="border-top:none;padding-top:4px">${c.log.slice(0, 30).map(x => `${tmm(x.at)} — ${esc(x.text)}`).join('<br>')}</div>`, { open: false, count: c.log.length, icon: I.doc })}</div>` : ''}
   </div>`;
 }
 function wireCampaigns(root) {
@@ -1076,6 +1151,46 @@ $('#newLeadBtn').addEventListener('click', () => {
   });
 });
 
+/* ---------- глобальный поиск ---------- */
+(() => {
+  const inp = $('#gsInput'), box = $('#gsResults');
+  if (!inp) return;
+  let t = null, sel = -1, items = [];
+  const close = () => { box.classList.remove('show'); sel = -1; };
+  const open = (leads) => {
+    items = leads;
+    if (!leads.length) { box.innerHTML = '<div class="gs-item"><span class="gp">Ничего не найдено</span></div>'; box.classList.add('show'); return; }
+    box.innerHTML = leads.map((l, i) => `<div class="gs-item" data-i="${i}" data-id="${l.id}">
+      <div class="ava" style="width:28px;height:28px;flex:0 0 28px;font-size:10px">${esc(l.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
+      <div><div class="gn">${esc(l.name)}</div><div class="gp">${esc(l.phone)} · ${l.geoName}</div></div>
+      <span class="badge">${stageName(l.stage)}</span>
+    </div>`).join('');
+    box.classList.add('show');
+    $$('.gs-item', box).forEach(x => x.addEventListener('mousedown', (e) => { e.preventDefault(); pick(x.dataset.id); }));
+  };
+  const pick = (id) => { close(); inp.value = ''; inp.blur(); PAGE_STATE.inboxLead = id; go('inbox'); };
+  inp.addEventListener('input', () => {
+    clearTimeout(t);
+    const q = inp.value.trim();
+    if (q.length < 2) { close(); return; }
+    t = setTimeout(async () => open((await api.get('/leads?q=' + encodeURIComponent(q))).slice(0, 8)), 220);
+  });
+  inp.addEventListener('keydown', (e) => {
+    const els = $$('.gs-item[data-id]', box);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      sel = e.key === 'ArrowDown' ? Math.min(sel + 1, els.length - 1) : Math.max(sel - 1, 0);
+      els.forEach((x, i) => x.classList.toggle('sel', i === sel));
+    } else if (e.key === 'Enter' && els[sel >= 0 ? sel : 0]) pick(els[sel >= 0 ? sel : 0].dataset.id);
+    else if (e.key === 'Escape') { close(); inp.blur(); }
+  });
+  inp.addEventListener('blur', () => setTimeout(close, 150));
+  /* ⌘K / Ctrl+K — фокус в поиск */
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); inp.focus(); inp.select(); }
+  });
+})();
+
 /* ---------- цикл обновления ---------- */
 setInterval(async () => {
   try {
@@ -1093,11 +1208,13 @@ setInterval(async () => {
 /* ---------- старт ---------- */
 (async () => {
   initNav();
+  const t0 = Date.now();
   try {
     await loadState();
   } catch (e) {
     if (e.message !== 'auth') {
       /* сервер недоступен на старте → не пустой каркас, а внятный экран */
+      hidePreloader();
       setConn(false);
       const retry = setInterval(async () => {
         try { await loadState(); clearInterval(retry); setConn(true); go('overview'); } catch (_) {}
@@ -1106,4 +1223,6 @@ setInterval(async () => {
     return;
   }
   go('overview');
+  /* прелоадеру — минимум 900мс жизни, чтобы вихрь успел «дохнуть» */
+  setTimeout(hidePreloader, Math.max(0, 900 - (Date.now() - t0)));
 })();

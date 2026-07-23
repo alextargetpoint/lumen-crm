@@ -11,6 +11,15 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- прелоадер: кобальтовый вихрь + дышащая искра; прячет app.js после загрузки -->
+<div id="preloader">
+  <video autoplay muted loop playsinline src="assets/nebula-bg.mp4"></video>
+  <div class="pl-center">
+    <img src="logo.svg" class="pl-logo" alt="">
+    <div class="pl-word">LUMEN</div>
+    <div class="pl-sub">REAL ESTATE CRM</div>
+  </div>
+</div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
@@ -56,6 +65,11 @@
       <div>
         <div class="page-title" id="pageTitle">Обзор</div>
         <div class="page-sub" id="pageSub"></div>
+      </div>
+      <div class="gsearch" id="gsearch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="gsInput" placeholder="Поиск лида или номера…" autocomplete="off">
+        <div class="gs-results" id="gsResults"></div>
       </div>
       <div class="tb-spacer"></div>
       <div class="demo-chip" id="demoChip" style="display:none"><i></i>Демо-режим · симуляция диалогов</div>

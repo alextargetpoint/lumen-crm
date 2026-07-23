@@ -100,6 +100,8 @@ function analytics(db) {
     geoStats[g] = { name: db.settings.geoNames[g], total: gl.length, qualified: gq.length, conv: gl.length ? Math.round(gq.length / gl.length * 100) : 0 };
   }
   return {
+    unread: leads.filter(l => l.lastDir === 'in' && l.stage !== 'lost').length,
+    totalActive: leads.filter(l => !['lost'].includes(l.stage)).length,
     funnel: { new: by('new'), touch: by('touch'), dialog: by('dialog'), qualified: by('qualified'), handover: by('handover'), viewing: by('viewing'), deal: by('deal'), sleeping: by('sleeping'), lost: by('lost') },
     compare: {
       human: { firstContact: '47 мин', dialogConv: 40, qualConv: 30, qualTime: '2–3 дня' },
