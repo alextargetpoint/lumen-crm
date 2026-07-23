@@ -64,6 +64,7 @@ const DEFAULT_PASS = 'lumen2026';
     rrCursor: 0,
   };
   if (!db.settings.customFields) db.settings.customFields = [];
+  if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
   if (!db.settings.portals) db.settings.portals = {
     property_finder: { name: 'Property Finder', key: '', status: 'off' },
     bayut: { name: 'Bayut / Dubizzle', key: '', status: 'off' },
@@ -116,6 +117,18 @@ const DEFAULT_PASS = 'lumen2026';
         paymentRows: [{ pct: '50%', label: 'Первоначальный взнос' }, { pct: '50%', label: 'К завершению' }],
         whyRent: ['Управляющая компания берёт сдачу на себя — пассивный доход.', 'Заполняемость вилл в Бераве 80%+ круглый год.', 'Лизхолд 30 лет с опцией продления — проговариваем сразу.'] },
     };
+    const imgMap = {
+      pr_jvc1: ['/assets/props/ext1.jpg', '/assets/props/int1.jpg', '/assets/props/ext3.jpg'],
+      pr_mar1: ['/assets/props/ext2.jpg', '/assets/props/int2.jpg'],
+      pr_jvc2: ['/assets/props/int3.jpg', '/assets/props/ext4.jpg'],
+      pr_dt1: ['/assets/props/ext4.jpg', '/assets/props/int2.jpg'],
+      pr_jvt1: ['/assets/props/ext3.jpg', '/assets/props/int1.jpg'],
+      pr_bali1: ['/assets/props/villa1.jpg', '/assets/props/villa2.jpg'],
+    };
+    for (const [id2, imgs] of Object.entries(imgMap)) {
+      const pr = db.properties.find(x => x.id === id2);
+      if (pr && !(pr.images || []).length) pr.images = imgs;
+    }
     for (const [id, ex] of Object.entries(enrich)) {
       const pr = db.properties.find(x => x.id === id);
       if (pr && !pr.hookTitle) Object.assign(pr, ex);
@@ -188,6 +201,7 @@ function publicSettings(db) {
   const s = JSON.parse(JSON.stringify(db.settings));
   delete s.auth;
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
+  if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -356,6 +370,36 @@ const server = http.createServer(async (req, res) => {
       if (db.intakeLog.length > 200) db.intakeLog.length = 200;
       store.save();
       return json(res, 200, { ok: true, leadId: lead.id, result: entry.result, adMatched: !!(lead.ads && lead.ads.matched) });
+    }
+
+    /* ---------------- телефония: вебхук записей звонков ----------------
+       Zadarma/Twilio/Telnyx после звонка шлют сюда JSON с номером клиента и
+       ссылкой на запись. Мы находим лида по номеру, скачиваем запись и
+       расшифровываем Whisper-ом — транскрипт сам ложится в карточку. */
+    if (p === '/hooks/call' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const phone = String(b.phone || b.caller_id || b.to || b.destination || '').replace(/\D/g, '');
+      const rec = b.record_url || b.recording_url || b.call_record_link || b.url;
+      if (!phone || !rec) return json(res, 400, { error: 'нужны phone и record_url' });
+      const lead = db.leads.find(l => l.phone.replace(/\D/g, '').endsWith(phone.slice(-9)));
+      if (!lead) return json(res, 200, { ok: true, matched: false });
+      (async () => {
+        try {
+          const r2 = await fetch(rec);
+          if (!r2.ok) throw new Error('запись недоступна: ' + r2.status);
+          const buf = Buffer.from(await r2.arrayBuffer());
+          if (buf.length > 24e6) throw new Error('запись больше 24МБ');
+          const extM = String(rec).split('?')[0].match(/\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i);
+          const text = await llm.transcribe(buf, 'call.' + (extM ? extM[1].toLowerCase() : 'mp3'));
+          const t = { id: store.nextId('tr'), at: Date.now(), label: 'Звонок · телефония' + (b.duration ? ' · ' + b.duration + 'с' : ''), text: text.slice(0, 20000) };
+          lead.transcripts = lead.transcripts || [];
+          lead.transcripts.push(t);
+          ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок расшифрован автоматически: ${lead.name} (${Math.round(text.length / 1000)}k символов)` });
+          store.save();
+        } catch (e) { console.error('[call-hook]', e.message); }
+      })();
+      return json(res, 200, { ok: true, matched: true, leadId: lead.id });
     }
 
     /* ---------------- auth ---------------- */
@@ -635,7 +679,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
       if (b.agency && b.agency.about) { Object.assign(db.settings.agency.about, b.agency.about); delete b.agency.about; }
-      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
@@ -807,7 +851,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- подборки ---------------- */
     if (p === '/api/collections' && req.method === 'GET') {
-      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null })));
+      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: db.settings.hooks.secret })));
     }
     if (p === '/api/collections' && req.method === 'POST') {
       const b = await readBody(req);
@@ -824,6 +868,50 @@ const server = http.createServer(async (req, res) => {
       ai.pushEvent(db, { type: 'msg_in', leadId: lead.id, text: `Подборка «${c.title}» отправлена в чат: ${lead.name}` });
       store.save();
       return json(res, 200, { ok: true, url });
+    }
+    /* конструктор: сохранение правок (ключ = hooks.secret) */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/custom$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      c.custom = {
+        hidden: (b.hidden || []).slice(0, 10).map(String),
+        order: (b.order || []).slice(0, 30).map(String),
+        title: b.title ? String(b.title).slice(0, 200) : null,
+        intro: b.intro != null ? String(b.intro).slice(0, 2000) : null,
+        props: {},
+      };
+      for (const [pid, ov] of Object.entries(b.props || {})) {
+        c.custom.props[pid] = {};
+        if (ov.hookTitle) c.custom.props[pid].hookTitle = String(ov.hookTitle).slice(0, 200);
+        if (ov.blurb) c.custom.props[pid].blurb = String(ov.blurb).slice(0, 600);
+        if (ov.whyRent) c.custom.props[pid].whyRent = ov.whyRent.slice(0, 4).map(x => String(x).slice(0, 300));
+      }
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* трекинг глубины просмотра (sendBeacon, без авторизации) */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/track$/)) && req.method === 'POST') {
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 200, { ok: true });
+      const b = await readBody(req);
+      const a = c.analytics = c.analytics || { maxDepth: 0, totalTime: 0, deepSessions: 0, lastAt: null };
+      const depth = Math.min(100, Math.max(0, +b.depth || 0));
+      const dt = Math.min(60, Math.max(0, +b.dt || 0));
+      a.totalTime += dt;
+      a.lastAt = Date.now();
+      if (depth > a.maxDepth) a.maxDepth = depth;
+      if (b.deep && !a['s_' + b.sid]) {
+        a['s_' + b.sid] = 1;
+        a.deepSessions += 1;
+        if (c.leadId) {
+          const vl = db.leads.find(l => l.id === c.leadId);
+          if (vl) ai.pushEvent(db, { type: 'view', leadId: vl.id, text: `${vl.name} изучил подборку «${c.title}» на ${depth}% (${Math.round(a.totalTime / 60)} мин) — горячий интерес` });
+        }
+      }
+      store.save();
+      return json(res, 200, { ok: true });
     }
     if ((m = p.match(/^\/api\/collections\/([^/]+)$/)) && req.method === 'DELETE') {
       db.collections = db.collections.filter(x => x.id !== m[1]); store.save();
@@ -884,7 +972,21 @@ const server = http.createServer(async (req, res) => {
       }
       c.lastViewAt = Date.now();
       store.save();
-      const props = c.propertyIds.map(id => db.properties.find(x => x.id === id)).filter(Boolean);
+      const cust = c.custom || {};
+      let ids = c.propertyIds.slice();
+      if (cust.order && cust.order.length) ids = cust.order.filter(x => ids.includes(x)).concat(ids.filter(x => !cust.order.includes(x)));
+      const props = ids.map(id => db.properties.find(x => x.id === id)).filter(Boolean).map(pr0 => {
+        const ov = (cust.props || {})[pr0.id] || {};
+        const pr3 = JSON.parse(JSON.stringify(pr0));
+        if (ov.hookTitle) pr3.hookTitle = ov.hookTitle;
+        if (ov.blurb && pr3.district) pr3.district.blurb = ov.blurb;
+        if (ov.whyRent) pr3.whyRent = ov.whyRent;
+        return pr3;
+      });
+      const hiddenSec = cust.hidden || [];
+      const cTitle = cust.title || c.title;
+      const cIntro = cust.intro != null ? cust.intro : c.intro;
+      const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
       const lead = db.leads.find(l => l.id === c.leadId);
       const mgr = db.settings.agency.manager || {};
       const about = db.settings.agency.about || {};
@@ -898,9 +1000,9 @@ const server = http.createServer(async (req, res) => {
       const nProj = props.length + ' ' + plural(props.length);
       const star = '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
       const projPage = (pr2, idx) => `
-<section class="pg">
+<section class="pg" data-sec="proj" data-prid="${pr2.id}">
   <div class="kicker">Проект №${idx + 1}</div>
-  <h2 class="ph2">${pr2.hookTitle || pr2.name}</h2>
+  <h2 class="ph2" data-t="hook:${pr2.id}">${pr2.hookTitle || pr2.name}</h2>
   <div class="metrics">
     <div class="mt"><span>Стоимость</span><b>от ${fmt(pr2.priceFrom, pr2.currency)}</b></div>
     <div class="mt"><span>Дата сдачи</span><b>${pr2.handover || '—'}</b></div>
@@ -913,13 +1015,13 @@ const server = http.createServer(async (req, res) => {
   </div>
   ${pr2.district && pr2.district.name ? `<div class="district">
     <div class="dmap">${star.replace('class="star"', 'class="dpin"')}</div>
-    <div class="dtext"><b>${pr2.district.name}</b> — ${pr2.district.blurb || ''}
+    <div class="dtext"><b>${pr2.district.name}</b> — <span data-t="blurb:${pr2.id}">${pr2.district.blurb || ''}</span>
       <div class="dtimes">${(pr2.district.times || []).map(t2 => `<div><i>${t2.min} мин</i> 🚘 ${t2.place}</div>`).join('')}</div>
     </div>
   </div>` : ''}
   ${(pr2.paymentRows || []).length ? `<h3 class="ph3">${pr2.market === 'offplan' ? 'Рассрочка' : 'Оплата'}</h3>
   <div class="payrow">${pr2.paymentRows.map(r2 => `<div class="pay"><b>${r2.pct}</b><span>${r2.label}</span></div>`).join('')}</div>` : ''}
-  ${(pr2.whyRent || []).length ? `<div class="rec"><div class="rec-t">Рекомендуем для сдачи в аренду:</div><ol>${pr2.whyRent.map(w2 => `<li>${w2}</li>`).join('')}</ol></div>` : ''}
+  ${(pr2.whyRent || []).length ? `<div class="rec"><div class="rec-t">Рекомендуем для сдачи в аренду:</div><ol>${pr2.whyRent.map((w2, wi) => `<li data-t="why:${pr2.id}:${wi}">${w2}</li>`).join('')}</ol></div>` : ''}
   ${(pr2.units || []).length ? `<h3 class="ph3">Доступные юниты</h3><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
     ${pr2.units.map(u2 => `<tr><td><b>${u2.plan}</b></td><td>${u2.area}</td><td>${u2.floor}</td><td>${u2.view}</td><td class="pr">${fmt(u2.price, pr2.currency)}</td></tr>`).join('')}</table>` : ''}
   ${((pr2.layouts || []).length || (pr2.materials || []).length) ? `<div class="mats">${(pr2.layouts || []).map(l2 => `<a href="${l2.url}" target="_blank">📐 ${l2.label}</a>`).join('')}${(pr2.materials || []).map(mt2 => `<a href="${mt2.url}" target="_blank">${mt2.label} →</a>`).join('')}</div>` : ''}
@@ -928,7 +1030,7 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${c.title} — ${AG}</title>
+<title>${cTitle} — ${AG}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#1D34D8;--ink:#0B0B0F;--mut:#5E6470;--bg:#F5F5F3}
@@ -991,14 +1093,14 @@ table.units{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:12px
 @media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}}
 </style></head><body><div class="book">
 
-<section class="cover blue">
+<section class="cover blue" data-sec="cover">
   <div class="brand">${star}${AG}</div>
-  <h1>${c.title}</h1>
+  <h1 data-t="title">${cTitle}</h1>
   ${isFinite(minPrice) ? `<div class="badge">от ${fmt(minPrice, props[0]?.currency)} </div>` : ''}
   ${heroImg ? `<div class="coverimg" style="background-image:url('${heroImg}')"></div>` : `<div class="coverimg grad"><span>${nProj}</span></div>`}
 </section>
 
-<section class="pg">
+<section class="pg" data-sec="hello" ${hiddenSec.includes('hello') ? 'style="display:none"' : ''}>
   <h2 class="hi">Привет!</h2>
   <div class="hello">
     <p><b>${mgr.name ? 'Меня зовут ' + mgr.name + ',' : AG + ' —'}</b> ${about.intro || 'мы подбираем недвижимость под задачу клиента.'}${lead ? `<br><br>Эта подборка собрана персонально для вас${lead.name ? ', ' + lead.name.split(' ')[0] : ''}.` : ''}</p>
@@ -1006,24 +1108,24 @@ table.units{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:12px
   </div>
   <h2 class="hi" style="font-size:26px;margin-top:36px">Об агентстве</h2>
   <div class="arrows">${(about.bullets || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^:—]+[:—])/, '<b>$1</b>')}</span></div>`).join('')}</div>
-  ${c.intro ? `<div class="intro">${c.intro}</div>` : ''}
+  ${cIntro || isEdit ? `<div class="intro" data-t="intro">${cIntro || ''}</div>` : ''}
   <div class="pnum">02</div>
 </section>
 
-<section class="sep blue">
+<section class="sep blue" data-sec="sep" ${hiddenSec.includes('sep') ? 'style="display:none"' : ''}>
   <div class="sepimg" ${heroImg ? `style="background-image:url('${heroImg}')"` : ''}></div>
   <h2>${nProj}<br>под ваш запрос</h2>
 </section>
 
 ${props.map(projPage).join('')}
 
-<section class="cta">
+<section class="cta" data-sec="cta" ${hiddenSec.includes('cta') ? 'style="display:none"' : ''}>
   <h2>Напишите номер проекта в чат,</h2>
   <p>чтобы получить подробности, планировки и расчёт доходности по нему</p>
   <a class="ctabtn" href="https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}">Написать в WhatsApp</a>
 </section>
 
-<section class="pg">
+<section class="pg" data-sec="why" ${hiddenSec.includes('why') ? 'style="display:none"' : ''}>
   <h2 class="hi" style="font-size:28px">Почему клиенты выбирают именно нас</h2>
   <div class="arrows">${(about.whyUs || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^.]+\.)/, '<b>$1</b>')}</span></div>`).join('')}</div>
   ${about.freeNote ? `<p style="font-weight:700;margin-top:22px;font-size:15px">${about.freeNote}</p>` : ''}
@@ -1032,9 +1134,91 @@ ${props.map(projPage).join('')}
   <div class="pnum">${String(props.length + 3).padStart(2, '0')}</div>
 </section>
 
-<section class="final blue"><div class="brand">${star}${AG}</div></section>
+<section class="final blue" data-sec="final" ${hiddenSec.includes('final') ? 'style="display:none"' : ''}><div class="brand">${star}${AG}</div></section>
 <div class="foot">${AG} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-</div>${isPrint ? '<script>window.print()</script>' : ''}</body></html>`);
+</div>
+${isPrint ? '<script>window.print()</script>' : `<script>
+(() => {
+  const sid = Math.random().toString(36).slice(2, 10);
+  let maxD = 0, lastSent = 0, deepSent = false, t0 = Date.now(), lastBeat = Date.now();
+  const depth = () => Math.min(100, Math.round((scrollY + innerHeight) / document.body.scrollHeight * 100));
+  addEventListener('scroll', () => { maxD = Math.max(maxD, depth()); }, { passive: true });
+  const send = () => {
+    const now = Date.now();
+    const dt = Math.round((now - lastBeat) / 1000);
+    lastBeat = now;
+    maxD = Math.max(maxD, depth());
+    const deep = maxD >= 75 && !deepSent;
+    if (deep) deepSent = true;
+    if (dt < 1 && !deep && maxD <= lastSent) return;
+    lastSent = maxD;
+    navigator.sendBeacon('/p/${c.id}/track', JSON.stringify({ sid, depth: maxD, dt, deep }));
+  };
+  setInterval(send, 5000);
+  addEventListener('pagehide', send);
+})();
+</script>`}
+${isEdit ? `<style>
+[data-t]{outline:1.5px dashed rgba(29,52,216,.5);outline-offset:3px;min-height:1em;cursor:text}
+.blue [data-t]{outline-color:rgba(255,255,255,.6)}
+.edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:#0B0B0F;color:#fff;display:flex;gap:10px;align-items:center;padding:10px 16px;font-size:13px;flex-wrap:wrap}
+.edbar b{font-weight:800}
+.edbar label{display:flex;gap:5px;align-items:center;cursor:pointer;font-size:12px}
+.edbar .sp{flex:1}
+.edbtn{background:#1D34D8;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+.edbtn.g{background:#2b2f3a}
+.pmove{position:absolute;top:14px;right:14px;z-index:5;display:flex;gap:5px}
+.pmove button{width:30px;height:30px;border-radius:8px;border:none;background:#0B0B0F;color:#fff;cursor:pointer;font-size:15px}
+.book{margin-top:52px}
+</style>
+<div class="edbar"><b>Конструктор подборки</b>
+  ${['hello|Привет', 'sep|Разделитель', 'cta|CTA', 'why|Почему мы', 'final|Финал'].map(x => { const [k, n] = x.split('|'); return `<label><input type="checkbox" data-sechide="${k}" ${hiddenSec.includes(k) ? '' : 'checked'}>${n}</label>`; }).join('')}
+  <span class="sp"></span>
+  <button class="edbtn g" onclick="location.href='/p/${c.id}'">Просмотр</button>
+  <button class="edbtn" id="edSave">Сохранить</button>
+</div>
+<script>
+document.querySelectorAll('[data-t]').forEach(el => el.contentEditable = 'plaintext-only');
+document.querySelectorAll('[data-sechide]').forEach(ch => ch.addEventListener('change', () => {
+  document.querySelector('[data-sec="' + ch.dataset.sechide + '"]').style.display = ch.checked ? '' : 'none';
+}));
+document.querySelectorAll('[data-sec="proj"]').forEach(sec => {
+  const bar = document.createElement('div');
+  bar.className = 'pmove';
+  bar.innerHTML = '<button data-mv="-1">↑</button><button data-mv="1">↓</button>';
+  sec.style.position = 'relative';
+  sec.appendChild(bar);
+  bar.addEventListener('click', (e) => {
+    const d = +e.target.dataset.mv;
+    if (!d) return;
+    const list = Array.from(document.querySelectorAll('[data-sec="proj"]'));
+    const i2 = list.indexOf(sec);
+    const other = list[i2 + d];
+    if (!other) return;
+    if (d > 0) other.after(sec); else other.before(sec);
+    document.querySelectorAll('[data-sec="proj"] .kicker').forEach((k, ki) => k.textContent = 'Проект №' + (ki + 1));
+  });
+});
+document.getElementById('edSave').addEventListener('click', async () => {
+  const texts = {};
+  document.querySelectorAll('[data-t]').forEach(el => texts[el.dataset.t] = el.innerText.trim());
+  const props = {};
+  for (const [k, v] of Object.entries(texts)) {
+    const [kind, pid, idx] = k.split(':');
+    if (kind === 'hook') (props[pid] = props[pid] || {}).hookTitle = v;
+    if (kind === 'blurb') (props[pid] = props[pid] || {}).blurb = v;
+    if (kind === 'why') { const p2 = props[pid] = props[pid] || {}; (p2.whyRent = p2.whyRent || [])[+idx] = v; }
+  }
+  const hidden = Array.from(document.querySelectorAll('[data-sechide]')).filter(x => !x.checked).map(x => x.dataset.sechide);
+  const order = Array.from(document.querySelectorAll('[data-sec="proj"]')).map(x => x.dataset.prid);
+  const r = await fetch('/p/${c.id}/custom?key=${u.searchParams.get('key')}', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: texts.title, intro: texts.intro, hidden, order, props }) });
+  const btn = document.getElementById('edSave');
+  btn.textContent = r.ok ? 'Сохранено ✓' : 'Ошибка';
+  setTimeout(() => btn.textContent = 'Сохранить', 1800);
+});
+</script>` : ''}
+</body></html>`);
       return;
     }
 

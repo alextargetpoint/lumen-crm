@@ -1451,7 +1451,9 @@ PAGES.collections = async (root) => {
         ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}">
           <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
           <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
+          ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
           <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
+            <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
             <a class="btn btn-sm" href="/p/${c.id}" target="_blank">${ic(I.eye)}Открыть</a>
             <button class="btn btn-sm" data-act="copy">${ic(I.copy)}Ссылка</button>
             <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank">${ic(I.doc)}PDF</a>
@@ -1989,6 +1991,24 @@ PAGES.settings = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.phone)}Телефония<span class="sub">звонки → авто-транскрибация в карточку</span></div>
+          <div class="set-row"><div class="sp"><div class="sl">Провайдер</div><div class="sd">Zadarma — дешевле всего для старта (номер ОАЭ + записи + API); Twilio/Telnyx — глобальные</div></div>
+            <select id="telProv" style="width:150px">
+              <option value="none" ${(s.telephony || {}).provider === 'none' ? 'selected' : ''}>Не подключена</option>
+              <option value="zadarma" ${(s.telephony || {}).provider === 'zadarma' ? 'selected' : ''}>Zadarma</option>
+              <option value="twilio" ${(s.telephony || {}).provider === 'twilio' ? 'selected' : ''}>Twilio</option>
+              <option value="telnyx" ${(s.telephony || {}).provider === 'telnyx' ? 'selected' : ''}>Telnyx</option>
+            </select></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>API key</label><input id="telKey" type="password" placeholder="${(s.telephony || {}).keySet ? '•••••• сохранён' : 'ключ провайдера'}"></div>
+            <div class="form-row"><label>API secret</label><input id="telSecret" type="password"></div>
+          </div>
+          <div class="form-row"><label>Вебхук записей звонков (вставить у провайдера)</label>
+            <code class="pill" style="display:block;overflow-x:auto;white-space:nowrap;padding:8px 10px">${location.origin}/hooks/call?key=<секрет из «Рекламы»></code></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.55">Как работает: провайдер после звонка шлёт номер клиента и ссылку на запись → Lumen находит лида по номеру, скачивает запись, расшифровывает Whisper-ом и кладёт транскрипт в хронологию + ИИ-сводку. Ничего руками.</div>
+          <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы» в подборках</span></div>
           <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro">${esc((s.agency.about || {}).intro || '')}</textarea></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2055,6 +2075,13 @@ PAGES.settings = async (root) => {
     const j = await r.json();
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
     else toast('Не получилось', j.error || 'ошибка');
+  });
+  $('#telSave').addEventListener('click', async () => {
+    const t = { provider: $('#telProv').value };
+    if ($('#telKey').value.trim()) { t.key = $('#telKey').value.trim(); t.secret = $('#telSecret').value.trim(); }
+    await api.patch('/settings', { telephony: t });
+    toast('Телефония сохранена', t.provider === 'none' ? undefined : 'Вебхук записей активен', true);
+    loadState();
   });
   $('#abSave').addEventListener('click', async () => {
     await api.patch('/settings', { agency: { about: {
