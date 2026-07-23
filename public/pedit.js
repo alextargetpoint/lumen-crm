@@ -26,6 +26,10 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .edbar b{font-weight:800}
 .edbar .hint{opacity:.55;font-size:11.5px}
 .edbar .sp{flex:1}
+.pethemes{display:inline-flex;gap:6px;align-items:center;margin-left:10px}
+.peth-dot{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--td) 50%,var(--tb) 50%);transition:transform .15s}
+.peth-dot:hover{transform:scale(1.15)}
+.peth-dot.on{border-color:#fff;box-shadow:0 0 0 2px #1D34D8}
 .edbtn{background:#1D34D8;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;gap:6px;align-items:center}
 .edbtn.g{background:#2b2f3a}
 .edbtn.ai{background:linear-gradient(120deg,#1D34D8,#5B2BD8)}
@@ -66,11 +70,21 @@ section[data-bid]:hover .btool{opacity:1}
   bar.className = 'edbar';
   bar.innerHTML = `<b>Конструктор подборки</b>
     <span class="hint">клик по тексту — правка · 🖼 — картинка · пустой пункт списка удалится при сохранении</span>
+    <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
     <span class="sp"></span>
     ${P.llm ? '<button class="edbtn ai" id="peCompose">✦ Собрать тексты ИИ</button>' : ''}
     <button class="edbtn g" id="peView">Просмотр</button>
     <button class="edbtn" id="peSave">Сохранить</button>`;
   document.body.appendChild(bar);
+  $$('.peth-dot', bar).forEach((d) => d.addEventListener('click', async () => {
+    flash('Применяю тему…', 0);
+    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks: serialize(), theme: d.dataset.theme }),
+    });
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); location.reload(); }
+    else flash('Ошибка темы');
+  }));
 
   /* ---------- попап-хелпер ---------- */
   let pop = null;

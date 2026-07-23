@@ -322,6 +322,11 @@ const api = {
 function renderLogin() {
   hidePreloader();
   if ($('#loginScreen')) return;
+  let loginBrand = '';
+  try {
+    const b = JSON.parse(localStorage.getItem('lumen_brand') || 'null');
+    if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(120,160,255,.4))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7C9BFF;opacity:.75;margin-top:12px">работает на Lumen</div></div>`;
+  } catch (e) {}
   const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
     <video autoplay muted loop playsinline src="assets/nebula-bg.mp4"
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
@@ -331,6 +336,7 @@ function renderLogin() {
         backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
         box-shadow:0 30px 80px -20px rgba(3,8,25,.85);text-align:center;
         animation:reveal .8s var(--ease-spring) both">
+      ${loginBrand}
       <img src="logo.svg" class="pl-logo" style="width:44px;height:53px;margin:0 auto 14px">
       <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
       <div style="font-size:10px;letter-spacing:.16em;color:#86AFFF;margin:4px 0 26px">REAL ESTATE CRM</div>
@@ -646,9 +652,23 @@ PAGES.overview = async (root) => {
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
 
+  /* спарклайн: новые лиды по дням за 14 дней */
+  const spark = (() => {
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - (13 - i));
+      const d1 = +d0 + 864e5;
+      return leads.filter(l => l.createdAt >= +d0 && l.createdAt < d1).length;
+    });
+    const max = Math.max(...days, 1);
+    const pts = days.map((v, i) => `${(i / 13 * 100).toFixed(1)},${(30 - v / max * 26).toFixed(1)}`).join(' ');
+    return `<svg class="kpi-spark" viewBox="0 0 100 32" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="url(#spg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <defs><linearGradient id="spg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#93B4FF"/><stop offset="1" stop-color="#2563EB"/></linearGradient></defs>
+    </svg>`;
+  })();
   root.innerHTML = `
     <div class="kpis">
-      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}</div><div class="delta">цепочка стартует ≤ 1 мин</div></div>
+      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}</div><div class="delta">цепочка стартует ≤ 1 мин</div>${spark}</div>
       <div class="kpi glass"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}</div><div class="delta">${f.deal} дошло до сделки</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} активных номеров · качество ${an.wa.avgQuality}%</div></div>
@@ -1785,7 +1805,11 @@ PAGES.sequences = async (root) => {
     return String(t || '')
       .replace(/\{name\}/g, 'Алекс').replace(/\{geo\}/g, geoName(seq.geo === 'all' ? 'dubai' : seq.geo))
       .replace(/\{ad\}/g, '«Дубай · студии JVC»').replace(/\{month\}/g, 'июле')
-      .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name);
+      .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name)
+      .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ')
+      .replace(/\{countryQ\}/g, 'Вы же из России? Во сколько удобно созвониться?')
+      .replace(/\{countryQEn\}/g, 'You are from the UK, right? What time works for a quick call?')
+      .replace(/\{[a-zA-Z]+\}/g, '…'); /* незнакомая переменная не должна торчать в превью */
   }
   /* спокойный интерактив: вся цепочка видна сразу, шкала дней сверху —
      клик по дню плавно листает телефон к сообщению и подсвечивает его */
@@ -2958,7 +2982,10 @@ PAGES.brokers = async (root) => {
               <div class="pd-fact"><label class="lc-lbl">Направление</label><select data-be="geo">${st.agency.geos.map(g => `<option value="${g}" ${b.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select></div>
               <div class="pd-fact"><label class="lc-lbl">Лимит лидов</label><input class="gi" data-be="capacity" type="number" value="${b.capacity}"></div>
             </div>
-            <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки (через запятую)</label><input class="gi" data-be="langs" value="${esc(b.langs.join(', '))}"></div>
+            <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
+              <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(lg)}</button>`).join('')}
+                <span class="chip-add"><input id="langAddInp" placeholder="+ язык" style="width:76px"><button class="chip-plus" id="langAddBtn">${ic(I.plus)}</button></span>
+              </div></div>
           </div>
           <div>
             <label class="lc-lbl">Дни смен</label>
@@ -3000,12 +3027,24 @@ PAGES.brokers = async (root) => {
   const eb = root.querySelector('[data-bredit]');
   if (eb) {
     $$('.day-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('on')));
+    $$('.lang-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('on')));
+    const lAdd = () => {
+      const inp = eb.querySelector('#langAddInp');
+      const v = inp.value.trim().toLowerCase();
+      if (!v) return;
+      inp.value = '';
+      const chip = el(`<button type="button" class="chip-t lang-chip on" data-lg="${esc(v)}">${esc(v)}</button>`);
+      chip.addEventListener('click', () => chip.classList.toggle('on'));
+      eb.querySelector('#langAddInp').closest('.chips-row').insertBefore(chip, eb.querySelector('.chip-add'));
+    };
+    eb.querySelector('#langAddBtn').addEventListener('click', lAdd);
+    eb.querySelector('#langAddInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lAdd(); } });
     eb.querySelector('[data-brsave]').addEventListener('click', async () => {
       await api.patch('/brokers/' + eb.dataset.bredit, {
         name: eb.querySelector('[data-be="name"]').value,
         geo: eb.querySelector('[data-be="geo"]').value,
         capacity: +eb.querySelector('[data-be="capacity"]').value,
-        langs: eb.querySelector('[data-be="langs"]').value.split(',').map(x => x.trim()).filter(Boolean),
+        langs: $$('.lang-chip.on', eb).map(x => x.dataset.lg),
         schedule: { days: $$('.day-chip.on', eb).map(x => +x.dataset.d), from: eb.querySelector('[data-be="from"]').value, to: eb.querySelector('[data-be="to"]').value },
       });
       PAGE_STATE.brokerEdit = null;
