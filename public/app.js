@@ -620,44 +620,44 @@ PAGES.overview = async (root) => {
       <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}</div><div class="delta">${f.deal} дошло до сделки</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} активных номеров · качество ${an.wa.avgQuality}%</div></div>
     </div>
-    <div class="ov-grid">
-      <div>
-        <div class="card mb f3card">
-          <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} лидов всего · клик по стадии — канбан</span></div>
-          <div class="f3">
-            <div class="f3stage">
-              <div class="f3glow"></div>
-              ${[0, 1, 2, 3, 4, 5].map(i => `<i class="f3p" style="--pd:${(i * 0.55).toFixed(2)}s;--px:${(i * 37) % 90 - 45}px"></i>`).join('')}
-              <div class="f3funwrap">
-                <img class="f3fun" src="assets/funnel-cut.png" alt="">
-                <b class="f3t" data-t3="0" style="top:3%;width:96%;height:26%"></b>
-                <b class="f3t" data-t3="1" style="top:31%;width:70%;height:20%"></b>
-                <b class="f3t" data-t3="2" style="top:52%;width:52%;height:17%"></b>
-                <b class="f3t" data-t3="3" style="top:70%;width:38%;height:20%"></b>
-              </div>
+    <div class="card mb f3card">
+      <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} лидов всего · клик по стадии — канбан</span></div>
+      ${(() => {
+        const shown = STAGES.filter(s => !['lost'].includes(s.id));
+        const TIER = { new: 0, touch: 0, dialog: 1, qualified: 2, handover: 2, sleeping: -1 };
+        const rows = shown.map((s, i) => {
+          const v = f[s.id] || 0;
+          const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0;
+          const conv = i > 0 && prevV > 0 ? Math.round(v / prevV * 100) : null;
+          const prevName = i > 0 ? shown[i - 1].name : null;
+          const tier = TIER[s.id] != null ? TIER[s.id] : 3;
+          return `<div class="f3row" data-f3go data-tier="${tier}" style="--fd:${i * 45}ms">
+            <div class="f3txt">
+              <div class="f3name">${s.name}</div>
+              <div class="f3conv">${s.id === 'sleeping' ? 'реанимация будит волнами' : i === 0 ? 'вход воронки' : conv != null && conv <= 100 ? conv + '% из «' + prevName.toLowerCase() + '»' : ''}</div>
             </div>
-            <div class="f3rows">
-              ${(() => {
-                const shown = STAGES.filter(s => !['lost'].includes(s.id));
-                const max = Math.max(...shown.map(s => f[s.id] || 0), 1);
-                const TIER = { new: 0, touch: 0, dialog: 1, qualified: 2, handover: 2, sleeping: -1 };
-                let prev = null;
-                return shown.map((s, i) => {
-                  const v = f[s.id] || 0;
-                  const conv = prev != null && prev > 0 ? Math.round(v / prev * 100) : null;
-                  prev = v || prev;
-                  const tier = TIER[s.id] != null ? TIER[s.id] : 3;
-                  return `<div class="f3row" data-f3go data-tier="${tier}" style="--fd:${i * 40}ms">
-                    <div class="f3name">${s.name}</div>
-                    <div class="f3bar"><i style="width:${Math.max(v / max * 100, 3)}%"></i></div>
-                    <div class="f3num">${v}</div>
-                    <div class="f3conv">${conv != null ? '→ ' + conv + '%' : ''}</div>
-                  </div>`;
-                }).join('');
-              })()}
+            <div class="f3num">${v}</div>
+          </div>`;
+        });
+        return `<div class="f3 v2">
+          <div class="f3side left">${rows.slice(0, 4).join('')}</div>
+          <div class="f3stage">
+            <div class="f3glow"></div>
+            ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<i class="f3p" style="--pd:${(i * 0.42).toFixed(2)}s;--px:${(i * 37) % 120 - 60}px"></i>`).join('')}
+            <div class="f3funwrap">
+              <img class="f3fun" src="assets/funnel-cut.png" alt="">
+              <b class="f3t" data-t3="0" style="top:3%;width:96%;height:26%"></b>
+              <b class="f3t" data-t3="1" style="top:31%;width:70%;height:20%"></b>
+              <b class="f3t" data-t3="2" style="top:52%;width:52%;height:17%"></b>
+              <b class="f3t" data-t3="3" style="top:70%;width:38%;height:20%"></b>
             </div>
           </div>
-        </div>
+          <div class="f3side right">${rows.slice(4).join('')}</div>
+        </div>`;
+      })()}
+    </div>
+    <div class="ov-grid">
+      <div>
         <div class="glass card">
           <div class="card-title">${ic(I.bars)}Первая линия: показатели</div>
           <div class="vs">
@@ -1024,7 +1024,18 @@ PAGES.meetings = async (root) => {
     const d = new Date(mt.at).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
     (byDay[d] = byDay[d] || []).push(mt);
   }
-  root.innerHTML = calHtml + `
+  const mtWeek = listF.filter(mt => { const t = new Date(mt.at); return t >= mon && t < new Date(+mon + 7 * 864e5); });
+  const mtNext = list.filter(mt => mt.at > Date.now() && mt.status === 'planned').sort((a2, b2) => a2.at - b2.at)[0];
+  root.innerHTML = heroArt('assets/art/calendar.png', `
+      <div class="ha-title">${ic(I.cal)}Встречи<span class="sub">показы, звонки и Zoom — подтверждения уходят в WhatsApp сами</span></div>
+      ${[
+        ['На этой неделе', mtWeek.length, 'в календаре ниже'],
+        mtNext ? ['Ближайшая', new Date(mtNext.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' ' + tmm(mtNext.at), esc(mtNext.leadName) + ' · ' + esc(mtNext.brokerName.split(' ')[0])] : null,
+        ['Прошли · не пришёл', list.filter(mt => mt.status === 'done').length + ' · ' + list.filter(mt => mt.status === 'noshow').length, 'за всё время'],
+      ].filter(Boolean).map(([k, v, sub]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `) + calHtml + `
     <div class="two-col">
       <div>
         ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items], di) => coll(day, items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
@@ -1387,7 +1398,7 @@ async function openLeadModal(id) {
 PAGES.inbox = async (root) => {
   root.innerHTML = `<div class="inbox">
     <div class="glass conv-list" id="convList"></div>
-    <div class="glass chat" id="chatPane"><div class="chat-empty">Выберите диалог слева</div></div>
+    <div class="glass chat" id="chatPane"><div class="chat-empty"><img class="ce-art" src="assets/art/chat.png" alt=""><div>Выберите диалог слева</div></div></div>
     <div class="glass lead-panel" id="leadPanel"><div class="empty">Данные лида появятся здесь</div></div>
   </div>`;
   await refreshInbox(true);
@@ -2151,7 +2162,19 @@ PAGES.collections = async (root) => {
   if (selLead) { try { suggest = await api.get(`/leads/${selLead}/suggest-properties`); } catch (e) {} }
   const ordered = selLead && suggest.length ? suggest : props;
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+  const clViews = cols0.reduce((s2, c) => s2 + (c.views || 0), 0);
+  const clHot = cols0.filter(c => c.analytics && c.analytics.maxDepth >= 75).length;
   root.innerHTML = `
+    ${heroArt('assets/art/brochures.png', `
+      <div class="ha-title">${ic(I.layers)}Подборки<span class="sub">персональные веб-страницы и PDF · трекинг каждого просмотра</span></div>
+      ${[
+        ['Собрано подборок', cols0.length, 'конструктор — слева'],
+        ['Просмотров клиентами', clViews, 'по всем ссылкам'],
+        ['Горячий интерес', clHot, 'изучили страницу на 75%+'],
+      ].map(([k, v, sub]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `)}
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
@@ -2356,7 +2379,17 @@ PAGES.automations = async (root) => {
   const swRow = (t, d, inner) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div>${inner}</div>`;
   const sw = (key, on) => `<label class="switch"><input type="checkbox" data-auto="${key}" ${on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
   const link = (page, label) => `<button class="btn btn-sm" data-go="${page}">${label}</button>`;
+  const autoOn = ['autoHandover', 'meetRemind', 'noshowReturn'].filter(k => a[k]).length + (s.ai.autopilot ? 1 : 0);
   root.innerHTML = `
+    ${heroArt('assets/art/gears.png', `
+      <div class="ha-title">${ic(I.bolt)}Автоматизации<span class="sub">рутина крутится сама — команда занимается клиентами</span></div>
+      <div class="ha-chips">
+        <span class="ha-chip" data-ha>Включено <b>${autoOn}</b></span>
+        <span class="ha-chip" data-ha>${s.ai.autopilot ? '⚡ Автопилот ИИ активен' : 'Автопилот ИИ выключен'}</span>
+        <span class="ha-chip" data-ha>${a.assignMode === 'load' ? 'Распределение: по загрузке' : a.assignMode === 'roundrobin' ? 'Распределение: по очереди' : 'Распределение: по сменам'}</span>
+      </div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Отчёты в мессенджер: <b>${(s.reports || {}).daily || (s.reports || {}).weekly ? 'включены' : 'выключены'}</b> · мгновенные алерты: <b>${Object.values((s.reports || {}).instant || {}).filter(Boolean).length}</b></span></div>
+    `)}
     <div class="two-col">
       <div>
         <div class="glass card mb">
@@ -2552,6 +2585,11 @@ PAGES.playbook = async (root) => {
   const cur = PAGE_STATE.pbCat;
   const items = pb.filter(x => x.cat === cur);
   root.innerHTML = `
+    ${heroArt('assets/art/book.png', `
+      <div class="ha-title">${ic(I.doc)}Плейбук продаж<span class="sub">${pb.length} приёмов · Дубай и США · вшит в промпт ИИ</span></div>
+      <div class="ha-chips">${cats.map(([k, name]) => `<span class="ha-chip" data-ha data-pbgo="${k}" style="cursor:pointer">${name} <b>${pb.filter(x => x.cat === k).length}</b></span>`).join('')}</div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">ИИ применяет эти приёмы сам — в диалогах и в подсказке «что делать дальше» в карточке лида</span></div>
+    `)}
     <div class="pb-layout">
       <div class="pb-nav glass">
         <div class="pb-nav-hd">Категории</div>
@@ -2578,6 +2616,7 @@ PAGES.playbook = async (root) => {
       </div>
     </div>`;
   $$('.pb-cat', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.cat; render(); }));
+  $$('[data-pbgo]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.pbgo; render(); }));
   $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
 };
 
@@ -2714,6 +2753,16 @@ PAGES.templates = async (root) => {
   STATE.templates = st.templates;
   const stBadge = { approved: '<span class="badge ok">approved</span>', pending: '<span class="badge warn">на модерации Meta</span>', rejected: '<span class="badge bad">отклонён</span>' };
   root.innerHTML = `
+    ${heroArt('assets/art/docs.png', `
+      <div class="ha-title">${ic(I.doc)}Шаблоны WhatsApp<span class="sub">инициирующие сообщения — только одобренными шаблонами Meta</span></div>
+      ${[
+        ['Utility · сервисные', st.templates.filter(t => t.category === 'utility').length, 'в ~4 раза дешевле marketing'],
+        ['Marketing · инициация', st.templates.filter(t => t.category === 'marketing').length, 'первые касания и реанимация'],
+        ['Одобрено · на модерации', st.templates.filter(t => t.status === 'approved').length + ' · ' + st.templates.filter(t => t.status === 'pending').length, 'статус Meta'],
+      ].map(([k, v, sub]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `)}
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
     <div class="two-col">
       <div><div class="nav-label" style="padding-left:2px">Utility — сервисные (дешевле, быстрее модерация)</div>
@@ -2750,7 +2799,20 @@ PAGES.brokers = async (root) => {
   const st = STATE.settings;
   const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
   const editId = PAGE_STATE.brokerEdit;
+  const brHot = leads.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
+  const brCap = STATE.brokers.reduce((s2, b) => s2 + (b.capacity || 0), 0);
+  const brLoad = STATE.brokers.reduce((s2, b) => s2 + (b.load || 0), 0);
   root.innerHTML = `
+  ${heroArt('assets/art/team.png', `
+    <div class="ha-title">${ic(I.users)}Команда брокеров<span class="sub">квалифицированные лиды распределяются сами</span></div>
+    ${[
+      ['В команде', STATE.brokers.length, 'брокеров в ротации'],
+      ['Загрузка', brCap ? Math.round(brLoad / brCap * 100) + '%' : '—', brLoad + ' лидов из ' + brCap + ' мест'],
+      ['Горячих в работе', brHot, 'передано + показы'],
+    ].map(([k, v, sub]) => `<div class="ha-row" data-ha>
+      <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+    </div>`).join('')}
+  `)}
   <div class="filters"><span class="muted" style="font-size:12px">${STATE.brokers.length} в команде · распределение: ${{ load: 'по загрузке', roundrobin: 'по очереди', shift: 'по сменам' }[(st.automations || {}).assignMode] || ''} <button class="btn btn-sm" id="brAutoLink" style="margin-left:8px">Настроить</button></span>
     <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button></div>
   <div class="broker-grid">
