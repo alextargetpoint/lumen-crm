@@ -51,6 +51,7 @@ const DEFAULT_PASS = 'lumen2026';
     { adId: '120209934110255019', name: 'Бали · виллы под сдачу · рилс', adsetName: 'RU номады', campaignName: 'Bali CTWA Август', geo: 'bali' },
   ];
   if (!db.intakeLog) db.intakeLog = [];
+  for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
   store.save();
 }
 
@@ -321,7 +322,11 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       if (req.method === 'GET') {
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
-        return json(res, 200, Object.assign(leadView(db, lead), { messages: msgs }));
+        return json(res, 200, Object.assign(leadView(db, lead), {
+          messages: msgs,
+          events: db.events.filter(e => e.leadId === lead.id).slice(0, 60),
+          meetings: (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => Object.assign({}, mt, { brokerName: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '—' })),
+        }));
       }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
@@ -332,6 +337,22 @@ const server = http.createServer(async (req, res) => {
         store.save();
         return json(res, 200, leadView(db, lead));
       }
+    }
+
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/(note|contacts)$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (m[2] === 'note') {
+        const text = String(b.text || '').trim();
+        if (text) {
+          lead.notes = lead.notes || [];
+          lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: text.slice(0, 2000) });
+        }
+      }
+      if (m[2] === 'contacts') lead.contacts = (b.contacts || []).slice(0, 20).map(c => ({ kind: String(c.kind || 'other').slice(0, 20), value: String(c.value || '').slice(0, 200) })).filter(c => c.value);
+      store.save();
+      return json(res, 200, { notes: lead.notes, contacts: lead.contacts });
     }
 
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/(message|inbound|handover|analyze)$/)) && req.method === 'POST') {
@@ -441,13 +462,16 @@ const server = http.createServer(async (req, res) => {
         id: store.nextId('mt'), leadId: lead.id, brokerId: broker.id,
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
+        /* видео-встреча: своя комната из коробки (Jitsi, работает в браузере без аккаунтов);
+           Zoom API подключается сюда же при наличии кредов */
+        link: b.link || (b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null),
       };
       db.meetings = db.meetings || [];
       db.meetings.push(mt);
       if (b.confirm !== false) {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
         const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}. Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
+        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}.${mt.link ? ` Ссылка на видеовстречу: ${mt.link}` : ''} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
       }
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name} + ${broker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
       store.save();

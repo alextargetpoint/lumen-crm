@@ -70,10 +70,36 @@ const MONTHS = ['января', 'февраля', 'марта', 'апреля', 
 const MONTHS_N = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
-function closeAllPickers(except) {
-  $$('.cs.open, .dtp.open').forEach(x => { if (x !== except) x.classList.remove('open'); });
+/* поповеры пикеров живут в body fixed-слоем (внутри модалки их режет overflow,
+   а position:fixed под transform ломается — проверено дашбордом) */
+let CUR_POP = null;
+function closePop() {
+  if (!CUR_POP) return;
+  CUR_POP.pop.classList.remove('show');
+  CUR_POP.pop.remove();
+  CUR_POP.wrap.classList.remove('open');
+  CUR_POP = null;
 }
-document.addEventListener('mousedown', (e) => { if (!e.target.closest('.cs') && !e.target.closest('.dtp')) closeAllPickers(); });
+function openPop(wrap, btn, pop) {
+  closePop();
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  Object.assign(pop.style, { position: 'fixed', zIndex: 400, minWidth: r.width + 'px', visibility: 'hidden' });
+  pop.classList.add('show');
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 12)) + 'px';
+  const below = innerHeight - r.bottom;
+  /* не влезает вниз — переворачиваем над кнопкой */
+  pop.style.top = (below > h + 14 || r.top < h + 14 ? r.bottom + 6 : r.top - h - 6) + 'px';
+  pop.style.visibility = '';
+  wrap.classList.add('open');
+  CUR_POP = { wrap, pop };
+}
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.cs, .dtp, .cs-list, .dtp-pop')) closePop();
+});
+window.addEventListener('scroll', (e) => { if (CUR_POP && !e.target.closest?.('.cs-list, .dtp-pop')) closePop(); }, true);
+window.addEventListener('resize', closePop);
 
 function enhanceControls(root) {
   /* селекты → стилизованный дропдаун (нативный остаётся хранителем значения) */
@@ -87,7 +113,7 @@ function enhanceControls(root) {
     wrap.appendChild(sel);
     const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.chev, 2)}</span></button>`);
     const list = el('<div class="cs-list"></div>');
-    wrap.append(btn, list);
+    wrap.append(btn);
     const sync = () => { btn.querySelector('.cs-val').textContent = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.trim() : ''; };
     const build = () => {
       list.innerHTML = Array.from(sel.options).map((o, i) =>
@@ -99,13 +125,13 @@ function enhanceControls(root) {
         sel.value = o.value;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
         sync();
-        wrap.classList.remove('open');
+        closePop();
       }));
     };
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (wrap.classList.contains('open')) wrap.classList.remove('open');
-      else { closeAllPickers(wrap); build(); wrap.classList.add('open'); }
+      if (wrap.classList.contains('open')) closePop();
+      else { build(); openPop(wrap, btn, list); }
     });
     sync();
   });
@@ -120,7 +146,7 @@ function enhanceControls(root) {
     wrap.appendChild(inp);
     const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.cal)}</span></button>`);
     const pop = el('<div class="dtp-pop"></div>');
-    wrap.append(btn, pop);
+    wrap.append(btn);
     const label = () => {
       const [y, mo, d] = (inp.value || '').split('-').map(Number);
       btn.querySelector('.cs-val').textContent = d ? `${d} ${MONTHS[mo - 1]} ${y}` : 'Выбрать дату';
@@ -146,17 +172,17 @@ function enhanceControls(root) {
           ${Array.from({ length: shift }, () => '<span></span>').join('')}
           ${Array.from({ length: days }, (_, i) => `<button type="button" class="dtp-day ${isSel(i + 1) ? 'sel' : ''} ${isToday(i + 1) ? 'today' : ''}" data-day="${i + 1}">${i + 1}</button>`).join('')}
         </div>`;
-      $$('.dtp-nav', pop).forEach(b => b.addEventListener('click', () => { view.m += +b.dataset.d; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } build(); }));
+      $$('.dtp-nav', pop).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); view.m += +b.dataset.d; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } build(); }));
       $$('.dtp-day', pop).forEach(b => b.addEventListener('click', () => {
         inp.value = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(b.dataset.day).padStart(2, '0')}`;
         inp.dispatchEvent(new Event('change', { bubbles: true }));
         label();
-        wrap.classList.remove('open');
+        closePop();
       }));
     };
     btn.addEventListener('click', () => {
-      if (wrap.classList.contains('open')) wrap.classList.remove('open');
-      else { closeAllPickers(wrap); view = null; build(); wrap.classList.add('open'); }
+      if (wrap.classList.contains('open')) closePop();
+      else { view = null; build(); openPop(wrap, btn, pop); }
     });
     label();
   });
@@ -171,7 +197,7 @@ function enhanceControls(root) {
     wrap.appendChild(inp);
     const btn = el(`<button type="button" class="cs-btn"><span class="cs-val"></span><span class="cs-chev">${ic(I.clock)}</span></button>`);
     const pop = el('<div class="dtp-pop dtp-time"></div>');
-    wrap.append(btn, pop);
+    wrap.append(btn);
     const label = () => { btn.querySelector('.cs-val').textContent = inp.value || 'Время'; };
     const build = () => {
       const slots = [];
@@ -181,12 +207,12 @@ function enhanceControls(root) {
         inp.value = b.textContent;
         inp.dispatchEvent(new Event('change', { bubbles: true }));
         label();
-        wrap.classList.remove('open');
+        closePop();
       }));
     };
     btn.addEventListener('click', () => {
-      if (wrap.classList.contains('open')) wrap.classList.remove('open');
-      else { closeAllPickers(wrap); build(); wrap.classList.add('open'); const sel = pop.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'center' }); }
+      if (wrap.classList.contains('open')) closePop();
+      else { build(); openPop(wrap, btn, pop); const sel = pop.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'center' }); }
     });
     label();
   });
@@ -284,7 +310,7 @@ function tmm(ts) { return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-di
 /* ---------- модалки/тосты ---------- */
 function modal({ title, sub, body, actions, wide }) {
   closeModal();
-  const bd = el(`<div class="modal-bd"><div class="modal glass" ${wide ? 'style="width:640px"' : ''}>
+  const bd = el(`<div class="modal-bd"><div class="modal glass" ${wide === 'card' ? 'style="width:980px"' : wide ? 'style="width:680px"' : ''}>
     <h3>${esc(title)}</h3>${sub ? `<div class="m-sub">${sub}</div>` : ''}
     <div class="m-body">${body || ''}</div>
     <div class="m-actions"></div>
@@ -680,29 +706,111 @@ function openMeetingModal(lead, after) {
   });
 }
 
+/* ============================================================
+   Полная карточка лида: хронология (переписка+события+заметки),
+   комментарии, доп-контакты, встречи с видео-ссылкой
+   ============================================================ */
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
-  modal({
+  const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
+  const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
+  const contactKinds = { telegram: 'Telegram', email: 'E-mail', instagram: 'Instagram', whatsapp: 'WhatsApp #2', other: 'Другое' };
+
+  /* единая хронология: сообщения + события + заметки + встречи */
+  const timeline = [
+    ...(l.messages || []).map(m => ({ at: m.at, kind: 'msg', m })),
+    ...(l.events || []).map(e => ({ at: e.at, kind: 'ev', e })),
+    ...(l.notes || []).map(n => ({ at: n.at, kind: 'note', n })),
+    ...(l.meetings || []).map(mt => ({ at: mt.createdAt, kind: 'meet', mt })),
+  ].sort((a, b) => b.at - a.at);
+
+  const tlItem = (t) => {
+    if (t.kind === 'msg') return `<div class="tl-item" data-f="msg"><div class="tl-dot ${t.m.dir === 'in' ? 'in' : 'out'}">${ic(I.chat)}</div>
+      <div class="tl-body"><div class="tl-head"><b>${t.m.dir === 'in' ? esc(l.name.split(' ')[0]) : ({ ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер' }[t.m.via] || 'Мы')}</b><span>${tmm(t.at)} · ${new Date(t.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span></div>
+      <div class="tl-text">${esc(t.m.text)}</div></div></div>`;
+    if (t.kind === 'ev') return `<div class="tl-item" data-f="ev"><div class="tl-dot ev">${ic(I.bolt)}</div>
+      <div class="tl-body"><div class="tl-text muted">${esc(t.e.text)}</div><div class="tl-head"><span>${ago(t.at)}</span></div></div></div>`;
+    if (t.kind === 'note') return `<div class="tl-item" data-f="note"><div class="tl-dot note">${ic(I.edit || I.doc)}</div>
+      <div class="tl-body tl-note"><div class="tl-text">${esc(t.n.text)}</div><div class="tl-head"><span>комментарий · ${ago(t.at)}</span></div></div></div>`;
+    if (t.kind === 'meet') return `<div class="tl-item" data-f="ev"><div class="tl-dot meet">${ic(I.cal)}</div>
+      <div class="tl-body"><div class="tl-text">${kindRu[t.mt.kind] || 'Встреча'} с ${esc(t.mt.brokerName)} · ${new Date(t.mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${t.mt.link ? ` · <a class="link" href="${t.mt.link}" target="_blank">видео-комната</a>` : ''}</div>
+      <div class="tl-head"><span>${{ scheduled: 'назначена', done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[t.mt.status]}</span></div></div></div>`;
+    return '';
+  };
+
+  const bd = modal({
     title: l.name,
-    sub: `${l.geoName} · ${esc(l.phone)} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
-    wide: true,
+    sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
+    wide: 'card',
     body: `
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
         <span class="badge acc">${stageName(l.stage)}</span>
-        ${l.ai.enabled ? '<span class="badge violet">ИИ ведёт диалог</span>' : '<span class="badge">ИИ выключен</span>'}
+        ${l.ai.enabled ? '<span class="badge violet">ИИ ведёт диалог</span>' : ''}
         ${l.brokerName ? `<span class="badge ok">брокер: ${esc(l.brokerName)}</span>` : ''}
         ${(l.tags || []).map(t => `<span class="badge">${esc(t)}</span>`).join('')}
       </div>
-      ${axesHtml(l)}
-      ${l.summary ? `<div class="lp-sec">Саммари для брокера</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
-      <div class="lp-sec">Сменить стадию</div>
-      <select id="mStage" style="width:100%">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select>`,
+      <div class="lc-grid">
+        <div class="lc-left">
+          <div class="lc-note-row">
+            <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
+            <button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.plus)}</button>
+          </div>
+          <div class="lc-filters">
+            <button class="btn btn-sm lc-f active" data-f="all">Всё</button>
+            <button class="btn btn-sm lc-f" data-f="msg">Переписка</button>
+            <button class="btn btn-sm lc-f" data-f="note">Комментарии</button>
+            <button class="btn btn-sm lc-f" data-f="ev">События</button>
+          </div>
+          <div class="lc-timeline" id="lcTimeline">${timeline.map(tlItem).join('') || '<div class="empty">Хронология пуста</div>'}</div>
+        </div>
+        <div class="lc-right">
+          <div class="lp-sec" style="margin-top:0">Стадия</div>
+          <select id="mStage" style="width:100%">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select>
+          ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
+          <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
+          <div class="axr-list">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}"><span class="axr-k">${axName[a]}</span><span class="axr-v">${q ? esc(q.value) : '—'}</span>${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}</div>`; }).join('')}</div>
+          ${l.summary ? `<div class="lp-sec">Саммари</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
+          <div class="lp-sec">Контакты</div>
+          <div id="lcContacts">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
+          <div class="lc-note-row" style="margin-top:7px">
+            <select id="lcCKind" style="width:118px;flex:0 0 118px">${Object.entries(contactKinds).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+            <input id="lcCVal" placeholder="@ник / почта…">
+            <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
+          </div>
+          <div class="lp-sec">Встречи</div>
+          ${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}
+        </div>
+      </div>`,
     actions: [
       { label: 'Открыть диалог', cls: 'btn-accent', onClick: () => { PAGE_STATE.inboxLead = l.id; go('inbox'); } },
-      { label: 'Сохранить стадию', onClick: async (bd) => { await api.patch('/leads/' + l.id, { stage: $('#mStage', bd).value }); render(); } },
+      { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
       { label: 'Закрыть' },
     ],
   });
+
+  $('#lcPhone', bd).addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
+  $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
+  const addNote = async () => {
+    const t = $('#lcNote', bd).value.trim();
+    if (!t) return;
+    await api.post(`/leads/${id}/note`, { text: t });
+    openLeadModal(id);
+  };
+  $('#lcNoteAdd', bd).addEventListener('click', addNote);
+  $('#lcNote', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
+  const saveContacts = async (contacts) => { await api.post(`/leads/${id}/contacts`, { contacts }); openLeadModal(id); };
+  $('#lcCAdd', bd).addEventListener('click', () => {
+    const v = $('#lcCVal', bd).value.trim();
+    if (!v) return;
+    saveContacts([...(l.contacts || []), { kind: $('#lcCKind', bd).value, value: v }]);
+  });
+  $$('.lc-cx', bd).forEach(b => b.addEventListener('click', () => saveContacts((l.contacts || []).filter((_, i) => i !== +b.dataset.i))));
+  $$('.lc-copy', bd).forEach(b => b.addEventListener('click', () => { navigator.clipboard.writeText(b.dataset.link); toast('Ссылка на комнату скопирована', null, true); }));
+  $$('.lc-f', bd).forEach(f => f.addEventListener('click', () => {
+    $$('.lc-f', bd).forEach(x => x.classList.remove('active'));
+    f.classList.add('active');
+    $$('#lcTimeline .tl-item', bd).forEach(it => { it.style.display = f.dataset.f === 'all' || it.dataset.f === f.dataset.f ? '' : 'none'; });
+  }));
 }
 
 /* ---------------- ДИАЛОГИ ---------------- */
