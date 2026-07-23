@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen — AI-CRM для недвижимости</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><img src="logo.svg" alt="Lumen"></div>
+      <div class="brand-name">LUMEN<span>REAL ESTATE CRM</span></div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <div class="nav-label">Работа</div>
+      <button class="nav-item active" data-page="overview"></button>
+      <button class="nav-item" data-page="funnel"></button>
+      <button class="nav-item" data-page="inbox"></button>
+
+      <div class="nav-label">ИИ-отдел</div>
+      <button class="nav-item" data-page="qualifier"></button>
+      <button class="nav-item" data-page="sequences"></button>
+      <button class="nav-item" data-page="wake"></button>
+
+      <div class="nav-label">Инфраструктура</div>
+      <button class="nav-item" data-page="numbers"></button>
+      <button class="nav-item" data-page="templates"></button>
+      <button class="nav-item" data-page="brokers"></button>
+
+      <div class="nav-label">Система</div>
+      <button class="nav-item" data-page="analytics"></button>
+      <button class="nav-item" data-page="settings"></button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="agency">
+        <div class="ava" id="agencyAva">OA</div>
+        <div>
+          <div class="nm" id="agencyName">—</div>
+          <div class="rl" id="agencyRole">агентство недвижимости</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="page-title" id="pageTitle">Обзор</div>
+        <div class="page-sub" id="pageSub"></div>
+      </div>
+      <div class="tb-spacer"></div>
+      <div class="demo-chip" id="demoChip" style="display:none"><i></i>Демо-режим · симуляция диалогов</div>
+      <button class="btn btn-accent" id="newLeadBtn">Новый лид</button>
+    </header>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>
