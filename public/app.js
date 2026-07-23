@@ -1277,6 +1277,23 @@ PAGES.properties = async (root) => {
         <div class="pd-fact"><label class="lc-lbl">Заметка (короткая)</label><input class="gi" data-f="note" style="width:100%" value="${esc(pr.note || '')}"></div>
       </div>
       <div class="glass card" style="margin-top:16px">
+        <div class="card-title">${ic(I.layers)}Для подборки — уровень эталона<span class="sub">крючок, метрики, район, рассрочка, аргументы</span></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px">
+          <div class="pd-fact"><label class="lc-lbl">Заголовок-крючок (вместо названия ЖК)</label><input class="gi" data-f="hookTitle" style="width:100%" value="${esc(pr.hookTitle || '')}" placeholder="Комплекс с инфраструктурой… в 20 минутах от Business Bay"></div>
+          <div class="pd-fact"><label class="lc-lbl">Доходность</label><input class="gi" data-f="roi" style="width:100%" value="${esc(pr.roi || '')}" placeholder="от 7% годовых"></div>
+          <div class="pd-fact"><label class="lc-lbl">Прирост стоимости</label><input class="gi" data-f="appreciation" style="width:100%" value="${esc(pr.appreciation || '')}" placeholder="от 25% к сдаче"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+          <div class="pd-fact"><label class="lc-lbl">Район: название</label><input class="gi" data-f="districtName" style="width:100%" value="${esc((pr.district || {}).name || '')}" placeholder="JVC"></div>
+          <div class="pd-fact"><label class="lc-lbl">Тайминги (строка = «мин | место»)</label><textarea class="gi" data-f="districtTimes" style="width:100%;min-height:64px" placeholder="16 | Expo City">${esc(((pr.district || {}).times || []).map(t => t.min + ' | ' + t.place).join('\n'))}</textarea></div>
+        </div>
+        <div class="pd-fact"><label class="lc-lbl">Район: описание</label><textarea class="gi" data-f="districtBlurb" style="width:100%">${esc((pr.district || {}).blurb || '')}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+          <div class="pd-fact"><label class="lc-lbl">Рассрочка (строка = «20% | Первоначальный взнос»)</label><textarea class="gi" data-f="paymentRowsStr" style="width:100%;min-height:70px">${esc((pr.paymentRows || []).map(r2 => r2.pct + ' | ' + r2.label).join('\n'))}</textarea></div>
+          <div class="pd-fact"><label class="lc-lbl">«Рекомендуем для аренды» (3 аргумента по строкам)</label><textarea class="gi" data-f="whyRentStr" style="width:100%;min-height:70px">${esc((pr.whyRent || []).join('\n'))}</textarea></div>
+        </div>
+      </div>
+      <div class="glass card" style="margin-top:16px">
         <div class="card-title">${ic(I.grid)}Юниты<span class="sub">попадают таблицей в подборку и PDF</span></div>
         <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
           ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
@@ -1322,6 +1339,13 @@ PAGES.properties = async (root) => {
       const f = inp.dataset.f;
       if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
       else if (f === 'amenitiesStr') await upd({ amenities: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'districtName' || f === 'districtBlurb' || f === 'districtTimes') {
+        const box = inp.closest('.glass');
+        const times = (box.querySelector('[data-f="districtTimes"]').value || '').split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([mn, pl]) => ({ min: parseInt(mn) || 0, place: pl.trim() }));
+        await upd({ district: { name: box.querySelector('[data-f="districtName"]').value, blurb: box.querySelector('[data-f="districtBlurb"]').value, times } });
+      }
+      else if (f === 'paymentRowsStr') await upd({ paymentRows: inp.value.split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([p2, l2]) => ({ pct: p2.trim(), label: l2.trim() })) });
+      else if (f === 'whyRentStr') await upd({ whyRent: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
       else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
       else await upd({ [f]: inp.value });
     }));
@@ -1965,6 +1989,19 @@ PAGES.settings = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы» в подборках</span></div>
+          <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro">${esc((s.agency.about || {}).intro || '')}</textarea></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Факты об агентстве (по строкам)</label><textarea id="abBullets" style="min-height:96px">${esc(((s.agency.about || {}).bullets || []).join('\n'))}</textarea></div>
+            <div class="form-row"><label>«Почему мы» (по строкам)</label><textarea id="abWhy" style="min-height:96px">${esc(((s.agency.about || {}).whyUs || []).join('\n'))}</textarea></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Приписка про бесплатность</label><input id="abFree" value="${esc((s.agency.about || {}).freeNote || '')}"></div>
+            <div class="form-row"><label>Офис (адрес)</label><input id="abOffice" value="${esc(((s.agency.about || {}).office || {}).address || '')}"></div>
+          </div>
+          <button class="btn" id="abSave">Сохранить</button>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <div class="form-row"><label>Имя</label><input id="mgrName" value="${esc((s.agency.manager || {}).name || '')}"></div>
@@ -2018,6 +2055,17 @@ PAGES.settings = async (root) => {
     const j = await r.json();
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
     else toast('Не получилось', j.error || 'ошибка');
+  });
+  $('#abSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { about: {
+      intro: $('#abIntro').value,
+      bullets: $('#abBullets').value.split('\n').map(x => x.trim()).filter(Boolean),
+      whyUs: $('#abWhy').value.split('\n').map(x => x.trim()).filter(Boolean),
+      freeNote: $('#abFree').value,
+      office: Object.assign({}, (s.agency.about || {}).office, { address: $('#abOffice').value }),
+    } } });
+    toast('Об агентстве сохранено', 'Обновится во всех подборках', true);
+    loadState();
   });
   $('#mgrSave').addEventListener('click', async () => {
     await api.patch('/settings', { agency: { manager: { name: $('#mgrName').value, phone: $('#mgrPhone').value, email: $('#mgrEmail').value } } });

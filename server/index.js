@@ -82,6 +82,45 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.collections) db.collections = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
+  if (!db.settings.agency.about) db.settings.agency.about = {
+    intro: 'Мы — международное агентство недвижимости. Помогаем покупать в Дубае, на Бали и в Таиланде удалённо и безопасно.',
+    bullets: ['5 направлений: Дубай, Бали, Пхукет, Испания, Оман', '300+ сделок за последние 2 года', 'Аналитика по каждому запросу: 3-5 экспертов на подбор', 'Сопровождение до ключей и после: аренда, перепродажа'],
+    whyUs: ['Сильная аналитика. Каждый запрос обрабатывают несколько экспертов — в подборку попадают только объекты, проходящие фильтр по доходности и застройщику.', 'Работаем во всех сегментах: первичка и вторичка, апартаменты, виллы и офисы.', 'Отдел заботы: документооборот, бронь, гарантия оплаты — на нашей стороне. После сделки помогаем со сдачей в аренду и перепродажей.'],
+    freeNote: 'Услуги на первичном рынке бесплатны для вас — мы зарабатываем на комиссии застройщиков.',
+    office: { city: 'Dubai', address: '', blurb: 'Работаем в будни, выходные и праздники. Будете в Дубае — приходите знакомиться лично.' },
+  };
+  {
+    const enrich = {
+      pr_jvc1: { hookTitle: 'Комплекс с инфраструктурой от бассейна до ретейла в сердце JVC', roi: 'от 7% годовых', appreciation: 'от 20% к сдаче',
+        district: { name: 'JVC', blurb: 'Jumeirah Village Circle — самый арендуемый комьюнити-район Дубая: 30+ парков, школы, Circle Mall.', times: [{ min: 20, place: 'Dubai Marina' }, { min: 25, place: 'Burj Khalifa' }, { min: 28, place: 'Аэропорт DXB' }] },
+        paymentRows: [{ pct: '20%', label: 'Первоначальный взнос' }, { pct: '50%', label: 'Во время строительства' }, { pct: '30%', label: 'При получении ключей' }],
+        whyRent: ['Застройщик Binghatti — 40+ реализованных проектов, сдаёт с опережением сроков.', 'JVC — лидер по спросу на аренду среди экспатов: заполняемость выше 90%.', 'Быстрый доступ к Marina, Downtown и Mall of the Emirates на машине.'] },
+      pr_mar1: { hookTitle: 'Видовые апартаменты у марины от Emaar', roi: 'от 6% годовых', appreciation: 'от 15% к сдаче',
+        district: { name: 'Dubai Marina', blurb: 'Марина — витрина Дубая: набережная, яхт-клуб, рестораны, пляжи JBR в пешей доступности.', times: [{ min: 5, place: 'JBR Beach' }, { min: 20, place: 'Burj Khalifa' }, { min: 30, place: 'Аэропорт DXB' }] },
+        paymentRows: [{ pct: '10%', label: 'Первоначальный взнос' }, { pct: '50%', label: 'Во время строительства' }, { pct: '40%', label: 'При получении ключей' }],
+        whyRent: ['Emaar — госзастройщик, реализовавший Burj Khalifa: высочайшее качество и ликвидность.', 'Марина — стабильно высокий спрос на краткосрок и долгосрок круглый год.', 'Видовые линии на марину — премия к аренде 15-20%.'] },
+      pr_jvc2: { hookTitle: 'Готовая студия под сдачу с арендатором внутри', roi: '7.4% net', appreciation: 'готовый актив',
+        district: { name: 'JVC', blurb: 'Готовый фонд JVC — вход в рынок аренды Дубая с первого дня, без ожидания стройки.', times: [{ min: 20, place: 'Dubai Marina' }, { min: 25, place: 'Downtown' }] },
+        paymentRows: [{ pct: '100%', label: 'Оплата / ипотека' }],
+        whyRent: ['Арендатор уже внутри — доход с первого месяца.', 'Net-доходность 7.4% подтверждена договором аренды.', 'Вторичка JVC растёт на волне дефицита готового фонда.'] },
+      pr_dt1: { hookTitle: 'Готовый 1BR на канале в Business Bay', roi: 'от 6.5%', appreciation: 'готовый актив',
+        district: { name: 'Business Bay', blurb: 'Деловой центр Дубая на канале: офисы, Downtown в 10 минутах пешком.', times: [{ min: 10, place: 'Burj Khalifa' }, { min: 18, place: 'Аэропорт DXB' }] },
+        paymentRows: [{ pct: '100%', label: 'Оплата / ипотека' }],
+        whyRent: ['Спрос от офисных сотрудников круглый год.', 'Пешком до Downtown — премия к аренде.', 'Ликвидность вторички Business Bay — одна из лучших в городе.'] },
+      pr_jvt1: { hookTitle: 'Студии и 1BR с рассрочкой 1% в месяц до сдачи', roi: 'от 7% годовых', appreciation: 'от 18% к сдаче',
+        district: { name: 'JVT', blurb: 'Jumeirah Village Triangle — тихий семейный район рядом с JVC, растущая инфраструктура.', times: [{ min: 18, place: 'Dubai Marina' }, { min: 27, place: 'Downtown' }] },
+        paymentRows: [{ pct: '20%', label: 'Первоначальный взнос' }, { pct: '1%/мес', label: 'До сдачи' }, { pct: 'Остаток', label: 'При ключах' }],
+        whyRent: ['Рассрочка 1%/мес — минимальная нагрузка до ключей.', 'Вход от $160k — нижняя граница рынка с потенциалом роста.', 'Tiger Properties — 15 лет на рынке, 20+ сданных башен.'] },
+      pr_bali1: { hookTitle: 'Виллы под сдачу в эко-комьюнити с управляющей компанией', roi: 'от 12% годовых', appreciation: 'от 25% к сдаче',
+        district: { name: 'Берава', blurb: 'Берава — центр серфинг- и номад-жизни Бали: пляжные клубы, кафе, международные школы.', times: [{ min: 5, place: 'Пляж Berawa' }, { min: 15, place: 'Чангу' }, { min: 45, place: 'Аэропорт DPS' }] },
+        paymentRows: [{ pct: '50%', label: 'Первоначальный взнос' }, { pct: '50%', label: 'К завершению' }],
+        whyRent: ['Управляющая компания берёт сдачу на себя — пассивный доход.', 'Заполняемость вилл в Бераве 80%+ круглый год.', 'Лизхолд 30 лет с опцией продления — проговариваем сразу.'] },
+    };
+    for (const [id, ex] of Object.entries(enrich)) {
+      const pr = db.properties.find(x => x.id === id);
+      if (pr && !pr.hookTitle) Object.assign(pr, ex);
+    }
+  }
   /* обогащение демо-объекта под эталонную структуру */
   {
     const bg = db.properties.find(x => x.id === 'pr_jvc1');
@@ -595,6 +634,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
+      if (b.agency && b.agency.about) { Object.assign(db.settings.agency.about, b.agency.about); delete b.agency.about; }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
@@ -734,6 +774,12 @@ const server = http.createServer(async (req, res) => {
         if (b.description !== undefined) pr.description = String(b.description).slice(0, 3000);
         if (b.amenities) pr.amenities = b.amenities.slice(0, 30).map(x => String(x).slice(0, 40));
         if (b.units) pr.units = b.units.slice(0, 40).map(u => ({ plan: String(u.plan || '').slice(0, 30), area: String(u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40) }));
+        if (b.hookTitle !== undefined) pr.hookTitle = String(b.hookTitle).slice(0, 160);
+        if (b.roi !== undefined) pr.roi = String(b.roi).slice(0, 40);
+        if (b.appreciation !== undefined) pr.appreciation = String(b.appreciation).slice(0, 40);
+        if (b.district) pr.district = { name: String(b.district.name || '').slice(0, 60), blurb: String(b.district.blurb || '').slice(0, 500), times: (b.district.times || []).slice(0, 5).map(t => ({ min: +t.min || 0, place: String(t.place || '').slice(0, 60) })) };
+        if (b.paymentRows) pr.paymentRows = (b.paymentRows || []).slice(0, 4).map(r2 => ({ pct: String(r2.pct || '').slice(0, 8), label: String(r2.label || '').slice(0, 60) }));
+        if (b.whyRent) pr.whyRent = (b.whyRent || []).slice(0, 4).map(x => String(x).slice(0, 300));
         if (b.layouts) pr.layouts = b.layouts.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
         store.save();
         return json(res, 200, pr);
@@ -841,84 +887,153 @@ const server = http.createServer(async (req, res) => {
       const props = c.propertyIds.map(id => db.properties.find(x => x.id === id)).filter(Boolean);
       const lead = db.leads.find(l => l.id === c.leadId);
       const mgr = db.settings.agency.manager || {};
+      const about = db.settings.agency.about || {};
+      const AG = db.settings.agency.name;
+      const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + ' млн' : Math.round(n / 1000) + ' тыс';
       const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
+      const minPrice = Math.min(...props.map(p2 => p2.priceFrom || Infinity));
       const isPrint = u.searchParams.get('print') === '1';
-      const cover = (pr2) => (pr2.images || [])[0]
-        ? `<div class="phero" style="background-image:url('${pr2.images[0]}')"></div>`
-        : `<div class="phero grad"><span>${pr2.area || pr2.name}</span></div>`;
+      const heroImg = props.map(p2 => (p2.images || [])[0]).find(Boolean);
+      const plural = (n) => n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов';
+      const nProj = props.length + ' ' + plural(props.length);
+      const star = '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
+      const projPage = (pr2, idx) => `
+<section class="pg">
+  <div class="kicker">Проект №${idx + 1}</div>
+  <h2 class="ph2">${pr2.hookTitle || pr2.name}</h2>
+  <div class="metrics">
+    <div class="mt"><span>Стоимость</span><b>от ${fmt(pr2.priceFrom, pr2.currency)}</b></div>
+    <div class="mt"><span>Дата сдачи</span><b>${pr2.handover || '—'}</b></div>
+    ${pr2.roi ? `<div class="mt"><span>Доходность</span><b>${pr2.roi}</b></div>` : ''}
+    ${pr2.appreciation ? `<div class="mt"><span>Прирост стоимости</span><b>${pr2.appreciation}</b></div>` : ''}
+  </div>
+  <div class="shots ${(pr2.images || []).length > 1 ? '' : 'single'}">
+    ${(pr2.images || [])[0] ? `<div class="shot main" style="background-image:url('${pr2.images[0]}')"></div>` : `<div class="shot main grad"><span>${pr2.area || pr2.name}</span></div>`}
+    ${(pr2.images || []).slice(1, 3).map(u2 => `<div class="shot" style="background-image:url('${u2}')"></div>`).join('')}
+  </div>
+  ${pr2.district && pr2.district.name ? `<div class="district">
+    <div class="dmap">${star.replace('class="star"', 'class="dpin"')}</div>
+    <div class="dtext"><b>${pr2.district.name}</b> — ${pr2.district.blurb || ''}
+      <div class="dtimes">${(pr2.district.times || []).map(t2 => `<div><i>${t2.min} мин</i> 🚘 ${t2.place}</div>`).join('')}</div>
+    </div>
+  </div>` : ''}
+  ${(pr2.paymentRows || []).length ? `<h3 class="ph3">${pr2.market === 'offplan' ? 'Рассрочка' : 'Оплата'}</h3>
+  <div class="payrow">${pr2.paymentRows.map(r2 => `<div class="pay"><b>${r2.pct}</b><span>${r2.label}</span></div>`).join('')}</div>` : ''}
+  ${(pr2.whyRent || []).length ? `<div class="rec"><div class="rec-t">Рекомендуем для сдачи в аренду:</div><ol>${pr2.whyRent.map(w2 => `<li>${w2}</li>`).join('')}</ol></div>` : ''}
+  ${(pr2.units || []).length ? `<h3 class="ph3">Доступные юниты</h3><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
+    ${pr2.units.map(u2 => `<tr><td><b>${u2.plan}</b></td><td>${u2.area}</td><td>${u2.floor}</td><td>${u2.view}</td><td class="pr">${fmt(u2.price, pr2.currency)}</td></tr>`).join('')}</table>` : ''}
+  ${((pr2.layouts || []).length || (pr2.materials || []).length) ? `<div class="mats">${(pr2.layouts || []).map(l2 => `<a href="${l2.url}" target="_blank">📐 ${l2.label}</a>`).join('')}${(pr2.materials || []).map(mt2 => `<a href="${mt2.url}" target="_blank">${mt2.label} →</a>`).join('')}</div>` : ''}
+  <div class="pnum">${String(idx + 1).padStart(2, '0')}</div>
+</section>`;
+
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${c.title} — ${db.settings.agency.name}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>${c.title} — ${AG}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#F4F7FB;color:#111827}
-.page{max-width:900px;margin:0 auto;background:#fff}
-.cover{min-height:520px;background:radial-gradient(700px 400px at 85% -10%,rgba(47,107,255,.45),transparent 60%),linear-gradient(155deg,#102B5C,#061126 80%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 24px}
-.cover .logo{width:44px;height:53px;margin-bottom:18px}.cover h1{font-size:34px;letter-spacing:-.5px;font-weight:800}.cover .for{color:#86AFFF;font-size:15px;margin-top:10px}
-.mgr{margin-top:44px;display:flex;gap:14px;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(134,175,255,.25);border-radius:16px;padding:14px 22px;backdrop-filter:blur(10px)}
-.mgr .ava{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#102B5C);display:grid;place-items:center;font-weight:700;font-size:16px}
-.mgr .nm{font-weight:700;font-size:15px}.mgr .ct{font-size:12.5px;color:#9FB5E8;margin-top:2px}
-.intro{padding:34px 40px;font-size:15px;line-height:1.65;color:#3D4A63;border-bottom:1px solid #E7ECF3;white-space:pre-line}
-.pobj{padding:0 0 34px;border-bottom:1px solid #E7ECF3;page-break-after:always}
-.phero{height:300px;background-size:cover;background-position:center}
-.phero.grad{background:linear-gradient(135deg,#102B5C,#2F6BFF);display:grid;place-items:center}.phero.grad span{color:rgba(255,255,255,.85);font-size:30px;font-weight:800}
-.pbody{padding:26px 40px 0}
-.ptitle{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
-.ptitle h2{font-size:24px;color:#0A1833;font-weight:800}.pprice{font-size:22px;font-weight:800;color:#2563EB;white-space:nowrap}
-.pmeta{color:#667085;font-size:13px;margin-top:4px}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0}
-.chip{background:#EEF2F7;border-radius:10px;padding:8px 13px;font-size:12px}.chip b{display:block;font-size:13px;color:#0A1833}.chip span{color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-.pdesc{margin-top:16px;font-size:13.5px;line-height:1.65;color:#3D4A63}
-.sec{margin-top:20px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:#667085;margin-bottom:9px}
-.am{display:flex;gap:7px;flex-wrap:wrap}.am span{background:#DCE8FF;color:#102B5C;font-weight:600;font-size:12px;border-radius:14px;padding:5px 12px}
-.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.gallery div{aspect-ratio:4/3;border-radius:10px;background-size:cover;background-position:center}
-table.units{width:100%;border-collapse:collapse;font-size:13px}
-.units th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#102B5C;padding:7px 9px;border-bottom:2px solid #DCE3ED}
-.units td{padding:8px 9px;border-bottom:1px solid #E7ECF3}.units .pr{font-weight:700;color:#2563EB}
-.mats a{display:inline-block;margin:0 14px 6px 0;color:#2563EB;font-size:13px}
-.final{padding:44px 40px;text-align:center}
-.cta{display:inline-block;background:#2563EB;color:#fff;text-decoration:none;font-weight:700;border-radius:12px;padding:15px 34px;margin-top:16px}
-.foot{text-align:center;color:#667085;font-size:12px;padding:18px}
-@media print{body{background:#fff}.cover,.phero.grad{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cta{display:none}.pobj{border:none}}
-@media(max-width:640px){.pbody,.intro,.final{padding-left:18px;padding-right:18px}.gallery{grid-template-columns:1fr 1fr}}
-</style></head><body><div class="page">
-<div class="cover">
-  <svg class="logo" viewBox="0 0 100 120"><defs><linearGradient id="g" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#g)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
-  <div style="font-size:13px;letter-spacing:.24em;color:#86AFFF;margin-bottom:10px">${db.settings.agency.name.toUpperCase()}</div>
+:root{--blue:#1D34D8;--ink:#0B0B0F;--mut:#5E6470;--bg:#F5F5F3}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#DDDEE2;color:var(--ink);-webkit-font-smoothing:antialiased}
+.book{max-width:680px;margin:0 auto;background:#fff;box-shadow:0 0 60px rgba(0,0,0,.15)}
+section{page-break-after:always}
+.pg{padding:44px 38px 56px;position:relative}
+.blue{background:var(--blue);color:#fff}
+.star{width:38px;height:46px}.dpin{width:20px;height:24px}
+.cover{min-height:92vh;display:flex;flex-direction:column;padding:44px 38px}
+.brand{font-size:22px;font-weight:700;letter-spacing:.02em;display:flex;gap:10px;align-items:center}
+.cover h1{font-size:42px;line-height:1.08;font-weight:800;letter-spacing:-.5px;margin-top:40px}
+.badge{display:inline-block;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;padding:10px 18px;font-size:19px;font-weight:700;margin-top:26px;width:fit-content}
+.coverimg{flex:1;min-height:340px;border-radius:6px;background-size:cover;background-position:center;margin-top:36px}
+.coverimg.grad{background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center}.coverimg.grad span{font-size:34px;font-weight:800;color:rgba(255,255,255,.85)}
+.kicker{font-size:13px;color:var(--mut);margin-bottom:10px}
+h2.hi{font-size:34px;font-weight:800;letter-spacing:-.4px}
+.ph2{font-size:25px;font-weight:800;line-height:1.2;letter-spacing:-.3px;margin-bottom:20px}
+.ph3{font-size:19px;font-weight:800;margin:26px 0 0;padding-bottom:10px;border-bottom:1px solid #E2E2E6}
+.hello{display:grid;grid-template-columns:1fr 220px;gap:24px;margin-top:26px}
+.hello p{font-size:15.5px;line-height:1.6}.hello b{font-weight:700}
+.mgrph{aspect-ratio:3/4;border-radius:6px;background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center;color:#fff;font-size:34px;font-weight:800}
+.arrows{margin-top:30px}.arrows div{display:flex;gap:14px;font-size:15px;line-height:1.55;padding:10px 0}
+.arrows i{color:var(--blue);font-style:normal;font-weight:800;flex:0 0 18px}
+.arrows b{font-weight:700}
+.intro{font-size:16px;line-height:1.7;white-space:pre-line;margin-top:26px;color:#2A2E3A}
+.metrics{display:flex;gap:0;background:var(--bg);border-radius:6px;padding:18px 0;margin-bottom:16px;flex-wrap:wrap}
+.mt{flex:1;min-width:130px;padding:0 20px}.mt span{font-size:12.5px;color:var(--mut);display:block;margin-bottom:5px}.mt b{font-size:19px;font-weight:800;white-space:nowrap}
+.shots{display:grid;grid-template-columns:1.75fr 1fr;gap:8px}
+.shots.single{grid-template-columns:1fr}
+.shot{border-radius:4px;background-size:cover;background-position:center;min-height:130px}
+.shot.main{grid-row:span 2;min-height:280px}
+.shot.grad{background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center}.shot.grad span{color:rgba(255,255,255,.85);font-size:26px;font-weight:800}
+.district{display:grid;grid-template-columns:150px 1fr;gap:18px;margin-top:18px;align-items:start}
+.dmap{background:#EFEFED;border-radius:6px;height:120px;display:grid;place-items:center}
+.dmap svg path{fill:var(--blue)}
+.dtext{font-size:14px;line-height:1.55}.dtext b{font-weight:700}
+.dtimes{margin-top:9px}.dtimes div{font-size:13.5px;padding:2px 0}.dtimes i{font-style:normal;font-weight:700;display:inline-block;min-width:56px}
+.payrow{display:flex;margin-top:14px}
+.pay{flex:1;padding:6px 18px 0;border-left:1px solid #E2E2E6}.pay:first-child{border-left:none;padding-left:0}
+.pay b{font-size:24px;font-weight:800;display:block}.pay span{font-size:13px;color:var(--mut)}
+.rec{background:var(--blue);color:#fff;border-radius:6px;padding:22px 24px;margin-top:22px}
+.rec-t{font-size:18px;font-weight:800;margin-bottom:12px}
+.rec ol{padding-left:20px}.rec li{font-size:14px;line-height:1.55;margin-bottom:8px}
+table.units{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:12px}
+.units th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:8px 9px;border-bottom:2px solid #E2E2E6}
+.units td{padding:9px;border-bottom:1px solid #EEE}.units .pr{font-weight:800;color:var(--blue)}
+.mats{margin-top:16px}.mats a{display:inline-block;margin-right:16px;color:var(--blue);font-size:14px;font-weight:600;text-decoration:none}
+.pnum{position:absolute;bottom:20px;right:26px;font-size:13px;color:var(--mut)}
+.sep{min-height:70vh;display:flex;flex-direction:column;padding:44px 38px}
+.sepimg{flex:1;min-height:300px;border-radius:6px;background-size:cover;background-position:center;background-image:linear-gradient(160deg,#3F5BE8,#0E1B8C)}
+.sep h2{font-size:34px;font-weight:800;margin-top:34px}
+.cta{text-align:center;padding:70px 38px}
+.cta h2{font-size:30px;font-weight:800;line-height:1.2}.cta p{color:var(--mut);margin-top:12px;font-size:15px}
+.ctabtn{display:inline-block;background:var(--blue);color:#fff;text-decoration:none;font-weight:800;font-size:16px;border-radius:10px;padding:16px 36px;margin-top:26px}
+.final{min-height:60vh;display:grid;place-items:center}
+.final .brand{font-size:34px}
+.foot{font-size:12px;color:var(--mut);text-align:center;padding:14px}
+@media print{body{background:#fff}.book{box-shadow:none;max-width:none}.blue,.rec,.shot.grad,.coverimg.grad,.mgrph,.sepimg,.dmap{-webkit-print-color-adjust:exact;print-color-adjust:exact}.ctabtn{display:none}}
+@media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}}
+</style></head><body><div class="book">
+
+<section class="cover blue">
+  <div class="brand">${star}${AG}</div>
   <h1>${c.title}</h1>
-  <div class="for">${lead ? 'персонально для ' + lead.name.split(' ')[0] + ' · ' : ''}${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · ${props.length} проект(а)</div>
-  <div class="mgr"><div class="ava">${(mgr.name || 'M').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
-    <div style="text-align:left"><div class="nm">${mgr.name || ''}</div><div class="ct">${[mgr.phone, mgr.email].filter(Boolean).join(' · ')}</div></div></div>
-</div>
-${c.intro ? `<div class="intro">${c.intro}</div>` : ''}
-${props.map((pr2, idx) => `<div class="pobj">
-  ${cover(pr2)}
-  <div class="pbody">
-    <div class="ptitle"><div><h2>${idx + 1}. ${pr2.name}</h2><div class="pmeta">${pr2.area}${pr2.developer && pr2.developer !== '—' ? ' · ' + pr2.developer : ''} · ${pr2.market === 'offplan' ? 'первичка' : 'вторичка'}</div></div>
-    <div class="pprice">от ${fmt(pr2.priceFrom, pr2.currency)}</div></div>
-    <div class="chips">
-      <div class="chip"><span>формат</span><b>${pr2.type || '—'}</b></div>
-      <div class="chip"><span>сдача</span><b>${pr2.handover || '—'}</b></div>
-      <div class="chip"><span>план оплаты</span><b>${pr2.payment || '—'}</b></div>
-      ${pr2.tags.slice(0, 2).map(t => `<div class="chip"><span>особенность</span><b>${t}</b></div>`).join('')}
-    </div>
-    ${pr2.description ? `<div class="pdesc">${pr2.description}</div>` : pr2.note ? `<div class="pdesc">${pr2.note}</div>` : ''}
-    ${(pr2.amenities || []).length ? `<div class="sec"><h3>Удобства</h3><div class="am">${pr2.amenities.map(a => `<span>${a}</span>`).join('')}</div></div>` : ''}
-    ${(pr2.images || []).length > 1 ? `<div class="sec"><h3>Галерея</h3><div class="gallery">${pr2.images.slice(1, 7).map(u2 => `<div style="background-image:url('${u2}')"></div>`).join('')}</div></div>` : ''}
-    ${(pr2.units || []).length ? `<div class="sec"><h3>Доступные юниты</h3><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
-      ${pr2.units.map(u2 => `<tr><td><b>${u2.plan}</b></td><td>${u2.area}</td><td>${u2.floor}</td><td>${u2.view}</td><td class="pr">${fmt(u2.price, pr2.currency)}</td></tr>`).join('')}</table></div>` : ''}
-    ${((pr2.layouts || []).length || (pr2.materials || []).length) ? `<div class="sec"><h3>Планировки и материалы</h3><div class="mats">
-      ${(pr2.layouts || []).map(l2 => `<a href="${l2.url}" target="_blank">📐 ${l2.label}</a>`).join('')}
-      ${(pr2.materials || []).map(mt2 => `<a href="${mt2.url}" target="_blank">${mt2.label} →</a>`).join('')}</div></div>` : ''}
-    ${pr2.note && pr2.description ? `<div class="pdesc" style="font-size:12.5px;color:#667085;margin-top:12px">${pr2.note}</div>` : ''}
+  ${isFinite(minPrice) ? `<div class="badge">от ${fmt(minPrice, props[0]?.currency)} </div>` : ''}
+  ${heroImg ? `<div class="coverimg" style="background-image:url('${heroImg}')"></div>` : `<div class="coverimg grad"><span>${nProj}</span></div>`}
+</section>
+
+<section class="pg">
+  <h2 class="hi">Привет!</h2>
+  <div class="hello">
+    <p><b>${mgr.name ? 'Меня зовут ' + mgr.name + ',' : AG + ' —'}</b> ${about.intro || 'мы подбираем недвижимость под задачу клиента.'}${lead ? `<br><br>Эта подборка собрана персонально для вас${lead.name ? ', ' + lead.name.split(' ')[0] : ''}.` : ''}</p>
+    <div class="mgrph">${(mgr.name || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
   </div>
-</div>`).join('')}
-<div class="final">
-  <div style="font-size:19px;font-weight:800;color:#0A1833">Что откликается — обсудим</div>
-  <div style="color:#667085;font-size:13.5px;margin-top:8px">Посчитаю доходность по понравившимся вариантам и забронирую юнит.<br>${[mgr.name, mgr.phone].filter(Boolean).join(' · ')}</div>
-  <a class="cta" href="https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! Смотрю подборку «' + c.title + '»')}">Обсудить в WhatsApp</a>
-</div>
-<div class="foot">${db.settings.agency.name} · собрано в Lumen CRM</div>
+  <h2 class="hi" style="font-size:26px;margin-top:36px">Об агентстве</h2>
+  <div class="arrows">${(about.bullets || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^:—]+[:—])/, '<b>$1</b>')}</span></div>`).join('')}</div>
+  ${c.intro ? `<div class="intro">${c.intro}</div>` : ''}
+  <div class="pnum">02</div>
+</section>
+
+<section class="sep blue">
+  <div class="sepimg" ${heroImg ? `style="background-image:url('${heroImg}')"` : ''}></div>
+  <h2>${nProj}<br>под ваш запрос</h2>
+</section>
+
+${props.map(projPage).join('')}
+
+<section class="cta">
+  <h2>Напишите номер проекта в чат,</h2>
+  <p>чтобы получить подробности, планировки и расчёт доходности по нему</p>
+  <a class="ctabtn" href="https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}">Написать в WhatsApp</a>
+</section>
+
+<section class="pg">
+  <h2 class="hi" style="font-size:28px">Почему клиенты выбирают именно нас</h2>
+  <div class="arrows">${(about.whyUs || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^.]+\.)/, '<b>$1</b>')}</span></div>`).join('')}</div>
+  ${about.freeNote ? `<p style="font-weight:700;margin-top:22px;font-size:15px">${about.freeNote}</p>` : ''}
+  ${about.office && about.office.blurb ? `<h2 class="hi" style="font-size:24px;margin-top:34px">Наш офис${about.office.city ? ' · ' + about.office.city : ''}</h2>
+  <p style="margin-top:12px;font-size:15px;line-height:1.6">${about.office.address ? '<b>' + about.office.address + '</b><br>' : ''}${about.office.blurb}</p>` : ''}
+  <div class="pnum">${String(props.length + 3).padStart(2, '0')}</div>
+</section>
+
+<section class="final blue"><div class="brand">${star}${AG}</div></section>
+<div class="foot">${AG} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
 </div>${isPrint ? '<script>window.print()</script>' : ''}</body></html>`);
       return;
     }
