@@ -67,6 +67,7 @@ const DEFAULT_PASS = 'lumen2026';
     rrCursor: 0,
   };
   if (!db.settings.customFields) db.settings.customFields = [];
+  if (!db.settings.stagesCfg) db.settings.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
   if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
   if (!db.settings.reports) db.settings.reports = {
@@ -918,6 +919,13 @@ const server = http.createServer(async (req, res) => {
       }
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      if (b.stagesCfg) {
+        const sc = db.settings.stagesCfg;
+        if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
+        if (b.stagesCfg.names) sc.names = Object.fromEntries(Object.entries(b.stagesCfg.names).slice(0, 30).map(([k, v]) => [k, String(v).slice(0, 40)]));
+        if (b.stagesCfg.custom) sc.custom = b.stagesCfg.custom.slice(0, 15).map(x => ({ id: String(x.id).slice(0, 30), name: String(x.name).slice(0, 40) }));
+        if (b.stagesCfg.hidden) sc.hidden = b.stagesCfg.hidden.slice(0, 20).map(String);
+      }
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);

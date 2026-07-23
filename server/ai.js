@@ -71,7 +71,7 @@ function screen(db, lead) {
 
   /* стадии двигаем только вперёд и только по фактам; ручные стадии
      (handover/viewing/deal/lost) скрининг никогда не трогает */
-  if (['handover', 'viewing', 'deal', 'lost', 'sleeping'].includes(lead.stage)) return lead;
+  if (!['new', 'touch', 'dialog', 'qualified'].includes(lead.stage)) return lead; // ручные и кастомные стадии не трогаем
   if (filled === 4) lead.stage = 'qualified';
   else if (inbound.length > 0) lead.stage = 'dialog';
   else if (lead.ai.chainStep > 0) lead.stage = 'touch';

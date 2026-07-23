@@ -243,18 +243,32 @@ const NAV = {
   agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
 };
 
-const STAGES = [
-  { id: 'new', name: 'Новые', icon: 'plus' },
-  { id: 'touch', name: 'Первое касание', icon: 'chain' },
-  { id: 'dialog', name: 'В диалоге с ИИ', icon: 'chat' },
-  { id: 'qualified', name: 'Квалифицирован', icon: 'spark' },
-  { id: 'handover', name: 'У брокера', icon: 'handover' },
+const BASE_STAGES = [
+  { id: 'new', name: 'Новые', icon: 'plus', sys: true },
+  { id: 'touch', name: 'Первое касание', icon: 'chain', sys: true },
+  { id: 'dialog', name: 'В диалоге с ИИ', icon: 'chat', sys: true },
+  { id: 'qualified', name: 'Квалифицирован', icon: 'spark', sys: true },
+  { id: 'handover', name: 'У брокера', icon: 'handover', sys: true },
   { id: 'viewing', name: 'Показ', icon: 'eye' },
-  { id: 'deal', name: 'Сделка', icon: 'flame' },
-  { id: 'sleeping', name: 'Спящие', icon: 'moon' },
-  { id: 'lost', name: 'Закрыт', icon: 'x' },
+  { id: 'deal', name: 'Сделка', icon: 'flame', sys: true },
+  { id: 'sleeping', name: 'Спящие', icon: 'moon', sys: true },
+  { id: 'lost', name: 'Закрыт', icon: 'x', sys: true },
 ];
-const stageName = (id) => (STAGES.find(s => s.id === id) || {}).name || id;
+let STAGES = BASE_STAGES.slice();
+function rebuildStages() {
+  const cfg = (STATE && STATE.settings.stagesCfg) || {};
+  let list = BASE_STAGES.map(st => ({ ...st, name: (cfg.names || {})[st.id] || st.name }))
+    .concat((cfg.custom || []).map(c => ({ id: c.id, name: (cfg.names || {})[c.id] || c.name, icon: 'doc', custom: true })));
+  if (cfg.order && cfg.order.length) {
+    list.sort((a, b) => {
+      const ia = cfg.order.indexOf(a.id), ib = cfg.order.indexOf(b.id);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+  }
+  STAGES = list.filter(st => !(cfg.hidden || []).includes(st.id));
+  STAGES._all = list;
+}
+const stageName = (id) => ((STAGES._all || STAGES).find(s => s.id === id) || {}).name || id;
 
 /* ---------- api ---------- */
 async function apiReq(method, p, b) {
@@ -355,6 +369,7 @@ async function loadState() {
   $('#agencyAva').textContent = STATE.settings.agency.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   $('#demoChip').style.display = STATE.settings.demo.simulateReplies ? 'flex' : 'none';
   /* живые счётчики в меню: непрочитанные диалоги и активные лиды */
+  rebuildStages();
   const an = STATE.analytics || {};
   const setCnt = (page, v) => {
     const b = $$('.nav-item').find(x => x.dataset.page === page);
@@ -2165,6 +2180,23 @@ PAGES.automations = async (root) => {
           ${swRow('Атрибуция к объявлениям', 'Мэтчинг ad_id на базу объявлений', link('ads', 'К базе'))}
           ${swRow('Исходящий мост', 'Квал/передача уходят POST-ом во внешнюю CRM', link('ads', 'Настроить'))}
         </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.funnel)}Конструктор воронки<span class="sub">названия, порядок, свои стадии</span></div>
+          <div id="stList">${(STAGES._all || STAGES).map(st => `<div class="ch-prio" data-stid="${st.id}">
+            <span class="kb-ic">${ic(I[st.icon] || I.doc)}</span>
+            <input class="gi" data-stname value="${esc(st.name)}" style="flex:1">
+            <button class="btn-ghost" data-stmv="-1">${ic(I.chev)}</button>
+            <button class="btn-ghost" data-stmv="1" style="transform:rotate(90deg)">${ic(I.chev)}</button>
+            ${st.sys ? '<span class="mini-badge" title="Системная: на ней завязаны ИИ и цепочки — можно переименовать и подвинуть, но не удалить">🔒</span>'
+              : `<label class="switch" title="Показывать в канбане"><input type="checkbox" data-sthide ${(s.stagesCfg?.hidden || []).includes(st.id) ? '' : 'checked'}><span class="tr"></span><span class="th"></span></label>
+                 <button class="btn-ghost" data-stdel>${ic(I.x)}</button>`}
+          </div>`).join('')}</div>
+          <div class="lc-note-row" style="margin-top:9px">
+            <input id="stNew" placeholder="Своя стадия (например: Бронь / Договор / Ипотека)">
+            <button class="btn btn-sm" id="stAdd">${ic(I.plus)}</button>
+          </div>
+          <button class="btn btn-accent btn-sm" id="stSave" style="margin-top:10px">Сохранить воронку</button>
+        </div>
         <div class="glass card">
           <div class="card-title">${ic(I.doc)}Свои поля карточки лида</div>
           <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. Тип «выбор» — свои варианты через запятую.</div>
@@ -2216,6 +2248,35 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  const stSaveAll = async () => {
+    const rows = $$('#stList .ch-prio', root);
+    const order = rows.map(x => x.dataset.stid);
+    const names = {};
+    rows.forEach(x => names[x.dataset.stid] = x.querySelector('[data-stname]').value.trim() || x.dataset.stid);
+    const custom = rows.filter(x => !BASE_STAGES.some(b => b.id === x.dataset.stid)).map(x => ({ id: x.dataset.stid, name: names[x.dataset.stid] }));
+    const hidden = rows.filter(x => { const h = x.querySelector('[data-sthide]'); return h && !h.checked; }).map(x => x.dataset.stid);
+    await api.patch('/settings', { stagesCfg: { order, names, custom, hidden } });
+    await loadState();
+    toast('Воронка сохранена', 'Стадии применены во всех разделах', true);
+    render();
+  };
+  $('#stSave').addEventListener('click', stSaveAll);
+  $$('#stList [data-stmv]', root).forEach(b => b.addEventListener('click', () => {
+    const row = b.closest('.ch-prio');
+    const sib = +b.dataset.stmv < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (sib) (+b.dataset.stmv < 0 ? sib.before(row) : sib.after(row));
+  }));
+  $$('#stList [data-stdel]', root).forEach(b => b.addEventListener('click', () => b.closest('.ch-prio').remove()));
+  $('#stAdd').addEventListener('click', () => {
+    const name = $('#stNew').value.trim();
+    if (!name) return;
+    const id = 'st_' + name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '_').slice(0, 20);
+    const row = el(`<div class="ch-prio" data-stid="${id}"><span class="kb-ic">${ic(I.doc)}</span><input class="gi" data-stname value="${esc(name)}" style="flex:1"><button class="btn-ghost" data-stmv="-1">${ic(I.chev)}</button><button class="btn-ghost" data-stmv="1" style="transform:rotate(90deg)">${ic(I.chev)}</button><label class="switch"><input type="checkbox" data-sthide checked><span class="tr"></span><span class="th"></span></label><button class="btn-ghost" data-stdel>${ic(I.x)}</button></div>`);
+    $('#stList').appendChild(row);
+    row.querySelector('[data-stdel]').addEventListener('click', () => row.remove());
+    $$('[data-stmv]', row).forEach(b2 => b2.addEventListener('click', () => { const sib = +b2.dataset.stmv < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) (+b2.dataset.stmv < 0 ? sib.before(row) : sib.after(row)); }));
+    $('#stNew').value = '';
+  });
   $('#cfType').addEventListener('change', (e) => { $('#cfOptions').style.display = e.target.value === 'select' ? '' : 'none'; });
   $('#cfAdd').addEventListener('click', async () => {
     const label = $('#cfLabel').value.trim();
