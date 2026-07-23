@@ -527,12 +527,19 @@ let STATE = null;
 let CUR = 'overview';
 const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 
+const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
+
 /* брокер-режим: админ-разделы недоступны и скрыты */
 const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency'];
 function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
-  $$('.nav-item').forEach(btn => { if (BROKER_HIDDEN_PAGES.includes(btn.dataset.page)) btn.style.display = isBroker ? 'none' : ''; });
+  const solo = IS_SOLO();
+  $$('.nav-item').forEach(btn => {
+    const hideB = isBroker && BROKER_HIDDEN_PAGES.includes(btn.dataset.page);
+    const hideS = solo && btn.dataset.page === 'brokers';
+    btn.style.display = (hideB || hideS) ? 'none' : '';
+  });
   $$('.nav-label').forEach(lb => { /* прячем осиротевшие заголовки групп */
     let el2 = lb.nextElementSibling, any = false;
     while (el2 && !el2.classList.contains('nav-label')) { if (el2.style.display !== 'none') any = true; el2 = el2.nextElementSibling; }
@@ -1601,7 +1608,7 @@ async function renderChat(id, rebuild) {
   const panel = $('#leadPanel');
   /* карточка «для ленивых»: одно главное действие по контексту, всё остальное — в один клик */
   const primary = l.stage === 'qualified'
-    ? `<button class="btn btn-accent lp-primary" id="handoverBtn">${ic(I.handover)}Передать брокеру</button>`
+    ? `<button class="btn btn-accent lp-primary" id="handoverBtn">${ic(I.handover)}${IS_SOLO() ? 'Взять в работу' : 'Передать брокеру'}</button>`
     : ['handover', 'viewing'].includes(l.stage)
       ? `<button class="btn btn-accent lp-primary" id="meetBtn">${ic(I.cal)}Назначить встречу</button>`
       : l.stage === 'deal'
@@ -1659,7 +1666,7 @@ async function renderChat(id, rebuild) {
   if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
   $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); });
   const hb = $('#handoverBtn');
-  if (hb) hb.addEventListener('click', async () => { await api.post(`/leads/${id}/handover`); toast('Лид передан брокеру', 'Саммари и слот отправлены', true); renderChat(id, true); });
+  if (hb) hb.addEventListener('click', async () => { await api.post(`/leads/${id}/handover`); toast(IS_SOLO() ? 'Лид взят в работу' : 'Лид передан брокеру', 'Саммари и слот отправлены', true); renderChat(id, true); });
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));
   const sb = $('#simBtn');
   if (sb) sb.addEventListener('click', async () => {
@@ -2731,6 +2738,12 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  /* Solo: команда/распределение/SLA не нужны — прячем целыми карточками */
+  if (IS_SOLO()) {
+    [...$$('.card-title', root)].filter(t => t.textContent.includes('Распределение по брокерам')).forEach(t => { t.closest('.glass.card').style.display = 'none'; });
+    const slaRow = $('#slaMin', root);
+    if (slaRow) slaRow.closest('.set-row').style.display = 'none';
+  }
   const qhSave = () => saveAuto({ quietHours: { enabled: $('#qhOn').checked, from: Math.min(23, Math.max(0, +$('#qhFrom').value || 21)), to: Math.min(23, Math.max(0, +$('#qhTo').value || 9)) } });
   ['qhFrom', 'qhTo', 'qhOn'].forEach(id2 => { const el2 = $('#' + id2); if (el2) el2.addEventListener('change', qhSave); });
   const sla = $('#slaMin');
@@ -3249,6 +3262,13 @@ PAGES.agency = async (root) => {
       <div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.building)}Агентство<span class="sub">бренд на подборках, PDF и в системе</span></div>
+          <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Формат работы</label>
+            <div class="chips-row">
+              <button type="button" class="chip-t ${(s.agency.edition || 'agency') === 'agency' ? 'on' : ''}" data-edition="agency">🏢 Агентство · команда брокеров</button>
+              <button type="button" class="chip-t ${s.agency.edition === 'solo' ? 'on' : ''}" data-edition="solo">👤 Solo · работаю один</button>
+            </div>
+            <div class="muted" style="font-size:11px;margin-top:6px">Solo прячет команду, распределение и SLA — все лиды ведёте вы, «передача» становится «взять в работу»</div>
+          </div>
           <div style="display:flex;gap:16px;align-items:center">
             <div class="ag-logo" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.4">`}</div>
             <div style="flex:1">
@@ -3305,6 +3325,12 @@ PAGES.agency = async (root) => {
     if (r.ok) { $('#agLogoPrev').innerHTML = `<img src="${j.logo}">`; toast('Логотип загружен', 'Уже на обложках подборок', true); loadState(); }
     else toast('Не загрузился', j.error);
   });
+  $$('[data-edition]', root).forEach(ch => ch.addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { edition: ch.dataset.edition } });
+    await loadState();
+    toast(ch.dataset.edition === 'solo' ? 'Режим Solo включён' : 'Режим агентства включён', null, true);
+    render();
+  }));
   $('#agSave').addEventListener('click', async () => {
     await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
     toast('Сохранено', null, true);
