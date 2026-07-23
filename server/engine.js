@@ -183,6 +183,33 @@ function handover(db, lead, brokerId) {
 /* ---------- цепочки касаний ---------- */
 function dayMs(db) { return db.settings.demo.accelerate ? db.settings.demo.dayMs : DAY; }
 
+/* ---------- тихие часы по поясу ЛИДА ----------
+   Ночью не трогаем: касания цепочек, реанимация, напоминания сдвигаются на утро.
+   Исключение — мгновенный первый ответ на свежую заявку (клиент сейчас онлайн). */
+function quietCfg(db) {
+  const q = (db.settings.automations || {}).quietHours;
+  return Object.assign({ enabled: true, from: 21, to: 9 }, q || {});
+}
+function leadLocalHour(lead) {
+  return new Date(Date.now() + (lead.tz ?? 4) * 3600e3).getUTCHours();
+}
+function inQuiet(db, lead) {
+  const q = quietCfg(db);
+  if (!q.enabled) return false;
+  const h = leadLocalHour(lead);
+  return q.from > q.to ? (h >= q.from || h < q.to) : (h >= q.from && h < q.to);
+}
+/* следующее «утро» лида (q.to:00 его времени) в UTC-timestamp */
+function morningAt(db, lead) {
+  const q = quietCfg(db);
+  const tz = (lead.tz ?? 4) * 3600e3;
+  const local = new Date(Date.now() + tz);
+  const m = new Date(local);
+  m.setUTCHours(q.to, 0, 0, 0);
+  if (m <= local) m.setUTCDate(m.getUTCDate() + 1);
+  return +m - tz + Math.floor(Math.random() * 20 * 60e3); /* джиттер 0-20 мин, чтобы не залпом */
+}
+
 function tickChains(db) {
   const nowT = Date.now();
   const actives = db.sequences.filter(s => s.active);
@@ -217,6 +244,9 @@ function tickChains(db) {
       continue;
     }
     if (nowT < lead.ai.nextTouchAt) continue;
+    /* тихие часы: мгновенное первое касание (шаг 0, свежая заявка <30 мин) разрешено — клиент онлайн; остальное ждёт утра */
+    const freshInstant = lead.ai.chainStep === 0 && nowT - lead.createdAt < 30 * 60e3;
+    if (!freshInstant && inQuiet(db, lead)) { lead.ai.nextTouchAt = morningAt(db, lead); continue; }
 
     let text;
     const sendOpts = {};
@@ -342,6 +372,8 @@ function tickMeetings(db) {
       if (mt.at - nowT > 0 && mt.at - nowT <= hrs * 3600e3) {
         const lead = db.leads.find(l => l.id === mt.leadId);
         if (!lead) return;
+        /* тихие часы: ночью не будим — кроме случая, когда встреча раньше «утра» (короткое напоминание важнее сна) */
+        if (inQuiet(db, lead) && mt.at > morningAt(db, lead)) return;
         const broker = db.brokers.find(b => b.id === mt.brokerId);
         const when = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         const soon = hrs <= 1;

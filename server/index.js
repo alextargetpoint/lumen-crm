@@ -594,6 +594,16 @@ function sanitizeBlocks(raw) {
   return out.length ? out : null;
 }
 
+
+/* часовой пояс по коду страны телефона (грубо, для тихих часов достаточно) */
+const PHONE_TZ = [['7', 3], ['971', 4], ['966', 3], ['968', 4], ['974', 3], ['62', 8], ['66', 7], ['34', 2], ['39', 2], ['49', 2], ['33', 2], ['44', 1], ['48', 2], ['380', 3], ['375', 3], ['998', 5], ['996', 6], ['992', 5], ['994', 4], ['995', 4], ['374', 4], ['90', 3], ['972', 3], ['20', 3], ['1', -5], ['86', 8], ['91', 5.5], ['81', 9]];
+function tzFromPhone(phone) {
+  const d = String(phone || '').replace(/\D/g, '');
+  let best = null;
+  for (const [code, tz] of PHONE_TZ) if (d.startsWith(code) && (!best || code.length > best[0].length)) best = [code, tz];
+  return best ? best[1] : 4;
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
@@ -619,7 +629,7 @@ const server = http.createServer(async (req, res) => {
           const phone = '+' + wam.from.replace(/\D/g, '');
           let lead = db.leads.find(l => l.phone.replace(/\D/g, '') === wam.from.replace(/\D/g, ''));
           if (!lead) {
-            lead = { id: store.nextId('ld'), name: changes.contacts?.[0]?.profile?.name || phone, phone, geo: db.settings.agency.geos[0], lang: 'ru', tz: 4, stage: 'new', score: 0, source: 'wa_inbound', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['входящий'], numberId: null, ads: null };
+            lead = { id: store.nextId('ld'), name: changes.contacts?.[0]?.profile?.name || phone, phone, geo: db.settings.agency.geos[0], lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0, source: 'wa_inbound', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['входящий'], numberId: null, ads: null };
             /* CTWA: реферал несёт id объявления — атрибуция из коробки */
             const ref = wam.referral;
             if (ref && (ref.source_id || ref.ctwa_clid)) {
@@ -661,7 +671,7 @@ const server = http.createServer(async (req, res) => {
         lead = {
           id: store.nextId('ld'), name, phone,
           geo: pick('geo', 'direction') || db.settings.agency.geos[0],
-          lang: pick('lang', 'language') || 'ru', tz: 4, stage: 'new', score: 0,
+          lang: pick('lang', 'language') || 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0,
           source: pick('source', 'src') || 'meta_form',
           createdAt: Date.now(), lastMsgAt: null, lastDir: null,
           quals: { purpose: null, timeline: null, budget: null, type: null },
@@ -858,7 +868,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const lead = {
         id: store.nextId('ld'), name: b.name || 'Без имени', phone: b.phone || '', geo: b.geo || db.settings.agency.geos[0],
-        lang: b.lang || 'ru', tz: b.tz ?? 4, stage: 'new', score: 0, source: b.source || 'manual',
+        lang: b.lang || 'ru', tz: b.tz ?? tzFromPhone(b.phone), stage: 'new', score: 0, source: b.source || 'manual',
         createdAt: Date.now(), lastMsgAt: null, lastDir: null,
         quals: { purpose: null, timeline: null, budget: null, type: null },
         ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
@@ -1789,10 +1799,10 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
   <h1${be(b.id, 'title')}>${esc(title)}</h1>
   ${d.sub || isEdit ? `<p class="csub"${be(b.id, 'sub')}>${esc(d.sub || '')}</p>` : ''}
   ${badge || isEdit ? `<div class="badge"${be(b.id, 'badge')}>${esc(badge)}</div>` : ''}`;
-          if (b.v === 'split') return `<section class="cover csplit"><div class="cs-l blue">${inner}</div><div class="cs-r" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div></section>`;
-          if (b.v === 'photo') return `<section class="cover cphoto" ${bg(img)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</section>`;
-          if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : ''}</section>`;
-          return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
+          if (b.v === 'split') return `<section class="cover csplit"><div class="cs-l blue">${inner}</div><div class="cs-r" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div></section>`;
+          if (b.v === 'photo') return `<section class="cover cphoto" ${bg(img)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</section>`;
+          if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : ''}</section>`;
+          return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
         },
         hello(b) {
           const d = b.data;
@@ -1803,7 +1813,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
   <h2 class="hi"${be(b.id, 'heading')}>${esc(d.heading || 'Привет!')}</h2>
   <div class="hello">
     <p><b${be(b.id, 'lede')}>${esc(d.lede || (mgr.name ? 'Меня зовут ' + mgr.name + ',' : ''))}</b> <span${be(b.id, 'text')}>${esc(d.text || defText)}</span></p>
-    <div class="mgrph" ${d.photo ? bg(d.photo) : ''}>${d.photo ? '' : esc((mgr.name || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}${isEdit ? `<div class="imghot" ${bimg(b.id, 'photo', null, d.photo)}>🖼</div>` : ''}</div>
+    <div class="mgrph" ${d.photo ? bg(d.photo) : ''}>${d.photo ? '' : esc((mgr.name || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}${isEdit ? `<div class="imghot" ${bimg(b.id, 'photo', null, d.photo)}>🖼 Заменить</div>` : ''}</div>
   </div>
   <h2 class="hi h2sm"${be(b.id, 'aboutHeading')}>${esc(d.aboutHeading || 'Об агентстве')}</h2>
   <div class="arrows" data-plist="${b.id}:bullets">${bullets.map((b2, bi) => `<div><i>↳</i><span${be(b.id, 'bullets', bi)}>${esc(b2).replace(/^([^:—]+[:—])/, '<b>$1</b>')}</span></div>`).join('')}</div>
@@ -1816,7 +1826,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
           const img = d.img || heroImg;
           const cls = b.v === 'light' ? 'sep slight' : b.v === 'photo' ? 'sep sphoto' : 'sep blue';
           return `<section class="${cls}" ${b.v === 'photo' ? bg(img) : ''}>${b.v === 'photo' ? '<div class="cshade"></div>' : ''}
-  ${b.v !== 'photo' ? `<div class="sepimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : (isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : '')}
+  ${b.v !== 'photo' ? `<div class="sepimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : (isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : '')}
   <h2 class="sin"${be(b.id, 'heading')}>${esc(d.heading || nProj + ' под ваш запрос')}</h2>
 </section>`;
         },
@@ -1828,7 +1838,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
           const blurb = d.blurb || (pr0.district || {}).blurb || '';
           const whyRent = d.whyRent || pr0.whyRent || [];
           const imgs = (d.imgs && d.imgs.length ? d.imgs : (pr0.images || [])).filter(Boolean);
-          const imHot = (i2) => isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, imgs[i2])}>🖼</div>` : '';
+          const imHot = (i2) => isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, imgs[i2])}>🖼 Заменить</div>` : '';
           const shots = b.v === 'gallery'
             ? `<div class="shots wide">${(imgs.length ? imgs : ['']).slice(0, 4).map((u2, i2) => u2 ? `<div class="shot g" ${bg(u2)}>${imHot(i2)}</div>` : `<div class="shot g grad"><span>${esc(pr0.area || pr0.name)}</span>${imHot(i2)}</div>`).join('')}</div>`
             : `<div class="shots ${imgs.length > 1 ? '' : 'single'}">
@@ -1874,12 +1884,12 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         },
         image(b) {
           const d = b.data;
-          const im = `<div class="bigimg ${b.v === 'inset' ? 'inset' : ''}" ${bg(d.img)}>${d.img ? '' : '<span class="phold">Картинка — кликните 🖼, чтобы добавить</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼</div>` : ''}</div>`;
+          const im = `<div class="bigimg ${b.v === 'inset' ? 'inset' : ''}" ${bg(d.img)}>${d.img ? '' : '<span class="phold">Картинка — кликните 🖼, чтобы добавить</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼 Заменить</div>` : ''}</div>`;
           return `<section class="pg imgpg">${im}${d.caption || isEdit ? `<div class="cap"${be(b.id, 'caption')}>${esc(d.caption || '')}</div>` : ''}</section>`;
         },
         gallery(b) {
           const imgs = (b.data.imgs || []).slice(0, 12);
-          const cells = (imgs.length ? imgs : ['', '', '']).map((u2, i2) => `<div class="gcell" ${bg(u2)}>${u2 ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, u2)}>🖼</div>` : ''}</div>`).join('');
+          const cells = (imgs.length ? imgs : ['', '', '']).map((u2, i2) => `<div class="gcell" ${bg(u2)}>${u2 ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, u2)}>🖼 Заменить</div>` : ''}</div>`).join('');
           return `<section class="pg"><div class="ggrid ${b.v === 'rows' ? 'rows' : b.v === 'masonry' ? 'masonry' : ''}" data-plist="${b.id}:imgs">${cells}</div></section>`;
         },
         video(b) {
@@ -1990,7 +2000,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
           return `<section class="pg">
   <div class="tximg ${b.v === 'imgleft' ? 'flip' : ''}">
     <div class="tx-side">${d.title || isEdit ? `<h2 class="ph2"${be(b.id, 'title')}>${esc(d.title || '')}</h2>` : ''}<div class="tbody"${be(b.id, 'body')}>${esc(d.body || '')}</div></div>
-    <div class="tx-img" ${bg(d.img)}>${d.img ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼</div>` : ''}</div>
+    <div class="tx-img" ${bg(d.img)}>${d.img ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼 Заменить</div>` : ''}</div>
   </div>
   <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
@@ -2012,7 +2022,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
   <p${be(b.id, 'sub')}>${esc(d.sub || 'чтобы получить подробности, планировки и расчёт доходности по нему')}</p>
   <a class="ctabtn" href="${waHref}"><span${be(b.id, 'btn')}>${esc(d.btn || 'Написать в WhatsApp')}</span></a>`;
           if (b.v === 'card') return `<section class="pg"><div class="ctacard">${inner}</div></section>`;
-          if (b.v === 'photo') return `<section class="cta ctaphoto" ${bg(d.img || heroImg)}><div class="cshade"></div><div class="cta-in">${inner}</div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img || heroImg)}>🖼</div>` : ''}</section>`;
+          if (b.v === 'photo') return `<section class="cta ctaphoto" ${bg(d.img || heroImg)}><div class="cshade"></div><div class="cta-in">${inner}</div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img || heroImg)}>🖼 Заменить</div>` : ''}</section>`;
           return `<section class="cta">${inner}</section>`;
         },
         why(b) {
@@ -2166,9 +2176,14 @@ table.units{width:100%;border-collapse:collapse;font-size:13.5px;min-width:430px
 .step span{display:block;font-size:13.5px;line-height:1.5;color:var(--mut);margin-top:5px}
 .freenote{font-weight:700;margin-top:22px;font-size:15px}
 .officetxt{margin-top:12px;font-size:15px;line-height:1.6}
-.cover.csplit{flex-direction:row;padding:0;min-height:88vh}
-.cs-l{flex:1.15;padding:44px 34px;display:flex;flex-direction:column;justify-content:center}
-.cs-r{flex:1;background-size:cover;background-position:center;position:relative;background-image:linear-gradient(160deg,color-mix(in srgb,var(--blue) 78%,#fff),color-mix(in srgb,var(--blue) 62%,#000))}
+.cover.csplit{flex-direction:row;padding:0;min-height:92vh;background:var(--blue)}
+.cs-l{flex:1.25;padding:52px 44px;display:flex;flex-direction:column;color:#fff}
+.cs-l .brand{margin-bottom:auto}
+.cs-l h1{font-size:44px;line-height:1.06;margin-top:26px;letter-spacing:-1px}
+.cs-l .csub{margin-top:18px;font-size:15.5px;line-height:1.6;opacity:.82;max-width:400px}
+.cs-l .badge{margin-top:30px;background:rgba(255,255,255,.12);border-color:transparent;backdrop-filter:blur(4px)}
+.cs-r{flex:1;background-size:cover;background-position:center;position:relative;margin:14px 14px 14px 0;border-radius:14px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.cs-r::after{content:'';position:absolute;inset:0;background:linear-gradient(200deg,transparent 55%,color-mix(in srgb,var(--blue) 55%,transparent))}
 .cta.ctaphoto{position:relative;background-size:cover;background-position:center;color:#fff}
 .cta.ctaphoto .cta-in{position:relative}
 .cta.ctaphoto p{color:rgba(255,255,255,.85)}

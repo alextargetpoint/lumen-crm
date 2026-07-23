@@ -22,6 +22,13 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .imghot{display:flex!important;position:absolute;top:10px;right:10px;z-index:6;background:#0B0B0F;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;align-items:center;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.3);user-select:none}
 .imghot:hover{background:#1D34D8}
 .imghot.vhot{top:auto;bottom:14px;right:14px}
+#peload{position:fixed;inset:0;z-index:2000;background:radial-gradient(700px 500px at 50% 40%,#102B5C,#061126 70%);display:grid;place-items:center;opacity:1;transition:opacity .4s}
+#peload.out{opacity:0}
+#peload .pl-box{display:grid;place-items:center;gap:14px}
+#peload svg{width:46px;height:56px;animation:peb 1.6s ease-in-out infinite;filter:drop-shadow(0 0 22px rgba(120,160,255,.7))}
+#peload span{color:#fff;font-weight:650;letter-spacing:.3em;font-size:15px;font-family:Inter,sans-serif}
+#peload i{color:#7C9BFF;font-size:11px;font-style:normal;letter-spacing:.08em;font-family:Inter,sans-serif}
+@keyframes peb{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
 .edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:#0B0B0F;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;font-size:13px;flex-wrap:wrap;font-family:Inter,sans-serif}
 .edbar b{font-weight:800}
 .edbar .hint{opacity:.55;font-size:11.5px}
@@ -48,6 +55,12 @@ section[data-bid]:hover .btool{opacity:1}
 .pepop input[type=text]:focus{border-color:#1D34D8}
 .pepop .prow{display:flex;gap:6px;padding:4px 6px}
 .plibrow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px 6px}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px;max-width:420px}
+.pi.ptile{flex-direction:column;gap:6px;text-align:center;padding:12px 6px;border:1px solid #EDF0F7;border-radius:11px}
+.pi.ptile i{font-size:21px;width:auto}
+.pi.ptile span{font-size:10.5px;line-height:1.25;font-weight:650;color:#3D4A63}
+.pi.ptile:hover{border-color:#1D34D8;background:#F3F6FF}
+section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:-3px;opacity:.75}
 .plib{aspect-ratio:4/3;border-radius:7px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent}
 .plib:hover{border-color:#1D34D8}
 .aifab{position:fixed;z-index:940;background:linear-gradient(120deg,#1D34D8,#5B2BD8);color:#fff;border:none;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(29,52,216,.4);font-family:Inter,sans-serif;display:none}
@@ -57,6 +70,21 @@ section[data-bid]:hover .btool{opacity:1}
 @media print{.edbar,.btool,.imghot,.plistadd,.aifab,.pestatus{display:none!important}}
 `;
   document.head.appendChild(css);
+
+  /* ---------- фирменный лоадер: показываем ПЕРЕД перезагрузкой и сразу после неё ---------- */
+  const peLoader = () => {
+    if (document.querySelector('#peload')) return;
+    const o = document.createElement('div');
+    o.id = 'peload';
+    o.innerHTML = `<div class="pl-box"><svg viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg><span>LUMEN</span><i>собираем страницу…</i></div>`;
+    document.body.appendChild(o);
+  };
+  const reloadWithLoader = () => { sessionStorage.setItem('pe_loading', '1'); peLoader(); location.reload(); };
+  if (sessionStorage.getItem('pe_loading')) {
+    sessionStorage.removeItem('pe_loading');
+    peLoader();
+    addEventListener('load', () => setTimeout(() => { const o = document.querySelector('#peload'); if (o) { o.classList.add('out'); setTimeout(() => o.remove(), 450); } }, 250));
+  }
 
   /* ---------- состояние ---------- */
   let dirty = false;
@@ -82,7 +110,7 @@ section[data-bid]:hover .btool{opacity:1}
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ blocks: serialize(), theme: d.dataset.theme }),
     });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); location.reload(); }
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     else flash('Ошибка темы');
   }));
 
@@ -154,7 +182,7 @@ section[data-bid]:hover .btool{opacity:1}
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); flash('Ошибка: ' + (j.error || r.status)); return false; }
     dirty = false;
-    if (reload) { location.reload(); return true; }
+    if (reload) { reloadWithLoader(); return true; }
     flash('Сохранено ✓');
     return true;
   }
@@ -168,7 +196,7 @@ section[data-bid]:hover .btool{opacity:1}
     flash('✦ ИИ собирает тексты под лида…', 0);
     await save(false);
     const r = await fetch(`/p/${P.cid}/compose?key=${encodeURIComponent(KEY)}`, { method: 'POST' });
-    if (r.ok) location.reload();
+    if (r.ok) reloadWithLoader();
     else { const j = await r.json().catch(() => ({})); flash(j.error || 'ИИ не справился'); composeBtn.disabled = false; }
   });
 
@@ -178,7 +206,7 @@ section[data-bid]:hover .btool{opacity:1}
     const t = TYPE(sec.dataset.bt);
     const tool = document.createElement('div');
     tool.className = 'btool';
-    tool.innerHTML = `<span class="bname">${t.name}</span>
+    tool.innerHTML = `<button class="bgrip" title="Перетащить блок" style="cursor:grab">⠿</button><span class="bname">${t.name}</span>
       <button data-op="up" title="Выше">↑</button>
       <button data-op="down" title="Ниже">↓</button>
       ${t.variants.length > 1 ? '<button data-op="variant" title="Сменить вид">◧</button>' : ''}
@@ -213,6 +241,30 @@ section[data-bid]:hover .btool{opacity:1}
       }
       if (op === 'add') openPalette(sec, e.clientX, e.clientY);
     });
+    /* умный drag: тянешь за ⠿ — секция едет по странице, соседи расступаются */
+    tool.querySelector('.bgrip').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      let moving = false;
+      const onMove = (e2) => {
+        if (!moving && Math.abs(e2.clientY - startY) < 8) return;
+        if (!moving) { moving = true; sec.classList.add('sec-drag'); document.body.style.userSelect = 'none'; }
+        const under = document.elementFromPoint(innerWidth / 2, e2.clientY);
+        const tgt = under && under.closest('section[data-bid]');
+        if (tgt && tgt !== sec) {
+          const r = tgt.getBoundingClientRect();
+          if (e2.clientY < r.top + r.height / 2) tgt.before(sec); else tgt.after(sec);
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.style.userSelect = '';
+        if (moving) { sec.classList.remove('sec-drag'); renumber(); if (typeof buildRail === 'function') buildRail(); dirty = true; flash('Порядок изменён — не забудьте сохранить'); }
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
   });
 
   function renumber() {
@@ -223,8 +275,8 @@ section[data-bid]:hover .btool{opacity:1}
   const PALETTE = ['text', 'textimg', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta', 'proj'];
   const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦' };
   function openPalette(afterSec, x, y) {
-    const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi" data-add="${t}"><i>${PICONS[t] || '▢'}</i>${TYPE(t).name}</div>`).join('');
-    const el = openPop(`<div class="psec">Добавить блок</div>${items}`, x, y);
+    const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi ptile" data-add="${t}"><i>${PICONS[t] || '▢'}</i><span>${TYPE(t).name}</span></div>`).join('');
+    const el = openPop(`<div class="psec">Добавить блок</div><div class="pgrid">${items}</div>`, x, y);
     el.addEventListener('click', async (e) => {
       const pi = e.target.closest('[data-add]');
       if (!pi) return;
@@ -252,7 +304,7 @@ section[data-bid]:hover .btool{opacity:1}
     const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
     });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); location.reload(); }
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     else flash('Ошибка добавления');
   }
   const sc = sessionStorage.getItem('pe_scroll');
@@ -283,7 +335,7 @@ section[data-bid]:hover .btool{opacity:1}
       const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
       });
-      if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); location.reload(); }
+      if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     });
   });
 

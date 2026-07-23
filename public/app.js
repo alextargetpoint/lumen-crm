@@ -2617,6 +2617,7 @@ PAGES.automations = async (root) => {
         <div class="glass card mb">
           <div class="card-title">${ic(I.cal)}Встречи</div>
           ${swRow('Цепочка напоминаний клиенту', 'Часы до встречи через запятую (0.5 = за 30 мин) — каждое уходит в WhatsApp со ссылкой на страницу встречи', `<input id="meetChain" style="width:150px" value="${esc((a.meetRemindChain || (a.meetingReminderHrs ? [a.meetingReminderHrs] : [24, 3])).join(', '))}" placeholder="24, 3, 0.5">`)}
+          ${swRow('Тихие часы по поясу лида', 'Ночью касания/реанимация/напоминания сдвигаются на утро клиента; мгновенный ответ на свежую заявку — исключение (клиент онлайн). Пояс берётся из кода страны номера', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">с <input id="qhFrom" type="number" style="width:58px" value="${(a.quietHours || {}).from ?? 21}"> до <input id="qhTo" type="number" style="width:58px" value="${(a.quietHours || {}).to ?? 9}"> <label class="switch"><input type="checkbox" id="qhOn" ${(a.quietHours || {}).enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`)}
           ${swRow('SLA брокера, минут', 'Не коснулся лида после передачи за N мин → эскалация в ленту; за 2×N → лид уходит следующему брокеру', `<input id="slaMin" type="number" style="width:90px" value="${a.brokerSlaMin || ''}" placeholder="30">`)}
           ${swRow('«Не пришёл» — вернуть в работу', 'Мягкое сообщение клиенту + ИИ снова ведёт диалог, лид не теряется', sw('noShowMessage', a.noShowMessage))}
         </div>
@@ -2702,6 +2703,8 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  const qhSave = () => saveAuto({ quietHours: { enabled: $('#qhOn').checked, from: Math.min(23, Math.max(0, +$('#qhFrom').value || 21)), to: Math.min(23, Math.max(0, +$('#qhTo').value || 9)) } });
+  ['qhFrom', 'qhTo', 'qhOn'].forEach(id2 => { const el2 = $('#' + id2); if (el2) el2.addEventListener('change', qhSave); });
   const sla = $('#slaMin');
   if (sla) sla.addEventListener('change', () => saveAuto({ brokerSlaMin: +sla.value || 0 }));
   const mc = $('#meetChain');
