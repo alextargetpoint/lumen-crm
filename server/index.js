@@ -29,6 +29,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 const llm = require('./llm');
 const wa = require('./wa');
 const playbook = require('./playbook');
+const { MARKET } = require('./marketdata');
 
 store.load(seed);
 engine.startLoop();
@@ -65,7 +66,34 @@ const DEFAULT_PASS = 'lumen2026';
   };
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
+  if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
   for (const sq of db.sequences) if (!sq.geo) sq.geo = 'all';
+  if (!db.settings.chainV2) {
+    db.settings.chainV2 = true;
+    const std = db.sequences.find(sq => sq.id === 'seq_default');
+    if (std) {
+      std.name = 'Стандартная · усиленная (якорь на объявление)';
+      std.steps = [
+        { day: 0, channel: 'wa', mode: 'text', label: 'Мгновенный ответ · якорь на объявление', active: true,
+          text: '{name}, здравствуйте! Видел вашу заявку по объявлению {ad} — отличный выбор 👌\nЯ из {agency}, помогу подобрать под вашу задачу.\nПодскажите: смотрите для жизни или как инвестицию?' },
+        { day: 0.15, channel: 'wa', mode: 'text', label: 'Визитка + микро-да (~3 ч)', active: true,
+          text: 'Кстати, мы не просто листингуем объекты — отбираем лучшие вручную, и этот прошёл отбор.\nПрислать сюда 3 сильных варианта в вашей вилке? Одним сообщением, без спама.' },
+        { day: 1, channel: 'wa', mode: 'text', label: 'Ценность + urgency (день 2)', active: true,
+          text: '{name}, короткий апдейт по {geo}: застройщик готовит повышение цен по очереди, тайминг сейчас важен.\n💰 доходность до 8-10% годовых · 📈 рассрочка 0%\nПрислать сравнение лучших вариантов {month}?' },
+        { day: 3, channel: 'wa', mode: 'text', label: 'Кейс по гео (день 4)', active: true,
+          text: '{name}, из свежего: на этой неделе наш клиент закрыл сделку в {geo} — вход на 15% ниже прайса за счёт предстарта.\nТакие окна появляются регулярно — могу присылать только подходящие под ваш запрос. Ок?' },
+        { day: 6, channel: 'voice', mode: 'ai', prompt: 'Голосовое 20-30 сек: личное обращение по имени, 1 факт по запросу клиента, приглашение на короткий созвон', label: 'Голосовое (день 7)', active: true },
+        { day: 9, channel: 'wa', mode: 'text', label: 'Вывод в звонок (день 10)', active: true,
+          text: 'Давайте созвонимся на 10 минут — проведу по лучшим предложениям под ваш запрос и посчитаю доходность.\nУдобно {slots}?' },
+        { day: 14, channel: 'wa', mode: 'text', label: 'Сострадательное прощание (день 15)', active: true,
+          text: '{name}, честно: сложно двигаться дальше, не понимая, актуален ли ещё вопрос.\nЕсли найдётся минута — дайте знать, пожалуйста. В любом случае остаюсь вашим экспертом по {geo} — пишите сюда в любой момент 🙏' },
+      ];
+    }
+    const t1 = db.templates.find(t => t.id === 'tpl_first_ru');
+    if (t1) t1.body = '{name}, здравствуйте! Видел вашу заявку по объявлению {ad} — отличный выбор. Я из {agency}, помогу подобрать под вашу задачу. Смотрите для жизни или как инвестицию?';
+    const tw = db.templates.find(t => t.id === 'tpl_wake_ru');
+    if (tw) tw.body = '{name}, здравствуйте! Вы интересовались недвижимостью в {geo}. С тех пор рынок сдвинулся: новые запуски с рассрочкой 0% и предстарты ниже прайса. Собрать свежую подборку под ваш прежний запрос?';
+  }
   if (!db.sequences.some(sq => sq.id === 'seq_b2c_2025')) {
     db.sequences.push({
       id: 'seq_b2c_2025', name: 'B2C: лид из рекламы · скрипт-прожимка 2025', geo: 'all', active: false,
@@ -116,6 +144,7 @@ const DEFAULT_PASS = 'lumen2026';
     { id: 'pr_bali1', name: 'Nuanu Ecoverse Villas', area: 'Берава', developer: 'Nuanu', market: 'offplan', type: 'Villa 2BR', beds: 2, priceFrom: 250000, currency: 'USD', handover: 'Q3 2026', payment: '50/50', geo: 'bali', tags: ['вилла', 'управление'], materials: [], note: 'Лизхолд 30 лет' },
   ];
   if (!db.collections) db.collections = [];
+  if (!db.folders) db.folders = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
   if (!db.settings.agency.about) db.settings.agency.about = {
@@ -237,6 +266,7 @@ function publicSettings(db) {
   delete s.auth;
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
+  if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -258,12 +288,13 @@ const readBody = (req) => new Promise((resolve) => {
 /* подсказка «что делать дальше» — считается по фактам карточки */
 function leadHint(db, l, axesFilled) {
   const now = Date.now();
+  /* живой просмотр подборки — самый горячий сигнал, выше всего */
+  const hotView0 = (db.collections || []).find(c => c.leadId === l.id && c.lastViewAt && now - c.lastViewAt < 24 * 3600e3);
+  if (hotView0 && !['deal', 'lost'].includes(l.stage)) return { kind: 'act', text: `Смотрел подборку «${hotView0.title}» ${Math.round((now - hotView0.lastViewAt) / 60e3)} мин назад — идеальный момент для звонка` };
   if (l.nextAction && l.nextAction.at && l.nextAction.at < now) return { kind: 'warn', text: `Просрочен следующий шаг: ${l.nextAction.text}` };
   if ((l.tags || []).includes('нужен человек')) return { kind: 'warn', text: 'ИИ отключился: клиент ждёт живого менеджера — ответьте вручную' };
   const noShow = (db.meetings || []).find(mt => mt.leadId === l.id && mt.status === 'no_show');
   if (noShow && !['deal', 'lost'].includes(l.stage)) return { kind: 'warn', text: 'Не пришёл на встречу — предложите новый слот, лид ещё тёплый' };
-  const hotView = (db.collections || []).find(c => c.leadId === l.id && c.lastViewAt && now - c.lastViewAt < 24 * 3600e3);
-  if (hotView && !['deal', 'lost'].includes(l.stage)) return { kind: 'act', text: `Смотрел подборку «${hotView.title}» ${Math.round((now - hotView.lastViewAt) / 60e3)} мин назад — идеальный момент для звонка` };
   if (l.stage === 'qualified') return { kind: 'act', text: 'Все 4 оси закрыты — передайте брокеру, пока лид горячий' };
   if (['handover', 'viewing'].includes(l.stage) && !(db.meetings || []).some(mt => mt.leadId === l.id && mt.status === 'scheduled')) return { kind: 'act', text: 'Встреча не назначена — предложите слот' };
   if (l.stage === 'dialog' && axesFilled < 4) return { kind: 'info', text: `ИИ выясняет оси: осталось ${4 - axesFilled} из 4` };
@@ -424,6 +455,27 @@ const server = http.createServer(async (req, res) => {
       db.settings.agency.logo = '/assets/' + fname + '?v=' + Date.now();
       store.save();
       return json(res, 200, { logo: db.settings.agency.logo });
+    }
+
+    /* ---------------- голос ElevenLabs: тест генерации ---------------- */
+    if (p === '/api/voice/test' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const v = db.settings.voice || {};
+      if (!v.key || !v.voiceId) return json(res, 400, { error: 'нужны API-ключ и Voice ID' });
+      const b = await readBody(req);
+      try {
+        const r2 = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${v.voiceId}?output_format=mp3_44100_128`, {
+          method: 'POST',
+          headers: { 'xi-api-key': v.key, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: String(b.text || 'Добрый день! Это тест голосового сообщения из Lumen CRM.').slice(0, 600), model_id: 'eleven_multilingual_v2' }),
+        });
+        if (!r2.ok) throw new Error('elevenlabs ' + r2.status + ': ' + (await r2.text()).slice(0, 140));
+        const buf = Buffer.from(await r2.arrayBuffer());
+        fs.mkdirSync(path.join(PUBLIC, 'assets', 'voice'), { recursive: true });
+        const fname = 'voice/tts-' + Date.now() + '.mp3';
+        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        return json(res, 200, { url: '/assets/' + fname });
+      } catch (e) { return json(res, 500, { error: e.message }); }
     }
 
     /* ---------------- телефония: вебхук записей звонков ----------------
@@ -746,7 +798,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
       if (b.agency && b.agency.about) { Object.assign(db.settings.agency.about, b.agency.about); delete b.agency.about; }
-      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
@@ -891,6 +943,7 @@ const server = http.createServer(async (req, res) => {
         if (b.district) pr.district = { name: String(b.district.name || '').slice(0, 60), blurb: String(b.district.blurb || '').slice(0, 500), times: (b.district.times || []).slice(0, 5).map(t => ({ min: +t.min || 0, place: String(t.place || '').slice(0, 60) })) };
         if (b.paymentRows) pr.paymentRows = (b.paymentRows || []).slice(0, 4).map(r2 => ({ pct: String(r2.pct || '').slice(0, 8), label: String(r2.label || '').slice(0, 60) }));
         if (b.whyRent) pr.whyRent = (b.whyRent || []).slice(0, 4).map(x => String(x).slice(0, 300));
+        if (b.folderId !== undefined) pr.folderId = b.folderId || null;
         if (b.layouts) pr.layouts = b.layouts.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
         store.save();
         return json(res, 200, pr);
@@ -914,6 +967,43 @@ const server = http.createServer(async (req, res) => {
         .sort((a, b) => b.score - a.score)
         .map(x => Object.assign({ matchScore: x.score }, x.pr));
       return json(res, 200, list);
+    }
+
+    /* ---------------- папки (объекты и подборки) ---------------- */
+    if (p === '/api/folders' && req.method === 'GET') {
+      return json(res, 200, db.folders.map(f => Object.assign({}, f, {
+        count: f.kind === 'prop' ? db.properties.filter(x => x.folderId === f.id).length : db.collections.filter(x => x.folderId === f.id).length,
+      })));
+    }
+    if (p === '/api/folders' && req.method === 'POST') {
+      const b = await readBody(req);
+      const f = { id: store.nextId('fd'), name: String(b.name || 'Папка').slice(0, 60), kind: b.kind === 'coll' ? 'coll' : 'prop' };
+      db.folders.push(f); store.save();
+      return json(res, 200, f);
+    }
+    if ((m = p.match(/^\/api\/folders\/([^/]+)$/)) && req.method === 'PATCH') {
+      const f = db.folders.find(x => x.id === m[1]);
+      if (!f) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.name) f.name = String(b.name).slice(0, 60);
+      store.save();
+      return json(res, 200, f);
+    }
+    if ((m = p.match(/^\/api\/folders\/([^/]+)$/)) && req.method === 'DELETE') {
+      for (const x of db.properties) if (x.folderId === m[1]) x.folderId = null;
+      for (const x of db.collections) if (x.folderId === m[1]) x.folderId = null;
+      db.folders = db.folders.filter(x => x.id !== m[1]);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    if ((m = p.match(/^\/api\/collections\/([^/]+)$/)) && req.method === 'PATCH') {
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.folderId !== undefined) c.folderId = b.folderId || null;
+      if (b.title) c.title = String(b.title).slice(0, 200);
+      store.save();
+      return json(res, 200, c);
     }
 
     /* ---------------- подборки ---------------- */
@@ -1024,6 +1114,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, leadView(db, keep));
     }
 
+    if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
     if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));

@@ -970,3 +970,42 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .wa-msg.typing span:nth-child(2) { animation-delay: .18s; }
 .wa-msg.typing span:nth-child(3) { animation-delay: .36s; }
 @keyframes waT { 0%, 100% { opacity: .4; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+/* ---------- папки-полка ---------- */
+.shelf { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.shelf-sm { margin-bottom: 12px; }
+.fold {
+  position: relative; width: 150px; border-radius: var(--r-md); background: #fff; border: 1px solid var(--stroke);
+  padding: 10px 12px 11px; cursor: pointer; box-shadow: var(--shadow);
+  transition: transform var(--dur-fast) var(--ease-spring), border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.fold:hover { transform: translateY(-2px); border-color: #B9CBEE; }
+.fold.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, .13); }
+.fold.drop { border-color: var(--accent); background: var(--blue-100); transform: scale(1.05); }
+.fold img { width: 54px; height: 54px; object-fit: contain; display: block; margin-bottom: 4px; }
+.fold-meta b { display: block; font-size: 12px; color: var(--navy-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold-meta i { font-size: 10.5px; color: var(--ink-3); font-style: normal; }
+.fold-acts { position: absolute; top: 7px; right: 7px; display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-fast); }
+.fold:hover .fold-acts { opacity: 1; }
+.fold-acts svg { width: 12px; height: 12px; color: var(--ink-3); }
+.fold-acts button:hover svg { color: var(--accent); }
+.fold-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--ink-3); border-style: dashed; background: transparent; box-shadow: none; font-size: 12px; font-weight: 600; min-height: 96px; }
+.fold-new svg { width: 18px; height: 18px; }
+.fold-new:hover { color: var(--accent); border-color: var(--accent); }
+.prop-card { touch-action: none; user-select: none; -webkit-user-select: none; }
+.cmp-card { touch-action: pan-y; }
+
+/* ---------- структурные контролы деталки ---------- */
+.gi-sel { min-width: 150px; }
+.pd-sub .cs { min-width: 170px; }
+.payrow-mini { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 9px; }
+.payrow-mini span { font-size: 11.5px; color: var(--ink-3); }
+.payrow-mini b { font-size: 13px; color: var(--navy-900); margin-right: 4px; }
+.chips-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-t {
+  font-size: 11.5px; font-weight: 550; color: var(--ink-2); background: var(--bg-2);
+  border: 1px solid var(--stroke); border-radius: 16px; padding: 4px 11px;
+  transition: all var(--dur-fast);
+}
+.chip-t:hover { border-color: #B9CBEE; }
+.chip-t.on { background: var(--accent); border-color: var(--accent); color: #fff; }

@@ -586,6 +586,50 @@ PAGES.funnel = async (root) => {
   wireKanbanDrag(root);
 };
 
+/* ---------- drag предметов на папки (объекты/подборки) ---------- */
+function wireShelfDrag(root, itemSel, onDrop) {
+  $$(itemSel, root).forEach(card => card.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button,a,input,select,label')) return;
+    const startX = e.clientX, startY = e.clientY;
+    let ghost = null;
+    DRAG.moved = false;
+    const onMove = (ev) => {
+      if (!ghost && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+      if (!ghost) {
+        DRAG.moved = true; DRAG.active = true;
+        const r = card.getBoundingClientRect();
+        ghost = card.cloneNode(true);
+        ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${Math.min(r.width, 260)}px;z-index:400;pointer-events:none;opacity:.9;transform:rotate(2deg) scale(.9);box-shadow:var(--shadow-lift)`;
+        document.body.appendChild(ghost);
+        card.style.opacity = '.4';
+      }
+      ghost.style.left = (ev.clientX - 60) + 'px';
+      ghost.style.top = (ev.clientY - 30) + 'px';
+      $$('.fold', root).forEach(f => f.classList.remove('drop'));
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const fold = under && under.closest('.fold[data-fid], .fold[data-cfid]');
+      if (fold) fold.classList.add('drop');
+    };
+    const onUp = async (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!ghost) return;
+      ghost.remove();
+      card.style.opacity = '';
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const fold = under && under.closest('.fold[data-fid], .fold[data-cfid]');
+      $$('.fold', root).forEach(f => f.classList.remove('drop'));
+      setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
+      if (fold) {
+        await onDrop(card.dataset.dragprop || card.dataset.dragcoll, fold.dataset.fid || fold.dataset.cfid);
+        toast('Разложено в папку', null, true);
+      }
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }));
+}
+
 /* ---------- канбан: перетаскивание на pointer-событиях (HTML5 DnD глючит) ---------- */
 const DRAG = { moved: false, active: false };
 function wireKanbanDrag(root) {
@@ -1431,7 +1475,16 @@ PAGES.properties = async (root) => {
   if (PAGE_STATE.propView) {
     const pr = props.find(x => x.id === PAGE_STATE.propView);
     if (!pr) { PAGE_STATE.propView = null; return PAGES.properties(root); }
+    const MD = PAGE_STATE.marketData || (PAGE_STATE.marketData = await api.get('/marketdata'));
+    const geoMD = MD[pr.geo] || MD.dubai;
     const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
+    /* combo: справочник + «своё значение» */
+    const combo = (field, options, val, ph) => `<select class="gi-sel" data-cf2="${field}">
+      <option value="">${ph || '—'}</option>
+      ${options.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}
+      ${val && !options.includes(val) ? `<option selected>${esc(val)}</option>` : ''}
+      <option value="__custom">✏️ Своё значение…</option>
+    </select>`;
     const gi = (field, val, ph, num) => `<input class="gi" data-f="${field}" ${num ? 'type="number"' : ''} value="${esc(val ?? '')}" placeholder="${ph || '—'}">`;
     const fmt = (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
     root.innerHTML = `
@@ -1440,7 +1493,7 @@ PAGES.properties = async (root) => {
       <div class="pd-head">
         <div style="flex:1;min-width:0">
           <input class="gi gi-title" data-f="name" value="${esc(pr.name)}">
-          <div class="pd-sub">${gi('area', pr.area, 'район')} · ${gi('developer', pr.developer, 'застройщик')}</div>
+          <div class="pd-sub">${combo('area', geoMD.areas, pr.area, 'район')} ${combo('developer', geoMD.developers, pr.developer, 'застройщик')}</div>
         </div>
         <div style="text-align:right">
           <div class="pd-price">от <input class="gi gi-price" data-f="priceFrom" type="number" value="${pr.priceFrom}"> ${pr.currency}</div>
@@ -1451,10 +1504,21 @@ PAGES.properties = async (root) => {
         </div>
       </div>
       <div class="pd-facts glass card">
-        ${[['type', 'Формат', pr.type], ['handover', 'Сдача', pr.handover], ['payment', 'План оплаты', pr.payment], ['tagsStr', 'Теги (через запятую)', (pr.tags || []).join(', ')]]
-          .map(([f, k, v]) => `<div class="pd-fact"><label class="lc-lbl">${k}</label>${gi(f, v)}</div>`).join('')}
+        <div class="pd-fact"><label class="lc-lbl">Формат</label>${combo('type', MD.common.types, pr.type, 'формат')}</div>
+        <div class="pd-fact"><label class="lc-lbl">Сдача</label>${combo('handover', MD.common.handover, pr.handover, 'срок')}</div>
+        <div class="pd-fact" style="grid-column:span 2"><label class="lc-lbl">План оплаты (пресеты рынка)</label>
+          <select class="gi-sel" data-payplan>
+            <option value="">${esc(pr.payment || 'выбрать план…')}</option>
+            ${geoMD.payments.map((pp, pi) => `<option value="${pi}">${esc(pp.label)} · ${pp.rows.map(r2 => r2.pct).join(' / ')}</option>`).join('')}
+          </select>
+          ${(pr.paymentRows || []).length ? `<div class="payrow-mini">${pr.paymentRows.map(r2 => `<span><b>${esc(r2.pct)}</b> ${esc(r2.label)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="pd-fact" style="grid-column:1/-1"><label class="lc-lbl">Теги</label>
+          <div class="chips-row">${MD.common.tags.map(t => `<button type="button" class="chip-t ${(pr.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+        </div>
         <div class="pd-fact" style="grid-column:1/-1"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="width:100%;min-height:90px">${esc(pr.description || '')}</textarea></div>
-        <div class="pd-fact" style="grid-column:1/-2"><label class="lc-lbl">Удобства (через запятую)</label><input class="gi" data-f="amenitiesStr" style="width:100%" value="${esc((pr.amenities || []).join(', '))}" placeholder="Бассейн, Фитнес, Паркинг…"></div>
+        <div class="pd-fact" style="grid-column:1/-2"><label class="lc-lbl">Удобства</label>
+          <div class="chips-row">${MD.common.amenities.map(a => `<button type="button" class="chip-t ${(pr.amenities || []).includes(a) ? 'on' : ''}" data-amen="${esc(a)}">${esc(a)}</button>`).join('')}</div></div>
         <div class="pd-fact"><label class="lc-lbl">Заметка (короткая)</label><input class="gi" data-f="note" style="width:100%" value="${esc(pr.note || '')}"></div>
       </div>
       <div class="glass card" style="margin-top:16px">
@@ -1530,6 +1594,31 @@ PAGES.properties = async (root) => {
       else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
       else await upd({ [f]: inp.value });
     }));
+    $$('[data-cf2]', root).forEach(sel => sel.addEventListener('change', async () => {
+      if (sel.value === '__custom') {
+        const inp = el(`<input class="gi" style="width:100%" placeholder="своё значение">`);
+        sel.closest('.cs').replaceWith(inp);
+        inp.focus();
+        inp.addEventListener('change', () => upd({ [sel.dataset.cf2]: inp.value }));
+        return;
+      }
+      await upd({ [sel.dataset.cf2]: sel.value });
+    }));
+    const pp = root.querySelector('[data-payplan]');
+    if (pp) pp.addEventListener('change', async () => {
+      const plan = geoMD.payments[+pp.value];
+      if (!plan) return;
+      await upd({ payment: plan.label, paymentRows: plan.rows });
+      render();
+    });
+    $$('[data-tag]', root).forEach(ch => ch.addEventListener('click', async () => {
+      ch.classList.toggle('on');
+      await upd({ tags: $$('[data-tag].on', root).map(x => x.dataset.tag) });
+    }));
+    $$('[data-amen]', root).forEach(ch => ch.addEventListener('click', async () => {
+      ch.classList.toggle('on');
+      await upd({ amenities: $$('[data-amen].on', root).map(x => x.dataset.amen) });
+    }));
     $('#pdMarket').addEventListener('change', (e) => upd({ market: e.target.value }));
     $('#pdGeo').addEventListener('change', (e) => upd({ geo: e.target.value }));
     $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
@@ -1554,7 +1643,9 @@ PAGES.properties = async (root) => {
   /* -------- список: богатые карточки -------- */
   const geoF = PAGE_STATE.propGeo || '';
   const marketF = PAGE_STATE.propMarket || '';
-  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF));
+  const folders = (await api.get('/folders')).filter(f => f.kind === 'prop');
+  const folderF = PAGE_STATE.propFolder || '';
+  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF));
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     <div class="filters">
@@ -1563,8 +1654,23 @@ PAGES.properties = async (root) => {
       <span class="muted" style="font-size:12px">${list.length} объектов</span>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
+    <div class="shelf">
+      <div class="fold ${!folderF ? 'active' : ''}" data-fopen="">
+        <img src="assets/folder.jpg"><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
+      </div>
+      ${folders.map(f => `<div class="fold ${folderF === f.id ? 'active' : ''}" data-fopen="${f.id}" data-fid="${f.id}">
+        <img src="assets/folder.jpg">
+        <div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count} объект(ов)</i></div>
+        <div class="fold-acts">
+          <button class="btn-ghost" data-fcoll="${f.id}" title="Собрать подборку из папки">${ic(I.layers)}</button>
+          <button class="btn-ghost" data-fdel="${f.id}" title="Удалить папку">${ic(I.x)}</button>
+        </div>
+      </div>`).join('')}
+      <button class="fold fold-new" id="fNew">${ic(I.plus)}<span>Папка</span></button>
+    </div>
+    <div class="muted" style="font-size:11px;margin:-6px 0 12px">Перетащите карточку объекта на папку, чтобы разложить · клик по папке — фильтр · ${ic ? '' : ''}из папки можно собрать подборку одной кнопкой</div>
     <div class="prop-grid">
-      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}">
+      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}" data-dragprop="${pr.id}">
         ${propCover(pr)}
         <div class="prop-body">
           <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
@@ -1588,7 +1694,26 @@ PAGES.properties = async (root) => {
       <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
-  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.propView = c.dataset.pr; render(); }));
+  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) { PAGE_STATE.propView = c.dataset.pr; render(); } }));
+  $$('[data-fopen]', root).forEach(f => f.addEventListener('click', (e) => {
+    if (e.target.closest('[data-fcoll],[data-fdel]')) return;
+    PAGE_STATE.propFolder = f.dataset.fopen; render();
+  }));
+  $('#fNew').addEventListener('click', () => modal({
+    title: 'Новая папка объектов', body: '<div class="form-row"><label>Название</label><input id="fName" placeholder="Например: Под визу / JVC / Предстарты"></div>',
+    actions: [{ label: 'Создать', cls: 'btn-accent', onClick: async (bd) => { await api.post('/folders', { name: $('#fName', bd).value, kind: 'prop' }); render(); } }, { label: 'Отмена' }],
+  }));
+  $$('[data-fdel]', root).forEach(b => b.addEventListener('click', async () => { await fetch('/api/folders/' + b.dataset.fdel, { method: 'DELETE' }); render(); }));
+  $$('[data-fcoll]', root).forEach(b => b.addEventListener('click', async () => {
+    const f = folders.find(x => x.id === b.dataset.fcoll);
+    const ids = props.filter(x => x.folderId === f.id).map(x => x.id);
+    if (!ids.length) { toast('Папка пуста', 'Перетащите в неё объекты'); return; }
+    const c = await api.post('/collections', { title: f.name, propertyIds: ids });
+    toast('Подборка собрана из папки', f.name + ' · ' + ids.length + ' объект(ов)', true);
+    PAGE_STATE.collLead = '';
+    go('collections');
+  }));
+  wireShelfDrag(root, '[data-dragprop]', async (itemId, folderId) => { await api.patch('/properties/' + itemId, { folderId }); render(); });
   $('#prAdd').addEventListener('click', async () => {
     const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
     PAGE_STATE.propView = pr.id;
@@ -1605,7 +1730,10 @@ PAGES.properties = async (root) => {
 
 /* ---------------- ПОДБОРКИ ---------------- */
 PAGES.collections = async (root) => {
-  const [cols, props, leads] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads')]);
+  const [cols0, props, leads, allFolders] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads'), api.get('/folders')]);
+  const cFolders = allFolders.filter(f => f.kind === 'coll');
+  const cFolderF = PAGE_STATE.collFolder || '';
+  const cols = cols0.filter(c => !cFolderF || c.folderId === cFolderF);
   const active = leads.filter(l => !['lost'].includes(l.stage));
   const selLead = PAGE_STATE.collLead || '';
   let suggest = [];
@@ -1629,7 +1757,15 @@ PAGES.collections = async (root) => {
         <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
       </div>
       <div>
-        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}">
+        <div class="shelf shelf-sm">
+          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><img src="assets/folder.jpg"><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
+          ${cFolders.map(f => `<div class="fold ${cFolderF === f.id ? 'active' : ''}" data-cfopen="${f.id}" data-cfid="${f.id}">
+            <img src="assets/folder.jpg"><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
+            <div class="fold-acts"><button class="btn-ghost" data-cfdel2="${f.id}">${ic(I.x)}</button></div>
+          </div>`).join('')}
+          <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
+        </div>
+        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}" data-dragcoll="${c.id}">
           <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
           <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
           ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
@@ -1645,6 +1781,16 @@ PAGES.collections = async (root) => {
         </div>`).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
       </div>
     </div>`;
+  $$('[data-cfopen]', root).forEach(f => f.addEventListener('click', (e) => {
+    if (e.target.closest('[data-cfdel2]')) return;
+    PAGE_STATE.collFolder = f.dataset.cfopen; render();
+  }));
+  $('#cfNew').addEventListener('click', () => modal({
+    title: 'Новая папка подборок', body: '<div class="form-row"><label>Название</label><input id="cfName" placeholder="Например: Горячие / Инвесторы / Сентябрь"></div>',
+    actions: [{ label: 'Создать', cls: 'btn-accent', onClick: async (bd) => { await api.post('/folders', { name: $('#cfName', bd).value, kind: 'coll' }); render(); } }, { label: 'Отмена' }],
+  }));
+  $$('[data-cfdel2]', root).forEach(b => b.addEventListener('click', async () => { await fetch('/api/folders/' + b.dataset.cfdel2, { method: 'DELETE' }); render(); }));
+  wireShelfDrag(root, '[data-dragcoll]', async (itemId, folderId) => { await api.patch('/collections/' + itemId, { folderId }); render(); });
   $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
@@ -2216,6 +2362,28 @@ PAGES.settings = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.mic || I.phone)}Голос брокера · ElevenLabs<span class="sub">голосовые касания настоящим голосом</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>API key (xi-api-key)</label><input id="vKey" type="password" placeholder="${(s.voice || {}).keySet ? '•••••• сохранён' : 'sk_…'}"></div>
+            <div class="form-row"><label>Voice ID (клонированный голос)</label><input id="vId" value="${esc((s.voice || {}).voiceId || '')}" placeholder="из My Voices"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn" id="vSave">Сохранить</button>
+            <button class="btn btn-sm" id="vTest">${ic(I.play)}Тест голоса</button>
+            <span id="vPlayer"></span>
+          </div>
+          ${coll('Как агентству настроить самостоятельно (5 минут)', `
+            <ol style="font-size:12.3px;line-height:1.7;color:var(--ink-2);padding-left:18px;margin-top:8px">
+              <li>Регистрация на <b>elevenlabs.io</b> (тариф Starter ~$5/мес достаточно для голосовых).</li>
+              <li>Voices → <b>Add voice → Instant Voice Clone</b>: брокер записывает 1-2 минуты чистой речи на телефон и загружает.</li>
+              <li>Скопировать <b>Voice ID</b> из карточки голоса (My Voices → ⋯ → Copy ID).</li>
+              <li>Profile → <b>API Keys</b> → создать ключ, вставить оба значения сюда и нажать «Тест голоса».</li>
+              <li>Готово: шаги цепочек с каналом «Голосовое» будут озвучиваться этим голосом и уходить клиенту как voice-сообщение.</li>
+            </ol>
+            <div class="muted" style="font-size:11.5px">Стоимость: ~$0.10-0.20 за минуту речи. Каждый брокер может иметь свой голос — при мультиброкерных голосовых добавим выбор голоса на брокера.</div>`,
+            { open: false, icon: I.doc })}
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.phone)}Телефония<span class="sub">звонки → авто-транскрибация в карточку</span></div>
           <div class="set-row"><div class="sp"><div class="sl">Провайдер</div><div class="sd">Zadarma — дешевле всего для старта (номер ОАЭ + записи + API); Twilio/Telnyx — глобальные</div></div>
             <select id="telProv" style="width:150px">
@@ -2314,6 +2482,22 @@ PAGES.settings = async (root) => {
     await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
     toast('Сохранено', null, true);
     await loadState();
+  });
+  $('#vSave').addEventListener('click', async () => {
+    const v = { voiceId: $('#vId').value.trim() };
+    if ($('#vKey').value.trim()) v.key = $('#vKey').value.trim();
+    await api.patch('/settings', { voice: v });
+    toast('Голос сохранён', null, true);
+    loadState();
+  });
+  $('#vTest').addEventListener('click', async () => {
+    const b = $('#vTest');
+    b.disabled = true; b.textContent = 'Генерирую…';
+    const r = await fetch('/api/voice/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Добрый день! Это ' + (STATE.settings.agency.manager?.name || 'ваш эксперт') + ' из ' + STATE.settings.agency.name + '. Записал для вас короткое голосовое — тест из Lumen CRM.' }) });
+    const j = await r.json();
+    b.disabled = false; b.innerHTML = ic(I.play) + 'Тест голоса';
+    if (r.ok) $('#vPlayer').innerHTML = `<audio controls autoplay src="${j.url}" style="height:32px;vertical-align:middle"></audio>`;
+    else toast('Не сгенерировалось', j.error);
   });
   $('#telSave').addEventListener('click', async () => {
     const t = { provider: $('#telProv').value };
