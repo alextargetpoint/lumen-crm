@@ -1126,3 +1126,33 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .nm-pen svg { width: 12px; height: 12px; }
 .cmp-head .nm:hover .nm-pen { opacity: 1; }
 .nm-edit { font: inherit; font-weight: inherit; border: 1.5px solid var(--acc, #2563EB); border-radius: 7px; padding: 2px 8px; outline: none; min-width: 200px; }
+
+/* ---------- hero-панель раздела (.ha): Higgsfield-объект + данные ---------- */
+.ha { background: linear-gradient(150deg, #061126, #0A1833 55%, #102B5C 135%); border: 1px solid rgba(122, 158, 255, .14); border-radius: 18px; color: #fff; overflow: hidden; position: relative; display: grid; grid-template-columns: 175px 1fr; gap: 6px; align-items: center; box-shadow: 0 16px 40px rgba(6, 17, 38, .3); padding: 16px 20px 16px 10px; }
+.ha-stage { position: relative; display: grid; place-items: center; min-height: 170px; }
+.ha-glow { position: absolute; width: 88%; height: 78%; border-radius: 50%; background: radial-gradient(closest-side, rgba(37, 99, 235, .48), transparent 72%); filter: blur(24px); animation: f3pulse 5.5s ease-in-out infinite; transition: opacity .25s; }
+.ha-glow.lit { background: radial-gradient(closest-side, rgba(122, 158, 255, .75), rgba(124, 58, 237, .3) 60%, transparent 75%); }
+.ha-obj { position: relative; z-index: 2; width: min(82%, 150px); max-height: 165px; object-fit: contain; animation: f3float 7s ease-in-out infinite; filter: drop-shadow(0 20px 26px rgba(0, 0, 0, .5)); }
+.ha-p { position: absolute; bottom: 12%; left: calc(50% + var(--px, 0px)); width: 3.5px; height: 3.5px; border-radius: 50%; background: #B8CCFF; box-shadow: 0 0 7px rgba(157, 184, 255, .9); opacity: 0; animation: haup 3.8s linear infinite; animation-delay: var(--pd, 0s); z-index: 1; }
+@keyframes haup { 0% { opacity: 0; transform: translateY(6px) } 15% { opacity: .9 } 60% { opacity: .5; transform: translateY(-90px) } 85% { opacity: 0; transform: translateY(-130px) } 100% { opacity: 0 } }
+.ha-body { min-width: 0; position: relative; z-index: 2; padding: 4px 0; }
+.ha-title { display: flex; align-items: center; gap: 9px; font-weight: 750; font-size: 14.5px; margin-bottom: 10px; }
+.ha-title svg { width: 16px; height: 16px; color: #9DB8FF; }
+.ha-title .sub { font-weight: 500; font-size: 11.5px; color: #8FA3C8; }
+.ha-row { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 11px; cursor: default; transition: background .18s var(--ease-spring, ease), transform .18s var(--ease-spring, ease); }
+.ha-row:hover { background: rgba(157, 184, 255, .1); transform: translateX(5px); }
+.ha-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: #7C9BFF; box-shadow: 0 0 8px rgba(124, 155, 255, .8); }
+.ha-row .nm2 { font-size: 12.5px; color: #B9C7E8; min-width: 0; }
+.ha-row .nm2 b { color: #fff; font-weight: 750; }
+.ha-row .sp2 { flex: 1; }
+.ha-row .val2 { font-weight: 800; font-size: 16px; color: #fff; }
+.ha-row .sub2 { font-size: 11px; color: #7E93C4; }
+.ha-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.ha-chip { border: 1px solid rgba(157, 184, 255, .3); border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 650; color: #CBD8F5; transition: all .18s var(--ease-spring, ease); cursor: default; }
+.ha-chip:hover { border-color: #9DB8FF; background: rgba(157, 184, 255, .12); transform: translateY(-2px); color: #fff; }
+.ha-chip b { color: #fff; }
+.ha-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.ha-step { border-radius: 9px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(157, 184, 255, .18); padding: 5px 10px; font-size: 11px; font-weight: 650; color: #B9C7E8; animation: hastep 3.6s ease-in-out infinite; animation-delay: calc(var(--i) * .45s); }
+@keyframes hastep { 0%, 100% { background: rgba(255, 255, 255, .07); color: #B9C7E8 } 8% { background: rgba(79, 125, 255, .45); color: #fff; box-shadow: 0 0 14px rgba(79, 125, 255, .5) } 20% { background: rgba(255, 255, 255, .07); color: #B9C7E8 } }
+@media (prefers-reduced-motion: reduce) { .ha-obj, .ha-glow, .ha-p, .ha-step { animation: none; } .ha-p { display: none; } }
+@media (max-width: 760px) { .ha { grid-template-columns: 1fr; padding: 16px; } .ha-stage { min-height: 140px; } .ha-obj { width: 120px; } }

@@ -412,6 +412,28 @@ function wireAiWand(root) {
   });
 }
 
+/* ---------- hero-панель раздела: вырезанный Higgsfield-объект + glow + частицы ----------
+   Единый приём «органичной» графики: объект парит слева, справа — живые данные раздела.
+   Интерактив: строки/чипы с data-ha подсвечивают glow объекта при наведении. */
+function heroArt(img, inner, opts = {}) {
+  const o = Object.assign({ particles: 5, cls: '' }, opts);
+  return `<div class="ha mb ${o.cls}">
+    <div class="ha-stage">
+      <div class="ha-glow"></div>
+      ${Array.from({ length: o.particles }, (_, i) => `<i class="ha-p" style="--pd:${(i * 0.62).toFixed(2)}s;--px:${(i * 43) % 84 - 42}px"></i>`).join('')}
+      <img class="ha-obj" src="${img}" alt="" loading="lazy">
+    </div>
+    <div class="ha-body">${inner}</div>
+  </div>`;
+}
+function wireHeroArt(root) {
+  $$('.ha [data-ha]', root).forEach(r => {
+    const ha = r.closest('.ha');
+    r.addEventListener('mouseenter', () => $('.ha-glow', ha).classList.add('lit'));
+    r.addEventListener('mouseleave', () => $('.ha-glow', ha).classList.remove('lit'));
+  });
+}
+
 /* ---------- глобальное состояние ---------- */
 let STATE = null;
 let CUR = 'overview';
@@ -508,6 +530,7 @@ async function render() {
         await fn(c0);
         enhanceControls(c0);
         wireAiWand(c0);
+        wireHeroArt(c0);
         if (isWave) countUp(c0);
         else { /* мягкое перестроение при фильтрах/обновлениях — без грубого скачка */
           c0.classList.remove('soft');
@@ -1502,6 +1525,13 @@ async function renderChat(id, rebuild) {
 PAGES.qualifier = async (root) => {
   const s = STATE.settings;
   root.innerHTML = `
+    ${heroArt('assets/art/core.png', `
+      <div class="ha-title">${ic(I.spark)}ИИ-квалификатор<span class="sub">первая линия отвечает ≤ 1 минуты · факты только из слов клиента</span></div>
+      <div class="ha-chips">${['🎯 Цель', '⏱ Срок', '💰 Бюджет', '🏠 Тип'].map(a => `<span class="ha-chip" data-ha>${a}</span>`).join('')}</div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha>
+        <span class="nm2">Автопилот: <b>${s.ai.autopilot ? 'включён' : 'выключен'}</b> · движок: <b>${s.ai.llmAvailable ? esc((s.ai.llmModel || 'LLM').split(' ')[0]) : 'ядро (без LLM)'}</b> · стоп-слов: <b>${(s.stopWords || []).length}</b></span>
+      </div>
+    `)}
     <div class="two-col">
       <div>
         <div class="glass card mb">
@@ -1618,7 +1648,14 @@ PAGES.sequences = async (root) => {
       </div>`;
   };
 
+  const haSteps = seq.steps.filter(st => st.active);
+  const haMaxDay = Math.max(...haSteps.map(st => st.day), 0);
   root.innerHTML = `
+    ${heroArt('assets/art/chain.png', `
+      <div class="ha-title">${ic(I.chain)}Цепочки касаний<span class="sub">${esc(seq.name.length > 44 ? seq.name.slice(0, 42) + '…' : seq.name)} · ${haSteps.length} касаний · ${haMaxDay < 1 ? 'первые сутки' : haMaxDay + ' дней'}</span></div>
+      <div class="ha-steps">${haSteps.map((st, i) => `<span class="ha-step" style="--i:${i}" data-ha>${dayLabel(st.day)}</span>`).join('') || '<span class="sub2">в цепочке нет активных шагов</span>'}</div>
+      <div class="sub2" style="margin-top:9px">Работает только до первого ответа клиента — дальше подключается ИИ-диалог</div>
+    `)}
     <div class="fl-tabs">
       ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
         <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}<span>${geoName(sq.geo)}</span></button>`).join('')}
@@ -2017,6 +2054,11 @@ PAGES.properties = async (root) => {
   const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF));
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
+    ${heroArt('assets/art/tower.png', `
+      <div class="ha-title">${ic(I.building || I.doc)}База объектов<span class="sub">${props.length} проектов · подборки собираются отсюда</span></div>
+      <div class="ha-chips">${st.agency.geos.map(g => { const n = props.filter(p2 => p2.geo === g).length; return n ? `<span class="ha-chip" data-ha>${st.geoNames[g]} <b>${n}</b></span>` : ''; }).join('')}</div>
+      ${(() => { const mp = Math.min(...props.map(p2 => p2.priceFrom || Infinity)); return isFinite(mp) ? `<div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вход в рынок от <b>$${mp.toLocaleString('ru-RU')}</b> · первичка ${props.filter(p2 => p2.market === 'offplan').length} · вторичка ${props.filter(p2 => p2.market === 'secondary').length}</span></div>` : ''; })()}
+    `)}
     <div class="filters">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
@@ -2202,11 +2244,18 @@ PAGES.wake = async (root) => {
   PAGE_STATE.wakePreview = preview;
   const segs = { A: preview.filter(p => p.segment === 'A'), B: preview.filter(p => p.segment === 'B'), C: preview.filter(p => p.segment === 'C') };
   root.innerHTML = `
-    <div class="seg-grid">
-      <div class="seg a glass"><div class="sg-hd">${ic(I.flame)}Сегмент A — будить первыми</div><div class="sg-num">${segs.A.length}</div><div class="sg-sub">score ≥ 55: свежие, вовлечённые, писали сами</div></div>
-      <div class="seg b glass"><div class="sg-hd">${ic(I.clock)}Сегмент B — вторая волна</div><div class="sg-num">${segs.B.length}</div><div class="sg-sub">score 30–54: были в диалоге, остыли</div></div>
-      <div class="seg c glass"><div class="sg-hd">${ic(I.moon)}Сегмент C — фон</div><div class="sg-num">${segs.C.length}</div><div class="sg-sub">score &lt; 30: холодные, редкими волнами</div></div>
-    </div>
+    ${heroArt('assets/art/moon.png', `
+      <div class="ha-title">${ic(I.moon)}Спящая база<span class="sub">${preview.length} лидов ждут пробуждения · скоринг: свежесть + вовлечённость</span></div>
+      ${[
+        ['A', 'будить первыми', segs.A.length, 'score ≥ 55: свежие, вовлечённые, писали сами', '#FFB86B'],
+        ['B', 'вторая волна', segs.B.length, 'score 30–54: были в диалоге, остыли', '#7C9BFF'],
+        ['C', 'фон', segs.C.length, 'score < 30: холодные, редкими волнами', '#5E6C8F'],
+      ].map(([k, nm, v, sub, col]) => `<div class="ha-row" data-ha>
+        <span class="dot" style="background:${col};box-shadow:0 0 8px ${col}"></span>
+        <span class="nm2"><b>Сегмент ${k}</b> · ${nm}<div class="sub2">${sub}</div></span>
+        <span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `)}
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.wake)}Скоринг спящих<span class="sub">кого разбудить сначала</span></div>
@@ -2536,7 +2585,19 @@ PAGES.playbook = async (root) => {
 PAGES.ads = async (root) => {
   const d = await api.get('/ads');
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
+  const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
+  const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
   root.innerHTML = `
+    ${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I.target || I.bolt)}Реклама<span class="sub">атрибуция лидов до объявления</span></div>
+      ${[
+        ['Объявлений в базе', d.ads.length, 'связаны с лидами по ad_id'],
+        ['Лидов с рекламы', adLeads, 'через мост и CTWA'],
+        topAd && topAd.leads ? ['Топ-объявление', topAd.leads + ' лидов', esc(topAd.name || topAd.adId)] : null,
+      ].filter(Boolean).map(([k, v, sub]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `)}
     <div class="two-col">
       <div>
         <div class="glass card mb">
@@ -2603,6 +2664,16 @@ PAGES.numbers = async (root) => {
   };
   const stBadge = { active: '<span class="badge ok"><i></i>активен</span>', warming: '<span class="badge warn"><i></i>прогрев</span>', quarantine: '<span class="badge bad"><i></i>карантин</span>' };
   root.innerHTML = `
+    ${heroArt('assets/art/sim.png', `
+      <div class="ha-title">${ic(I.sim)}Пул номеров<span class="sub">здоровье канала WhatsApp</span></div>
+      ${[
+        ['Активных номеров', st.numbers.filter(n => n.state === 'active').length, 'в ротации'],
+        ['Среднее качество', Math.round(st.numbers.reduce((s2, n) => s2 + n.quality, 0) / Math.max(st.numbers.length, 1)) + '%', 'доставляемость'],
+        ['Отправлено сегодня', st.numbers.reduce((s2, n) => s2 + n.sentToday, 0), 'по всем номерам'],
+      ].map(([k, v, sub]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
+      </div>`).join('')}
+    `)}
     <div class="glass card mb">
       <div class="card-title">${ic(I.shield)}Гигиена канала</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
@@ -2773,6 +2844,17 @@ function isOnShift(b) {
 PAGES.analytics = async (root) => {
   const an = await api.get('/analytics');
   root.innerHTML = `
+    ${heroArt('assets/art/chart.png', `
+      <div class="ha-title">${ic(I.bars)}Аналитика<span class="sub">человек против ИИ — живые цифры</span></div>
+      ${[
+        ['Первый контакт', an.compare.aiLine.firstContact, an.compare.human.firstContact],
+        ['Конверсия в диалог', an.compare.aiLine.dialogConv + '%', an.compare.human.dialogConv + '%'],
+        ['Лид → квалификация', an.compare.aiLine.qualConv + '%', an.compare.human.qualConv + '%'],
+      ].map(([k, ai2, hum]) => `<div class="ha-row" data-ha>
+        <span class="nm2">${k}</span><span class="sp2"></span>
+        <span class="sub2">человек: ${hum}</span><span class="val2" style="min-width:64px;text-align:right">${ai2}</span>
+      </div>`).join('')}
+    `)}
     <div class="glass card mb">
       <div class="card-title">${ic(I.bars)}Показатели первой линии</div>
       <div class="vs">
