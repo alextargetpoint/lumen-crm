@@ -479,7 +479,7 @@ PAGES.overview = async (root) => {
   const [an, events, leads] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads')]);
   const f = an.funnel;
   const inDialog = f.dialog + f.touch;
-  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user }[t] || I.bolt);
+  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
 
   root.innerHTML = `
@@ -778,6 +778,7 @@ async function openLeadModal(id) {
   /* единая хронология: сообщения + события + заметки + встречи */
   const timeline = [
     ...(l.messages || []).map(m => ({ at: m.at, kind: 'msg', m })),
+    ...(l.transcripts || []).map(t => ({ at: t.at, kind: 'call', t })),
     ...(l.events || []).map(e => ({ at: e.at, kind: 'ev', e })),
     ...(l.notes || []).map(n => ({ at: n.at, kind: 'note', n })),
     ...(l.meetings || []).map(mt => ({ at: mt.createdAt, kind: 'meet', mt })),
@@ -791,6 +792,9 @@ async function openLeadModal(id) {
       <div class="tl-body"><div class="tl-text muted">${esc(t.e.text)}</div><div class="tl-head"><span>${ago(t.at)}</span></div></div></div>`;
     if (t.kind === 'note') return `<div class="tl-item" data-f="note"><div class="tl-dot note">${ic(I.edit || I.doc)}</div>
       <div class="tl-body tl-note"><div class="tl-text">${esc(t.n.text)}</div><div class="tl-head"><span>комментарий · ${ago(t.at)}</span></div></div></div>`;
+    if (t.kind === 'call') return `<div class="tl-item" data-f="call"><div class="tl-dot meet">${ic(I.phone)}</div>
+      <div class="tl-body">${coll(esc(t.t.label) + ' · транскрипт', `<div class="tl-text" style="white-space:pre-line;font-size:12.3px;padding:6px 0">${esc(t.t.text)}</div>`, { open: false, icon: I.phone })}
+      <div class="tl-head"><span>${ago(t.at)} · учитывается в ИИ-сводке</span></div></div></div>`;
     if (t.kind === 'meet') return `<div class="tl-item" data-f="ev"><div class="tl-dot meet">${ic(I.cal)}</div>
       <div class="tl-body"><div class="tl-text">${kindRu[t.mt.kind] || 'Встреча'} с ${esc(t.mt.brokerName)} · ${new Date(t.mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${t.mt.link ? ` · <a class="link" href="${t.mt.link}" target="_blank">видео-комната</a>` : ''}</div>
       <div class="tl-head"><span>${{ scheduled: 'назначена', done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[t.mt.status]}</span></div></div></div>`;
@@ -815,11 +819,14 @@ async function openLeadModal(id) {
           <div class="lc-note-row">
             <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
             <button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.plus)}</button>
+            <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Звонок</button>
+            <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
           <div class="lc-filters">
             <button class="btn btn-sm lc-f active" data-f="all">Всё</button>
             <button class="btn btn-sm lc-f" data-f="msg">Переписка</button>
             <button class="btn btn-sm lc-f" data-f="note">Комментарии</button>
+            <button class="btn btn-sm lc-f" data-f="call">Звонки</button>
             <button class="btn btn-sm lc-f" data-f="ev">События</button>
           </div>
           <div class="lc-timeline" id="lcTimeline">${timeline.map(tlItem).join('') || '<div class="empty">Хронология пуста</div>'}</div>
@@ -901,6 +908,19 @@ async function openLeadModal(id) {
     openLeadModal(id);
   };
   $('#lcNoteAdd', bd).addEventListener('click', addNote);
+  $('#lcCallBtn', bd).addEventListener('click', () => $('#lcCallFile', bd).click());
+  $('#lcCallFile', bd).addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 24e6) { toast('Файл больше 24 МБ', 'Обрежьте запись перед загрузкой'); return; }
+    const btn = $('#lcCallBtn', bd);
+    btn.disabled = true; btn.textContent = 'Расшифровываю…';
+    const label = f.name.toLowerCase().includes('zoom') ? 'Zoom' : 'Звонок';
+    const r = await fetch(`/api/leads/${id}/transcribe?filename=${encodeURIComponent(f.name)}&label=${encodeURIComponent(label + ' · ' + f.name.slice(0, 30))}`, { method: 'POST', body: f });
+    const j = await r.json();
+    if (r.ok) { toast('Транскрипт готов', 'Добавлен в хронологию и ИИ-сводку', true); openLeadModal(id); }
+    else { toast('Не расшифровалось', j.error); btn.disabled = false; btn.textContent = 'Звонок'; }
+  });
   $('#lcNote', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
   const saveContacts = async (contacts) => { await api.post(`/leads/${id}/contacts`, { contacts }); openLeadModal(id); };
   $('#lcCAdd', bd).addEventListener('click', () => {
@@ -1923,6 +1943,8 @@ PAGES.settings = async (root) => {
         <div class="form-row" style="margin-top:12px"><label>Phone Number ID</label><input id="waPhoneId" value="${esc(s.wa.phoneId)}" placeholder="из Meta Business → WhatsApp → API Setup"></div>
         <div class="form-row"><label>WABA ID</label><input id="waWabaId" value="${esc(s.wa.wabaId)}" placeholder="WhatsApp Business Account ID"></div>
         <div class="form-row"><label>Постоянный токен</label><input id="waToken" type="password" placeholder="${s.wa.tokenSet ? '•••••• сохранён' : 'System User token'}"></div>
+        <div class="form-row"><label>Внешняя ссылка (туннель) — для команды и вебхуков</label>
+          <div style="display:flex;gap:8px;align-items:center">${s.tunnelUrl ? `<code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${esc(s.tunnelUrl)}</code><button class="btn btn-sm" id="tunCopy">${ic(I.copy)}</button>` : '<span class="badge warn">туннель не запущен</span>'}</div></div>
         <div class="form-row"><label>Webhook для входящих</label><div><code class="pill">${location.origin}/wa/webhook</code> <span class="muted" style="font-size:11px">verify token: <code class="pill">${esc(s.wa.webhookVerifyToken)}</code></span></div></div>
         <button class="btn btn-accent" id="saveWa" style="width:100%;justify-content:center;margin-top:6px">Сохранить подключение</button>
       </div>
@@ -1976,6 +1998,8 @@ PAGES.settings = async (root) => {
         </div>
       </div>
     </div>`;
+  const tc = $('#tunCopy');
+  if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
   $('#saveWa').addEventListener('click', async () => {
     const token = $('#waToken').value.trim();
     const phoneId = $('#waPhoneId').value.trim();

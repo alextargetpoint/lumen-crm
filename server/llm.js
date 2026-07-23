@@ -130,12 +130,14 @@ async function summarize(db, lead) {
     .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'МЫ: ') + m.text)
     .join('\n');
   const notes = (lead.notes || []).slice(0, 5).map(n => '· ' + n.text).join('\n');
+  const calls = (lead.transcripts || []).slice(-2).map(t => `[${t.label}]: ` + t.text.slice(0, 1500)).join('\n');
   const q = lead.quals;
   const prompt = `Ты — ассистент CRM агентства недвижимости. Составь сводку по лиду для брокера (3-5 коротких предложений, по-деловому, без воды): кто клиент, что хочет (цель/бюджет/тип/срок), ключевые договорённости и возражения, каким должен быть следующий шаг.
 
 Данные: имя ${lead.name}, направление ${db.settings.geoNames[lead.geo] || lead.geo}, стадия ${lead.stage}.
 Оси: ${['purpose', 'timeline', 'budget', 'type'].map(a => q[a] ? q[a].value : '—').join(' / ')}
 Комментарии команды:\n${notes || '—'}
+ТРАНСКРИПТЫ ЗВОНКОВ/ZOOM:\n${calls || '—'}
 ПЕРЕПИСКА:\n${history || '—'}
 
 Ответь строго JSON: {"summary": "текст сводки"}`;
@@ -144,4 +146,20 @@ async function summarize(db, lead) {
   return out.summary.trim().slice(0, 900);
 }
 
-module.exports = { available, reply, summarize, MODEL };
+/* транскрибация звонка/Zoom: OpenAI Whisper ($0.006/мин) */
+async function transcribe(buf, filename) {
+  if (!OKEY) throw new Error('нет OPENAI_API_KEY для Whisper');
+  const fd = new FormData();
+  fd.append('file', new Blob([buf]), filename || 'call.m4a');
+  fd.append('model', 'whisper-1');
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${OKEY}` },
+    body: fd,
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error('whisper ' + r.status + ': ' + (j.error?.message || ''));
+  return (j.text || '').trim();
+}
+
+module.exports = { available, reply, summarize, transcribe, MODEL };

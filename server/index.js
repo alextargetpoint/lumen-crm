@@ -97,7 +97,7 @@ const DEFAULT_PASS = 'lumen2026';
     }
   }
   for (const b of db.brokers) if (!b.schedule) b.schedule = { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' };
-  for (const l of db.leads) if (!l.custom) l.custom = {};
+  for (const l of db.leads) { if (!l.custom) l.custom = {}; if (!l.transcripts) l.transcripts = []; }
   store.save();
 }
 
@@ -137,12 +137,21 @@ function getSession(req) {
   return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
 }
 
+function tunnelUrl() {
+  try {
+    const log = fs.readFileSync('/tmp/lumen-tunnel.log', 'utf8');
+    const m2 = log.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g);
+    return m2 ? m2[m2.length - 1] : null;
+  } catch { return null; }
+}
+
 function publicSettings(db) {
   const s = JSON.parse(JSON.stringify(db.settings));
   delete s.auth;
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
+  s.tunnelUrl = tunnelUrl();
   return s;
 }
 
@@ -408,6 +417,32 @@ const server = http.createServer(async (req, res) => {
         if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
         store.save();
         return json(res, 200, leadView(db, lead));
+      }
+    }
+
+    /* транскрибация звонка: raw-аудио в теле (до 24МБ), ?label=&filename= */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/transcribe$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const chunks = [];
+      let size = 0, over = false;
+      await new Promise((resolve) => {
+        req.on('data', (c) => { size += c.length; if (size > 24e6) { over = true; req.destroy(); resolve(); } else chunks.push(c); });
+        req.on('end', resolve);
+        req.on('close', resolve);
+      });
+      if (over) return json(res, 400, { error: 'файл больше 24 МБ — обрежьте запись' });
+      if (!size) return json(res, 400, { error: 'пустой файл' });
+      try {
+        const text = await llm.transcribe(Buffer.concat(chunks), u.searchParams.get('filename') || 'call.m4a');
+        const t = { id: store.nextId('tr'), at: Date.now(), label: (u.searchParams.get('label') || 'Звонок').slice(0, 60), text: text.slice(0, 20000) };
+        lead.transcripts = lead.transcripts || [];
+        lead.transcripts.push(t);
+        ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Транскрипт добавлен: ${lead.name} · ${t.label} (${Math.round(text.length / 1000)}k символов)` });
+        store.save();
+        return json(res, 200, t);
+      } catch (e) {
+        return json(res, 500, { error: e.message });
       }
     }
 
@@ -905,5 +940,8 @@ ${props.map((pr2, idx) => `<div class="pobj">
     json(res, 500, { error: e.message });
   }
 });
+
+/* curl/интеграторы с Expect: 100-continue — отвечаем и продолжаем как обычный запрос */
+server.on('checkContinue', (req, res) => { res.writeContinue(); server.emit('request', req, res); });
 
 server.listen(PORT, () => console.log(`Lumen CRM → http://localhost:${PORT}`));
