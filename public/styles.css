@@ -192,8 +192,10 @@ textarea { resize: vertical; min-height: 70px; }
   box-shadow: 0 6px 16px -6px rgba(37, 99, 235, .5);
 }
 .btn-accent:hover { background: #1D54D6; border-color: #1D54D6; box-shadow: 0 10px 26px -8px rgba(37, 99, 235, .65); }
-.btn-ghost { background: transparent; border-color: transparent; color: var(--ink-3); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--ink-3); display: inline-flex; align-items: center; gap: 5px; }
 .btn-ghost:hover { background: var(--bg-2); color: var(--ink); }
+/* страховка: у ic() нет атрибутов размера — любой svg в ghost-кнопке обязан иметь габарит из CSS */
+.btn-ghost svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .btn-danger { color: var(--bad); border-color: #EDC5C0; background: #fff; }
 .btn-danger:hover { background: var(--bad-bg); }
 .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
