@@ -88,6 +88,39 @@ document.addEventListener('click', (e) => {
   if (h) h.parentElement.classList.toggle('open');
 });
 
+/* ---------- «?»-подсказки: объяснялки не занимают экран, живут в поповере ---------- */
+const HINTS = {};
+function hint(id, title, items) {
+  HINTS[id] = { title, items };
+  return `<button class="hint-q" type="button" data-hint="${id}" aria-label="Как это работает">?</button>`;
+}
+function closeHint() { const p = document.querySelector('.hint-pop'); if (p) p.remove(); }
+document.addEventListener('click', (e) => {
+  const q = e.target.closest('.hint-q');
+  const open = document.querySelector('.hint-pop');
+  if (open && (!q || open.dataset.for === q.dataset.hint)) { open.remove(); if (q) return; }
+  else if (open) open.remove();
+  if (!q) return;
+  const h = HINTS[q.dataset.hint];
+  if (!h) return;
+  const pop = document.createElement('div');
+  pop.className = 'hint-pop';
+  pop.dataset.for = q.dataset.hint;
+  pop.innerHTML = `<div class="hp-t">${h.title}</div>` + h.items.map(([t, d]) => `<div class="hp-row"><b>${t}</b><span>${d}</span></div>`).join('');
+  document.body.appendChild(pop);
+  const r = q.getBoundingClientRect();
+  const w = Math.min(330, window.innerWidth - 16);
+  pop.style.width = w + 'px';
+  pop.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - w - 8)) + 'px';
+  pop.style.top = (r.bottom + 8) + 'px';
+  requestAnimationFrame(() => {
+    const pr = pop.getBoundingClientRect();
+    if (pr.bottom > window.innerHeight - 8) pop.style.top = Math.max(8, r.top - pr.height - 8) + 'px';
+    pop.classList.add('show');
+  });
+});
+window.addEventListener('scroll', (e) => { if (!e.target.closest?.('.hint-pop')) closeHint(); }, true);
+
 function plural(n, one, few, many) {
   const m = Math.abs(n) % 100, d = m % 10;
   if (m > 10 && m < 20) return many;
@@ -591,6 +624,7 @@ let renderBusy = false, renderQueued = false;
 async function render() {
   if (renderBusy) { renderQueued = true; return; }
   closePop(); /* перерисовка не должна оставлять поповер-сироту над мёртвым селектом */
+  closeHint();
   renderBusy = true;
   try {
     do {
@@ -703,13 +737,13 @@ PAGES.overview = async (root) => {
   })();
   root.innerHTML = `
     <div class="kpis">
-      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}</div><div class="delta">цепочка стартует ≤ 1 мин</div>${spark}</div>
+      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
       <div class="kpi glass"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}</div><div class="delta">${f.deal} дошло до сделки</div></div>
-      <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} активных номеров · качество ${an.wa.avgQuality}%</div></div>
+      <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
     </div>
     <div class="card mb f3card">
-      <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} лидов всего · клик по стадии — канбан</span></div>
+      <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} ${plural(leads.length, 'лид', 'лида', 'лидов')}</span></div>
       ${(() => {
         const shown = STAGES.filter(s => !['lost'].includes(s.id));
         const TIER = { new: 0, touch: 0, dialog: 1, qualified: 2, handover: 2, sleeping: -1 };
@@ -765,7 +799,7 @@ PAGES.overview = async (root) => {
         </div>
       </div>
       <div class="glass card">
-        <div class="card-title">${ic(I.bolt)}Живая лента<span class="sub">обновляется сама</span></div>
+        <div class="card-title">${ic(I.bolt)}Живая лента</div>
         <div class="feed">
           ${events.slice(0, 8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join('') || '<div class="empty">Событий пока нет</div>'}
         </div>
@@ -807,10 +841,10 @@ PAGES.funnel = async (root) => {
       <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
       <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
       <div class="seg-toggle">
-        ${[['', 'Все'], ['hot', '🔥 Горячие'], ['overdue', '⏰ Просрочка'], ['human', '✋ Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
+        ${[['', 'Все'], ['hot', 'Горячие'], ['overdue', 'Просрочка'], ['human', 'Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
       </div>
       <span class="tb-spacer"></span>
-      <button class="btn btn-sm" id="importBtn">${ic(I.doc)}Импорт базы</button>
+      <button class="btn btn-sm" id="importBtn">${ic(I.doc)}Импорт</button>
       <button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
       <div class="seg-toggle">
@@ -834,7 +868,7 @@ PAGES.funnel = async (root) => {
                 ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
                 ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
                 ${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? '<span class="mini-badge warn">просрочен шаг</span>' : ''}
-                ${(l.tags || []).includes('нужен человек') ? '<span class="mini-badge warn">✋</span>' : ''}
+                ${(l.tags || []).includes('нужен человек') ? `<span class="mini-badge warn" title="нужен человек">${ic(I.user, 2)}</span>` : ''}
                 <span class="tm">${ago(l.lastMsgAt || l.createdAt)}</span>
               </div>
             </div>`).join('') || '<div class="empty" style="padding:14px;font-size:11.5px">пусто</div>'}
@@ -1088,7 +1122,12 @@ PAGES.meetings = async (root) => {
       return `<div class="cal-ev st-${mt.status}" style="top:${top}px" data-mtid="${mt.id}" data-mtdrag="${mt.id}" title="${esc(mt.leadName)} · перетащите для переноса"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span></div>`; }).join('');
   const calHtml = `
     <div class="glass card mb">
-      <div class="card-title">${ic(I.cal)}Календарь недели
+      <div class="card-title">${ic(I.cal)}Календарь недели ${hint('meet', 'Как работают встречи', [
+        ['Слот из диалога', 'ИИ довёл до квалификации → в панели лида «Назначить встречу»'],
+        ['WhatsApp-подтверждение', 'Клиенту уходит время и имя эксперта тем же каналом'],
+        ['Перенос словами', '«Давайте позже» — менеджер двигает слот в один клик'],
+        ['Не пришёл — не потерян', 'Статус возвращает лида в работу, а не в архив'],
+        ['Календарь', 'Клик по слоту — новая встреча; клик по встрече — карточка лида']])}
         <span class="sub" style="display:flex;gap:8px;align-items:center">
           <select id="calBroker" style="width:150px"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${brF === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
           <button class="btn btn-sm" id="calPrev">${ic(I.chev)}</button>
@@ -1103,7 +1142,6 @@ PAGES.meetings = async (root) => {
             ${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cal-slot" style="top:${i * HPX}px" data-h="${H0 + i}"></div>`).join('')}</div>
         </div>`).join('')}
       </div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Клик по пустому слоту — новая встреча в это время; клик по встрече — карточка лида</div>
     </div>`;
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' };
   const stBadge = { scheduled: '<span class="badge acc">назначена</span>', done: '<span class="badge ok">прошла</span>', no_show: '<span class="badge bad">не пришёл</span>', canceled: '<span class="badge">отменена</span>' };
@@ -1124,8 +1162,7 @@ PAGES.meetings = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `) + calHtml + `
-    <div class="two-col">
-      <div>
+    <div>
         ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items], di) => coll(day, items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
             <div style="font-size:15px;font-weight:700;color:var(--navy-900);min-width:48px">${tmm(mt.at)}</div>
             <div style="flex:1">
@@ -1136,15 +1173,6 @@ PAGES.meetings = async (root) => {
             ${mt.status === 'scheduled' ? `<button class="btn btn-sm" data-mt="${mt.id}" data-st="done">Прошла</button>
             <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>` : ''}
           </div>`).join(''), { open: di < 3, count: items.length, icon: I.cal })).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
-      </div>
-      <div class="glass card" style="align-self:start">
-        <div class="card-title">${ic(I.cal)}Как работают встречи</div>
-        ${[['Слот из диалога', 'ИИ довёл до квалификации → в панели лида кнопка «Назначить встречу»: слот, тип, эксперт'],
-           ['WhatsApp-подтверждение', 'Клиенту сразу уходит подтверждение со временем и именем эксперта — тем же каналом, где шёл диалог'],
-           ['Перенос словами', 'Клиент пишет «давайте позже» — диалог живой, менеджер двигает слот в один клик'],
-           ['Не пришёл — не потерян', 'Статус «не пришёл» возвращает лида в работу первой линии, а не в архив']]
-          .map(([t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
-      </div>
     </div>`;
   $$('[data-mt]', root).forEach(b => b.addEventListener('click', async () => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
@@ -1656,7 +1684,12 @@ PAGES.qualifier = async (root) => {
     <div class="two-col">
       <div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.spark)}Автопилот первой линии</div>
+          <div class="card-title">${ic(I.spark)}Автопилот первой линии ${hint('aiflow', 'Как ИИ ведёт диалог', [
+            ['Мгновенный ответ', 'Заявка из Lead Form / CTWA → первое сообщение за секунды'],
+            ['Одна ось за раз', 'Короткие вопросы: цель, бюджет, тип, срок — без анкет'],
+            ['Down-sell вместо отказа', 'Бюджет ниже порога — альтернатива из настроек направления'],
+            ['Передача с саммари', '4 оси закрыты → брокеру выжимка с цитатами и слот созвона'],
+            ['Молчун → реанимация', 'Цепочка касаний исчерпана — лид уходит в «Спящие»']])}</div>
           <div class="set-row">
             <div class="sp"><div class="sl">ИИ отвечает сам</div><div class="sd">Первый контакт ≤ 1 минуты, квалификация по 4 осям: цель · срок · бюджет · тип. Стадии двигаются только по фактам из сообщений клиента.</div></div>
             <label class="switch"><input type="checkbox" id="autopilot" ${s.ai.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
@@ -1671,15 +1704,6 @@ PAGES.qualifier = async (root) => {
              ['onEscalation', 'Эскалация', 'Юрист, претензия, возврат денег — только живой менеджер']]
             .map(([k, t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div>
             <label class="switch"><input type="checkbox" data-aoff="${k}" ${(s.ai.autoOff || {})[k] ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>`).join('')}
-        </div>
-        <div class="glass card">
-          <div class="card-title">${ic(I.shield)}Как ИИ ведёт диалог</div>
-          ${[['1', 'Мгновенный ответ', 'Заявка из Meta Lead Form / CTWA → первое сообщение за секунды, пока лид горячий'],
-             ['2', 'Одна ось за раз', 'Никаких анкет: короткие человеческие вопросы — цель, бюджет, тип, срок'],
-             ['3', 'Down-sell вместо отказа', 'Бюджет ниже порога — ИИ предлагает альтернативу из настроек направления, лид не теряется'],
-             ['4', 'Передача с саммари', '4 оси закрыты → брокер получает выжимку с цитатами клиента и слот созвона'],
-             ['5', 'Молчун → цепочка → реанимация', 'Нет ответа — работает цепочка касаний; исчерпана — лид уходит в «Спящие» под кампании']]
-            .map(([n, t, d]) => `<div class="set-row"><div class="seq-day" style="align-self:flex-start">${n}</div><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
         </div>
       </div>
       <div class="glass card">
@@ -1775,12 +1799,17 @@ PAGES.sequences = async (root) => {
     ${heroArt('assets/art/chain.png', `
       <div class="ha-title">${ic(I.chain)}Цепочки касаний<span class="sub">${esc(seq.name.length > 44 ? seq.name.slice(0, 42) + '…' : seq.name)} · ${haSteps.length} касаний · ${haMaxDay < 1 ? 'первые сутки' : haMaxDay + ' дней'}</span></div>
       <div class="ha-steps">${haSteps.map((st, i) => `<span class="ha-step" style="--i:${i}" data-ha>${dayLabel(st.day)}</span>`).join('') || '<span class="sub2">в цепочке нет активных шагов</span>'}</div>
-      <div class="sub2" style="margin-top:9px">Работает только до первого ответа клиента — дальше подключается ИИ-диалог</div>
+      <div class="sub2" style="margin-top:9px">До первого ответа клиента — дальше ведёт ИИ</div>
     `, { v: 'left', hue: '#2563EB' })}
     <div class="fl-tabs">
       ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
         <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}<span>${geoName(sq.geo)}</span></button>`).join('')}
       <button class="btn btn-sm" id="seqNew">${ic(I.plus)}Цепочка</button>
+      ${hint('chains', 'Как работают цепочки', [
+        ['Одна цепочка на гео', 'Лид получает цепочку своего направления; «Все гео» — запасная'],
+        ['Только до первого ответа', 'Клиент написал → живой диалог ИИ, рассылка стоит'],
+        ['Переменные', '{name} · {geo} · {ad} · {month} · {slots} · {agency}'],
+        ['Пресеты внизу списка', '«B2C-скрипт 2025» и «Онбординг Facebook-лидгена» — включите и правьте под себя']])}
     </div>
     <div class="two-col" style="grid-template-columns:1.5fr 1fr">
       <div>
@@ -1794,27 +1823,19 @@ PAGES.sequences = async (root) => {
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
             <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${geoName(seq.geo)}</b></div>
-            <div class="fl-prev">Facebook Lead Form / CTWA / вебхук интегратора — цепочка стартует, пока клиент не ответил</div></div>
+            <div class="fl-prev">Lead Form / CTWA / вебхук — пока клиент не ответил</div></div>
           </div>
           ${seq.steps.map((st, i) => `<div class="fl-conn"><i></i><button class="fl-add" data-addat="${i}" title="Вставить шаг">${ic(I.plus, 2.2)}</button></div>` + stepNode(st, i)).join('')}
           <div class="fl-conn"><i></i><button class="fl-add" data-addat="${seq.steps.length}">${ic(I.plus, 2.2)}</button></div>
           <div class="fl-node fl-end">
             <div class="fl-body"><div class="fl-title">${ic(I.moon)}<b>Не ответил — в «Спящие»</b></div>
-            <div class="fl-prev">Лид не теряется: его подхватит скоринг реанимации. Ответил на любом шаге — цепочка стоит, ведёт ИИ-квалификатор</div></div>
+            <div class="fl-prev">Дальше — скоринг реанимации. Ответил — ведёт ИИ</div></div>
           </div>
         </div>
       </div>
       <div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.shield)}Как работают цепочки</div>
-          ${[['Одна цепочка на гео', 'Лид получает цепочку своего направления; «Все гео» — запасная'],
-             ['Только до первого ответа', 'Клиент написал → живой диалог квалификатора, рассылка стоит'],
-             ['Переменные в тексте', '{name} · {geo} · {ad} (объявление из атрибуции — «не отвертишься от заявки») · {month} · {slots} · {agency}'],
-             ['Пресеты внизу списка', '«B2C-скрипт 2025» (якорь на объявление, визитка, прожимка 6 касаний) и «Онбординг Facebook-лидгена» — включите свитчем и правьте под себя']]
-            .map(([t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
-        </div>
         <div class="wa-phone">
-          <div class="wa-note">${ic(I.eye)}Как увидит клиент</div>
+          <div class="wa-note">${ic(I.eye)}Превью</div>
           <div class="wa-scrub" id="waScrub"></div>
           <div class="wa-device">
             <div class="wa-top">
@@ -2005,7 +2026,7 @@ PAGES.properties = async (root) => {
     const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
     /* combo: справочник + «своё значение» */
     const combo = (field, options, val, ph) => `<select class="gi-sel" data-cf2="${field}">
-      <option value="">${ph || '—'}</option>
+      <option value="" disabled ${val ? '' : 'selected'}>${ph || '—'}</option>
       ${options.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}
       ${val && !options.includes(val) ? `<option selected>${esc(val)}</option>` : ''}
       <option value="__custom">✏️ Своё значение…</option>
@@ -3005,7 +3026,11 @@ PAGES.brokers = async (root) => {
     </div>`).join('')}
   `, { v: 'mark', hue: '#4F5BD5' })}
   <div class="filters"><span class="muted" style="font-size:12px">${STATE.brokers.length} в команде · распределение: ${{ load: 'по загрузке', roundrobin: 'по очереди', shift: 'по сменам' }[(st.automations || {}).assignMode] || ''} <button class="btn btn-sm" id="brAutoLink" style="margin-left:8px">Настроить</button></span>
-    <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button></div>
+    <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button>
+    ${hint('brokers', 'Как ИИ выбирает брокера', [
+      ['Режим распределения', 'По загрузке, по очереди или по сменам — в «Автоматизациях»'],
+      ['Саммари вместе с лидом', '4 оси с цитатами, источник, история диалога'],
+      ['Авто-задача', '«Позвонить в течение 30 минут» при передаче']])}</div>
   <div class="broker-grid">
     ${STATE.brokers.map(b => {
       const mine = leads.filter(l => l.broker === b.id);
@@ -3061,10 +3086,7 @@ PAGES.brokers = async (root) => {
     }).join('')}
   </div>
   ${auditLog.length ? `<div style="margin-top:16px">${coll('Журнал доступа · безопасность базы', `<div style="font-size:12px;line-height:1.9;padding:6px 2px">${auditLog.slice(0, 40).map(a => `<div><span class="muted">${new Date(a.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <b>${esc(a.who || '—')}</b> — ${esc(a.action)}${a.lead ? ' · ' + esc(a.lead) : ''}</div>`).join('')}</div>`, { open: false, count: auditLog.length, icon: I.shield })}</div>` : ''}
-  <div class="glass card" style="margin-top:16px">
-    <div class="card-title">${ic(I.handover)}Как ИИ выбирает брокера</div>
-    <div class="muted" style="font-size:12.8px;line-height:1.6">Режим распределения настраивается в «Автоматизациях»: по загрузке, по очереди или по сменам. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога — и авто-задачу «позвонить в течение 30 минут». Учётки-логины брокеров добавим следующим этапом.</div>
-  </div>`;
+  `;
   $('#brAutoLink').addEventListener('click', () => go('automations'));
   $('#brAdd').addEventListener('click', async () => {
     const nb = await api.post('/brokers', { name: 'Новый брокер' });
@@ -3538,7 +3560,7 @@ setInterval(async () => {
     setConn(true);
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
-    if (CUR_POP) return; // открыт пикер/дропдаун — DOM под ним не дёргаем (иначе выбор бьёт по мёртвому селекту)
+    if (CUR_POP || document.querySelector('.hint-pop')) return; // открыт пикер/дропдаун/подсказка — DOM под ними не дёргаем
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();

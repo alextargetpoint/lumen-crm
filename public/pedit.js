@@ -22,13 +22,6 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .imghot{display:flex!important;position:absolute;top:10px;right:10px;z-index:6;background:#0B0B0F;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;align-items:center;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.3);user-select:none}
 .imghot:hover{background:#1D34D8}
 .imghot.vhot{top:auto;bottom:14px;right:14px}
-#peload{position:fixed;inset:0;z-index:2000;background:radial-gradient(700px 500px at 50% 40%,#102B5C,#061126 70%);display:grid;place-items:center;opacity:1;transition:opacity .4s}
-#peload.out{opacity:0}
-#peload .pl-box{display:grid;place-items:center;gap:14px}
-#peload svg{width:46px;height:56px;animation:peb 1.6s ease-in-out infinite;filter:drop-shadow(0 0 22px rgba(120,160,255,.7))}
-#peload span{color:#fff;font-weight:650;letter-spacing:.3em;font-size:15px;font-family:Inter,sans-serif}
-#peload i{color:#7C9BFF;font-size:11px;font-style:normal;letter-spacing:.08em;font-family:Inter,sans-serif}
-@keyframes peb{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
 .edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:#0B0B0F;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;font-size:13px;flex-wrap:wrap;font-family:Inter,sans-serif}
 .edbar b{font-weight:800}
 .edbar .hint{opacity:.55;font-size:11.5px}
@@ -71,20 +64,34 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
 `;
   document.head.appendChild(css);
 
-  /* ---------- фирменный лоадер: показываем ПЕРЕД перезагрузкой и сразу после неё ---------- */
-  const peLoader = () => {
-    if (document.querySelector('#peload')) return;
-    const o = document.createElement('div');
-    o.id = 'peload';
-    o.innerHTML = `<div class="pl-box"><svg viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg><span>LUMEN</span><i>собираем страницу…</i></div>`;
-    document.body.appendChild(o);
+  /* ---------- фирменный лоадер ----------
+     Оверлей отрендерен СЕРВЕРОМ первым элементом body (виден с первого кадра,
+     белой вспышки между страницами нет); инлайн-скрипт там же гасит его, если
+     перезагрузка не наша или флаг протух (>15с). Здесь: показ перед reload +
+     плавное снятие с МИНИМАЛЬНЫМ временем показа (не мигает на быстрых загрузках). */
+  const peShow = () => {
+    const o = document.querySelector('#peload');
+    if (o) { o.style.display = 'grid'; o.classList.remove('out'); }
   };
-  const reloadWithLoader = () => { sessionStorage.setItem('pe_loading', '1'); peLoader(); location.reload(); };
-  if (sessionStorage.getItem('pe_loading')) {
+  const reloadWithLoader = () => { sessionStorage.setItem('pe_loading', String(Date.now())); peShow(); setTimeout(() => location.reload(), 60); };
+  (() => {
+    const t0 = +sessionStorage.getItem('pe_loading') || 0;
     sessionStorage.removeItem('pe_loading');
-    peLoader();
-    addEventListener('load', () => setTimeout(() => { const o = document.querySelector('#peload'); if (o) { o.classList.add('out'); setTimeout(() => o.remove(), 450); } }, 250));
-  }
+    const o = document.querySelector('#peload');
+    if (!o) return;
+    if (!t0) { o.style.display = 'none'; return; }
+    const MIN_SHOW = 750;                       /* короче — воспринимается как мигание */
+    const hide = () => {
+      const wait = Math.max(0, MIN_SHOW - (Date.now() - t0));
+      setTimeout(() => {
+        try { sessionStorage.setItem('pe_diag', JSON.stringify({ shownMs: Date.now() - t0, waited: wait })); } catch (e) {}
+        o.classList.add('out'); setTimeout(() => { o.style.display = 'none'; }, 420);
+      }, wait);
+    };
+    if (document.readyState === 'complete') hide();
+    else addEventListener('load', hide);
+    setTimeout(() => { o.classList.add('out'); setTimeout(() => o.style.display = 'none', 420); }, 6000); /* страховка от застревания */
+  })();
 
   /* ---------- состояние ---------- */
   let dirty = false;

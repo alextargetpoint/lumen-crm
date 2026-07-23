@@ -2264,7 +2264,14 @@ body.motion section[data-bid].vis{opacity:1;transform:none}
 @media(max-width:560px){.cover.csplit{flex-direction:column}.cs-r{min-height:220px}.cmp2{grid-template-columns:1fr}.ckl.cols{grid-template-columns:1fr}.tximg{grid-template-columns:1fr}.ggrid.masonry{columns:2}.bn-v{font-size:44px}}
 @media print{body{background:#fff}.book{box-shadow:none;max-width:none}.blue,.rec,.shot.grad,.coverimg.grad,.mgrph,.sepimg,.dmap,.step i,.cshade{-webkit-print-color-adjust:exact;print-color-adjust:exact}.ctabtn{display:none}.uwrap{overflow:visible}}
 @media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.mt b{white-space:normal}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}.bigimg.inset{margin:0}.stats{flex-direction:column}}
-</style></head><body><div class="book">
+${isEdit ? `#peload{position:fixed;inset:0;z-index:2000;background:radial-gradient(700px 500px at 50% 42%,#102B5C,#061126 72%);display:grid;place-items:center;opacity:1;transition:opacity .38s ease}
+#peload.out{opacity:0;pointer-events:none}
+#peload .plx{display:grid;place-items:center;gap:14px}
+#peload svg{width:46px;height:56px;animation:pebr 1.5s ease-in-out infinite;filter:drop-shadow(0 0 22px rgba(120,160,255,.7))}
+#peload b{color:#fff;font-weight:650;letter-spacing:.3em;font-size:15px}
+#peload i{color:#7C9BFF;font-size:11px;font-style:normal;letter-spacing:.08em}
+@keyframes pebr{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}` : ''}
+</style></head><body>${isEdit ? `<div id="peload"><div class="plx"><svg viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg><b>LUMEN</b><i>собираем страницу…</i></div></div><script>(function(){try{var t=+sessionStorage.getItem('pe_loading')||0;if(!t||Date.now()-t>15000){document.getElementById('peload').style.display='none';sessionStorage.removeItem('pe_loading');}}catch(e){}})()</${'script'}>` : ''}<div class="book">
 ${bodyHtml}
 <div class="foot">${esc(AG)} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
 </div>
