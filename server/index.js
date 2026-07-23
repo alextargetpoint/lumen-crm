@@ -407,6 +407,25 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, leadId: lead.id, result: entry.result, adMatched: !!(lead.ads && lead.ads.matched) });
     }
 
+    /* ---------------- логотип агентства ---------------- */
+    if (p === '/api/agency/logo' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const chunks = [];
+      let size = 0;
+      await new Promise((resolve) => {
+        req.on('data', (c) => { size += c.length; if (size > 3e6) req.destroy(); else chunks.push(c); });
+        req.on('end', resolve); req.on('close', resolve);
+      });
+      if (!size || size > 3e6) return json(res, 400, { error: 'файл до 3 МБ (PNG/SVG/JPG)' });
+      const ct = req.headers['content-type'] || '';
+      const ext = ct.includes('svg') ? 'svg' : ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+      const fname = 'agency-logo.' + ext;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      db.settings.agency.logo = '/assets/' + fname + '?v=' + Date.now();
+      store.save();
+      return json(res, 200, { logo: db.settings.agency.logo });
+    }
+
     /* ---------------- телефония: вебхук записей звонков ----------------
        Zadarma/Twilio/Telnyx после звонка шлют сюда JSON с номером клиента и
        ссылкой на запись. Мы находим лида по номеру, скачиваем запись и
@@ -1046,7 +1065,9 @@ const server = http.createServer(async (req, res) => {
       const heroImg = props.map(p2 => (p2.images || [])[0]).find(Boolean);
       const plural = (n) => n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов';
       const nProj = props.length + ' ' + plural(props.length);
-      const star = '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
+      const star = db.settings.agency.logo
+        ? `<img class="star" src="${db.settings.agency.logo}" style="width:auto;max-width:150px;height:44px;object-fit:contain">`
+        : '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
       const projPage = (pr2, idx) => `
 <section class="pg" data-sec="proj" data-prid="${pr2.id}">
   <div class="kicker">Проект №${idx + 1}</div>

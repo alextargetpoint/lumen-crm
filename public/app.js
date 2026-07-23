@@ -378,7 +378,13 @@ function initNav() {
   $$('.nav-item').forEach(btn => {
     const def = NAV[btn.dataset.page];
     btn.innerHTML = `${ic(def.icon)}${def.name}<span class="cnt" data-cnt style="display:none"></span>`;
-    btn.addEventListener('click', () => go(btn.dataset.page));
+    btn.addEventListener('click', () => {
+      /* клик по пункту меню = верхний уровень раздела: сбрасываем «внутренние» состояния */
+      if (btn.dataset.page === 'properties') PAGE_STATE.propView = null;
+      if (btn.dataset.page === 'collections') PAGE_STATE.collLead = '';
+      if (btn.dataset.page === 'sequences') PAGE_STATE.seqEdit = null;
+      go(btn.dataset.page);
+    });
   });
 }
 function go(page) {
@@ -412,23 +418,35 @@ function countUp(root) {
     requestAnimationFrame(tick);
   });
 }
+/* Рендер сериализован: медленная фоновая перерисовка не может перезаписать
+   раздел, на который пользователь уже перешёл (была гонка poll vs клик). */
+let renderBusy = false, renderQueued = false;
 async function render() {
-  const fn = PAGES[CUR];
-  if (!fn) return;
+  if (renderBusy) { renderQueued = true; return; }
+  renderBusy = true;
   try {
-    await fn($('#content'));
-    enhanceControls($('#content'));
-    if ($('#content').classList.contains('anim')) countUp($('#content'));
-  } catch (e) {
-    if (e.message === 'auth') return; // гейт уже показан
-    /* инвариант: раздел никогда не остаётся молча пустым */
-    console.error('[render]', CUR, e);
-    $('#content').innerHTML = `<div class="glass card" style="max-width:520px;margin:60px auto;text-align:center">
-      <div style="font-size:15px;font-weight:650;color:var(--navy-900);margin-bottom:6px">Раздел не загрузился</div>
-      <div class="muted" style="font-size:12.5px;margin-bottom:16px">${esc(e.message || 'ошибка сети')} — данные не потеряны, попробуйте ещё раз</div>
-      <button class="btn btn-accent" onclick="render()" style="margin:0 auto">Повторить</button>
-    </div>`;
-  }
+    do {
+      renderQueued = false;
+      const page = CUR;
+      const fn = PAGES[page];
+      if (!fn) break;
+      try {
+        await fn($('#content'));
+        enhanceControls($('#content'));
+        if ($('#content').classList.contains('anim')) countUp($('#content'));
+      } catch (e) {
+        if (e.message === 'auth') return; // гейт уже показан
+        /* инвариант: раздел никогда не остаётся молча пустым */
+        console.error('[render]', page, e);
+        $('#content').innerHTML = `<div class="glass card" style="max-width:520px;margin:60px auto;text-align:center">
+          <div style="font-size:15px;font-weight:650;color:var(--navy-900);margin-bottom:6px">Раздел не загрузился</div>
+          <div class="muted" style="font-size:12.5px;margin-bottom:16px">${esc(e.message || 'ошибка сети')} — данные не потеряны, попробуйте ещё раз</div>
+          <button class="btn btn-accent" onclick="render()" style="margin:0 auto">Повторить</button>
+        </div>`;
+      }
+      if (CUR !== page) renderQueued = true; // пока рисовали — ушли на другой раздел
+    } while (renderQueued);
+  } finally { renderBusy = false; }
 }
 
 /* ---------- связь с сервером: молча не умираем ---------- */
@@ -1343,6 +1361,255 @@ PAGES.sequences = async (root) => {
   });
 };
 
+/* ---------------- ОБЪЕКТЫ: портальный формат, без попапов ---------------- */
+function propCover(pr, big) {
+  const img = (pr.images || [])[0];
+  if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
+  const hues = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
+  return `<div class="prop-cover ${big ? 'big' : ''}" style="background:${hues[pr.geo] || hues.dubai}">
+    <img src="logo.svg" class="pc-star"><span>${esc(pr.area || pr.name)}</span></div>`;
+}
+
+PAGES.properties = async (root) => {
+  const props = await api.get('/properties');
+  const st = STATE.settings;
+
+  /* -------- детальная страница объекта (inline-редактирование) -------- */
+  if (PAGE_STATE.propView) {
+    const pr = props.find(x => x.id === PAGE_STATE.propView);
+    if (!pr) { PAGE_STATE.propView = null; return PAGES.properties(root); }
+    const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
+    const gi = (field, val, ph, num) => `<input class="gi" data-f="${field}" ${num ? 'type="number"' : ''} value="${esc(val ?? '')}" placeholder="${ph || '—'}">`;
+    const fmt = (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+    root.innerHTML = `
+      <button class="btn btn-ghost" id="prBack" style="margin-bottom:12px">${ic(I.chev)}<span style="transform:scaleX(-1)"></span>← Ко всем объектам</button>
+      ${propCover(pr, true)}
+      <div class="pd-head">
+        <div style="flex:1;min-width:0">
+          <input class="gi gi-title" data-f="name" value="${esc(pr.name)}">
+          <div class="pd-sub">${gi('area', pr.area, 'район')} · ${gi('developer', pr.developer, 'застройщик')}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="pd-price">от <input class="gi gi-price" data-f="priceFrom" type="number" value="${pr.priceFrom}"> ${pr.currency}</div>
+          <div style="display:flex;gap:7px;justify-content:flex-end;margin-top:8px">
+            <select id="pdMarket" style="width:130px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+            <select id="pdGeo" style="width:120px">${st.agency.geos.map(g => `<option value="${g}" ${pr.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+      <div class="pd-facts glass card">
+        ${[['type', 'Формат', pr.type], ['handover', 'Сдача', pr.handover], ['payment', 'План оплаты', pr.payment], ['tagsStr', 'Теги (через запятую)', (pr.tags || []).join(', ')]]
+          .map(([f, k, v]) => `<div class="pd-fact"><label class="lc-lbl">${k}</label>${gi(f, v)}</div>`).join('')}
+        <div class="pd-fact" style="grid-column:1/-1"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="width:100%;min-height:90px">${esc(pr.description || '')}</textarea></div>
+        <div class="pd-fact" style="grid-column:1/-2"><label class="lc-lbl">Удобства (через запятую)</label><input class="gi" data-f="amenitiesStr" style="width:100%" value="${esc((pr.amenities || []).join(', '))}" placeholder="Бассейн, Фитнес, Паркинг…"></div>
+        <div class="pd-fact"><label class="lc-lbl">Заметка (короткая)</label><input class="gi" data-f="note" style="width:100%" value="${esc(pr.note || '')}"></div>
+      </div>
+      <div class="glass card" style="margin-top:16px">
+        <div class="card-title">${ic(I.layers)}Для подборки — уровень эталона<span class="sub">крючок, метрики, район, рассрочка, аргументы</span></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px">
+          <div class="pd-fact"><label class="lc-lbl">Заголовок-крючок (вместо названия ЖК)</label><input class="gi" data-f="hookTitle" style="width:100%" value="${esc(pr.hookTitle || '')}" placeholder="Комплекс с инфраструктурой… в 20 минутах от Business Bay"></div>
+          <div class="pd-fact"><label class="lc-lbl">Доходность</label><input class="gi" data-f="roi" style="width:100%" value="${esc(pr.roi || '')}" placeholder="от 7% годовых"></div>
+          <div class="pd-fact"><label class="lc-lbl">Прирост стоимости</label><input class="gi" data-f="appreciation" style="width:100%" value="${esc(pr.appreciation || '')}" placeholder="от 25% к сдаче"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+          <div class="pd-fact"><label class="lc-lbl">Район: название</label><input class="gi" data-f="districtName" style="width:100%" value="${esc((pr.district || {}).name || '')}" placeholder="JVC"></div>
+          <div class="pd-fact"><label class="lc-lbl">Тайминги (строка = «мин | место»)</label><textarea class="gi" data-f="districtTimes" style="width:100%;min-height:64px" placeholder="16 | Expo City">${esc(((pr.district || {}).times || []).map(t => t.min + ' | ' + t.place).join('\n'))}</textarea></div>
+        </div>
+        <div class="pd-fact"><label class="lc-lbl">Район: описание</label><textarea class="gi" data-f="districtBlurb" style="width:100%">${esc((pr.district || {}).blurb || '')}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+          <div class="pd-fact"><label class="lc-lbl">Рассрочка (строка = «20% | Первоначальный взнос»)</label><textarea class="gi" data-f="paymentRowsStr" style="width:100%;min-height:70px">${esc((pr.paymentRows || []).map(r2 => r2.pct + ' | ' + r2.label).join('\n'))}</textarea></div>
+          <div class="pd-fact"><label class="lc-lbl">«Рекомендуем для аренды» (3 аргумента по строкам)</label><textarea class="gi" data-f="whyRentStr" style="width:100%;min-height:70px">${esc((pr.whyRent || []).join('\n'))}</textarea></div>
+        </div>
+      </div>
+      <div class="glass card" style="margin-top:16px">
+        <div class="card-title">${ic(I.grid)}Юниты<span class="sub">попадают таблицей в подборку и PDF</span></div>
+        <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
+          ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
+        </tbody></table>
+        <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
+          <input id="uPlan" placeholder="1BR" style="width:80px;flex:0 0 80px"><input id="uArea" placeholder="68 м²" style="width:80px;flex:0 0 80px">
+          <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
+          <input id="uPrice" type="number" placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
+        </div>
+      </div>
+      <div class="two-col" style="margin-top:16px">
+        <div>
+          <div class="glass card mb">
+            <div class="card-title">${ic(I.eye)}Фото и интерьеры<span class="sub">первое — обложка</span></div>
+            <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки (портал/облако агентства)</div>'}</div>
+            <div class="lc-note-row" style="margin-top:10px"><input id="pdImgUrl" placeholder="https://…jpg"><button class="btn btn-sm" id="pdImgAdd">${ic(I.plus)}</button></div>
+          </div>
+          <div class="glass card">
+            <div class="card-title">${ic(I.grid)}Планировки</div>
+            ${(pr.layouts || []).map((l2, ix) => `<div class="lc-contact"><span class="badge acc">${esc(l2.label)}</span><a class="lc-cv link" href="${esc(l2.url)}" target="_blank">${esc(l2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-laydel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Планировок нет</div>'}
+            <div class="lc-note-row" style="margin-top:8px"><input id="pdLayLabel" placeholder="1BR тип A" style="width:120px;flex:0 0 120px"><input id="pdLayUrl" placeholder="https://…pdf"><button class="btn btn-sm" id="pdLayAdd">${ic(I.plus)}</button></div>
+          </div>
+        </div>
+        <div>
+          <div class="glass card mb">
+            <div class="card-title">${ic(I.doc)}Документы и материалы<span class="sub">попадают в подборки</span></div>
+            ${(pr.materials || []).map((m2, ix) => `<div class="lc-contact"><span class="badge">${esc(m2.label)}</span><a class="lc-cv link" href="${esc(m2.url)}" target="_blank">${esc(m2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-matdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Брошюры, прайсы, видео — ссылками</div>'}
+            <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:120px;flex:0 0 120px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
+          </div>
+          <div class="glass card">
+            <div class="card-title">${ic(I.layers)}Действия</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
+              <span class="tb-spacer"></span>
+              <button class="btn btn-danger" id="pdDel">Удалить объект</button>
+            </div>
+            <div class="muted" style="font-size:11.5px;margin-top:10px">Все правки сохраняются сами по мере ввода — без кнопки «Сохранить».</div>
+          </div>
+        </div>
+      </div>`;
+    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; render(); });
+    $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
+      const f = inp.dataset.f;
+      if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'amenitiesStr') await upd({ amenities: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'districtName' || f === 'districtBlurb' || f === 'districtTimes') {
+        const box = inp.closest('.glass');
+        const times = (box.querySelector('[data-f="districtTimes"]').value || '').split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([mn, pl]) => ({ min: parseInt(mn) || 0, place: pl.trim() }));
+        await upd({ district: { name: box.querySelector('[data-f="districtName"]').value, blurb: box.querySelector('[data-f="districtBlurb"]').value, times } });
+      }
+      else if (f === 'paymentRowsStr') await upd({ paymentRows: inp.value.split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([p2, l2]) => ({ pct: p2.trim(), label: l2.trim() })) });
+      else if (f === 'whyRentStr') await upd({ whyRent: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
+      else await upd({ [f]: inp.value });
+    }));
+    $('#pdMarket').addEventListener('change', (e) => upd({ market: e.target.value }));
+    $('#pdGeo').addEventListener('change', (e) => upd({ geo: e.target.value }));
+    $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
+    $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
+    $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
+    $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
+    $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
+    $('#uAdd').addEventListener('click', async () => {
+      await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: +$('#uPrice').value }] });
+      render();
+    });
+    $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
+    $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdDel').addEventListener('click', () => modal({
+      title: 'Удалить объект?', sub: pr.name,
+      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); PAGE_STATE.propView = null; render(); } }, { label: 'Отмена' }],
+    }));
+    return;
+  }
+
+  /* -------- список: богатые карточки -------- */
+  const geoF = PAGE_STATE.propGeo || '';
+  const marketF = PAGE_STATE.propMarket || '';
+  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF));
+  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+  root.innerHTML = `
+    <div class="filters">
+      <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+      <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+      <span class="muted" style="font-size:12px">${list.length} объектов</span>
+      <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
+    </div>
+    <div class="prop-grid">
+      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}">
+        ${propCover(pr)}
+        <div class="prop-body">
+          <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
+            <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
+            <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
+          <div class="prop-price">от ${fmt(pr)}</div>
+          <div class="prop-meta"><span>${esc(pr.type)}</span><span>${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
+          <div class="prop-foot">
+            ${(pr.tags || []).slice(0, 3).map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}
+            <span class="tb-spacer"></span>
+            <span class="muted" style="font-size:10.5px">${(pr.images || []).length ? (pr.images.length + ' фото · ') : ''}${(pr.layouts || []).length ? (pr.layouts.length + ' план. · ') : ''}${(pr.materials || []).length ? pr.materials.length + ' док.' : ''}</span>
+          </div>
+        </div>
+      </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
+    </div>
+    <div style="margin-top:16px">${coll('Источники данных · рынок Дубая', `
+      <div class="muted" style="font-size:11.8px;margin:8px 0 12px">Слоты под API порталов первички и вторички. Вставьте ключ — статус обновится; синк листингов включается после проверки ключа.</div>
+      ${Object.entries(st.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
+        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
+        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
+      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
+  $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
+  $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
+  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.propView = c.dataset.pr; render(); }));
+  $('#prAdd').addEventListener('click', async () => {
+    const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
+    PAGE_STATE.propView = pr.id;
+    render();
+  });
+  $('#portalSave')?.addEventListener('click', async () => {
+    const body = {};
+    $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
+    await api.patch('/portals', body);
+    toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
+    await loadState(); render();
+  });
+};
+
+/* ---------------- ПОДБОРКИ ---------------- */
+PAGES.collections = async (root) => {
+  const [cols, props, leads] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads')]);
+  const active = leads.filter(l => !['lost'].includes(l.stage));
+  const selLead = PAGE_STATE.collLead || '';
+  let suggest = [];
+  if (selLead) { try { suggest = await api.get(`/leads/${selLead}/suggest-properties`); } catch (e) {} }
+  const ordered = selLead && suggest.length ? suggest : props;
+  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+  root.innerHTML = `
+    <div class="two-col">
+      <div class="glass card">
+        <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
+        <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
+        <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
+        <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
+        <div class="cl-props">
+          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
+            <span class="cl-chk"></span>
+            <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
+            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>`).join('')}
+        </div>
+        <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
+      </div>
+      <div>
+        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}">
+          <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
+          <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
+          ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
+          <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
+            <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
+            <a class="btn btn-sm" href="/p/${c.id}" target="_blank">${ic(I.eye)}Открыть</a>
+            <button class="btn btn-sm" data-act="copy">${ic(I.copy)}Ссылка</button>
+            <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank">${ic(I.doc)}PDF</a>
+            ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат лиду</button>` : ''}
+            <span class="tb-spacer"></span>
+            <button class="btn-ghost" data-act="del">${ic(I.x)}</button>
+          </div>
+        </div>`).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
+      </div>
+    </div>`;
+  $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
+  $('#clCreate').addEventListener('click', async () => {
+    const ids = $$('.cl-prop input:checked', root).map(x => x.value);
+    if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
+    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids });
+    render();
+  });
+  $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]');
+    if (!act) return;
+    const id = card.dataset.cl;
+    if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
+    if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
+    if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
+  }));
+};
+
+
 /* ---------------- РЕАНИМАЦИЯ ---------------- */
 PAGES.wake = async (root) => {
   const [preview, campaigns] = await Promise.all([api.get('/wake/preview'), api.get('/campaigns')]);
@@ -1853,6 +2120,21 @@ PAGES.settings = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.building)}Агентство<span class="sub">бренд на подборках, PDF и в системе</span></div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div class="ag-logo" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.4">`}</div>
+            <div style="flex:1">
+              <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
+                <input type="file" id="agLogoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none">
+                <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
+              </div>
+              <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
+            </div>
+          </div>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.phone)}Телефония<span class="sub">звонки → авто-транскрибация в карточку</span></div>
           <div class="set-row"><div class="sp"><div class="sl">Провайдер</div><div class="sd">Zadarma — дешевле всего для старта (номер ОАЭ + записи + API); Twilio/Telnyx — глобальные</div></div>
             <select id="telProv" style="width:150px">
@@ -1937,6 +2219,20 @@ PAGES.settings = async (root) => {
     const j = await r.json();
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
     else toast('Не получилось', j.error || 'ошибка');
+  });
+  $('#agLogoBtn').addEventListener('click', () => $('#agLogoFile').click());
+  $('#agLogoFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = await fetch('/api/agency/logo', { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
+    const j = await r.json();
+    if (r.ok) { $('#agLogoPrev').innerHTML = `<img src="${j.logo}">`; toast('Логотип загружен', 'Уже на обложках подборок', true); loadState(); }
+    else toast('Не загрузился', j.error);
+  });
+  $('#agSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
+    toast('Сохранено', null, true);
+    await loadState();
   });
   $('#telSave').addEventListener('click', async () => {
     const t = { provider: $('#telProv').value };
