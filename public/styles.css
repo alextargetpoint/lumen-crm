@@ -659,6 +659,50 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .lc-meet b { color: var(--navy-900); }
 @media (max-width: 1000px) { .lc-grid { grid-template-columns: 1fr; } }
 
+/* ---------- карточка v2: мини-воронка, подсказка, ИИ-блок ---------- */
+.lc-funnel { display: flex; gap: 4px; margin-bottom: 14px; }
+.lcf-step { flex: 1; min-width: 0; text-align: center; }
+.lcf-step i { display: block; height: 5px; border-radius: 4px; background: var(--bg-2); margin-bottom: 5px; }
+.lcf-step.done i { background: var(--blue-300); }
+.lcf-step.cur i { background: var(--accent); box-shadow: 0 0 0 2px var(--blue-100); }
+.lcf-step.warn.cur i { background: #E4B33D; }
+.lcf-step.bad.cur i { background: var(--bad); }
+.lcf-step span { font-size: 9px; font-weight: 600; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.lcf-step.cur span { color: var(--navy-900); }
+.lc-hint { display: flex; gap: 9px; align-items: center; font-size: 12.5px; font-weight: 550; border-radius: var(--r-md); padding: 10px 13px; margin-bottom: 12px; }
+.lc-hint svg { width: 15px; height: 15px; flex: 0 0 15px; }
+.lc-hint.act { background: var(--blue-100); color: var(--navy-700); border: 1px solid #C3D6FA; }
+.lc-hint.act svg { color: var(--accent); }
+.lc-hint.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBD9B0; }
+.lc-hint.info { background: var(--bg); color: var(--ink-2); border: 1px solid var(--stroke-soft); }
+.lc-hint.info svg { color: var(--accent-2); }
+.lc-ai { border: 1px solid var(--stroke); border-radius: var(--r-md); padding: 12px 14px; background: var(--bg); }
+.lc-ai.on { background: linear-gradient(150deg, var(--blue-100), #EDF3FE); border-color: #C3D6FA; }
+.lc-ai-head { display: flex; gap: 8px; align-items: center; }
+.lc-ai-head svg { width: 15px; height: 15px; color: var(--accent); }
+.lc-ai-head b { font-size: 13px; color: var(--navy-900); flex: 1; }
+.lc-ai-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; line-height: 1.45; }
+.lc-3sel { display: grid; gap: 9px; margin-top: 12px; }
+.lc-lbl { display: block; font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.lc-meet-acts { margin-left: 8px; display: inline-flex; gap: 5px; }
+.lc-meet-acts .btn { padding: 3px 8px; font-size: 10.5px; }
+
+/* ---------- мобильные фиксы (аудит 390px) ---------- */
+@media (max-width: 860px) {
+  .glass.card, .cmp-card { overflow-x: auto; }
+  code.pill { white-space: normal; word-break: break-all; }
+  .chat-head .badge { display: none; }
+  .num-grid, .broker-grid { grid-template-columns: 1fr; }
+  .gsearch { display: none; }
+  table.tbl { min-width: 420px; }
+  .coll-inner .glass { flex-wrap: wrap; }
+  .cmp-stats { gap: 14px; }
+  .lc-note-row { flex-wrap: wrap; }
+  .vs { grid-template-columns: 1fr; }
+  .modal { padding: 18px; }
+  .set-row { flex-wrap: wrap; }
+}
+
 /* ---------- эмблема раздела ---------- */
 .page-emblem {
   width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; flex: 0 0 40px;

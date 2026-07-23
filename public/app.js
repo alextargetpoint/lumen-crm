@@ -470,8 +470,8 @@ PAGES.overview = async (root) => {
   const [an, events, leads] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads')]);
   const f = an.funnel;
   const inDialog = f.dialog + f.touch;
-  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy }[t] || I.bolt);
-  const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn' }[t] || '');
+  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user }[t] || I.bolt);
+  const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
 
   root.innerHTML = `
     <div class="kpis">
@@ -544,6 +544,7 @@ PAGES.funnel = async (root) => {
                 ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ ведёт</span>' : ''}
                 ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
                 ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
+                ${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? '<span class="mini-badge warn">просрочен шаг</span>' : ''}
                 <span class="tm">${ago(l.lastMsgAt || l.createdAt)}</span>
               </div>
             </div>`).join('') || '<div class="empty" style="padding:14px;font-size:11.5px">пусто</div>'}
@@ -738,15 +739,16 @@ async function openLeadModal(id) {
     return '';
   };
 
+  const FUNNEL_STEPS = ['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'];
+  const stepIdx = FUNNEL_STEPS.indexOf(l.stage);
   const bd = modal({
     title: l.name,
     sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
     wide: 'card',
     body: `
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-        <span class="badge acc">${stageName(l.stage)}</span>
-        ${l.ai.enabled ? '<span class="badge violet">ИИ ведёт диалог</span>' : ''}
-        ${l.brokerName ? `<span class="badge ok">брокер: ${esc(l.brokerName)}</span>` : ''}
+      <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
+      ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
         ${(l.tags || []).map(t => `<span class="badge">${esc(t)}</span>`).join('')}
       </div>
       <div class="lc-grid">
@@ -764,12 +766,27 @@ async function openLeadModal(id) {
           <div class="lc-timeline" id="lcTimeline">${timeline.map(tlItem).join('') || '<div class="empty">Хронология пуста</div>'}</div>
         </div>
         <div class="lc-right">
-          <div class="lp-sec" style="margin-top:0">Стадия</div>
-          <select id="mStage" style="width:100%">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select>
+          <div class="lc-ai ${l.ai.enabled ? 'on' : ''}">
+            <div class="lc-ai-head">${ic(I.spark)}<b>ИИ-помощник</b>
+              <label class="switch" title="Автопилот"><input type="checkbox" id="lcAi" ${l.ai.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+            <div class="lc-ai-sub">${l.ai.enabled ? 'Ведёт диалог сам. Напишете вручную — встанет на паузу.' : (l.tags || []).includes('нужен человек') ? 'Отключился сам: клиент попросил человека.' : 'На паузе — лид на менеджере.'}</div>
+            <button class="btn btn-sm" id="lcSumBtn" style="margin-top:9px">${ic(I.doc)}Сводка ИИ по лиду</button>
+          </div>
+          <div class="lc-3sel">
+            <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
+            <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
+            <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+          </div>
+          <div class="lp-sec">Следующий шаг</div>
+          <div class="lc-note-row">
+            <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
+            <input id="lcNaDate" type="date" value="${l.nextAction && l.nextAction.at ? (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(l.nextAction.at)) : ''}" style="width:150px;flex:0 0 150px">
+            <button class="btn btn-sm" id="lcNaSave">${ic(I.check)}</button>
+          </div>
           ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
           <div class="axr-list">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}"><span class="axr-k">${axName[a]}</span><span class="axr-v">${q ? esc(q.value) : '—'}</span>${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}</div>`; }).join('')}</div>
-          ${l.summary ? `<div class="lp-sec">Саммари</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
+          ${l.summary ? `<div class="lp-sec">Сводка${l.summaryAt ? ` <span style="text-transform:none;letter-spacing:0">· ${ago(l.summaryAt)}</span>` : ''}</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
           <div class="lp-sec">Контакты</div>
           <div id="lcContacts">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
           <div class="lc-note-row" style="margin-top:7px">
@@ -778,7 +795,8 @@ async function openLeadModal(id) {
             <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
           </div>
           <div class="lp-sec">Встречи</div>
-          ${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}
+          ${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
+            ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}
         </div>
       </div>`,
     actions: [
@@ -790,6 +808,25 @@ async function openLeadModal(id) {
 
   $('#lcPhone', bd).addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
+  $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
+  $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
+  $('#lcAi', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { ai: { enabled: e.target.checked } }); openLeadModal(id); });
+  $('#lcSumBtn', bd).addEventListener('click', async () => {
+    const b = $('#lcSumBtn', bd);
+    b.disabled = true; b.textContent = 'Собираю сводку…';
+    await api.post(`/leads/${id}/summary`);
+    openLeadModal(id);
+  });
+  $('#lcNaSave', bd).addEventListener('click', async () => {
+    const dt = $('#lcNaDate', bd).value;
+    await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });
+    openLeadModal(id);
+  });
+  $$('[data-mtst]', bd).forEach(b => b.addEventListener('click', async () => {
+    const [mid, st] = b.dataset.mtst.split('|');
+    await api.patch('/meetings/' + mid, { status: st });
+    openLeadModal(id);
+  }));
   const addNote = async () => {
     const t = $('#lcNote', bd).value.trim();
     if (!t) return;
@@ -910,6 +947,7 @@ async function renderChat(id, rebuild) {
     </div>
     ${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
     <div style="margin:14px 0 10px">${primary}</div>
+    ${l.hint ? `<div class="lc-hint ${l.hint.kind}" style="margin-bottom:10px">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
     <div class="lp-quick">
       <a class="btn btn-sm" href="https://wa.me/${l.phone.replace(/\D/g, '')}" target="_blank" title="Открыть в WhatsApp">${ic(I.chat)}WA</a>
       ${!['handover', 'viewing', 'deal'].includes(l.stage) ? `<button class="btn btn-sm" id="meetBtn" title="Назначить встречу">${ic(I.cal)}</button>` : ''}
@@ -961,6 +999,12 @@ PAGES.qualifier = async (root) => {
             <div class="sp"><div class="sl">Стоп-слова (opt-out)</div><div class="sd">Любое из слов в сообщении клиента мгновенно отключает ИИ и закрывает лида</div></div>
           </div>
           <input id="stopWords" style="width:100%" value="${esc((s.stopWords || []).join(', '))}">
+          <div class="lp-sec" style="margin-top:18px">Когда ИИ отключается сам</div>
+          ${[['onHumanReply', 'Менеджер написал вручную', 'Перехват: ваш ответ в диалоге ставит автопилот на паузу — ИИ не влезет поверх'],
+             ['onHumanRequest', 'Клиент просит человека', '«Позовите менеджера», «перезвоните» — ИИ уходит, лид помечается «нужен человек»'],
+             ['onEscalation', 'Эскалация', 'Юрист, претензия, возврат денег — только живой менеджер']]
+            .map(([k, t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div>
+            <label class="switch"><input type="checkbox" data-aoff="${k}" ${(s.ai.autoOff || {})[k] ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>`).join('')}
         </div>
         <div class="glass card">
           <div class="card-title">${ic(I.shield)}Как ИИ ведёт диалог</div>
@@ -986,6 +1030,12 @@ PAGES.qualifier = async (root) => {
       </div>
     </div>`;
   $('#autopilot').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { autopilot: e.target.checked } }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', null, true); loadState(); });
+  $$('[data-aoff]', root).forEach(sw => sw.addEventListener('change', async () => {
+    const autoOff = {};
+    $$('[data-aoff]', root).forEach(x => autoOff[x.dataset.aoff] = x.checked);
+    await api.patch('/settings', { ai: { autoOff } });
+    loadState();
+  }));
   $('#saveCrit').addEventListener('click', async () => {
     const criteria = {};
     $$('[data-crit]', root).forEach(inp => {

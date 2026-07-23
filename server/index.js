@@ -52,6 +52,8 @@ const DEFAULT_PASS = 'lumen2026';
   ];
   if (!db.intakeLog) db.intakeLog = [];
   for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
+  /* правила авто-отключения ИИ (перехват человеком) */
+  if (!db.settings.ai.autoOff) db.settings.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
   store.save();
 }
 
@@ -112,17 +114,34 @@ const readBody = (req) => new Promise((resolve) => {
   req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
 });
 
+/* подсказка «что делать дальше» — считается по фактам карточки */
+function leadHint(db, l, axesFilled) {
+  const now = Date.now();
+  if (l.nextAction && l.nextAction.at && l.nextAction.at < now) return { kind: 'warn', text: `Просрочен следующий шаг: ${l.nextAction.text}` };
+  if ((l.tags || []).includes('нужен человек')) return { kind: 'warn', text: 'ИИ отключился: клиент ждёт живого менеджера — ответьте вручную' };
+  const noShow = (db.meetings || []).find(mt => mt.leadId === l.id && mt.status === 'no_show');
+  if (noShow && !['deal', 'lost'].includes(l.stage)) return { kind: 'warn', text: 'Не пришёл на встречу — предложите новый слот, лид ещё тёплый' };
+  if (l.stage === 'qualified') return { kind: 'act', text: 'Все 4 оси закрыты — передайте брокеру, пока лид горячий' };
+  if (['handover', 'viewing'].includes(l.stage) && !(db.meetings || []).some(mt => mt.leadId === l.id && mt.status === 'scheduled')) return { kind: 'act', text: 'Встреча не назначена — предложите слот' };
+  if (l.stage === 'dialog' && axesFilled < 4) return { kind: 'info', text: `ИИ выясняет оси: осталось ${4 - axesFilled} из 4` };
+  if (['new', 'touch'].includes(l.stage) && l.ai.nextTouchAt) return { kind: 'info', text: `Молчит — цепочка коснётся ${new Date(l.ai.nextTouchAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` };
+  if (l.stage === 'sleeping') return { kind: 'info', text: `Спит · скоринг реанимации ${engine.wakeScore(db, l)} — кандидат в кампанию` };
+  return null;
+}
+
 function leadView(db, l) {
   let lastText = null;
   for (let i = db.messages.length - 1; i >= 0; i--) {
     if (db.messages[i].leadId === l.id) { lastText = db.messages[i].text; break; }
   }
+  const axesFilled = ai.AXES.filter(a => l.quals[a]).length;
   return Object.assign({}, l, {
     brokerName: (db.brokers.find(b => b.id === l.broker) || {}).name || null,
     geoName: db.settings.geoNames[l.geo] || l.geo,
-    axesFilled: ai.AXES.filter(a => l.quals[a]).length,
+    axesFilled,
     wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
     lastText,
+    hint: leadHint(db, l, axesFilled),
   });
 }
 
@@ -331,12 +350,28 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PATCH') {
         const b = await readBody(req);
         if (b.stage) lead.stage = b.stage;
-        if (b.broker !== undefined) lead.broker = b.broker;
-        if (b.ai) Object.assign(lead.ai, b.ai);
+        if (b.broker !== undefined) lead.broker = b.broker || null;
+        if (b.geo) lead.geo = b.geo;
+        if (b.ai) {
+          if (b.ai.enabled === true) lead.tags = (lead.tags || []).filter(t => t !== 'нужен человек');
+          Object.assign(lead.ai, b.ai);
+        }
         if (b.name) lead.name = b.name;
+        if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
         store.save();
         return json(res, 200, leadView(db, lead));
       }
+    }
+
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/summary$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      let text = null;
+      if (llm.available()) { try { text = await llm.summarize(db, lead); } catch (e) { console.error('[summary]', e.message); } }
+      lead.summary = text || ai.buildSummary(db, lead);
+      lead.summaryAt = Date.now();
+      store.save();
+      return json(res, 200, { summary: lead.summary, summaryAt: lead.summaryAt, viaLlm: !!text });
     }
 
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/(note|contacts)$/)) && req.method === 'POST') {
@@ -359,7 +394,14 @@ const server = http.createServer(async (req, res) => {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
-      if (m[2] === 'message') { engine.send(db, lead, b.text || '', 'human'); lead.ai.enabled = b.keepAi !== false ? lead.ai.enabled : false; }
+      if (m[2] === 'message') {
+        engine.send(db, lead, b.text || '', 'human');
+        /* менеджер подхватил — ИИ на паузу (правило autoOff.onHumanReply) */
+        if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) {
+          lead.ai.enabled = false;
+          ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `${lead.name}: менеджер подхватил диалог — автопилот на паузе` });
+        }
+      }
       if (m[2] === 'inbound') engine.inbound(db, lead, b.text || '', { simulated: true });
       if (m[2] === 'handover') engine.handover(db, lead, b.brokerId);
       if (m[2] === 'analyze') { ai.screen(db, lead); if (lead.stage === 'qualified') lead.summary = ai.buildSummary(db, lead); }

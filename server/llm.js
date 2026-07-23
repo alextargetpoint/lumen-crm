@@ -117,4 +117,26 @@ async function reply(db, lead) {
   return { text: out.reply.trim().slice(0, 600), axes: clampAxes(db, lead, out.axes) };
 }
 
-module.exports = { available, reply, MODEL };
+/* ИИ-сводка по лиду: вся хронология → 3-5 предложений для брокера */
+async function summarize(db, lead) {
+  const history = db.messages
+    .filter(m => m.leadId === lead.id)
+    .slice(-30)
+    .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'МЫ: ') + m.text)
+    .join('\n');
+  const notes = (lead.notes || []).slice(0, 5).map(n => '· ' + n.text).join('\n');
+  const q = lead.quals;
+  const prompt = `Ты — ассистент CRM агентства недвижимости. Составь сводку по лиду для брокера (3-5 коротких предложений, по-деловому, без воды): кто клиент, что хочет (цель/бюджет/тип/срок), ключевые договорённости и возражения, каким должен быть следующий шаг.
+
+Данные: имя ${lead.name}, направление ${db.settings.geoNames[lead.geo] || lead.geo}, стадия ${lead.stage}.
+Оси: ${['purpose', 'timeline', 'budget', 'type'].map(a => q[a] ? q[a].value : '—').join(' / ')}
+Комментарии команды:\n${notes || '—'}
+ПЕРЕПИСКА:\n${history || '—'}
+
+Ответь строго JSON: {"summary": "текст сводки"}`;
+  const out = await callGemini(prompt, 10000);
+  if (!out || typeof out.summary !== 'string' || !out.summary.trim()) throw new Error('bad summary');
+  return out.summary.trim().slice(0, 900);
+}
+
+module.exports = { available, reply, summarize, MODEL };

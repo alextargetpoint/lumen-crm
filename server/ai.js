@@ -114,8 +114,30 @@ function buildSummary(db, lead) {
   return `${g}. ${parts.join(', ') || 'квалификация не завершена'}. Сообщений от клиента: ${inbound}. Источник: ${lead.source}.`;
 }
 
+/* ---------- авто-отключение ИИ: клиенту нужен человек ---------- */
+const RE_HUMAN = /менеджер|оператор|живо(й|го) человек|с человеком|соедини|позовите|перезвон|позвоните мне/i;
+const RE_ESCALATION = /юрист|адвокат|жалоб|претензи|верн(и|ите|уть) деньги|расторж|обман|мошен/i;
+
+function autoOffCheck(db, lead, text) {
+  const rules = db.settings.ai.autoOff || {};
+  if (!lead.ai.enabled) return null;
+  if (rules.onHumanRequest && RE_HUMAN.test(text)) return 'клиент попросил человека';
+  if (rules.onEscalation && RE_ESCALATION.test(text)) return 'эскалация (юр./претензия)';
+  return null;
+}
+
 /* ---------- обработка входящего сообщения ---------- */
 function onInbound(db, lead, text) {
+  const offReason = autoOffCheck(db, lead, text);
+  if (offReason) {
+    lead.ai.enabled = false;
+    lead.tags = [...new Set([...(lead.tags || []), 'нужен человек'])];
+    lead.lastMsgAt = Date.now();
+    lead.lastDir = 'in';
+    screen(db, lead);
+    pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `${lead.name}: ИИ отключился сам — ${offReason}. Лид ждёт менеджера` });
+    return { reply: null };
+  }
   if (hasStopWord(db, text)) {
     lead.ai.enabled = false;
     lead.stage = 'lost';
