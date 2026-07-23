@@ -104,9 +104,12 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
   const bar = document.createElement('div');
   bar.className = 'edbar';
   bar.innerHTML = `<b>Конструктор подборки</b>
-    <span class="hint">клик по тексту — правка · 🖼 — картинка · пустой пункт списка удалится при сохранении</span>
+    <span class="hint">клик по тексту — правка · правый клик — меню блока и пунктов</span>
     <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
     <span class="sp"></span>
+    <button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button>
+    <button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button>
+    <button class="edbtn g" id="peVers">Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button>
     ${P.llm ? '<button class="edbtn ai" id="peCompose">✦ Собрать тексты ИИ</button>' : ''}
     <button class="edbtn g" id="peView">Просмотр</button>
     <button class="edbtn" id="peSave">Сохранить</button>`;
@@ -172,6 +175,9 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
       });
       /* видео */
       if (b.t === 'video') b.data.url = sec.dataset.vurl || '';
+      /* своя ссылка CTA-кнопки (пусто = дефолтный WhatsApp менеджера) */
+      const cbtn = sec.querySelector('.ctabtn');
+      if (cbtn && (cbtn.dataset.chref || '').trim()) b.data.href = cbtn.dataset.chref.trim();
       /* чистка списков: пустые текстовые пункты и объекты-пустышки выпадают */
       for (const k of ['bullets', 'whyRent']) if (Array.isArray(b.data[k])) b.data[k] = b.data[k].filter((x) => x && String(x).trim());
       if (Array.isArray(b.data.items)) b.data.items = b.data.items.filter((x) => x && Object.values(x).some((v) => String(v || '').trim()));
@@ -196,6 +202,69 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
   $('#peSave').addEventListener('click', () => save(false));
   $('#peView').addEventListener('click', async () => { if (!dirty || await save(false)) location.href = `/p/${P.cid}`; });
   addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
+
+  /* ---------- undo / redo (серверная история: переживает перезагрузки) ---------- */
+  async function histStep(op) {
+    /* несохранённые правки сначала фиксируем — тогда одна отмена возвращает как было */
+    if (dirty && op === 'undo') { if (!await save(false)) return; }
+    flash(op === 'undo' ? 'Отменяю…' : 'Повторяю…', 0);
+    const r = await fetch(`/p/${P.cid}/${op}?key=${encodeURIComponent(KEY)}`, { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { flash(j.error || 'Ошибка'); return; }
+    dirty = false;
+    sessionStorage.setItem('pe_scroll', String(scrollY));
+    reloadWithLoader();
+  }
+  $('#peUndo').addEventListener('click', () => histStep('undo'));
+  $('#peRedo').addEventListener('click', () => histStep('redo'));
+  addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    const inText = document.activeElement && (document.activeElement.isContentEditable || /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName));
+    if (e.key.toLowerCase() === 's') { e.preventDefault(); save(false); return; }
+    if (e.key.toLowerCase() === 'z' && !inText) { e.preventDefault(); histStep(e.shiftKey ? 'redo' : 'undo'); }
+  });
+
+  /* ---------- именованные версии ---------- */
+  $('#peVers').addEventListener('click', (e) => {
+    const vs = P.versions || [];
+    const list = vs.length
+      ? vs.slice().reverse().map((v) => `<div class="pi" data-vap="${v.id}"><i>⎘</i><span style="flex:1">${v.name}<br><small style="opacity:.55;font-weight:500">${new Date(v.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></span><i data-vdel="${v.id}" title="Удалить версию" style="opacity:.45">✕</i></div>`).join('')
+      : '<div class="psec" style="padding-bottom:8px">Сохранённых версий нет</div>';
+    const el = openPop(`<div class="psec">Версии подборки</div>${list}
+      <div class="psec">Сохранить текущую как</div>
+      <input type="text" id="peVName" placeholder="например: вариант для Дубая">
+      <div class="prow"><button class="edbtn" id="peVSave" style="flex:1">Сохранить версию</button></div>`, e.clientX, Math.min(e.clientY + 10, innerHeight - 200));
+    $('#peVSave', el).addEventListener('click', async () => {
+      const name = $('#peVName', el).value.trim();
+      closePop();
+      flash('Сохраняю версию…', 0);
+      if (dirty) await save(false);
+      const r = await fetch(`/p/${P.cid}/version?key=${encodeURIComponent(KEY)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'save', name }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { P.versions = j.versions; $('#peVers').textContent = 'Версии · ' + j.versions.length; flash('Версия сохранена ✓'); }
+      else flash(j.error || 'Ошибка');
+    });
+    el.addEventListener('click', async (e2) => {
+      const del = e2.target.closest('[data-vdel]');
+      if (del) {
+        e2.stopPropagation();
+        const r = await fetch(`/p/${P.cid}/version?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'del', vid: del.dataset.vdel }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok) { P.versions = j.versions; closePop(); flash('Версия удалена'); }
+        return;
+      }
+      const ap = e2.target.closest('[data-vap]');
+      if (!ap) return;
+      closePop();
+      flash('Открываю версию…', 0);
+      const r = await fetch(`/p/${P.cid}/version?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'apply', vid: ap.dataset.vap }) });
+      if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+      else flash('Ошибка применения');
+    });
+  });
 
   const composeBtn = $('#peCompose');
   if (composeBtn) composeBtn.addEventListener('click', async () => {
@@ -460,6 +529,116 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
       });
     });
   }
+
+  /* ---------- сохранение композиции с возвратом на место ---------- */
+  async function postBlocks(blocks) {
+    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
+    });
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); return true; }
+    flash('Ошибка сохранения');
+    return false;
+  }
+
+  /* ---------- контекстное меню: правый клик по блоку / пункту / кнопке ---------- */
+  document.body.addEventListener('contextmenu', (e) => {
+    const sec = e.target.closest('section[data-bid]');
+    if (!sec) return;
+    e.preventDefault();
+    const beEl = e.target.closest('[data-be]');
+    const parts = beEl ? beEl.dataset.be.split(':') : null;
+    const LIST_FIELDS = ['bullets', 'whyRent', 'items'];
+    const li = parts && parts.length >= 3 && LIST_FIELDS.includes(parts[1]) ? { field: parts[1], idx: +parts[2] } : null;
+    const isCta = sec.dataset.bt === 'cta';
+    const t = TYPE(sec.dataset.bt);
+    let html = '';
+    if (li) html += `<div class="psec">Пункт списка</div>
+      <div class="pi" data-cm="li-above"><i>↟</i>Добавить выше</div>
+      <div class="pi" data-cm="li-below"><i>↡</i>Добавить ниже</div>
+      <div class="pi" data-cm="li-del" style="color:#C62828"><i>✕</i>Удалить пункт</div>`;
+    if (isCta) html += `<div class="psec">Кнопка</div><div class="pi" data-cm="href"><i>🔗</i>Ссылка кнопки…</div>`;
+    html += `<div class="psec">Блок · ${t.name}</div>
+      <div class="pi" data-cm="up"><i>↑</i>Переместить выше</div>
+      <div class="pi" data-cm="down"><i>↓</i>Переместить ниже</div>
+      ${t.variants.length > 1 ? '<div class="pi" data-cm="variant"><i>◧</i>Сменить вид</div>' : ''}
+      <div class="pi" data-cm="hide"><i>${sec.dataset.bhid === '1' ? '👁' : '🙈'}</i>${sec.dataset.bhid === '1' ? 'Показать блок' : 'Скрыть блок'}</div>
+      <div class="pi" data-cm="dup"><i>⎘</i>Дублировать блок</div>
+      <div class="pi" data-cm="add"><i>＋</i>Добавить блок ниже</div>
+      <div class="pi" data-cm="del" style="color:#C62828"><i>✕</i>Удалить блок</div>`;
+    const el = openPop(html, e.clientX, e.clientY);
+    el.addEventListener('click', async (e2) => {
+      const cm = e2.target.closest('[data-cm]');
+      if (!cm) return;
+      const op = cm.dataset.cm;
+      /* --- пункты списков --- */
+      if (op.startsWith('li-')) {
+        closePop();
+        const blocks = serialize();
+        const b = blocks.find((x) => x.id === sec.dataset.bid);
+        if (!b) return;
+        const arr = b.data[li.field] = b.data[li.field] || [];
+        if (op === 'li-del') arr.splice(li.idx, 1);
+        else {
+          const def = LIST_DEFAULTS[li.field];
+          const val = typeof def === 'function' ? def(sec.dataset.bt) : def;
+          arr.splice(op === 'li-above' ? li.idx : li.idx + 1, 0, val);
+        }
+        flash(op === 'li-del' ? 'Удаляю пункт…' : 'Добавляю пункт…', 0);
+        await postBlocks(blocks);
+        return;
+      }
+      /* --- ссылка CTA-кнопки --- */
+      if (op === 'href') {
+        const btn = sec.querySelector('.ctabtn');
+        const cur = (btn && btn.dataset.chref) || '';
+        const el2 = openPop(`<div class="psec">Ссылка кнопки</div>
+          <input type="text" id="peHref" placeholder="https://… (пусто = WhatsApp менеджера)" value="${cur.replace(/"/g, '&quot;')}">
+          <div class="prow"><button class="edbtn" id="peHrefOk" style="flex:1">Применить</button>${cur ? '<button class="edbtn g" id="peHrefRm">Сбросить</button>' : ''}</div>`, e.clientX, e.clientY);
+        $('#peHrefOk', el2).addEventListener('click', () => {
+          const v = $('#peHref', el2).value.trim();
+          if (v && !/^(https?:\/\/|mailto:|tel:)/.test(v)) { flash('Ссылка должна начинаться с https:// (или mailto:, tel:)'); return; }
+          if (btn) { btn.dataset.chref = v; if (v) btn.href = v; }
+          dirty = true; closePop(); flash(v ? 'Ссылка кнопки заменена — сохраните' : 'Вернул WhatsApp менеджера — сохраните');
+        });
+        const rm = $('#peHrefRm', el2);
+        if (rm) rm.addEventListener('click', () => { if (btn) btn.dataset.chref = ''; dirty = true; closePop(); flash('Вернул WhatsApp менеджера — сохраните'); });
+        return;
+      }
+      /* --- операции блока (та же логика, что в тулбаре) --- */
+      if (op === 'up' || op === 'down') {
+        const list = $$('section[data-bid]');
+        const i = list.indexOf(sec);
+        const other = list[i + (op === 'up' ? -1 : 1)];
+        if (other) { if (op === 'up') other.before(sec); else other.after(sec); renumber(); buildRail(); dirty = true; }
+        closePop(); return;
+      }
+      if (op === 'hide') {
+        sec.dataset.bhid = sec.dataset.bhid === '1' ? '' : '1';
+        const tb = sec.querySelector('.btool [data-op="hide"]');
+        if (tb) tb.textContent = sec.dataset.bhid === '1' ? '🙈' : '👁';
+        dirty = true; closePop(); return;
+      }
+      if (op === 'variant') { sec.dataset.bv = t.variants[(t.variants.indexOf(sec.dataset.bv) + 1) % t.variants.length]; closePop(); await save(true); return; }
+      if (op === 'dup') {
+        closePop();
+        const blocks = serialize();
+        const i = blocks.findIndex((x) => x.id === sec.dataset.bid);
+        if (i < 0) return;
+        const clone = JSON.parse(JSON.stringify(blocks[i]));
+        clone.id = 'b_' + Math.random().toString(36).slice(2, 10);
+        blocks.splice(i + 1, 0, clone);
+        flash('Дублирую блок…', 0);
+        await postBlocks(blocks);
+        return;
+      }
+      if (op === 'del') {
+        if ($$('section[data-bid]').length <= 1) return;
+        sec.remove(); renumber(); buildRail(); dirty = true; closePop(); flash('Блок удалён — не забудьте сохранить');
+        return;
+      }
+      if (op === 'add') { closePop(); openPalette(sec, e.clientX, e.clientY); }
+    });
+  });
 
   /* ---------- мини-навигатор страниц: визуальный ряд + drag-порядок ---------- */
   const rail = document.createElement('div');

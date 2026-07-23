@@ -1486,3 +1486,13 @@ html[data-night] .bubble.in { box-shadow: none; }
 .pd2-scol .chips-row { max-height: 132px; overflow-y: auto; scrollbar-width: thin; padding-right: 4px; }
 .pd2-scol .pd-imgs { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 @media (max-width: 1100px) { .pd2-cols { grid-template-columns: 1fr; } }
+
+/* ночной режим: панель лида и WhatsApp-чат (баги «светлым по светлому», найдены визуально) */
+html[data-night] .chat--wa .bubble.in { color: #17202A; }
+html[data-night] .chat--wa .bubble.in .bmeta { color: rgba(23, 32, 42, .5); }
+html[data-night] .axis.done { background: #0E2A21; border-color: #1E4636; }
+html[data-night] .lc-hint.act { color: #BFD3FF; border-color: #2A3C6B; }
+html[data-night] .lc-hint.warn { border-color: #4A3E1C; }
+html[data-night] .lp-ai-state { background: linear-gradient(150deg, #152647, #0E1A33); border-color: #2A3C6B; }
+html[data-night] .axr.done { background: #0E2A21; }
+html[data-night] .lp-ad { color: #BFD3FF; }

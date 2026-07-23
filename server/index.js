@@ -589,6 +589,7 @@ function sanitizeBlocks(raw) {
     if (b.t === 'team') putList('items', (x) => x && (x.name || x.role) ? { name: str(x.name, 120), role: str(x.role, 200) } : null);
     if (b.t === 'bignum') { put('v', 60); put('k', 300); }
     if (b.t === 'hello' || b.t === 'why' || b.t === 'checklist') putList('bullets', (x) => str(x, 400).trim() || null);
+    if (b.t === 'cta') { const h = str(d.href, 500).trim(); if (h && /^(https?:\/\/|mailto:|tel:)/.test(h)) nb.data.href = h; }
     out.push(nb);
   }
   return out.length ? out : null;
@@ -1389,12 +1390,59 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const blocks = sanitizeBlocks(b.blocks);
       if (!blocks) return json(res, 400, { error: 'bad blocks' });
+      /* история для undo/redo: прошлое состояние в стек, redo-ветка сгорает */
+      c.histBack = c.histBack || [];
+      c.histBack.push({ at: Date.now(), blocks: c.blocks || [], theme: c.theme || null });
+      if (c.histBack.length > 40) c.histBack.shift();
+      c.histFwd = [];
       c.blocks = blocks;
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
       const cover = blocks.find(x => x.t === 'cover');
       if (cover && cover.data.title) c.title = cover.data.title.slice(0, 200);
       store.save();
-      return json(res, 200, { ok: true, count: blocks.length });
+      return json(res, 200, { ok: true, count: blocks.length, undo: c.histBack.length, redo: 0 });
+    }
+    /* конструктор v2: undo / redo поверх серверной истории */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/(undo|redo)$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      c.histBack = c.histBack || []; c.histFwd = c.histFwd || [];
+      const [from, to] = m[2] === 'undo' ? [c.histBack, c.histFwd] : [c.histFwd, c.histBack];
+      if (!from.length) return json(res, 400, { error: m[2] === 'undo' ? 'нечего отменять' : 'нечего повторять' });
+      to.push({ at: Date.now(), blocks: c.blocks || [], theme: c.theme || null });
+      if (to.length > 40) to.shift();
+      const s2 = from.pop();
+      c.blocks = s2.blocks;
+      if (s2.theme) c.theme = s2.theme;
+      store.save();
+      return json(res, 200, { ok: true, undo: c.histBack.length, redo: c.histFwd.length });
+    }
+    /* конструктор v2: именованные версии */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/version$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      c.versions = c.versions || [];
+      if (b.op === 'save') {
+        const name = String(b.name || '').trim().slice(0, 60) || ('Версия ' + (c.versions.length + 1));
+        c.versions.push({ id: store.nextId('cv'), name, at: Date.now(), blocks: c.blocks || [], theme: c.theme || null });
+        if (c.versions.length > 20) c.versions.shift();
+      } else if (b.op === 'apply') {
+        const v2 = c.versions.find(x => x.id === b.vid);
+        if (!v2) return json(res, 404, { error: 'версия не найдена' });
+        c.histBack = c.histBack || [];
+        c.histBack.push({ at: Date.now(), blocks: c.blocks || [], theme: c.theme || null });
+        if (c.histBack.length > 40) c.histBack.shift();
+        c.histFwd = [];
+        c.blocks = v2.blocks;
+        if (v2.theme) c.theme = v2.theme;
+      } else if (b.op === 'del') {
+        c.versions = c.versions.filter(x => x.id !== b.vid);
+      } else return json(res, 400, { error: 'bad op' });
+      store.save();
+      return json(res, 200, { ok: true, versions: c.versions.map(v3 => ({ id: v3.id, name: v3.name, at: v3.at })) });
     }
     /* конструктор v2: загрузка картинки/видео (raw body, до 25МБ) */
     if ((m = p.match(/^\/p\/([a-f0-9]+)\/asset$/)) && req.method === 'POST') {
@@ -2017,10 +2065,10 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         },
         cta(b) {
           const d = b.data;
-          const waHref = `https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}`;
+          const waHref = d.href || `https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}`;
           const inner = `<h2${be(b.id, 'title')}>${esc(d.title || 'Напишите номер проекта в чат,')}</h2>
   <p${be(b.id, 'sub')}>${esc(d.sub || 'чтобы получить подробности, планировки и расчёт доходности по нему')}</p>
-  <a class="ctabtn" href="${waHref}"><span${be(b.id, 'btn')}>${esc(d.btn || 'Написать в WhatsApp')}</span></a>`;
+  <a class="ctabtn" href="${esc(waHref)}"${isEdit ? ` data-chref="${esc(d.href || '')}"` : ''}><span${be(b.id, 'btn')}>${esc(d.btn || 'Написать в WhatsApp')}</span></a>`;
           if (b.v === 'card') return `<section class="pg"><div class="ctacard">${inner}</div></section>`;
           if (b.v === 'photo') return `<section class="cta ctaphoto" ${bg(d.img || heroImg)}><div class="cshade"></div><div class="cta-in">${inner}</div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img || heroImg)}>🖼 Заменить</div>` : ''}</section>`;
           return `<section class="cta">${inner}</section>`;
@@ -2322,7 +2370,10 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
         lib: (() => { try { return fs.readdirSync(path.join(PUBLIC, 'assets', 'lib')).filter(f => /\.(jpe?g|png|webp)$/i.test(f)).map(f => '/assets/lib/' + f); } catch (e) { return []; } })(),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=18"></script>` : ''}
+        undo: (c.histBack || []).length,
+        redo: (c.histFwd || []).length,
+        versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=19"></script>` : ''}
 </body></html>`);
       return;
     }
@@ -2330,7 +2381,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
     /* ---------------- статика ---------------- */
-    let file = p === '/' ? '/index.html' : p;
+    let file = p === '/' ? '/index.html' : p === '/landing' ? '/landing.html' : p;
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
     const full = path.join(PUBLIC, file);
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
