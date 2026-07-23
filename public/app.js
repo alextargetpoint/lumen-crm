@@ -413,6 +413,8 @@ function initNav() {
 }
 function go(page) {
   CUR = page;
+  /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
+  if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
@@ -3046,6 +3048,14 @@ setInterval(async () => {
 /* ---------- старт ---------- */
 document.querySelector('.side-foot .agency')?.addEventListener('click', () => go('agency'));
 
+/* стартовый раздел — из hash (переживает F5); битый hash → обзор */
+const startPage = () => (NAV[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
+window.addEventListener('hashchange', () => {
+  const p = location.hash.slice(1);
+  if (NAV[p] && p !== CUR) go(p);
+  else if (!NAV[p]) history.replaceState(null, '', '#' + CUR);
+});
+
 (async () => {
   initNav();
   const t0 = Date.now();
@@ -3057,12 +3067,12 @@ document.querySelector('.side-foot .agency')?.addEventListener('click', () => go
       hidePreloader();
       setConn(false);
       const retry = setInterval(async () => {
-        try { await loadState(); clearInterval(retry); setConn(true); go('overview'); } catch (_) {}
+        try { await loadState(); clearInterval(retry); setConn(true); go(startPage()); } catch (_) {}
       }, 3000);
     }
     return;
   }
-  go('overview');
+  go(startPage());
   /* прелоадеру — минимум 900мс жизни, чтобы вихрь успел «дохнуть» */
   setTimeout(hidePreloader, Math.max(0, 900 - (Date.now() - t0)));
 })();
