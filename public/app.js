@@ -1244,14 +1244,67 @@ PAGES.sequences = async (root) => {
              ['Пресеты внизу списка', '«B2C-скрипт 2025» (якорь на объявление, визитка, прожимка 6 касаний) и «Онбординг Facebook-лидгена» — включите свитчем и правьте под себя']]
             .map(([t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
         </div>
-        <div class="glass card">
-          <div class="card-title">${ic(I.eye)}Предпросмотр для молчуна</div>
-          <div class="feed">
-            ${seq.steps.filter(x => x.active).map((st) => `<div class="feed-item"><div class="feed-dot">${ic(st.channel === 'voice' ? I.phone : I.chat)}</div><div><div class="feed-text"><b>${dayLabel(st.day)}.</b> ${esc(st.label || '')}</div></div></div>`).join('') || '<div class="empty">Все шаги выключены</div>'}
+        <div class="wa-phone">
+          <div class="wa-note">${ic(I.eye)}Как увидит клиент · <button class="link" id="waReplay">проиграть заново</button></div>
+          <div class="wa-device">
+            <div class="wa-top">
+              <span class="wa-back">‹</span>
+              <div class="wa-ava">${esc((STATE.settings.agency.name || 'A').slice(0, 1))}</div>
+              <div class="wa-peer"><b>${esc(STATE.settings.agency.name || 'Агентство')}</b><i>онлайн</i></div>
+              <span class="wa-dots">⋮</span>
+            </div>
+            <div class="wa-body" id="waBody"></div>
           </div>
         </div>
       </div>
     </div>`;
+
+  /* WhatsApp-эмулятор: проигрываем активные шаги как входящую переписку */
+  const waSteps = seq.steps.filter(x => x.active);
+  const waPreview = (st) => {
+    if (st.mode === 'text') return fillVarsDemo(st.text);
+    if (st.mode === 'template') { const t = tpls.find(t => t.id === st.templateId); return t ? fillVarsDemo(t.body) : st.label; }
+    return '💬 ' + (st.prompt ? 'ИИ: ' + st.prompt : st.label);
+  };
+  function fillVarsDemo(t) {
+    return String(t || '')
+      .replace(/\{name\}/g, 'Алекс').replace(/\{geo\}/g, geoName(seq.geo === 'all' ? 'dubai' : seq.geo))
+      .replace(/\{ad\}/g, '«Дубай · студии JVC»').replace(/\{month\}/g, 'июле')
+      .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name);
+  }
+  const playWa = () => {
+    const body = $('#waBody', root);
+    if (!body) return;
+    body.innerHTML = '';
+    let i = 0;
+    const step = () => {
+      if (i >= waSteps.length || CUR !== 'sequences') return;
+      const st = waSteps[i];
+      const day = document.createElement('div');
+      day.className = 'wa-day';
+      day.textContent = st.day === 0 ? 'сразу после заявки' : st.day < 1 ? 'через ~' + Math.round(st.day * 24) + ' ч' : 'день ' + st.day;
+      body.appendChild(day);
+      const typing = document.createElement('div');
+      typing.className = 'wa-msg out typing';
+      typing.innerHTML = '<span></span><span></span><span></span>';
+      body.appendChild(typing);
+      body.scrollTop = body.scrollHeight;
+      setTimeout(() => {
+        typing.remove();
+        const msg = document.createElement('div');
+        msg.className = 'wa-msg out';
+        const now = new Date();
+        msg.innerHTML = (st.channel === 'voice' ? '<span class="wa-voice">▶ голосовое 0:24</span>' : esc(waPreview(st)).replace(/\n/g, '<br>')) + `<span class="wa-time">${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ✓✓</span>`;
+        body.appendChild(msg);
+        body.scrollTop = body.scrollHeight;
+        i++;
+        setTimeout(step, 900);
+      }, 750);
+    };
+    step();
+  };
+  setTimeout(playWa, 300);
+  $('#waReplay', root)?.addEventListener('click', playWa);
 
   /* табы и шапка */
   $$('.fl-tab', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
@@ -1791,18 +1844,46 @@ PAGES.automations = async (root) => {
 /* ---------------- ПЛЕЙБУК ПРОДАЖ ---------------- */
 PAGES.playbook = async (root) => {
   const pb = await api.get('/playbook');
-  const cats = [['first', 'Первое касание', I.bolt], ['followup', 'Фоллоу-апы (нативные)', I.chain], ['call', 'Вывод в звонок', I.phone], ['zoom', 'Мотивация на Zoom', I.cal], ['post', 'Дожим после Zoom', I.flame], ['objections', 'Возражения', I.shield], ['qualify', 'Квалификация', I.spark]];
+  const cats = [
+    ['first', 'Первое касание', I.bolt, 'Скорость, канал, якорь на объявление'],
+    ['followup', 'Фоллоу-апы', I.chain, 'Дожимы, которые не бесят'],
+    ['call', 'Вывод в звонок', I.phone, 'Как поднять из текста в голос'],
+    ['zoom', 'Мотивация на Zoom', I.cal, 'Показ вместо «встречи», явка'],
+    ['post', 'Дожим после Zoom', I.flame, 'Резюме, дефицит, ROI, тишина'],
+    ['objections', 'Возражения', I.shield, '«Подумаю», «дорого», удалёнка'],
+    ['qualify', 'Квалификация', I.spark, 'LPMAMA, бюджет вилкой'],
+  ];
+  if (!PAGE_STATE.pbCat) PAGE_STATE.pbCat = 'first';
+  const cur = PAGE_STATE.pbCat;
+  const items = pb.filter(x => x.cat === cur);
   root.innerHTML = `
-    <div class="glass card mb">
-      <div class="card-title">${ic(I.flame)}Как это работает</div>
-      <div class="muted" style="font-size:12.8px;line-height:1.6">Выжимка практик топовых команд (Follow Up Boss, Lofty, Serhant, ISA-модели США + дубайские регламенты). Эти приёмы уже <b>вшиты в ИИ</b>: квалификатор получает 2-3 релевантных приёма под момент сделки в каждый ответ, а в карточке лида показывается подсказка из плейбука. Здесь — вся база для команды.</div>
-    </div>
-    ${cats.map(([key, name, icn], i2) => coll(name, pb.filter(x => x.cat === key).map(x => `
-      <div class="pb-item">
-        <div class="pb-t">${esc(x.title)}</div>
-        <div class="pb-b">${esc(x.body)}</div>
-        <div class="pb-tip">${ic(I.spark)}${esc(x.tip)}</div>
-      </div>`).join(''), { open: i2 === 0, icon: icn, count: pb.filter(x => x.cat === key).length })).join('')}`;
+    <div class="pb-layout">
+      <div class="pb-nav glass">
+        <div class="pb-nav-hd">Категории</div>
+        ${cats.map(([k, name, icn, sub]) => `<button class="pb-cat ${k === cur ? 'active' : ''}" data-cat="${k}">
+          <span class="pb-cat-ic">${ic(icn)}</span>
+          <span class="pb-cat-t"><b>${name}</b><i>${sub}</i></span>
+          <span class="pb-cat-n">${pb.filter(x => x.cat === k).length}</span>
+        </button>`).join('')}
+        <div class="pb-tipbox">${ic(I.spark)}Приёмы этой вкладки ИИ уже применяет сам в диалогах и в подсказке карточки лида.</div>
+      </div>
+      <div class="pb-main">
+        <div class="pb-main-hd">${ic((cats.find(c => c[0] === cur) || [])[2])}<b>${(cats.find(c => c[0] === cur) || [])[1]}</b><span>${items.length} приёмов</span></div>
+        ${items.map((x, i) => `<div class="pb-acc ${i === 0 ? 'open' : ''}" data-acc>
+          <button class="pb-acc-hd">
+            <span class="pb-num">${String(i + 1).padStart(2, '0')}</span>
+            <span class="pb-acc-t">${esc(x.title)}</span>
+            <span class="chev">${ic(I.chev, 2)}</span>
+          </button>
+          <div class="pb-acc-body"><div class="pb-acc-inner">
+            <div class="pb-b">${esc(x.body)}</div>
+            <div class="pb-tip">${ic(I.spark)}${esc(x.tip)}</div>
+          </div></div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  $$('.pb-cat', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.cat; render(); }));
+  $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
 };
 
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
