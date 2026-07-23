@@ -182,8 +182,39 @@ function go(page) {
 }
 async function render() {
   const fn = PAGES[CUR];
-  if (fn) await fn($('#content'));
+  if (!fn) return;
+  try {
+    await fn($('#content'));
+  } catch (e) {
+    if (e.message === 'auth') return; // гейт уже показан
+    /* инвариант: раздел никогда не остаётся молча пустым */
+    console.error('[render]', CUR, e);
+    $('#content').innerHTML = `<div class="glass card" style="max-width:520px;margin:60px auto;text-align:center">
+      <div style="font-size:15px;font-weight:650;color:var(--navy-900);margin-bottom:6px">Раздел не загрузился</div>
+      <div class="muted" style="font-size:12.5px;margin-bottom:16px">${esc(e.message || 'ошибка сети')} — данные не потеряны, попробуйте ещё раз</div>
+      <button class="btn btn-accent" onclick="render()" style="margin:0 auto">Повторить</button>
+    </div>`;
+  }
 }
+
+/* ---------- связь с сервером: молча не умираем ---------- */
+let CONN_LOST = false;
+function setConn(ok) {
+  if (ok && CONN_LOST) {
+    CONN_LOST = false;
+    const b = $('#connBanner'); if (b) b.remove();
+    toast('Связь восстановлена', null, true);
+    render();
+  } else if (!ok && !CONN_LOST) {
+    CONN_LOST = true;
+    document.body.appendChild(el(`<div id="connBanner" style="position:fixed;top:0;left:0;right:0;z-index:500;
+      background:linear-gradient(90deg,#9A6700,#7a5200);color:#fff;font-size:12.5px;font-weight:550;
+      text-align:center;padding:7px">Нет связи с сервером Lumen — переподключаюсь…</div>`));
+  }
+}
+
+/* необработанная ошибка интерфейса — видна, а не молчит */
+window.addEventListener('error', (e) => { try { toast('Ошибка интерфейса', String(e.message).slice(0, 120)); } catch (_) {} });
 
 /* ---------- рендер осей квалификации ---------- */
 const AXIS_NAMES = { purpose: 'Цель покупки', timeline: 'Срок', budget: 'Бюджет', type: 'Тип объекта' };
@@ -426,8 +457,9 @@ PAGES.meetings = async (root) => {
 
 function openMeetingModal(lead, after) {
   const brokers = STATE.brokers.filter(b => b.geo === lead.geo).concat(STATE.brokers.filter(b => b.geo !== lead.geo));
+  /* локальные компоненты, не toISOString — UTC-сдвиг даёт «вчера» ночью */
   const tomorrow = new Date(Date.now() + 24 * 3600e3);
-  const defDate = tomorrow.toISOString().slice(0, 10);
+  const defDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
   modal({
     title: 'Назначить встречу',
     sub: `${esc(lead.name)} · ${lead.geoName}. Клиент получит WhatsApp-подтверждение сразу после назначения.`,
@@ -1048,15 +1080,30 @@ $('#newLeadBtn').addEventListener('click', () => {
 setInterval(async () => {
   try {
     await loadState();
+    setConn(true);
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
+    if ($('.modal-bd')) return; // и под открытой модалкой тоже
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
-    else if (['overview', 'funnel'].includes(CUR) && !$('.modal-bd')) await render();
-  } catch (e) { /* сервер перезапускается — тихо ждём */ }
+    else if (['overview', 'funnel'].includes(CUR)) await render();
+  } catch (e) {
+    if (e.message !== 'auth') setConn(false); // сервер лёг/рестартует — баннер, не молчание
+  }
 }, 7000);
 
 /* ---------- старт ---------- */
 (async () => {
   initNav();
-  await loadState();
+  try {
+    await loadState();
+  } catch (e) {
+    if (e.message !== 'auth') {
+      /* сервер недоступен на старте → не пустой каркас, а внятный экран */
+      setConn(false);
+      const retry = setInterval(async () => {
+        try { await loadState(); clearInterval(retry); setConn(true); go('overview'); } catch (_) {}
+      }, 3000);
+    }
+    return;
+  }
   go('overview');
 })();
