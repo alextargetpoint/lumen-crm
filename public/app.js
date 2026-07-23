@@ -233,13 +233,14 @@ const NAV = {
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
   meetings:  { name: 'Встречи', icon: I.cal, sub: 'Слоты с экспертами · WhatsApp-подтверждения' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: 'Библиотека автоматизаций агентства: распределение, напоминания, ИИ' },
-  playbook: { name: 'Плейбук продаж', icon: I.flame, sub: 'Работающие приёмы Дубай/США: касания, звонки, Zoom, дожимы' },
+  playbook: { name: 'Плейбук продаж', icon: I.flame, sub: 'Приёмы работы с лидами: касания, звонки, Zoom, дожимы' },
   ads:       { name: 'Реклама', icon: I.target, sub: 'Мост приёма лидов (Albato) · атрибуция к объявлениям' },
   numbers:   { name: 'Номера', icon: I.sim, sub: 'Пул WhatsApp-номеров: качество, лимиты, прогрев' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: 'Utility и Marketing шаблоны Cloud API' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: 'Команда экспертов и загрузка' },
-  analytics: { name: 'Аналитика', icon: I.bars, sub: 'Человек против ИИ · регионы · канал' },
-  settings:  { name: 'Подключения', icon: I.gear, sub: 'WhatsApp Cloud API · ИИ · демо-режим' },
+  analytics: { name: 'Аналитика', icon: I.bars, sub: 'Показатели первой линии · регионы · канал' },
+  settings:  { name: 'Подключения', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим' },
+  agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
 };
 
 const STAGES = [
@@ -444,6 +445,7 @@ async function render() {
           <button class="btn btn-accent" onclick="render()" style="margin:0 auto">Повторить</button>
         </div>`;
       }
+      window._lastRenderAt = Date.now();
       if (CUR !== page) renderQueued = true; // пока рисовали — ушли на другой раздел
     } while (renderQueued);
   } finally { renderBusy = false; }
@@ -467,6 +469,13 @@ function setConn(ok) {
 
 /* необработанная ошибка интерфейса — видна, а не молчит */
 window.addEventListener('error', (e) => { try { toast('Ошибка интерфейса', String(e.message).slice(0, 120)); } catch (_) {} });
+
+/* ---------- аватар лида: реальный (WA/TG/интегратор) или инициалы ---------- */
+function avaHtml(l, size) {
+  const st = size ? `style="width:${size}px;height:${size}px;flex:0 0 ${size}px"` : '';
+  if (l.avatarUrl) return `<div class="ava" ${st}><img src="${esc(l.avatarUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div>`;
+  return `<div class="ava" ${st}>${esc((l.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>`;
+}
 
 /* ---------- рендер осей квалификации ---------- */
 const AXIS_NAMES = { purpose: 'Цель покупки', timeline: 'Срок', budget: 'Бюджет', type: 'Тип объекта' };
@@ -518,7 +527,7 @@ PAGES.overview = async (root) => {
           }).join('')}
         </div>
         <div class="glass card">
-          <div class="card-title">${ic(I.bars)}Первая линия: человек против ИИ</div>
+          <div class="card-title">${ic(I.bars)}Первая линия: показатели</div>
           <div class="vs">
             <div class="vs-col"><div class="hd">Ручная линия</div>
               <div class="vs-row"><span class="k">Первый контакт</span><span class="v">${an.compare.human.firstContact}</span></div>
@@ -1018,7 +1027,7 @@ async function refreshInbox(first) {
   if (!PAGE_STATE.inboxLead && leads.length) PAGE_STATE.inboxLead = leads[0].id;
   list.innerHTML = leads.map(l => `
     <div class="conv ${l.id === PAGE_STATE.inboxLead ? 'active' : ''}" data-id="${l.id}">
-      <div class="ava">${esc(l.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
+      ${avaHtml(l)}
       <div class="meta"><div class="nm">${esc(l.name)}</div><div class="prev">${esc(l.lastText || 'нет сообщений')}</div></div>
       <div class="tm">${l.lastMsgAt ? tmm(l.lastMsgAt) : ''}</div>
       ${l.lastDir === 'in' ? '<div class="unread"></div>' : ''}
@@ -1033,6 +1042,7 @@ async function renderChat(id, rebuild) {
   if (!pane) return;
   const draft = $('#composerText') ? $('#composerText').value : '';
   const viaName = { ai: 'Lumen AI', chain: 'Цепочка', wake: 'Реанимация', human: 'Менеджер', template: 'Шаблон' };
+  const chName = { wa: 'WA', tg: 'TG', viber: 'VB', email: '@' };
   let lastDay = '';
   const lastMsg = (l.messages || []).slice(-1)[0];
   const isNewMsg = lastMsg && PAGE_STATE['lm_' + l.id] && PAGE_STATE['lm_' + l.id] !== lastMsg.id;
@@ -1043,7 +1053,7 @@ async function renderChat(id, rebuild) {
     lastDay = day;
     return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
       ${esc(m.text)}
-      <div class="bmeta">${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
+      <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
     </div>`;
   }).join('');
   /* «ИИ печатает» — клиент написал, автопилот готовит ответ */
@@ -1053,7 +1063,7 @@ async function renderChat(id, rebuild) {
 
   pane.innerHTML = `
     <div class="chat-head">
-      <div class="ava">${esc(l.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
+      ${avaHtml(l)}
       <div><div class="nm">${esc(l.name)}</div><div class="ph">${esc(l.phone)} · ${l.geoName}</div></div>
       <div class="tb-spacer"></div>
       <span class="badge ${l.ai.enabled ? 'violet' : ''}">${l.ai.enabled ? 'ИИ ведёт' : 'ИИ выключен'}</span>
@@ -1094,6 +1104,10 @@ async function renderChat(id, rebuild) {
       <div class="lp-sub" style="margin-bottom:0"><span class="lp-phone" id="copyPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName}</div></div>
       ${scoreRing(l.score)}
     </div>
+    <div class="ch-row">${[['wa', 'WhatsApp'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']].map(([k, n]) => {
+      const st = k === 'email' ? ((l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown') : (l.channels || {})[k] || 'unknown';
+      return `<span class="ch-pill ${st}" title="${n}: ${st === 'yes' ? 'есть' : st === 'no' ? 'нет' : 'не проверен'}">${n}</span>`;
+    }).join('')}${l.activeChannel && l.activeChannel !== 'wa' ? `<span class="mini-badge warn">активен: ${{ tg: 'Telegram', viber: 'Viber', email: 'E-mail' }[l.activeChannel]}</span>` : ''}</div>
     ${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
     <div style="margin:14px 0 10px">${primary}</div>
     ${l.hint ? `<div class="lc-hint ${l.hint.kind}" style="margin-bottom:10px">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
@@ -1219,7 +1233,8 @@ PAGES.sequences = async (root) => {
         <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
           <span class="lc-lbl" style="margin:0">Задержка, дней</span><input data-se="day" type="number" step="0.05" value="${st.day}" style="width:86px">
           <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага" style="flex:1">
-          <select data-se="channel" style="width:118px"><option value="wa" ${st.channel !== 'voice' ? 'selected' : ''}>WhatsApp</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option></select>
+          <select data-se="channel" style="width:130px"><option value="wa" ${!['voice', 'email'].includes(st.channel) ? 'selected' : ''}>Авто (каскад)</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option><option value="email" ${st.channel === 'email' ? 'selected' : ''}>E-mail</option></select>
+          ${st.channel === 'email' ? `<input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" style="flex:1">` : ''}
         </div>
         <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
           <select data-se="mode" style="width:130px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option></select>
@@ -1398,6 +1413,8 @@ PAGES.sequences = async (root) => {
       st.day = +eb.querySelector('[data-se="day"]').value || 0;
       st.label = eb.querySelector('[data-se="label"]').value || 'Касание';
       st.channel = eb.querySelector('[data-se="channel"]').value;
+      const subj = eb.querySelector('[data-se="subject"]');
+      if (subj) st.subject = subj.value;
       st.mode = modeSel.value;
       st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
       st.prompt = eb.querySelector('[data-se="prompt"]').value;
@@ -1934,6 +1951,27 @@ PAGES.automations = async (root) => {
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.send)}Омниканальный каскад</div>
+          <div class="muted" style="font-size:11.8px;margin-bottom:10px">Система сама решает, куда писать: идёт по приоритету сверху вниз, пропуская каналы, которых у клиента нет. Молчит весь круг — переключается на следующий канал и делает второй круг касаний.</div>
+          <div id="chPrio">${(a2 => (s.channels?.priority || ['wa', 'tg', 'viber', 'email']).map((ch, i2) => {
+            const names = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail (официальный тон)' };
+            return `<div class="ch-prio" data-ch="${ch}">
+              <b>${i2 + 1}</b><span style="flex:1">${names[ch]}</span>
+              <button class="btn-ghost" data-chmv="-1">${ic(I.up || I.chev)}</button>
+              <button class="btn-ghost" data-chmv="1" style="transform:rotate(180deg)">${ic(I.up || I.chev)}</button>
+              <label class="switch"><input type="checkbox" data-chen="${ch}" ${s.channels?.enabled?.[ch] ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+            </div>`;
+          }).join(''))()}</div>
+          ${swRow('Второй круг на следующем канале', 'Цепочка исчерпана без ответа → каскад переключает канал и повторяет касания', sw('chSecond', s.channels?.secondRound))}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+            <div class="form-row"><label>Telegram Bot Token</label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'от @BotFather'}"></div>
+            <div class="form-row"><label>Resend API key (e-mail)</label><input id="chEm" type="password" placeholder="${s.channels?.email?.keySet ? '•••••• сохранён' : 're_…'}"></div>
+            <div class="form-row"><label>E-mail отправителя</label><input id="chFrom" value="${esc(s.channels?.email?.from || '')}" placeholder="sales@agency.com"></div>
+            <div class="form-row"><label>Viber token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен паблик-аккаунта'}"></div>
+          </div>
+          <button class="btn" id="chSave">Сохранить каскад</button>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.cal)}Встречи</div>
           ${swRow('Напоминание клиенту', 'WhatsApp-напоминание до встречи (со ссылкой на видео-комнату)', `<select data-auto-sel="meetingReminderHrs" style="width:150px">
             ${[0, 1, 2, 3, 6, 24].map(h => `<option value="${h}" ${+a.meetingReminderHrs === h ? 'selected' : ''}>${h === 0 ? 'Выключено' : 'за ' + h + ' ч'}</option>`).join('')}
@@ -1969,7 +2007,27 @@ PAGES.automations = async (root) => {
     </div>`;
   $$('[data-go]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
-  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => saveAuto({ [sw2.dataset.auto]: sw2.checked })));
+  $$('[data-chmv]', root).forEach(b => b.addEventListener('click', () => {
+    const row = b.closest('.ch-prio');
+    const sib = +b.dataset.chmv < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (sib) (+b.dataset.chmv < 0 ? sib.before(row) : sib.after(row));
+    $$('#chPrio .ch-prio b', root).forEach((x, i2) => x.textContent = i2 + 1);
+  }));
+  $('#chSave').addEventListener('click', async () => {
+    const priority = $$('#chPrio .ch-prio', root).map(x => x.dataset.ch);
+    const enabled = {};
+    $$('[data-chen]', root).forEach(x => enabled[x.dataset.chen] = x.checked);
+    const ch = { priority, enabled, email: { from: $('#chFrom').value.trim() } };
+    if ($('#chTg').value.trim()) ch.tg = { botToken: $('#chTg').value.trim() };
+    if ($('#chEm').value.trim()) ch.email.key = $('#chEm').value.trim();
+    if ($('#chVb').value.trim()) ch.viber = { token: $('#chVb').value.trim() };
+    const sec = root.querySelector('[data-auto="chSecond"]');
+    if (sec) ch.secondRound = sec.checked;
+    await api.patch('/settings', { channels: ch });
+    toast('Каскад сохранён', 'Порядок и каналы применены', true);
+    loadState();
+  });
+  $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (sw2.dataset.auto !== 'chSecond') saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
   $('#cfType').addEventListener('change', (e) => { $('#cfOptions').style.display = e.target.value === 'select' ? '' : 'none'; });
   $('#cfAdd').addEventListener('click', async () => {
@@ -2274,9 +2332,9 @@ PAGES.analytics = async (root) => {
   const an = await api.get('/analytics');
   root.innerHTML = `
     <div class="glass card mb">
-      <div class="card-title">${ic(I.bars)}Человек против ИИ — метрики, которые двигают выручку</div>
+      <div class="card-title">${ic(I.bars)}Показатели первой линии</div>
       <div class="vs">
-        <div class="vs-col"><div class="hd">Ручная первая линия</div>
+        <div class="vs-col"><div class="hd">Ручная обработка</div>
           <div class="vs-row"><span class="k">Скорость первого контакта</span><span class="v">${an.compare.human.firstContact}</span></div>
           <div class="vs-row"><span class="k">Конверсия в диалог</span><span class="v">${an.compare.human.dialogConv}%</span></div>
           <div class="vs-row"><span class="k">Лид → квалификация</span><span class="v">${an.compare.human.qualConv}%</span></div>
@@ -2309,6 +2367,99 @@ PAGES.analytics = async (root) => {
         <div class="muted" style="font-size:12px;line-height:1.6;margin-top:12px">Воронка: ${Object.entries(an.funnel).filter(([k]) => !['lost'].includes(k)).map(([k, v]) => `${stageName(k)} — <b>${v}</b>`).join(' · ')}</div>
       </div>
     </div>`;
+};
+
+/* ---------------- ПРОФИЛЬ АГЕНТСТВА (открывается из футера сайдбара) ---------------- */
+PAGES.agency = async (root) => {
+  const s = STATE.settings;
+  root.innerHTML = `
+    <div class="two-col">
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.building)}Агентство<span class="sub">бренд на подборках, PDF и в системе</span></div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div class="ag-logo" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.4">`}</div>
+            <div style="flex:1">
+              <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
+                <input type="file" id="agLogoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none">
+                <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
+              </div>
+              <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
+            </div>
+          </div>
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="form-row"><label>Имя</label><input id="mgrName" value="${esc((s.agency.manager || {}).name || '')}"></div>
+            <div class="form-row"><label>Телефон</label><input id="mgrPhone" value="${esc((s.agency.manager || {}).phone || '')}"></div>
+            <div class="form-row"><label>E-mail</label><input id="mgrEmail" value="${esc((s.agency.manager || {}).email || '')}"></div>
+          </div>
+          <button class="btn" id="mgrSave">Сохранить подпись</button>
+        </div>
+      </div>
+      <div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы» в подборках</span></div>
+          <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro">${esc((s.agency.about || {}).intro || '')}</textarea></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Факты об агентстве (по строкам)</label><textarea id="abBullets" style="min-height:96px">${esc(((s.agency.about || {}).bullets || []).join('\n'))}</textarea></div>
+            <div class="form-row"><label>«Почему мы» (по строкам)</label><textarea id="abWhy" style="min-height:96px">${esc(((s.agency.about || {}).whyUs || []).join('\n'))}</textarea></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Приписка про бесплатность</label><input id="abFree" value="${esc((s.agency.about || {}).freeNote || '')}"></div>
+            <div class="form-row"><label>Офис (адрес)</label><input id="abOffice" value="${esc(((s.agency.about || {}).office || {}).address || '')}"></div>
+          </div>
+          <button class="btn" id="abSave">Сохранить</button>
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.shield)}Пароль входа</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Текущий</label><input id="pwCur" type="password"></div>
+            <div class="form-row"><label>Новый (от 8 символов)</label><input id="pwNext" type="password"></div>
+          </div>
+          <button class="btn" id="pwSave">Сменить пароль</button>
+        </div>
+      </div>
+    </div>`;
+  $('#agLogoBtn').addEventListener('click', () => $('#agLogoFile').click());
+  $('#agLogoFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = await fetch('/api/agency/logo', { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
+    const j = await r.json();
+    if (r.ok) { $('#agLogoPrev').innerHTML = `<img src="${j.logo}">`; toast('Логотип загружен', 'Уже на обложках подборок', true); loadState(); }
+    else toast('Не загрузился', j.error);
+  });
+  $('#agSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
+    toast('Сохранено', null, true);
+    await loadState();
+  });
+  $('#abSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { about: {
+      intro: $('#abIntro').value,
+      bullets: $('#abBullets').value.split('\n').map(x => x.trim()).filter(Boolean),
+      whyUs: $('#abWhy').value.split('\n').map(x => x.trim()).filter(Boolean),
+      freeNote: $('#abFree').value,
+      office: Object.assign({}, (s.agency.about || {}).office, { address: $('#abOffice').value }),
+    } } });
+    toast('Об агентстве сохранено', 'Обновится во всех подборках', true);
+    loadState();
+  });
+  $('#mgrSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { manager: { name: $('#mgrName').value, phone: $('#mgrPhone').value, email: $('#mgrEmail').value } } });
+    toast('Подпись сохранена', 'Появится на обложках подборок', true);
+    loadState();
+  });
+  $('#pwSave').addEventListener('click', async () => {
+    const r = await fetch('/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current: $('#pwCur').value, next: $('#pwNext').value }) });
+    const j = await r.json();
+    if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
+    else toast('Не получилось', j.error || 'ошибка');
+  });
 };
 
 /* ---------------- ПОДКЛЮЧЕНИЯ ---------------- */
@@ -2344,21 +2495,6 @@ PAGES.settings = async (root) => {
               <option value="llm" ${s.ai.provider === 'llm' ? 'selected' : ''}>Всегда LLM</option>
               <option value="core" ${s.ai.provider === 'core' ? 'selected' : ''}>Только ядро</option>
             </select>
-          </div>
-        </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.building)}Агентство<span class="sub">бренд на подборках, PDF и в системе</span></div>
-          <div style="display:flex;gap:16px;align-items:center">
-            <div class="ag-logo" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.4">`}</div>
-            <div style="flex:1">
-              <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
-                <input type="file" id="agLogoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none">
-                <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
-              </div>
-              <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
-            </div>
           </div>
         </div>
         <div class="glass card mb">
@@ -2401,36 +2537,6 @@ PAGES.settings = async (root) => {
           <div class="muted" style="font-size:11.8px;line-height:1.55">Как работает: провайдер после звонка шлёт номер клиента и ссылку на запись → Lumen находит лида по номеру, скачивает запись, расшифровывает Whisper-ом и кладёт транскрипт в хронологию + ИИ-сводку. Ничего руками.</div>
           <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button>
         </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы» в подборках</span></div>
-          <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro">${esc((s.agency.about || {}).intro || '')}</textarea></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Факты об агентстве (по строкам)</label><textarea id="abBullets" style="min-height:96px">${esc(((s.agency.about || {}).bullets || []).join('\n'))}</textarea></div>
-            <div class="form-row"><label>«Почему мы» (по строкам)</label><textarea id="abWhy" style="min-height:96px">${esc(((s.agency.about || {}).whyUs || []).join('\n'))}</textarea></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Приписка про бесплатность</label><input id="abFree" value="${esc((s.agency.about || {}).freeNote || '')}"></div>
-            <div class="form-row"><label>Офис (адрес)</label><input id="abOffice" value="${esc(((s.agency.about || {}).office || {}).address || '')}"></div>
-          </div>
-          <button class="btn" id="abSave">Сохранить</button>
-        </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-            <div class="form-row"><label>Имя</label><input id="mgrName" value="${esc((s.agency.manager || {}).name || '')}"></div>
-            <div class="form-row"><label>Телефон</label><input id="mgrPhone" value="${esc((s.agency.manager || {}).phone || '')}"></div>
-            <div class="form-row"><label>E-mail</label><input id="mgrEmail" value="${esc((s.agency.manager || {}).email || '')}"></div>
-          </div>
-          <button class="btn" id="mgrSave">Сохранить подпись</button>
-        </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.shield)}Пароль входа</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Текущий</label><input id="pwCur" type="password"></div>
-            <div class="form-row"><label>Новый (от 8 символов)</label><input id="pwNext" type="password"></div>
-          </div>
-          <button class="btn" id="pwSave">Сменить пароль</button>
-        </div>
         <div class="glass card">
           <div class="card-title">${ic(I.eye)}Демо-режим</div>
           <div class="set-row">
@@ -2463,26 +2569,6 @@ PAGES.settings = async (root) => {
     render();
   });
   $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); loadState(); });
-  $('#pwSave').addEventListener('click', async () => {
-    const r = await fetch('/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current: $('#pwCur').value, next: $('#pwNext').value }) });
-    const j = await r.json();
-    if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
-    else toast('Не получилось', j.error || 'ошибка');
-  });
-  $('#agLogoBtn').addEventListener('click', () => $('#agLogoFile').click());
-  $('#agLogoFile').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    const r = await fetch('/api/agency/logo', { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
-    const j = await r.json();
-    if (r.ok) { $('#agLogoPrev').innerHTML = `<img src="${j.logo}">`; toast('Логотип загружен', 'Уже на обложках подборок', true); loadState(); }
-    else toast('Не загрузился', j.error);
-  });
-  $('#agSave').addEventListener('click', async () => {
-    await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
-    toast('Сохранено', null, true);
-    await loadState();
-  });
   $('#vSave').addEventListener('click', async () => {
     const v = { voiceId: $('#vId').value.trim() };
     if ($('#vKey').value.trim()) v.key = $('#vKey').value.trim();
@@ -2504,22 +2590,6 @@ PAGES.settings = async (root) => {
     if ($('#telKey').value.trim()) { t.key = $('#telKey').value.trim(); t.secret = $('#telSecret').value.trim(); }
     await api.patch('/settings', { telephony: t });
     toast('Телефония сохранена', t.provider === 'none' ? undefined : 'Вебхук записей активен', true);
-    loadState();
-  });
-  $('#abSave').addEventListener('click', async () => {
-    await api.patch('/settings', { agency: { about: {
-      intro: $('#abIntro').value,
-      bullets: $('#abBullets').value.split('\n').map(x => x.trim()).filter(Boolean),
-      whyUs: $('#abWhy').value.split('\n').map(x => x.trim()).filter(Boolean),
-      freeNote: $('#abFree').value,
-      office: Object.assign({}, (s.agency.about || {}).office, { address: $('#abOffice').value }),
-    } } });
-    toast('Об агентстве сохранено', 'Обновится во всех подборках', true);
-    loadState();
-  });
-  $('#mgrSave').addEventListener('click', async () => {
-    await api.patch('/settings', { agency: { manager: { name: $('#mgrName').value, phone: $('#mgrPhone').value, email: $('#mgrEmail').value } } });
-    toast('Подпись сохранена', 'Появится на обложках подборок', true);
     loadState();
   });
   $('#dAcc').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { accelerate: e.target.checked } }); loadState(); });
@@ -2626,13 +2696,15 @@ setInterval(async () => {
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
-    else if (['overview', 'funnel'].includes(CUR)) await render();
+    else if (['overview', 'funnel'].includes(CUR) && Date.now() - (window._lastRenderAt || 0) > 5000) await render(); // не мигать поверх свежего рендера
   } catch (e) {
     if (e.message !== 'auth') setConn(false); // сервер лёг/рестартует — баннер, не молчание
   }
 }, 7000);
 
 /* ---------- старт ---------- */
+document.querySelector('.side-foot .agency')?.addEventListener('click', () => go('agency'));
+
 (async () => {
   initNav();
   const t0 = Date.now();

@@ -48,11 +48,13 @@ const DEFAULT_PASS = 'lumen2026';
   /* миграция: мост лидов + база рекламных объявлений */
   if (!db.settings.hooks) db.settings.hooks = { secret: crypto.randomBytes(10).toString('hex'), outboundUrl: '' };
   if (!db.ads) db.ads = [
-    { adId: '120211478921230508', name: 'Дубай · Мортгейдж 0% · видео-тур JVC', adsetName: 'RU 30-55 инвесторы', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
-    { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', adsetName: 'RU широкая', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
+    { adId: '120211478921230508', name: 'Дубай · Мортгейдж 0% · видео-тур JVC', priceFrom: 190000, adsetName: 'RU 30-55 инвесторы', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
+    { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', priceFrom: 180000, adsetName: 'RU широкая', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
     { adId: '120209934110255019', name: 'Бали · виллы под сдачу · рилс', adsetName: 'RU номады', campaignName: 'Bali CTWA Август', geo: 'bali' },
   ];
   if (!db.intakeLog) db.intakeLog = [];
+  { const a1 = (db.ads || []).find(x => x.adId === '120211478921230508'); if (a1 && !a1.priceFrom) a1.priceFrom = 190000;
+    const a2 = (db.ads || []).find(x => x.adId === '120211478921230742'); if (a2 && !a2.priceFrom) a2.priceFrom = 180000; }
   for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
   /* правила авто-отключения ИИ (перехват человеком) */
   if (!db.settings.ai.autoOff) db.settings.ai.autoOff = { onHumanReply: true, onHumanRequest: true, onEscalation: true };
@@ -67,7 +69,61 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
   if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
+  if (!db.settings.channels) db.settings.channels = {
+    priority: ['wa', 'tg', 'viber', 'email'],
+    enabled: { wa: true, tg: false, viber: false, email: false },
+    tg: { botToken: '' }, viber: { token: '' },
+    email: { provider: 'resend', key: '', from: '' },
+    secondRound: true, // цепочка исчерпана в канале → второй круг на следующем
+  };
+  for (const l of db.leads) {
+    if (!l.channels) l.channels = { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: (l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown' };
+    if (l.activeChannel === undefined) l.activeChannel = 'wa';
+    if (!l.avatarUrl) l.avatarUrl = null;
+  }
   for (const sq of db.sequences) if (!sq.geo) sq.geo = 'all';
+  if (!db.settings.chainV3) {
+    db.settings.chainV3 = true;
+    const std = db.sequences.find(sq => sq.id === 'seq_default');
+    if (std) {
+      std.name = 'Стандартная · нативный скрипт 2025';
+      std.steps = [
+        { day: 0, channel: 'wa', mode: 'text', label: '1 касание · мгновенно (+видео из рекламы)', active: true,
+          text: '{name}, здравствуйте! Увидел вашу заявку по {ad} — отличный выбор. Цены по нему, скорее всего, скоро подрастут, так что тайминг сейчас удачный.\n{priceLine}Прислать вам лучшие варианты в этой вилке?' },
+        { day: 0.15, channel: 'wa', mode: 'text', label: '2 касание · представление (+визитка брокера), ~3 часа', active: true,
+          text: 'Кстати, я из {agency} — мы не просто выставляем объекты, а отбираем лучшие вручную. И этот — точно из таких.\nПомогу найти правильный вариант и разобраться со всеми деталями. Вы рассматриваете для переезда или как инвестицию?' },
+        { day: 1, channel: 'wa', mode: 'text', label: '3 касание · ценность+срочность по проекту (день 2, + PDF-подборка)', active: true,
+          text: '{name}, короткий сигнал — цены по этому проекту скоро поднимаются.\n\n💰 Потенциальная доходность — до 10% годовых\n📈 Высокий спрос на краткосрочную аренду — стабильный кэшфлоу\n🏊 Инфраструктура: бассейн, сауна, спортзал, зона йоги\n\nПрислать вам сравнение лучших вариантов этого месяца?' },
+        { day: 2, channel: 'wa', mode: 'text', label: '4 касание · звонок естественно (день 3)', active: true,
+          text: 'Давайте созвонимся завтра — проведу вас по лучшим предложениям и отвечу на все вопросы.\n{countryQ}' },
+        { day: 3, channel: 'wa', mode: 'text', label: '5 касание · полезный крючок: каталог (день 4, + обложка каталога)', active: true,
+          text: 'Только что подготовил свежую подборку топ-проектов {geo} на {month} — варианты, отобранные вручную, с лучшими планами оплаты и локациями.\nПрислать вам?' },
+        { day: 6, channel: 'wa', mode: 'text', label: '6 касание · финальный чек-ин, по-человечески (день 7)', active: true,
+          text: '{name}, если честно — сложно двигаться дальше, не понимая, рассматриваете ли вы ещё этот вопрос.\nЕсли будет минутка, дадите знать? Буду признателен 🙏' },
+      ];
+    }
+    const t1 = db.templates.find(t => t.id === 'tpl_first_ru');
+    if (t1) t1.body = '{name}, здравствуйте! Увидел вашу заявку по {ad} — отличный выбор. Цены по нему, скорее всего, скоро подрастут, так что тайминг сейчас удачный. {priceLine}Прислать вам лучшие варианты в этой вилке?';
+    if (!db.sequences.some(sq => sq.id === 'seq_en_2025')) {
+      db.sequences.push({
+        id: 'seq_en_2025', name: 'EN · Native script 2025 (дословно из файла)', geo: 'all', active: false,
+        steps: [
+          { day: 0, channel: 'wa', mode: 'text', label: '1st Message · Personalized & Engaging', active: true,
+            text: 'Hey {name}! Saw your request about {ad} in Dubai — great pick! Prices might be going up soon, so timing is key.\n{priceLineEn}Want me to send you the best options in this range?' },
+          { day: 0.15, channel: 'wa', mode: 'text', label: '2nd Message · Building Trust Naturally (+broker card)', active: true,
+            text: 'By the way, I\u2019m {agency} — we don\u2019t just list properties, we handpick the best. And this one definitely made the cut.\nI can help you find the right deal and sort out all the details. Are you looking to buy for relocation or as an investment?' },
+          { day: 1, channel: 'wa', mode: 'text', label: '3rd Message · Follow-up with Value & Urgency (+PDF)', active: true,
+            text: 'Hey {name}, just a quick heads-up — prices for this project are going up soon!\n\n💰 Potential ROI of up to 10% annually\n📈 High demand for short-term rentals — strong cash flow\n🏊 Luxury amenities: pool, sauna, gym, yoga zone & more\n\nWant me to send you a comparison of the best options this month?' },
+          { day: 2, channel: 'wa', mode: 'text', label: '4th Message · Encouraging a Call Naturally', active: true,
+            text: 'Let\u2019s have a quick call tomorrow — I\u2019ll walk you through the best deals and answer any questions.\n{countryQEn}' },
+          { day: 3, channel: 'wa', mode: 'text', label: '5th Message · Providing a Valuable Hook (+catalog cover)', active: true,
+            text: 'Just prepared a fresh selection of Dubai\u2019s top projects — handpicked options with the best payment plans and locations.\nWant me to send it over?' },
+          { day: 6, channel: 'wa', mode: 'text', label: 'Last Message · Final Check-in, Compassionate', active: true,
+            text: 'Hey {name},\nHonestly, it\u2019s a bit hard to move forward without knowing if this is still something you\u2019re considering. If you have a minute, could you let me know? Appreciate it! 🙏' },
+        ],
+      });
+    }
+  }
   if (!db.settings.chainV2) {
     db.settings.chainV2 = true;
     const std = db.sequences.find(sq => sq.id === 'seq_default');
@@ -267,6 +323,12 @@ function publicSettings(db) {
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
+  if (s.channels) {
+    for (const k of ['tg', 'viber', 'email']) {
+      const c = s.channels[k];
+      if (c && (c.botToken || c.token || c.key)) { c.keySet = true; delete c.botToken; delete c.token; delete c.key; }
+    }
+  }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -404,6 +466,8 @@ const server = http.createServer(async (req, res) => {
       const phone = pick('phone', 'phone_number', 'phoneNumber', 'tel', 'телефон');
       if (!phone) return json(res, 400, { error: 'phone required' });
       const adId = pick('ad_id', 'adId', 'ad', 'utm_content');
+      const email = pick('email', 'e-mail', 'почта');
+      const avatarUrl = pick('avatar_url', 'avatar', 'profile_pic');
       const entry = { at: Date.now(), name, phone, adId, raw: Object.keys(b).slice(0, 20) };
 
       const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
@@ -423,6 +487,9 @@ const server = http.createServer(async (req, res) => {
           quals: { purpose: null, timeline: null, budget: null, type: null },
           ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
           broker: null, summary: null, tags: ['интегратор'], numberId: null,
+          avatarUrl: avatarUrl || null, activeChannel: 'wa',
+          channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' },
+          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
           ads: adId ? { adId, adsetId: pick('adset_id', 'adsetId'), campaignId: pick('campaign_id', 'campaignId'), formName: pick('form_name', 'form') } : null,
         };
         matchAd(db, lead);
@@ -603,6 +670,8 @@ const server = http.createServer(async (req, res) => {
         }
         if (b.name) lead.name = b.name;
         if (b.custom) { lead.custom = lead.custom || {}; Object.assign(lead.custom, b.custom); }
+        if (b.channels) Object.assign(lead.channels = lead.channels || {}, b.channels);
+        if (b.avatarUrl !== undefined) lead.avatarUrl = b.avatarUrl || null;
         if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
         store.save();
         return json(res, 200, leadView(db, lead));
@@ -798,6 +867,14 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
       if (b.agency && b.agency.about) { Object.assign(db.settings.agency.about, b.agency.about); delete b.agency.about; }
+      if (b.channels) {
+        const ch = db.settings.channels;
+        if (b.channels.priority) ch.priority = b.channels.priority.filter(x => ['wa', 'tg', 'viber', 'email'].includes(x));
+        if (b.channels.enabled) Object.assign(ch.enabled, b.channels.enabled);
+        for (const k2 of ['tg', 'viber', 'email']) if (b.channels[k2]) Object.assign(ch[k2], b.channels[k2]);
+        if (b.channels.secondRound != null) ch.secondRound = b.channels.secondRound;
+        delete b.channels;
+      }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
@@ -884,7 +961,8 @@ const server = http.createServer(async (req, res) => {
         for (const line of lines.slice(1)) {
           const c = line.split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
           if (ci.adId < 0 || !c[ci.adId]) continue;
-          rows.push({ adId: c[ci.adId], name: ci.name >= 0 ? c[ci.name] : '', adsetName: ci.adset >= 0 ? c[ci.adset] : '', campaignName: ci.camp >= 0 ? c[ci.camp] : '', geo: ci.geo >= 0 ? (c[ci.geo] || '').toLowerCase() : '' });
+          const cip = col(['price', 'цена', 'от']);
+          rows.push({ adId: c[ci.adId], name: ci.name >= 0 ? c[ci.name] : '', adsetName: ci.adset >= 0 ? c[ci.adset] : '', campaignName: ci.camp >= 0 ? c[ci.camp] : '', geo: ci.geo >= 0 ? (c[ci.geo] || '').toLowerCase() : '', priceFrom: cip >= 0 ? +String(c[cip]).replace(/\D/g, '') || 0 : 0 });
         }
       }
       let added = 0, updated = 0;
@@ -892,7 +970,7 @@ const server = http.createServer(async (req, res) => {
         if (!r.adId) continue;
         const ex = db.ads.find(a => String(a.adId) === String(r.adId));
         if (ex) { Object.assign(ex, { name: r.name || ex.name, adsetName: r.adsetName || ex.adsetName, campaignName: r.campaignName || ex.campaignName, geo: r.geo || ex.geo }); updated++; }
-        else { db.ads.push({ adId: String(r.adId), name: r.name || 'Объявление ' + r.adId, adsetName: r.adsetName || '', campaignName: r.campaignName || '', geo: r.geo || '' }); added++; }
+        else { db.ads.push({ adId: String(r.adId), name: r.name || 'Объявление ' + r.adId, adsetName: r.adsetName || '', campaignName: r.campaignName || '', geo: r.geo || '', priceFrom: r.priceFrom || 0 }); added++; }
       }
       /* ре-мэтчинг всех лидов с атрибуцией */
       let rematched = 0;

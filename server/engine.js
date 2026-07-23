@@ -10,6 +10,37 @@ const wa = require('./wa');
 
 const MIN = 60e3, DAY = 24 * 3600e3;
 
+/* ---------- омниканал: выбор канала по приоритетам ---------- */
+function resolveChannel(db, lead) {
+  const cfg = db.settings.channels || { priority: ['wa'], enabled: { wa: true } };
+  const has = (ch) => {
+    if (ch === 'wa') return (lead.channels?.wa || 'unknown') !== 'no';
+    if (ch === 'email') return (lead.contacts || []).some(c => c.kind === 'email');
+    if (ch === 'tg') return (lead.channels?.tg === 'yes') || (lead.contacts || []).some(c => c.kind === 'telegram');
+    if (ch === 'viber') return lead.channels?.viber === 'yes';
+    return false;
+  };
+  const pr = cfg.priority.filter(ch => cfg.enabled[ch] && has(ch));
+  const want = lead.activeChannel || 'wa';
+  if (pr.includes(want)) return want;
+  return pr[0] || 'wa';
+}
+
+function nextChannel(db, lead) {
+  const cfg = db.settings.channels || {};
+  const cur = lead.activeChannel || 'wa';
+  const pr = (cfg.priority || ['wa']).filter(ch => cfg.enabled?.[ch]);
+  const ix = pr.indexOf(cur);
+  for (let k = ix + 1; k < pr.length; k++) {
+    const ch = pr[k];
+    const probe = { ...lead, activeChannel: ch };
+    if (resolveChannel(db, probe) === ch) return ch;
+  }
+  return null;
+}
+
+const CH_NAMES = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
+
 /* ---------- выбор номера и отправка ---------- */
 function pickNumber(db, lead) {
   if (lead.numberId) {
@@ -33,6 +64,44 @@ function renderTemplate(db, tpl, lead) {
 }
 
 function send(db, lead, text, via, opts = {}) {
+  const channel = opts.channel || resolveChannel(db, lead);
+  if (channel !== 'wa') {
+    /* не-WA каналы: mock-запись в переписку; боевые слоты (TG-бот/Viber/Resend) включаются токенами */
+    const m0 = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel, text, at: Date.now(), status: 'sent', templateId: opts.templateId || null };
+    if (channel === 'email' && opts.subject) m0.subject = opts.subject;
+    db.messages.push(m0);
+    lead.lastMsgAt = m0.at;
+    lead.lastDir = 'out';
+    const cfg = db.settings.channels;
+    (async () => {
+      try {
+        if (channel === 'email' && cfg.email.key && cfg.email.from) {
+          const to = (lead.contacts || []).find(c => c.kind === 'email')?.value;
+          if (to) {
+            const r = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + cfg.email.key, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ from: cfg.email.from, to, subject: opts.subject || 'По вашей заявке', text }),
+            });
+            if (!r.ok) throw new Error('resend ' + r.status);
+          }
+        }
+        if (channel === 'tg' && cfg.tg.botToken && lead.channels?.tgChatId) {
+          await fetch(`https://api.telegram.org/bot${cfg.tg.botToken}/sendMessage`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: lead.channels.tgChatId, text }),
+          });
+        }
+        m0.status = 'delivered';
+      } catch (err) {
+        m0.status = 'failed';
+        ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `${CH_NAMES[channel]} отказал (${lead.name}): ${err.message}` });
+      }
+      store.save();
+    })();
+    store.save();
+    return m0;
+  }
   const num = pickNumber(db, lead);
   if (!num) {
     ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Пропуск отправки ${lead.name}: нет доступного номера (лимиты/карантин)` });
@@ -41,7 +110,7 @@ function send(db, lead, text, via, opts = {}) {
   lead.numberId = num.id;
   num.sentToday += 1;
   if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
-  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, waId: null };
+  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, waId: null };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
   lead.lastDir = 'out';
@@ -125,9 +194,19 @@ function tickChains(db) {
     if (lead.lastDir === 'in') continue;
     if (db.messages.some(m => m.leadId === lead.id && m.dir === 'in')) continue;
     const step = seq.steps.filter(s => s.active)[lead.ai.chainStep];
-    if (!step) { // цепочка исчерпана → спящий
+    if (!step) {
+      /* цепочка исчерпана: омниканальный второй круг → следующий канал по приоритету */
+      const nx = db.settings.channels?.secondRound ? nextChannel(db, lead) : null;
+      if (nx && !lead.ai.secondRound) {
+        lead.activeChannel = nx;
+        lead.ai.secondRound = true;
+        lead.ai.chainStep = 0;
+        lead.ai.nextTouchAt = nowT + 0.5 * dayMs(db);
+        ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: молчит в WhatsApp — переключаю каскад на ${CH_NAMES[nx]}, второй круг касаний` });
+        continue;
+      }
       lead.stage = 'sleeping';
-      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: цепочка (${seq.steps.length} касаний) исчерпана без ответа → «Спящие»` });
+      ai.pushEvent(db, { type: 'sleep', leadId: lead.id, text: `${lead.name}: каскад каналов исчерпан без ответа → «Спящие»` });
       continue;
     }
     if (lead.ai.nextTouchAt == null) {
@@ -137,6 +216,11 @@ function tickChains(db) {
     if (nowT < lead.ai.nextTouchAt) continue;
 
     let text;
+    const sendOpts = {};
+    if (step.channel === 'email' || (lead.activeChannel === 'email' && step.channel !== 'voice')) {
+      sendOpts.channel = 'email';
+      sendOpts.subject = fillVars(db, lead, step.subject || 'По вашей заявке — {agency}');
+    }
     if (step.mode === 'template') {
       const tpl = db.templates.find(t => t.id === step.templateId);
       text = tpl ? renderTemplate(db, tpl, lead) : null;
@@ -146,7 +230,11 @@ function tickChains(db) {
       text = chainAiText(db, lead, step);
     }
     if (text) {
-      send(db, lead, text, 'chain');
+      if (sendOpts.channel === 'email') {
+        /* официальный тон для e-mail */
+        text = 'Здравствуйте' + (lead.name && !/^[+\d]/.test(lead.name) ? ', ' + lead.name.split(' ')[0] : '') + '!\n\n' + text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '') + '\n\nС уважением,\n' + (db.settings.agency.manager?.name || db.settings.agency.name) + '\n' + db.settings.agency.name;
+      }
+      send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';
       ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `Касание ${lead.ai.chainStep + 1}/${seq.steps.length}: ${lead.name} — ${step.label}` });
     }
@@ -166,6 +254,16 @@ function fillVars(db, lead, text) {
   const now = new Date(Date.now() + (lead.tz || 0) * 3600e3);
   const slots = now.getUTCHours() < 16 ? 'сегодня в 18:00 или завтра в 11:00' : 'завтра в 11:00 или в 18:00';
   const adRef = lead.ads && lead.ads.matched && lead.ads.adName ? '«' + lead.ads.adName + '»' : (lead.ads && lead.ads.headline ? '«' + lead.ads.headline + '»' : 'вашу заявку');
+  const adRec = lead.ads && lead.ads.adId ? (db.ads || []).find(a => String(a.adId) === String(lead.ads.adId)) : null;
+  const price = adRec && adRec.priceFrom ? '$' + (+adRec.priceFrom).toLocaleString('en-US') : '';
+  const COUNTRY = [['971', 'ОАЭ'], ['7', 'России'], ['380', 'Украины'], ['375', 'Беларуси'], ['998', 'Узбекистана'], ['77', 'Казахстана'], ['48', 'Польши'], ['49', 'Германии'], ['44', 'Великобритании'], ['39', 'Италии'], ['34', 'Испании'], ['420', 'Чехии'], ['41', 'Швейцарии'], ['1', 'США/Канады'], ['90', 'Турции'], ['972', 'Израиля'], ['995', 'Грузии'], ['374', 'Армении']];
+  const ph = String(lead.phone || '').replace(/\D/g, '');
+  const country = (COUNTRY.find(([c]) => ph.startsWith(c)) || [])[1] || '';
+  t = t.replace(/\{priceLine\}/g, price ? `Вход — от ${price}. ` : '')
+       .replace(/\{priceLineEn\}/g, price ? `It starts from ${price}. ` : '')
+       .replace(/\{price\}/g, price || 'вашего бюджета')
+       .replace(/\{countryQ\}/g, country ? `Вы же из ${country}, верно? Во сколько вам удобно?` : 'Во сколько вам удобно?')
+       .replace(/\{countryQEn\}/g, country ? `You're from ${country}, right? What time works for you?` : 'What time works for you?');
   return t
     .replace(/\{ad\}/g, adRef)
     .replace(/\{geo\}/g, db.settings.geoNames[lead.geo] || lead.geo)
@@ -334,6 +432,18 @@ function inbound(db, lead, text, opts = {}) {
       let out = null;
       if (useLlm) {
         try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[llm]', e.message); }
+      }
+      /* стоп-триггер: и фолбэк-ядро не должно дублировать себя по кругу */
+      const dupGuard = (txt) => {
+        const norm = (x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim();
+        return fresh.messages.filter(x => x.leadId === l2.id && x.dir === 'out').slice(-3).some(x => norm(x.text) === norm(txt));
+      };
+      if (!out && dupGuard(reply.text)) {
+        l2.ai.enabled = false;
+        l2.tags = [...new Set([...(l2.tags || []), 'нужен человек'])];
+        ai.pushEvent(fresh, { type: 'ai_off', leadId: l2.id, text: `${l2.name}: ИИ зациклился (повтор реплики) — автопилот на паузе, лид ждёт менеджера` });
+        store.save();
+        return;
       }
       if (out) {
         let applied = 0;

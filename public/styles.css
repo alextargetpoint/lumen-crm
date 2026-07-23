@@ -1009,3 +1009,15 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 }
 .chip-t:hover { border-color: #B9CBEE; }
 .chip-t.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- омниканал ---------- */
+.ch-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.ch-pill { font-size: 10px; font-weight: 650; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--stroke); color: var(--ink-3); background: var(--bg-2); }
+.ch-pill.yes { color: var(--ok); background: var(--ok-bg); border-color: #C4E6D6; }
+.ch-pill.no { color: var(--bad); background: var(--bad-bg); border-color: #EDC5C0; text-decoration: line-through; }
+.ch-prio { display: flex; gap: 10px; align-items: center; padding: 9px 11px; border: 1px solid var(--stroke-soft); border-radius: var(--r-sm); margin-bottom: 6px; background: #fff; }
+.ch-prio b { width: 20px; height: 20px; border-radius: 6px; background: var(--blue-100); color: var(--accent); display: grid; place-items: center; font-size: 11px; }
+.ch-prio span { font-size: 13px; font-weight: 550; color: var(--navy-900); }
+.ch-prio .btn-ghost svg { width: 13px; height: 13px; color: var(--ink-3); }
+.ch-prio .switch { flex: 0 0 auto; height: 22px; }
+.side-foot .agency { cursor: pointer; transition: background var(--dur-fast); } .side-foot .agency:hover { background: rgba(134,175,255,.09); }

@@ -79,6 +79,11 @@ function buildPrompt(db, lead, history) {
 - Минимальный бюджет направления: ${crit.budgetMin} ${crit.currency}. Если клиент назвал бюджет ниже — НЕ отказывай, предложи down-sell: ${crit.downsell}
 - Заметки: ${crit.notes || '—'}
 - Тон: живой человеческий, коротко (1-3 предложения), без канцелярита, без эмодзи, один вопрос за раз.
+ЖЁСТКИЕ ЗАПРЕТЫ (нарушение = брак):
+- НЕ называй конкретные цены, доходности, скидки и сроки сдачи, которых НЕТ в этом промпте или в словах клиента. Нет данных — скажи «уточню у эксперта и вернусь с точной цифрой».
+- НЕ обещай («гарантирую», «точно вырастет»), не давай юридических/налоговых советов — только «этот вопрос разберёт эксперт на созвоне».
+- НЕ вставляй ссылки, плейсхолдеры в скобках, названия несуществующих объектов.
+- НЕ упоминай, что ты ИИ/бот/ассистент. НЕ извиняйся дважды. НЕ повторяй уже отправленное сообщение.
 - Уже выяснено: ${['purpose', 'timeline', 'budget', 'type'].filter(a => q[a]).map(a => `${axisRu[a]}: ${q[a].value}`).join('; ') || 'ничего'}
 - Ещё не выяснено: ${missing.map(a => axisRu[a]).join(', ') || 'всё выяснено — предложи передачу эксперту и удобное время созвона'}
 
@@ -111,15 +116,48 @@ function clampAxes(db, lead, axes) {
   return ok;
 }
 
+/* стоп-триггеры качества: бракованный ответ LLM не уходит клиенту */
+function validateReply(db, lead, text, promptContext) {
+  const t = String(text || '').trim();
+  if (t.length < 5) return 'пустой ответ';
+  if (t.length > 650) return 'слишком длинный';
+  if (/[{}\[\]]/.test(t)) return 'плейсхолдеры в тексте';
+  if (/https?:\/\//i.test(t)) return 'ссылка в ответе';
+  if (/языков(ая|ой) модель|искусственн\w+ интеллект\w*|как ии\b|i'?m an ai|language model|чат-?бот/i.test(t)) return 'самораскрытие ИИ';
+  /* язык: клиент пишет кириллицей → ответ обязан быть кириллическим (и наоборот) */
+  const lastIn = [...db.messages].reverse().find(m => m.leadId === lead.id && m.dir === 'in');
+  if (lastIn) {
+    const inCyr = /[а-яё]/i.test(lastIn.text);
+    const outCyr = /[а-яё]/i.test(t);
+    if (inCyr !== outCyr && lastIn.text.length > 6) return 'язык ответа не совпадает с языком клиента';
+  }
+  /* антигаллюцинация цифр: суммы/проценты в ответе должны существовать в контексте */
+  const known = (promptContext || '') + ' ' + db.messages.filter(m => m.leadId === lead.id).map(m => m.text).join(' ');
+  const knownNums = new Set((known.match(/\d[\d\s.,]{2,}/g) || []).map(x => x.replace(/[^\d]/g, '')));
+  for (const m2 of t.matchAll(/(\d[\d\s.,]{2,})\s*(\$|€|aed|тыс|k\b|%|процент)/gi)) {
+    const num = m2[1].replace(/[^\d]/g, '');
+    if (num.length >= 2 && !knownNums.has(num)) return 'цифра не из контекста: ' + m2[0].trim();
+  }
+  /* зацикливание: дубликат недавнего исходящего */
+  const lastOuts = db.messages.filter(m => m.leadId === lead.id && m.dir === 'out').slice(-3);
+  const norm = (x) => x.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (lastOuts.some(m2 => norm(m2.text) === norm(t))) return 'дубликат предыдущего сообщения';
+  return null;
+}
+
 async function reply(db, lead) {
   const history = db.messages
     .filter(m => m.leadId === lead.id)
     .slice(-12)
     .map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'ТЫ: ') + m.text)
     .join('\n');
-  const out = await callGemini(buildPrompt(db, lead, history));
+  const prompt = buildPrompt(db, lead, history);
+  const out = await callGemini(prompt);
   if (!out || typeof out.reply !== 'string' || !out.reply.trim()) throw new Error('llm bad shape');
-  return { text: out.reply.trim().slice(0, 600), axes: clampAxes(db, lead, out.axes) };
+  const text = out.reply.trim().slice(0, 650);
+  const bad = validateReply(db, lead, text, prompt);
+  if (bad) throw new Error('брак LLM: ' + bad);
+  return { text, axes: clampAxes(db, lead, out.axes) };
 }
 
 /* ИИ-сводка по лиду: вся хронология → 3-5 предложений для брокера */
@@ -162,4 +200,4 @@ async function transcribe(buf, filename) {
   return (j.text || '').trim();
 }
 
-module.exports = { available, reply, summarize, transcribe, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, MODEL };
