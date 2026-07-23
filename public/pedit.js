@@ -473,8 +473,9 @@ section[data-bid]:hover .btool{opacity:1}
 .peth-grip:active{cursor:grabbing}
 section.peflash{outline:3px solid rgba(29,52,216,.55);outline-offset:-3px}
 @media(max-width:1080px){.perail{display:none}}
-.book{margin-right:190px}
-@media(max-width:1080px){.book{margin-right:auto}}`;
+body{padding-right:190px}
+.book{margin:0 auto}
+@media(max-width:1080px){body{padding-right:0}}`;
   document.head.appendChild(railCss);
 
   renumber();

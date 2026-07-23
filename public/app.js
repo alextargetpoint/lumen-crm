@@ -466,6 +466,23 @@ function wireHeroArt(root) {
   });
 }
 
+/* ночной режим: переключатель + память выбора */
+(() => {
+  const apply = (on) => {
+    document.documentElement.toggleAttribute('data-night', on);
+    const b = document.getElementById('nightBtn');
+    if (b) b.textContent = on ? '☀️' : '🌙';
+  };
+  const saved = localStorage.getItem('lumen_night') === '1';
+  apply(saved);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#nightBtn')) return;
+    const on = !document.documentElement.hasAttribute('data-night');
+    localStorage.setItem('lumen_night', on ? '1' : '0');
+    apply(on);
+  });
+})();
+
 /* копирование ссылки страницы встречи (кнопки живут в модалках) */
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mcopy]');
@@ -556,6 +573,7 @@ function countUp(root) {
 let renderBusy = false, renderQueued = false;
 async function render() {
   if (renderBusy) { renderQueued = true; return; }
+  closePop(); /* перерисовка не должна оставлять поповер-сироту над мёртвым селектом */
   renderBusy = true;
   try {
     do {
@@ -3484,6 +3502,9 @@ setInterval(async () => {
     setConn(true);
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
+    if (CUR_POP) return; // открыт пикер/дропдаун — DOM под ним не дёргаем (иначе выбор бьёт по мёртвому селекту)
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
     else if (['overview', 'funnel'].includes(CUR) && Date.now() - (window._lastRenderAt || 0) > 5000) await render(); // не мигать поверх свежего рендера
   } catch (e) {

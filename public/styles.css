@@ -1347,3 +1347,104 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .dt-d { width: 30px; flex: 0 0 30px; font-size: 12px; font-weight: 800; color: var(--acc, #2563EB); text-transform: uppercase; }
 .dt-sep { color: var(--ink-3, #8a90a0); }
 .dt-row .cs, .dt-row .gi { flex: 1; }
+
+/* ============================================================
+   НОЧНОЙ РЕЖИМ (html[data-night]) — глубокий кобальт-люкс
+   ============================================================ */
+html[data-night] {
+  --bg: #0A1120; --bg-2: #0C1424; --card: #101B31; --glass: rgba(16, 27, 49, .72);
+  --ink: #E9EEF9; --ink-2: #BCC7DE; --ink-3: #8291AE;
+  --stroke: #26355A; --stroke-soft: #1B2843;
+  --blue-100: #1C2C50; --blue-300: #8FB4FF;
+  --ok-bg: #0E2A21; --warn-bg: #2B2310; --bad-bg: #2B1613; --violet-bg: #201B3E;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -12px rgba(0, 0, 0, .5);
+  --shadow-lift: 0 14px 36px -12px rgba(0, 0, 0, .6);
+}
+html[data-night] body { background: var(--bg); color: var(--ink); }
+/* поверхности с жёсткими литералами */
+html[data-night] .pds, html[data-night] .pds.grey { background: var(--card); border-color: var(--stroke-soft); }
+html[data-night] .pds.tint { background: linear-gradient(160deg, #14203C, #101B31); border-color: #26355A; }
+html[data-night] .pds-hd > div b { color: var(--ink); }
+html[data-night] .pds-ic { background: #1C2C50; color: #8FB4FF; }
+html[data-night] .pd2 .gi, html[data-night] .pd2 textarea.gi, html[data-night] .pds .gi { background: #0D1730; color: var(--ink); }
+html[data-night] .pd2 .gi:hover, html[data-night] .pds .gi:hover { background: #122040; }
+html[data-night] .pd2 .gi:focus, html[data-night] .pds .gi:focus { background: #0D1730; }
+html[data-night] .prow { background: #0D1730; }
+html[data-night] .prow-pct, html[data-night] .prow-lbl { background: #101B31; border-color: #26355A; color: var(--ink); }
+html[data-night] .prow-bar { background: #16223C; }
+html[data-night] .pay-calc-in { background: #0D1730; }
+html[data-night] .pay-calc-in input { color: var(--ink); }
+html[data-night] .pay-total { background: #16223C; color: var(--ink-3); }
+html[data-night] .chip-add input { border-color: #2C3B60; color: var(--ink); }
+html[data-night] .chip-plus { background: #1C2C50; color: #8FB4FF; }
+html[data-night] .wa-sc { background: var(--card); border-color: var(--stroke); color: var(--ink-2); }
+html[data-night] .nm-edit { background: var(--card); color: var(--ink); }
+html[data-night] .f3card, html[data-night] .ha { box-shadow: 0 18px 44px rgba(0, 0, 0, .5); }
+html[data-night] .kpi-spark { opacity: 1; }
+html[data-night] .aiwrap textarea { background: #0D1730; color: var(--ink); }
+/* переключатель */
+#nightBtn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--stroke); background: var(--card); cursor: pointer; display: grid; place-items: center; font-size: 15px; transition: transform .2s var(--ease-spring); }
+#nightBtn:hover { transform: scale(1.08); }
+
+/* ночной режим: тексты на var(--navy-900) становятся светлыми */
+html[data-night] .page-title,
+html[data-night] .card-title,
+html[data-night] .kpi .val,
+html[data-night] .funnel-row .fv,
+html[data-night] .vs-row .v,
+html[data-night] .lead-card .nm,
+html[data-night] .conv .nm,
+html[data-night] .chat-head .nm,
+html[data-night] .lp-name,
+html[data-night] .axis .ax-val,
+html[data-night] .set-row .sl,
+html[data-night] .seq-step .st-name,
+html[data-night] .seg .sg-num,
+html[data-night] .tbl td b,
+html[data-night] .wake-score,
+html[data-night] .cmp-head .nm,
+html[data-night] .cmp-stat .v,
+html[data-night] .num-head .ph,
+html[data-night] .q-ring .txt,
+html[data-night] .num-meta .m .v,
+html[data-night] .geo-bar .g-top b,
+html[data-night] .tpl-head .nm,
+html[data-night] .broker-card .nm,
+html[data-night] .modal h3,
+html[data-night] .toast,
+html[data-night] .coll-head,
+html[data-night] .gs-item .gn,
+html[data-night] .dtp-head b,
+html[data-night] .lp-ai-state b,
+html[data-night] .axr-v,
+html[data-night] .axg-c b,
+html[data-night] .lc-f.active,
+html[data-night] .lc-cv,
+html[data-night] .lc-meet b,
+html[data-night] .lcf-step.cur span,
+html[data-night] .lc-ai-head b,
+html[data-night] .prop-name,
+html[data-night] .cal-dhead b,
+html[data-night] .gi-title,
+html[data-night] .pb-t,
+html[data-night] .fl-tab.active,
+html[data-night] .fl-title b,
+html[data-night] .pb-cat-t b,
+html[data-night] .pb-main-hd b,
+html[data-night] .pb-acc-t,
+html[data-night] .fold-meta b,
+html[data-night] .payrow-mini b,
+html[data-night] .ch-prio span,
+html[data-night] .seg-btn.on { color: var(--ink); }
+
+/* ночной режим: кастомные контролы и поповеры */
+html[data-night] .cs-btn { background: #0D1730; border-color: #26355A; color: var(--ink); }
+html[data-night] .cs-btn:hover { border-color: #3A4E7E; }
+html[data-night] .cs-list, html[data-night] .dtp-pop, html[data-night] .pop { background: #101B31; border-color: #26355A; color: var(--ink); box-shadow: 0 18px 50px rgba(0, 0, 0, .6); }
+html[data-night] .cs-opt:hover, html[data-night] .pop-item:hover { background: #1C2C50; }
+html[data-night] input, html[data-night] textarea, html[data-night] select { background: #0D1730; border-color: #26355A; color: var(--ink); }
+html[data-night] .search input { background: #0D1730; color: var(--ink); }
+html[data-night] .modal { background: rgba(16, 27, 49, .96); }
+html[data-night] .toast { background: rgba(16, 27, 49, .95); color: var(--ink); }
+html[data-night] .fold-meta b { color: var(--ink); }
+html[data-night] .fold-meta i { color: var(--ink-3); }
