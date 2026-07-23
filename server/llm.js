@@ -5,7 +5,7 @@
    Любая ошибка/таймаут → молчаливый откат на детерминированное ядро. */
 /* Цепочка провайдеров (как Groq→Fireworks→Gemini в TargetPoint):
    Gemini Flash → OpenAI gpt-4o-mini; недоступен один — берёт следующий. */
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite'; /* 2.0-flash снят Google 06.2026; lite — та же цена $0.10/$0.40 за 1М ток. */
 const OPENAI_MODEL = 'gpt-4o-mini';
 const GKEY = process.env.GEMINI_API_KEY || '';
 const OKEY = process.env.OPENAI_API_KEY || '';
