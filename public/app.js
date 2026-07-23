@@ -2074,26 +2074,9 @@ PAGES.properties = async (root) => {
           </div>
         </div>
 
-        <div class="pds">
-          <div class="pds-hd"><span class="pds-ic">${ic(I.doc)}</span><div><b>Паспорт объекта</b><i>формат, сдача, теги и удобства — фильтры и match подборок</i></div></div>
-          <div class="pds-grid c3">
-            <div class="pd-fact"><label class="lc-lbl">Формат</label>${combo('type', MD.common.types, pr.type, 'формат')}</div>
-            <div class="pd-fact"><label class="lc-lbl">Сдача</label>${combo('handover', MD.common.handover, pr.handover, 'срок')}</div>
-            <div class="pd-fact"><label class="lc-lbl">Заметка (внутренняя)</label><input class="gi" data-f="note" value="${esc(pr.note || '')}" placeholder="для команды, клиент не видит"></div>
-          </div>
-          <div class="pd-fact" style="margin-top:12px"><label class="lc-lbl">Теги</label>
-            <div class="chips-row">${tagList.map(t => `<button type="button" class="chip-t ${(pr.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}
-              <span class="chip-add"><input id="tagAddInp" placeholder="+ свой тег"><button class="chip-plus" id="tagAddBtn">${ic(I.plus)}</button></span>
-            </div>
-          </div>
-          <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Удобства</label>
-            <div class="chips-row">${amenList.map(a => `<button type="button" class="chip-t ${(pr.amenities || []).includes(a) ? 'on' : ''}" data-amen="${esc(a)}">${esc(a)}</button>`).join('')}
-              <span class="chip-add"><input id="amenAddInp" placeholder="+ своё удобство"><button class="chip-plus" id="amenAddBtn">${ic(I.plus)}</button></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pds tint">
+                <div class="pd2-cols">
+          <div class="pd2-mcol">
+<div class="pds tint">
           <div class="pds-hd"><span class="pds-ic v">✦</span><div><b>Витрина для подборки</b><i>крючок, метрики, район и аргументы — ровно то, что увидит клиент</i></div></div>
           <div class="pds-grid hookrow">
             <div class="pd-fact"><label class="lc-lbl">Заголовок-крючок (вместо названия ЖК)</label><input class="gi big" data-f="hookTitle" value="${esc(pr.hookTitle || '')}" placeholder="Комплекс с инфраструктурой… в 20 минутах от Business Bay"></div>
@@ -2149,6 +2132,28 @@ PAGES.properties = async (root) => {
           </div>
         </div>
 
+        
+          </div>
+          <aside class="pd2-scol">
+<div class="pds">
+          <div class="pds-hd"><span class="pds-ic">${ic(I.doc)}</span><div><b>Паспорт объекта</b><i>формат, сдача, теги и удобства — фильтры и match подборок</i></div></div>
+          <div class="pds-grid c3">
+            <div class="pd-fact"><label class="lc-lbl">Формат</label>${combo('type', MD.common.types, pr.type, 'формат')}</div>
+            <div class="pd-fact"><label class="lc-lbl">Сдача</label>${combo('handover', MD.common.handover, pr.handover, 'срок')}</div>
+            <div class="pd-fact"><label class="lc-lbl">Заметка (внутренняя)</label><input class="gi" data-f="note" value="${esc(pr.note || '')}" placeholder="для команды, клиент не видит"></div>
+          </div>
+          <div class="pd-fact" style="margin-top:12px"><label class="lc-lbl">Теги</label>
+            <div class="chips-row">${tagList.map(t => `<button type="button" class="chip-t ${(pr.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}
+              <span class="chip-add"><input id="tagAddInp" placeholder="+ свой тег"><button class="chip-plus" id="tagAddBtn">${ic(I.plus)}</button></span>
+            </div>
+          </div>
+          <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Удобства</label>
+            <div class="chips-row">${amenList.map(a => `<button type="button" class="chip-t ${(pr.amenities || []).includes(a) ? 'on' : ''}" data-amen="${esc(a)}">${esc(a)}</button>`).join('')}
+              <span class="chip-add"><input id="amenAddInp" placeholder="+ своё удобство"><button class="chip-plus" id="amenAddBtn">${ic(I.plus)}</button></span>
+            </div>
+          </div>
+        </div>
+
         <div class="pds grey">
           <div class="pds-hd"><span class="pds-ic m">${ic(I.eye)}</span><div><b>Медиа и материалы</b><i>фото, планировки, брошюры — уходят в подборки</i></div></div>
           <div class="pds-grid c3 media">
@@ -2168,6 +2173,8 @@ PAGES.properties = async (root) => {
               <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:110px;flex:0 0 110px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
             </div>
           </div>
+        </div>
+          </aside>
         </div>
       </div>`;
 
