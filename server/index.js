@@ -342,6 +342,24 @@ function getSession(req) {
   if (!m) return null;
   return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
 }
+/* роль сессии: owner (пароль агентства) | broker (личный PIN) */
+function sessionRole(req) {
+  const sid = getSession(req);
+  if (!sid) return null;
+  const s = store.get().settings.auth.sessions[sid];
+  return { sid, role: s.role || 'owner', brokerId: s.brokerId || null };
+}
+/* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
+function audit(db, req, action, extra) {
+  const s = sessionRole(req);
+  const who = s && s.role === 'broker' ? ((db.brokers.find(b => b.id === s.brokerId) || {}).name || s.brokerId) : 'владелец';
+  db.audit = db.audit || [];
+  db.audit.unshift(Object.assign({ at: Date.now(), who, role: s ? s.role : '—', action }, extra || {}));
+  if (db.audit.length > 500) db.audit.length = 500;
+  store.save();
+}
+/* маскировка телефона для чужих лидов у роли broker */
+const maskPhone = (ph) => String(ph || '').replace(/^(\+?\d{2,4})\d+(\d{2})$/, '$1•••••$2');
 
 function tunnelUrl() {
   try {
@@ -748,12 +766,20 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- auth ---------------- */
     if (p === '/auth/login' && req.method === 'POST') {
       const b = await readBody(req);
-      if (sha(String(b.password || '')) !== db.settings.auth.passHash) {
+      let sess = null;
+      if (sha(String(b.password || '')) === db.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
+      else {
+        /* личный PIN брокера → роль broker (урезанный доступ) */
+        const br = db.brokers.find(x => x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false);
+        if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id };
+      }
+      if (!sess) {
         await new Promise(r => setTimeout(r, 600)); // тормоз перебору
         return json(res, 401, { error: 'wrong password' });
       }
       const sid = crypto.randomBytes(16).toString('hex');
-      db.settings.auth.sessions[sid] = { at: Date.now() };
+      db.settings.auth.sessions[sid] = sess;
+      if (sess.role === 'broker') { const brName = (db.brokers.find(x => x.id === sess.brokerId) || {}).name; db.audit = db.audit || []; db.audit.unshift({ at: Date.now(), who: brName, role: 'broker', action: 'вход в систему' }); }
       const keys = Object.keys(db.settings.auth.sessions);
       if (keys.length > 20) delete db.settings.auth.sessions[keys[0]];
       store.save();
@@ -795,16 +821,31 @@ const server = http.createServer(async (req, res) => {
 
     if (p.startsWith('/api/') && !getSession(req)) return json(res, 401, { error: 'auth required' });
 
+    /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
+    const ROLE = sessionRole(req);
+    const IS_BROKER = ROLE && ROLE.role === 'broker';
+    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
+    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
+    /* видимость лида для брокера: только свои */
+    const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
+    const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; return c2; };
+
     if (p === '/api/state' && req.method === 'GET') {
       json(res, 200, {
-        settings: publicSettings(db), brokers: db.brokers, numbers: db.numbers,
+        settings: publicSettings(db), brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
         templates: db.templates, sequences: db.sequences,
-        events: db.events.slice(0, 40), analytics: analytics(db),
+        events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
+        analytics: analytics(db),
+        me: ROLE ? { role: ROLE.role, brokerId: ROLE.brokerId, name: IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}).name : null } : null,
       }); return;
+    }
+    /* журнал доступа (только владелец) */
+    if (p === '/api/audit' && req.method === 'GET') {
+      return json(res, 200, (db.audit || []).slice(0, 200));
     }
 
     if (p === '/api/leads' && req.method === 'GET') {
-      let list = db.leads.map(l => leadView(db, l));
+      let list = (IS_BROKER ? db.leads.filter(canSeeLead) : db.leads).map(l => leadView(db, l));
       const stage = u.searchParams.get('stage'), geo = u.searchParams.get('geo'), q = (u.searchParams.get('q') || '').toLowerCase();
       if (stage) list = list.filter(l => l.stage === stage);
       if (geo) list = list.filter(l => l.geo === geo);
@@ -830,10 +871,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     let m;
+    if ((m = p.match(/^\/api\/leads\/([^/]+)/))) {
+      const lead0 = db.leads.find(l => l.id === m[1]);
+      if (lead0 && !canSeeLead(lead0)) { audit(db, req, 'попытка доступа к чужому лиду', { leadId: lead0.id }); return json(res, 403, { error: 'чужой лид' }); }
+    }
     if ((m = p.match(/^\/api\/leads\/([^/]+)$/))) {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
       if (req.method === 'GET') {
+        if (IS_BROKER) audit(db, req, 'открыл карточку лида', { leadId: lead.id, lead: lead.name });
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
         return json(res, 200, Object.assign(leadView(db, lead), {
           messages: msgs,
@@ -1002,6 +1048,26 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      /* личный PIN для входа (роль broker); минимум 6 символов, уникальность против пароля владельца */
+      if (b.pin) {
+        const ph = sha(String(b.pin));
+        if (String(b.pin).length < 6) return json(res, 400, { error: 'PIN короче 6 символов' });
+        if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
+        br.pinHash = ph;
+        audit(db, req, 'задан PIN брокеру', { broker: br.name });
+      }
+      /* kill-switch: отключение доступа + переназначение лидов + сброс сессий брокера */
+      if (b.active === false && br.active !== false) {
+        br.active = false;
+        for (const [sid2, s2] of Object.entries(db.settings.auth.sessions)) if (s2.brokerId === br.id) delete db.settings.auth.sessions[sid2];
+        const mine = db.leads.filter(l => l.broker === br.id && !['deal', 'lost'].includes(l.stage));
+        const pool = db.brokers.filter(x => x.id !== br.id && x.active !== false);
+        mine.forEach(l => { const nb = pool.sort((a2, b2) => a2.load - b2.load)[0]; l.broker = nb ? nb.id : null; if (nb) nb.load += 1; });
+        br.load = 0;
+        audit(db, req, `доступ отключён, ${mine.length} лидов переназначено`, { broker: br.name });
+        ai.pushEvent(db, { type: 'ai_off', text: `Брокер ${br.name} отключён — ${mine.length} лидов переданы команде` });
+      }
+      if (b.active === true) { br.active = true; audit(db, req, 'доступ включён', { broker: br.name }); }
       store.save();
       return json(res, 200, br);
     }

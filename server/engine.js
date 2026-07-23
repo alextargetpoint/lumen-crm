@@ -167,6 +167,8 @@ function handover(db, lead, brokerId) {
   if (!broker) broker = pickBroker(db, lead);
   lead.broker = broker.id;
   lead.stage = 'handover';
+  lead.handoverAt = Date.now();   /* точка отсчёта SLA «коснись за N минут» */
+  lead.slaFlag = null;
   broker.load += 1;
   if (!lead.summary) lead.summary = ai.buildSummary(db, lead);
   if (!lead.nextAction) lead.nextAction = { text: `Позвонить в течение 30 мин (передан от ИИ)`, at: Date.now() + 30 * 60e3 };
@@ -351,6 +353,37 @@ function tickMeetings(db) {
         ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Напоминание (${hrs >= 1 ? 'за ' + hrs + ' ч' : 'за ' + Math.round(hrs * 60) + ' мин'}) отправлено: ${lead.name}` });
       }
     });
+  }
+}
+
+/* ---------- SLA: брокер обязан коснуться лида за N минут после передачи ----------
+   Просрочка → эскалация в ленту (+ мгновенный алерт, если включён); вторая просрочка
+   (2×N) → «shark tank»: лид возвращается в пул и уходит следующему брокеру. */
+function tickSla(db) {
+  const slaMin = (db.settings.automations || {}).brokerSlaMin;
+  if (!slaMin) return;
+  const nowT = Date.now();
+  for (const l of db.leads) {
+    if (l.stage !== 'handover' || !l.broker || !l.handoverAt) continue;
+    const touched = db.messages.some(m2 => m2.leadId === l.id && m2.dir === 'out' && m2.via === 'human' && m2.at > l.handoverAt);
+    const mt = (db.meetings || []).some(x => x.leadId === l.id && x.createdAt > l.handoverAt);
+    if (touched || mt) { l.slaFlag = null; continue; }
+    const overdueMin = (nowT - l.handoverAt) / 60e3;
+    const broker = db.brokers.find(b => b.id === l.broker);
+    if (overdueMin > slaMin * 2 && l.slaFlag === 'warned') {
+      /* shark tank: возврат в пул */
+      const pool = db.brokers.filter(b => b.id !== l.broker && b.active !== false && b.geo === l.geo)
+        .concat(db.brokers.filter(b => b.id !== l.broker && b.active !== false));
+      const nb = pool.sort((a2, b2) => a2.load - b2.load)[0];
+      if (nb) {
+        if (broker) broker.load = Math.max(0, broker.load - 1);
+        l.broker = nb.id; nb.load += 1; l.handoverAt = nowT; l.slaFlag = 'reassigned';
+        ai.pushEvent(db, { type: 'handover', leadId: l.id, text: `⚠️ SLA ×2: ${l.name} не взят в работу — переназначен на ${nb.name}` });
+      }
+    } else if (overdueMin > slaMin && !l.slaFlag) {
+      l.slaFlag = 'warned';
+      ai.pushEvent(db, { type: 'ai_off', leadId: l.id, text: `⚠️ SLA: ${broker ? broker.name : 'брокер'} не связался с ${l.name} за ${slaMin} мин после передачи` });
+    }
   }
 }
 
@@ -578,6 +611,7 @@ function startLoop() {
       tickChains(db);
       tickCampaigns(db);
       tickMeetings(db);
+      tickSla(db);
       tickReports(db);
       tickSimulator(db);
       store.save();

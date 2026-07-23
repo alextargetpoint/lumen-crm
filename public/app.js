@@ -494,8 +494,25 @@ let STATE = null;
 let CUR = 'overview';
 const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 
+/* брокер-режим: админ-разделы недоступны и скрыты */
+const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency'];
+function applyRoleUi() {
+  const me = STATE && STATE.me;
+  const isBroker = me && me.role === 'broker';
+  $$('.nav-item').forEach(btn => { if (BROKER_HIDDEN_PAGES.includes(btn.dataset.page)) btn.style.display = isBroker ? 'none' : ''; });
+  $$('.nav-label').forEach(lb => { /* прячем осиротевшие заголовки групп */
+    let el2 = lb.nextElementSibling, any = false;
+    while (el2 && !el2.classList.contains('nav-label')) { if (el2.style.display !== 'none') any = true; el2 = el2.nextElementSibling; }
+    lb.style.display = isBroker && !any ? 'none' : '';
+  });
+  if (isBroker && BROKER_HIDDEN_PAGES.includes(CUR)) go('inbox');
+  const foot = $('.side-foot .agency');
+  if (foot && isBroker && !foot.dataset.roleBadge) { foot.dataset.roleBadge = '1'; foot.insertAdjacentHTML('beforeend', `<div style="font-size:9.5px;color:#86AFFF;margin-top:3px">брокер · ${esc(me.name || '')}</div>`); }
+}
+
 async function loadState() {
   STATE = await api.get('/state');
+  applyRoleUi();
   $('#agencyName').textContent = STATE.settings.agency.name;
   try { localStorage.setItem('lumen_brand', JSON.stringify({ logo: STATE.settings.agency.logo || '', name: STATE.settings.agency.name || '' })); } catch (e) {}
   $('#agencyAva').textContent = STATE.settings.agency.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -2600,6 +2617,7 @@ PAGES.automations = async (root) => {
         <div class="glass card mb">
           <div class="card-title">${ic(I.cal)}Встречи</div>
           ${swRow('Цепочка напоминаний клиенту', 'Часы до встречи через запятую (0.5 = за 30 мин) — каждое уходит в WhatsApp со ссылкой на страницу встречи', `<input id="meetChain" style="width:150px" value="${esc((a.meetRemindChain || (a.meetingReminderHrs ? [a.meetingReminderHrs] : [24, 3])).join(', '))}" placeholder="24, 3, 0.5">`)}
+          ${swRow('SLA брокера, минут', 'Не коснулся лида после передачи за N мин → эскалация в ленту; за 2×N → лид уходит следующему брокеру', `<input id="slaMin" type="number" style="width:90px" value="${a.brokerSlaMin || ''}" placeholder="30">`)}
           ${swRow('«Не пришёл» — вернуть в работу', 'Мягкое сообщение клиенту + ИИ снова ведёт диалог, лид не теряется', sw('noShowMessage', a.noShowMessage))}
         </div>
         <div class="glass card">
@@ -2684,6 +2702,8 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  const sla = $('#slaMin');
+  if (sla) sla.addEventListener('change', () => saveAuto({ brokerSlaMin: +sla.value || 0 }));
   const mc = $('#meetChain');
   if (mc) mc.addEventListener('change', () => {
     const chain = mc.value.split(',').map(x => parseFloat(x.trim().replace(',', '.'))).filter(x => x > 0).slice(0, 6);
@@ -2962,6 +2982,8 @@ function tplCard(t, stBadge) {
 /* ---------------- БРОКЕРЫ ---------------- */
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
+  let auditLog = [];
+  try { auditLog = await api.get('/audit'); } catch (e) {}
   const st = STATE.settings;
   const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
   const editId = PAGE_STATE.brokerEdit;
@@ -3000,6 +3022,13 @@ PAGES.brokers = async (root) => {
               <div class="pd-fact"><label class="lc-lbl">Направление</label><select data-be="geo">${st.agency.geos.map(g => `<option value="${g}" ${b.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select></div>
               <div class="pd-fact"><label class="lc-lbl">Лимит лидов</label><input class="gi" data-be="capacity" type="number" value="${b.capacity}"></div>
             </div>
+            <div class="pds-grid c2" style="margin-top:10px">
+              <div class="pd-fact"><label class="lc-lbl">Личный PIN для входа (мин. 6 символов)</label><input class="gi" data-be="pin" type="password" placeholder="${b.pinHash ? '•••••• задан — ввести новый' : 'выдайте брокеру PIN'}"></div>
+              <div class="pd-fact"><label class="lc-lbl">Доступ в систему</label>
+                <div style="display:flex;gap:9px;align-items:center;padding-top:6px"><label class="switch"><input type="checkbox" data-be="active" ${b.active !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+                <span class="muted" style="font-size:11.5px">${b.active !== false ? 'активен · видит только своих лидов' : 'отключён · лиды переданы команде'}</span></div>
+              </div>
+            </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(lg)}</button>`).join('')}
                 <span class="chip-add"><input id="langAddInp" placeholder="+ язык" style="width:76px"><button class="chip-plus" id="langAddBtn">${ic(I.plus)}</button></span>
@@ -3028,6 +3057,7 @@ PAGES.brokers = async (root) => {
       </div>`;
     }).join('')}
   </div>
+  ${auditLog.length ? `<div style="margin-top:16px">${coll('Журнал доступа · безопасность базы', `<div style="font-size:12px;line-height:1.9;padding:6px 2px">${auditLog.slice(0, 40).map(a => `<div><span class="muted">${new Date(a.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <b>${esc(a.who || '—')}</b> — ${esc(a.action)}${a.lead ? ' · ' + esc(a.lead) : ''}</div>`).join('')}</div>`, { open: false, count: auditLog.length, icon: I.shield })}</div>` : ''}
   <div class="glass card" style="margin-top:16px">
     <div class="card-title">${ic(I.handover)}Как ИИ выбирает брокера</div>
     <div class="muted" style="font-size:12.8px;line-height:1.6">Режим распределения настраивается в «Автоматизациях»: по загрузке, по очереди или по сменам. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога — и авто-задачу «позвонить в течение 30 минут». Учётки-логины брокеров добавим следующим этапом.</div>
@@ -3085,10 +3115,13 @@ PAGES.brokers = async (root) => {
     eb.querySelector('#langAddBtn').addEventListener('click', lAdd);
     eb.querySelector('#langAddInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lAdd(); } });
     eb.querySelector('[data-brsave]').addEventListener('click', async () => {
+      const pinVal = eb.querySelector('[data-be="pin"]').value.trim();
       await api.patch('/brokers/' + eb.dataset.bredit, {
         name: eb.querySelector('[data-be="name"]').value,
         geo: eb.querySelector('[data-be="geo"]').value,
         capacity: +eb.querySelector('[data-be="capacity"]').value,
+        ...(pinVal ? { pin: pinVal } : {}),
+        active: eb.querySelector('[data-be="active"]').checked,
         langs: $$('.lang-chip.on', eb).map(x => x.dataset.lg),
         schedule: (() => {
           const on = $$('.day-chip.on', eb).map(x => +x.dataset.d);
