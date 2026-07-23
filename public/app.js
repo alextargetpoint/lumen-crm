@@ -36,6 +36,8 @@ const I = {
   shield: '<path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/>',
   handover: '<path d="M4 14a4 4 0 0 1 6-3.5L12 12l2-1.5a4 4 0 0 1 6 3.5M12 12v6M8 21h8"/>',
   eye: '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
+  cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
 };
 
 const NAV = {
@@ -45,6 +47,7 @@ const NAV = {
   qualifier: { name: 'ИИ-квалификатор', icon: I.spark, sub: 'Критерии, регламент и автопилот первой линии' },
   sequences: { name: 'Цепочки касаний', icon: I.chain, sub: '7 касаний / 18 дней для молчунов' },
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
+  meetings:  { name: 'Встречи', icon: I.cal, sub: 'Слоты с экспертами · WhatsApp-подтверждения' },
   numbers:   { name: 'Номера', icon: I.sim, sub: 'Пул WhatsApp-номеров: качество, лимиты, прогрев' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: 'Utility и Marketing шаблоны Cloud API' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: 'Команда экспертов и загрузка' },
@@ -66,11 +69,51 @@ const STAGES = [
 const stageName = (id) => (STAGES.find(s => s.id === id) || {}).name || id;
 
 /* ---------- api ---------- */
+async function apiReq(method, p, b) {
+  const r = await fetch('/api' + p, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: method === 'GET' ? undefined : JSON.stringify(b || {}),
+  });
+  if (r.status === 401) { renderLogin(); throw new Error('auth'); }
+  return r.json();
+}
 const api = {
-  get: (p) => fetch('/api' + p).then(r => r.json()),
-  post: (p, b) => fetch('/api' + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.json()),
-  patch: (p, b) => fetch('/api' + p, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.json()),
+  get: (p) => apiReq('GET', p),
+  post: (p, b) => apiReq('POST', p, b),
+  patch: (p, b) => apiReq('PATCH', p, b),
 };
+
+/* ---------- экран входа (тёмный, по бренду) ---------- */
+function renderLogin() {
+  if ($('#loginScreen')) return;
+  const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;
+      background:radial-gradient(900px 600px at 80% -10%,rgba(47,107,255,.25),transparent 60%),
+                 radial-gradient(700px 500px at 10% 110%,rgba(16,43,92,.5),transparent 55%),
+                 linear-gradient(160deg,#0A1833,#061126 70%)">
+    <div style="width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
+        background:rgba(255,255,255,.06);border:1px solid rgba(134,175,255,.18);
+        backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+        box-shadow:0 30px 80px -20px rgba(3,8,25,.8);text-align:center">
+      <img src="logo.svg" style="width:44px;height:53px;margin:0 auto 14px;filter:drop-shadow(0 4px 14px rgba(78,130,255,.5))">
+      <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
+      <div style="font-size:10px;letter-spacing:.16em;color:#86AFFF;margin:4px 0 26px">REAL ESTATE CRM</div>
+      <input id="loginPass" type="password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);
+        border:1px solid rgba(134,175,255,.25);color:#fff;text-align:center;font-size:14px;padding:11px">
+      <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:#f28b8b"></div>
+      <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:44px;font-size:14px">Войти</button>
+    </div>
+  </div>`);
+  document.body.appendChild(s);
+  const doLogin = async () => {
+    const r = await fetch('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('#loginPass').value }) });
+    if (r.ok) location.reload();
+    else $('#loginErr').textContent = 'Неверный пароль';
+  };
+  $('#loginBtn').addEventListener('click', doLogin);
+  $('#loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+  $('#loginPass').focus();
+}
 
 /* ---------- время ---------- */
 function ago(ts) {
@@ -171,7 +214,7 @@ PAGES.overview = async (root) => {
   const [an, events, leads] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads')]);
   const f = an.funnel;
   const inDialog = f.dialog + f.touch;
-  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield }[t] || I.bolt);
+  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn' }[t] || '');
 
   root.innerHTML = `
@@ -222,18 +265,21 @@ PAGES.overview = async (root) => {
 PAGES.funnel = async (root) => {
   const leads = await api.get('/leads' + (PAGE_STATE.funnelGeo ? '?geo=' + PAGE_STATE.funnelGeo : ''));
   const geos = STATE.settings.agency.geos;
+  const dupes = await api.get('/duplicates');
   root.innerHTML = `
     <div class="filters">
       <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${PAGE_STATE.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
-      <span class="muted" style="font-size:12px">${leads.length} лидов</span>
+      <span class="muted" style="font-size:12px">${leads.length} лидов · карточки можно перетаскивать между стадиями</span>
+      <span class="tb-spacer"></span>
+      ${dupes.length ? `<button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли: <b style="color:var(--bad)">&nbsp;${dupes.length}</b></button>` : `<span class="badge ok">${ic(I.check)}дублей нет</span>`}
     </div>
     <div class="kanban">
       ${STAGES.map(s => {
         const items = leads.filter(l => l.stage === s.id);
-        return `<div class="kb-col">
+        return `<div class="kb-col" data-stage="${s.id}">
           <div class="kb-head"><span class="nm">${s.name}</span><span class="ct">${items.length}</span></div>
           <div class="kb-cards">
-            ${items.map(l => `<div class="lead-card glass" data-id="${l.id}">
+            ${items.map(l => `<div class="lead-card glass" data-id="${l.id}" data-stage="${l.stage}">
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
               <div class="axes">${Object.keys(AXIS_NAMES).map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
@@ -249,8 +295,163 @@ PAGES.funnel = async (root) => {
       }).join('')}
     </div>`;
   $('#fGeo').addEventListener('change', (e) => { PAGE_STATE.funnelGeo = e.target.value; render(); });
-  $$('.lead-card', root).forEach(c => c.addEventListener('click', () => openLeadModal(c.dataset.id)));
+  $$('.lead-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) openLeadModal(c.dataset.id); }));
+  const db = $('#dupesBtn');
+  if (db) db.addEventListener('click', () => openDupesModal(dupes));
+  wireKanbanDrag(root);
 };
+
+/* ---------- канбан: перетаскивание на pointer-событиях (HTML5 DnD глючит) ---------- */
+const DRAG = { moved: false, active: false };
+function wireKanbanDrag(root) {
+  const board = $('.kanban', root);
+  if (!board) return;
+  board.addEventListener('pointerdown', (e) => {
+    const card = e.target.closest('.lead-card');
+    if (!card || e.button !== 0) return;
+    const startX = e.clientX, startY = e.clientY;
+    let ghost = null;
+    DRAG.moved = false;
+    DRAG.active = true;
+
+    const onMove = (ev) => {
+      if (!ghost && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 7) return;
+      if (!ghost) {
+        DRAG.moved = true;
+        const r = card.getBoundingClientRect();
+        ghost = card.cloneNode(true);
+        ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:400;pointer-events:none;opacity:.92;transform:rotate(2deg);box-shadow:var(--shadow-lift)`;
+        ghost.dataset.ox = ev.clientX - r.left;
+        ghost.dataset.oy = ev.clientY - r.top;
+        document.body.appendChild(ghost);
+        card.style.opacity = '.35';
+      }
+      ghost.style.left = (ev.clientX - ghost.dataset.ox) + 'px';
+      ghost.style.top = (ev.clientY - ghost.dataset.oy) + 'px';
+      $$('.kb-col', board).forEach(c => c.classList.remove('drop'));
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const col = under && under.closest('.kb-col');
+      if (col) col.classList.add('drop');
+    };
+    const onUp = async (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!ghost) return;
+      ghost.remove();
+      card.style.opacity = '';
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const col = under && under.closest('.kb-col');
+      $$('.kb-col', board).forEach(c => c.classList.remove('drop'));
+      if (col && col.dataset.stage && col.dataset.stage !== card.dataset.stage) {
+        await api.patch('/leads/' + card.dataset.id, { stage: col.dataset.stage });
+        toast('Стадия обновлена', stageName(col.dataset.stage), true);
+        render();
+      }
+      setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 50);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  });
+}
+
+/* ---------- дубли ---------- */
+function openDupesModal(groups) {
+  modal({
+    title: 'Дубли лидов',
+    sub: 'Один номер телефона — несколько карточек. При объединении переписка и оси квалификации переносятся в основную (самую раннюю) карточку.',
+    wide: true,
+    body: groups.map((g, gi) => `
+      <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px 14px;margin-bottom:11px">
+        <div style="font-size:12px;color:var(--ink-3);margin-bottom:8px">${esc(g[0].phone)}</div>
+        ${g.map((l, i) => `<div style="display:flex;align-items:center;gap:9px;padding:5px 0">
+          <b style="font-size:13px">${esc(l.name)}</b>
+          <span class="badge">${stageName(l.stage)}</span>
+          <span class="muted" style="font-size:11px">${l.geoName} · создан ${ago(l.createdAt)}</span>
+          ${i === 0 ? '<span class="badge ok">останется</span>' : ''}
+        </div>`).join('')}
+        <button class="btn btn-sm btn-accent" data-merge="${gi}" style="margin-top:8px">${ic(I.copy)}Объединить</button>
+      </div>`).join(''),
+    actions: [{ label: 'Закрыть' }],
+  });
+  $$('.modal [data-merge]').forEach(b => b.addEventListener('click', async () => {
+    const g = groups[+b.dataset.merge];
+    await api.post('/duplicates/merge', { keepId: g[0].id, mergeIds: g.slice(1).map(x => x.id) });
+    toast('Дубли объединены', 'Переписка перенесена в основную карточку', true);
+    closeModal();
+    render();
+  }));
+}
+
+/* ---------- встречи ---------- */
+PAGES.meetings = async (root) => {
+  const list = await api.get('/meetings');
+  const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' };
+  const stBadge = { scheduled: '<span class="badge acc">назначена</span>', done: '<span class="badge ok">прошла</span>', no_show: '<span class="badge bad">не пришёл</span>', canceled: '<span class="badge">отменена</span>' };
+  const byDay = {};
+  for (const mt of list) {
+    const d = new Date(mt.at).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+    (byDay[d] = byDay[d] || []).push(mt);
+  }
+  root.innerHTML = `
+    <div class="two-col">
+      <div>
+        ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items]) => `
+          <div class="nav-label" style="padding-left:2px">${day}</div>
+          ${items.map(mt => `<div class="glass" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px">
+            <div style="font-size:15px;font-weight:700;color:var(--navy-900);min-width:48px">${tmm(mt.at)}</div>
+            <div style="flex:1">
+              <div style="font-size:13.5px;font-weight:650;color:var(--navy-900)">${esc(mt.leadName)} <span class="muted" style="font-weight:400">· ${kindRu[mt.kind] || mt.kind}</span></div>
+              <div class="muted" style="font-size:11.5px;margin-top:2px">эксперт: ${esc(mt.brokerName)}${mt.note ? ' · ' + esc(mt.note) : ''}</div>
+            </div>
+            ${stBadge[mt.status] || ''}
+            ${mt.status === 'scheduled' ? `<button class="btn btn-sm" data-mt="${mt.id}" data-st="done">Прошла</button>
+            <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>` : ''}
+          </div>`).join('')}`).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
+      </div>
+      <div class="glass card" style="align-self:start">
+        <div class="card-title">${ic(I.cal)}Как работают встречи</div>
+        ${[['Слот из диалога', 'ИИ довёл до квалификации → в панели лида кнопка «Назначить встречу»: слот, тип, эксперт'],
+           ['WhatsApp-подтверждение', 'Клиенту сразу уходит подтверждение со временем и именем эксперта — тем же каналом, где шёл диалог'],
+           ['Перенос словами', 'Клиент пишет «давайте позже» — диалог живой, менеджер двигает слот в один клик'],
+           ['Не пришёл — не потерян', 'Статус «не пришёл» возвращает лида в работу первой линии, а не в архив']]
+          .map(([t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
+      </div>
+    </div>`;
+  $$('[data-mt]', root).forEach(b => b.addEventListener('click', async () => {
+    await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
+    toast('Статус встречи обновлён', null, true);
+    PAGES.meetings(root);
+  }));
+};
+
+function openMeetingModal(lead, after) {
+  const brokers = STATE.brokers.filter(b => b.geo === lead.geo).concat(STATE.brokers.filter(b => b.geo !== lead.geo));
+  const tomorrow = new Date(Date.now() + 24 * 3600e3);
+  const defDate = tomorrow.toISOString().slice(0, 10);
+  modal({
+    title: 'Назначить встречу',
+    sub: `${esc(lead.name)} · ${lead.geoName}. Клиент получит WhatsApp-подтверждение сразу после назначения.`,
+    body: `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Дата</label><input id="mtDate" type="date" value="${defDate}"></div>
+        <div class="form-row"><label>Время</label><input id="mtTime" type="time" value="11:00"></div>
+      </div>
+      <div class="form-row"><label>Тип</label><select id="mtKind">
+        <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
+      </select></div>
+      <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>`,
+    actions: [
+      { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
+        const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
+        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, note: $('#mtNote', bd).value });
+        toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
+        if (after) after();
+      } },
+      { label: 'Отмена' },
+    ],
+  });
+}
 
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
@@ -360,12 +561,14 @@ async function renderChat(id, rebuild) {
     ${l.summary ? `<div class="lp-sec">Саммари для брокера</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
     <div class="lp-actions">
       ${!['handover', 'viewing', 'deal'].includes(l.stage) ? `<button class="btn btn-accent" id="handoverBtn">${ic(I.handover)}Передать брокеру</button>` : `<div class="badge ok" style="justify-content:center">${ic(I.check)}У брокера: ${esc(l.brokerName || '')}</div>`}
+      <button class="btn" id="meetBtn">${ic(I.cal)}Назначить встречу</button>
       ${STATE.settings.demo.simulateReplies ? `<button class="btn" id="simBtn">${ic(I.chat)}Демо: ответ клиента</button>` : ''}
       <button class="btn btn-ghost" id="reScreenBtn">Перечитать переписку (скрининг)</button>
     </div>`;
   $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); toast(e.target.checked ? 'ИИ снова ведёт диалог' : 'ИИ на паузе — лид на менеджере', null, true); });
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', async () => { await api.post(`/leads/${id}/handover`); toast('Лид передан брокеру', 'Саммари и слот отправлены', true); renderChat(id, true); });
+  $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));
   const sb = $('#simBtn');
   if (sb) sb.addEventListener('click', async () => {
     const pool = ['Рассматриваю как инвестицию, под сдачу', 'Бюджет до 200 тысяч долларов', 'Смотрим виллу с 2 спальнями', 'Готов в течение пары месяцев', 'А что по ценам сейчас?'];
@@ -749,9 +952,25 @@ PAGES.settings = async (root) => {
         <div class="glass card mb">
           <div class="card-title">${ic(I.spark)}Движок ИИ</div>
           <div class="set-row">
-            <div class="sp"><div class="sl">Провайдер</div><div class="sd">v1: детерминированное ядро квалификации (факты только из сообщений клиента). LLM-слой подключается здесь без смены логики.</div></div>
-            <span class="badge acc">${s.ai.provider === 'mock' ? 'ядро v1' : 'LLM'}</span>
+            <div class="sp"><div class="sl">LLM (${s.ai.llmModel || 'Gemini'})</div><div class="sd">${s.ai.llmAvailable ? 'Ключ найден — живые ответы включены. Оси квалификации всё равно клампятся цитатами клиента.' : 'Ключ не задан (GEMINI_API_KEY в .env) — работает детерминированное ядро.'}</div></div>
+            <span class="badge ${s.ai.llmAvailable ? 'ok' : 'warn'}">${s.ai.llmAvailable ? 'подключён' : 'нет ключа'}</span>
           </div>
+          <div class="set-row">
+            <div class="sp"><div class="sl">Режим ответов</div><div class="sd">«Экономный» — LLM только для реальных клиентов, демо-симуляция ходит на бесплатном ядре и не жжёт токены</div></div>
+            <select id="aiProv" style="width:170px">
+              <option value="auto" ${s.ai.provider === 'auto' ? 'selected' : ''}>Экономный (авто)</option>
+              <option value="llm" ${s.ai.provider === 'llm' ? 'selected' : ''}>Всегда LLM</option>
+              <option value="core" ${s.ai.provider === 'core' ? 'selected' : ''}>Только ядро</option>
+            </select>
+          </div>
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.shield)}Пароль входа</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Текущий</label><input id="pwCur" type="password"></div>
+            <div class="form-row"><label>Новый (от 8 символов)</label><input id="pwNext" type="password"></div>
+          </div>
+          <button class="btn" id="pwSave">Сменить пароль</button>
         </div>
         <div class="glass card">
           <div class="card-title">${ic(I.eye)}Демо-режим</div>
@@ -772,9 +991,22 @@ PAGES.settings = async (root) => {
     </div>`;
   $('#saveWa').addEventListener('click', async () => {
     const token = $('#waToken').value.trim();
-    await api.patch('/settings', { wa: { phoneId: $('#waPhoneId').value.trim(), wabaId: $('#waWabaId').value.trim(), ...(token ? { tokenSet: true } : {}) } });
-    toast('Подключение сохранено', token ? 'Токен принят' : undefined, true);
-    loadState();
+    const phoneId = $('#waPhoneId').value.trim();
+    await api.patch('/settings', { wa: {
+      phoneId, wabaId: $('#waWabaId').value.trim(),
+      ...(token ? { token } : {}),
+      mode: (token || s.wa.tokenSet) && phoneId ? 'cloud' : 'mock',
+    } });
+    toast('Подключение сохранено', token && phoneId ? 'Боевой режим: отправка через Cloud API' : 'Демо-режим (нет токена или Phone ID)', true);
+    await loadState();
+    render();
+  });
+  $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); toast('Режим ИИ обновлён', null, true); loadState(); });
+  $('#pwSave').addEventListener('click', async () => {
+    const r = await fetch('/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current: $('#pwCur').value, next: $('#pwNext').value }) });
+    const j = await r.json();
+    if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
+    else toast('Не получилось', j.error || 'ошибка');
   });
   $('#dAcc').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { accelerate: e.target.checked } }); loadState(); });
   $('#dSim').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { simulateReplies: e.target.checked } }); loadState(); });
@@ -816,6 +1048,7 @@ $('#newLeadBtn').addEventListener('click', () => {
 setInterval(async () => {
   try {
     await loadState();
+    if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
     else if (['overview', 'funnel'].includes(CUR) && !$('.modal-bd')) await render();
   } catch (e) { /* сервер перезапускается — тихо ждём */ }

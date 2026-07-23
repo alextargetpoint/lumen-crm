@@ -3,7 +3,19 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { URL } = require('url');
+
+/* .env → process.env (без зависимостей) */
+try {
+  const envFile = path.join(__dirname, '..', '.env');
+  if (fs.existsSync(envFile)) {
+    for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+    }
+  }
+} catch (e) { console.error('[env]', e.message); }
 
 const store = require('./store');
 const { seed } = require('./seed');
@@ -14,8 +26,40 @@ const PORT = process.env.PORT || 5077;
 const PUBLIC = path.join(__dirname, '..', 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 
+const llm = require('./llm');
+const wa = require('./wa');
+
 store.load(seed);
 engine.startLoop();
+
+/* ---------- авторизация ---------- */
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const DEFAULT_PASS = 'lumen2026';
+{
+  const db = store.get();
+  if (!db.settings.auth) {
+    db.settings.auth = { passHash: sha(DEFAULT_PASS), sessions: {} };
+    store.save();
+    console.log(`[auth] пароль по умолчанию: ${DEFAULT_PASS} — смените в «Подключениях»`);
+  }
+  if (db.settings.ai.provider === 'mock') { db.settings.ai.provider = 'auto'; store.save(); }
+}
+
+function getSession(req) {
+  const cookie = req.headers.cookie || '';
+  const m = cookie.match(/lumen_sid=([a-f0-9]{32})/);
+  if (!m) return null;
+  return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
+}
+
+function publicSettings(db) {
+  const s = JSON.parse(JSON.stringify(db.settings));
+  delete s.auth;
+  if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
+  s.ai.llmAvailable = llm.available();
+  s.ai.llmModel = llm.MODEL;
+  return s;
+}
 
 const json = (res, code, data) => {
   const body = JSON.stringify(data);
@@ -92,6 +136,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       try {
         const changes = body.entry?.[0]?.changes?.[0]?.value;
+        if (wa.applyStatuses(db, changes)) store.save();
         const wam = changes?.messages?.[0];
         if (wam && wam.type === 'text') {
           const phone = '+' + wam.from.replace(/\D/g, '');
@@ -107,10 +152,47 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { ok: true }); return;
     }
 
-    /* ---------------- API ---------------- */
+    /* ---------------- auth ---------------- */
+    if (p === '/auth/login' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (sha(String(b.password || '')) !== db.settings.auth.passHash) {
+        await new Promise(r => setTimeout(r, 600)); // тормоз перебору
+        return json(res, 401, { error: 'wrong password' });
+      }
+      const sid = crypto.randomBytes(16).toString('hex');
+      db.settings.auth.sessions[sid] = { at: Date.now() };
+      const keys = Object.keys(db.settings.auth.sessions);
+      if (keys.length > 20) delete db.settings.auth.sessions[keys[0]];
+      store.save();
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax`,
+      });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
+    if (p === '/auth/logout' && req.method === 'POST') {
+      const sid = getSession(req);
+      if (sid) { delete db.settings.auth.sessions[sid]; store.save(); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
+    if (p === '/auth/password' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      if (sha(String(b.current || '')) !== db.settings.auth.passHash) return json(res, 400, { error: 'текущий пароль неверен' });
+      if (String(b.next || '').length < 8) return json(res, 400, { error: 'новый пароль короче 8 символов' });
+      db.settings.auth.passHash = sha(String(b.next));
+      db.settings.auth.sessions = { [getSession(req)]: { at: Date.now() } }; // остальные сессии — в сброс
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- API (всё под сессией) ---------------- */
+    if (p.startsWith('/api/') && !getSession(req)) return json(res, 401, { error: 'auth required' });
+
     if (p === '/api/state' && req.method === 'GET') {
       json(res, 200, {
-        settings: db.settings, brokers: db.brokers, numbers: db.numbers,
+        settings: publicSettings(db), brokers: db.brokers, numbers: db.numbers,
         templates: db.templates, sequences: db.sequences,
         events: db.events.slice(0, 40), analytics: analytics(db),
       }); return;
@@ -166,7 +248,7 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (m[2] === 'message') { engine.send(db, lead, b.text || '', 'human'); lead.ai.enabled = b.keepAi !== false ? lead.ai.enabled : false; }
-      if (m[2] === 'inbound') engine.inbound(db, lead, b.text || '');
+      if (m[2] === 'inbound') engine.inbound(db, lead, b.text || '', { simulated: true });
       if (m[2] === 'handover') engine.handover(db, lead, b.brokerId);
       if (m[2] === 'analyze') { ai.screen(db, lead); if (lead.stage === 'qualified') lead.summary = ai.buildSummary(db, lead); }
       store.save();
@@ -244,10 +326,83 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
       for (const k of ['agency', 'wa', 'ai', 'demo']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
       store.save();
-      return json(res, 200, db.settings);
+      return json(res, 200, publicSettings(db));
+    }
+
+    /* ---------------- встречи ---------------- */
+    if (p === '/api/meetings' && req.method === 'GET') {
+      const list = (db.meetings || []).map(mt => Object.assign({}, mt, {
+        leadName: (db.leads.find(l => l.id === mt.leadId) || {}).name || '—',
+        brokerName: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '—',
+      })).sort((a, b2) => a.at - b2.at);
+      return json(res, 200, list);
+    }
+    if (p === '/api/meetings' && req.method === 'POST') {
+      const b = await readBody(req);
+      const lead = db.leads.find(l => l.id === b.leadId);
+      if (!lead) return json(res, 400, { error: 'lead not found' });
+      const broker = db.brokers.find(x => x.id === (b.brokerId || lead.broker)) || db.brokers.find(x => x.geo === lead.geo) || db.brokers[0];
+      const mt = {
+        id: store.nextId('mt'), leadId: lead.id, brokerId: broker.id,
+        at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
+        note: b.note || '', status: 'scheduled', createdAt: Date.now(),
+      };
+      db.meetings = db.meetings || [];
+      db.meetings.push(mt);
+      if (b.confirm !== false) {
+        const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
+        const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}. Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
+      }
+      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name} + ${broker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
+      store.save();
+      return json(res, 200, mt);
+    }
+    if ((m = p.match(/^\/api\/meetings\/([^/]+)$/)) && req.method === 'PATCH') {
+      const mt = (db.meetings || []).find(x => x.id === m[1]);
+      if (!mt) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.status) mt.status = b.status;
+      if (b.at) mt.at = +b.at;
+      store.save();
+      return json(res, 200, mt);
+    }
+
+    /* ---------------- дубли ---------------- */
+    if (p === '/api/duplicates' && req.method === 'GET') {
+      const norm = (ph) => (ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      const byPhone = {};
+      for (const l of db.leads) {
+        const k = norm(l.phone);
+        if (!k) continue;
+        (byPhone[k] = byPhone[k] || []).push(l);
+      }
+      const groups = Object.values(byPhone).filter(g => g.length > 1)
+        .map(g => g.sort((a, b2) => a.createdAt - b2.createdAt).map(l => leadView(db, l)));
+      return json(res, 200, groups);
+    }
+    if (p === '/api/duplicates/merge' && req.method === 'POST') {
+      const b = await readBody(req); // {keepId, mergeIds:[]}
+      const keep = db.leads.find(l => l.id === b.keepId);
+      if (!keep) return json(res, 400, { error: 'keep not found' });
+      let moved = 0;
+      for (const id of b.mergeIds || []) {
+        const dup = db.leads.find(l => l.id === id);
+        if (!dup || dup.id === keep.id) continue;
+        for (const msg of db.messages) if (msg.leadId === dup.id) { msg.leadId = keep.id; moved++; }
+        for (const a of ai.AXES) if (!keep.quals[a] && dup.quals[a]) keep.quals[a] = dup.quals[a];
+        keep.tags = [...new Set([...(keep.tags || []), ...(dup.tags || []), 'объединён'])];
+        if ((dup.lastMsgAt || 0) > (keep.lastMsgAt || 0)) { keep.lastMsgAt = dup.lastMsgAt; keep.lastDir = dup.lastDir; }
+        db.leads = db.leads.filter(l => l.id !== dup.id);
+      }
+      ai.screen(db, keep);
+      ai.pushEvent(db, { type: 'merge', leadId: keep.id, text: `Дубли объединены в «${keep.name}» (перенесено сообщений: ${moved})` });
+      store.save();
+      return json(res, 200, leadView(db, keep));
     }
 
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));

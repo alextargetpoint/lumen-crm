@@ -10,7 +10,8 @@ const AXES = ['purpose', 'timeline', 'budget', 'type'];
 /* ---------- извлечение фактов из текста клиента ---------- */
 function extractBudget(text) {
   const t = text.toLowerCase().replace(/\s+/g, ' ');
-  let m = t.match(/(?:до|около|порядка|бюджет|budget|up to|around)?\s*\$?\s*(\d{2,3})\s*(?:к|k|тыс|тысяч|thousand)\b/);
+  /* ⚠️ без \b после кириллицы: в JS \w = латиница, «тыс»/«к» границу не дают */
+  let m = t.match(/(?:до|около|порядка|бюджет|budget|up to|around)?\s*\$?\s*(\d{2,3})\s*(?:[кk](?![а-яёa-z])|тыс[а-яё]*|thousand)/);
   if (m) return { num: +m[1] * 1000, raw: m[0] };
   m = t.match(/(\d{1,3}(?:[ .,]\d{3})+)\s*(?:\$|€|usd|eur|aed|долл|евро)?/);
   if (m) { const n = +m[1].replace(/[ .,]/g, ''); if (n >= 20000) return { num: n, raw: m[0] }; }

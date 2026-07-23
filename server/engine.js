@@ -5,6 +5,8 @@
    пишется в переписку. */
 const store = require('./store');
 const ai = require('./ai');
+const llm = require('./llm');
+const wa = require('./wa');
 
 const MIN = 60e3, DAY = 24 * 3600e3;
 
@@ -39,13 +41,23 @@ function send(db, lead, text, via, opts = {}) {
   lead.numberId = num.id;
   num.sentToday += 1;
   if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
-  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null };
+  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, waId: null };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
   lead.lastDir = 'out';
   if (lead.ai.silentSince == null) lead.ai.silentSince = m.at;
-  /* здесь включается боевой канал: wa.sendCloudApi(num, lead.phone, text|template) */
-  setTimeout(() => { m.status = 'delivered'; store.save(); }, 1500);
+  if (wa.ready(db)) {
+    const tpl = opts.templateId ? db.templates.find(t => t.id === opts.templateId) : null;
+    const job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text) : wa.sendText(db, lead, text);
+    job.then(res => { m.waId = res.messages?.[0]?.id || null; store.save(); })
+      .catch(err => {
+        m.status = 'failed';
+        ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Cloud API отказал (${lead.name}): ${err.message}` });
+        store.save();
+      });
+  } else {
+    setTimeout(() => { if (m.status === 'sent') m.status = 'delivered'; store.save(); }, 1500); // mock-доставка
+  }
   store.save();
   return m;
 }
@@ -223,12 +235,12 @@ function tickSimulator(db) {
     const axis = missing.length && Math.random() < 0.75 ? missing[0] : 'generic';
     const pool = PERSONA[axis] || PERSONA.generic;
     const text = pool[Math.floor(Math.random() * pool.length)];
-    inbound(db, lead, text);
+    inbound(db, lead, text, { simulated: true });
   }
 }
 
 /* ---------- единая обработка входящего (вебхук / симулятор / демо-кнопка) ---------- */
-function inbound(db, lead, text) {
+function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
   db.messages.push(m);
   const wasWake = (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';
@@ -238,15 +250,38 @@ function inbound(db, lead, text) {
   }
   const { reply } = ai.onInbound(db, lead, text);
   if (reply) {
-    setTimeout(() => {
+    /* LLM: 'auto' — только реальные входящие (симуляция не жжёт токены),
+       'llm' — всегда, 'core' — никогда. Ошибка/таймаут → скрипт ядра. */
+    const prov = db.settings.ai.provider;
+    const useLlm = llm.available() && (prov === 'llm' || (prov === 'auto' && !opts.simulated));
+    setTimeout(async () => {
       const fresh = store.get();
       const l2 = fresh.leads.find(x => x.id === lead.id);
-      if (l2 && l2.lastDir === 'in') {
-        send(fresh, l2, reply.text, 'ai');
-        if (reply.kind === 'handover_offer') {
-          for (const cmp of fresh.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1;
-        }
+      if (!l2 || l2.lastDir !== 'in') return;
+      let out = null;
+      if (useLlm) {
+        try { out = await llm.reply(fresh, l2); } catch (e) { console.error('[llm]', e.message); }
       }
+      if (out) {
+        let applied = 0;
+        for (const [axis, v] of Object.entries(out.axes)) {
+          if (!l2.quals[axis]) { l2.quals[axis] = v; applied++; }
+        }
+        if (applied) {
+          ai.screen(fresh, l2);
+          if (l2.stage === 'qualified' && !l2.summary) {
+            l2.summary = ai.buildSummary(fresh, l2);
+            ai.pushEvent(fresh, { type: 'qualified', leadId: l2.id, text: `${l2.name} квалифицирован ИИ (LLM) — готов к передаче брокеру` });
+          }
+        }
+        send(fresh, l2, out.text, 'ai');
+      } else {
+        send(fresh, l2, reply.text, 'ai');
+      }
+      if (reply.kind === 'handover_offer') {
+        for (const cmp of fresh.campaigns) if (cmp.recipients.includes(l2.id)) cmp.stats.qualified += 1;
+      }
+      store.save();
     }, 4000 + Math.random() * 5000); // человеческий тайминг ответа
   }
   store.save();

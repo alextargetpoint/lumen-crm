@@ -220,6 +220,8 @@ textarea { resize: vertical; min-height: 70px; }
 .kb-head .nm { font-size: 12.5px; font-weight: 650; color: var(--ink-2); }
 .kb-head .ct { font-size: 11px; color: var(--ink-3); background: var(--bg-2); border: 1px solid var(--stroke); padding: 1px 7px; border-radius: 10px; }
 .kb-cards { display: flex; flex-direction: column; gap: 10px; min-height: 30px; }
+.kb-col.drop .kb-cards { outline: 2px dashed var(--accent-2); outline-offset: 4px; border-radius: 12px; background: var(--blue-100); }
+.lead-card { touch-action: none; user-select: none; -webkit-user-select: none; }
 .lead-card { padding: 13px 14px; border-radius: var(--r-md); cursor: pointer; transition: transform .12s, box-shadow .15s, border-color .15s; }
 .lead-card:hover { transform: translateY(-1px); border-color: #B9CBEE; box-shadow: var(--shadow-lift); }
 .lead-card .top { display: flex; align-items: center; gap: 8px; }
