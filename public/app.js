@@ -233,6 +233,7 @@ const NAV = {
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: 'Скоринг спящих и безопасные кампании' },
   meetings:  { name: 'Встречи', icon: I.cal, sub: 'Слоты с экспертами · WhatsApp-подтверждения' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: 'Библиотека автоматизаций агентства: распределение, напоминания, ИИ' },
+  playbook: { name: 'Плейбук продаж', icon: I.flame, sub: 'Работающие приёмы Дубай/США: касания, звонки, Zoom, дожимы' },
   ads:       { name: 'Реклама', icon: I.target, sub: 'Мост приёма лидов (Albato) · атрибуция к объявлениям' },
   numbers:   { name: 'Номера', icon: I.sim, sub: 'Пул WhatsApp-номеров: качество, лимиты, прогрев' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: 'Utility и Marketing шаблоны Cloud API' },
@@ -386,6 +387,7 @@ function go(page) {
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
   $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
+  syncTopAction();
   /* волна входа: анимации только при смене раздела, фоновые обновления без replay */
   const c = $('#content');
   c.classList.add('anim');
@@ -804,6 +806,7 @@ async function openLeadModal(id) {
     body: `
       <div class="lc-funnel">${FUNNEL_STEPS.map((st, i) => `<div class="lcf-step ${i < stepIdx ? 'done' : ''} ${i === stepIdx ? 'cur' : ''}"><i></i><span>${stageName(st)}</span></div>`).join('')}${l.stage === 'sleeping' ? '<div class="lcf-step warn cur"><i></i><span>Спит</span></div>' : ''}${l.stage === 'lost' ? '<div class="lcf-step bad cur"><i></i><span>Закрыт</span></div>' : ''}</div>
       ${l.hint ? `<div class="lc-hint ${l.hint.kind}">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
+      ${l.playTip ? `<div class="lc-hint info" style="border-style:dashed">${ic(I.flame)}<span><b>Приём:</b> ${esc(l.playTip.tip)}</span></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
         ${(l.tags || []).map(t => `<span class="badge">${esc(t)}</span>`).join('')}
       </div>
@@ -1116,26 +1119,48 @@ PAGES.qualifier = async (root) => {
 /* ---------------- ЦЕПОЧКИ ---------------- */
 PAGES.sequences = async (root) => {
   const seq = STATE.sequences[0];
-  const tplName = (id) => (STATE.templates.find(t => t.id === id) || {}).name || 'ИИ-текст';
+  const tpls = STATE.templates;
+  const tplName = (id) => (tpls.find(t => t.id === id) || {}).name || 'ИИ-текст';
+  const editIx = PAGE_STATE.seqEdit;
+  const save = async () => { seq.steps.sort((a, b) => a.day - b.day); await api.patch('/sequences/' + seq.id, { steps: seq.steps }); };
   root.innerHTML = `
     <div class="two-col">
       <div class="glass card">
-        <div class="card-title">${ic(I.chain)}${esc(seq.name)}<span class="sub">выкл. шаг — пропускается</span></div>
+        <div class="card-title">${ic(I.chain)}${esc(seq.name)}<span class="sub">клик по шагу — редактирование</span></div>
         <div class="seq">
-          ${seq.steps.map((st, i) => `
-            <div class="seq-step ${st.active ? '' : 'off'}">
+          ${seq.steps.map((st, i) => editIx === i ? `
+            <div class="seq-step" style="flex-direction:column;align-items:stretch;gap:10px">
+              <div style="display:flex;gap:9px;align-items:center">
+                <span class="lc-lbl" style="margin:0">День</span><input data-se="day" type="number" value="${st.day}" style="width:70px">
+                <input data-se="label" value="${esc(st.label)}" placeholder="Название шага" style="flex:1">
+                <select data-se="channel" style="width:120px"><option value="wa" ${st.channel !== 'voice' ? 'selected' : ''}>WhatsApp</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option></select>
+              </div>
+              <div style="display:flex;gap:9px;align-items:center">
+                <select data-se="mode" style="width:130px"><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option></select>
+                <select data-se="templateId" style="width:210px;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
+                <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что должен сказать ИИ в этом касании" style="flex:1;${st.mode === 'template' ? 'display:none' : ''}">
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
+                <button class="btn btn-sm" data-secancel>Отмена</button>
+                <span class="tb-spacer"></span>
+                <button class="btn btn-danger btn-sm" data-sedel="${i}">Удалить шаг</button>
+              </div>
+            </div>` : `
+            <div class="seq-step ${st.active ? '' : 'off'}" data-seedit="${i}" style="cursor:pointer">
               <span class="seq-day">день ${st.day}</span>
               <div style="flex:1"><div class="st-name">${esc(st.label)}</div>
-                <div class="st-desc">${st.channel === 'voice' ? '🎙 голосовое · ' : ''}${st.mode === 'template' ? 'шаблон: ' + esc(tplName(st.templateId)) : 'ИИ-текст: ' + esc(st.prompt || '')}</div></div>
-              <label class="switch"><input type="checkbox" data-step="${i}" ${st.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+                <div class="st-desc">${st.channel === 'voice' ? 'голосовое · ' : ''}${st.mode === 'template' ? 'шаблон: ' + esc(tplName(st.templateId)) : 'ИИ-текст: ' + esc(st.prompt || '')}</div></div>
+              <label class="switch" data-stopclick><input type="checkbox" data-step="${i}" ${st.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
             </div>`).join('')}
         </div>
+        <button class="btn" id="seqAdd" style="margin-top:6px">${ic(I.plus)}Добавить касание</button>
       </div>
       <div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.shield)}Правила гигиены цепочки</div>
           ${[['Ответил — цепочка стоит', 'Как только клиент написал, работает живой диалог квалификатора, а не рассылка'],
-             ['Не больше одного касания в день', 'Интервалы растут: 0 → 1 → 3 → 6 → 9 → 13 → 18'],
+             ['Не больше одного касания в день', 'Интервалы задаёте днями — шаги сортируются сами'],
              ['Вариативные тексты', 'ИИ перефразирует каждое касание — никаких одинаковых сообщений на пуле номеров'],
              ['Исчерпана — в «Спящие»', 'После последнего касания лид не удаляется: его подхватит скоринг реанимации'],
              ['Стоп-слово — мгновенный выход', 'Opt-out обрывает цепочку и закрывает лида корректно']]
@@ -1144,47 +1169,189 @@ PAGES.sequences = async (root) => {
         <div class="glass card">
           <div class="card-title">${ic(I.clock)}Как это выглядит для молчуна</div>
           <div class="feed">
-            ${seq.steps.filter(s => s.active).map((st) => `<div class="feed-item"><div class="feed-dot">${ic(st.channel === 'voice' ? I.phone : I.chat)}</div><div><div class="feed-text"><b>День ${st.day}.</b> ${esc(st.label)}</div></div></div>`).join('')}
+            ${seq.steps.filter(x => x.active).map((st) => `<div class="feed-item"><div class="feed-dot">${ic(st.channel === 'voice' ? I.phone : I.chat)}</div><div><div class="feed-text"><b>День ${st.day}.</b> ${esc(st.label)}</div></div></div>`).join('')}
             <div class="feed-item"><div class="feed-dot warn">${ic(I.moon)}</div><div><div class="feed-text"><b>После.</b> Лид уходит в «Спящие» — вернётся через кампании реанимации</div></div></div>
           </div>
         </div>
       </div>
     </div>`;
-  $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => {
-    seq.steps[+sw.dataset.step].active = sw.checked;
-    await api.patch('/sequences/' + seq.id, { steps: seq.steps });
-  }));
+  $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => { seq.steps[+sw.dataset.step].active = sw.checked; await save(); }));
+  $$('[data-stopclick]', root).forEach(x => x.addEventListener('click', (e) => e.stopPropagation()));
+  $$('[data-seedit]', root).forEach(x => x.addEventListener('click', () => { PAGE_STATE.seqEdit = +x.dataset.seedit; render(); }));
+  const editBox = root.querySelector('[data-sesave]');
+  if (editBox) {
+    const box = editBox.closest('.seq-step');
+    const modeSel = box.querySelector('[data-se="mode"]');
+    modeSel.addEventListener('change', () => {
+      box.querySelector('[data-se="templateId"]').closest('.cs').style.display = modeSel.value === 'template' ? '' : 'none';
+      box.querySelector('[data-se="prompt"]').style.display = modeSel.value === 'template' ? 'none' : '';
+    });
+    root.querySelector('[data-sesave]').addEventListener('click', async (e) => {
+      const i = +e.currentTarget.dataset.sesave;
+      const st = seq.steps[i];
+      st.day = +box.querySelector('[data-se="day"]').value || 0;
+      st.label = box.querySelector('[data-se="label"]').value || 'Касание';
+      st.channel = box.querySelector('[data-se="channel"]').value;
+      st.mode = modeSel.value;
+      st.templateId = st.mode === 'template' ? box.querySelector('[data-se="templateId"]').value : null;
+      st.prompt = box.querySelector('[data-se="prompt"]').value;
+      PAGE_STATE.seqEdit = null;
+      await save(); render();
+    });
+    root.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
+    root.querySelector('[data-sedel]').addEventListener('click', async (e) => {
+      seq.steps.splice(+e.currentTarget.dataset.sedel, 1);
+      PAGE_STATE.seqEdit = null;
+      await save(); render();
+    });
+  }
+  $('#seqAdd').addEventListener('click', async () => {
+    const last = seq.steps[seq.steps.length - 1];
+    seq.steps.push({ day: (last ? last.day + 3 : 0), channel: 'wa', mode: 'ai', prompt: '', label: 'Новое касание', active: true });
+    PAGE_STATE.seqEdit = seq.steps.length - 1;
+    await save(); render();
+  });
 };
 
-/* ---------------- ОБЪЕКТЫ ---------------- */
+/* ---------------- ОБЪЕКТЫ: портальный формат, без попапов ---------------- */
+function propCover(pr, big) {
+  const img = (pr.images || [])[0];
+  if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
+  const hues = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
+  return `<div class="prop-cover ${big ? 'big' : ''}" style="background:${hues[pr.geo] || hues.dubai}">
+    <img src="logo.svg" class="pc-star"><span>${esc(pr.area || pr.name)}</span></div>`;
+}
+
 PAGES.properties = async (root) => {
   const props = await api.get('/properties');
   const st = STATE.settings;
+
+  /* -------- детальная страница объекта (inline-редактирование) -------- */
+  if (PAGE_STATE.propView) {
+    const pr = props.find(x => x.id === PAGE_STATE.propView);
+    if (!pr) { PAGE_STATE.propView = null; return PAGES.properties(root); }
+    const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
+    const gi = (field, val, ph, num) => `<input class="gi" data-f="${field}" ${num ? 'type="number"' : ''} value="${esc(val ?? '')}" placeholder="${ph || '—'}">`;
+    const fmt = (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
+    root.innerHTML = `
+      <button class="btn btn-ghost" id="prBack" style="margin-bottom:12px">${ic(I.chev)}<span style="transform:scaleX(-1)"></span>← Ко всем объектам</button>
+      ${propCover(pr, true)}
+      <div class="pd-head">
+        <div style="flex:1;min-width:0">
+          <input class="gi gi-title" data-f="name" value="${esc(pr.name)}">
+          <div class="pd-sub">${gi('area', pr.area, 'район')} · ${gi('developer', pr.developer, 'застройщик')}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="pd-price">от <input class="gi gi-price" data-f="priceFrom" type="number" value="${pr.priceFrom}"> ${pr.currency}</div>
+          <div style="display:flex;gap:7px;justify-content:flex-end;margin-top:8px">
+            <select id="pdMarket" style="width:130px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+            <select id="pdGeo" style="width:120px">${st.agency.geos.map(g => `<option value="${g}" ${pr.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+      <div class="pd-facts glass card">
+        ${[['type', 'Формат', pr.type], ['handover', 'Сдача', pr.handover], ['payment', 'План оплаты', pr.payment], ['tagsStr', 'Теги (через запятую)', (pr.tags || []).join(', ')]]
+          .map(([f, k, v]) => `<div class="pd-fact"><label class="lc-lbl">${k}</label>${gi(f, v)}</div>`).join('')}
+        <div class="pd-fact" style="grid-column:1/-1"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="width:100%;min-height:90px">${esc(pr.description || '')}</textarea></div>
+        <div class="pd-fact" style="grid-column:1/-2"><label class="lc-lbl">Удобства (через запятую)</label><input class="gi" data-f="amenitiesStr" style="width:100%" value="${esc((pr.amenities || []).join(', '))}" placeholder="Бассейн, Фитнес, Паркинг…"></div>
+        <div class="pd-fact"><label class="lc-lbl">Заметка (короткая)</label><input class="gi" data-f="note" style="width:100%" value="${esc(pr.note || '')}"></div>
+      </div>
+      <div class="glass card" style="margin-top:16px">
+        <div class="card-title">${ic(I.grid)}Юниты<span class="sub">попадают таблицей в подборку и PDF</span></div>
+        <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
+          ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
+        </tbody></table>
+        <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
+          <input id="uPlan" placeholder="1BR" style="width:80px;flex:0 0 80px"><input id="uArea" placeholder="68 м²" style="width:80px;flex:0 0 80px">
+          <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
+          <input id="uPrice" type="number" placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
+        </div>
+      </div>
+      <div class="two-col" style="margin-top:16px">
+        <div>
+          <div class="glass card mb">
+            <div class="card-title">${ic(I.eye)}Фото и интерьеры<span class="sub">первое — обложка</span></div>
+            <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки (портал/облако агентства)</div>'}</div>
+            <div class="lc-note-row" style="margin-top:10px"><input id="pdImgUrl" placeholder="https://…jpg"><button class="btn btn-sm" id="pdImgAdd">${ic(I.plus)}</button></div>
+          </div>
+          <div class="glass card">
+            <div class="card-title">${ic(I.grid)}Планировки</div>
+            ${(pr.layouts || []).map((l2, ix) => `<div class="lc-contact"><span class="badge acc">${esc(l2.label)}</span><a class="lc-cv link" href="${esc(l2.url)}" target="_blank">${esc(l2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-laydel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Планировок нет</div>'}
+            <div class="lc-note-row" style="margin-top:8px"><input id="pdLayLabel" placeholder="1BR тип A" style="width:120px;flex:0 0 120px"><input id="pdLayUrl" placeholder="https://…pdf"><button class="btn btn-sm" id="pdLayAdd">${ic(I.plus)}</button></div>
+          </div>
+        </div>
+        <div>
+          <div class="glass card mb">
+            <div class="card-title">${ic(I.doc)}Документы и материалы<span class="sub">попадают в подборки</span></div>
+            ${(pr.materials || []).map((m2, ix) => `<div class="lc-contact"><span class="badge">${esc(m2.label)}</span><a class="lc-cv link" href="${esc(m2.url)}" target="_blank">${esc(m2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-matdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Брошюры, прайсы, видео — ссылками</div>'}
+            <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:120px;flex:0 0 120px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
+          </div>
+          <div class="glass card">
+            <div class="card-title">${ic(I.layers)}Действия</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
+              <span class="tb-spacer"></span>
+              <button class="btn btn-danger" id="pdDel">Удалить объект</button>
+            </div>
+            <div class="muted" style="font-size:11.5px;margin-top:10px">Все правки сохраняются сами по мере ввода — без кнопки «Сохранить».</div>
+          </div>
+        </div>
+      </div>`;
+    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; render(); });
+    $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
+      const f = inp.dataset.f;
+      if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'amenitiesStr') await upd({ amenities: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
+      else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
+      else await upd({ [f]: inp.value });
+    }));
+    $('#pdMarket').addEventListener('change', (e) => upd({ market: e.target.value }));
+    $('#pdGeo').addEventListener('change', (e) => upd({ geo: e.target.value }));
+    $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
+    $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
+    $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
+    $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
+    $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
+    $('#uAdd').addEventListener('click', async () => {
+      await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: +$('#uPrice').value }] });
+      render();
+    });
+    $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
+    $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdDel').addEventListener('click', () => modal({
+      title: 'Удалить объект?', sub: pr.name,
+      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); PAGE_STATE.propView = null; render(); } }, { label: 'Отмена' }],
+    }));
+    return;
+  }
+
+  /* -------- список: богатые карточки -------- */
   const geoF = PAGE_STATE.propGeo || '';
-  const list = props.filter(pr => !geoF || pr.geo === geoF);
+  const marketF = PAGE_STATE.propMarket || '';
+  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF));
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     <div class="filters">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
+      <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
       <span class="muted" style="font-size:12px">${list.length} объектов</span>
-      <span class="tb-spacer"></span>
-      <button class="btn btn-accent" id="prAdd">${ic(I.plus)}Объект</button>
+      <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
     <div class="prop-grid">
-      ${list.map(pr => `<div class="glass prop-card" data-pr="${pr.id}">
-        <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
-          <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
-          <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
-        <div class="prop-price">от ${fmt(pr)}</div>
-        <div class="prop-meta"><span>${esc(pr.type)}</span><span>сдача: ${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
-        ${pr.tags.length ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">${pr.tags.map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}</div>` : ''}
-        ${pr.note ? `<div class="muted" style="font-size:11.5px;margin-top:7px">${esc(pr.note)}</div>` : ''}
-        <div class="prop-mats">${(pr.materials || []).map(m2 => `<a class="link" href="${esc(m2.url)}" target="_blank">${esc(m2.label)}</a>`).join('')}
-          <button class="btn-ghost prop-mat-add" title="Добавить материал">${ic(I.plus)}</button></div>
-        <div style="display:flex;gap:6px;margin-top:11px">
-          <button class="btn btn-sm prop-edit">${ic(I.edit || I.doc)}Изменить</button>
-          <span class="tb-spacer"></span>
-          <button class="btn-ghost prop-del" title="Удалить">${ic(I.x)}</button>
+      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}">
+        ${propCover(pr)}
+        <div class="prop-body">
+          <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
+            <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
+            <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
+          <div class="prop-price">от ${fmt(pr)}</div>
+          <div class="prop-meta"><span>${esc(pr.type)}</span><span>${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
+          <div class="prop-foot">
+            ${(pr.tags || []).slice(0, 3).map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}
+            <span class="tb-spacer"></span>
+            <span class="muted" style="font-size:10.5px">${(pr.images || []).length ? (pr.images.length + ' фото · ') : ''}${(pr.layouts || []).length ? (pr.layouts.length + ' план. · ') : ''}${(pr.materials || []).length ? pr.materials.length + ' док.' : ''}</span>
+          </div>
         </div>
       </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
     </div>
@@ -1195,48 +1362,12 @@ PAGES.properties = async (root) => {
         <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
       <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
-  const propModal = (pr) => modal({
-    title: pr ? 'Объект · ' + pr.name : 'Новый объект', wide: true,
-    body: `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-row"><label>Название</label><input id="pName" value="${esc(pr?.name || '')}"></div>
-        <div class="form-row"><label>Район</label><input id="pArea" value="${esc(pr?.area || '')}"></div>
-        <div class="form-row"><label>Застройщик</label><input id="pDev" value="${esc(pr?.developer || '')}"></div>
-        <div class="form-row"><label>Рынок</label><select id="pMarket"><option value="offplan" ${pr?.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr?.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select></div>
-        <div class="form-row"><label>Формат (Studio/1BR/Villa…)</label><input id="pType" value="${esc(pr?.type || '')}"></div>
-        <div class="form-row"><label>Цена от</label><input id="pPrice" type="number" value="${pr?.priceFrom || ''}"></div>
-        <div class="form-row"><label>Сдача</label><input id="pHand" value="${esc(pr?.handover || '')}"></div>
-        <div class="form-row"><label>Оплата</label><input id="pPay" value="${esc(pr?.payment || '')}"></div>
-        <div class="form-row"><label>Направление</label><select id="pGeo">${st.agency.geos.map(g => `<option value="${g}" ${pr?.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Теги (через запятую)</label><input id="pTags" value="${esc((pr?.tags || []).join(', '))}"></div>
-      </div>
-      <div class="form-row"><label>Заметка (видна клиенту в подборке)</label><input id="pNote" value="${esc(pr?.note || '')}"></div>`,
-    actions: [
-      { label: pr ? 'Сохранить' : 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
-        const body = { name: $('#pName', bd).value, area: $('#pArea', bd).value, developer: $('#pDev', bd).value, market: $('#pMarket', bd).value, type: $('#pType', bd).value, priceFrom: +$('#pPrice', bd).value, handover: $('#pHand', bd).value, payment: $('#pPay', bd).value, geo: $('#pGeo', bd).value, tags: $('#pTags', bd).value.split(',').map(x => x.trim()).filter(Boolean), note: $('#pNote', bd).value };
-        if (pr) await api.patch('/properties/' + pr.id, body); else await api.post('/properties', body);
-        render();
-      } },
-      { label: 'Отмена' },
-    ],
-  });
-  $('#prAdd').addEventListener('click', () => propModal(null));
-  $$('.prop-card', root).forEach(card => {
-    const pr = props.find(x => x.id === card.dataset.pr);
-    card.querySelector('.prop-edit').addEventListener('click', () => propModal(pr));
-    card.querySelector('.prop-del').addEventListener('click', () => modal({
-      title: 'Удалить объект?', sub: pr.name + ' исчезнет из библиотеки (в собранных подборках останется)',
-      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); render(); } }, { label: 'Отмена' }],
-    }));
-    card.querySelector('.prop-mat-add').addEventListener('click', () => modal({
-      title: 'Материал · ' + pr.name, sub: 'Брошюра, планировки, видео-тур — ссылка попадёт в подборки клиентам',
-      body: `<div class="form-row"><label>Название</label><input id="mLabel" placeholder="Брошюра"></div>
-             <div class="form-row"><label>Ссылка</label><input id="mUrl" placeholder="https://…"></div>`,
-      actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
-        await api.patch('/properties/' + pr.id, { materials: [...(pr.materials || []), { label: $('#mLabel', bd).value || 'Материал', url: $('#mUrl', bd).value }] });
-        render();
-      } }, { label: 'Отмена' }],
-    }));
+  $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
+  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.propView = c.dataset.pr; render(); }));
+  $('#prAdd').addEventListener('click', async () => {
+    const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
+    PAGE_STATE.propView = pr.id;
+    render();
   });
   $('#portalSave')?.addEventListener('click', async () => {
     const body = {};
@@ -1262,9 +1393,10 @@ PAGES.collections = async (root) => {
         <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
         <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
         <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
+        <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
         <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
         <div class="cl-props">
-          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 ? 'checked' : ''}>
+          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
             <span class="cl-chk"></span>
             <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
             ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>`).join('')}
@@ -1290,7 +1422,7 @@ PAGES.collections = async (root) => {
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
     if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
-    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, propertyIds: ids });
+    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids });
     render();
   });
   $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
@@ -1328,7 +1460,7 @@ PAGES.wake = async (root) => {
         })()}
       </div>
       <div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-accent" id="newCmp">${ic(I.plus)}Новая кампания</button></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-accent page-primary" id="newCmp">${ic(I.plus)}Новая кампания</button></div>
         <div id="cmpList">${campaigns.map(cmpCard).join('') || '<div class="glass card empty">Кампаний ещё нет</div>'}</div>
       </div>
     </div>`;
@@ -1481,6 +1613,23 @@ PAGES.automations = async (root) => {
   }));
 };
 
+/* ---------------- ПЛЕЙБУК ПРОДАЖ ---------------- */
+PAGES.playbook = async (root) => {
+  const pb = await api.get('/playbook');
+  const cats = [['first', 'Первое касание', I.bolt], ['followup', 'Фоллоу-апы (нативные)', I.chain], ['call', 'Вывод в звонок', I.phone], ['zoom', 'Мотивация на Zoom', I.cal], ['post', 'Дожим после Zoom', I.flame], ['objections', 'Возражения', I.shield], ['qualify', 'Квалификация', I.spark]];
+  root.innerHTML = `
+    <div class="glass card mb">
+      <div class="card-title">${ic(I.flame)}Как это работает</div>
+      <div class="muted" style="font-size:12.8px;line-height:1.6">Выжимка практик топовых команд (Follow Up Boss, Lofty, Serhant, ISA-модели США + дубайские регламенты). Эти приёмы уже <b>вшиты в ИИ</b>: квалификатор получает 2-3 релевантных приёма под момент сделки в каждый ответ, а в карточке лида показывается подсказка из плейбука. Здесь — вся база для команды.</div>
+    </div>
+    ${cats.map(([key, name, icn], i2) => coll(name, pb.filter(x => x.cat === key).map(x => `
+      <div class="pb-item">
+        <div class="pb-t">${esc(x.title)}</div>
+        <div class="pb-b">${esc(x.body)}</div>
+        <div class="pb-tip">${ic(I.spark)}${esc(x.tip)}</div>
+      </div>`).join(''), { open: i2 === 0, icon: icn, count: pb.filter(x => x.cat === key).length })).join('')}`;
+};
+
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   const d = await api.get('/ads');
@@ -1592,7 +1741,7 @@ PAGES.templates = async (root) => {
   STATE.templates = st.templates;
   const stBadge = { approved: '<span class="badge ok">approved</span>', pending: '<span class="badge warn">на модерации Meta</span>', rejected: '<span class="badge bad">отклонён</span>' };
   root.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-accent" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
     <div class="two-col">
       <div><div class="nav-label" style="padding-left:2px">Utility — сервисные (дешевле, быстрее модерация)</div>
         ${st.templates.filter(t => t.category === 'utility').map(t => tplCard(t, stBadge)).join('')}</div>
@@ -1625,23 +1774,47 @@ function tplCard(t, stBadge) {
 /* ---------------- БРОКЕРЫ ---------------- */
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
-  root.innerHTML = `<div class="broker-grid">
+  const st = STATE.settings;
+  const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+  const editId = PAGE_STATE.brokerEdit;
+  root.innerHTML = `
+  <div class="filters"><span class="muted" style="font-size:12px">${STATE.brokers.length} в команде · распределение: ${{ load: 'по загрузке', roundrobin: 'по очереди', shift: 'по сменам' }[(st.automations || {}).assignMode] || ''} <button class="btn btn-sm" id="brAutoLink" style="margin-left:8px">Настроить</button></span>
+    <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button></div>
+  <div class="broker-grid">
     ${STATE.brokers.map(b => {
       const mine = leads.filter(l => l.broker === b.id);
       const hot = mine.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
-      const pct = Math.round(b.load / b.capacity * 100);
-      return `<div class="glass broker-card">
+      const pct = Math.min(Math.round(b.load / b.capacity * 100), 100);
+      if (editId === b.id) return `<div class="glass broker-card" data-bredit="${b.id}" style="flex-direction:column;align-items:stretch">
+        <div class="form-row"><label>Имя</label><input data-be="name" value="${esc(b.name)}"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>Направление</label><select data-be="geo">${st.agency.geos.map(g => `<option value="${g}" ${b.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Лимит лидов</label><input data-be="capacity" type="number" value="${b.capacity}"></div>
+        </div>
+        <div class="form-row"><label>Языки (через запятую)</label><input data-be="langs" value="${esc(b.langs.join(', '))}"></div>
+        <label class="lc-lbl">Смены</label>
+        <div style="display:flex;gap:5px;margin:4px 0 10px">${days.map((d, i3) => `<button type="button" class="btn btn-sm day-chip ${(b.schedule?.days || []).includes(i3 + 1) ? 'btn-accent' : ''}" data-d="${i3 + 1}">${d}</button>`).join('')}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>С</label><input data-be="from" type="time" value="${b.schedule?.from || '09:00'}"></div>
+          <div class="form-row"><label>До</label><input data-be="to" type="time" value="${b.schedule?.to || '20:00'}"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent btn-sm" data-brsave="${b.id}">${ic(I.check)}Готово</button>
+          <button class="btn btn-sm" data-brcancel>Отмена</button>
+          <span class="tb-spacer"></span>
+          <button class="btn btn-danger btn-sm" data-brdel="${b.id}">Удалить</button>
+        </div>
+      </div>`;
+      return `<div class="glass broker-card" data-brok="${b.id}" style="cursor:pointer" title="Клик — редактировать">
         <div class="ava" style="width:44px;height:44px;flex:0 0 44px;font-size:14px">${esc(b.avatar)}</div>
         <div class="bmeta">
           <div class="nm">${esc(b.name)}</div>
-          <div class="gl">${STATE.settings.geoNames[b.geo]} · ${b.langs.join(' / ')} · сделок за 90 дн: ${b.deals90}</div>
+          <div class="gl">${st.geoNames[b.geo]} · ${b.langs.join(' / ')} · сделок 90 дн: ${b.deals90}</div>
           <div class="load-track"><i style="width:${pct}%"></i></div>
           <div class="muted" style="font-size:11px;margin-top:5px">загрузка ${b.load}/${b.capacity} · в работе от ИИ: ${hot}</div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:9px">
             <span class="badge ${isOnShift(b) ? 'ok' : ''}">${isOnShift(b) ? 'на смене' : 'не на смене'}</span>
             <span class="muted" style="font-size:10.5px">${(b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ')} · ${b.schedule?.from || ''}–${b.schedule?.to || ''}</span>
-            <span class="tb-spacer"></span>
-            <button class="btn btn-sm" data-sched="${b.id}">${ic(I.clock)}</button>
           </div>
         </div>
       </div>`;
@@ -1649,34 +1822,38 @@ PAGES.brokers = async (root) => {
   </div>
   <div class="glass card" style="margin-top:16px">
     <div class="card-title">${ic(I.handover)}Как ИИ выбирает брокера</div>
-    <div class="muted" style="font-size:12.8px;line-height:1.6">Режим распределения настраивается в «Автоматизациях»: по загрузке, по очереди или по сменам. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога. Клиенту в тот же момент уходит сообщение-мост с именем эксперта и слотом созвона — без «повисания» между линиями.</div>
+    <div class="muted" style="font-size:12.8px;line-height:1.6">Режим распределения настраивается в «Автоматизациях»: по загрузке, по очереди или по сменам. Вместе с лидом брокер получает саммари: 4 оси квалификации с цитатами клиента, источник, историю диалога — и авто-задачу «позвонить в течение 30 минут». Учётки-логины брокеров добавим следующим этапом.</div>
   </div>`;
-  $$('[data-sched]', root).forEach(btn => btn.addEventListener('click', () => {
-    const b = STATE.brokers.find(x => x.id === btn.dataset.sched);
-    const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
-    modal({
-      title: 'Расписание · ' + b.name,
-      sub: 'Смены учитываются автораспределением в режиме «по сменам»',
-      body: `
-        <div class="lp-sec" style="margin-top:0">Рабочие дни</div>
-        <div style="display:flex;gap:6px;margin-bottom:14px">${days.map((d, i) => `<button type="button" class="btn btn-sm day-chip ${(b.schedule?.days || []).includes(i + 1) ? 'btn-accent' : ''}" data-d="${i + 1}">${d}</button>`).join('')}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="form-row"><label>С</label><input id="schFrom" type="time" value="${b.schedule?.from || '09:00'}"></div>
-          <div class="form-row"><label>До</label><input id="schTo" type="time" value="${b.schedule?.to || '20:00'}"></div>
-        </div>
-        <div class="form-row"><label>Лимит лидов в работе</label><input id="schCap" type="number" value="${b.capacity}"></div>`,
-      actions: [
-        { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
-          const daysSel = $$('.day-chip.btn-accent', bd).map(x => +x.dataset.d);
-          await api.patch('/brokers/' + b.id, { schedule: { days: daysSel, from: $('#schFrom', bd).value, to: $('#schTo', bd).value }, capacity: +$('#schCap', bd).value });
-          await loadState();
-          render();
-        } },
-        { label: 'Отмена' },
-      ],
+  $('#brAutoLink').addEventListener('click', () => go('automations'));
+  $('#brAdd').addEventListener('click', async () => {
+    const nb = await api.post('/brokers', { name: 'Новый брокер' });
+    await loadState();
+    PAGE_STATE.brokerEdit = nb.id;
+    render();
+  });
+  $$('[data-brok]', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.brokerEdit = c.dataset.brok; render(); }));
+  const eb = root.querySelector('[data-bredit]');
+  if (eb) {
+    $$('.day-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('btn-accent')));
+    eb.querySelector('[data-brsave]').addEventListener('click', async () => {
+      await api.patch('/brokers/' + eb.dataset.bredit, {
+        name: eb.querySelector('[data-be="name"]').value,
+        geo: eb.querySelector('[data-be="geo"]').value,
+        capacity: +eb.querySelector('[data-be="capacity"]').value,
+        langs: eb.querySelector('[data-be="langs"]').value.split(',').map(x => x.trim()).filter(Boolean),
+        schedule: { days: $$('.day-chip.btn-accent', eb).map(x => +x.dataset.d), from: eb.querySelector('[data-be="from"]').value, to: eb.querySelector('[data-be="to"]').value },
+      });
+      PAGE_STATE.brokerEdit = null;
+      await loadState(); render();
     });
-    $$('.day-chip').forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('btn-accent')));
-  }));
+    eb.querySelector('[data-brcancel]').addEventListener('click', () => { PAGE_STATE.brokerEdit = null; render(); });
+    eb.querySelector('[data-brdel]').addEventListener('click', async () => {
+      const r = await fetch('/api/brokers/' + eb.dataset.bredit, { method: 'DELETE' });
+      if (!r.ok) toast('Нельзя удалить', (await r.json()).error);
+      PAGE_STATE.brokerEdit = null;
+      await loadState(); render();
+    });
+  }
 };
 
 /* брокер на смене? (зеркало серверной логики) */
@@ -1766,6 +1943,15 @@ PAGES.settings = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="form-row"><label>Имя</label><input id="mgrName" value="${esc((s.agency.manager || {}).name || '')}"></div>
+            <div class="form-row"><label>Телефон</label><input id="mgrPhone" value="${esc((s.agency.manager || {}).phone || '')}"></div>
+            <div class="form-row"><label>E-mail</label><input id="mgrEmail" value="${esc((s.agency.manager || {}).email || '')}"></div>
+          </div>
+          <button class="btn" id="mgrSave">Сохранить подпись</button>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.shield)}Пароль входа</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Текущий</label><input id="pwCur" type="password"></div>
@@ -1809,6 +1995,11 @@ PAGES.settings = async (root) => {
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
     else toast('Не получилось', j.error || 'ошибка');
   });
+  $('#mgrSave').addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { manager: { name: $('#mgrName').value, phone: $('#mgrPhone').value, email: $('#mgrEmail').value } } });
+    toast('Подпись сохранена', 'Появится на обложках подборок', true);
+    loadState();
+  });
   $('#dAcc').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { accelerate: e.target.checked } }); loadState(); });
   $('#dSim').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { simulateReplies: e.target.checked } }); loadState(); });
   $('#dReset').addEventListener('click', () => modal({
@@ -1822,7 +2013,7 @@ PAGES.settings = async (root) => {
 };
 
 /* ---------- новый лид ---------- */
-$('#newLeadBtn').addEventListener('click', () => {
+function openNewLeadModal() {
   const s = STATE.settings;
   modal({
     title: 'Новый лид',
@@ -1842,7 +2033,28 @@ $('#newLeadBtn').addEventListener('click', () => {
       { label: 'Отмена' },
     ],
   });
-});
+}
+
+/* ---------- контекстное главное действие раздела (кнопка в топбаре) ----------
+   «Новый лид» уместен только там, где работают с лидами; на остальных
+   разделах кнопка = главное действие раздела или прячется. */
+const TOP_ACTIONS = {
+  overview: { label: 'Новый лид', run: () => openNewLeadModal() },
+  funnel: { label: 'Новый лид', run: () => openNewLeadModal() },
+  inbox: { label: 'Новый лид', run: () => openNewLeadModal() },
+  properties: { label: 'Объект', run: () => $('#prAdd')?.click() },
+  wake: { label: 'Новая кампания', run: () => $('#newCmp')?.click() },
+  templates: { label: 'Новый шаблон', run: () => $('#newTpl')?.click() },
+  brokers: { label: 'Брокер', run: () => $('#brAdd')?.click() },
+};
+$('#newLeadBtn').addEventListener('click', () => { const a = TOP_ACTIONS[CUR]; if (a) a.run(); });
+function syncTopAction() {
+  const btn = $('#newLeadBtn');
+  const a = TOP_ACTIONS[CUR];
+  if (!a) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  btn.innerHTML = ic(I.plus) + a.label;
+}
 
 /* ---------- глобальный поиск ---------- */
 (() => {

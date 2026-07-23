@@ -65,6 +65,8 @@ async function callGemini(prompt, timeoutMs = 8000) {
   return withTimeout((s) => callOpenAiRaw(prompt, s), timeoutMs);
 }
 
+const playbook = require('./playbook');
+
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const crit = db.settings.criteria[lead.geo] || {};
@@ -79,6 +81,9 @@ function buildPrompt(db, lead, history) {
 - Тон: живой человеческий, коротко (1-3 предложения), без канцелярита, без эмодзи, один вопрос за раз.
 - Уже выяснено: ${['purpose', 'timeline', 'budget', 'type'].filter(a => q[a]).map(a => `${axisRu[a]}: ${q[a].value}`).join('; ') || 'ничего'}
 - Ещё не выяснено: ${missing.map(a => axisRu[a]).join(', ') || 'всё выяснено — предложи передачу эксперту и удобное время созвона'}
+
+ПРИЁМЫ ПРОДАЖ (используй уместно, не цитируй дословно):
+${playbook.forContext(lead, 4 - missing.length).map(p => '- ' + p.title + ': ' + p.tip).join('\n')}
 
 ДИАЛОГ (последние сообщения):
 ${history}

@@ -792,3 +792,44 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .modal-card .lc-timeline { flex: 1; max-height: none; }
 .modal-card .lc-right { overflow-y: auto; padding-right: 4px; }
 @media (max-width: 1000px) { .modal-card { height: auto; max-height: 92vh; overflow-y: auto; } .modal-card .lc-timeline { max-height: 40vh; } .modal-card .lc-right { overflow: visible; } }
+.page-primary { display: none; }
+
+/* ---------- объекты: обложки и деталка ---------- */
+.prop-card.rich { padding: 0; overflow: hidden; cursor: pointer; }
+.prop-card.rich .prop-body { padding: 14px 16px 15px; }
+.prop-cover {
+  height: 150px; background-size: cover; background-position: center; position: relative;
+  display: grid; place-items: center;
+}
+.prop-cover.big { height: 240px; border-radius: var(--r-lg); margin-bottom: 16px; box-shadow: var(--shadow); }
+.prop-cover .pc-star { width: 26px; height: 31px; opacity: .5; position: absolute; top: 14px; left: 16px; }
+.prop-cover span { font-size: 20px; font-weight: 700; color: rgba(255, 255, 255, .85); letter-spacing: .04em; }
+.prop-cover.big span { font-size: 30px; }
+.prop-foot { display: flex; gap: 5px; align-items: center; margin-top: 10px; }
+.pd-head { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 14px; }
+.pd-sub { display: flex; gap: 8px; margin-top: 6px; }
+.pd-sub .gi { width: 180px; }
+.pd-price { font-size: 22px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.gi-price { width: 130px; font-size: 19px; font-weight: 700; color: var(--accent); }
+.gi {
+  background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.gi:hover { border-color: var(--stroke); background: #fff; }
+.gi:focus { border-color: var(--accent-2); background: #fff; }
+.gi-title { font-size: 22px; font-weight: 700; color: var(--navy-900); width: 100%; }
+.pd-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.pd-facts .gi, .pd-facts textarea.gi { width: 100%; }
+.pd-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 9px; }
+.pd-img { aspect-ratio: 4/3; border-radius: 10px; background-size: cover; background-position: center; position: relative; border: 1px solid var(--stroke); }
+.pd-x { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 7px; background: rgba(6, 17, 38, .55); display: grid; place-items: center; }
+.pd-x svg { width: 11px; height: 11px; color: #fff; }
+@media (max-width: 1000px) { .pd-facts { grid-template-columns: 1fr 1fr; } .pd-head { flex-direction: column; } }
+
+/* ---------- плейбук ---------- */
+.pb-item { padding: 13px 0; border-bottom: 1px solid var(--stroke-soft); }
+.pb-item:last-child { border-bottom: none; }
+.pb-t { font-size: 13.5px; font-weight: 700; color: var(--navy-900); }
+.pb-b { font-size: 12.6px; line-height: 1.6; color: var(--ink-2); margin-top: 5px; }
+.pb-tip { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: 12px; font-weight: 550; color: var(--navy-700); background: var(--blue-100); border-radius: 9px; padding: 8px 11px; }
+.pb-tip svg { width: 13px; height: 13px; flex: 0 0 13px; color: var(--accent); margin-top: 1px; }

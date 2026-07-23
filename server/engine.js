@@ -99,6 +99,7 @@ function handover(db, lead, brokerId) {
   lead.stage = 'handover';
   broker.load += 1;
   if (!lead.summary) lead.summary = ai.buildSummary(db, lead);
+  if (!lead.nextAction) lead.nextAction = { text: `Позвонить в течение 30 мин (передан от ИИ)`, at: Date.now() + 30 * 60e3 };
   if (module.exports.onHandover) module.exports.onHandover(db, lead);
   const tpl = db.templates.find(t => t.id === 'tpl_slot');
   if (tpl) send(db, lead, renderTemplate(db, tpl, lead), 'ai');

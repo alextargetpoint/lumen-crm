@@ -28,6 +28,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 
 const llm = require('./llm');
 const wa = require('./wa');
+const playbook = require('./playbook');
 
 store.load(seed);
 engine.startLoop();
@@ -79,6 +80,22 @@ const DEFAULT_PASS = 'lumen2026';
     { id: 'pr_bali1', name: 'Nuanu Ecoverse Villas', area: 'Берава', developer: 'Nuanu', market: 'offplan', type: 'Villa 2BR', beds: 2, priceFrom: 250000, currency: 'USD', handover: 'Q3 2026', payment: '50/50', geo: 'bali', tags: ['вилла', 'управление'], materials: [], note: 'Лизхолд 30 лет' },
   ];
   if (!db.collections) db.collections = [];
+  for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
+  if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
+  /* обогащение демо-объекта под эталонную структуру */
+  {
+    const bg = db.properties.find(x => x.id === 'pr_jvc1');
+    if (bg && !bg.description) {}
+    if (bg && !bg.amenities.length) {
+      bg.description = 'Роскошный жилой комплекс от Binghatti в сердце JVC: подземный паркинг, ретейл на первом этаже, студии и апартаменты с 1-2 спальнями, панорамные виды на скайлайн Дубая. Развитая инфраструктура района: 30+ парков, школы, Circle Mall, 25 минут до Palm Jumeirah и Burj Khalifa.';
+      bg.amenities = ['Бассейн', 'Фитнес-центр', 'Лобби', 'Паркинг', 'Зоны отдыха', 'Ретейл'];
+      bg.units = [
+        { plan: 'Studio', area: '38 м²', floor: '5', price: 203000, view: 'community' },
+        { plan: '1BR', area: '68 м²', floor: '3', price: 291600, view: 'main road' },
+        { plan: '1BR', area: '72 м²', floor: '11', price: 315000, view: 'skyline' },
+      ];
+    }
+  }
   for (const b of db.brokers) if (!b.schedule) b.schedule = { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' };
   for (const l of db.leads) if (!l.custom) l.custom = {};
   store.save();
@@ -148,6 +165,8 @@ function leadHint(db, l, axesFilled) {
   if ((l.tags || []).includes('нужен человек')) return { kind: 'warn', text: 'ИИ отключился: клиент ждёт живого менеджера — ответьте вручную' };
   const noShow = (db.meetings || []).find(mt => mt.leadId === l.id && mt.status === 'no_show');
   if (noShow && !['deal', 'lost'].includes(l.stage)) return { kind: 'warn', text: 'Не пришёл на встречу — предложите новый слот, лид ещё тёплый' };
+  const hotView = (db.collections || []).find(c => c.leadId === l.id && c.lastViewAt && now - c.lastViewAt < 24 * 3600e3);
+  if (hotView && !['deal', 'lost'].includes(l.stage)) return { kind: 'act', text: `Смотрел подборку «${hotView.title}» ${Math.round((now - hotView.lastViewAt) / 60e3)} мин назад — идеальный момент для звонка` };
   if (l.stage === 'qualified') return { kind: 'act', text: 'Все 4 оси закрыты — передайте брокеру, пока лид горячий' };
   if (['handover', 'viewing'].includes(l.stage) && !(db.meetings || []).some(mt => mt.leadId === l.id && mt.status === 'scheduled')) return { kind: 'act', text: 'Встреча не назначена — предложите слот' };
   if (l.stage === 'dialog' && axesFilled < 4) return { kind: 'info', text: `ИИ выясняет оси: осталось ${4 - axesFilled} из 4` };
@@ -169,6 +188,7 @@ function leadView(db, l) {
     wakeScore: l.stage === 'sleeping' ? engine.wakeScore(db, l) : null,
     lastText,
     hint: leadHint(db, l, axesFilled),
+    playTip: (playbook.forContext(l, axesFilled)[0] || null),
   });
 }
 
@@ -468,10 +488,33 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, cmp);
     }
 
+    if (p === '/api/brokers' && req.method === 'POST') {
+      const b = await readBody(req);
+      const name = String(b.name || '').trim() || 'Новый брокер';
+      const br = {
+        id: store.nextId('br'), name, geo: b.geo || db.settings.agency.geos[0],
+        langs: (b.langs || ['ru']).slice(0, 6), load: 0, capacity: +b.capacity || 20, deals90: 0,
+        avatar: name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(),
+        schedule: { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' },
+      };
+      db.brokers.push(br); store.save();
+      return json(res, 200, br);
+    }
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'DELETE') {
+      if (db.brokers.length <= 1) return json(res, 400, { error: 'нельзя удалить последнего брокера' });
+      for (const l of db.leads) if (l.broker === m[1]) l.broker = null;
+      for (const mt of db.meetings || []) if (mt.brokerId === m[1]) mt.brokerId = db.brokers.find(x => x.id !== m[1]).id;
+      db.brokers = db.brokers.filter(x => x.id !== m[1]);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
     if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'PATCH') {
       const br = db.brokers.find(x => x.id === m[1]);
       if (!br) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
+      if (b.name) { br.name = String(b.name).slice(0, 60); br.avatar = br.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(); }
+      if (b.geo) br.geo = b.geo;
+      if (b.langs) br.langs = b.langs.slice(0, 6);
       if (b.schedule) br.schedule = { days: (b.schedule.days || []).map(Number).filter(d => d >= 1 && d <= 7), from: String(b.schedule.from || '09:00'), to: String(b.schedule.to || '20:00') };
       if (b.capacity != null) br.capacity = +b.capacity;
       store.save();
@@ -652,6 +695,11 @@ const server = http.createServer(async (req, res) => {
         for (const k of ['beds', 'priceFrom']) if (b[k] !== undefined) pr[k] = +b[k];
         if (b.tags) pr.tags = b.tags;
         if (b.materials) pr.materials = b.materials.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
+        if (b.images) pr.images = b.images.slice(0, 20).map(String);
+        if (b.description !== undefined) pr.description = String(b.description).slice(0, 3000);
+        if (b.amenities) pr.amenities = b.amenities.slice(0, 30).map(x => String(x).slice(0, 40));
+        if (b.units) pr.units = b.units.slice(0, 40).map(u => ({ plan: String(u.plan || '').slice(0, 30), area: String(u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40) }));
+        if (b.layouts) pr.layouts = b.layouts.slice(0, 20).map(x => ({ label: String(x.label || '').slice(0, 60), url: String(x.url || '').slice(0, 500) })).filter(x => x.url);
         store.save();
         return json(res, 200, pr);
       }
@@ -682,7 +730,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/collections' && req.method === 'POST') {
       const b = await readBody(req);
-      const c = { id: crypto.randomBytes(5).toString('hex'), leadId: b.leadId || null, title: b.title || 'Подборка', propertyIds: (b.propertyIds || []).slice(0, 30), createdAt: Date.now(), views: 0 };
+      const c = { id: crypto.randomBytes(5).toString('hex'), leadId: b.leadId || null, title: b.title || 'Подборка', intro: String(b.intro || '').slice(0, 1500), propertyIds: (b.propertyIds || []).slice(0, 30), createdAt: Date.now(), views: 0 };
       db.collections.unshift(c); store.save();
       return json(res, 200, c);
     }
@@ -740,6 +788,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, leadView(db, keep));
     }
 
+    if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
@@ -747,45 +796,95 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/p\/([a-f0-9]+)$/)) && req.method === 'GET') {
       const c = db.collections.find(x => x.id === m[1]);
       if (!c) { res.writeHead(404); res.end('not found'); return; }
-      c.views = (c.views || 0) + 1; store.save();
+      c.views = (c.views || 0) + 1;
+      if (c.leadId && (!c.lastViewAt || Date.now() - c.lastViewAt > 10 * 60e3)) {
+        const vl = db.leads.find(l => l.id === c.leadId);
+        if (vl) ai.pushEvent(db, { type: 'view', leadId: vl.id, text: `${vl.name} открыл подборку «${c.title}» — лучший момент для звонка` });
+      }
+      c.lastViewAt = Date.now();
+      store.save();
       const props = c.propertyIds.map(id => db.properties.find(x => x.id === id)).filter(Boolean);
       const lead = db.leads.find(l => l.id === c.leadId);
+      const mgr = db.settings.agency.manager || {};
       const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
       const isPrint = u.searchParams.get('print') === '1';
+      const cover = (pr2) => (pr2.images || [])[0]
+        ? `<div class="phero" style="background-image:url('${pr2.images[0]}')"></div>`
+        : `<div class="phero grad"><span>${pr2.area || pr2.name}</span></div>`;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${c.title} — ${db.settings.agency.name}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#F4F7FB;color:#111827}
-.hero{background:radial-gradient(600px 300px at 85% -20%,rgba(47,107,255,.4),transparent 60%),linear-gradient(155deg,#102B5C,#061126 80%);color:#fff;padding:44px 24px 38px;text-align:center}
-.hero .logo{width:34px;height:41px;margin:0 auto 12px}.hero h1{font-size:24px;letter-spacing:-.3px}.hero .sub{color:#86AFFF;font-size:13px;margin-top:6px}
-.wrap{max-width:860px;margin:-18px auto 40px;padding:0 16px}
-.card{background:#fff;border:1px solid #DCE3ED;border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 8px 24px -12px rgba(16,43,92,.12)}
-.card h2{font-size:17px;color:#0A1833}.meta{color:#667085;font-size:12.5px;margin-top:3px}
-.row{display:flex;gap:22px;flex-wrap:wrap;margin-top:13px}.m .v{font-weight:700;font-size:14.5px;color:#0A1833}.m .k{font-size:10.5px;color:#667085;text-transform:uppercase;letter-spacing:.06em}
-.price{color:#2563EB!important}.tags{margin-top:11px;display:flex;gap:6px;flex-wrap:wrap}.tag{font-size:11px;font-weight:600;background:#DCE8FF;color:#102B5C;border-radius:14px;padding:3px 10px}
-.note{margin-top:10px;font-size:12.5px;color:#3D4A63;background:#F4F7FB;border-radius:9px;padding:9px 12px}
-.mats{margin-top:10px;font-size:12.5px}.mats a{color:#2563EB;margin-right:12px}
-.foot{text-align:center;color:#667085;font-size:12px;padding:20px}
-.cta{display:block;text-align:center;background:#2563EB;color:#fff;text-decoration:none;font-weight:600;border-radius:12px;padding:14px;margin:18px 0}
-@media print{.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cta{display:none}.card{break-inside:avoid;box-shadow:none}}
-</style></head><body>
-<div class="hero"><svg class="logo" viewBox="0 0 100 120"><defs><linearGradient id="g" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#g)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
-<h1>${c.title}</h1><div class="sub">${db.settings.agency.name}${lead ? ' · персонально для ' + lead.name.split(' ')[0] : ''} · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
-<div class="wrap">
-${props.map((pr2, idx) => `<div class="card"><h2>${idx + 1}. ${pr2.name}</h2><div class="meta">${pr2.area} · ${pr2.developer !== '—' ? pr2.developer + ' · ' : ''}${pr2.market === 'offplan' ? 'первичка' : 'вторичка'}</div>
-<div class="row"><div class="m"><div class="v price">от ${fmt(pr2.priceFrom, pr2.currency)}</div><div class="k">цена</div></div>
-<div class="m"><div class="v">${pr2.type}</div><div class="k">формат</div></div>
-<div class="m"><div class="v">${pr2.handover}</div><div class="k">сдача</div></div>
-<div class="m"><div class="v">${pr2.payment}</div><div class="k">оплата</div></div></div>
-${pr2.tags.length ? '<div class="tags">' + pr2.tags.map(t => '<span class="tag">' + t + '</span>').join('') + '</div>' : ''}
-${pr2.note ? '<div class="note">' + pr2.note + '</div>' : ''}
-${(pr2.materials || []).length ? '<div class="mats">' + pr2.materials.map(mt2 => '<a href="' + mt2.url + '" target="_blank">' + mt2.label + ' →</a>').join('') + '</div>' : ''}
+.page{max-width:900px;margin:0 auto;background:#fff}
+.cover{min-height:520px;background:radial-gradient(700px 400px at 85% -10%,rgba(47,107,255,.45),transparent 60%),linear-gradient(155deg,#102B5C,#061126 80%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 24px}
+.cover .logo{width:44px;height:53px;margin-bottom:18px}.cover h1{font-size:34px;letter-spacing:-.5px;font-weight:800}.cover .for{color:#86AFFF;font-size:15px;margin-top:10px}
+.mgr{margin-top:44px;display:flex;gap:14px;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(134,175,255,.25);border-radius:16px;padding:14px 22px;backdrop-filter:blur(10px)}
+.mgr .ava{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#102B5C);display:grid;place-items:center;font-weight:700;font-size:16px}
+.mgr .nm{font-weight:700;font-size:15px}.mgr .ct{font-size:12.5px;color:#9FB5E8;margin-top:2px}
+.intro{padding:34px 40px;font-size:15px;line-height:1.65;color:#3D4A63;border-bottom:1px solid #E7ECF3;white-space:pre-line}
+.pobj{padding:0 0 34px;border-bottom:1px solid #E7ECF3;page-break-after:always}
+.phero{height:300px;background-size:cover;background-position:center}
+.phero.grad{background:linear-gradient(135deg,#102B5C,#2F6BFF);display:grid;place-items:center}.phero.grad span{color:rgba(255,255,255,.85);font-size:30px;font-weight:800}
+.pbody{padding:26px 40px 0}
+.ptitle{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.ptitle h2{font-size:24px;color:#0A1833;font-weight:800}.pprice{font-size:22px;font-weight:800;color:#2563EB;white-space:nowrap}
+.pmeta{color:#667085;font-size:13px;margin-top:4px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0}
+.chip{background:#EEF2F7;border-radius:10px;padding:8px 13px;font-size:12px}.chip b{display:block;font-size:13px;color:#0A1833}.chip span{color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.pdesc{margin-top:16px;font-size:13.5px;line-height:1.65;color:#3D4A63}
+.sec{margin-top:20px}.sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:#667085;margin-bottom:9px}
+.am{display:flex;gap:7px;flex-wrap:wrap}.am span{background:#DCE8FF;color:#102B5C;font-weight:600;font-size:12px;border-radius:14px;padding:5px 12px}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.gallery div{aspect-ratio:4/3;border-radius:10px;background-size:cover;background-position:center}
+table.units{width:100%;border-collapse:collapse;font-size:13px}
+.units th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#102B5C;padding:7px 9px;border-bottom:2px solid #DCE3ED}
+.units td{padding:8px 9px;border-bottom:1px solid #E7ECF3}.units .pr{font-weight:700;color:#2563EB}
+.mats a{display:inline-block;margin:0 14px 6px 0;color:#2563EB;font-size:13px}
+.final{padding:44px 40px;text-align:center}
+.cta{display:inline-block;background:#2563EB;color:#fff;text-decoration:none;font-weight:700;border-radius:12px;padding:15px 34px;margin-top:16px}
+.foot{text-align:center;color:#667085;font-size:12px;padding:18px}
+@media print{body{background:#fff}.cover,.phero.grad{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cta{display:none}.pobj{border:none}}
+@media(max-width:640px){.pbody,.intro,.final{padding-left:18px;padding-right:18px}.gallery{grid-template-columns:1fr 1fr}}
+</style></head><body><div class="page">
+<div class="cover">
+  <svg class="logo" viewBox="0 0 100 120"><defs><linearGradient id="g" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#g)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
+  <div style="font-size:13px;letter-spacing:.24em;color:#86AFFF;margin-bottom:10px">${db.settings.agency.name.toUpperCase()}</div>
+  <h1>${c.title}</h1>
+  <div class="for">${lead ? 'персонально для ' + lead.name.split(' ')[0] + ' · ' : ''}${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · ${props.length} проект(а)</div>
+  <div class="mgr"><div class="ava">${(mgr.name || 'M').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
+    <div style="text-align:left"><div class="nm">${mgr.name || ''}</div><div class="ct">${[mgr.phone, mgr.email].filter(Boolean).join(' · ')}</div></div></div>
+</div>
+${c.intro ? `<div class="intro">${c.intro}</div>` : ''}
+${props.map((pr2, idx) => `<div class="pobj">
+  ${cover(pr2)}
+  <div class="pbody">
+    <div class="ptitle"><div><h2>${idx + 1}. ${pr2.name}</h2><div class="pmeta">${pr2.area}${pr2.developer && pr2.developer !== '—' ? ' · ' + pr2.developer : ''} · ${pr2.market === 'offplan' ? 'первичка' : 'вторичка'}</div></div>
+    <div class="pprice">от ${fmt(pr2.priceFrom, pr2.currency)}</div></div>
+    <div class="chips">
+      <div class="chip"><span>формат</span><b>${pr2.type || '—'}</b></div>
+      <div class="chip"><span>сдача</span><b>${pr2.handover || '—'}</b></div>
+      <div class="chip"><span>план оплаты</span><b>${pr2.payment || '—'}</b></div>
+      ${pr2.tags.slice(0, 2).map(t => `<div class="chip"><span>особенность</span><b>${t}</b></div>`).join('')}
+    </div>
+    ${pr2.description ? `<div class="pdesc">${pr2.description}</div>` : pr2.note ? `<div class="pdesc">${pr2.note}</div>` : ''}
+    ${(pr2.amenities || []).length ? `<div class="sec"><h3>Удобства</h3><div class="am">${pr2.amenities.map(a => `<span>${a}</span>`).join('')}</div></div>` : ''}
+    ${(pr2.images || []).length > 1 ? `<div class="sec"><h3>Галерея</h3><div class="gallery">${pr2.images.slice(1, 7).map(u2 => `<div style="background-image:url('${u2}')"></div>`).join('')}</div></div>` : ''}
+    ${(pr2.units || []).length ? `<div class="sec"><h3>Доступные юниты</h3><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
+      ${pr2.units.map(u2 => `<tr><td><b>${u2.plan}</b></td><td>${u2.area}</td><td>${u2.floor}</td><td>${u2.view}</td><td class="pr">${fmt(u2.price, pr2.currency)}</td></tr>`).join('')}</table></div>` : ''}
+    ${((pr2.layouts || []).length || (pr2.materials || []).length) ? `<div class="sec"><h3>Планировки и материалы</h3><div class="mats">
+      ${(pr2.layouts || []).map(l2 => `<a href="${l2.url}" target="_blank">📐 ${l2.label}</a>`).join('')}
+      ${(pr2.materials || []).map(mt2 => `<a href="${mt2.url}" target="_blank">${mt2.label} →</a>`).join('')}</div></div>` : ''}
+    ${pr2.note && pr2.description ? `<div class="pdesc" style="font-size:12.5px;color:#667085;margin-top:12px">${pr2.note}</div>` : ''}
+  </div>
 </div>`).join('')}
-<a class="cta" href="https://wa.me/?text=${encodeURIComponent('Здравствуйте! Смотрю подборку «' + c.title + '»')}">Обсудить в WhatsApp</a>
-</div><div class="foot">${db.settings.agency.name} · подборка собрана в Lumen CRM</div>
-${isPrint ? '<script>window.print()</script>' : ''}</body></html>`);
+<div class="final">
+  <div style="font-size:19px;font-weight:800;color:#0A1833">Что откликается — обсудим</div>
+  <div style="color:#667085;font-size:13.5px;margin-top:8px">Посчитаю доходность по понравившимся вариантам и забронирую юнит.<br>${[mgr.name, mgr.phone].filter(Boolean).join(' · ')}</div>
+  <a class="cta" href="https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! Смотрю подборку «' + c.title + '»')}">Обсудить в WhatsApp</a>
+</div>
+<div class="foot">${db.settings.agency.name} · собрано в Lumen CRM</div>
+</div>${isPrint ? '<script>window.print()</script>' : ''}</body></html>`);
       return;
     }
 
