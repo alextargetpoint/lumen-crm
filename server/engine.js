@@ -112,10 +112,12 @@ function handover(db, lead, brokerId) {
 function dayMs(db) { return db.settings.demo.accelerate ? db.settings.demo.dayMs : DAY; }
 
 function tickChains(db) {
-  const seq = db.sequences.find(s => s.active);
-  if (!seq) return;
   const nowT = Date.now();
+  const actives = db.sequences.filter(s => s.active);
+  if (!actives.length) return;
   for (const lead of db.leads) {
+    const seq = actives.find(s => s.geo === lead.geo) || actives.find(s => !s.geo || s.geo === 'all');
+    if (!seq) continue;
     if (!lead.ai.enabled) continue;
     /* цепочка — только до первого ответа клиента; ответил → живой диалог,
        и обратно в «Спящие» из диалога цепочка лида не роняет */
@@ -138,6 +140,8 @@ function tickChains(db) {
     if (step.mode === 'template') {
       const tpl = db.templates.find(t => t.id === step.templateId);
       text = tpl ? renderTemplate(db, tpl, lead) : null;
+    } else if (step.mode === 'text') {
+      text = fillVars(db, lead, step.text);
     } else {
       text = chainAiText(db, lead, step);
     }
@@ -148,8 +152,26 @@ function tickChains(db) {
     }
     lead.ai.chainStep += 1;
     const next = seq.steps.filter(s => s.active)[lead.ai.chainStep];
-    lead.ai.nextTouchAt = next ? nowT + Math.max(1, next.day - step.day) * dayMs(db) : nowT + dayMs(db);
+    lead.ai.nextTouchAt = next ? nowT + Math.max(0.1, next.day - step.day) * dayMs(db) : nowT + dayMs(db);
   }
+}
+
+const MONTHS_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
+function fillVars(db, lead, text) {
+  const name = (lead.name || '').trim().split(/\s+/)[0];
+  const isPhone = /^[+\d][\d\s()-]*$/.test(name);
+  let t = String(text || '');
+  if (name && !isPhone) t = t.replace(/\{name\}/g, name);
+  else t = t.replace(/,\s*\{name\}/g, '').replace(/\{name\}\s*,\s*/g, '').replace(/\{name\}\s*/g, '');
+  const now = new Date(Date.now() + (lead.tz || 0) * 3600e3);
+  const slots = now.getUTCHours() < 16 ? 'сегодня в 18:00 или завтра в 11:00' : 'завтра в 11:00 или в 18:00';
+  const adRef = lead.ads && lead.ads.matched && lead.ads.adName ? '«' + lead.ads.adName + '»' : (lead.ads && lead.ads.headline ? '«' + lead.ads.headline + '»' : 'вашу заявку');
+  return t
+    .replace(/\{ad\}/g, adRef)
+    .replace(/\{geo\}/g, db.settings.geoNames[lead.geo] || lead.geo)
+    .replace(/\{month\}/g, MONTHS_PREP[new Date().getMonth()])
+    .replace(/\{agency\}/g, db.settings.agency.name)
+    .replace(/\{slots\}/g, slots);
 }
 
 function chainAiText(db, lead, step) {

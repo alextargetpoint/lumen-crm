@@ -1137,348 +1137,210 @@ PAGES.qualifier = async (root) => {
 };
 
 /* ---------------- ЦЕПОЧКИ ---------------- */
+/* ---------------- ЦЕПОЧКИ: визуальный flow-конструктор ---------------- */
 PAGES.sequences = async (root) => {
-  const seq = STATE.sequences[0];
-  const tpls = STATE.templates;
-  const tplName = (id) => (tpls.find(t => t.id === id) || {}).name || 'ИИ-текст';
+  const seqs = STATE.sequences;
+  if (!PAGE_STATE.seqSel || !seqs.find(x => x.id === PAGE_STATE.seqSel)) PAGE_STATE.seqSel = seqs[0].id;
+  const seq = seqs.find(x => x.id === PAGE_STATE.seqSel);
   const editIx = PAGE_STATE.seqEdit;
-  const save = async () => { seq.steps.sort((a, b) => a.day - b.day); await api.patch('/sequences/' + seq.id, { steps: seq.steps }); };
-  root.innerHTML = `
-    <div class="two-col">
-      <div class="glass card">
-        <div class="card-title">${ic(I.chain)}${esc(seq.name)}<span class="sub">клик по шагу — редактирование</span></div>
-        <div class="seq">
-          ${seq.steps.map((st, i) => editIx === i ? `
-            <div class="seq-step" style="flex-direction:column;align-items:stretch;gap:10px">
-              <div style="display:flex;gap:9px;align-items:center">
-                <span class="lc-lbl" style="margin:0">День</span><input data-se="day" type="number" value="${st.day}" style="width:70px">
-                <input data-se="label" value="${esc(st.label)}" placeholder="Название шага" style="flex:1">
-                <select data-se="channel" style="width:120px"><option value="wa" ${st.channel !== 'voice' ? 'selected' : ''}>WhatsApp</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option></select>
-              </div>
-              <div style="display:flex;gap:9px;align-items:center">
-                <select data-se="mode" style="width:130px"><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option></select>
-                <select data-se="templateId" style="width:210px;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
-                <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что должен сказать ИИ в этом касании" style="flex:1;${st.mode === 'template' ? 'display:none' : ''}">
-              </div>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
-                <button class="btn btn-sm" data-secancel>Отмена</button>
-                <span class="tb-spacer"></span>
-                <button class="btn btn-danger btn-sm" data-sedel="${i}">Удалить шаг</button>
-              </div>
-            </div>` : `
-            <div class="seq-step ${st.active ? '' : 'off'}" data-seedit="${i}" style="cursor:pointer">
-              <span class="seq-day">день ${st.day}</span>
-              <div style="flex:1"><div class="st-name">${esc(st.label)}</div>
-                <div class="st-desc">${st.channel === 'voice' ? 'голосовое · ' : ''}${st.mode === 'template' ? 'шаблон: ' + esc(tplName(st.templateId)) : 'ИИ-текст: ' + esc(st.prompt || '')}</div></div>
-              <label class="switch" data-stopclick><input type="checkbox" data-step="${i}" ${st.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-            </div>`).join('')}
+  const tpls = STATE.templates;
+  const save = async (patch) => { await api.patch('/sequences/' + seq.id, patch || { steps: seq.steps }); };
+  const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
+  const dayLabel = (d) => d === 0 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + d;
+  const VARS = ['{name}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
+
+  const stepNode = (st, i) => {
+    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст' }[st.mode] || st.mode;
+    const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
+    if (editIx === i) return `
+      <div class="fl-node fl-edit" data-i="${i}">
+        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
+          <span class="lc-lbl" style="margin:0">Задержка, дней</span><input data-se="day" type="number" step="0.05" value="${st.day}" style="width:86px">
+          <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага" style="flex:1">
+          <select data-se="channel" style="width:118px"><option value="wa" ${st.channel !== 'voice' ? 'selected' : ''}>WhatsApp</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option></select>
         </div>
-        <button class="btn" id="seqAdd" style="margin-top:6px">${ic(I.plus)}Добавить касание</button>
+        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
+          <select data-se="mode" style="width:130px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option></select>
+          <select data-se="templateId" style="flex:1;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
+          <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что должен сказать ИИ" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
+        </div>
+        <div data-se-textwrap style="${st.mode === 'text' ? '' : 'display:none'}">
+          <textarea data-se="text" style="width:100%;min-height:130px" placeholder="Текст сообщения…">${esc(st.text || '')}</textarea>
+          <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}<span class="muted" style="font-size:10.5px;margin-left:4px">клик — вставить · {ad} = название объявления из атрибуции</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
+          <button class="btn btn-sm" data-secancel>Отмена</button>
+          <span class="tb-spacer"></span>
+          <button class="btn btn-danger btn-sm" data-sedel="${i}">Удалить шаг</button>
+        </div>
+      </div>`;
+    return `
+      <div class="fl-node ${st.active ? '' : 'off'}" data-i="${i}" data-drag="${i}">
+        <div class="fl-day">${ic(I.clock)}${dayLabel(st.day)}</div>
+        <div class="fl-body">
+          <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : ''}">${modeName}</span></div>
+          <div class="fl-prev">${esc(preview.slice(0, 150))}${preview.length > 150 ? '…' : ''}</div>
+        </div>
+        <div class="fl-side">
+          <label class="switch" data-stopclick><input type="checkbox" data-step="${i}" ${st.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          <span class="fl-grip" title="Перетащить">⋮⋮</span>
+        </div>
+      </div>`;
+  };
+
+  root.innerHTML = `
+    <div class="fl-tabs">
+      ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
+        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}<span>${geoName(sq.geo)}</span></button>`).join('')}
+      <button class="btn btn-sm" id="seqNew">${ic(I.plus)}Цепочка</button>
+    </div>
+    <div class="two-col" style="grid-template-columns:1.5fr 1fr">
+      <div>
+        <div class="glass card mb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="seqName" value="${esc(seq.name)}" style="flex:1;min-width:200px;font-weight:650">
+          <select id="seqGeo" style="width:140px"><option value="all" ${seq.geo === 'all' ? 'selected' : ''}>Все гео</option>${STATE.settings.agency.geos.map(g => `<option value="${g}" ${seq.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
+          <div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:12px">Активна</span>
+            <label class="switch"><input type="checkbox" id="seqActive" ${seq.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>
+        </div>
+        <div class="flow" id="flow">
+          <div class="fl-node fl-trigger">
+            <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${geoName(seq.geo)}</b></div>
+            <div class="fl-prev">Facebook Lead Form / CTWA / вебхук интегратора — цепочка стартует, пока клиент не ответил</div></div>
+          </div>
+          ${seq.steps.map((st, i) => `<div class="fl-conn"><i></i><button class="fl-add" data-addat="${i}" title="Вставить шаг">${ic(I.plus, 2.2)}</button></div>` + stepNode(st, i)).join('')}
+          <div class="fl-conn"><i></i><button class="fl-add" data-addat="${seq.steps.length}">${ic(I.plus, 2.2)}</button></div>
+          <div class="fl-node fl-end">
+            <div class="fl-body"><div class="fl-title">${ic(I.moon)}<b>Не ответил — в «Спящие»</b></div>
+            <div class="fl-prev">Лид не теряется: его подхватит скоринг реанимации. Ответил на любом шаге — цепочка стоит, ведёт ИИ-квалификатор</div></div>
+          </div>
+        </div>
       </div>
       <div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.shield)}Правила гигиены цепочки</div>
-          ${[['Ответил — цепочка стоит', 'Как только клиент написал, работает живой диалог квалификатора, а не рассылка'],
-             ['Не больше одного касания в день', 'Интервалы задаёте днями — шаги сортируются сами'],
-             ['Вариативные тексты', 'ИИ перефразирует каждое касание — никаких одинаковых сообщений на пуле номеров'],
-             ['Исчерпана — в «Спящие»', 'После последнего касания лид не удаляется: его подхватит скоринг реанимации'],
-             ['Стоп-слово — мгновенный выход', 'Opt-out обрывает цепочку и закрывает лида корректно']]
+          <div class="card-title">${ic(I.shield)}Как работают цепочки</div>
+          ${[['Одна цепочка на гео', 'Лид получает цепочку своего направления; «Все гео» — запасная'],
+             ['Только до первого ответа', 'Клиент написал → живой диалог квалификатора, рассылка стоит'],
+             ['Переменные в тексте', '{name} · {geo} · {ad} (объявление из атрибуции — «не отвертишься от заявки») · {month} · {slots} · {agency}'],
+             ['Пресеты внизу списка', '«B2C-скрипт 2025» (якорь на объявление, визитка, прожимка 6 касаний) и «Онбординг Facebook-лидгена» — включите свитчем и правьте под себя']]
             .map(([t, d]) => `<div class="set-row"><div class="sp"><div class="sl">${t}</div><div class="sd">${d}</div></div></div>`).join('')}
         </div>
         <div class="glass card">
-          <div class="card-title">${ic(I.clock)}Как это выглядит для молчуна</div>
+          <div class="card-title">${ic(I.eye)}Предпросмотр для молчуна</div>
           <div class="feed">
-            ${seq.steps.filter(x => x.active).map((st) => `<div class="feed-item"><div class="feed-dot">${ic(st.channel === 'voice' ? I.phone : I.chat)}</div><div><div class="feed-text"><b>День ${st.day}.</b> ${esc(st.label)}</div></div></div>`).join('')}
-            <div class="feed-item"><div class="feed-dot warn">${ic(I.moon)}</div><div><div class="feed-text"><b>После.</b> Лид уходит в «Спящие» — вернётся через кампании реанимации</div></div></div>
+            ${seq.steps.filter(x => x.active).map((st) => `<div class="feed-item"><div class="feed-dot">${ic(st.channel === 'voice' ? I.phone : I.chat)}</div><div><div class="feed-text"><b>${dayLabel(st.day)}.</b> ${esc(st.label || '')}</div></div></div>`).join('') || '<div class="empty">Все шаги выключены</div>'}
           </div>
         </div>
       </div>
     </div>`;
+
+  /* табы и шапка */
+  $$('.fl-tab', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
+  $('#seqNew').addEventListener('click', async () => { const nq = await api.post('/sequences', {}); await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = 0; render(); });
+  $('#seqName').addEventListener('change', (e) => save({ name: e.target.value }));
+  $('#seqGeo').addEventListener('change', (e) => { seq.geo = e.target.value; save({ geo: e.target.value }).then(() => render()); });
+  $('#seqActive').addEventListener('change', (e) => { seq.active = e.target.checked; save({ active: e.target.checked }); });
+  $('#seqDel').addEventListener('click', () => modal({
+    title: 'Удалить цепочку?', sub: seq.name,
+    actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/sequences/' + seq.id, { method: 'DELETE' }); await loadState(); PAGE_STATE.seqSel = null; render(); } }, { label: 'Отмена' }],
+  }));
+
+  /* шаги */
   $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => { seq.steps[+sw.dataset.step].active = sw.checked; await save(); }));
   $$('[data-stopclick]', root).forEach(x => x.addEventListener('click', (e) => e.stopPropagation()));
-  $$('[data-seedit]', root).forEach(x => x.addEventListener('click', () => { PAGE_STATE.seqEdit = +x.dataset.seedit; render(); }));
-  const editBox = root.querySelector('[data-sesave]');
-  if (editBox) {
-    const box = editBox.closest('.seq-step');
-    const modeSel = box.querySelector('[data-se="mode"]');
-    modeSel.addEventListener('change', () => {
-      box.querySelector('[data-se="templateId"]').closest('.cs').style.display = modeSel.value === 'template' ? '' : 'none';
-      box.querySelector('[data-se="prompt"]').style.display = modeSel.value === 'template' ? 'none' : '';
-    });
-    root.querySelector('[data-sesave]').addEventListener('click', async (e) => {
+  $$('.fl-node[data-drag]', root).forEach(node => node.addEventListener('click', (e) => {
+    if (e.target.closest('.fl-grip') || DRAG.moved) return;
+    PAGE_STATE.seqEdit = +node.dataset.i; render();
+  }));
+  $$('.fl-add', root).forEach(b => b.addEventListener('click', async () => {
+    const at = +b.dataset.addat;
+    const prev = seq.steps[at - 1];
+    seq.steps.splice(at, 0, { day: prev ? +(prev.day + 1).toFixed(2) : 0, channel: 'wa', mode: 'text', text: '', label: 'Новое касание', active: true });
+    PAGE_STATE.seqEdit = at;
+    await save(); render();
+  }));
+
+  /* редактор шага */
+  const eb = root.querySelector('.fl-edit');
+  if (eb) {
+    const modeSel = eb.querySelector('[data-se="mode"]');
+    const syncMode = () => {
+      eb.querySelector('[data-se="templateId"]').closest('.cs').style.display = modeSel.value === 'template' ? '' : 'none';
+      eb.querySelector('[data-se="prompt"]').style.display = modeSel.value === 'ai' ? '' : 'none';
+      eb.querySelector('[data-se-textwrap]').style.display = modeSel.value === 'text' ? '' : 'none';
+    };
+    modeSel.addEventListener('change', syncMode);
+    const ta = eb.querySelector('[data-se="text"]');
+    $$('.fl-var', eb).forEach(v => v.addEventListener('click', () => {
+      const p2 = ta.selectionStart || ta.value.length;
+      ta.value = ta.value.slice(0, p2) + v.dataset.var + ta.value.slice(p2);
+      ta.focus();
+    }));
+    eb.querySelector('[data-sesave]').addEventListener('click', async (e) => {
       const i = +e.currentTarget.dataset.sesave;
       const st = seq.steps[i];
-      st.day = +box.querySelector('[data-se="day"]').value || 0;
-      st.label = box.querySelector('[data-se="label"]').value || 'Касание';
-      st.channel = box.querySelector('[data-se="channel"]').value;
+      st.day = +eb.querySelector('[data-se="day"]').value || 0;
+      st.label = eb.querySelector('[data-se="label"]').value || 'Касание';
+      st.channel = eb.querySelector('[data-se="channel"]').value;
       st.mode = modeSel.value;
-      st.templateId = st.mode === 'template' ? box.querySelector('[data-se="templateId"]').value : null;
-      st.prompt = box.querySelector('[data-se="prompt"]').value;
+      st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
+      st.prompt = eb.querySelector('[data-se="prompt"]').value;
+      st.text = ta.value;
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
-    root.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
-    root.querySelector('[data-sedel]').addEventListener('click', async (e) => {
+    eb.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
+    eb.querySelector('[data-sedel]').addEventListener('click', async (e) => {
       seq.steps.splice(+e.currentTarget.dataset.sedel, 1);
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
   }
-  $('#seqAdd').addEventListener('click', async () => {
-    const last = seq.steps[seq.steps.length - 1];
-    seq.steps.push({ day: (last ? last.day + 3 : 0), channel: 'wa', mode: 'ai', prompt: '', label: 'Новое касание', active: true });
-    PAGE_STATE.seqEdit = seq.steps.length - 1;
-    await save(); render();
-  });
-};
 
-/* ---------------- ОБЪЕКТЫ: портальный формат, без попапов ---------------- */
-function propCover(pr, big) {
-  const img = (pr.images || [])[0];
-  if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
-  const hues = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
-  return `<div class="prop-cover ${big ? 'big' : ''}" style="background:${hues[pr.geo] || hues.dubai}">
-    <img src="logo.svg" class="pc-star"><span>${esc(pr.area || pr.name)}</span></div>`;
-}
-
-PAGES.properties = async (root) => {
-  const props = await api.get('/properties');
-  const st = STATE.settings;
-
-  /* -------- детальная страница объекта (inline-редактирование) -------- */
-  if (PAGE_STATE.propView) {
-    const pr = props.find(x => x.id === PAGE_STATE.propView);
-    if (!pr) { PAGE_STATE.propView = null; return PAGES.properties(root); }
-    const upd = async (patch) => { await api.patch('/properties/' + pr.id, patch); Object.assign(pr, patch); };
-    const gi = (field, val, ph, num) => `<input class="gi" data-f="${field}" ${num ? 'type="number"' : ''} value="${esc(val ?? '')}" placeholder="${ph || '—'}">`;
-    const fmt = (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
-    root.innerHTML = `
-      <button class="btn btn-ghost" id="prBack" style="margin-bottom:12px">${ic(I.chev)}<span style="transform:scaleX(-1)"></span>← Ко всем объектам</button>
-      ${propCover(pr, true)}
-      <div class="pd-head">
-        <div style="flex:1;min-width:0">
-          <input class="gi gi-title" data-f="name" value="${esc(pr.name)}">
-          <div class="pd-sub">${gi('area', pr.area, 'район')} · ${gi('developer', pr.developer, 'застройщик')}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="pd-price">от <input class="gi gi-price" data-f="priceFrom" type="number" value="${pr.priceFrom}"> ${pr.currency}</div>
-          <div style="display:flex;gap:7px;justify-content:flex-end;margin-top:8px">
-            <select id="pdMarket" style="width:130px"><option value="offplan" ${pr.market !== 'secondary' ? 'selected' : ''}>Первичка</option><option value="secondary" ${pr.market === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
-            <select id="pdGeo" style="width:120px">${st.agency.geos.map(g => `<option value="${g}" ${pr.geo === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
-          </div>
-        </div>
-      </div>
-      <div class="pd-facts glass card">
-        ${[['type', 'Формат', pr.type], ['handover', 'Сдача', pr.handover], ['payment', 'План оплаты', pr.payment], ['tagsStr', 'Теги (через запятую)', (pr.tags || []).join(', ')]]
-          .map(([f, k, v]) => `<div class="pd-fact"><label class="lc-lbl">${k}</label>${gi(f, v)}</div>`).join('')}
-        <div class="pd-fact" style="grid-column:1/-1"><label class="lc-lbl">Описание проекта (для подборок и PDF)</label><textarea class="gi" data-f="description" style="width:100%;min-height:90px">${esc(pr.description || '')}</textarea></div>
-        <div class="pd-fact" style="grid-column:1/-2"><label class="lc-lbl">Удобства (через запятую)</label><input class="gi" data-f="amenitiesStr" style="width:100%" value="${esc((pr.amenities || []).join(', '))}" placeholder="Бассейн, Фитнес, Паркинг…"></div>
-        <div class="pd-fact"><label class="lc-lbl">Заметка (короткая)</label><input class="gi" data-f="note" style="width:100%" value="${esc(pr.note || '')}"></div>
-      </div>
-      <div class="glass card" style="margin-top:16px">
-        <div class="card-title">${ic(I.layers)}Для подборки — уровень эталона<span class="sub">крючок, метрики, район, рассрочка, аргументы</span></div>
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px">
-          <div class="pd-fact"><label class="lc-lbl">Заголовок-крючок (вместо названия ЖК)</label><input class="gi" data-f="hookTitle" style="width:100%" value="${esc(pr.hookTitle || '')}" placeholder="Комплекс с инфраструктурой… в 20 минутах от Business Bay"></div>
-          <div class="pd-fact"><label class="lc-lbl">Доходность</label><input class="gi" data-f="roi" style="width:100%" value="${esc(pr.roi || '')}" placeholder="от 7% годовых"></div>
-          <div class="pd-fact"><label class="lc-lbl">Прирост стоимости</label><input class="gi" data-f="appreciation" style="width:100%" value="${esc(pr.appreciation || '')}" placeholder="от 25% к сдаче"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
-          <div class="pd-fact"><label class="lc-lbl">Район: название</label><input class="gi" data-f="districtName" style="width:100%" value="${esc((pr.district || {}).name || '')}" placeholder="JVC"></div>
-          <div class="pd-fact"><label class="lc-lbl">Тайминги (строка = «мин | место»)</label><textarea class="gi" data-f="districtTimes" style="width:100%;min-height:64px" placeholder="16 | Expo City">${esc(((pr.district || {}).times || []).map(t => t.min + ' | ' + t.place).join('\n'))}</textarea></div>
-        </div>
-        <div class="pd-fact"><label class="lc-lbl">Район: описание</label><textarea class="gi" data-f="districtBlurb" style="width:100%">${esc((pr.district || {}).blurb || '')}</textarea></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
-          <div class="pd-fact"><label class="lc-lbl">Рассрочка (строка = «20% | Первоначальный взнос»)</label><textarea class="gi" data-f="paymentRowsStr" style="width:100%;min-height:70px">${esc((pr.paymentRows || []).map(r2 => r2.pct + ' | ' + r2.label).join('\n'))}</textarea></div>
-          <div class="pd-fact"><label class="lc-lbl">«Рекомендуем для аренды» (3 аргумента по строкам)</label><textarea class="gi" data-f="whyRentStr" style="width:100%;min-height:70px">${esc((pr.whyRent || []).join('\n'))}</textarea></div>
-        </div>
-      </div>
-      <div class="glass card" style="margin-top:16px">
-        <div class="card-title">${ic(I.grid)}Юниты<span class="sub">попадают таблицей в подборку и PDF</span></div>
-        <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
-          ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
-        </tbody></table>
-        <div class="lc-note-row" style="margin-top:10px;flex-wrap:wrap">
-          <input id="uPlan" placeholder="1BR" style="width:80px;flex:0 0 80px"><input id="uArea" placeholder="68 м²" style="width:80px;flex:0 0 80px">
-          <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
-          <input id="uPrice" type="number" placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
-        </div>
-      </div>
-      <div class="two-col" style="margin-top:16px">
-        <div>
-          <div class="glass card mb">
-            <div class="card-title">${ic(I.eye)}Фото и интерьеры<span class="sub">первое — обложка</span></div>
-            <div class="pd-imgs">${(pr.images || []).map((u, ix) => `<div class="pd-img" style="background-image:url('${esc(u)}')"><button class="pd-x" data-imgdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px">Фото нет — вставьте ссылки (портал/облако агентства)</div>'}</div>
-            <div class="lc-note-row" style="margin-top:10px"><input id="pdImgUrl" placeholder="https://…jpg"><button class="btn btn-sm" id="pdImgAdd">${ic(I.plus)}</button></div>
-          </div>
-          <div class="glass card">
-            <div class="card-title">${ic(I.grid)}Планировки</div>
-            ${(pr.layouts || []).map((l2, ix) => `<div class="lc-contact"><span class="badge acc">${esc(l2.label)}</span><a class="lc-cv link" href="${esc(l2.url)}" target="_blank">${esc(l2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-laydel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Планировок нет</div>'}
-            <div class="lc-note-row" style="margin-top:8px"><input id="pdLayLabel" placeholder="1BR тип A" style="width:120px;flex:0 0 120px"><input id="pdLayUrl" placeholder="https://…pdf"><button class="btn btn-sm" id="pdLayAdd">${ic(I.plus)}</button></div>
-          </div>
-        </div>
-        <div>
-          <div class="glass card mb">
-            <div class="card-title">${ic(I.doc)}Документы и материалы<span class="sub">попадают в подборки</span></div>
-            ${(pr.materials || []).map((m2, ix) => `<div class="lc-contact"><span class="badge">${esc(m2.label)}</span><a class="lc-cv link" href="${esc(m2.url)}" target="_blank">${esc(m2.url.slice(0, 46))}…</a><button class="btn-ghost lc-cx" data-matdel="${ix}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;margin-bottom:6px">Брошюры, прайсы, видео — ссылками</div>'}
-            <div class="lc-note-row" style="margin-top:8px"><input id="pdMatLabel" placeholder="Брошюра" style="width:120px;flex:0 0 120px"><input id="pdMatUrl" placeholder="https://…"><button class="btn btn-sm" id="pdMatAdd">${ic(I.plus)}</button></div>
-          </div>
-          <div class="glass card">
-            <div class="card-title">${ic(I.layers)}Действия</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
-              <span class="tb-spacer"></span>
-              <button class="btn btn-danger" id="pdDel">Удалить объект</button>
-            </div>
-            <div class="muted" style="font-size:11.5px;margin-top:10px">Все правки сохраняются сами по мере ввода — без кнопки «Сохранить».</div>
-          </div>
-        </div>
-      </div>`;
-    $('#prBack').addEventListener('click', () => { PAGE_STATE.propView = null; render(); });
-    $$('.gi', root).forEach(inp => inp.addEventListener('change', async () => {
-      const f = inp.dataset.f;
-      if (f === 'tagsStr') await upd({ tags: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
-      else if (f === 'amenitiesStr') await upd({ amenities: inp.value.split(',').map(x => x.trim()).filter(Boolean) });
-      else if (f === 'districtName' || f === 'districtBlurb' || f === 'districtTimes') {
-        const box = inp.closest('.glass');
-        const times = (box.querySelector('[data-f="districtTimes"]').value || '').split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([mn, pl]) => ({ min: parseInt(mn) || 0, place: pl.trim() }));
-        await upd({ district: { name: box.querySelector('[data-f="districtName"]').value, blurb: box.querySelector('[data-f="districtBlurb"]').value, times } });
+  /* drag-переупорядочивание узлов (pointer, как канбан) */
+  const flow = $('#flow');
+  flow.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('.fl-grip');
+    if (!grip) return;
+    const node = grip.closest('.fl-node');
+    const from = +node.dataset.drag;
+    let ghost = null;
+    DRAG.moved = false;
+    DRAG.active = true;
+    const onMove = (ev) => {
+      if (!ghost) {
+        DRAG.moved = true;
+        const r = node.getBoundingClientRect();
+        ghost = node.cloneNode(true);
+        ghost.style.cssText = `position:fixed;left:${r.left}px;top:${ev.clientY - 30}px;width:${r.width}px;z-index:400;pointer-events:none;opacity:.9;box-shadow:var(--shadow-lift)`;
+        document.body.appendChild(ghost);
+        node.style.opacity = '.35';
       }
-      else if (f === 'paymentRowsStr') await upd({ paymentRows: inp.value.split('\n').map(x => x.split('|')).filter(x => x.length === 2).map(([p2, l2]) => ({ pct: p2.trim(), label: l2.trim() })) });
-      else if (f === 'whyRentStr') await upd({ whyRent: inp.value.split('\n').map(x => x.trim()).filter(Boolean) });
-      else if (f === 'priceFrom') await upd({ priceFrom: +inp.value });
-      else await upd({ [f]: inp.value });
-    }));
-    $('#pdMarket').addEventListener('change', (e) => upd({ market: e.target.value }));
-    $('#pdGeo').addEventListener('change', (e) => upd({ geo: e.target.value }));
-    $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
-    $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
-    $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
-    $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
-    $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
-    $$('[data-matdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ materials: pr.materials.filter((_, ix) => ix !== +b.dataset.matdel) }); render(); }));
-    $('#uAdd').addEventListener('click', async () => {
-      await upd({ units: [...(pr.units || []), { plan: $('#uPlan').value, area: $('#uArea').value, floor: $('#uFloor').value, view: $('#uView').value, price: +$('#uPrice').value }] });
-      render();
-    });
-    $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
-    $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
-    $('#pdDel').addEventListener('click', () => modal({
-      title: 'Удалить объект?', sub: pr.name,
-      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); PAGE_STATE.propView = null; render(); } }, { label: 'Отмена' }],
-    }));
-    return;
-  }
-
-  /* -------- список: богатые карточки -------- */
-  const geoF = PAGE_STATE.propGeo || '';
-  const marketF = PAGE_STATE.propMarket || '';
-  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF));
-  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
-  root.innerHTML = `
-    <div class="filters">
-      <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
-      <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
-      <span class="muted" style="font-size:12px">${list.length} объектов</span>
-      <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
-    </div>
-    <div class="prop-grid">
-      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}">
-        ${propCover(pr)}
-        <div class="prop-body">
-          <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
-            <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
-            <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
-          <div class="prop-price">от ${fmt(pr)}</div>
-          <div class="prop-meta"><span>${esc(pr.type)}</span><span>${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
-          <div class="prop-foot">
-            ${(pr.tags || []).slice(0, 3).map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}
-            <span class="tb-spacer"></span>
-            <span class="muted" style="font-size:10.5px">${(pr.images || []).length ? (pr.images.length + ' фото · ') : ''}${(pr.layouts || []).length ? (pr.layouts.length + ' план. · ') : ''}${(pr.materials || []).length ? pr.materials.length + ' док.' : ''}</span>
-          </div>
-        </div>
-      </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
-    </div>
-    <div style="margin-top:16px">${coll('Источники данных · рынок Дубая', `
-      <div class="muted" style="font-size:11.8px;margin:8px 0 12px">Слоты под API порталов первички и вторички. Вставьте ключ — статус обновится; синк листингов включается после проверки ключа.</div>
-      ${Object.entries(st.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
-        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
-        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
-      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
-  $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
-  $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
-  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.propView = c.dataset.pr; render(); }));
-  $('#prAdd').addEventListener('click', async () => {
-    const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
-    PAGE_STATE.propView = pr.id;
-    render();
+      ghost.style.top = (ev.clientY - 30) + 'px';
+      $$('.fl-node[data-drag]', flow).forEach(n => n.classList.remove('fl-over'));
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const tgt = under && under.closest('.fl-node[data-drag]');
+      if (tgt && tgt !== node) tgt.classList.add('fl-over');
+    };
+    const onUp = async (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (ghost) ghost.remove();
+      node.style.opacity = '';
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const tgt = under && under.closest('.fl-node[data-drag]');
+      $$('.fl-node[data-drag]', flow).forEach(n => n.classList.remove('fl-over'));
+      setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
+      if (!tgt || tgt === node) return;
+      const to = +tgt.dataset.drag;
+      const [mv] = seq.steps.splice(from, 1);
+      seq.steps.splice(to, 0, mv);
+      await save(); render();
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   });
-  $('#portalSave')?.addEventListener('click', async () => {
-    const body = {};
-    $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
-    await api.patch('/portals', body);
-    toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
-    await loadState(); render();
-  });
-};
-
-/* ---------------- ПОДБОРКИ ---------------- */
-PAGES.collections = async (root) => {
-  const [cols, props, leads] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads')]);
-  const active = leads.filter(l => !['lost'].includes(l.stage));
-  const selLead = PAGE_STATE.collLead || '';
-  let suggest = [];
-  if (selLead) { try { suggest = await api.get(`/leads/${selLead}/suggest-properties`); } catch (e) {} }
-  const ordered = selLead && suggest.length ? suggest : props;
-  const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
-  root.innerHTML = `
-    <div class="two-col">
-      <div class="glass card">
-        <div class="card-title">${ic(I.layers)}Конструктор подборки<span class="sub">веб-страница + PDF</span></div>
-        <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
-        <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
-        <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
-        <div class="cl-props">
-          ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
-            <span class="cl-chk"></span>
-            <span style="flex:1;min-width:0"><b>${esc(pr.name)}</b> <span class="muted" style="font-size:11px">${esc(pr.area)} · ${esc(pr.type)} · от ${fmt(pr)}</span></span>
-            ${pr.matchScore >= 2 ? '<span class="mini-badge ok">match</span>' : ''}</label>`).join('')}
-        </div>
-        <button class="btn btn-accent" id="clCreate" style="margin-top:14px;width:100%;justify-content:center">${ic(I.plus)}Создать подборку</button>
-      </div>
-      <div>
-        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}">
-          <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
-          <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
-          ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
-          <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
-            <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
-            <a class="btn btn-sm" href="/p/${c.id}" target="_blank">${ic(I.eye)}Открыть</a>
-            <button class="btn btn-sm" data-act="copy">${ic(I.copy)}Ссылка</button>
-            <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank">${ic(I.doc)}PDF</a>
-            ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат лиду</button>` : ''}
-            <span class="tb-spacer"></span>
-            <button class="btn-ghost" data-act="del">${ic(I.x)}</button>
-          </div>
-        </div>`).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
-      </div>
-    </div>`;
-  $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
-  $('#clCreate').addEventListener('click', async () => {
-    const ids = $$('.cl-prop input:checked', root).map(x => x.value);
-    if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
-    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids });
-    render();
-  });
-  $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
-    const act = e.target.closest('[data-act]');
-    if (!act) return;
-    const id = card.dataset.cl;
-    if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
-    if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
-    if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
-  }));
 };
 
 /* ---------------- РЕАНИМАЦИЯ ---------------- */

@@ -833,3 +833,59 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pb-b { font-size: 12.6px; line-height: 1.6; color: var(--ink-2); margin-top: 5px; }
 .pb-tip { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: 12px; font-weight: 550; color: var(--navy-700); background: var(--blue-100); border-radius: 9px; padding: 8px 11px; }
 .pb-tip svg { width: 13px; height: 13px; flex: 0 0 13px; color: var(--accent); margin-top: 1px; }
+
+/* ---------- flow-конструктор цепочек ---------- */
+.fl-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.fl-tab {
+  display: flex; gap: 8px; align-items: center; padding: 8px 13px; border-radius: var(--r-sm);
+  background: #fff; border: 1px solid var(--stroke); font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+}
+.fl-tab i { width: 7px; height: 7px; border-radius: 50%; background: #C6D0DF; }
+.fl-tab i.on { background: #23B383; }
+.fl-tab span { font-size: 10.5px; color: var(--ink-3); font-weight: 500; }
+.fl-tab.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); color: var(--navy-900); }
+.flow { display: flex; flex-direction: column; align-items: stretch; max-width: 640px; }
+.fl-node {
+  display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid var(--stroke);
+  border-radius: var(--r-md); padding: 13px 15px; box-shadow: var(--shadow); cursor: pointer;
+  transition: border-color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+}
+.fl-node:hover { border-color: #B9CBEE; }
+.fl-node.off { opacity: .55; }
+.fl-node.fl-over { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
+.fl-trigger, .fl-end { cursor: default; background: linear-gradient(155deg, var(--navy-700), var(--navy-950)); border: none; color: #E3EAFB; }
+.fl-trigger .fl-title b, .fl-end .fl-title b { color: #fff; }
+.fl-trigger .fl-prev, .fl-end .fl-prev { color: #8CA0CC; }
+.fl-trigger .fl-title svg { color: var(--blue-300); }
+.fl-end .fl-title svg { color: #E4B33D; }
+.fl-day {
+  flex: 0 0 auto; display: flex; gap: 5px; align-items: center; font-size: 10.5px; font-weight: 700;
+  color: var(--accent); background: var(--blue-100); border-radius: 10px; padding: 4px 9px; white-space: nowrap;
+}
+.fl-day svg { width: 11px; height: 11px; }
+.fl-body { flex: 1; min-width: 0; }
+.fl-title { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.fl-title svg { width: 15px; height: 15px; color: var(--accent); flex: 0 0 15px; }
+.fl-title b { color: var(--navy-900); }
+.fl-prev { font-size: 11.8px; color: var(--ink-3); margin-top: 4px; line-height: 1.45; white-space: pre-line; }
+.fl-side { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.fl-grip { cursor: grab; color: var(--ink-3); font-size: 13px; letter-spacing: -2px; user-select: none; padding: 2px 4px; }
+.fl-grip:active { cursor: grabbing; }
+.fl-conn { display: flex; flex-direction: column; align-items: center; height: 34px; position: relative; }
+.fl-conn i { width: 2px; flex: 1; background: linear-gradient(180deg, var(--blue-300), var(--accent)); }
+.fl-add {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; border: 1.5px solid var(--stroke); display: grid; place-items: center;
+  opacity: 0; transition: opacity var(--dur-fast), border-color var(--dur-fast);
+}
+.fl-add svg { width: 11px; height: 11px; color: var(--accent); }
+.fl-conn:hover .fl-add { opacity: 1; }
+.fl-add:hover { border-color: var(--accent); }
+.fl-edit { cursor: default; flex-direction: column; align-items: stretch; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+.fl-vars { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.fl-var {
+  font-family: 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: 600; color: var(--accent);
+  background: var(--blue-100); border: 1px solid #C3D6FA; border-radius: 7px; padding: 3px 8px;
+}
+.fl-var:hover { background: #CCE0FF; }
+.fl-side .switch { flex: 0 0 auto; height: 22px; }

@@ -65,6 +65,41 @@ const DEFAULT_PASS = 'lumen2026';
   };
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
+  for (const sq of db.sequences) if (!sq.geo) sq.geo = 'all';
+  if (!db.sequences.some(sq => sq.id === 'seq_b2c_2025')) {
+    db.sequences.push({
+      id: 'seq_b2c_2025', name: 'B2C: лид из рекламы · скрипт-прожимка 2025', geo: 'all', active: false,
+      steps: [
+        { day: 0, channel: 'wa', mode: 'text', label: '1 касание · якорь на объявление (мгновенно)', active: true,
+          text: '{name}, здравствуйте! Видел вашу заявку по объявлению {ad} — отличный выбор 👌\nЦены по этому проекту скоро пойдут вверх, тайминг сейчас важен.\nВход от разумного бюджета — прислать лучшие варианты в этой вилке?' },
+        { day: 0.15, channel: 'wa', mode: 'text', label: '2 касание · визитка + развилка цели (~3 ч)', active: true,
+          text: 'Кстати, я из {agency} — мы не просто листингуем объекты, а отбираем лучшие вручную, и этот прошёл отбор.\nПомогу подобрать и закрыть все детали. Смотрите для переезда или как инвестицию?' },
+        { day: 1, channel: 'wa', mode: 'text', label: '3 касание · ценность + urgency (день 2)', active: true,
+          text: '{name}, короткий апдейт — цены по проекту скоро поднимут.\n💰 Потенциальная доходность до 10% годовых\n📈 Высокий спрос на краткосрочную аренду\n🏊 Инфраструктура: бассейн, сауна, спортзал\nПрислать сравнение лучших вариантов месяца?' },
+        { day: 2, channel: 'wa', mode: 'text', label: '4 касание · подборка (день 3)', active: true,
+          text: 'Подготовил свежую подборку топ-проектов {geo} на {month} — отобраны вручную, с лучшими планами оплаты.\nПрислать сюда ссылкой?' },
+        { day: 3, channel: 'wa', mode: 'text', label: '5 касание · вывод в звонок (день 4)', active: true,
+          text: 'Давайте созвонимся завтра на 10 минут — проведу по лучшим предложениям и отвечу на вопросы.\nУдобно {slots}?' },
+        { day: 6, channel: 'wa', mode: 'text', label: '6 касание · сострадательное прощание (день 7)', active: true,
+          text: '{name}, честно: сложно двигаться дальше, не понимая, актуален ли ещё вопрос для вас.\nЕсли найдётся минута — дайте знать, пожалуйста. Спасибо! 🙏' },
+      ],
+    });
+  }
+  if (!db.sequences.some(sq => sq.id === 'seq_fb_onb')) {
+    db.sequences.push({
+      id: 'seq_fb_onb', name: 'Онбординг из Facebook-лидгена · пресет TargetPoint', geo: 'all', active: false,
+      steps: [
+        { day: 0, channel: 'wa', mode: 'text', label: 'Первое касание (мгновенно)', active: true,
+          text: 'Добрый день, {name}\nМеня зовут {agency} — вы оставляли заявку по недвижимости ({geo}).\n\nВ {month} по {geo} у нас:\n• живая база проектов с рассрочкой\n• подбор под цель: инвестиция / переезд / ВНЖ\n• полное сопровождение сделки удалённо\n\nПодскажите, рассматриваете для жизни или как инвестицию?' },
+        { day: 0.15, channel: 'wa', mode: 'text', label: 'Знакомство + зум (через ~3 часа)', active: true,
+          text: 'Приятно познакомиться 🤝\nПредлагаю короткий зум: за 15 минут покажу 3 проекта под ваш запрос с расчётом доходности.\nУдобно {slots}?' },
+        { day: 1, channel: 'wa', mode: 'text', label: 'Дожим · тишина (24 часа)', active: true,
+          text: '{name}, добрый день) Есть новости по нашему вопросу?\nМогу подобрать удобный слот под зум на эту неделю — во сколько вам комфортно?' },
+        { day: 3, channel: 'wa', mode: 'text', label: 'Дожим · персональный разбор (72 часа)', active: true,
+          text: '{name}, могу сделать для вас разбор: соберу подборку по вашему запросу в {geo} с планами оплаты и расчётом доходности — посмотрите за 5 минут.\nЕсли актуально — пришлю ссылкой сюда.' },
+      ],
+    });
+  }
   if (!db.settings.portals) db.settings.portals = {
     property_finder: { name: 'Property Finder', key: '', status: 'off' },
     bayut: { name: 'Bayut / Dubizzle', key: '', status: 'off' },
@@ -653,12 +688,25 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, num);
     }
 
+    if (p === '/api/sequences' && req.method === 'POST') {
+      const b = await readBody(req);
+      const seq = { id: store.nextId('seq'), name: String(b.name || 'Новая цепочка').slice(0, 80), geo: b.geo || 'all', active: false, steps: b.steps || [{ day: 0, channel: 'wa', mode: 'text', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {geo}. Подскажите, рассматриваете для жизни или как инвестицию?', label: 'Первое касание', active: true }] };
+      db.sequences.push(seq); store.save();
+      return json(res, 200, seq);
+    }
+    if ((m = p.match(/^\/api\/sequences\/([^/]+)$/)) && req.method === 'DELETE') {
+      if (db.sequences.length <= 1) return json(res, 400, { error: 'нельзя удалить последнюю цепочку' });
+      db.sequences = db.sequences.filter(s => s.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
     if ((m = p.match(/^\/api\/sequences\/([^/]+)$/)) && req.method === 'PATCH') {
       const seq = db.sequences.find(s => s.id === m[1]);
       if (!seq) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
-      if (b.steps) seq.steps = b.steps;
+      if (b.steps) seq.steps = b.steps.slice(0, 30);
       if (b.active != null) seq.active = b.active;
+      if (b.name) seq.name = String(b.name).slice(0, 80);
+      if (b.geo) seq.geo = b.geo;
       store.save();
       return json(res, 200, seq);
     }
