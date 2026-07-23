@@ -24,7 +24,7 @@ const engine = require('./engine');
 
 const PORT = process.env.PORT || 5077;
 const PUBLIC = path.join(__dirname, '..', 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon' };
 
 const llm = require('./llm');
 const wa = require('./wa');
@@ -450,6 +450,102 @@ function analytics(db) {
   };
 }
 
+/* ================= ПОДБОРКИ: блочная модель =================
+   c.blocks = [{id, t, v, hidden, data}] — источник правды композиции страницы.
+   Старые подборки (без blocks) синтезируются из legacy c.custom на лету. */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+const PB_TYPES = {
+  cover: { name: 'Обложка', variants: ['blue', 'photo', 'light'], std: true },
+  hello: { name: 'Привет + об агентстве', variants: ['std'], std: true },
+  sep: { name: 'Разделитель', variants: ['blue', 'photo', 'light'], std: true },
+  proj: { name: 'Объект', variants: ['full', 'compact', 'gallery'], std: true },
+  cta: { name: 'Призыв (CTA)', variants: ['blue', 'card'], std: true },
+  why: { name: 'Почему мы + офис', variants: ['std'], std: true },
+  final: { name: 'Финальная страница', variants: ['blue'], std: true },
+  text: { name: 'Текст', variants: ['plain', 'panel', 'blue'] },
+  image: { name: 'Картинка', variants: ['full', 'inset'] },
+  gallery: { name: 'Галерея', variants: ['grid', 'rows'] },
+  video: { name: 'Видео', variants: ['std'] },
+  quote: { name: 'Отзыв / цитата', variants: ['card', 'blue'] },
+  stats: { name: 'Цифры', variants: ['row', 'cards', 'blue'] },
+  faq: { name: 'Вопрос-ответ', variants: ['std'] },
+  steps: { name: 'Как мы работаем', variants: ['std'] },
+};
+
+function pbDefaults(t) {
+  switch (t) {
+    case 'text': return { title: 'Заголовок', body: 'Текст блока — кликните, чтобы отредактировать.' };
+    case 'image': return { img: '', caption: '' };
+    case 'gallery': return { imgs: ['', '', ''] };
+    case 'video': return { url: '', caption: '' };
+    case 'quote': return { text: 'Отзыв клиента — пара предложений о работе с нами.', author: 'Имя клиента', role: 'купил апартаменты в Дубае' };
+    case 'stats': return { items: [{ k: 'лет на рынке', v: '7' }, { k: 'сделок закрыто', v: '340+' }, { k: 'доходность клиентов', v: '8–11%' }] };
+    case 'faq': return { items: [{ q: 'Какой первый шаг?', a: 'Короткий созвон: уточняем задачу и бюджет, дальше присылаем расчёт.' }, { q: 'Есть ли комиссия?', a: 'Для покупателя наши услуги бесплатны — комиссию платит застройщик.' }] };
+    case 'steps': return { items: [{ title: 'Созвон 10 минут', text: 'Уточняем цель, бюджет и сроки.' }, { title: 'Подборка и расчёт', text: 'Присылаем варианты с цифрами доходности.' }, { title: 'Показ и сделка', text: 'Онлайн или лично — сопровождаем до ключей.' }] };
+    default: return {};
+  }
+}
+
+/* blocks подборки: из сохранённых или синтез из legacy custom */
+function collBlocks(c) {
+  if (Array.isArray(c.blocks) && c.blocks.length) return c.blocks;
+  const cust = c.custom || {};
+  const hid = cust.hidden || [];
+  let ids = (c.propertyIds || []).slice();
+  if (cust.order && cust.order.length) ids = cust.order.filter((x) => ids.includes(x)).concat(ids.filter((x) => !cust.order.includes(x)));
+  const b = [];
+  b.push({ id: 'b_cover', t: 'cover', v: 'blue', data: {} });
+  b.push({ id: 'b_hello', t: 'hello', v: 'std', hidden: hid.includes('hello'), data: {} });
+  b.push({ id: 'b_sep', t: 'sep', v: 'blue', hidden: hid.includes('sep'), data: {} });
+  for (const pid of ids) {
+    const ov = (cust.props || {})[pid] || {};
+    b.push({ id: 'b_p_' + pid, t: 'proj', v: 'full', data: { pid, hookTitle: ov.hookTitle || '', blurb: ov.blurb || '', whyRent: ov.whyRent || null } });
+  }
+  b.push({ id: 'b_cta', t: 'cta', v: 'blue', hidden: hid.includes('cta'), data: {} });
+  b.push({ id: 'b_why', t: 'why', v: 'std', hidden: hid.includes('why'), data: {} });
+  b.push({ id: 'b_final', t: 'final', v: 'blue', hidden: hid.includes('final'), data: {} });
+  return b;
+}
+
+/* санитайз blocks при сохранении из редактора */
+function sanitizeBlocks(raw) {
+  if (!Array.isArray(raw)) return null;
+  const okUrl = (s) => /^(assets\/|\/assets\/|https?:\/\/)/.test(s);
+  const str = (s, n) => String(s == null ? '' : s).slice(0, n);
+  const out = [];
+  for (const b of raw.slice(0, 60)) {
+    if (!b || !PB_TYPES[b.t]) continue;
+    const meta = PB_TYPES[b.t];
+    const nb = {
+      id: /^[\w-]{1,40}$/.test(String(b.id)) ? String(b.id) : 'b_' + crypto.randomBytes(4).toString('hex'),
+      t: b.t,
+      v: meta.variants.includes(b.v) ? b.v : meta.variants[0],
+      hidden: !!b.hidden,
+      data: {},
+    };
+    const d = b.data || {};
+    const put = (k, n) => { if (d[k] != null && String(d[k]).trim() !== '') nb.data[k] = str(d[k], n); };
+    const putImg = (k) => { const v2 = str(d[k], 500).trim(); if (v2 && okUrl(v2)) nb.data[k] = v2; };
+    const putList = (k, map) => { if (Array.isArray(d[k])) nb.data[k] = d[k].slice(0, 20).map(map).filter(Boolean); };
+    put('title', 300); put('sub', 500); put('body', 4000); put('caption', 400);
+    put('heading', 300); put('text', 2000); put('author', 120); put('role', 200);
+    put('intro', 2000); put('badge', 120); put('btn', 80); put('freeNote', 400);
+    put('hookTitle', 200); put('blurb', 800); put('officeText', 800);
+    put('lede', 200); put('aboutHeading', 200); put('recTitle', 200); put('brandName', 120); put('note', 400);
+    putImg('img'); putImg('photo');
+    if (b.t === 'video') { const v2 = str(d.url, 500).trim(); if (v2 && /^(assets\/|\/assets\/|https?:\/\/)/.test(v2)) nb.data.url = v2; }
+    if (b.t === 'proj') { nb.data.pid = str(d.pid, 30); putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; }); putList('whyRent', (x) => str(x, 300).trim() || null); }
+    if (b.t === 'gallery') putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; });
+    if (b.t === 'stats') putList('items', (x) => x && (x.k || x.v) ? { k: str(x.k, 120), v: str(x.v, 60) } : null);
+    if (b.t === 'faq') putList('items', (x) => x && (x.q || x.a) ? { q: str(x.q, 300), a: str(x.a, 1000) } : null);
+    if (b.t === 'steps') putList('items', (x) => x && (x.title || x.text) ? { title: str(x.title, 200), text: str(x.text, 600) } : null);
+    if (b.t === 'hello' || b.t === 'why') putList('bullets', (x) => str(x, 400).trim() || null);
+    out.push(nb);
+  }
+  return out.length ? out : null;
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
@@ -653,6 +749,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---------------- API (всё под сессией) ---------------- */
+    /* ИИ-переписывание текста: доступно из приложения (сессия) и из конструктора (key) */
+    if (p === '/api/ai/text' && req.method === 'POST') {
+      if (!getSession(req) && u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 401, { error: 'auth required' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const b = await readBody(req);
+      if (!b.text || !String(b.text).trim()) return json(res, 400, { error: 'пустой текст' });
+      try {
+        const text = await llm.rewrite(String(b.text), String(b.mode || 'improve'), b.ctx ? String(b.ctx) : '');
+        return json(res, 200, { text });
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+
     if (p.startsWith('/api/') && !getSession(req)) return json(res, 401, { error: 'auth required' });
 
     if (p === '/api/state' && req.method === 'GET') {
@@ -1154,6 +1262,70 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, url });
     }
+    /* конструктор v2: сохранение блочной композиции */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/blocks$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const blocks = sanitizeBlocks(b.blocks);
+      if (!blocks) return json(res, 400, { error: 'bad blocks' });
+      c.blocks = blocks;
+      const cover = blocks.find(x => x.t === 'cover');
+      if (cover && cover.data.title) c.title = cover.data.title.slice(0, 200);
+      store.save();
+      return json(res, 200, { ok: true, count: blocks.length });
+    }
+    /* конструктор v2: загрузка картинки/видео (raw body, до 25МБ) */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/asset$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(jpe?g|png|webp|gif|mp4|webm)$/i);
+      if (!extM) return json(res, 400, { error: 'формат: jpg/png/webp/gif/mp4/webm' });
+      const chunks = [];
+      let size = 0;
+      await new Promise((resolve) => {
+        req.on('data', (ch) => { size += ch.length; if (size > 25e6) req.destroy(); else chunks.push(ch); });
+        req.on('end', resolve); req.on('close', resolve);
+      });
+      if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'coll'), { recursive: true });
+      const fname = `coll/${c.id}-${crypto.randomBytes(4).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      return json(res, 200, { url: '/assets/' + fname });
+    }
+    /* конструктор v2: ИИ-сборка текстов подборки из контекста лида */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/compose$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const props = (c.propertyIds || []).map(id => db.properties.find(x => x.id === id)).filter(Boolean);
+      const lead = db.leads.find(l => l.id === c.leadId) || null;
+      try {
+        const out = await llm.composeCollection(db, c, props, lead);
+        const blocks = collBlocks(c).map(b => JSON.parse(JSON.stringify(b)));
+        let projI = 0;
+        for (const b of blocks) {
+          if (b.t === 'cover' && out.title) b.data.title = out.title;
+          if (b.t === 'hello' && out.intro) b.data.intro = out.intro;
+          if (b.t === 'proj') {
+            /* модель может вернуть id не дословно — фолбэк по порядку объектов */
+            const pp = out.props.find(x => x.id === b.data.pid) || out.props[projI];
+            projI += 1;
+            if (pp) { if (pp.hook) b.data.hookTitle = pp.hook; if (pp.why && pp.why.length) b.data.whyRent = pp.why; }
+          }
+        }
+        c.blocks = sanitizeBlocks(blocks) || c.blocks;
+        if (out.title) c.title = out.title.slice(0, 200);
+        store.save();
+        return json(res, 200, { ok: true });
+      } catch (e) {
+        console.error('[compose]', e.message);
+        return json(res, 500, { error: 'ИИ не собрал тексты: ' + e.message });
+      }
+    }
     /* конструктор: сохранение правок (ключ = hooks.secret) */
     if ((m = p.match(/^\/p\/([a-f0-9]+)\/custom$/)) && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
@@ -1356,177 +1528,351 @@ const server = http.createServer(async (req, res) => {
       }
       c.lastViewAt = Date.now();
       store.save();
-      const cust = c.custom || {};
-      let ids = c.propertyIds.slice();
-      if (cust.order && cust.order.length) ids = cust.order.filter(x => ids.includes(x)).concat(ids.filter(x => !cust.order.includes(x)));
-      const props = ids.map(id => db.properties.find(x => x.id === id)).filter(Boolean).map(pr0 => {
-        const ov = (cust.props || {})[pr0.id] || {};
-        const pr3 = JSON.parse(JSON.stringify(pr0));
-        if (ov.hookTitle) pr3.hookTitle = ov.hookTitle;
-        if (ov.blurb && pr3.district) pr3.district.blurb = ov.blurb;
-        if (ov.whyRent) pr3.whyRent = ov.whyRent;
-        return pr3;
-      });
-      const hiddenSec = cust.hidden || [];
-      const cTitle = cust.title || c.title;
-      const cIntro = cust.intro != null ? cust.intro : c.intro;
       const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
+      const isPrint = u.searchParams.get('print') === '1';
+      const cust = c.custom || {};
+      const blocks = collBlocks(c);
       const lead = db.leads.find(l => l.id === c.leadId);
       const mgr = db.settings.agency.manager || {};
       const about = db.settings.agency.about || {};
       const AG = db.settings.agency.name;
-      const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + ' млн' : Math.round(n / 1000) + ' тыс';
+      const prById = (pid) => db.properties.find(x => x.id === pid);
+      const projBlocks = blocks.filter(b => b.t === 'proj' && prById(b.data.pid));
       const fmt = (n, cur) => (cur === 'EUR' ? '€' : '$') + (n || 0).toLocaleString('ru-RU');
-      const minPrice = Math.min(...props.map(p2 => p2.priceFrom || Infinity));
-      const isPrint = u.searchParams.get('print') === '1';
-      const heroImg = props.map(p2 => (p2.images || [])[0]).find(Boolean);
+      const minPrice = Math.min(...projBlocks.map(b => prById(b.data.pid).priceFrom || Infinity));
+      const heroImg = projBlocks.map(b => ((prById(b.data.pid) || {}).images || [])[0]).find(Boolean) || '';
       const plural = (n) => n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов';
-      const nProj = props.length + ' ' + plural(props.length);
+      const nProj = projBlocks.length + ' ' + plural(projBlocks.length);
+      const hasBlocks = Array.isArray(c.blocks) && c.blocks.length > 0;
+      const cTitle = hasBlocks ? c.title : (cust.title || c.title);   /* legacy custom — только до первого сохранения блоков */
+      const cIntro = hasBlocks ? c.intro : (cust.intro != null ? cust.intro : c.intro);
       const star = db.settings.agency.logo
-        ? `<img class="star" src="${db.settings.agency.logo}" style="width:auto;max-width:150px;height:44px;object-fit:contain">`
+        ? `<img class="star" src="${esc(db.settings.agency.logo)}" style="width:auto;max-width:150px;height:44px;object-fit:contain">`
         : '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
-      const projPage = (pr2, idx) => `
-<section class="pg" data-sec="proj" data-prid="${pr2.id}">
-  <div class="kicker">Проект №${idx + 1}</div>
-  <h2 class="ph2" data-t="hook:${pr2.id}">${pr2.hookTitle || pr2.name}</h2>
-  <div class="metrics">
-    <div class="mt"><span>Стоимость</span><b>от ${fmt(pr2.priceFrom, pr2.currency)}</b></div>
-    <div class="mt"><span>Дата сдачи</span><b>${pr2.handover || '—'}</b></div>
-    ${pr2.roi ? `<div class="mt"><span>Доходность</span><b>${pr2.roi}</b></div>` : ''}
-    ${pr2.appreciation ? `<div class="mt"><span>Прирост стоимости</span><b>${pr2.appreciation}</b></div>` : ''}
+
+      /* --- edit-хелперы: text=data-be, img=data-bimg, list-item append=pedit --- */
+      const be = (bid, f, idx) => isEdit ? ` data-be="${bid}:${f}${idx != null ? ':' + idx : ''}"` : '';
+      const abs = (u2) => u2 && /^assets\//.test(u2) ? '/' + u2 : u2;   /* страница живёт на /p/… — пути только абсолютные */
+      const bg = (url) => url ? `style="background-image:url('${esc(abs(url))}')"` : '';
+      const bimg = (bid, f, idx, url) => isEdit ? ` data-bimg="${bid}:${f}${idx != null ? ':' + idx : ''}" data-bival="${esc(url || '')}"` : '';
+      const ytId = (url) => { const mm = String(url || '').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,20})/); return mm ? mm[1] : null; };
+      const vimeoId = (url) => { const mm = String(url || '').match(/vimeo\.com\/(\d{6,12})/); return mm ? mm[1] : null; };
+
+      let pageNo = 0;
+      const R = {
+        cover(b) {
+          const d = b.data;
+          const title = d.title || cTitle;
+          const img = d.img || heroImg;
+          const badge = d.badge || (isFinite(minPrice) ? 'от ' + fmt(minPrice, (prById((projBlocks[0] || { data: {} }).data.pid) || {}).currency) : '');
+          const inner = `
+  <div class="brand">${star}<span${be(b.id, 'brandName')}>${esc(d.brandName || AG)}</span></div>
+  <h1${be(b.id, 'title')}>${esc(title)}</h1>
+  ${d.sub || isEdit ? `<p class="csub"${be(b.id, 'sub')}>${esc(d.sub || '')}</p>` : ''}
+  ${badge || isEdit ? `<div class="badge"${be(b.id, 'badge')}>${esc(badge)}</div>` : ''}`;
+          if (b.v === 'photo') return `<section class="cover cphoto" ${bg(img)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</section>`;
+          if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : ''}</section>`;
+          return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
+        },
+        hello(b) {
+          const d = b.data;
+          const defText = `${mgr.name ? '' : AG + ' — '}${about.intro || 'мы подбираем недвижимость под задачу клиента.'}${lead ? ` Эта подборка собрана персонально для вас${lead.name ? ', ' + lead.name.split(' ')[0] : ''}.` : ''}`;
+          const bullets = d.bullets || about.bullets || [];
+          const intro = d.intro != null ? d.intro : (cIntro || '');
+          return `<section class="pg">
+  <h2 class="hi"${be(b.id, 'heading')}>${esc(d.heading || 'Привет!')}</h2>
+  <div class="hello">
+    <p><b${be(b.id, 'lede')}>${esc(d.lede || (mgr.name ? 'Меня зовут ' + mgr.name + ',' : ''))}</b> <span${be(b.id, 'text')}>${esc(d.text || defText)}</span></p>
+    <div class="mgrph" ${d.photo ? bg(d.photo) : ''}>${d.photo ? '' : esc((mgr.name || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}${isEdit ? `<div class="imghot" ${bimg(b.id, 'photo', null, d.photo)}>🖼</div>` : ''}</div>
   </div>
-  <div class="shots ${(pr2.images || []).length > 1 ? '' : 'single'}">
-    ${(pr2.images || [])[0] ? `<div class="shot main" style="background-image:url('${pr2.images[0]}')"></div>` : `<div class="shot main grad"><span>${pr2.area || pr2.name}</span></div>`}
-    ${(pr2.images || []).slice(1, 3).map(u2 => `<div class="shot" style="background-image:url('${u2}')"></div>`).join('')}
-  </div>
-  ${pr2.district && pr2.district.name ? `<div class="district">
-    <div class="dmap">${star.replace('class="star"', 'class="dpin"')}</div>
-    <div class="dtext"><b>${pr2.district.name}</b> — <span data-t="blurb:${pr2.id}">${pr2.district.blurb || ''}</span>
-      <div class="dtimes">${(pr2.district.times || []).map(t2 => `<div><i>${t2.min} мин</i> 🚘 ${t2.place}</div>`).join('')}</div>
-    </div>
-  </div>` : ''}
-  ${(pr2.paymentRows || []).length ? `<h3 class="ph3">${pr2.market === 'offplan' ? 'Рассрочка' : 'Оплата'}</h3>
-  <div class="payrow">${pr2.paymentRows.map(r2 => `<div class="pay"><b>${r2.pct}</b><span>${r2.label}</span></div>`).join('')}</div>` : ''}
-  ${(pr2.whyRent || []).length ? `<div class="rec"><div class="rec-t">Рекомендуем для сдачи в аренду:</div><ol>${pr2.whyRent.map((w2, wi) => `<li data-t="why:${pr2.id}:${wi}">${w2}</li>`).join('')}</ol></div>` : ''}
-  ${(pr2.units || []).length ? `<h3 class="ph3">Доступные юниты</h3><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
-    ${pr2.units.map(u2 => `<tr><td><b>${u2.plan}</b></td><td>${u2.area}</td><td>${u2.floor}</td><td>${u2.view}</td><td class="pr">${fmt(u2.price, pr2.currency)}</td></tr>`).join('')}</table>` : ''}
-  ${((pr2.layouts || []).length || (pr2.materials || []).length) ? `<div class="mats">${(pr2.layouts || []).map(l2 => `<a href="${l2.url}" target="_blank">📐 ${l2.label}</a>`).join('')}${(pr2.materials || []).map(mt2 => `<a href="${mt2.url}" target="_blank">${mt2.label} →</a>`).join('')}</div>` : ''}
-  <div class="pnum">${String(idx + 1).padStart(2, '0')}</div>
+  <h2 class="hi h2sm"${be(b.id, 'aboutHeading')}>${esc(d.aboutHeading || 'Об агентстве')}</h2>
+  <div class="arrows" data-plist="${b.id}:bullets">${bullets.map((b2, bi) => `<div><i>↳</i><span${be(b.id, 'bullets', bi)}>${esc(b2).replace(/^([^:—]+[:—])/, '<b>$1</b>')}</span></div>`).join('')}</div>
+  ${intro || isEdit ? `<div class="intro"${be(b.id, 'intro')}>${esc(intro)}</div>` : ''}
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
+        },
+        sep(b) {
+          const d = b.data;
+          const img = d.img || heroImg;
+          const cls = b.v === 'light' ? 'sep slight' : b.v === 'photo' ? 'sep sphoto' : 'sep blue';
+          return `<section class="${cls}" ${b.v === 'photo' ? bg(img) : ''}>${b.v === 'photo' ? '<div class="cshade"></div>' : ''}
+  ${b.v !== 'photo' ? `<div class="sepimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : ''}</div>` : (isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼</div>` : '')}
+  <h2 class="sin"${be(b.id, 'heading')}>${esc(d.heading || nProj + ' под ваш запрос')}</h2>
+</section>`;
+        },
+        proj(b, projIdx) {
+          const pr0 = prById(b.data.pid);
+          if (!pr0) return '';
+          const d = b.data;
+          const hook = d.hookTitle || pr0.hookTitle || pr0.name;
+          const blurb = d.blurb || (pr0.district || {}).blurb || '';
+          const whyRent = d.whyRent || pr0.whyRent || [];
+          const imgs = (d.imgs && d.imgs.length ? d.imgs : (pr0.images || [])).filter(Boolean);
+          const imHot = (i2) => isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, imgs[i2])}>🖼</div>` : '';
+          const shots = b.v === 'gallery'
+            ? `<div class="shots wide">${(imgs.length ? imgs : ['']).slice(0, 4).map((u2, i2) => u2 ? `<div class="shot g" ${bg(u2)}>${imHot(i2)}</div>` : `<div class="shot g grad"><span>${esc(pr0.area || pr0.name)}</span>${imHot(i2)}</div>`).join('')}</div>`
+            : `<div class="shots ${imgs.length > 1 ? '' : 'single'}">
+    ${imgs[0] ? `<div class="shot main" ${bg(imgs[0])}>${imHot(0)}</div>` : `<div class="shot main grad"><span>${esc(pr0.area || pr0.name)}</span>${imHot(0)}</div>`}
+    ${imgs.slice(1, 3).map((u2, i2) => `<div class="shot" ${bg(u2)}>${imHot(i2 + 1)}</div>`).join('')}
+  </div>`;
+          const metrics = `<div class="metrics">
+    <div class="mt"><span>Стоимость</span><b>от ${fmt(pr0.priceFrom, pr0.currency)}</b></div>
+    <div class="mt"><span>Дата сдачи</span><b>${esc(pr0.handover || '—')}</b></div>
+    ${pr0.roi ? `<div class="mt"><span>Доходность</span><b>${esc(pr0.roi)}</b></div>` : ''}
+    ${pr0.appreciation ? `<div class="mt"><span>Прирост стоимости</span><b>${esc(pr0.appreciation)}</b></div>` : ''}
+  </div>`;
+          const district = pr0.district && pr0.district.name ? `<div class="district">
+    <div class="dmap">${star.replace('class="star"', 'class="dpin"')}</div>
+    <div class="dtext"><b>${esc(pr0.district.name)}</b> — <span${be(b.id, 'blurb')}>${esc(blurb)}</span>
+      <div class="dtimes">${(pr0.district.times || []).map(t2 => `<div><i>${esc(t2.min)} мин</i> 🚘 ${esc(t2.place)}</div>`).join('')}</div>
+    </div>
+  </div>` : '';
+          const pay = (pr0.paymentRows || []).length ? `<h3 class="ph3">${pr0.market === 'offplan' ? 'Рассрочка' : 'Оплата'}</h3>
+  <div class="payrow">${pr0.paymentRows.map(r2 => `<div class="pay"><b>${esc(r2.pct)}</b><span>${esc(r2.label)}</span></div>`).join('')}</div>` : '';
+          const rec = (whyRent.length || isEdit) ? `<div class="rec"><div class="rec-t"${be(b.id, 'recTitle')}>${esc(d.recTitle || 'Рекомендуем для сдачи в аренду:')}</div><ol data-plist="${b.id}:whyRent">${whyRent.map((w2, wi) => `<li${be(b.id, 'whyRent', wi)}>${esc(w2)}</li>`).join('')}</ol></div>` : '';
+          const units = (pr0.units || []).length ? `<h3 class="ph3">Доступные юниты</h3><div class="uwrap"><table class="units"><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th></tr>
+    ${pr0.units.map(u2 => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td class="pr">${fmt(u2.price, pr0.currency)}</td></tr>`).join('')}</table></div>` : '';
+          const mats = ((pr0.layouts || []).length || (pr0.materials || []).length) ? `<div class="mats">${(pr0.layouts || []).map(l2 => `<a href="${esc(l2.url)}" target="_blank">📐 ${esc(l2.label)}</a>`).join('')}${(pr0.materials || []).map(mt2 => `<a href="${esc(mt2.url)}" target="_blank">${esc(mt2.label)} →</a>`).join('')}</div>` : '';
+          const body = b.v === 'compact'
+            ? metrics + shots + district
+            : b.v === 'gallery'
+              ? shots + metrics + district + rec
+              : metrics + shots + district + pay + rec + units + mats;
+          return `<section class="pg" data-pid="${esc(b.data.pid)}">
+  <div class="kicker">Проект №${projIdx + 1}</div>
+  <h2 class="ph2"${be(b.id, 'hookTitle')}>${esc(hook)}</h2>
+  ${body}
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        text(b) {
+          const d = b.data;
+          const inner = `${d.title || isEdit ? `<h2 class="ph2"${be(b.id, 'title')}>${esc(d.title || '')}</h2>` : ''}<div class="tbody"${be(b.id, 'body')}>${esc(d.body || '')}</div>`;
+          if (b.v === 'blue') return `<section class="pg blue tblk">${inner}<div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div></section>`;
+          if (b.v === 'panel') return `<section class="pg"><div class="tpanel">${inner}</div><div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div></section>`;
+          return `<section class="pg">${inner}<div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div></section>`;
+        },
+        image(b) {
+          const d = b.data;
+          const im = `<div class="bigimg ${b.v === 'inset' ? 'inset' : ''}" ${bg(d.img)}>${d.img ? '' : '<span class="phold">Картинка — кликните 🖼, чтобы добавить</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼</div>` : ''}</div>`;
+          return `<section class="pg imgpg">${im}${d.caption || isEdit ? `<div class="cap"${be(b.id, 'caption')}>${esc(d.caption || '')}</div>` : ''}</section>`;
+        },
+        gallery(b) {
+          const imgs = (b.data.imgs || []).slice(0, 12);
+          const cells = (imgs.length ? imgs : ['', '', '']).map((u2, i2) => `<div class="gcell" ${bg(u2)}>${u2 ? '' : '<span class="phold">🖼</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'imgs', i2, u2)}>🖼</div>` : ''}</div>`).join('');
+          return `<section class="pg"><div class="ggrid ${b.v === 'rows' ? 'rows' : ''}" data-plist="${b.id}:imgs">${cells}</div></section>`;
+        },
+        video(b) {
+          const d = b.data;
+          const yid = ytId(d.url);
+          const vid = vimeoId(d.url);
+          let media;
+          if (yid) media = `<iframe class="vframe" src="https://www.youtube.com/embed/${yid}" allowfullscreen frameborder="0"></iframe>`;
+          else if (vid) media = `<iframe class="vframe" src="https://player.vimeo.com/video/${vid}" allowfullscreen frameborder="0"></iframe>`;
+          else if (d.url) media = `<video class="vframe" controls preload="metadata" src="${esc(abs(d.url))}"></video>`;
+          else media = `<div class="vframe vhold"><span class="phold">Видео — вставьте ссылку YouTube/Vimeo или загрузите MP4</span></div>`;
+          return `<section class="pg vidpg" data-vurl="${esc(d.url || '')}">${media}${isEdit ? `<div class="imghot vhot" data-bvideo="${b.id}">🎬 ${d.url ? 'заменить' : 'добавить'} видео</div>` : ''}${d.caption || isEdit ? `<div class="cap"${be(b.id, 'caption')}>${esc(d.caption || '')}</div>` : ''}</section>`;
+        },
+        quote(b) {
+          const d = b.data;
+          const inner = `<div class="qmark">“</div><div class="qtext"${be(b.id, 'text')}>${esc(d.text || '')}</div><div class="qwho"><b${be(b.id, 'author')}>${esc(d.author || '')}</b><span${be(b.id, 'role')}>${esc(d.role || '')}</span></div>`;
+          if (b.v === 'blue') return `<section class="pg blue qblk">${inner}</section>`;
+          return `<section class="pg"><div class="qcard">${inner}</div></section>`;
+        },
+        stats(b) {
+          const items = b.data.items || [];
+          const cells = items.map((it, i2) => `<div class="stat"><b${be(b.id, 'items', i2 + ':v')}>${esc(it.v)}</b><span${be(b.id, 'items', i2 + ':k')}>${esc(it.k)}</span></div>`).join('');
+          if (b.v === 'blue') return `<section class="pg blue"><div class="stats row" data-plist="${b.id}:items">${cells}</div></section>`;
+          if (b.v === 'cards') return `<section class="pg"><div class="stats cards" data-plist="${b.id}:items">${cells}</div></section>`;
+          return `<section class="pg"><div class="stats row light" data-plist="${b.id}:items">${cells}</div></section>`;
+        },
+        faq(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Частые вопросы')}</h2>
+  <div class="faq" data-plist="${b.id}:items">${items.map((it, i2) => `<div class="fq"><div class="fq-q"${be(b.id, 'items', i2 + ':q')}>${esc(it.q)}</div><div class="fq-a"${be(b.id, 'items', i2 + ':a')}>${esc(it.a)}</div></div>`).join('')}</div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        steps(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Как мы работаем')}</h2>
+  <div class="steps" data-plist="${b.id}:items">${items.map((it, i2) => `<div class="step"><i>${i2 + 1}</i><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title)}</b><span${be(b.id, 'items', i2 + ':text')}>${esc(it.text)}</span></div>`).join('')}</div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        cta(b) {
+          const d = b.data;
+          const waHref = `https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}`;
+          const inner = `<h2${be(b.id, 'title')}>${esc(d.title || 'Напишите номер проекта в чат,')}</h2>
+  <p${be(b.id, 'sub')}>${esc(d.sub || 'чтобы получить подробности, планировки и расчёт доходности по нему')}</p>
+  <a class="ctabtn" href="${waHref}"><span${be(b.id, 'btn')}>${esc(d.btn || 'Написать в WhatsApp')}</span></a>`;
+          if (b.v === 'card') return `<section class="pg"><div class="ctacard">${inner}</div></section>`;
+          return `<section class="cta">${inner}</section>`;
+        },
+        why(b) {
+          const d = b.data;
+          const bullets = d.bullets || about.whyUs || [];
+          return `<section class="pg">
+  <h2 class="hi h2md"${be(b.id, 'heading')}>${esc(d.heading || 'Почему клиенты выбирают именно нас')}</h2>
+  <div class="arrows" data-plist="${b.id}:bullets">${bullets.map((b2, bi) => `<div><i>↳</i><span${be(b.id, 'bullets', bi)}>${esc(b2).replace(/^([^.]+\.)/, '<b>$1</b>')}</span></div>`).join('')}</div>
+  ${(d.freeNote || about.freeNote || isEdit) ? `<p class="freenote"${be(b.id, 'freeNote')}>${esc(d.freeNote || about.freeNote || '')}</p>` : ''}
+  ${(about.office && about.office.blurb) || d.officeText ? `<h2 class="hi h2sm2">Наш офис${about.office && about.office.city ? ' · ' + esc(about.office.city) : ''}</h2>
+  <p class="officetxt"${be(b.id, 'officeText')}>${esc(d.officeText || ((about.office.address ? about.office.address + '. ' : '') + about.office.blurb))}</p>` : ''}
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        final(b) {
+          return `<section class="final blue"><div class="brand">${star}<span${be(b.id, 'brandName')}>${esc(b.data.brandName || AG)}</span></div>${b.data.note || isEdit ? `<p class="fnote"${be(b.id, 'note')}>${esc(b.data.note || '')}</p>` : ''}</section>`;
+        },
+      };
+
+      let projIdx = 0;
+      const bodyHtml = blocks.map((b0) => {
+        if (b0.hidden && !isEdit) return '';
+        if (!R[b0.t]) return '';
+        const b = Object.assign({}, b0, { data: Object.assign({}, pbDefaults(b0.t), b0.data) });
+        const html = R[b.t](b, b.t === 'proj' ? projIdx : undefined);
+        if (b.t === 'proj' && prById(b.data.pid)) projIdx += 1;
+        if (!html) return '';
+        return html.replace('<section ', `<section data-bid="${b.id}" data-bt="${b.t}" data-bv="${b.v}" ${b.hidden ? 'data-bhid="1"' : ''} `);
+      }).join('\n');
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${cTitle} — ${AG}</title>
+<title>${esc(cTitle)} — ${esc(AG)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#1D34D8;--ink:#0B0B0F;--mut:#5E6470;--bg:#F5F5F3}
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#DDDEE2;color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p,li,td,span,div{overflow-wrap:break-word;word-break:normal}
 .book{max-width:680px;margin:0 auto;background:#fff;box-shadow:0 0 60px rgba(0,0,0,.15)}
-section{page-break-after:always}
+section{page-break-after:always;position:relative}
 .pg{padding:44px 38px 56px;position:relative}
 .blue{background:var(--blue);color:#fff}
-.star{width:38px;height:46px}.dpin{width:20px;height:24px}
+.star{width:38px;height:46px;flex:0 0 auto}.dpin{width:20px;height:24px}
 .cover{min-height:92vh;display:flex;flex-direction:column;padding:44px 38px}
-.brand{font-size:22px;font-weight:700;letter-spacing:.02em;display:flex;gap:10px;align-items:center}
+.brand{font-size:22px;font-weight:700;letter-spacing:.02em;display:flex;gap:10px;align-items:center;min-width:0;flex-wrap:wrap}
 .cover h1{font-size:42px;line-height:1.08;font-weight:800;letter-spacing:-.5px;margin-top:40px}
-.badge{display:inline-block;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;padding:10px 18px;font-size:19px;font-weight:700;margin-top:26px;width:fit-content}
-.coverimg{flex:1;min-height:340px;border-radius:6px;background-size:cover;background-position:center;margin-top:36px}
+.csub{margin-top:14px;font-size:16px;line-height:1.5;opacity:.85;max-width:520px}
+.badge{display:inline-block;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;padding:10px 18px;font-size:19px;font-weight:700;margin-top:26px;width:fit-content;max-width:100%}
+.coverimg{flex:1;min-height:340px;border-radius:6px;background-size:cover;background-position:center;margin-top:36px;position:relative}
 .coverimg.grad{background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center}.coverimg.grad span{font-size:34px;font-weight:800;color:rgba(255,255,255,.85)}
+.cover.cphoto{background-size:cover;background-position:center;justify-content:flex-end}
+.cshade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,12,40,.25),rgba(6,12,40,.78))}
+.cover.cphoto .cin{position:relative;color:#fff}
+.cover.cphoto .csp{height:30px}
+.cover.clight{background:#fff;color:var(--ink)}
+.cover.clight .badge{border-color:var(--blue);color:var(--blue)}
+.brand.dark .star path{fill:var(--blue)}
 .kicker{font-size:13px;color:var(--mut);margin-bottom:10px}
 h2.hi{font-size:34px;font-weight:800;letter-spacing:-.4px}
+.h2sm{font-size:26px!important;margin-top:36px}
+.h2sm2{font-size:24px!important;margin-top:34px}
+.h2md{font-size:28px!important}
 .ph2{font-size:25px;font-weight:800;line-height:1.2;letter-spacing:-.3px;margin-bottom:20px}
 .ph3{font-size:19px;font-weight:800;margin:26px 0 0;padding-bottom:10px;border-bottom:1px solid #E2E2E6}
-.hello{display:grid;grid-template-columns:1fr 220px;gap:24px;margin-top:26px}
-.hello p{font-size:15.5px;line-height:1.6}.hello b{font-weight:700}
-.mgrph{aspect-ratio:3/4;border-radius:6px;background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center;color:#fff;font-size:34px;font-weight:800}
+.hello{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:24px;margin-top:26px}
+.hello p{font-size:15.5px;line-height:1.6;min-width:0}.hello b{font-weight:700}
+.mgrph{aspect-ratio:3/4;border-radius:6px;background:linear-gradient(160deg,#3F5BE8,#0E1B8C) center/cover;display:grid;place-items:center;color:#fff;font-size:34px;font-weight:800;position:relative}
 .arrows{margin-top:30px}.arrows div{display:flex;gap:14px;font-size:15px;line-height:1.55;padding:10px 0}
 .arrows i{color:var(--blue);font-style:normal;font-weight:800;flex:0 0 18px}
+.arrows span{min-width:0;flex:1}
 .arrows b{font-weight:700}
 .intro{font-size:16px;line-height:1.7;white-space:pre-line;margin-top:26px;color:#2A2E3A}
-.metrics{display:flex;gap:0;background:var(--bg);border-radius:6px;padding:18px 0;margin-bottom:16px;flex-wrap:wrap}
-.mt{flex:1;min-width:130px;padding:0 20px}.mt span{font-size:12.5px;color:var(--mut);display:block;margin-bottom:5px}.mt b{font-size:19px;font-weight:800;white-space:nowrap}
+.metrics{display:flex;gap:0;background:var(--bg);border-radius:6px;padding:18px 0;margin-bottom:16px;flex-wrap:wrap;row-gap:14px}
+.mt{flex:1;min-width:130px;padding:0 20px}.mt span{font-size:12.5px;color:var(--mut);display:block;margin-bottom:5px}.mt b{font-size:19px;font-weight:800}
 .shots{display:grid;grid-template-columns:1.75fr 1fr;gap:8px}
 .shots.single{grid-template-columns:1fr}
-.shot{border-radius:4px;background-size:cover;background-position:center;min-height:130px}
+.shots.wide{grid-template-columns:1fr 1fr}
+.shot{border-radius:4px;background-size:cover;background-position:center;min-height:130px;position:relative}
 .shot.main{grid-row:span 2;min-height:280px}
-.shot.grad{background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center}.shot.grad span{color:rgba(255,255,255,.85);font-size:26px;font-weight:800}
-.district{display:grid;grid-template-columns:150px 1fr;gap:18px;margin-top:18px;align-items:start}
+.shot.g{min-height:210px}
+.shot.grad{background:linear-gradient(160deg,#3F5BE8,#0E1B8C);display:grid;place-items:center}.shot.grad span{color:rgba(255,255,255,.85);font-size:26px;font-weight:800;padding:0 12px;text-align:center}
+.district{display:grid;grid-template-columns:150px minmax(0,1fr);gap:18px;margin-top:18px;align-items:start}
 .dmap{background:#EFEFED;border-radius:6px;height:120px;display:grid;place-items:center}
 .dmap svg path{fill:var(--blue)}
-.dtext{font-size:14px;line-height:1.55}.dtext b{font-weight:700}
+.dtext{font-size:14px;line-height:1.55;min-width:0}.dtext b{font-weight:700}
 .dtimes{margin-top:9px}.dtimes div{font-size:13.5px;padding:2px 0}.dtimes i{font-style:normal;font-weight:700;display:inline-block;min-width:56px}
-.payrow{display:flex;margin-top:14px}
-.pay{flex:1;padding:6px 18px 0;border-left:1px solid #E2E2E6}.pay:first-child{border-left:none;padding-left:0}
+.payrow{display:flex;margin-top:14px;flex-wrap:wrap;row-gap:12px}
+.pay{flex:1;min-width:120px;padding:6px 18px 0;border-left:1px solid #E2E2E6}.pay:first-child{border-left:none;padding-left:0}
 .pay b{font-size:24px;font-weight:800;display:block}.pay span{font-size:13px;color:var(--mut)}
 .rec{background:var(--blue);color:#fff;border-radius:6px;padding:22px 24px;margin-top:22px}
 .rec-t{font-size:18px;font-weight:800;margin-bottom:12px}
 .rec ol{padding-left:20px}.rec li{font-size:14px;line-height:1.55;margin-bottom:8px}
-table.units{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:12px}
+.uwrap{overflow-x:auto;margin-top:12px}
+table.units{width:100%;border-collapse:collapse;font-size:13.5px;min-width:430px}
 .units th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:8px 9px;border-bottom:2px solid #E2E2E6}
-.units td{padding:9px;border-bottom:1px solid #EEE}.units .pr{font-weight:800;color:var(--blue)}
-.mats{margin-top:16px}.mats a{display:inline-block;margin-right:16px;color:var(--blue);font-size:14px;font-weight:600;text-decoration:none}
+.units td{padding:9px;border-bottom:1px solid #EEE}.units .pr{font-weight:800;color:var(--blue);white-space:nowrap}
+.mats{margin-top:16px}.mats a{display:inline-block;margin-right:16px;color:var(--blue);font-size:14px;font-weight:600;text-decoration:none;overflow-wrap:anywhere}
 .pnum{position:absolute;bottom:20px;right:26px;font-size:13px;color:var(--mut)}
 .sep{min-height:70vh;display:flex;flex-direction:column;padding:44px 38px}
-.sepimg{flex:1;min-height:300px;border-radius:6px;background-size:cover;background-position:center;background-image:linear-gradient(160deg,#3F5BE8,#0E1B8C)}
+.sep.sphoto{background-size:cover;background-position:center;justify-content:flex-end;color:#fff}
+.sep.sphoto .sin{position:relative}
+.sep.slight{background:#fff;color:var(--ink)}
+.sepimg{flex:1;min-height:300px;border-radius:6px;background-size:cover;background-position:center;background-image:linear-gradient(160deg,#3F5BE8,#0E1B8C);position:relative}
 .sep h2{font-size:34px;font-weight:800;margin-top:34px}
 .cta{text-align:center;padding:70px 38px}
-.cta h2{font-size:30px;font-weight:800;line-height:1.2}.cta p{color:var(--mut);margin-top:12px;font-size:15px}
-.ctabtn{display:inline-block;background:var(--blue);color:#fff;text-decoration:none;font-weight:800;font-size:16px;border-radius:10px;padding:16px 36px;margin-top:26px}
-.final{min-height:60vh;display:grid;place-items:center}
-.final .brand{font-size:34px}
+.cta h2,.ctacard h2{font-size:30px;font-weight:800;line-height:1.2}.cta p,.ctacard p{color:var(--mut);margin-top:12px;font-size:15px}
+.ctacard{border:1.5px solid #E2E2E6;border-radius:14px;padding:46px 34px;text-align:center}
+.ctabtn{display:inline-block;background:var(--blue);color:#fff;text-decoration:none;font-weight:800;font-size:16px;border-radius:10px;padding:16px 36px;margin-top:26px;max-width:100%}
+.final{min-height:60vh;display:grid;place-items:center;text-align:center}
+.final .brand{font-size:34px;justify-content:center}
+.fnote{margin-top:14px;font-size:14px;opacity:.8}
 .foot{font-size:12px;color:var(--mut);text-align:center;padding:14px}
-@media print{body{background:#fff}.book{box-shadow:none;max-width:none}.blue,.rec,.shot.grad,.coverimg.grad,.mgrph,.sepimg,.dmap{-webkit-print-color-adjust:exact;print-color-adjust:exact}.ctabtn{display:none}}
-@media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}}
+.tbody{font-size:16px;line-height:1.7;white-space:pre-line;color:#2A2E3A}
+.tblk .tbody{color:rgba(255,255,255,.92)}
+.tpanel{background:var(--bg);border-radius:10px;padding:28px 26px}
+.imgpg{padding-bottom:44px}
+.bigimg{min-height:380px;border-radius:8px;background:linear-gradient(160deg,#E8EAF2,#D5D9E8) center/cover;position:relative}
+.bigimg.inset{margin:0 40px}
+.cap{font-size:13px;color:var(--mut);margin-top:10px;text-align:center}
+.phold{position:absolute;inset:0;display:grid;place-items:center;color:#8A90A0;font-size:14px;font-weight:600;padding:20px;text-align:center}
+.ggrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ggrid.rows{grid-template-columns:1fr}
+.gcell{min-height:220px;border-radius:8px;background:linear-gradient(160deg,#E8EAF2,#D5D9E8) center/cover;position:relative}
+.vidpg{padding-bottom:44px}
+.vframe{width:100%;aspect-ratio:16/9;border-radius:8px;display:block;background:#0B0B0F}
+.vhold{background:linear-gradient(160deg,#E8EAF2,#D5D9E8);position:relative}
+.qcard{border:1.5px solid #E2E2E6;border-radius:14px;padding:38px 34px}
+.qmark{font-size:64px;line-height:.6;color:var(--blue);font-weight:800;margin-bottom:18px}
+.qblk .qmark{color:#fff}
+.qtext{font-size:19px;line-height:1.55;font-weight:600}
+.qwho{margin-top:20px;font-size:14px}.qwho b{display:block}.qwho span{color:var(--mut)}
+.qblk .qwho span{color:rgba(255,255,255,.75)}
+.stats{display:flex;gap:14px;flex-wrap:wrap}
+.stats.row{align-items:stretch}
+.stat{flex:1;min-width:130px}
+.stats.row .stat{padding:8px 0 8px 18px;border-left:3px solid var(--blue)}
+.stats.row.light .stat{border-color:var(--blue)}
+.blue .stats.row .stat{border-color:rgba(255,255,255,.7)}
+.stats.cards .stat{background:var(--bg);border-radius:10px;padding:22px 20px}
+.stat b{font-size:30px;font-weight:800;display:block;letter-spacing:-.5px}
+.stat span{font-size:13px;color:var(--mut);display:block;margin-top:4px}
+.blue .stat span{color:rgba(255,255,255,.75)}
+.faq{margin-top:6px}
+.fq{padding:16px 0;border-bottom:1px solid #E8E8EC}
+.fq-q{font-weight:800;font-size:15.5px}
+.fq-a{font-size:14.5px;line-height:1.6;color:#2A2E3A;margin-top:6px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:8px}
+.step{background:var(--bg);border-radius:10px;padding:20px 18px;position:relative}
+.step i{font-style:normal;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;font-size:13px;margin-bottom:12px}
+.step b{display:block;font-size:15px}
+.step span{display:block;font-size:13.5px;line-height:1.5;color:var(--mut);margin-top:5px}
+.freenote{font-weight:700;margin-top:22px;font-size:15px}
+.officetxt{margin-top:12px;font-size:15px;line-height:1.6}
+.imghot{display:none}
+@media print{body{background:#fff}.book{box-shadow:none;max-width:none}.blue,.rec,.shot.grad,.coverimg.grad,.mgrph,.sepimg,.dmap,.step i,.cshade{-webkit-print-color-adjust:exact;print-color-adjust:exact}.ctabtn{display:none}.uwrap{overflow:visible}}
+@media(max-width:560px){.pg,.cover,.sep{padding:30px 20px}.cover h1{font-size:31px}.hello{grid-template-columns:1fr}.metrics{flex-direction:column;gap:12px}.mt b{white-space:normal}.payrow{flex-direction:column;gap:10px}.pay{border-left:none;padding:0}.bigimg.inset{margin:0}.stats{flex-direction:column}}
 </style></head><body><div class="book">
-
-<section class="cover blue" data-sec="cover">
-  <div class="brand">${star}${AG}</div>
-  <h1 data-t="title">${cTitle}</h1>
-  ${isFinite(minPrice) ? `<div class="badge">от ${fmt(minPrice, props[0]?.currency)} </div>` : ''}
-  ${heroImg ? `<div class="coverimg" style="background-image:url('${heroImg}')"></div>` : `<div class="coverimg grad"><span>${nProj}</span></div>`}
-</section>
-
-<section class="pg" data-sec="hello" ${hiddenSec.includes('hello') ? 'style="display:none"' : ''}>
-  <h2 class="hi">Привет!</h2>
-  <div class="hello">
-    <p><b>${mgr.name ? 'Меня зовут ' + mgr.name + ',' : AG + ' —'}</b> ${about.intro || 'мы подбираем недвижимость под задачу клиента.'}${lead ? `<br><br>Эта подборка собрана персонально для вас${lead.name ? ', ' + lead.name.split(' ')[0] : ''}.` : ''}</p>
-    <div class="mgrph">${(mgr.name || AG).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</div>
-  </div>
-  <h2 class="hi" style="font-size:26px;margin-top:36px">Об агентстве</h2>
-  <div class="arrows">${(about.bullets || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^:—]+[:—])/, '<b>$1</b>')}</span></div>`).join('')}</div>
-  ${cIntro || isEdit ? `<div class="intro" data-t="intro">${cIntro || ''}</div>` : ''}
-  <div class="pnum">02</div>
-</section>
-
-<section class="sep blue" data-sec="sep" ${hiddenSec.includes('sep') ? 'style="display:none"' : ''}>
-  <div class="sepimg" ${heroImg ? `style="background-image:url('${heroImg}')"` : ''}></div>
-  <h2>${nProj}<br>под ваш запрос</h2>
-</section>
-
-${props.map(projPage).join('')}
-
-<section class="cta" data-sec="cta" ${hiddenSec.includes('cta') ? 'style="display:none"' : ''}>
-  <h2>Напишите номер проекта в чат,</h2>
-  <p>чтобы получить подробности, планировки и расчёт доходности по нему</p>
-  <a class="ctabtn" href="https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}">Написать в WhatsApp</a>
-</section>
-
-<section class="pg" data-sec="why" ${hiddenSec.includes('why') ? 'style="display:none"' : ''}>
-  <h2 class="hi" style="font-size:28px">Почему клиенты выбирают именно нас</h2>
-  <div class="arrows">${(about.whyUs || []).map(b2 => `<div><i>↳</i><span>${b2.replace(/^([^.]+\.)/, '<b>$1</b>')}</span></div>`).join('')}</div>
-  ${about.freeNote ? `<p style="font-weight:700;margin-top:22px;font-size:15px">${about.freeNote}</p>` : ''}
-  ${about.office && about.office.blurb ? `<h2 class="hi" style="font-size:24px;margin-top:34px">Наш офис${about.office.city ? ' · ' + about.office.city : ''}</h2>
-  <p style="margin-top:12px;font-size:15px;line-height:1.6">${about.office.address ? '<b>' + about.office.address + '</b><br>' : ''}${about.office.blurb}</p>` : ''}
-  <div class="pnum">${String(props.length + 3).padStart(2, '0')}</div>
-</section>
-
-<section class="final blue" data-sec="final" ${hiddenSec.includes('final') ? 'style="display:none"' : ''}><div class="brand">${star}${AG}</div></section>
-<div class="foot">${AG} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+${bodyHtml}
+<div class="foot">${esc(AG)} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
 </div>
-${isPrint ? '<script>window.print()</script>' : `<script>
+${isPrint ? '<script>window.print()</script>' : isEdit ? '' : `<script>
 (() => {
   const sid = Math.random().toString(36).slice(2, 10);
-  let maxD = 0, lastSent = 0, deepSent = false, t0 = Date.now(), lastBeat = Date.now();
+  let maxD = 0, lastSent = 0, deepSent = false, lastBeat = Date.now();
   const depth = () => Math.min(100, Math.round((scrollY + innerHeight) / document.body.scrollHeight * 100));
   addEventListener('scroll', () => { maxD = Math.max(maxD, depth()); }, { passive: true });
   const send = () => {
@@ -1544,66 +1890,14 @@ ${isPrint ? '<script>window.print()</script>' : `<script>
   addEventListener('pagehide', send);
 })();
 </script>`}
-${isEdit ? `<style>
-[data-t]{outline:1.5px dashed rgba(29,52,216,.5);outline-offset:3px;min-height:1em;cursor:text}
-.blue [data-t]{outline-color:rgba(255,255,255,.6)}
-.edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:#0B0B0F;color:#fff;display:flex;gap:10px;align-items:center;padding:10px 16px;font-size:13px;flex-wrap:wrap}
-.edbar b{font-weight:800}
-.edbar label{display:flex;gap:5px;align-items:center;cursor:pointer;font-size:12px}
-.edbar .sp{flex:1}
-.edbtn{background:#1D34D8;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
-.edbtn.g{background:#2b2f3a}
-.pmove{position:absolute;top:14px;right:14px;z-index:5;display:flex;gap:5px}
-.pmove button{width:30px;height:30px;border-radius:8px;border:none;background:#0B0B0F;color:#fff;cursor:pointer;font-size:15px}
-.book{margin-top:52px}
-</style>
-<div class="edbar"><b>Конструктор подборки</b>
-  ${['hello|Привет', 'sep|Разделитель', 'cta|CTA', 'why|Почему мы', 'final|Финал'].map(x => { const [k, n] = x.split('|'); return `<label><input type="checkbox" data-sechide="${k}" ${hiddenSec.includes(k) ? '' : 'checked'}>${n}</label>`; }).join('')}
-  <span class="sp"></span>
-  <button class="edbtn g" onclick="location.href='/p/${c.id}'">Просмотр</button>
-  <button class="edbtn" id="edSave">Сохранить</button>
-</div>
-<script>
-document.querySelectorAll('[data-t]').forEach(el => el.contentEditable = 'plaintext-only');
-document.querySelectorAll('[data-sechide]').forEach(ch => ch.addEventListener('change', () => {
-  document.querySelector('[data-sec="' + ch.dataset.sechide + '"]').style.display = ch.checked ? '' : 'none';
-}));
-document.querySelectorAll('[data-sec="proj"]').forEach(sec => {
-  const bar = document.createElement('div');
-  bar.className = 'pmove';
-  bar.innerHTML = '<button data-mv="-1">↑</button><button data-mv="1">↓</button>';
-  sec.style.position = 'relative';
-  sec.appendChild(bar);
-  bar.addEventListener('click', (e) => {
-    const d = +e.target.dataset.mv;
-    if (!d) return;
-    const list = Array.from(document.querySelectorAll('[data-sec="proj"]'));
-    const i2 = list.indexOf(sec);
-    const other = list[i2 + d];
-    if (!other) return;
-    if (d > 0) other.after(sec); else other.before(sec);
-    document.querySelectorAll('[data-sec="proj"] .kicker').forEach((k, ki) => k.textContent = 'Проект №' + (ki + 1));
-  });
-});
-document.getElementById('edSave').addEventListener('click', async () => {
-  const texts = {};
-  document.querySelectorAll('[data-t]').forEach(el => texts[el.dataset.t] = el.innerText.trim());
-  const props = {};
-  for (const [k, v] of Object.entries(texts)) {
-    const [kind, pid, idx] = k.split(':');
-    if (kind === 'hook') (props[pid] = props[pid] || {}).hookTitle = v;
-    if (kind === 'blurb') (props[pid] = props[pid] || {}).blurb = v;
-    if (kind === 'why') { const p2 = props[pid] = props[pid] || {}; (p2.whyRent = p2.whyRent || [])[+idx] = v; }
-  }
-  const hidden = Array.from(document.querySelectorAll('[data-sechide]')).filter(x => !x.checked).map(x => x.dataset.sechide);
-  const order = Array.from(document.querySelectorAll('[data-sec="proj"]')).map(x => x.dataset.prid);
-  const r = await fetch('/p/${c.id}/custom?key=${u.searchParams.get('key')}', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: texts.title, intro: texts.intro, hidden, order, props }) });
-  const btn = document.getElementById('edSave');
-  btn.textContent = r.ok ? 'Сохранено ✓' : 'Ошибка';
-  setTimeout(() => btn.textContent = 'Сохранить', 1800);
-});
-</script>` : ''}
+${isEdit ? `<script>window.PEDIT=${JSON.stringify({
+        cid: c.id,
+        key: u.searchParams.get('key'),
+        llm: llm.available(),
+        types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
+        props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
+        lib: (() => { try { return fs.readdirSync(path.join(PUBLIC, 'assets', 'lib')).filter(f => /\.(jpe?g|png|webp)$/i.test(f)).map(f => '/assets/lib/' + f); } catch (e) { return []; } })(),
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=18"></script>` : ''}
 </body></html>`);
       return;
     }
@@ -1617,7 +1911,10 @@ document.getElementById('edSave').addEventListener('click', async () => {
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
     fs.readFile(full, (err, buf) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
+      const ext = path.extname(full);
+      /* код всегда свежий (иначе браузер держит старый app.js), медиа кэшируются */
+      const cache = ['.js', '.css', '.html'].includes(ext) ? 'no-cache' : 'public, max-age=86400';
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache });
       res.end(buf);
     });
   } catch (e) {

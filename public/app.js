@@ -355,6 +355,7 @@ function modal({ title, sub, body, actions, wide }) {
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) closeModal(); });
   document.body.appendChild(bd);
   enhanceControls(bd);
+  wireAiWand(bd);
   requestAnimationFrame(() => bd.classList.add('show'));
   return bd;
 }
@@ -364,6 +365,51 @@ function toast(text, sub, ok) {
   $('#toasts').appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3400);
+}
+
+/* ---------- ✦ ИИ-ассистент текстовых полей ----------
+   Вешается на длинные текстовые поля (селекторы ниже): кнопка ✦ →
+   меню режимов → POST /api/ai/text → замена текста + «вернуть». */
+const AI_WAND_SEL = [
+  '#clIntro', '#tBody', '#abIntro', '#abWhy', '#abBullets',
+  'textarea[data-f="description"]', 'textarea[data-f="districtBlurb"]', 'textarea[data-f="whyRentStr"]',
+  'textarea[data-se="text"]', 'textarea[data-crit][data-k="downsell"]',
+].join(',');
+const AI_MODES = [['improve', '✦ Улучшить'], ['shorter', '— Короче'], ['longer', '+ Подробнее'], ['selling', '₊ Продажнее'], ['formal', '§ Официальнее'], ['friendly', '☺ Дружелюбнее']];
+function wireAiWand(root) {
+  $$(AI_WAND_SEL, root).forEach(ta => {
+    if (ta.dataset.aiw) return;
+    ta.dataset.aiw = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'aiwrap';
+    ta.parentNode.insertBefore(wrap, ta);
+    wrap.appendChild(ta);
+    const btn = el('<button type="button" class="aiwand" title="Переписать ИИ">✦</button>');
+    wrap.appendChild(btn);
+    let undo = null;
+    btn.addEventListener('click', () => {
+      const pop = el(`<div class="pop ai-pop">${AI_MODES.map(([k, n]) => `<div class="pop-item" data-m="${k}">${n}</div>`).join('')}${undo != null ? '<div class="pop-item" data-m="undo">↩ Вернуть как было</div>' : ''}</div>`);
+      pop.addEventListener('click', async (e) => {
+        const it = e.target.closest('[data-m]');
+        if (!it) return;
+        closePop();
+        if (it.dataset.m === 'undo') { ta.value = undo; undo = null; ta.dispatchEvent(new Event('input')); return; }
+        const text = ta.value.trim();
+        if (!text) { toast('Поле пустое — сначала напишите черновик'); return; }
+        btn.classList.add('busy');
+        btn.textContent = '…';
+        try {
+          const r = await api.post('/ai/text', { text, mode: it.dataset.m });
+          undo = ta.value;
+          ta.value = r.text;
+          ta.dispatchEvent(new Event('input'));
+        } catch (e2) { toast('ИИ не справился', e2.message); }
+        btn.classList.remove('busy');
+        btn.textContent = '✦';
+      });
+      openPop(wrap, btn, pop);
+    });
+  });
 }
 
 /* ---------- глобальное состояние ---------- */
@@ -461,6 +507,7 @@ async function render() {
         const isWave = c0.classList.contains('anim');
         await fn(c0);
         enhanceControls(c0);
+        wireAiWand(c0);
         if (isWave) countUp(c0);
         else { /* мягкое перестроение при фильтрах/обновлениях — без грубого скачка */
           c0.classList.remove('soft');
@@ -552,13 +599,41 @@ PAGES.overview = async (root) => {
     </div>
     <div class="ov-grid">
       <div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} лидов всего</span></div>
-          ${STAGES.filter(s => !['lost'].includes(s.id)).map(s => {
-            const v = f[s.id] || 0;
-            const max = Math.max(...Object.values(f), 1);
-            return `<div class="funnel-row"><div class="fl">${s.name}</div><div class="bar-wrap"><div class="bar" style="width:${Math.max(v / max * 100, 2)}%"></div></div><div class="fv">${v}</div></div>`;
-          }).join('')}
+        <div class="card mb f3card">
+          <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} лидов всего · клик по стадии — канбан</span></div>
+          <div class="f3">
+            <div class="f3stage">
+              <div class="f3glow"></div>
+              ${[0, 1, 2, 3, 4, 5].map(i => `<i class="f3p" style="--pd:${(i * 0.55).toFixed(2)}s;--px:${(i * 37) % 90 - 45}px"></i>`).join('')}
+              <div class="f3funwrap">
+                <img class="f3fun" src="assets/funnel-cut.png" alt="">
+                <b class="f3t" data-t3="0" style="top:3%;width:96%;height:26%"></b>
+                <b class="f3t" data-t3="1" style="top:31%;width:70%;height:20%"></b>
+                <b class="f3t" data-t3="2" style="top:52%;width:52%;height:17%"></b>
+                <b class="f3t" data-t3="3" style="top:70%;width:38%;height:20%"></b>
+              </div>
+            </div>
+            <div class="f3rows">
+              ${(() => {
+                const shown = STAGES.filter(s => !['lost'].includes(s.id));
+                const max = Math.max(...shown.map(s => f[s.id] || 0), 1);
+                const TIER = { new: 0, touch: 0, dialog: 1, qualified: 2, handover: 2, sleeping: -1 };
+                let prev = null;
+                return shown.map((s, i) => {
+                  const v = f[s.id] || 0;
+                  const conv = prev != null && prev > 0 ? Math.round(v / prev * 100) : null;
+                  prev = v || prev;
+                  const tier = TIER[s.id] != null ? TIER[s.id] : 3;
+                  return `<div class="f3row" data-f3go data-tier="${tier}" style="--fd:${i * 40}ms">
+                    <div class="f3name">${s.name}</div>
+                    <div class="f3bar"><i style="width:${Math.max(v / max * 100, 3)}%"></i></div>
+                    <div class="f3num">${v}</div>
+                    <div class="f3conv">${conv != null ? '→ ' + conv + '%' : ''}</div>
+                  </div>`;
+                }).join('');
+              })()}
+            </div>
+          </div>
         </div>
         <div class="glass card">
           <div class="card-title">${ic(I.bars)}Первая линия: показатели</div>
@@ -586,6 +661,12 @@ PAGES.overview = async (root) => {
         ${events.length > 8 ? coll(`Раньше`, events.slice(8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join(''), { open: false, count: events.length - 8, icon: I.clock }) : ''}
       </div>
     </div>`;
+  $$('[data-f3go]', root).forEach(r => {
+    r.addEventListener('click', () => go('funnel'));
+    /* наведение на стадию подсвечивает соответствующий ярус стеклянной воронки */
+    r.addEventListener('mouseenter', () => { const t = $(`.f3t[data-t3="${r.dataset.tier}"]`, root); if (t) t.classList.add('on'); });
+    r.addEventListener('mouseleave', () => $$('.f3t.on', root).forEach(x => x.classList.remove('on')));
+  });
 };
 
 /* ---------------- ВОРОНКА (канбан) ---------------- */
@@ -2054,7 +2135,7 @@ PAGES.collections = async (root) => {
           <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
         </div>
         ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}" data-dragcoll="${c.id}">
-          <div class="cmp-head"><div class="nm">${esc(c.title)}</div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
+          <div class="cmp-head"><div class="nm" data-act="ren" title="Переименовать">${esc(c.title)}<span class="nm-pen">${ic(I.edit || I.doc)}</span></div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
           <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
           ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
           <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
@@ -2093,6 +2174,24 @@ PAGES.collections = async (root) => {
     if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
     if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
     if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
+    if (act.dataset.act === 'ren' && !act.dataset.editing) {
+      act.dataset.editing = '1';
+      const cur = act.childNodes[0].textContent;
+      act.innerHTML = '<input class="nm-edit">';
+      const inp = act.querySelector('input');
+      inp.value = cur;
+      inp.focus(); inp.select();
+      inp.addEventListener('pointerdown', ev => ev.stopPropagation()); /* не дёргать drag карточки */
+      let done0 = false;
+      const done = async (saveIt) => {
+        if (done0) return; done0 = true;
+        const v = inp.value.trim();
+        if (saveIt && v && v !== cur) await api.patch('/collections/' + id, { title: v });
+        render();
+      };
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
+      inp.addEventListener('blur', () => done(true));
+    }
   }));
 };
 

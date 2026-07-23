@@ -1080,3 +1080,49 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .lead-tbl tr:hover td { background: var(--blue-100); }
 @keyframes softIn { from { opacity: .55; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .content.soft > * { animation: softIn .24s var(--ease-soft); }
+
+/* ---------- Обзор: живая 3D-воронка (Higgsfield-вырезка, парит в hero-панели) ---------- */
+.f3card { background: linear-gradient(150deg, #061126, #0A1833 55%, #102B5C 130%); border: 1px solid rgba(122, 158, 255, .14); border-radius: 18px; padding: 18px 20px; color: #fff; overflow: hidden; position: relative; box-shadow: 0 18px 44px rgba(6, 17, 38, .35); }
+.f3card .card-title { color: #fff; }
+.f3card .card-title .sub { color: #8FA3C8; }
+.f3card .card-title svg { color: #9DB8FF; }
+.f3 { display: grid; grid-template-columns: 215px 1fr; gap: 8px; align-items: center; }
+.f3stage { position: relative; display: grid; place-items: center; min-height: 300px; }
+.f3glow { position: absolute; width: 85%; height: 75%; border-radius: 50%; background: radial-gradient(closest-side, rgba(37, 99, 235, .5), transparent 72%); filter: blur(26px); animation: f3pulse 5.5s ease-in-out infinite; }
+.f3funwrap { position: relative; width: min(76%, 205px); z-index: 2; animation: f3float 7s ease-in-out infinite; }
+.f3fun { width: 100%; display: block; filter: drop-shadow(0 26px 34px rgba(0, 0, 0, .55)); }
+.f3t { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(157, 184, 255, .65), rgba(124, 58, 237, .3) 55%, transparent 78%); opacity: 0; transition: opacity .25s ease; filter: blur(7px); pointer-events: none; mix-blend-mode: screen; }
+.f3t.on { opacity: 1; }
+.f3p { position: absolute; top: 4%; left: calc(50% + var(--px, 0px)); width: 4px; height: 4px; border-radius: 50%; background: #B8CCFF; box-shadow: 0 0 8px rgba(157, 184, 255, .9); opacity: 0; animation: f3drop 3.4s linear infinite; animation-delay: var(--pd, 0s); z-index: 3; }
+@keyframes f3drop { 0% { opacity: 0; transform: translate(0, -14px) } 12% { opacity: .95 } 55% { opacity: .75; transform: translate(calc(var(--px, 0px) * -0.5), 90px) } 78% { opacity: 0; transform: translate(calc(var(--px, 0px) * -0.9), 150px) } 100% { opacity: 0; transform: translate(calc(var(--px, 0px) * -0.9), 150px) } }
+@keyframes f3float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+@keyframes f3pulse { 0%, 100% { opacity: .75; transform: scale(1) } 50% { opacity: 1; transform: scale(1.07) } }
+.f3rows { min-width: 0; position: relative; z-index: 2; }
+.f3row { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 11px; cursor: pointer; transition: background .18s var(--ease-spring, ease), transform .18s var(--ease-spring, ease); }
+.f3row:hover { background: rgba(157, 184, 255, .1); transform: translateX(5px); }
+.f3name { width: 128px; font-size: 12.5px; color: #B9C7E8; flex: 0 0 auto; }
+.f3bar { flex: 1; height: 9px; border-radius: 999px; background: rgba(255, 255, 255, .1); overflow: hidden; min-width: 40px; }
+.f3bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2563EB, #7C9BFF); transition: width .5s var(--ease-spring, ease); }
+.f3row:hover .f3bar i { background: linear-gradient(90deg, #4F7DFF, #A78BFA); box-shadow: 0 0 12px rgba(122, 158, 255, .6); }
+.f3num { font-weight: 800; font-size: 14.5px; min-width: 30px; text-align: right; color: #fff; }
+.f3conv { font-size: 11px; color: #7E93C4; min-width: 52px; opacity: 0; transition: opacity .18s; }
+.f3row:hover .f3conv { opacity: 1; }
+.content.anim .f3row { animation: f3in .45s var(--ease-spring, ease) both; animation-delay: var(--fd, 0ms); }
+@keyframes f3in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .f3funwrap, .f3glow, .f3p { animation: none; } .f3p { display: none; } }
+@media (max-width: 760px) { .f3 { grid-template-columns: 1fr; } .f3stage { min-height: 240px; } .f3funwrap { width: 165px; } }
+
+/* ---------- ✦ ИИ-ассистент полей ---------- */
+.aiwrap { position: relative; }
+.aiwrap textarea { width: 100%; }
+.aiwand { position: absolute; top: 7px; right: 7px; z-index: 5; width: 26px; height: 26px; border: none; border-radius: 8px; background: linear-gradient(120deg, #2563EB, #5B2BD8); color: #fff; font-size: 13px; cursor: pointer; opacity: .35; transition: opacity .15s, transform .15s; display: grid; place-items: center; }
+.aiwrap:hover .aiwand, .aiwand.busy { opacity: 1; }
+.aiwand:hover { transform: scale(1.08); }
+.ai-pop .pop-item { font-size: 12.5px; }
+
+/* ---------- переименование подборки ---------- */
+.cmp-head .nm { cursor: text; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.nm-pen { opacity: 0; transition: opacity .15s; color: var(--ink-3, #8a90a0); display: inline-flex; }
+.nm-pen svg { width: 12px; height: 12px; }
+.cmp-head .nm:hover .nm-pen { opacity: 1; }
+.nm-edit { font: inherit; font-weight: inherit; border: 1.5px solid var(--acc, #2563EB); border-radius: 7px; padding: 2px 8px; outline: none; min-width: 200px; }

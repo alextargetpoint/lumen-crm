@@ -19,14 +19,14 @@ async function withTimeout(fn, timeoutMs) {
   try { return await fn(ctl.signal); } finally { clearTimeout(timer); }
 }
 
-async function callGeminiRaw(prompt, signal) {
+async function callGeminiRaw(prompt, signal, maxTokens = 500) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GKEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 500, responseMimeType: 'application/json' },
+      generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
     }),
   });
   if (!r.ok) throw new Error('gemini http ' + r.status);
@@ -36,7 +36,7 @@ async function callGeminiRaw(prompt, signal) {
   return JSON.parse(text);
 }
 
-async function callOpenAiRaw(prompt, signal) {
+async function callOpenAiRaw(prompt, signal, maxTokens = 500) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OKEY}` },
@@ -45,7 +45,7 @@ async function callOpenAiRaw(prompt, signal) {
       model: OPENAI_MODEL,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.4,
-      max_tokens: 500,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' },
     }),
   });
@@ -56,13 +56,13 @@ async function callOpenAiRaw(prompt, signal) {
   return JSON.parse(text);
 }
 
-async function callGemini(prompt, timeoutMs = 8000) {
+async function callGemini(prompt, timeoutMs = 8000, maxTokens = 500) {
   if (GKEY) {
-    try { return await withTimeout((s) => callGeminiRaw(prompt, s), timeoutMs); }
+    try { return await withTimeout((s) => callGeminiRaw(prompt, s, maxTokens), timeoutMs); }
     catch (e) { if (!OKEY) throw e; console.error('[llm] gemini недоступен (' + e.message + ') → openai'); }
   }
   if (!OKEY) throw new Error('нет ключей LLM');
-  return withTimeout((s) => callOpenAiRaw(prompt, s), timeoutMs);
+  return withTimeout((s) => callOpenAiRaw(prompt, s, maxTokens), timeoutMs);
 }
 
 const playbook = require('./playbook');
@@ -200,4 +200,59 @@ async function transcribe(buf, filename) {
   return (j.text || '').trim();
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, MODEL };
+/* ИИ-переписывание произвольного текста (кнопки «✦» в конструкторе и в приложении) */
+const REWRITE_MODES = {
+  improve: 'Улучши текст: живой человеческий язык, без канцелярита и рекламных клише, сохрани смысл и длину примерно как была.',
+  shorter: 'Сократи текст в 1.5-2 раза, оставь только суть. Без потери ключевых фактов и цифр.',
+  longer: 'Разверни текст подробнее (примерно в 1.5 раза длиннее), добавь конкретики, но НЕ выдумывай факты и цифры, которых нет в исходнике.',
+  selling: 'Перепиши продающе, но без агрессии и клише («уникальная возможность», «не упустите»). Тон уверенного брокера: конкретика, выгода, лёгкий призыв.',
+  formal: 'Перепиши официально-деловым тоном (для документа/письма). Без эмодзи и разговорных оборотов.',
+  friendly: 'Перепиши тёплым дружеским тоном, как пишет живой человек в мессенджере. Коротко, без пафоса.',
+};
+async function rewrite(text, mode, ctx) {
+  const task = REWRITE_MODES[mode] || REWRITE_MODES.improve;
+  const prompt = `Ты — редактор текстов агентства недвижимости. ${task}
+Пиши на том же языке, что и исходный текст. НЕ добавляй кавычки вокруг результата, НЕ комментируй.
+${ctx ? 'Контекст (для понимания, в ответ не включать): ' + String(ctx).slice(0, 600) + '\n' : ''}
+ИСХОДНЫЙ ТЕКСТ:
+${String(text).slice(0, 3000)}
+
+Ответь строго JSON: {"text": "переписанный текст"}`;
+  const out = await callGemini(prompt, 15000, 1200);
+  if (!out || typeof out.text !== 'string' || !out.text.trim()) throw new Error('bad rewrite');
+  const res = out.text.trim().slice(0, 4000);
+  if (/\{[a-z_]+\}|как (ИИ|нейросеть|модель)/i.test(res)) throw new Error('брак rewrite');
+  return res;
+}
+
+/* ИИ-сборка текстов подборки: интро + крючки/аргументы по каждому объекту из контекста лида */
+async function composeCollection(db, c, props, lead) {
+  const q = lead ? lead.quals : null;
+  const history = lead ? db.messages.filter(m => m.leadId === lead.id).slice(-14).map(m => (m.dir === 'in' ? 'КЛИЕНТ: ' : 'МЫ: ') + m.text).join('\n') : '';
+  const propLines = props.map((p, i) => `${i + 1}. id=${p.id} «${p.name}» — ${p.area || ''}, тип ${p.type || '—'}, от ${p.priceFrom || '?'} ${p.currency || 'USD'}, сдача ${p.handover || '—'}${p.roi ? ', доходность ' + p.roi : ''}${p.description ? '. ' + String(p.description).slice(0, 200) : ''}`).join('\n');
+  const prompt = `Ты — опытный брокер элитной недвижимости. Собери тексты для персональной веб-подборки объектов.
+Пиши как живой русскоязычный брокер: конкретно, тепло, без рекламных клише и канцелярита. Цифры бери ТОЛЬКО из данных ниже, ничего не выдумывай.
+
+КЛИЕНТ: ${lead ? `${lead.name}, направление ${db.settings.geoNames[lead.geo] || lead.geo || '—'}. Оси: цель=${q.purpose?.value || '—'}, срок=${q.timeline?.value || '—'}, бюджет=${q.budget?.value || '—'}, тип=${q.type?.value || '—'}` : 'общая подборка, клиент не указан'}
+${history ? 'ПЕРЕПИСКА (важно: учти пожелания):\n' + history : ''}
+ОБЪЕКТЫ:
+${propLines}
+
+Верни строго JSON:
+{"title":"заголовок обложки до 60 символов, персональный, без слова 'подборка' дважды",
+ "intro":"вступление 2-4 предложения от первого лица (я подобрал / посмотрите), обращение по имени если есть",
+ "props":[{"id":"id объекта","hook":"продающий заголовок-крючок до 80 символов (выгода, не название ЖК)","why":["аргумент 1 почему подходит именно этому клиенту","аргумент 2","аргумент 3"]}]}`;
+  const out = await callGemini(prompt, 30000, 3000);
+  if (!out || !Array.isArray(out.props)) throw new Error('bad compose');
+  return {
+    title: String(out.title || '').slice(0, 90),
+    intro: String(out.intro || '').slice(0, 1200),
+    props: out.props.filter(x => x && x.id).map(x => ({
+      id: String(x.id),
+      hook: String(x.hook || '').slice(0, 140),
+      why: Array.isArray(x.why) ? x.why.slice(0, 4).map(w => String(w).slice(0, 260)) : [],
+    })),
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, MODEL };
