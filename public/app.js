@@ -2988,12 +2988,10 @@ PAGES.brokers = async (root) => {
               </div></div>
           </div>
           <div>
-            <label class="lc-lbl">Дни смен</label>
+            <label class="lc-lbl">Дни смен · у каждого дня свой интервал</label>
             <div class="chips-row" style="margin-bottom:12px">${days.map((d, i3) => `<button type="button" class="chip-t day-chip ${(b.schedule?.days || []).includes(i3 + 1) ? 'on' : ''}" data-d="${i3 + 1}">${d}</button>`).join('')}</div>
-            <div class="pds-grid c2">
-              <div class="pd-fact"><label class="lc-lbl">С</label><input class="gi" data-be="from" type="time" value="${b.schedule?.from || '09:00'}"></div>
-              <div class="pd-fact"><label class="lc-lbl">До</label><input class="gi" data-be="to" type="time" value="${b.schedule?.to || '20:00'}"></div>
-            </div>
+            <div id="dayTimes"></div>
+            <button type="button" class="btn btn-sm" id="dtSameAll" style="margin-top:8px">${ic(I.copy)}Как в первом дне — во все</button>
           </div>
         </div>
       </div>`;
@@ -3006,7 +3004,7 @@ PAGES.brokers = async (root) => {
           <div class="muted" style="font-size:11px;margin-top:5px">загрузка ${b.load}/${b.capacity} · в работе от ИИ: ${hot}</div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:9px">
             <span class="badge ${isOnShift(b) ? 'ok' : ''}">${isOnShift(b) ? 'на смене' : 'не на смене'}</span>
-            <span class="muted" style="font-size:10.5px">${(b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ')} · ${b.schedule?.from || ''}–${b.schedule?.to || ''}</span>
+            <span class="muted" style="font-size:10.5px">${(b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ')} · ${(() => { const pd = b.schedule?.perDay || {}; const wins = (b.schedule?.days || []).map(d => (pd[d] ? pd[d].from + '–' + pd[d].to : (b.schedule?.from || '') + '–' + (b.schedule?.to || ''))); return [...new Set(wins)].length > 1 ? 'инд. график' : (wins[0] || ''); })()}</span>
           </div>
         </div>
       </div>`;
@@ -3026,7 +3024,36 @@ PAGES.brokers = async (root) => {
   $$('[data-brok]', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.brokerEdit = c.dataset.brok; render(); }));
   const eb = root.querySelector('[data-bredit]');
   if (eb) {
-    $$('.day-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('on')));
+    /* пер-дневные интервалы: строка «день · с – до» на каждый активный день */
+    const bEdit = STATE.brokers.find(x => x.id === eb.dataset.bredit) || {};
+    const dayNames = ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+    const perDay0 = (bEdit.schedule || {}).perDay || {};
+    const dtVals = {};
+    for (let d2 = 1; d2 <= 7; d2++) dtVals[d2] = perDay0[d2] || { from: bEdit.schedule?.from || '09:00', to: bEdit.schedule?.to || '20:00' };
+    const buildDayTimes = () => {
+      const on = $$('.day-chip.on', eb).map(x => +x.dataset.d);
+      $('#dayTimes', eb).innerHTML = on.map(d2 => `<div class="dt-row" data-dtday="${d2}">
+        <span class="dt-d">${dayNames[d2]}</span>
+        <input class="gi dt-from" type="time" value="${dtVals[d2].from}">
+        <span class="dt-sep">–</span>
+        <input class="gi dt-to" type="time" value="${dtVals[d2].to}">
+      </div>`).join('') || '<div class="muted" style="font-size:12px">Дни не выбраны — брокер вне ротации смен</div>';
+      $$('.dt-row', eb).forEach(row => {
+        const d2 = +row.dataset.dtday;
+        row.querySelector('.dt-from').addEventListener('change', (e) => { dtVals[d2].from = e.target.value; });
+        row.querySelector('.dt-to').addEventListener('change', (e) => { dtVals[d2].to = e.target.value; });
+      });
+      enhanceControls($('#dayTimes', eb));   /* кастомные тайм-пикеры и на перестроенных строках */
+    };
+    buildDayTimes();
+    $('#dtSameAll', eb).addEventListener('click', () => {
+      const on = $$('.day-chip.on', eb).map(x => +x.dataset.d);
+      if (!on.length) return;
+      const first = dtVals[on[0]];
+      on.forEach(d2 => { dtVals[d2] = { from: first.from, to: first.to }; });
+      buildDayTimes();
+    });
+    $$('.day-chip', eb).forEach(ch => ch.addEventListener('click', () => { ch.classList.toggle('on'); buildDayTimes(); }));
     $$('.lang-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('on')));
     const lAdd = () => {
       const inp = eb.querySelector('#langAddInp');
@@ -3045,7 +3072,13 @@ PAGES.brokers = async (root) => {
         geo: eb.querySelector('[data-be="geo"]').value,
         capacity: +eb.querySelector('[data-be="capacity"]').value,
         langs: $$('.lang-chip.on', eb).map(x => x.dataset.lg),
-        schedule: { days: $$('.day-chip.on', eb).map(x => +x.dataset.d), from: eb.querySelector('[data-be="from"]').value, to: eb.querySelector('[data-be="to"]').value },
+        schedule: (() => {
+          const on = $$('.day-chip.on', eb).map(x => +x.dataset.d);
+          const perDay = {};
+          on.forEach(d2 => { perDay[d2] = dtVals[d2]; });
+          const base = on.length ? dtVals[on[0]] : { from: '09:00', to: '20:00' };
+          return { days: on, from: base.from, to: base.to, perDay };
+        })(),
       });
       PAGE_STATE.brokerEdit = null;
       await loadState(); render();
@@ -3068,7 +3101,8 @@ function isOnShift(b) {
   if (sch.days && !sch.days.includes(day)) return false;
   const hm = now.getHours() * 60 + now.getMinutes();
   const toMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
-  return !(sch.from && hm < toMin(sch.from)) && !(sch.to && hm >= toMin(sch.to));
+  const win = (sch.perDay || {})[day] || sch;
+  return !(win.from && hm < toMin(win.from)) && !(win.to && hm >= toMin(win.to));
 }
 
 /* ---------------- АНАЛИТИКА ---------------- */

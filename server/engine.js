@@ -139,8 +139,9 @@ function brokerOnShift(b) {
   if (s.days && !s.days.includes(day)) return false;
   const hm = now.getHours() * 60 + now.getMinutes();
   const toMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
-  if (s.from && hm < toMin(s.from)) return false;
-  if (s.to && hm >= toMin(s.to)) return false;
+  const win = (s.perDay || {})[day] || s;   /* у дня может быть свой интервал */
+  if (win.from && hm < toMin(win.from)) return false;
+  if (win.to && hm >= toMin(win.to)) return false;
   return true;
 }
 

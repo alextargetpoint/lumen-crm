@@ -990,7 +990,17 @@ const server = http.createServer(async (req, res) => {
       if (b.name) { br.name = String(b.name).slice(0, 60); br.avatar = br.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(); }
       if (b.geo) br.geo = b.geo;
       if (b.langs) br.langs = b.langs.slice(0, 6);
-      if (b.schedule) br.schedule = { days: (b.schedule.days || []).map(Number).filter(d => d >= 1 && d <= 7), from: String(b.schedule.from || '09:00'), to: String(b.schedule.to || '20:00') };
+      if (b.schedule) {
+        br.schedule = { days: (b.schedule.days || []).map(Number).filter(d => d >= 1 && d <= 7), from: String(b.schedule.from || '09:00'), to: String(b.schedule.to || '20:00') };
+        /* пер-дневные интервалы: perDay[день 1..7] = {from,to} */
+        if (b.schedule.perDay && typeof b.schedule.perDay === 'object') {
+          br.schedule.perDay = {};
+          for (const [d, t] of Object.entries(b.schedule.perDay)) {
+            const dn = +d;
+            if (dn >= 1 && dn <= 7 && t && /^\d{1,2}:\d{2}$/.test(String(t.from || '')) && /^\d{1,2}:\d{2}$/.test(String(t.to || ''))) br.schedule.perDay[dn] = { from: String(t.from), to: String(t.to) };
+          }
+        }
+      }
       if (b.capacity != null) br.capacity = +b.capacity;
       store.save();
       return json(res, 200, br);
