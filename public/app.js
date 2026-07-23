@@ -64,6 +64,14 @@ document.addEventListener('click', (e) => {
   if (h) h.parentElement.classList.toggle('open');
 });
 
+function plural(n, one, few, many) {
+  const m = Math.abs(n) % 100, d = m % 10;
+  if (m > 10 && m < 20) return many;
+  if (d > 1 && d < 5) return few;
+  if (d === 1) return one;
+  return many;
+}
+
 /* ============================================================
    Кастомные контролы (золотое правило: никаких нативных
    дропдаунов/календарей — всё в стилистике продукта)
@@ -447,9 +455,18 @@ async function render() {
       const fn = PAGES[page];
       if (!fn) break;
       try {
-        await fn($('#content'));
-        enhanceControls($('#content'));
-        if ($('#content').classList.contains('anim')) countUp($('#content'));
+        const c0 = $('#content');
+        const isWave = c0.classList.contains('anim');
+        await fn(c0);
+        enhanceControls(c0);
+        if (isWave) countUp(c0);
+        else { /* мягкое перестроение при фильтрах/обновлениях — без грубого скачка */
+          c0.classList.remove('soft');
+          void c0.offsetWidth;
+          c0.classList.add('soft');
+          clearTimeout(render._soft);
+          render._soft = setTimeout(() => c0.classList.remove('soft'), 400);
+        }
       } catch (e) {
         if (e.message === 'auth') return; // гейт уже показан
         /* инвариант: раздел никогда не остаётся молча пустым */
@@ -599,6 +616,7 @@ PAGES.funnel = async (root) => {
         ${[['', 'Все'], ['hot', '🔥 Горячие'], ['overdue', '⏰ Просрочка'], ['human', '✋ Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
       </div>
       <span class="tb-spacer"></span>
+      <button class="btn btn-sm" id="importBtn">${ic(I.doc)}Импорт базы</button>
       <button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
       <div class="seg-toggle">
@@ -667,6 +685,40 @@ PAGES.funnel = async (root) => {
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
   $$('[data-row]', root).forEach(r => r.addEventListener('click', () => openLeadModal(r.dataset.row)));
   $$('.lead-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) openLeadModal(c.dataset.id); }));
+  $('#importBtn').addEventListener('click', () => modal({
+    title: 'Импорт действующей базы',
+    sub: 'Из Bitrix24 / amoCRM / Excel. Дубли по номеру не создаются — карточки обогащаются. Импортированные попадают в «Спящие» с выключенным ИИ (их поднимет реанимация по скорингу) — база не получит внезапную рассылку.',
+    wide: true,
+    body: `
+      <div class="lp-sec" style="margin-top:0">Вариант 1 · CSV/Excel (универсальный: амо, Битрикс, таблица)</div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Экспортируйте лидов в CSV и вставьте сюда. Колонки распознаются по заголовку: имя, телефон (обязательно), email, статус, бюджет, комментарий, гео.</div>
+      <textarea id="impCsv" style="min-height:120px;font-family:Menlo,monospace;font-size:11.5px" placeholder="Имя;Телефон;Email;Статус;Комментарий
+Иван Петров;+79161234567;ivan@mail.ru;В работе;Интересовался студией"></textarea>
+      <div class="lp-sec">Вариант 2 · Bitrix24 напрямую</div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Bitrix24 → Разработчикам → Другое → Входящий вебхук (право crm) → вставьте URL вида https://домен.bitrix24.ru/rest/1/код</div>
+      <input id="impB24" placeholder="https://mycompany.bitrix24.ru/rest/1/abc123xyz" style="width:100%">
+      <div class="lp-sec">Куда сложить</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="impGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}">${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Стадия</label><select id="impStage"><option value="sleeping">Спящие (рекомендуем)</option>${(STAGES._all || STAGES).filter(x => x.id !== 'sleeping').map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="muted" style="font-size:11px">amoCRM: экспорт в CSV через Списки → Экспорт (прямое API-подключение добавим при необходимости).</div>`,
+    actions: [
+      { label: 'Импортировать', cls: 'btn-accent', onClick: async (bd) => {
+        const defaults = { geo: $('#impGeo', bd).value, stage: $('#impStage', bd).value };
+        const b24 = $('#impB24', bd).value.trim();
+        const csv = $('#impCsv', bd).value.trim();
+        if (!b24 && !csv) { toast('Вставьте CSV или вебхук Bitrix24'); return false; }
+        const r = b24
+          ? await api.post('/import/bitrix', { webhookUrl: b24, defaults })
+          : await api.post('/import/csv', { csv, defaults });
+        if (r.error) { toast('Импорт не прошёл', r.error); return false; }
+        toast(`Импортировано: ${r.created}`, `дублей обогащено: ${r.merged}${r.skipped != null ? ' · пропущено: ' + r.skipped : ''}`, true);
+        render();
+      } },
+      { label: 'Отмена' },
+    ],
+  }));
   const db = $('#dupesBtn');
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
@@ -1050,6 +1102,15 @@ async function openLeadModal(id) {
 
   const FUNNEL_STEPS = ['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'];
   const stepIdx = FUNNEL_STEPS.indexOf(l.stage);
+
+  /* хронология: последние записи сразу, ранние — по кнопке (карточка не тонет в ленте) */
+  const TL_SHOW = 8;
+  const tlHtml = timeline.length
+    ? timeline.slice(0, TL_SHOW).map(tlItem).join('')
+      + (timeline.length > TL_SHOW
+        ? `<button class="tl-old-btn" id="tlMore">Показать ранние · ${timeline.length - TL_SHOW}</button><div class="tl-old" style="display:none">${timeline.slice(TL_SHOW).map(tlItem).join('')}</div>`
+        : '')
+    : '<div class="empty">Хронология пуста</div>';
   const bd = modal({
     title: l.name,
     sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
@@ -1076,7 +1137,7 @@ async function openLeadModal(id) {
             <button class="btn btn-sm lc-f" data-f="call">Звонки</button>
             <button class="btn btn-sm lc-f" data-f="ev">События</button>
           </div>
-          <div class="lc-timeline" id="lcTimeline">${timeline.map(tlItem).join('') || '<div class="empty">Хронология пуста</div>'}</div>
+          <div class="lc-timeline" id="lcTimeline">${tlHtml}</div>
         </div>
         <div class="lc-right">
           <div class="lc-ai ${l.ai.enabled ? 'on' : ''}">
@@ -1098,22 +1159,31 @@ async function openLeadModal(id) {
           </div>
           ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
-          <div class="axr-list">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axr ${q ? 'done' : ''}"><span class="axr-k">${axName[a]}</span><span class="axr-v">${q ? esc(q.value) : '—'}</span>${q ? `<span class="axr-ok">${ic(I.check)}</span>` : ''}</div>`; }).join('')}</div>
-          ${(STATE.settings.customFields || []).length ? `<div class="lp-sec">Свои поля</div>
-          <div class="lc-3sel">${STATE.settings.customFields.map(f => `<div><label class="lc-lbl">${esc(f.label)}</label>
-            ${f.type === 'select' ? `<select data-cf="${esc(f.key)}"><option value="">—</option>${(f.options || []).map(o => `<option ${((l.custom || {})[f.key] === o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
-            : `<input data-cf="${esc(f.key)}" value="${esc((l.custom || {})[f.key] || '')}" placeholder="—">`}</div>`).join('')}</div>` : ''}
-          ${l.summary ? `<div class="lp-sec">Сводка${l.summaryAt ? ` <span style="text-transform:none;letter-spacing:0">· ${ago(l.summaryAt)}</span>` : ''}</div><div class="summary-box">${esc(l.summary)}</div>` : ''}
-          <div class="lp-sec">Контакты</div>
-          <div id="lcContacts">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
-          <div class="lc-note-row" style="margin-top:7px">
-            <select id="lcCKind" style="width:118px;flex:0 0 118px">${Object.entries(contactKinds).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-            <input id="lcCVal" placeholder="@ник / почта…">
-            <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
-          </div>
-          <div class="lp-sec">Встречи</div>
-          ${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
-            ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}
+          <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b title="${q ? esc(q.value) : ''}">${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
+          ${l.summary ? coll(`Сводка ИИ${l.summaryAt ? ` · ${ago(l.summaryAt)}` : ''}`, `<div class="summary-box" style="margin-top:8px">${esc(l.summary)}</div>`, { open: false, icon: I.doc }) : ''}
+          ${coll('Свои поля', `
+            <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn-ghost" id="cfGear" title="Настроить поля">${ic(I.gear)}Настроить</button></div>
+            <div id="cfEditor" style="display:none">
+              ${(STATE.settings.customFields || []).map((f, fi) => `<div class="lc-note-row" style="margin-bottom:6px"><input data-cfl="${fi}" value="${esc(f.label)}"><button class="btn-ghost" data-cfx="${fi}">${ic(I.x)}</button></div>`).join('')}
+              <div class="lc-note-row"><input id="cfNewName" placeholder="Новое поле (напр. Паспорт/ВНЖ)"><select id="cfNewType" style="width:96px;flex:0 0 96px"><option value="text">Текст</option><option value="select">Выбор</option></select><button class="btn btn-sm" id="cfNewAdd">${ic(I.plus)}</button></div>
+              <button class="btn btn-sm btn-accent" id="cfApply" style="margin:8px 0">Применить поля</button>
+            </div>
+            ${(STATE.settings.customFields || []).length ? `
+            <div class="lc-3sel">${STATE.settings.customFields.map(f => `<div><label class="lc-lbl">${esc(f.label)}</label>
+              ${f.type === 'select' ? `<select data-cf="${esc(f.key)}"><option value="">—</option>${(f.options || []).map(o => `<option ${((l.custom || {})[f.key] === o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+              : `<input data-cf="${esc(f.key)}" value="${esc((l.custom || {})[f.key] || '')}" placeholder="—">`}</div>`).join('')}</div>` : '<div class="muted" style="font-size:12px;padding-bottom:4px">Полей пока нет — добавьте через «Настроить»</div>'}`,
+    { open: false, icon: I.layers, count: (STATE.settings.customFields || []).length || null })}
+          ${coll('Контакты', `
+            <div id="lcContacts" style="margin-top:6px">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
+            <div class="lc-note-row" style="margin:7px 0 4px">
+              <select id="lcCKind" style="width:118px;flex:0 0 118px">${Object.entries(contactKinds).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+              <input id="lcCVal" placeholder="@ник / почта…">
+              <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
+            </div>`,
+    { open: false, icon: I.phone, count: (l.contacts || []).length || null })}
+          ${coll('Встречи', `<div style="margin-top:6px">${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
+            ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}</div>`,
+    { open: (l.meetings || []).some(mt => mt.status === 'scheduled'), icon: I.cal, count: (l.meetings || []).length || null })}
         </div>
       </div>`,
     actions: [
@@ -1138,6 +1208,26 @@ async function openLeadModal(id) {
   $('#lcNaSave', bd).addEventListener('click', async () => {
     const dt = $('#lcNaDate', bd).value;
     await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });
+    openLeadModal(id);
+  });
+  $('#cfGear', bd)?.addEventListener('click', () => { const ed = $('#cfEditor', bd); ed.style.display = ed.style.display === 'none' ? '' : 'none'; });
+  $('#cfNewAdd', bd)?.addEventListener('click', () => {
+    const nm = $('#cfNewName', bd).value.trim();
+    if (!nm) return;
+    const row = el(`<div class="lc-note-row" style="margin-bottom:6px"><input data-cfl-new value="${esc(nm)}" data-cft="${$('#cfNewType', bd).value}"><button class="btn-ghost" onclick="this.parentElement.remove()">✕</button></div>`);
+    $('#cfNewAdd', bd).closest('.lc-note-row').before(row);
+    $('#cfNewName', bd).value = '';
+  });
+  $$('#cfEditor [data-cfx]', bd).forEach(b => b.addEventListener('click', () => b.parentElement.remove()));
+  $('#cfApply', bd)?.addEventListener('click', async () => {
+    const fields = [];
+    $$('#cfEditor [data-cfl]', bd).forEach(inp => { const f = STATE.settings.customFields[+inp.dataset.cfl]; if (f) fields.push({ ...f, label: inp.value.trim() || f.label }); });
+    $$('#cfEditor [data-cfl-new]', bd).forEach(inp => {
+      const label = inp.value.trim();
+      if (label) fields.push({ key: 'cf_' + label.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '_').slice(0, 30), label, type: inp.dataset.cft || 'text', options: [] });
+    });
+    await api.patch('/settings', { customFields: fields });
+    await loadState();
     openLeadModal(id);
   });
   $$('[data-cf]', bd).forEach(inp => inp.addEventListener('change', async () => {
@@ -1177,9 +1267,12 @@ async function openLeadModal(id) {
   });
   $$('.lc-cx', bd).forEach(b => b.addEventListener('click', () => saveContacts((l.contacts || []).filter((_, i) => i !== +b.dataset.i))));
   $$('.lc-copy', bd).forEach(b => b.addEventListener('click', () => { navigator.clipboard.writeText(b.dataset.link); toast('Ссылка на комнату скопирована', null, true); }));
+  const tlExpand = () => { const old = $('.tl-old', bd); if (old) old.style.display = ''; $('#tlMore', bd)?.remove(); };
+  $('#tlMore', bd)?.addEventListener('click', tlExpand);
   $$('.lc-f', bd).forEach(f => f.addEventListener('click', () => {
     $$('.lc-f', bd).forEach(x => x.classList.remove('active'));
     f.classList.add('active');
+    if (f.dataset.f !== 'all') tlExpand();
     $$('#lcTimeline .tl-item', bd).forEach(it => { it.style.display = f.dataset.f === 'all' || it.dataset.f === f.dataset.f ? '' : 'none'; });
   }));
 }
@@ -1853,7 +1946,7 @@ PAGES.properties = async (root) => {
       </div>
       ${folders.map(f => `<div class="fold ${folderF === f.id ? 'active' : ''}" data-fopen="${f.id}" data-fid="${f.id}">
         <img src="assets/folder.png">
-        <div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count} объект(ов)</i></div>
+        <div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count} ${plural(f.count, 'объект', 'объекта', 'объектов')}</i></div>
         <div class="fold-acts">
           <button class="btn-ghost" data-fcoll="${f.id}" title="Собрать подборку из папки">${ic(I.layers)}</button>
           <button class="btn-ghost" data-fdel="${f.id}" title="Удалить папку">${ic(I.x)}</button>
@@ -1902,7 +1995,7 @@ PAGES.properties = async (root) => {
     const ids = props.filter(x => x.folderId === f.id).map(x => x.id);
     if (!ids.length) { toast('Папка пуста', 'Перетащите в неё объекты'); return; }
     const c = await api.post('/collections', { title: f.name, propertyIds: ids });
-    toast('Подборка собрана из папки', f.name + ' · ' + ids.length + ' объект(ов)', true);
+    toast('Подборка собрана из папки', f.name + ' · ' + ids.length + ' ' + plural(ids.length, 'объект', 'объекта', 'объектов'), true);
     PAGE_STATE.collLead = '';
     go('collections');
   }));

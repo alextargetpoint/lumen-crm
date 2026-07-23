@@ -1209,6 +1209,104 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, db.settings.portals);
     }
 
+    /* ---------------- импорт базы (CSV из Bitrix/amo + Bitrix24 API) ---------------- */
+    if (p === '/api/import/csv' && req.method === 'POST') {
+      const b = await readBody(req);
+      const lines = String(b.csv || '').split('\n').map(x => x.trim()).filter(Boolean);
+      if (lines.length < 2) return json(res, 400, { error: 'нужен заголовок и хотя бы одна строка' });
+      const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+      const head = lines[0].toLowerCase().split(sep).map(h => h.trim().replace(/^"|"$/g, ''));
+      const col = (names) => head.findIndex(h => names.some(n => h.includes(n)));
+      const ci = {
+        name: col(['name', 'имя', 'фио', 'контакт', 'title', 'название']),
+        phone: col(['phone', 'телефон', 'тел', 'mobile', 'моб']),
+        email: col(['mail', 'почта']),
+        stage: col(['stage', 'status', 'стади', 'статус', 'этап']),
+        note: col(['comment', 'коммент', 'примечан', 'note', 'описан']),
+        budget: col(['budget', 'бюджет', 'opportunity', 'сумма']),
+        geo: col(['geo', 'гео', 'направлен', 'город', 'регион']),
+      };
+      if (ci.phone < 0) return json(res, 400, { error: 'не найдена колонка телефона (phone/телефон)' });
+      const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      const defaults = b.defaults || {};
+      let created = 0, merged = 0, skipped = 0;
+      for (const line of lines.slice(1)) {
+        const c = line.split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
+        const phone = c[ci.phone];
+        if (!phone || norm(phone).length < 8) { skipped++; continue; }
+        const ex = db.leads.find(l => norm(l.phone) === norm(phone));
+        const noteTxt = ci.note >= 0 && c[ci.note] ? c[ci.note].slice(0, 1500) : '';
+        const email = ci.email >= 0 ? c[ci.email] : '';
+        if (ex) {
+          merged++;
+          if (noteTxt) { ex.notes = ex.notes || []; ex.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: '[импорт] ' + noteTxt }); }
+          if (email && !(ex.contacts || []).some(x => x.kind === 'email')) (ex.contacts = ex.contacts || []).push({ kind: 'email', value: email });
+          continue;
+        }
+        const lead = {
+          id: store.nextId('ld'), name: (ci.name >= 0 && c[ci.name]) || phone, phone,
+          geo: (ci.geo >= 0 && (c[ci.geo] || '').toLowerCase().match(/dubai|дубай/) ? 'dubai' : null) || defaults.geo || db.settings.agency.geos[0],
+          lang: 'ru', tz: 4, stage: defaults.stage || 'sleeping', score: 0, source: 'import',
+          createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+          quals: { purpose: null, timeline: null, budget: null, type: null },
+          ai: { enabled: !!defaults.aiOn, chainStep: 99, nextTouchAt: null, silentSince: null },
+          broker: null, summary: noteTxt || null, tags: ['импорт'], numberId: null,
+          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
+          channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' }, activeChannel: 'wa', avatarUrl: null,
+        };
+        if (ci.budget >= 0 && c[ci.budget]) {
+          const n = +String(c[ci.budget]).replace(/\D/g, '');
+          if (n > 1000) lead.quals.budget = { value: '$' + n.toLocaleString('ru-RU'), num: n, quote: 'из импорта' };
+        }
+        if (ci.stage >= 0 && c[ci.stage]) lead.tags.push('было: ' + c[ci.stage].slice(0, 30));
+        db.leads.push(lead);
+        created++;
+      }
+      ai.pushEvent(db, { type: 'merge', text: `Импорт базы: +${created} лидов, обогащено дублей: ${merged}, пропущено: ${skipped}` });
+      store.save();
+      return json(res, 200, { created, merged, skipped });
+    }
+    if (p === '/api/import/bitrix' && req.method === 'POST') {
+      const b = await readBody(req);
+      const url = String(b.webhookUrl || '').replace(/\/$/, '');
+      if (!/^https:\/\/.+\/rest\/\d+\/\w+$/.test(url)) return json(res, 400, { error: 'формат: https://домен.bitrix24.ru/rest/1/КОД' });
+      let start = 0, created = 0, merged = 0, total = 0;
+      const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      try {
+        for (let page = 0; page < 40; page++) {
+          const r2 = await fetch(`${url}/crm.lead.list.json?start=${start}&select[]=TITLE&select[]=NAME&select[]=LAST_NAME&select[]=PHONE&select[]=EMAIL&select[]=STATUS_ID&select[]=COMMENTS&select[]=OPPORTUNITY`);
+          const j = await r2.json();
+          if (j.error) throw new Error(j.error_description || j.error);
+          const rows = j.result || [];
+          for (const row of rows) {
+            total++;
+            const phone = ((row.PHONE || [])[0] || {}).VALUE;
+            if (!phone) continue;
+            if (db.leads.find(l => norm(l.phone) === norm(phone))) { merged++; continue; }
+            const email = ((row.EMAIL || [])[0] || {}).VALUE;
+            db.leads.push({
+              id: store.nextId('ld'), name: [row.NAME, row.LAST_NAME].filter(Boolean).join(' ') || row.TITLE || phone, phone,
+              geo: (b.defaults || {}).geo || db.settings.agency.geos[0], lang: 'ru', tz: 4,
+              stage: (b.defaults || {}).stage || 'sleeping', score: 0, source: 'bitrix24',
+              createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+              quals: { purpose: null, timeline: null, budget: +row.OPPORTUNITY > 1000 ? { value: '$' + (+row.OPPORTUNITY).toLocaleString('ru-RU'), num: +row.OPPORTUNITY, quote: 'из Bitrix24' } : null, type: null, timeline: null, purpose: null },
+              ai: { enabled: false, chainStep: 99, nextTouchAt: null, silentSince: null },
+              broker: null, summary: (row.COMMENTS || '').replace(/<[^>]+>/g, '').slice(0, 1000) || null,
+              tags: ['импорт', 'bitrix24', row.STATUS_ID ? 'было: ' + row.STATUS_ID : ''].filter(Boolean), numberId: null,
+              contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
+              channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' }, activeChannel: 'wa', avatarUrl: null,
+            });
+            created++;
+          }
+          if (j.next == null) break;
+          start = j.next;
+        }
+      } catch (e) { return json(res, 500, { error: 'Bitrix24: ' + e.message, created, merged }); }
+      ai.pushEvent(db, { type: 'merge', text: `Импорт из Bitrix24: +${created} из ${total}, дублей: ${merged}` });
+      store.save();
+      return json(res, 200, { created, merged, total });
+    }
+
     /* ---------------- дубли ---------------- */
     if (p === '/api/duplicates' && req.method === 'GET') {
       const norm = (ph) => (ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
