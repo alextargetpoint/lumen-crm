@@ -423,6 +423,15 @@ function modal({ title, sub, body, actions, wide }) {
   return bd;
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
+/* Escape закрывает по слоям: подсказка → пикер → модалка (пока юзер не в поле ввода) */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (document.querySelector('.hint-pop')) { closeHint(); return; }
+  if (CUR_POP) { closePop(); return; }
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) { ae.blur(); return; }
+  closeModal();
+});
 function toast(text, sub, ok) {
   const t = el(`<div class="toast glass ${ok ? 'ok' : ''}">${ic(ok ? I.check : I.spark)}<div><div>${esc(text)}</div>${sub ? `<div class="t-sub">${esc(sub)}</div>` : ''}</div></div>`);
   $('#toasts').appendChild(t);

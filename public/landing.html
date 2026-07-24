@@ -142,6 +142,30 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 @media(max-width:640px){.cmp .row{grid-template-columns:1.2fr 1fr 1fr;padding:14px 16px;font-size:12.5px}}
 .note{max-width:880px;margin:14px auto 0;color:var(--ink3);font-size:12.5px;text-align:center}
 
+/* калькулятор экономики */
+.calc{display:grid;grid-template-columns:1.05fr 1fr;gap:18px;max-width:980px;margin:0 auto}
+.calc .cin,.calc .cout{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);padding:32px 34px}
+.calc .cout{border-color:rgba(79,125,255,.4);box-shadow:0 0 0 1px rgba(79,125,255,.15),0 24px 60px -30px rgba(29,52,216,.5);position:relative;overflow:hidden}
+.calc .cout::before{content:'';position:absolute;inset:auto -20% -40% -20%;height:70%;background:radial-gradient(closest-side,rgba(37,99,235,.35),transparent);filter:blur(30px);pointer-events:none}
+.crow{margin-bottom:26px}
+.crow:last-child{margin-bottom:0}
+.crow .cl{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;color:var(--ink2);font-weight:600;margin-bottom:12px}
+.crow .cl b{font-family:var(--disp);font-size:19px;color:var(--ink);font-weight:600}
+.crow input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;background:linear-gradient(90deg,var(--blue2) var(--p,50%),rgba(143,180,255,.16) var(--p,50%));outline:none;cursor:pointer}
+.crow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:5px solid var(--blue);box-shadow:0 0 0 5px rgba(37,99,235,.22),0 4px 14px rgba(0,0,0,.5);transition:transform .15s var(--ease-spring)}
+.crow input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.12)}
+.crow input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:5px solid var(--blue);box-shadow:0 0 0 5px rgba(37,99,235,.22)}
+.cres{position:relative;z-index:1}
+.cres .big{padding:14px 0 18px;border-bottom:1px solid var(--stroke)}
+.cres .big i{display:block;font-style:normal;font-size:12.5px;letter-spacing:.05em;color:var(--ink3);font-weight:600;text-transform:uppercase}
+.cres .big b{font-family:var(--disp);font-weight:600;font-size:clamp(30px,3.4vw,42px);color:#FF8E8E;letter-spacing:-.01em}
+.cres .row2{display:flex;justify-content:space-between;gap:14px;padding:15px 0;border-bottom:1px solid var(--stroke);font-size:14px;color:var(--ink2);align-items:baseline}
+.cres .row2 b{font-family:var(--disp);font-weight:600;font-size:20px;color:var(--sky);white-space:nowrap}
+.cres .row2:last-child{border-bottom:none}
+.cres .pay{margin-top:16px;font-size:12.5px;color:var(--ink3);line-height:1.55}
+.cres .pay b{color:#9EF0C3;font-weight:700}
+@media(max-width:840px){.calc{grid-template-columns:1fr}.crow .cl b{font-size:15.5px}.calc .cin,.calc .cout{padding:24px 22px}}
+
 /* почему не «оплата за лида» */
 .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px;margin:0 auto}
 .vs .col{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);padding:30px 32px}
@@ -369,6 +393,44 @@ footer .fb img{width:18px;height:18px}
   </div>
 </section>
 
+<section id="calc">
+  <div class="wrap">
+    <div class="sec-head" data-rv>
+      <span class="sec-badge">Калькулятор</span>
+      <h2>Сколько вы теряете прямо сейчас</h2>
+      <p>Подвигайте ползунки под свои цифры — считаем по консервативной середине вилки Lumen.</p>
+    </div>
+    <div class="calc" data-rv>
+      <div class="cin">
+        <div class="crow">
+          <div class="cl"><span>Заявок в месяц</span><b id="cvLeads">300</b></div>
+          <input type="range" id="cLeads" min="50" max="2000" step="10" value="300" aria-label="Заявок в месяц">
+        </div>
+        <div class="crow">
+          <div class="cl"><span>Средняя комиссия со сделки</span><b id="cvFee">$8 000</b></div>
+          <input type="range" id="cFee" min="2000" max="30000" step="500" value="8000" aria-label="Средняя комиссия">
+        </div>
+        <div class="crow">
+          <div class="cl"><span>Сейчас доходит до квалификации</span><b id="cvConv">30%</b></div>
+          <input type="range" id="cConv" min="10" max="60" step="1" value="30" aria-label="Текущая конверсия в квалификацию">
+        </div>
+        <div class="crow" style="margin-top:30px">
+          <div class="cl" style="margin-bottom:0"><span style="color:var(--ink3);font-weight:500">Квал → сделка взяли 12%, Lumen считаем по 65% доквала (низ вилки 55–80%). Формулы честные, без магии.</span></div>
+        </div>
+      </div>
+      <div class="cout">
+        <div class="cres">
+          <div class="big"><i>Недополученная комиссия в месяц</i><b id="rLost">$0</b></div>
+          <div class="row2"><span>Квалифицированных сейчас</span><b id="rQnow">0</b></div>
+          <div class="row2"><span>Квалифицированных с Lumen</span><b id="rQnew">0</b></div>
+          <div class="row2"><span>Дополнительных сделок в месяц</span><b id="rDeals">0</b></div>
+          <div class="pay" id="rPay"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="why">
   <div class="wrap">
     <div class="sec-head" data-rv>
@@ -528,6 +590,31 @@ document.querySelectorAll('.ptg').forEach(b => b.addEventListener('click', () =>
     el.textContent = (+el.dataset[per === 'm' ? 'pm' : 'py']).toLocaleString('en-US').replace(',', ' ');
   });
 }));
+
+/* калькулятор экономики */
+const fmt$ = n => '$' + Math.round(n).toLocaleString('en-US').replace(/,/g, ' ');
+const CALC = { leads: document.getElementById('cLeads'), fee: document.getElementById('cFee'), conv: document.getElementById('cConv') };
+function calcRun() {
+  const N = +CALC.leads.value, K = +CALC.fee.value, c = +CALC.conv.value;
+  document.getElementById('cvLeads').textContent = N;
+  document.getElementById('cvFee').textContent = fmt$(K);
+  document.getElementById('cvConv').textContent = c + '%';
+  const LUMEN = 0.65, D = 0.12;
+  const qNow = N * c / 100, qNew = N * LUMEN;
+  const extraDeals = Math.max(0, (qNew - qNow) * D);
+  const lost = extraDeals * K;
+  document.getElementById('rQnow').textContent = Math.round(qNow);
+  document.getElementById('rQnew').textContent = Math.round(qNew);
+  document.getElementById('rDeals').textContent = '+' + extraDeals.toFixed(1);
+  document.getElementById('rLost').textContent = fmt$(lost);
+  const plan = 1190;
+  document.getElementById('rPay').innerHTML = lost > plan * 2
+    ? 'Тариф «Рост» ($1 190/мес) окупается <b>в ' + Math.max(1, Math.round(lost / plan)) + '×</b> — одной дополнительной сделкой раз в ' + (extraDeals >= 1 ? 'месяц' : Math.ceil(1 / Math.max(extraDeals, .05)) + ' мес.') + '.'
+    : 'Даже при таких цифрах тариф «Старт» ($590/мес) закрывается меньше чем одной сделкой в квартал.';
+  Object.values(CALC).forEach(r => r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%'));
+}
+Object.values(CALC).forEach(r => r.addEventListener('input', calcRun));
+calcRun();
 
 /* FAQ-аккордеон */
 document.querySelectorAll('.qa .q').forEach(q => q.addEventListener('click', () => {
