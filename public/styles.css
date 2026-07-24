@@ -766,7 +766,8 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
   .kpis { grid-template-columns: 1fr; }
   .kanban .kb-col { min-width: 210px; width: 210px; flex: 0 0 210px; }
   .content { padding: 6px 14px 20px; }
-  .topbar { padding: 14px 14px 10px; }
+  .topbar { padding: 14px 14px 10px; flex-wrap: wrap; }
+  .topbar .btn-accent { padding: 8px 13px; font-size: 12.5px; }
   .inbox { grid-template-columns: 1fr; }
   .conv-list { display: none; }
 }
