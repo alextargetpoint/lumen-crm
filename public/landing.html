@@ -94,10 +94,12 @@ h1 .em{color:var(--sky);text-shadow:0 0 44px rgba(79,125,255,.55)}
 .hero-shot::before{content:'';position:absolute;inset:8% 12% -6%;background:radial-gradient(closest-side,rgba(37,99,235,.4),transparent);filter:blur(52px);z-index:-1}
 .hero-shot img.app{position:relative;border-radius:18px;border:1px solid var(--stroke2);box-shadow:0 -1px 0 rgba(143,180,255,.25),0 40px 110px -30px rgba(0,0,0,.8)}
 /* стеклянный Дубай поднимается из-за дашборда */
-.hero-shot .sky{position:absolute;left:50%;transform:translateX(-50%);top:-215px;width:min(124%,1400px);z-index:-1;pointer-events:none;opacity:.94;
-  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 72%,transparent 100%),linear-gradient(90deg,transparent 0,#000 12%,#000 88%,transparent 100%);
+.hero-shot .sky-static{display:none}
+@media(max-width:760px),(prefers-reduced-motion:reduce){.hero-shot .sky-live{display:none}.hero-shot .sky-static{display:block}}
+.hero-shot .sky{position:absolute;left:50%;transform:translateX(-50%);top:-215px;width:min(124%,1400px);z-index:-1;pointer-events:none;opacity:.88;filter:brightness(.82) saturate(.95);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 72%,transparent 100%),linear-gradient(90deg,transparent 0,#000 26%,#000 74%,transparent 100%);
   -webkit-mask-composite:source-in;
-  mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 72%,transparent 100%),linear-gradient(90deg,transparent 0,#000 12%,#000 88%,transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 72%,transparent 100%),linear-gradient(90deg,transparent 0,#000 26%,#000 74%,transparent 100%);
   mask-composite:intersect}
 @media(max-width:760px){.hero-shot{margin-top:70px}.hero-shot .sky{top:-90px}}
 .hero-strip{display:flex;justify-content:center;gap:clamp(20px,5vw,70px);flex-wrap:wrap;padding:46px 24px 0;text-align:center}
@@ -305,6 +307,11 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
   mask-image:radial-gradient(600px 420px at 15% 100%, #000, transparent 65%),radial-gradient(500px 340px at 90% 0%, #000, transparent 65%)}
 .fpanel .fsky{position:absolute;left:0;right:0;bottom:0;width:100%;opacity:.55;pointer-events:none;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 55%);mask-image:linear-gradient(180deg,transparent 0,#000 55%)}
+.fpanel .fsky-static{display:none}
+@media(max-width:760px),(prefers-reduced-motion:reduce){
+  .fpanel .fsky-live{display:none}
+  .fpanel .fsky-static{display:block}
+}
 .final{position:relative}
 .final .fspark{position:absolute;top:-74px;left:50%;transform:translateX(-50%);width:150px;z-index:2;pointer-events:none;
   filter:drop-shadow(0 0 34px rgba(79,125,255,.75));animation:sparkfloat 7s ease-in-out infinite}
@@ -341,7 +348,6 @@ footer .fb img{width:18px;height:18px}
 </nav>
 
 <header class="hero">
-  <video class="neb" src="/assets/nebula-bg.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
   <div class="wrap">
     <span class="badge" data-hrv="1"><i></i>AI-CRM для агентств недвижимости</span>
     <h1 data-hrv="2">ИИ-отдел продаж, который отвечает лиду <span class="em">за 60 секунд</span></h1>
@@ -352,7 +358,8 @@ footer .fb img{width:18px;height:18px}
     </div>
   </div>
   <div class="hero-shot" data-hrv="5">
-    <img class="sky" src="/assets/land/art/skyline.jpg" alt="" aria-hidden="true">
+    <video class="sky sky-live" src="/assets/land/skyline-calm.mp4?v=3" poster="/assets/land/art/skyline.jpg" autoplay muted loop playsinline aria-hidden="true"></video>
+    <img class="sky sky-static" src="/assets/land/art/skyline.jpg" alt="" aria-hidden="true">
     <img class="app" src="/assets/land/overview.jpg" alt="Дашборд Lumen: воронка и первая линия" loading="eager">
   </div>
   <div class="hero-strip">
@@ -481,7 +488,7 @@ footer .fb img{width:18px;height:18px}
         <p class="pain">Клиент сравнивает месяцами, менеджер бросает дожим после второго «я подумаю».</p>
         <div class="fix"><b>Lumen:</b> 7 касаний за 18 дней без раздражения + подборка с доходностью, открыл — брокеру сигнал «звони сейчас».</div>
       </div>
-      <div class="niche" data-rv style="background-image:url('/assets/lib/penthouse.jpg')">
+      <div class="niche" data-rv style="background-image:url('/assets/lib/phuket-villa.jpg')">
         <span class="geo">Пхукет · Инвест</span>
         <h3>База копилась годами и молчит</h3>
         <p class="pain">Тысячи старых контактов лежат мёртвым грузом — обзванивать некому и дорого.</p>
@@ -726,7 +733,8 @@ footer .fb img{width:18px;height:18px}
 <div class="final wrap">
   <img class="fspark" src="/assets/land/art/spark.png" alt="" aria-hidden="true">
   <div class="fpanel" data-rv>
-    <img class="fsky" src="/assets/land/art/skyline.jpg" alt="" aria-hidden="true">
+    <video class="fsky fsky-live" src="/assets/land/skyline.mp4?v=2" poster="/assets/land/art/skyline.jpg" autoplay muted loop playsinline aria-hidden="true"></video>
+    <img class="fsky fsky-static" src="/assets/land/art/skyline.jpg" alt="" aria-hidden="true">
     <span class="badge"><i></i>Подключение — 7 дней</span>
     <h2>Посчитаем, сколько сделок теряет ваша первая линия</h2>
     <p>Покажем систему на живом демо и посчитаем экономику по вашим цифрам: заявки, конверсии, стоимость лида.</p>
@@ -746,6 +754,14 @@ footer .fb img{width:18px;height:18px}
 /* reveal по скроллу */
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
 document.querySelectorAll('[data-rv]').forEach(el => io.observe(el));
+/* страховка: элемент уже в кадре (переход по якорю, быстрый скролл) — показать без ожидания IO */
+const rvSafety = () => document.querySelectorAll('[data-rv]:not(.in)').forEach(el => {
+  const r = el.getBoundingClientRect();
+  if (r.top < innerHeight && r.bottom > 0) el.classList.add('in');
+});
+setTimeout(rvSafety, 700);
+addEventListener('hashchange', () => setTimeout(rvSafety, 600));
+setInterval(rvSafety, 2500);
 
 /* активный пункт навигации */
 const secs = [...document.querySelectorAll('section[id], .final')];
@@ -806,14 +822,14 @@ calcRun();
 
 /* моушн: параллакс стеклянного города + свет за курсором на тарифах + count-up метрик */
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-document.querySelector('.hero .neb')?.play?.().catch(() => {});
-const sky = document.querySelector('.hero-shot .sky');
-if (sky && !REDUCED) {
+document.querySelectorAll('video[autoplay]').forEach(v => v.play?.().catch(() => {}));
+const skyEls = [...document.querySelectorAll('.hero-shot .sky')];
+if (skyEls.length && !REDUCED) {
   let tick = false;
   addEventListener('scroll', () => {
     if (tick) return;
     tick = true;
-    requestAnimationFrame(() => { sky.style.transform = 'translateX(-50%) translateY(' + Math.min(130, scrollY * .13) + 'px)'; tick = false; });
+    requestAnimationFrame(() => { const t2 = 'translateX(-50%) translateY(' + Math.min(130, scrollY * .13) + 'px)'; skyEls.forEach(s2 => s2.style.transform = t2); tick = false; });
   }, { passive: true });
 }
 document.querySelectorAll('.plan').forEach(p2 => p2.addEventListener('pointermove', e => {
