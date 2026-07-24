@@ -970,7 +970,7 @@ PAGES.funnel = async (root) => {
     wide: true,
     body: `
       <div class="lp-sec" style="margin-top:0">Вариант 1 · CSV/Excel (универсальный: амо, Битрикс, таблица)</div>
-      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Экспортируйте лидов в CSV и вставьте сюда. Колонки распознаются по заголовку: имя, телефон (обязательно), email, статус, бюджет, комментарий, гео.</div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Вставьте CSV — колонки распознаются по заголовку (телефон обязателен).</div>
       <textarea id="impCsv" style="min-height:120px;font-family:Menlo,monospace;font-size:11.5px" placeholder="Имя;Телефон;Email;Статус;Комментарий
 Иван Петров;+79161234567;ivan@mail.ru;В работе;Интересовался студией"></textarea>
       <div class="lp-sec">Вариант 2 · Bitrix24 напрямую</div>
@@ -2674,8 +2674,9 @@ PAGES.automations = async (root) => {
           </div>
         </div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.send)}Омниканальный каскад</div>
-          <div class="muted" style="font-size:11.8px;margin-bottom:10px">Система сама решает, куда писать: идёт по приоритету сверху вниз, пропуская каналы, которых у клиента нет. Молчит весь круг — переключается на следующий канал и делает второй круг касаний.</div>
+          <div class="card-title">${ic(I.send)}Омниканальный каскад ${hint('cascade', 'Как работает каскад', [
+            ['Приоритет сверху вниз', 'Каналы без контакта у клиента пропускаются'],
+            ['Второй круг', 'Молчит весь круг — переключение на следующий канал и повтор касаний']])}</div>
           <div id="chPrio">${(a2 => (s.channels?.priority || ['wa', 'tg', 'viber', 'email']).map((ch, i2) => {
             const names = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail (официальный тон)' };
             return `<div class="ch-prio" data-ch="${ch}">
@@ -3508,8 +3509,10 @@ PAGES.settings = async (root) => {
           </div>
           <div class="form-row"><label>Вебхук записей звонков (вставить у провайдера)</label>
             <code class="pill" style="display:block;overflow-x:auto;white-space:nowrap;padding:8px 10px">${location.origin}/hooks/call?key=<секрет из «Рекламы»></code></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.55">Как работает: провайдер после звонка шлёт номер клиента и ссылку на запись → Lumen находит лида по номеру, скачивает запись, расшифровывает Whisper-ом и кладёт транскрипт в хронологию + ИИ-сводку. Ничего руками.</div>
-          <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button>
+          <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button> ${hint('telhow', 'Как работает телефония', [
+            ['Вебхук после звонка', 'Провайдер шлёт номер клиента и ссылку на запись'],
+            ['Лид находится по номеру', 'Запись скачивается и расшифровывается Whisper-ом'],
+            ['Транскрипт в карточку', 'Хронология + ИИ-сводка — руками ничего']])}
         </div>
         <div class="glass card">
           <div class="card-title">${ic(I.eye)}Демо-режим</div>
@@ -3628,12 +3631,21 @@ function syncTopAction() {
   if (!inp) return;
   let t = null, sel = -1, items = [];
   const close = () => { box.classList.remove('show'); sel = -1; };
+  /* подсветка совпадения запроса в имени/телефоне */
+  const mark = (text, q) => {
+    const t2 = esc(text);
+    if (!q) return t2;
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return t2;
+    return esc(text.slice(0, i)) + '<mark class="gs-m">' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+  };
   const open = (leads) => {
     items = leads;
-    if (!leads.length) { box.innerHTML = '<div class="gs-item"><span class="gp">Ничего не найдено</span></div>'; box.classList.add('show'); return; }
+    const q = inp.value.trim();
+    if (!leads.length) { box.innerHTML = '<div class="gs-item"><span class="gp">Ничего не найдено — проверьте номер или имя</span></div>'; box.classList.add('show'); return; }
     box.innerHTML = leads.map((l, i) => `<div class="gs-item" data-i="${i}" data-id="${l.id}">
       <div class="ava" style="width:28px;height:28px;flex:0 0 28px;font-size:10px">${esc(l.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
-      <div><div class="gn">${esc(l.name)}</div><div class="gp">${esc(l.phone)} · ${l.geoName}</div></div>
+      <div><div class="gn">${mark(l.name, q)}</div><div class="gp">${mark(l.phone, q)} · ${l.geoName}</div></div>
       <span class="badge">${stageName(l.stage)}</span>
     </div>`).join('');
     box.classList.add('show');

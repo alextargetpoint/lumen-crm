@@ -1523,3 +1523,4 @@ html[data-night] .lp-ad { color: #BFD3FF; }
 .ob-row:hover .ob-t { color: var(--accent); }
 html[data-night] .ob-row .ob-t { color: var(--ink); }
 html[data-night] .ob-row.ok .ob-t { color: var(--ink-3); }
+.gs-m { background: rgba(37, 99, 235, .22); color: inherit; border-radius: 3px; padding: 0 1px; }
