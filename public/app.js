@@ -1184,6 +1184,7 @@ PAGES.meetings = async (root) => {
           <button class="btn btn-sm" id="calPrev">${ic(I.chev)}</button>
           <b style="color:var(--navy-900)">${mon.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${dayCols[6].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</b>
           <button class="btn btn-sm" id="calNext" style="transform:none">${ic(I.chev)}</button>
+          <button class="btn btn-sm" id="mtPrint" title="Печать недели / PDF">${ic(I.doc)}</button>
         </span></div>
       <div class="cal-grid" style="--hpx:${HPX}px">
         <div class="cal-hours">${Array.from({ length: H1 - H0 }, (_, i) => `<div>${H0 + i}:00</div>`).join('')}</div>
@@ -1229,6 +1230,7 @@ PAGES.meetings = async (root) => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
     render();
   }));
+  $('#mtPrint').addEventListener('click', () => window.open('/meetings/print?w=' + (PAGE_STATE.calWeek || 0), '_blank'));
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
   $('#calBroker').addEventListener('change', (e) => { PAGE_STATE.calBroker = e.target.value; render(); });

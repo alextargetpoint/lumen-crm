@@ -1715,6 +1715,60 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
 
+    /* ================= печатное расписание встреч недели: /meetings/print?w=N ================= */
+    if (p === '/meetings/print' && req.method === 'GET') {
+      if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
+      const w = +(u.searchParams.get('w') || 0);
+      const now = new Date();
+      const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7) + w * 7);
+      const end = new Date(+mon + 7 * 864e5);
+      const AG = db.settings.agency;
+      const KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' };
+      const ST = { scheduled: 'назначена', done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' };
+      const list = (db.meetings || []).filter(mt => mt.at >= +mon && mt.at < +end).sort((a, b2) => a.at - b2.at);
+      const byDay = {};
+      for (const mt of list) {
+        const d = new Date(mt.at).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+        (byDay[d] = byDay[d] || []).push(mt);
+      }
+      const fmtT = t => new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Встречи недели — ${esc(AG.name || '')}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter Tight',-apple-system,sans-serif;color:#1A2233;background:#F4F7FB;font-size:13.5px;line-height:1.5}
+.page{max-width:760px;margin:26px auto;background:#fff;border-radius:14px;padding:40px 44px;box-shadow:0 10px 40px rgba(16,43,92,.08)}
+.hd{display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:2px solid #102B5C}
+.hd img{height:30px}.hd b{font-size:16px;color:#102B5C}
+.hd .r{margin-left:auto;text-align:right;font-size:11px;color:#66738F}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;margin:22px 0 8px}
+.mt{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #E3E9F4;page-break-inside:avoid}
+.mt .t{flex:0 0 46px;font-weight:800;color:#102B5C}
+.mt .k{flex:0 0 110px;color:#66738F;font-size:12px;padding-top:1px}
+.mt b{font-weight:650}
+.mt .who{color:#66738F;font-size:12px}
+.mt .st{margin-left:auto;font-size:11px;font-weight:700;padding:2px 10px;border-radius:9px;background:#EEF2F9;color:#3D4A63;align-self:center}
+.mt .st.done{background:#E4F5EC;color:#0E7A52}.mt .st.no_show{background:#FBE9E7;color:#B3261E}
+.empty{color:#66738F;padding:20px 0}
+.toolbar{position:fixed;top:14px;right:14px}
+.toolbar button{background:#2563EB;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+@media print{body{background:#fff}.page{box-shadow:none;margin:0;padding:8mm 10mm;max-width:none;border-radius:0}.toolbar{display:none}}
+</style></head><body>
+<div class="toolbar"><button onclick="window.print()">Печать / PDF</button></div>
+<div class="page">
+  <div class="hd">${AG.logo ? `<img src="${esc(AG.logo)}">` : ''}<b>${esc(AG.name || 'Агентство')}</b>
+    <span class="r">Встречи недели<br>${mon.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${new Date(+end - 864e5).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span></div>
+  ${Object.keys(byDay).length ? Object.entries(byDay).map(([day, items]) => `<h2>${esc(day)}</h2>` + items.map(mt => {
+    const lead = db.leads.find(l => l.id === mt.leadId) || {};
+    const br = db.brokers.find(b2 => b2.id === mt.brokerId) || {};
+    return `<div class="mt"><span class="t">${fmtT(mt.at)}</span><span class="k">${KIND[mt.kind] || 'Встреча'}</span>
+      <span><b>${esc(lead.name || '—')}</b> <span class="who">${esc(lead.phone || '')} · эксперт: ${esc(br.name || '—')}</span></span>
+      <span class="st ${mt.status}">${ST[mt.status] || mt.status}</span></div>`;
+  }).join('')).join('') : '<div class="empty">На этой неделе встреч нет</div>'}
+</div></body></html>`);
+      return;
+    }
+
     /* ================= печатная карточка лида (экспорт/PDF): /lead/:id/print ================= */
     if ((m = p.match(/^\/lead\/(ld_[\w]+)\/print$/)) && req.method === 'GET') {
       if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
