@@ -1686,6 +1686,83 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
 
+    /* ================= печатная карточка лида (экспорт/PDF): /lead/:id/print ================= */
+    if ((m = p.match(/^\/lead\/(ld_[\w]+)\/print$/)) && req.method === 'GET') {
+      if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) { res.writeHead(404); res.end('lead not found'); return; }
+      const AG = db.settings.agency;
+      const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
+      const STAGE_RU = Object.assign({ new: 'Новый', touch: 'Первое касание', dialog: 'В диалоге с ИИ', qualified: 'Квалифицирован', handover: 'У брокера', viewing: 'Показ / Zoom', deal: 'Сделка', sleeping: 'Спящий', lost: 'Потерян' }, namesCfg);
+      const broker = db.brokers.find(b => b.id === lead.broker);
+      const AXN = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Тип объекта' };
+      const dt = (t) => new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      /* хронология: сообщения + комментарии + встречи в одну ленту */
+      const feed = [];
+      for (const msg of db.messages) if (msg.leadId === lead.id) feed.push({ at: msg.at, kind: msg.dir === 'in' ? 'in' : (msg.via === 'ai' ? 'ai' : 'out'), text: msg.text });
+      for (const n of lead.notes || []) feed.push({ at: n.at, kind: 'note', text: n.text, who: n.who });
+      for (const mt of db.meetings || []) if (mt.leadId === lead.id) feed.push({ at: mt.at, kind: 'meet', text: ({ call: 'Созвон', video: 'Видео-показ', tour: 'Показ объекта' }[mt.kind] || 'Встреча') + ' · ' + ({ scheduled: 'назначена', done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status) });
+      feed.sort((a, b2) => a.at - b2.at);
+      const KIND_RU = { in: 'Клиент', ai: 'Lumen AI', out: 'Менеджер', note: 'Комментарий', meet: 'Встреча' };
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карточка лида — ${esc(lead.name)}</title>
+<style>
+:root{--navy:#102B5C;--ink:#1A2233;--mut:#66738F;--line:#E3E9F4;--blue:#2563EB}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter Tight',-apple-system,'Segoe UI',sans-serif;color:var(--ink);background:#F4F7FB;font-size:13.5px;line-height:1.55}
+.page{max-width:800px;margin:26px auto;background:#fff;border-radius:14px;padding:44px 48px;box-shadow:0 10px 40px rgba(16,43,92,.08)}
+.hd{display:flex;align-items:center;gap:14px;padding-bottom:20px;border-bottom:2px solid var(--navy)}
+.hd img{height:34px}
+.hd .ag{font-weight:800;font-size:17px;color:var(--navy);letter-spacing:.04em}
+.hd .doc{margin-left:auto;text-align:right;font-size:11px;color:var(--mut)}
+h1{font-size:24px;margin:24px 0 2px;color:var(--navy)}
+.sub{color:var(--mut);font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;margin:20px 0 6px}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.kv i{font-style:normal;color:var(--mut)}
+.kv b{text-align:right}
+h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);margin:26px 0 10px}
+.ax{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.ax b{font-size:13px}
+.ax .q{color:var(--mut);font-size:12px;margin-top:2px;font-style:italic}
+.sum{background:#EFF4FE;border:1px solid #D5E2FA;border-radius:10px;padding:13px 16px;font-size:13px}
+.fi{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;page-break-inside:avoid}
+.fi .t{flex:0 0 92px;color:var(--mut);font-size:11px;padding-top:2px}
+.fi .w{flex:0 0 86px;font-weight:700;font-size:11px;padding-top:2px}
+.fi.in .w{color:#0E7A52}.fi.ai .w{color:var(--blue)}.fi.note .w{color:#8A5A00}.fi.meet .w{color:#7B3FBF}
+.tags{margin-top:8px}.tag{display:inline-block;background:#EEF2F9;border-radius:8px;padding:2px 10px;font-size:11px;color:#3D4A63;margin:0 6px 6px 0}
+.ft{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--mut);font-size:11px}
+.toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px}
+.toolbar button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(37,99,235,.35)}
+.toolbar .g{background:#fff;color:var(--ink);border:1px solid var(--line)}
+@media print{body{background:#fff}.page{box-shadow:none;margin:0;border-radius:0;padding:10mm 12mm;max-width:none}.toolbar{display:none}}
+</style></head><body>
+<div class="toolbar"><button class="g" onclick="history.back()">← Назад</button><button onclick="window.print()">Печать / PDF</button></div>
+<div class="page">
+  <div class="hd">${AG.logo ? `<img src="${esc(AG.logo)}" alt="">` : ''}<span class="ag">${esc(AG.name || 'Агентство')}</span>
+    <span class="doc">Карточка лида<br>${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+  <h1>${esc(lead.name)}</h1>
+  <div class="sub">${esc(lead.phone || '')}${lead.geo ? ' · ' + esc((db.settings.geoNames || {})[lead.geo] || lead.geo) : ''} · ${esc(STAGE_RU[lead.stage] || lead.stage)} · скоринг ${lead.score || 0}</div>
+  <div class="grid">
+    <div class="kv"><i>Источник</i><b>${esc(lead.source || '—')}</b></div>
+    <div class="kv"><i>Создан</i><b>${dt(lead.createdAt)}</b></div>
+    <div class="kv"><i>Брокер</i><b>${esc(broker ? broker.name : '—')}</b></div>
+    <div class="kv"><i>Объявление</i><b>${esc(lead.ads && (lead.ads.adName || lead.ads.adId) || '—')}</b></div>
+    ${(lead.contacts || []).map(ct => `<div class="kv"><i>${esc(ct.kind)}</i><b>${esc(ct.value)}</b></div>`).join('')}
+  </div>
+  <h2>Квалификация</h2>
+  ${Object.keys(AXN).map(a => { const q = lead.quals[a]; return `<div class="ax"><b>${AXN[a]}: ${q ? esc(q.value) : '—'}</b>${q && q.quote ? `<div class="q">«${esc(q.quote)}»</div>` : ''}</div>`; }).join('')}
+  ${lead.summary ? `<h2>Саммари для брокера</h2><div class="sum">${esc(lead.summary)}</div>` : ''}
+  ${(lead.tags || []).length ? `<div class="tags">${lead.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+  <h2>Хронология · ${feed.length}</h2>
+  ${feed.map(f2 => `<div class="fi ${f2.kind}"><span class="t">${dt(f2.at)}</span><span class="w">${KIND_RU[f2.kind]}</span><span>${esc(String(f2.text || '').slice(0, 600))}</span></div>`).join('') || '<div class="sub">Событий нет</div>'}
+  <div class="ft"><span>Сформировано в Lumen AI CRM</span><span>${esc(lead.id)}</span></div>
+</div>
+</body></html>`);
+      return;
+    }
+
     /* ================= страница встречи для клиента: /m/:id ================= */
     if ((m = p.match(/^\/m\/(mt_[\w]+)$/)) && req.method === 'GET') {
       const mt = (db.meetings || []).find(x => x.id === m[1]);
