@@ -773,6 +773,25 @@ PAGES.overview = async (root) => {
       <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}${kdQual}</div><div class="delta">${f.deal} дошло до сделки</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
     </div>
+    ${(() => {
+      /* онбординг-чеклист агентства: тихий, исчезает когда всё готово */
+      const s2 = STATE.settings;
+      const steps = [
+        { ok: !!(s2.agency && s2.agency.logo), t: 'Логотип агентства', d: 'встанет на подборки, PDF и вход', go: 'agency' },
+        { ok: !!(s2.wa && s2.wa.tokenSet && s2.wa.phoneId), t: 'Боевой WhatsApp', d: 'токен Cloud API в «Подключениях»', go: 'connections' },
+        { ok: (STATE.sequences || []).some(q => q.active), t: 'Цепочка касаний включена', d: 'дожим молчунов 18 дней', go: 'sequences' },
+        { ok: !!(s2.reports && s2.reports.tgChatId), t: 'Отчёты владельцу в Telegram', d: 'ежедневная сводка и алерты', go: 'automations' },
+        { ok: (STATE.brokers || []).some(b2 => b2.photo), t: 'Фото брокеров', d: 'живые лица в карточках и подборках', go: 'brokers' },
+      ];
+      const done = steps.filter(x => x.ok).length;
+      if (done === steps.length) return '';
+      return `<div class="glass card mb ob-check">${coll(`Запуск агентства · ${done} из ${steps.length}`, steps.map(st2 => `
+        <button class="ob-row ${st2.ok ? 'ok' : ''}" data-obgo="${st2.go}">
+          <span class="ob-dot">${st2.ok ? ic(I.check, 2.4) : ''}</span>
+          <span class="ob-t">${st2.t}<i>${st2.d}</i></span>
+          ${st2.ok ? '' : `<span class="ob-go">${ic(I.arrow, 2)}</span>`}
+        </button>`).join(''), { open: done < 2, count: null, icon: I.bolt })}</div>`;
+    })()}
     <div class="card mb f3card">
       <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} ${plural(leads.length, 'лид', 'лида', 'лидов')}</span></div>
       ${(() => {
@@ -837,6 +856,7 @@ PAGES.overview = async (root) => {
         ${events.length > 8 ? coll(`Раньше`, events.slice(8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join(''), { open: false, count: events.length - 8, icon: I.clock }) : ''}
       </div>
     </div>`;
+  $$('[data-obgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.obgo)));
   $$('[data-f3go]', root).forEach(r => {
     r.addEventListener('click', () => go('funnel'));
     /* наведение на стадию подсвечивает соответствующий ярус стеклянной воронки */
