@@ -6,6 +6,22 @@
 <title>Lumen — AI-CRM для агентств недвижимости. ИИ-отдел продаж, который отвечает за 60 секунд</title>
 <meta name="description" content="Lumen квалифицирует лиды в WhatsApp за минуту, дожимает молчунов 18 дней, будит спящую базу и собирает продающие подборки с PDF. Фиксированная цена — без оплаты за лида.">
 <link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/land/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/land/apple-touch.png">
+<meta name="theme-color" content="#04070F">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lumen AI CRM">
+<meta property="og:title" content="Lumen — ИИ-отдел продаж для агентств недвижимости">
+<meta property="og:description" content="Квалификация лидов в WhatsApp за 60 секунд, реанимация спящей базы, подборки с PDF. Фиксированная цена — без оплаты за лида.">
+<meta property="og:image" content="/assets/land/og.jpg">
+<meta property="og:locale" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lumen — ИИ-отдел продаж для агентств недвижимости">
+<meta name="twitter:image" content="/assets/land/og.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Lumen AI CRM","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-CRM для агентств недвижимости: ИИ-квалификация лидов в WhatsApp, цепочки касаний, реанимация базы, конструктор подборок с PDF.","offers":{"@type":"AggregateOffer","priceCurrency":"USD","lowPrice":"590","highPrice":"2400","offerCount":"3"}}
+</script>
+<link rel="preload" as="image" href="/assets/land/overview.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -175,6 +191,23 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 .vs li svg{width:16px;height:16px;flex:0 0 16px;margin-top:3px}
 .vs .win li{color:var(--ink)}
 @media(max-width:760px){.vs{grid-template-columns:1fr}}
+
+/* внедрение за 7 дней */
+.tl7{display:grid;grid-template-columns:repeat(6,1fr);gap:0;max-width:1100px;margin:0 auto;position:relative}
+.tl7::before{content:'';position:absolute;top:21px;left:4%;right:4%;height:2px;background:linear-gradient(90deg,transparent,rgba(79,125,255,.45) 12%,rgba(79,125,255,.45) 88%,transparent)}
+.tl7 .d{position:relative;text-align:center;padding:0 10px}
+.tl7 .dot{width:44px;height:44px;border-radius:50%;margin:0 auto;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--stroke2);font-family:var(--disp);font-weight:600;font-size:12.5px;color:var(--sky);position:relative;z-index:1;box-shadow:0 0 0 6px var(--bg)}
+.tl7 .d:last-child .dot{background:var(--blue);color:#fff;border-color:transparent;box-shadow:0 0 0 6px var(--bg),0 0 26px rgba(37,99,235,.65)}
+.tl7 b{display:block;font-size:14px;font-weight:650;margin-top:14px}
+.tl7 p{font-size:12.3px;color:var(--ink3);margin-top:5px;line-height:1.5}
+@media(max-width:860px){
+  .tl7{grid-template-columns:1fr;gap:0;max-width:420px}
+  .tl7::before{left:21px;right:auto;top:4%;bottom:4%;width:2px;height:auto;background:linear-gradient(180deg,transparent,rgba(79,125,255,.45) 10%,rgba(79,125,255,.45) 90%,transparent)}
+  .tl7 .d{display:grid;grid-template-columns:44px 1fr;column-gap:16px;text-align:left;padding:14px 0;align-items:start}
+  .tl7 .dot{margin:0;grid-row:1 / span 2}
+  .tl7 b{margin-top:3px}
+  .tl7 p{grid-column:2;margin-top:3px}
+}
 
 /* тарифы */
 .ptoggle{display:flex;gap:6px;justify-content:center;margin-bottom:40px}
@@ -453,6 +486,24 @@ footer .fb img{width:18px;height:18px}
         <li><svg viewBox="0 0 24 24" fill="none" stroke="#4F7DFF" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Полный цикл: квалификация + реанимация + подборки + встречи + отчёты</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="#4F7DFF" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>White-label: логотип и бренд агентства на каждой странице для клиента</li>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="onboarding">
+  <div class="wrap">
+    <div class="sec-head" data-rv>
+      <span class="sec-badge">Внедрение</span>
+      <h2>От брифа до живых заявок — 7 дней</h2>
+      <p>Всё делаем мы. От вас — один созвон, доступы и желание зарабатывать больше.</p>
+    </div>
+    <div class="tl7" data-rv>
+      <div class="d"><span class="dot">0</span><b>Бриф и доступы</b><p>Созвон 40 минут: ниши, тон, номер WhatsApp</p></div>
+      <div class="d"><span class="dot">1–2</span><b>Перенос базы</b><p>CSV из любой CRM, дедупликация, объекты и объявления</p></div>
+      <div class="d"><span class="dot">3–4</span><b>Скрипты и критерии</b><p>Цепочки под ваши направления, пороги бюджета, down-sell</p></div>
+      <div class="d"><span class="dot">5</span><b>Обучение команды</b><p>Час с брокерами: карточка, передача, встречи</p></div>
+      <div class="d"><span class="dot">6</span><b>Тест на живых</b><p>Первые заявки под присмотром, донастройка тона</p></div>
+      <div class="d"><span class="dot">7</span><b>Запуск</b><p>ИИ на первой линии 24/7, отчёты владельцу в Telegram</p></div>
     </div>
   </div>
 </section>
