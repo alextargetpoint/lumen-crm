@@ -115,16 +115,16 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 
 /* бенто */
 .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
-.bcard{grid-column:span 3;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);overflow:hidden;position:relative;transition:transform var(--dur) var(--ease-spring),border-color var(--dur)}
+.bcard{grid-column:span 3;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);overflow:hidden;position:relative;transition:transform var(--dur) var(--ease-spring),border-color var(--dur);display:flex;flex-direction:column}
 .bcard:hover{transform:translateY(-4px);border-color:var(--stroke2)}
 .bcard.w4{grid-column:span 4}.bcard.w2{grid-column:span 2}
 .bcard .pad{padding:26px 28px 20px}
 .bcard h3{font-family:var(--disp);font-weight:600;font-size:20px;letter-spacing:.01em;display:flex;gap:10px;align-items:center}
 .bcard h3 svg{width:19px;height:19px;color:var(--sky);flex:0 0 auto}
 .bcard p{color:var(--ink2);font-size:13.8px;margin-top:8px;line-height:1.55}
-.bcard .shot{margin:16px 18px 18px;border-radius:12px;border:1px solid var(--stroke);overflow:hidden;position:relative}
+.bcard .shot{margin:16px 18px 18px;border-radius:12px;border:1px solid var(--stroke);overflow:hidden;position:relative;flex:1;min-height:210px}
 .bcard .shot::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(4,7,15,.55));pointer-events:none}
-.bcard .shot img{transition:transform .8s var(--ease-spring)}
+.bcard .shot img{width:100%;height:100%;object-fit:cover;object-position:top;transition:transform .8s var(--ease-spring)}
 .bcard:hover .shot img{transform:scale(1.025)}
 @media(max-width:900px){.bcard,.bcard.w4,.bcard.w2{grid-column:span 6}}
 
@@ -320,7 +320,7 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 .final{margin-top:180px;margin-left:auto;margin-right:auto}
 .fpanel h2{max-width:720px;margin:18px auto 0}
 .fpanel p{color:var(--ink2);max-width:560px;margin:18px auto 0}
-footer{padding:44px 0 40px;color:var(--ink3);font-size:13px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
+footer{margin-top:70px;padding:34px 0 40px;border-top:1px solid var(--stroke);color:var(--ink3);font-size:13px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center}
 footer .fb{display:flex;align-items:center;gap:9px;font-family:var(--disp);letter-spacing:.1em;font-weight:600;color:var(--ink2)}
 footer .fb img{width:18px;height:18px}
 
@@ -350,7 +350,7 @@ footer .fb img{width:18px;height:18px}
 <header class="hero">
   <div class="wrap">
     <span class="badge" data-hrv="1"><i></i>AI-CRM для агентств недвижимости</span>
-    <h1 data-hrv="2">ИИ-отдел продаж, который отвечает лиду <span class="em">за 60 секунд</span></h1>
+    <h1 data-hrv="2">ИИ-отдел продаж,<br>который отвечает лиду<br><span class="em">за 60 секунд</span></h1>
     <p class="sub" data-hrv="3">Lumen сам квалифицирует заявки в WhatsApp, дожимает молчунов 18 дней, будит спящую базу и передаёт брокеру только тёплых — с выжимкой и слотом созвона.</p>
     <div class="hero-ctas" data-hrv="4">
       <button class="btn-xl" onclick="location.href='/'">Смотреть живое демо</button>
@@ -391,7 +391,7 @@ footer .fb img{width:18px;height:18px}
       <div class="bcard" data-rv>
         <div class="pad"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Реанимация базы</h3>
         <p>Скоринг A/B/C решает, кого будить первым. Волны с паузами, тихие часы по поясу клиента, safe-mode для здоровья номеров — спящая база превращается в сделки.</p></div>
-        <div class="shot"><img src="/assets/land/react.jpg" alt="Реанимация базы" loading="lazy"></div>
+        <div class="shot"><img src="/assets/land/react.jpg?v=2" alt="Реанимация базы" loading="lazy"></div>
       </div>
       <div class="bcard" data-rv>
         <div class="pad"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 2v6h6"/></svg>Подборки и PDF</h3>
@@ -454,7 +454,7 @@ footer .fb img{width:18px;height:18px}
         <div class="st"><span class="n">03</span><div><b>Волны с safe-mode</b><p>Пачки, паузы, тихие часы по поясу клиента — номера живут, база не выгорает.</p></div></div>
         <div class="st"><span class="n">04</span><div><b>Ответил — ведёт ИИ</b><p>Проснувшийся лид попадает в обычную первую линию и доходит до встречи.</p></div></div>
       </div>
-      <div class="pshot"><img src="/assets/land/react.jpg" alt="Реанимация" loading="lazy"></div>
+      <div class="pshot"><img src="/assets/land/react.jpg?v=2" alt="Реанимация" loading="lazy"></div>
     </div>
     <div class="ppane">
       <div class="steps">
@@ -569,9 +569,7 @@ footer .fb img{width:18px;height:18px}
           <div class="cl"><span>Сейчас доходит до квалификации</span><b id="cvConv">30%</b></div>
           <input type="range" id="cConv" min="10" max="60" step="1" value="30" aria-label="Текущая конверсия в квалификацию">
         </div>
-        <div class="crow" style="margin-top:30px">
-          <div class="cl" style="margin-bottom:0"><span style="color:var(--ink3);font-weight:500">Квал → сделка взяли 12%, Lumen считаем по 65% доквала (низ вилки 55–80%). Формулы честные, без магии.</span></div>
-        </div>
+        <div style="margin-top:26px;padding-top:16px;border-top:1px solid var(--stroke);font-size:12px;color:var(--ink3);line-height:1.6">Квал → сделка — 12%, Lumen — 65% доквала (низ вилки 55–80%). Формулы честные, без магии.</div>
       </div>
       <div class="cout">
         <div class="cres">
@@ -616,7 +614,7 @@ footer .fb img{width:18px;height:18px}
   <div class="wrap">
     <div class="sec-head" data-rv>
       <span class="sec-badge">Внедрение</span>
-      <h2>От брифа до живых заявок — 7 дней</h2>
+      <h2>От брифа до живых заявок&nbsp;— 7&nbsp;дней</h2>
       <p>Всё делаем мы. От вас — один созвон, доступы и желание зарабатывать больше.</p>
     </div>
     <div class="tl7" data-rv>
