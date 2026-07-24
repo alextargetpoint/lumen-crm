@@ -3082,7 +3082,14 @@ PAGES.brokers = async (root) => {
       const hot = mine.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
       const pct = Math.min(Math.round(b.load / b.capacity * 100), 100);
       if (editId === b.id) return `<div class="pds br-edit" data-bredit="${b.id}">
-        <div class="pds-hd"><span class="pds-ic v">${ic(I.user)}</span><div><b>${esc(b.name)}</b><i>профиль брокера · смены и лимиты</i></div>
+        <div class="pds-hd">
+          <span class="br-photo" id="brPhotoPrev">${b.photo ? `<img src="${esc(b.photo)}" alt="">` : esc(b.avatar || '?')}</span>
+          <div><b>${esc(b.name)}</b><i>профиль брокера · смены и лимиты</i>
+            <div style="display:flex;gap:7px;margin-top:6px">
+              <button type="button" class="btn btn-sm" id="brPhotoBtn">${ic(I.user)}${b.photo ? 'Заменить фото' : 'Фото'}</button>
+              ${b.photo ? `<button type="button" class="btn-ghost" id="brPhotoDel" title="Убрать фото">${ic(I.x)}</button>` : ''}
+            </div>
+          </div>
           <span class="tb-spacer"></span>
           <button class="btn btn-accent btn-sm" data-brsave="${b.id}">${ic(I.check)}Готово</button>
           <button class="btn btn-sm" data-brcancel>Отмена</button>
@@ -3116,7 +3123,7 @@ PAGES.brokers = async (root) => {
         </div>
       </div>`;
       return `<div class="glass broker-card" data-brok="${b.id}" style="cursor:pointer" title="Клик — редактировать">
-        <div class="ava" style="width:44px;height:44px;flex:0 0 44px;font-size:14px">${esc(b.avatar)}</div>
+        <div class="ava" style="width:44px;height:44px;flex:0 0 44px;font-size:14px">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
         <div class="bmeta">
           <div class="nm">${esc(b.name)}</div>
           <div class="gl">${st.geoNames[b.geo]} · ${b.langs.join(' / ')} · сделок 90 дн: ${b.deals90}</div>
@@ -3173,6 +3180,30 @@ PAGES.brokers = async (root) => {
     });
     $$('.day-chip', eb).forEach(ch => ch.addEventListener('click', () => { ch.classList.toggle('on'); buildDayTimes(); }));
     $$('.lang-chip', eb).forEach(ch => ch.addEventListener('click', () => ch.classList.toggle('on')));
+    /* фото брокера: файл → raw POST, превью сразу */
+    const phBtn = $('#brPhotoBtn', eb);
+    if (phBtn) phBtn.addEventListener('click', () => {
+      const fi = el('<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none">');
+      document.body.appendChild(fi);
+      fi.addEventListener('change', async () => {
+        const f = fi.files[0];
+        fi.remove();
+        if (!f) return;
+        if (f.size > 3e6) { toast('Файл больше 3 МБ', null, false); return; }
+        const r = await fetch(`/api/brokers/${eb.dataset.bredit}/photo`, { method: 'POST', headers: { 'Content-Type': f.type || 'image/jpeg' }, body: f });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { toast('Не удалось загрузить', j.error, false); return; }
+        await loadState();
+        render();
+      });
+      fi.click();
+    });
+    const phDel = $('#brPhotoDel', eb);
+    if (phDel) phDel.addEventListener('click', async () => {
+      await fetch(`/api/brokers/${eb.dataset.bredit}/photo`, { method: 'DELETE' });
+      await loadState();
+      render();
+    });
     const lAdd = () => {
       const inp = eb.querySelector('#langAddInp');
       const v = inp.value.trim().toLowerCase();

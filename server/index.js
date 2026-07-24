@@ -1032,6 +1032,35 @@ const server = http.createServer(async (req, res) => {
       db.brokers.push(br); store.save();
       return json(res, 200, br);
     }
+    /* фото брокера: raw body ≤3МБ → assets/brokers/<id>.<ext>; DELETE — убрать */
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)\/photo$/)) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) return json(res, 404, { error: 'not found' });
+      const chunks = [];
+      let size = 0;
+      await new Promise((resolve) => {
+        req.on('data', (c) => { size += c.length; if (size > 3e6) req.destroy(); else chunks.push(c); });
+        req.on('end', resolve); req.on('close', resolve);
+      });
+      if (!size || size > 3e6) return json(res, 400, { error: 'файл до 3 МБ (JPG/PNG/WebP)' });
+      const ct = req.headers['content-type'] || '';
+      const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+      const dir = path.join(PUBLIC, 'assets', 'brokers');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, br.id + '.' + ext), Buffer.concat(chunks));
+      br.photo = '/assets/brokers/' + br.id + '.' + ext + '?v=' + Date.now();
+      store.save();
+      return json(res, 200, { ok: true, photo: br.photo });
+    }
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)\/photo$/)) && req.method === 'DELETE') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) return json(res, 404, { error: 'not found' });
+      br.photo = null;
+      store.save();
+      return json(res, 200, { ok: true });
+    }
     if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'DELETE') {
       if (db.brokers.length <= 1) return json(res, 400, { error: 'нельзя удалить последнего брокера' });
       for (const l of db.leads) if (l.broker === m[1]) l.broker = null;
