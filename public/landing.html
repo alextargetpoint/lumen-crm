@@ -74,6 +74,8 @@ button{font-family:inherit;cursor:pointer}
 
 /* ---------- герой ---------- */
 .hero{padding:150px 0 0;text-align:center;position:relative}
+.hero .neb{position:absolute;top:-12%;left:50%;transform:translateX(-50%);width:min(1500px,120vw);height:70%;object-fit:cover;opacity:.14;mix-blend-mode:screen;pointer-events:none;z-index:-1;filter:saturate(1.25);-webkit-mask-image:radial-gradient(70% 70% at 50% 40%,#000,transparent);mask-image:radial-gradient(70% 70% at 50% 40%,#000,transparent)}
+@media(max-width:760px),(prefers-reduced-motion:reduce){.hero .neb{display:none}}
 .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--stroke2);border-radius:999px;padding:7px 16px;
   font-size:12.5px;font-weight:600;letter-spacing:.04em;color:var(--sky);background:rgba(29,52,216,.14)}
 .badge i{width:6px;height:6px;border-radius:50%;background:var(--blue2);box-shadow:0 0 10px var(--blue2);animation:pulse 2.4s infinite}
@@ -215,7 +217,10 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 .ptg.on{background:rgba(37,99,235,.9);color:#fff;border-color:transparent}
 .ptg .off{font-size:11px;color:#9EF0C3;margin-left:6px;font-weight:700}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
-.plan{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);padding:34px 32px;display:flex;flex-direction:column;position:relative;transition:transform var(--dur) var(--ease-spring),border-color var(--dur)}
+.plan{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--stroke);border-radius:var(--r);padding:34px 32px;display:flex;flex-direction:column;position:relative;transition:transform var(--dur) var(--ease-spring),border-color var(--dur);overflow:hidden}
+.plan::after{content:'';position:absolute;inset:0;opacity:0;transition:opacity .35s;background:radial-gradient(360px 260px at var(--mx,50%) var(--my,-20%), rgba(79,125,255,.17), transparent 65%);pointer-events:none}
+.plan:hover::after{opacity:1}
+.plan .tag{z-index:1}
 .plan:hover{transform:translateY(-5px);border-color:var(--stroke2)}
 .plan.hot{border-color:rgba(79,125,255,.5);box-shadow:0 0 0 1px rgba(79,125,255,.2),0 30px 80px -30px rgba(29,52,216,.6);background:linear-gradient(180deg,#0D1B3C,var(--panel2))}
 .plan .tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;border-radius:999px;padding:5px 16px;font-size:11.5px;font-weight:700;letter-spacing:.06em;box-shadow:0 8px 22px rgba(37,99,235,.5);white-space:nowrap}
@@ -287,6 +292,7 @@ footer .fb img{width:18px;height:18px}
 </nav>
 
 <header class="hero">
+  <video class="neb" src="/assets/nebula-bg.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
   <div class="wrap">
     <span class="badge" data-hrv="1"><i></i>AI-CRM для агентств недвижимости</span>
     <h1 data-hrv="2">ИИ-отдел продаж, который отвечает лиду <span class="em">за 60 секунд</span></h1>
@@ -666,6 +672,42 @@ function calcRun() {
 }
 Object.values(CALC).forEach(r => r.addEventListener('input', calcRun));
 calcRun();
+
+/* моушн: параллакс стеклянного города + свет за курсором на тарифах + count-up метрик */
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelector('.hero .neb')?.play?.().catch(() => {});
+const sky = document.querySelector('.hero-shot .sky');
+if (sky && !REDUCED) {
+  let tick = false;
+  addEventListener('scroll', () => {
+    if (tick) return;
+    tick = true;
+    requestAnimationFrame(() => { sky.style.transform = 'translateX(-50%) translateY(' + Math.min(130, scrollY * .13) + 'px)'; tick = false; });
+  }, { passive: true });
+}
+document.querySelectorAll('.plan').forEach(p2 => p2.addEventListener('pointermove', e => {
+  const r = p2.getBoundingClientRect();
+  p2.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+  p2.style.setProperty('--my', (e.clientY - r.top) + 'px');
+}));
+/* count-up чисел в hero-strip при появлении */
+if (!REDUCED) {
+  const cio = new IntersectionObserver(es => es.forEach(en => {
+    if (!en.isIntersecting) return;
+    cio.unobserve(en.target);
+    const el = en.target, final = el.textContent;
+    const m2 = final.match(/\d+/);
+    if (!m2) return;
+    const target = +m2[0], t0 = performance.now(), DUR = 900;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / DUR), v = Math.round(target * (1 - Math.pow(1 - k, 3)));
+      el.textContent = final.replace(/\d+/, v);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }), { rootMargin: '0px 0px -10%' });
+  document.querySelectorAll('.hs-i b').forEach(b => cio.observe(b));
+}
 
 /* FAQ-аккордеон */
 document.querySelectorAll('.qa .q').forEach(q => q.addEventListener('click', () => {
