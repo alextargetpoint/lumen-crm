@@ -751,11 +751,26 @@ PAGES.overview = async (root) => {
       <defs><linearGradient id="spg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#93B4FF"/><stop offset="1" stop-color="#2563EB"/></linearGradient></defs>
     </svg>`;
   })();
+  /* дельты неделя-к-неделе — только там, где есть честные данные (createdAt / события) */
+  const _wk = 7 * 864e5, _now = Date.now();
+  const kd = (cur, prev) => {
+    if (!cur && !prev) return '';
+    if (!prev) return '<span class="kd up">новое</span>';
+    const p = Math.round((cur - prev) / prev * 100);
+    if (Math.abs(p) < 3) return '<span class="kd flat">ровно</span>';
+    if (p > 500) return `<span class="kd up">×${Math.round(cur / prev)}</span>`;
+    return `<span class="kd ${p > 0 ? 'up' : 'dn'}">${p > 0 ? '+' : ''}${p}%</span>`;
+  };
+  const _newTs = leads.map(l => l.createdAt).filter(Boolean);
+  const _qualTs = (events || []).filter(e => ['qual', 'qualified', 'handover', 'deal'].includes(e.type)).map(e => e.at);
+  const _cnt = (arr, from, to) => arr.filter(t => t > from && t <= to).length;
+  const kdNew = kd(_cnt(_newTs, _now - _wk, _now), _cnt(_newTs, _now - 2 * _wk, _now - _wk));
+  const kdQual = kd(_cnt(_qualTs, _now - _wk, _now), _cnt(_qualTs, _now - 2 * _wk, _now - _wk));
   root.innerHTML = `
     <div class="kpis">
-      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
+      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}${kdNew}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
       <div class="kpi glass"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
-      <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}</div><div class="delta">${f.deal} дошло до сделки</div></div>
+      <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}${kdQual}</div><div class="delta">${f.deal} дошло до сделки</div></div>
       <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
     </div>
     <div class="card mb f3card">
@@ -2313,7 +2328,7 @@ PAGES.properties = async (root) => {
       </div>`).join('')}
       <button class="fold fold-new" id="fNew">${ic(I.plus)}<span>Папка</span></button>
     </div>
-    <div class="muted" style="font-size:11px;margin:-6px 0 12px">Перетащите карточку объекта на папку, чтобы разложить · клик по папке — фильтр · ${ic ? '' : ''}из папки можно собрать подборку одной кнопкой</div>
+    <div class="muted" style="font-size:11px;margin:-6px 0 12px">Карточку — на папку · клик по папке — фильтр и подборка</div>
     <div class="prop-grid">
       ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}" data-dragprop="${pr.id}">
         ${propCover(pr)}

@@ -1496,3 +1496,9 @@ html[data-night] .lc-hint.warn { border-color: #4A3E1C; }
 html[data-night] .lp-ai-state { background: linear-gradient(150deg, #152647, #0E1A33); border-color: #2A3C6B; }
 html[data-night] .axr.done { background: #0E2A21; }
 html[data-night] .lp-ad { color: #BFD3FF; }
+
+/* KPI-дельты неделя-к-неделе (Обзор) */
+.kpi .kd { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 9px; vertical-align: 6px; margin-left: 8px; letter-spacing: .02em; }
+.kd.up { background: rgba(35, 179, 131, .14); color: #23B383; }
+.kd.dn { background: rgba(229, 72, 77, .13); color: #E5484D; }
+.kd.flat { background: var(--bg-2); color: var(--ink-3); }
