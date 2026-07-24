@@ -194,6 +194,55 @@ h2{font-family:var(--disp);font-weight:600;font-size:clamp(24px,3.2vw,38px);line
 .vs .win li{color:var(--ink)}
 @media(max-width:760px){.vs{grid-template-columns:1fr}}
 
+/* сценарии по нишам */
+.niches{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.niche{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--stroke);min-height:430px;display:flex;flex-direction:column;justify-content:flex-end;padding:26px 26px 24px;background-size:cover;background-position:center;transition:transform var(--dur) var(--ease-spring),border-color var(--dur)}
+.niche::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,7,15,.25) 0%,rgba(4,7,15,.55) 45%,rgba(4,7,15,.94) 78%)}
+.niche:hover{transform:translateY(-4px);border-color:var(--stroke2)}
+.niche>*{position:relative}
+.niche .geo{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sky)}
+.niche h3{font-family:var(--disp);font-weight:600;font-size:19px;margin-top:8px}
+.niche .pain{color:var(--ink2);font-size:13.2px;margin-top:10px;line-height:1.55}
+.niche .fix{margin-top:14px;padding-top:14px;border-top:1px solid rgba(143,180,255,.22);font-size:13.2px;color:var(--ink);line-height:1.55}
+.niche .fix b{color:var(--sky)}
+@media(max-width:900px){.niches{grid-template-columns:1fr}.niche{min-height:340px}}
+
+/* живой WhatsApp-диалог */
+.wa-demo{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;max-width:980px;margin:0 auto}
+.wa-pts .pt{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--stroke)}
+.wa-pts .pt:last-child{border-bottom:none}
+.wa-pts .pt svg{width:18px;height:18px;flex:0 0 18px;color:var(--sky);margin-top:3px}
+.wa-pts b{display:block;font-size:15.5px}
+.wa-pts p{color:var(--ink2);font-size:13.3px;margin-top:4px}
+.phone{width:320px;margin:0 auto;background:#0B141A;border-radius:34px;border:1px solid rgba(143,180,255,.3);box-shadow:0 30px 80px -25px rgba(0,0,0,.85),0 0 0 6px #05080F;overflow:hidden}
+.phone .ph-top{background:#1F2C34;padding:13px 16px;display:flex;gap:10px;align-items:center}
+.phone .ph-ava{width:32px;height:32px;border-radius:50%;background:var(--blue);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+.phone .ph-top b{font-size:13.5px;display:block;color:#E9EDEF}
+.phone .ph-top i{font-style:normal;font-size:10.5px;color:#8696A0}
+.phone .ph-body{background:#0B141A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' opacity='.04'%3E%3Ccircle cx='30' cy='30' r='1.2' fill='%238FB4FF'/%3E%3C/svg%3E");padding:14px 12px 16px;display:flex;flex-direction:column;gap:7px;min-height:430px}
+.phone .bub{max-width:82%;padding:8px 11px;border-radius:10px;font-size:12.6px;line-height:1.45;color:#E9EDEF;position:relative}
+.phone .bub.in{align-self:flex-start;background:#1F2C34;border-top-left-radius:3px}
+.phone .bub.out{align-self:flex-end;background:#005C4B;border-top-right-radius:3px}
+.phone .bub .bm{display:block;text-align:right;font-size:9.5px;color:rgba(233,237,239,.55);margin-top:3px}
+.phone .ph-day{align-self:center;background:#1F2C34;color:#8696A0;border-radius:8px;font-size:10px;padding:3px 10px;margin:4px 0}
+@media(max-width:860px){.wa-demo{grid-template-columns:1fr}.phone{width:min(320px,90vw)}}
+
+/* сравнение тарифов таблицей */
+.cmp-toggle{display:block;margin:26px auto 0;background:transparent;border:1px solid var(--stroke2);color:var(--ink2);border-radius:999px;padding:11px 26px;font-size:13.5px;font-weight:600;transition:all var(--dur-fast)}
+.cmp-toggle:hover{color:var(--ink);border-color:rgba(143,180,255,.5)}
+.pcmp{max-width:980px;margin:0 auto;overflow:hidden;max-height:0;opacity:0;transition:max-height .6s var(--ease-soft),opacity .4s}
+.pcmp.open{max-height:1400px;opacity:1;margin-top:26px}
+.pcmp .tblwrap{overflow-x:auto;border:1px solid var(--stroke);border-radius:var(--r);background:linear-gradient(180deg,var(--panel),var(--panel2))}
+.pcmp table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+.pcmp th{font-family:var(--disp);font-weight:600;font-size:13px;padding:16px 18px;text-align:center;border-bottom:1px solid var(--stroke);color:var(--ink)}
+.pcmp th:first-child{text-align:left}
+.pcmp th.hot{color:var(--sky)}
+.pcmp td{padding:11px 18px;border-bottom:1px solid var(--stroke);color:var(--ink2);text-align:center}
+.pcmp td:first-child{text-align:left}
+.pcmp tr:last-child td{border-bottom:none}
+.pcmp td .y{color:#23B383;font-weight:700}
+.pcmp td .n{color:var(--ink3)}
+
 /* внедрение за 7 дней */
 .tl7{display:grid;grid-template-columns:repeat(6,1fr);gap:0;max-width:1100px;margin:0 auto;position:relative}
 .tl7::before{content:'';position:absolute;top:21px;left:4%;right:4%;height:2px;background:linear-gradient(90deg,transparent,rgba(79,125,255,.45) 12%,rgba(79,125,255,.45) 88%,transparent)}
@@ -412,6 +461,66 @@ footer .fb img{width:18px;height:18px}
   </div>
 </section>
 
+<section id="niches">
+  <div class="wrap">
+    <div class="sec-head" data-rv>
+      <span class="sec-badge">Ниши</span>
+      <h2>Заточен под ваши направления</h2>
+      <p>Критерии квалификации, пороги бюджета и скрипты — свои для каждого рынка.</p>
+    </div>
+    <div class="niches">
+      <div class="niche" data-rv style="background-image:url('/assets/lib/dubai-night.jpg')">
+        <span class="geo">Дубай · Off-plan</span>
+        <h3>Заявки сгорают за часы</h3>
+        <p class="pain">Лид с Meta-рекламы остывает, пока менеджер спит или на показе. Конкуренты отвечают первыми.</p>
+        <div class="fix"><b>Lumen:</b> ответ ≤ 60 сек по конкретному объявлению с ценами из вашей базы, рассрочка и ROI — в первом касании.</div>
+      </div>
+      <div class="niche" data-rv style="background-image:url('/assets/lib/bali-villa.jpg')">
+        <span class="geo">Бали · Виллы</span>
+        <h3>Инвестор долго думает</h3>
+        <p class="pain">Клиент сравнивает месяцами, менеджер бросает дожим после второго «я подумаю».</p>
+        <div class="fix"><b>Lumen:</b> 7 касаний за 18 дней без раздражения + подборка с доходностью, открыл — брокеру сигнал «звони сейчас».</div>
+      </div>
+      <div class="niche" data-rv style="background-image:url('/assets/lib/penthouse.jpg')">
+        <span class="geo">Пхукет · Инвест</span>
+        <h3>База копилась годами и молчит</h3>
+        <p class="pain">Тысячи старых контактов лежат мёртвым грузом — обзванивать некому и дорого.</p>
+        <div class="fix"><b>Lumen:</b> реанимация волнами со скорингом A/B/C: 3–7% базы просыпается и заходит в живую воронку.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="wa-live">
+  <div class="wrap">
+    <div class="sec-head" data-rv>
+      <span class="sec-badge">Живой сценарий</span>
+      <h2>Так это выглядит для клиента</h2>
+      <p>Не робот с кнопками — живой диалог, который доводит до встречи.</p>
+    </div>
+    <div class="wa-demo">
+      <div class="wa-pts" data-rv>
+        <div class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg><div><b>Мгновенный ответ по объявлению</b><p>ИИ знает, с какой рекламы пришёл лид, и говорит цифрами из вашей базы объектов.</p></div></div>
+        <div class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5z"/></svg><div><b>Одна ось за раз</b><p>Цель, бюджет, тип, срок — короткие человеческие вопросы, а не анкета из десяти полей.</p></div></div>
+        <div class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14a4 4 0 0 1 6-3.5L12 12l2-1.5a4 4 0 0 1 6 3.5M12 12v6M8 21h8"/></svg><div><b>Передача живому эксперту</b><p>Все оси закрыты — брокер получает саммари с цитатами и слот созвона уже в календаре.</p></div></div>
+      </div>
+      <div class="phone" data-rv>
+        <div class="ph-top"><span class="ph-ava">OA</span><div><b>One Agency</b><i>онлайн</i></div></div>
+        <div class="ph-body">
+          <span class="ph-day">сразу после заявки</span>
+          <div class="bub out">Алекс, добрый день! Видел вашу заявку по «Дубай · студии JVC». Цены в этой вилке — от $145 000. Есть 2–3 сильных варианта, пока их не разобрали по брони. Скинуть коротко, без простыни?<span class="bm">12:00 ✓✓</span></div>
+          <div class="bub in">Да, давайте. Рассматриваю как инвестицию<span class="bm">12:07</span></div>
+          <div class="bub out">Отличная цель — Дубай сейчас даёт 6–9% годовых в аренде. Чтобы предложить точные варианты: какой бюджет закладываете на покупку?<span class="bm">12:07 ✓✓</span></div>
+          <div class="bub in">До 150 тысяч долларов<span class="bm">12:11</span></div>
+          <div class="bub out">Принял. В этом бюджете сильные варианты — 1BR в брендированных кондо-отелях: управление отелем, доход по пулу. Такой формат интересен или смотрим классические апартаменты?<span class="bm">12:12 ✓✓</span></div>
+          <div class="bub in">Наверное 1BR апартаменты<span class="bm">12:16</span></div>
+          <div class="bub out">Отлично, у меня всё есть для точной подборки. Передаю вас нашему эксперту по Дубаю — он подготовит адресные варианты и созвонится в удобное время. Сегодня вечером или завтра?<span class="bm">12:16 ✓✓</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="numbers">
   <div class="wrap">
     <div class="sec-head" data-rv>
@@ -572,6 +681,28 @@ footer .fb img{width:18px;height:18px}
       </div>
     </div>
     <p class="note">Расходники сверх тарифа оплачиваются напрямую провайдерам и прозрачны: шаблоны WhatsApp + токены ИИ ≈ $70–180/мес при 500 лидах. Никаких наценок на трафик.</p>
+    <button class="cmp-toggle" id="pcmpBtn">Сравнить тарифы подробно</button>
+    <div class="pcmp" id="pcmp">
+      <div class="tblwrap">
+        <table>
+          <tr><th>Возможность</th><th>Старт</th><th class="hot">Рост</th><th>Масштаб</th></tr>
+          <tr><td>ИИ-квалификатор + цепочки касаний</td><td><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Лидов в месяц</td><td>до 500</td><td>до 2 000</td><td>безлимит</td></tr>
+          <tr><td>Номеров WhatsApp</td><td>1</td><td>3</td><td>по запросу</td></tr>
+          <tr><td>Каналы: Telegram · Viber · E-mail</td><td><span class="n">—</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Конструктор подборок + PDF</td><td><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>ИИ-тексты подборок под лида</td><td><span class="n">—</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Реанимация базы (скоринг A/B/C)</td><td><span class="n">—</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Телефония + транскрибация звонков</td><td><span class="n">—</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Голос брокера (ElevenLabs)</td><td><span class="n">—</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Отчёты владельцу в Telegram</td><td><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Мультиофис и роли</td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>White-label: свой домен и бренд</td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Кастомные интеграции (порталы, CRM)</td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="y">✓</span></td></tr>
+          <tr><td>Поддержка</td><td>чат</td><td>чат · 24ч</td><td>личный менеджер · SLA</td></tr>
+        </table>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -708,6 +839,12 @@ if (!REDUCED) {
   }), { rootMargin: '0px 0px -10%' });
   document.querySelectorAll('.hs-i b').forEach(b => cio.observe(b));
 }
+
+/* сравнение тарифов */
+document.getElementById('pcmpBtn').addEventListener('click', () => {
+  const el = document.getElementById('pcmp'), open = el.classList.toggle('open');
+  document.getElementById('pcmpBtn').textContent = open ? 'Свернуть сравнение' : 'Сравнить тарифы подробно';
+});
 
 /* FAQ-аккордеон */
 document.querySelectorAll('.qa .q').forEach(q => q.addEventListener('click', () => {
