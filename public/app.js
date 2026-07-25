@@ -888,11 +888,18 @@ function wireLeadSelect(root, leads) {
   };
   items.forEach(el => {
     const id = idOf(el);
+    el.addEventListener('mousedown', (e) => { if (e.shiftKey) e.preventDefault(); }); /* не выделять текст при Shift */
     el.addEventListener('click', (e) => {
       if (DRAG.moved) return;
       const chk = e.target.closest('[data-check]');
+      /* Shift = выделить диапазон. Без якоря — от первой карточки этой колонки (в таблице — от первой строки): кликнул 10-ю → выделились 1–10 */
+      if (e.shiftKey) {
+        e.preventDefault(); e.stopPropagation();
+        let anchor = LEAD_SEL_ANCHOR;
+        if (!anchor) { const col = el.closest('.kb-col'); const first = col ? col.querySelector('.lead-card') : items[0]; anchor = first ? idOf(first) : orderIds[0]; }
+        selectRange(anchor, id); LEAD_SEL_ANCHOR = anchor; refreshSel(root); return;
+      }
       if (chk || e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); toggle(id); LEAD_SEL_ANCHOR = id; refreshSel(root); return; }
-      if (e.shiftKey && LEAD_SEL_ANCHOR) { e.preventDefault(); selectRange(LEAD_SEL_ANCHOR, id); refreshSel(root); return; }
       if (LEAD_SEL.size) { LEAD_SEL.clear(); refreshSel(root); return; } /* клик мимо снимает выделение */
       openLeadModal(id);
     });
@@ -901,6 +908,24 @@ function wireLeadSelect(root, leads) {
       if (!LEAD_SEL.has(id)) { if (!(e.metaKey || e.ctrlKey)) LEAD_SEL.clear(); LEAD_SEL.add(id); LEAD_SEL_ANCHOR = id; refreshSel(root); }
       openLeadCtxMenu(e.clientX, e.clientY, root);
     });
+  });
+  /* «выделить всю колонку/стадию» — клик по счётчику в шапке */
+  $$('[data-selcol]', root).forEach(h => h.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const col = h.closest('.kb-col');
+    const ids = $$('.lead-card', col).map(c => c.dataset.id);
+    const allSel = ids.length && ids.every(id => LEAD_SEL.has(id));
+    ids.forEach(id => allSel ? LEAD_SEL.delete(id) : LEAD_SEL.add(id)); /* повторный клик — снять */
+    if (ids.length) LEAD_SEL_ANCHOR = ids[0];
+    refreshSel(root);
+  }));
+  /* таблица: чекбокс «выделить всё» в шапке */
+  const selAll = $('#tblSelAll', root);
+  if (selAll) selAll.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const all = orderIds.length && orderIds.every(id => LEAD_SEL.has(id));
+    orderIds.forEach(id => all ? LEAD_SEL.delete(id) : LEAD_SEL.add(id));
+    refreshSel(root);
   });
   renderBulkBar(root);
 }
@@ -1054,7 +1079,7 @@ PAGES.funnel = async (root) => {
       ${STAGES.map(st => {
         const items = leads.filter(l => l.stage === st.id);
         return `<div class="kb-col" data-stage="${st.id}">
-          <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct">${items.length}</span></div>
+          <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass ${LEAD_SEL.has(l.id) ? 'sel' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
@@ -1076,6 +1101,7 @@ PAGES.funnel = async (root) => {
     </div>` : `
     <div class="glass card" style="padding:8px 0">
       <table class="tbl lead-tbl"><thead><tr>
+        <th style="width:34px"><span class="lc-check tbl" id="tblSelAll" title="Выделить всё">${ic(I.check, 2)}</span></th>
         ${[['name', 'Лид'], ['stage', 'Стадия'], ['geo', 'Гео'], ['budget', 'Бюджет'], ['axes', 'Квал'], ['broker', 'Брокер'], ['last', 'Контакт'], ['next', 'Следующий шаг']].map(([k, n]) => `<th data-sort="${k}" style="cursor:pointer">${n}${F.funnelSort === k ? ' ↓' : ''}</th>`).join('')}
       </tr></thead><tbody>
         ${leads.sort((a, b) => {
@@ -1807,7 +1833,11 @@ async function renderChat(id, rebuild) {
       ? `<button class="btn btn-accent lp-primary" id="meetBtn">${ic(I.cal)}Назначить встречу</button>`
       : l.stage === 'deal'
         ? `<div class="badge ok lp-primary" style="justify-content:center">${ic(I.flame)}Сделка закрыта</div>`
-        : `<div class="lp-ai-state">${ic(I.spark)}<div><b>ИИ ведёт диалог</b><span>${4 - l.axesFilled ? `осталось выяснить: ${4 - l.axesFilled} из 4` : 'готовит передачу'}</span></div></div>`;
+        : l.ai.enabled
+          ? `<div class="lp-ai-state">${ic(I.spark)}<div><b>ИИ ведёт диалог</b><span>${4 - l.axesFilled ? `осталось выяснить: ${4 - l.axesFilled} из 4` : 'готовит передачу'}</span></div></div>
+             <button class="btn lp-primary" id="takeoverBtn" style="margin-top:8px;justify-content:center">${ic(I.handover)}Взять диалог на себя</button>`
+          : `<div class="lp-ai-state" style="border-color:var(--accent-2)">${ic(I.user)}<div><b>Вы ведёте диалог</b><span>ИИ на паузе — пишете с того же номера</span></div></div>
+             <button class="btn btn-accent lp-primary" id="resumeAiBtn" style="margin-top:8px;justify-content:center">${ic(I.spark)}Вернуть ИИ</button>`;
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:11px">
@@ -1859,6 +1889,8 @@ async function renderChat(id, rebuild) {
   const cp = $('#copyPhone');
   if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
   $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); });
+  $('#takeoverBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: false } }); toast('Диалог у вас', 'ИИ на паузе — пишите клиенту с того же номера', true); renderChat(id, false); });
+  $('#resumeAiBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: true } }); toast('ИИ снова ведёт диалог', null, true); renderChat(id, false); });
   const hb = $('#handoverBtn');
   if (hb) hb.addEventListener('click', async () => { await api.post(`/leads/${id}/handover`); toast(IS_SOLO() ? 'Лид взят в работу' : 'Лид передан брокеру', 'Саммари и слот отправлены', true); renderChat(id, true); });
   $('#meetBtn').addEventListener('click', () => openMeetingModal(l, () => renderChat(id, true)));

@@ -1570,12 +1570,14 @@ html[data-night] .cmt-group-hd { color: var(--ink); }
 
 /* ---------- Массовое управление лидами (Воронка) ---------- */
 .lead-card { position: relative; }
-.lc-check { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--stroke); background: var(--card); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s, background .12s; z-index: 3; }
+.lead-card .top { padding-left: 22px; }                 /* место под чекбокс — не налезает на имя/кружок */
+.lc-check { position: absolute; top: 12px; left: 10px; width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid var(--stroke); background: var(--card); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s, background .12s; z-index: 3; }
 .lc-check svg { width: 12px; height: 12px; color: #fff; opacity: 0; }
 .lead-card:hover .lc-check { opacity: 1; }
 .lead-card.sel .lc-check { opacity: 1; background: var(--accent); border-color: var(--accent); }
 .lead-card.sel .lc-check svg { opacity: 1; }
-.lead-card.sel { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: 0 0 0 4px rgba(37,99,235,.12); }
+/* выделение — рамкой ВНУТРЬ (inset box-shadow), чтобы не обрезалось краем колонки */
+.lead-card.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .lc-check.tbl { position: static; opacity: .5; width: 18px; height: 18px; flex: 0 0 18px; }
 tr.sel { background: rgba(37,99,235,.08); }
 tr.sel .lc-check.tbl { opacity: 1; background: var(--accent); border-color: var(--accent); }
@@ -1602,3 +1604,7 @@ tr:hover .lc-check.tbl { opacity: 1; }
 .ctx-arr { margin-left: auto; color: var(--ink-3); font-size: 11px; }
 .ctx-sep { height: 1px; background: var(--stroke-soft); margin: 5px 8px; }
 html[data-night] .bulk-bar { background: #0D1730; border: 1px solid var(--stroke); }
+.kb-head .ct[data-selcol] { cursor: pointer; transition: background .12s, color .12s; }
+.kb-head .ct[data-selcol]:hover { background: var(--accent); color: #fff; }
+#tblSelAll { cursor: pointer; }
+.lead-tbl thead th:first-child { text-align: center; }
