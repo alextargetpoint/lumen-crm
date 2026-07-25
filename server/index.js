@@ -29,6 +29,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 const llm = require('./llm');
 const wa = require('./wa');
 const comments = require('./comments');
+const inventory = require('./inventory');
 const playbook = require('./playbook');
 const { MARKET } = require('./marketdata');
 
@@ -59,6 +60,8 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.adComments) db.adComments = [];
   if (!db.settings.comments) db.settings.comments = { autoReply: false, autoHide: false };
   if (!db.settings.social) db.settings.social = { ig: { enabled: false, token: '', igId: '' }, fb: { enabled: false, token: '', pageId: '' } };
+  /* источники инвентаря объектов (новостройки): Reelly — основной для брокеров ОАЭ */
+  if (!db.settings.inventorySources) db.settings.inventorySources = { reelly: { enabled: false, key: '', baseUrl: '' } };
   if (!db.intakeLog) db.intakeLog = [];
   { const a1 = (db.ads || []).find(x => x.adId === '120211478921230508'); if (a1 && !a1.priceFrom) a1.priceFrom = 190000;
     const a2 = (db.ads || []).find(x => x.adId === '120211478921230742'); if (a2 && !a2.priceFrom) a2.priceFrom = 180000; }
@@ -390,6 +393,7 @@ function publicSettings(db) {
     }
   }
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
+  if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -1273,6 +1277,7 @@ const server = http.createServer(async (req, res) => {
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
+      if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -1401,6 +1406,19 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- объекты (библиотека) ---------------- */
     if (p === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);
+    /* ---------------- ИМПОРТ ИНВЕНТАРЯ ОБЪЕКТОВ ---------------- */
+    if (p === '/api/properties/import' && req.method === 'POST') {
+      const b = await readBody(req);
+      const defaults = b.defaults || {};
+      let r;
+      if (b.source === 'reelly') r = await inventory.importReelly(db, defaults);
+      else if (b.json != null) { let arr; try { arr = typeof b.json === 'string' ? JSON.parse(b.json) : b.json; } catch (e) { return json(res, 400, { error: 'битый JSON: ' + e.message }); } r = inventory.importJson(db, arr, defaults); }
+      else if (b.csv != null) r = inventory.importTable(db, b.csv, defaults);
+      else return json(res, 400, { error: 'нужен csv, json или source:reelly' });
+      if (r.error) return json(res, 400, r);
+      store.save();
+      return json(res, 200, r);
+    }
     if (p === '/api/properties' && req.method === 'POST') {
       const b = await readBody(req);
       const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '' };

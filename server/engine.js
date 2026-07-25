@@ -175,6 +175,13 @@ function handover(db, lead, brokerId) {
   if (module.exports.onHandover) module.exports.onHandover(db, lead);
   const tpl = db.templates.find(t => t.id === 'tpl_slot');
   if (tpl) send(db, lead, renderTemplate(db, tpl, lead), 'ai');
+  /* Вариант B: брокер пишет с личного номера — тёплый преданонс с того же (центрального)
+     номера, чтобы сообщение брокера не выглядело холодным незнакомым номером */
+  const auto = db.settings.automations || {};
+  if (auto.handoverPreannounce && broker.phone) {
+    const first = lead.name.split(' ')[0];
+    send(db, lead, `${first}, с вами свяжется ${broker.name}, ваш персональный эксперт по ${db.settings.geoNames[lead.geo] || lead.geo} — напишет сюда или с номера ${broker.phone}. Это тот же наш отдел, продолжите с ним.`, 'ai');
+  }
   ai.pushEvent(db, { type: 'handover', leadId: lead.id, text: `${lead.name} передан брокеру: ${broker.name} (саммари готово)` });
   store.save();
   return broker;
