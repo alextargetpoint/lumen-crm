@@ -3570,17 +3570,20 @@ PAGES.brokers = async (root) => {
           </div>
         </div>
       </div>`;
-      return `<div class="glass broker-card" data-brok="${b.id}" style="cursor:pointer" title="Клик — редактировать">
-        <div class="ava" style="width:44px;height:44px;flex:0 0 44px;font-size:14px">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
-        <div class="bmeta">
-          <div class="nm">${esc(b.name)}</div>
-          <div class="gl">${st.geoNames[b.geo]} · ${b.langs.join(' / ')} · сделок 90 дн: ${b.deals90}</div>
-          <div class="load-track"><i style="width:${pct}%"></i></div>
-          <div class="muted" style="font-size:11px;margin-top:5px">загрузка ${b.load}/${b.capacity} · в работе от ИИ: ${hot}</div>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:9px">
-            <span class="badge ${isOnShift(b) ? 'ok' : ''}">${isOnShift(b) ? 'на смене' : 'не на смене'}</span>
-            <span class="muted" style="font-size:10.5px">${(b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ')} · ${(() => { const pd = b.schedule?.perDay || {}; const wins = (b.schedule?.days || []).map(d => (pd[d] ? pd[d].from + '–' + pd[d].to : (b.schedule?.from || '') + '–' + (b.schedule?.to || ''))); return [...new Set(wins)].length > 1 ? 'инд. график' : (wins[0] || ''); })()}</span>
-          </div>
+      const sched = (() => { const pd = b.schedule?.perDay || {}; const wins = (b.schedule?.days || []).map(d => (pd[d] ? pd[d].from + '–' + pd[d].to : (b.schedule?.from || '') + '–' + (b.schedule?.to || ''))); return [...new Set(wins)].length > 1 ? 'инд. график' : (wins[0] || ''); })();
+      const days = (b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ');
+      return `<div class="glass br2-card ${b.active === false ? 'off' : ''}" data-brok="${b.id}" title="Клик — редактировать">
+        <div class="br2-top">
+          <div class="ava br2-ava">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
+          <div class="br2-id"><div class="br2-name">${esc(b.name)}</div><div class="br2-sub">${st.geoNames[b.geo]} · ${b.langs.join(' / ')}</div></div>
+          <span class="br2-shift ${isOnShift(b) ? 'on' : ''}"><i></i>${isOnShift(b) ? 'на смене' : 'вне смен'}</span>
+        </div>
+        <div class="br2-load"><div class="br2-bar ${pct >= 90 ? 'full' : ''}"><i style="width:${pct}%"></i></div><b>${b.load}/${b.capacity}</b></div>
+        <div class="br2-stats">
+          <span><b>${b.deals90}</b> сделок · 90д</span>
+          ${hot ? `<span class="hot"><b>${hot}</b> в работе</span>` : ''}
+          <span class="tb-spacer"></span>
+          <span class="br2-sch" title="${days} · ${sched}">${days ? days + ' · ' + sched : 'смены не заданы'}</span>
         </div>
       </div>`;
     }).join('')}

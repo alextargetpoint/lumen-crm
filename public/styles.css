@@ -1692,3 +1692,27 @@ html[data-night] .hero-xp span { color: var(--ink); text-shadow: 0 1px 2px rgba(
 .cl2-analytics.hot { color: #C05B18; font-weight: 600; }
 .cl2-acts { display: flex; gap: 6px; align-items: center; margin-top: 13px; }
 html[data-night] .cl2-name { color: var(--ink); }
+
+/* ---------- Карточка брокера v2 ---------- */
+.br2-card { padding: 16px 17px; cursor: pointer; border-radius: 15px; transition: box-shadow .22s var(--ease-spring, ease), transform .22s var(--ease-spring, ease); }
+.br2-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+.br2-card.off { opacity: .55; }
+.br2-top { display: flex; align-items: center; gap: 12px; }
+.br2-ava { width: 46px; height: 46px; flex: 0 0 46px; font-size: 15px; }
+.br2-id { flex: 1; min-width: 0; }
+.br2-name { font-size: 15px; font-weight: 750; color: var(--navy-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br2-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.br2-shift { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--bg-2); color: var(--ink-3); white-space: nowrap; }
+.br2-shift i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.br2-shift.on { background: var(--ok-bg); color: var(--ok); }
+.br2-shift.on i { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.br2-load { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.br2-load .br2-bar { flex: 1; height: 7px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
+.br2-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2563EB, #7C9BFF); transition: width .4s var(--ease-spring, ease); }
+.br2-bar.full i { background: linear-gradient(90deg, #E4813D, #E0B252); }
+.br2-load b { font-size: 12.5px; font-weight: 800; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.br2-stats { display: flex; align-items: center; gap: 12px; margin-top: 11px; font-size: 11px; color: var(--ink-3); }
+.br2-stats b { color: var(--navy-900); font-weight: 750; }
+.br2-stats .hot b { color: #C05B18; }
+.br2-sch { font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-stats b { color: var(--ink); }
