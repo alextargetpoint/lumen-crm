@@ -31,6 +31,7 @@ const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
 const playbook = require('./playbook');
+const billing = require('./billing');
 const { MARKET } = require('./marketdata');
 
 store.load(seed);
@@ -383,6 +384,7 @@ function tunnelUrl() {
 function publicSettings(db) {
   const s = JSON.parse(JSON.stringify(db.settings));
   delete s.auth;
+  delete s.billing; // отдаётся отдельным computed-роутом /api/billing (с расчётом/расходниками)
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
@@ -871,6 +873,21 @@ const server = http.createServer(async (req, res) => {
     /* видимость лида для брокера: только свои */
     const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
     const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; return c2; };
+
+    /* ---------------- биллинг подписки (личный кабинет, только владелец) ---------------- */
+    if (p.startsWith('/api/billing')) {
+      if (IS_BROKER) return json(res, 403, { error: 'недоступно для брокера' });
+      if (!db.settings.billing) db.settings.billing = billing.defBilling();
+      if (p === '/api/billing' && req.method === 'GET') return json(res, 200, billing.view(db));
+      if (p === '/api/billing/plan' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setPlan(db, b)); }
+      if (p === '/api/billing/method' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setMethod(db, b)); }
+      if (p === '/api/billing/invoice' && req.method === 'POST') { const b = await readBody(req); const r = billing.issueInvoice(db, b); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/billing/checkout' && req.method === 'POST') {
+        try { const r = await billing.stripeCheckout(db, global.LUMEN_BASE || ''); return json(res, 200, r); }
+        catch (e) { return json(res, 400, { error: e.message }); }
+      }
+      return json(res, 404, { error: 'not found' });
+    }
 
     if (p === '/api/state' && req.method === 'GET') {
       json(res, 200, {

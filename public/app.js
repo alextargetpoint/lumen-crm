@@ -69,6 +69,7 @@ const I = {
   chev: '<path d="M9 6l6 6-6 6"/>',
   building: '<path d="M3 21V5l7-3v19M10 21V8l8 2v11M3 21h18M6 8h1M6 12h1M6 16h1M14 13h1M14 17h1"/>',
   layers: '<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
 };
 
 /* ---------- сворачиваемые группы (стекло-стиль, spring-раскрытие) ---------- */
@@ -338,6 +339,7 @@ const NAV = {
   analytics: { name: 'Аналитика', icon: I.bars, sub: '' },
   settings:  { name: 'Подключения', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим' },
   agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
+  billing:   { name: 'Подписка и оплата', icon: I.card, sub: 'Тариф, места, счета, расходники по себестоимости' },
 };
 
 const BASE_STAGES = [
@@ -571,7 +573,7 @@ const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
-const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency'];
+const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency', 'billing'];
 function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
@@ -3932,6 +3934,168 @@ PAGES.agency = async (root) => {
     const j = await r.json();
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
     else toast('Не получилось', j.error || 'ошибка');
+  });
+};
+
+/* ---------------- ПОДПИСКА И ОПЛАТА (личный кабинет агентства) ---------------- */
+PAGES.billing = async (root) => {
+  const B = await api.get('/billing');
+  const money = (n) => '$' + Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+  const date = (t) => t ? new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const STATUS = {
+    trial:     { t: 'Пробный период', c: '#7C9BFF' },
+    active:    { t: 'Активна',        c: '#4ADE80' },
+    past_due:  { t: 'Ожидает оплаты', c: '#F0B04A' },
+    canceled:  { t: 'Отменена',       c: '#F28B8B' },
+  };
+  const st = STATUS[B.status] || STATUS.trial;
+  const q = B.quote;
+  const u = B.usageLive;
+
+  const planCard = (key) => {
+    const def = B.prices[key];
+    const on = B.plan === key;
+    const price = def.custom ? 'договорная' : (B.cycle === 'yearly' ? money(def.yearly) : money(def.monthly)) + '/мес';
+    const sub = key === 'broker' ? '1 брокер · до 400 лидов/мес'
+      : key === 'agency' ? '3 места включено · +' + money(B.cycle === 'yearly' ? def.seatYearly : def.seat) + '/брокер'
+      : 'мультиофис · white-label · от объёма';
+    return `<button type="button" class="bill-plan chip-t ${on ? 'on' : ''}" data-plan="${key}">
+      <span class="bp-name">${def.name}</span>
+      <span class="bp-price">${price}</span>
+      <span class="bp-sub">${sub}</span>
+    </button>`;
+  };
+
+  const seatsRow = (q.plan === 'agency' && !q.custom) ? `
+    <div class="bill-seats">
+      <label class="lc-lbl">Мест (брокеров)</label>
+      <div class="stepper">
+        <button type="button" class="btn btn-sm" id="seatMinus">−</button>
+        <span id="seatVal">${q.seats}</span>
+        <button type="button" class="btn btn-sm" id="seatPlus">+</button>
+      </div>
+      <span class="muted" style="font-size:11px">${q.seatsIncluded} включено, далее ${money(q.seatPrice)}/мес за место</span>
+    </div>` : '';
+
+  const totalBlock = q.custom ? `
+    <div class="bill-total">
+      <div class="bt-sum">по договору</div>
+      <div class="muted" style="font-size:12px">Тариф «Сеть» рассчитывается от числа офисов и объёма лидов — обсудим индивидуально</div>
+    </div>` : `
+    <div class="bill-total">
+      <div class="bt-line"><span>Платформа «${q.name}»</span><b>${money(q.base)}/мес</b></div>
+      ${q.extraSeats ? `<div class="bt-line"><span>Доп. места × ${q.extraSeats}</span><b>${money(q.extraSeats * q.seatPrice)}/мес</b></div>` : ''}
+      <div class="bt-line bt-grand"><span>Итого${q.cycle === 'yearly' ? ' в месяц' : ''}</span><b>${money(q.monthlyTotal)}/мес</b></div>
+      ${q.cycle === 'yearly' ? `<div class="bt-line bt-year"><span>К оплате за год (−${q.saveYearlyPct}%)</span><b>${money(q.billedNow)}</b></div>` : ''}
+    </div>`;
+
+  root.innerHTML = `
+    <div class="two-col">
+      <div>
+        <!-- статус подписки -->
+        <div class="glass card mb bill-status">
+          <div class="card-title">${ic(I.card)}Ваша подписка</div>
+          <div class="bill-hero">
+            <div>
+              <div class="bh-plan">${q.name || '—'}</div>
+              <div class="bh-status" style="color:${st.c}">● ${st.t}</div>
+            </div>
+            <div class="bh-right">
+              <div class="bh-amt">${q.custom ? 'по договору' : money(q.monthlyTotal) + '/мес'}</div>
+              <div class="muted" style="font-size:11.5px">${B.status === 'trial'
+                ? `пробный до ${date(B.trialEndsAt)}`
+                : `следующее списание ${date(B.currentPeriodEnd)}`}${B.daysLeft != null ? ` · ${B.daysLeft} дн.` : ''}</div>
+            </div>
+          </div>
+          ${B.method ? `<div class="bill-method">${ic(I.card)} ${esc(B.method.brand)} ···· ${esc(B.method.last4)}${B.method.exp ? ' · ' + esc(B.method.exp) : ''}</div>`
+            : `<div class="bill-method muted">Способ оплаты не привязан — ${B.payMode === 'stripe' ? 'картой через Stripe' : 'оплата по счёту'}</div>`}
+        </div>
+
+        <!-- выбор тарифа -->
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.layers)}Тариф<span class="sub">платите за платформу, расходники — по себестоимости</span></div>
+          <div class="seg-toggle bill-cycle">
+            <button type="button" class="seg-btn ${B.cycle === 'monthly' ? 'on' : ''}" data-cycle="monthly">Помесячно</button>
+            <button type="button" class="seg-btn ${B.cycle === 'yearly' ? 'on' : ''}" data-cycle="yearly">Годовой <span class="seg-badge">−20%</span></button>
+          </div>
+          <div class="bill-plans">${['broker', 'agency', 'network'].map(planCard).join('')}</div>
+          ${seatsRow}
+          ${totalBlock}
+          <div class="bill-actions">
+            ${q.custom
+              ? `<a class="btn btn-accent" href="https://wa.me/?text=Здравствуйте!%20Интересует%20тариф%20Сеть%20в%20Lumen" target="_blank">${ic(I.chat)}Обсудить проект</a>`
+              : (B.stripeReady
+                ? `<button class="btn btn-accent" id="payStripe">${ic(I.card)}Оплатить картой</button>`
+                : `<button class="btn btn-accent" id="issueInv">${ic(I.doc)}Выставить счёт на ${money(q.billedNow)}</button>`)}
+            <span class="muted" style="font-size:11px">${B.stripeReady ? 'безопасная оплата через Stripe' : 'счёт на банковский перевод (проформа)'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- расходники -->
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.bolt)}Расходники периода<span class="sub">напрямую провайдеру, по себестоимости</span></div>
+          <div class="bill-usage">
+            <div class="bu-cell"><div class="bu-n">${u.outbound}</div><div class="bu-l">WhatsApp-сообщений</div><div class="bu-c">${money(u.waCost)}</div></div>
+            <div class="bu-cell"><div class="bu-n">${u.inbound}</div><div class="bu-l">проходов ИИ</div><div class="bu-c">${money(u.aiCost)}</div></div>
+            <div class="bu-cell bu-total"><div class="bu-n">${money(u.total)}</div><div class="bu-l">итого расходников</div><div class="bu-c">за период</div></div>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:10px">Не входит в подписку и не несёт нашей наценки. Шаблоны WhatsApp тарифицирует Meta, токены ИИ — провайдер модели. Оценка по факту переписки за текущий период.</div>
+        </div>
+
+        <!-- реквизиты -->
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.building)}Реквизиты для счёта</div>
+          <div class="form-row"><label>Юр. название</label><input id="coName" value="${esc((B.company || {}).legalName || '')}"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>VAT / ИНН</label><input id="coVat" value="${esc((B.company || {}).vat || '')}"></div>
+            <div class="form-row"><label>E-mail для счетов</label><input id="coEmail" value="${esc((B.company || {}).email || '')}"></div>
+          </div>
+          <div class="form-row"><label>Адрес</label><input id="coAddr" value="${esc((B.company || {}).address || '')}"></div>
+          <button class="btn btn-sm" id="coSave">Сохранить реквизиты</button>
+        </div>
+
+        <!-- счета -->
+        <div class="glass card">
+          <div class="card-title">${ic(I.doc)}Счета<span class="sub">${B.invoices.length}</span></div>
+          ${B.invoices.length ? `<div class="bill-inv">${B.invoices.map(iv => `
+            <div class="bi-row">
+              <div><b>${esc(iv.id)}</b><div class="muted" style="font-size:11px">${date(iv.at)} · ${esc(iv.planName)} · ${esc(iv.period)}</div></div>
+              <div class="bi-amt">${money(iv.amount)}</div>
+              <div class="bi-st bi-${iv.status}">${iv.status === 'paid' ? 'оплачен' : iv.status === 'issued' ? 'выставлен' : esc(iv.status)}</div>
+            </div>`).join('')}</div>`
+            : `<div class="muted" style="font-size:12.5px;padding:8px 0">Счетов пока нет — появятся после первой оплаты.</div>`}
+        </div>
+      </div>
+    </div>`;
+
+  /* --- взаимодействие --- */
+  const reload = async () => { await PAGES.billing(root); };
+  $$('[data-cycle]', root).forEach(b => b.addEventListener('click', async () => { await api.post('/billing/plan', { cycle: b.dataset.cycle }); await reload(); }));
+  $$('[data-plan]', root).forEach(b => b.addEventListener('click', async () => { await api.post('/billing/plan', { plan: b.dataset.plan }); await reload(); }));
+  const seat = $('#seatVal');
+  if (seat) {
+    $('#seatMinus').addEventListener('click', async () => { await api.post('/billing/plan', { seats: Math.max(1, (+seat.textContent) - 1) }); await reload(); });
+    $('#seatPlus').addEventListener('click', async () => { await api.post('/billing/plan', { seats: (+seat.textContent) + 1 }); await reload(); });
+  }
+  const inv = $('#issueInv');
+  if (inv) inv.addEventListener('click', async () => {
+    const r = await api.post('/billing/invoice', {});
+    if (r.error) { toast('Не получилось', r.error); return; }
+    toast('Счёт выставлен', `${r.invoice.id} на ${money(r.invoice.amount)} — подписка активна`, true);
+    await reload();
+  });
+  const ps = $('#payStripe');
+  if (ps) ps.addEventListener('click', async () => {
+    ps.disabled = true;
+    const r = await api.post('/billing/checkout', {});
+    if (r.url) location.href = r.url;
+    else { toast('Stripe', r.error || 'ошибка'); ps.disabled = false; }
+  });
+  $('#coSave').addEventListener('click', async () => {
+    await api.post('/billing/method', { company: { legalName: $('#coName').value, vat: $('#coVat').value, email: $('#coEmail').value, address: $('#coAddr').value } });
+    toast('Реквизиты сохранены', 'Появятся в счёте', true);
   });
 };
 

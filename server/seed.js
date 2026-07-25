@@ -224,6 +224,7 @@ function seed() {
       },
       stopWords: ['не пишите', 'отпишите', 'удалите номер', 'stop', 'unsubscribe'],
       geoNames: { dubai: 'Дубай', bali: 'Бали', phuket: 'Пхукет', spain: 'Испания' },
+      billing: require('./billing').defBilling(),
     },
     brokers, numbers, templates, sequences,
     leads: L, messages: M, events,

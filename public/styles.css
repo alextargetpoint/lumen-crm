@@ -1786,3 +1786,68 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
   .content.anim .kb-cards .lead-card, .content.anim .prop-card, .content.anim .cl2-card,
   .content.anim .broker-grid > *, .content.anim .cmt-card, .content.anim .feed-item { animation: none !important; }
 }
+
+/* ---------------- Подписка и оплата ---------------- */
+.bill-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 4px 0 10px; }
+.bh-plan { font-size: 22px; font-weight: 700; color: var(--navy-900); letter-spacing: -.3px; }
+.bh-status { font-size: 12.5px; font-weight: 600; margin-top: 4px; }
+.bh-right { text-align: right; }
+.bh-amt { font-size: 18px; font-weight: 700; color: var(--navy-900); }
+.bill-method { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--stroke-soft); font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 7px; }
+.bill-method svg { width: 15px; height: 15px; opacity: .7; }
+
+.bill-cycle { margin: 4px 0 14px; }
+.seg-badge { font-size: 10px; font-weight: 700; color: var(--ok); }
+.seg-btn.on .seg-badge { color: #1E9E6A; }
+
+.bill-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bill-plan { flex-direction: column; align-items: flex-start; text-align: left; padding: 13px 14px; border-radius: var(--r-md); gap: 3px; min-height: 92px; height: auto; white-space: normal; }
+.bp-name { font-size: 13.5px; font-weight: 700; }
+.bp-price { font-size: 15px; font-weight: 700; }
+.bill-plan:not(.on) .bp-price { color: var(--navy-900); }
+.bp-sub { font-size: 10.5px; line-height: 1.3; opacity: .8; }
+
+.bill-seats { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; flex-wrap: wrap; }
+.stepper { display: inline-flex; align-items: center; gap: 10px; background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 10px; padding: 3px 6px; }
+.stepper span { min-width: 26px; text-align: center; font-weight: 700; font-size: 15px; color: var(--navy-900); }
+.stepper .btn { min-width: 30px; height: 28px; justify-content: center; padding: 0; font-size: 17px; }
+
+.bill-total { margin-top: 16px; padding: 14px 16px; border-radius: var(--r-md); background: var(--bg-2); border: 1px solid var(--stroke-soft); }
+.bt-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); padding: 3px 0; }
+.bt-line b { color: var(--navy-900); font-weight: 650; }
+.bt-grand { border-top: 1px solid var(--stroke); margin-top: 6px; padding-top: 9px; font-size: 14px; }
+.bt-grand b { font-size: 16px; }
+.bt-year { color: var(--accent); font-weight: 600; }
+.bt-year b { color: var(--accent); }
+.bt-sum { font-size: 20px; font-weight: 700; color: var(--navy-900); }
+
+.bill-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+.bill-usage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bu-cell { padding: 13px; border-radius: var(--r-md); background: var(--bg-2); border: 1px solid var(--stroke-soft); text-align: center; }
+.bu-total { background: linear-gradient(180deg, rgba(37,99,235,.08), rgba(37,99,235,.02)); border-color: rgba(37,99,235,.25); }
+.bu-n { font-size: 20px; font-weight: 700; color: var(--navy-900); }
+.bu-l { font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
+.bu-c { font-size: 12px; font-weight: 650; color: var(--accent); margin-top: 5px; }
+
+.bill-inv { display: flex; flex-direction: column; gap: 2px; }
+.bi-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--stroke-soft); }
+.bi-row:last-child { border-bottom: 0; }
+.bi-amt { font-weight: 700; color: var(--navy-900); font-size: 13.5px; }
+.bi-st { font-size: 10.5px; font-weight: 650; padding: 3px 9px; border-radius: 999px; }
+.bi-paid { background: rgba(18,133,95,.12); color: var(--ok); }
+.bi-issued { background: rgba(154,103,0,.14); color: var(--warn); }
+.bill-plan.on .bp-price, .bill-plan.on .bp-sub { color: #fff; }
+
+/* биллинг — ночная тема: тёмный navy-текст → светлый ink */
+html[data-night] .bh-plan,
+html[data-night] .bh-amt,
+html[data-night] .bp-name,
+html[data-night] .bill-plan:not(.on) .bp-price,
+html[data-night] .stepper span,
+html[data-night] .bt-line b,
+html[data-night] .bt-sum,
+html[data-night] .bu-n,
+html[data-night] .bi-amt { color: var(--ink); }
+html[data-night] .bu-total { background: linear-gradient(180deg, rgba(143,180,255,.10), rgba(143,180,255,.02)); border-color: rgba(143,180,255,.28); }
+html[data-night] .bill-plan.on .bp-price, html[data-night] .bill-plan.on .bp-sub, html[data-night] .bill-plan.on .bp-name { color: #fff; }
