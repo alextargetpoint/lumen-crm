@@ -1526,3 +1526,31 @@ html[data-night] .lp-ad { color: #BFD3FF; }
 html[data-night] .ob-row .ob-t { color: var(--ink); }
 html[data-night] .ob-row.ok .ob-t { color: var(--ink-3); }
 .gs-m { background: rgba(37, 99, 235, .22); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* ---------- Комментарии под рекламой (comment-to-lead) ---------- */
+.cmt-list { display: flex; flex-direction: column; gap: 12px; }
+.cmt-card { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--stroke-soft); border-radius: 14px; padding: 14px 16px; transition: box-shadow .18s; }
+.cmt-card.new { border-left: 3px solid var(--accent); }
+.cmt-card.hidden { opacity: .55; }
+.cmt-card:hover { box-shadow: var(--shadow); }
+.cmt-ava { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; background: linear-gradient(140deg, #E4813D, #B85C1E); color: #fff; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.cmt-main { flex: 1; min-width: 0; }
+.cmt-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmt-head b { font-size: 13.5px; color: var(--navy-900); }
+.cmt-head .muted { font-size: 12px; }
+.cmt-plat { font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; letter-spacing: .04em; }
+.cmt-plat.ig { background: linear-gradient(120deg, #F58529, #DD2A7B); color: #fff; }
+.cmt-plat.fb { background: #1877F2; color: #fff; }
+.cmt-intent { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--bg-2); color: var(--ink-2); }
+.cmt-intent.hot { background: #FFF0E4; color: #C05B18; }
+.cmt-intent.neg { background: var(--bad-bg); color: var(--bad); }
+.cmt-text { font-size: 14px; line-height: 1.5; margin: 7px 0; color: var(--ink); }
+.cmt-ad { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-3); background: var(--bg-2); padding: 4px 10px; border-radius: 8px; }
+.cmt-ad svg { width: 12px; height: 12px; }
+.cmt-replies { margin: 9px 0; display: flex; flex-direction: column; gap: 5px; }
+.cmt-reply { font-size: 12.5px; line-height: 1.45; padding: 8px 11px; border-radius: 9px; background: var(--bg-2); color: var(--ink-2); }
+.cmt-reply.private { background: #EAF0FF; color: #2447A8; }
+.cmt-acts { display: flex; gap: 7px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.cmt-hidden-badge { font-size: 11px; color: var(--ink-3); margin-top: 8px; }
+html[data-night] .cmt-intent.hot { background: #2B2310; color: #E4A968; }
+html[data-night] .cmt-reply.private { background: #16223C; color: #8FB4FF; }

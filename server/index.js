@@ -28,6 +28,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 
 const llm = require('./llm');
 const wa = require('./wa');
+const comments = require('./comments');
 const playbook = require('./playbook');
 const { MARKET } = require('./marketdata');
 
@@ -52,6 +53,12 @@ const DEFAULT_PASS = 'lumen2026';
     { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', priceFrom: 180000, adsetName: 'RU широкая', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
     { adId: '120209934110255019', name: 'Бали · виллы под сдачу · рилс', adsetName: 'RU номады', campaignName: 'Bali CTWA Август', geo: 'bali' },
   ];
+  /* postId у объявлений — чтобы комментарии под публикацией цеплялись к объявлению */
+  { const ids = { '120211478921230508': '17841400000000001', '120211478921230742': '17841400000000002', '120209934110255019': '17841400000000003' };
+    for (const a of db.ads) if (!a.postId && ids[a.adId]) a.postId = ids[a.adId]; }
+  if (!db.adComments) db.adComments = [];
+  if (!db.settings.comments) db.settings.comments = { autoReply: false, autoHide: false };
+  if (!db.settings.social) db.settings.social = { ig: { enabled: false, token: '', igId: '' }, fb: { enabled: false, token: '', pageId: '' } };
   if (!db.intakeLog) db.intakeLog = [];
   { const a1 = (db.ads || []).find(x => x.adId === '120211478921230508'); if (a1 && !a1.priceFrom) a1.priceFrom = 190000;
     const a2 = (db.ads || []).find(x => x.adId === '120211478921230742'); if (a2 && !a2.priceFrom) a2.priceFrom = 180000; }
@@ -335,6 +342,7 @@ function notifyOutbound(db, lead, event) {
 }
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => notifyOutbound(db, lead, 'lead.handover');
+engine.matchAd = matchAd; /* демо-генератор комментариев цепляет объявление к лиду */
 
 function getSession(req) {
   const cookie = req.headers.cookie || '';
@@ -381,6 +389,7 @@ function publicSettings(db) {
       if (c && (c.botToken || c.token || c.key)) { c.keySet = true; delete c.botToken; delete c.token; delete c.key; }
     }
   }
+  if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -623,7 +632,14 @@ const server = http.createServer(async (req, res) => {
     if (p === '/wa/webhook' && req.method === 'POST') {
       const body = await readBody(req);
       try {
+        const field = body.entry?.[0]?.changes?.[0]?.field;
         const changes = body.entry?.[0]?.changes?.[0]?.value;
+        /* комментарии под публикацией/рекламой (IG field 'comments', FB 'feed' item 'comment') */
+        if (field === 'comments' || (field === 'feed' && changes?.item === 'comment' && changes?.verb === 'add')) {
+          const r0 = comments.ingest(db, { value: changes, platform: field === 'comments' ? 'ig' : 'fb' }, matchAd);
+          if (r0) { try { await comments.autoReply(db, r0); } catch (e) { console.error('[cmt-auto]', e.message); } store.save(); }
+          json(res, 200, { ok: true }); return;
+        }
         if (wa.applyStatuses(db, changes)) store.save();
         const wam = changes?.messages?.[0];
         if (wam && wam.type === 'text') {
@@ -694,6 +710,17 @@ const server = http.createServer(async (req, res) => {
       if (db.intakeLog.length > 200) db.intakeLog.length = 200;
       store.save();
       return json(res, 200, { ok: true, leadId: lead.id, result: entry.result, adMatched: !!(lead.ads && lead.ads.matched) });
+    }
+
+    /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
+    if (p === '/hooks/comment' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const r0 = comments.ingest(db, b, matchAd);
+      if (!r0) return json(res, 200, { ok: true, skipped: 'дубль/пусто' });
+      try { await comments.autoReply(db, r0); } catch (e) { console.error('[cmt-auto]', e.message); }
+      store.save();
+      return json(res, 200, { ok: true, commentId: r0.comment.id, leadId: r0.lead.id, fresh: r0.fresh, intent: r0.comment.intent });
     }
 
     /* ---------------- логотип агентства ---------------- */
@@ -835,8 +862,8 @@ const server = http.createServer(async (req, res) => {
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
     const IS_BROKER = ROLE && ROLE.role === 'broker';
-    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
-    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
+    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice|comments)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
+    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake|comments)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
     /* видимость лида для брокера: только свои */
     const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
     const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; return c2; };
@@ -853,6 +880,50 @@ const server = http.createServer(async (req, res) => {
     /* журнал доступа (только владелец) */
     if (p === '/api/audit' && req.method === 'GET') {
       return json(res, 200, (db.audit || []).slice(0, 200));
+    }
+
+    /* ---------------- КОММЕНТАРИИ под рекламой ---------------- */
+    let mm;
+    if (p === '/api/comments' && req.method === 'GET') {
+      const st = u.searchParams.get('status');
+      let list = (db.adComments || []);
+      if (st) list = list.filter(c => c.status === st);
+      const withLead = list.slice(0, 120).map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, live: comments.ready(db, c.platform) }));
+      return json(res, 200, { comments: withLead, counts: { new: (db.adComments || []).filter(c => c.status === 'new').length, all: (db.adComments || []).length }, autoReply: !!(db.settings.comments || {}).autoReply, connected: { ig: comments.ready(db, 'ig'), fb: comments.ready(db, 'fb') } });
+    }
+    if ((mm = p.match(/^\/api\/comments\/([^/]+)\/reply$/)) && req.method === 'POST') {
+      const c = (db.adComments || []).find(x => x.id === mm[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const kind = b.kind === 'private' ? 'private' : 'public';
+      if (!String(b.text || '').trim()) return json(res, 400, { error: 'пустой ответ' });
+      try {
+        await comments.sendReply(db, c, kind, String(b.text).slice(0, 1000));
+        /* приватный ответ = старт диалога: заводим сообщение лиду и оживляем ИИ */
+        if (kind === 'private') {
+          const lead = db.leads.find(l => l.id === c.leadId);
+          if (lead) {
+            db.messages.push({ id: store.nextId('m'), leadId: lead.id, dir: 'out', via: 'human', channel: c.platform, text: String(b.text).slice(0, 1000), at: Date.now(), status: 'sent' });
+            lead.lastMsgAt = Date.now(); lead.lastDir = 'out'; lead.ai.enabled = true;
+            ai.pushEvent(db, { type: 'msg_in', leadId: lead.id, text: `Ответ в директ ${lead.name} — комментатор уведён в диалог` });
+          }
+        }
+        store.save();
+        return json(res, 200, { ok: true, comment: c });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    if ((mm = p.match(/^\/api\/comments\/([^/]+)\/hide$/)) && req.method === 'POST') {
+      const c = (db.adComments || []).find(x => x.id === mm[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      try { await comments.hide(db, c, b.hidden !== false); store.save(); return json(res, 200, { ok: true, comment: c }); }
+      catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* демо: сгенерировать входящий комментарий (кнопка в UI) */
+    if (p === '/api/comments/simulate' && req.method === 'POST') {
+      const r0 = engine.simulateComment(db);
+      if (r0) { try { await comments.autoReply(db, r0); } catch (e) {} store.save(); }
+      return json(res, 200, { ok: !!r0, comment: r0 ? r0.comment : null });
     }
 
     if (p === '/api/leads' && req.method === 'GET') {
@@ -1174,7 +1245,8 @@ const server = http.createServer(async (req, res) => {
         delete b.channels;
       }
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
-      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);

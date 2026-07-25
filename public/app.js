@@ -300,6 +300,7 @@ const NAV = {
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
   ads:       { name: 'Реклама', icon: I.target, sub: '' },
+  comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: '' },
@@ -539,7 +540,7 @@ const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
-const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency'];
+const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency'];
 function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
@@ -734,7 +735,7 @@ PAGES.overview = async (root) => {
   const [an, events, leads] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads')]);
   const f = an.funnel;
   const inDialog = f.dialog + f.touch;
-  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
+  const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
 
   /* спарклайн: новые лиды по дням за 14 дней */
@@ -1672,7 +1673,7 @@ async function renderChat(id, rebuild) {
       const st = k === 'email' ? ((l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown') : (l.channels || {})[k] || 'unknown';
       return `<span class="ch-pill ${st}" title="${n}: ${st === 'yes' ? 'есть' : st === 'no' ? 'нет' : 'не проверен'}">${n}</span>`;
     }).join('')}${l.activeChannel && l.activeChannel !== 'wa' ? `<span class="mini-badge warn">активен: ${{ tg: 'Telegram', viber: 'Viber', email: 'E-mail' }[l.activeChannel]}</span>` : ''}</div>
-    ${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
+    ${l.source === "ad_comment" ? `<div class="lp-ad" style="background:#FFF0E4;color:#C05B18">${ic(I.chat)}Лид из комментария под рекламой${l.social && l.social.username ? " · @" + esc(l.social.username) : ""}</div>` : ""}${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
     <div style="margin:14px 0 10px">${primary}</div>
     ${l.hint ? `<div class="lc-hint ${l.hint.kind}" style="margin-bottom:10px">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
     <div class="lp-quick">
@@ -2965,6 +2966,80 @@ PAGES.ads = async (root) => {
     toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
     render();
   });
+};
+
+/* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */
+const CMT_INTENT = { price: ['спрашивает цену', 'hot'], payment: ['рассрочка/ипотека', 'hot'], interest: ['проявил интерес', 'hot'], location: ['про локацию', 'hot'], question: ['вопрос', 'hot'], negative: ['негатив', 'neg'], spam: ['спам', 'neg'], other: ['комментарий', ''] };
+PAGES.comments = async (root) => {
+  const st = PAGE_STATE.cmtFilter || '';
+  const d = await api.get('/comments' + (st ? '?status=' + st : ''));
+  const platIcon = (p) => p === 'ig' ? '<span class="cmt-plat ig">IG</span>' : '<span class="cmt-plat fb">FB</span>';
+  const card = (c) => {
+    const [intentTxt, intentCls] = CMT_INTENT[c.intent] || CMT_INTENT.other;
+    const av = (c.author.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const lastReply = (c.replies || [])[c.replies.length - 1];
+    return `<div class="cmt-card ${c.status}" data-cmt="${c.id}">
+      <div class="cmt-ava">${esc(av)}</div>
+      <div class="cmt-main">
+        <div class="cmt-head">
+          ${platIcon(c.platform)}<b>${esc(c.author.name)}</b>${c.author.username ? `<span class="muted">@${esc(c.author.username)}</span>` : ''}
+          <span class="cmt-intent ${intentCls}">${intentTxt}</span>
+          <span class="tb-spacer"></span>
+          <span class="muted" style="font-size:11px">${ago(c.at)}</span>
+        </div>
+        <div class="cmt-text">${esc(c.text)}</div>
+        ${c.adName ? `<div class="cmt-ad">${ic(I.target)}${esc(c.adName)}</div>` : ''}
+        ${(c.replies || []).length ? `<div class="cmt-replies">${c.replies.map(r => `<div class="cmt-reply ${r.kind}">${r.kind === 'private' ? '✉ в директ' : '↩ публично'}${r.live ? '' : ' · демо'}: ${esc(r.text)}</div>`).join('')}</div>` : ''}
+        ${c.status === 'hidden' ? '<div class="cmt-hidden-badge">скрыт</div>' : `<div class="cmt-acts">
+          <button class="btn btn-sm btn-accent" data-cact="private">${ic(I.send)}Ответить в директ</button>
+          <button class="btn btn-sm" data-cact="public">${ic(I.chat)}Публично</button>
+          <button class="btn btn-sm" data-cact="lead">${ic(I.user)}Открыть лида</button>
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost" data-cact="hide" title="Скрыть комментарий">${ic(I.x)}</button>
+        </div>`}
+      </div>
+    </div>`;
+  };
+  root.innerHTML = `
+    ${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I.chat)}Комментарии под рекламой<span class="sub">каждый комментатор — потенциальный лид</span></div>
+      ${[['Всего комментариев', d.counts.all, 'создают карточки лидов'], ['Новых · ждут ответа', d.counts.new, 'ответьте и уведите в директ'], ['ИИ-автоответ', d.autoReply ? 'включён' : 'выключен', 'на горячие: цена/интерес']].map(([k, v, s]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${s}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
+    `, { v: 'right', hue: '#E4813D' })}
+    <div class="glass card mb">
+      <div class="card-title">${ic(I.spark)}ИИ отвечает на комментарии сам<span class="sub">горячие (цена/рассрочка/интерес) → публичный «ответили в личку» + приватный оффер в директ</span></div>
+      <div class="set-row"><div class="sp"><div class="sl">Авто-ответ на горячие комментарии</div><div class="sd">Публичный ответ виден всем под постом — держите тон агентства. Приватный уводит в диалог. ${d.connected.ig || d.connected.fb ? '<b>Каналы подключены.</b>' : 'Сейчас демо — подключите Instagram/Facebook в «Подключениях».'}</div></div>
+        <label class="switch"><input type="checkbox" id="cmtAuto" ${d.autoReply ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+    </div>
+    <div class="filters">
+      ${[['', 'Все'], ['new', 'Новые'], ['replied', 'Отвеченные'], ['hidden', 'Скрытые']].map(([k, n]) => `<button class="chip-t ${st === k ? 'on' : ''}" data-cfilter="${k}">${n}</button>`).join('')}
+      <span class="tb-spacer"></span>
+      <button class="btn btn-sm" id="cmtSim">${ic(I.bolt)}Демо: новый комментарий</button>
+    </div>
+    <div class="cmt-list">${d.comments.length ? d.comments.map(card).join('') : '<div class="glass card empty">Комментариев пока нет. Нажмите «Демо: новый комментарий» или подключите Instagram/Facebook.</div>'}</div>`;
+
+  $('#cmtAuto').addEventListener('change', async (e) => { await api.patch('/settings', { comments: { autoReply: e.target.checked } }); toast(e.target.checked ? 'ИИ будет отвечать на горячие комментарии' : 'Авто-ответ выключен', null, true); });
+  $('#cmtSim').addEventListener('click', async () => { await api.post('/comments/simulate'); render(); });
+  $$('[data-cfilter]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.cmtFilter = b.dataset.cfilter; render(); }));
+  $$('[data-cmt]', root).forEach(card2 => card2.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-cact]'); if (!act) return;
+    const id = card2.dataset.cmt;
+    const c = d.comments.find(x => x.id === id);
+    if (act.dataset.cact === 'lead') return openLeadModal(c.leadId);
+    if (act.dataset.cact === 'hide') return api.post(`/comments/${id}/hide`, { hidden: true }).then(render);
+    /* ответ: инлайн-поле */
+    const kind = act.dataset.cact;
+    modal({
+      title: kind === 'private' ? 'Ответить в директ' : 'Публичный ответ', wide: true,
+      sub: kind === 'private' ? 'Личное сообщение уведёт комментатора в диалог' : 'Виден всем под постом — держите тон агентства',
+      body: `<div class="form-row"><label>${esc(c.author.name)} · «${esc(c.text.slice(0, 80))}»</label>
+        <textarea id="cmtReply" style="min-height:96px">${kind === 'private' ? 'Здравствуйте! Пришлю подборку с ценами и планами оплаты. Подскажите, рассматриваете под переезд или под доход?' : 'Отправили детали вам в личные сообщения 👆'}</textarea></div>`,
+      actions: [{ label: kind === 'private' ? 'Отправить в директ' : 'Ответить публично', cls: 'btn-accent', onClick: async (bd) => {
+        const text = $('#cmtReply', bd).value.trim(); if (!text) return false;
+        await api.post(`/comments/${id}/reply`, { kind, text });
+        toast(kind === 'private' ? 'Ушло в директ — лид в диалоге' : 'Ответ опубликован', null, true); render();
+      } }, { label: 'Отмена' }],
+    });
+  }));
 };
 
 /* ---------------- НОМЕРА ---------------- */

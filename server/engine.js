@@ -481,6 +481,39 @@ function tickSimulator(db) {
     const text = pool[Math.floor(Math.random() * pool.length)];
     inbound(db, lead, text, { simulated: true });
   }
+  /* демо: изредка «капает» комментарий под рекламой — витрина петли comment-to-lead */
+  if (Math.random() < 0.12) {
+    try { const r0 = simulateComment(db); if (r0) { const comments = require('./comments'); comments.autoReply(db, r0).catch(() => {}); } } catch (e) {}
+  }
+}
+
+/* ---------- демо-генератор комментариев под рекламой ---------- */
+const CMT_TEXTS = [
+  'А сколько стоит?', 'Цена?', 'Почём такие?', 'Интересует, есть рассрочка?',
+  'Можно подробнее в личку?', 'Какой район?', 'Реально доходность такая?',
+  'Ипотека для нерезидентов есть?', 'Хочу подборку', 'Что по срокам сдачи?',
+  'А документы как оформляются удалённо?', 'Первоначальный взнос какой?',
+  'Красиво 😍 сколько за студию?', 'Это развод или реально?', 'Подпишись на меня взамен 🙈',
+];
+const CMT_NAMES = [
+  ['Артём Ковалёв', 'artem.kv'], ['Дина Салимова', 'dina_s'], ['Олег Пряхин', 'opryahin'],
+  ['Марго Лебедева', 'margo.leb'], ['Ислам Керимов', 'islam.k'], ['Настя Рой', 'nastya.roi'],
+  ['Виктор Гаас', 'v.gaas'], ['Лейла Мамедова', 'leila.m'], ['Roman P', 'roman_p_dxb'],
+];
+let _cmtSeq = 1;
+function simulateComment(db) {
+  const comments = require('./comments');
+  const ads = (db.ads || []).filter(a => a.postId);
+  if (!ads.length) return null;
+  const ad = ads[Math.floor(Math.random() * ads.length)];
+  const [name, username] = CMT_NAMES[Math.floor(Math.random() * CMT_NAMES.length)];
+  const text = CMT_TEXTS[Math.floor(Math.random() * CMT_TEXTS.length)];
+  const platform = ad.geo === 'bali' ? 'ig' : (Math.random() < 0.6 ? 'ig' : 'fb');
+  return comments.ingest(db, {
+    platform, postId: ad.postId, adId: ad.adId,
+    commentId: 'demo_c_' + (_cmtSeq++) + '_' + Date.now(),
+    userId: 'demo_u_' + username, name, username, text,
+  }, module.exports.matchAd);
 }
 
 /* ---------- единая обработка входящего (вебхук / симулятор / демо-кнопка) ---------- */
@@ -651,4 +684,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify };
+module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment };
