@@ -720,7 +720,7 @@ const server = http.createServer(async (req, res) => {
       if (!r0) return json(res, 200, { ok: true, skipped: 'дубль/пусто' });
       try { await comments.autoReply(db, r0); } catch (e) { console.error('[cmt-auto]', e.message); }
       store.save();
-      return json(res, 200, { ok: true, commentId: r0.comment.id, leadId: r0.lead.id, fresh: r0.fresh, intent: r0.comment.intent });
+      return json(res, 200, { ok: true, commentId: r0.comment.id, leadId: r0.lead ? r0.lead.id : null, fresh: r0.fresh, intent: r0.comment.intent, junk: !!r0.junk, moderated: !!r0.comment.moderated });
     }
 
     /* ---------------- логотип агентства ---------------- */
@@ -888,8 +888,8 @@ const server = http.createServer(async (req, res) => {
       const st = u.searchParams.get('status');
       let list = (db.adComments || []);
       if (st) list = list.filter(c => c.status === st);
-      const withLead = list.slice(0, 120).map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, live: comments.ready(db, c.platform) }));
-      return json(res, 200, { comments: withLead, counts: { new: (db.adComments || []).filter(c => c.status === 'new').length, all: (db.adComments || []).length }, autoReply: !!(db.settings.comments || {}).autoReply, connected: { ig: comments.ready(db, 'ig'), fb: comments.ready(db, 'fb') } });
+      const withLead = list.slice(0, 120).map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, live: comments.ready(db, c.platform), priv: comments.privateState(c), hasPublic: (c.replies || []).some(r => r.kind === 'public') }));
+      return json(res, 200, { comments: withLead, counts: { new: (db.adComments || []).filter(c => c.status === 'new').length, all: (db.adComments || []).length }, autoReply: !!(db.settings.comments || {}).autoReply, autoHide: !!(db.settings.comments || {}).autoHide, connected: { ig: comments.ready(db, 'ig'), fb: comments.ready(db, 'fb') } });
     }
     if ((mm = p.match(/^\/api\/comments\/([^/]+)\/reply$/)) && req.method === 'POST') {
       const c = (db.adComments || []).find(x => x.id === mm[1]);

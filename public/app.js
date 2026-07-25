@@ -2987,45 +2987,97 @@ PAGES.comments = async (root) => {
           <span class="tb-spacer"></span>
           <span class="muted" style="font-size:11px">${ago(c.at)}</span>
         </div>
-        <div class="cmt-text">${esc(c.text)}</div>
+        <div class="cmt-text">${esc(c.text)}${c.moderated ? '<span class="cmt-mod">🧹 модерация</span>' : ''}</div>
         ${c.adName ? `<div class="cmt-ad">${ic(I.target)}${esc(c.adName)}</div>` : ''}
         ${(c.replies || []).length ? `<div class="cmt-replies">${c.replies.map(r => `<div class="cmt-reply ${r.kind}">${r.kind === 'private' ? '✉ в директ' : '↩ публично'}${r.live ? '' : ' · демо'}: ${esc(r.text)}</div>`).join('')}</div>` : ''}
-        ${c.status === 'hidden' ? '<div class="cmt-hidden-badge">скрыт</div>' : `<div class="cmt-acts">
-          <button class="btn btn-sm btn-accent" data-cact="private">${ic(I.send)}Ответить в директ</button>
-          <button class="btn btn-sm" data-cact="public">${ic(I.chat)}Публично</button>
-          <button class="btn btn-sm" data-cact="lead">${ic(I.user)}Открыть лида</button>
+        ${c.status === 'hidden'
+          ? `<div class="cmt-acts"><span class="cmt-hidden-badge">${c.moderated ? 'скрыт авто-модерацией' : 'скрыт'}</span><span class="tb-spacer"></span><button class="btn btn-sm" data-cact="unhide">Восстановить</button></div>`
+          : `<div class="cmt-acts">
+          ${c.leadId ? `${c.priv && c.priv.open
+            ? `<button class="btn btn-sm btn-accent" data-cact="private">${ic(I.send)}Ответить в директ${c.priv.daysLeft <= 3 ? ` · окно ${c.priv.daysLeft} дн` : ''}</button>`
+            : `<button class="btn btn-sm" disabled title="${c.priv && c.priv.used ? 'Meta разрешает 1 личный ответ на комментарий' : 'Окно директа истекло (7 дней)'}">${ic(I.send)}Директ ${c.priv && c.priv.used ? 'использован' : 'закрыт'}</button>`}
+          <button class="btn btn-sm ${c.hasPublic ? 'btn-ghost' : ''}" data-cact="public">${ic(I.chat)}${c.hasPublic ? 'Ещё публично' : 'Публично'}</button>
+          <button class="btn btn-sm" data-cact="lead">${ic(I.user)}Открыть лида</button>` : `<span class="muted" style="font-size:12px">${c.moderated ? 'помечен как ' + ((CMT_INTENT[c.intent] || [])[0] || 'мусор') + ' — лид не создан' : ''}</span>`}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-cact="hide" title="Скрыть комментарий">${ic(I.x)}</button>
         </div>`}
       </div>
     </div>`;
   };
+  /* фильтры/сортировка на клиенте (данных немного) */
+  const adF = PAGE_STATE.cmtAd || '';
+  const platF = PAGE_STATE.cmtPlat || '';
+  const sort = PAGE_STATE.cmtSort || 'new';
+  const limit = PAGE_STATE.cmtLimit || 20;
+  const isHot = (c) => (CMT_INTENT[c.intent] || [])[1] === 'hot';
+  /* список объявлений для дропдауна (по числу комментариев) */
+  const adAgg = {};
+  d.comments.forEach(c => { const k = c.adId || 'none'; (adAgg[k] = adAgg[k] || { name: c.adName || 'Без объявления', n: 0 }).n++; });
+  const adOpts = Object.entries(adAgg).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `<option value="${k}" ${adF === k ? 'selected' : ''}>${esc(v.name)} · ${v.n}</option>`).join('');
+  let list = d.comments.slice();
+  if (adF) list = list.filter(c => (c.adId || 'none') === adF);
+  if (platF) list = list.filter(c => c.platform === platF);
+  if (sort === 'old') list.sort((a, b) => a.at - b.at);
+  else if (sort === 'hot') list.sort((a, b) => (isHot(b) - isHot(a)) || b.at - a.at);
+  else if (sort !== 'ad') list.sort((a, b) => b.at - a.at);
+  /* тело: группировка по объявлению ИЛИ плоский список с лимитом */
+  let body;
+  if (!list.length) body = '<div class="glass card empty">Ничего не найдено под фильтр.</div>';
+  else if (sort === 'ad') {
+    const groups = {};
+    list.forEach(c => { const k = c.adId || 'none'; (groups[k] = groups[k] || { name: c.adName || 'Без объявления', items: [] }).items.push(c); });
+    body = Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length).map(([k, g]) => `
+      <div class="cmt-group"><div class="cmt-group-hd">${ic(I.target)}${esc(g.name)}<span class="cmt-group-n">${g.items.length}</span></div>
+      ${g.items.slice(0, 30).map(card).join('')}</div>`).join('');
+  } else {
+    const shown = list.slice(0, limit);
+    body = shown.map(card).join('') + (list.length > limit ? `<button class="btn cmt-more" id="cmtMore">Показать ещё ${Math.min(20, list.length - limit)} из ${list.length - limit}</button>` : '');
+  }
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
       <div class="ha-title">${ic(I.chat)}Комментарии под рекламой<span class="sub">каждый комментатор — потенциальный лид</span></div>
       ${[['Всего комментариев', d.counts.all, 'создают карточки лидов'], ['Новых · ждут ответа', d.counts.new, 'ответьте и уведите в директ'], ['ИИ-автоответ', d.autoReply ? 'включён' : 'выключен', 'на горячие: цена/интерес']].map(([k, v, s]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${s}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
     <div class="glass card mb">
-      <div class="card-title">${ic(I.spark)}ИИ отвечает на комментарии сам<span class="sub">горячие (цена/рассрочка/интерес) → публичный «ответили в личку» + приватный оффер в директ</span></div>
-      <div class="set-row"><div class="sp"><div class="sl">Авто-ответ на горячие комментарии</div><div class="sd">Публичный ответ виден всем под постом — держите тон агентства. Приватный уводит в диалог. ${d.connected.ig || d.connected.fb ? '<b>Каналы подключены.</b>' : 'Сейчас демо — подключите Instagram/Facebook в «Подключениях».'}</div></div>
+      <div class="card-title">${ic(I.spark)}ИИ ведёт комментарии сам<span class="sub">автоответ на горячие + авто-модерация спама и оскорблений</span></div>
+      <div class="set-row"><div class="sp"><div class="sl">Авто-ответ на горячие комментарии</div><div class="sd">Публичный ответ (текст каждый раз варьируется — чтобы Meta не сочла спамом) + приватный оффер уводит в директ. ${d.connected.ig || d.connected.fb ? '<b>Каналы подключены.</b>' : 'Сейчас демо — подключите Instagram/Facebook в «Подключениях».'}</div></div>
         <label class="switch"><input type="checkbox" id="cmtAuto" ${d.autoReply ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="set-row"><div class="sp"><div class="sl">Авто-модерация: чистить спам и оскорбления</div><div class="sd">Реклама, ссылки, мат и токсичные комментарии (в т.ч. на другом языке) скрываются автоматически — лид-мусор не создаётся. Без токенов Meta прячем локально.</div></div>
+        <label class="switch"><input type="checkbox" id="cmtHide" ${d.autoHide ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="set-row"><div class="sp"><div class="sl">Темп автоответов (защита от бана)</div><div class="sd">Не чаще <input id="cmtGap" type="number" style="width:56px" value="${(STATE.settings.comments || {}).minGapSec ?? 45}"> сек между ответами и до <input id="cmtHour" type="number" style="width:56px" value="${(STATE.settings.comments || {}).perHour ?? 20}"> в час — залп одинаковых ответов Meta считает спамом.</div></div></div>
     </div>
     <div class="filters">
       ${[['', 'Все'], ['new', 'Новые'], ['replied', 'Отвеченные'], ['hidden', 'Скрытые']].map(([k, n]) => `<button class="chip-t ${st === k ? 'on' : ''}" data-cfilter="${k}">${n}</button>`).join('')}
       <span class="tb-spacer"></span>
       <button class="btn btn-sm" id="cmtSim">${ic(I.bolt)}Демо: новый комментарий</button>
     </div>
-    <div class="cmt-list">${d.comments.length ? d.comments.map(card).join('') : '<div class="glass card empty">Комментариев пока нет. Нажмите «Демо: новый комментарий» или подключите Instagram/Facebook.</div>'}</div>`;
+    <div class="cmt-controls">
+      <select id="cmtAdSel"><option value="">Все объявления</option>${adOpts}</select>
+      <select id="cmtPlatSel">${[['', 'IG и Facebook'], ['ig', 'Instagram'], ['fb', 'Facebook']].map(([k, n]) => `<option value="${k}" ${platF === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <select id="cmtSortSel">${[['new', 'Сначала новые'], ['old', 'Сначала старые'], ['hot', 'Сначала горячие'], ['ad', 'Сгруппировать по объявлению']].map(([k, n]) => `<option value="${k}" ${sort === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <span class="muted" style="font-size:12px;margin-left:auto">${list.length} из ${d.comments.length}</span>
+    </div>
+    <div class="cmt-list">${body}</div>`;
 
   $('#cmtAuto').addEventListener('change', async (e) => { await api.patch('/settings', { comments: { autoReply: e.target.checked } }); toast(e.target.checked ? 'ИИ будет отвечать на горячие комментарии' : 'Авто-ответ выключен', null, true); });
+  $('#cmtHide').addEventListener('change', async (e) => { await api.patch('/settings', { comments: { autoHide: e.target.checked } }); toast(e.target.checked ? 'Спам и оскорбления будут скрываться сами' : 'Авто-модерация выключена', null, true); });
+  const saveThrottle = () => api.patch('/settings', { comments: { minGapSec: Math.max(5, +$('#cmtGap').value || 45), perHour: Math.max(1, +$('#cmtHour').value || 20) } });
+  $('#cmtGap').addEventListener('change', saveThrottle);
+  $('#cmtHour').addEventListener('change', saveThrottle);
   $('#cmtSim').addEventListener('click', async () => { await api.post('/comments/simulate'); render(); });
-  $$('[data-cfilter]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.cmtFilter = b.dataset.cfilter; render(); }));
+  $$('[data-cfilter]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.cmtFilter = b.dataset.cfilter; PAGE_STATE.cmtLimit = 20; render(); }));
+  $('#cmtAdSel').addEventListener('change', (e) => { PAGE_STATE.cmtAd = e.target.value; PAGE_STATE.cmtLimit = 20; render(); });
+  $('#cmtPlatSel').addEventListener('change', (e) => { PAGE_STATE.cmtPlat = e.target.value; PAGE_STATE.cmtLimit = 20; render(); });
+  $('#cmtSortSel').addEventListener('change', (e) => { PAGE_STATE.cmtSort = e.target.value; render(); });
+  const moreBtn = $('#cmtMore', root);
+  if (moreBtn) moreBtn.addEventListener('click', () => { PAGE_STATE.cmtLimit = (PAGE_STATE.cmtLimit || 20) + 20; render(); });
   $$('[data-cmt]', root).forEach(card2 => card2.addEventListener('click', (e) => {
     const act = e.target.closest('[data-cact]'); if (!act) return;
     const id = card2.dataset.cmt;
     const c = d.comments.find(x => x.id === id);
     if (act.dataset.cact === 'lead') return openLeadModal(c.leadId);
     if (act.dataset.cact === 'hide') return api.post(`/comments/${id}/hide`, { hidden: true }).then(render);
+    if (act.dataset.cact === 'unhide') return api.post(`/comments/${id}/hide`, { hidden: false }).then(render);
     /* ответ: инлайн-поле */
     const kind = act.dataset.cact;
     modal({
