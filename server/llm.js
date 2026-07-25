@@ -69,11 +69,12 @@ const playbook = require('./playbook');
 
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
+  const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
   const crit = db.settings.criteria[lead.geo] || {};
   const q = lead.quals;
   const missing = ['purpose', 'timeline', 'budget', 'type'].filter(a => !q[a]);
   const axisRu = { purpose: 'цель покупки', timeline: 'срок покупки', budget: 'бюджет', type: 'тип объекта' };
-  return `Ты — первая линия квалификации агентства недвижимости «${db.settings.agency.name}» (направление: ${g}). Ты ведёшь WhatsApp-диалог с лидом по имени ${lead.name.split(' ')[0]}.
+  return `Ты — первая линия квалификации агентства недвижимости «${db.settings.agency.name}». Агентство работает по направлениям: ${allGeos}. Сейчас клиент интересуется направлением «${g}» — если он назовёт другое из наших направлений, спокойно работай с ним и НЕ говори, что вы только по «${g}». Ты ведёшь WhatsApp-диалог с лидом по имени ${lead.name.split(' ')[0]}.
 
 РЕГЛАМЕНТ:
 - Минимальный бюджет направления: ${crit.budgetMin} ${crit.currency}. Если клиент назвал бюджет ниже — НЕ отказывай, предложи down-sell: ${crit.downsell}

@@ -55,10 +55,27 @@ function hasStopWord(db, text) {
   return (db.settings.stopWords || []).some(w => t.includes(w.toLowerCase()));
 }
 
+/* ---------- направление из слов клиента (только те, что агентство ведёт) ---------- */
+const GEO_HINTS = {
+  dubai: /дуба(й|е|я)|dubai|оаэ|эмират/i,
+  bali: /бали|bali|индонез/i,
+  phuket: /пхукет|пукет|phuket|таил?анд|thailand/i,
+  spain: /испани|spain|барселон|коста\s?бланка|марбель|аликанте|валенси/i,
+  oman: /оман\b|oman|маскат/i,
+};
+function detectGeo(text, db) {
+  const geos = db.settings.agency.geos || [];
+  for (const g of geos) { if (GEO_HINTS[g] && GEO_HINTS[g].test(text)) return g; }
+  return null;
+}
+
 /* ---------- скрининг лида по всей переписке ---------- */
 function screen(db, lead) {
   const inbound = db.messages.filter(m => m.leadId === lead.id && m.dir === 'in');
   const q = lead.quals;
+  /* направление из сообщений клиента — иначе всё уедет в дефолтный Дубай */
+  const geoDet = detectGeo(inbound.map(m => m.text).join(' '), db);
+  if (geoDet) lead.geo = geoDet;
   for (const m of inbound) {
     if (!q.purpose) { const v = extractPurpose(m.text); if (v) q.purpose = { value: v, quote: clip(m.text) }; }
     if (!q.timeline) { const v = extractTimeline(m.text); if (v) q.timeline = { value: v, quote: clip(m.text) }; }
