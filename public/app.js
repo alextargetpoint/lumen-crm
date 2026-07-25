@@ -2540,19 +2540,17 @@ PAGES.properties = async (root) => {
     </div>
     <div class="muted" style="font-size:11px;margin:-6px 0 12px">Карточку — на папку · клик по папке — фильтр и подборка</div>
     <div class="prop-grid">
-      ${list.map(pr => `<div class="glass prop-card rich" data-pr="${pr.id}" data-dragprop="${pr.id}">
+      ${list.map(pr => `<div class="glass prop-card v2" data-pr="${pr.id}" data-dragprop="${pr.id}">
         ${propCover(pr)}
-        <div class="prop-body">
-          <div class="prop-top"><div><div class="prop-name">${esc(pr.name)}</div>
-            <div class="muted" style="font-size:11.5px">${esc(pr.area)}${pr.developer && pr.developer !== '—' ? ' · ' + esc(pr.developer) : ''}</div></div>
-            <span class="badge ${pr.market === 'offplan' ? 'acc' : 'ok'}">${pr.market === 'offplan' ? 'первичка' : 'вторичка'}</span></div>
-          <div class="prop-price">от ${fmt(pr)}</div>
-          <div class="prop-meta"><span>${esc(pr.type)}</span><span>${esc(pr.handover)}</span><span>${esc(pr.payment)}</span></div>
-          <div class="prop-foot">
-            ${(pr.tags || []).slice(0, 3).map(t => `<span class="mini-badge ai">${esc(t)}</span>`).join('')}
-            <span class="tb-spacer"></span>
-            <span class="muted" style="font-size:10.5px">${(pr.images || []).length ? (pr.images.length + ' фото · ') : ''}${(pr.layouts || []).length ? (pr.layouts.length + ' план. · ') : ''}${(pr.materials || []).length ? pr.materials.length + ' док.' : ''}</span>
+        <span class="pc2-market ${pr.market === 'offplan' ? 'off' : 'sec'}">${pr.market === 'offplan' ? 'Первичка' : 'Вторичка'}</span>
+        <div class="pc2-body">
+          <div class="pc2-name">${esc(pr.name)}</div>
+          ${pr.area || (pr.developer && pr.developer !== '—') ? `<div class="pc2-loc">${esc(pr.area || '')}${pr.developer && pr.developer !== '—' ? (pr.area ? ' · ' : '') + esc(pr.developer) : ''}</div>` : ''}
+          <div class="pc2-price-row">
+            <span class="pc2-price">${pr.priceFrom ? 'от ' + fmt(pr) : '—'}</span>
+            ${pr.roi ? `<span class="pc2-roi">${esc(pr.roi)}</span>` : ''}
           </div>
+          ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}
         </div>
       </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
     </div>
