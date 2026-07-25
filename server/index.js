@@ -1419,6 +1419,22 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, r);
     }
+    if (p === '/api/properties/bulk' && req.method === 'POST') {
+      const b = await readBody(req);
+      const ids = Array.isArray(b.ids) ? b.ids : [];
+      const targets = db.properties.filter(x => ids.includes(x.id));
+      let done = 0;
+      for (const pr of targets) {
+        if (b.action === 'folder') { pr.folderId = b.value || null; done++; }
+        else if (b.action === 'tag' && b.value) { pr.tags = [...new Set([...(pr.tags || []), String(b.value).slice(0, 40)])]; done++; }
+        else if (b.action === 'geo' && b.value) { pr.geo = String(b.value); done++; }
+        else if (b.action === 'market' && b.value) { pr.market = b.value === 'secondary' ? 'secondary' : 'offplan'; done++; }
+        else if (b.action === 'delete') { done++; }
+      }
+      if (b.action === 'delete') db.properties = db.properties.filter(x => !ids.includes(x.id));
+      store.save();
+      return json(res, 200, { ok: true, done });
+    }
     if (p === '/api/properties' && req.method === 'POST') {
       const b = await readBody(req);
       const pr = { id: store.nextId('pr'), name: b.name || 'Объект', area: b.area || '', developer: b.developer || '', market: b.market === 'secondary' ? 'secondary' : 'offplan', type: b.type || '', beds: +b.beds || 0, priceFrom: +b.priceFrom || 0, currency: b.currency || 'USD', handover: b.handover || '', payment: b.payment || '', geo: b.geo || 'dubai', tags: b.tags || [], materials: [], note: b.note || '' };
@@ -1510,6 +1526,15 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- подборки ---------------- */
     if (p === '/api/collections' && req.method === 'GET') {
       return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: db.settings.hooks.secret })));
+    }
+    if (p === '/api/collections/bulk' && req.method === 'POST') {
+      const b = await readBody(req);
+      const ids = Array.isArray(b.ids) ? b.ids : [];
+      let done = 0;
+      if (b.action === 'folder') { for (const c of db.collections) if (ids.includes(c.id)) { c.folderId = b.value || null; done++; } }
+      else if (b.action === 'delete') { const before = db.collections.length; db.collections = db.collections.filter(c => !ids.includes(c.id)); done = before - db.collections.length; }
+      store.save();
+      return json(res, 200, { ok: true, done });
     }
     if (p === '/api/collections' && req.method === 'POST') {
       const b = await readBody(req);

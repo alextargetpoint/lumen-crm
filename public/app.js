@@ -897,128 +897,15 @@ PAGES.overview = async (root) => {
   });
 };
 
-/* ---------------- ВОРОНКА (канбан) ---------------- */
 /* ============================================================
-   Массовое управление лидами на Воронке: multi-select (Cmd/Shift/
-   чекбокс), контекстное меню (правый клик), панель массовых действий,
-   горячие клавиши. Работает и в канбане, и в таблице.
+   УНИВЕРСАЛЬНЫЙ ДВИЖОК МАССОВОГО ВЫДЕЛЕНИЯ (лиды/объекты/подборки/…)
+   multi-select (Cmd/Shift/чекбокс), контекст-меню (правый клик),
+   панель массовых действий, горячие клавиши. Конфиг на раздел.
    ============================================================ */
-let LEAD_SEL = new Set();
-let LEAD_SEL_ANCHOR = null;
-
-function wireLeadSelect(root, leads) {
-  const items = $$('.lead-card, [data-row]', root);
-  const orderIds = items.map(el => el.dataset.id || el.dataset.row);
-  const idOf = (el) => el.dataset.id || el.dataset.row;
-  const toggle = (id) => { LEAD_SEL.has(id) ? LEAD_SEL.delete(id) : LEAD_SEL.add(id); };
-  const selectRange = (fromId, toId) => {
-    const a = orderIds.indexOf(fromId), b = orderIds.indexOf(toId);
-    if (a < 0 || b < 0) return;
-    const [lo, hi] = a < b ? [a, b] : [b, a];
-    for (let i = lo; i <= hi; i++) LEAD_SEL.add(orderIds[i]);
-  };
-  items.forEach(el => {
-    const id = idOf(el);
-    el.addEventListener('mousedown', (e) => { if (e.shiftKey) e.preventDefault(); }); /* не выделять текст при Shift */
-    el.addEventListener('click', (e) => {
-      if (DRAG.moved) return;
-      const chk = e.target.closest('[data-check]');
-      /* Shift = выделить диапазон. Без якоря — от первой карточки этой колонки (в таблице — от первой строки): кликнул 10-ю → выделились 1–10 */
-      if (e.shiftKey) {
-        e.preventDefault(); e.stopPropagation();
-        let anchor = LEAD_SEL_ANCHOR;
-        if (!anchor) { const col = el.closest('.kb-col'); const first = col ? col.querySelector('.lead-card') : items[0]; anchor = first ? idOf(first) : orderIds[0]; }
-        selectRange(anchor, id); LEAD_SEL_ANCHOR = anchor; refreshSel(root); return;
-      }
-      if (chk || e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); toggle(id); LEAD_SEL_ANCHOR = id; refreshSel(root); return; }
-      if (LEAD_SEL.size) { LEAD_SEL.clear(); refreshSel(root); return; } /* клик мимо снимает выделение */
-      openLeadModal(id);
-    });
-    el.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      if (!LEAD_SEL.has(id)) { if (!(e.metaKey || e.ctrlKey)) LEAD_SEL.clear(); LEAD_SEL.add(id); LEAD_SEL_ANCHOR = id; refreshSel(root); }
-      openLeadCtxMenu(e.clientX, e.clientY, root);
-    });
-  });
-  /* «выделить всю колонку/стадию» — клик по счётчику в шапке */
-  $$('[data-selcol]', root).forEach(h => h.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const col = h.closest('.kb-col');
-    const ids = $$('.lead-card', col).map(c => c.dataset.id);
-    const allSel = ids.length && ids.every(id => LEAD_SEL.has(id));
-    ids.forEach(id => allSel ? LEAD_SEL.delete(id) : LEAD_SEL.add(id)); /* повторный клик — снять */
-    if (ids.length) LEAD_SEL_ANCHOR = ids[0];
-    refreshSel(root);
-  }));
-  /* таблица: чекбокс «выделить всё» в шапке */
-  const selAll = $('#tblSelAll', root);
-  if (selAll) selAll.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const all = orderIds.length && orderIds.every(id => LEAD_SEL.has(id));
-    orderIds.forEach(id => all ? LEAD_SEL.delete(id) : LEAD_SEL.add(id));
-    refreshSel(root);
-  });
-  renderBulkBar(root);
-}
-
-function refreshSel(root) {
-  $$('.lead-card, [data-row]', root || document).forEach(el => el.classList.toggle('sel', LEAD_SEL.has(el.dataset.id || el.dataset.row)));
-  renderBulkBar(root);
-}
-
-async function bulkLeads(action, value, confirmMsg) {
-  const ids = [...LEAD_SEL];
-  if (!ids.length) return;
-  const run = async () => {
-    const r = await api.post('/leads/bulk', { ids, action, value });
-    LEAD_SEL.clear(); LEAD_SEL_ANCHOR = null;
-    toast(`Готово: ${r.done} лид(ов)`, null, true);
-    render();
-  };
-  if (confirmMsg) modal({ title: confirmMsg.title, sub: confirmMsg.sub, actions: [{ label: confirmMsg.ok, cls: confirmMsg.danger ? 'btn-danger' : 'btn-accent', onClick: run }, { label: 'Отмена' }] });
-  else run();
-}
-
-/* меню выбора стадии/брокера/тега — переиспользуется панелью и контекстным меню */
-function bulkStageMenu(x, y) {
-  ctxPopup(x, y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => bulkLeads('stage', s.id) })));
-}
-function bulkBrokerMenu(x, y) {
-  ctxPopup(x, y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => bulkLeads('broker', b.id) })));
-}
-function bulkTagPrompt() {
-  modal({ title: 'Добавить тег выбранным', body: '<div class="form-row"><label>Тег</label><input id="bbTag" placeholder="напр. VIP / перезвонить / горячий"></div>',
-    actions: [{ label: 'Пометить', cls: 'btn-accent', onClick: (bd) => { const v = $('#bbTag', bd).value.trim(); if (v) bulkLeads('tag', v); } }, { label: 'Отмена' }] });
-}
-
-function renderBulkBar(root) {
-  let bar = $('#bulkBar');
-  if (!LEAD_SEL.size || CUR !== 'funnel') { if (bar) bar.remove(); return; }
-  if (!bar) { bar = el('<div id="bulkBar" class="bulk-bar"></div>'); document.body.appendChild(bar); }
-  bar.innerHTML = `<span class="bb-count">${LEAD_SEL.size}</span><span class="bb-lbl">выбрано</span>
-    <button class="btn btn-sm" data-bb="stage">${ic(I.arrow)}Стадия</button>
-    <button class="btn btn-sm" data-bb="broker">${ic(I.handover)}Брокеру</button>
-    <button class="btn btn-sm" data-bb="tag">${ic(I.plus)}Тег</button>
-    <button class="btn btn-sm" data-bb="aion" title="Включить ИИ">${ic(I.spark)}ИИ вкл</button>
-    <button class="btn btn-sm" data-bb="aioff" title="Выключить ИИ">ИИ выкл</button>
-    <button class="btn btn-sm" data-bb="archive">${ic(I.moon)}В архив</button>
-    <button class="btn btn-sm btn-danger" data-bb="delete">${ic(I.x)}Удалить</button>
-    <span class="bb-sp"></span>
-    <button class="btn-ghost bb-clear" data-bb="clear" title="Снять выделение (Esc)">${ic(I.x)}</button>`;
-  bar.onclick = (e) => {
-    const b = e.target.closest('[data-bb]'); if (!b) return;
-    const r = b.getBoundingClientRect();
-    const act = b.dataset.bb;
-    if (act === 'stage') bulkStageMenu(r.left, r.top - 8);
-    else if (act === 'broker') bulkBrokerMenu(r.left, r.top - 8);
-    else if (act === 'tag') bulkTagPrompt();
-    else if (act === 'aion') bulkLeads('ai', true);
-    else if (act === 'aioff') bulkLeads('ai', false);
-    else if (act === 'archive') bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size} лид(ов)?`, sub: 'Уйдут в «Потерянные», ИИ выключится. Их можно вернуть вручную.', ok: 'В архив' });
-    else if (act === 'delete') bulkLeads('delete', null, { title: `Удалить ${LEAD_SEL.size} лид(ов) навсегда?`, sub: 'Карточки и переписка удалятся безвозвратно. Обычно лучше «В архив».', ok: 'Удалить навсегда', danger: true });
-    else if (act === 'clear') { LEAD_SEL.clear(); refreshSel(root); }
-  };
-}
+const SEL_STORE = {};                 /* Set выделения на раздел (переживает render) */
+const SEL_ANCHOR = {};
+let SELCTX = null;                     /* активный конфиг (для панели/хоткеев) */
+function selSet(kind) { return SEL_STORE[kind] || (SEL_STORE[kind] = new Set()); }
 
 /* универсальный контекст-поповер (в body, fixed) */
 function ctxPopup(x, y, items) {
@@ -1033,43 +920,191 @@ function ctxPopup(x, y, items) {
 }
 function closeCtx() { const p = $('#ctxPop'); if (p) p.remove(); }
 
-function openLeadCtxMenu(x, y, root) {
-  const one = LEAD_SEL.size === 1 ? [...LEAD_SEL][0] : null;
-  const items = [];
-  if (one) items.push({ ic: I.user, label: 'Открыть карточку', onClick: () => openLeadModal(one) });
-  items.push({ ic: I.arrow, label: `Сменить стадию (${LEAD_SEL.size})`, onClick: () => bulkStageMenu(x + 12, y) });
-  items.push({ ic: I.handover, label: 'Передать брокеру', onClick: () => bulkBrokerMenu(x + 12, y) });
-  items.push({ ic: I.plus, label: 'Добавить тег', onClick: bulkTagPrompt });
-  items.push({ ic: I.spark, label: 'Включить ИИ', onClick: () => bulkLeads('ai', true) });
-  items.push({ label: 'Выключить ИИ', onClick: () => bulkLeads('ai', false) });
-  if (one) { const l = LEAD_LOOKUP[one]; if (l) items.push({ ic: I.chat, label: 'Написать в WhatsApp', onClick: () => window.open('https://wa.me/' + l.phone.replace(/\D/g, ''), '_blank') }); }
-  items.push({ sep: true });
-  items.push({ ic: I.moon, label: `В архив (${LEAD_SEL.size})`, onClick: () => bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size}?`, sub: 'В «Потерянные», ИИ off.', ok: 'В архив' }) });
-  items.push({ ic: I.x, label: 'Удалить навсегда', danger: true, onClick: () => bulkLeads('delete', null, { title: `Удалить ${LEAD_SEL.size} навсегда?`, sub: 'Безвозвратно.', ok: 'Удалить', danger: true }) });
+/* массовый вызов на сервер по конфигу раздела */
+async function selBulk(cfg, action, value, confirmMsg) {
+  const ids = [...selSet(cfg.kind)];
+  if (!ids.length) return;
+  const run = async () => {
+    const r = await api.post(cfg.bulkUrl, { ids, action, value });
+    selSet(cfg.kind).clear(); SEL_ANCHOR[cfg.kind] = null;
+    celebrate(action, r.done || ids.length, cfg);          /* анимированный поп-ап итога */
+    render();
+  };
+  if (confirmMsg) modal({ title: confirmMsg.title, sub: confirmMsg.sub, actions: [{ label: confirmMsg.ok, cls: confirmMsg.danger ? 'btn-danger' : 'btn-accent', onClick: run }, { label: 'Отмена' }] });
+  else run();
+}
+
+function selRefresh(cfg) {
+  $$(cfg.itemSel, document).forEach(el => el.classList.toggle('sel', selSet(cfg.kind).has(el.dataset.id || el.dataset.row)));
+  selBulkBar(cfg);
+}
+
+function selBulkBar(cfg) {
+  let bar = $('#bulkBar');
+  const sel = selSet(cfg.kind);
+  if (!sel.size || CUR !== cfg.kind) { if (bar) bar.remove(); return; }
+  if (!bar) { bar = el('<div id="bulkBar" class="bulk-bar"></div>'); document.body.appendChild(bar); }
+  const acts = cfg.actions(sel.size);
+  bar.innerHTML = `<span class="bb-count">${sel.size}</span><span class="bb-lbl">${cfg.entityPlural || 'выбрано'}</span>`
+    + acts.map((a, i) => `<button class="btn btn-sm ${a.danger ? 'btn-danger' : ''}" data-bb="${i}">${a.ic ? ic(a.ic) : ''}${esc(a.label)}</button>`).join('')
+    + `<span class="bb-sp"></span><button class="btn-ghost bb-clear" data-bb="clear" title="Снять (Esc)">${ic(I.x)}</button>`;
+  bar.onclick = (e) => {
+    const b = e.target.closest('[data-bb]'); if (!b) return;
+    if (b.dataset.bb === 'clear') { sel.clear(); selRefresh(cfg); return; }
+    const a = acts[+b.dataset.bb]; const r = b.getBoundingClientRect();
+    a.run(cfg, { x: r.left, y: r.top - 8 });
+  };
+}
+
+function selCtxMenu(cfg, x, y) {
+  const sel = selSet(cfg.kind);
+  const one = sel.size === 1 ? [...sel][0] : null;
+  const items = (cfg.ctxHead ? cfg.ctxHead(one, sel.size) : []).concat(
+    cfg.actions(sel.size).map(a => ({ ic: a.ic, label: a.label, danger: a.danger, onClick: () => a.run(cfg, { x: x + 12, y }) })));
   ctxPopup(x, y, items);
 }
 
-/* горячие клавиши воронки */
+/* wireSelectable — вешает выделение на список раздела */
+function wireSelectable(root, cfg) {
+  SELCTX = cfg;
+  const sel = selSet(cfg.kind);
+  const idOf = (el) => el.dataset.id || el.dataset.row;
+  const items = $$(cfg.itemSel, root);
+  const orderIds = items.map(idOf);
+  /* чистим выделение от исчезнувших */
+  [...sel].forEach(id => { if (!orderIds.includes(id)) sel.delete(id); });
+  const toggle = (id) => sel.has(id) ? sel.delete(id) : sel.add(id);
+  const selectRange = (fromId, toId) => { const a = orderIds.indexOf(fromId), b = orderIds.indexOf(toId); if (a < 0 || b < 0) return; const [lo, hi] = a < b ? [a, b] : [b, a]; for (let i = lo; i <= hi; i++) sel.add(orderIds[i]); };
+  items.forEach(el => {
+    const id = idOf(el);
+    el.addEventListener('mousedown', (e) => { if (e.shiftKey) e.preventDefault(); });
+    el.addEventListener('click', (e) => {
+      if (cfg.dragGuard && cfg.dragGuard()) return;
+      const chk = e.target.closest('[data-check]');
+      if (!chk && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.target.closest('a, button, [data-act]')) return; /* клик по кнопке/ссылке карточки — не трогаем выделение */
+      if (e.shiftKey) {
+        e.preventDefault(); e.stopPropagation();
+        let anchor = SEL_ANCHOR[cfg.kind];
+        if (!anchor) { const col = cfg.colSel ? el.closest(cfg.colSel) : null; const first = col ? col.querySelector(cfg.itemSel.split(',')[0]) : items[0]; anchor = first ? idOf(first) : orderIds[0]; }
+        selectRange(anchor, id); SEL_ANCHOR[cfg.kind] = anchor; selRefresh(cfg); return;
+      }
+      if (chk || e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); toggle(id); SEL_ANCHOR[cfg.kind] = id; selRefresh(cfg); return; }
+      if (sel.size) { sel.clear(); selRefresh(cfg); return; }
+      cfg.onOpen(id);
+    });
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!sel.has(id)) { if (!(e.metaKey || e.ctrlKey)) sel.clear(); sel.add(id); SEL_ANCHOR[cfg.kind] = id; selRefresh(cfg); }
+      selCtxMenu(cfg, e.clientX, e.clientY);
+    });
+  });
+  /* «выделить всю колонку» — счётчик в шапке (канбан) */
+  $$('[data-selcol]', root).forEach(h => h.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const col = h.closest(cfg.colSel || '.kb-col');
+    const ids = $$(cfg.itemSel.split(',')[0], col).map(idOf);
+    const all = ids.length && ids.every(id => sel.has(id));
+    ids.forEach(id => all ? sel.delete(id) : sel.add(id));
+    if (ids.length) SEL_ANCHOR[cfg.kind] = ids[0];
+    selRefresh(cfg);
+  }));
+  /* таблица: «выделить всё» в шапке */
+  const selAll = $('#tblSelAll', root);
+  if (selAll) selAll.addEventListener('click', (e) => { e.stopPropagation(); const all = orderIds.length && orderIds.every(id => sel.has(id)); orderIds.forEach(id => all ? sel.delete(id) : sel.add(id)); selRefresh(cfg); });
+  selBulkBar(cfg);
+}
+
+/* общий тег-промпт для любого раздела */
+function selTagPrompt(cfg) {
+  modal({ title: 'Добавить тег выбранным', body: '<div class="form-row"><label>Тег</label><input id="bbTag" placeholder="напр. VIP / горячий / под визу"></div>',
+    actions: [{ label: 'Пометить', cls: 'btn-accent', onClick: (bd) => { const v = $('#bbTag', bd).value.trim(); if (v) selBulk(cfg, 'tag', v); } }, { label: 'Отмена' }] });
+}
+
+/* ---------- конфиг: ЛИДЫ ---------- */
 let LEAD_LOOKUP = {};
+const SELCFG_LEADS = {
+  kind: 'funnel', itemSel: '.lead-card, [data-row]', colSel: '.kb-col', bulkUrl: '/leads/bulk',
+  entity: 'лид', entityPlural: 'выбрано', dragGuard: () => DRAG.moved,
+  onOpen: (id) => openLeadModal(id),
+  actions: (n) => [
+    { id: 'stage', label: 'Стадия', ic: I.arrow, run: (cfg, c) => ctxPopup(c.x, c.y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => selBulk(cfg, 'stage', s.id) }))) },
+    { id: 'broker', label: 'Брокеру', ic: I.handover, run: (cfg, c) => ctxPopup(c.x, c.y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => selBulk(cfg, 'broker', b.id) }))) },
+    { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
+    { id: 'aion', label: 'ИИ вкл', ic: I.spark, run: (cfg) => selBulk(cfg, 'ai', true) },
+    { id: 'aioff', label: 'ИИ выкл', run: (cfg) => selBulk(cfg, 'ai', false) },
+    { id: 'archive', label: 'В архив', ic: I.moon, run: (cfg) => selBulk(cfg, 'archive', null, { title: `Архивировать ${n} лид(ов)?`, sub: 'В «Потерянные», ИИ выключится. Обратимо.', ok: 'В архив' }) },
+    { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} лид(ов) навсегда?`, sub: 'Карточки и переписка — безвозвратно. Обычно лучше «В архив».', ok: 'Удалить навсегда', danger: true }) },
+  ],
+  ctxHead: (one) => { const items = []; if (one) { items.push({ ic: I.user, label: 'Открыть карточку', onClick: () => openLeadModal(one) }); const l = LEAD_LOOKUP[one]; if (l) items.push({ ic: I.chat, label: 'Написать в WhatsApp', onClick: () => window.open('https://wa.me/' + l.phone.replace(/\D/g, ''), '_blank') }); items.push({ sep: true }); } return items; },
+};
+function wireLeadSelect(root) { wireSelectable(root, SELCFG_LEADS); }
+
+/* ---------- конфиг: ОБЪЕКТЫ ---------- */
+let PROP_FOLDERS = [];
+const SELCFG_PROPS = {
+  kind: 'properties', itemSel: '.prop-card', bulkUrl: '/properties/bulk',
+  entity: 'объект', entityPlural: 'выбрано', dragGuard: () => DRAG.moved,
+  onOpen: (id) => { PAGE_STATE.propView = id; render(); },
+  actions: (n) => [
+    { id: 'folder', label: 'В папку', ic: I.copy, run: (cfg, c) => ctxPopup(c.x, c.y, [{ ic: I.x, label: 'Без папки', onClick: () => selBulk(cfg, 'folder', null) }].concat(PROP_FOLDERS.map(f => ({ ic: I.copy, label: f.name, onClick: () => selBulk(cfg, 'folder', f.id) })))) },
+    { id: 'collect', label: 'Собрать подборку', ic: I.layers, run: async (cfg) => { const ids = [...selSet('properties')]; const c = await api.post('/collections', { title: 'Подборка · ' + ids.length + ' объектов', propertyIds: ids }); selSet('properties').clear(); toast('Подборка собрана', ids.length + ' объектов', true); go('collections'); } },
+    { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
+    { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} объект(ов)?`, sub: 'Карточки объектов удалятся. Подборки, где они были, не тронутся.', ok: 'Удалить', danger: true }) },
+  ],
+  ctxHead: (one) => one ? [{ ic: I.eye, label: 'Открыть объект', onClick: () => { PAGE_STATE.propView = one; render(); } }, { sep: true }] : [],
+};
+function wirePropSelect(root) { wireSelectable(root, SELCFG_PROPS); }
+
+/* ---------- конфиг: ПОДБОРКИ ---------- */
+let COLL_FOLDERS = [];
+const SELCFG_COLLS = {
+  kind: 'collections', itemSel: '.cl2-card', bulkUrl: '/collections/bulk',
+  entity: 'подборка', entityPlural: 'выбрано', dragGuard: () => DRAG.moved,
+  onOpen: (id) => window.open('/p/' + id + '?edit=1&key=' + (COLL_KEY[id] || ''), '_blank'),
+  actions: (n) => [
+    { id: 'folder', label: 'В папку', ic: I.copy, run: (cfg, c) => ctxPopup(c.x, c.y, [{ ic: I.x, label: 'Без папки', onClick: () => selBulk(cfg, 'folder', null) }].concat(COLL_FOLDERS.map(f => ({ ic: I.copy, label: f.name, onClick: () => selBulk(cfg, 'folder', f.id) })))) },
+    { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} подбор(ок)?`, sub: 'Веб-страницы станут недоступны по ссылке.', ok: 'Удалить', danger: true }) },
+  ],
+  ctxHead: (one) => one ? [{ ic: I.edit || I.doc, label: 'Конструктор', onClick: () => window.open('/p/' + one + '?edit=1&key=' + (COLL_KEY[one] || ''), '_blank') }, { ic: I.eye, label: 'Открыть страницу', onClick: () => window.open('/p/' + one, '_blank') }, { sep: true }] : [],
+};
+let COLL_KEY = {};
+function wireCollSelect(root) { wireSelectable(root, SELCFG_COLLS); }
+
+/* горячие клавиши — по активному разделу */
 document.addEventListener('keydown', (e) => {
-  if (CUR !== 'funnel') return;
+  const cfg = { funnel: SELCFG_LEADS, properties: SELCFG_PROPS, collections: SELCFG_COLLS }[CUR];
+  if (!cfg) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const sel = selSet(cfg.kind);
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault(); $$(cfg.itemSel).forEach(el => sel.add(el.dataset.id || el.dataset.row)); selRefresh(cfg);
+  } else if (e.key === 'Escape' && sel.size) { sel.clear(); selRefresh(cfg); closeCtx(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) {
     e.preventDefault();
-    $$('.lead-card, [data-row]').forEach(el => LEAD_SEL.add(el.dataset.id || el.dataset.row));
-    refreshSel();
-  } else if (e.key === 'Escape' && LEAD_SEL.size) { LEAD_SEL.clear(); refreshSel(); closeCtx(); }
-  else if ((e.key === 'Delete' || e.key === 'Backspace') && LEAD_SEL.size) {
-    e.preventDefault();
-    bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size} лид(ов)?`, sub: 'Клавиша Delete — в «Потерянные». Удаление навсегда — правый клик → Удалить.', ok: 'В архив' });
+    const del = cfg.actions(sel.size).find(a => a.id === 'archive') || cfg.actions(sel.size).find(a => a.id === 'delete');
+    if (del) del.run(cfg, {});
   }
 });
+
+/* ---------- анимированный поп-ап итога массового действия ---------- */
+function celebrate(action, n, cfg) {
+  const kind = ['delete'].includes(action) ? 'delete' : ['archive'].includes(action) ? 'archive' : 'ok';
+  const txt = { delete: `Удалено · ${n}`, archive: `В архиве · ${n}`, ok: `Готово · ${n}` }[kind];
+  const o = el(`<div class="celebrate ${kind}"><div class="cel-card">
+    <div class="cel-orb"></div>
+    ${Array.from({ length: 10 }, (_, i) => `<i class="cel-p" style="--a:${i * 36}deg;--d:${(i % 3) * 40}ms"></i>`).join('')}
+    <div class="cel-txt">${esc(txt)}</div>
+  </div></div>`);
+  document.body.appendChild(o);
+  setTimeout(() => o.classList.add('show'), 12);
+  setTimeout(() => { o.classList.remove('show'); setTimeout(() => o.remove(), 350); }, 1150);
+}
 
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
   LEAD_LOOKUP = Object.fromEntries(all.map(l => [l.id, l]));
-  LEAD_SEL = new Set([...LEAD_SEL].filter(id => LEAD_LOOKUP[id])); /* выкидываем исчезнувших */
+  selSet("funnel").forEach(id => { if (!LEAD_LOOKUP[id]) selSet("funnel").delete(id); });
   const F = PAGE_STATE;
   const geos = STATE.settings.agency.geos;
   const q = (F.funnelQ || '').toLowerCase();
@@ -1112,7 +1147,7 @@ PAGES.funnel = async (root) => {
         return `<div class="kb-col" data-stage="${st.id}">
           <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
           <div class="kb-cards">
-            ${items.map(l => `<div class="lead-card glass ${LEAD_SEL.has(l.id) ? 'sel' : ''}" data-id="${l.id}" data-stage="${l.stage}">
+            ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
@@ -1145,7 +1180,7 @@ PAGES.funnel = async (root) => {
           if (k === 'geo') return a.geo.localeCompare(b.geo);
           if (k === 'next') return ((a.nextAction || {}).at || Infinity) - ((b.nextAction || {}).at || Infinity);
           return a.name.localeCompare(b.name);
-        }).map(l => `<tr data-row="${l.id}" class="${LEAD_SEL.has(l.id) ? 'sel' : ''}" style="cursor:pointer">
+        }).map(l => `<tr data-row="${l.id}" class="${selSet("funnel").has(l.id) ? "sel" : ""}" style="cursor:pointer">
           <td><div style="display:flex;gap:9px;align-items:center"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span>${avaHtml(l, 28)}<div><b>${esc(l.name)}</b><div class="muted" style="font-size:10.5px">${esc(l.phone)}</div></div></div></td>
           <td><span class="badge ${['qualified', 'handover', 'deal'].includes(l.stage) ? 'ok' : l.stage === 'sleeping' ? '' : 'acc'}">${stageName(l.stage)}</span></td>
           <td>${l.geoName}</td>
@@ -1166,7 +1201,7 @@ PAGES.funnel = async (root) => {
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
-  wireLeadSelect(root, leads);
+  wireLeadSelect(root);
   $('#importBtn').addEventListener('click', () => modal({
     title: 'Импорт действующей базы',
     sub: 'Из Bitrix24 / amoCRM / Excel. Дубли по номеру не создаются — карточки обогащаются. Импортированные попадают в «Спящие» с выключенным ИИ (их поднимет реанимация по скорингу) — база не получит внезапную рассылку.',
@@ -1210,6 +1245,7 @@ PAGES.funnel = async (root) => {
 function wireShelfDrag(root, itemSel, onDrop) {
   $$(itemSel, root).forEach(card => card.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || e.target.closest('button,a,input,select,label')) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.target.closest('[data-check]')) return; /* выделение, не драг */
     const startX = e.clientX, startY = e.clientY;
     let ghost = null;
     DRAG.moved = false;
@@ -2592,7 +2628,8 @@ PAGES.properties = async (root) => {
     </div>
     <div class="muted" style="font-size:11px;margin:-6px 0 12px">Карточку — на папку · клик по папке — фильтр и подборка</div>
     <div class="prop-grid">
-      ${list.map(pr => `<div class="glass prop-card v2" data-pr="${pr.id}" data-dragprop="${pr.id}">
+      ${list.map(pr => `<div class="glass prop-card v2 ${selSet('properties').has(pr.id) ? 'sel' : ''}" data-pr="${pr.id}" data-id="${pr.id}" data-dragprop="${pr.id}">
+        <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
         ${propCover(pr)}
         <span class="pc2-market ${pr.market === 'offplan' ? 'off' : 'sec'}">${pr.market === 'offplan' ? 'Первичка' : 'Вторичка'}</span>
         <div class="pc2-body">
@@ -2614,7 +2651,8 @@ PAGES.properties = async (root) => {
       <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
-  $$('.prop-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) { PAGE_STATE.propView = c.dataset.pr; render(); } }));
+  PROP_FOLDERS = folders;
+  wirePropSelect(root);
   $$('[data-fopen]', root).forEach(f => f.addEventListener('click', (e) => {
     if (e.target.closest('[data-fcoll],[data-fdel]')) return;
     PAGE_STATE.propFolder = f.dataset.fopen; render();
@@ -2751,7 +2789,8 @@ PAGES.collections = async (root) => {
           const thumbs = c.propertyIds.map(id => { const p = props.find(x => x.id === id); return p && (p.images || [])[0]; }).filter(Boolean).slice(0, 4);
           const geoHue = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
           const firstGeo = (props.find(x => x.id === c.propertyIds[0]) || {}).geo || 'dubai';
-          return `<div class="glass cl2-card" data-cl="${c.id}" data-dragcoll="${c.id}">
+          return `<div class="glass cl2-card ${selSet('collections').has(c.id) ? 'sel' : ''}" data-cl="${c.id}" data-id="${c.id}" data-dragcoll="${c.id}">
+          <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
           <div class="cl2-preview">
             ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}"><img src="logo.svg"></div>`}
             ${c.propertyIds.length > thumbs.length && thumbs.length ? `<div class="cl2-thumb more">+${c.propertyIds.length - thumbs.length}</div>` : ''}
@@ -2784,6 +2823,8 @@ PAGES.collections = async (root) => {
   }));
   $$('[data-cfdel2]', root).forEach(b => b.addEventListener('click', async () => { await fetch('/api/folders/' + b.dataset.cfdel2, { method: 'DELETE' }); render(); }));
   wireShelfDrag(root, '[data-dragcoll]', async (itemId, folderId) => { await api.patch('/collections/' + itemId, { folderId }); render(); });
+  COLL_FOLDERS = cFolders; COLL_KEY = Object.fromEntries(cols0.map(c => [c.id, c.editKey]));
+  wireCollSelect(root);
   $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
