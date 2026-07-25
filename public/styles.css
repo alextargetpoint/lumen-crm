@@ -1567,3 +1567,38 @@ html[data-night] .cmt-reply.private { background: #16223C; color: #8FB4FF; }
 html[data-night] .cmt-group-hd { color: var(--ink); }
 .cmt-mod { display: inline-block; margin-left: 8px; font-size: 10.5px; font-weight: 700; color: #C05B18; background: #FFF0E4; padding: 1px 8px; border-radius: 999px; vertical-align: middle; }
 .cmt-acts button[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ---------- Массовое управление лидами (Воронка) ---------- */
+.lead-card { position: relative; }
+.lc-check { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--stroke); background: var(--card); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s, background .12s; z-index: 3; }
+.lc-check svg { width: 12px; height: 12px; color: #fff; opacity: 0; }
+.lead-card:hover .lc-check { opacity: 1; }
+.lead-card.sel .lc-check { opacity: 1; background: var(--accent); border-color: var(--accent); }
+.lead-card.sel .lc-check svg { opacity: 1; }
+.lead-card.sel { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: 0 0 0 4px rgba(37,99,235,.12); }
+.lc-check.tbl { position: static; opacity: .5; width: 18px; height: 18px; flex: 0 0 18px; }
+tr.sel { background: rgba(37,99,235,.08); }
+tr.sel .lc-check.tbl { opacity: 1; background: var(--accent); border-color: var(--accent); }
+tr.sel .lc-check.tbl svg { opacity: 1; }
+tr:hover .lc-check.tbl { opacity: 1; }
+/* панель массовых действий */
+.bulk-bar { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; align-items: center; gap: 7px; background: var(--navy-900); color: #fff; padding: 9px 10px 9px 16px; border-radius: 14px; box-shadow: 0 16px 44px rgba(6,17,38,.4); animation: bbIn .22s var(--ease-spring, ease); }
+@keyframes bbIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.bb-count { background: var(--accent); color: #fff; font-weight: 800; font-size: 13px; min-width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; padding: 0 7px; }
+.bb-lbl { font-size: 12px; color: #9DB8FF; margin-right: 6px; }
+.bulk-bar .btn { background: rgba(255,255,255,.1); color: #fff; border: none; }
+.bulk-bar .btn:hover { background: rgba(255,255,255,.2); }
+.bulk-bar .btn-danger { background: rgba(224,82,82,.25); }
+.bulk-bar .btn-danger:hover { background: rgba(224,82,82,.45); }
+.bb-sp { width: 4px; }
+.bulk-bar .bb-clear { color: #9DB8FF; }
+/* контекст-поповер */
+.ctx-pop { position: fixed; z-index: 950; background: var(--card); border: 1px solid var(--stroke); border-radius: 12px; box-shadow: 0 18px 50px rgba(10,16,40,.28); padding: 6px; min-width: 210px; }
+.ctx-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--ink); }
+.ctx-item:hover { background: var(--bg-2); }
+.ctx-item svg { width: 15px; height: 15px; color: var(--ink-3); }
+.ctx-item.danger { color: var(--bad); }
+.ctx-item.danger svg { color: var(--bad); }
+.ctx-arr { margin-left: auto; color: var(--ink-3); font-size: 11px; }
+.ctx-sep { height: 1px; background: var(--stroke-soft); margin: 5px 8px; }
+html[data-night] .bulk-bar { background: #0D1730; border: 1px solid var(--stroke); }

@@ -867,8 +867,153 @@ PAGES.overview = async (root) => {
 };
 
 /* ---------------- ВОРОНКА (канбан) ---------------- */
+/* ============================================================
+   Массовое управление лидами на Воронке: multi-select (Cmd/Shift/
+   чекбокс), контекстное меню (правый клик), панель массовых действий,
+   горячие клавиши. Работает и в канбане, и в таблице.
+   ============================================================ */
+let LEAD_SEL = new Set();
+let LEAD_SEL_ANCHOR = null;
+
+function wireLeadSelect(root, leads) {
+  const items = $$('.lead-card, [data-row]', root);
+  const orderIds = items.map(el => el.dataset.id || el.dataset.row);
+  const idOf = (el) => el.dataset.id || el.dataset.row;
+  const toggle = (id) => { LEAD_SEL.has(id) ? LEAD_SEL.delete(id) : LEAD_SEL.add(id); };
+  const selectRange = (fromId, toId) => {
+    const a = orderIds.indexOf(fromId), b = orderIds.indexOf(toId);
+    if (a < 0 || b < 0) return;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    for (let i = lo; i <= hi; i++) LEAD_SEL.add(orderIds[i]);
+  };
+  items.forEach(el => {
+    const id = idOf(el);
+    el.addEventListener('click', (e) => {
+      if (DRAG.moved) return;
+      const chk = e.target.closest('[data-check]');
+      if (chk || e.metaKey || e.ctrlKey) { e.preventDefault(); e.stopPropagation(); toggle(id); LEAD_SEL_ANCHOR = id; refreshSel(root); return; }
+      if (e.shiftKey && LEAD_SEL_ANCHOR) { e.preventDefault(); selectRange(LEAD_SEL_ANCHOR, id); refreshSel(root); return; }
+      if (LEAD_SEL.size) { LEAD_SEL.clear(); refreshSel(root); return; } /* клик мимо снимает выделение */
+      openLeadModal(id);
+    });
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!LEAD_SEL.has(id)) { if (!(e.metaKey || e.ctrlKey)) LEAD_SEL.clear(); LEAD_SEL.add(id); LEAD_SEL_ANCHOR = id; refreshSel(root); }
+      openLeadCtxMenu(e.clientX, e.clientY, root);
+    });
+  });
+  renderBulkBar(root);
+}
+
+function refreshSel(root) {
+  $$('.lead-card, [data-row]', root || document).forEach(el => el.classList.toggle('sel', LEAD_SEL.has(el.dataset.id || el.dataset.row)));
+  renderBulkBar(root);
+}
+
+async function bulkLeads(action, value, confirmMsg) {
+  const ids = [...LEAD_SEL];
+  if (!ids.length) return;
+  const run = async () => {
+    const r = await api.post('/leads/bulk', { ids, action, value });
+    LEAD_SEL.clear(); LEAD_SEL_ANCHOR = null;
+    toast(`Готово: ${r.done} лид(ов)`, null, true);
+    render();
+  };
+  if (confirmMsg) modal({ title: confirmMsg.title, sub: confirmMsg.sub, actions: [{ label: confirmMsg.ok, cls: confirmMsg.danger ? 'btn-danger' : 'btn-accent', onClick: run }, { label: 'Отмена' }] });
+  else run();
+}
+
+/* меню выбора стадии/брокера/тега — переиспользуется панелью и контекстным меню */
+function bulkStageMenu(x, y) {
+  ctxPopup(x, y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => bulkLeads('stage', s.id) })));
+}
+function bulkBrokerMenu(x, y) {
+  ctxPopup(x, y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => bulkLeads('broker', b.id) })));
+}
+function bulkTagPrompt() {
+  modal({ title: 'Добавить тег выбранным', body: '<div class="form-row"><label>Тег</label><input id="bbTag" placeholder="напр. VIP / перезвонить / горячий"></div>',
+    actions: [{ label: 'Пометить', cls: 'btn-accent', onClick: (bd) => { const v = $('#bbTag', bd).value.trim(); if (v) bulkLeads('tag', v); } }, { label: 'Отмена' }] });
+}
+
+function renderBulkBar(root) {
+  let bar = $('#bulkBar');
+  if (!LEAD_SEL.size || CUR !== 'funnel') { if (bar) bar.remove(); return; }
+  if (!bar) { bar = el('<div id="bulkBar" class="bulk-bar"></div>'); document.body.appendChild(bar); }
+  bar.innerHTML = `<span class="bb-count">${LEAD_SEL.size}</span><span class="bb-lbl">выбрано</span>
+    <button class="btn btn-sm" data-bb="stage">${ic(I.arrow)}Стадия</button>
+    <button class="btn btn-sm" data-bb="broker">${ic(I.handover)}Брокеру</button>
+    <button class="btn btn-sm" data-bb="tag">${ic(I.plus)}Тег</button>
+    <button class="btn btn-sm" data-bb="aion" title="Включить ИИ">${ic(I.spark)}ИИ вкл</button>
+    <button class="btn btn-sm" data-bb="aioff" title="Выключить ИИ">ИИ выкл</button>
+    <button class="btn btn-sm" data-bb="archive">${ic(I.moon)}В архив</button>
+    <button class="btn btn-sm btn-danger" data-bb="delete">${ic(I.x)}Удалить</button>
+    <span class="bb-sp"></span>
+    <button class="btn-ghost bb-clear" data-bb="clear" title="Снять выделение (Esc)">${ic(I.x)}</button>`;
+  bar.onclick = (e) => {
+    const b = e.target.closest('[data-bb]'); if (!b) return;
+    const r = b.getBoundingClientRect();
+    const act = b.dataset.bb;
+    if (act === 'stage') bulkStageMenu(r.left, r.top - 8);
+    else if (act === 'broker') bulkBrokerMenu(r.left, r.top - 8);
+    else if (act === 'tag') bulkTagPrompt();
+    else if (act === 'aion') bulkLeads('ai', true);
+    else if (act === 'aioff') bulkLeads('ai', false);
+    else if (act === 'archive') bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size} лид(ов)?`, sub: 'Уйдут в «Потерянные», ИИ выключится. Их можно вернуть вручную.', ok: 'В архив' });
+    else if (act === 'delete') bulkLeads('delete', null, { title: `Удалить ${LEAD_SEL.size} лид(ов) навсегда?`, sub: 'Карточки и переписка удалятся безвозвратно. Обычно лучше «В архив».', ok: 'Удалить навсегда', danger: true });
+    else if (act === 'clear') { LEAD_SEL.clear(); refreshSel(root); }
+  };
+}
+
+/* универсальный контекст-поповер (в body, fixed) */
+function ctxPopup(x, y, items) {
+  closeCtx();
+  const pop = el(`<div class="ctx-pop" id="ctxPop">${items.map((it, i) => it.sep ? '<div class="ctx-sep"></div>' : `<div class="ctx-item ${it.danger ? 'danger' : ''}" data-ci="${i}">${it.ic ? ic(it.ic, 2) : ''}<span>${esc(it.label)}</span>${it.arrow ? '<i class="ctx-arr">▸</i>' : ''}</div>`).join('')}</div>`);
+  document.body.appendChild(pop);
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.min(x, innerWidth - w - 8) + 'px';
+  pop.style.top = Math.min(y, innerHeight - h - 8) + 'px';
+  pop.addEventListener('click', (e) => { const it = e.target.closest('[data-ci]'); if (!it) return; const h2 = items[+it.dataset.ci]; closeCtx(); if (h2.onClick) h2.onClick(); });
+  setTimeout(() => document.addEventListener('pointerdown', closeCtx, { once: true }), 0);
+}
+function closeCtx() { const p = $('#ctxPop'); if (p) p.remove(); }
+
+function openLeadCtxMenu(x, y, root) {
+  const one = LEAD_SEL.size === 1 ? [...LEAD_SEL][0] : null;
+  const items = [];
+  if (one) items.push({ ic: I.user, label: 'Открыть карточку', onClick: () => openLeadModal(one) });
+  items.push({ ic: I.arrow, label: `Сменить стадию (${LEAD_SEL.size})`, onClick: () => bulkStageMenu(x + 12, y) });
+  items.push({ ic: I.handover, label: 'Передать брокеру', onClick: () => bulkBrokerMenu(x + 12, y) });
+  items.push({ ic: I.plus, label: 'Добавить тег', onClick: bulkTagPrompt });
+  items.push({ ic: I.spark, label: 'Включить ИИ', onClick: () => bulkLeads('ai', true) });
+  items.push({ label: 'Выключить ИИ', onClick: () => bulkLeads('ai', false) });
+  if (one) { const l = LEAD_LOOKUP[one]; if (l) items.push({ ic: I.chat, label: 'Написать в WhatsApp', onClick: () => window.open('https://wa.me/' + l.phone.replace(/\D/g, ''), '_blank') }); }
+  items.push({ sep: true });
+  items.push({ ic: I.moon, label: `В архив (${LEAD_SEL.size})`, onClick: () => bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size}?`, sub: 'В «Потерянные», ИИ off.', ok: 'В архив' }) });
+  items.push({ ic: I.x, label: 'Удалить навсегда', danger: true, onClick: () => bulkLeads('delete', null, { title: `Удалить ${LEAD_SEL.size} навсегда?`, sub: 'Безвозвратно.', ok: 'Удалить', danger: true }) });
+  ctxPopup(x, y, items);
+}
+
+/* горячие клавиши воронки */
+let LEAD_LOOKUP = {};
+document.addEventListener('keydown', (e) => {
+  if (CUR !== 'funnel') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    $$('.lead-card, [data-row]').forEach(el => LEAD_SEL.add(el.dataset.id || el.dataset.row));
+    refreshSel();
+  } else if (e.key === 'Escape' && LEAD_SEL.size) { LEAD_SEL.clear(); refreshSel(); closeCtx(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && LEAD_SEL.size) {
+    e.preventDefault();
+    bulkLeads('archive', null, { title: `Архивировать ${LEAD_SEL.size} лид(ов)?`, sub: 'Клавиша Delete — в «Потерянные». Удаление навсегда — правый клик → Удалить.', ok: 'В архив' });
+  }
+});
+
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
+  LEAD_LOOKUP = Object.fromEntries(all.map(l => [l.id, l]));
+  LEAD_SEL = new Set([...LEAD_SEL].filter(id => LEAD_LOOKUP[id])); /* выкидываем исчезнувших */
   const F = PAGE_STATE;
   const geos = STATE.settings.agency.geos;
   const q = (F.funnelQ || '').toLowerCase();
@@ -911,7 +1056,8 @@ PAGES.funnel = async (root) => {
         return `<div class="kb-col" data-stage="${st.id}">
           <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct">${items.length}</span></div>
           <div class="kb-cards">
-            ${items.map(l => `<div class="lead-card glass" data-id="${l.id}" data-stage="${l.stage}">
+            ${items.map(l => `<div class="lead-card glass ${LEAD_SEL.has(l.id) ? 'sel' : ''}" data-id="${l.id}" data-stage="${l.stage}">
+              <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
               <div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
@@ -942,8 +1088,8 @@ PAGES.funnel = async (root) => {
           if (k === 'geo') return a.geo.localeCompare(b.geo);
           if (k === 'next') return ((a.nextAction || {}).at || Infinity) - ((b.nextAction || {}).at || Infinity);
           return a.name.localeCompare(b.name);
-        }).map(l => `<tr data-row="${l.id}" style="cursor:pointer">
-          <td><div style="display:flex;gap:9px;align-items:center">${avaHtml(l, 28)}<div><b>${esc(l.name)}</b><div class="muted" style="font-size:10.5px">${esc(l.phone)}</div></div></div></td>
+        }).map(l => `<tr data-row="${l.id}" class="${LEAD_SEL.has(l.id) ? 'sel' : ''}" style="cursor:pointer">
+          <td><div style="display:flex;gap:9px;align-items:center"><span class="lc-check tbl" data-check title="Выделить">${ic(I.check, 2)}</span>${avaHtml(l, 28)}<div><b>${esc(l.name)}</b><div class="muted" style="font-size:10.5px">${esc(l.phone)}</div></div></div></td>
           <td><span class="badge ${['qualified', 'handover', 'deal'].includes(l.stage) ? 'ok' : l.stage === 'sleeping' ? '' : 'acc'}">${stageName(l.stage)}</span></td>
           <td>${l.geoName}</td>
           <td>${(l.quals.budget || {}).value || '—'}</td>
@@ -963,8 +1109,7 @@ PAGES.funnel = async (root) => {
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
-  $$('[data-row]', root).forEach(r => r.addEventListener('click', () => openLeadModal(r.dataset.row)));
-  $$('.lead-card', root).forEach(c => c.addEventListener('click', () => { if (!DRAG.moved) openLeadModal(c.dataset.id); }));
+  wireLeadSelect(root, leads);
   $('#importBtn').addEventListener('click', () => modal({
     title: 'Импорт действующей базы',
     sub: 'Из Bitrix24 / amoCRM / Excel. Дубли по номеру не создаются — карточки обогащаются. Импортированные попадают в «Спящие» с выключенным ИИ (их поднимет реанимация по скорингу) — база не получит внезапную рассылку.',
@@ -1088,6 +1233,7 @@ function wireKanbanDrag(root) {
   board.addEventListener('pointerdown', (e) => {
     const card = e.target.closest('.lead-card');
     if (!card || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.target.closest('[data-check]')) return; /* выделение, не драг */
     const startX = e.clientX, startY = e.clientY;
     let ghost = null;
     DRAG.moved = false;
@@ -1749,6 +1895,12 @@ PAGES.qualifier = async (root) => {
             <div class="sp"><div class="sl">ИИ отвечает сам</div><div class="sd">Первый контакт ≤ 1 минуты, квалификация по 4 осям: цель · срок · бюджет · тип. Стадии двигаются только по фактам из сообщений клиента.</div></div>
             <label class="switch"><input type="checkbox" id="autopilot" ${s.ai.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
           </div>
+          <div class="lp-sec" style="margin-top:18px">Персона ИИ ${hint('persona', 'Зачем персона', [['Как живой человек', 'ИИ представляется именем и говорит от первого лица — клиент общается будто с менеджером, не с ботом'],['Бесшовная передача', 'Когда брокер подхватит тот же чат, клиент не заметит смены — тот же голос']])}</div>
+          <div class="pds-grid c2" style="margin-top:8px">
+            <div class="pd-fact"><label class="lc-lbl">Имя</label><input class="gi" id="personaName" value="${esc((s.ai.persona || {}).name || '')}" placeholder="напр. Мария"></div>
+            <div class="pd-fact"><label class="lc-lbl">Роль</label><input class="gi" id="personaRole" value="${esc((s.ai.persona || {}).role || '')}" placeholder="напр. специалист отдела подбора"></div>
+          </div>
+          <div class="sd" style="margin-top:6px">Пусто — ИИ пишет без имени, как «отдел продаж».</div>
           <div class="set-row">
             <div class="sp"><div class="sl">Стоп-слова (opt-out)</div><div class="sd">Любое из слов в сообщении клиента мгновенно отключает ИИ и закрывает лида</div></div>
           </div>
@@ -1788,7 +1940,8 @@ PAGES.qualifier = async (root) => {
       criteria[g][inp.dataset.k] = inp.type === 'number' ? +inp.value : inp.value;
     });
     const stopWords = $('#stopWords').value.split(',').map(x => x.trim()).filter(Boolean);
-    await api.patch('/settings', { criteria, stopWords });
+    const persona = { name: $('#personaName')?.value.trim() || '', role: $('#personaRole')?.value.trim() || '' };
+    await api.patch('/settings', { criteria, stopWords, ai: { persona } });
     toast('Критерии сохранены', 'ИИ будет использовать их со следующего сообщения', true);
     loadState();
   });

@@ -953,6 +953,32 @@ const server = http.createServer(async (req, res) => {
     }
 
     let m;
+    /* массовые операции над лидами (выделение на канбане) */
+    if (p === '/api/leads/bulk' && req.method === 'POST') {
+      const b = await readBody(req);
+      const ids = Array.isArray(b.ids) ? b.ids.slice(0, 500) : [];
+      const action = String(b.action || '');
+      let targets = ids.map(id => db.leads.find(l => l.id === id)).filter(Boolean);
+      if (IS_BROKER) targets = targets.filter(canSeeLead); /* брокер — только свои */
+      if (!targets.length) return json(res, 400, { error: 'нет доступных лидов' });
+      if (IS_BROKER && ['delete', 'broker'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
+      let done = 0;
+      for (const l of targets) {
+        if (action === 'stage' && b.value) { l.stage = String(b.value); done++; }
+        else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
+        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') l.stage = 'handover'; if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
+        else if (action === 'tag' && b.value) { l.tags = [...new Set([...(l.tags || []), String(b.value).slice(0, 40)])]; done++; }
+        else if (action === 'untag' && b.value) { l.tags = (l.tags || []).filter(t => t !== b.value); done++; }
+        else if (action === 'ai') { l.ai.enabled = !!b.value; if (b.value) l.tags = (l.tags || []).filter(t => t !== 'нужен человек'); done++; }
+        else if (action === 'delete') { db.messages = db.messages.filter(mm2 => mm2.leadId !== l.id); db.leads = db.leads.filter(x => x.id !== l.id); done++; }
+      }
+      if (IS_BROKER) audit(db, req, `массовое действие «${action}» над ${done} лид(ами)`);
+      const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', delete: 'удалено' };
+      ai.pushEvent(db, { type: 'stage', text: `Массовое действие: ${labels[action] || action} — ${done} лид(ов)` });
+      store.save();
+      return json(res, 200, { ok: true, done });
+    }
+
     if ((m = p.match(/^\/api\/leads\/([^/]+)/))) {
       const lead0 = db.leads.find(l => l.id === m[1]);
       if (lead0 && !canSeeLead(lead0)) { audit(db, req, 'попытка доступа к чужому лиду', { leadId: lead0.id }); return json(res, 403, { error: 'чужой лид' }); }
