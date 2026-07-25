@@ -3571,7 +3571,7 @@ PAGES.brokers = async (root) => {
         </div>
       </div>`;
       const sched = (() => { const pd = b.schedule?.perDay || {}; const wins = (b.schedule?.days || []).map(d => (pd[d] ? pd[d].from + '–' + pd[d].to : (b.schedule?.from || '') + '–' + (b.schedule?.to || ''))); return [...new Set(wins)].length > 1 ? 'инд. график' : (wins[0] || ''); })();
-      const days = (b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ');
+      const daysStr = (b.schedule?.days || []).map(d => ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][d]).join(' ');
       return `<div class="glass br2-card ${b.active === false ? 'off' : ''}" data-brok="${b.id}" title="Клик — редактировать">
         <div class="br2-top">
           <div class="ava br2-ava">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
@@ -3583,7 +3583,7 @@ PAGES.brokers = async (root) => {
           <span><b>${b.deals90}</b> сделок · 90д</span>
           ${hot ? `<span class="hot"><b>${hot}</b> в работе</span>` : ''}
           <span class="tb-spacer"></span>
-          <span class="br2-sch" title="${days} · ${sched}">${days ? days + ' · ' + sched : 'смены не заданы'}</span>
+          <span class="br2-sch" title="${daysStr} · ${sched}">${daysStr ? daysStr + ' · ' + sched : 'смены не заданы'}</span>
         </div>
       </div>`;
     }).join('')}
