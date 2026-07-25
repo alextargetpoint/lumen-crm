@@ -214,7 +214,7 @@ function seed() {
     settings: {
       agency: { name: 'One Agency', geos: ['dubai', 'bali', 'phuket', 'spain'] },
       wa: { mode: 'mock', phoneId: '', wabaId: '', tokenSet: false, webhookVerifyToken: 'lumen-verify' },
-      ai: { provider: 'mock', autopilot: true, model: '' },
+      ai: { provider: 'mock', autopilot: true, model: '', persona: { name: 'Мария', role: 'специалист отдела подбора' } },
       demo: { accelerate: true, dayMs: 90e3, simulateReplies: true },
       criteria: {
         dubai:  { budgetMin: 130000, currency: 'USD', purposes: ['Инвестиция', 'Переезд', 'ВНЖ'], downsell: 'Ниже $130k — офф-план студии JVC/Dubai South, рассрочка 1%/мес', notes: 'Вторичка-first при бюджете от $250k' },
