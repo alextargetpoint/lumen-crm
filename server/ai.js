@@ -186,6 +186,11 @@ function pushEvent(db, e) {
   const ev = Object.assign({ at: Date.now() }, e);
   db.events.unshift(ev);
   if (db.events.length > 300) db.events.length = 300;
+  /* прокачка ИИ-героя: +1 XP активной персоне за каждого квалифицированного лида */
+  if (e.type === 'qualified') {
+    const pid = ((db.settings.ai || {}).persona || {}).id;
+    if (pid) { db.settings.ai.heroXP = db.settings.ai.heroXP || {}; db.settings.ai.heroXP[pid] = (db.settings.ai.heroXP[pid] || 0) + 1; }
+  }
   try { require('./engine').maybeInstantNotify(db, ev); } catch (_) {}
 }
 

@@ -133,6 +133,37 @@ function plural(n, one, few, many) {
    Кастомные контролы (золотое правило: никаких нативных
    дропдаунов/календарей — всё в стилистике продукта)
    ============================================================ */
+/* ---------- ИИ-герои квалификатора (RPG-персоны) ---------- */
+const AI_HEROES = [
+  { id: 'maria', name: 'Мария', role: 'тёплый подбор', avatar: '/assets/personas/maria.jpg',
+    tagline: 'Заботливо вникает и ведёт без давления',
+    tone: 'тёплая, заботливая, эмпатичная; искренне вникает в потребности клиента, ведёт мягко и по-человечески, без давления',
+    fit: 'Семьи, переезд, деликатные клиенты',
+    stats: { Мягкость: 95, Скорость: 70, Экспертность: 75, Напор: 40 } },
+  { id: 'artur', name: 'Артур', role: 'эксперт-аналитик', avatar: '/assets/personas/artur.jpg',
+    tagline: 'Уверенно, фактами, вызывает доверие',
+    tone: 'уверенный, по делу; оперирует логикой и фактами (никогда не выдумывая цифр), вызывает доверие экспертностью, спокойный тон',
+    fit: 'Инвесторы, крупные бюджеты, требовательные',
+    stats: { Мягкость: 55, Скорость: 75, Экспертность: 95, Напор: 65 } },
+  { id: 'sofia', name: 'София', role: 'люкс-консультант', avatar: '/assets/personas/sofia.jpg',
+    tagline: 'Элегантно и премиально, безупречный этикет',
+    tone: 'элегантная, премиальная, безупречный этикет; ненавязчивая, обращается уважительно, для состоятельных клиентов',
+    fit: 'Элитная недвижимость, VIP, интернационал',
+    stats: { Мягкость: 80, Скорость: 60, Экспертность: 85, Напор: 45 } },
+  { id: 'dmitry', name: 'Дмитрий', role: 'скоростной дожим', avatar: '/assets/personas/dmitry.jpg',
+    tagline: 'Энергично, быстро к следующему шагу',
+    tone: 'энергичный, динамичный; мягко создаёт ощущение срочности, быстро и цепко ведёт к следующему шагу, но не грубит',
+    fit: 'Горячие лиды с рекламы, быстрые сделки',
+    stats: { Мягкость: 50, Скорость: 95, Экспертность: 65, Напор: 90 } },
+];
+const HERO_LV = [[0, 'Новичок'], [5, 'Уверенный'], [15, 'Профи'], [40, 'Мастер'], [100, 'Легенда']];
+function heroLevel(xp) {
+  xp = xp || 0; let i = 0;
+  for (let k = 0; k < HERO_LV.length; k++) if (xp >= HERO_LV[k][0]) i = k;
+  const cur = HERO_LV[i], next = HERO_LV[i + 1];
+  return { lvl: i + 1, name: cur[1], xp, prev: cur[0], cap: next ? next[0] : cur[0], max: !next };
+}
+
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const MONTHS_N = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
@@ -1927,12 +1958,26 @@ PAGES.qualifier = async (root) => {
             <div class="sp"><div class="sl">ИИ отвечает сам</div><div class="sd">Первый контакт ≤ 1 минуты, квалификация по 4 осям: цель · срок · бюджет · тип. Стадии двигаются только по фактам из сообщений клиента.</div></div>
             <label class="switch"><input type="checkbox" id="autopilot" ${s.ai.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
           </div>
-          <div class="lp-sec" style="margin-top:18px">Персона ИИ ${hint('persona', 'Зачем персона', [['Как живой человек', 'ИИ представляется именем и говорит от первого лица — клиент общается будто с менеджером, не с ботом'],['Бесшовная передача', 'Когда брокер подхватит тот же чат, клиент не заметит смены — тот же голос']])}</div>
-          <div class="pds-grid c2" style="margin-top:8px">
-            <div class="pd-fact"><label class="lc-lbl">Имя</label><input class="gi" id="personaName" value="${esc((s.ai.persona || {}).name || '')}" placeholder="напр. Мария"></div>
-            <div class="pd-fact"><label class="lc-lbl">Роль</label><input class="gi" id="personaRole" value="${esc((s.ai.persona || {}).role || '')}" placeholder="напр. специалист отдела подбора"></div>
+          <div class="lp-sec" style="margin-top:18px">ИИ-герой квалификатора ${hint('persona', 'Как работают герои', [['Свой характер', 'Каждый герой ведёт диалог своей манерой — тон реально меняет ответы ИИ'],['Прокачка', 'Герой растёт в уровне за каждого квалифицированного лида'],['Бесшовно', 'Клиент общается будто с живым менеджером; брокер подхватит тот же чат — тот же голос']])}</div>
+          <div class="hero-grid">
+            ${AI_HEROES.map(h => {
+              const on = (s.ai.persona || {}).id === h.id;
+              const xp = ((s.ai.heroXP || {})[h.id]) || 0; const L = heroLevel(xp);
+              const prog = L.max ? 100 : Math.round((xp - L.prev) / Math.max(1, L.cap - L.prev) * 100);
+              return `<div class="hero-card ${on ? 'on' : ''}" data-hero="${h.id}">
+                <div class="hero-lvl" title="Уровень ${L.lvl}: ${L.name}">LV${L.lvl}</div>
+                <div class="hero-ava"><img src="${h.avatar}" alt="${h.name}" loading="lazy"><span class="hero-ring"></span></div>
+                <div class="hero-nm">${h.name}</div>
+                <div class="hero-role">${h.role}</div>
+                <div class="hero-tag">${h.tagline}</div>
+                <div class="hero-stats">${Object.entries(h.stats).map(([k, v]) => `<div class="hstat"><span>${k}</span><i><b style="width:${v}%"></b></i></div>`).join('')}</div>
+                <div class="hero-fit">${ic(I.target, 2)}${h.fit}</div>
+                <div class="hero-xp"><i style="width:${prog}%"></i><span>${L.max ? 'MAX · ' + xp + ' квал' : L.name + ' · ' + xp + '/' + L.cap + ' квал'}</span></div>
+                <div class="hero-pick">${on ? ic(I.check, 2.4) + ' Выбран' : 'Выбрать'}</div>
+              </div>`;
+            }).join('')}
           </div>
-          <div class="sd" style="margin-top:6px">Пусто — ИИ пишет без имени, как «отдел продаж».</div>
+          <div class="sd" style="margin-top:8px">Тон героя меняет манеру ИИ. Уровень растёт за каждого квалифицированного лида. <button class="btn-ghost" id="heroClear" style="font-size:11.5px;padding:2px 6px">Без имени (отдел продаж)</button></div>
           <div class="set-row">
             <div class="sp"><div class="sl">Стоп-слова (opt-out)</div><div class="sd">Любое из слов в сообщении клиента мгновенно отключает ИИ и закрывает лида</div></div>
           </div>
@@ -1959,6 +2004,15 @@ PAGES.qualifier = async (root) => {
       </div>
     </div>`;
   $('#autopilot').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { autopilot: e.target.checked } }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', null, true); loadState(); });
+  $$('.hero-card', root).forEach(card => card.addEventListener('click', async () => {
+    if (card.classList.contains('on')) return;
+    const h = AI_HEROES.find(x => x.id === card.dataset.hero);
+    card.classList.add('picking');
+    await api.patch('/settings', { ai: { persona: { id: h.id, name: h.name, role: h.role, tone: h.tone } } });
+    toast(`${h.name} у руля`, `Квалификатор теперь ведёт диалог как «${h.role}»`, true);
+    await loadState(); render();
+  }));
+  $('#heroClear')?.addEventListener('click', async () => { await api.patch('/settings', { ai: { persona: { id: '', name: '', role: '', tone: '' } } }); toast('ИИ без имени', 'Пишет как «отдел продаж»', true); await loadState(); render(); });
   $$('[data-aoff]', root).forEach(sw => sw.addEventListener('change', async () => {
     const autoOff = {};
     $$('[data-aoff]', root).forEach(x => autoOff[x.dataset.aoff] = x.checked);
@@ -1972,8 +2026,7 @@ PAGES.qualifier = async (root) => {
       criteria[g][inp.dataset.k] = inp.type === 'number' ? +inp.value : inp.value;
     });
     const stopWords = $('#stopWords').value.split(',').map(x => x.trim()).filter(Boolean);
-    const persona = { name: $('#personaName')?.value.trim() || '', role: $('#personaRole')?.value.trim() || '' };
-    await api.patch('/settings', { criteria, stopWords, ai: { persona } });
+    await api.patch('/settings', { criteria, stopWords });
     toast('Критерии сохранены', 'ИИ будет использовать их со следующего сообщения', true);
     loadState();
   });
