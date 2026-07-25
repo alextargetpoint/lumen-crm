@@ -2748,20 +2748,31 @@ PAGES.collections = async (root) => {
           </div>`).join('')}
           <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
         </div>
-        ${cols.map(c => `<div class="glass cmp-card" data-cl="${c.id}" data-dragcoll="${c.id}">
-          <div class="cmp-head"><div class="nm" data-act="ren" title="Переименовать">${esc(c.title)}<span class="nm-pen">${ic(I.edit || I.doc)}</span></div><span class="badge">${c.propertyIds.length} объект(а)</span>${c.views ? `<span class="badge acc">${ic(I.eye)}${c.views}</span>` : ''}</div>
-          <div class="muted" style="font-size:11.5px;margin-top:4px">${c.leadName ? 'для: ' + esc(c.leadName) + ' · ' : ''}${ago(c.createdAt)}</div>
-          ${c.analytics ? `<div class="lc-hint ${c.analytics.maxDepth >= 75 ? 'act' : 'info'}" style="margin-top:10px">${ic(I.eye)}Изучил на ${c.analytics.maxDepth}% · ${Math.max(1, Math.round((c.analytics.totalTime || 0) / 60))} мин на странице${c.analytics.deepSessions ? ' · глубоких просмотров: ' + c.analytics.deepSessions : ''}</div>` : ''}
-          <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
-            <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
-            <a class="btn btn-sm" href="/p/${c.id}" target="_blank">${ic(I.eye)}Открыть</a>
-            <button class="btn btn-sm" data-act="copy">${ic(I.copy)}Ссылка</button>
-            <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank">${ic(I.doc)}PDF</a>
-            ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат лиду</button>` : ''}
-            <span class="tb-spacer"></span>
-            <button class="btn-ghost" data-act="del">${ic(I.x)}</button>
+        ${cols.map(c => {
+          const thumbs = c.propertyIds.map(id => { const p = props.find(x => x.id === id); return p && (p.images || [])[0]; }).filter(Boolean).slice(0, 4);
+          const geoHue = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
+          const firstGeo = (props.find(x => x.id === c.propertyIds[0]) || {}).geo || 'dubai';
+          return `<div class="glass cl2-card" data-cl="${c.id}" data-dragcoll="${c.id}">
+          <div class="cl2-preview">
+            ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}"><img src="logo.svg"></div>`}
+            ${c.propertyIds.length > thumbs.length && thumbs.length ? `<div class="cl2-thumb more">+${c.propertyIds.length - thumbs.length}</div>` : ''}
+            ${c.views ? `<span class="cl2-views">${ic(I.eye)}${c.views}</span>` : ''}
           </div>
-        </div>`).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
+          <div class="cl2-body">
+            <div class="nm cl2-name" data-act="ren" title="Переименовать">${esc(c.title)}<span class="nm-pen">${ic(I.edit || I.doc)}</span></div>
+            <div class="cl2-meta">${c.propertyIds.length} ${plural(c.propertyIds.length, 'объект', 'объекта', 'объектов')}${c.leadName ? ' · для ' + esc(c.leadName) : ''} · ${ago(c.createdAt)}</div>
+            ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
+            <div class="cl2-acts">
+              <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
+              ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат</button>` : ''}
+              <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть">${ic(I.eye)}</a>
+              <button class="btn btn-sm" data-act="copy" title="Копировать ссылку">${ic(I.copy)}</button>
+              <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank" title="PDF">${ic(I.doc)}</a>
+              <span class="tb-spacer"></span>
+              <button class="btn-ghost" data-act="del" title="Удалить">${ic(I.x)}</button>
+            </div>
+          </div>
+        </div>`; }).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
       </div>
     </div>`;
   $$('[data-cfopen]', root).forEach(f => f.addEventListener('click', (e) => {
