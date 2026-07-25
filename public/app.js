@@ -2521,6 +2521,7 @@ PAGES.properties = async (root) => {
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
       <span class="muted" style="font-size:12px">${list.length} объектов</span>
+      <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
     <div class="shelf">
@@ -2555,8 +2556,8 @@ PAGES.properties = async (root) => {
         </div>
       </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
     </div>
-    <div style="margin-top:16px">${coll('Источники данных · рынок Дубая', `
-      <div class="muted" style="font-size:11.8px;margin:8px 0 12px">Слоты под API порталов первички и вторички. Вставьте ключ — статус обновится; синк листингов включается после проверки ключа.</div>
+    <div style="margin-top:16px">${coll('Источники инвентаря и листинги', `
+      <div class="muted" style="font-size:11.8px;margin:8px 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» вверху: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
       ${Object.entries(st.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
         <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
         <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
@@ -2587,6 +2588,56 @@ PAGES.properties = async (root) => {
     const pr = await api.post('/properties', { name: 'Новый объект', geo: PAGE_STATE.propGeo || st.agency.geos[0] });
     PAGE_STATE.propView = pr.id;
     render();
+  });
+  $('#prImport').addEventListener('click', () => {
+    const reellySet = ((st.inventorySources || {}).reelly || {}).keySet;
+    const geoOpts = st.agency.geos.map(g => `<option value="${g}">${st.geoNames[g]}</option>`).join('');
+    const bd = modal({
+      title: 'Импорт объектов', wide: 'card',
+      sub: 'Из Reelly и других баз новостроек, CSV/Excel или JSON-фида. Дубли по «название + застройщик» не создаются — карточки дополняются.',
+      body: `
+        <div class="imp-tabs">
+          <button class="imp-tab on" data-imptab="reelly">${ic(I.building)}Reelly · новостройки</button>
+          <button class="imp-tab" data-imptab="table">${ic(I.doc)}Таблица · CSV/Excel</button>
+          <button class="imp-tab" data-imptab="json">${ic(I.doc)}JSON-фид</button>
+        </div>
+        <div data-imppane="reelly">
+          <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px"><b>Reelly.io</b> — база 500+ застройщиков ОАЭ (off-plan проекты: цены, планы оплаты, доступность, брошюры). Основной источник инвентаря новостроек для брокеров. Вставьте партнёрский ключ для живого синка — или загрузите демо-набор, чтобы увидеть, как импорт ложится в карточки.</div>
+          <div class="form-row"><label>Reelly API key (партнёрский)</label><input id="impReellyKey" type="password" placeholder="${reellySet ? '•••••• сохранён' : 'ключ Reelly для живого синка'}"></div>
+          <button class="btn btn-accent" id="impReellyGo">${ic(I.building)}Загрузить проекты из Reelly</button>
+        </div>
+        <div data-imppane="table" style="display:none">
+          <div class="muted" style="font-size:12px;margin-bottom:8px">CSV/TSV из любой базы или Excel. Колонки распознаются по заголовку: name/project · developer · area/location · price/starting_price · handover/completion · unit_type/bedrooms · roi/yield · currency.</div>
+          <textarea id="impTable" style="min-height:130px;font-family:Menlo,monospace;font-size:11.5px" placeholder="project,developer,area,starting_price,currency,completion,unit_type,roi
+Sobha Waves,Sobha,MBR City,640000,USD,Q4 2027,1,7.5%
+Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
+          <button class="btn btn-accent" id="impTableGo" style="margin-top:8px">Импортировать таблицу</button>
+        </div>
+        <div data-imppane="json" style="display:none">
+          <div class="muted" style="font-size:12px;margin-bottom:8px">JSON-массив объектов (или <code class="pill">{items:[…]}</code> / <code class="pill">{data:[…]}</code>). Ключи маппятся автоматически — подойдёт экспорт большинства сервисов.</div>
+          <textarea id="impJson" style="min-height:130px;font-family:Menlo,monospace;font-size:11.5px" placeholder='[{"name":"Peninsula Four","developer":"Select Group","location":"Business Bay","min_price":520000,"handover":"2028","bedrooms":"2","yield":"6.5%"}]'></textarea>
+          <button class="btn btn-accent" id="impJsonGo" style="margin-top:8px">Импортировать JSON</button>
+        </div>
+        <div class="lp-sec">Куда сложить</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>Направление (если не в данных)</label><select id="impPGeo">${geoOpts}</select></div>
+          <div class="form-row"><label>Рынок по умолчанию</label><select id="impPMarket"><option value="offplan">Первичка (новостройки)</option><option value="secondary">Вторичка</option></select></div>
+        </div>`,
+      actions: [{ label: 'Закрыть' }],
+    });
+    $$('.imp-tab', bd).forEach(t => t.addEventListener('click', () => {
+      $$('.imp-tab', bd).forEach(x => x.classList.toggle('on', x === t));
+      $$('[data-imppane]', bd).forEach(p => p.style.display = p.dataset.imppane === t.dataset.imptab ? '' : 'none');
+    }));
+    const defaults = () => ({ geo: $('#impPGeo', bd).value, market: $('#impPMarket', bd).value });
+    const done = (r) => { if (r.error) { toast('Импорт не прошёл', r.error); return; } toast(`Импортировано: ${r.created}`, `дополнено: ${r.merged}${r.skipped ? ' · пропущено: ' + r.skipped : ''}${r.demo ? ' · демо-набор Reelly' : r.live ? ' · живой синк' : ''}`, true); closeModal(); render(); };
+    $('#impReellyGo', bd).addEventListener('click', async () => {
+      const key = $('#impReellyKey', bd).value.trim();
+      if (key) await api.patch('/settings', { inventorySources: { reelly: { key, enabled: true } } });
+      done(await api.post('/properties/import', { source: 'reelly', defaults: defaults() }));
+    });
+    $('#impTableGo', bd).addEventListener('click', async () => { const csv = $('#impTable', bd).value.trim(); if (!csv) return toast('Вставьте таблицу'); done(await api.post('/properties/import', { csv, defaults: defaults() })); });
+    $('#impJsonGo', bd).addEventListener('click', async () => { const j = $('#impJson', bd).value.trim(); if (!j) return toast('Вставьте JSON'); done(await api.post('/properties/import', { json: j, defaults: defaults() })); });
   });
   $('#portalSave')?.addEventListener('click', async () => {
     const body = {};

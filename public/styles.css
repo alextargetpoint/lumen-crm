@@ -1608,3 +1608,10 @@ html[data-night] .bulk-bar { background: #0D1730; border: 1px solid var(--stroke
 .kb-head .ct[data-selcol]:hover { background: var(--accent); color: #fff; }
 #tblSelAll { cursor: pointer; }
 .lead-tbl thead th:first-child { text-align: center; }
+
+/* Импорт объектов: вкладки источников */
+.imp-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.imp-tab { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1.5px solid var(--stroke); background: var(--card); font-size: 12.5px; font-weight: 650; color: var(--ink-2); cursor: pointer; }
+.imp-tab svg { width: 14px; height: 14px; }
+.imp-tab.on { border-color: var(--accent); background: var(--blue-100); color: var(--accent); }
+[data-imppane] textarea { width: 100%; }
