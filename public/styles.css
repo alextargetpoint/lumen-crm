@@ -1737,3 +1737,52 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 @keyframes celBurst { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(1); } 20% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-56px) scale(.3); } }
 .cel-txt { color: #fff; font-weight: 800; font-size: 15px; letter-spacing: .01em; }
 @media (prefers-reduced-motion: reduce) { .cel-orb, .cel-p, .cel-card { animation: none; transition: none; } }
+
+/* ============================================================
+   Микро-анимации интерфейса (спокойный люкс, без мельтешения)
+   ============================================================ */
+/* 1. Полоса загрузки при переходах между разделами */
+#navprog { position: fixed; top: 0; left: 0; height: 2.5px; width: 0; z-index: 1200; background: linear-gradient(90deg, #2563EB, #7C9BFF); box-shadow: 0 0 8px rgba(37,99,235,.5); opacity: 0; pointer-events: none; }
+#navprog.run { width: 82%; opacity: 1; transition: width 1.6s cubic-bezier(.1,.7,.3,1); }
+#navprog.done { width: 100%; opacity: 0; transition: width .2s ease, opacity .35s ease .15s; }
+
+/* 2. Ripple — тактильная волна от клика */
+.ripple { position: absolute; border-radius: 50%; background: currentColor; opacity: .28; transform: scale(0); pointer-events: none; animation: rippleGo .6s ease-out; z-index: 0; }
+@keyframes rippleGo { to { transform: scale(1); opacity: 0; } }
+.btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
+
+/* 3. Мягкая пульсация горячих лидов — привлекает внимание к важному */
+.lead-card.hot { position: relative; }
+.lead-card.hot::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(224,129,61,.5); animation: hotPulse 2.6s ease-in-out infinite; pointer-events: none; }
+@keyframes hotPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(224,129,61,.0); } 50% { box-shadow: 0 0 0 3px rgba(224,129,61,.28); } }
+
+/* 4. Каскадное появление карточек/строк при входе в раздел */
+.content.anim .kb-cards .lead-card, .content.anim .prop-card, .content.anim .cl2-card,
+.content.anim .broker-grid > *, .content.anim .cmt-card { animation: cardIn .5s var(--ease-spring, ease) both; }
+.content.anim .kb-cards .lead-card:nth-child(1) { animation-delay: .02s; }
+.content.anim .kb-cards .lead-card:nth-child(2) { animation-delay: .06s; }
+.content.anim .kb-cards .lead-card:nth-child(3) { animation-delay: .10s; }
+.content.anim .kb-cards .lead-card:nth-child(4) { animation-delay: .14s; }
+.content.anim .kb-cards .lead-card:nth-child(n+5) { animation-delay: .18s; }
+.content.anim .prop-card:nth-child(3n+1) { animation-delay: .04s; }
+.content.anim .prop-card:nth-child(3n+2) { animation-delay: .09s; }
+.content.anim .prop-card:nth-child(3n) { animation-delay: .14s; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* 5. Живая лента: новые события въезжают каскадом */
+.content.anim .feed-item { animation: feedIn .45s var(--ease-spring, ease) both; }
+.content.anim .feed-item:nth-child(1) { animation-delay: .05s; }
+.content.anim .feed-item:nth-child(2) { animation-delay: .1s; }
+.content.anim .feed-item:nth-child(3) { animation-delay: .15s; }
+.content.anim .feed-item:nth-child(n+4) { animation-delay: .2s; }
+@keyframes feedIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+/* 6. Счётчики в меню — pop при изменении */
+.nav-item [data-cnt].bump { animation: cntBump .4s var(--ease-spring, ease); }
+@keyframes cntBump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  #navprog, .ripple, .lead-card.hot::before,
+  .content.anim .kb-cards .lead-card, .content.anim .prop-card, .content.anim .cl2-card,
+  .content.anim .broker-grid > *, .content.anim .cmt-card, .content.anim .feed-item { animation: none !important; }
+}

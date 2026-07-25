@@ -605,7 +605,11 @@ async function loadState() {
     const b = $$('.nav-item').find(x => x.dataset.page === page);
     if (!b) return;
     const c = b.querySelector('[data-cnt]');
-    if (c) { c.textContent = v; c.style.display = v ? '' : 'none'; }
+    if (c) {
+      const prev = c.textContent;
+      c.textContent = v; c.style.display = v ? '' : 'none';
+      if (v && prev !== '' && String(v) !== prev) { c.classList.add('bump'); setTimeout(() => c.classList.remove('bump'), 420); }
+    }
   };
   setCnt('inbox', an.unread || 0);
   setCnt('funnel', an.totalActive || 0);
@@ -633,8 +637,32 @@ function initNav() {
     });
   });
 }
+/* ---------- тонкая полоса загрузки при переходах (вместо белого моргания) ---------- */
+function navProgress() {
+  let b = $('#navprog'); if (!b) { b = el('<div id="navprog"></div>'); document.body.appendChild(b); }
+  b.classList.remove('done'); void b.offsetWidth; b.classList.add('run');
+}
+function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remove('run'); b.classList.add('done'); } }
+
+/* ---------- ripple: тактильная волна от клика ---------- */
+document.addEventListener('pointerdown', (e) => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const btn = e.target.closest('.btn, .nav-item, .seg-btn, .chip-t, .imp-tab');
+  if (!btn || btn.disabled || btn.querySelector('.ripple')) return;
+  const r = btn.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 1.2;
+  const rip = document.createElement('span');
+  rip.className = 'ripple';
+  rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+  const pos = getComputedStyle(btn).position;
+  if (pos === 'static') btn.style.position = 'relative';
+  btn.appendChild(rip);
+  setTimeout(() => rip.remove(), 620);
+}, true);
+
 function go(page) {
   CUR = page;
+  navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
@@ -708,7 +736,7 @@ async function render() {
       window._lastRenderAt = Date.now();
       if (CUR !== page) renderQueued = true; // пока рисовали — ушли на другой раздел
     } while (renderQueued);
-  } finally { renderBusy = false; }
+  } finally { renderBusy = false; navProgressDone(); }
 }
 
 /* ---------- связь с сервером: молча не умираем ---------- */
@@ -1147,7 +1175,7 @@ PAGES.funnel = async (root) => {
         return `<div class="kb-col" data-stage="${st.id}">
           <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
           <div class="kb-cards">
-            ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""}" data-id="${l.id}" data-stage="${l.stage}">
+            ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
               <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
