@@ -1964,15 +1964,14 @@ PAGES.qualifier = async (root) => {
               const on = (s.ai.persona || {}).id === h.id;
               const xp = ((s.ai.heroXP || {})[h.id]) || 0; const L = heroLevel(xp);
               const prog = L.max ? 100 : Math.round((xp - L.prev) / Math.max(1, L.cap - L.prev) * 100);
-              return `<div class="hero-card ${on ? 'on' : ''}" data-hero="${h.id}">
+              return `<div class="hero-card ${on ? 'on' : ''}" data-hero="${h.id}" title="${h.tagline} · подходит: ${h.fit}">
                 <div class="hero-lvl" title="Уровень ${L.lvl}: ${L.name}">LV${L.lvl}</div>
                 <div class="hero-ava"><img src="${h.avatar}" alt="${h.name}" loading="lazy"><span class="hero-ring"></span></div>
                 <div class="hero-nm">${h.name}</div>
                 <div class="hero-role">${h.role}</div>
-                <div class="hero-tag">${h.tagline}</div>
                 <div class="hero-stats">${Object.entries(h.stats).map(([k, v]) => `<div class="hstat"><span>${k}</span><i><b style="width:${v}%"></b></i></div>`).join('')}</div>
-                <div class="hero-fit">${ic(I.target, 2)}${h.fit}</div>
-                <div class="hero-xp"><i style="width:${prog}%"></i><span>${L.max ? 'MAX · ' + xp + ' квал' : L.name + ' · ' + xp + '/' + L.cap + ' квал'}</span></div>
+                <div class="hero-xpcap">${L.max ? 'MAX' : L.name} · ${xp}${L.max ? '' : '/' + L.cap} квал</div>
+                <div class="hero-xp"><i style="width:${prog}%"></i></div>
                 <div class="hero-pick">${on ? ic(I.check, 2.4) + ' Выбран' : 'Выбрать'}</div>
               </div>`;
             }).join('')}
