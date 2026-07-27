@@ -34,6 +34,17 @@ const playbook = require('./playbook');
 const billing = require('./billing');
 const { MARKET } = require('./marketdata');
 
+/* Стартовые WhatsApp-шаблоны первого касания. Тело = фикс-текст + {{1}},
+   где {{1}} — полностью собранное Lumen персональное сообщение (совпадает
+   с одно-параметровой отправкой в wa.sendTemplate). Категория MARKETING —
+   первое исходящее касание вне 24ч-окна по правилам Meta это маркетинг. */
+const STARTER_TEMPLATES = [
+  { name: 'lumen_first_touch', language: 'ru', category: 'MARKETING',
+    components: [{ type: 'BODY', text: 'Здравствуйте! 👋 На связи агентство недвижимости.\n\n{{1}}', example: { body_text: [['Подобрали для вас несколько объектов под ваш запрос — скинуть подборку?']] } }] },
+  { name: 'lumen_first_touch', language: 'en', category: 'MARKETING',
+    components: [{ type: 'BODY', text: 'Hello! 👋 This is a real estate agency reaching out.\n\n{{1}}', example: { body_text: [['We\'ve prepared a few options matching your request — shall we send the selection?']] } }] },
+];
+
 store.load(seed);
 engine.startLoop();
 
@@ -868,8 +879,8 @@ const server = http.createServer(async (req, res) => {
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
     const IS_BROKER = ROLE && ROLE.role === 'broker';
-    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice|comments)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
-    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake|comments)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
+    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice|comments|wa)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
+    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake|comments|wa)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
     /* видимость лида для брокера: только свои */
     const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
     const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; return c2; };
@@ -1308,6 +1319,35 @@ const server = http.createServer(async (req, res) => {
       if (b.stopWords) db.settings.stopWords = b.stopWords;
       store.save();
       return json(res, 200, publicSettings(db));
+    }
+
+    /* ---------------- WhatsApp Cloud: живая проверка / шаблоны ---------------- */
+    /* Проверка подключения по сохранённым реквизитам. Сохраняет отпечаток
+       (номер/качество/срок токена) в settings.wa — UI показывает «зелёный». */
+    if (p === '/api/wa/verify' && req.method === 'POST') {
+      const r = await wa.verify(db);
+      const w = db.settings.wa;
+      if (r.ok) {
+        w.verifiedAt = Date.now(); w.number = r.number || ''; w.quality = r.quality || '';
+        w.tokenExpiresAt = r.tokenExpiresAt || 0; w.verifiedName = r.verifiedName || '';
+      } else { w.verifiedAt = 0; }
+      store.save();
+      return json(res, 200, r);
+    }
+    /* Синк списка шаблонов из WABA (имя/статус модерации/категория/язык) */
+    if (p === '/api/wa/templates' && req.method === 'GET') {
+      try { const t = await wa.listTemplates(db); return json(res, 200, { ok: true, templates: t.map(x => ({ name: x.name, status: x.status, category: x.category, language: x.language })) }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* Создать стартовый набор шаблонов первого касания (ru+en) в WABA */
+    if (p === '/api/wa/templates/create' && req.method === 'POST') {
+      const results = [];
+      for (const def of STARTER_TEMPLATES) {
+        try { const r = await wa.createTemplate(db, def); results.push({ name: def.name, lang: def.language, ok: true, id: r.id || null, status: r.status || 'PENDING' }); }
+        catch (e) { results.push({ name: def.name, lang: def.language, ok: false, error: e.message }); }
+      }
+      audit(db, req, 'создал стартовые WhatsApp-шаблоны');
+      return json(res, 200, { results });
     }
 
     /* ---------------- встречи ---------------- */

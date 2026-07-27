@@ -1851,3 +1851,11 @@ html[data-night] .bu-n,
 html[data-night] .bi-amt { color: var(--ink); }
 html[data-night] .bu-total { background: linear-gradient(180deg, rgba(143,180,255,.10), rgba(143,180,255,.02)); border-color: rgba(143,180,255,.28); }
 html[data-night] .bill-plan.on .bp-price, html[data-night] .bill-plan.on .bp-sub, html[data-night] .bill-plan.on .bp-name { color: #fff; }
+
+/* WhatsApp Cloud — панель статуса подключения */
+.wa-st{display:flex;gap:8px;align-items:flex-start;padding:9px 12px;border-radius:12px;font-size:12.5px;line-height:1.45}
+.wa-st svg{flex:0 0 15px;width:15px;height:15px;margin-top:1px;opacity:.9}
+.wa-st b{color:inherit;font-weight:650}
+.wa-st.ok{background:color-mix(in srgb,var(--ok) 13%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 32%,transparent)}
+.wa-st.bad{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 32%,transparent)}
+.wa-st.neutral{background:rgba(148,163,184,.08);color:var(--ink-2);border:1px solid var(--line)}

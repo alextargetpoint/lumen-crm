@@ -3,7 +3,7 @@
    engine.send работает в mock-режиме (сообщение только в CRM).
    Отправка «в огонь»: статус проставляется по факту ответа Graph API,
    доставка/прочтение прилетают вебхуком statuses. */
-const GRAPH = 'https://graph.facebook.com/v20.0';
+const GRAPH = 'https://graph.facebook.com/v21.0';
 
 function ready(db) {
   const wa = db.settings.wa;
@@ -20,6 +20,50 @@ async function post(db, path, body) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`cloud api ${r.status}: ${j.error?.message || 'unknown'}`);
   return j;
+}
+
+/* GET к Graph с текущим токеном (для проверок/чтения шаблонов) */
+async function graphGet(db, path, params) {
+  const wa = db.settings.wa;
+  const usp = new URLSearchParams(Object.assign({ access_token: wa.token }, params || {}));
+  const r = await fetch(`${GRAPH}/${path}?${usp.toString()}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error?.message || `graph ${r.status}`);
+  return j;
+}
+
+/* Живая проверка подключения: валиден ли токен, что за номер, качество,
+   когда истекает токен, какие шаблоны есть в WABA и их статус модерации.
+   Работает независимо от mode — можно проверить ДО включения боевого. */
+async function verify(db) {
+  const wa = db.settings.wa;
+  if (!wa.token) return { ok: false, error: 'Токен не задан' };
+  if (!wa.phoneId) return { ok: false, error: 'Phone Number ID не задан' };
+  try {
+    const ph = await graphGet(db, wa.phoneId, { fields: 'display_phone_number,verified_name,quality_rating,code_verification_status,platform_type' });
+    const out = {
+      ok: true, number: ph.display_phone_number || '', verifiedName: ph.verified_name || '',
+      quality: ph.quality_rating || '', codeStatus: ph.code_verification_status || '', platform: ph.platform_type || '',
+    };
+    try { const dbg = await graphGet(db, 'debug_token', { input_token: wa.token }); const d = dbg.data || {}; out.tokenExpiresAt = d.expires_at || 0; out.tokenType = d.type || ''; out.appId = d.app_id || ''; } catch (e) { /* debug_token может быть недоступен под system-user — не критично */ }
+    if (wa.wabaId) {
+      try { const t = await graphGet(db, `${wa.wabaId}/message_templates`, { fields: 'name,status,category,language', limit: 100 }); out.templates = (t.data || []).map(x => ({ name: x.name, status: x.status, category: x.category, language: x.language })); }
+      catch (e) { out.templatesError = e.message; }
+    }
+    return out;
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function listTemplates(db) {
+  if (!db.settings.wa.wabaId) throw new Error('WABA ID не задан');
+  const t = await graphGet(db, `${db.settings.wa.wabaId}/message_templates`, { fields: 'name,status,category,language,components', limit: 100 });
+  return t.data || [];
+}
+
+/* Создать шаблон в WABA (модерация Meta ~минуты-часы). def — payload Graph. */
+async function createTemplate(db, def) {
+  if (!db.settings.wa.wabaId) throw new Error('WABA ID не задан');
+  return post(db, `${db.settings.wa.wabaId}/message_templates`, def);
 }
 
 function toWaPhone(phone) { return phone.replace(/\D/g, ''); }
@@ -59,4 +103,4 @@ function applyStatuses(db, value) {
   return changed;
 }
 
-module.exports = { ready, sendText, sendTemplate, applyStatuses };
+module.exports = { ready, sendText, sendTemplate, applyStatuses, verify, listTemplates, createTemplate };

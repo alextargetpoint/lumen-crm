@@ -4100,6 +4100,23 @@ PAGES.billing = async (root) => {
 };
 
 /* ---------------- ПОДКЛЮЧЕНИЯ ---------------- */
+function waFmtDate(ms) { if (!ms) return ''; try { return new Date(ms).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (e) { return ''; } }
+function waBadSt(html) { return `<div class="wa-st bad">${ic(I.spark)}<span>${html}</span></div>`; }
+/* Панель статуса подключения: из живого ответа verify (live) либо из сохранённого отпечатка (w) */
+function waStatusHtml(w, live) {
+  if (live && !live.ok) return waBadSt(`Не подключилось: ${esc(live.error || 'ошибка')}`);
+  const src = (live && live.ok) ? live : (w && w.verifiedAt ? w : null);
+  if (!src) return `<div class="wa-st neutral">${ic(I.spark)}<span>Подключение не проверено — вставьте токен и нажмите «Проверить».</span></div>`;
+  const num = src.number || '', name = src.verifiedName || '', qual = src.quality || '';
+  const tokMs = (src.tokenExpiresAt || 0) ? src.tokenExpiresAt * 1000 : 0;
+  if (tokMs && tokMs < Date.now()) return waBadSt(`Номер <b>${esc(num)}</b>, но токен истёк ${waFmtDate(tokMs)} — обновите System User токен.`);
+  const tokTxt = !tokMs ? 'бессрочный' : ('до ' + waFmtDate(tokMs));
+  return `<div class="wa-st ok">${ic(I.spark)}<span>Подключено: <b>${esc(num)}</b>${name ? ' · ' + esc(name) : ''} · качество <b>${esc(qual || '—')}</b> · токен ${tokTxt}</span></div>`;
+}
+function tplListHtml(list) {
+  const badge = st => st === 'APPROVED' ? '<span class="badge ok">одобрен</span>' : st === 'REJECTED' ? '<span class="badge bad">отклонён</span>' : `<span class="badge warn">${esc((st || 'модерация').toLowerCase())}</span>`;
+  return list.map(t => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>${esc(t.name)}</b> <span class="muted">· ${esc(t.language)} · ${esc((t.category || '').toLowerCase())}</span></span>${badge(t.status)}</div>`).join('');
+}
 PAGES.settings = async (root) => {
   const s = STATE.settings;
   root.innerHTML = `
@@ -4107,16 +4124,23 @@ PAGES.settings = async (root) => {
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
         <div class="set-row">
-          <div class="sp"><div class="sl">Режим</div><div class="sd">${s.wa.mode === 'mock' ? 'Демо: сообщения пишутся только в CRM' : 'Боевой: отправка через Cloud API'}</div></div>
-          <span class="badge ${s.wa.mode === 'mock' ? 'warn' : 'ok'}">${s.wa.mode === 'mock' ? 'демо' : 'подключён'}</span>
+          <div class="sp"><div class="sl">Боевой режим</div><div class="sd">${s.wa.mode === 'mock' ? 'Выключен: сообщения пишутся только в CRM' : 'Включён: отправка через Cloud API'}</div></div>
+          <label class="switch"><input type="checkbox" id="waMode" ${s.wa.mode === 'cloud' ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
         </div>
-        <div class="form-row" style="margin-top:12px"><label>Phone Number ID</label><input id="waPhoneId" value="${esc(s.wa.phoneId)}" placeholder="из Meta Business → WhatsApp → API Setup"></div>
+        <div id="waStatus" style="margin:10px 0">${waStatusHtml(s.wa)}</div>
+        <div class="form-row" style="margin-top:6px"><label>Phone Number ID</label><input id="waPhoneId" value="${esc(s.wa.phoneId)}" placeholder="из Meta Business → WhatsApp → API Setup"></div>
         <div class="form-row"><label>WABA ID</label><input id="waWabaId" value="${esc(s.wa.wabaId)}" placeholder="WhatsApp Business Account ID"></div>
-        <div class="form-row"><label>Постоянный токен</label><input id="waToken" type="password" placeholder="${s.wa.tokenSet ? '•••••• сохранён' : 'System User token'}"></div>
+        <div class="form-row"><label>Постоянный токен (System User)</label><input id="waToken" type="password" placeholder="${s.wa.tokenSet ? '•••••• сохранён' : 'EAAG… из Business Settings → System Users'}"></div>
+        <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="saveWa" style="flex:1;justify-content:center">Сохранить и проверить</button><button class="btn" id="waVerify" title="Проверить текущее подключение">${ic(I.spark)}Проверить</button></div>
         <div class="form-row"><label>Внешняя ссылка (туннель) — для команды и вебхуков</label>
           <div style="display:flex;gap:8px;align-items:center">${s.tunnelUrl ? `<code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${esc(s.tunnelUrl)}</code><button class="btn btn-sm" id="tunCopy">${ic(I.copy)}</button>` : '<span class="badge warn">туннель не запущен</span>'}</div></div>
-        <div class="form-row"><label>Webhook для входящих</label><div><code class="pill">${location.origin}/wa/webhook</code> <span class="muted" style="font-size:11px">verify token: <code class="pill">${esc(s.wa.webhookVerifyToken)}</code></span></div></div>
-        <button class="btn btn-accent" id="saveWa" style="width:100%;justify-content:center;margin-top:6px">Сохранить подключение</button>
+        <div class="form-row"><label>Webhook для входящих (вставить в Meta → WhatsApp → Configuration)</label>
+          <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${(s.tunnelUrl || location.origin)}/wa/webhook</code><button class="btn btn-sm" id="whCopy">${ic(I.copy)}</button></div>
+          <span class="muted" style="font-size:11px">Verify token: <code class="pill">${esc(s.wa.webhookVerifyToken)}</code> · поля подписки: <b>messages</b></span></div>
+        <div class="wa-tpl-card" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="sl">Шаблоны первого касания</div><div style="display:flex;gap:6px"><button class="btn btn-sm" id="waSyncTpl">${ic(I.refresh || I.spark)}Синк</button><button class="btn btn-sm btn-accent" id="waCreateTpl">Создать стартовые</button></div></div>
+          <div id="waTpl" class="muted" style="font-size:12px">${s.wa.templates && s.wa.templates.length ? tplListHtml(s.wa.templates) : 'Шаблоны нужны для холодного первого касания (вне 24-часового окна Meta пускает только их). Нажмите «Синк» после подключения токена или «Создать стартовые».'}</div>
+        </div>
       </div>
       <div>
         <div class="glass card mb">
@@ -4195,17 +4219,58 @@ PAGES.settings = async (root) => {
     </div>`;
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
-  $('#saveWa').addEventListener('click', async () => {
+  const whc = $('#whCopy');
+  if (whc) whc.addEventListener('click', () => { navigator.clipboard.writeText((s.tunnelUrl || location.origin) + '/wa/webhook'); toast('Webhook-ссылка скопирована', null, true); });
+  /* Сохранить реквизиты (без флипа режима) и сразу проверить их живьём */
+  const saveWaCreds = async () => {
     const token = $('#waToken').value.trim();
-    const phoneId = $('#waPhoneId').value.trim();
     await api.patch('/settings', { wa: {
-      phoneId, wabaId: $('#waWabaId').value.trim(),
+      phoneId: $('#waPhoneId').value.trim(), wabaId: $('#waWabaId').value.trim(),
       ...(token ? { token } : {}),
-      mode: (token || s.wa.tokenSet) && phoneId ? 'cloud' : 'mock',
     } });
-    toast('Подключение сохранено', token && phoneId ? 'Боевой режим: отправка через Cloud API' : 'Демо-режим (нет токена или Phone ID)', true);
+  };
+  const runVerify = async (announce) => {
+    const box = $('#waStatus'); box.innerHTML = '<span class="muted" style="font-size:12px">Проверяю подключение к Meta…</span>';
+    const r = await api.post('/wa/verify');
     await loadState();
-    render();
+    box.innerHTML = waStatusHtml(STATE.settings.wa, r);
+    if (announce) { if (r.ok) toast('Подключение живое', `${r.number || ''} · качество ${r.quality || '—'}`, true); else toast('Подключение не прошло', r.error); }
+    return r;
+  };
+  $('#saveWa').addEventListener('click', async () => { await saveWaCreds(); await runVerify(true); });
+  $('#waVerify').addEventListener('click', () => runVerify(true));
+  /* Боевой режим: включать можно только на проверенном токене */
+  $('#waMode').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    if (on) {
+      await saveWaCreds();
+      const r = await runVerify(false);
+      if (!r.ok) { e.target.checked = false; toast('Нельзя включить боевой', r.error || 'токен не прошёл проверку'); return; }
+      const tokExp = r.tokenExpiresAt ? r.tokenExpiresAt * 1000 : 0;
+      if (tokExp && tokExp < Date.now()) { e.target.checked = false; toast('Токен истёк', 'Обновите System User токен — он просрочен'); return; }
+      await api.patch('/settings', { wa: { mode: 'cloud' } });
+      toast('Боевой режим включён', 'Исходящие уходят через Cloud API', true);
+    } else {
+      await api.patch('/settings', { wa: { mode: 'mock' } });
+      toast('Боевой режим выключен', 'Сообщения снова только в CRM', true);
+    }
+    await loadState(); render();
+  });
+  $('#waSyncTpl').addEventListener('click', async () => {
+    const box = $('#waTpl'); box.innerHTML = 'Синхронизирую…';
+    const r = await api.get('/wa/templates');
+    if (r.ok) { await api.patch('/settings', { wa: {} }); box.innerHTML = r.templates.length ? tplListHtml(r.templates) : 'В WABA пока нет шаблонов — нажмите «Создать стартовые».'; }
+    else box.innerHTML = `<span style="color:var(--bad)">${esc(r.error)}</span>`;
+  });
+  $('#waCreateTpl').addEventListener('click', async () => {
+    const b = $('#waCreateTpl'); b.disabled = true; b.textContent = 'Создаю…';
+    const r = await api.post('/wa/templates/create');
+    b.disabled = false; b.textContent = 'Создать стартовые';
+    const ok = (r.results || []).filter(x => x.ok).length;
+    const fail = (r.results || []).filter(x => !x.ok);
+    if (fail.length) toast(`Создано ${ok}, ошибок ${fail.length}`, fail[0].error);
+    else toast(`Отправлено на модерацию: ${ok} шаблон(а)`, 'Статус станет APPROVED через несколько минут — нажмите «Синк»', true);
+    setTimeout(() => $('#waSyncTpl') && $('#waSyncTpl').click(), 1200);
   });
   $('#aiProv').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { provider: e.target.value } }); loadState(); });
   $('#vSave').addEventListener('click', async () => {
