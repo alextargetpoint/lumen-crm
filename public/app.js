@@ -342,6 +342,19 @@ const NAV = {
   billing:   { name: 'Подписка и оплата', icon: I.card, sub: 'Тариф, места, счета, расходники по себестоимости' },
 };
 
+/* Рабочие пространства: родственные разделы схлопнуты в один пункт сайдбара
+   с сегментным переключателем сверху. Роутинг не меняется — CUR остаётся
+   реальной страницей (кнопки действий/счётчики/deep-links живут как прежде),
+   меняется только группировка в меню. Минус ~9 пунктов из бокового меню. */
+const WORKSPACES = {
+  base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
+  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'comments', 'wake'] },
+  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
+  config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
+};
+const PARENT_OF = {};
+for (const [ws, def] of Object.entries(WORKSPACES)) for (const pk of def.pages) PARENT_OF[pk] = ws;
+
 const BASE_STAGES = [
   { id: 'new', name: 'Новые', icon: 'plus', sys: true },
   { id: 'touch', name: 'Первое касание', icon: 'chain', sys: true },
@@ -628,16 +641,30 @@ function hidePreloader() {
 /* ---------- навигация ---------- */
 function initNav() {
   $$('.nav-item').forEach(btn => {
-    const def = NAV[btn.dataset.page];
+    /* кнопка-пространство рисует свой лейбл/иконку; ведёт на дефолтную под-страницу */
+    const ws = btn.dataset.ws ? WORKSPACES[btn.dataset.ws] : null;
+    const def = ws ? { icon: ws.icon, name: ws.label } : NAV[btn.dataset.page];
     btn.innerHTML = `${ic(def.icon)}${def.name}<span class="cnt" data-cnt style="display:none"></span>`;
     btn.addEventListener('click', () => {
-      /* клик по пункту меню = верхний уровень раздела: сбрасываем «внутренние» состояния */
-      if (btn.dataset.page === 'properties') PAGE_STATE.propView = null;
-      if (btn.dataset.page === 'collections') PAGE_STATE.collLead = '';
-      if (btn.dataset.page === 'sequences') PAGE_STATE.seqEdit = null;
-      go(btn.dataset.page);
+      /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */
+      let target = btn.dataset.page;
+      if (ws) { target = ws.pages.includes(CUR) ? CUR : (PAGE_STATE['ws_' + btn.dataset.ws] || ws.pages[0]); }
+      if (target === 'properties') PAGE_STATE.propView = null;
+      if (target === 'collections') PAGE_STATE.collLead = '';
+      if (target === 'sequences') PAGE_STATE.seqEdit = null;
+      go(target);
     });
   });
+}
+/* Сегментный переключатель под-разделов пространства — вставляется первым
+   элементом в #content, поверх любой страницы, входящей в пространство. */
+function injectWorkspaceTabs(c0, page) {
+  const parent = PARENT_OF[page];
+  if (!parent) return;
+  const ws = WORKSPACES[parent];
+  const bar = el(`<div class="ws-tabs">${ws.pages.map(pk => `<button class="ws-tab${pk === page ? ' on' : ''}" data-p="${pk}">${ic(NAV[pk].icon)}<span>${NAV[pk].name}</span></button>`).join('')}</div>`);
+  bar.querySelectorAll('.ws-tab').forEach(b => b.addEventListener('click', () => { if (b.dataset.p !== CUR) go(b.dataset.p); }));
+  c0.insertBefore(bar, c0.firstChild);
 }
 /* ---------- тонкая полоса загрузки при переходах (вместо белого моргания) ---------- */
 function navProgress() {
@@ -667,7 +694,8 @@ function go(page) {
   navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
-  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  if (PARENT_OF[page]) PAGE_STATE['ws_' + PARENT_OF[page]] = page; /* запоминаем вкладку пространства */
+  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? WORKSPACES[b.dataset.ws].pages.includes(page) : b.dataset.page === page));
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
   $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
@@ -714,6 +742,7 @@ async function render() {
         const c0 = $('#content');
         const isWave = c0.classList.contains('anim');
         await fn(c0);
+        injectWorkspaceTabs(c0, page);
         enhanceControls(c0);
         wireAiWand(c0);
         wireHeroArt(c0);

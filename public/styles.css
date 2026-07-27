@@ -1859,3 +1859,28 @@ html[data-night] .bill-plan.on .bp-price, html[data-night] .bill-plan.on .bp-sub
 .wa-st.ok{background:color-mix(in srgb,var(--ok) 13%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 32%,transparent)}
 .wa-st.bad{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 32%,transparent)}
 .wa-st.neutral{background:rgba(148,163,184,.08);color:var(--ink-2);border:1px solid var(--line)}
+
+/* Пункт «Настройки» прижат к низу бокового меню, отделён тонкой чертой */
+.nav-config { margin-top: auto; }
+.nav-config::before { content: ''; display: block; }
+.nav .nav-config { position: relative; margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 2px; }
+
+/* Сегментный переключатель под-разделов рабочего пространства (над страницей) */
+.ws-tabs {
+  display: flex; gap: 2px; padding: 3px; margin: 0 0 20px;
+  background: rgba(140,165,230,.06); border: 1px solid var(--line);
+  border-radius: 13px; width: max-content; max-width: 100%;
+  overflow-x: auto; scrollbar-width: none;
+}
+.ws-tabs::-webkit-scrollbar { display: none; }
+.ws-tab {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 8px 15px; border-radius: 10px; font-size: 13px; font-weight: 550;
+  color: var(--ink-2); background: transparent; border: 0; cursor: pointer;
+  transition: color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast);
+}
+.ws-tab svg { width: 15px; height: 15px; stroke-width: 1.7; opacity: .8; }
+.ws-tab:hover { color: var(--ink); background: rgba(140,175,255,.09); }
+.ws-tab.on { color: #fff; background: rgba(120,160,255,.20); box-shadow: inset 0 0 0 1px rgba(150,185,255,.28); }
+.ws-tab.on svg { opacity: 1; color: var(--blue-300); }
+@media (max-width: 760px) { .ws-tabs { width: 100%; } }
