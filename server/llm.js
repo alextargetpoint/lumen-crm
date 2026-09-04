@@ -261,4 +261,26 @@ ${propLines}
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, MODEL };
+/* ИИ-генерация картинок для конструктора подборок (OpenAI gpt-image-1).
+   Возвращает Buffer PNG. Стоимость ~$0.02–0.07/шт (medium 1536×1024). */
+async function generateImage(prompt, opts = {}) {
+  if (!OKEY) throw new Error('нет OPENAI_API_KEY для генерации картинок');
+  const r = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OKEY}` },
+    body: JSON.stringify({
+      model: 'gpt-image-1',
+      prompt: String(prompt).slice(0, 3200),
+      size: opts.size || '1536x1024',
+      quality: opts.quality || 'medium',
+      n: 1,
+    }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error('image ' + r.status + ': ' + (j.error?.message || ''));
+  const b64 = j.data?.[0]?.b64_json;
+  if (!b64) throw new Error('image empty');
+  return Buffer.from(b64, 'base64');
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, generateImage, hasImage: () => !!OKEY, MODEL };

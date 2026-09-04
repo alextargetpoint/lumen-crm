@@ -1690,6 +1690,23 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
       return json(res, 200, { url: '/assets/' + fname });
     }
+    /* конструктор v2: ИИ-генерация картинки (OpenAI gpt-image-1) → сохраняем в общую библиотеку */
+    if ((m = p.match(/^\/p\/([a-f0-9]+)\/ai-image$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для генерации картинок' });
+      const b = await readBody(req);
+      const pr = String(b.prompt || '').trim();
+      if (!pr) return json(res, 400, { error: 'опишите картинку' });
+      /* обогащаем промпт под стиль подборки недвижимости, если пользователь дал только короткое описание */
+      const style = b.raw ? '' : ', premium real-estate photography, cinematic natural light, elegant, high-end, photoreal, no text, no watermark, no logo';
+      try {
+        const buf = await llm.generateImage(pr + style, { size: b.size || '1536x1024', quality: b.quality || 'medium' });
+        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        const fname = `lib/ai-${crypto.randomBytes(5).toString('hex')}.png`;
+        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        return json(res, 200, { url: '/assets/' + fname });
+      } catch (e) { return json(res, 500, { error: 'ИИ-картинка не удалась: ' + e.message }); }
+    }
     /* конструктор v2: ИИ-сборка текстов подборки из контекста лида */
     if ((m = p.match(/^\/p\/([a-f0-9]+)\/compose$/)) && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
@@ -2731,7 +2748,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=19"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=20"></script>` : ''}
 </body></html>`);
       return;
     }

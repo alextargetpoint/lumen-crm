@@ -450,6 +450,9 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
     const lib = (P.lib || []).map((u) => `<div class="plib" data-lib="${u}" style="background-image:url('${u}')"></div>`).join('');
     const el = openPop(`<div class="psec">Картинка</div>
       <div class="pi" data-img="file"><i>⤴</i>Загрузить файл</div>
+      ${P.llm ? `<div class="psec">✦ Сгенерировать ИИ</div>
+      <textarea id="peAiPrompt" rows="2" placeholder="Опишите картинку: напр. «светлая гостиная виллы на Бали с видом на джунгли, закат»"></textarea>
+      <div class="prow"><button class="edbtn ai" id="peAiGo" style="flex:1">✦ Сгенерировать картинку</button></div>` : ''}
       ${lib ? `<div class="psec">Библиотека</div><div class="plibrow">${lib}</div>` : ''}
       <div class="psec">или ссылка</div>
       <input type="text" id="peImgUrl" placeholder="https://…" value="${cur.replace(/"/g, '&quot;')}">
@@ -457,6 +460,25 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
     $$('.plib', el).forEach((th) => th.addEventListener('click', () => { applyImg(hot, th.dataset.lib); closePop(); }));
     $('.pi[data-img="file"]', el).addEventListener('click', () => { filePickCb = (u) => applyImg(hot, u); fileInput.click(); closePop(); });
     $('#peImgOk', el).addEventListener('click', () => { applyImg(hot, $('#peImgUrl', el).value.trim()); closePop(); });
+    const aiGo = $('#peAiGo', el);
+    if (aiGo) aiGo.addEventListener('click', async () => {
+      const prompt = $('#peAiPrompt', el).value.trim();
+      if (!prompt) { flash('Опишите картинку'); return; }
+      const holder = hot; closePop();
+      flash('✦ ИИ рисует картинку (10–20 сек)…', 0);
+      try {
+        const r = await fetch(`/p/${P.cid}/ai-image?key=${encodeURIComponent(KEY)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || r.status);
+        applyImg(holder, j.url);
+        if (P.lib && !P.lib.includes(j.url)) P.lib.unshift(j.url);
+        flash('Готово — картинка вставлена и добавлена в библиотеку');
+        await save(true);
+      } catch (e2) { flash('Не вышло: ' + e2.message); }
+    });
     const rm = $('#peImgRm', el);
     if (rm) rm.addEventListener('click', () => { applyImg(hot, ''); closePop(); });
   }, true);
