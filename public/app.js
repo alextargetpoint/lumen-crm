@@ -367,6 +367,10 @@ const BASE_STAGES = [
   { id: 'lost', name: 'Закрыт', icon: 'x', sys: true },
 ];
 let STAGES = BASE_STAGES.slice();
+
+/* полные названия языков для этикеток брокеров (код → человекочитаемое) */
+const LANG_NAMES = { ru: 'Русский', en: 'Английский', ar: 'Арабский', id: 'Индонезийский', es: 'Испанский', de: 'Немецкий', fr: 'Французский', it: 'Итальянский', zh: 'Китайский', pt: 'Португальский', tr: 'Турецкий', fa: 'Персидский', hi: 'Хинди', uk: 'Украинский', pl: 'Польский', nl: 'Нидерландский' };
+const langName = (lg) => LANG_NAMES[lg] || (lg ? lg.charAt(0).toUpperCase() + lg.slice(1) : lg);
 function rebuildStages() {
   const cfg = (STATE && STATE.settings.stagesCfg) || {};
   let list = BASE_STAGES.map(st => ({ ...st, name: (cfg.names || {})[st.id] || st.name }))
@@ -408,7 +412,7 @@ function renderLogin() {
     if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(120,160,255,.4))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7C9BFF;opacity:.75;margin-top:12px">работает на Lumen</div></div>`;
   } catch (e) {}
   const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
-    <video autoplay muted loop playsinline src="assets/nebula-bg.mp4"
+    <video autoplay muted loop playsinline src="assets/skyline-bg.mp4?v=1" poster="assets/skyline-poster.jpg"
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
     <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
     <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
@@ -3049,9 +3053,15 @@ PAGES.automations = async (root) => {
       </div>
       <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Отчёты в мессенджер: <b>${(s.reports || {}).daily || (s.reports || {}).weekly ? 'включены' : 'выключены'}</b> · мгновенные алерты: <b>${Object.values((s.reports || {}).instant || {}).filter(Boolean).length}</b></span></div>
     `, { v: 'mark', hue: '#5E7BB8' })}
-    <div class="two-col">
-      <div>
-        <div class="glass card mb">
+    <div class="seg auto-seg" id="autoSeg">
+      <button class="seg-b on" data-ag="first">${ic(I.spark)}Первая линия</button>
+      <button class="seg-b" data-ag="dist">${ic(I.users)}Распределение</button>
+      <button class="seg-b" data-ag="meet">${ic(I.cal)}Встречи</button>
+      <button class="seg-b" data-ag="reports">${ic(I.send)}Отчёты и каналы</button>
+      <button class="seg-b" data-ag="build">${ic(I.funnel)}Конструкторы</button>
+    </div>
+    <div class="auto-grid" id="autoGrid">
+        <div class="glass card mb" data-ag="dist">
           <div class="card-title">${ic(I.users)}Распределение по брокерам</div>
           ${swRow('Режим распределения', 'Кому уходит квалифицированный лид нужного гео', `<select data-auto-sel="assignMode" style="width:190px">
             <option value="load" ${a.assignMode === 'load' ? 'selected' : ''}>По загрузке (меньше — берёт)</option>
@@ -3061,7 +3071,7 @@ PAGES.automations = async (root) => {
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
-        <div class="glass card mb">
+        <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
           ${swRow('Еженедельная (пн) и ежемесячная (1-е)', 'Расширенные сводки по периодам', sw('rep_weekly', (s.reports || {}).weekly) + sw('rep_monthly', (s.reports || {}).monthly))}
@@ -3073,7 +3083,7 @@ PAGES.automations = async (root) => {
             <button class="btn btn-sm" id="repTest">${ic(I.send)}Тест-сводка</button>
           </div>
         </div>
-        <div class="glass card mb">
+        <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.send)}Омниканальный каскад ${hint('cascade', 'Как работает каскад', [
             ['Приоритет сверху вниз', 'Каналы без контакта у клиента пропускаются'],
             ['Второй круг', 'Молчит весь круг — переключение на следующий канал и повтор касаний']])}</div>
@@ -3095,28 +3105,26 @@ PAGES.automations = async (root) => {
           </div>
           <button class="btn" id="chSave">Сохранить каскад</button>
         </div>
-        <div class="glass card mb">
+        <div class="glass card mb" data-ag="meet">
           <div class="card-title">${ic(I.cal)}Встречи</div>
           ${swRow('Цепочка напоминаний клиенту', 'Часы до встречи через запятую (0.5 = за 30 мин) — каждое уходит в WhatsApp со ссылкой на страницу встречи', `<input id="meetChain" style="width:150px" value="${esc((a.meetRemindChain || (a.meetingReminderHrs ? [a.meetingReminderHrs] : [24, 3])).join(', '))}" placeholder="24, 3, 0.5">`)}
           ${swRow('Тихие часы по поясу лида', 'Ночью касания/реанимация/напоминания сдвигаются на утро клиента; мгновенный ответ на свежую заявку — исключение (клиент онлайн). Пояс берётся из кода страны номера', `<span style="display:inline-flex;gap:6px;align-items:center;font-size:12px">с <input id="qhFrom" type="number" style="width:58px" value="${(a.quietHours || {}).from ?? 21}"> до <input id="qhTo" type="number" style="width:58px" value="${(a.quietHours || {}).to ?? 9}"> <label class="switch"><input type="checkbox" id="qhOn" ${(a.quietHours || {}).enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></span>`)}
           ${swRow('SLA брокера, минут', 'Не коснулся лида после передачи за N мин → эскалация в ленту; за 2×N → лид уходит следующему брокеру', `<input id="slaMin" type="number" style="width:90px" value="${a.brokerSlaMin || ''}" placeholder="30">`)}
           ${swRow('«Не пришёл» — вернуть в работу', 'Мягкое сообщение клиенту + ИИ снова ведёт диалог, лид не теряется', sw('noShowMessage', a.noShowMessage))}
         </div>
-        <div class="glass card">
+        <div class="glass card" data-ag="first">
           <div class="card-title">${ic(I.spark)}Первая линия и ИИ</div>
           ${swRow('Мгновенный ответ + цепочка касаний', '7 касаний / 18 дней, пока клиент не ответил', link('sequences', 'Настроить'))}
           ${swRow('ИИ-квалификатор и правила отключения', 'Критерии по гео, стоп-слова, перехват человеком', link('qualifier', 'Настроить'))}
           ${swRow('Реанимация спящих', 'Скоринг + безопасные кампании пачками', link('wake', 'Настроить'))}
         </div>
-      </div>
-      <div>
-        <div class="glass card mb">
+        <div class="glass card mb" data-ag="first">
           <div class="card-title">${ic(I.link)}Поток лидов</div>
           ${swRow('Приём из рекламы + дедупликация', 'Вебхук Albato/Make, повторные заявки не плодят дубли', link('ads', 'Настроить'))}
           ${swRow('Атрибуция к объявлениям', 'Мэтчинг ad_id на базу объявлений', link('ads', 'К базе'))}
           ${swRow('Исходящий мост', 'Квал/передача уходят POST-ом во внешнюю CRM', link('ads', 'Настроить'))}
         </div>
-        <div class="glass card mb">
+        <div class="glass card mb" data-ag="build">
           <div class="card-title">${ic(I.funnel)}Конструктор воронки<span class="sub">названия, порядок, свои стадии</span></div>
           <div id="stList">${(STAGES._all || STAGES).map(st => `<div class="ch-prio" data-stid="${st.id}">
             <span class="kb-ic">${ic(I[st.icon] || I.doc)}</span>
@@ -3133,7 +3141,7 @@ PAGES.automations = async (root) => {
           </div>
           <button class="btn btn-accent btn-sm" id="stSave" style="margin-top:10px">Сохранить воронку</button>
         </div>
-        <div class="glass card">
+        <div class="glass card" data-ag="build">
           <div class="card-title">${ic(I.doc)}Свои поля карточки лида</div>
           <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. Тип «выбор» — свои варианты через запятую.</div>
           <div id="cfList">${(s.customFields || []).map((f, i) => `<div class="set-row"><div class="sp"><div class="sl">${esc(f.label)}</div><div class="sd">${f.type === 'select' ? 'выбор: ' + esc((f.options || []).join(', ')) : 'текст'}</div></div><button class="btn-ghost" data-cfdel="${i}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;padding:6px 0">Полей пока нет</div>'}</div>
@@ -3144,9 +3152,19 @@ PAGES.automations = async (root) => {
           <input id="cfOptions" placeholder="Варианты через запятую (для типа «выбор»)" style="width:100%;margin-top:8px;display:none">
           <button class="btn btn-accent btn-sm" id="cfAdd" style="margin-top:10px">${ic(I.plus)}Добавить поле</button>
         </div>
-      </div>
     </div>`;
   $$('[data-go]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+  // сегментированная суб-навигация: показываем одну группу карточек за раз
+  const autoGrid = root.querySelector('#autoGrid');
+  const applyAg = (g) => {
+    $$('#autoSeg .seg-b', root).forEach(b => b.classList.toggle('on', b.dataset.ag === g));
+    let shown = 0;
+    $$('[data-ag]', autoGrid).forEach(c => { const v = c.dataset.ag === g; c.style.display = v ? '' : 'none'; if (v) shown++; });
+    autoGrid.classList.toggle('solo', shown === 1);
+    closePop();
+  };
+  $$('#autoSeg .seg-b', root).forEach(b => b.addEventListener('click', () => applyAg(b.dataset.ag)));
+  applyAg('first');
   const saveAuto = async (patch) => { await api.patch('/settings', { automations: patch }); loadState(); };
   const repPatch = () => ({
     daily: root.querySelector('[data-auto="rep_daily"]').checked,
@@ -3657,7 +3675,7 @@ PAGES.brokers = async (root) => {
               </div>
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
-              <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(lg)}</button>`).join('')}
+              <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
                 <span class="chip-add"><input id="langAddInp" placeholder="+ язык" style="width:76px"><button class="chip-plus" id="langAddBtn">${ic(I.plus)}</button></span>
               </div></div>
           </div>
@@ -3674,7 +3692,7 @@ PAGES.brokers = async (root) => {
       return `<div class="glass br2-card ${b.active === false ? 'off' : ''}" data-brok="${b.id}" title="Клик — редактировать">
         <div class="br2-top">
           <div class="ava br2-ava">${b.photo ? `<img src="${esc(b.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : esc(b.avatar)}</div>
-          <div class="br2-id"><div class="br2-name">${esc(b.name)}</div><div class="br2-sub">${st.geoNames[b.geo]} · ${b.langs.join(' / ')}</div></div>
+          <div class="br2-id"><div class="br2-name">${esc(b.name)}</div><div class="br2-sub">${st.geoNames[b.geo]} · ${b.langs.map(langName).join(' / ')}</div></div>
           <span class="br2-shift ${isOnShift(b) ? 'on' : ''}"><i></i>${isOnShift(b) ? 'на смене' : 'вне смен'}</span>
         </div>
         <div class="br2-load"><div class="br2-bar ${pct >= 90 ? 'full' : ''}"><i style="width:${pct}%"></i></div><b>${b.load}/${b.capacity}</b></div>
@@ -3759,7 +3777,7 @@ PAGES.brokers = async (root) => {
       const v = inp.value.trim().toLowerCase();
       if (!v) return;
       inp.value = '';
-      const chip = el(`<button type="button" class="chip-t lang-chip on" data-lg="${esc(v)}">${esc(v)}</button>`);
+      const chip = el(`<button type="button" class="chip-t lang-chip on" data-lg="${esc(v)}">${esc(langName(v))}</button>`);
       chip.addEventListener('click', () => chip.classList.toggle('on'));
       eb.querySelector('#langAddInp').closest('.chips-row').insertBefore(chip, eb.querySelector('.chip-add'));
     };
@@ -4437,7 +4455,7 @@ setInterval(async () => {
     setConn(true);
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания
     if ($('.modal-bd')) return; // и под открытой модалкой тоже
-    if (CUR_POP || document.querySelector('.hint-pop')) return; // открыт пикер/дропдаун/подсказка — DOM под ними не дёргаем
+    if (CUR_POP || document.querySelector('.hint-pop, #ctxPop, .cs.open, .dtp.open')) return; // открыт пикер/дропдаун/подсказка/контекст-меню — DOM под ними не дёргаем
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();

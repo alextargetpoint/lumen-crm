@@ -34,7 +34,8 @@
   --r-sm: 10px;
   --shadow: 0 1px 2px rgba(16, 43, 92, .05), 0 8px 24px -12px rgba(16, 43, 92, .12);
   --shadow-lift: 0 12px 32px -12px rgba(16, 43, 92, .22);
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', 'Manrope', Georgia, serif;
   /* motion: critically-damped spring, ноль отскока */
   --ease-spring: cubic-bezier(.16, 1, .3, 1);
   --ease-soft: cubic-bezier(.4, 0, .2, 1);
@@ -90,8 +91,29 @@ body {
   color: var(--ink);
   background: linear-gradient(180deg, #F6F9FD, var(--bg) 40%);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
   overflow: hidden;
 }
+/* ---------- дисплейная типографика (люкс-сериф Fraunces, только крупный текст) ---------- */
+.font-display, .page-title, .hero-nm, .kpi .val, .modal-title,
+.stat-big, .big-num, .hero-title { font-family: var(--font-display); font-optical-sizing: auto; }
+.page-title { font-weight: 600; letter-spacing: -0.02em; }
+.kpi .val, .stat-big, .big-num { font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+
+/* ---------- сегментированная суб-навигация раздела ---------- */
+.auto-seg { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-bottom: 20px; background: var(--card); border: 1px solid var(--stroke); padding: 5px; border-radius: 13px; box-shadow: var(--shadow); }
+.auto-seg .seg-b { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-3); transition: color var(--dur-fast), background var(--dur-fast); white-space: nowrap; }
+.auto-seg .seg-b svg { width: 15px; height: 15px; opacity: .8; }
+.auto-seg .seg-b:hover { color: var(--ink); background: var(--bg-2); }
+.auto-seg .seg-b.on { background: linear-gradient(180deg, var(--navy-700), var(--navy-900)); color: #fff; box-shadow: 0 6px 16px -6px rgba(16, 43, 92, .5); }
+.auto-seg .seg-b.on svg { opacity: 1; color: var(--blue-300); }
+.auto-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.auto-grid.solo { grid-template-columns: minmax(0, 760px); justify-content: start; }
+@media (max-width: 1000px) { .auto-grid, .auto-grid.solo { grid-template-columns: 1fr; } }
+html[data-night] .auto-seg { background: var(--card); border-color: var(--stroke); }
+html[data-night] .auto-seg .seg-b { color: var(--ink-3); }
+html[data-night] .auto-seg .seg-b:hover { color: var(--ink); background: rgba(140, 165, 230, .1); }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #C5D0DF; border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
