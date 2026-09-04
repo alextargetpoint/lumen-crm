@@ -47,8 +47,8 @@
 }
 
 /* ---------- оркестрированный вход раздела (класс anim вешает go(), одна волна) ---------- */
-@keyframes reveal { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-.content.anim > * { opacity: 0; animation: reveal .65s var(--ease-spring) forwards; }
+@keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+.content.anim > * { opacity: 0; animation: reveal .38s var(--ease-soft) forwards; }
 .content.anim > *:nth-child(2) { animation-delay: .07s; }
 .content.anim > *:nth-child(3) { animation-delay: .14s; }
 .content.anim > *:nth-child(4) { animation-delay: .21s; }
@@ -95,11 +95,11 @@ body {
   letter-spacing: -0.006em;
   overflow: hidden;
 }
-/* ---------- дисплейная типографика (люкс-сериф Fraunces, только крупный текст) ---------- */
-.font-display, .page-title, .hero-nm, .kpi .val, .modal-title,
-.stat-big, .big-num, .hero-title { font-family: var(--font-display); font-optical-sizing: auto; }
+/* ---------- дисплейная типографика (люкс-сериф Fraunces — только заголовки, НЕ цифры) ---------- */
+.font-display, .page-title, .hero-nm, .modal-title, .hero-title { font-family: var(--font-display); font-optical-sizing: auto; }
 .page-title { font-weight: 600; letter-spacing: -0.02em; }
-.kpi .val, .stat-big, .big-num { font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+/* цифры остаются на гротеске Manrope — чистые табличные, без серифа */
+.kpi .val, .stat-big, .big-num { font-family: var(--font); font-variant-numeric: tabular-nums; }
 
 /* ---------- сегментированная суб-навигация раздела ---------- */
 .auto-seg { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-bottom: 20px; background: var(--card); border: 1px solid var(--stroke); padding: 5px; border-radius: 13px; box-shadow: var(--shadow); }
@@ -151,7 +151,7 @@ textarea { resize: vertical; min-height: 70px; }
   transition: background var(--dur-fast) var(--ease-soft), color var(--dur-fast); text-align: left;
 }
 .nav-item svg { width: 17px; height: 17px; stroke-width: 1.7; opacity: .85; transition: transform var(--dur) var(--ease-spring), opacity var(--dur-fast); }
-.nav-item:hover svg { transform: translateX(2px) scale(1.06); }
+.nav-item:hover svg { transform: translateX(2px); }
 .nav-item:hover { background: rgba(134, 175, 255, .09); color: #fff; }
 .nav-item.active {
   background: linear-gradient(120deg, rgba(47, 107, 255, .28), rgba(47, 107, 255, .12));
@@ -204,11 +204,10 @@ textarea { resize: vertical; min-height: 70px; }
   background: var(--card); border: 1px solid var(--stroke); color: var(--ink-2);
   transition: background .15s, border-color .15s, transform .1s;
 }
-.btn { transition: background var(--dur-fast) var(--ease-soft), border-color var(--dur-fast), transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur) var(--ease-soft); }
-.btn:hover { background: var(--bg-2); border-color: #C9D4E3; transform: translateY(-1px); }
-.btn:active { transform: translateY(0) scale(.985); }
-.btn svg { width: 15px; height: 15px; transition: transform var(--dur-fast) var(--ease-spring); }
-.btn:hover svg { transform: translateX(1px); }
+.btn { transition: background var(--dur-fast) var(--ease-soft), border-color var(--dur-fast), box-shadow var(--dur) var(--ease-soft); }
+.btn:hover { background: var(--bg-2); border-color: #C9D4E3; }
+.btn:active { background: var(--bg); }
+.btn svg { width: 15px; height: 15px; }
 .btn-accent {
   background: var(--accent); border-color: var(--accent); color: #fff;
   box-shadow: 0 6px 16px -6px rgba(37, 99, 235, .5);
@@ -625,7 +624,7 @@ body > .cs-list.show, body > .dtp-pop.show { display: block; animation: gsIn .22
   aspect-ratio: 1; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--ink);
   display: grid; place-items: center; transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
-.dtp-day:hover { background: var(--blue-100); transform: scale(1.08); }
+.dtp-day:hover { background: var(--blue-100); }
 .dtp-day.today { box-shadow: inset 0 0 0 1.5px var(--blue-300); }
 .dtp-day.sel { background: var(--accent); color: #fff; font-weight: 700; }
 .dtp-time { max-height: 230px; overflow-y: auto; padding: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; min-width: 170px; }

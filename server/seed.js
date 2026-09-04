@@ -202,6 +202,15 @@ function seed() {
     summary: 'Бюджет $40k — вне рынка. Даунсейл не подошёл, закрыт корректно.', tags: [],
   });
 
+  /* ---- Встречи (календарь витрины) ---- */
+  const mt = (leadId, brokerId, at, kind, note, status) => ({ id: nextId('mt'), leadId, brokerId, at, kind, note, status: status || 'scheduled', createdAt: now - 1 * DAY, rem: {}, link: kind === 'video' ? 'https://meet.jit.si/Lumen-demo-' + leadId.slice(-4) : null });
+  const meetings = [
+    mt(l1.id, 'br_amir', now + 20 * HOUR, 'tour', 'Показ 3 брендированных 1BR под $172k'),
+    mt(l5.id, 'br_lena', now + 2 * DAY + 4 * HOUR, 'video', 'Sea-view condo, Bang Tao — видео-показ'),
+    mt(l2.id, 'br_ketut', now + 3 * DAY, 'video', 'Видео-тур виллы Берава 2BR'),
+    mt(l6.id, 'br_amir', now - 2 * DAY, 'call', 'Финализация депозита JVC 1BR', 'done'),
+  ];
+
   const events = [
     { at: now - 4 * MIN, type: 'lead_new', leadId: l4.id, text: 'Новый лид из Meta Lead Form: Игорь Матвеев · Дубай' },
     { at: now - 25 * MIN, type: 'msg_in', leadId: l2.id, text: 'Мария Власова ответила — закрыта ось «срок» (3 из 4)' },
