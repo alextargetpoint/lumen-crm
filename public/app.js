@@ -678,20 +678,7 @@ function navProgress() {
 function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remove('run'); b.classList.add('done'); } }
 
 /* ---------- ripple: тактильная волна от клика ---------- */
-document.addEventListener('pointerdown', (e) => {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const btn = e.target.closest('.btn, .nav-item, .seg-btn, .chip-t, .imp-tab');
-  if (!btn || btn.disabled || btn.querySelector('.ripple')) return;
-  const r = btn.getBoundingClientRect();
-  const size = Math.max(r.width, r.height) * 1.2;
-  const rip = document.createElement('span');
-  rip.className = 'ripple';
-  rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
-  const pos = getComputedStyle(btn).position;
-  if (pos === 'static') btn.style.position = 'relative';
-  btn.appendChild(rip);
-  setTimeout(() => rip.remove(), 620);
-}, true);
+/* ripple убран: Material-волна «раскрывала» кнопки/пункты меню при клике — не в стиле продукта */
 
 function go(page) {
   CUR = page;

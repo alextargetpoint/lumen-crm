@@ -1767,9 +1767,7 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 #navprog.run { width: 82%; opacity: 1; transition: width 1.6s cubic-bezier(.1,.7,.3,1); }
 #navprog.done { width: 100%; opacity: 0; transition: width .2s ease, opacity .35s ease .15s; }
 
-/* 2. Ripple — тактильная волна от клика */
-.ripple { position: absolute; border-radius: 50%; background: currentColor; opacity: .28; transform: scale(0); pointer-events: none; animation: rippleGo .6s ease-out; z-index: 0; }
-@keyframes rippleGo { to { transform: scale(1); opacity: 0; } }
+/* 2. Ripple убран (Material-волна «раскрывала» кнопки при клике — не в стиле продукта) */
 .btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
 
 /* 3. Мягкая пульсация горячих лидов — привлекает внимание к важному */
