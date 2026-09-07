@@ -1637,6 +1637,44 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, list);
     }
 
+    /* авто-подборка: ИИ подбирает объекты под оси лида (гео/бюджет/тип) → готовая подборка */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/auto-collection$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const budget = (lead.quals.budget || {}).num || null;
+      const typeStr = ((lead.quals.type || {}).value || '').toLowerCase();
+      const scored = db.properties
+        .filter(pr => pr.geo === lead.geo)
+        .map(pr => {
+          let score = 0;
+          if (budget && pr.priceFrom) { const r = pr.priceFrom / budget; if (r >= 0.7 && r <= 1.3) score += 2; else if (r < 0.7) score += 1; else score -= 1; }
+          if (typeStr && (typeStr.includes('вилл') ? /villa|вилл/i.test(pr.type + pr.name) : typeStr.includes('студи') ? /studio/i.test(pr.type) : /br/i.test(pr.type))) score += 1;
+          return { pr, score };
+        })
+        .sort((a, b) => b.score - a.score);
+      let picked = scored.filter(x => x.score > 0).slice(0, 5).map(x => x.pr);
+      if (!picked.length) picked = scored.slice(0, 4).map(x => x.pr); /* нет чётких совпадений — берём по гео */
+      if (!picked.length) return json(res, 400, { error: 'нет объектов по направлению лида — добавьте в базу' });
+      const ids = picked.map(p2 => p2.id);
+      const c = { id: crypto.randomBytes(5).toString('hex'), leadId: lead.id, title: `Подборка для ${(lead.name || '').split(' ')[0] || 'клиента'} · ${db.settings.geoNames[lead.geo] || lead.geo}`, intro: '', propertyIds: ids, createdAt: Date.now(), views: 0 };
+      /* ИИ-тексты под лида (интро + крючки), если ключи есть — иначе просто список */
+      if (llm.available()) {
+        try {
+          const out = await llm.composeCollection(db, c, picked, lead);
+          if (out.title) c.title = out.title;
+          if (out.intro) c.intro = out.intro;
+          if (out.props && out.props.length) {
+            c.custom = { props: {} };
+            for (const op of out.props) { if (op.id && ids.includes(op.id)) c.custom.props[op.id] = { hookTitle: op.hook || '', whyRent: op.why || null }; }
+          }
+        } catch (e) { /* ИИ не справился — подборка всё равно собрана */ }
+      }
+      db.collections.unshift(c);
+      ai.pushEvent(db, { type: 'msg_in', leadId: lead.id, text: `Авто-подборка собрана для ${lead.name}: ${ids.length} объектов` });
+      store.save();
+      return json(res, 200, { id: c.id, count: ids.length, title: c.title, editKey: db.settings.hooks.secret, url: `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/p/${c.id}` });
+    }
+
     /* ---------------- папки (объекты и подборки) ---------------- */
     if (p === '/api/folders' && req.method === 'GET') {
       return json(res, 200, db.folders.map(f => Object.assign({}, f, {

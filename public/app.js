@@ -1860,6 +1860,16 @@ async function openLeadModal(id) {
       </div>`,
     actions: [
       { label: 'Открыть диалог', cls: 'btn-accent', onClick: () => { PAGE_STATE.inboxLead = l.id; go('inbox'); } },
+      { label: '✦ Авто-подборка', onClick: async (bd, btn) => {
+        if (btn) { btn.disabled = true; btn.textContent = '✦ ИИ подбирает…'; }
+        try {
+          const r = await api.post(`/leads/${l.id}/auto-collection`, {});
+          toast('Авто-подборка собрана', `${r.count} объектов под запрос — открываю`, true);
+          window.open('/p/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+          PAGE_STATE.collLead = l.id; go('collections');
+        } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = '✦ Авто-подборка'; } }
+        return false;
+      } },
       { label: 'Собрать подборку', onClick: () => { PAGE_STATE.collLead = l.id; go('collections'); } },
       { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
       { label: 'Печать / PDF', onClick: () => { window.open('/lead/' + l.id + '/print', '_blank'); return false; } },
