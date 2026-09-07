@@ -25,7 +25,7 @@
     topo: 'repeating-radial-gradient(ellipse 60% 40% at 30% 20%,transparent 0 10px,#2563EB33 10px 12px)',
   };
   const isDark = (h) => { const x = String(h || '').replace('#', ''); const s = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s.slice(0, 2), 16), g = parseInt(s.slice(2, 4), 16), b = parseInt(s.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
-  let dirty = false, pop = null, sel = 0, panelOpen = true;
+  let dirty = false, pop = null, popOutside = null, sel = 0, panelOpen = true;
 
   const css = document.createElement('style');
   css.textContent = `
@@ -139,8 +139,8 @@ body.cpanel-on{padding-right:308px!important}
   document.querySelector('.wrap').style.marginTop = '8px';
 
   const flash = (t, ms = 1600) => { let s = $('.cstatus'); if (!s) { s = el('<div class="cstatus"></div>'); document.body.appendChild(s); } s.textContent = t; s.style.display = 'block'; clearTimeout(flash._t); if (ms) flash._t = setTimeout(() => s.style.display = 'none', ms); };
-  const closePop = () => { if (pop) { pop.remove(); pop = null; } };
-  const openPop = (html, x, y) => { closePop(); pop = el(`<div class="cpop">${html}</div>`); document.body.appendChild(pop); const w = pop.offsetWidth, h = pop.offsetHeight; pop.style.left = Math.max(10, Math.min(x, innerWidth - w - 12)) + 'px'; pop.style.top = Math.max(58, Math.min(y, innerHeight - h - 12)) + 'px'; setTimeout(() => document.addEventListener('click', function h2(e) { if (pop && !pop.contains(e.target)) { closePop(); document.removeEventListener('click', h2); } }), 0); return pop; };
+  const closePop = () => { if (popOutside) { document.removeEventListener('click', popOutside); popOutside = null; } if (pop) { pop.remove(); pop = null; } };
+  const openPop = (html, x, y) => { closePop(); pop = el(`<div class="cpop">${html}</div>`); document.body.appendChild(pop); const w = pop.offsetWidth, h = pop.offsetHeight; pop.style.left = Math.max(10, Math.min(x, innerWidth - w - 12)) + 'px'; pop.style.top = Math.max(58, Math.min(y, innerHeight - h - 12)) + 'px'; popOutside = (e) => { if (pop && !pop.contains(e.target)) closePop(); }; setTimeout(() => document.addEventListener('click', popOutside), 0); return pop; };
 
   /* ---------- верхняя полоса ---------- */
   const bar = el(`<div class="cbar">
