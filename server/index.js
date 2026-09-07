@@ -2171,8 +2171,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 
 .bio{font-size:13.5px;line-height:1.6;color:#B9C7E8;text-align:center;margin:16px 4px 4px}
 .btns{margin-top:22px;display:flex;flex-direction:column;gap:10px}
 .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;color:#fff}
+.b-book{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
 .b-wa{background:linear-gradient(120deg,#22A45B,#12855F)}
-.b-call{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
+.b-call{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
 .b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
 .foot{margin-top:22px;text-align:center;font-size:11px;color:#5E6E96}
 .hd{display:flex;justify-content:center;margin-bottom:20px}
@@ -2185,12 +2186,126 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 
   <div class="tags">${geoName ? `<span class="tag">📍 ${esc(geoName)}</span>` : ''}${(br.langs || []).map(l => `<span class="tag">${esc(LN[l] || l)}</span>`).join('')}</div>
   ${br.bio ? `<div class="bio">${esc(br.bio)}</div>` : ''}
   <div class="btns">
+    <a class="btn b-book" href="/b/${br.id}/book">Забронировать звонок</a>
     ${waDigits ? `<a class="btn b-wa" href="https://wa.me/${waDigits}" target="_blank">Написать в WhatsApp</a>` : ''}
     ${br.phone ? `<a class="btn b-call" href="tel:${esc(br.phone.replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}
     ${br.email ? `<a class="btn b-ghost" href="mailto:${esc(br.email)}">${esc(br.email)}</a>` : ''}
   </div>
   <div class="foot">${esc(AG)}</div>
 </div></body></html>`);
+      return;
+    }
+
+    /* ================= бронирование звонка у брокера: /b/:id/book ================= */
+    if ((m = p.match(/^\/b\/(br_[\w]+)\/book$/)) && req.method === 'POST') {
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (!b.name || !b.phone || !b.at) return json(res, 400, { error: 'заполните имя, телефон и слот' });
+      const lead = {
+        id: store.nextId('ld'), name: String(b.name).slice(0, 80), phone: String(b.phone).slice(0, 40),
+        geo: br.geo || db.settings.agency.geos[0], lang: 'ru', tz: tzFromPhone(String(b.phone)), stage: 'handover', score: 0,
+        source: 'broker_card', createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+        quals: { purpose: null, timeline: null, budget: null, type: null },
+        ai: { enabled: false, chainStep: 0, nextTouchAt: null, silentSince: null },
+        broker: br.id, summary: null, tags: ['визитка брокера'], numberId: null, handoverAt: Date.now(),
+      };
+      db.leads.push(lead); br.load = (br.load || 0) + 1;
+      const at = +b.at;
+      const mt = { id: store.nextId('mt'), leadId: lead.id, brokerId: br.id, at, kind: 'call', note: String(b.note || '').slice(0, 300), status: 'scheduled', createdAt: Date.now(), rem: {}, link: null };
+      db.meetings = db.meetings || []; db.meetings.push(mt);
+      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Запись с визитки: ${lead.name} → ${br.name} · ${new Date(at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
+      store.save();
+      return json(res, 200, { ok: true, mId: mt.id });
+    }
+    if ((m = p.match(/^\/b\/(br_[\w]+)\/book$/)) && req.method === 'GET') {
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) { res.writeHead(404); res.end('not found'); return; }
+      const AG = db.settings.agency.name; const logo = db.settings.agency.logo;
+      const wdays = (br.schedule && br.schedule.days && br.schedule.days.length) ? br.schedule.days : [1, 2, 3, 4, 5];
+      const times = ['11:00', '14:00', '17:00'];
+      const nowT = Date.now();
+      const booked = new Set((db.meetings || []).filter(mt => mt.brokerId === br.id).map(mt => mt.at));
+      const dowN = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+      const monN = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+      const base = new Date(); base.setHours(0, 0, 0, 0);
+      const byDay = [];
+      for (let dOff = 0; dOff < 14 && byDay.length < 5; dOff++) {
+        const day = new Date(base); day.setDate(base.getDate() + dOff);
+        const wd = day.getDay() === 0 ? 7 : day.getDay();
+        if (!wdays.includes(wd)) continue;
+        const slots = times.map(t => { const [hh, mm] = t.split(':'); const dt = new Date(day); dt.setHours(+hh, +mm, 0, 0); return { t, at: dt.getTime() }; }).filter(s => s.at > nowT + 3600e3 && !booked.has(s.at));
+        if (slots.length) byDay.push({ label: `${dowN[day.getDay()]}, ${day.getDate()} ${monN[day.getMonth()]}`, slots });
+      }
+      const geoName = db.settings.geoNames[br.geo] || br.geo || '';
+      const initials = br.avatar || (br.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:36px;max-width:140px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:19px;font-weight:600">${esc(AG)}</span>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Запись к ${esc(br.name)} — ${esc(AG)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Manrope,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 420px at 18% 8%,rgba(37,99,235,.28),transparent 60%),radial-gradient(700px 520px at 88% 92%,rgba(91,43,216,.22),transparent 60%)}
+.card{position:relative;max-width:460px;width:100%;background:rgba(10,24,51,.72);backdrop-filter:blur(16px);border:1px solid rgba(122,158,255,.2);border-radius:24px;padding:28px 26px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.hd{display:flex;justify-content:center;margin-bottom:18px}
+.top{display:flex;gap:14px;align-items:center;margin-bottom:22px}
+.ava{width:60px;height:60px;border-radius:50%;flex:0 0 60px;display:grid;place-items:center;font-size:20px;font-weight:700;background:linear-gradient(150deg,#2563EB,#5B2BD8);border:2px solid rgba(134,175,255,.35);overflow:hidden}
+.ava img{width:100%;height:100%;object-fit:cover}
+.nm{font-family:Fraunces,serif;font-size:21px;font-weight:600}
+.ttl{font-size:12.5px;color:#9DB8FF;margin-top:2px}
+.lbl{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9DB8FF;margin:18px 0 10px}
+.day{margin-bottom:14px}
+.day b{font-size:13px;color:#CFE0FF;font-weight:600;text-transform:capitalize}
+.slots{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.slot{padding:10px 16px;border-radius:11px;background:rgba(255,255,255,.06);border:1.5px solid rgba(122,158,255,.2);font-size:14px;font-weight:600;color:#CFE0FF;cursor:pointer;transition:.15s}
+.slot:hover{border-color:rgba(122,158,255,.5)}
+.slot.on{background:linear-gradient(120deg,#2563EB,#5B2BD8);border-color:transparent;color:#fff}
+input{width:100%;background:rgba(6,17,38,.6);border:1.5px solid rgba(134,175,255,.22);color:#fff;border-radius:11px;padding:13px 14px;font-size:14px;font-family:inherit;margin-top:10px;outline:none}
+input:focus{border-color:#7C9BFF}
+.btn{display:block;width:100%;border:none;border-radius:13px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;background:linear-gradient(120deg,#2563EB,#5B2BD8);margin-top:16px}
+.btn:disabled{opacity:.5}
+.foot{margin-top:20px;text-align:center;font-size:11px;color:#5E6E96}
+.done{text-align:center;padding:14px 0}
+.done .ok{width:64px;height:64px;border-radius:50%;background:rgba(35,179,131,.2);border:1.5px solid rgba(35,179,131,.5);display:grid;place-items:center;font-size:30px;margin:0 auto 16px;color:#7BE8C3}
+.err{color:#f28b8b;font-size:12.5px;margin-top:8px;min-height:16px}
+</style></head><body>
+<div class="card" id="card">
+  <div class="hd">${brandTop}</div>
+  <div class="top">
+    <div class="ava">${br.photo ? `<img src="${esc(br.photo)}">` : esc(initials)}</div>
+    <div><div class="nm">${esc(br.name)}</div><div class="ttl">${esc(br.title || ('Эксперт по недвижимости' + (geoName ? ' · ' + geoName : '')))}</div></div>
+  </div>
+  ${byDay.length ? `<div class="lbl">Выберите удобное время</div>
+  ${byDay.map(d => `<div class="day"><b>${esc(d.label)}</b><div class="slots">${d.slots.map(s => `<button class="slot" data-at="${s.at}">${s.t}</button>`).join('')}</div></div>`).join('')}
+  <input id="bkName" placeholder="Ваше имя" autocomplete="name">
+  <input id="bkPhone" placeholder="Телефон / WhatsApp" autocomplete="tel">
+  <input id="bkNote" placeholder="Что интересует? (необязательно)">
+  <div class="err" id="bkErr"></div>
+  <button class="btn" id="bkBtn" disabled>Записаться на звонок</button>` : '<div class="lbl">Свободных слотов пока нет</div><p style="color:#9DB8FF;font-size:14px">Напишите брокеру напрямую — подберём время.</p>'}
+  <div class="foot">${esc(AG)}</div>
+</div>
+<script>
+let selAt=null;
+document.querySelectorAll('.slot').forEach(s=>s.addEventListener('click',()=>{document.querySelectorAll('.slot').forEach(x=>x.classList.remove('on'));s.classList.add('on');selAt=+s.dataset.at;document.getElementById('bkBtn').disabled=false;}));
+const bk=document.getElementById('bkBtn');
+if(bk)bk.addEventListener('click',async()=>{
+  const name=document.getElementById('bkName').value.trim(),phone=document.getElementById('bkPhone').value.trim();
+  const err=document.getElementById('bkErr');
+  if(!selAt){err.textContent='Выберите время';return;}
+  if(!name||!phone){err.textContent='Укажите имя и телефон';return;}
+  bk.disabled=true;bk.textContent='Записываем…';
+  try{
+    const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,note:document.getElementById('bkNote').value,at:selAt})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||'ошибка');
+    const dt=new Date(selAt).toLocaleString('ru-RU',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('card').innerHTML='<div class="done"><div class="ok">✓</div><div class="nm">Вы записаны</div><p style="color:#B9C7E8;font-size:14px;margin-top:10px">${esc(br.name)} позвонит вам:<br><b style="color:#CFE0FF;text-transform:capitalize">'+dt+'</b></p><a class="btn" style="text-decoration:none;text-align:center" href="/m/'+j.mId+'">Детали встречи</a></div>';
+  }catch(e){err.textContent=e.message;bk.disabled=false;bk.textContent='Записаться на звонок';}
+});
+</${'script'}>
+</body></html>`);
       return;
     }
 
