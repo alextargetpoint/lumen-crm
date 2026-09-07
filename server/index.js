@@ -1166,6 +1166,22 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { url: lead.creativeUrl });
     }
 
+    /* диктовка: голос → Whisper → (опц.) ИИ-причёсывание. Универсально для любого текстового поля */
+    if (p === '/api/voice/dictate' && req.method === 'POST') {
+      if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для распознавания речи' });
+      const chunks = []; let size = 0, over = false;
+      await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 16e6) { over = true; req.destroy(); resolve(); } else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
+      if (over) return json(res, 400, { error: 'запись слишком длинная' });
+      if (!size) return json(res, 400, { error: 'пустая запись' });
+      try {
+        let text = ((await llm.transcribe(Buffer.concat(chunks), u.searchParams.get('filename') || 'note.webm')) || '').trim();
+        if (u.searchParams.get('clean') === '1' && text && llm.available()) {
+          try { text = await llm.rewrite(text, u.searchParams.get('mode') || 'improve', 'надиктованная заметка в CRM недвижимости — причеши в аккуратный текст, не выдумывай'); } catch (e) { /* fallback: сырой транскрипт */ }
+        }
+        return json(res, 200, { text });
+      } catch (e) { return json(res, 500, { error: 'не распозналось: ' + e.message }); }
+    }
+
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0) };
       return json(res, 200, engine.wakePreview(db, filters));

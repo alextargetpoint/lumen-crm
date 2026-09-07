@@ -52,6 +52,7 @@ const I = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   flame: '<path d="M12 2s5.5 4.6 5.5 9.5a5.5 5.5 0 0 1-11 0C6.5 8.6 8 7.5 8.5 6c.8 1.5 2 2 2 2C10.5 5.5 12 2 12 2z"/>',
   phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   play: '<path d="M6 4l14 8-14 8V4z"/>',
@@ -483,6 +484,7 @@ function modal({ title, sub, body, actions, wide }) {
   document.body.appendChild(bd);
   enhanceControls(bd);
   wireAiWand(bd);
+  wireDictate(bd);
   requestAnimationFrame(() => bd.classList.add('show'));
   return bd;
 }
@@ -544,6 +546,44 @@ function wireAiWand(root) {
         btn.textContent = '✦';
       });
       openPop(wrap, btn, pop);
+    });
+  });
+}
+
+/* ---------- диктовка: мик-кнопка на текстовых полях (голос → Whisper → ИИ-причёсывание) ---------- */
+const DICTATE_SEL = 'textarea:not([data-nodic])';
+let DIC_ACTIVE = null;
+function wireDictate(root) {
+  $$(DICTATE_SEL, root).forEach((field) => {
+    if (field.dataset.dicw) return;
+    field.dataset.dicw = '1';
+    const inWand = field.closest('.aiwrap');
+    let wrap = inWand;
+    if (!wrap) { wrap = document.createElement('div'); wrap.className = 'aiwrap'; field.parentNode.insertBefore(wrap, field); wrap.appendChild(field); }
+    const btn = el(`<button type="button" class="dic-btn ${inWand ? 'with-wand' : ''}" title="Диктовать голосом — ИИ причешет текст">${ic(I.mic || I.phone)}</button>`);
+    wrap.appendChild(btn);
+    btn.addEventListener('click', async () => {
+      if (btn.classList.contains('rec')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
+      if (DIC_ACTIVE) { toast('Уже идёт запись в другом поле'); return; }
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch (e) { toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); return; }
+      const rec = new MediaRecorder(stream);
+      const parts = [];
+      rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        btn.classList.remove('rec'); btn.classList.add('busy'); DIC_ACTIVE = null;
+        try {
+          const r = await fetch('/api/voice/dictate?clean=1&filename=note.webm', { method: 'POST', body: new Blob(parts, { type: 'audio/webm' }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || 'ошибка');
+          if (j.text) { const cur = field.value.trim(); field.value = cur ? cur + ' ' + j.text : j.text; field.dispatchEvent(new Event('input', { bubbles: true })); field.focus(); toast('Готово', 'ИИ причесал надиктованное', true); }
+          else toast('Ничего не распознал', 'Попробуйте ещё раз, ближе к микрофону');
+        } catch (e) { toast('Диктовка не удалась', e.message); }
+        btn.classList.remove('busy');
+      };
+      DIC_ACTIVE = rec; rec.start(); btn.classList.add('rec');
     });
   });
 }
@@ -749,6 +789,7 @@ async function render() {
         injectWorkspaceTabs(c0, page);
         enhanceControls(c0);
         wireAiWand(c0);
+        wireDictate(c0);
         wireHeroArt(c0);
         if (isWave) countUp(c0);
         else { /* мягкое перестроение при фильтрах/обновлениях — без грубого скачка */
@@ -3406,7 +3447,7 @@ PAGES.ads = async (root) => {
         <div class="glass card">
           <div class="card-title">${ic(I.doc)}Загрузка объявлений таблицей</div>
           <div class="muted" style="font-size:11.8px;margin-bottom:8px">Вставь строки из таблицы (CSV / из Excel). Колонки: <code class="pill">ad_id</code> <code class="pill">name</code> <code class="pill">adset</code> <code class="pill">campaign</code> <code class="pill">geo</code> — порядок любой, определяется по заголовку.</div>
-          <textarea id="adsCsv" style="min-height:110px;font-family:Menlo,monospace;font-size:11.5px" placeholder="ad_id,name,adset,campaign,geo
+          <textarea id="adsCsv" data-nodic style="min-height:110px;font-family:Menlo,monospace;font-size:11.5px" placeholder="ad_id,name,adset,campaign,geo
 120211478921230508,Дубай · видео-тур JVC,RU 30-55,DXB Sept,dubai"></textarea>
           <button class="btn btn-accent" id="importAds" style="margin-top:10px">Импортировать и смэтчить</button>
         </div>
