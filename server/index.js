@@ -3543,16 +3543,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
-          ${isEdit ? `<div class="s-bar">
-            <button data-sact="edit" title="Редактировать слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
-            <button data-sact="photo" title="Добавить фото-фон"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg></button>
-            <button data-sact="dup" title="Дублировать слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
-            <button data-sact="up" title="Выше"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
-            <button data-sact="down" title="Ниже"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
-            <button data-sact="del" title="Удалить слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-          </div><button class="s-ins" data-sact="insert" title="Добавить слайд после этого"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Слайд</button>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
@@ -3561,7 +3553,14 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
           ${renderCarLayers(s.layers, isEdit)}
-        </div>`;
+        </div>${isEdit ? `<div class="s-bar">
+            <button data-sact="edit" title="Редактировать слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+            <button data-sact="photo" title="Добавить фото-фон"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg></button>
+            <button data-sact="dup" title="Дублировать слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+            <button data-sact="up" title="Выше"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+            <button data-sact="down" title="Ниже"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+            <button data-sact="del" title="Удалить слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div><button class="s-ins" data-sact="insert" title="Добавить слайд после этого"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Слайд</button></div>` : ''}`;
       }).join('');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -3572,7 +3571,9 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
 :root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${hf.fam}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
-.wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+.cslot{position:relative}
+.cslot:hover{z-index:6}
 .slide{position:relative;aspect-ratio:${dims.ar};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex}
 .slide.hasbg{color:#fff}
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
@@ -3659,14 +3660,15 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 [data-ce]{outline:1.5px dashed transparent;border-radius:4px;transition:outline .12s}
 ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}.s-eye:empty:before{content:'ЭЙБРОУ';opacity:.4}` : ''}
 .s-bar{position:absolute;top:10px;right:10px;z-index:8;display:flex;gap:2px;opacity:0;transition:opacity .15s;background:rgba(10,18,38,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:3px}
-.slide:hover .s-bar{opacity:1}
+.cslot:hover .s-bar{opacity:1}
 .s-bar button{width:30px;height:30px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,.85);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;padding:0}
 .s-bar button svg{width:16px;height:16px;display:block}
 .s-bar button:hover{background:var(--blue);color:#fff}
 .s-bar button[data-sact="del"]:hover{background:#E0483D}
-.s-ins{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);z-index:9;border:none;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;font-size:11.5px;font-weight:700;padding:6px 13px 6px 10px;opacity:0;transition:opacity .15s,transform .12s,box-shadow .12s;box-shadow:0 6px 18px -5px rgba(37,99,235,.7);font-family:'Manrope',sans-serif;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.s-ins{position:absolute;left:50%;bottom:-13px;transform:translateX(-50%);z-index:12;border:none;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;font-size:11.5px;font-weight:700;padding:7px 15px 7px 12px;opacity:0;transition:opacity .15s,transform .12s,box-shadow .12s;box-shadow:0 6px 18px -5px rgba(37,99,235,.7);font-family:'Manrope',sans-serif;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.s-ins:hover{transform:translateX(-50%) translateY(-1px);box-shadow:0 10px 24px -6px rgba(37,99,235,.85);filter:brightness(1.05)}
 .s-ins svg{width:14px;height:14px;display:block}
-.slide:hover .s-ins{opacity:1}
+.cslot:hover .s-ins{opacity:1}
 .s-ins:hover{transform:translateX(-50%) scale(1.05);box-shadow:0 8px 22px -5px rgba(37,99,235,.85)}
 ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}
 .s-lyr{cursor:grab}.s-lyr:active{cursor:grabbing}
@@ -3683,7 +3685,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=14"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=15"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

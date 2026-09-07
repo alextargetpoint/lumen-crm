@@ -31,7 +31,8 @@
   css.textContent = `
 :root{--cb:#2563EB}
 .cbar{position:fixed;top:0;left:0;right:0;z-index:900;background:rgba(9,18,38,.82);backdrop-filter:blur(14px);color:#fff;display:flex;gap:10px;align-items:center;padding:9px 14px;font-family:Manrope,sans-serif;font-size:13px;border-bottom:1px solid rgba(134,175,255,.14)}
-.cbar b{font-family:Fraunces,serif;font-weight:600;font-size:14px;opacity:.9}
+.cbar b{font-family:'Manrope',sans-serif;font-weight:700;font-size:13.5px;letter-spacing:-.01em;opacity:.96;max-width:min(46vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbar .ctag{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8FB0FF;background:rgba(122,158,255,.14);border:1px solid rgba(122,158,255,.22);padding:3px 8px;border-radius:999px;flex:0 0 auto}
 .cbar .sp{flex:1}
 .cbtn{background:linear-gradient(180deg,#3B78FF,#2563EB);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:Manrope,sans-serif;display:inline-flex;gap:6px;align-items:center;box-shadow:0 6px 16px -6px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.22);transition:transform .14s cubic-bezier(.4,0,.2,1),box-shadow .14s,filter .14s}
 .cbtn:hover{transform:translateY(-1px);box-shadow:0 11px 24px -6px rgba(37,99,235,.72),inset 0 1px 0 rgba(255,255,255,.25);filter:brightness(1.05)}
@@ -134,10 +135,14 @@ body.cpanel-on{padding-right:308px!important}
 .ctpl:hover{border-color:#2563EB;transform:translateY(-2px)}
 .ctpl-aa{font-size:26px;line-height:1}
 .ctpl i{font-style:normal;font-size:10.5px;color:#fff;opacity:.92;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.5)}
-.cctx{display:flex;flex-direction:column;min-width:180px}
-.cctx button{display:block;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#2A3346;cursor:pointer;font-family:inherit}
-.cctx button:hover{background:#EEF3FF;color:#2563EB}
-.cctx button.dng:hover{background:#FDEEEC;color:#E0483D}
+.cpop.cpop-ctx{background:rgba(11,20,38,.94);border:1px solid rgba(134,175,255,.18);box-shadow:0 24px 64px rgba(6,17,38,.6);padding:6px;width:auto;min-width:206px;backdrop-filter:blur(18px)}
+.cctx{display:flex;flex-direction:column;gap:1px}
+.cctx button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;color:#DCE6FF;cursor:pointer;font-family:'Manrope',sans-serif;transition:background .12s,color .12s}
+.cctx button svg{width:16px;height:16px;flex:0 0 16px;opacity:.92}
+.cctx button:hover{background:rgba(37,99,235,.92);color:#fff}
+.cctx button.dng{color:#FF9E93}
+.cctx button.dng:hover{background:#E0483D;color:#fff}
+.cctx-sep{height:1px;background:rgba(134,175,255,.16);margin:4px 6px}
 .celem-add-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
 .celem-add{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid #E1E8F4;border-radius:12px;background:#fff;cursor:pointer;padding:11px 4px 8px;font-size:11px;font-weight:600;color:#5E6470;font-family:inherit;transition:border-color .12s,color .12s,transform .12s}
 .celem-add:hover{border-color:#2563EB;color:#2563EB;transform:translateY(-2px)}
@@ -156,7 +161,8 @@ body.cpanel-on{padding-right:308px!important}
   /* ---------- верхняя полоса ---------- */
   const bar = el(`<div class="cbar">
     <button class="cbtn g" id="cExit" title="Сохранить и выйти в CRM">← Готово</button>
-    <b>Карусель</b>
+    <span class="ctag">Карусель</span>
+    <b>${esc(P.title || 'Без названия')}</b>
     <span class="sp"></span>
     <button class="cbtn g" id="cDl" title="Скачать (PDF / картинки)">Скачать</button>
     <button class="cbtn" id="cSave">Сохранить</button>
@@ -238,7 +244,7 @@ body.cpanel-on{padding-right:308px!important}
   }
   document.body.addEventListener('click', (e) => {
     const sa = e.target.closest('[data-sact]');
-    if (sa) { e.stopPropagation(); const sl0 = sa.closest('.slide'); if (sl0) slideAction(sa.dataset.sact, +sl0.dataset.idx); return; }
+    if (sa) { e.stopPropagation(); const sl0 = sa.closest('.cslot, .slide'); if (sl0) slideAction(sa.dataset.sact, +sl0.dataset.idx); return; }
     const sl = e.target.closest('.slide'); if (!sl) return;
     if (e.target.closest('.s-lyr, .s-frame, [data-ce]')) { selectSlide(+sl.dataset.idx, false); return; }  /* слои/текст — без смены вкладки */
     selLayer(null);
@@ -249,8 +255,20 @@ body.cpanel-on{padding-right:308px!important}
     const sl = e.target.closest('.slide'); if (!sl) return;
     e.preventDefault();
     const i = +sl.dataset.idx;
-    const items = [['edit', '✎ Редактировать'], ['photo', '🖼 Фото-фон'], ['dup', '⧉ Дублировать'], ['insert', '＋ Слайд после'], ['up', '↑ Выше'], ['down', '↓ Ниже'], ['del', '✕ Удалить']];
-    const pp = openPop(`<div class="cctx">${items.map(([a, n]) => `<button data-ctx="${a}" class="${a === 'del' ? 'dng' : ''}">${n}</button>`).join('')}</div>`, e.clientX, e.clientY);
+    const CIC = {
+      edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+      photo: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-9 9"/>',
+      dup: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+      insert: '<path d="M12 5v14M5 12h14"/>',
+      up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+      down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+      del: '<path d="M6 6l12 12M18 6L6 18"/>',
+    };
+    const csvg = a => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CIC[a]}</svg>`;
+    const items = [['edit', 'Редактировать'], ['photo', 'Фото-фон'], ['dup', 'Дублировать'], ['insert', 'Слайд после'], ['up', 'Выше'], ['down', 'Ниже'], ['del', 'Удалить']];
+    const pp = openPop(`<div class="cctx">${items.map(([a, n]) => `${a === 'del' ? '<div class="cctx-sep"></div>' : ''}<button data-ctx="${a}" class="${a === 'del' ? 'dng' : ''}">${csvg(a)}<span>${n}</span></button>`).join('')}</div>`, e.clientX, e.clientY);
+    pp.classList.add('cpop-ctx');
+    { const w = pp.offsetWidth, h = pp.offsetHeight; pp.style.left = Math.max(10, Math.min(e.clientX, innerWidth - w - 12)) + 'px'; pp.style.top = Math.max(58, Math.min(e.clientY, innerHeight - h - 12)) + 'px'; }
     pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-ctx]'); if (!b) return; closePop(); slideAction(b.dataset.ctx, i); });
   });
 
