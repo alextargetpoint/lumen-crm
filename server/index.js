@@ -1377,6 +1377,28 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, br);
     }
 
+    if (p === '/api/numbers' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (!b.phone || !String(b.phone).trim()) return json(res, 400, { error: 'укажите номер' });
+      const num = {
+        id: store.nextId('num'), phone: String(b.phone).slice(0, 32).trim(),
+        geo: b.geo || db.settings.agency.geos[0], channel: b.channel === 'cloud_api' ? 'cloud_api' : 'web',
+        label: String(b.label || '').slice(0, 60) || (db.settings.geoNames[b.geo] || b.geo || '') + ' · новый',
+        quality: b.state === 'active' ? 90 : 60, tier: b.channel === 'cloud_api' ? '250/сутки' : '—',
+        sentToday: 0, dayLimit: b.state === 'active' ? (b.channel === 'cloud_api' ? 250 : 40) : 20,
+        state: b.state || 'warming', warmupDay: (b.state || 'warming') === 'warming' ? 1 : null,
+      };
+      db.numbers.push(num);
+      ai.pushEvent(db, { type: 'number', text: `Добавлен номер ${num.phone} · ${num.state === 'warming' ? 'на прогрев' : num.state}` });
+      store.save();
+      return json(res, 200, num);
+    }
+    if ((m = p.match(/^\/api\/numbers\/([^/]+)$/)) && req.method === 'DELETE') {
+      const before = db.numbers.length;
+      db.numbers = db.numbers.filter(n => n.id !== m[1]);
+      store.save();
+      return json(res, 200, { ok: true, removed: before - db.numbers.length });
+    }
     if ((m = p.match(/^\/api\/numbers\/([^/]+)$/)) && req.method === 'PATCH') {
       const num = db.numbers.find(n => n.id === m[1]);
       if (!num) return json(res, 404, { error: 'not found' });

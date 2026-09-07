@@ -3758,6 +3758,10 @@ PAGES.numbers = async (root) => {
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
       </div>
     </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="lp-sec" style="margin:0">Номера в пуле · ${st.numbers.length}</div>
+      <button class="btn btn-accent btn-sm" id="numAdd">${ic(I.plus)}Добавить номер</button>
+    </div>
     <div class="num-grid">
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
         <div class="num-head">
@@ -3773,13 +3777,38 @@ PAGES.numbers = async (root) => {
         <div class="progress" style="margin-top:2px"><i style="width:${n.dayLimit ? Math.min(n.sentToday / n.dayLimit * 100, 100) : 0}%"></i></div>
         <div class="num-actions" style="margin-top:13px">
           ${n.state !== 'quarantine' ? `<button class="btn btn-danger btn-sm" data-act="quarantine">В карантин</button>` : `<button class="btn btn-sm" data-act="warming">На прогрев</button><button class="btn btn-sm btn-accent" data-act="active">Активировать</button>`}
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost" data-act="del" title="Убрать номер">${ic(I.x)}</button>
         </div>
       </div>`).join('')}
     </div>`;
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
-    await api.patch('/numbers/' + b.closest('[data-num]').dataset.num, { state: b.dataset.act });
+    const id = b.closest('[data-num]').dataset.num;
+    if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
+    await api.patch('/numbers/' + id, { state: b.dataset.act });
     render();
   }));
+  $('#numAdd')?.addEventListener('click', () => {
+    const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
+    modal({
+      title: 'Добавить номер в пул',
+      body: `<div class="form-row"><label>Номер телефона</label><input id="nnPhone" placeholder="+971 58 000 00 00"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>Направление</label><select id="nnGeo">${geoOpts}</select></div>
+          <div class="form-row"><label>Канал</label><select id="nnChannel"><option value="web">Web-протокол (тёплый номер)</option><option value="cloud_api">Официальный Cloud API</option></select></div>
+        </div>
+        <div class="form-row"><label>Название (необязательно)</label><input id="nnLabel" placeholder="напр. Дубай · основной"></div>
+        <div class="form-row"><label>Стартовое состояние</label><select id="nnState"><option value="warming">На прогрев (рекомендуется для нового)</option><option value="active">Сразу активен</option></select></div>
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:2px">Новый номер лучше 2–3 недели держать на прогреве: 10–20 контактов/день, рост ~20% в неделю. Холодные первые касания — только официальным Cloud API шаблонами.</div>`,
+      actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
+        const phone = $('#nnPhone', bd).value.trim();
+        if (!phone) { toast('Укажите номер'); return false; }
+        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel: $('#nnChannel', bd).value, label: $('#nnLabel', bd).value, state: $('#nnState', bd).value });
+        toast('Номер добавлен', 'В пуле — можно вести к активации', true);
+        render();
+      } }, { label: 'Отмена' }],
+    });
+  });
 };
 
 /* ---------------- ШАБЛОНЫ ---------------- */
