@@ -1129,6 +1129,34 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, Object.assign(leadView(db, lead), { messages: msgs }));
     }
 
+    /* ИИ первое касание: разбор лида + готовое персональное сообщение */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/first-touch$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const b = await readBody(req);
+      try {
+        const out = await llm.composeFirstTouch(db, lead, b.draft ? String(b.draft) : '', db.settings.agency.name);
+        return json(res, 200, out);
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+    /* загрузка креатива объявления к лиду (для первого касания) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/creative$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(jpe?g|png|webp|gif)$/i);
+      if (!extM) return json(res, 400, { error: 'формат: jpg/png/webp/gif' });
+      const chunks = []; let size = 0;
+      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 12e6) req.destroy(); else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
+      if (!size || size > 12e6) return json(res, 400, { error: 'файл до 12 МБ' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      const fname = `creatives/${lead.id}-${crypto.randomBytes(3).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      lead.creativeUrl = '/assets/' + fname;
+      store.save();
+      return json(res, 200, { url: lead.creativeUrl });
+    }
+
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0) };
       return json(res, 200, engine.wakePreview(db, filters));

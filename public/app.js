@@ -1726,6 +1726,18 @@ async function openLeadModal(id) {
             <div class="lc-ai-sub">${l.ai.enabled ? 'Ведёт диалог сам. Напишете вручную — встанет на паузу.' : (l.tags || []).includes('нужен человек') ? 'Отключился сам: клиент попросил человека.' : 'На паузе — лид на менеджере.'}</div>
             <button class="btn btn-sm" id="lcSumBtn" style="margin-top:9px">${ic(I.doc)}Сводка ИИ по лиду</button>
           </div>
+          ${coll('Первое касание', `
+            <div class="lc-ft" style="margin-top:6px">
+              <div id="lcCreoWrap" class="lc-creo ${l.creativeUrl ? 'has' : ''}">${l.creativeUrl ? `<img src="${esc(l.creativeUrl)}" alt="креатив">` : '<span>Креатив объявления не прикреплён</span>'}</div>
+              <input type="file" id="lcCreoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+              <button class="btn btn-sm" id="lcCreoBtn" style="margin:8px 0 4px">${ic(I.plus)}${l.creativeUrl ? 'Заменить креатив' : 'Прикрепить креатив'}</button>
+              <textarea id="lcFtText" placeholder="Текст первого касания…" style="min-height:88px">${esc(`Здравствуйте, ${(l.name || '').split(' ')[0] || ''}! Это ${STATE.settings.agency.name}. Вы оставили заявку по недвижимости — ${l.geoName}. Помогу подобрать варианты. Рассматриваете для жизни или как инвестицию?`)}</textarea>
+              <div class="lc-note-row" style="margin-top:8px">
+                <button class="btn btn-sm" id="lcFtAi">${ic(I.spark)}Собрать / улучшить (Gemini)</button>
+                <button class="btn btn-sm btn-accent" id="lcFtSend">${ic(I.send)}Отправить</button>
+              </div>
+              <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
+            </div>`, { open: ['new', 'touch'].includes(l.stage), icon: I.send })}
           <div class="lc-3sel">
             <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
@@ -1840,6 +1852,37 @@ async function openLeadModal(id) {
     else { toast('Не расшифровалось', j.error); btn.disabled = false; btn.textContent = 'Звонок'; }
   });
   $('#lcNote', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
+  /* --- первое касание: креатив + Gemini + отправка --- */
+  const creoBtn = $('#lcCreoBtn', bd);
+  if (creoBtn) {
+    creoBtn.addEventListener('click', () => $('#lcCreoFile', bd).click());
+    $('#lcCreoFile', bd).addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = await fetch(`/api/leads/${id}/creative?filename=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
+      const j = await r.json();
+      if (r.ok) { const w = $('#lcCreoWrap', bd); w.classList.add('has'); w.innerHTML = `<img src="${j.url}" alt="креатив">`; toast('Креатив прикреплён', null, true); }
+      else toast('Не загрузилось', j.error);
+    });
+    $('#lcFtAi', bd).addEventListener('click', async () => {
+      const btn = $('#lcFtAi', bd); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '✦ Gemini думает…';
+      try {
+        const r = await fetch(`/api/leads/${id}/first-touch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: $('#lcFtText', bd).value }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || r.status);
+        $('#lcFtText', bd).value = j.message;
+        if (j.analysis) { const a = $('#lcFtAnalysis', bd); a.style.display = 'block'; a.innerHTML = `${ic(I.spark)}<span>${esc(j.analysis)}</span>`; }
+        toast('Gemini собрал касание', 'Проверьте и отправьте', true);
+      } catch (e2) { toast('ИИ не справился', e2.message); }
+      finally { btn.disabled = false; btn.innerHTML = orig; }
+    });
+    $('#lcFtSend', bd).addEventListener('click', async () => {
+      const text = $('#lcFtText', bd).value.trim();
+      if (!text) { toast('Пустой текст'); return; }
+      await api.post(`/leads/${id}/message`, { text });
+      toast('Первое касание отправлено', 'Ушло клиенту в WhatsApp', true);
+      openLeadModal(id);
+    });
+  }
   const saveContacts = async (contacts) => { await api.post(`/leads/${id}/contacts`, { contacts }); openLeadModal(id); };
   $('#lcCAdd', bd).addEventListener('click', () => {
     const v = $('#lcCVal', bd).value.trim();

@@ -1770,6 +1770,13 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 /* 2. Ripple убран (Material-волна «раскрывала» кнопки при клике — не в стиле продукта) */
 .btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
 
+/* первое касание в карточке лида */
+.lc-creo { border: 1px dashed var(--stroke); border-radius: 10px; min-height: 56px; display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 12px; background: var(--bg-2); overflow: hidden; text-align: center; padding: 8px; }
+.lc-creo.has { border-style: solid; padding: 0; }
+.lc-creo img { width: 100%; max-height: 180px; object-fit: cover; display: block; }
+.lc-ft-an { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--ink-2); background: var(--violet-bg); border-radius: 9px; padding: 8px 10px; display: flex; gap: 7px; align-items: flex-start; }
+.lc-ft-an svg { width: 14px; height: 14px; color: var(--violet); flex: 0 0 14px; margin-top: 2px; }
+
 /* 3. Мягкая пульсация горячих лидов — привлекает внимание к важному */
 .lead-card.hot { position: relative; }
 .lead-card.hot::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(224,129,61,.5); animation: hotPulse 2.6s ease-in-out infinite; pointer-events: none; }

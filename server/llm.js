@@ -261,6 +261,24 @@ ${propLines}
   };
 }
 
+/* ИИ первое касание: разбор лида + готовое персональное сообщение (+ короткий анализ) */
+async function composeFirstTouch(db, lead, draft, agencyName) {
+  const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+  const adName = lead.ads && lead.ads.matched ? lead.ads.adName : '';
+  const prompt = `Ты — сильный брокер зарубежной недвижимости в агентстве «${String(agencyName || 'агентство').slice(0, 80)}». Нужно первое касание клиенту в WhatsApp.
+Пиши как живой русскоязычный человек: коротко (2-4 предложения), тепло, по делу, без клише и канцелярита, без длинных простыней. Заверши мягким вопросом, который двигает диалог (цель/бюджет/сроки).
+ДАННЫЕ ЛИДА: имя ${lead.name || '—'}, направление ${geoName}, источник ${lead.source || '—'}${adName ? ', пришёл с объявления «' + adName + '»' : ''}.
+${draft ? 'ЧЕРНОВИК МЕНЕДЖЕРА (улучши его, сохранив смысл):\n' + String(draft).slice(0, 800) : 'Черновика нет — напиши с нуля.'}
+Верни строго JSON:
+{"message":"текст первого сообщения клиенту (обращение по имени, если оно есть; без плейсхолдеров в фигурных скобках)",
+ "analysis":"1-2 предложения для менеджера: что за лид и на что давить в касании"}`;
+  const out = await callGemini(prompt, 18000, 900);
+  if (!out || typeof out.message !== 'string' || !out.message.trim()) throw new Error('bad first-touch');
+  const msg = out.message.trim().slice(0, 900);
+  if (/\{[a-z_]+\}/i.test(msg)) throw new Error('брак: плейсхолдер в тексте');
+  return { message: msg, analysis: String(out.analysis || '').slice(0, 400) };
+}
+
 /* ИИ-заполнение блока «Об агентстве» для профиля/обложек подборок */
 async function composeAgencyAbout(name, geos) {
   const prompt = `Ты — маркетолог агентства недвижимости «${String(name || 'наше агентство').slice(0, 80)}». Направления работы: ${(Array.isArray(geos) ? geos.join(', ') : '') || 'зарубежная недвижимость'}.
@@ -298,4 +316,4 @@ async function generateImage(prompt, opts = {}) {
   return Buffer.from(b64, 'base64');
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, generateImage, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, generateImage, hasImage: () => !!OKEY, MODEL };
