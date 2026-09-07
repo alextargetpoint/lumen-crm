@@ -67,6 +67,31 @@ async function callGemini(prompt, timeoutMs = 8000, maxTokens = 500) {
 
 const playbook = require('./playbook');
 
+/* ИИ-герои квалификатора: ползунки → конкретные инструкции промпта; авто-подбор по гео */
+const HEROES = {
+  maria: { name: 'Мария', role: 'тёплый подбор', tone: 'тёплая, заботливая, эмпатичная; ведёт мягко и по-человечески, без давления', axes: { soft: 95, fast: 70, expert: 75, push: 40 } },
+  artur: { name: 'Артур', role: 'эксперт-аналитик', tone: 'уверенный, по делу; оперирует логикой и фактами, вызывает доверие экспертностью', axes: { soft: 55, fast: 75, expert: 95, push: 65 } },
+  sofia: { name: 'София', role: 'люкс-консультант', tone: 'элегантная, премиальная, безупречный этикет; ненавязчивая, уважительная', axes: { soft: 80, fast: 60, expert: 85, push: 45 } },
+  dmitry: { name: 'Дмитрий', role: 'скоростной дожим', tone: 'энергичный, динамичный; мягко создаёт срочность, быстро ведёт к следующему шагу', axes: { soft: 50, fast: 95, expert: 65, push: 90 } },
+};
+function axisPrompt(a) {
+  if (!a) return '';
+  const L = [];
+  if (a.soft >= 70) L.push('очень мягко и бережно, без давления'); else if (a.soft <= 45) L.push('прямо и по делу, без лишних смягчений');
+  if (a.fast >= 70) L.push('коротко и динамично, быстро подводи к следующему шагу'); else if (a.fast <= 45) L.push('спокойно и вдумчиво, не тороп клиента');
+  if (a.expert >= 70) L.push('опирайся на факты и экспертизу (цифры — только реальные, из промпта или слов клиента)');
+  if (a.push >= 70) L.push('уверенно подталкивай к следующему шагу, создавай лёгкое ощущение своевременности'); else if (a.push <= 40) L.push('без напора — дай клиенту вести в своём темпе');
+  return L.length ? ' Манера (держи во всех ответах): ' + L.join('; ') + '.' : '';
+}
+function pickPersona(db, lead) {
+  const ai = db.settings.ai || {};
+  if (ai.personaAuto && lead && ai.personaByGeo && HEROES[ai.personaByGeo[lead.geo]]) { const id = ai.personaByGeo[lead.geo]; return Object.assign({ id }, HEROES[id]); }
+  const pid = (ai.persona || {}).id;
+  if (pid && HEROES[pid]) return Object.assign({ id: pid }, HEROES[pid]);
+  if (ai.persona && ai.persona.name) return Object.assign({ id: pid || 'custom', axes: null }, ai.persona);
+  return null;
+}
+
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
@@ -74,10 +99,10 @@ function buildPrompt(db, lead, history) {
   const q = lead.quals;
   const missing = ['purpose', 'timeline', 'budget', 'type'].filter(a => !q[a]);
   const axisRu = { purpose: 'цель покупки', timeline: 'срок покупки', budget: 'бюджет', type: 'тип объекта' };
-  const persona = (db.settings.ai || {}).persona || {};
+  const persona = pickPersona(db, lead) || {};
   const pname = persona.name || '';
   const identity = pname
-    ? `Тебя зовут ${pname}, ты ${persona.role || 'специалист по подбору'} агентства недвижимости «${db.settings.agency.name}». Общайся от первого лица, живым человеческим языком, как реальный сотрудник — клиент должен воспринимать тебя как живого менеджера. Если уместно представиться — представься как ${pname}.${persona.tone ? ` Твоя манера общения: ${persona.tone}. Выдерживай этот стиль во всех ответах.` : ''}`
+    ? `Тебя зовут ${pname}, ты ${persona.role || 'специалист по подбору'} агентства недвижимости «${db.settings.agency.name}». Общайся от первого лица, живым человеческим языком, как реальный сотрудник — клиент должен воспринимать тебя как живого менеджера. Если уместно представиться — представься как ${pname}.${persona.tone ? ` Твоя манера общения: ${persona.tone}.` : ''}${axisPrompt(persona.axes)}`
     : `Ты — первая линия квалификации агентства недвижимости «${db.settings.agency.name}».`;
   return `${identity} Агентство работает по направлениям: ${allGeos}. Сейчас клиент интересуется направлением «${g}» — если он назовёт другое из наших направлений, спокойно работай с ним и НЕ говори, что вы только по «${g}». Ты ведёшь WhatsApp-диалог с лидом по имени ${lead.name.split(' ')[0]}.
 
@@ -316,4 +341,4 @@ async function generateImage(prompt, opts = {}) {
   return Buffer.from(b64, 'base64');
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, generateImage, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

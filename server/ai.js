@@ -82,6 +82,18 @@ function screen(db, lead) {
     if (!q.budget) { const b = extractBudget(m.text); if (b) q.budget = { value: fmtMoney(b.num, lead.geo, db), num: b.num, quote: clip(m.text) }; }
     if (!q.type) { const v = extractType(m.text); if (v) q.type = { value: v, quote: clip(m.text) }; }
   }
+  /* атрибуция ИИ-героя: кто ведёт лида (для честной A/B-статистики) — фиксируем при первом ведении */
+  if (!lead.personaId) {
+    try {
+      const p = require('./llm').pickPersona(db, lead);
+      if (p && p.id) {
+        lead.personaId = p.id;
+        const st = (db.settings.ai.personaStats = db.settings.ai.personaStats || {});
+        st[p.id] = st[p.id] || { handled: 0, qualified: 0 };
+        st[p.id].handled += 1;
+      }
+    } catch (e) {}
+  }
   const filled = AXES.filter(a => q[a]).length;
   const engagement = Math.min(inbound.length * 4, 20);
   lead.score = Math.min(100, filled * 20 + engagement);
@@ -186,10 +198,16 @@ function pushEvent(db, e) {
   const ev = Object.assign({ at: Date.now() }, e);
   db.events.unshift(ev);
   if (db.events.length > 300) db.events.length = 300;
-  /* прокачка ИИ-героя: +1 XP активной персоне за каждого квалифицированного лида */
+  /* прокачка + честная A/B: квал атрибутируется герою, который реально вёл этого лида */
   if (e.type === 'qualified') {
-    const pid = ((db.settings.ai || {}).persona || {}).id;
-    if (pid) { db.settings.ai.heroXP = db.settings.ai.heroXP || {}; db.settings.ai.heroXP[pid] = (db.settings.ai.heroXP[pid] || 0) + 1; }
+    const lead = db.leads.find(l => l.id === e.leadId);
+    const pid = (lead && lead.personaId) || ((db.settings.ai || {}).persona || {}).id;
+    if (pid) {
+      db.settings.ai.heroXP = db.settings.ai.heroXP || {}; db.settings.ai.heroXP[pid] = (db.settings.ai.heroXP[pid] || 0) + 1;
+      const st = (db.settings.ai.personaStats = db.settings.ai.personaStats || {});
+      st[pid] = st[pid] || { handled: 0, qualified: 0 };
+      st[pid].qualified += 1;
+    }
   }
   try { require('./engine').maybeInstantNotify(db, ev); } catch (_) {}
 }
