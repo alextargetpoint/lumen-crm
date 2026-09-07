@@ -193,10 +193,14 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   addEventListener('scroll', closePop, { passive: true });
 
   /* ---------- contenteditable ---------- */
-  $$('[data-be]').forEach((el) => {
-    el.contentEditable = 'plaintext-only';
-    el.addEventListener('input', () => { dirty = true; });
-  });
+  function wireEditables() {
+    $$('[data-be]').forEach((el) => {
+      if (el.dataset.pw) return; el.dataset.pw = '1';
+      el.contentEditable = 'plaintext-only';
+      el.addEventListener('input', () => { dirty = true; });
+    });
+  }
+  wireEditables();
 
   /* ---------- сериализация DOM → blocks ---------- */
   function serialize() {
@@ -259,7 +263,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     });
     if (!r.ok) { const j = await r.json().catch(() => ({})); flash('Ошибка: ' + (j.error || r.status)); return false; }
     dirty = false;
-    if (reload) { reloadWithLoader(); return true; }
+    if (reload) { await liveRefresh(); return true; }
     flash('Сохранено ✓');
     return true;
   }
@@ -277,8 +281,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { flash(j.error || 'Ошибка'); return; }
     dirty = false;
-    sessionStorage.setItem('pe_scroll', String(scrollY));
-    reloadWithLoader();
+    await liveRefresh();
   }
   $('#peUndo').addEventListener('click', () => histStep('undo'));
   $('#peRedo').addEventListener('click', () => histStep('redo'));
@@ -337,13 +340,15 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     flash('✦ ИИ собирает тексты под лида…', 0);
     await save(false);
     const r = await fetch(`/p/${P.cid}/compose?key=${encodeURIComponent(KEY)}`, { method: 'POST' });
-    if (r.ok) reloadWithLoader();
+    if (r.ok) { await liveRefresh(); composeBtn.disabled = false; }
     else { const j = await r.json().catch(() => ({})); flash(j.error || 'ИИ не справился'); composeBtn.disabled = false; }
   });
 
   /* ---------- тулбар блока ---------- */
   const TYPE = (t) => (P.types || {})[t] || { name: t, variants: [] };
+  function wireTools() {
   $$('section[data-bid]').forEach((sec) => {
+    if (sec.querySelector(':scope > .btool')) return;
     const t = TYPE(sec.dataset.bt);
     const tool = document.createElement('div');
     tool.className = 'btool';
@@ -407,6 +412,8 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
       document.addEventListener('pointerup', onUp);
     });
   });
+  }
+  wireTools();
 
   function renumber() {
     $$('section[data-bt="proj"]').forEach((s, i) => { const k = $('.kicker', s); if (k) k.textContent = 'Проект №' + (i + 1); });
@@ -484,7 +491,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     blocks.splice(i + 1, 0, ...news);
     flash('Собираю готовую страницу…', 0);
     const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+    if (r.ok) await liveRefresh(news[0] && news[0].id);
     else flash('Ошибка добавления');
   }
   async function addBlock(afterSec, t, data) {
@@ -497,7 +504,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
     });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+    if (r.ok) await liveRefresh(nb.id);
     else flash('Ошибка добавления');
   }
   const sc = sessionStorage.getItem('pe_scroll');
@@ -510,7 +517,9 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     imgs: '',
     items: (bt) => bt === 'stats' ? { k: 'показатель', v: '000' } : bt === 'faq' ? { q: 'Новый вопрос', a: 'Ответ на него' } : { title: 'Шаг', text: 'Описание шага' },
   };
+  function wireLists() {
   $$('[data-plist]').forEach((listEl) => {
+    if (listEl.nextElementSibling && listEl.nextElementSibling.classList.contains('plistadd')) return;
     const [bid, field] = listEl.dataset.plist.split(':');
     const sec = listEl.closest('section[data-bid]');
     const btn = document.createElement('button');
@@ -528,9 +537,11 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
       const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
       });
-      if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+      if (r.ok) await liveRefresh(bid);
     });
   });
+  }
+  wireLists();
 
   /* ---------- картинки ---------- */
   const fileInput = document.createElement('input');
@@ -694,7 +705,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }),
     });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); return true; }
+    if (r.ok) { await liveRefresh(); return true; }
     flash('Ошибка сохранения');
     return false;
   }
@@ -855,6 +866,24 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     });
   }
   buildRail();
+  /* ---------- ЖИВОЕ обновление без перезагрузки ----------
+     После правки блоков подтягиваем свежий серверный рендер и меняем ТОЛЬКО .book,
+     затем заново вешаем обработчики на блоки. Тема/шрифт живут в <head> — они по-прежнему грузят страницу. */
+  function wireBlocks() { wireEditables(); wireTools(); wireLists(); renumber(); buildRail(); }
+  async function liveRefresh(flashBid) {
+    try {
+      const r = await fetch(`/p/${P.cid}?edit=1&key=${encodeURIComponent(KEY)}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('fetch ' + r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const fresh = doc.querySelector('.book'), live = document.querySelector('.book');
+      if (!fresh || !live) throw new Error('no .book');
+      live.innerHTML = fresh.innerHTML;
+      dirty = false;
+      wireBlocks();
+      if (flashBid) { const s = document.querySelector(`section[data-bid="${flashBid}"]`); if (s) { s.scrollIntoView({ behavior: 'smooth', block: 'center' }); s.classList.add('peflash'); setTimeout(() => s.classList.remove('peflash'), 1500); } }
+      flash('Готово ✓');
+    } catch (e) { /* не смогли вживую — честный фолбэк на перезагрузку */ sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+  }
   const railCss = document.createElement('style');
   railCss.textContent = `
 .perail{position:fixed;right:14px;top:72px;bottom:20px;width:166px;z-index:890;background:linear-gradient(180deg,rgba(10,24,51,.94),rgba(6,17,38,.94));backdrop-filter:blur(12px);border:1px solid rgba(134,175,255,.16);border-radius:16px;padding:12px 9px;overflow-y:auto;font-family:Manrope,sans-serif;scrollbar-width:thin;box-shadow:0 20px 50px -18px rgba(6,17,38,.6)}
