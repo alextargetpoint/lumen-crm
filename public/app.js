@@ -1686,11 +1686,22 @@ function openWidgetStyle(k, onChange) {
   $$('[data-wsskin]', md).forEach(b => b.addEventListener('click', () => { ovSetSkin(k, b.dataset.wsskin); $$('[data-wsskin]', md).forEach(x => x.classList.toggle('on', x === b)); onChange && onChange(); }));
 }
 /* галерея готовых паков всей обзорной страницы */
+/* реалистичные мини-мокапы паков — чтобы по превью было видно РАЗНИЦУ */
+function ovPackPreview(id) {
+  const mspark = (pts) => { const w = 60, h = 16, mx = Math.max(...pts), pl = pts.map((v, i) => `${(i / (pts.length - 1) * w).toFixed(0)},${(h - v / mx * (h - 2)).toFixed(0)}`).join(' '); return `<svg class="opv-spk" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pl}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`; };
+  const donut = `<svg class="opv-donut" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--stroke)" stroke-width="6"/><circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="52 88" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg>`;
+  if (id === 'focus') return `<div class="opv opv-focus"><div class="opv-big"><span class="opv-n">42</span>${mspark([3, 5, 4, 7, 6, 9, 8])}</div><div class="opv-col"><div class="opv-s"></div><div class="opv-s"></div></div></div>`;
+  if (id === 'command') return `<div class="opv opv-command"><div class="opv-champ"><span class="opv-av"></span><span class="opv-avl"></span></div><div class="opv-steps"><i style="height:60%"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:95%"></i></div><div class="opv-grid4"><span></span><span></span><span></span><span></span></div></div>`;
+  if (id === 'data') return `<div class="opv opv-data"><div class="opv-dcell">${donut}</div><div class="opv-col2"><div class="opv-dcell tall">${mspark([2, 6, 3, 8, 5, 9, 7, 10])}</div><div class="opv-bars"><i style="width:80%"></i><i style="width:55%"></i><i style="width:35%"></i></div></div></div>`;
+  if (id === 'premium') return `<div class="opv opv-premium"><div class="opv-dark big"><span class="opv-glow"></span><span class="opv-n light">42</span></div><div class="opv-col"><div class="opv-dark sm"></div><div class="opv-dark sm"></div></div></div>`;
+  if (id === 'content') return `<div class="opv opv-content"><div class="opv-idea"><span class="opv-tag"></span><span class="opv-line"></span><span class="opv-line w2"></span><span class="opv-line w3"></span></div><div class="opv-col"><div class="opv-row"></div><div class="opv-row"></div><div class="opv-row"></div></div></div>`;
+  return '';
+}
 function openOvPacks(onChange) {
   const md = modal({
-    title: 'Шаблоны обзора', wide: true, sub: 'Готовые сборки: раскладка блоков + форматы + акценты + фон. Можно потом донастроить.',
-    body: `<div class="ov2-packs">${Object.entries(OV_PACKS).map(([id, p]) => `<button class="ov2-pack" data-pack="${id}">
-      <div class="ov2-pack-prev">${p.layout.slice(0, 6).map((wk, i) => `<span class="opk-cell ${i === 0 ? 'wide' : ''}"></span>`).join('')}</div>
+    title: 'Шаблоны обзора', wide: true, sub: 'Готовые сборки: раскладка, форматы, акценты и фон. Наведи — увидишь, как будет выглядеть страница. Потом можно донастроить.',
+    body: `<div class="ov2-packs">${Object.entries(OV_PACKS).map(([id, p]) => `<button class="ov2-pack pk-${id}" data-pack="${id}">
+      <div class="ov2-pack-prev">${ovPackPreview(id)}</div>
       <div class="ov2-pack-b"><b>${esc(p.name)}</b><span>${esc(p.desc)}</span><i>${p.layout.length} ${plural(p.layout.length, 'блок', 'блока', 'блоков')}</i></div>
     </button>`).join('')}</div>`,
     actions: [{ label: 'Закрыть' }],
