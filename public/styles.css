@@ -3313,22 +3313,22 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov-delta.flat { color: var(--ink-3); background: var(--bg-2); }
 /* KPI · Бенто */
 .kpi-bento { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; }
-.kb-hero { position: relative; overflow: hidden; text-align: left; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke)); border-radius: 20px; padding: 18px 20px; cursor: pointer; display: flex; flex-direction: column; background:
+.kbn-hero { position: relative; overflow: hidden; text-align: left; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke)); border-radius: 20px; padding: 18px 20px; cursor: pointer; display: flex; flex-direction: column; background:
   radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
   linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--card)), var(--card)); }
-.kb-hero-glow { position: absolute; top: -40%; right: -20%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%); filter: blur(20px); pointer-events: none; }
-.kb-ic { position: relative; width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(140deg, var(--accent), var(--accent-2)); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 20px -8px var(--accent); }
-.kb-ic svg { width: 19px; height: 19px; }
-.kb-lbl { position: relative; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-top: 12px; }
-.kb-num { position: relative; font-size: 46px; font-weight: 800; color: var(--navy-900); line-height: 1; letter-spacing: -1.5px; font-family: var(--font-display, 'Fraunces'), serif; }
-.kb-sub { position: relative; font-size: 11.5px; color: var(--ink-3); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
-.kb-spark { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; opacity: .8; }
-.kb-side { display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 10px; }
-.kb-cell { text-align: left; border: 1px solid var(--stroke); border-radius: 14px; padding: 10px 13px; cursor: pointer; background: var(--card); display: flex; flex-direction: column; justify-content: center; transition: border-color .15s, transform .15s; }
-.kb-cell:hover { border-color: var(--accent); transform: translateX(2px); }
-.kb-c-ic { color: var(--accent); } .kb-c-ic svg { width: 15px; height: 15px; }
-.kb-c-num { font-size: 24px; font-weight: 800; color: var(--navy-900); line-height: 1.1; }
-.kb-c-lbl { font-size: 11px; color: var(--ink-3); }
+.kbn-hero-glow { position: absolute; top: -40%; right: -20%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%); filter: blur(20px); pointer-events: none; }
+.kbn-ic { position: relative; width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(140deg, var(--accent), var(--accent-2)); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 20px -8px var(--accent); }
+.kbn-ic svg { width: 19px; height: 19px; }
+.kbn-lbl { position: relative; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-top: 12px; }
+.kbn-num { position: relative; font-size: 46px; font-weight: 800; color: var(--navy-900); line-height: 1; letter-spacing: -1.5px; font-family: var(--font-display, 'Fraunces'), serif; }
+.kbn-sub { position: relative; font-size: 11.5px; color: var(--ink-3); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.kbn-spark { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; opacity: .8; }
+.kbn-side { display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 10px; }
+.kbn-cell { text-align: left; border: 1px solid var(--stroke); border-radius: 14px; padding: 10px 13px; cursor: pointer; background: var(--card); display: flex; flex-direction: column; justify-content: center; transition: border-color .15s, transform .15s; }
+.kbn-cell:hover { border-color: var(--accent); transform: translateX(2px); }
+.kbn-c-ic { color: var(--accent); } .kbn-c-ic svg { width: 15px; height: 15px; }
+.kbn-c-num { font-size: 24px; font-weight: 800; color: var(--navy-900); line-height: 1.1; }
+.kbn-c-lbl { font-size: 11px; color: var(--ink-3); }
 /* KPI · Тренд */
 .kpi-trend { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
 .kt-hero { text-align: left; border: 1px solid var(--stroke); border-radius: 18px; padding: 16px 18px 8px; cursor: pointer; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 6%, var(--card)), var(--card)); display: flex; flex-direction: column; }

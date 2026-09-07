@@ -1084,14 +1084,14 @@ const OV_W = {
     if (v === 'bento') {
       const [m, ...rest] = cards;
       return `<div class="kpi-bento">
-        <button class="kb-hero" data-ovgo="${m.go}"><div class="kb-hero-glow"></div>
-          <span class="kb-ic">${ic(m.ic)}</span>
-          <span class="kb-lbl">${m.k}</span>
-          <span class="kb-num">${cup(m.v)}</span>
-          <span class="kb-sub">${deltaChip(wkNow, wkPrev)} к прошлой неделе</span>
-          <div class="kb-spark">${sparkSvg(d14, { w: 160, h: 40 })}</div>
+        <button class="kbn-hero" data-ovgo="${m.go}"><div class="kbn-hero-glow"></div>
+          <span class="kbn-ic">${ic(m.ic)}</span>
+          <span class="kbn-lbl">${m.k}</span>
+          <span class="kbn-num">${cup(m.v)}</span>
+          <span class="kbn-sub">${deltaChip(wkNow, wkPrev)} к прошлой неделе</span>
+          <div class="kbn-spark">${sparkSvg(d14, { w: 160, h: 40 })}</div>
         </button>
-        <div class="kb-side">${rest.map(x => `<button class="kb-cell" data-ovgo="${x.go}"><span class="kb-c-ic">${ic(x.ic)}</span><span class="kb-c-num">${cup(x.v)}</span><span class="kb-c-lbl">${x.k}</span></button>`).join('')}</div>
+        <div class="kbn-side">${rest.map(x => `<button class="kbn-cell" data-ovgo="${x.go}"><span class="kbn-c-ic">${ic(x.ic)}</span><span class="kbn-c-num">${cup(x.v)}</span><span class="kbn-c-lbl">${x.k}</span></button>`).join('')}</div>
       </div>`;
     }
     /* ТРЕНД: аналитический ряд — крупный спарклайн-герой + компактные метрики с дельтами */
@@ -1283,7 +1283,7 @@ const OV_W = {
     const rows = geos.map(g => {
       const tz = GEO_TZ[g]; const nm = STATE.settings.geoNames[g] || g;
       const t = tz == null ? null : new Date(now + (tz * 60 - (-new Date().getTimezoneOffset())) * 60e3);
-      const hh = t ? pad2(t.getHours()) + ':' + pad2(t.getMinutes()) : '—';
+      const hh = t ? pad2h(t.getHours()) + ':' + pad2h(t.getMinutes()) : '—';
       const bad = t && (t.getHours() < 8 || t.getHours() >= 22);
       return `<div class="ov2-wc-row"><span class="ov2-wc-nm">${esc(nm)}${tz != null ? ` <i>GMT${tz >= 0 ? '+' : ''}${tz}</i>` : ''}</span><span class="ov2-wc-t ${bad ? 'off' : ''}">${hh}${bad ? ` ${ic(I.moon, 2)}` : ''}</span></div>`;
     }).join('');
