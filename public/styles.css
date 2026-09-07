@@ -2388,6 +2388,33 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .sh-conf div div { color: var(--ink-2); }
 @media (max-width: 640px) { .sh-lookup { flex-direction: column; } }
 
+/* фото со страницы (скрейпинг) — выбор для вставки в карусель */
+.sh-imgs:empty { display: none; }
+.sh-imgs { margin-bottom: 12px; }
+.sh-imgs-hd { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+.sh-imgs-hd svg { width: 14px; height: 14px; }
+.sh-imgs-n { margin-left: auto; background: var(--accent); color: #fff; border-radius: 20px; padding: 1px 8px; font-size: 11px; }
+.sh-imgs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.sh-img { position: relative; aspect-ratio: 4/3; border-radius: 10px; background: #DCE3ED center/cover no-repeat; border: none; cursor: pointer; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(6,17,38,.08); transition: transform .12s; }
+.sh-img:hover { transform: translateY(-2px); }
+.sh-img-ck { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 50%; background: rgba(6,17,38,.4); display: grid; place-items: center; opacity: 0; transition: opacity .12s; }
+.sh-img-ck svg { width: 13px; height: 13px; color: #fff; }
+.sh-img.on { box-shadow: inset 0 0 0 3px var(--accent); }
+.sh-img.on .sh-img-ck { opacity: 1; background: var(--accent); }
+
+/* понятные пресеты: тема-свотч и шрифт-превью с описанием */
+.cpick-row { margin-bottom: 12px; }
+.cpick-hd { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.cpick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.cpick-it { flex: 0 0 auto; display: flex; align-items: center; gap: 9px; padding: 7px 12px 7px 8px; border: 1.5px solid var(--stroke); border-radius: 12px; background: var(--card, #fff); cursor: pointer; text-align: left; transition: border-color .12s, background .12s; }
+.cpick-it:hover { border-color: var(--accent); }
+.cpick-it.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cpick-sw { width: 30px; height: 30px; border-radius: 8px; flex: none; box-shadow: inset 0 0 0 1px rgba(6,17,38,.12); }
+.cpick-aa { width: 30px; text-align: center; font-size: 21px; line-height: 1; flex: none; color: var(--navy-900); }
+.cpick-l { display: flex; flex-direction: column; line-height: 1.2; }
+.cpick-l b { font-size: 12.5px; font-weight: 700; color: var(--navy-900); }
+.cpick-l i { font-size: 10.5px; font-style: normal; color: var(--ink-3); white-space: nowrap; }
+
 /* меню быстрой отправки контента */
 .sh-shr { color: var(--ink-3); }
 .sh-shr:hover { color: var(--accent); }
@@ -2407,3 +2434,20 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .sh-treflinks .sh-tref-lbl svg { width: 12px; height: 12px; }
 .sh-reflink { font-size: 11.5px; font-weight: 600; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke)); border-radius: 20px; padding: 3px 11px; transition: background .14s, transform .14s, box-shadow .14s; }
 .sh-reflink:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); transform: translateY(-1px); box-shadow: 0 6px 14px -8px rgba(37,99,235,.5); }
+
+/* просмотр кабинета брокера (view-as) + выдача доступа */
+#previewBanner { position: fixed; top: 0; left: 0; right: 0; z-index: 400; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: linear-gradient(90deg, #7C5BD8, #4F7DFF); color: #fff; font-size: 12.5px; font-weight: 600; box-shadow: 0 6px 20px -8px rgba(37,99,235,.6); }
+#previewBanner svg { width: 15px; height: 15px; }
+#previewBanner b { font-weight: 700; }
+#previewBanner button { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; font-family: inherit; transition: background .14s; }
+#previewBanner button:hover { background: rgba(255,255,255,.3); }
+body.has-preview { padding-top: 38px; }
+.pv-done { margin-top: 14px; }
+.pv-done-hd { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--ok); margin-bottom: 12px; }
+.pv-done-hd svg { width: 16px; height: 16px; }
+.pv-cred { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; background: var(--bg-2); border: 1px solid var(--stroke); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 12px; }
+.pv-cred div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pv-cred span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.pv-cred b { font-size: 13px; color: var(--navy-900); word-break: break-all; }
+.pv-cred .pv-pin { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: .12em; color: var(--accent); }
+.pv-send { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }

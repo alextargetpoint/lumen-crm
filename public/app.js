@@ -657,11 +657,22 @@ function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const solo = IS_SOLO();
+  const hidePages = (me && me.hidePages) || [];
   $$('.nav-item').forEach(btn => {
-    const hideB = isBroker && BROKER_HIDDEN_PAGES.includes(btn.dataset.page);
+    const hideB = isBroker && (BROKER_HIDDEN_PAGES.includes(btn.dataset.page) || hidePages.includes(btn.dataset.page));
     const hideS = solo && btn.dataset.page === 'brokers';
     btn.style.display = (hideB || hideS) ? 'none' : '';
   });
+  /* баннер «просмотр кабинета брокера» для владельца */
+  const existing = document.getElementById('previewBanner');
+  if (me && me.preview) {
+    if (!existing) {
+      const bn = el(`<div id="previewBanner">${ic(I.eye)}<span>Просмотр кабинета: <b>${esc(me.name || 'брокер')}</b></span><button id="previewExit">Выйти из просмотра</button></div>`);
+      document.body.appendChild(bn);
+      document.body.classList.add('has-preview');
+      $('#previewExit', bn).addEventListener('click', async () => { try { await api.post('/preview', {}); } catch (e) {} location.reload(); });
+    }
+  } else if (existing) { existing.remove(); document.body.classList.remove('has-preview'); }
   $$('.nav-label').forEach(lb => { /* прячем осиротевшие заголовки групп */
     let el2 = lb.nextElementSibling, any = false;
     while (el2 && !el2.classList.contains('nav-label')) { if (el2.style.display !== 'none') any = true; el2 = el2.nextElementSibling; }
@@ -3948,6 +3959,37 @@ PAGES.comments = async (root) => {
 const CAR_TPL = { project: 'Новый проект', reasons: '3–5 причин инвестировать', review: 'Отзыв клиента / кейс', digest: 'Подборка недели', tips: 'Гид покупателя', launch: 'Новый запуск / старт продаж' };
 const CAR_THEMES = { klein: 'Klein', royal: 'Royal', emerald: 'Emerald', champagne: 'Champagne', noir: 'Noir', mocha: 'Mocha', sage: 'Sage', bordeaux: 'Bordeaux', slate: 'Slate', terracotta: 'Terracotta', midnight: 'Midnight' };
 const CAR_FONTS = { fraunces: 'Fraunces (люкс)', playfair: 'Playfair (глянец)', cormorant: 'Cormorant', instrument: 'Instrument Serif', bricolage: 'Bricolage', spacegro: 'Space Grotesk', unbounded: 'Unbounded', oswald: 'Oswald', manrope: 'Manrope' };
+/* понятные пресеты: [название, что это простыми словами, цвет1, цвет2] и для шрифтов [название, характер, css-family, google] */
+const CAR_THEME_META = {
+  klein: ['Klein', 'глубокий кобальт', '#1D34D8', '#0A1833'], royal: ['Royal', 'фиолетовый люкс', '#5B2BD8', '#12081F'],
+  emerald: ['Emerald', 'изумруд', '#0E7A5F', '#07211A'], champagne: ['Champagne', 'тёплое золото', '#A8791F', '#241F14'],
+  noir: ['Noir', 'графит-нуар', '#2A2A38', '#0B0B12'], mocha: ['Mocha', 'какао', '#7A5C43', '#2A2018'],
+  sage: ['Sage', 'спокойный шалфей', '#5C6E5A', '#1E2620'], bordeaux: ['Bordeaux', 'винный', '#7C2D3A', '#241318'],
+  slate: ['Slate', 'холодный сланец', '#3E4A5B', '#141922'], terracotta: ['Terracotta', 'терракота', '#B0532E', '#2A1810'],
+  midnight: ['Midnight', 'песок на тёмном', '#C7B08A', '#111524'],
+};
+const CAR_FONT_META = {
+  fraunces: ['Fraunces', 'мягкий люкс, с засечками', "'Fraunces',serif", 'Fraunces:opsz,wght@9..144,600'],
+  playfair: ['Playfair', 'глянцевый, журнальный', "'Playfair Display',serif", 'Playfair+Display:wght@600'],
+  cormorant: ['Cormorant', 'тонкий, элегантный', "'Cormorant',serif", 'Cormorant:wght@600'],
+  instrument: ['Instrument Serif', 'контрастный, редакторский', "'Instrument Serif',serif", 'Instrument+Serif'],
+  bricolage: ['Bricolage', 'современный гротеск', "'Bricolage Grotesque',sans-serif", 'Bricolage+Grotesque:opsz,wght@12..96,600'],
+  spacegro: ['Space Grotesk', 'техно-минимал', "'Space Grotesk',sans-serif", 'Space+Grotesk:wght@600'],
+  unbounded: ['Unbounded', 'смелый, дисплейный', "'Unbounded',sans-serif", 'Unbounded:wght@700'],
+  oswald: ['Oswald', 'узкий, плакатный', "'Oswald',sans-serif", 'Oswald:wght@600'],
+  manrope: ['Manrope', 'чистый, нейтральный', "'Manrope',sans-serif", 'Manrope:wght@700'],
+};
+function carThemePicker(id, sel) {
+  return `<div class="cpick" data-pick="${id}"><input type="hidden" id="${id}" value="${sel}">${Object.entries(CAR_THEME_META).map(([k, [n, d, c1, c2]]) => `<button type="button" class="cpick-it ${k === sel ? 'on' : ''}" data-v="${k}"><span class="cpick-sw" style="background:linear-gradient(135deg,${c1},${c2})"></span><span class="cpick-l"><b>${n}</b><i>${d}</i></span></button>`).join('')}</div>`;
+}
+function carFontPicker(id, sel) {
+  return `<div class="cpick" data-pick="${id}"><input type="hidden" id="${id}" value="${sel}">${Object.entries(CAR_FONT_META).map(([k, [n, d, fam]]) => `<button type="button" class="cpick-it ${k === sel ? 'on' : ''}" data-v="${k}"><span class="cpick-aa" style="font-family:${fam}">Aa</span><span class="cpick-l"><b style="font-family:${fam}">${n}</b><i>${d}</i></span></button>`).join('')}</div>`;
+}
+let CAR_FONTS_LOADED = false;
+function wireCarPickers(scope) {
+  if (!CAR_FONTS_LOADED) { CAR_FONTS_LOADED = true; Object.values(CAR_FONT_META).forEach(([, , , gf]) => { if (gf) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + gf + '&display=swap'; document.head.appendChild(l); } }); }
+  $$('.cpick', scope).forEach(pick => pick.addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; pick.querySelector('input').value = b.dataset.v; $$('[data-v]', pick).forEach(x => x.classList.toggle('on', x === b)); }));
+}
 const SHOOT_FMT = { talking: 'Говорящая голова', dialogue: 'Диалог 50/50', vlog: 'Влог / на объекте' };
 const SOCIAL_TOOLS = {
   scripts:   { name: 'Сценарии Reels', icon: I.play,   sub: 'хук → структура → CTA', hue: '#2FA98C' },
@@ -4044,18 +4086,16 @@ function wireCarCards(root) {
 }
 /* модалка «Новая карусель» — используется в инструменте «Карусели» */
 function openCarouselModal() {
-  modal({
+  const _bd = modal({
     title: 'Новая карусель',
     body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Шаблон</label><select id="carTpl">${Object.entries(CAR_TPL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option><option value="story">9:16 сторис / Reels</option></select></div>
       </div>
       <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Стиль (тема)</label><select id="carTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Шрифт</label><select id="carFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-      </div>
+      <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+      <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('carTheme', 'klein')}</div>
+      <div class="cpick-row"><span class="cpick-hd">Шрифт заголовков</span>${carFontPicker('carFont', 'fraunces')}</div>
       <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin-top:4px"><input type="checkbox" id="carAi" checked><span style="font-size:13px">✦ Написать тексты слайдов с ИИ</span></label>`,
     actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
       const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
@@ -4067,6 +4107,7 @@ function openCarouselModal() {
       } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Собрать'; } return false; }
     } }, { label: 'Отмена' }],
   });
+  wireCarPickers(_bd);
 }
 
 /* карточка одного сценария (зеркалит проверенный контент-бот, но под недвижимость) */
@@ -4333,17 +4374,20 @@ async function shLaunch(main) {
         <button class="btn btn-accent" id="lcFind">${ic(I.search)}Найти инфо</button>
       </div>
       <div id="lcConf" class="sh-lc-conf"></div>
+      <div id="lcImgs" class="sh-imgs"></div>
       <div class="form-row"><label>Объект / ЖК — что запускаем</label><input id="lcName" placeholder="напр. ЖК Marina Vista — старт продаж"></div>
       <div class="form-row"><label>Условия входа: цена, рассрочка, доходность, дедлайн оффера, сдача <span class="muted" style="font-weight:400">— проверь и поправь</span></label><textarea id="lcFacts" placeholder="1BR от $180k · рассрочка 0% на 3 года · доходность ~8% · старт-цена только до конца месяца · сдача 2027"></textarea></div>
       <div class="sh-launch-opts">
         <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
         <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
-        <select id="lcTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-        <select id="lcFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
       </div>
+      <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('lcTheme', 'klein')}</div>
+      <div class="cpick-row"><span class="cpick-hd">Шрифт заголовков</span>${carFontPicker('lcFont', 'fraunces')}</div>
       <div class="sh-gen-foot"><span class="tb-spacer"></span><button class="btn btn-accent" id="lcGo">${ic(I.spark)}Собрать карусель</button></div>
     </div>
     ${launches.length ? `<div class="lp-sec">Карусели из лончей · ${launches.length}</div><div class="car-grid">${launches.map(carCardHTML).join('')}</div>` : ''}`;
+  wireCarPickers(main);
+  let lcPicked = new Set();   /* выбранные фото со страницы для вставки в карусель */
   /* умный поиск фактов о проекте */
   $('#lcFind', main).addEventListener('click', async () => {
     const v = $('#lcLook', main).value.trim(); if (!v) { toast('Вставь ссылку или название проекта'); return; }
@@ -4356,9 +4400,22 @@ async function shLaunch(main) {
       if (parts.length) $('#lcFacts', main).value = parts.join(' · ');
       const cc = { высокая: 'ok', средняя: 'warn', низкая: 'bad' }[f.confidence] || 'warn';
       $('#lcConf', main).innerHTML = `<div class="sh-conf ${cc}">${ic(I.shield)}<div><b>Данные найдены · достоверность: ${esc(f.confidence)}</b>${f.note ? `<div>${esc(f.note)}</div>` : ''}<div class="muted">Проверь цифры перед сборкой — ИИ мог ошибиться.</div></div></div>`;
-      toast('Инфо подтянута', 'Проверь и правь', true);
+      /* фото/рендеры со страницы — выбери, что вставить в карусель */
+      lcPicked = new Set();
+      const imgs = (f.images || []).slice(0, 18);
+      if (imgs.length) {
+        imgs.slice(0, 6).forEach(u => lcPicked.add(u));   /* первые 6 выбраны по умолчанию */
+        $('#lcImgs', main).innerHTML = `<div class="sh-imgs-hd">${ic(I.photo || I.eye)}Фото со страницы — отметь, что вставить в карусель <b class="sh-imgs-n">${lcPicked.size}</b></div><div class="sh-imgs-grid">${imgs.map(u => `<button type="button" class="sh-img ${lcPicked.has(u) ? 'on' : ''}" data-img="${esc(u)}" style="background-image:url('${esc(u)}')"><span class="sh-img-ck">${ic(I.check)}</span></button>`).join('')}</div>`;
+      } else { $('#lcImgs', main).innerHTML = ''; }
+      toast('Инфо подтянута', imgs.length ? `Найдено фото: ${imgs.length} — проверь` : 'Проверь и правь', true);
     } catch (e) { toast('Не нашёл', e.message); $('#lcConf', main).innerHTML = `<div class="sh-conf bad">${ic(I.shield)}<div><b>Не удалось получить данные</b><div class="muted">${esc(e.message)} — заполни поля вручную.</div></div></div>`; }
     btn.disabled = false; btn.innerHTML = ic(I.search) + 'Найти инфо';
+  });
+  /* тоггл выбора фото */
+  $('#lcImgs', main).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-img]'); if (!b) return;
+    const u = b.dataset.img; if (lcPicked.has(u)) lcPicked.delete(u); else lcPicked.add(u);
+    b.classList.toggle('on', lcPicked.has(u)); const n = $('.sh-imgs-n', main); if (n) n.textContent = lcPicked.size;
   });
   $('#lcLook', main).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcFind', main).click(); });
   $('#lcGo', main).addEventListener('click', async () => {
@@ -4368,7 +4425,7 @@ async function shLaunch(main) {
     const topic = `Старт продаж / лонч: ${name}. Условия и факты: ${facts || '—'}`;
     const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
     try {
-      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, ai: true });
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, images: [...lcPicked], ai: true });
       toast('Карусель собрана', 'Открываю редактор', true);
       window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
       render();
@@ -4788,6 +4845,8 @@ PAGES.brokers = async (root) => {
             </div>
           </div>
           <span class="tb-spacer"></span>
+          <button class="btn btn-sm" data-brprovision="${b.id}" title="Умная выдача доступа: PIN + пресет + стартовый чеклист">${ic(I.spark)}Выдать доступ</button>
+          <button class="btn btn-sm" data-brpreview="${b.id}" title="Посмотреть его кабинет как есть">${ic(I.eye)}Кабинет</button>
           <button class="btn btn-accent btn-sm" data-brsave="${b.id}">${ic(I.check)}Готово</button>
           <button class="btn btn-sm" data-brcancel>Отмена</button>
           <button class="btn-ghost" data-brdel="${b.id}" title="Удалить брокера">${ic(I.x)}</button>
@@ -4954,8 +5013,59 @@ PAGES.brokers = async (root) => {
       PAGE_STATE.brokerEdit = null;
       await loadState(); render();
     });
+    const pv = eb.querySelector('[data-brpreview]');
+    if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
+    const pr = eb.querySelector('[data-brprovision]');
+    if (pr) pr.addEventListener('click', () => openProvisionModal(pr.dataset.brprovision));
   }
 };
+
+/* владелец → «посмотреть кабинет брокера» (view-as) */
+async function previewBroker(id) {
+  try { await api.post('/preview', { brokerId: id }); location.reload(); }
+  catch (e) { toast('Не вышло', e.message); }
+}
+/* умная выдача доступа: пресет + PIN → ссылка+код для отправки брокеру */
+function openProvisionModal(id) {
+  const br = (STATE.brokers || []).find(x => x.id === id) || {};
+  const PRESETS = [
+    ['starter', 'Новичок', 'полный доступ + обучающий стартовый чеклист (рекомендуется)'],
+    ['sales', 'Только продажи', 'лиды/встречи/задачи; движки соцсетей скрыты'],
+    ['full', 'Полный доступ', 'все разделы, без обучалок'],
+  ];
+  const bd = modal({
+    title: `Выдать доступ · ${br.name || 'брокер'}`, sub: 'Кабинет соберётся сам — PIN, формат и стартовый чеклист',
+    body: `<div class="form-row"><label>Формат кабинета</label><select id="pvPreset">${PRESETS.map(([k, n, d]) => `<option value="${k}">${n} — ${d}</option>`).join('')}</select></div>
+      <div class="form-row"><label>PIN брокеру (пусто = сгенерируем сами)</label><input id="pvPin" placeholder="мин. 6 символов · или оставь пустым"></div>
+      <div id="pvResult"></div>`,
+    actions: [{ label: 'Выдать доступ', cls: 'btn-accent', onClick: async (bd2) => {
+      const btn = bd2.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Готовлю…'; }
+      try {
+        const r = await api.post('/brokers/' + id + '/provision', { preset: $('#pvPreset', bd2).value, pin: $('#pvPin', bd2).value.trim() });
+        const link = r.link || location.origin + '/';
+        const msg = `Доступ в Lumen CRM 🔑\nСсылка: ${link}\nВаш код входа: ${r.pin}\n(введите код на странице входа)`;
+        $('#pvResult', bd2).innerHTML = `<div class="pv-done">
+          <div class="pv-done-hd">${ic(I.check)}Доступ выдан · формат «${esc(r.presetName)}»${r.seeded ? ` · ${r.seeded} стартовых задач в кабинете` : ''}</div>
+          <div class="pv-cred"><div><span>Ссылка</span><b>${esc(link)}</b></div><div><span>Код входа</span><b class="pv-pin">${esc(r.pin)}</b></div></div>
+          <div class="pv-send">
+            <button class="btn btn-sm" id="pvCopy">${ic(I.copy)}Скопировать</button>
+            <button class="btn btn-sm" id="pvWa">${ic(I.chat)}WhatsApp</button>
+            <button class="btn btn-sm" id="pvTg">${ic(I.send)}Telegram</button>
+            <span class="tb-spacer"></span>
+            <button class="btn btn-sm btn-accent" id="pvOpen">${ic(I.eye)}Открыть его кабинет</button>
+          </div></div>`;
+        $('#pvCopy', bd2).addEventListener('click', () => { navigator.clipboard.writeText(msg); toast('Скопировано — отправь брокеру', null, true); });
+        $('#pvWa', bd2).addEventListener('click', () => waShare(msg));
+        $('#pvTg', bd2).addEventListener('click', () => tgShare(msg));
+        $('#pvOpen', bd2).addEventListener('click', () => previewBroker(id));
+        await loadState();
+        if (btn) { btn.disabled = false; btn.textContent = 'Выдать заново'; }
+      } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Выдать доступ'; } }
+      return false; /* держим модалку открытой, чтобы показать ссылку+код */
+    } }, { label: 'Закрыть' }],
+  });
+  return bd;
+}
 
 /* брокер на смене? (зеркало серверной логики) */
 function isOnShift(b) {

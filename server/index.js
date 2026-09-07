@@ -370,12 +370,23 @@ function getSession(req) {
   if (!m) return null;
   return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
 }
-/* роль сессии: owner (пароль агентства) | broker (личный PIN) */
+/* роль сессии: owner (пароль агентства) | broker (личный PIN).
+   previewAs: владелец может смотреть кабинет брокера — читаем как брокер, но помним, что реально owner. */
 function sessionRole(req) {
   const sid = getSession(req);
   if (!sid) return null;
   const s = store.get().settings.auth.sessions[sid];
-  return { sid, role: s.role || 'owner', brokerId: s.brokerId || null };
+  const realRole = s.role || 'owner';
+  if (realRole === 'owner' && s.previewAs && store.get().brokers.some(b => b.id === s.previewAs)) {
+    return { sid, role: 'broker', brokerId: s.previewAs, previewOwner: true };
+  }
+  return { sid, role: realRole, brokerId: s.brokerId || null };
+}
+/* реальная роль сессии (без preview) — для проверок «может ли owner» */
+function realRole(req) {
+  const sid = getSession(req); if (!sid) return null;
+  const s = store.get().settings.auth.sessions[sid];
+  return { sid, role: s.role || 'owner', brokerId: s.brokerId || null, previewAs: s.previewAs || null };
 }
 /* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
 function audit(db, req, action, extra) {
@@ -1025,6 +1036,17 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
       res.end(JSON.stringify({ ok: true })); return;
     }
+    /* владелец смотрит кабинет брокера (view-as) — читаем как брокер, выходим одной кнопкой */
+    if (p === '/api/preview' && req.method === 'POST') {
+      const rr = realRole(req);
+      if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const s = db.settings.auth.sessions[rr.sid];
+      if (b.brokerId && db.brokers.some(x => x.id === b.brokerId)) s.previewAs = b.brokerId;
+      else delete s.previewAs;
+      store.save();
+      return json(res, 200, { ok: true, previewAs: s.previewAs || null });
+    }
     if (p === '/auth/password' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
@@ -1091,7 +1113,7 @@ const server = http.createServer(async (req, res) => {
         templates: db.templates, sequences: db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
-        me: ROLE ? { role: ROLE.role, brokerId: ROLE.brokerId, name: IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}).name : null } : null,
+        me: ROLE ? { role: ROLE.role, brokerId: ROLE.brokerId, name: IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}).name : null, preview: !!ROLE.previewOwner, hidePages: IS_BROKER ? ((db.brokers.find(b => b.id === ROLE.brokerId) || {}).hidePages || []) : [] } : null,
       }); return;
     }
     /* журнал доступа (только владелец) */
@@ -1426,6 +1448,51 @@ const server = http.createServer(async (req, res) => {
       db.brokers.push(br); store.save();
       return json(res, 200, br);
     }
+    /* умная выдача доступа брокеру: PIN (или авто) + пресет кабинета + стартовый онбординг-чеклист */
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)\/provision$/)) && req.method === 'POST') {
+      const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const br = db.brokers.find(x => x.id === m[1]); if (!br) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const PRESETS = {
+        starter: { name: 'Новичок', hide: [], learn: true },
+        full: { name: 'Полный доступ', hide: [], learn: false },
+        sales: { name: 'Только продажи', hide: ['social'], learn: false },
+      };
+      const preset = PRESETS[b.preset] ? b.preset : 'starter';
+      /* PIN: свой или авто-6 цифр, уникальный против пароля и других брокеров */
+      let pin = String(b.pin || '').trim();
+      if (pin) { if (pin.length < 6) return json(res, 400, { error: 'PIN короче 6 символов' }); }
+      else { let tries = 0; do { pin = String(Math.floor(100000 + Math.random() * 900000)); tries++; } while ((sha(pin) === db.settings.auth.passHash || db.brokers.some(x => x.pinHash === sha(pin))) && tries < 40); }
+      const ph = sha(pin);
+      if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
+      br.pinHash = ph; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice();
+      /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
+      let seeded = 0;
+      if (!br.onboarded) {
+        const _d = new Date(); const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+        const common = [
+          { t: 'Заполни визитку: фото, должность, пара слов о себе', p: 'p2' },
+          { t: 'Задай график смен — когда ты на связи с клиентами', p: 'p3' },
+          { t: 'Спланируй день в «Мои задачи» — 3 главные задачи', p: 'p2' },
+        ];
+        const sales = [
+          { t: 'Свяжись с первым назначенным лидом (WhatsApp + звонок)', p: 'p1' },
+          { t: 'Разбери спящих: запусти 3 касания', p: 'p2' },
+        ];
+        const social = [
+          { t: 'Соцсети → собери первый Reels-сценарий под свой объект', p: 'p2' },
+          { t: 'Соцсети → наханть 5 идей в копилку (свайпай карточки)', p: 'p3' },
+          { t: 'Собери карусель по новому объекту и выложи', p: 'p3' },
+        ];
+        const list = [...common, ...(preset === 'sales' ? sales : [...social, ...sales.slice(0, 1)])];
+        list.forEach(it => { db.brokerTasks.unshift({ id: crypto.randomBytes(5).toString('hex'), brokerId: br.id, title: it.t, priority: it.p, status: 'todo', due: null, scheduled: today, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null, seed: true }); seeded++; });
+        br.onboarded = true;
+      }
+      audit(db, req, `выдан доступ (${PRESETS[preset].name})`, { broker: br.name });
+      store.save();
+      const base = global.LUMEN_BASE || (`${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host || 'localhost'}`);
+      return json(res, 200, { ok: true, pin, preset, presetName: PRESETS[preset].name, seeded, link: base + '/', brokerName: br.name });
+    }
     /* фото брокера: raw body ≤3МБ → assets/brokers/<id>.<ext>; DELETE — убрать */
     if ((m = p.match(/^\/api\/brokers\/([^/]+)\/photo$/)) && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -1755,6 +1822,13 @@ const server = http.createServer(async (req, res) => {
         try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo); title = out.title; slides = out.slides; }
         catch (e) { /* ИИ не справился — стартовые слайды */ }
       }
+      /* умная раскладка фото: 1-й слайд (обложка) — крупный кадр; далее фото на смысловые слайды; последний (CTA) оставляем чистым градиентом */
+      const pics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))).slice(0, 12) : [];
+      if (pics.length && slides.length) {
+        slides[0] = Object.assign({}, slides[0], { bg: pics[0], pos: slides[0].pos || 'bottom', size: slides[0].size || 'l' });
+        let pi = 1;
+        for (let i = 1; i < slides.length - 1 && pi < pics.length; i++) { slides[i] = Object.assign({}, slides[i], { bg: pics[pi++], pos: slides[i].pos || 'bottom' }); }
+      }
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -1869,22 +1943,26 @@ const server = http.createServer(async (req, res) => {
       const url = String(b.url || '').trim();
       const query = String(b.query || '').trim();
       let sourceText = String(b.text || '').trim();
+      let images = [];
       if (!url && !query && !sourceText) return json(res, 400, { error: 'дайте ссылку или название проекта' });
       if (url && !sourceText) {
         try {
-          const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
-          const host = uu.hostname;
-          if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(host)) return json(res, 400, { error: 'ссылка недоступна' });
-          const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 12000);
-          const rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 LumenBot' } });
-          clearTimeout(to);
-          const html = (await rr.text()).slice(0, 400000);
+          const { html, finalUrl } = await safeFetchPage(url);
+          images = scrapeImagesFromHtml(html, finalUrl);
           sourceText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
           if (!sourceText) return json(res, 400, { error: 'страница пустая или не отдала текст' });
         } catch (e) { return json(res, 400, { error: 'не удалось загрузить страницу — вставьте текст вручную' }); }
       }
-      try { const facts = await llm.extractLaunch({ sourceText, query }); return json(res, 200, facts); }
+      try { const facts = await llm.extractLaunch({ sourceText, query }); facts.images = images; return json(res, 200, facts); }
       catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* скрейпинг фото со страницы: ссылка → список изображений (для вставки в карусель) */
+    if (p === '/api/social/scrape-images' && req.method === 'POST') {
+      const b = await readBody(req);
+      const url = String(b.url || '').trim();
+      if (!url) return json(res, 400, { error: 'дайте ссылку на страницу' });
+      try { const { html, finalUrl } = await safeFetchPage(url); return json(res, 200, { images: scrapeImagesFromHtml(html, finalUrl) }); }
+      catch (e) { return json(res, 400, { error: 'не удалось загрузить страницу: ' + e.message }); }
     }
     /* копилка идей: список / добавить (текст или диктовка/свайп) / удалить */
     if (p === '/api/social/ideas' && req.method === 'GET') {
@@ -1922,8 +2000,10 @@ const server = http.createServer(async (req, res) => {
         if (b.meetingId !== undefined) t.meetingId = b.meetingId ? String(b.meetingId).slice(0, 60) : null;
         return t;
       };
+      const TASK_OWNER = IS_BROKER ? ROLE.brokerId : null; /* чьи задачи: брокер видит свои, владелец — свои (null) */
+      const mineLead = (l) => !IS_BROKER || l.broker === TASK_OWNER;
       if (p === '/api/tasks' && req.method === 'GET') {
-        const tasks = db.brokerTasks.slice();
+        const tasks = db.brokerTasks.filter(t => (t.brokerId || null) === TASK_OWNER);
         /* стрик: подряд идущие дни с ≥1 выполненной задачей, заканчивая сегодня/вчера */
         const doneDays = new Set(tasks.filter(t => t.status === 'done' && t.doneAt).map(t => dstr(t.doneAt)));
         let streak = 0; const cur = new Date();
@@ -1939,7 +2019,7 @@ const server = http.createServer(async (req, res) => {
         };
         /* встречи на сегодня+ (тайм-блоки) */
         const now = Date.now();
-        const meetings = (db.meetings || []).filter(mt => mt.at && mt.at > now - 6 * 3600e3 && mt.at < now + 8 * 864e5)
+        const meetings = (db.meetings || []).filter(mt => mt.at && mt.at > now - 6 * 3600e3 && mt.at < now + 8 * 864e5 && (!IS_BROKER || mt.brokerId === TASK_OWNER))
           .sort((a, b2) => a.at - b2.at).slice(0, 12).map(mt => {
             const lead = db.leads.find(l => l.id === mt.leadId) || {};
             return { id: mt.id, at: mt.at, kind: mt.kind || 'call', leadId: mt.leadId, leadName: lead.name || 'Клиент', link: mt.link || '' };
@@ -1956,7 +2036,7 @@ const server = http.createServer(async (req, res) => {
         }
         /* горячие лиды без задачи-follow-up */
         const leadTaskIds = new Set(tasks.filter(t => t.leadId && t.status !== 'done').map(t => t.leadId));
-        for (const l of db.leads.filter(l => ['qualified', 'viewing', 'handover'].includes(l.stage)).slice(0, 6)) {
+        for (const l of db.leads.filter(l => ['qualified', 'viewing', 'handover'].includes(l.stage) && mineLead(l)).slice(0, 6)) {
           if (leadTaskIds.has(l.id)) continue;
           suggestions.push({ kind: 'lead-followup', leadId: l.id, priority: 'p2', title: `Дожать: ${l.name || 'лид'} — ${l.geoName || ''} (${({ qualified: 'квалифицирован', viewing: 'показ', handover: 'у брокера' })[l.stage] || l.stage})`, scheduled: todayStr });
         }
@@ -1965,17 +2045,18 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/tasks' && req.method === 'POST') {
         const b = await readBody(req);
         if (!String(b.title || '').trim()) return json(res, 400, { error: 'пустая задача' });
-        const t = sanTask(b, { id: crypto.randomBytes(5).toString('hex'), priority: 'p3', status: 'todo', due: null, scheduled: null, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null });
+        const t = sanTask(b, { id: crypto.randomBytes(5).toString('hex'), brokerId: TASK_OWNER, priority: 'p3', status: 'todo', due: null, scheduled: null, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null });
         db.brokerTasks.unshift(t); db.brokerTasks = db.brokerTasks.slice(0, 1000); store.save();
         return json(res, 200, t);
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
         const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
+        if ((t.brokerId || null) !== TASK_OWNER) return json(res, 403, { error: 'чужая задача' });
         sanTask(await readBody(req), t); store.save();
         return json(res, 200, t);
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
-        db.brokerTasks = db.brokerTasks.filter(x => x.id !== m[1]); store.save();
+        db.brokerTasks = db.brokerTasks.filter(x => !(x.id === m[1] && (x.brokerId || null) === TASK_OWNER)); store.save();
         return json(res, 200, { ok: true });
       }
     }
