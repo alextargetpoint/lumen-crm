@@ -970,6 +970,19 @@ const server = http.createServer(async (req, res) => {
       try { await comments.hide(db, c, b.hidden !== false); store.save(); return json(res, 200, { ok: true, comment: c }); }
       catch (e) { return json(res, 500, { error: e.message }); }
     }
+    /* массовые действия по комментариям */
+    if (p === '/api/comments/bulk' && req.method === 'POST') {
+      const b = await readBody(req);
+      const ids = Array.isArray(b.ids) ? b.ids : [];
+      let done = 0;
+      if (b.action === 'delete') { const before = (db.adComments || []).length; db.adComments = (db.adComments || []).filter(c => !ids.includes(c.id)); done = before - db.adComments.length; }
+      else for (const c of db.adComments || []) if (ids.includes(c.id)) {
+        if (b.action === 'hide') { c.status = 'hidden'; done++; }
+        else if (b.action === 'unhide') { c.status = c.leadId ? 'replied' : 'new'; done++; }
+      }
+      store.save();
+      return json(res, 200, { ok: true, done });
+    }
     /* демо: сгенерировать входящий комментарий (кнопка в UI) */
     if (p === '/api/comments/simulate' && req.method === 'POST') {
       const r0 = engine.simulateComment(db);

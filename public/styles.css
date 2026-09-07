@@ -1575,7 +1575,12 @@ html[data-night] .ob-row.ok .ob-t { color: var(--ink-3); }
 
 /* ---------- Комментарии под рекламой (comment-to-lead) ---------- */
 .cmt-list { display: flex; flex-direction: column; gap: 12px; }
-.cmt-card { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--stroke-soft); border-radius: 14px; padding: 14px 16px; transition: box-shadow .18s; }
+.cmt-card { position: relative; display: flex; gap: 12px; background: var(--card); border: 1px solid var(--stroke-soft); border-radius: 14px; padding: 14px 16px; transition: box-shadow .18s; }
+.cmt-card .lc-check { left: auto; right: 12px; top: 12px; }
+.cmt-card:hover .lc-check, .cmt-card.sel .lc-check { opacity: 1; transform: scale(1); }
+.cmt-card.sel .lc-check { background: var(--accent); border-color: var(--accent); }
+.cmt-card.sel .lc-check svg { opacity: 1; }
+.cmt-card.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .cmt-card.new { border-left: 3px solid var(--accent); }
 .cmt-card.hidden { opacity: .55; }
 .cmt-card:hover { box-shadow: var(--shadow); }

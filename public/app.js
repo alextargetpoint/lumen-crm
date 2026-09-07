@@ -1200,9 +1200,23 @@ const SELCFG_COLLS = {
 let COLL_KEY = {};
 function wireCollSelect(root) { wireSelectable(root, SELCFG_COLLS); }
 
+/* ---------- конфиг: КОММЕНТАРИИ ---------- */
+const SELCFG_COMMENTS = {
+  kind: 'comments', itemSel: '.cmt-card', bulkUrl: '/comments/bulk',
+  entity: 'комментарий', entityPlural: 'выбрано', dragGuard: () => false,
+  onOpen: () => {},
+  actions: (n) => [
+    { id: 'hide', label: 'Скрыть', ic: I.x, run: (cfg) => selBulk(cfg, 'hide') },
+    { id: 'unhide', label: 'Восстановить', ic: I.check, run: (cfg) => selBulk(cfg, 'unhide') },
+    { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} комментарий(ев)?`, sub: 'Безвозвратно. Лиды из них не тронутся.', ok: 'Удалить', danger: true }) },
+  ],
+  ctxHead: () => [],
+};
+function wireCommentSelect(root) { wireSelectable(root, SELCFG_COMMENTS); }
+
 /* горячие клавиши — по активному разделу */
 document.addEventListener('keydown', (e) => {
-  const cfg = { funnel: SELCFG_LEADS, properties: SELCFG_PROPS, collections: SELCFG_COLLS }[CUR];
+  const cfg = { funnel: SELCFG_LEADS, properties: SELCFG_PROPS, collections: SELCFG_COLLS, comments: SELCFG_COMMENTS }[CUR];
   if (!cfg) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -3584,7 +3598,8 @@ PAGES.comments = async (root) => {
     const [intentTxt, intentCls] = CMT_INTENT[c.intent] || CMT_INTENT.other;
     const av = (c.author.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
     const lastReply = (c.replies || [])[c.replies.length - 1];
-    return `<div class="cmt-card ${c.status}" data-cmt="${c.id}">
+    return `<div class="cmt-card ${c.status}" data-cmt="${c.id}" data-id="${c.id}">
+      <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
       <div class="cmt-ava">${esc(av)}</div>
       <div class="cmt-main">
         <div class="cmt-head">
@@ -3677,6 +3692,7 @@ PAGES.comments = async (root) => {
   $('#cmtSortSel').addEventListener('change', (e) => { PAGE_STATE.cmtSort = e.target.value; render(); });
   const moreBtn = $('#cmtMore', root);
   if (moreBtn) moreBtn.addEventListener('click', () => { PAGE_STATE.cmtLimit = (PAGE_STATE.cmtLimit || 20) + 20; render(); });
+  wireCommentSelect(root);
   $$('[data-cmt]', root).forEach(card2 => card2.addEventListener('click', (e) => {
     const act = e.target.closest('[data-cact]'); if (!act) return;
     const id = card2.dataset.cmt;
