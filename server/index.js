@@ -781,6 +781,53 @@ const sanSlide = (s) => ({
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 
+/* ═══ Авто-конструктор слайдов: раскладка фото ПО РОЛЯМ с вариациями композиции ═══
+   photos[] + roles[] (из llm.classifyPhotos) → фото едут на ПРАВИЛЬНЫЕ слайды:
+   рендеры → обложка + галерея; планировки → слайд «Планировки» (виден целиком, не кроп);
+   карты → слайд «Локация»; интерьеры/аменити → галерея-коллаж. Композиции варьируются по числу кадров. */
+function placeProjectPhotos(slides, photos, roles, opts = {}) {
+  const bias = opts.photoBias || 'medium';
+  if (!Array.isArray(photos) || !photos.length || !Array.isArray(slides) || !slides.length) return slides;
+  const B = { render_ext: [], interior: [], floorplan: [], map: [], amenity: [], lifestyle: [], logo: [], other: [] };
+  photos.forEach((u, i) => { (B[roles[i]] || B.other).push(u); });
+  const renders = B.render_ext.concat(B.lifestyle, B.other);          /* логотипы НЕ используем как фон */
+  const galleryPool0 = B.interior.concat(B.amenity);
+  const plans = B.floorplan, maps = B.map;
+  const out = slides.map(s => Object.assign({}, s));
+  /* обложка — первый рендер (иначе первый интерьер) */
+  let cover = renders[0] || galleryPool0[0] || null, usedRender = 0;
+  if (cover && out[0]) { out[0] = Object.assign({}, out[0], { bg: cover, pos: 'bottom', size: 'l' }); usedRender = renders[0] ? 1 : 0; }
+  const inserts = [];
+  /* Планировки — целиком, по центру (1) или бок-о-бок (2) */
+  if (plans.length && bias !== 'low') {
+    const p = plans.slice(0, 2);
+    const layers = p.length >= 2
+      ? [sanLayer({ t: 'img', url: p[0], x: 5, y: 30, w: 44, round: 8, z: 1 }), sanLayer({ t: 'img', url: p[1], x: 52, y: 30, w: 44, round: 8, z: 2 })]
+      : [sanLayer({ t: 'img', url: p[0], x: 15, y: 24, w: 70, round: 8, z: 1 })];
+    inserts.push(sanSlide({ heading: 'Планировки', sub: '', eyebrow: 'ПЛАНЫ', pos: 'top', size: 's', layers }));
+  }
+  /* Локация — карта в рамке по центру */
+  if (maps.length && bias !== 'low') {
+    inserts.push(sanSlide({ heading: 'Локация', sub: String(opts.geoName || ''), eyebrow: 'ГДЕ', pos: 'top', size: 's', layers: [sanLayer({ t: 'img', url: maps[0], x: 8, y: 26, w: 84, round: 12, z: 1 })] }));
+  }
+  /* Галерея видов/интерьеров — коллаж 2×2 (≥3 кадра) или два крупных бок-о-бок (2) */
+  const pool = galleryPool0.concat(renders.slice(usedRender)).concat(B.amenity);
+  const seen = new Set(); const uniq = pool.filter(u => (u && !seen.has(u)) ? (seen.add(u), true) : false);
+  const galSlides = bias === 'high' ? 2 : bias === 'low' ? 0 : 1;
+  const titles = ['Виды и интерьеры', 'Пространство'];
+  let gi = 0;
+  for (let g = 0; g < galSlides && uniq.length - gi >= 2; g++) {
+    const set = uniq.slice(gi, gi + 4); gi += set.length;
+    const layers = set.length >= 3
+      ? set.slice(0, 4).map((u, k) => sanLayer({ t: 'img', url: u, x: k % 2 === 0 ? 6 : 52, y: k < 2 ? 30 : 64, w: 42, h: 31, round: 12, z: k + 1 }))
+      : set.map((u, k) => sanLayer({ t: 'img', url: u, x: k === 0 ? 5 : 52, y: 28, w: 44, h: 46, round: 12, z: k + 1 }));
+    inserts.push(sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'ГАЛЕРЕЯ', pos: 'top', size: 's', layers }));
+  }
+  const at = Math.max(1, out.length - 1);                              /* перед финальным CTA */
+  out.splice(at, 0, ...inserts);
+  return out;
+}
+
 /* библиотека иконок удобств/гарантий в стиле дашборда (тонкая линия) — вместо эмодзи в блоках */
 const AMEN_ICONS = {
   pool: '<path d="M3 18c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M7 14V6a2 2 0 014 0M7 10h4"/>',
@@ -2203,20 +2250,15 @@ const server = http.createServer(async (req, res) => {
       if (b.ai && slides.length && (Array.isArray(b.images) && b.images.length || b.template === 'launch')) {
         const rawPics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))) : [];
         const q = [String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
-        const want = photoBias === 'high' ? 9 : photoBias === 'low' ? 3 : 6;
+        const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         const good = await gatherLaunchPhotos(rawPics, q, want);
         if (good.length) {
-          slides[0] = Object.assign({}, slides[0], { bg: good[0], pos: 'bottom', size: 'l' });
-          const rest = good.slice(1);
-          /* сколько слайдов-галерей вставить: low — 0, medium — 1 (до 4 фото), high — до 2 (планировки/виды) */
-          const galSlides = photoBias === 'low' ? 0 : photoBias === 'high' ? 2 : 1;
-          const titles = ['Виды и пространство', 'Планировки и детали'];
-          let used = 0;
-          for (let g = 0; g < galSlides && rest.length - used >= 2; g++) {
-            const gal = rest.slice(used, used + 4); used += gal.length;
-            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 30 : 64, w: 42, h: 31, z: gi + 1, round: 12 }));
-            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
-          }
+          /* классифицируем кадры по роли и раскладываем по правильным слайдам с вариациями */
+          let roles = good.map(() => 'other');
+          const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);
+          try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — падаём на порядок/размер */ }
+          console.error('[launch] photo roles:', roles.join(',') || '(none)');
+          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });
         }
       }
       const c = {
@@ -2303,20 +2345,15 @@ const server = http.createServer(async (req, res) => {
            мало — добираем из открытых источников. Обложка — крупный кадр; смысловые слайды чистые; галереи по углу подачи.
            НЕ мажем случайный кадр под каждый слайд (это давало «коряво где-то фоном»). */
         const q = [facts && facts.name || String(topic || '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
-        const want = photoBias === 'high' ? 9 : photoBias === 'low' ? 3 : 6;
+        const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         const good = await gatherLaunchPhotos(images, q, want);
         let pics = good;
         if (good.length && slides.length) {
-          slides[0] = Object.assign({}, slides[0], { bg: good[0], pos: 'bottom', size: 'l' });
-          const rest = good.slice(1);
-          const galSlides = photoBias === 'low' ? 0 : photoBias === 'high' ? 2 : 1;
-          const titles = [facts && facts.name ? 'Планировки и виды' : 'Виды и пространство', 'Детали и материалы'];
-          let used = 0;
-          for (let g = 0; g < galSlides && rest.length - used >= 2; g++) {
-            const gal = rest.slice(used, used + 4); used += gal.length;
-            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 30 : 64, w: 42, h: 31, z: gi + 1, round: 12 }));
-            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
-          }
+          let roles = good.map(() => 'other');
+          const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);   /* локальные /assets → абсолютные для vision */
+          try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — по порядку */ }
+          console.error('[ai-compose] photo roles:', roles.join(',') || '(none)');
+          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });
         }
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);

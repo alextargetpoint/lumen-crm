@@ -391,6 +391,53 @@ ${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}
 
 /* ИИ психо-профиль лида: тип покупателя из переписки + подход + отработка возражений + готовые ответы.
    Основано на систематике продаж недвижимости (психотипы покупателей, DISC, отработка возражений, SPIN). */
+
+/* ═══ Классификация фото по роли (Gemini Vision) — для авто-конструктора слайдов ═══
+   Понимает, ЧТО на кадре: рендер экстерьера / интерьер / планировка / карта-локация / аменити /
+   лайфстайл / логотип. Один мультимодальный вызов на весь набор. Нет ключа/ошибка → всё 'other'. */
+const PHOTO_ROLES = ['render_ext', 'interior', 'floorplan', 'map', 'amenity', 'lifestyle', 'logo', 'other'];
+async function callGeminiVision(parts, maxTokens = 700) {
+  return withTimeout(async (signal) => {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GKEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens, responseMimeType: 'application/json' } }),
+    });
+    if (!r.ok) throw new Error('gemini vision http ' + r.status);
+    const j = await r.json();
+    const text = j.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('gemini vision empty');
+    return JSON.parse(text);
+  }, 22000);
+}
+async function classifyPhotos(urls) {
+  const list = (urls || []).filter(u => /^https?:\/\//.test(String(u))).slice(0, 12);
+  if (!GKEY || !list.length) return list.map(() => 'other');
+  /* тянем байты каждого изображения (кап 4МБ, только растр) */
+  const imgs = [];
+  for (const u of list) {
+    try {
+      const res = await withTimeout((s) => fetch(u, { signal: s }), 7000);
+      const ct = (res.headers.get('content-type') || '').split(';')[0];
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(ct)) { imgs.push(null); continue; }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length < 900 || buf.length > 4 * 1024 * 1024) { imgs.push(null); continue; }
+      imgs.push({ mime: ct, data: buf.toString('base64') });
+    } catch (e) { imgs.push(null); }
+  }
+  const avail = []; imgs.forEach((im, i) => { if (im) avail.push({ i, im }); });
+  if (!avail.length) return list.map(() => 'other');
+  const parts = [{ text: `Ты классифицируешь маркетинговые изображения объекта недвижимости. Для КАЖДОГО изображения по порядку определи роль строго из списка: ${PHOTO_ROLES.join(', ')}.
+Определения: render_ext — рендер/фото здания или комплекса снаружи; interior — интерьер квартиры/номера/комнаты; floorplan — архитектурный план этажа/планировка (чертёж с комнатами, размерами); map — карта локации/район/геопозиция; amenity — удобства (бассейн, лобби, спортзал, спа, ресепшн); lifestyle — люди, пляж, city-vibe, атмосфера; logo — логотип/текст/водяной знак/иконка; other — не подходит.
+Верни строго JSON: {"roles":[...]} — РОВНО ${avail.length} значений в ТОМ ЖЕ порядке, что изображения.` }];
+  avail.forEach(a => parts.push({ inline_data: { mime_type: a.im.mime, data: a.im.data } }));
+  let roles = [];
+  try { const out = await callGeminiVision(parts, 800); roles = Array.isArray(out.roles) ? out.roles : []; }
+  catch (e) { console.error('[llm] classifyPhotos: ' + e.message); return list.map(() => 'other'); }
+  const res = list.map(() => 'other');
+  avail.forEach((a, j) => { const rr = String(roles[j] || 'other'); res[a.i] = PHOTO_ROLES.includes(rr) ? rr : 'other'; });
+  return res;
+}
+
 async function composeLeadPsych(db, lead, history) {
   const q = lead.quals || {};
   const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
@@ -660,4 +707,4 @@ async function parseTask(text, todayStr, dow) {
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
