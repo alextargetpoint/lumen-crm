@@ -3405,3 +3405,20 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .lc-ftvb-t i { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--accent); }
 .lc-ftvb-x { font-size: 13px; line-height: 1.5; color: var(--ink); margin-bottom: 9px; }
 @media (max-width: 700px) { .lc-ft2 { grid-template-columns: 1fr; } .lc-ft-phone { order: -1; } .lc-ft-phone .iph-sm { width: 210px; } }
+
+/* ============ Премиум-выполнение задачи (галочка + разлёт частиц) ============ */
+.tk-check.on { background: linear-gradient(140deg, #17A06B, #0E7A52); border-color: #0E7A52; color: #fff; box-shadow: 0 4px 12px -3px rgba(14,122,82,.5); }
+.tk-check.on svg { animation: tkDraw .34s cubic-bezier(.4,0,.2,1) .04s both; }
+@keyframes tkDraw { from { opacity: .2; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+.tk-check.tk-pop { animation: tkPop .44s cubic-bezier(.34,1.56,.64,1); }
+@keyframes tkPop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
+/* строка «уезжает» после выполнения (обзор) */
+.ov2-task.tk-cleared { animation: tkClear .5s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes tkClear { to { opacity: 0; transform: translateX(14px); } }
+/* разлёт частиц (в body, fixed — переживает перерисовку) */
+.tk-burst { position: fixed; z-index: 9999; width: 0; height: 0; pointer-events: none; }
+.tk-burst::before { content: ''; position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #17A06B; transform: translate(-50%, -50%); animation: tkRipple .5s ease-out forwards; }
+@keyframes tkRipple { 0% { opacity: .75; transform: translate(-50%,-50%) scale(.5); } 100% { opacity: 0; transform: translate(-50%,-50%) scale(2.6); } }
+.tk-burst i { position: absolute; left: 0; top: 0; width: 6px; height: 6px; border-radius: 50%; transform: translate(-50%,-50%); animation: tkFly .62s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes tkFly { 0% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(.2); } }
+@media (prefers-reduced-motion: reduce) { .tk-burst, .tk-check.tk-pop, .ov2-task.tk-cleared { animation: none !important; } }
