@@ -890,6 +890,11 @@ const CAR_STICKERS = {
   circles:  '<g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></g>',
   target:   '<g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/></g>',
 };
+/* нумерация-бейджи 1..9: залитый кружок (цвет = цвет слоя, т.е. тема/нейтраль) + белая цифра.
+   для перечислений «1, 2, 3…» с иконкой-кружком в цвете темы. */
+for (let n = 1; n <= 9; n++) CAR_STICKERS['num' + n] = `<circle cx="12" cy="12" r="11" fill="currentColor"/><text x="12" y="16.4" text-anchor="middle" font-size="13" font-weight="800" font-family="Manrope,Arial,sans-serif" fill="#fff">${n}</text>`;
+/* контурные бейджи 1..9: кольцо + цифра цветом слоя (для нейтральной/светлой подачи) */
+for (let n = 1; n <= 9; n++) CAR_STICKERS['numo' + n] = `<circle cx="12" cy="12" r="10.6" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="16.4" text-anchor="middle" font-size="12.5" font-weight="800" font-family="Manrope,Arial,sans-serif" fill="currentColor">${n}</text>`;
 /* пресеты оформления текста заголовка («Стиль» из референса) */
 const CAR_TSTYLES = { plain: 'Обычный', outline: 'Контур', block: 'Плашка', underline: 'Подчерк', huge: 'Крупный', caps: 'Капс', gradient: 'Градиент', shadow: 'Тень', italic: 'Курсив', quote: 'Кавычки', boxed: 'В рамке', bar: 'Полоса', glow: 'Свечение', gold: 'Золото', neon: 'Неон', retro: 'Ретро', pill: 'Пилюля', spaced: 'Разрядка' };
 const CAR_TSTYLES_SET = new Set(Object.keys(CAR_TSTYLES));
@@ -4121,7 +4126,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=20"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=21"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

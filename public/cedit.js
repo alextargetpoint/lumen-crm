@@ -121,7 +121,8 @@ body.cpanel-on{padding-right:308px!important}
 .csec{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#8a90a0;padding:8px 2px 3px;font-weight:700}
 .cpi{display:flex;gap:8px;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;cursor:pointer;font-weight:600;font-size:13px;background:#EEF3FF;color:#2563EB;margin-top:4px}
 .cpi:hover{background:#e0eaff}
-.celem-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px;max-height:230px;overflow:auto}
+.cpop.cpop-el{width:340px;max-width:calc(100vw - 20px)}
+.celem-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:8px;max-height:320px;overflow:auto}
 .celem{aspect-ratio:1;border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#2A3346;padding:8px}
 .celem:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
 .celem svg{width:100%;height:100%}
@@ -596,6 +597,7 @@ body.cpanel-on{padding-right:308px!important}
         <div class="cseg ctpl-cats" id="cElCats">${keys.map((c, ci) => `<button data-c="${ci}" class="${ci === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
         <div class="celem-grid" id="cElGrid">${gridHtml(0)}</div>
         <div class="celem-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg>Клик — по центру. Или перетащи прямо на нужный слайд.</div>`, x, y);
+      pp.classList.add('cpop-el');
       $('#cElCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cElCats button', pp).forEach(z => z.classList.toggle('on', z === b)); $('#cElGrid', pp).innerHTML = gridHtml(+b.dataset.c); });
       /* перетаскивание тайла на макет (pointer-события; HTML5-DnD в проекте не используем) */
       pp.addEventListener('pointerdown', (ev) => {
@@ -644,14 +646,20 @@ body.cpanel-on{padding-right:308px!important}
           'Стекло': ['realestate-glass/house', 'realestate-glass/building', 'realestate-glass/key', 'realestate-glass/pin', 'realestate-glass/roi'],
           'AUS': ['aus/app', 'aus/camera', 'aus/chat', 'aus/star', 'aus/check'],
         };
-        const cats = Object.assign({}, IMG_PACKS, STICK_CATS);   /* трендовые сгенерированные паки — ПЕРВЫМИ */
-        elemPicker('Стикеры', cats,
-          (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24">${(P.stickers || {})[k] || ''}</svg>`,
+        const NUMS = { 'Цифры': [] };   /* нумерация: залитые 1..9 + контурные 1..9 */
+        for (let n = 1; n <= 9; n++) NUMS['Цифры'].push('num' + n);
+        for (let n = 1; n <= 9; n++) NUMS['Цифры'].push('numo' + n);
+        const cats = Object.assign({}, IMG_PACKS, NUMS, STICK_CATS);   /* трендовые паки + цифры — ПЕРВЫМИ */
+        elemPicker('Стикеры и нумерация', cats,
+          (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24" style="color:${/^num\d/.test(k) ? accent : 'inherit'}">${(P.stickers || {})[k] || ''}</svg>`,
           (k, drop) => {
             if (k.includes('/')) return { t: 'img', url: `/assets/stickers/${k}.png`, w: 24, round: 0, x: drop ? +clamp(drop.x - 12, -20, 110).toFixed(1) : 38, y: drop ? +clamp(drop.y - 12, -20, 110).toFixed(1) : 36 };
-            const white = slideEl(drop ? drop.slideIdx : i).classList.contains('hasbg'); return { t: 'sticker', key: k, color: white ? '#FFFFFF' : accent, w: 16, x: drop ? +clamp(drop.x - 8, -20, 110).toFixed(1) : 40, y: drop ? +clamp(drop.y - 8, -20, 110).toFixed(1) : 38 };
+            const isNum = /^num\d/.test(k);   /* залитые цифры — всегда акцент (белая цифра читается на любом фоне) */
+            const white = slideEl(drop ? drop.slideIdx : i).classList.contains('hasbg');
+            const color = isNum ? accent : (white ? '#FFFFFF' : accent);
+            return { t: 'sticker', key: k, color, w: isNum ? 11 : 16, x: drop ? +clamp(drop.x - 6, -20, 110).toFixed(1) : 40, y: drop ? +clamp(drop.y - 6, -20, 110).toFixed(1) : 38 };
           },
-          e.clientX - 160, e.clientY);
+          e.clientX - 170, e.clientY);
       } else if (kind === 'frame') {
         const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
         const pp = openPop(`<div class="csec" style="padding-top:2px">Рамки</div><div class="celem-frames">${(P.frames || []).map(f => `<button class="celem-fr" data-frame="${f}"><span class="cfrpv"><span class="frame-${f}" style="--fc:#fff"></span></span><i style="font-style:normal">${FN[f] || f}</i></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
