@@ -3734,6 +3734,14 @@ PAGES.brokers = async (root) => {
             <div class="chips-row" style="margin-bottom:12px">${days.map((d, i3) => `<button type="button" class="chip-t day-chip ${(b.schedule?.days || []).includes(i3 + 1) ? 'on' : ''}" data-d="${i3 + 1}">${d}</button>`).join('')}</div>
             <div id="dayTimes"></div>
             <button type="button" class="btn btn-sm" id="dtSameAll" style="margin-top:8px">${ic(I.copy)}Как в первом дне — во все</button>
+            <div class="lc-lbl" style="margin-top:16px">Визитка брокера · публичная страница</div>
+            <div class="pds-grid c2" style="margin-top:6px">
+              <div class="pd-fact"><label class="lc-lbl">Телефон / WhatsApp</label><input class="gi" data-be="phone" value="${esc(b.phone || '')}" placeholder="+971…"></div>
+              <div class="pd-fact"><label class="lc-lbl">E-mail</label><input class="gi" data-be="email" value="${esc(b.email || '')}" placeholder="broker@agency.com"></div>
+            </div>
+            <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Должность</label><input class="gi" data-be="title" value="${esc(b.title || '')}" placeholder="Эксперт по недвижимости ${st.geoNames[b.geo] || ''}"></div>
+            <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">О себе (для визитки)</label><textarea class="gi" data-be="bio" style="min-height:64px" placeholder="Пара предложений: опыт, специализация, чем полезен клиенту">${esc(b.bio || '')}</textarea></div>
+            <a class="btn btn-sm" href="/b/${b.id}" target="_blank" style="margin-top:10px">${ic(I.eye)}Открыть визитку</a>
           </div>
         </div>
       </div>`;
@@ -3841,6 +3849,10 @@ PAGES.brokers = async (root) => {
         capacity: +eb.querySelector('[data-be="capacity"]').value,
         ...(pinVal ? { pin: pinVal } : {}),
         active: eb.querySelector('[data-be="active"]').checked,
+        phone: eb.querySelector('[data-be="phone"]').value,
+        email: eb.querySelector('[data-be="email"]').value,
+        title: eb.querySelector('[data-be="title"]').value,
+        bio: eb.querySelector('[data-be="bio"]').value,
         langs: $$('.lang-chip.on', eb).map(x => x.dataset.lg),
         schedule: (() => {
           const on = $$('.day-chip.on', eb).map(x => +x.dataset.d);

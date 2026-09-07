@@ -12,10 +12,10 @@ function msg(leadId, dir, via, text, at, status) {
 
 function seed() {
   const brokers = [
-    { id: 'br_amir',  name: 'Амир Хусейн',   geo: 'dubai',  langs: ['ru', 'en', 'ar'], load: 14, capacity: 25, deals90: 6, avatar: 'АХ' },
-    { id: 'br_dasha', name: 'Дарья Соколова', geo: 'dubai',  langs: ['ru', 'en'],       load: 21, capacity: 25, deals90: 4, avatar: 'ДС' },
-    { id: 'br_ketut', name: 'Кетут Арта',     geo: 'bali',   langs: ['en', 'id'],       load: 9,  capacity: 20, deals90: 3, avatar: 'КА' },
-    { id: 'br_lena',  name: 'Елена Мороз',    geo: 'phuket', langs: ['ru', 'en'],       load: 12, capacity: 22, deals90: 5, avatar: 'ЕМ' },
+    { id: 'br_amir',  name: 'Амир Хусейн',   geo: 'dubai',  langs: ['ru', 'en', 'ar'], load: 14, capacity: 25, deals90: 6, avatar: 'АХ', phone: '+971 58 512 04 71', email: 'amir@oneagency.ae', title: 'Старший брокер · Дубай off-plan', bio: '7 лет на рынке Дубая. Специализируюсь на брендированных резиденциях и инвестициях с арендным доходом. Провожу сделку от подбора до ключей.' },
+    { id: 'br_dasha', name: 'Дарья Соколова', geo: 'dubai',  langs: ['ru', 'en'],       load: 21, capacity: 25, deals90: 4, avatar: 'ДС', phone: '+971 52 337 88 12', email: 'daria@oneagency.ae', title: 'Эксперт по недвижимости · Дубай', bio: 'Помогаю с переездом и первой инвестицией в ОАЭ. Подберу под бюджет, объясню рассрочку и ВНЖ простыми словами.' },
+    { id: 'br_ketut', name: 'Кетут Арта',     geo: 'bali',   langs: ['en', 'id'],       load: 9,  capacity: 20, deals90: 3, avatar: 'КА', phone: '+62 813 3902 4415', email: 'ketut@oneagency.id', title: 'Эксперт по недвижимости · Бали', bio: 'Виллы и апартаменты на Бали под доход и жизнь. Знаю нюансы лизхолда и управляющих компаний изнутри.' },
+    { id: 'br_lena',  name: 'Елена Мороз',    geo: 'phuket', langs: ['ru', 'en'],       load: 12, capacity: 22, deals90: 5, avatar: 'ЕМ', phone: '+66 92 481 70 03', email: 'elena@oneagency.co.th', title: 'Эксперт по недвижимости · Пхукет', bio: 'Апартаменты у моря на Пхукете под аренду и отдых. Сопровождаю сделку и помогаю с управлением после покупки.' },
   ];
 
   const numbers = [

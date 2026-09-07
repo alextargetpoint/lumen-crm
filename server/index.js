@@ -1255,6 +1255,11 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      /* поля публичной визитки брокера (/b/:id) */
+      if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
+      if (b.email != null) br.email = String(b.email).slice(0, 80);
+      if (b.title != null) br.title = String(b.title).slice(0, 80);
+      if (b.bio != null) br.bio = String(b.bio).slice(0, 600);
       /* личный PIN для входа (роль broker); минимум 6 символов, уникальность против пароля владельца */
       if (b.pin) {
         const ph = sha(String(b.pin));
@@ -2122,6 +2127,61 @@ h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy
   <div class="ft"><span>Сформировано в Lumen AI CRM</span><span>${esc(lead.id)}</span></div>
 </div>
 </body></html>`);
+      return;
+    }
+
+    /* ================= публичная визитка брокера: /b/:id ================= */
+    if ((m = p.match(/^\/b\/(br_[\w]+)$/)) && req.method === 'GET') {
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) { res.writeHead(404); res.end('not found'); return; }
+      const AG = db.settings.agency.name;
+      const logo = db.settings.agency.logo;
+      const LN = { ru: 'Русский', en: 'Английский', ar: 'Арабский', id: 'Индонезийский', es: 'Испанский', de: 'Немецкий', fr: 'Французский', it: 'Итальянский', zh: 'Китайский', pt: 'Португальский', tr: 'Турецкий', fa: 'Персидский' };
+      const geoName = db.settings.geoNames[br.geo] || br.geo || '';
+      const title = br.title || ('Эксперт по недвижимости' + (geoName ? ' · ' + geoName : ''));
+      const waDigits = (br.phone || '').replace(/\D/g, '');
+      const initials = br.avatar || (br.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:40px;max-width:150px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:20px;font-weight:600">${esc(AG)}</span>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(br.name)} — ${esc(AG)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Manrope,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 420px at 18% 8%,rgba(37,99,235,.28),transparent 60%),radial-gradient(700px 520px at 88% 92%,rgba(91,43,216,.22),transparent 60%)}
+.card{position:relative;max-width:430px;width:100%;background:rgba(10,24,51,.72);backdrop-filter:blur(16px);border:1px solid rgba(122,158,255,.2);border-radius:24px;padding:30px 28px 26px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.top{display:flex;justify-content:center;margin-bottom:22px}
+.ava{width:104px;height:104px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;font-size:34px;font-weight:700;background:linear-gradient(150deg,#2563EB,#5B2BD8);border:2px solid rgba(134,175,255,.35);overflow:hidden;box-shadow:0 12px 34px -10px rgba(37,99,235,.6)}
+.ava img{width:100%;height:100%;object-fit:cover}
+.nm{font-family:Fraunces,serif;font-size:27px;font-weight:600;text-align:center;letter-spacing:-.01em}
+.ttl{text-align:center;font-size:13px;color:#9DB8FF;margin-top:6px;letter-spacing:.02em}
+.tags{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:16px 0 6px}
+.tag{font-size:11.5px;font-weight:600;color:#CFE0FF;background:rgba(134,175,255,.13);border:1px solid rgba(134,175,255,.2);padding:5px 11px;border-radius:20px}
+.bio{font-size:13.5px;line-height:1.6;color:#B9C7E8;text-align:center;margin:16px 4px 4px}
+.btns{margin-top:22px;display:flex;flex-direction:column;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;color:#fff}
+.b-wa{background:linear-gradient(120deg,#22A45B,#12855F)}
+.b-call{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
+.b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
+.foot{margin-top:22px;text-align:center;font-size:11px;color:#5E6E96}
+.hd{display:flex;justify-content:center;margin-bottom:20px}
+</style></head><body>
+<div class="card">
+  <div class="hd">${brandTop}</div>
+  <div class="ava">${br.photo ? `<img src="${esc(br.photo)}" alt="">` : esc(initials)}</div>
+  <div class="nm">${esc(br.name)}</div>
+  <div class="ttl">${esc(title)}</div>
+  <div class="tags">${geoName ? `<span class="tag">📍 ${esc(geoName)}</span>` : ''}${(br.langs || []).map(l => `<span class="tag">${esc(LN[l] || l)}</span>`).join('')}</div>
+  ${br.bio ? `<div class="bio">${esc(br.bio)}</div>` : ''}
+  <div class="btns">
+    ${waDigits ? `<a class="btn b-wa" href="https://wa.me/${waDigits}" target="_blank">Написать в WhatsApp</a>` : ''}
+    ${br.phone ? `<a class="btn b-call" href="tel:${esc(br.phone.replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}
+    ${br.email ? `<a class="btn b-ghost" href="mailto:${esc(br.email)}">${esc(br.email)}</a>` : ''}
+  </div>
+  <div class="foot">${esc(AG)}</div>
+</div></body></html>`);
       return;
     }
 
