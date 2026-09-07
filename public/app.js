@@ -977,7 +977,7 @@ const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? m
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
 /* скины виджетов (визуальные вариации). По умолчанию — чистый; фон/видео строго опциональны и читаемы */
-const OV_SKINS = [['clean', 'Чистый'], ['tint', 'Кобальт'], ['frost', 'Стекло'], ['accent', 'Акцент'], ['video', 'Видеофон']];
+const OV_SKINS = [['clean', 'Чистый'], ['tint', 'Кобальт'], ['frost', 'Стекло'], ['accent', 'Акцент'], ['dark', 'Тёмный'], ['midnight', 'Полночь'], ['gradient', 'Градиент'], ['video', 'Видеофон']];
 function ovGetSkins() { try { return JSON.parse(localStorage.getItem(ovKey() + '_skin')) || {}; } catch (_) { return {}; } }
 function ovSetSkin(k, s) { const m = ovGetSkins(); if (s === 'clean') delete m[k]; else m[k] = s; try { localStorage.setItem(ovKey() + '_skin', JSON.stringify(m)); } catch (_) {} }
 /* формат виджета (реальная пересборка вёрстки), акцентная палитра */
@@ -989,10 +989,11 @@ const OV_PAL = { cobalt: ['#2563EB', '#5B2BD8', 'Кобальт'], emerald: ['#0
 /* готовые паки оформления всей обзорной страницы: раскладка + форматы + фон + палитра */
 const OV_PACKS = {
   focus: { name: 'Фокус', desc: 'Минимум блоков, чистый вид', layout: ['attention', 'kpi', 'tasks', 'meetings'], vars: { kpi: 'bento' }, skins: {}, pals: {} },
-  command: { name: 'Командный центр', desc: 'Насыщенно, для владельца', layout: ['kpi', 'attention', 'leaders', 'funnel', 'hotleads', 'goal', 'tasks', 'meetings'], vars: { funnel: 'steps', leaders: 'spotlight', goal: 'gauge', kpi: 'tiles' }, skins: { leaders: 'tint', goal: 'accent' }, pals: {} },
+  command: { name: 'Командный центр', desc: 'Насыщенно, для владельца', layout: ['kpi', 'attention', 'funnel', 'leaders', 'hotleads', 'goal', 'tasks', 'meetings'], vars: { funnel: 'steps', leaders: 'spotlight', goal: 'gauge', kpi: 'bento' }, skins: { kpi: 'gradient', leaders: 'tint', goal: 'accent' }, pals: {} },
   data: { name: 'Данные', desc: 'Плотно, цифры и графики', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'trend', funnel: 'donut', goal: 'stat', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
-  premium: { name: 'Тёмный премиум', desc: 'Видеофоны, глубокий вид', layout: ['attention', 'kpi', 'leaders', 'goal', 'ideas', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge' }, skins: { kpi: 'video', leaders: 'video', goal: 'frost', ideas: 'tint' }, pals: {} },
-  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['ideas', 'kpi', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'editorial', hotleads: 'cards' }, skins: { ideas: 'accent' }, pals: { ideas: 'violet' } },
+  studio: { name: 'Студия', desc: 'Светлое + акцентные тёмные плитки', layout: ['kpi', 'attention', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { kpi: 'gradient', goal: 'dark', leaders: 'tint' }, pals: { goal: 'violet' } },
+  premium: { name: 'Тёмный кокпит', desc: 'Единый тёмный вид с акцентом', layout: ['kpi', 'attention', 'funnel', 'leaders', 'goal', 'ideas', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge', funnel: 'ribbon' }, skins: { kpi: 'gradient', attention: 'midnight', leaders: 'dark', funnel: 'midnight', goal: 'dark', ideas: 'dark', meetings: 'dark' }, pals: {} },
+  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['kpi', 'ideas', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'editorial', hotleads: 'cards' }, skins: { ideas: 'accent' }, pals: { ideas: 'violet' } },
 };
 function ovApplyPack(id) {
   const p = OV_PACKS[id]; if (!p) return;
@@ -1693,6 +1694,7 @@ function ovPackPreview(id) {
   if (id === 'focus') return `<div class="opv opv-focus"><div class="opv-big"><span class="opv-n">42</span>${mspark([3, 5, 4, 7, 6, 9, 8])}</div><div class="opv-col"><div class="opv-s"></div><div class="opv-s"></div></div></div>`;
   if (id === 'command') return `<div class="opv opv-command"><div class="opv-champ"><span class="opv-av"></span><span class="opv-avl"></span></div><div class="opv-steps"><i style="height:60%"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:95%"></i></div><div class="opv-grid4"><span></span><span></span><span></span><span></span></div></div>`;
   if (id === 'data') return `<div class="opv opv-data"><div class="opv-dcell">${donut}</div><div class="opv-col2"><div class="opv-dcell tall">${mspark([2, 6, 3, 8, 5, 9, 7, 10])}</div><div class="opv-bars"><i style="width:80%"></i><i style="width:55%"></i><i style="width:35%"></i></div></div></div>`;
+  if (id === 'studio') return `<div class="opv opv-studio"><div class="opv-grad"><span class="opv-glow light"></span><span class="opv-n light">42</span>${mspark([3, 5, 4, 7, 6, 9, 8])}</div><div class="opv-col"><div class="opv-dark sm"></div><div class="opv-s"></div></div></div>`;
   if (id === 'premium') return `<div class="opv opv-premium"><div class="opv-dark big"><span class="opv-glow"></span><span class="opv-n light">42</span></div><div class="opv-col"><div class="opv-dark sm"></div><div class="opv-dark sm"></div></div></div>`;
   if (id === 'content') return `<div class="opv opv-content"><div class="opv-idea"><span class="opv-tag"></span><span class="opv-line"></span><span class="opv-line w2"></span><span class="opv-line w3"></span></div><div class="opv-col"><div class="opv-row"></div><div class="opv-row"></div><div class="opv-row"></div></div></div>`;
   return '';
