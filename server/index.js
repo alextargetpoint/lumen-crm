@@ -3385,7 +3385,14 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
         return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
-          ${isEdit ? `<div class="s-pick" data-sop="pick" title="Редактировать слайд">✎</div>` : ''}
+          ${isEdit ? `<div class="s-bar">
+            <button data-sact="edit" title="Редактировать слайд">✎</button>
+            <button data-sact="photo" title="Добавить фото-фон">🖼</button>
+            <button data-sact="dup" title="Дублировать слайд">⧉</button>
+            <button data-sact="up" title="Выше">↑</button>
+            <button data-sact="down" title="Ниже">↓</button>
+            <button data-sact="del" title="Удалить слайд">✕</button>
+          </div><button class="s-ins" data-sact="insert" title="Добавить слайд после этого">+ слайд</button>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}

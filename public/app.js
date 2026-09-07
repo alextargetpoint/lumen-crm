@@ -997,6 +997,36 @@ const OV_W = {
     const done = steps.filter(x => x.ok).length;
     return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done} из ${steps.length}</span></div><div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? '' : ic(I.arrow, 2)}</button>`).join('')}</div>`;
   } },
+  recent: { name: 'Свежие лиды', icon: () => I.plus, full: false, render: (c) => {
+    const ls = c.leads.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 6);
+    const body = ls.length ? ls.map(l => `<div class="ov2-lrow" data-ovlead="${l.id}"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(l.name || '—')}</div><div class="ov2-lrow-s">${esc(l.geoName || '')}${l.source ? ' · ' + esc(l.source) : ''}</div></div><span class="ov2-lrow-t">${ago(l.createdAt)}</span></div>`).join('') : '<div class="ov2-empty">Пока нет лидов</div>';
+    return `<div class="ov2-card-hd">${ic(I.plus)}Свежие лиды<span>${c.leads.length}</span><button class="btn btn-sm" data-ovgo="funnel">Все</button></div>${body}`;
+  } },
+  brokers: { name: 'Загрузка брокеров', icon: () => I.users, full: false, render: () => {
+    const brs = (STATE.brokers || []).filter(b => b.active !== false).slice(0, 6);
+    const body = brs.length ? brs.map(b => { const pct = Math.min(Math.round((b.load || 0) / (b.capacity || 20) * 100), 100); return `<div class="ov2-fun-row" data-ovgo="brokers"><span class="ov2-fun-nm">${esc(b.name)}</span><span class="ov2-fun-bar"><i style="width:${pct}%;background:${pct >= 90 ? 'var(--bad)' : 'var(--accent)'}"></i></span><span class="ov2-fun-v">${b.load || 0}/${b.capacity || 20}</span></div>`; }).join('') : '<div class="ov2-empty">Нет брокеров</div>';
+    return `<div class="ov2-card-hd">${ic(I.users)}Загрузка брокеров<span>${brs.length} в работе</span><button class="btn btn-sm" data-ovgo="brokers">Все</button></div>${body}`;
+  } },
+  numbers: { name: 'Здоровье WhatsApp', icon: () => I.sim, full: false, render: (c) => {
+    const w = c.an.wa; const tiles = [[w.sentToday, 'отправлено сегодня'], [w.numbersActive, 'активных номеров'], [w.avgQuality + '%', 'среднее качество']];
+    return `<div class="ov2-card-hd">${ic(I.sim)}Здоровье WhatsApp<button class="btn btn-sm" data-ovgo="settings">Номера</button></div><div class="ov2-mini3">${tiles.map(([v, k]) => `<div class="ov2-mini"><b>${v}</b><i>${k}</i></div>`).join('')}</div>`;
+  } },
+  geo: { name: 'Конверсия по гео', icon: () => I.target, full: false, render: (c) => {
+    const gs = Object.values(c.an.geoStats || {}).filter(g => g.total).sort((a, b) => b.conv - a.conv).slice(0, 6);
+    const body = gs.length ? gs.map(g => `<div class="ov2-fun-row" data-ovgo="analytics"><span class="ov2-fun-nm">${esc(g.name)}<i>${g.qualified}/${g.total} квал.</i></span><span class="ov2-fun-bar"><i style="width:${g.conv}%;background:var(--ok)"></i></span><span class="ov2-fun-v">${g.conv}%</span></div>`).join('') : '<div class="ov2-empty">Нет данных</div>';
+    return `<div class="ov2-card-hd">${ic(I.target)}Конверсия по направлениям<button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>${body}`;
+  } },
+  aivs: { name: 'ИИ против человека', icon: () => I.spark, full: false, render: (c) => {
+    const a = c.an.compare.aiLine, h = c.an.compare.human;
+    const rows = [['Первый контакт', a.firstContact, h.firstContact], ['Диалог → ответ', a.dialogConv + '%', h.dialogConv + '%'], ['Ответ → квал.', a.qualConv + '%', h.qualConv + '%'], ['Время до квал.', a.qualTime, h.qualTime]];
+    return `<div class="ov2-card-hd">${ic(I.spark)}ИИ против человека<button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div><div class="ov2-vs"><div class="ov2-vs-h"><span></span><b>ИИ</b><i>человек</i></div>${rows.map(([k, av, hv]) => `<div class="ov2-vs-r"><span>${k}</span><b>${av}</b><i>${hv}</i></div>`).join('')}</div>`;
+  } },
+  chains: { name: 'Цепочки касаний', icon: () => I.chain, full: false, render: () => {
+    const seqs = STATE.sequences || []; const on = seqs.filter(s => s.active).length;
+    const gn = (g) => g === 'all' ? 'Все гео' : (STATE.settings.geoNames[g] || g);
+    const body = seqs.length ? seqs.slice(0, 6).map(s => `<div class="ov2-lrow" data-ovgo="sequences"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(s.name)}</div><div class="ov2-lrow-s">${esc(gn(s.geo))} · ${(s.steps || []).length} касаний</div></div><span class="ov2-chip ${s.active ? 'on' : ''}">${s.active ? 'вкл' : 'выкл'}</span></div>`).join('') : '<div class="ov2-empty">Нет цепочек</div>';
+    return `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>${on} активны</span><button class="btn btn-sm" data-ovgo="sequences">Все</button></div>${body}`;
+  } },
 };
 
 PAGES.overview = async (root) => {
@@ -1009,18 +1039,16 @@ PAGES.overview = async (root) => {
 
   const paint = () => {
     root.innerHTML = `
-      <div class="ov2-head">
-        <div class="ov2-h-t">${ic(I.grid)}Обзор</div>
-        <div class="ov2-h-acts">
-          ${OV_EDIT ? `<button class="btn btn-sm" id="ovAdd">${ic(I.plus)}Виджет</button><button class="btn btn-sm" id="ovReset">Сбросить</button>` : ''}
-          <button class="btn btn-sm ${OV_EDIT ? 'btn-accent' : ''}" id="ovEdit">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}${OV_EDIT ? 'Готово' : 'Править'}</button>
-        </div>
+      <div class="ov2-bar">
+        ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×  · добавляй виджеты снизу</span>' : ''}
+        <button class="ov2-edit ${OV_EDIT ? 'on' : ''}" id="ovEdit" title="${OV_EDIT ? 'Готово' : 'Настроить обзор'}">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}<span>${OV_EDIT ? 'Готово' : 'Настроить'}</span></button>
       </div>
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
         ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; return `<div class="ov-w ${w.full ? 'full' : ''}" data-w="${k}">
           ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
           <div class="ov-w-body glass card">${w.render(ctx)}</div>
         </div>`; }).join('')}
+        ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
     /* переходы/действия */
     $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
@@ -1030,19 +1058,29 @@ PAGES.overview = async (root) => {
     /* конструктор */
     $('#ovEdit', root).addEventListener('click', () => { OV_EDIT = !OV_EDIT; paint(); });
     if (OV_EDIT) {
-      const rm = $('#ovReset', root); if (rm) rm.addEventListener('click', () => { layout = OV_DEFAULT.slice(); ovSetLayout(layout); paint(); });
-      const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', () => {
-        const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
-        if (!avail.length) { toast('Все виджеты уже на месте'); return; }
-        const lb = modal({ title: 'Добавить виджет', body: `<div class="ov2-lib">${avail.map(k => `<button class="ov2-lib-i" data-add="${k}">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b></button>`).join('')}</div>`, actions: [{ label: 'Закрыть' }] });
-        $$('[data-add]', lb).forEach(x => x.addEventListener('click', () => { layout = [...layout, x.dataset.add]; ovSetLayout(layout); closeModal(); paint(); }));
-      });
+      const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', () => ovLibrary(ctx, layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); }));
       $$('[data-wrm]', root).forEach(b => b.addEventListener('click', () => { layout = layout.filter(k => k !== b.closest('[data-w]').dataset.w); ovSetLayout(layout); paint(); }));
       ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
     }
   };
   paint();
 };
+/* библиотека виджетов с живыми превью */
+function ovLibrary(ctx, layout, onChange) {
+  const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
+  const isDefault = layout.length === OV_DEFAULT.length && layout.join() === OV_DEFAULT.join();
+  const lb = modal({
+    title: 'Библиотека виджетов', wide: 'card', sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
+    body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => `<div class="ov2-lib-i" data-add="${k}">
+        <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
+        <div class="ov2-lib-prev"><div class="ov2-lib-prev-in glass card">${OV_W[k].render(ctx)}</div></div>
+      </div>`).join('')}</div>` : '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>'}
+      ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`,
+    actions: [{ label: 'Закрыть' }],
+  });
+  $$('[data-add]', lb).forEach(x => x.addEventListener('click', () => { onChange([...layout, x.dataset.add]); closeModal(); }));
+  const rl = $('#ovResetLib', lb); if (rl) rl.addEventListener('click', () => { onChange(OV_DEFAULT.slice()); closeModal(); });
+}
 /* перетаскивание виджетов обзора (за grip) в режиме конструктора */
 function ovWireReorder(grid, getLayout, onChange) {
   grid.querySelectorAll('.ov-w [data-grip]').forEach(grip => {
