@@ -3968,6 +3968,58 @@ function cpBtn(text, label) { const i = CP.push(String(text == null ? '' : text)
 if (!window.__shCp) { window.__shCp = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.sh-cp'); if (b && CP[+b.dataset.cp] != null) { navigator.clipboard.writeText(CP[+b.dataset.cp]); toast('Скопировано', null, true); } }); }
 if (!window.__shKey) { window.__shKey = 1; document.addEventListener('keydown', (e) => { if (SOCIAL_TOOL !== 'hunt' || CUR !== 'social') return; const ae = document.activeElement; if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; if (e.key === 'ArrowLeft') { const b = document.getElementById('shSkip'); if (b) b.click(); } else if (e.key === 'ArrowRight') { const b = document.getElementById('shLike'); if (b) b.click(); } }); }
 
+/* ── быстрая отправка/сохранение контента (PDF · Telegram · WhatsApp · системное «Поделиться») ── */
+function scriptSetText(it) {
+  const L = ['📱 ' + (it.title || 'Сценарии Reels'), ''];
+  (it.scripts || []).forEach((s, i) => {
+    L.push(`━━━ Вариант ${i + 1} · ${s.format || ''}${s.duration_sec ? ' · ~' + s.duration_sec + 'с' : ''} ━━━`);
+    if ((s.hooks || []).length) { L.push('ХУКИ:'); s.hooks.forEach((h, j) => L.push(`${j + 1}) ${h}`)); }
+    if (s.full_script) { L.push('', 'СЦЕНАРИЙ:', s.full_script); }
+    if (s.cta) L.push('', 'ПРИЗЫВ: ' + s.cta);
+    if (s.codeword) L.push('Кодовое слово: ' + s.codeword + (s.leadmagnet ? ' → ' + s.leadmagnet : ''));
+    if (s.caption) L.push('', 'ПОДПИСЬ:', s.caption);
+    if ((s.broll || []).length) L.push('', 'ВИДЕОРЯД: ' + s.broll.join(' · '));
+    L.push('');
+  });
+  L.push('— собрано в Lumen');
+  return L.join('\n');
+}
+function postItemText(it) {
+  const p = it.payload || {}; const L = [p.body || ''];
+  if (p.cta) L.push('', p.cta);
+  if (p.first_comment) L.push('', '1-й комментарий:', p.first_comment);
+  if ((p.hashtags || []).length) L.push('', p.hashtags.map(h => '#' + h).join(' '));
+  return L.join('\n');
+}
+function waShare(t) { window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); }
+function tgShare(t) { window.open('https://t.me/share/url?url=&text=' + encodeURIComponent(t), '_blank'); }
+function nativeShare(t, title) { if (navigator.share) navigator.share({ title: title || 'Lumen', text: t }).catch(() => {}); else { navigator.clipboard.writeText(t); toast('Скопировано — вставь в чат', null, true); } }
+function openShareMenu(it) {
+  if (!it) return;
+  const isScript = it.kind === 'script';
+  const text = isScript ? scriptSetText(it) : postItemText(it);
+  const bd = modal({
+    title: 'Отправить / сохранить', sub: 'Быстро себе в мессенджер или файлом',
+    body: `<div class="sh-share-menu">
+      ${isScript ? `<button class="sh-share-opt" data-o="pdf">${ic(I.doc)}<span><b>Скачать PDF</b><i>красивый файл — сохранить или отправить</i></span></button>` : ''}
+      <button class="sh-share-opt" data-o="tg">${ic(I.send)}<span><b>В Telegram</b><i>откроется выбор чата — выбери себя</i></span></button>
+      <button class="sh-share-opt" data-o="wa">${ic(I.chat)}<span><b>В WhatsApp</b><i>отправить себе одним тапом</i></span></button>
+      <button class="sh-share-opt" data-o="copy">${ic(I.copy)}<span><b>Скопировать текст</b><i>вставить куда угодно</i></span></button>
+      ${navigator.share ? `<button class="sh-share-opt" data-o="native">${ic(I.link)}<span><b>Поделиться…</b><i>системное меню устройства</i></span></button>` : ''}
+    </div>`,
+    actions: [{ label: 'Закрыть' }],
+  });
+  $$('.sh-share-opt', bd).forEach(b => b.addEventListener('click', () => {
+    const o = b.dataset.o;
+    if (o === 'pdf') window.open('/script/' + it.id + '?print=1', '_blank');
+    else if (o === 'tg') tgShare(text);
+    else if (o === 'wa') waShare(text);
+    else if (o === 'copy') { navigator.clipboard.writeText(text); toast('Скопировано', null, true); }
+    else if (o === 'native') nativeShare(text, it.title);
+    closeModal();
+  }));
+}
+
 /* карточка карусели (общая для «Карусели» и «Карусель из лонча») */
 function carCardHTML(c) {
   return `<div class="glass car-card" data-car="${c.id}">
@@ -4047,7 +4099,7 @@ function renderScriptSet(it) {
   return `<div class="glass card sh-set ${open ? 'open' : ''}" data-set="${it.id}">
     <div class="sh-set-hd" data-toggle="${it.id}">
       <div class="sh-set-t">${ic(I.chev)}<b>${esc(it.title)}</b></div>
-      <div class="sh-set-meta">${it.mode === 'rewrite' ? '<span class="mini-badge">рерайт</span>' : ''}${it.geo ? '<span class="mini-badge">' + esc(STATE.settings.geoNames[it.geo] || it.geo) + '</span>' : ''}<span class="muted">${(it.scripts || []).length} × · ${ago(it.createdAt)}</span><button class="btn-ghost sh-del" data-del="${it.id}" title="Удалить">${ic(I.x)}</button></div>
+      <div class="sh-set-meta">${it.mode === 'rewrite' ? '<span class="mini-badge">рерайт</span>' : ''}${it.geo ? '<span class="mini-badge">' + esc(STATE.settings.geoNames[it.geo] || it.geo) + '</span>' : ''}<span class="muted">${(it.scripts || []).length} × · ${ago(it.createdAt)}</span><button class="btn-ghost sh-shr" data-share="${it.id}" title="Отправить в Telegram / WhatsApp / PDF">${ic(I.send)}</button><button class="btn-ghost sh-del" data-del="${it.id}" title="Удалить">${ic(I.x)}</button></div>
     </div>
     ${open ? `<div class="sh-set-body">${(it.scripts || []).map(renderScriptCard).join('')}</div>` : ''}
   </div>`;
@@ -4063,7 +4115,7 @@ function renderPostItem(it) {
   const kindName = { post: 'Пост', story: 'Сторис', thread: 'Тред' }[it.postKind] || 'Пост';
   const frames = (it.postKind !== 'post') ? String(p.body || '').split(/\n-{2,}\n/).map((f, i) => `<div class="sh-frame"><span class="sh-frame-n">${i + 1}</span><div>${esc(f.trim())}</div></div>`).join('') : '';
   return `<div class="glass card sh-post">
-    <div class="sh-card-hd"><div><span class="sh-badge">${kindName}</span><b style="margin-left:8px">${esc(it.title)}</b></div><div style="display:flex;gap:6px">${cpBtn(p.body, 'Текст')}<button class="btn-ghost sh-pdel" data-pdel="${it.id}" title="Удалить">${ic(I.x)}</button></div></div>
+    <div class="sh-card-hd"><div><span class="sh-badge">${kindName}</span><b style="margin-left:8px">${esc(it.title)}</b></div><div style="display:flex;gap:6px">${cpBtn(p.body, 'Текст')}<button class="btn-ghost sh-shr" data-pshare="${it.id}" title="Отправить в Telegram / WhatsApp">${ic(I.send)}</button><button class="btn-ghost sh-pdel" data-pdel="${it.id}" title="Удалить">${ic(I.x)}</button></div></div>
     ${it.postKind === 'post' ? `<div class="sh-post-body">${esc(p.body)}</div>` : `<div class="sh-frames">${frames}</div>`}
     ${(p.openers || []).length ? `<div class="sh-seclbl">Альтернативные заходы</div>${p.openers.map(o => `<div class="sh-alt"><span>${esc(o)}</span>${cpBtn(o, '')}</div>`).join('')}` : ''}
     ${p.cta ? `<div class="sh-cta">${esc(p.cta)}</div>` : ''}
@@ -4135,9 +4187,10 @@ async function shScripts(main) {
   const paintOut = () => {
     out.innerHTML = hist.length ? hist.map(renderScriptSet).join('') : '<div class="glass card empty">Пока пусто — опиши идею выше и собери первый сценарий</div>';
     $$('.sh-set-hd', out).forEach(h => h.addEventListener('click', (e) => {
-      if (e.target.closest('[data-del]')) return;
+      if (e.target.closest('[data-del]') || e.target.closest('[data-share]')) return;
       const id = h.dataset.toggle; SC_OPEN.has(id) ? SC_OPEN.delete(id) : SC_OPEN.add(id); paintOut();
     }));
+    $$('[data-share]', out).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openShareMenu(hist.find(x => x.id === b.dataset.share)); }));
     $$('[data-del]', out).forEach(b => b.addEventListener('click', async (e) => {
       e.stopPropagation(); await fetch('/api/social/content/' + b.dataset.del, { method: 'DELETE' });
       const i = hist.findIndex(x => x.id === b.dataset.del); if (i >= 0) hist.splice(i, 1); paintOut();
@@ -4331,6 +4384,7 @@ async function shPost(main) {
   const out = $('#shPOut', main);
   const paint = () => {
     out.innerHTML = hist.length ? hist.map(renderPostItem).join('') : '<div class="glass card empty">Пока пусто — напиши первый пост выше</div>';
+    $$('[data-pshare]', out).forEach(b => b.addEventListener('click', () => openShareMenu(hist.find(x => x.id === b.dataset.pshare))));
     $$('[data-pdel]', out).forEach(b => b.addEventListener('click', async () => { await fetch('/api/social/content/' + b.dataset.pdel, { method: 'DELETE' }); const i = hist.findIndex(x => x.id === b.dataset.pdel); if (i >= 0) hist.splice(i, 1); paint(); }));
   };
   paint();

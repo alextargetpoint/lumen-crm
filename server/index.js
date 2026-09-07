@@ -3066,6 +3066,56 @@ ${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchPara
       return;
     }
 
+    /* ============ печать/PDF набора сценариев: /script/:id ============ */
+    if ((m = p.match(/^\/script\/([a-f0-9]+)$/)) && req.method === 'GET') {
+      const it = (db.socialContent || []).find(x => x.id === m[1] && x.kind === 'script');
+      if (!it) { res.writeHead(404); res.end('not found'); return; }
+      const isPrint = u.searchParams.get('print') === '1';
+      const AG = db.settings.agency.name || 'Lumen';
+      const e = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const cards = (it.scripts || []).map((s, i) => `<section class="sc">
+        <div class="sc-hd"><span class="bdg">${e(s.format || '')}</span>${s.duration_sec ? `<span class="dur">~${e(String(s.duration_sec))} сек</span>` : ''}<span class="vn">Вариант ${i + 1}</span></div>
+        ${s.goal_fit ? `<div class="gf">${e(s.goal_fit)}</div>` : ''}
+        ${(s.hooks || []).length ? `<div class="lbl">Хуки</div><ol class="hooks">${s.hooks.map(h => `<li>${e(h)}</li>`).join('')}</ol>` : ''}
+        ${(s.beats || []).length ? `<div class="lbl">Раскадровка</div><table class="beats">${s.beats.map(b => `<tr><td class="t">${e(b.t || '')}</td><td><b>${e(b.role || '')}</b> ${e(b.say || '')}${b.onscreen ? `<div class="os">На экране: ${e(b.onscreen)}</div>` : ''}</td></tr>`).join('')}</table>` : ''}
+        ${s.full_script ? `<div class="lbl">Сценарий под запись</div><div class="scr">${e(s.full_script).replace(/\n/g, '<br>')}</div>` : ''}
+        ${s.cta ? `<div class="cta">${e(s.cta)}${s.codeword ? ` · кодовое слово: <b>${e(s.codeword)}</b>` : ''}</div>` : ''}
+        ${s.caption ? `<div class="lbl">Подпись под рилс</div><div class="cap">${e(s.caption).replace(/\n/g, '<br>')}</div>` : ''}
+        ${(s.broll || []).length ? `<div class="lbl">Видеоряд</div><div class="broll">${s.broll.map(x => `<span>${e(x)}</span>`).join('')}</div>` : ''}
+      </section>`).join('');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${e(it.title)} — сценарии</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Manrope',sans-serif;background:#EEF1F5;color:#0F131C;padding:34px 16px;line-height:1.5}
+.pg{max-width:720px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;border-bottom:2px solid #0F131C;padding-bottom:12px}
+h1{font-family:'Fraunces',serif;font-weight:600;font-size:26px;letter-spacing:-.02em;max-width:80%}
+.brand{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#2563EB}
+.sc{background:#fff;border:1px solid #E1E8F4;border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 10px 30px -18px rgba(16,43,92,.4)}
+.sc-hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bdg{background:#102B5C;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:7px}
+.dur{font-size:12px;color:#667085}.vn{margin-left:auto;font-size:12px;color:#98A2B3;font-weight:600}
+.gf{font-style:italic;color:#3D4A63;font-size:13px;margin-bottom:8px}
+.lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8A93A8;margin:14px 0 6px}
+.hooks{padding-left:20px}.hooks li{margin-bottom:4px;font-size:14px}
+.beats{width:100%;border-collapse:collapse}.beats td{padding:5px 0;font-size:13px;border-bottom:1px solid #EEF1F6;vertical-align:top}
+.beats .t{color:#2563EB;font-weight:600;white-space:nowrap;padding-right:12px;width:64px}
+.beats .os{color:#8A93A8;font-size:11.5px;margin-top:2px}
+.scr{background:#F5F7FB;border:1px solid #E1E8F4;border-radius:10px;padding:13px;font-size:14px;white-space:pre-wrap}
+.cta{margin-top:12px;background:rgba(37,99,235,.08);border-left:3px solid #2563EB;border-radius:0 8px 8px 0;padding:9px 12px;font-size:13.5px}
+.cap{background:#F5F7FB;border:1px solid #E1E8F4;border-radius:10px;padding:11px;font-size:13px;color:#3D4A63}
+.broll{display:flex;flex-wrap:wrap;gap:6px}.broll span{font-size:12px;background:#F0F3F8;border:1px solid #E1E8F4;border-radius:20px;padding:3px 10px;color:#3D4A63}
+@media print{body{background:#fff;padding:0}.sc{box-shadow:none;page-break-inside:avoid;border-radius:0;border:none;border-bottom:1px solid #ddd}}
+</style></head><body>
+<div class="pg"><div class="top"><h1>${e(it.title)}</h1><div class="brand">${e(AG)}</div></div>${cards}</div>
+${isPrint ? '<script>window.print()<\/script>' : ''}
+</body></html>`);
+      return;
+    }
+
     if ((m = p.match(/^\/p\/([a-f0-9]+)$/)) && req.method === 'GET') {
       const c = db.collections.find(x => x.id === m[1]);
       if (!c) { res.writeHead(404); res.end('not found'); return; }

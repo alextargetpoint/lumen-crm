@@ -2387,3 +2387,14 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .sh-conf.bad { background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--bad); }
 .sh-conf div div { color: var(--ink-2); }
 @media (max-width: 640px) { .sh-lookup { flex-direction: column; } }
+
+/* меню быстрой отправки контента */
+.sh-shr { color: var(--ink-3); }
+.sh-shr:hover { color: var(--accent); }
+.sh-share-menu { display: flex; flex-direction: column; gap: 8px; }
+.sh-share-opt { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: var(--r-md); background: var(--card); text-align: left; transition: border-color .14s, background .14s, transform .14s, box-shadow .14s; }
+.sh-share-opt:hover { border-color: var(--accent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--card)), var(--card)); transform: translateY(-1px); box-shadow: 0 8px 18px -10px rgba(37,99,235,.4); }
+.sh-share-opt svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
+.sh-share-opt span { display: flex; flex-direction: column; min-width: 0; }
+.sh-share-opt b { font-size: 13.5px; color: var(--navy-900); }
+.sh-share-opt i { font-size: 11.5px; font-style: normal; color: var(--ink-3); }
