@@ -2234,11 +2234,17 @@ PAGES.qualifier = async (root) => {
                 <div class="hero-stats">${Object.entries(h.stats).map(([k, v]) => `<div class="hstat"><span>${k}</span><i><b style="width:${v}%"></b></i></div>`).join('')}</div>
                 <div class="hero-xpcap">${L.max ? 'MAX' : L.name} · ${xp}${L.max ? '' : '/' + L.cap} квал</div>
                 <div class="hero-xp"><i style="width:${prog}%"></i></div>
+                ${(() => { const ps = (s.ai.personaStats || {})[h.id] || { handled: 0, qualified: 0 }; const rate = ps.handled ? Math.round(ps.qualified / ps.handled * 100) : 0; return `<div class="hero-ab" title="Честная A/B: реально вёл лидов → квалифицировал"><span>${ps.handled} лид</span><span>${ps.qualified} квал</span><b class="${rate >= 40 ? 'hi' : ''}">${rate}%</b></div>`; })()}
                 <div class="hero-pick">${on ? ic(I.check, 2.4) + ' Выбран' : 'Выбрать'}</div>
               </div>`;
             }).join('')}
           </div>
-          <div class="sd" style="margin-top:8px">Тон героя меняет манеру ИИ. Уровень растёт за каждого квалифицированного лида. <button class="btn-ghost" id="heroClear" style="font-size:11.5px;padding:2px 6px">Без имени (отдел продаж)</button></div>
+          <div class="sd" style="margin-top:8px">Ползунки героя реально меняют манеру ИИ в диалоге. Уровень и A/B растут на реальных лидах. <button class="btn-ghost" id="heroClear" style="font-size:11.5px;padding:2px 6px">Без имени (отдел продаж)</button></div>
+          <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">${ic(I.spark)}Авто-герой по направлению</div><div class="sd">ИИ сам подбирает героя под гео лида: Дубай-люкс → мягкий эксперт, горячий флип → скоростной дожим. Иначе — выбранный сверху.</div></div>
+            <label class="switch"><input type="checkbox" id="personaAuto" ${s.ai.personaAuto ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div id="personaMatrix" ${s.ai.personaAuto ? '' : 'style="display:none"'}>
+            ${s.agency.geos.map(g => `<div class="pmx-row"><span class="pmx-geo">${ic(I.pin || I.building)}${esc(s.geoNames[g] || g)}</span><select data-pmxgeo="${g}"><option value="">— по умолчанию</option>${AI_HEROES.map(h => `<option value="${h.id}" ${(s.ai.personaByGeo || {})[g] === h.id ? 'selected' : ''}>${h.name} · ${h.role}</option>`).join('')}</select></div>`).join('')}
+          </div>
           <div class="set-row">
             <div class="sp"><div class="sl">Стоп-слова (opt-out)</div><div class="sd">Любое из слов в сообщении клиента мгновенно отключает ИИ и закрывает лида</div></div>
           </div>
@@ -2274,6 +2280,8 @@ PAGES.qualifier = async (root) => {
     await loadState(); render();
   }));
   $('#heroClear')?.addEventListener('click', async () => { await api.patch('/settings', { ai: { persona: { id: '', name: '', role: '', tone: '' } } }); toast('ИИ без имени', 'Пишет как «отдел продаж»', true); await loadState(); render(); });
+  $('#personaAuto')?.addEventListener('change', async (e) => { await api.patch('/settings', { ai: { personaAuto: e.target.checked } }); const mx = $('#personaMatrix', root); if (mx) mx.style.display = e.target.checked ? '' : 'none'; toast(e.target.checked ? 'Авто-герой по гео включён' : 'Авто-герой выключен', 'ИИ подбирает манеру под направление лида', true); await loadState(); });
+  $$('[data-pmxgeo]', root).forEach(sel => sel.addEventListener('change', async () => { const cur = Object.assign({}, STATE.settings.ai.personaByGeo || {}); cur[sel.dataset.pmxgeo] = sel.value; await api.patch('/settings', { ai: { personaByGeo: cur } }); toast('Герой для направления сохранён', null, true); await loadState(); }));
   $$('[data-aoff]', root).forEach(sw => sw.addEventListener('change', async () => {
     const autoOff = {};
     $$('[data-aoff]', root).forEach(x => autoOff[x.dataset.aoff] = x.checked);
