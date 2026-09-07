@@ -348,6 +348,7 @@ const CAROUSEL_TEMPLATES = {
   review: { name: 'Отзыв клиента / кейс', brief: 'история клиента: запрос → что подобрали → результат (доход/переезд), по-человечески, финальный призыв' },
   digest: { name: 'Подборка недели', brief: '3–4 объекта недели: по объекту на слайд (крючок + цена + фишка), финальный призыв' },
   tips: { name: 'Гид покупателя', brief: 'полезные советы по покупке недвижимости за рубежом: по одному совету на слайд, экспертно, финальный призыв' },
+  launch: { name: 'Новый запуск / старт продаж', brief: 'анонс старта продаж/лонча объекта: сильный крючок про запуск, что за объект, ключевые условия входа (цена «от», рассрочка, доходность), почему сейчас/дедлайн оффера, финальный призыв с кодовым словом' },
 };
 async function composeCarousel(topic, templateKey, count, agencyName, geo) {
   const t = CAROUSEL_TEMPLATES[templateKey] || CAROUSEL_TEMPLATES.project;
@@ -367,4 +368,44 @@ ${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, CAROUSEL_TEMPLATES, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+/* ИИ психо-профиль лида: тип покупателя из переписки + подход + отработка возражений + готовые ответы.
+   Основано на систематике продаж недвижимости (психотипы покупателей, DISC, отработка возражений, SPIN). */
+async function composeLeadPsych(db, lead, history) {
+  const q = lead.quals || {};
+  const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+  const prompt = `Ты — старший тренер по продажам элитной недвижимости и переговорщик. Разбери лида по переписке и дай брокеру рабочую «шпаргалку подхода».
+Опирайся на систематику: психотипы покупателей недвижимости (аналитик-инвестор — рационал, цифры/ROI; эмоциональный/семейный — образ жизни, безопасность; статусный/VIP — престиж, эксклюзив; осторожный-скептик — гарантии, контроль, соц-доказательство; решительный — скорость, конкретика), модель DISC, отработка возражений, SPIN.
+ВАЖНО: выводы делай ТОЛЬКО из реальных слов клиента в переписке и осей квалификации. Где данных мало — так и скажи («мало сигналов»), НЕ выдумывай факты и цифры.
+
+ЛИД: ${lead.name || '—'}, направление ${geoName}, источник ${lead.source || '—'}.
+ОСИ: цель=${(q.purpose || {}).value || '—'}, срок=${(q.timeline || {}).value || '—'}, бюджет=${(q.budget || {}).value || '—'}, тип=${(q.type || {}).value || '—'}.
+ПЕРЕПИСКА (последние сообщения):
+${history || '(переписки пока мало)'}
+
+Верни строго JSON:
+{"type":"краткое имя психотипа (2-4 слова)",
+ "confidence":"высокая|средняя|низкая — насколько уверенно по имеющимся сигналам",
+ "axes":{"Рациональность":0-100,"Эмоциональность":0-100,"Скорость решения":0-100,"Осторожность":0-100},
+ "summary":"1-2 предложения: что за клиент и что им движет",
+ "press":["2-4 точки, на что делать акцент в разговоре именно с этим типом"],
+ "avoid":["2-3 чего избегать, что оттолкнёт этот тип"],
+ "objections":[{"q":"вероятное возражение","a":"как отработать коротко"}],
+ "replies":["1-2 готовых сообщения в чат под этот психотип и текущий момент диалога (живым языком, без клише, без выдуманных цифр)"]}`;
+  const out = await callGemini(prompt, 30000, 2200);
+  if (!out || !out.type) throw new Error('bad psych');
+  const arr = (a, n) => Array.isArray(a) ? a.slice(0, n).map(x => String(x).slice(0, 300)).filter(Boolean) : [];
+  const clampAx = (o) => { const r = {}; for (const k of ['Рациональность', 'Эмоциональность', 'Скорость решения', 'Осторожность']) r[k] = Math.max(0, Math.min(100, parseInt((o || {})[k]) || 0)); return r; };
+  return {
+    type: String(out.type).slice(0, 60),
+    confidence: String(out.confidence || 'средняя').slice(0, 20),
+    axes: clampAx(out.axes),
+    summary: String(out.summary || '').slice(0, 500),
+    press: arr(out.press, 4),
+    avoid: arr(out.avoid, 3),
+    objections: Array.isArray(out.objections) ? out.objections.slice(0, 4).map(o => ({ q: String((o || {}).q || '').slice(0, 200), a: String((o || {}).a || '').slice(0, 400) })).filter(o => o.q) : [],
+    replies: arr(out.replies, 2),
+    at: Date.now(),
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, CAROUSEL_TEMPLATES, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

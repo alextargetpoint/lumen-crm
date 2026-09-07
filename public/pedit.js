@@ -128,7 +128,8 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   /* ---------- верхняя панель ---------- */
   const bar = document.createElement('div');
   bar.className = 'edbar';
-  bar.innerHTML = `<b>Конструктор</b>
+  bar.innerHTML = `<button class="edbtn g" id="peExit" title="Сохранить и выйти в CRM">← Готово</button>
+    <b>Конструктор</b>
     <span class="hint">клик по тексту — правка · правый клик — меню блока</span>
     <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
     ${Object.keys(P.fonts || {}).length ? `<button class="edbtn g pefont-btn" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button>` : ''}
@@ -254,6 +255,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   }
   $('#peSave').addEventListener('click', () => save(false));
   $('#peView').addEventListener('click', async () => { if (!dirty || await save(false)) location.href = `/p/${P.cid}`; });
+  $('#peExit').addEventListener('click', async () => { if (dirty) await save(false); try { window.close(); } catch (e) {} setTimeout(() => { if (!window.closed) location.href = '/#collections'; }, 250); });
   addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
 
   /* ---------- undo / redo (серверная история: переживает перезагрузки) ---------- */

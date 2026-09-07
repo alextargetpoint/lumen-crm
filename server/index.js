@@ -556,6 +556,55 @@ const FONT_PRESETS = {
   tech: { name: 'Модерн', gf: 'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700', disp: "'Space Grotesk',sans-serif", body: "'Inter',sans-serif" },
 };
 
+/* большая библиотека шрифтов заголовков для карусели соц-помощника (как в референсе — десятки гарнитур).
+   key → { name (рус), gf (family=... для css2), fam (css font-family), cat: serif|sans|display|hand } */
+const FONT_LIB = {
+  fraunces:   { name: 'Fraunces',        cat: 'serif',   gf: 'family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700', fam: "'Fraunces',serif" },
+  playfair:   { name: 'Playfair Display',cat: 'serif',   gf: 'family=Playfair+Display:wght@500;600;700;800', fam: "'Playfair Display',serif" },
+  cormorant:  { name: 'Cormorant',       cat: 'serif',   gf: 'family=Cormorant:wght@500;600;700', fam: "'Cormorant',serif" },
+  ptserif:    { name: 'PT Serif',        cat: 'serif',   gf: 'family=PT+Serif:wght@400;700', fam: "'PT Serif',serif" },
+  instrument: { name: 'Instrument Serif',cat: 'serif',   gf: 'family=Instrument+Serif:ital@0;1', fam: "'Instrument Serif',serif" },
+  eb:         { name: 'EB Garamond',     cat: 'serif',   gf: 'family=EB+Garamond:wght@500;600;700', fam: "'EB Garamond',serif" },
+  manrope:    { name: 'Manrope',         cat: 'sans',    gf: 'family=Manrope:wght@500;600;700;800', fam: "'Manrope',sans-serif" },
+  inter:      { name: 'Inter',           cat: 'sans',    gf: 'family=Inter:wght@500;600;700;800', fam: "'Inter',sans-serif" },
+  montser:    { name: 'Montserrat',      cat: 'sans',    gf: 'family=Montserrat:wght@500;600;700;800', fam: "'Montserrat',sans-serif" },
+  spacegro:   { name: 'Space Grotesk',   cat: 'sans',    gf: 'family=Space+Grotesk:wght@500;600;700', fam: "'Space Grotesk',sans-serif" },
+  bricolage:  { name: 'Bricolage',       cat: 'sans',    gf: 'family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700', fam: "'Bricolage Grotesque',sans-serif" },
+  unbounded:  { name: 'Unbounded',       cat: 'display', gf: 'family=Unbounded:wght@500;600;700;800', fam: "'Unbounded',sans-serif" },
+  oswald:     { name: 'Oswald',          cat: 'display', gf: 'family=Oswald:wght@500;600;700', fam: "'Oswald',sans-serif" },
+  russo:      { name: 'Russo One',       cat: 'display', gf: 'family=Russo+One', fam: "'Russo One',sans-serif" },
+  dela:       { name: 'Dela Gothic One', cat: 'display', gf: 'family=Dela+Gothic+One', fam: "'Dela Gothic One',sans-serif" },
+  daysone:    { name: 'Days One',        cat: 'display', gf: 'family=Days+One', fam: "'Days One',sans-serif" },
+  tektur:     { name: 'Tektur',          cat: 'display', gf: 'family=Tektur:wght@500;600;700', fam: "'Tektur',sans-serif" },
+  rusdisplay: { name: 'Ruslan Display',  cat: 'display', gf: 'family=Ruslan+Display', fam: "'Ruslan Display',cursive" },
+  bebas:      { name: 'Bebas Neue',      cat: 'display', gf: 'family=Bebas+Neue', fam: "'Bebas Neue',sans-serif" },
+  comfortaa:  { name: 'Comfortaa',       cat: 'display', gf: 'family=Comfortaa:wght@500;600;700', fam: "'Comfortaa',sans-serif" },
+  caveat:     { name: 'Caveat',          cat: 'hand',    gf: 'family=Caveat:wght@500;600;700', fam: "'Caveat',cursive" },
+  amatic:     { name: 'Amatic SC',       cat: 'hand',    gf: 'family=Amatic+SC:wght@700', fam: "'Amatic SC',cursive" },
+  badscript:  { name: 'Bad Script',      cat: 'hand',    gf: 'family=Bad+Script', fam: "'Bad Script',cursive" },
+  neucha:     { name: 'Neucha',          cat: 'hand',    gf: 'family=Neucha', fam: "'Neucha',cursive" },
+  pangolin:   { name: 'Pangolin',        cat: 'hand',    gf: 'family=Pangolin', fam: "'Pangolin',cursive" },
+};
+
+const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
+const CAR_POS = new Set(['top', 'center', 'bottom']);
+const CAR_SIZE = new Set(['s', 'm', 'l']);
+/* нормализация слайда карусели при записи: ограниченный инлайн-HTML в заголовке/подписи + мета текста */
+const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
+  .replace(/<\s*(\/?)(b|strong|i|em|u|mark|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
+  .replace(/<(?!\/?(?:b|strong|i|em|u|mark|br)>)[^>]*>/gi, '');
+const sanSlide = (s) => ({
+  heading: sanCarInline(s.heading).slice(0, 200),
+  sub: sanCarInline(s.sub).slice(0, 320),
+  eyebrow: String(s.eyebrow || '').replace(/<[^>]*>/g, '').slice(0, 40),
+  bg: /^(assets\/|\/assets\/|https?:\/\/)/.test(String(s.bg || '')) ? String(s.bg).slice(0, 500) : '',
+  bgv: /^(assets\/|\/assets\/|https?:\/\/).+\.(mp4|webm)/i.test(String(s.bgv || '')) ? String(s.bgv).slice(0, 500) : '',
+  bgc: /^#[0-9a-fA-F]{3,8}$/.test(String(s.bgc || '')) ? s.bgc : '',
+  pos: CAR_POS.has(s.pos) ? s.pos : '',
+  align: s.align === 'center' ? 'center' : 'left',
+  size: CAR_SIZE.has(s.size) ? s.size : 'm',
+});
+
 /* библиотека иконок удобств/гарантий в стиле дашборда (тонкая линия) — вместо эмодзи в блоках */
 const AMEN_ICONS = {
   pool: '<path d="M3 18c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M7 14V6a2 2 0 014 0M7 10h4"/>',
@@ -1629,8 +1678,9 @@ const server = http.createServer(async (req, res) => {
       }
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
-        format: b.format === 'portrait' ? 'portrait' : 'square', theme: b.theme || 'klein', fontPreset: b.fontPreset || 'soft',
-        slides: slides.map(s => ({ heading: String(s.heading || '').slice(0, 90), sub: String(s.sub || '').slice(0, 240), bg: '' })),
+        format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
+        font: FONT_LIB[b.font] ? b.font : 'fraunces', footer: { on: false, text: '' },
+        slides: slides.map(s => sanSlide(s)),
         createdAt: Date.now(),
       };
       db.carousels.unshift(c); store.save();
@@ -1643,15 +1693,31 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.title != null) c.title = String(b.title).slice(0, 120);
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
-      if (b.fontPreset && FONT_PRESETS[b.fontPreset]) c.fontPreset = b.fontPreset;
-      if (b.format) c.format = b.format === 'portrait' ? 'portrait' : 'square';
-      if (Array.isArray(b.slides)) c.slides = b.slides.slice(0, 12).map(s => ({ heading: String(s.heading || '').slice(0, 90), sub: String(s.sub || '').slice(0, 240), bg: /^(assets\/|\/assets\/|https?:\/\/)/.test(String(s.bg || '')) ? String(s.bg).slice(0, 500) : '' }));
+      if (b.font && FONT_LIB[b.font]) c.font = b.font;
+      if (b.format && CAR_FORMATS.has(b.format)) c.format = b.format;
+      if (b.footer && typeof b.footer === 'object') c.footer = { on: !!b.footer.on, text: String(b.footer.text || '').slice(0, 80) };
+      if (Array.isArray(b.slides)) c.slides = b.slides.slice(0, 12).map(s => sanSlide(s));
       store.save();
       return json(res, 200, { ok: true, count: c.slides.length });
     }
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
       db.carousels = db.carousels.filter(x => x.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
+    }
+    /* загрузка фото/видео-фона слайда (raw body, до 25МБ) */
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/asset$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(jpe?g|png|webp|gif|mp4|webm)$/i);
+      if (!extM) return json(res, 400, { error: 'формат: jpg/png/webp/gif/mp4/webm' });
+      const chunks = []; let size = 0;
+      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 25e6) req.destroy(); else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
+      if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
+      const fname = `car/${c.id}-${crypto.randomBytes(4).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      return json(res, 200, { url: '/assets/' + fname });
     }
     /* ИИ-картинка фона слайда (переиспользуем генератор) */
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/ai-bg$/)) && req.method === 'POST') {
@@ -2696,20 +2762,34 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
       const isPrint = u.searchParams.get('print') === '1';
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
-      const font = FONT_PRESETS[c.fontPreset] || FONT_PRESETS.soft;
+      const hf = FONT_LIB[c.font] || FONT_LIB.fraunces;
       const AG = db.settings.agency.name;
       const logo = db.settings.agency.logo;
+      const footer = c.footer || {};
+      const brandTxt = footer.on ? (footer.text || AG) : AG;
       const ce = (f, i) => isEdit ? ` data-ce="${i}:${f}"` : '';
       const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
+      /* инлайн-форматирование (B/I/выделение) — храним ограниченный HTML */
+      const sanInline = (h) => String(h == null ? '' : h).slice(0, 900)
+        .replace(/<\s*(\/?)(b|strong|i|em|u|mark|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
+        .replace(/<(?!\/?(?:b|strong|i|em|u|mark|br)>)[^>]*>/gi, '');
+      const dims = c.format === 'story' ? { ar: '9/16', w: 420 } : c.format === 'portrait' ? { ar: '4/5', w: 460 } : { ar: '1/1', w: 560 };
+      const isDarkHex = (h) => { const x = String(h || '').replace('#', ''); const s2 = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
       const slides = (c.slides || []).map((s, i) => {
-        const hasBg = !!s.bg;
-        return `<div class="slide${hasBg ? ' hasbg' : ''}" data-idx="${i}" style="${hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.6)),url('${esc(abs(s.bg))}')` : ''}">
-          ${isEdit ? `<div class="s-tools"><button data-sop="bg" title="Фон">${'▦'}</button><button data-sop="up" title="Выше">↑</button><button data-sop="down" title="Ниже">↓</button><button data-sop="del" title="Удалить">✕</button></div>` : ''}
+        const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
+        const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
+        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`].join(' ');
+        const eye = s.eyebrow || '';
+        const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
+        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''} style="${style}">
+          ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
+          ${isEdit ? `<div class="s-pick" data-sop="pick" title="Редактировать слайд">✎</div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
-            <h2 class="s-h"${ce('heading', i)}>${esc(s.heading || '')}</h2>
-            <p class="s-s"${ce('sub', i)}>${esc(s.sub || '')}</p>
-            <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : esc(AG)}</div>
+            ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
+            <h2 class="s-h"${ce('heading', i)}>${sanInline(s.heading)}</h2>
+            <p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>
+            <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
         </div>`;
       }).join('');
@@ -2717,34 +2797,48 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.title)} — ${esc(AG)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?${font.gf}&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&${hf.gf}&display=swap" rel="stylesheet">
 <style>
-:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${font.disp}}
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${hf.fam}}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:${font.body},sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
-.wrap{max-width:${c.format === 'portrait' ? '460px' : '560px'};margin:0 auto;display:flex;flex-direction:column;gap:20px}
-.slide{position:relative;aspect-ratio:${c.format === 'portrait' ? '4/5' : '1/1'};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex}
+body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
+.wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.slide{position:relative;aspect-ratio:${dims.ar};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex}
 .slide.hasbg{color:#fff}
+.s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
+.slide .s-in{position:relative;z-index:1}
 .slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
-.s-in{position:relative;padding:11% 10%;display:flex;flex-direction:column;justify-content:center;width:100%;gap:14px}
-.slide:first-child .s-in{justify-content:flex-end}
+.slide .s-h mark{background:var(--blue);color:#fff;padding:0 .12em;border-radius:.12em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.s-in{position:relative;padding:11% 10%;display:flex;flex-direction:column;justify-content:center;width:100%;gap:13px}
+.slide.pos-top .s-in{justify-content:flex-start;padding-top:15%}
+.slide.pos-bottom .s-in{justify-content:flex-end;padding-bottom:15%}
+.slide.al-center .s-in{text-align:center;align-items:center}
 .s-num{position:absolute;top:8%;left:10%;font-size:13px;font-weight:600;color:var(--mut);letter-spacing:.05em}
-.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:clamp(26px,6.2vw,40px);line-height:1.08;letter-spacing:-.02em}
+.slide.al-center .s-num{left:50%;transform:translateX(-50%)}
+.s-eye{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}
+.slide.hasbg .s-eye{color:#fff;opacity:.9}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em}
+.slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
+.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
+.slide.sz-l .s-h{font-size:clamp(32px,8vw,52px);line-height:1.02}
 .slide.hasbg .s-h{color:#fff}
-.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:92%}
+.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%}
+.slide.al-center .s-s{max-width:100%}
 .slide.hasbg .s-s{color:rgba(255,255,255,.92)}
-.s-brand{position:absolute;bottom:8%;left:10%;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
+.s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
+.slide.al-center .s-brand{left:50%;transform:translateX(-50%)}
 .s-brand img{height:26px;max-width:130px;object-fit:contain}
 [data-ce]{outline:1.5px dashed transparent;border-radius:4px;transition:outline .12s}
-${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}` : ''}
-.s-tools{position:absolute;top:10px;right:10px;z-index:5;display:flex;gap:4px;opacity:0;transition:opacity .15s}
-.slide:hover .s-tools{opacity:1}
-.s-tools button{width:30px;height:30px;border:none;border-radius:8px;background:rgba(6,17,38,.8);color:#fff;cursor:pointer;font-size:14px;backdrop-filter:blur(6px)}
-.s-tools button:hover{background:var(--blue)}
-@media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tools{display:none}}
+${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}.s-eye:empty:before{content:'ЭЙБРОУ';opacity:.4}` : ''}
+.s-pick{position:absolute;top:10px;right:10px;z-index:6;width:32px;height:32px;border-radius:9px;background:rgba(6,17,38,.72);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s,background .15s;backdrop-filter:blur(6px)}
+.slide:hover .s-pick{opacity:1}
+.s-pick:hover{background:var(--blue)}
+${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}` : ''}
+@media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, fontPreset: c.fontPreset, format: c.format, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=1"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=3"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

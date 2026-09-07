@@ -162,6 +162,27 @@ textarea { resize: vertical; min-height: 70px; }
   margin-left: auto; font-size: 11px; font-weight: 600; color: var(--blue-300);
   background: rgba(134, 175, 255, .14); padding: 1px 7px; border-radius: 20px;
 }
+/* каретка-индикатор раскрытия у кнопки-пространства */
+.nav-caret { margin-left: auto; display: inline-flex; opacity: .5; transition: transform var(--dur) var(--ease-spring), opacity var(--dur-fast); }
+.nav-caret svg { width: 14px !important; height: 14px !important; opacity: 1 !important; }
+.nav-caret svg { transform: none !important; }
+.nav-item.ws-open .nav-caret { opacity: .9; transform: rotate(-180deg); }
+.nav-item[data-ws] .cnt { margin-left: 6px; }
+/* раскрывающийся список подстраниц пространства */
+.nav-sub { display: grid; grid-template-rows: 0fr; overflow: hidden; transition: grid-template-rows var(--dur) var(--ease-soft); margin: 0 0 0 6px; }
+.nav-sub > * { min-height: 0; }
+.nav-sub-inner { overflow: hidden; }
+.nav-sub.open { grid-template-rows: 1fr; }
+.nav-sub .nav-subitem {
+  display: flex; align-items: center; gap: 9px; width: calc(100% - 4px); margin: 2px 0; padding: 7px 10px 7px 14px;
+  border-radius: var(--r-sm); font-size: 12.5px; font-weight: 500; color: #8FA0C6; text-align: left;
+  position: relative; transition: background var(--dur-fast), color var(--dur-fast);
+}
+.nav-sub .nav-subitem::before { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 1.5px; background: rgba(134, 175, 255, .16); }
+.nav-sub .nav-subitem svg { width: 15px; height: 15px; stroke-width: 1.7; opacity: .8; }
+.nav-sub .nav-subitem:hover { background: rgba(134, 175, 255, .08); color: #fff; }
+.nav-sub .nav-subitem.on { color: #fff; background: rgba(47, 107, 255, .16); }
+.nav-sub .nav-subitem.on::before { background: var(--blue-300); }
 .side-foot { padding-top: 12px; border-top: 1px solid rgba(134, 175, 255, .14); margin-top: 10px; }
 .agency { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: var(--r-sm); }
 .agency .ava {
@@ -1723,6 +1744,12 @@ html[data-night] .hero-lvl { border-color: #2A3C6B; }
 .pmx-geo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--navy-900); min-width: 130px; }
 .pmx-geo svg { width: 14px; height: 14px; color: var(--accent); }
 .pmx-row select { flex: 1; }
+.pmx-arrow { color: var(--accent); font-weight: 700; opacity: .7; }
+.capi-guide { display: flex; flex-direction: column; gap: 11px; padding: 4px 2px 6px; }
+.cg-step { display: flex; gap: 11px; font-size: 12.5px; line-height: 1.55; color: var(--navy-900); }
+.cg-step .cg-n { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2, #5B2BD8)); margin-top: 1px; }
+.cg-step code.pill { font-size: 11px; }
+.cg-loop { margin-top: 3px; padding: 10px 12px; border-radius: 10px; background: rgba(47, 107, 255, .07); border: 1px solid rgba(47, 107, 255, .16); font-size: 12.3px; line-height: 1.55; color: var(--navy-900); }
 .hero-xp i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, #4F7DFF, #23B383); animation: statFill 1s var(--ease-spring); }
 .hero-pick { font-size: 12px; font-weight: 700; color: var(--ink-2); border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 0; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .hero-pick svg { width: 13px; height: 13px; }
@@ -1826,6 +1853,7 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .car-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .car-prev { aspect-ratio: 1/1; display: grid; place-items: center; padding: 22px; background: linear-gradient(160deg, #1D34D8, #0A1833); color: #fff; text-align: center; }
 .car-prev.portrait { aspect-ratio: 4/5; }
+.car-prev.story { aspect-ratio: 9/16; }
 .car-h { font-family: var(--font-display); font-optical-sizing: auto; font-weight: 600; font-size: 19px; line-height: 1.15; letter-spacing: -.01em; }
 .car-body { padding: 13px 15px; }
 .car-body .nm { font-size: 14px; font-weight: 650; color: var(--navy-900); }

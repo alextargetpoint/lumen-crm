@@ -702,7 +702,7 @@ function initNav() {
     /* кнопка-пространство рисует свой лейбл/иконку; ведёт на дефолтную под-страницу */
     const ws = btn.dataset.ws ? WORKSPACES[btn.dataset.ws] : null;
     const def = ws ? { icon: ws.icon, name: ws.label } : NAV[btn.dataset.page];
-    btn.innerHTML = `${ic(def.icon)}${def.name}<span class="cnt" data-cnt style="display:none"></span>`;
+    btn.innerHTML = `${ic(def.icon)}${def.name}${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
     btn.addEventListener('click', () => {
       /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */
       let target = btn.dataset.page;
@@ -712,7 +712,30 @@ function initNav() {
       if (target === 'sequences') PAGE_STATE.seqEdit = null;
       go(target);
     });
+    /* под кнопкой-пространством — раскрывающийся список его подстраниц (аккордеон в сайдбаре) */
+    if (ws) {
+      const sub = el(`<div class="nav-sub" data-subws="${btn.dataset.ws}"><div class="nav-sub-inner">${ws.pages.map(pk => `<button class="nav-subitem" data-subpage="${pk}">${ic(NAV[pk].icon)}<span>${NAV[pk].name}</span></button>`).join('')}</div></div>`);
+      sub.querySelectorAll('.nav-subitem').forEach(sb => sb.addEventListener('click', (e) => {
+        e.stopPropagation(); const target = sb.dataset.subpage;
+        if (target === 'properties') PAGE_STATE.propView = null;
+        if (target === 'collections') PAGE_STATE.collLead = '';
+        if (target === 'sequences') PAGE_STATE.seqEdit = null;
+        if (target !== CUR) go(target);
+      }));
+      btn.after(sub);
+    }
   });
+  syncNavSub();
+}
+/* синхронизация раскрытия/активности сайдбар-подстраниц с текущей страницей */
+function syncNavSub() {
+  $$('.nav-sub').forEach(sub => {
+    const ws = WORKSPACES[sub.dataset.subws];
+    const open = ws.pages.includes(CUR);
+    sub.classList.toggle('open', open);
+    sub.querySelectorAll('.nav-subitem').forEach(sb => sb.classList.toggle('on', sb.dataset.subpage === CUR));
+  });
+  $$('.nav-item[data-ws]').forEach(b => b.classList.toggle('ws-open', WORKSPACES[b.dataset.ws].pages.includes(CUR)));
 }
 /* Сегментный переключатель под-разделов пространства — вставляется первым
    элементом в #content, поверх любой страницы, входящей в пространство. */
@@ -741,6 +764,7 @@ function go(page) {
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
   if (PARENT_OF[page]) PAGE_STATE['ws_' + PARENT_OF[page]] = page; /* запоминаем вкладку пространства */
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? WORKSPACES[b.dataset.ws].pages.includes(page) : b.dataset.page === page));
+  syncNavSub();
   $('#pageTitle').textContent = NAV[page].name;
   $('#pageSub').textContent = NAV[page].sub;
   $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
@@ -3541,18 +3565,30 @@ PAGES.ads = async (root) => {
         ${(() => {
           const cp = STATE.settings.capi || {};
           const CAPI_DEFAULT = { qualified: 'Lead', handover: 'Schedule', viewing: 'Schedule', deal: 'Purchase' };
-          const evOpts = ['Lead', 'Schedule', 'Contact', 'Purchase', 'CompleteRegistration'];
+          /* стандартные события Meta — имена обязаны быть каноничными (их понимает алгоритм), но подписываем по-человечески */
+          const EV_LABELS = { Lead: 'Lead — лид квалифицирован', Contact: 'Contact — первый контакт с лидом', Schedule: 'Schedule — встреча / Zoom назначены', CompleteRegistration: 'CompleteRegistration — заявка заполнена', Purchase: 'Purchase — сделка закрыта' };
+          const evOpts = ['Lead', 'Contact', 'Schedule', 'CompleteRegistration', 'Purchase'];
+          const STAGE_HINT = { qualified: 'лид прошёл квалификацию', handover: 'передан брокеру / на встречу', viewing: 'назначен показ / просмотр', deal: 'закрыта сделка' };
           return `<div class="glass card mb">
           <div class="card-title">${ic(I.target)}Meta CAPI · дообучение рекламы<span class="sub">офлайн-конверсии в Meta</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="capiOn" ${cp.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Лид дошёл до целевой стадии (квал / передан / сделка) → Lumen шлёт событие в Meta по официальному Conversions API, и алгоритм учится приводить ПОХОЖИХ качественных лидов, а не просто заявки. Персональные данные хешируются (SHA-256).</div>
+          ${coll('📘 Как настроить весь цикл — приём лидов и обратные сигналы', `
+            <div class="capi-guide">
+              <div class="cg-step"><span class="cg-n">1</span><div><b>Приём лидов из лид-форм.</b> В Meta Ads запустите кампанию с целью <b>«Лид-формы»</b> (Instant Forms). Подключите форму к интегратору (Albato / Make / Zapier) и направьте его вебхук на <b>«Webhook приёма»</b> ниже. Лид падает в CRM с <code class="pill">ad_id</code> и автоматически мэтчится на объявление из базы.</div></div>
+              <div class="cg-step"><span class="cg-n">2</span><div><b>Доступы для обратной отправки.</b> Events Manager → ваш источник данных (Dataset/Pixel): скопируйте <b>Dataset ID</b> в поле «Pixel / Dataset ID», затем Settings → <b>Generate access token</b> — вставьте в «CAPI access token».</div></div>
+              <div class="cg-step"><span class="cg-n">3</span><div><b>Свяжите стадии воронки с событиями Meta.</b> Ниже: когда лид доходит до стадии, Lumen шлёт соответствующее <b>стандартное событие</b> Meta. Стандартные имена (Lead / Schedule / Purchase) обязательны — только их понимает алгоритм оптимизации.</div></div>
+              <div class="cg-step"><span class="cg-n">4</span><div><b>Проверьте.</b> Впишите <b>Test event code</b> (Events Manager → Test Events), нажмите «Тест-событие» и убедитесь, что оно видно в Meta. Затем очистите test code — события пойдут в прод.</div></div>
+              <div class="cg-loop">🔄 Итог — двусторонний цикл: <b>Meta → лид-форма → CRM</b> (приём) и <b>CRM → квал/сделка → Meta</b> (обратный сигнал качества). Алгоритм дообучается на реально качественных лидах, а не на всех заявках подряд.</div>
+            </div>`, { open: !cp.enabled, count: 0, icon: I.doc })}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Pixel / Dataset ID</label><input id="capiPixel" value="${esc(cp.pixelId || '')}" placeholder="напр. 1234567890"></div>
             <div class="form-row"><label>CAPI access token</label><input id="capiToken" type="password" placeholder="${cp.tokenSet ? '•••••• сохранён' : 'EAAB…'}"></div>
           </div>
           <div class="form-row"><label>Test event code (Events Manager → Test events, необязательно)</label><input id="capiTest" value="${esc(cp.testCode || '')}" placeholder="TEST12345"></div>
           <div class="lp-sec">Стадия воронки → событие Meta</div>
-          ${['qualified', 'handover', 'viewing', 'deal'].map(stg => `<div class="pmx-row"><span class="pmx-geo">${stageName(stg)}</span><select data-capiev="${stg}"><option value="">— не слать</option>${evOpts.map(ev => `<option value="${ev}" ${(cp.stageEvents || CAPI_DEFAULT)[stg] === ev ? 'selected' : ''}>${ev}</option>`).join('')}</select></div>`).join('')}
+          <div class="muted" style="font-size:11px;margin:-4px 0 8px">Слева — стадия в Lumen, справа — что уходит в Meta как конверсия.</div>
+          ${['qualified', 'handover', 'viewing', 'deal'].map(stg => `<div class="pmx-row"><span class="pmx-geo" title="${STAGE_HINT[stg] || ''}">${stageName(stg)} <span class="pmx-arrow">→</span></span><select data-capiev="${stg}"><option value="">— не отправлять</option>${evOpts.map(ev => `<option value="${ev}" ${(cp.stageEvents || CAPI_DEFAULT)[stg] === ev ? 'selected' : ''}>${EV_LABELS[ev]}</option>`).join('')}</select></div>`).join('')}
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
             <button class="btn btn-accent btn-sm" id="capiSave">Сохранить</button>
             <button class="btn btn-sm" id="capiTestBtn">${ic(I.send)}Тест-событие</button>
@@ -3763,7 +3799,7 @@ PAGES.comments = async (root) => {
 /* ---------------- СОЦ-ПОМОЩНИК: карусели ---------------- */
 const CAR_TPL = { project: 'Новый проект', reasons: '3–5 причин инвестировать', review: 'Отзыв клиента / кейс', digest: 'Подборка недели', tips: 'Гид покупателя' };
 const CAR_THEMES = { klein: 'Klein', royal: 'Royal', emerald: 'Emerald', champagne: 'Champagne', noir: 'Noir', mocha: 'Mocha', sage: 'Sage', bordeaux: 'Bordeaux', slate: 'Slate', terracotta: 'Terracotta', midnight: 'Midnight' };
-const CAR_FONTS = { soft: 'Мягкий люкс', editorial: 'Глянец', studio: 'Дизайн-студия', minimal: 'Минимал', tech: 'Модерн' };
+const CAR_FONTS = { fraunces: 'Fraunces (люкс)', playfair: 'Playfair (глянец)', cormorant: 'Cormorant', instrument: 'Instrument Serif', bricolage: 'Bricolage', spacegro: 'Space Grotesk', unbounded: 'Unbounded', oswald: 'Oswald', manrope: 'Manrope' };
 PAGES.social = async (root) => {
   const cars = await api.get('/carousels');
   root.innerHTML = `
@@ -3796,7 +3832,7 @@ PAGES.social = async (root) => {
       title: 'Новая карусель',
       body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="form-row"><label>Шаблон</label><select id="carTpl">${Object.entries(CAR_TPL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option></select></div>
+          <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option><option value="story">9:16 сторис / Reels</option></select></div>
         </div>
         <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
@@ -3808,7 +3844,7 @@ PAGES.social = async (root) => {
       actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
         const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
         try {
-          const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, fontPreset: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
+          const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
           toast('Карусель собрана', 'Открываю редактор', true);
           window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
           render();
