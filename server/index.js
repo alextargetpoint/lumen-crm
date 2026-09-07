@@ -667,7 +667,7 @@ function renderCarLayers(layers, isEdit) {
     let inner = '';
     if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:cover;border-radius:${l.round || 0}px;display:block">`;
     else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : 'aspect-ratio:1;'}">${carShapeSVG(l.shape, l.color, l.fill)}</div>`;
-    else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
+    else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
     else if (l.t === 'text') inner = `<span class="lyr-tx" style="color:${esc(l.color)};font-size:${l.tsize}px;font-family:${l.tw === 'serif' ? 'var(--disp)' : "'Manrope',sans-serif"};font-weight:${l.tb ? 800 : 600};line-height:1.1;display:block">${esc(l.text)}</span>`;
     return `<div class="s-lyr lyr-${l.t}" style="${geo}"${de}>${inner}${handles}</div>`;
   }).join('');
@@ -725,7 +725,31 @@ const AMEN_ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   award: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
 };
-const CAR_STICKERS = AMEN_ICONS;   /* переиспользуем тонкие линейные иконки как стикеры (~34 шт) */
+/* декоративные стикеры-акценты для соц-карусели (не утилитарные иконки) — markup сам задаёт fill/stroke через currentColor */
+const CAR_STICKERS = {
+  sparkle:  '<path fill="currentColor" d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/>',
+  star:     '<path fill="currentColor" d="M12 2l2.9 6.6 7 .6-5.3 4.6 1.6 6.9L12 17.8 5.8 20.7l1.6-6.9L2.1 9.2l7-.6z"/>',
+  star4:    '<path fill="currentColor" d="M12 2c.6 5.4 2 6.9 8 8-6 1.1-7.4 2.6-8 8-.6-5.4-2-6.9-8-8 6-1.1 7.4-2.6 8-8z"/>',
+  pin:      '<path fill="currentColor" d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z"/>',
+  tag:      '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 12l8-8h6v6l-8 8z"/><circle cx="15" cy="9" r="1.4" fill="currentColor"/>',
+  quote:    '<path fill="currentColor" d="M6 7h5v6H8c0 2 1 3 3 3v2c-4 0-5-3-5-6zM14 7h5v6h-3c0 2 1 3 3 3v2c-4 0-5-3-5-6z"/>',
+  sun:      '<circle cx="12" cy="12" r="4.3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5 5l1.6 1.6M17.4 17.4L19 19M19 5l-1.6 1.6M6.6 17.4L5 19"/></g>',
+  wave:     '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 12c2.5-4 5 4 7.5 0S14.5 8 17 12s5 4 5 0"/>',
+  dots:     '<g fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g>',
+  ring:     '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/>',
+  plus:     '<path stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M12 5v14M5 12h14"/>',
+  heart:    '<path fill="currentColor" d="M12 21s-8-4.6-8-10a4.5 4.5 0 018-3 4.5 4.5 0 018 3c0 5.4-8 10-8 10z"/>',
+  fire:     '<path fill="currentColor" d="M12 2c1.2 3-1 4.2-1 6.2 0 1.1 1 2 1 2s2-1 2-3.2c2 2 3 4 3 6a5 5 0 01-10 0c0-3.2 3-4.2 5-11z"/>',
+  crown:    '<path fill="currentColor" d="M3 8l3.2 3L9.5 6 12.7 11 16 6l2.8 5L22 8l-1.6 9.5H4.6z"/>',
+  check:    '<circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8 12.5l2.6 2.6 5-5.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  bolt:     '<path fill="currentColor" d="M13 2L4 14h6l-1 8 9-12h-6z"/>',
+  arrowc:   '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M5 15c2-6.5 8.5-8.5 14-8m0 0l-3.4-2.2M19 7l-2.2 3.8"/>',
+  diamond:  '<path fill="currentColor" d="M12 3l6 6-6 12L6 9z"/>',
+  ribbon:   '<path fill="currentColor" d="M8 3h8v12l-4-2.6L8 15z"/>',
+  underline:'<path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M4 16c4.5 2.2 11.5 2.2 16 0"/>',
+  circles:  '<g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></g>',
+  target:   '<g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/></g>',
+};
 /* пресеты оформления текста заголовка («Стиль» из референса) */
 const CAR_TSTYLES = { plain: 'Обычный', outline: 'Контур', block: 'Плашка', underline: 'Подчерк', huge: 'Крупный', caps: 'Капс', gradient: 'Градиент', shadow: 'Тень', italic: 'Курсив', quote: 'Кавычки', boxed: 'В рамке', bar: 'Полоса', glow: 'Свечение', gold: 'Золото', neon: 'Неон', retro: 'Ретро', pill: 'Пилюля', spaced: 'Разрядка' };
 const CAR_TSTYLES_SET = new Set(Object.keys(CAR_TSTYLES));
@@ -3350,7 +3374,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=6"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=7"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

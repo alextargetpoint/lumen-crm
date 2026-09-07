@@ -349,7 +349,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-    <div class="cgrp"><label>Стиль заголовка</label><div class="ctstyles" id="cTStyle">${Object.entries(P.tstyles || { plain: 'Обычный' }).map(([k, n]) => { const on = (sl.dataset.tstyle || 'plain') === k; return `<button class="ctst ${on ? 'on' : ''}" data-ts="${k}" title="${n}"><span class="s-h ts-${k}" style="font-size:19px;font-family:var(--disp)">Aa</span><i>${n}</i></button>`; }).join('')}</div></div>
+    <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
       <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
@@ -377,7 +377,13 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    const tsEl = $('#cTStyle', body); if (tsEl) tsEl.addEventListener('click', (e) => { const b = e.target.closest('[data-ts]'); if (!b) return; const k = b.dataset.ts; const sl = slideEl(i); sl.dataset.tstyle = k; const h = sl.querySelector('.s-h'); if (h) h.className = 's-h' + (k !== 'plain' ? ' ts-' + k : ''); $$('#cTStyle button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(false); });
+    const tsBtn = $('#cTStyleBtn', body);
+    if (tsBtn) tsBtn.addEventListener('click', (e) => {
+      const sl = slideEl(i); const cur = sl.dataset.tstyle || 'plain';
+      const grid = Object.entries(P.tstyles || { plain: 'Обычный' }).map(([k, n]) => `<button class="ctst ${cur === k ? 'on' : ''}" data-ts="${k}" title="${n}"><span class="s-h ts-${k}" style="font-size:18px;font-family:var(--disp)">Aa</span><i>${n}</i></button>`).join('');
+      const pp = openPop(`<div class="ctstyles">${grid}</div>`, e.clientX - 250, e.clientY);
+      pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-ts]'); if (!b) return; const k = b.dataset.ts; sl.dataset.tstyle = k; const h = sl.querySelector('.s-h'); if (h) h.className = 's-h' + (k !== 'plain' ? ' ts-' + k : ''); dirty = true; closePop(); save(false); renderBody(); });
+    });
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
@@ -410,7 +416,7 @@ body.cpanel-on{padding-right:308px!important}
         const pp = openPop(`<div class="celem-grid">${(P.shapes || []).map(s => `<button class="celem" data-shape="${s}" title="${s}"><svg viewBox="0 0 24 24" fill="currentColor">${shapeMini(s)}</svg></button>`).join('')}</div>`, e.clientX - 120, e.clientY);
         pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-shape]'); if (!t) return; closePop(); addLayer({ t: 'shape', shape: t.dataset.shape, color: accent, fill: true, x: 34, y: 34, w: 26, round: 10 }); });
       } else if (kind === 'sticker') {
-        const pp = openPop(`<div class="celem-grid">${Object.entries(P.stickers || {}).map(([k, path]) => `<button class="celem" data-stick="${k}" title="${k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
+        const pp = openPop(`<div class="celem-grid">${Object.entries(P.stickers || {}).map(([k, path]) => `<button class="celem" data-stick="${k}" title="${k}"><svg viewBox="0 0 24 24">${path}</svg></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
         pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-stick]'); if (!t) return; closePop(); const sl = slideEl(i); const white = sl.classList.contains('hasbg'); addLayer({ t: 'sticker', key: t.dataset.stick, color: white ? '#FFFFFF' : accent, x: 40, y: 38, w: 16 }); });
       } else if (kind === 'frame') {
         const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
