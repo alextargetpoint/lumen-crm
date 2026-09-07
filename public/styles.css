@@ -3149,3 +3149,22 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-hot-score { font-size: 13px; font-weight: 800; color: var(--ink-3); background: var(--bg-2); border-radius: 8px; padding: 3px 9px; font-variant-numeric: tabular-nums; flex: none; }
 .ov2-hot-score.mid { color: #B8860B; background: rgba(224,168,46,.13); }
 .ov2-hot-score.hi { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+
+/* ============ Скины виджетов обзора (визуальные вариации, читаемость сохранена) ============ */
+.ov-w-skin { background: none; border: none; cursor: pointer; color: var(--ink-3); display: grid; place-items: center; padding: 2px; margin-left: auto; }
+.ov-w-bar .ov-w-rm { margin-left: 6px; }
+.ov-w-bar b { margin-right: auto; }
+.ov-w-skin svg { width: 15px; height: 15px; }
+.ov-w-skin:hover { color: var(--accent); }
+/* Кобальт: мягкий градиент карточки */
+.ov-skin-tint .ov-w-body { background: linear-gradient(162deg, color-mix(in srgb, var(--accent) 9%, var(--card)) 0%, var(--card) 58%); }
+/* Стекло: frosted + лёгкое свечение */
+.ov-skin-frost .ov-w-body { background: color-mix(in srgb, var(--card) 80%, transparent); backdrop-filter: blur(14px); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--stroke)); box-shadow: 0 12px 34px -16px color-mix(in srgb, var(--accent) 60%, transparent); }
+/* Акцент: цветная линия слева + акцентный заголовок */
+.ov-skin-accent .ov-w-body { border-left: 3px solid var(--accent); }
+.ov-skin-accent .ov2-card-hd, .ov-skin-accent .ov2-card-hd svg { color: var(--accent); }
+/* Видеофон: очень тонкий skyline под белым скримом — текст полностью читаем */
+.ov-skin-video .ov-w-body { position: relative; overflow: hidden; }
+.ov-skin-video .ov-skin-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .16; z-index: 0; pointer-events: none; }
+.ov-skin-video .ov-w-body::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--card) 82%, transparent); z-index: 1; pointer-events: none; }
+.ov-skin-video .ov-w-body > *:not(.ov-skin-vid) { position: relative; z-index: 2; }

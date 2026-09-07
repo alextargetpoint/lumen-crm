@@ -976,6 +976,10 @@ const OV_DEFAULT = ['attention', 'kpi', 'leaders', 'tasks', 'ideas', 'meetings',
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
+/* скины виджетов (визуальные вариации). По умолчанию — чистый; фон/видео строго опциональны и читаемы */
+const OV_SKINS = [['clean', 'Чистый'], ['tint', 'Кобальт'], ['frost', 'Стекло'], ['accent', 'Акцент'], ['video', 'Видеофон']];
+function ovGetSkins() { try { return JSON.parse(localStorage.getItem(ovKey() + '_skin')) || {}; } catch (_) { return {}; } }
+function ovSetSkin(k, s) { const m = ovGetSkins(); if (s === 'clean') delete m[k]; else m[k] = s; try { localStorage.setItem(ovKey() + '_skin', JSON.stringify(m)); } catch (_) {} }
 
 /* реестр виджетов обзора: key → { name, icon, full, render(ctx)→html } */
 const OV_W = {
@@ -1385,15 +1389,16 @@ PAGES.overview = async (root) => {
   let layout = ovGetLayout();
 
   const paint = () => {
+    const skins = ovGetSkins();
     root.innerHTML = `
       <div class="ov2-bar">
-        ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×  · добавляй виджеты снизу</span>' : ''}
+        ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · 🎨 меняй стиль · убирай ×  · добавляй виджеты снизу</span>' : ''}
         <button class="ov2-edit ${OV_EDIT ? 'on' : ''}" id="ovEdit" title="${OV_EDIT ? 'Готово' : 'Настроить обзор'}">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}<span>${OV_EDIT ? 'Готово' : 'Настроить'}</span></button>
       </div>
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
-        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; return `<div class="ov-w ${w.full ? 'full' : ''}" data-w="${k}">
-          ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
-          <div class="ov-w-body glass card">${w.render(ctx)}</div>
+        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; const skin = skins[k] || 'clean'; return `<div class="ov-w ${w.full ? 'full' : ''} ov-skin-${skin}" data-w="${k}">
+          ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-skin" data-wskin title="Стиль виджета">${ic(I.spark)}</button><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
+          <div class="ov-w-body glass card">${skin === 'video' ? '<video class="ov-skin-vid" autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="assets/skyline-bg.mp4?v=2"></video>' : ''}${w.render(ctx)}</div>
         </div>`; }).join('')}
         ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
@@ -1420,6 +1425,7 @@ PAGES.overview = async (root) => {
     if (OV_EDIT) {
       const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', () => ovLibrary(ctx, layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); }));
       $$('[data-wrm]', root).forEach(b => b.addEventListener('click', () => { layout = layout.filter(k => k !== b.closest('[data-w]').dataset.w); ovSetLayout(layout); paint(); }));
+      $$('[data-wskin]', root).forEach(b => b.addEventListener('click', (e) => { const k = b.closest('[data-w]').dataset.w; const cur = ovGetSkins()[k] || 'clean'; const r = b.getBoundingClientRect(); ctxPopup(r.left, r.bottom + 4, OV_SKINS.map(([s, n]) => ({ ic: cur === s ? I.check : (s === 'video' ? I.play : I.spark), label: n + (cur === s ? ' ✓' : ''), onClick: () => { ovSetSkin(k, s); paint(); } }))); }));
       ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
     }
   };
