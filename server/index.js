@@ -3153,6 +3153,95 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
       return;
     }
 
+    /* ================= разбор кейсов (планёрка/ТВ/PDF): /cases?ids=a,b,c ================= */
+    if (p === '/cases' && req.method === 'GET') {
+      if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
+      const ids = String(u.searchParams.get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+      const AG = db.settings.agency;
+      const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
+      const STAGE_RU = Object.assign({ new: 'Новый', touch: 'Первое касание', dialog: 'В диалоге с ИИ', qualified: 'Квалифицирован', handover: 'У брокера', viewing: 'Показ / Zoom', deal: 'Сделка', sleeping: 'Спящий', lost: 'Потерян' }, namesCfg);
+      const AXN = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Тип объекта' };
+      const dt = (t) => t ? new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+      const KIND_RU = { in: 'Клиент', ai: 'Lumen AI', out: 'Менеджер' };
+      const leads = ids.map(id => db.leads.find(l => l.id === id)).filter(Boolean);
+      const cardHtml = (lead) => {
+        const broker = db.brokers.find(b => b.id === lead.broker);
+        const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+        /* ключевые реплики: последние сообщения клиента + ИИ, до 6 */
+        const msgs = db.messages.filter(mm => mm.leadId === lead.id).sort((a, b2) => a.at - b2.at);
+        const key = msgs.slice(-8).map(mm => ({ at: mm.at, kind: mm.dir === 'in' ? 'in' : (mm.via === 'ai' ? 'ai' : 'out'), text: mm.text }));
+        return `<section class="case">
+  <div class="chd">
+    <div class="cnm">${esc(lead.name)}<span class="score">${lead.score || 0}</span></div>
+    <div class="cmeta">${esc(lead.phone || '')}${geoName ? ' · ' + esc(geoName) : ''} · <b>${esc(STAGE_RU[lead.stage] || lead.stage)}</b> · источник: ${esc(lead.source || '—')} · эксперт: ${esc(broker ? broker.name : '—')}</div>
+  </div>
+  <div class="cbody">
+    <div class="ccol">
+      <div class="csec-t">Квалификация</div>
+      ${Object.keys(AXN).map(a => { const q = lead.quals[a]; return `<div class="ax"><b>${AXN[a]}</b><span>${q ? esc(q.value) : '—'}</span>${q && q.quote ? `<div class="q">«${esc(q.quote)}»</div>` : ''}</div>`; }).join('')}
+      ${lead.summary ? `<div class="csec-t">Саммари</div><div class="sum">${esc(lead.summary)}</div>` : ''}
+      ${(lead.tags || []).length ? `<div class="tags">${lead.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+    </div>
+    <div class="ccol">
+      <div class="csec-t">Ключевые реплики</div>
+      ${key.length ? key.map(f2 => `<div class="fi ${f2.kind}"><span class="w">${KIND_RU[f2.kind]}</span><span class="tx">${esc(String(f2.text || '').slice(0, 320))}</span></div>`).join('') : '<div class="muted">Переписки нет</div>'}
+    </div>
+  </div>
+  <div class="verdict"><span class="vt">Разбор команды / выводы</span><div class="vbox"></div></div>
+</section>`;
+      };
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разбор кейсов — ${esc(AG.name || 'Агентство')}</title>
+<style>
+:root{--navy:#102B5C;--ink:#1A2233;--mut:#66738F;--line:#E3E9F4;--blue:#2563EB}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter Tight',-apple-system,'Segoe UI',sans-serif;color:var(--ink);background:#F4F7FB;font-size:13.5px;line-height:1.55}
+.wrap{max-width:900px;margin:26px auto;padding:0 16px}
+.doc-hd{display:flex;align-items:center;gap:14px;background:#fff;border-radius:14px;padding:22px 28px;box-shadow:0 10px 40px rgba(16,43,92,.08);margin-bottom:18px}
+.doc-hd img{height:32px}
+.doc-hd .ag{font-weight:800;font-size:17px;color:var(--navy);letter-spacing:.04em}
+.doc-hd h1{font-size:15px;color:var(--ink);font-weight:700}
+.doc-hd .r{margin-left:auto;text-align:right;font-size:11px;color:var(--mut)}
+.case{background:#fff;border-radius:14px;padding:26px 30px;box-shadow:0 10px 40px rgba(16,43,92,.08);margin-bottom:18px;page-break-inside:avoid;break-inside:avoid}
+.chd{padding-bottom:14px;border-bottom:2px solid var(--navy);margin-bottom:16px}
+.cnm{font-size:23px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:12px}
+.cnm .score{margin-left:auto;font-size:13px;font-weight:800;color:#fff;background:linear-gradient(120deg,#2563EB,#5B2BD8);border-radius:9px;padding:3px 12px}
+.cmeta{color:var(--mut);font-size:12.5px;margin-top:5px}
+.cbody{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.csec-t{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);margin:0 0 8px;font-weight:700}
+.ccol .csec-t:not(:first-child){margin-top:18px}
+.ax{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:7px}
+.ax b{font-size:11px;color:var(--mut);display:block;text-transform:uppercase;letter-spacing:.05em}
+.ax span{font-size:13.5px;font-weight:650}
+.ax .q{color:var(--mut);font-size:12px;margin-top:3px;font-style:italic}
+.sum{background:#EFF4FE;border:1px solid #D5E2FA;border-radius:10px;padding:12px 14px;font-size:13px}
+.tags{margin-top:10px}.tag{display:inline-block;background:#EEF2F9;border-radius:8px;padding:2px 10px;font-size:11px;color:#3D4A63;margin:0 6px 6px 0}
+.fi{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;page-break-inside:avoid}
+.fi .w{flex:0 0 74px;font-weight:700;font-size:10.5px;padding-top:2px;text-transform:uppercase;letter-spacing:.04em}
+.fi .tx{flex:1}
+.fi.in .w{color:#0E7A52}.fi.ai .w{color:var(--blue)}.fi.out .w{color:#8A5A00}
+.muted{color:var(--mut);font-size:12.5px}
+.verdict{margin-top:18px}
+.verdict .vt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);font-weight:700}
+.verdict .vbox{margin-top:8px;min-height:64px;border:1.5px dashed #C3D0E8;border-radius:10px;background:#FBFCFE}
+.toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:10}
+.toolbar button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(37,99,235,.35)}
+.toolbar .g{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.empty{background:#fff;border-radius:14px;padding:50px;text-align:center;color:var(--mut);box-shadow:0 10px 40px rgba(16,43,92,.08)}
+@media print{body{background:#fff}.wrap{margin:0;max-width:none;padding:0}.doc-hd,.case{box-shadow:none;margin:0 0 8mm;border-radius:0}.toolbar{display:none}}
+</style></head><body>
+<div class="toolbar"><button class="g" onclick="history.back()">← Назад</button><button onclick="window.print()">Печать / PDF</button></div>
+<div class="wrap">
+  <div class="doc-hd">${AG.logo ? `<img src="${esc(AG.logo)}" alt="">` : ''}<span class="ag">${esc(AG.name || 'Агентство')}</span>
+    <div><h1>Разбор кейсов · планёрка</h1></div>
+    <span class="r">${leads.length} ${leads.length === 1 ? 'кейс' : 'кейс(ов)'}<br>${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+  ${leads.length ? leads.map(cardHtml).join('') : '<div class="empty">Кейсы не выбраны. Отметьте лиды в воронке и нажмите «Разбор кейсов».</div>'}
+</div>
+</body></html>`);
+      return;
+    }
+
     /* ================= печатная карточка лида (экспорт/PDF): /lead/:id/print ================= */
     if ((m = p.match(/^\/lead\/(ld_[\w]+)\/print$/)) && req.method === 'GET') {
       if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
