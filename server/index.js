@@ -3311,6 +3311,34 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
     }
 
     /* ================= разбор кейсов (планёрка/ТВ/PDF): /cases?ids=a,b,c ================= */
+    /* база кейсов (академия агентства): сохранённые разборы для обучения команды */
+    if (p === '/api/cases/list' && req.method === 'GET') {
+      if (!ROLE) return json(res, 401, { error: 'auth' });
+      return json(res, 200, (db.caseBase || []).slice(0, 200));
+    }
+    if (p === '/api/cases/save' && req.method === 'POST') {
+      if (!ROLE) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const lead = db.leads.find(l => l.id === b.leadId);
+      if (!lead) return json(res, 400, { error: 'лид не найден' });
+      const broker = db.brokers.find(x => x.id === lead.broker);
+      const who = ROLE.role === 'owner' ? (db.settings.agency.name || 'Владелец') : ((db.brokers.find(x => x.id === ROLE.brokerId) || {}).name || 'Сотрудник');
+      db.caseBase = db.caseBase || [];
+      const item = {
+        id: crypto.randomBytes(5).toString('hex'), leadId: lead.id, name: lead.name, geo: lead.geo,
+        geoName: (db.settings.geoNames || {})[lead.geo] || lead.geo || '', stage: lead.stage, score: lead.score || 0,
+        broker: broker ? broker.name : '—', outcome: String(b.outcome || '').slice(0, 40),
+        verdict: String(b.verdict || '').slice(0, 4000), tags: Array.isArray(b.tags) ? b.tags.map(t => String(t).slice(0, 40)).slice(0, 12) : (lead.tags || []).slice(0, 12),
+        savedBy: who, at: Date.now(),
+      };
+      db.caseBase.unshift(item); db.caseBase = db.caseBase.slice(0, 400); store.save();
+      return json(res, 200, item);
+    }
+    if ((m = p.match(/^\/api\/cases\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      if (!ROLE) return json(res, 401, { error: 'auth' });
+      db.caseBase = (db.caseBase || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
     if (p === '/cases' && req.method === 'GET') {
       if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
       const ids = String(u.searchParams.get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -3327,7 +3355,7 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
         /* ключевые реплики: последние сообщения клиента + ИИ, до 6 */
         const msgs = db.messages.filter(mm => mm.leadId === lead.id).sort((a, b2) => a.at - b2.at);
         const key = msgs.slice(-8).map(mm => ({ at: mm.at, kind: mm.dir === 'in' ? 'in' : (mm.via === 'ai' ? 'ai' : 'out'), text: mm.text }));
-        return `<section class="case">
+        return `<section class="case" data-lid="${esc(lead.id)}">
   <div class="chd">
     <div class="cnm">${esc(lead.name)}<span class="score">${lead.score || 0}</span></div>
     <div class="cmeta">${esc(lead.phone || '')}${geoName ? ' · ' + esc(geoName) : ''} · <b>${esc(STAGE_RU[lead.stage] || lead.stage)}</b> · источник: ${esc(lead.source || '—')} · эксперт: ${esc(broker ? broker.name : '—')}</div>
@@ -3344,7 +3372,12 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
       ${key.length ? key.map(f2 => `<div class="fi ${f2.kind}"><span class="w">${KIND_RU[f2.kind]}</span><span class="tx">${esc(String(f2.text || '').slice(0, 320))}</span></div>`).join('') : '<div class="muted">Переписки нет</div>'}
     </div>
   </div>
-  <div class="verdict"><span class="vt">Разбор команды / выводы</span><div class="vbox"></div></div>
+  <div class="verdict"><span class="vt">Разбор команды / выводы</span>
+    <div class="outcomes">${['Выиграли', 'Проиграли', 'В работе', 'Урок'].map(o => `<button type="button" class="oc" data-oc="${o}">${o}</button>`).join('')}</div>
+    <textarea class="vbox" placeholder="Что сработало, что упустили, вывод для команды…"></textarea>
+    <button type="button" class="save-case">${'💾'} Сохранить в базу кейсов</button>
+    <span class="save-ok"></span>
+  </div>
 </section>`;
       };
       /* данные для полноэкранной презентации (ТВ на планёрке) */
@@ -3395,7 +3428,16 @@ body{font-family:'Inter Tight',-apple-system,'Segoe UI',sans-serif;color:var(--i
 .muted{color:var(--mut);font-size:12.5px}
 .verdict{margin-top:18px}
 .verdict .vt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);font-weight:700}
-.verdict .vbox{margin-top:8px;min-height:64px;border:1.5px dashed #C3D0E8;border-radius:10px;background:#FBFCFE}
+.verdict .outcomes{display:flex;gap:7px;margin:8px 0}
+.verdict .oc{border:1px solid var(--line);background:#fff;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer;font-family:inherit}
+.verdict .oc.on{border-color:var(--blue);color:var(--blue);background:#EFF4FE}
+.verdict .vbox{margin-top:4px;width:100%;min-height:64px;border:1.5px dashed #C3D0E8;border-radius:10px;background:#FBFCFE;padding:10px 12px;font-size:13px;font-family:inherit;color:var(--ink);resize:vertical;outline:none}
+.verdict .vbox:focus{border-color:var(--blue);border-style:solid}
+.verdict .save-case{margin-top:9px;background:var(--navy);color:#fff;border:none;border-radius:9px;padding:8px 15px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.verdict .save-ok{margin-left:10px;font-size:12px;color:var(--mut)}
+.verdict .save-ok.done{color:#0E7A52;font-weight:700}
+.verdict .save-ok.warn{color:#B3261E}
+@media print{.verdict .outcomes,.verdict .save-case,.verdict .save-ok{display:none}.verdict .vbox{border-style:dashed}}
 .toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:10}
 .toolbar button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(37,99,235,.35)}
 .toolbar .g{background:#fff;color:var(--ink);border:1px solid var(--line)}
@@ -3465,6 +3507,21 @@ function tvStop(){document.getElementById('tv').classList.remove('on');try{docum
 document.addEventListener('keydown',function(e){if(!document.getElementById('tv').classList.contains('on'))return;if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')tvGo(1);else if(e.key==='ArrowLeft'||e.key==='PageUp')tvGo(-1);else if(e.key==='Escape')tvStop();});
 document.getElementById('tvNext').onclick=function(){tvGo(1);};document.getElementById('tvPrev').onclick=function(){tvGo(-1);};
 document.getElementById('tvStage').onclick=function(){tvGo(1);};
+/* сохранение разбора в базу кейсов */
+document.querySelectorAll('.case').forEach(function(sec){
+  var oc='';
+  sec.querySelectorAll('[data-oc]').forEach(function(b){b.onclick=function(){var on=b.classList.contains('on');sec.querySelectorAll('[data-oc]').forEach(function(x){x.classList.remove('on');});if(!on){b.classList.add('on');oc=b.getAttribute('data-oc');}else oc='';};});
+  var btn=sec.querySelector('.save-case'), ok=sec.querySelector('.save-ok');
+  btn.onclick=function(){
+    var verdict=sec.querySelector('.vbox').value.trim();
+    if(!verdict&&!oc){ok.textContent='напишите вывод или выберите исход';ok.className='save-ok warn';return;}
+    btn.disabled=true;ok.textContent='сохраняю…';ok.className='save-ok';
+    fetch('/api/cases/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leadId:sec.getAttribute('data-lid'),verdict:verdict,outcome:oc})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'ошибка');return j;});})
+      .then(function(){ok.textContent='✓ в базе кейсов';ok.className='save-ok done';btn.disabled=false;})
+      .catch(function(e){ok.textContent=e.message;ok.className='save-ok warn';btn.disabled=false;});
+  };
+});
 </script>
 </body></html>`);
       return;

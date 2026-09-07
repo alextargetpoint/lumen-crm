@@ -1155,6 +1155,12 @@ const OV_W = {
     const body = hot.length ? hot.map(l => `<div class="ov2-lrow" data-ovlead="${l.id}"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(l.name || '—')}</div><div class="ov2-lrow-s">${esc(l.geoName || '')}${l.stageName ? ' · ' + esc(l.stageName) : ''}</div></div><span class="ov2-hot-score ${(l.score || 0) >= 70 ? 'hi' : (l.score || 0) >= 40 ? 'mid' : ''}">${l.score || 0}</span></div>`).join('') : '<div class="ov2-empty">Пока нет активных лидов</div>';
     return `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>${body}`;
   } },
+  casebase: { name: 'База кейсов', icon: () => I.doc, full: false, render: (c) => {
+    const OC = { 'Выиграли': 'win', 'Проиграли': 'lose', 'В работе': 'wip', 'Урок': 'lesson' };
+    const cs = (c.cases || []).slice(0, 6);
+    const body = cs.length ? cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('') : '<div class="ov2-empty">Разберите лиды на планёрке → «Сохранить в базу кейсов»</div>';
+    return `<div class="ov2-card-hd">${ic(I.doc)}База кейсов<span>${(c.cases || []).length} ${plural((c.cases || []).length, 'разбор', 'разбора', 'разборов')}</span></div>${body}`;
+  } },
 };
 
 /* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
@@ -1178,6 +1184,7 @@ const OV_PREV = {
   worldclock: () => `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${[['Дубай', 'GMT+4', '14:20', false], ['Бали', 'GMT+8', '18:20', false], ['Пхукет', 'GMT+7', '17:20', false], ['Испания', 'GMT+1', '11:20', false]].map(([n, z, t, bad]) => `<div class="ov2-wc-row"><span class="ov2-wc-nm">${n} <i>${z}</i></span><span class="ov2-wc-t ${bad ? 'off' : ''}">${t}</span></div>`).join('')}`,
   goal: () => `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span></div><div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><circle cx="60" cy="60" r="52" class="gr-bg"/><circle cx="60" cy="60" r="52" class="gr-fg" stroke-dasharray="326.7" stroke-dashoffset="98"/></svg><div class="ov2-goal-c"><b>7</b><i>из 10</i></div></div><div class="ov2-goal-note">Ещё 3 сделки до цели</div>`,
   hotleads: () => `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span></div>${[['Ислам Керимов', 'Дубай · квалифицирован', 86, 'hi'], ['Мария Власова', 'Бали · в диалоге', 64, 'mid'], ['Настя Рой', 'Дубай · новый', 38, '']].map(([n, s, sc, cl]) => `<div class="ov2-lrow"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${n}</div><div class="ov2-lrow-s">${s}</div></div><span class="ov2-hot-score ${cl}">${sc}</span></div>`).join('')}`,
+  casebase: () => `<div class="ov2-card-hd">${ic(I.doc)}База кейсов<span>3 разбора</span></div>${[['Ислам Керимов', 'Дубай · дожали через рассрочку застройщика', 'Выиграли', 'win'], ['Мария Власова', 'Бали · ушла думать, потеряли темп', 'Урок', 'lesson'], ['Настя Рой', 'Дубай · в работе, ждём документы', 'В работе', 'wip']].map(([n, s, o, cl]) => `<div class="ov2-case"><div class="ov2-case-b"><div class="ov2-case-n">${n}<span class="ov2-oc ${cl}">${o}</span></div><div class="ov2-case-s">${s}</div></div></div>`).join('')}`,
 };
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
@@ -1357,6 +1364,24 @@ function openFeedPrivacy(onDone) {
   });
   $$('[data-fpmode]', md).forEach(b => b.addEventListener('click', () => { FEED_AUD.mode = b.dataset.fpmode; $$('[data-fpmode]', md).forEach(x => x.classList.toggle('on', x === b)); $('#fpList', md).style.display = FEED_AUD.mode === 'all' ? 'none' : 'block'; }));
 }
+/* карточка сохранённого кейса из базы (академия) */
+function openCaseModal(k) {
+  if (!k) return;
+  const OC = { 'Выиграли': 'win', 'Проиграли': 'lose', 'В работе': 'wip', 'Урок': 'lesson' };
+  const md = modal({
+    title: k.name, wide: false,
+    sub: `${esc(k.geoName || '')} · эксперт: ${esc(k.broker || '—')} · разбор от ${new Date(k.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} · ${esc(k.savedBy || '')}`,
+    body: `${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}" style="margin-bottom:10px;display:inline-block">${esc(k.outcome)}</span>` : ''}
+      <div class="case-verdict">${k.verdict ? esc(k.verdict).replace(/\n/g, '<br>') : '<span class="muted">Вывод не заполнен</span>'}</div>
+      ${(k.tags || []).length ? `<div class="tags" style="margin-top:12px">${k.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}`,
+    actions: [
+      { label: 'Открыть лида', onClick: () => { closeModal(); openLeadModal(k.leadId); } },
+      { label: 'Пересмотреть кейс', cls: 'btn-accent', onClick: () => window.open('/cases?ids=' + k.leadId, '_blank') },
+      { label: 'Удалить из базы', danger: true, onClick: async () => { await fetch('/api/cases/' + k.id, { method: 'DELETE' }); toast('Убрано из базы', null, true); if (CUR === 'overview') go('overview'); } },
+    ],
+  });
+  return md;
+}
 /* контроль посадочных мест (анти-фрод подписки) — рендер в #seatBody */
 async function loadSeats() {
   const box = document.getElementById('seatBody'); if (!box) return;
@@ -1380,12 +1405,12 @@ async function loadSeats() {
     <div class="seat-note">Сигнал не блокирует вход автоматически — это подсказка владельцу. Массовый вход разных сотрудников с одного IP/устройства обычно означает передачу одного доступа на несколько человек в обход подписки.</div>`;
 }
 PAGES.overview = async (root) => {
-  const [an, events, leads, tsk, feedD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] }))]);
+  const [an, events, leads, tsk, feedD, casesD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] })), api.get('/cases/list').catch(() => [])]);
   const ovBoard = (feedD.board || []).filter(b => b.deals > 0 || b.dealsMonth > 0);
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', qual: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
-  const ctx = { an, events, leads, tsk, f: an.funnel, dstr2, feedIcon, feedCls };
+  const ctx = { an, events, leads, tsk, cases: casesD || [], f: an.funnel, dstr2, feedIcon, feedCls };
   let layout = ovGetLayout();
 
   const paint = () => {
@@ -1405,6 +1430,7 @@ PAGES.overview = async (root) => {
     /* переходы/действия */
     $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
     $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
+    $$('[data-ovcase]', root).forEach(b => b.addEventListener('click', () => openCaseModal((ctx.cases || []).find(k => k.id === b.dataset.ovcase))));
     $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const row = b.closest('.ov2-task'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
     $$('[data-ovsug]', root).forEach(b => b.querySelector('.ov2-task-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
     /* тиндер идей: локальная перерисовка только тела виджета (без рефетча всего обзора) */
