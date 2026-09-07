@@ -55,6 +55,8 @@ section[data-bid]:hover .btool{opacity:1}
 .pi.ptile i{font-size:23px;width:auto}
 .pi.ptile span{font-size:11px;line-height:1.25;font-weight:600;color:#3D4A63}
 .pi.ptile:hover{border-color:#2563EB;background:#F5F8FF;box-shadow:0 10px 26px -12px rgba(37,99,235,.4);transform:translateY(-2px)}
+.pi.ptile.tpl{border-color:#C3D6FA;background:linear-gradient(180deg,#F5F8FF,#fff)}
+.pi.ptile.tpl:hover{border-color:#2563EB}
 section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:-3px;opacity:.75}
 .plib{aspect-ratio:4/3;border-radius:9px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent}
 .plib:hover{border-color:#2563EB}
@@ -352,10 +354,22 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   /* ---------- палитра блоков ---------- */
   const PALETTE = ['proj', 'hero', 'amenities', 'guarantee', 'textimg', 'text', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta'];
   const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦', amenities: '🏊', hero: '🌅', guarantee: '🛡' };
+  /* готовые страницы — бандлы блоков в едином стиле, вставляются одним кликом */
+  const TEMPLATES = [
+    { id: 'hero_intro', name: 'Хиро + крючок', ic: '🌅', blocks: ['hero', 'text'] },
+    { id: 'location', name: 'Локация + инфраструктура', ic: '🏊', blocks: ['amenities', 'textimg'] },
+    { id: 'trust', name: 'Разворот доверия', ic: '🛡', blocks: ['guarantee', 'stats', 'quote'] },
+    { id: 'finance', name: 'Финансы + пакеты', ic: '💳', blocks: ['bignum', 'pricecards', 'steps'] },
+    { id: 'about', name: 'О нас + команда', ic: '⭐', blocks: ['benefits', 'team'] },
+    { id: 'closing', name: 'Отзыв + призыв', ic: '📣', blocks: ['quote', 'cta'] },
+  ].map((t) => Object.assign({}, t, { blocks: t.blocks.filter((b) => P.types[b]) })).filter((t) => t.blocks.length);
   function openPalette(afterSec, x, y) {
+    const tpls = TEMPLATES.map((t) => `<div class="pi ptile tpl" data-tpl="${t.id}" title="${t.blocks.length} блок(ов)"><i>${t.ic}</i><span>${t.name}</span></div>`).join('');
     const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi ptile" data-add="${t}"><i>${PICONS[t] || '▢'}</i><span>${TYPE(t).name}</span></div>`).join('');
-    const el = openPop(`<div class="psec">Добавить блок</div><div class="pgrid">${items}</div>`, x, y);
+    const el = openPop(`${tpls ? `<div class="psec">✦ Готовые страницы</div><div class="pgrid">${tpls}</div>` : ''}<div class="psec">Отдельные блоки</div><div class="pgrid">${items}</div>`, x, y);
     el.addEventListener('click', async (e) => {
+      const tp = e.target.closest('[data-tpl]');
+      if (tp) { const t = TEMPLATES.find((x) => x.id === tp.dataset.tpl); if (t) await addBlocks(afterSec, t.blocks); return; }
       const pi = e.target.closest('[data-add]');
       if (!pi) return;
       const t = pi.dataset.add;
@@ -371,6 +385,17 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
       }
       await addBlock(afterSec, t, null);
     });
+  }
+  async function addBlocks(afterSec, types) {
+    closePop();
+    const blocks = serialize();
+    const i = blocks.findIndex((b) => b.id === afterSec.dataset.bid);
+    const news = types.map((t) => ({ id: 'b_' + Math.random().toString(36).slice(2, 10), t, v: TYPE(t).variants[0], hidden: false, data: {} }));
+    blocks.splice(i + 1, 0, ...news);
+    flash('Собираю готовую страницу…', 0);
+    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blocks }) });
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+    else flash('Ошибка добавления');
   }
   async function addBlock(afterSec, t, data) {
     closePop();
