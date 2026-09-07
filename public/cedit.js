@@ -132,9 +132,11 @@ body.cpanel-on{padding-right:308px!important}
 .slide.drop-hi{outline:3px solid var(--blue,#2563EB);outline-offset:-3px;box-shadow:0 0 0 6px color-mix(in srgb,var(--blue,#2563EB) 22%,transparent)!important}
 .celem-hint{font-size:11px;color:#9aa1b2;margin-top:7px;line-height:1.45;display:flex;align-items:center;gap:6px}
 .celem-hint svg{width:13px;height:13px;flex:0 0 13px}
-.celem-frames{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}
-.celem-fr{border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;padding:12px 8px;font-weight:600;font-size:12.5px;color:#2A3346}
-.celem-fr:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
+.celem-frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.celem-fr{display:flex;flex-direction:column;gap:6px;align-items:center;border:1.5px solid #E1E8F4;border-radius:12px;background:#fff;cursor:pointer;padding:7px;font-weight:600;font-size:11px;color:#2A3346;transition:border-color .12s,transform .12s}
+.celem-fr:hover{border-color:#2563EB;transform:translateY(-2px)}
+.cfrpv{position:relative;width:100%;aspect-ratio:5/4;border-radius:8px;overflow:hidden;background:linear-gradient(150deg,#22345C,#0A1833)}
+.cfrpv>span{position:absolute;inset:0}
 .ctstyles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
 .ctst{display:flex;flex-direction:column;align-items:center;gap:3px;border:1.5px solid #E1E8F4;border-radius:10px;background:#0A1833;cursor:pointer;padding:10px 4px 6px;overflow:hidden}
 .ctst .s-h{color:#fff;line-height:1;--blue:#4F7BFF;--disp:'Fraunces',serif}
@@ -327,8 +329,18 @@ body.cpanel-on{padding-right:308px!important}
   document.addEventListener('pointerdown', (e) => {
     const tb = e.target.closest('.lyr-tools button');
     if (tb) { e.preventDefault(); e.stopPropagation(); const lyr = tb.closest('.s-lyr,.s-frame'); if (!lyr) return;
-      if (tb.hasAttribute('data-ldel')) { lyr.remove(); dirty = true; save(false); return; }
-      const dir = tb.hasAttribute('data-lup') ? 1 : -1; const o = updL(lyr, {}); const nz = Math.max(0, (o.z || 0) + dir); updL(lyr, { z: nz }); lyr.style.zIndex = 10 + nz; dirty = true; save(false); return;
+      if (tb.hasAttribute('data-ldel')) { lyr.remove(); selLayer(null); dirty = true; save(false); return; }
+      /* «Вперёд» = НА САМЫЙ ВЕРХ, «Назад» = В САМЫЙ НИЗ (видимо с одного клика, а не ±1) */
+      const slide = lyr.closest('.slide'); const sibs = $$('.s-lyr,.s-frame', slide);
+      const zOf = (x) => { try { return JSON.parse(x.getAttribute('data-l') || '{}').z || 0; } catch (_) { return 0; } };
+      if (tb.hasAttribute('data-lup')) {
+        const nz = Math.max(0, ...sibs.filter(x => x !== lyr).map(zOf)) + 1;
+        updL(lyr, { z: nz }); lyr.style.zIndex = 10 + nz;
+      } else {
+        sibs.forEach(x => { if (x !== lyr) { const nz = zOf(x) + 1; updL(x, { z: nz }); x.style.zIndex = 10 + nz; } });
+        updL(lyr, { z: 0 }); lyr.style.zIndex = 10;
+      }
+      selLayer(lyr); dirty = true; save(false); return;
     }
     const rs = e.target.closest('.lyr-rs');
     if (rs) { e.preventDefault(); e.stopPropagation(); const lyr = rs.closest('.s-lyr'); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const startW = lyr.offsetWidth, startX = e.clientX; selLayer(lyr);
@@ -632,7 +644,7 @@ body.cpanel-on{padding-right:308px!important}
           'Стекло': ['realestate-glass/house', 'realestate-glass/building', 'realestate-glass/key', 'realestate-glass/pin', 'realestate-glass/roi'],
           'AUS': ['aus/app', 'aus/camera', 'aus/chat', 'aus/star', 'aus/check'],
         };
-        const cats = Object.assign({}, STICK_CATS, IMG_PACKS);
+        const cats = Object.assign({}, IMG_PACKS, STICK_CATS);   /* трендовые сгенерированные паки — ПЕРВЫМИ */
         elemPicker('Стикеры', cats,
           (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24">${(P.stickers || {})[k] || ''}</svg>`,
           (k, drop) => {
@@ -642,7 +654,7 @@ body.cpanel-on{padding-right:308px!important}
           e.clientX - 160, e.clientY);
       } else if (kind === 'frame') {
         const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
-        const pp = openPop(`<div class="celem-frames">${(P.frames || []).map(f => `<button class="celem-fr" data-frame="${f}">${FN[f] || f}</button>`).join('')}</div>`, e.clientX - 120, e.clientY);
+        const pp = openPop(`<div class="csec" style="padding-top:2px">Рамки</div><div class="celem-frames">${(P.frames || []).map(f => `<button class="celem-fr" data-frame="${f}"><span class="cfrpv"><span class="frame-${f}" style="--fc:#fff"></span></span><i style="font-style:normal">${FN[f] || f}</i></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
         pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-frame]'); if (!t) return; closePop(); const sl = slideEl(i); addLayer({ t: 'frame', frame: t.dataset.frame, color: sl.classList.contains('hasbg') ? '#FFFFFF' : accent }); });
       } else if (kind === 'text') {
         addLayer({ t: 'text', text: 'Текст', color: slideEl(i).classList.contains('hasbg') ? '#FFFFFF' : '#0A1833', tsize: 24, tw: 'sans', tb: true, x: 30, y: 42, w: 40 });

@@ -4113,14 +4113,15 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 .s-lyr.lsel .lyr-rs{opacity:1}
 .lyr-tools{position:absolute;top:-13px;right:-6px;display:none;gap:3px;z-index:31}
 .s-lyr.lsel .lyr-tools{display:flex}
-.s-frame .lyr-tools{top:16px;right:16px;pointer-events:auto;display:flex;opacity:0;transition:opacity .15s}
-.slide:hover .s-frame .lyr-tools{opacity:1}
+.s-frame .lyr-tools{top:16px;left:16px;right:auto;pointer-events:auto;display:flex;opacity:0;transition:opacity .15s;background:rgba(6,17,38,.6);border-radius:9px;padding:2px}
+.cslot:hover .s-frame .lyr-tools,.s-frame.lsel .lyr-tools{opacity:1}
+.s-frame .lyr-tools:before{content:'Рамка';color:#fff;font-size:10px;font-weight:700;padding:0 6px;align-self:center;opacity:.85}
 .lyr-tools button{width:24px;height:24px;border:none;border-radius:7px;background:rgba(6,17,38,.85);color:#fff;font-size:12px;cursor:pointer;backdrop-filter:blur(6px)}
 .lyr-tools button:hover{background:#2563EB}` : ''}
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=19"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=20"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
