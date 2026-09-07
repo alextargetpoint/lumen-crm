@@ -2373,3 +2373,17 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
   .tk-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
   .tk-acts { opacity: 1; }
 }
+
+/* Карусель из лонча — умный поиск фактов */
+.sh-lookup { display: flex; gap: 10px; margin-bottom: 10px; }
+.sh-lookup-in { flex: 1; }
+.sh-lc-conf:empty { display: none; }
+.sh-conf { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md); margin-bottom: 12px; font-size: 12px; line-height: 1.45; }
+.sh-conf svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.sh-conf b { font-size: 12.5px; }
+.sh-conf .muted { font-size: 11px; }
+.sh-conf.ok { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); }
+.sh-conf.warn { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.sh-conf.bad { background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--bad); }
+.sh-conf div div { color: var(--ink-2); }
+@media (max-width: 640px) { .sh-lookup { flex-direction: column; } }

@@ -35,7 +35,7 @@ const ic = (p, sw) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 
 const I = {
   grid: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
-  funnel: '<path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>',
+  funnel: '<path d="M3 5.5h18M6.5 12h11M10 18.5h4"/>',
   chat: '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5z"/>',
   spark: '<path d="M12 2l1.9 5.8L20 9.7l-5 3.9 1.6 6.2L12 16.4l-4.6 3.4L9 13.6 4 9.7l6.1-1.9L12 2z"/>',
   chain: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M6 8.5v7M11 6h7M11 18h7"/>',
@@ -4257,9 +4257,14 @@ async function shLaunch(main) {
   const geos = STATE.settings.agency.geos;
   main.innerHTML = `
     <div class="glass card sh-gen">
-      <div class="sh-gen-hd">${ic(I.target)}Карусель из лонча<span class="sub">новый старт продаж / объект → готовая карусель за один клик</span></div>
+      <div class="sh-gen-hd">${ic(I.target)}Карусель из лонча<span class="sub">вставь ссылку или название — ИИ найдёт факты, проверь и собери за клик</span></div>
+      <div class="sh-lookup">
+        <input id="lcLook" class="sh-lookup-in" placeholder="Ссылка на проект или название ЖК — напр. emaar.com/… или «Marina Vista Dubai»">
+        <button class="btn btn-accent" id="lcFind">${ic(I.search)}Найти инфо</button>
+      </div>
+      <div id="lcConf" class="sh-lc-conf"></div>
       <div class="form-row"><label>Объект / ЖК — что запускаем</label><input id="lcName" placeholder="напр. ЖК Marina Vista — старт продаж"></div>
-      <div class="form-row"><label>Условия входа: цена, рассрочка, доходность, дедлайн оффера, сдача</label><textarea id="lcFacts" placeholder="1BR от $180k · рассрочка 0% на 3 года · доходность ~8% · старт-цена только до конца месяца · сдача 2027"></textarea></div>
+      <div class="form-row"><label>Условия входа: цена, рассрочка, доходность, дедлайн оффера, сдача <span class="muted" style="font-weight:400">— проверь и поправь</span></label><textarea id="lcFacts" placeholder="1BR от $180k · рассрочка 0% на 3 года · доходность ~8% · старт-цена только до конца месяца · сдача 2027"></textarea></div>
       <div class="sh-launch-opts">
         <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
         <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
@@ -4269,6 +4274,23 @@ async function shLaunch(main) {
       <div class="sh-gen-foot"><span class="tb-spacer"></span><button class="btn btn-accent" id="lcGo">${ic(I.spark)}Собрать карусель</button></div>
     </div>
     ${launches.length ? `<div class="lp-sec">Карусели из лончей · ${launches.length}</div><div class="car-grid">${launches.map(carCardHTML).join('')}</div>` : ''}`;
+  /* умный поиск фактов о проекте */
+  $('#lcFind', main).addEventListener('click', async () => {
+    const v = $('#lcLook', main).value.trim(); if (!v) { toast('Вставь ссылку или название проекта'); return; }
+    const isUrl = /\.[a-z]{2,}(\/|$)/i.test(v) || /^https?:/i.test(v);
+    const btn = $('#lcFind', main); btn.disabled = true; btn.innerHTML = ic(I.search) + 'Ищу…';
+    try {
+      const f = await api.post('/social/launch-lookup', isUrl ? { url: v } : { query: v });
+      if (f.name && !$('#lcName', main).value.trim()) $('#lcName', main).value = f.name;
+      const parts = [f.units, f.priceFrom && ('от ' + f.priceFrom), f.payment, f.roi && ('доходность ' + f.roi), f.handover && ('сдача ' + f.handover), f.location, ...(f.highlights || [])].filter(Boolean);
+      if (parts.length) $('#lcFacts', main).value = parts.join(' · ');
+      const cc = { высокая: 'ok', средняя: 'warn', низкая: 'bad' }[f.confidence] || 'warn';
+      $('#lcConf', main).innerHTML = `<div class="sh-conf ${cc}">${ic(I.shield)}<div><b>Данные найдены · достоверность: ${esc(f.confidence)}</b>${f.note ? `<div>${esc(f.note)}</div>` : ''}<div class="muted">Проверь цифры перед сборкой — ИИ мог ошибиться.</div></div></div>`;
+      toast('Инфо подтянута', 'Проверь и правь', true);
+    } catch (e) { toast('Не нашёл', e.message); $('#lcConf', main).innerHTML = `<div class="sh-conf bad">${ic(I.shield)}<div><b>Не удалось получить данные</b><div class="muted">${esc(e.message)} — заполни поля вручную.</div></div></div>`; }
+    btn.disabled = false; btn.innerHTML = ic(I.search) + 'Найти инфо';
+  });
+  $('#lcLook', main).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcFind', main).click(); });
   $('#lcGo', main).addEventListener('click', async () => {
     const name = $('#lcName', main).value.trim();
     const facts = $('#lcFacts', main).value.trim();
