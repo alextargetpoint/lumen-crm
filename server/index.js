@@ -2258,7 +2258,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 
 .bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;z-index:0}
 body::before{z-index:1}.card{z-index:2}
 </style></head><body>
-<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg" src="/assets/skyline-bg.mp4"></video>
+<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg?v=2" src="/assets/skyline-bg.mp4?v=2"></video>
 <div class="card">
   <div class="hd">${brandTop}</div>
   <div class="ava">${br.photo ? `<img src="${esc(br.photo)}" alt="">` : esc(initials)}</div>
@@ -2355,7 +2355,7 @@ input:focus{border-color:#7C9BFF}
 .bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;z-index:0}
 body::before{z-index:1}.card{z-index:2}
 </style></head><body>
-<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg" src="/assets/skyline-bg.mp4"></video>
+<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg?v=2" src="/assets/skyline-bg.mp4?v=2"></video>
 <div class="card" id="card">
   <div class="hd">${brandTop}</div>
   <div class="top">

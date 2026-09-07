@@ -426,7 +426,7 @@ function renderLogin() {
     if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(120,160,255,.4))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7C9BFF;opacity:.75;margin-top:12px">работает на Lumen</div></div>`;
   } catch (e) {}
   const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
-    <video autoplay muted loop playsinline src="assets/skyline-bg.mp4?v=1" poster="assets/skyline-poster.jpg"
+    <video autoplay muted loop playsinline src="assets/skyline-bg.mp4?v=2" poster="assets/skyline-poster.jpg?v=2"
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
     <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
     <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
@@ -4105,7 +4105,7 @@ PAGES.agency = async (root) => {
   const edition = s.agency.edition || 'agency';
   root.innerHTML = `
     <div class="ag-profile">
-      <div class="ag-cover"><video class="ag-cover-v" autoplay muted loop playsinline poster="assets/skyline-poster.jpg" src="assets/skyline-bg.mp4"></video></div>
+      <div class="ag-cover"><video class="ag-cover-v" autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="assets/skyline-bg.mp4?v=2"></video></div>
       <div class="ag-ident">
         <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.55">`}</div>
         <div class="ag-id-main">
