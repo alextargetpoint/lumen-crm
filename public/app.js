@@ -3537,6 +3537,28 @@ PAGES.ads = async (root) => {
       </div>`; })()}
     <div class="two-col">
       <div>
+        ${(() => {
+          const cp = STATE.settings.capi || {};
+          const CAPI_DEFAULT = { qualified: 'Lead', handover: 'Schedule', viewing: 'Schedule', deal: 'Purchase' };
+          const evOpts = ['Lead', 'Schedule', 'Contact', 'Purchase', 'CompleteRegistration'];
+          return `<div class="glass card mb">
+          <div class="card-title">${ic(I.target)}Meta CAPI · дообучение рекламы<span class="sub">офлайн-конверсии в Meta</span>
+            <label class="switch" style="margin-left:auto"><input type="checkbox" id="capiOn" ${cp.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Лид дошёл до целевой стадии (квал / передан / сделка) → Lumen шлёт событие в Meta по официальному Conversions API, и алгоритм учится приводить ПОХОЖИХ качественных лидов, а не просто заявки. Персональные данные хешируются (SHA-256).</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Pixel / Dataset ID</label><input id="capiPixel" value="${esc(cp.pixelId || '')}" placeholder="напр. 1234567890"></div>
+            <div class="form-row"><label>CAPI access token</label><input id="capiToken" type="password" placeholder="${cp.tokenSet ? '•••••• сохранён' : 'EAAB…'}"></div>
+          </div>
+          <div class="form-row"><label>Test event code (Events Manager → Test events, необязательно)</label><input id="capiTest" value="${esc(cp.testCode || '')}" placeholder="TEST12345"></div>
+          <div class="lp-sec">Стадия воронки → событие Meta</div>
+          ${['qualified', 'handover', 'viewing', 'deal'].map(stg => `<div class="pmx-row"><span class="pmx-geo">${stageName(stg)}</span><select data-capiev="${stg}"><option value="">— не слать</option>${evOpts.map(ev => `<option value="${ev}" ${(cp.stageEvents || CAPI_DEFAULT)[stg] === ev ? 'selected' : ''}>${ev}</option>`).join('')}</select></div>`).join('')}
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+            <button class="btn btn-accent btn-sm" id="capiSave">Сохранить</button>
+            <button class="btn btn-sm" id="capiTestBtn">${ic(I.send)}Тест-событие</button>
+            ${cp.stats ? `<span class="muted" style="font-size:11.5px">отправлено ${cp.stats.sent || 0} · ошибок ${cp.stats.failed || 0}</span>` : ''}
+          </div>
+          ${(cp.log || []).length ? coll('Журнал отправок в Meta', (cp.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (cp.log || []).length, icon: I.doc }) : ''}
+        </div>`; })()}
         <div class="glass card mb">
           <div class="card-title">${ic(I.link)}Мост приёма лидов<span class="sub">Albato / Make / любой интегратор</span></div>
           <div class="form-row"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
@@ -3594,6 +3616,18 @@ PAGES.ads = async (root) => {
     await api.post(`/ads/${encodeURIComponent(inp.dataset.adid)}/spend`, { spend: +inp.value || 0 });
     render();
   }));
+  /* --- Meta CAPI --- */
+  const capiPatch = () => {
+    const p = { enabled: $('#capiOn')?.checked, pixelId: ($('#capiPixel')?.value || '').trim(), testCode: ($('#capiTest')?.value || '').trim(), stageEvents: Object.fromEntries($$('[data-capiev]', root).map(s => [s.dataset.capiev, s.value])) };
+    const tok = ($('#capiToken')?.value || '').trim(); if (tok) p.token = tok;
+    return p;
+  };
+  $('#capiSave')?.addEventListener('click', async () => { await api.patch('/settings', { capi: capiPatch() }); toast('Meta CAPI сохранён', 'Настройки применены', true); await loadState(); render(); });
+  $('#capiOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { capi: { enabled: e.target.checked } }); toast(e.target.checked ? 'CAPI включён' : 'CAPI выключен', e.target.checked ? 'События целевых стадий уходят в Meta' : null, true); await loadState(); });
+  $('#capiTestBtn')?.addEventListener('click', async () => {
+    try { const r = await api.post('/capi/test', {}); toast(r.ok ? 'Тест-событие ушло в Meta' : 'Meta вернула ошибку', r.ok ? `Lead · ${r.lead} — смотрите Events Manager` : (r.error || ''), r.ok); await loadState(); render(); }
+    catch (e) { toast('Не удалось', e.message); }
+  });
 };
 
 /* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */

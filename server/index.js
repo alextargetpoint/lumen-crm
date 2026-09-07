@@ -21,6 +21,7 @@ const store = require('./store');
 const { seed } = require('./seed');
 const ai = require('./ai');
 const engine = require('./engine');
+const capi = require('./capi');
 
 const PORT = process.env.PORT || 5077;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -407,6 +408,7 @@ function publicSettings(db) {
   }
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
+  if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -756,6 +758,9 @@ const server = http.createServer(async (req, res) => {
       const adId = pick('ad_id', 'adId', 'ad', 'utm_content');
       const email = pick('email', 'e-mail', 'почта');
       const avatarUrl = pick('avatar_url', 'avatar', 'profile_pic');
+      /* Meta-идентификаторы для CAPI-матчинга (дообучение алгоритма на качественных событиях) */
+      const metaCap = { fbclid: pick('fbclid', 'fbc_id'), fbc: pick('fbc', '_fbc'), fbp: pick('fbp', '_fbp'), leadId: pick('lead_id', 'leadId', 'leadgen_id'), adId, clickAt: Date.now() };
+      Object.keys(metaCap).forEach(k => !metaCap[k] && delete metaCap[k]);
       const entry = { at: Date.now(), name, phone, adId, raw: Object.keys(b).slice(0, 20) };
 
       const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
@@ -763,6 +768,7 @@ const server = http.createServer(async (req, res) => {
       if (lead) {
         entry.result = 'repeat';
         lead.tags = [...new Set([...(lead.tags || []), 'повторная заявка'])];
+        if (Object.keys(metaCap).length) lead.meta = Object.assign(lead.meta || {}, metaCap);
         if (adId && !(lead.ads && lead.ads.adId)) { lead.ads = { adId, adsetId: pick('adset_id'), campaignId: pick('campaign_id') }; matchAd(db, lead); }
         ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка: ${lead.name} — дубль не создан, карточка обогащена` });
       } else {
@@ -775,6 +781,7 @@ const server = http.createServer(async (req, res) => {
           quals: { purpose: null, timeline: null, budget: null, type: null },
           ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
           broker: null, summary: null, tags: ['интегратор'], numberId: null,
+          meta: metaCap,
           avatarUrl: avatarUrl || null, activeChannel: 'wa',
           channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' },
           contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
@@ -1083,9 +1090,9 @@ const server = http.createServer(async (req, res) => {
       if (IS_BROKER && ['delete', 'broker'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
       let done = 0;
       for (const l of targets) {
-        if (action === 'stage' && b.value) { l.stage = String(b.value); done++; }
+        if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
-        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') l.stage = 'handover'; if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
+        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
         else if (action === 'tag' && b.value) { l.tags = [...new Set([...(l.tags || []), String(b.value).slice(0, 40)])]; done++; }
         else if (action === 'untag' && b.value) { l.tags = (l.tags || []).filter(t => t !== b.value); done++; }
         else if (action === 'ai') { l.ai.enabled = !!b.value; if (b.value) l.tags = (l.tags || []).filter(t => t !== 'нужен человек'); done++; }
@@ -1116,7 +1123,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
-        if (b.stage) lead.stage = b.stage;
+        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; capi.onStageChange(db, lead, b.stage); }
         if (b.broker !== undefined) lead.broker = b.broker || null;
         if (b.geo) lead.geo = b.geo;
         if (b.ai) {
@@ -1464,6 +1471,7 @@ const server = http.createServer(async (req, res) => {
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
+      if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -1477,6 +1485,15 @@ const server = http.createServer(async (req, res) => {
       if (b.stopWords) db.settings.stopWords = b.stopWords;
       store.save();
       return json(res, 200, publicSettings(db));
+    }
+    /* CAPI: тестовое событие (проверка подключения к Meta) */
+    if (p === '/api/capi/test' && req.method === 'POST') {
+      if (!capi.ready(db)) return json(res, 400, { error: 'заполните Pixel ID + токен и включите интеграцию' });
+      const lead = db.leads.find(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage)) || db.leads[0];
+      if (!lead) return json(res, 400, { error: 'нет лида для теста' });
+      const r0 = await capi.sendEvent(db, lead, 'Lead');
+      store.save();
+      return json(res, 200, Object.assign({ lead: lead.name }, r0));
     }
 
     /* ---------------- WhatsApp Cloud: живая проверка / шаблоны ---------------- */
