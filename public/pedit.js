@@ -24,8 +24,14 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .imghot.vhot{top:auto;bottom:14px;right:14px}
 .edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:linear-gradient(100deg,#0A1833,#061126);color:#fff;display:flex;gap:9px;align-items:center;padding:11px 16px;font-size:13px;flex-wrap:wrap;font-family:Manrope,sans-serif;border-bottom:1px solid rgba(134,175,255,.16);box-shadow:0 4px 24px rgba(6,17,38,.3)}
 .edbar b{font-weight:700;font-family:Manrope,sans-serif;font-size:14px;letter-spacing:.01em}
-.pefont{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:600;font-family:Manrope,sans-serif;cursor:pointer;outline:none}
-.pefont option{color:#0B1220}
+.pefont-btn{gap:7px}
+.fontlist{display:flex;flex-direction:column;gap:3px;padding:4px;min-width:230px}
+.fontpref{display:flex;align-items:center;gap:14px;padding:9px 11px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+.fontpref:hover{background:#EEF3FF}
+.fontpref.on{border-color:#2563EB;background:#F5F8FF}
+.fp-aa{font-size:27px;line-height:1;width:38px;flex:0 0 38px;text-align:center;color:#0B1220}
+.fp-nm{display:flex;flex-direction:column;font-size:13px;font-weight:600;color:#0B1220;line-height:1.2}
+.fp-nm i{font-style:normal;font-size:14px;font-weight:500;color:#5E6470;margin-top:3px}
 .edbar .hint{opacity:.6;font-size:11.5px;color:#9DB8FF}
 .edbar .sp{flex:1}
 .pethemes{display:inline-flex;gap:6px;align-items:center;margin-left:10px}
@@ -125,7 +131,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   bar.innerHTML = `<b>Конструктор</b>
     <span class="hint">клик по тексту — правка · правый клик — меню блока</span>
     <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
-    ${Object.keys(P.fonts || {}).length ? `<select class="pefont" title="Шрифт подборки">${Object.entries(P.fonts).map(([k, f]) => `<option value="${k}" ${k === P.fontPreset ? 'selected' : ''}>Aa · ${f.name}</option>`).join('')}</select>` : ''}
+    ${Object.keys(P.fonts || {}).length ? `<button class="edbtn g pefont-btn" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button>` : ''}
     <span class="sp"></span>
     <button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button>
     <button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button>
@@ -143,16 +149,27 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     else flash('Ошибка темы');
   }));
-  const pfSel = bar.querySelector('.pefont');
-  if (pfSel) pfSel.addEventListener('change', async () => {
-    flash('Меняю шрифт…', 0);
-    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ blocks: serialize(), fontPreset: pfSel.value }),
+  const pfBtn = bar.querySelector('#peFontBtn');
+  if (pfBtn) {
+    /* подгружаем все шрифты пресетов, чтобы превью рендерились в своём шрифте */
+    Object.values(P.fonts).forEach((f) => { if (f.gf) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?${f.gf}&display=swap`; document.head.appendChild(l); } });
+    pfBtn.addEventListener('click', (e) => {
+      const tiles = Object.entries(P.fonts).map(([k, f]) => `<div class="pi fontpref ${k === P.fontPreset ? 'on' : ''}" data-fp="${k}"><span class="fp-aa" style="font-family:${f.disp}">Aa</span><span class="fp-nm">${f.name}<i style="font-family:${f.disp}">Заголовок подборки</i></span></div>`).join('');
+      const el = openPop(`<div class="psec">Шрифт подборки</div><div class="fontlist">${tiles}</div>`, e.clientX, e.clientY);
+      el.addEventListener('click', async (e2) => {
+        const t = e2.target.closest('[data-fp]');
+        if (!t) return;
+        closePop();
+        flash('Меняю шрифт…', 0);
+        const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blocks: serialize(), fontPreset: t.dataset.fp }),
+        });
+        if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+        else flash('Ошибка шрифта');
+      });
     });
-    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
-    else flash('Ошибка шрифта');
-  });
+  }
 
   /* ---------- попап-хелпер ---------- */
   let pop = null;
