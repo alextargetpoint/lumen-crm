@@ -1088,7 +1088,7 @@ function ovLibrary(ctx, layout, onChange) {
   const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
   const isDefault = layout.length === OV_DEFAULT.length && layout.join() === OV_DEFAULT.join();
   const lb = modal({
-    title: 'Библиотека виджетов', wide: 'card', sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
+    title: 'Библиотека виджетов', wide: true, sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
     body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => `<div class="ov2-lib-i" data-add="${k}">
         <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
         <div class="ov2-lib-prev"><div class="ov2-lib-prev-in glass card">${OV_PREV[k] ? OV_PREV[k]() : OV_W[k].render(ctx)}</div></div>
@@ -6107,6 +6107,36 @@ function mountFab() {
   main.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   fab.querySelector('.qfab-menu').addEventListener('click', (e) => { const b = e.target.closest('[data-qf]'); if (!b) return; const a = acts.find(x => x.k === b.dataset.qf); toggle(false); if (a) a.run(); });
   document.addEventListener('click', (e) => { if (!fab.contains(e.target)) toggle(false); });
+}
+function quickPropertyModal() {
+  const st = STATE.settings;
+  modal({
+    title: 'Новый объект', sub: 'Быстрое добавление — детали заполните в карточке',
+    body: `<div class="form-row"><label>Название / ЖК</label><input id="qpName" placeholder="напр. Marina Vista · 1BR" autofocus></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="qpGeo">${(st.agency.geos || []).map(g => `<option value="${g}">${esc(st.geoNames[g] || g)}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Рынок</label><select id="qpMarket"><option value="offplan">Первичка</option><option value="secondary">Вторичка</option></select></div>
+      </div>`,
+    actions: [{ label: 'Создать и открыть', cls: 'btn-accent', onClick: async (bd) => {
+      const name = $('#qpName', bd).value.trim() || 'Новый объект';
+      const pr = await api.post('/properties', { name, geo: $('#qpGeo', bd).value, market: $('#qpMarket', bd).value });
+      toast('Объект создан', 'Открываю карточку', true);
+      PAGE_STATE.propView = pr.id; go('properties');
+    } }, { label: 'Отмена' }],
+  });
+}
+function quickIdeaModal() {
+  const st = STATE.settings;
+  modal({
+    title: 'Идея для соцсетей', sub: 'Сохраним в копилку идей — потом соберёте пост/карусель',
+    body: `<div class="form-row"><label>Идея</label><textarea id="qiText" placeholder="напр. разбор: почему рассрочка 0% выгоднее ипотеки — с цифрами" autofocus></textarea></div>
+      <div class="form-row"><label>Направление (необязательно)</label><select id="qiGeo"><option value="">—</option>${(st.agency.geos || []).map(g => `<option value="${g}">${esc(st.geoNames[g] || g)}</option>`).join('')}</select></div>`,
+    actions: [
+      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => { const t = $('#qiText', bd).value.trim(); if (!t) { toast('Пустая идея'); return false; } await api.post('/social/ideas', { text: t, geo: $('#qiGeo', bd).value, source: 'быстрая' }); toast('Идея сохранена', 'В копилке «Соц-помощник»', true); } },
+      { label: 'Открыть Соц-помощник', onClick: () => go('social') },
+      { label: 'Отмена' },
+    ],
+  });
 }
 function quickTaskModal() {
   const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();

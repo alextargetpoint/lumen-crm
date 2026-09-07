@@ -144,7 +144,7 @@ body.cpanel-on{padding-right:308px!important}
 
   const flash = (t, ms = 1600) => { let s = $('.cstatus'); if (!s) { s = el('<div class="cstatus"></div>'); document.body.appendChild(s); } s.textContent = t; s.style.display = 'block'; clearTimeout(flash._t); if (ms) flash._t = setTimeout(() => s.style.display = 'none', ms); };
   const closePop = () => { if (popOutside) { document.removeEventListener('click', popOutside); popOutside = null; } if (pop) { pop.remove(); pop = null; } };
-  const openPop = (html, x, y) => { closePop(); pop = el(`<div class="cpop">${html}</div>`); document.body.appendChild(pop); const w = pop.offsetWidth, h = pop.offsetHeight; pop.style.left = Math.max(10, Math.min(x, innerWidth - w - 12)) + 'px'; pop.style.top = Math.max(58, Math.min(y, innerHeight - h - 12)) + 'px'; popOutside = (e) => { if (pop && !pop.contains(e.target)) closePop(); }; setTimeout(() => document.addEventListener('click', popOutside), 0); return pop; };
+  const openPop = (html, x, y) => { closePop(); pop = el(`<div class="cpop">${html}</div>`); pop._t = Date.now(); document.body.appendChild(pop); const w = pop.offsetWidth, h = pop.offsetHeight; pop.style.left = Math.max(10, Math.min(x, innerWidth - w - 12)) + 'px'; pop.style.top = Math.max(58, Math.min(y, innerHeight - h - 12)) + 'px'; popOutside = (e) => { if (!pop) return; if (Date.now() - pop._t < 280) return; /* игнор трейлинг-клика открывающего жеста (иначе попап «испаряется») */ if (!pop.contains(e.target)) closePop(); }; setTimeout(() => document.addEventListener('click', popOutside), 0); return pop; };
 
   /* ---------- верхняя полоса ---------- */
   const bar = el(`<div class="cbar">
@@ -416,12 +416,12 @@ body.cpanel-on{padding-right:308px!important}
       <button data-cmd="clear" title="Убрать формат и выделение">✕</button>
     </div><div class="cnote">Выделите текст в заголовке/подписи, затем нажмите. «A» — палитра цветов выделения.</div></div>
     <div class="cgrp"><label>Элементы на слайде</label>
-      <div class="cbtn-row">
-        <button class="cwbtn" data-add="shape">◆ Фигура</button>
-        <button class="cwbtn" data-add="sticker">✦ Стикер</button>
-        <button class="cwbtn" data-add="frame">▢ Рамка</button>
-        <button class="cwbtn" data-add="text">T Текст</button>
-        <button class="cwbtn wide" data-add="photo">🖼 Фото-слой</button>
+      <div class="celem-add-grid">
+        <button class="celem-add" data-add="shape"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="4.5"/><rect x="12" y="12" width="8" height="8" rx="1.5"/></svg></span>Фигура</button>
+        <button class="celem-add" data-add="sticker"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.9L20 9.6l-6.3 1.7L12 17l-1.7-5.7L4 9.6l6.3-1.7z"/></svg></span>Стикер</button>
+        <button class="celem-add" data-add="frame"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="1"/></svg></span>Рамка</button>
+        <button class="celem-add" data-add="text"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 6h14M12 6v13M9 19h6"/></svg></span>Текст</button>
+        <button class="celem-add" data-add="photo"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg></span>Фото</button>
       </div>
       <div class="cnote">Добавь элемент → тяни его на макете, угол — размер, стрелки над ним — слои вперёд/назад.</div>
     </div>
