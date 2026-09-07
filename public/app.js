@@ -918,7 +918,7 @@ const PAGES = {};
 
 /* ---------------- ОБЗОР (конструктор виджетов) ---------------- */
 let OV_EDIT = false;
-const OV_DEFAULT = ['attention', 'kpi', 'tasks', 'meetings', 'funnel'];
+const OV_DEFAULT = ['attention', 'kpi', 'leaders', 'tasks', 'meetings', 'funnel'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -1029,6 +1029,21 @@ const OV_W = {
     const body = seqs.length ? seqs.slice(0, 6).map(s => `<div class="ov2-lrow" data-ovgo="sequences"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(s.name)}</div><div class="ov2-lrow-s">${esc(gn(s.geo))} · ${(s.steps || []).length} касаний</div></div><span class="ov2-chip ${s.active ? 'on' : ''}">${s.active ? 'вкл' : 'выкл'}</span></div>`).join('') : '<div class="ov2-empty">Нет цепочек</div>';
     return `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>${on} активны</span><button class="btn btn-sm" data-ovgo="sequences">Все</button></div>${body}`;
   } },
+  leaders: { name: 'Доска лидеров', icon: () => I.flame, full: false, render: (c) => {
+    const now = Date.now(), mAgo = now - 30 * 864e5;
+    const board = (STATE.brokers || []).filter(b => b.active !== false).map(b => {
+      const deals = c.leads.filter(l => l.broker === b.id && l.stage === 'deal');
+      const dealsMonth = deals.filter(l => (c.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at > mAgo)).length;
+      return { name: b.name, photo: b.photo, deals: deals.length, dealsMonth };
+    }).sort((a, b) => b.dealsMonth - a.dealsMonth || b.deals - a.deals).filter(b => b.deals || b.dealsMonth);
+    const ini = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const top = board.slice(0, 3), rest = board.slice(3, 6);
+    const hd = `<div class="ov2-card-hd">${ic(I.flame)}Доска лидеров<span>сделки за месяц</span><button class="btn btn-sm" data-ovgo="brokers">Команда</button></div>`;
+    if (!board.length) return hd + '<div class="ov2-empty">Доска заполнится с первыми сделками</div>';
+    const podium = `<div class="ov2-lead-podium">${top.map((b, i) => `<div class="ov2-lp p${i + 1}"><div class="ov2-lp-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(ini(b.name))}<span class="ov2-lp-rank">${i + 1}</span></div><b>${esc((b.name || '').split(' ')[0])}</b><i>${b.dealsMonth || b.deals} ${plural(b.dealsMonth || b.deals, 'сделка', 'сделки', 'сделок')}</i></div>`).join('')}</div>`;
+    const list = rest.map((b, i) => `<div class="ov2-lead-row"><span class="ov2-lr-rank">${i + 4}</span><span class="ov2-lr-name">${esc(b.name)}</span><b>${b.dealsMonth || b.deals}</b></div>`).join('');
+    return hd + `<div class="ov2-lead-hero">${podium}</div>${list}`;
+  } },
 };
 
 /* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
@@ -1047,6 +1062,7 @@ const OV_PREV = {
   activity: () => `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>${[['ok', I.flame, 'Сделка: Denis Grinberg', '5 мин'], ['', I.chat, 'Новое сообщение · Мария', '18 мин'], ['ok', I.spark, 'Квалифицирован · Ярослав', '1 ч']].map(([c, i, t, tm]) => `<div class="ov2-act ${c}"><span class="ov2-act-ic">${ic(i)}</span><span class="ov2-act-t">${t}</span><span class="ov2-act-tm">${tm}</span></div>`).join('')}`,
   spark: () => `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div><div class="ov2-spark"><div class="ov2-spark-n">18<i>за неделю</i></div><svg viewBox="0 0 100 32" preserveAspectRatio="none" class="ov2-spark-svg"><polyline points="0,26 8,20 15,24 23,12 31,16 38,8 46,14 54,6 62,12 69,4 77,10 85,5 92,9 100,3" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`,
   onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
+  leaders: () => `<div class="ov2-card-hd">${ic(I.flame)}Доска лидеров<span>сделки за месяц</span></div><div class="ov2-lead-hero"><div class="ov2-lead-podium">${[['Дарья', 5, 1], ['Амир', 3, 2], ['Кетут', 2, 3]].map(([n, d, r]) => `<div class="ov2-lp p${r}"><div class="ov2-lp-ava">${n[0]}<span class="ov2-lp-rank">${r}</span></div><b>${n}</b><i>${d} сделок</i></div>`).join('')}</div></div>`,
 };
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
@@ -1131,7 +1147,8 @@ PAGES.feed = async (root) => {
   });
 };
 PAGES.overview = async (root) => {
-  const [an, events, leads, tsk] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] }))]);
+  const [an, events, leads, tsk, feedD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] }))]);
+  const ovBoard = (feedD.board || []).filter(b => b.deals > 0 || b.dealsMonth > 0);
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', qual: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
