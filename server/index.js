@@ -3347,6 +3347,20 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
   <div class="verdict"><span class="vt">Разбор команды / выводы</span><div class="vbox"></div></div>
 </section>`;
       };
+      /* данные для полноэкранной презентации (ТВ на планёрке) */
+      const slidesData = leads.map(lead => {
+        const broker = db.brokers.find(b => b.id === lead.broker);
+        const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+        const msgs = db.messages.filter(mm => mm.leadId === lead.id).sort((a, b2) => a.at - b2.at).slice(-6);
+        return {
+          name: lead.name, score: lead.score || 0, geo: geoName, stage: STAGE_RU[lead.stage] || lead.stage,
+          source: lead.source || '—', broker: broker ? broker.name : '—',
+          quals: Object.keys(AXN).map(a => ({ k: AXN[a], v: lead.quals[a] ? lead.quals[a].value : '—', q: lead.quals[a] && lead.quals[a].quote ? lead.quals[a].quote : '' })),
+          summary: lead.summary || '', tags: lead.tags || [],
+          key: msgs.map(mm => ({ who: mm.dir === 'in' ? 'Клиент' : (mm.via === 'ai' ? 'Lumen AI' : 'Менеджер'), kind: mm.dir === 'in' ? 'in' : (mm.via === 'ai' ? 'ai' : 'out'), text: String(mm.text || '').slice(0, 260) })),
+        };
+      });
+      const slidesJson = JSON.stringify(slidesData).replace(/</g, '\\u003c');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Разбор кейсов — ${esc(AG.name || 'Агентство')}</title>
@@ -3385,16 +3399,73 @@ body{font-family:'Inter Tight',-apple-system,'Segoe UI',sans-serif;color:var(--i
 .toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:10}
 .toolbar button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(37,99,235,.35)}
 .toolbar .g{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.toolbar .tv-btn{background:linear-gradient(120deg,#0A1833,#2563EB)}
 .empty{background:#fff;border-radius:14px;padding:50px;text-align:center;color:var(--mut);box-shadow:0 10px 40px rgba(16,43,92,.08)}
-@media print{body{background:#fff}.wrap{margin:0;max-width:none;padding:0}.doc-hd,.case{box-shadow:none;margin:0 0 8mm;border-radius:0}.toolbar{display:none}}
+/* ===== презентация на ТВ ===== */
+.tv{position:fixed;inset:0;z-index:100;background:radial-gradient(1200px 800px at 20% 10%,#12266a,#061126 60%);display:none;flex-direction:column;color:#fff}
+.tv.on{display:flex}
+.tv-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:3vh 5vw;opacity:1;transform:translateY(0);transition:opacity .28s,transform .28s}
+.tv-stage.in{opacity:0;transform:translateY(14px)}
+.tv-card{width:100%;max-width:1200px}
+.tv-h{border-bottom:2px solid rgba(122,158,255,.4);padding-bottom:2.2vh;margin-bottom:3vh}
+.tv-nm{font-size:clamp(28px,4.6vw,58px);font-weight:800;display:flex;align-items:center;gap:20px;letter-spacing:-.5px}
+.tv-sc{margin-left:auto;font-size:clamp(15px,1.5vw,22px);font-weight:800;background:linear-gradient(120deg,#2563EB,#5B2BD8);border-radius:14px;padding:6px 20px}
+.tv-meta{color:#9DB8FF;font-size:clamp(14px,1.5vw,21px);margin-top:1.4vh}
+.tv-body{display:grid;grid-template-columns:1fr 1fr;gap:4vw}
+.tv-st{font-size:clamp(12px,1.1vw,16px);letter-spacing:.1em;text-transform:uppercase;color:#7FA0E8;font-weight:700;margin:0 0 1.6vh}
+.tv-col .tv-st:not(:first-child){margin-top:3vh}
+.tvq{border:1px solid rgba(122,158,255,.22);border-radius:14px;padding:1.4vh 20px;margin-bottom:1.4vh;background:rgba(122,158,255,.06)}
+.tvq b{font-size:clamp(11px,1vw,14px);color:#8FA9E8;text-transform:uppercase;letter-spacing:.05em;display:block}
+.tvq span{font-size:clamp(17px,1.9vw,26px);font-weight:650}
+.tvq i{display:block;color:#B9C7E8;font-size:clamp(13px,1.4vw,18px);margin-top:.6vh;font-style:italic}
+.tv-sum{background:rgba(122,158,255,.1);border:1px solid rgba(122,158,255,.24);border-radius:14px;padding:1.8vh 22px;font-size:clamp(15px,1.7vw,23px);line-height:1.5}
+.tvm{display:flex;gap:16px;padding:1.3vh 0;border-bottom:1px solid rgba(122,158,255,.14);font-size:clamp(14px,1.6vw,22px);line-height:1.4}
+.tvw{flex:0 0 12ch;font-size:clamp(11px,1vw,15px);font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding-top:.5vh}
+.tvm.in .tvw{color:#5FE0A0}.tvm.ai .tvw{color:#7FA9FF}.tvm.out .tvw{color:#F0C560}
+.tvmut{color:#7E8FB6;font-size:clamp(14px,1.6vw,20px)}
+.tv-nav{position:absolute;bottom:3vh;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:24px}
+.tv-nav button{width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font-size:28px;cursor:pointer;line-height:1}
+.tv-nav button:hover{background:rgba(255,255,255,.16)}
+#tvDots{display:flex;gap:9px}
+#tvDots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.28)}
+#tvDots i.on{background:#7FA9FF;box-shadow:0 0 0 4px rgba(127,169,255,.2)}
+.tv-exit{position:absolute;top:3vh;right:4vw;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:12px;padding:10px 16px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.tv-brand{position:absolute;top:3.4vh;left:4vw;color:#7FA0E8;font-size:14px;font-weight:600;letter-spacing:.04em}
+@media print{body{background:#fff}.wrap{margin:0;max-width:none;padding:0}.doc-hd,.case{box-shadow:none;margin:0 0 8mm;border-radius:0}.toolbar,.tv{display:none!important}}
 </style></head><body>
-<div class="toolbar"><button class="g" onclick="history.back()">← Назад</button><button onclick="window.print()">Печать / PDF</button></div>
+<div class="toolbar">${leads.length ? '<button class="tv-btn" onclick="tvStart()">▶ Презентация (ТВ)</button>' : ''}<button class="g" onclick="history.back()">← Назад</button><button onclick="window.print()">Печать / PDF</button></div>
 <div class="wrap">
   <div class="doc-hd">${AG.logo ? `<img src="${esc(AG.logo)}" alt="">` : ''}<span class="ag">${esc(AG.name || 'Агентство')}</span>
     <div><h1>Разбор кейсов · планёрка</h1></div>
     <span class="r">${leads.length} ${leads.length === 1 ? 'кейс' : 'кейс(ов)'}<br>${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
   ${leads.length ? leads.map(cardHtml).join('') : '<div class="empty">Кейсы не выбраны. Отметьте лиды в воронке и нажмите «Разбор кейсов».</div>'}
 </div>
+<div id="tv" class="tv"><div class="tv-stage" id="tvStage"></div>
+  <div class="tv-nav"><button id="tvPrev">‹</button><span id="tvDots"></span><button id="tvNext">›</button></div>
+  <button class="tv-exit" onclick="tvStop()">✕ Esc</button>
+  <div class="tv-brand">${esc(AG.name || 'Агентство')} · разбор кейсов</div>
+</div>
+<script>
+var SLIDES = ${slidesJson}; var tvI = 0;
+function tvEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function tvSlide(s){
+  var quals = s.quals.map(function(q){return '<div class="tvq"><b>'+tvEsc(q.k)+'</b><span>'+tvEsc(q.v)+'</span>'+(q.q?'<i>«'+tvEsc(q.q)+'»</i>':'')+'</div>';}).join('');
+  var key = s.key.length ? s.key.map(function(f){return '<div class="tvm '+f.kind+'"><span class="tvw">'+tvEsc(f.who)+'</span><span>'+tvEsc(f.text)+'</span></div>';}).join('') : '<div class="tvmut">Переписки нет</div>';
+  return '<div class="tv-card"><div class="tv-h"><div class="tv-nm">'+tvEsc(s.name)+'<span class="tv-sc">'+s.score+'</span></div>'+
+    '<div class="tv-meta">'+tvEsc(s.geo)+' · '+tvEsc(s.stage)+' · источник: '+tvEsc(s.source)+' · эксперт: '+tvEsc(s.broker)+'</div></div>'+
+    '<div class="tv-body"><div class="tv-col"><div class="tv-st">Квалификация</div>'+quals+(s.summary?'<div class="tv-st">Саммари</div><div class="tv-sum">'+tvEsc(s.summary)+'</div>':'')+'</div>'+
+    '<div class="tv-col"><div class="tv-st">Ключевые реплики</div>'+key+'</div></div></div>';
+}
+function tvRender(){var st=document.getElementById('tvStage');st.innerHTML=tvSlide(SLIDES[tvI]);st.className='tv-stage in';setTimeout(function(){st.className='tv-stage';},20);
+  document.getElementById('tvDots').innerHTML=SLIDES.map(function(_,i){return '<i class="'+(i===tvI?'on':'')+'"></i>';}).join('');
+  document.getElementById('tvPrev').style.visibility=tvI>0?'visible':'hidden';document.getElementById('tvNext').style.visibility=tvI<SLIDES.length-1?'visible':'hidden';}
+function tvGo(d){tvI=Math.max(0,Math.min(SLIDES.length-1,tvI+d));tvRender();}
+function tvStart(){tvI=0;document.getElementById('tv').classList.add('on');tvRender();try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}catch(e){}}
+function tvStop(){document.getElementById('tv').classList.remove('on');try{document.fullscreenElement&&document.exitFullscreen();}catch(e){}}
+document.addEventListener('keydown',function(e){if(!document.getElementById('tv').classList.contains('on'))return;if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')tvGo(1);else if(e.key==='ArrowLeft'||e.key==='PageUp')tvGo(-1);else if(e.key==='Escape')tvStop();});
+document.getElementById('tvNext').onclick=function(){tvGo(1);};document.getElementById('tvPrev').onclick=function(){tvGo(-1);};
+document.getElementById('tvStage').onclick=function(){tvGo(1);};
+</script>
 </body></html>`);
       return;
     }
@@ -3931,7 +4002,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=17"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=19"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

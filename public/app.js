@@ -1486,9 +1486,12 @@ function ctxPopup(x, y, items) {
   pop.style.left = Math.min(x, innerWidth - w - 8) + 'px';
   pop.style.top = Math.min(y, innerHeight - h - 8) + 'px';
   pop.addEventListener('click', (e) => { const it = e.target.closest('[data-ci]'); if (!it) return; const h2 = items[+it.dataset.ci]; closeCtx(); if (h2.onClick) h2.onClick(); });
-  setTimeout(() => document.addEventListener('pointerdown', closeCtx, { once: true }), 0);
+  /* закрытие по клику ВНЕ попапа — но не по самому попапу (иначе pointerdown убивал попап до click по пункту) */
+  _ctxDown = (e) => { if (e.target && e.target.closest && e.target.closest('#ctxPop')) return; closeCtx(); };
+  setTimeout(() => document.addEventListener('pointerdown', _ctxDown, true), 0);
 }
-function closeCtx() { const p = $('#ctxPop'); if (p) p.remove(); }
+let _ctxDown = null;
+function closeCtx() { const p = $('#ctxPop'); if (p) p.remove(); if (_ctxDown) { document.removeEventListener('pointerdown', _ctxDown, true); _ctxDown = null; } }
 
 /* массовый вызов на сервер по конфигу раздела */
 async function selBulk(cfg, action, value, confirmMsg) {
