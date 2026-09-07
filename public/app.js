@@ -4859,7 +4859,9 @@ PAGES.brokers = async (root) => {
               <div class="pd-fact"><label class="lc-lbl">Лимит лидов</label><input class="gi" data-be="capacity" type="number" value="${b.capacity}"></div>
             </div>
             <div class="pds-grid c2" style="margin-top:10px">
-              <div class="pd-fact"><label class="lc-lbl">Личный PIN для входа (мин. 6 символов)</label><input class="gi" data-be="pin" type="password" placeholder="${b.pinHash ? '•••••• задан — ввести новый' : 'выдайте брокеру PIN'}"></div>
+              <div class="pd-fact"><label class="lc-lbl">Код доступа брокера</label>
+                ${b.pinPlain ? `<div class="br-pin" data-brpincode="${esc(b.pinPlain)}"><b>${esc(b.pinPlain)}</b><button type="button" class="btn-ghost br-pincopy" title="Скопировать код">${ic(I.copy)}</button><span class="muted">${b.accessAt ? 'выдан ' + ago(b.accessAt) : 'сохранён'}</span></div>` : (b.pinHash ? '<div class="muted" style="font-size:11.5px;padding-top:6px">PIN задан вручную (скрыт). Нажми «Выдать доступ», чтобы задать новый и сохранить его видимым.</div>' : '<div class="muted" style="font-size:11.5px;padding-top:6px">Доступ не выдан. Нажми «Выдать доступ» ↑</div>')}
+                <input class="gi" data-be="pin" type="password" placeholder="сменить PIN вручную (мин. 6)" style="margin-top:8px"></div>
               <div class="pd-fact"><label class="lc-lbl">Доступ в систему</label>
                 <div style="display:flex;gap:9px;align-items:center;padding-top:6px"><label class="switch"><input type="checkbox" data-be="active" ${b.active !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
                 <span class="muted" style="font-size:11.5px">${b.active !== false ? 'активен · видит только своих лидов' : 'отключён · лиды переданы команде'}</span></div>
@@ -5013,6 +5015,8 @@ PAGES.brokers = async (root) => {
       PAGE_STATE.brokerEdit = null;
       await loadState(); render();
     });
+    const pinC = eb.querySelector('.br-pincopy');
+    if (pinC) pinC.addEventListener('click', () => { navigator.clipboard.writeText(pinC.closest('[data-brpincode]').dataset.brpincode); toast('Код скопирован', null, true); });
     const pv = eb.querySelector('[data-brpreview]');
     if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
     const pr = eb.querySelector('[data-brprovision]');

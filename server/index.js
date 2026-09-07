@@ -614,7 +614,6 @@ const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
 /* ── Слои слайда: фигуры, стикеры, рамки, фото, текст (drag/resize/z-order) ── */
 const CAR_SHAPES = new Set(['rect', 'circle', 'ring', 'line', 'triangle', 'blob', 'arrow', 'badge', 'diamond']);
 const CAR_FRAMES = new Set(['thin', 'double', 'corners', 'inset', 'film', 'tape']);
-const CAR_STICKERS = AMEN_ICONS;   /* переиспользуем тонкие линейные иконки как стикеры (~34 шт) */
 const CAR_LTYPES = new Set(['img', 'shape', 'sticker', 'frame', 'text']);
 const hex = (v, d) => /^#[0-9a-fA-F]{3,8}$/.test(String(v)) ? v : d;
 const sanLayer = (l) => {
@@ -650,9 +649,10 @@ function renderCarLayers(layers, isEdit) {
   if (!Array.isArray(layers) || !layers.length) return '';
   const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
   const handles = isEdit ? '<span class="lyr-h lyr-rs" data-lrs title="Размер"></span><span class="lyr-tools"><button data-lup title="Вперёд">↑</button><button data-ldn title="Назад">↓</button><button data-ldel title="Удалить">✕</button></span>' : '';
+  const lj = (l) => isEdit ? ` data-l='${JSON.stringify(l).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : '';
   return layers.map((l, i) => {
     const z = 10 + (l.z || 0);
-    const de = isEdit ? ` data-lyr="${i}"` : '';
+    const de = isEdit ? ` data-lyr="${i}"${lj(l)}` : '';
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
     const geo = `left:${l.x}%;top:${l.y}%;width:${l.w}%;z-index:${z};transform:rotate(${l.rot || 0}deg)`;
     let inner = '';
@@ -715,6 +715,7 @@ const AMEN_ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   award: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
 };
+const CAR_STICKERS = AMEN_ICONS;   /* переиспользуем тонкие линейные иконки как стикеры (~34 шт) */
 const amenIcon = (v) => AMEN_ICONS[v] ? `<svg class="amn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[v]}</svg>` : (v ? `<span class="amn-emoji">${String(v).slice(0, 3)}</span>` : '');
 
 function pbDefaults(t) {

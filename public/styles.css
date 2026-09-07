@@ -2451,3 +2451,11 @@ body.has-preview { padding-top: 38px; }
 .pv-cred b { font-size: 13px; color: var(--navy-900); word-break: break-all; }
 .pv-cred .pv-pin { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: .12em; color: var(--accent); }
 .pv-send { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+/* сохранённый код доступа брокера (виден владельцу) */
+.br-pin { display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: color-mix(in srgb, var(--accent) 7%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke)); border-radius: 10px; }
+.br-pin b { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: .14em; color: var(--accent); }
+.br-pin .btn-ghost { width: 26px; height: 26px; display: grid; place-items: center; color: var(--ink-3); }
+.br-pin .btn-ghost:hover { color: var(--accent); }
+.br-pin .btn-ghost svg { width: 14px; height: 14px; }
+.br-pin .muted { font-size: 10.5px; margin-left: auto; }
