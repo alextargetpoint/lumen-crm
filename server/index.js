@@ -778,8 +778,39 @@ const sanSlide = (s) => ({
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
   tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
+  /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
+  mode: (s.mode === 'stats' || s.mode === 'steps') ? s.mode : '',
+  items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160) })).filter(x => x.k || x.v || x.text) : [],
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
+/* фактические слайды из данных проекта: «Цифры» (сетка) и «План» (нумерованный разбор) */
+function factSlides(facts) {
+  const out = [];
+  if (!facts) return out;
+  /* короткие «пунчевые» значения для сетки цифр (факты приходят фразами — вытаскиваем суть) */
+  const short = (s, n = 16) => { s = String(s || '').trim(); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; };
+  const price = facts.priceFrom ? (String(facts.priceFrom).match(/(?:от\s*)?[$€£]?\s?[\d.,]+\s?(?:k|к|тыс|млн|m|mln)?/i) || [String(facts.priceFrom)])[0].trim() : '';
+  const roiPct = facts.roi ? (String(facts.roi).match(/\d+(?:[.,]\d+)?\s*%/g) || []).slice(0, 2).join(' / ') : '';
+  const year = facts.handover ? (String(facts.handover).match(/\b(20\d{2})\b/) || [])[1] : '';
+  const unitsN = facts.units ? String(facts.units).split(/[,;•]/).map(x => x.trim()).filter(Boolean).length : 0;
+  const stat = [];
+  if (price) stat.push({ k: 'Старт цены', v: short(price, 14) });
+  if (roiPct) stat.push({ k: 'Доходность', v: roiPct });
+  else if (facts.roi) stat.push({ k: 'Доходность', v: short(facts.roi, 14) });
+  const plF = (n) => (n % 10 === 1 && n % 100 !== 11) ? 'формат' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'формата' : 'форматов';
+  if (unitsN >= 2) stat.push({ k: 'Планировки', v: unitsN + ' ' + plF(unitsN) });
+  else if (facts.units) stat.push({ k: 'Формат', v: short(facts.units, 14) });
+  if (year) stat.push({ k: 'Сдача', v: year });
+  else if (facts.handover) stat.push({ k: 'Сдача', v: short(facts.handover, 14) });
+  if (stat.length >= 2) out.push(sanSlide({ eyebrow: 'ЦИФРЫ', heading: 'Коротко о главном', mode: 'stats', items: stat.slice(0, 4), pos: 'center', size: 'm' }));
+  const steps = [];
+  steps.push({ text: 'Бронирование — фиксируем лот и цену старта' });
+  if (facts.payment) steps.push({ text: String(facts.payment) });
+  else steps.push({ text: 'Гибкий план оплаты по графику проекта' });
+  steps.push({ text: (facts.handover ? 'Сдача ' + facts.handover + ' — ' : '') + 'получение ключей и заселение' });
+  out.push(sanSlide({ eyebrow: 'ПЛАН', heading: 'Как проходит покупка', mode: 'steps', items: steps.slice(0, 4), pos: 'top', size: 's' }));
+  return out;
+}
 
 /* ═══ Авто-конструктор слайдов: раскладка фото ПО РОЛЯМ с вариациями композиции ═══
    photos[] + roles[] (из llm.classifyPhotos) → фото едут на ПРАВИЛЬНЫЕ слайды:
@@ -2346,6 +2377,9 @@ const server = http.createServer(async (req, res) => {
         const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '', b.angle);
         let slides = (out.slides || []).map(s => sanSlide(s));
         const photoBias = out.photoBias || 'medium';
+        /* фактические rich-слайды (цифры/план оплаты) из скрейпа — перед финальным CTA */
+        const fs = factSlides(facts);
+        if (fs.length) slides.splice(Math.max(1, slides.length - 1), 0, ...fs);
         /* Раскладка фото (как в «Карусель из лонча»): скачиваем + фильтруем по размеру (логотипы/LQIP отсекаются),
            мало — добираем из открытых источников. Обложка — крупный кадр; смысловые слайды чистые; галереи по углу подачи.
            НЕ мажем случайный кадр под каждый слайд (это давало «коряво где-то фоном»). */
@@ -3983,13 +4017,15 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
             <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}>${sanInline(s.heading)}</h2>
-            <p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>
+            ${s.mode === 'stats' && (s.items || []).length ? `<div class="s-stats">${s.items.map(it => `<div class="s-stat"><b>${esc(it.v || it.k)}</b><i>${esc(it.v ? it.k : '')}</i></div>`).join('')}</div>` : ''}
+            ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
+            ${!s.mode ? `<p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>` : ''}
             <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -4086,6 +4122,16 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.al-center .s-num{left:50%;transform:translateX(-50%)}
 .s-eye{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}
 .slide.hasbg .s-eye{color:#fff;opacity:.9}
+.s-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;margin-top:8px}
+.s-stat b{display:block;font-family:var(--disp);font-optical-sizing:auto;font-size:clamp(22px,5.6vw,36px);font-weight:600;line-height:1.02;letter-spacing:-.02em;color:var(--blue);overflow-wrap:anywhere}
+.slide.hasbg .s-stat b{color:#fff}
+.s-stat i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.02em;margin-top:5px;display:block}
+.slide.hasbg .s-stat i{color:rgba(255,255,255,.82)}
+.s-steps{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.s-step{display:flex;align-items:center;gap:13px;font-size:clamp(14px,3.6vw,17px);line-height:1.35;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
+.slide.hasbg .s-step{color:rgba(255,255,255,.92)}
+.s-step-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;font-family:'Manrope',sans-serif}
+.slide.hasbg .s-step-n{background:#fff;color:var(--blue)}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
@@ -4126,7 +4172,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=21"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=22"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
