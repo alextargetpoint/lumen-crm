@@ -2949,6 +2949,29 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
 };
 
 /* ---------------- ПОДБОРКИ ---------------- */
+/* единая панель «Поделиться»: ссылка / PDF / QR / в чат / WhatsApp */
+function openShareModal(id, leadId, title) {
+  const url = location.origin + '/p/' + id;
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(url)}`;
+  const bd = modal({
+    title: 'Поделиться подборкой', wide: true,
+    body: `<div class="share-wrap">
+      <div class="share-qr"><img src="${qr}" alt="QR-код"><span>Наведите камеру телефона — откроется подборка</span></div>
+      <div class="share-opts">
+        <label class="lc-lbl">Ссылка на подборку</label>
+        <div class="share-linkrow"><input id="shLink" readonly value="${esc(url)}"><button class="btn btn-sm btn-accent" id="shCopy">${ic(I.copy)}Копировать</button></div>
+        <a class="btn share-b" href="${esc(url)}" target="_blank">${ic(I.eye)}Открыть страницу (динамическая ссылка)</a>
+        <a class="btn share-b" href="${esc(url)}?print=1" target="_blank">${ic(I.doc)}Скачать PDF</a>
+        <a class="btn share-b" href="https://wa.me/?text=${encodeURIComponent((title ? title + ' — ' : '') + url)}" target="_blank">${ic(I.chat)}Поделиться в WhatsApp</a>
+        ${leadId ? `<button class="btn btn-accent share-b" id="shChat">${ic(I.send)}Отправить в чат лиду</button>` : ''}
+      </div>
+    </div>`,
+    actions: [{ label: 'Закрыть' }],
+  });
+  $('#shCopy', bd).addEventListener('click', () => { navigator.clipboard.writeText(url); toast('Ссылка скопирована', null, true); });
+  const chat = $('#shChat', bd);
+  if (chat) chat.addEventListener('click', async () => { await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат лиду', null, true); closeModal(); });
+}
 PAGES.collections = async (root) => {
   const [cols0, props, leads, allFolders] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads'), api.get('/folders')]);
   const cFolders = allFolders.filter(f => f.kind === 'coll');
@@ -3001,7 +3024,7 @@ PAGES.collections = async (root) => {
           const thumbs = c.propertyIds.map(id => { const p = props.find(x => x.id === id); return p && (p.images || [])[0]; }).filter(Boolean).slice(0, 4);
           const geoHue = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
           const firstGeo = (props.find(x => x.id === c.propertyIds[0]) || {}).geo || 'dubai';
-          return `<div class="glass cl2-card ${selSet('collections').has(c.id) ? 'sel' : ''}" data-cl="${c.id}" data-id="${c.id}" data-dragcoll="${c.id}">
+          return `<div class="glass cl2-card ${selSet('collections').has(c.id) ? 'sel' : ''}" data-cl="${c.id}" data-id="${c.id}" data-cllead="${c.leadId || ''}" data-title="${esc(c.title || '')}" data-dragcoll="${c.id}">
           <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
           <div class="cl2-preview">
             ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}"><img src="logo.svg"></div>`}
@@ -3014,10 +3037,8 @@ PAGES.collections = async (root) => {
             ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
             <div class="cl2-acts">
               <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
-              ${c.leadId ? `<button class="btn btn-sm btn-accent" data-act="send">${ic(I.send)}В чат</button>` : ''}
+              <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
               <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть">${ic(I.eye)}</a>
-              <button class="btn btn-sm" data-act="copy" title="Копировать ссылку">${ic(I.copy)}</button>
-              <a class="btn btn-sm" href="/p/${c.id}?print=1" target="_blank" title="PDF">${ic(I.doc)}</a>
               <span class="tb-spacer"></span>
               <button class="btn-ghost" data-act="del" title="Удалить">${ic(I.x)}</button>
             </div>
@@ -3049,6 +3070,7 @@ PAGES.collections = async (root) => {
     if (!act) return;
     const id = card.dataset.cl;
     if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
+    if (act.dataset.act === 'share') { openShareModal(id, card.dataset.cllead, card.dataset.title); return; }
     if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
     if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
     if (act.dataset.act === 'ren' && !act.dataset.editing) {

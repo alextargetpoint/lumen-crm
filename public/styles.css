@@ -1798,6 +1798,17 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 /* 2. Ripple убран (Material-волна «раскрывала» кнопки при клике — не в стиле продукта) */
 .btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
 
+/* панель «Поделиться» подборкой */
+.share-wrap { display: grid; grid-template-columns: 240px 1fr; gap: 22px; align-items: start; }
+@media (max-width: 620px) { .share-wrap { grid-template-columns: 1fr; } }
+.share-qr { text-align: center; }
+.share-qr img { width: 100%; max-width: 240px; border-radius: 14px; border: 1px solid var(--stroke); background: #fff; padding: 8px; box-shadow: var(--shadow); }
+.share-qr span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.4; }
+.share-opts { display: flex; flex-direction: column; gap: 9px; }
+.share-linkrow { display: flex; gap: 8px; margin-bottom: 6px; }
+.share-linkrow input { flex: 1; font-size: 12.5px; color: var(--ink-2); background: var(--bg-2); }
+.share-b { justify-content: flex-start; width: 100%; }
+
 /* профиль агентства — соц-страница (organizer) */
 .ag-profile { border-radius: 18px; overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow); background: var(--card); border: 1px solid var(--stroke); }
 .ag-cover { position: relative; height: 156px; background: linear-gradient(120deg, #0A1833, #102B5C); overflow: hidden; }
