@@ -17,7 +17,30 @@
 .blue [data-be],.cphoto [data-be],.sphoto [data-be]{outline-color:rgba(255,255,255,.55)}
 .blue [data-be]:focus,.cphoto [data-be]:focus{outline-color:#fff;background:rgba(255,255,255,.08)}
 div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
-.book{margin-top:56px;margin-bottom:120px}
+body{overflow-x:hidden;padding-left:0!important;padding-right:0!important}
+.book{margin:24px auto 120px;max-width:min(680px,calc(100vw - 440px))}
+/* правая панель настроек (вместо верхнего меню) */
+.pepanel{position:fixed;right:12px;top:16px;bottom:16px;width:190px;z-index:900;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(10,24,51,.96),rgba(6,17,38,.96));backdrop-filter:blur(14px);border:1px solid rgba(134,175,255,.16);border-radius:18px;color:#fff;font-family:Manrope,sans-serif;box-shadow:0 24px 60px -20px rgba(6,17,38,.6);overflow:hidden}
+.pep-top{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(134,175,255,.14)}
+.pep-top b{font-size:14px;font-weight:700}
+.pep-top #peExit{padding:7px 11px}
+.pep-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:16px;scrollbar-width:thin}
+.pep-sec{display:flex;flex-direction:column;gap:8px}
+.pep-lbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C9BFF;font-weight:700}
+.pep-row{display:flex;gap:6px;flex-wrap:wrap}
+.pep-foot{padding:12px 14px;border-top:1px solid rgba(134,175,255,.14);display:flex;flex-direction:column;gap:8px}
+.pep-hint{font-size:10px;line-height:1.5;color:#7A8AB5;margin-top:4px}
+.edbtn.wide{width:100%;justify-content:center}
+.pethemes{flex-wrap:wrap;margin-left:0}
+@media(max-width:1080px){
+  .pepanel{right:0;left:0;top:0;bottom:auto;width:auto;flex-direction:row;align-items:center;border-radius:0;padding:8px 12px;gap:10px;overflow-x:auto}
+  .pep-top{border:none;padding:0}.pep-top b{display:none}
+  .pep-body{flex-direction:row;overflow:visible;padding:0;gap:12px;align-items:center}
+  .pep-sec{flex-direction:row;align-items:center;gap:6px}.pep-lbl{display:none}
+  .pep-foot{flex-direction:row;border:none;padding:0}.pep-hint{display:none}
+  .edbtn.wide{width:auto}
+  .book{margin-top:64px;max-width:680px}
+}
 [data-bhid="1"]{opacity:.35}
 .imghot{display:flex!important;position:absolute;top:10px;right:10px;z-index:6;background:rgba(6,17,38,.72);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font-size:13px;cursor:pointer;align-items:center;gap:5px;box-shadow:0 4px 14px rgba(0,0,0,.3);user-select:none;backdrop-filter:blur(8px);font-family:Manrope,sans-serif;font-weight:600}
 .imghot:hover{background:#2563EB;border-color:transparent}
@@ -130,19 +153,20 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
 
   /* ---------- верхняя панель ---------- */
   const bar = document.createElement('div');
-  bar.className = 'edbar';
-  bar.innerHTML = `<button class="edbtn g" id="peExit" title="Сохранить и выйти в CRM">← Готово</button>
-    <b>Конструктор</b>
-    <span class="hint">клик по тексту — правка · правый клик — меню блока</span>
-    <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
-    ${Object.keys(P.fonts || {}).length ? `<button class="edbtn g pefont-btn" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button>` : ''}
-    <span class="sp"></span>
-    <button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button>
-    <button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button>
-    <button class="edbtn g" id="peVers">Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button>
-    ${P.llm ? '<button class="edbtn ai" id="peCompose">✦ Собрать тексты ИИ</button>' : ''}
-    <button class="edbtn g" id="peView">Просмотр</button>
-    <button class="edbtn" id="peSave">Сохранить</button>`;
+  bar.className = 'pepanel';
+  bar.innerHTML = `
+    <div class="pep-top"><button class="edbtn g" id="peExit" title="Сохранить и выйти в CRM">←</button><b>Конструктор</b></div>
+    <div class="pep-body">
+      <div class="pep-sec"><div class="pep-lbl">Тема</div><div class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</div></div>
+      ${Object.keys(P.fonts || {}).length ? `<div class="pep-sec"><div class="pep-lbl">Шрифт</div><button class="edbtn g pefont-btn wide" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button></div>` : ''}
+      <div class="pep-sec"><div class="pep-lbl">История</div><div class="pep-row"><button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button><button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button><button class="edbtn g wide" id="peVers">Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button></div></div>
+      ${P.llm ? `<div class="pep-sec"><button class="edbtn ai wide" id="peCompose">✦ Собрать тексты ИИ</button></div>` : ''}
+    </div>
+    <div class="pep-foot">
+      <button class="edbtn g wide" id="peView">Просмотр</button>
+      <button class="edbtn wide" id="peSave">Сохранить</button>
+      <div class="pep-hint">⌘S сохранить · ⌘Z отменить · клик по тексту — правка · правый клик — меню блока</div>
+    </div>`;
   document.body.appendChild(bar);
   $$('.peth-dot', bar).forEach((d) => d.addEventListener('click', async () => {
     flash('Применяю тему…', 0);
@@ -886,7 +910,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   }
   const railCss = document.createElement('style');
   railCss.textContent = `
-.perail{position:fixed;right:14px;top:72px;bottom:20px;width:166px;z-index:890;background:linear-gradient(180deg,rgba(10,24,51,.94),rgba(6,17,38,.94));backdrop-filter:blur(12px);border:1px solid rgba(134,175,255,.16);border-radius:16px;padding:12px 9px;overflow-y:auto;font-family:Manrope,sans-serif;scrollbar-width:thin;box-shadow:0 20px 50px -18px rgba(6,17,38,.6)}
+.perail{position:fixed;left:14px;top:16px;bottom:16px;width:166px;z-index:890;background:linear-gradient(180deg,rgba(10,24,51,.94),rgba(6,17,38,.94));backdrop-filter:blur(12px);border:1px solid rgba(134,175,255,.16);border-radius:16px;padding:12px 9px;overflow-y:auto;font-family:Manrope,sans-serif;scrollbar-width:thin;box-shadow:0 20px 50px -18px rgba(6,17,38,.6)}
 .perail-hd{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C9BFF;padding:2px 8px 9px;font-weight:700}
 .peth{display:flex;gap:8px;align-items:center;padding:8px 9px;border-radius:10px;cursor:pointer;color:#CFE0FF;font-size:11.5px;font-weight:600;transition:background .15s}
 .peth:hover{background:rgba(37,99,235,.28)}

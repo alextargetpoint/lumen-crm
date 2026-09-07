@@ -4337,7 +4337,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=29"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=33"></script>` : ''}
 </body></html>`);
       return;
     }
