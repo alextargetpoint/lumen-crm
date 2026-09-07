@@ -1441,17 +1441,43 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
     if (p === '/api/ads' && req.method === 'GET') {
+      const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+      const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
+      const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const stats = db.ads.map(ad => {
         const mine = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
+        const leads = mine.length;
+        const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
+        const qualified = mine.filter(l => QUAL.includes(l.stage)).length;
+        const deals = mine.filter(l => l.stage === 'deal').length;
+        const spend = +ad.spend || 0;
         return Object.assign({}, ad, {
-          leads: mine.length,
-          qualified: mine.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage)).length,
-          deals: mine.filter(l => l.stage === 'deal').length,
+          leads, dialogs, qualified, deals, spend,
+          cpl: leads ? Math.round(spend / leads) : 0,
+          cpa: deals ? Math.round(spend / deals) : 0,
+          qualRate: rate(qualified, leads),
+          dealRate: rate(deals, leads),
         });
       });
+      const sum = (k) => stats.reduce((a, x) => a + (x[k] || 0), 0);
+      const tLeads = sum('leads'), tQual = sum('qualified'), tDeals = sum('deals'), tSpend = sum('spend'), tDialogs = sum('dialogs');
+      const totals = { ads: stats.length, leads: tLeads, dialogs: tDialogs, qualified: tQual, deals: tDeals, spend: tSpend,
+        cpl: tLeads ? Math.round(tSpend / tLeads) : 0, cpa: tDeals ? Math.round(tSpend / tDeals) : 0,
+        qualRate: rate(tQual, tLeads), dialogRate: rate(tDialogs, tLeads), dealRate: rate(tDeals, tLeads) };
+      const geo = {};
+      for (const ad of stats) { const g = ad.geo || '—'; geo[g] = geo[g] || { name: db.settings.geoNames[g] || g, leads: 0, qualified: 0, deals: 0, spend: 0 }; geo[g].leads += ad.leads; geo[g].qualified += ad.qualified; geo[g].deals += ad.deals; geo[g].spend += ad.spend; }
       const unmatched = db.leads.filter(l => l.ads && l.ads.adId && !l.ads.matched)
         .map(l => ({ leadId: l.id, name: l.name, adId: l.ads.adId }));
-      return json(res, 200, { ads: stats, unmatched, intakeLog: db.intakeLog.slice(0, 30), hooks: { secret: db.settings.hooks.secret, outboundUrl: db.settings.hooks.outboundUrl } });
+      return json(res, 200, { ads: stats, totals, geo, unmatched, intakeLog: db.intakeLog.slice(0, 30), hooks: { secret: db.settings.hooks.secret, outboundUrl: db.settings.hooks.outboundUrl } });
+    }
+    /* правка расхода по объявлению (для CPL/CPA) */
+    if ((m = p.match(/^\/api\/ads\/([^/]+)\/spend$/)) && req.method === 'POST') {
+      const b = await readBody(req);
+      const ad = db.ads.find(a => String(a.adId) === String(m[1]));
+      if (!ad) return json(res, 404, { error: 'not found' });
+      ad.spend = Math.max(0, +b.spend || 0);
+      store.save();
+      return json(res, 200, { ok: true, spend: ad.spend });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);

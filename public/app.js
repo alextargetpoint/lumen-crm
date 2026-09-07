@@ -3361,6 +3361,17 @@ PAGES.ads = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
+    ${(() => { const t = d.totals || {}; const money = n => '$' + Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
+      return `<div class="ad-kpis">
+        ${tile('Лидов с рекламы', t.leads || 0, `${t.ads || 0} объявлений`)}
+        ${tile('Диалоги', t.dialogs || 0, `${t.dialogRate || 0}% от лидов`)}
+        ${tile('Квалы', t.qualified || 0, `${t.qualRate || 0}% квал-рейт`)}
+        ${tile('Сделки', t.deals || 0, `${t.dealRate || 0}% от лидов`)}
+        ${tile('Расход', money(t.spend), 'по всем объявлениям')}
+        ${tile('CPL', money(t.cpl), 'цена лида', true)}
+        ${tile('CPA', money(t.cpa), 'цена сделки', true)}
+      </div>`; })()}
     <div class="two-col">
       <div>
         <div class="glass card mb">
@@ -3389,15 +3400,20 @@ PAGES.ads = async (root) => {
       </div>
       <div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Объявления · лиды · квалы<span class="sub">${d.ads.length} в базе</span></div>
-          <table class="tbl"><thead><tr><th>Объявление</th><th>Лиды</th><th>Квалы</th><th>Сделки</th></tr></thead><tbody>
-            ${d.ads.map(a => `<tr>
-              <td><b>${esc(a.name)}</b><div class="muted" style="font-size:10.5px">${esc(a.campaignName || '')}${a.adsetName ? ' · ' + esc(a.adsetName) : ''} · <code class="pill" style="font-size:9.5px">${esc(a.adId)}</code></div></td>
+          <div class="card-title">${ic(I.target)}Эффективность объявлений<span class="sub">воронка · CPL · расход</span></div>
+          <table class="tbl ad-tbl"><thead><tr><th>Объявление</th><th>Лиды</th><th>Диал.</th><th>Квал.</th><th>Сделки</th><th>Расход $</th><th>CPL</th></tr></thead><tbody>
+            ${d.ads.slice().sort((a, b) => b.leads - a.leads).map(a => `<tr>
+              <td><b>${esc(a.name)}</b><div class="muted" style="font-size:10.5px">${esc(a.campaignName || '')}${a.adsetName ? ' · ' + esc(a.adsetName) : ''}</div>
+                <div class="ad-funnel" title="лиды → диалоги → квалы → сделки">${[['leads', '#2563EB'], ['dialogs', '#7C9BFF'], ['qualified', '#12855F'], ['deals', '#E4813D']].map(([k, c]) => `<span style="flex:${Math.max(a[k], 0.02)};background:${c}" title="${k}: ${a[k]}"></span>`).join('')}</div></td>
               <td><b>${a.leads}</b></td>
-              <td>${a.qualified}${a.leads ? ` <span class="muted" style="font-size:10px">(${Math.round(a.qualified / a.leads * 100)}%)</span>` : ''}</td>
+              <td>${a.dialogs}</td>
+              <td>${a.qualified}${a.leads ? `<span class="muted" style="font-size:9.5px"> ${a.qualRate}%</span>` : ''}</td>
               <td>${a.deals}</td>
-            </tr>`).join('') || '<tr><td colspan="4" class="empty">Объявлений нет — загрузите таблицей слева</td></tr>'}
+              <td><input class="ad-spend" data-adid="${esc(a.adId)}" type="number" value="${a.spend || ''}" placeholder="0" style="width:74px"></td>
+              <td><b>${a.cpl ? '$' + a.cpl : '—'}</b></td>
+            </tr>`).join('') || '<tr><td colspan="7" class="empty">Объявлений нет — загрузите таблицей слева</td></tr>'}
           </tbody></table>
+          ${d.geo && Object.keys(d.geo).length > 1 ? `<div class="ad-geo">${Object.values(d.geo).map(g => `<div class="ad-geo-row"><span class="ad-geo-nm">${esc(g.name)}</span><span class="muted">${g.leads} лид · ${g.qualified} квал · ${g.deals} сдел.</span></div>`).join('')}</div>` : ''}
           ${d.unmatched.length ? coll('Лиды с неизвестным ad_id', d.unmatched.map(x => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(x.name)}</div><div class="sd">ad_id: ${esc(x.adId)} — добавьте объявление в базу, мэтчинг пройдёт сам</div></div></div>`).join(''), { open: false, count: d.unmatched.length, icon: I.x }) : ''}
         </div>
         ${coll('Журнал приёма', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: true, count: d.intakeLog.length, icon: I.bolt })}
@@ -3411,6 +3427,10 @@ PAGES.ads = async (root) => {
     toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
     render();
   });
+  $$('.ad-spend', root).forEach(inp => inp.addEventListener('change', async () => {
+    await api.post(`/ads/${encodeURIComponent(inp.dataset.adid)}/spend`, { spend: +inp.value || 0 });
+    render();
+  }));
 };
 
 /* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */

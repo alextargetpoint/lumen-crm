@@ -1770,6 +1770,26 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 /* 2. Ripple убран (Material-волна «раскрывала» кнопки при клике — не в стиле продукта) */
 .btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
 
+/* реклама: KPI-плитки в стиле клиентского дашборда */
+.ad-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 1200px) { .ad-kpis { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 640px) { .ad-kpis { grid-template-columns: repeat(2, 1fr); } }
+.ad-tile { background: var(--card); border: 1px solid var(--stroke); border-radius: var(--r-md); padding: 13px 15px; box-shadow: var(--shadow); }
+.ad-tile.accent { background: linear-gradient(160deg, var(--navy-700), var(--navy-900)); border-color: var(--navy-700); }
+.ad-tile.accent .at-lbl, .ad-tile.accent .at-sub { color: #9DB8FF; }
+.ad-tile.accent .at-val { color: #fff; }
+.at-lbl { font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.at-val { font-size: 24px; font-weight: 700; color: var(--navy-900); margin-top: 6px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.at-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+.ad-tbl td { vertical-align: top; }
+.ad-tbl input.ad-spend { padding: 5px 7px; font-size: 12.5px; }
+.ad-funnel { display: flex; gap: 2px; height: 5px; border-radius: 3px; overflow: hidden; margin-top: 6px; max-width: 220px; }
+.ad-funnel span { display: block; min-width: 2px; }
+.ad-geo { margin-top: 12px; border-top: 1px solid var(--stroke-soft); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ad-geo-row { display: flex; justify-content: space-between; font-size: 12.5px; }
+.ad-geo-nm { font-weight: 600; color: var(--navy-900); }
+html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke); }
+
 /* первое касание в карточке лида */
 .lc-creo { border: 1px dashed var(--stroke); border-radius: 10px; min-height: 56px; display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 12px; background: var(--bg-2); overflow: hidden; text-align: center; padding: 8px; }
 .lc-creo.has { border-style: solid; padding: 0; }
