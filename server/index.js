@@ -779,8 +779,8 @@ const sanSlide = (s) => ({
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
   tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
-  mode: (s.mode === 'stats' || s.mode === 'steps') ? s.mode : '',
-  items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160) })).filter(x => x.k || x.v || x.text) : [],
+  mode: (s.mode === 'stats' || s.mode === 'steps' || s.mode === 'gauges') ? s.mode : '',
+  items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))) })).filter(x => x.k || x.v || x.text) : [],
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 /* фактические слайды из данных проекта: «Цифры» (сетка) и «План» (нумерованный разбор) */
@@ -790,19 +790,21 @@ function factSlides(facts) {
   /* короткие «пунчевые» значения для сетки цифр (факты приходят фразами — вытаскиваем суть) */
   const short = (s, n = 16) => { s = String(s || '').trim(); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; };
   const price = facts.priceFrom ? (String(facts.priceFrom).match(/(?:от\s*)?[$€£]?\s?[\d.,]+\s?(?:k|к|тыс|млн|m|mln)?/i) || [String(facts.priceFrom)])[0].trim() : '';
-  const roiPct = facts.roi ? (String(facts.roi).match(/\d+(?:[.,]\d+)?\s*%/g) || []).slice(0, 2).join(' / ') : '';
   const year = facts.handover ? (String(facts.handover).match(/\b(20\d{2})\b/) || [])[1] : '';
   const unitsN = facts.units ? String(facts.units).split(/[,;•]/).map(x => x.trim()).filter(Boolean).length : 0;
+  /* проценты из доходности → кольцевые диаграммы (гейджи): честные значения из фактов */
+  const roiMatches = facts.roi ? (String(facts.roi).match(/\d+(?:[.,]\d+)?\s*%/g) || []).slice(0, 2) : [];
+  const gauges = roiMatches.map((m, idx) => { const n = parseFloat(m.replace(',', '.')); return { v: m.replace(/\s+/g, ''), k: idx === 0 ? 'Доходность' : 'Рост цены', pct: Math.max(4, Math.min(100, n)) }; });
   const stat = [];
   if (price) stat.push({ k: 'Старт цены', v: short(price, 14) });
-  if (roiPct) stat.push({ k: 'Доходность', v: roiPct });
-  else if (facts.roi) stat.push({ k: 'Доходность', v: short(facts.roi, 14) });
+  if (!gauges.length && facts.roi) stat.push({ k: 'Доходность', v: short(facts.roi, 14) });
   const plF = (n) => (n % 10 === 1 && n % 100 !== 11) ? 'формат' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'формата' : 'форматов';
   if (unitsN >= 2) stat.push({ k: 'Планировки', v: unitsN + ' ' + plF(unitsN) });
   else if (facts.units) stat.push({ k: 'Формат', v: short(facts.units, 14) });
   if (year) stat.push({ k: 'Сдача', v: year });
   else if (facts.handover) stat.push({ k: 'Сдача', v: short(facts.handover, 14) });
   if (stat.length >= 2) out.push(sanSlide({ eyebrow: 'ЦИФРЫ', heading: 'Коротко о главном', mode: 'stats', items: stat.slice(0, 4), pos: 'center', size: 'm' }));
+  if (gauges.length) out.push(sanSlide({ eyebrow: 'ДОХОДНОСТЬ', heading: 'Инвест-показатели', mode: 'gauges', items: gauges, pos: 'center', size: 'm' }));
   const steps = [];
   steps.push({ text: 'Бронирование — фиксируем лот и цену старта' });
   if (facts.payment) steps.push({ text: String(facts.payment) });
@@ -810,6 +812,23 @@ function factSlides(facts) {
   steps.push({ text: (facts.handover ? 'Сдача ' + facts.handover + ' — ' : '') + 'получение ключей и заселение' });
   out.push(sanSlide({ eyebrow: 'ПЛАН', heading: 'Как проходит покупка', mode: 'steps', items: steps.slice(0, 4), pos: 'top', size: 's' }));
   return out;
+}
+
+/* галерея-раскладки: чередуем композиции, чтобы слайды не были однотипными
+   (2×2 сетка / герой+лента / скрапбук-внахлёст с наклоном / два крупных / стопка-этикетка) */
+function galleryLayout(set, variant) {
+  const n = set.length;
+  const L = (u, o) => sanLayer(Object.assign({ t: 'img', url: u, round: 12 }, o));
+  if (n >= 4) {
+    if (variant % 2 === 1) return [L(set[0], { x: 8, y: 15, w: 84, h: 40, z: 1 }), L(set[1], { x: 8, y: 60, w: 26, h: 28, z: 2 }), L(set[2], { x: 37, y: 60, w: 26, h: 28, z: 3 }), L(set[3], { x: 66, y: 60, w: 26, h: 28, z: 4 })];
+    return set.slice(0, 4).map((u, k) => L(u, { x: k % 2 === 0 ? 6 : 52, y: k < 2 ? 30 : 64, w: 42, h: 31, z: k + 1 }));
+  }
+  if (n === 3) {
+    if (variant % 2 === 1) return [L(set[0], { x: 8, y: 14, w: 84, h: 42, z: 1 }), L(set[1], { x: 8, y: 60, w: 40, h: 28, z: 2 }), L(set[2], { x: 52, y: 60, w: 40, h: 28, z: 3 })];
+    return [L(set[0], { x: 6, y: 22, w: 47, h: 40, z: 1, rot: -4 }), L(set[1], { x: 42, y: 32, w: 47, h: 40, z: 2, rot: 3 }), L(set[2], { x: 22, y: 55, w: 45, h: 34, z: 3, rot: -2 })];
+  }
+  if (variant % 2 === 1) return [L(set[0], { x: 10, y: 15, w: 80, h: 40, z: 1, rot: -2 }), L(set[1], { x: 16, y: 56, w: 70, h: 34, z: 2, rot: 3 })];
+  return set.map((u, k) => L(u, { x: k === 0 ? 5 : 52, y: 28, w: 44, h: 46, z: k + 1 }));
 }
 
 /* ═══ Авто-конструктор слайдов: раскладка фото ПО РОЛЯМ с вариациями композиции ═══
@@ -849,10 +868,7 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
   let gi = 0;
   for (let g = 0; g < galSlides && uniq.length - gi >= 2; g++) {
     const set = uniq.slice(gi, gi + 4); gi += set.length;
-    const layers = set.length >= 3
-      ? set.slice(0, 4).map((u, k) => sanLayer({ t: 'img', url: u, x: k % 2 === 0 ? 6 : 52, y: k < 2 ? 30 : 64, w: 42, h: 31, round: 12, z: k + 1 }))
-      : set.map((u, k) => sanLayer({ t: 'img', url: u, x: k === 0 ? 5 : 52, y: 28, w: 44, h: 46, round: 12, z: k + 1 }));
-    inserts.push(sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'ГАЛЕРЕЯ', pos: 'top', size: 's', layers }));
+    inserts.push(sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'ГАЛЕРЕЯ', pos: 'top', size: 's', layers: galleryLayout(set, g) }));
   }
   const at = Math.max(1, out.length - 1);                              /* перед финальным CTA */
   out.splice(at, 0, ...inserts);
@@ -4025,6 +4041,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}>${sanInline(s.heading)}</h2>
             ${s.mode === 'stats' && (s.items || []).length ? `<div class="s-stats">${s.items.map(it => `<div class="s-stat"><b>${esc(it.v || it.k)}</b><i>${esc(it.v ? it.k : '')}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
+            ${s.mode === 'gauges' && (s.items || []).length ? `<div class="s-gauges">${s.items.map(it => { const C = 2 * Math.PI * 32, off = (C * (1 - (it.pct || 0) / 100)).toFixed(1); return `<div class="s-gauge"><svg viewBox="0 0 80 80"><circle class="gg-bg" cx="40" cy="40" r="32"/><circle class="gg-fg" cx="40" cy="40" r="32" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off}"/><text class="gg-t" x="40" y="46" text-anchor="middle">${esc(it.v)}</text></svg><i>${esc(it.k)}</i></div>`; }).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>` : ''}
             <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
@@ -4058,6 +4075,7 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 /* слои: фигуры/стикеры/фото/текст */
 .s-lyr{position:absolute}
 .s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
+.s-lyr.lyr-img img{box-shadow:0 10px 28px -10px rgba(6,17,38,.5)}
 .s-lyr.lyr-sticker{aspect-ratio:1}.s-lyr .lyr-ic{height:100%}
 .s-lyr .lyr-shape svg{filter:drop-shadow(0 6px 16px rgba(0,0,0,.18))}
 /* рамки (оверлей на весь слайд) */
@@ -4132,6 +4150,17 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .s-step{color:rgba(255,255,255,.92)}
 .s-step-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;font-family:'Manrope',sans-serif}
 .slide.hasbg .s-step-n{background:#fff;color:var(--blue)}
+.s-gauges{display:flex;gap:26px;margin-top:12px;flex-wrap:wrap}
+.s-gauge{display:flex;flex-direction:column;align-items:center;gap:9px}
+.s-gauge svg{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px)}
+.gg-bg,.gg-fg{fill:none;stroke-width:7;transform:rotate(-90deg);transform-origin:40px 40px}
+.gg-bg{stroke:color-mix(in srgb,var(--ink) 13%,transparent)}
+.gg-fg{stroke:var(--blue);stroke-linecap:round;transition:stroke-dashoffset .7s ease}
+.gg-t{font-family:var(--disp);font-optical-sizing:auto;font-size:19px;font-weight:600;fill:var(--blue)}
+.slide.hasbg .gg-bg{stroke:rgba(255,255,255,.22)}
+.slide.hasbg .gg-fg{stroke:#fff}.slide.hasbg .gg-t{fill:#fff}
+.s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
+.slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
