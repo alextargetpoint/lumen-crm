@@ -904,11 +904,30 @@ PAGES.overview = async (root) => {
   const kdQual = kd(_cnt(_qualTs, _now - _wk, _now), _cnt(_qualTs, _now - 2 * _wk, _now - _wk));
   root.innerHTML = `
     <div class="kpis">
-      <div class="kpi glass"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}${kdNew}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
-      <div class="kpi glass"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
-      <div class="kpi glass"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}${kdQual}</div><div class="delta">${f.deal} дошло до сделки</div></div>
-      <div class="kpi glass"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
+      <div class="kpi glass ov-click" data-ovgo="funnel" title="Открыть воронку"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}${kdNew}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
+      <div class="kpi glass ov-click" data-ovgo="inbox" title="Открыть диалоги"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
+      <div class="kpi glass ov-click" data-ovgo="funnel" title="Открыть воронку"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}${kdQual}</div><div class="delta">${f.deal} дошло до сделки</div></div>
+      <div class="kpi glass ov-click" data-ovgo="analytics" title="Открыть аналитику"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
     </div>
+    ${(() => {
+      const waiting = leads.filter(l => l.lastDir === 'in' && l.stage !== 'lost').length;
+      const needHuman = leads.filter(l => (l.tags || []).includes('нужен человек')).length;
+      const sleeping = f.sleeping || 0;
+      const meetWeek = (an.meetingsWeek != null) ? an.meetingsWeek : null;
+      const jump = [
+        { go: 'inbox', ic: I.chat, v: waiting, k: 'ждут ответа', hot: waiting > 0 },
+        { go: 'inbox', ic: I.shield, v: needHuman, k: 'нужен человек', hot: needHuman > 0 },
+        { go: 'meetings', ic: I.cal, v: (an.meetingsWeek != null ? an.meetingsWeek : '—'), k: 'встреч на неделе' },
+        { go: 'wake', ic: I.moon, v: sleeping, k: 'спящих — разбудить' },
+        { go: 'ads', ic: I.target, v: (an.adLeads != null ? an.adLeads : '—'), k: 'лидов с рекламы' },
+        { go: 'brokers', ic: I.users, v: (STATE.brokers || []).filter(b => b.active !== false).length, k: 'брокеров в работе' },
+      ];
+      return `<div class="ov-jump">${jump.map(j => `<button class="ov-jcard ${j.hot ? 'hot' : ''}" data-ovgo="${j.go}">
+        <span class="ov-jic">${ic(j.ic)}</span>
+        <span class="ov-jv">${j.v}</span>
+        <span class="ov-jk">${j.k}</span>
+      </button>`).join('')}</div>`;
+    })()}
     ${(() => {
       /* онбординг-чеклист агентства: тихий, исчезает когда всё готово */
       const s2 = STATE.settings;
@@ -993,6 +1012,7 @@ PAGES.overview = async (root) => {
       </div>
     </div>`;
   $$('[data-obgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.obgo)));
+  $$('[data-ovgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.ovgo)));
   $$('[data-f3go]', root).forEach(r => {
     r.addEventListener('click', () => go('funnel'));
     /* наведение на стадию подсвечивает соответствующий ярус стеклянной воронки */
