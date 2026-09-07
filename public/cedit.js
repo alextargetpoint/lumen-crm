@@ -138,6 +138,11 @@ body.cpanel-on{padding-right:308px!important}
 .cctx button{display:block;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#2A3346;cursor:pointer;font-family:inherit}
 .cctx button:hover{background:#EEF3FF;color:#2563EB}
 .cctx button.dng:hover{background:#FDEEEC;color:#E0483D}
+.celem-add-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
+.celem-add{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid #E1E8F4;border-radius:12px;background:#fff;cursor:pointer;padding:11px 4px 8px;font-size:11px;font-weight:600;color:#5E6470;font-family:inherit;transition:border-color .12s,color .12s,transform .12s}
+.celem-add:hover{border-color:#2563EB;color:#2563EB;transform:translateY(-2px)}
+.celem-add-ic{width:34px;height:34px;border-radius:10px;background:#EEF3FF;display:flex;align-items:center;justify-content:center;color:#2563EB}
+.celem-add-ic svg{width:19px;height:19px}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
