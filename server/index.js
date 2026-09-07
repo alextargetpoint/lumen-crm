@@ -257,6 +257,7 @@ const DEFAULT_PASS = 'lumen2026';
     { id: 'pr_bali1', name: 'Nuanu Ecoverse Villas', area: 'Берава', developer: 'Nuanu', market: 'offplan', type: 'Villa 2BR', beds: 2, priceFrom: 250000, currency: 'USD', handover: 'Q3 2026', payment: '50/50', geo: 'bali', tags: ['вилла', 'управление'], materials: [], note: 'Лизхолд 30 лет' },
   ];
   if (!db.collections) db.collections = [];
+  if (!db.carousels) db.carousels = [];
   if (!db.folders) db.folders = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
@@ -1614,6 +1615,60 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, mt);
     }
 
+    /* ---------------- соц-помощник: карусели ---------------- */
+    if (p === '/api/carousels' && req.method === 'GET') {
+      return json(res, 200, db.carousels.map(c => Object.assign({}, c, { editKey: db.settings.hooks.secret })));
+    }
+    if (p === '/api/carousels' && req.method === 'POST') {
+      const b = await readBody(req);
+      let slides = [{ heading: 'Заголовок карусели', sub: 'Подпись — кликните, чтобы отредактировать' }, { heading: 'Слайд 2', sub: 'Текст слайда' }, { heading: 'Оставьте заявку', sub: 'Напишите нам в директ' }];
+      let title = String(b.title || 'Карусель').slice(0, 120);
+      if (b.ai && llm.available()) {
+        try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo); title = out.title; slides = out.slides; }
+        catch (e) { /* ИИ не справился — стартовые слайды */ }
+      }
+      const c = {
+        id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
+        format: b.format === 'portrait' ? 'portrait' : 'square', theme: b.theme || 'klein', fontPreset: b.fontPreset || 'soft',
+        slides: slides.map(s => ({ heading: String(s.heading || '').slice(0, 90), sub: String(s.sub || '').slice(0, 240), bg: '' })),
+        createdAt: Date.now(),
+      };
+      db.carousels.unshift(c); store.save();
+      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret });
+    }
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.title != null) c.title = String(b.title).slice(0, 120);
+      if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
+      if (b.fontPreset && FONT_PRESETS[b.fontPreset]) c.fontPreset = b.fontPreset;
+      if (b.format) c.format = b.format === 'portrait' ? 'portrait' : 'square';
+      if (Array.isArray(b.slides)) c.slides = b.slides.slice(0, 12).map(s => ({ heading: String(s.heading || '').slice(0, 90), sub: String(s.sub || '').slice(0, 240), bg: /^(assets\/|\/assets\/|https?:\/\/)/.test(String(s.bg || '')) ? String(s.bg).slice(0, 500) : '' }));
+      store.save();
+      return json(res, 200, { ok: true, count: c.slides.length });
+    }
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      db.carousels = db.carousels.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* ИИ-картинка фона слайда (переиспользуем генератор) */
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/ai-bg$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY' });
+      const b = await readBody(req);
+      const pr = String(b.prompt || '').trim();
+      if (!pr) return json(res, 400, { error: 'опишите фон' });
+      try {
+        const buf = await llm.generateImage(pr + ', premium real-estate social media background, cinematic, elegant, no text, no watermark', { size: '1024x1024', quality: 'medium' });
+        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        const fname = `lib/car-${crypto.randomBytes(5).toString('hex')}.png`;
+        fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+        return json(res, 200, { url: '/assets/' + fname });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
     if (p === '/api/ads' && req.method === 'GET') {
       const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
@@ -2631,6 +2686,66 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         `SUMMARY:${kindRu} · ${db.settings.agency.name}`,
         `DESCRIPTION:${(broker.name ? 'Эксперт: ' + broker.name + '. ' : '') + (mt.link ? 'Видео: ' + mt.link : '')}`,
         mt.link ? `URL:${mt.link}` : '', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n'));
+      return;
+    }
+
+    /* ================= карусель для соцсетей: /car/:id ================= */
+    if ((m = p.match(/^\/car\/([a-f0-9]+)$/)) && req.method === 'GET') {
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) { res.writeHead(404); res.end('not found'); return; }
+      const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
+      const isPrint = u.searchParams.get('print') === '1';
+      const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
+      const font = FONT_PRESETS[c.fontPreset] || FONT_PRESETS.soft;
+      const AG = db.settings.agency.name;
+      const logo = db.settings.agency.logo;
+      const ce = (f, i) => isEdit ? ` data-ce="${i}:${f}"` : '';
+      const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
+      const slides = (c.slides || []).map((s, i) => {
+        const hasBg = !!s.bg;
+        return `<div class="slide${hasBg ? ' hasbg' : ''}" data-idx="${i}" style="${hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.6)),url('${esc(abs(s.bg))}')` : ''}">
+          ${isEdit ? `<div class="s-tools"><button data-sop="bg" title="Фон">${'▦'}</button><button data-sop="up" title="Выше">↑</button><button data-sop="down" title="Ниже">↓</button><button data-sop="del" title="Удалить">✕</button></div>` : ''}
+          <div class="s-in">
+            <span class="s-num">${i + 1} / ${c.slides.length}</span>
+            <h2 class="s-h"${ce('heading', i)}>${esc(s.heading || '')}</h2>
+            <p class="s-s"${ce('sub', i)}>${esc(s.sub || '')}</p>
+            <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : esc(AG)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(c.title)} — ${esc(AG)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?${font.gf}&display=swap" rel="stylesheet">
+<style>
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${font.disp}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:${font.body},sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
+.wrap{max-width:${c.format === 'portrait' ? '460px' : '560px'};margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.slide{position:relative;aspect-ratio:${c.format === 'portrait' ? '4/5' : '1/1'};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex}
+.slide.hasbg{color:#fff}
+.slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
+.s-in{position:relative;padding:11% 10%;display:flex;flex-direction:column;justify-content:center;width:100%;gap:14px}
+.slide:first-child .s-in{justify-content:flex-end}
+.s-num{position:absolute;top:8%;left:10%;font-size:13px;font-weight:600;color:var(--mut);letter-spacing:.05em}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:clamp(26px,6.2vw,40px);line-height:1.08;letter-spacing:-.02em}
+.slide.hasbg .s-h{color:#fff}
+.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:92%}
+.slide.hasbg .s-s{color:rgba(255,255,255,.92)}
+.s-brand{position:absolute;bottom:8%;left:10%;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
+.s-brand img{height:26px;max-width:130px;object-fit:contain}
+[data-ce]{outline:1.5px dashed transparent;border-radius:4px;transition:outline .12s}
+${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}` : ''}
+.s-tools{position:absolute;top:10px;right:10px;z-index:5;display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.slide:hover .s-tools{opacity:1}
+.s-tools button{width:30px;height:30px;border:none;border-radius:8px;background:rgba(6,17,38,.8);color:#fff;cursor:pointer;font-size:14px;backdrop-filter:blur(6px)}
+.s-tools button:hover{background:var(--blue)}
+@media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tools{display:none}}
+</style></head><body>
+<div class="wrap">${slides}</div>
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, fontPreset: c.fontPreset, format: c.format, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=1"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+</body></html>`);
       return;
     }
 

@@ -1821,6 +1821,26 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .share-linkrow input { flex: 1; font-size: 12.5px; color: var(--ink-2); background: var(--bg-2); }
 .share-b { justify-content: flex-start; width: 100%; }
 
+/* соц-помощник: карусели */
+.car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.car-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.car-prev { aspect-ratio: 1/1; display: grid; place-items: center; padding: 22px; background: linear-gradient(160deg, #1D34D8, #0A1833); color: #fff; text-align: center; }
+.car-prev.portrait { aspect-ratio: 4/5; }
+.car-h { font-family: var(--font-display); font-optical-sizing: auto; font-weight: 600; font-size: 19px; line-height: 1.15; letter-spacing: -.01em; }
+.car-body { padding: 13px 15px; }
+.car-body .nm { font-size: 14px; font-weight: 650; color: var(--navy-900); }
+.car-acts { display: flex; gap: 6px; margin-top: 12px; align-items: center; }
+.car-prev.th-royal { background: linear-gradient(160deg, #5B2BD8, #12081F); }
+.car-prev.th-emerald { background: linear-gradient(160deg, #0E7A5F, #07211A); }
+.car-prev.th-champagne { background: linear-gradient(160deg, #A8791F, #241F14); }
+.car-prev.th-noir { background: linear-gradient(160deg, #2A2A38, #0B0B12); }
+.car-prev.th-mocha { background: linear-gradient(160deg, #7A5C43, #2A2018); }
+.car-prev.th-sage { background: linear-gradient(160deg, #5C6E5A, #1E2620); }
+.car-prev.th-bordeaux { background: linear-gradient(160deg, #7C2D3A, #241318); }
+.car-prev.th-slate { background: linear-gradient(160deg, #3E4A5B, #141922); }
+.car-prev.th-terracotta { background: linear-gradient(160deg, #B0532E, #2A1810); }
+.car-prev.th-midnight { background: linear-gradient(160deg, #C7B08A, #111524); color: #12121a; }
+
 /* эмулятор прогрева номеров */
 .warmup-warn { display: flex; gap: 10px; font-size: 12px; line-height: 1.55; color: var(--ink-2); background: var(--warn-bg); border: 1px solid #F0DCA8; border-radius: 12px; padding: 12px 14px; }
 .warmup-warn svg { width: 18px; height: 18px; color: var(--warn); flex: 0 0 18px; margin-top: 1px; }

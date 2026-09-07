@@ -334,6 +334,7 @@ const NAV = {
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
   ads:       { name: 'Реклама', icon: I.target, sub: '' },
   comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
+  social:    { name: 'Соц-помощник', icon: I.layers, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: '' },
@@ -349,7 +350,7 @@ const NAV = {
    меняется только группировка в меню. Минус ~9 пунктов из бокового меню. */
 const WORKSPACES = {
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
-  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'comments', 'wake'] },
+  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'comments', 'social', 'wake'] },
   engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
   config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
@@ -3759,6 +3760,67 @@ PAGES.comments = async (root) => {
 };
 
 /* ---------------- НОМЕРА ---------------- */
+/* ---------------- СОЦ-ПОМОЩНИК: карусели ---------------- */
+const CAR_TPL = { project: 'Новый проект', reasons: '3–5 причин инвестировать', review: 'Отзыв клиента / кейс', digest: 'Подборка недели', tips: 'Гид покупателя' };
+const CAR_THEMES = { klein: 'Klein', royal: 'Royal', emerald: 'Emerald', champagne: 'Champagne', noir: 'Noir', mocha: 'Mocha', sage: 'Sage', bordeaux: 'Bordeaux', slate: 'Slate', terracotta: 'Terracotta', midnight: 'Midnight' };
+const CAR_FONTS = { soft: 'Мягкий люкс', editorial: 'Глянец', studio: 'Дизайн-студия', minimal: 'Минимал', tech: 'Модерн' };
+PAGES.social = async (root) => {
+  const cars = await api.get('/carousels');
+  root.innerHTML = `
+    ${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I.layers)}Соц-помощник<span class="sub">ИИ-карусели для Instagram и Threads</span></div>
+      <div class="ha-row" data-ha><span class="nm2">Каруселей собрано<div class="sub2">тексты пишет ИИ, стили — люкс</div></span><span class="sp2"></span><span class="val2">${cars.length}</span></div>
+    `, { v: 'right', hue: '#7C5BD8' })}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="lp-sec" style="margin:0">Мои карусели · ${cars.length}</div>
+      <button class="btn btn-accent" id="carNew">${ic(I.plus)}Новая карусель</button>
+    </div>
+    <div class="car-grid">
+      ${cars.map(c => `<div class="glass car-card" data-car="${c.id}">
+        <div class="car-prev ${esc(c.format)} th-${esc(c.theme)}"><span class="car-h">${esc((c.slides[0] || {}).heading || 'Слайд')}</span></div>
+        <div class="car-body">
+          <div class="nm">${esc(c.title)}</div>
+          <div class="muted" style="font-size:11.5px">${c.slides.length} слайдов · ${CAR_TPL[c.template] || ''} · ${ago(c.createdAt)}</div>
+          <div class="car-acts">
+            <a class="btn btn-sm btn-accent" href="/car/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Редактор</a>
+            <a class="btn btn-sm" href="/car/${c.id}" target="_blank" title="Просмотр">${ic(I.eye)}</a>
+            <a class="btn btn-sm" href="/car/${c.id}?print=1" target="_blank" title="Скачать PDF">${ic(I.doc)}</a>
+            <span class="tb-spacer"></span>
+            <button class="btn-ghost" data-cardel title="Удалить">${ic(I.x)}</button>
+          </div>
+        </div>
+      </div>`).join('') || '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}
+    </div>`;
+  $('#carNew').addEventListener('click', () => {
+    modal({
+      title: 'Новая карусель',
+      body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-row"><label>Шаблон</label><select id="carTpl">${Object.entries(CAR_TPL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option></select></div>
+        </div>
+        <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Стиль (тема)</label><select id="carTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Шрифт</label><select id="carFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        </div>
+        <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin-top:4px"><input type="checkbox" id="carAi" checked><span style="font-size:13px">✦ Написать тексты слайдов с ИИ</span></label>`,
+      actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
+        const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
+        try {
+          const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, fontPreset: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
+          toast('Карусель собрана', 'Открываю редактор', true);
+          window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+          render();
+        } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Собрать'; } return false; }
+      } }, { label: 'Отмена' }],
+    });
+  });
+  $$('[data-car]', root).forEach(card => card.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-cardel]')) { await fetch('/api/carousels/' + card.dataset.car, { method: 'DELETE' }); toast('Карусель удалена', null, true); render(); }
+  }));
+};
+
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;

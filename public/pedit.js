@@ -30,8 +30,8 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .fontpref:hover{background:#EEF3FF}
 .fontpref.on{border-color:#2563EB;background:#F5F8FF}
 .fp-aa{font-size:27px;line-height:1;width:38px;flex:0 0 38px;text-align:center;color:#0B1220}
-.fp-nm{display:flex;flex-direction:column;font-size:13px;font-weight:600;color:#0B1220;line-height:1.2}
-.fp-nm i{font-style:normal;font-size:14px;font-weight:500;color:#5E6470;margin-top:3px}
+.fp-nm{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px;font-weight:600;color:#0B1220;line-height:1.2;white-space:nowrap}
+.fp-nm i{font-style:normal;font-size:14px;font-weight:500;color:#5E6470;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .edbar .hint{opacity:.6;font-size:11.5px;color:#9DB8FF}
 .edbar .sp{flex:1}
 .pethemes{display:inline-flex;gap:6px;align-items:center;margin-left:10px}

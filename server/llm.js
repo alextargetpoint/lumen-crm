@@ -341,4 +341,30 @@ async function generateImage(prompt, opts = {}) {
   return Buffer.from(b64, 'base64');
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+/* ИИ-генератор карусели для соцсетей (недвижимость): заголовок + слайды */
+const CAROUSEL_TEMPLATES = {
+  project: { name: 'Новый проект', brief: 'обзор нового жилого проекта/ЖК: крючок, локация, планировки/цены, инфраструктура, доходность, призыв' },
+  reasons: { name: '3–5 причин инвестировать', brief: 'причины инвестировать в направление/объект: сильные аргументы по одному на слайд, финальный призыв' },
+  review: { name: 'Отзыв клиента / кейс', brief: 'история клиента: запрос → что подобрали → результат (доход/переезд), по-человечески, финальный призыв' },
+  digest: { name: 'Подборка недели', brief: '3–4 объекта недели: по объекту на слайд (крючок + цена + фишка), финальный призыв' },
+  tips: { name: 'Гид покупателя', brief: 'полезные советы по покупке недвижимости за рубежом: по одному совету на слайд, экспертно, финальный призыв' },
+};
+async function composeCarousel(topic, templateKey, count, agencyName, geo) {
+  const t = CAROUSEL_TEMPLATES[templateKey] || CAROUSEL_TEMPLATES.project;
+  const n = Math.max(4, Math.min(10, +count || 6));
+  const prompt = `Ты — SMM-копирайтер агентства недвижимости «${String(agencyName || 'агентство').slice(0, 80)}». Сделай текст для карусели в Instagram/Threads на ${n} слайдов.
+Формат: ${t.name} — ${t.brief}.
+${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}${geo ? 'Направление: ' + geo + '\n' : ''}
+Правила: живой человеческий язык, без клише и канцелярита, коротко (заголовок ≤ 40 символов, подпись ≤ 120). Первый слайд — сильный крючок. Последний — призыв к действию (написать в директ/оставить заявку). Цифры не выдумывай, если их нет во вводных — используй обтекаемо.
+Верни строго JSON:
+{"title":"название карусели (для внутреннего списка)",
+ "slides":[{"heading":"заголовок слайда","sub":"подпись 1-2 строки"}]}  // ровно ${n} слайдов`;
+  const out = await callGemini(prompt, 25000, 2000);
+  if (!out || !Array.isArray(out.slides) || !out.slides.length) throw new Error('bad carousel');
+  return {
+    title: String(out.title || t.name).slice(0, 120),
+    slides: out.slides.slice(0, 10).map(s => ({ heading: String(s.heading || '').slice(0, 90), sub: String(s.sub || '').slice(0, 240) })),
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, CAROUSEL_TEMPLATES, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
