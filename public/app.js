@@ -3792,6 +3792,16 @@ PAGES.numbers = async (root) => {
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
       </div>
     </div>
+    ${(() => { const w = STATE.settings.warmup || {}; return `<div class="glass card mb">
+      <div class="card-title">${ic(I.bolt)}Эмулятор прогрева (QR)<span class="sub">номера общаются между собой с делеями</span></div>
+      <div class="warmup-warn">${ic(I.shield)}<div><b>Неофициальный метод.</b> Номера подключаются по QR (протокол WhatsApp Web) и переписываются между собой, имитируя живую активность — это часто помогает прогреву, но <b>нарушает правила Meta</b> и несёт риск блокировки. Реальная отправка идёт через внешний мост; здесь — оркестрация и журнал.</div></div>
+      <div id="warmupState" style="margin-top:12px">
+        ${w.running
+          ? `<div class="warmup-live">${ic(I.spark)}<span>Прогрев идёт · обменов: <b id="wuCount">${w.count || 0}</b></span><span class="tb-spacer"></span><button class="btn btn-danger btn-sm" id="wuStop">Остановить</button></div>`
+          : `<button class="btn btn-accent" id="wuStart">${ic(I.bolt)}Запустить эмулятор прогрева</button>`}
+      </div>
+      <div class="warmup-log" id="warmupLog">${(w.log || []).slice(0, 12).map(e => `<div class="wu-msg"><b>${esc(e.from)}</b> → <b>${esc(e.to)}</b> <span>${esc(e.text)}</span><i>${tmm(e.at)}</i></div>`).join('') || '<div class="muted" style="font-size:12px;padding:8px">Журнал прогрева появится здесь</div>'}</div>
+    </div>`; })()}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="lp-sec" style="margin:0">Номера в пуле · ${st.numbers.length}</div>
       <button class="btn btn-accent btn-sm" id="numAdd">${ic(I.plus)}Добавить номер</button>
@@ -3843,6 +3853,30 @@ PAGES.numbers = async (root) => {
       } }, { label: 'Отмена' }],
     });
   });
+  /* --- эмулятор прогрева: вейвер + live-поллинг --- */
+  if (window.WARMUP_POLL) { clearInterval(window.WARMUP_POLL); window.WARMUP_POLL = null; }
+  const startWarmupPoll = () => {
+    if (window.WARMUP_POLL) clearInterval(window.WARMUP_POLL);
+    window.WARMUP_POLL = setInterval(async () => {
+      if (CUR !== 'numbers') { clearInterval(window.WARMUP_POLL); window.WARMUP_POLL = null; return; }
+      try {
+        const r = await api.post('/warmup/tick', {});
+        if (!r.running) { clearInterval(window.WARMUP_POLL); window.WARMUP_POLL = null; return; }
+        const c = $('#wuCount'); if (c && r.count != null) c.textContent = r.count;
+        if (r.exchange) { const log = $('#warmupLog'); if (log) { if (log.querySelector('.muted')) log.innerHTML = ''; const d = el(`<div class="wu-msg"><b>${esc(r.exchange.from)}</b> → <b>${esc(r.exchange.to)}</b> <span>${esc(r.exchange.text)}</span><i>сейчас</i></div>`); log.prepend(d); while (log.children.length > 12) log.lastChild.remove(); } }
+      } catch (e) {}
+    }, 3500);
+  };
+  if ((STATE.settings.warmup || {}).running) startWarmupPoll();
+  $('#wuStart')?.addEventListener('click', () => {
+    modal({
+      title: 'Согласие на запуск эмулятора прогрева',
+      body: `<div style="font-size:13px;line-height:1.65;color:var(--ink-2)">Эмулятор подключает номера по QR (неофициальный протокол WhatsApp Web) и заставляет их переписываться между собой. <b style="color:var(--bad)">Этот способ нарушает правила Meta/WhatsApp и может привести к блокировке номеров.</b> Это один из методов прогрева, который часто срабатывает, но не является «чистым» по регламенту.</div>
+        <label class="wu-consent"><input type="checkbox" id="wuAgree"><span>Я понимаю все риски (в том числе бан и блокировку номеров), <b>беру всю ответственность на себя</b> и снимаю с Lumen и его разработчиков любую ответственность за последствия использования эмулятора.</span></label>`,
+      actions: [{ label: 'Запустить прогрев', cls: 'btn-accent', onClick: async (bd) => { if (!$('#wuAgree', bd).checked) { toast('Отметьте согласие, чтобы продолжить'); return false; } await api.post('/warmup/consent', { agreed: true }); await api.post('/warmup/start', {}); toast('Эмулятор запущен', 'Номера прогреваются между собой', true); await loadState(); render(); } }, { label: 'Отмена' }],
+    });
+  });
+  $('#wuStop')?.addEventListener('click', async () => { await api.post('/warmup/stop', {}); if (window.WARMUP_POLL) { clearInterval(window.WARMUP_POLL); window.WARMUP_POLL = null; } toast('Прогрев остановлен', null, true); await loadState(); render(); });
 };
 
 /* ---------------- ШАБЛОНЫ ---------------- */

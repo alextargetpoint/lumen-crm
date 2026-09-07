@@ -1400,6 +1400,44 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, num);
     }
+    /* ---------- эмулятор прогрева номеров (между собой, с делеями) ----------
+       ⚠️ метод неофициальный (риск бана) — запускается ТОЛЬКО после явного согласия
+       пользователя (вейвер ответственности). Реальная отправка идёт через внешний
+       Mac-мост; здесь — оркестрация расписания + журнал. */
+    if (p === '/api/warmup/consent' && req.method === 'POST') {
+      const b = await readBody(req);
+      db.settings.warmup = db.settings.warmup || {};
+      db.settings.warmup.consent = { agreed: !!b.agreed, at: Date.now() };
+      if (!b.agreed) db.settings.warmup.running = false;
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    if ((p === '/api/warmup/start' || p === '/api/warmup/stop') && req.method === 'POST') {
+      db.settings.warmup = db.settings.warmup || {};
+      if (p.endsWith('start')) {
+        if (!(db.settings.warmup.consent && db.settings.warmup.consent.agreed)) return json(res, 400, { error: 'нужно согласие (вейвер ответственности)' });
+        db.settings.warmup.running = true;
+      } else db.settings.warmup.running = false;
+      store.save();
+      return json(res, 200, { ok: true, running: db.settings.warmup.running });
+    }
+    if (p === '/api/warmup/tick' && req.method === 'POST') {
+      const w = db.settings.warmup || {};
+      if (!(w.running && w.consent && w.consent.agreed)) return json(res, 200, { running: false, log: (w.log || []).slice(0, 30) });
+      const pool = db.numbers.filter(n => n.state === 'warming' || n.state === 'active');
+      if (pool.length < 2) return json(res, 200, { running: true, log: (w.log || []).slice(0, 30), note: 'нужно минимум 2 номера в пуле' });
+      const PHRASES = ['Привет! Как дела?', 'Смотрел новые проекты?', 'Да, договорились на завтра', 'Отправил, глянь пожалуйста', 'Ок, спасибо!', 'Позже наберу', 'Всё в силе?', 'Отлично, до связи', 'Принял, работаю', 'Как раз хотел написать'];
+      const i1 = Math.floor(pool.length * ((Date.now() / 1000) % pool.length) / pool.length) % pool.length;
+      const a = pool[i1]; let b2 = pool[(i1 + 1 + Math.floor((Date.now() / 3000) % (pool.length - 1))) % pool.length]; if (b2 === a) b2 = pool[(i1 + 1) % pool.length];
+      const text = PHRASES[Math.floor((Date.now() / 1500) % PHRASES.length)];
+      w.log = w.log || [];
+      w.log.unshift({ at: Date.now(), from: a.phone, to: b2.phone, text });
+      if (w.log.length > 80) w.log.length = 80;
+      w.count = (w.count || 0) + 1;
+      a.sentToday = (a.sentToday || 0) + 1;
+      store.save();
+      return json(res, 200, { running: true, exchange: { from: a.phone, to: b2.phone, text }, count: w.count, log: w.log.slice(0, 30) });
+    }
     if ((m = p.match(/^\/api\/numbers\/([^/]+)$/)) && req.method === 'DELETE') {
       const before = db.numbers.length;
       db.numbers = db.numbers.filter(n => n.id !== m[1]);

@@ -1821,6 +1821,19 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .share-linkrow input { flex: 1; font-size: 12.5px; color: var(--ink-2); background: var(--bg-2); }
 .share-b { justify-content: flex-start; width: 100%; }
 
+/* эмулятор прогрева номеров */
+.warmup-warn { display: flex; gap: 10px; font-size: 12px; line-height: 1.55; color: var(--ink-2); background: var(--warn-bg); border: 1px solid #F0DCA8; border-radius: 12px; padding: 12px 14px; }
+.warmup-warn svg { width: 18px; height: 18px; color: var(--warn); flex: 0 0 18px; margin-top: 1px; }
+.warmup-live { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--navy-900); background: var(--ok-bg); border: 1px solid #BDE7D4; border-radius: 11px; padding: 10px 14px; }
+.warmup-live svg { width: 16px; height: 16px; color: var(--ok); }
+.warmup-log { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 230px; overflow-y: auto; }
+.wu-msg { display: flex; align-items: center; gap: 8px; font-size: 12.5px; background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 9px; padding: 7px 11px; }
+.wu-msg b { color: var(--navy-900); font-weight: 600; font-variant-numeric: tabular-nums; }
+.wu-msg span { flex: 1; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wu-msg i { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.wu-consent { display: flex; gap: 11px; align-items: flex-start; margin-top: 16px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); cursor: pointer; background: var(--bad-bg); border: 1px solid #F1C9C4; border-radius: 12px; padding: 13px 15px; }
+.wu-consent input { margin-top: 2px; flex: 0 0 auto; width: 18px; height: 18px; }
+
 /* профиль агентства — соц-страница (organizer) */
 .ag-profile { border-radius: 18px; overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow); background: var(--card); border: 1px solid var(--stroke); }
 .ag-cover { position: relative; height: 156px; background: linear-gradient(120deg, #0A1833, #102B5C); overflow: hidden; }
