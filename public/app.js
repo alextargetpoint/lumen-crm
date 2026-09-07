@@ -1579,7 +1579,9 @@ PAGES.meetings = async (root) => {
   const listF = brF ? list.filter(mt => mt.brokerId === brF) : list;
   const calBlocks = (d) => listF.filter(mt => { const t = new Date(mt.at); return t.toDateString() === d.toDateString(); })
     .map(mt => { const t = new Date(mt.at); const top = Math.max(0, (t.getHours() + t.getMinutes() / 60 - H0) * HPX);
-      return `<div class="cal-ev st-${mt.status}" style="top:${top}px" data-mtid="${mt.id}" data-mtdrag="${mt.id}" title="${esc(mt.leadName)} · перетащите для переноса"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span></div>`; }).join('');
+      const dur = mt.dur || 60; const h = Math.max(19, dur / 60 * HPX - 2);
+      const endT = new Date(t.getTime() + dur * 60e3);
+      return `<div class="cal-ev st-${mt.status}" style="top:${top}px;height:${h}px" data-mtid="${mt.id}" data-mtdrag="${mt.id}" data-dur="${dur}" title="${esc(mt.leadName)} · ${tmm(mt.at)}–${tmm(+endT)} · тяните для переноса, за низ — длительность"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span><div class="cal-ev-rs" data-mtrs="${mt.id}" title="Растянуть длительность"></div></div>`; }).join('');
   const calHtml = `
     <div class="glass card mb">
       <div class="card-title">${ic(I.cal)}Календарь недели ${hint('meet', 'Как работают встречи', [
@@ -1643,12 +1645,48 @@ PAGES.meetings = async (root) => {
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
   $('#calBroker').addEventListener('change', (e) => { PAGE_STATE.calBroker = e.target.value; render(); });
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const SNAP = 15; /* минут */
+  /* по Y внутри тела дня → минуты от H0, снап к 15 мин, клампинг в рабочие часы */
+  const yToMin = (body, clientY, offsetTop = 0) => {
+    const rect = body.getBoundingClientRect();
+    let mins = (clientY - rect.top - offsetTop) / HPX * 60;
+    mins = Math.round(mins / SNAP) * SNAP;
+    return Math.max(0, Math.min((H1 - H0) * 60 - SNAP, mins));
+  };
+  /* растягивание длительности за нижнюю кромку */
+  $$('.cal-ev-rs', root).forEach(rs => {
+    rs.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const evEl = rs.closest('.cal-ev'); const mtId = rs.dataset.mtrs;
+      const body = evEl.closest('.cal-body'); const evTop = evEl.getBoundingClientRect().top;
+      DRAG.moved = true; DRAG.active = true; evEl.classList.add('rsizing');
+      const onMove = (ev2) => {
+        const rect = body.getBoundingClientRect();
+        let endMin = (ev2.clientY - rect.top) / HPX * 60; endMin = Math.round(endMin / SNAP) * SNAP;
+        const startMin = (evTop - rect.top) / HPX * 60;
+        let dur = Math.max(SNAP, Math.min(240, endMin - startMin));
+        evEl.style.height = Math.max(19, dur / 60 * HPX - 2) + 'px';
+        evEl.dataset.dur = dur;
+      };
+      const onUp = async () => {
+        document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
+        evEl.classList.remove('rsizing'); setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
+        await api.patch('/meetings/' + mtId, { dur: +evEl.dataset.dur || 60 });
+        toast('Длительность обновлена', (+evEl.dataset.dur || 60) + ' мин', true);
+        render();
+      };
+      document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
+    });
+  });
   $$('.cal-ev', root).forEach(evEl => {
-    /* клик — быстрый редактор; drag — перенос на другой слот */
-    let dragGhost = null, downAt = null;
+    /* клик — быстрый редактор; drag — перенос (снап 15 мин по вертикали и на любой день) */
+    let dragGhost = null, downAt = null, grabDY = 0;
     evEl.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.cal-ev-rs')) return; /* растягивание обрабатывается отдельно */
       e.stopPropagation();
       downAt = { x: e.clientX, y: e.clientY };
+      grabDY = e.clientY - evEl.getBoundingClientRect().top;
       const mt = list.find(x => x.id === evEl.dataset.mtid);
       const onMove = (ev2) => {
         if (!dragGhost && Math.hypot(ev2.clientX - downAt.x, ev2.clientY - downAt.y) < 7) return;
@@ -1656,38 +1694,39 @@ PAGES.meetings = async (root) => {
           DRAG.moved = true; DRAG.active = true;
           const r = evEl.getBoundingClientRect();
           dragGhost = evEl.cloneNode(true);
-          dragGhost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:400;pointer-events:none;opacity:.9`;
+          dragGhost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:400;pointer-events:none;opacity:.92`;
           document.body.appendChild(dragGhost);
           evEl.style.opacity = '.3';
         }
-        dragGhost.style.left = (ev2.clientX - 50) + 'px';
-        dragGhost.style.top = (ev2.clientY - 18) + 'px';
-        $$('.cal-slot', root).forEach(x => x.classList.remove('cal-hot'));
+        dragGhost.style.left = (ev2.clientX - (downAt.x - evEl.getBoundingClientRect().left)) + 'px';
+        dragGhost.style.top = (ev2.clientY - grabDY) + 'px';
+        $$('.cal-day', root).forEach(x => x.classList.remove('cal-hot'));
         const under = document.elementFromPoint(ev2.clientX, ev2.clientY);
-        const slot = under && under.closest('.cal-slot');
-        if (slot) slot.classList.add('cal-hot');
+        const dayEl = under && under.closest('.cal-day');
+        if (dayEl) dayEl.classList.add('cal-hot');
       };
       const onUp = async (ev2) => {
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
-        $$('.cal-slot', root).forEach(x => x.classList.remove('cal-hot'));
+        $$('.cal-day', root).forEach(x => x.classList.remove('cal-hot'));
         setTimeout(() => { DRAG.moved = false; DRAG.active = false; }, 60);
         if (!dragGhost) {
           /* клик: быстрый редактор встречи */
           modal({
             title: 'Встреча · ' + esc(mt.leadName),
             sub: `${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · ${esc(mt.brokerName)}${mt.link ? ' · есть видео-комната' : ''}`,
-            body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            body: `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
               <div class="form-row"><label>Дата</label><input id="emDate" type="date" value="${(d2 => `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}-${String(d2.getDate()).padStart(2, '0')}`)(new Date(mt.at))}"></div>
-              <div class="form-row"><label>Время</label><input id="emTime" type="time" value="${tmm(mt.at)}"></div></div>
+              <div class="form-row"><label>Время</label><input id="emTime" type="time" step="900" value="${tmm(mt.at)}"></div>
+              <div class="form-row"><label>Длительность</label><select id="emDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${(mt.dur || 60) === x ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div></div>
               <div class="form-row" style="margin-top:6px"><label>Страница встречи для клиента${mt.clientConfirmed ? ' · ✓ подтвердил' : ''}${mt.pageViews ? ' · открывал ' + mt.pageViews + ' раз' : ''}</label>
                 <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${location.origin}/m/${mt.id}</code>
                 <button class="btn btn-sm" data-mcopy="${mt.id}">${ic(I.copy)}</button>
                 <a class="btn btn-sm" href="/m/${mt.id}" target="_blank">${ic(I.eye)}</a></div></div>`,
             actions: [
-              { label: 'Перенести', cls: 'btn-accent', onClick: async (bd) => {
+              { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
                 const at = new Date($('#emDate', bd).value + 'T' + $('#emTime', bd).value).getTime();
-                await api.patch('/meetings/' + mt.id, { at });
+                await api.patch('/meetings/' + mt.id, { at, dur: +$('#emDur', bd).value });
                 render();
               } },
               { label: 'Карточка лида', onClick: () => openLeadModal(mt.leadId) },
@@ -1699,11 +1738,12 @@ PAGES.meetings = async (root) => {
         }
         dragGhost.remove();
         evEl.style.opacity = '';
-        const under = document.elementFromPoint(ev2.clientX, ev2.clientY);
-        const slot = under && under.closest('.cal-slot');
-        if (slot) {
-          const day = slot.closest('.cal-day').dataset.day;
-          const at = new Date(day + 'T' + String(slot.dataset.h).padStart(2, '0') + ':00').getTime();
+        const under = document.elementFromPoint(ev2.clientX, ev2.clientY) || document.elementFromPoint(ev2.clientX, downAt.y);
+        const dayEl = under && under.closest('.cal-day');
+        if (dayEl) {
+          const day = dayEl.dataset.day; const body = dayEl.querySelector('.cal-body');
+          const mins = yToMin(body, ev2.clientY, grabDY);
+          const at = new Date(`${day}T${pad2(H0 + Math.floor(mins / 60))}:${pad2(mins % 60)}`).getTime();
           await api.patch('/meetings/' + mt.id, { at });
           toast('Встреча перенесена', new Date(at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), true);
           render();
@@ -1714,20 +1754,27 @@ PAGES.meetings = async (root) => {
       document.addEventListener('pointerup', onUp);
     });
   });
-  $$('.cal-slot', root).forEach(slot => slot.addEventListener('click', async () => {
-    const day = slot.closest('.cal-day').dataset.day;
+  /* клик по телу дня — новая встреча со временем по позиции клика (снап 15 мин) */
+  $$('.cal-body', root).forEach(body => body.addEventListener('click', async (e) => {
+    if (DRAG.moved || e.target.closest('.cal-ev')) return; /* не создаём при перетаскивании/клике по встрече */
+    const day = body.closest('.cal-day').dataset.day;
+    const mins = yToMin(body, e.clientY);
+    const hh = pad2(H0 + Math.floor(mins / 60)), mm = pad2(mins % 60);
     const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
     modal({
-      title: 'Встреча · ' + new Date(day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + slot.dataset.h + ':00',
+      title: 'Встреча · ' + new Date(day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + hh + ':' + mm,
       sub: 'Клиент получит WhatsApp-подтверждение (для видео — со ссылкой на комнату)',
       body: `
         <div class="form-row"><label>Лид</label><select id="csLead">${leads.map(l => `<option value="${l.id}">${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Тип</label><select id="csKind"><option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option></select></div>
-        <div class="form-row"><label>Время</label><input id="csTime" type="time" value="${String(slot.dataset.h).padStart(2, '0')}:00"></div>`,
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-row"><label>Тип</label><select id="csKind"><option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option></select></div>
+          <div class="form-row"><label>Время</label><input id="csTime" type="time" step="900" value="${hh}:${mm}"></div>
+          <div class="form-row"><label>Длит.</label><select id="csDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div>
+        </div>`,
       actions: [
         { label: 'Назначить', cls: 'btn-accent', onClick: async (bd) => {
           const at = new Date(day + 'T' + $('#csTime', bd).value).getTime();
-          await api.post('/meetings', { leadId: $('#csLead', bd).value, kind: $('#csKind', bd).value, at });
+          await api.post('/meetings', { leadId: $('#csLead', bd).value, kind: $('#csKind', bd).value, at, dur: +$('#csDur', bd).value });
           render();
         } },
         { label: 'Отмена' },
@@ -1745,9 +1792,10 @@ function openMeetingModal(lead, after) {
     title: 'Назначить встречу',
     sub: `${esc(lead.name)} · ${lead.geoName}. Клиент получит WhatsApp-подтверждение сразу после назначения.`,
     body: `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div class="form-row"><label>Дата</label><input id="mtDate" type="date" value="${defDate}"></div>
-        <div class="form-row"><label>Время</label><input id="mtTime" type="time" value="11:00"></div>
+        <div class="form-row"><label>Время</label><input id="mtTime" type="time" step="900" value="11:00"></div>
+        <div class="form-row"><label>Длительность</label><select id="mtDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div>
       </div>
       <div class="form-row"><label>Тип</label><select id="mtKind">
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
@@ -1757,7 +1805,7 @@ function openMeetingModal(lead, after) {
     actions: [
       { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
         const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
-        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, note: $('#mtNote', bd).value });
+        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value });
         toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
         if (after) after();
       } },
@@ -3856,66 +3904,386 @@ PAGES.comments = async (root) => {
 };
 
 /* ---------------- НОМЕРА ---------------- */
-/* ---------------- СОЦ-ПОМОЩНИК: карусели ---------------- */
-const CAR_TPL = { project: 'Новый проект', reasons: '3–5 причин инвестировать', review: 'Отзыв клиента / кейс', digest: 'Подборка недели', tips: 'Гид покупателя' };
+/* ═══════════════════ СОЦСЕТИ: движки контента для брокеров ═══════════════════
+   Фиксированная боковая панель инструментов (не стек сверху) + правая рабочая зона.
+   Инструменты: Сценарии Reels · Хантинг идей (Tinder) · Копилка идей · Карусели ·
+   Карусель из лонча · Посты и сторис. Бэк: /api/social/*, /api/carousels. */
+const CAR_TPL = { project: 'Новый проект', reasons: '3–5 причин инвестировать', review: 'Отзыв клиента / кейс', digest: 'Подборка недели', tips: 'Гид покупателя', launch: 'Новый запуск / старт продаж' };
 const CAR_THEMES = { klein: 'Klein', royal: 'Royal', emerald: 'Emerald', champagne: 'Champagne', noir: 'Noir', mocha: 'Mocha', sage: 'Sage', bordeaux: 'Bordeaux', slate: 'Slate', terracotta: 'Terracotta', midnight: 'Midnight' };
 const CAR_FONTS = { fraunces: 'Fraunces (люкс)', playfair: 'Playfair (глянец)', cormorant: 'Cormorant', instrument: 'Instrument Serif', bricolage: 'Bricolage', spacegro: 'Space Grotesk', unbounded: 'Unbounded', oswald: 'Oswald', manrope: 'Manrope' };
-PAGES.social = async (root) => {
-  const cars = await api.get('/carousels');
-  root.innerHTML = `
-    ${heroArt('assets/art/mega.png', `
-      <div class="ha-title">${ic(I.layers)}Соц-помощник<span class="sub">ИИ-карусели для Instagram и Threads</span></div>
-      <div class="ha-row" data-ha><span class="nm2">Каруселей собрано<div class="sub2">тексты пишет ИИ, стили — люкс</div></span><span class="sp2"></span><span class="val2">${cars.length}</span></div>
-    `, { v: 'right', hue: '#7C5BD8' })}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div class="lp-sec" style="margin:0">Мои карусели · ${cars.length}</div>
-      <button class="btn btn-accent" id="carNew">${ic(I.plus)}Новая карусель</button>
+const SHOOT_FMT = { talking: 'Говорящая голова', dialogue: 'Диалог 50/50', vlog: 'Влог / на объекте' };
+const SOCIAL_TOOLS = {
+  scripts:   { name: 'Сценарии Reels', icon: I.play,   sub: 'хук → структура → CTA', hue: '#2FA98C' },
+  hunt:      { name: 'Хантинг идей',   icon: I.spark,  sub: 'листай как в Tinder',   hue: '#C9922E' },
+  bank:      { name: 'Копилка идей',   icon: I.wake,   sub: 'поймал мысль — запиши', hue: '#8B7BD8' },
+  carousels: { name: 'Карусели',       icon: I.layers, sub: 'слайды для ленты',       hue: '#7C5BD8' },
+  launch:    { name: 'Карусель из лонча', icon: I.target, sub: 'старт продаж → слайды', hue: '#E08A6B' },
+  post:      { name: 'Посты и сторис', icon: I.chat,   sub: 'текст в нужном стиле',    hue: '#4F7DFF' },
+};
+let SOCIAL_TOOL = 'scripts';
+let SOCIAL_SCRIPT_FMTS = new Set(['talking']);
+let SOCIAL_SCRIPT_MODE = 'idea';
+let SOCIAL_PREFILL = '';
+let HUNT_DECK = []; let HUNT_I = 0; let HUNT_LIKES = 0;
+const SC_OPEN = new Set();
+let CP = []; /* реестр копируемых текстов: кнопки несут data-cp=индекс */
+function cpBtn(text, label) { const i = CP.push(String(text == null ? '' : text)) - 1; return `<button type="button" class="btn btn-sm sh-cp" data-cp="${i}">${ic(I.copy)}${label ? '<span>' + esc(label) + '</span>' : ''}</button>`; }
+if (!window.__shCp) { window.__shCp = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.sh-cp'); if (b && CP[+b.dataset.cp] != null) { navigator.clipboard.writeText(CP[+b.dataset.cp]); toast('Скопировано', null, true); } }); }
+if (!window.__shKey) { window.__shKey = 1; document.addEventListener('keydown', (e) => { if (SOCIAL_TOOL !== 'hunt' || CUR !== 'social') return; const ae = document.activeElement; if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; if (e.key === 'ArrowLeft') { const b = document.getElementById('shSkip'); if (b) b.click(); } else if (e.key === 'ArrowRight') { const b = document.getElementById('shLike'); if (b) b.click(); } }); }
+
+/* карточка карусели (общая для «Карусели» и «Карусель из лонча») */
+function carCardHTML(c) {
+  return `<div class="glass car-card" data-car="${c.id}">
+    <div class="car-prev ${esc(c.format)} th-${esc(c.theme)}"><span class="car-h">${esc((c.slides[0] || {}).heading || 'Слайд')}</span></div>
+    <div class="car-body">
+      <div class="nm">${esc(c.title)}</div>
+      <div class="muted" style="font-size:11.5px">${c.slides.length} слайдов · ${CAR_TPL[c.template] || ''} · ${ago(c.createdAt)}</div>
+      <div class="car-acts">
+        <a class="btn btn-sm btn-accent" href="/car/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Редактор</a>
+        <a class="btn btn-sm" href="/car/${c.id}" target="_blank" title="Просмотр">${ic(I.eye)}</a>
+        <a class="btn btn-sm" href="/car/${c.id}?print=1" target="_blank" title="Скачать PDF">${ic(I.doc)}</a>
+        <span class="tb-spacer"></span>
+        <button class="btn-ghost" data-cardel title="Удалить">${ic(I.x)}</button>
+      </div>
     </div>
-    <div class="car-grid">
-      ${cars.map(c => `<div class="glass car-card" data-car="${c.id}">
-        <div class="car-prev ${esc(c.format)} th-${esc(c.theme)}"><span class="car-h">${esc((c.slides[0] || {}).heading || 'Слайд')}</span></div>
-        <div class="car-body">
-          <div class="nm">${esc(c.title)}</div>
-          <div class="muted" style="font-size:11.5px">${c.slides.length} слайдов · ${CAR_TPL[c.template] || ''} · ${ago(c.createdAt)}</div>
-          <div class="car-acts">
-            <a class="btn btn-sm btn-accent" href="/car/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Редактор</a>
-            <a class="btn btn-sm" href="/car/${c.id}" target="_blank" title="Просмотр">${ic(I.eye)}</a>
-            <a class="btn btn-sm" href="/car/${c.id}?print=1" target="_blank" title="Скачать PDF">${ic(I.doc)}</a>
-            <span class="tb-spacer"></span>
-            <button class="btn-ghost" data-cardel title="Удалить">${ic(I.x)}</button>
-          </div>
-        </div>
-      </div>`).join('') || '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}
-    </div>`;
-  $('#carNew').addEventListener('click', () => {
-    modal({
-      title: 'Новая карусель',
-      body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="form-row"><label>Шаблон</label><select id="carTpl">${Object.entries(CAR_TPL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option><option value="story">9:16 сторис / Reels</option></select></div>
-        </div>
-        <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-          <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Стиль (тема)</label><select id="carTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Шрифт</label><select id="carFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-        </div>
-        <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin-top:4px"><input type="checkbox" id="carAi" checked><span style="font-size:13px">✦ Написать тексты слайдов с ИИ</span></label>`,
-      actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
-        const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
-        try {
-          const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
-          toast('Карусель собрана', 'Открываю редактор', true);
-          window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
-          render();
-        } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Собрать'; } return false; }
-      } }, { label: 'Отмена' }],
-    });
-  });
+  </div>`;
+}
+function wireCarCards(root) {
   $$('[data-car]', root).forEach(card => card.addEventListener('click', async (e) => {
     if (e.target.closest('[data-cardel]')) { await fetch('/api/carousels/' + card.dataset.car, { method: 'DELETE' }); toast('Карусель удалена', null, true); render(); }
   }));
+}
+/* модалка «Новая карусель» — используется в инструменте «Карусели» */
+function openCarouselModal() {
+  modal({
+    title: 'Новая карусель',
+    body: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Шаблон</label><select id="carTpl">${Object.entries(CAR_TPL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option><option value="story">9:16 сторис / Reels</option></select></div>
+      </div>
+      <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Стиль (тема)</label><select id="carTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Шрифт</label><select id="carFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      </div>
+      <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin-top:4px"><input type="checkbox" id="carAi" checked><span style="font-size:13px">✦ Написать тексты слайдов с ИИ</span></label>`,
+    actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
+      const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
+      try {
+        const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
+        toast('Карусель собрана', 'Открываю редактор', true);
+        window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+        render();
+      } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Собрать'; } return false; }
+    } }, { label: 'Отмена' }],
+  });
+}
+
+/* карточка одного сценария (зеркалит проверенный контент-бот, но под недвижимость) */
+function renderScriptCard(s) {
+  const hookTags = ['Слом ожидания', 'С середины истории', 'Цена бездействия'];
+  const hooks = (s.hooks || []).map((h, j) => `<div class="sh-hook"><div class="sh-hook-top"><span class="sh-hook-tag">${esc(hookTags[j] || 'Хук')}</span>${cpBtn(h, '')}</div><div class="sh-hook-x">${esc(h)}</div></div>`).join('');
+  const beats = (s.beats || []).map(b => `<div class="sh-beat"><div class="sh-beat-t">${esc(b.t || '')}</div><div class="sh-beat-b"><div class="sh-beat-role">${esc(b.role || '')}</div><div class="sh-beat-say">${esc(b.say || '')}</div>${b.onscreen ? `<div class="sh-beat-os">На экране: ${esc(b.onscreen)}</div>` : ''}</div></div>`).join('');
+  const broll = (s.broll || []).map(x => `<span class="sh-broll-i">${esc(x)}</span>`).join('');
+  const allText = [(s.format || '') + (s.duration_sec ? ' · ~' + s.duration_sec + 'с' : ''), '',
+    'ХУКИ:', ...(s.hooks || []).map((h, i) => (i + 1) + ') ' + h), '',
+    'СЦЕНАРИЙ:', s.full_script || '', '',
+    s.cta ? 'ПРИЗЫВ: ' + s.cta : '', s.codeword ? ('КОДОВОЕ СЛОВО: ' + s.codeword + (s.leadmagnet ? (' → ' + s.leadmagnet) : '')) : '', '',
+    s.caption ? 'ПОДПИСЬ:\n' + s.caption : '', broll ? 'ВИДЕОРЯД: ' + (s.broll || []).join(' · ') : ''].filter(Boolean).join('\n');
+  return `<div class="sh-card">
+    <div class="sh-card-hd"><div><span class="sh-badge">${esc(s.format || SHOOT_FMT[s.format_key] || '')}</span>${s.duration_sec ? `<span class="sh-dur">~${s.duration_sec} сек</span>` : ''}</div>${cpBtn(allText, 'Весь вариант')}</div>
+    ${s.goal_fit ? `<div class="sh-goalfit">${esc(s.goal_fit)}</div>` : ''}
+    <div class="sh-seclbl">Хуки — 3 захода на первые секунды</div><div class="sh-hooks">${hooks}</div>
+    ${s.hook_note ? `<div class="sh-note">${esc(s.hook_note)}</div>` : ''}
+    ${beats ? `<div class="sh-seclbl">Раскадровка</div><div class="sh-beats">${beats}</div>` : ''}
+    ${s.full_script ? `<div class="sh-seclbl sh-seclbl-row">Сценарий под запись ${cpBtn(s.full_script, '')}</div><div class="sh-script">${esc(s.full_script)}</div>` : ''}
+    ${(s.codeword || s.leadmagnet) ? `<div class="sh-cta-row">${s.codeword ? `<span class="sh-code">Кодовое слово: <b>${esc(s.codeword)}</b></span>` : ''}${s.leadmagnet ? `<span class="sh-lm">→ ${esc(s.leadmagnet)}</span>` : ''}</div>` : ''}
+    ${s.cta ? `<div class="sh-cta">${esc(s.cta)}</div>` : ''}
+    ${s.caption ? `<div class="sh-seclbl sh-seclbl-row">Подпись под рилс ${cpBtn(s.caption, '')}</div><div class="sh-caption">${esc(s.caption)}</div>` : ''}
+    ${broll ? `<div class="sh-seclbl">Видеоряд</div><div class="sh-broll">${broll}</div>` : ''}
+    ${s.why_works ? `<div class="sh-why"><span>Почему залетит:</span> ${esc(s.why_works)}</div>` : ''}
+  </div>`;
+}
+function renderScriptSet(it) {
+  const open = SC_OPEN.has(it.id);
+  return `<div class="glass card sh-set ${open ? 'open' : ''}" data-set="${it.id}">
+    <div class="sh-set-hd" data-toggle="${it.id}">
+      <div class="sh-set-t">${ic(I.chev)}<b>${esc(it.title)}</b></div>
+      <div class="sh-set-meta">${it.mode === 'rewrite' ? '<span class="mini-badge">рерайт</span>' : ''}${it.geo ? '<span class="mini-badge">' + esc(STATE.settings.geoNames[it.geo] || it.geo) + '</span>' : ''}<span class="muted">${(it.scripts || []).length} × · ${ago(it.createdAt)}</span><button class="btn-ghost sh-del" data-del="${it.id}" title="Удалить">${ic(I.x)}</button></div>
+    </div>
+    ${open ? `<div class="sh-set-body">${(it.scripts || []).map(renderScriptCard).join('')}</div>` : ''}
+  </div>`;
+}
+function renderIdeaCard(i) {
+  return `<div class="glass sh-idea" data-idea="${i.id}" data-text="${esc(i.text)}">
+    <div class="sh-idea-x">${esc(i.text)}</div>
+    <div class="sh-idea-foot"><span class="mini-badge">${esc(i.source || 'идея')}</span>${i.geo ? `<span class="muted" style="font-size:11px">${esc(STATE.settings.geoNames[i.geo] || i.geo)}</span>` : ''}<span class="muted" style="font-size:11px">${ago(i.createdAt)}</span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent" data-iact="script">${ic(I.play)}Сценарий</button><button class="btn-ghost" data-iact="del" title="Удалить">${ic(I.x)}</button></div>
+  </div>`;
+}
+function renderPostItem(it) {
+  const p = it.payload || {};
+  const kindName = { post: 'Пост', story: 'Сторис', thread: 'Тред' }[it.postKind] || 'Пост';
+  const frames = (it.postKind !== 'post') ? String(p.body || '').split(/\n-{2,}\n/).map((f, i) => `<div class="sh-frame"><span class="sh-frame-n">${i + 1}</span><div>${esc(f.trim())}</div></div>`).join('') : '';
+  return `<div class="glass card sh-post">
+    <div class="sh-card-hd"><div><span class="sh-badge">${kindName}</span><b style="margin-left:8px">${esc(it.title)}</b></div><div style="display:flex;gap:6px">${cpBtn(p.body, 'Текст')}<button class="btn-ghost sh-pdel" data-pdel="${it.id}" title="Удалить">${ic(I.x)}</button></div></div>
+    ${it.postKind === 'post' ? `<div class="sh-post-body">${esc(p.body)}</div>` : `<div class="sh-frames">${frames}</div>`}
+    ${(p.openers || []).length ? `<div class="sh-seclbl">Альтернативные заходы</div>${p.openers.map(o => `<div class="sh-alt"><span>${esc(o)}</span>${cpBtn(o, '')}</div>`).join('')}` : ''}
+    ${p.cta ? `<div class="sh-cta">${esc(p.cta)}</div>` : ''}
+    ${p.first_comment ? `<div class="sh-seclbl sh-seclbl-row">Первый комментарий ${cpBtn(p.first_comment, '')}</div><div class="sh-caption">${esc(p.first_comment)}</div>` : ''}
+    ${(p.hashtags || []).length ? `<div class="sh-tags">${p.hashtags.map(h => `<span class="sh-tag">#${esc(h)}</span>`).join('')} ${cpBtn(p.hashtags.map(h => '#' + h).join(' '), '')}</div>` : ''}
+    <div class="muted" style="font-size:11px;margin-top:8px">${ago(it.createdAt)}</div>
+  </div>`;
+}
+
+PAGES.social = async (root) => {
+  CP = [];
+  const tool = SOCIAL_TOOLS[SOCIAL_TOOL] ? SOCIAL_TOOL : 'scripts';
+  root.innerHTML = `
+    <div class="sh-head">
+      <div class="sh-h-t">${ic(I.layers)}Соцсети<span>карманный контент-цех для брокера — сценарии, идеи, карусели и посты под недвижимость</span></div>
+    </div>
+    <div class="sh-wrap">
+      <nav class="sh-rail">
+        ${Object.entries(SOCIAL_TOOLS).map(([k, t]) => `<button class="sh-tab ${k === tool ? 'on' : ''}" data-tool="${k}" style="--hue:${t.hue}">${ic(t.icon)}<span class="sh-tab-x"><b>${t.name}</b><i>${t.sub}</i></span></button>`).join('')}
+      </nav>
+      <div class="sh-main" id="shMain"></div>
+    </div>`;
+  $$('.sh-tab', root).forEach(b => b.addEventListener('click', () => { SOCIAL_TOOL = b.dataset.tool; render(); }));
+  const main = $('#shMain', root);
+  if (tool === 'scripts') await shScripts(main);
+  else if (tool === 'hunt') await shHunt(main);
+  else if (tool === 'bank') await shBank(main);
+  else if (tool === 'carousels') await shCarousels(main);
+  else if (tool === 'launch') await shLaunch(main);
+  else if (tool === 'post') await shPost(main);
 };
+
+/* ── Сценарии Reels ── */
+async function shScripts(main) {
+  const hist = await api.get('/social/content?kind=script');
+  const geos = STATE.settings.agency.geos;
+  const prefill = SOCIAL_PREFILL; SOCIAL_PREFILL = '';
+  if (prefill) SOCIAL_SCRIPT_MODE = 'idea';
+  main.innerHTML = `
+    <div class="glass card sh-gen">
+      <div class="sh-gen-hd">${ic(I.play)}Сценарии Reels<span class="sub">хук → структура → CTA · как проверенный контент-бот, только под недвижимость</span></div>
+      <div class="seg-toggle sh-mode">
+        <button type="button" class="seg-btn ${SOCIAL_SCRIPT_MODE === 'idea' ? 'on' : ''}" data-mode="idea">${ic(I.spark)}Своя идея</button>
+        <button type="button" class="seg-btn ${SOCIAL_SCRIPT_MODE === 'rewrite' ? 'on' : ''}" data-mode="rewrite">${ic(I.chain)}Переписать чужой рилс</button>
+      </div>
+      <div class="sh-src form-row" style="${SOCIAL_SCRIPT_MODE === 'rewrite' ? '' : 'display:none'}"><label>Текст чужого рилса / субтитры / ссылка</label><textarea id="shSrc" placeholder="Вставь текст рилса, субтитры или ссылку — ИИ переупакует под твою нишу на свежий угол, без дублирования"></textarea></div>
+      <div class="form-row"><label id="shTopicLbl">${SOCIAL_SCRIPT_MODE === 'rewrite' ? 'Свой угол / что добавить (необязательно)' : 'Идея / тема / вводные'}</label><textarea id="shTopic" placeholder="Расскажи мысль голосом 🎤 или текстом. Напр.: почему дешёвые лиды сливают бюджет; рассрочка 0% в Дубае; ошибка при выборе района">${esc(prefill)}</textarea></div>
+      <div class="sh-fmts"><span class="sh-lbl">Формат съёмки</span>${Object.entries(SHOOT_FMT).map(([k, n]) => `<button type="button" class="chip-t ${SOCIAL_SCRIPT_FMTS.has(k) ? 'on' : ''}" data-fmt="${k}">${n}</button>`).join('')}<span class="muted sh-fmts-note">на каждый формат — свой вариант сценария</span></div>
+      <div class="sh-gen-foot">
+        <select id="shGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <span class="tb-spacer"></span>
+        <button class="btn btn-accent" id="shGo">${ic(I.spark)}Собрать сценарии</button>
+      </div>
+    </div>
+    <div id="shOut"></div>`;
+  $$('.sh-mode .seg-btn', main).forEach(b => b.addEventListener('click', () => {
+    SOCIAL_SCRIPT_MODE = b.dataset.mode;
+    $$('.sh-mode .seg-btn', main).forEach(x => x.classList.toggle('on', x === b));
+    const src = $('.sh-src', main); if (src) src.style.display = SOCIAL_SCRIPT_MODE === 'rewrite' ? '' : 'none';
+    $('#shTopicLbl', main).textContent = SOCIAL_SCRIPT_MODE === 'rewrite' ? 'Свой угол / что добавить (необязательно)' : 'Идея / тема / вводные';
+  }));
+  $$('.sh-fmts .chip-t', main).forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.fmt;
+    if (SOCIAL_SCRIPT_FMTS.has(k)) { if (SOCIAL_SCRIPT_FMTS.size > 1) SOCIAL_SCRIPT_FMTS.delete(k); }
+    else SOCIAL_SCRIPT_FMTS.add(k);
+    b.classList.toggle('on', SOCIAL_SCRIPT_FMTS.has(k));
+  }));
+  const out = $('#shOut', main);
+  const paintOut = () => {
+    out.innerHTML = hist.length ? hist.map(renderScriptSet).join('') : '<div class="glass card empty">Пока пусто — опиши идею выше и собери первый сценарий</div>';
+    $$('.sh-set-hd', out).forEach(h => h.addEventListener('click', (e) => {
+      if (e.target.closest('[data-del]')) return;
+      const id = h.dataset.toggle; SC_OPEN.has(id) ? SC_OPEN.delete(id) : SC_OPEN.add(id); paintOut();
+    }));
+    $$('[data-del]', out).forEach(b => b.addEventListener('click', async (e) => {
+      e.stopPropagation(); await fetch('/api/social/content/' + b.dataset.del, { method: 'DELETE' });
+      const i = hist.findIndex(x => x.id === b.dataset.del); if (i >= 0) hist.splice(i, 1); paintOut();
+    }));
+  };
+  paintOut();
+  $('#shGo', main).addEventListener('click', async () => {
+    const btn = $('#shGo', main);
+    const topic = $('#shTopic', main).value.trim();
+    const src = (($('#shSrc', main) || {}).value || '').trim();
+    if (SOCIAL_SCRIPT_MODE === 'rewrite' && !src) { toast('Вставь текст чужого рилса или ссылку'); return; }
+    if (SOCIAL_SCRIPT_MODE === 'idea' && !topic) { toast('Опиши идею — текстом или голосом 🎤'); return; }
+    btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ пишет сценарии…';
+    try {
+      const item = await api.post('/social/scripts', { topic, sourceText: src, mode: SOCIAL_SCRIPT_MODE, formats: [...SOCIAL_SCRIPT_FMTS], geo: $('#shGeo', main).value });
+      SC_OPEN.add(item.id); hist.unshift(item); paintOut();
+      toast('Готово', 'Сценарии собраны', true);
+      out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { toast('Не вышло', e.message); }
+    btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Собрать сценарии';
+  });
+}
+
+/* ── Хантинг идей (Tinder-колода) ── */
+async function shHunt(main) {
+  const geos = STATE.settings.agency.geos;
+  const ANGLES = [['all', 'Всё подряд'], ['myths', 'Мифы'], ['cases', 'Кейсы'], ['mistakes', 'Ошибки'], ['behind', 'Закулисье'], ['trends', 'Тренды'], ['guide', 'Гайды'], ['shoot', 'Под съёмку']];
+  main.innerHTML = `
+    <div class="glass card sh-gen">
+      <div class="sh-gen-hd">${ic(I.spark)}Хантинг идей<span class="sub">листай карточки как в Tinder — что нравится, летит в копилку (← мимо · → в копилку)</span></div>
+      <div class="sh-gen-foot">
+        <select id="shAngle" class="sh-sel">${ANGLES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
+        <select id="shHGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <span class="tb-spacer"></span>
+        <button class="btn btn-accent" id="shHunt">${ic(I.spark)}Нахантить идеи</button>
+      </div>
+    </div>
+    <div id="shDeck"></div>`;
+  const deck = $('#shDeck', main);
+  const paintDeck = () => {
+    if (!HUNT_DECK.length) { deck.innerHTML = '<div class="glass card empty">Нажми «Нахантить идеи» — ИИ накидает свежих идей под нишу. Понравившиеся свайпни вправо ❤ — они лягут в «Копилку идей».</div>'; return; }
+    if (HUNT_I >= HUNT_DECK.length) {
+      deck.innerHTML = `<div class="glass card sh-deck-done">${ic(I.check)}<div><b>Колода пройдена</b><div class="muted">В копилку добавлено идей: ${HUNT_LIKES}. Загляни в «Копилку идей» — там любую превратишь в сценарий одним тапом.</div></div><button class="btn btn-accent" id="shReHunt">${ic(I.spark)}Ещё колоду</button></div>`;
+      const rb = $('#shReHunt', deck); if (rb) rb.addEventListener('click', () => $('#shHunt', main).click());
+      return;
+    }
+    const idea = HUNT_DECK[HUNT_I];
+    deck.innerHTML = `<div class="sh-tinder">
+      <div class="sh-tcard glass">
+        <div class="sh-tcount">${HUNT_I + 1} / ${HUNT_DECK.length}</div>
+        ${idea.angle ? `<span class="sh-tangle">${esc(idea.angle)}</span>` : ''}
+        <div class="sh-ttitle">${esc(idea.title)}</div>
+        ${idea.hook ? `<div class="sh-thook">«${esc(idea.hook)}»</div>` : ''}
+        ${idea.why ? `<div class="sh-twhy">${esc(idea.why)}</div>` : ''}
+        <div class="sh-tmeta">${idea.format ? `<span class="sh-broll-i">${esc(idea.format)}</span>` : ''}${idea.effort ? `<span class="sh-broll-i">съёмка: ${esc(idea.effort)}</span>` : ''}</div>
+      </div>
+      <div class="sh-tbtns">
+        <button class="sh-tbtn skip" id="shSkip" title="Мимо (←)">${ic(I.x)}</button>
+        <button class="sh-tbtn like" id="shLike" title="В копилку (→)"><span>❤</span></button>
+      </div>
+    </div>`;
+    $('#shSkip', deck).addEventListener('click', () => { const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-l'); setTimeout(() => { HUNT_I++; paintDeck(); }, 160); });
+    $('#shLike', deck).addEventListener('click', async () => {
+      const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-r');
+      try { await api.post('/social/ideas', { text: idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : ''), hook: idea.hook, format: idea.format, source: 'хантинг', geo: $('#shHGeo', main).value }); HUNT_LIKES++; toast('В копилке', 'Идея сохранена', true); }
+      catch (e) { toast('Не сохранилось', e.message); }
+      setTimeout(() => { HUNT_I++; paintDeck(); }, 160);
+    });
+  };
+  paintDeck();
+  $('#shHunt', main).addEventListener('click', async () => {
+    const btn = $('#shHunt', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ думает…';
+    try { const r = await api.post('/social/hunt', { angle: $('#shAngle', main).value, geo: $('#shHGeo', main).value, count: 8 }); HUNT_DECK = r.ideas || []; HUNT_I = 0; HUNT_LIKES = 0; paintDeck(); }
+    catch (e) { toast('Не вышло', e.message); }
+    btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Нахантить идеи';
+  });
+}
+
+/* ── Копилка идей ── */
+async function shBank(main) {
+  const ideas = await api.get('/social/ideas');
+  main.innerHTML = `
+    <div class="glass card sh-gen">
+      <div class="sh-gen-hd">${ic(I.wake)}Копилка идей<span class="sub">поймал мысль между сделками — запиши голосом 🎤 или текстом, не потеряется</span></div>
+      <div class="form-row"><textarea id="shIdea" placeholder="Запиши идею для контента… (микрофон справа — можно голосом на ходу)"></textarea></div>
+      <div class="sh-gen-foot"><span class="tb-spacer"></span><button class="btn btn-accent" id="shAdd">${ic(I.plus)}В копилку</button></div>
+    </div>
+    <div class="lp-sec">В копилке · ${ideas.length}</div>
+    <div class="sh-bank">${ideas.length ? ideas.map(renderIdeaCard).join('') : '<div class="glass card empty">Пусто. Кидай сюда любые идеи — потом одним тапом превратишь в сценарий.</div>'}</div>`;
+  $('#shAdd', main).addEventListener('click', async () => {
+    const t = $('#shIdea', main).value.trim(); if (!t) { toast('Пустая идея'); return; }
+    try { await api.post('/social/ideas', { text: t, source: 'ручная' }); toast('В копилке', null, true); render(); }
+    catch (e) { toast('Не вышло', e.message); }
+  });
+  $$('[data-idea]', main).forEach(card => card.addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-iact]'); if (!act) return;
+    const id = card.dataset.idea;
+    if (act.dataset.iact === 'del') { await fetch('/api/social/ideas/' + id, { method: 'DELETE' }); render(); }
+    if (act.dataset.iact === 'script') { SOCIAL_PREFILL = card.dataset.text || ''; SOCIAL_TOOL = 'scripts'; render(); toast('Идея в генераторе', 'Выбери формат и собери сценарий', true); }
+  }));
+}
+
+/* ── Карусели ── */
+async function shCarousels(main) {
+  const cars = await api.get('/carousels');
+  main.innerHTML = `
+    <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-accent" id="carNew">${ic(I.plus)}Новая карусель</button></div>
+    <div class="car-grid">${cars.length ? cars.map(carCardHTML).join('') : '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}</div>`;
+  $('#carNew', main).addEventListener('click', openCarouselModal);
+  wireCarCards(main);
+}
+
+/* ── Карусель из лонча ── */
+async function shLaunch(main) {
+  const cars = await api.get('/carousels');
+  const launches = cars.filter(c => c.template === 'launch');
+  const geos = STATE.settings.agency.geos;
+  main.innerHTML = `
+    <div class="glass card sh-gen">
+      <div class="sh-gen-hd">${ic(I.target)}Карусель из лонча<span class="sub">новый старт продаж / объект → готовая карусель за один клик</span></div>
+      <div class="form-row"><label>Объект / ЖК — что запускаем</label><input id="lcName" placeholder="напр. ЖК Marina Vista — старт продаж"></div>
+      <div class="form-row"><label>Условия входа: цена, рассрочка, доходность, дедлайн оффера, сдача</label><textarea id="lcFacts" placeholder="1BR от $180k · рассрочка 0% на 3 года · доходность ~8% · старт-цена только до конца месяца · сдача 2027"></textarea></div>
+      <div class="sh-launch-opts">
+        <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
+        <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <select id="lcTheme">${Object.entries(CAR_THEMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <select id="lcFont">${Object.entries(CAR_FONTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      </div>
+      <div class="sh-gen-foot"><span class="tb-spacer"></span><button class="btn btn-accent" id="lcGo">${ic(I.spark)}Собрать карусель</button></div>
+    </div>
+    ${launches.length ? `<div class="lp-sec">Карусели из лончей · ${launches.length}</div><div class="car-grid">${launches.map(carCardHTML).join('')}</div>` : ''}`;
+  $('#lcGo', main).addEventListener('click', async () => {
+    const name = $('#lcName', main).value.trim();
+    const facts = $('#lcFacts', main).value.trim();
+    if (!name) { toast('Напиши, что запускаем'); return; }
+    const topic = `Старт продаж / лонч: ${name}. Условия и факты: ${facts || '—'}`;
+    const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
+    try {
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, ai: true });
+      toast('Карусель собрана', 'Открываю редактор', true);
+      window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+      render();
+    } catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Собрать карусель'; }
+  });
+  wireCarCards(main);
+}
+
+/* ── Посты и сторис ── */
+async function shPost(main) {
+  const hist = await api.get('/social/content?kind=post');
+  const geos = STATE.settings.agency.geos;
+  const KINDS = [['post', 'Пост в ленту'], ['story', 'Серия сторис'], ['thread', 'Тред Threads']];
+  const STYLES = [['expert', 'Экспертный'], ['warm', 'Тёплый'], ['lux', 'Люкс'], ['bold', 'Провокационный'], ['friendly', 'Дружелюбный']];
+  main.innerHTML = `
+    <div class="glass card sh-gen">
+      <div class="sh-gen-hd">${ic(I.chat)}Посты и сторис<span class="sub">быстрый текст в нужном стиле — пост, серия сторис или тред</span></div>
+      <div class="form-row"><label>Тема / вводные</label><textarea id="shPTopic" placeholder="о чём пост — голосом 🎤 или текстом"></textarea></div>
+      <div class="sh-fmts"><span class="sh-lbl">Что пишем</span>${KINDS.map(([k, n], i) => `<button type="button" class="chip-t ${i === 0 ? 'on' : ''}" data-pkind="${k}">${n}</button>`).join('')}</div>
+      <div class="sh-gen-foot">
+        <select id="shPStyle" class="sh-sel">${STYLES.map(([k, n]) => `<option value="${k}">Тон: ${n}</option>`).join('')}</select>
+        <select id="shPGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <span class="tb-spacer"></span>
+        <button class="btn btn-accent" id="shPGo">${ic(I.spark)}Написать</button>
+      </div>
+    </div>
+    <div id="shPOut"></div>`;
+  let pkind = 'post';
+  $$('[data-pkind]', main).forEach(b => b.addEventListener('click', () => { pkind = b.dataset.pkind; $$('[data-pkind]', main).forEach(x => x.classList.toggle('on', x === b)); }));
+  const out = $('#shPOut', main);
+  const paint = () => {
+    out.innerHTML = hist.length ? hist.map(renderPostItem).join('') : '<div class="glass card empty">Пока пусто — напиши первый пост выше</div>';
+    $$('[data-pdel]', out).forEach(b => b.addEventListener('click', async () => { await fetch('/api/social/content/' + b.dataset.pdel, { method: 'DELETE' }); const i = hist.findIndex(x => x.id === b.dataset.pdel); if (i >= 0) hist.splice(i, 1); paint(); }));
+  };
+  paint();
+  $('#shPGo', main).addEventListener('click', async () => {
+    const btn = $('#shPGo', main); const topic = $('#shPTopic', main).value.trim();
+    if (!topic) { toast('О чём пишем?'); return; }
+    btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ пишет…';
+    try { const it = await api.post('/social/post', { topic, kind: pkind, style: $('#shPStyle', main).value, geo: $('#shPGeo', main).value }); hist.unshift(it); paint(); toast('Готово', null, true); }
+    catch (e) { toast('Не вышло', e.message); }
+    btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Написать';
+  });
+}
 
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');

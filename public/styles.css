@@ -873,6 +873,15 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .cal-ev span { display: block; opacity: .75; font-size: 9px; }
 .cal-ev.st-done { background: var(--ok-bg); color: var(--ok); box-shadow: none; border: 1px solid #C4E6D6; }
 .cal-ev.st-no_show { background: var(--bad-bg); color: var(--bad); box-shadow: none; border: 1px solid #EDC5C0; }
+.cal-ev.rsizing { box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 8px 18px -6px rgba(37, 99, 235, .6); z-index: 5; }
+/* кромка растягивания длительности */
+.cal-ev-rs { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; cursor: ns-resize; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 1px; }
+.cal-ev-rs::after { content: ''; width: 20px; height: 2.5px; border-radius: 2px; background: currentColor; opacity: 0; transition: opacity var(--dur-fast); }
+.cal-ev:hover .cal-ev-rs::after { opacity: .55; }
+/* получасовая направляющая внутри часового слота */
+.cal-slot::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--stroke-soft); opacity: .45; pointer-events: none; }
+.cal-slot:hover { background: var(--blue-100); opacity: .32; }
+.cal-day.cal-hot { background: var(--blue-100); opacity: 1 !important; box-shadow: inset 0 0 0 2px var(--accent); }
 
 /* ---------- карточка лида: независимый скролл колонок (фикс обрезания) ---------- */
 .modal-card { display: flex; flex-direction: column; height: 90vh; max-height: 90vh; overflow: hidden; }

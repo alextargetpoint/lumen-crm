@@ -1648,6 +1648,7 @@ const server = http.createServer(async (req, res) => {
       const mt = {
         id: store.nextId('mt'), leadId: lead.id, brokerId: broker.id,
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
+        dur: Math.max(15, Math.min(240, +b.dur || 60)),
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
         /* видео-встреча: своя комната из коробки (Jitsi, работает в браузере без аккаунтов);
            Zoom API подключается сюда же при наличии кредов */
@@ -1671,6 +1672,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.status) mt.status = b.status;
       if (b.at) { mt.at = +b.at; mt.reminded = false; mt.rem = {}; }
+      if (b.dur != null) mt.dur = Math.max(15, Math.min(240, +b.dur));
       if (b.status === 'no_show' && db.settings.automations.noShowMessage) {
         const lead = db.leads.find(l => l.id === mt.leadId);
         if (lead && !['deal', 'lost'].includes(lead.stage)) {
