@@ -565,7 +565,34 @@ function wireAiWand(root) {
 
 /* ---------- диктовка: мик-кнопка на текстовых полях (голос → Whisper → ИИ-причёсывание) ---------- */
 const DICTATE_SEL = 'textarea:not([data-nodic])';
+/* свободные однострочные поля (в .form-row — колоночный лейаут, оверлей-микрофон безопасен, не ломает flex-строки) */
+const DIC_INPUT_SEL = '.form-row > input[type="text"]:not([data-nodic]), .form-row > input:not([type]):not([data-nodic])';
 let DIC_ACTIVE = null;
+/* общий рекордер: пишет голос → /voice/dictate (ИИ причёсывает) → дописывает в поле */
+function dicBind(field, btn) {
+  btn.addEventListener('click', async () => {
+    if (btn.classList.contains('rec')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
+    if (DIC_ACTIVE) { toast('Уже идёт запись в другом поле'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); return; }
+    const rec = new MediaRecorder(stream); const parts = [];
+    rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      btn.classList.remove('rec'); btn.classList.add('busy'); DIC_ACTIVE = null;
+      try {
+        const r = await fetch('/api/voice/dictate?clean=1&filename=note.webm', { method: 'POST', body: new Blob(parts, { type: 'audio/webm' }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'ошибка');
+        if (j.text) { const cur = field.value.trim(); field.value = cur ? cur + ' ' + j.text : j.text; field.dispatchEvent(new Event('input', { bubbles: true })); field.focus(); toast('Готово', 'ИИ причесал надиктованное', true); }
+        else toast('Ничего не распознал', 'Попробуйте ещё раз, ближе к микрофону');
+      } catch (e) { toast('Диктовка не удалась', e.message); }
+      btn.classList.remove('busy');
+    };
+    DIC_ACTIVE = rec; rec.start(); btn.classList.add('rec');
+  });
+}
 function wireDictate(root) {
   $$(DICTATE_SEL, root).forEach((field) => {
     if (field.dataset.dicw) return;
@@ -575,29 +602,16 @@ function wireDictate(root) {
     if (!wrap) { wrap = document.createElement('div'); wrap.className = 'aiwrap'; field.parentNode.insertBefore(wrap, field); wrap.appendChild(field); }
     const btn = el(`<button type="button" class="dic-btn ${inWand ? 'with-wand' : ''}" title="Диктовать голосом — ИИ причешет текст">${ic(I.mic || I.phone)}</button>`);
     wrap.appendChild(btn);
-    btn.addEventListener('click', async () => {
-      if (btn.classList.contains('rec')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
-      if (DIC_ACTIVE) { toast('Уже идёт запись в другом поле'); return; }
-      let stream;
-      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-      catch (e) { toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); return; }
-      const rec = new MediaRecorder(stream);
-      const parts = [];
-      rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        btn.classList.remove('rec'); btn.classList.add('busy'); DIC_ACTIVE = null;
-        try {
-          const r = await fetch('/api/voice/dictate?clean=1&filename=note.webm', { method: 'POST', body: new Blob(parts, { type: 'audio/webm' }) });
-          const j = await r.json();
-          if (!r.ok) throw new Error(j.error || 'ошибка');
-          if (j.text) { const cur = field.value.trim(); field.value = cur ? cur + ' ' + j.text : j.text; field.dispatchEvent(new Event('input', { bubbles: true })); field.focus(); toast('Готово', 'ИИ причесал надиктованное', true); }
-          else toast('Ничего не распознал', 'Попробуйте ещё раз, ближе к микрофону');
-        } catch (e) { toast('Диктовка не удалась', e.message); }
-        btn.classList.remove('busy');
-      };
-      DIC_ACTIVE = rec; rec.start(); btn.classList.add('rec');
-    });
+    dicBind(field, btn);
+  });
+  /* однострочные свободные поля — микрофон-оверлей справа внутри инпута (без изменения flex-строк) */
+  $$(DIC_INPUT_SEL, root).forEach((field) => {
+    if (field.dataset.dicw) return;
+    field.dataset.dicw = '1';
+    const w = document.createElement('span'); w.className = 'dic-inp'; field.parentNode.insertBefore(w, field); w.appendChild(field);
+    const btn = el(`<button type="button" class="dic-btn dic-inp-btn" title="Диктовать голосом — ИИ причешет текст">${ic(I.mic || I.phone)}</button>`);
+    w.appendChild(btn);
+    dicBind(field, btn);
   });
 }
 
