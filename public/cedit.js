@@ -127,6 +127,13 @@ body.cpanel-on{padding-right:308px!important}
 .ctst i{font-style:normal;font-size:9.5px;color:#9fb2d6;font-weight:600}
 .ctst:hover{border-color:#2563EB}
 .ctst.on{border-color:#2563EB;box-shadow:0 0 0 1px #2563EB inset}
+.ctpl-cats{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap}
+.ctpl-cats button{flex:0 0 auto}
+.ctpl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.ctpl{aspect-ratio:4/3;border:1.5px solid #E1E8F4;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;overflow:hidden;padding:8px}
+.ctpl:hover{border-color:#2563EB;transform:translateY(-2px)}
+.ctpl-aa{font-size:26px;line-height:1}
+.ctpl i{font-style:normal;font-size:10.5px;color:#fff;opacity:.92;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -299,8 +306,19 @@ body.cpanel-on{padding-right:308px!important}
     if (!sl) { body.innerHTML = `<div class="cslide-empty">Кликните по слайду в макете,<br>чтобы редактировать его</div>`; return; }
     body.innerHTML = slideHtml(sl); wireSlide(body, sel);
   }
+  function tplTile(tpl) {
+    const th = (P.themes || {})[tpl.theme] || { blue: '#2563EB', body: '#0A1833' };
+    const ff = ((P.fonts || {})[tpl.font] || {}).fam || 'serif';
+    return `<button class="ctpl" data-tpl='${esc(JSON.stringify(tpl))}' style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 22%,${th.body}),${th.body})"><span class="ctpl-aa" style="font-family:${ff};color:${th.blue}">Aa</span><i>${tpl.name}</i></button>`;
+  }
   function designHtml() {
+    const cats = Object.keys(P.templates || {});
     return `
+    <div class="cgrp"><label>Готовые шаблоны</label>
+      <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
+      <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
+      <div class="cnote">Один клик — тема, шрифт, узор и стиль текста применятся ко всем слайдам.</div>
+    </div>
     <div class="cgrp"><label>Цветовая тема</label><div class="cdots">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
     <div class="cgrp"><label>Шрифт заголовков</label><button class="cfontbtn" id="cFontBtn"><span class="aa" style="font-family:${curFont.fam}">Aa</span> <span style="flex:1">${curFont.name}</span> ▾</button></div>
     <div class="cgrp"><label>Формат</label><div class="cseg" id="cFmt">${['square', 'portrait', 'story'].map(f => `<button data-f="${f}" class="${P.format === f ? 'on' : ''}">${FMT[f]}</button>`).join('')}</div></div>
@@ -312,6 +330,10 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cnote">Тема, шрифт, формат и футер применяются ко всей карусели.</div>`;
   }
   function wireDesign(body) {
+    /* готовые шаблоны: категории + применение ко всем слайдам */
+    const grid = $('#cTplGrid', body);
+    $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
+    grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save(true, { theme: tpl.theme, font: tpl.font, slides: arr }); });
     $$('.cth-dot', body).forEach(d => d.addEventListener('click', () => save(true, { theme: d.dataset.theme })));
     $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save(true, { format: b.dataset.f }); });
     $('#cAddSlide', body).addEventListener('click', async () => { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); await save(true, { slides: arr }); });

@@ -559,6 +559,11 @@ const PAGE_THEMES = {
   slate: { name: 'Slate', blue: '#3E4A5B', ink: '#141922', mut: '#66707E', bg: '#F1F4F7', body: '#DCE1E7', paper: '#FFFFFF', line: '#E1E6EC' },
   terracotta: { name: 'Terracotta', blue: '#B0532E', ink: '#2A1810', mut: '#8A6A5A', bg: '#F9F1EA', body: '#EBDBCF', paper: '#FFFCF8', line: '#EDDDD0' },
   midnight: { name: 'Midnight', blue: '#C7B08A', ink: '#ECEAF2', mut: '#9AA0B0', bg: '#111524', body: '#080A14', paper: '#191E31', line: '#2A3048', dark: true },
+  /* тематические тёмные палитры (для готовых шаблонов карусели: Нетфликс/Матрица/Премиум/Бэтмен) */
+  netflix: { name: 'Netflix', blue: '#E50914', ink: '#F5F5F7', mut: '#9A9AA5', bg: '#0B0B0F', body: '#050507', paper: '#141418', line: '#2A2A30', dark: true },
+  matrix: { name: 'Matrix', blue: '#22E36A', ink: '#D6FFE4', mut: '#6E9A7E', bg: '#03120A', body: '#010A05', paper: '#08160E', line: '#153A26', dark: true },
+  goldlux: { name: 'Gold', blue: '#E8B84B', ink: '#F3EEE2', mut: '#9A9080', bg: '#0C0A06', body: '#050403', paper: '#16130C', line: '#2E2716', dark: true },
+  batman: { name: 'Batman', blue: '#FFD400', ink: '#EDEDF0', mut: '#8A8A95', bg: '#0A0A0C', body: '#040405', paper: '#141418', line: '#2A2A30', dark: true },
 };
 
 /* шрифтовые пресеты подборки: люкс-пары дисплей+текст (персонализация типографики) */
@@ -753,6 +758,54 @@ const CAR_STICKERS = {
 /* пресеты оформления текста заголовка («Стиль» из референса) */
 const CAR_TSTYLES = { plain: 'Обычный', outline: 'Контур', block: 'Плашка', underline: 'Подчерк', huge: 'Крупный', caps: 'Капс', gradient: 'Градиент', shadow: 'Тень', italic: 'Курсив', quote: 'Кавычки', boxed: 'В рамке', bar: 'Полоса', glow: 'Свечение', gold: 'Золото', neon: 'Неон', retro: 'Ретро', pill: 'Пилюля', spaced: 'Разрядка' };
 const CAR_TSTYLES_SET = new Set(Object.keys(CAR_TSTYLES));
+/* готовые шаблоны карусели по категориям (как в референсе): тема+шрифт+узор+стиль заголовка одним кликом */
+const CAR_TEMPLATES = {
+  'Тёмные': [
+    { name: 'Нуар', theme: 'noir', font: 'fraunces', tstyle: 'plain' },
+    { name: 'Полночь', theme: 'midnight', font: 'playfair', tstyle: 'spaced' },
+    { name: 'Графит·сетка', theme: 'noir', font: 'spacegro', bgpat: 'grid', tstyle: 'caps' },
+    { name: 'Тёмный акцент', theme: 'midnight', font: 'unbounded', tstyle: 'block' },
+    { name: 'Нуар·контур', theme: 'noir', font: 'oswald', tstyle: 'outline' },
+  ],
+  'Светлые': [
+    { name: 'Klein', theme: 'klein', font: 'fraunces', tstyle: 'plain' },
+    { name: 'Шампань', theme: 'champagne', font: 'cormorant', tstyle: 'spaced' },
+    { name: 'Шалфей', theme: 'sage', font: 'fraunces', tstyle: 'underline' },
+    { name: 'Мокко', theme: 'mocha', font: 'playfair', tstyle: 'plain' },
+    { name: 'Сланец·точки', theme: 'slate', font: 'manrope', bgpat: 'dots', tstyle: 'caps' },
+  ],
+  'Цветные': [
+    { name: 'Роял', theme: 'royal', font: 'unbounded', tstyle: 'block' },
+    { name: 'Изумруд', theme: 'emerald', font: 'fraunces', tstyle: 'plain' },
+    { name: 'Терракота', theme: 'terracotta', font: 'playfair', tstyle: 'spaced' },
+    { name: 'Бордо', theme: 'bordeaux', font: 'cormorant', tstyle: 'quote' },
+    { name: 'Роял·волны', theme: 'royal', font: 'spacegro', bgpat: 'waves', tstyle: 'caps' },
+  ],
+  'Нетфликс': [
+    { name: 'Netflix', theme: 'netflix', font: 'oswald', tstyle: 'caps' },
+    { name: 'Netflix крупно', theme: 'netflix', font: 'bebas', tstyle: 'huge' },
+    { name: 'Netflix плашка', theme: 'netflix', font: 'unbounded', tstyle: 'block' },
+    { name: 'Netflix контур', theme: 'netflix', font: 'oswald', tstyle: 'outline' },
+  ],
+  'Матрица': [
+    { name: 'Matrix', theme: 'matrix', font: 'firacode', tstyle: 'caps' },
+    { name: 'Matrix свечение', theme: 'matrix', font: 'firacode', tstyle: 'glow' },
+    { name: 'Matrix·сетка', theme: 'matrix', font: 'spacegro', bgpat: 'grid', tstyle: 'caps' },
+    { name: 'Matrix код', theme: 'matrix', font: 'tektur', tstyle: 'spaced' },
+  ],
+  'Премиум': [
+    { name: 'Золото', theme: 'goldlux', font: 'playfair', tstyle: 'gold' },
+    { name: 'Золото·разрядка', theme: 'goldlux', font: 'cormorant', tstyle: 'spaced' },
+    { name: 'Золото·курсив', theme: 'goldlux', font: 'fraunces', tstyle: 'italic' },
+    { name: 'Золото·рамка', theme: 'goldlux', font: 'playfair', tstyle: 'boxed' },
+  ],
+  'Бэтмен': [
+    { name: 'Batman', theme: 'batman', font: 'unbounded', tstyle: 'caps' },
+    { name: 'Batman контур', theme: 'batman', font: 'oswald', tstyle: 'outline' },
+    { name: 'Batman плашка', theme: 'batman', font: 'bebas', tstyle: 'block' },
+    { name: 'Batman крупно', theme: 'batman', font: 'unbounded', tstyle: 'huge' },
+  ],
+};
 const amenIcon = (v) => AMEN_ICONS[v] ? `<svg class="amn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[v]}</svg>` : (v ? `<span class="amn-emoji">${String(v).slice(0, 3)}</span>` : '');
 
 function pbDefaults(t) {
@@ -3374,7 +3427,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=7"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=8"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
