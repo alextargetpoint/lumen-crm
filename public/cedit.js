@@ -594,7 +594,7 @@ body.cpanel-on{padding-right:308px!important}
         const mv = (e2) => {
           if (!moved && Math.hypot(e2.clientX - sx, e2.clientY - sy) < 7) return;
           moved = true;
-          if (!ghost) { ghost = el(`<div class="celem-ghost">${tile.querySelector('svg').outerHTML}</div>`); document.body.appendChild(ghost); pp.style.pointerEvents = 'none'; document.body.style.cursor = 'grabbing'; }
+          if (!ghost) { ghost = el(`<div class="celem-ghost">${(tile.querySelector('svg') || tile.querySelector('img')).outerHTML}</div>`); document.body.appendChild(ghost); pp.style.pointerEvents = 'none'; document.body.style.cursor = 'grabbing'; }
           ghost.style.left = e2.clientX + 'px'; ghost.style.top = e2.clientY + 'px';
           ghost.style.display = 'none'; const under = document.elementFromPoint(e2.clientX, e2.clientY); ghost.style.display = '';
           clearHi(); const sl = under && under.closest('.slide'); if (sl) sl.classList.add('drop-hi');
@@ -625,9 +625,20 @@ body.cpanel-on{padding-right:308px!important}
           (k, drop) => ({ t: 'shape', shape: k, color: accent, fill: true, w: 26, round: 10, x: drop ? +clamp(drop.x - 13, -20, 110).toFixed(1) : 34, y: drop ? +clamp(drop.y - 13, -20, 110).toFixed(1) : 34 }),
           e.clientX - 130, e.clientY);
       } else if (kind === 'sticker') {
-        elemPicker('Стикеры', STICK_CATS,
-          (k) => `<svg viewBox="0 0 24 24">${(P.stickers || {})[k] || ''}</svg>`,
-          (k, drop) => { const white = slideEl(drop ? drop.slideIdx : i).classList.contains('hasbg'); return { t: 'sticker', key: k, color: white ? '#FFFFFF' : accent, w: 16, x: drop ? +clamp(drop.x - 8, -20, 110).toFixed(1) : 40, y: drop ? +clamp(drop.y - 8, -20, 110).toFixed(1) : 38 }; },
+        /* SVG-подкатегории + сгенерированные растровые паки (Telegram-style, прозрачный PNG).
+           Ключи паков — «dir/name», рендерятся <img> и вставляются как img-слой. */
+        const IMG_PACKS = {
+          'Недвижимость': ['realestate/house', 'realestate/building', 'realestate/key', 'realestate/pin', 'realestate/plan'],
+          'Стекло': ['realestate-glass/house', 'realestate-glass/building', 'realestate-glass/key', 'realestate-glass/pin', 'realestate-glass/roi'],
+          'AUS': ['aus/app', 'aus/camera', 'aus/chat', 'aus/star', 'aus/check'],
+        };
+        const cats = Object.assign({}, STICK_CATS, IMG_PACKS);
+        elemPicker('Стикеры', cats,
+          (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24">${(P.stickers || {})[k] || ''}</svg>`,
+          (k, drop) => {
+            if (k.includes('/')) return { t: 'img', url: `/assets/stickers/${k}.png`, w: 24, round: 0, x: drop ? +clamp(drop.x - 12, -20, 110).toFixed(1) : 38, y: drop ? +clamp(drop.y - 12, -20, 110).toFixed(1) : 36 };
+            const white = slideEl(drop ? drop.slideIdx : i).classList.contains('hasbg'); return { t: 'sticker', key: k, color: white ? '#FFFFFF' : accent, w: 16, x: drop ? +clamp(drop.x - 8, -20, 110).toFixed(1) : 40, y: drop ? +clamp(drop.y - 8, -20, 110).toFixed(1) : 38 };
+          },
           e.clientX - 160, e.clientY);
       } else if (kind === 'frame') {
         const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
