@@ -2603,10 +2603,11 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(cTitle)} — ${esc(AG)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
 <style>
-:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line}}
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:${theme.body};color:var(--ink);-webkit-font-smoothing:antialiased}
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:'Fraunces',Georgia,serif}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Manrope',-apple-system,'Segoe UI',sans-serif;background:${theme.body};color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 h1,h2,h3,p,li,td,span,div{overflow-wrap:break-word;word-break:normal}
 .book{max-width:680px;margin:0 auto;background:var(--paper);box-shadow:0 0 60px rgba(0,0,0,${'${theme.dark ? ".45" : ".15"}'})}
 section{page-break-after:always;position:relative}
@@ -2818,6 +2819,15 @@ ${isEdit ? `#peload{position:fixed;inset:0;z-index:2000;background:radial-gradie
 #peload b{color:#fff;font-weight:650;letter-spacing:.3em;font-size:15px}
 #peload i{color:#7C9BFF;font-size:11px;font-style:normal;letter-spacing:.08em}
 @keyframes pebr{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}` : ''}
+/* премиум-типографика: сериф Fraunces на крупных заголовках, мягче вес, дорогой ритм */
+.cover h1,h2.hi,.ph2,.sep h2,.cta h2,.ctacard h2,.cs-l h1,.coverimg.grad span,.mgrph,.bn-v{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;letter-spacing:-.015em}
+.ph3,.brand{font-family:var(--disp);font-optical-sizing:auto;font-weight:600}
+h2:not(.hi){font-family:var(--disp)}
+.brand{letter-spacing:.01em}
+.pg{padding:52px 44px 60px}
+.ph3{padding-bottom:12px}
+.intro,.hello p{font-size:15.5px;line-height:1.72}
+@media(max-width:560px){.pg{padding:32px 22px 40px}}
 </style></head><body>${isEdit ? `<div id="peload"><div class="plx"><svg viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg><b>LUMEN</b><i>собираем страницу…</i></div></div><script>(function(){try{var t=+sessionStorage.getItem('pe_loading')||0;if(!t||Date.now()-t>15000){document.getElementById('peload').style.display='none';sessionStorage.removeItem('pe_loading');}}catch(e){}})()</${'script'}>` : ''}<div class="book">
 ${bodyHtml}
 <div class="foot">${esc(AG)} · собрано в Lumen CRM · ${new Date(c.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
