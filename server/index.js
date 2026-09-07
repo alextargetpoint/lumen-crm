@@ -779,10 +779,29 @@ const sanSlide = (s) => ({
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
   tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
-  mode: (s.mode === 'stats' || s.mode === 'steps' || s.mode === 'gauges') ? s.mode : '',
-  items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))) })).filter(x => x.k || x.v || x.text) : [],
+  mode: ['stats', 'steps', 'gauges', 'amenities'].includes(s.mode) ? s.mode : '',
+  items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
+/* подбор иконки удобства по ключевым словам фишки (RU/EN) */
+function amenIconFor(text) {
+  const t = String(text || '').toLowerCase();
+  const M = [
+    ['pool', /бассейн|pool|инфинити/], ['gym', /фитнес|спортзал|тренаж|gym|fitness/], ['beach', /пляж|море|beach|sea|берег|лагун/],
+    ['spa', /спа|spa|веллнес|wellness/], ['sauna', /саун|хамам|sauna|баня/], ['restaurant', /ресторан|кафе|restaurant|cafe|гастро/],
+    ['security', /охран|безопас|security|24\/7|консьерж-сервис/], ['concierge', /консьерж|concierge|сервис/], ['elevator', /лифт|elevator/],
+    ['kids', /дет|kids|игров|плейгра/], ['school', /школ|school|образов|садик/], ['pets', /питом|pet|dog|животн/],
+    ['view', /вид|view|панорам|skyline|горизонт/], ['marina', /марин|яхт|marina|причал|пристан/], ['golf', /гольф|golf/],
+    ['tennis', /теннис|tennis|корт|падел/], ['bbq', /барбекю|bbq|мангал|гриль/], ['rooftop', /крыш|rooftop|руфтоп|террас/],
+    ['lounge', /лаундж|lounge|зона отдыха/], ['coworking', /коворкинг|coworking|офис|бизнес-центр/], ['cinema', /кино|cinema|кинотеатр/],
+    ['shop', /магазин|шоп|ритейл|shop|mall|молл|торгов/], ['metro', /метро|metro|станц|транспорт/], ['park', /парк|park|сквер|зелен/],
+    ['garden', /сад|garden|ландшафт|озелен/], ['parking', /парков|паркинг|parking|машиномест/], ['marina', /набережн/],
+    ['key', /ключ|заселен|сдач|move-in/], ['doc', /рассрочк|payment|0%|оплат|ипотек/], ['award', /премиум|luxury|люкс|награ|бренд/],
+    ['gate', /гейт|gate|закрыт|приватн|private/], ['shield', /гаранти|страхов|warranty/],
+  ];
+  for (const [icon, re] of M) if (re.test(t)) return icon;
+  return 'award';
+}
 /* фактические слайды из данных проекта: «Цифры» (сетка) и «План» (нумерованный разбор) */
 function factSlides(facts) {
   const out = [];
@@ -805,12 +824,23 @@ function factSlides(facts) {
   else if (facts.handover) stat.push({ k: 'Сдача', v: short(facts.handover, 14) });
   if (stat.length >= 2) out.push(sanSlide({ eyebrow: 'ЦИФРЫ', heading: 'Коротко о главном', mode: 'stats', items: stat.slice(0, 4), pos: 'center', size: 'm' }));
   if (gauges.length) out.push(sanSlide({ eyebrow: 'ДОХОДНОСТЬ', heading: 'Инвест-показатели', mode: 'gauges', items: gauges, pos: 'center', size: 'm' }));
-  const steps = [];
-  steps.push({ text: 'Бронирование — фиксируем лот и цену старта' });
-  if (facts.payment) steps.push({ text: String(facts.payment) });
-  else steps.push({ text: 'Гибкий план оплаты по графику проекта' });
-  steps.push({ text: (facts.handover ? 'Сдача ' + facts.handover + ' — ' : '') + 'получение ключей и заселение' });
-  out.push(sanSlide({ eyebrow: 'ПЛАН', heading: 'Как проходит покупка', mode: 'steps', items: steps.slice(0, 4), pos: 'top', size: 's' }));
+  /* Удобства — иконочная сетка из ключевых фишек проекта */
+  if (Array.isArray(facts.highlights) && facts.highlights.length >= 3) {
+    const clip = (s, n) => { s = String(s).replace(/^[-–•\s]+/, '').trim(); if (s.length <= n) return s; const cut = s.slice(0, n); const sp = cut.lastIndexOf(' '); return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[,;:.\s]+$/, '') + '…'; };
+    const amen = facts.highlights.slice(0, 6).map(h => ({ icon: amenIconFor(h), text: clip(h, 38) }));
+    out.push(sanSlide({ eyebrow: 'УДОБСТВА', heading: 'Что внутри', mode: 'amenities', items: amen, pos: 'top', size: 's' }));
+  }
+  /* План оплаты — реальные транши, если в условиях есть проценты; иначе общий 3-шаг */
+  const payPcts = facts.payment ? (String(facts.payment).match(/\d+\s*%/g) || []) : [];
+  let steps;
+  if (payPcts.length >= 2) {
+    steps = payPcts.slice(0, 4).map((p, idx, a) => ({ text: p.replace(/\s+/g, '') + ' — ' + (idx === 0 ? 'при бронировании' : idx === a.length - 1 ? 'при получении ключей' : 'в рассрочку по графику стройки') }));
+  } else {
+    steps = [{ text: 'Бронирование — фиксируем лот и цену старта' }];
+    steps.push({ text: facts.payment ? String(facts.payment) : 'Гибкий план оплаты по графику проекта' });
+    steps.push({ text: (facts.handover ? 'Сдача ' + facts.handover + ' — ' : '') + 'получение ключей и заселение' });
+  }
+  out.push(sanSlide({ eyebrow: 'ПЛАН', heading: 'План оплаты', mode: 'steps', items: steps.slice(0, 4), pos: 'top', size: 's' }));
   return out;
 }
 
@@ -4042,8 +4072,9 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'stats' && (s.items || []).length ? `<div class="s-stats">${s.items.map(it => `<div class="s-stat"><b>${esc(it.v || it.k)}</b><i>${esc(it.v ? it.k : '')}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'gauges' && (s.items || []).length ? `<div class="s-gauges">${s.items.map(it => { const C = 2 * Math.PI * 32, off = (C * (1 - (it.pct || 0) / 100)).toFixed(1); return `<div class="s-gauge"><svg viewBox="0 0 80 80"><circle class="gg-bg" cx="40" cy="40" r="32"/><circle class="gg-fg" cx="40" cy="40" r="32" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off}"/><text class="gg-t" x="40" y="46" text-anchor="middle">${esc(it.v)}</text></svg><i>${esc(it.k)}</i></div>`; }).join('')}</div>` : ''}
+            ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>` : ''}
-            <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
+            ${(s.mode || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
         </div>${isEdit ? `<div class="s-bar">
@@ -4161,6 +4192,12 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .gg-fg{stroke:#fff}.slide.hasbg .gg-t{fill:#fff}
 .s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
+.s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
+.s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
+.slide.hasbg .s-amen-i{color:rgba(255,255,255,.92)}
+.s-amen-ic{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,transparent);color:var(--blue)}
+.slide.hasbg .s-amen-ic{background:rgba(255,255,255,.14);color:#fff}
+.s-amen-ic svg{width:20px;height:20px}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
