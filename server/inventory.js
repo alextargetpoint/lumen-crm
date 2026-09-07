@@ -12,21 +12,25 @@
 const store = require('./store');
 
 /* ---------- синонимы полей: рус/англ + типовые ключи сервисов ---------- */
+/* синонимы полей под реальные фиды: Reelly, Property Finder, Bayut, DLD, общий CSV */
 const FIELD_SYN = {
-  name: ['name', 'project', 'title', 'building', 'название', 'проект', 'объект', 'жк'],
-  developer: ['developer', 'builder', 'dev', 'застройщик', 'девелопер'],
-  area: ['area', 'location', 'district', 'community', 'neighborhood', 'район', 'локация', 'комьюнити', 'адрес'],
-  priceFrom: ['price_from', 'starting_price', 'min_price', 'from_price', 'startingprice', 'price', 'стартовая', 'цена', 'стоимость', 'от'],
-  currency: ['currency', 'валюта', 'cur'],
-  handover: ['handover', 'completion', 'delivery', 'ready_date', 'completiondate', 'сдача', 'готовность', 'срок'],
-  type: ['unit_type', 'property_type', 'bedrooms', 'beds', 'type', 'тип', 'спальни', 'комнат'],
-  roi: ['roi', 'yield', 'net_yield', 'доходность', 'рентабельность', 'доход'],
-  market: ['status', 'market', 'sale_type', 'offering', 'стадия', 'рынок'],
-  payment: ['payment_plan', 'payment', 'plan', 'рассрочка', 'план_оплаты', 'оплата'],
-  description: ['description', 'about', 'overview', 'описание', 'о_проекте'],
-  image: ['image', 'photo', 'cover', 'thumbnail', 'picture', 'фото', 'изображение'],
-  brochure: ['brochure', 'pdf', 'presentation', 'брошюра', 'презентация'],
-  appreciation: ['appreciation', 'capital_gain', 'прирост'],
+  name: ['name', 'project', 'project_name', 'projectname', 'title', 'building', 'building_name', 'tower', 'listing_title', 'название', 'проект', 'объект', 'жк', 'наименование'],
+  developer: ['developer', 'developer_name', 'developername', 'builder', 'dev', 'company', 'застройщик', 'девелопер'],
+  area: ['area', 'area_name', 'location', 'location_name', 'district', 'community', 'sub_community', 'neighborhood', 'city', 'address', 'район', 'локация', 'комьюнити', 'адрес', 'город'],
+  priceFrom: ['price_from', 'starting_price', 'min_price', 'minprice', 'from_price', 'startingprice', 'starting_price_aed', 'price', 'price_aed', 'amount', 'стартовая', 'цена', 'стоимость', 'от', 'мин_цена'],
+  currency: ['currency', 'price_currency', 'валюта', 'cur'],
+  handover: ['handover', 'handover_date', 'handoverdate', 'completion', 'completion_date', 'completion_status', 'delivery', 'delivery_date', 'ready_date', 'completiondate', 'сдача', 'готовность', 'срок', 'дата_сдачи'],
+  type: ['unit_type', 'unittype', 'property_type', 'propertytype', 'bedrooms', 'beds', 'bed', 'br', 'type', 'category', 'тип', 'спальни', 'комнат', 'комнаты'],
+  beds: ['bedrooms', 'beds', 'bed', 'no_of_bedrooms', 'спальни', 'комнат'],
+  size: ['size', 'area_sqft', 'built_up_area', 'builtup', 'size_sqft', 'sqft', 'sqm', 'plot_size', 'площадь', 'метраж', 'кв_м', 'м2'],
+  roi: ['roi', 'yield', 'net_yield', 'gross_yield', 'rental_yield', 'доходность', 'рентабельность', 'доход'],
+  market: ['status', 'sale_status', 'salestatus', 'market', 'sale_type', 'offering', 'offering_type', 'listing_type', 'completion_status', 'стадия', 'рынок', 'статус'],
+  payment: ['payment_plan', 'paymentplan', 'payment_plans', 'payment', 'plan', 'installment', 'рассрочка', 'план_оплаты', 'оплата'],
+  description: ['description', 'about', 'overview', 'details', 'summary', 'описание', 'о_проекте'],
+  image: ['image', 'image_url', 'images', 'photo', 'cover', 'cover_image', 'thumbnail', 'main_image', 'picture', 'фото', 'изображение'],
+  brochure: ['brochure', 'brochure_url', 'pdf', 'presentation', 'factsheet', 'брошюра', 'презентация'],
+  appreciation: ['appreciation', 'capital_gain', 'capital_appreciation', 'прирост'],
+  ref: ['reference_number', 'reference', 'ref', 'permit_number', 'permit', 'rera', 'trakheesi', 'dld_permit', 'listing_id', 'id', 'номер', 'артикул'],
 };
 const GEO_HINT = [['dubai', /dubai|дубай|uae|оаэ|emirat/i], ['bali', /bali|бали|indonesi/i], ['phuket', /phuket|пхукет|thail|таиланд/i], ['spain', /spain|испан|marbella|costa/i]];
 
@@ -42,9 +46,16 @@ function normKey(s) { return String(s || '').toLowerCase().replace(/[\s_\-]+/g, 
 
 /* сырой ряд (объект ключ→значение) → наша property-модель */
 function mapItem(raw, defaults) {
-  const keys = Object.keys(raw);
+  /* плоское раскрытие вложенных объектов: Reelly/Property Finder отдают nested (location.community и т.п.) */
+  const flat = {};
+  (function fl(o, pre) { if (!o || typeof o !== 'object') return; for (const k in o) { const v = o[k]; if (v && typeof v === 'object' && !Array.isArray(v)) fl(v, pre + k + '_'); else flat[pre + k] = v; } })(raw, '');
+  const keys = Object.keys(flat);
+  const val = (k) => (k != null && flat[k] != null && String(flat[k]).trim() !== '') ? String(flat[k]).trim() : null;
   const find = (syns) => {
-    for (const syn of syns) { const k = keys.find(kk => normKey(kk) === normKey(syn) || normKey(kk).includes(normKey(syn))); if (k != null && raw[k] != null && String(raw[k]).trim() !== '') return String(raw[k]).trim(); }
+    /* пасс 1 — точные совпадения ключа (чтобы 'name' не хватал 'developer_name') */
+    for (const syn of syns) { const v = val(keys.find(kk => normKey(kk) === normKey(syn))); if (v != null) return v; }
+    /* пасс 2 — частичные (ключ содержит синоним или наоборот) */
+    for (const syn of syns) { const b = normKey(syn); const v = val(keys.find(kk => { const a = normKey(kk); return a.includes(b) || b.includes(a); })); if (v != null) return v; }
     return '';
   };
   const g = {};
@@ -52,6 +63,9 @@ function mapItem(raw, defaults) {
   const priceNum = parseInt(String(g.priceFrom).replace(/[^\d]/g, '')) || 0;
   const geo = detectGeo(g.area + ' ' + g.name + ' ' + g.developer, defaults.geo || 'dubai');
   const cur = (g.currency || '').toUpperCase().replace(/[^A-Z]/g, '') || (geo === 'dubai' ? 'USD' : geo === 'spain' ? 'EUR' : 'USD');
+  const beds = parseInt(String(g.beds).replace(/[^\d]/g, '')) || 0;
+  const firstImg = (u) => { const s = String(u || '').split(/[,;|\s]+/).find(x => /^https?:\/\//.test(x)); return s || ''; };
+  const img = firstImg(g.image);
   return {
     name: g.name || 'Объект',
     developer: g.developer || '',
@@ -59,14 +73,17 @@ function mapItem(raw, defaults) {
     priceFrom: priceNum,
     currency: cur === 'AED' ? 'AED' : cur === 'EUR' ? 'EUR' : 'USD',
     handover: g.handover || '',
-    type: g.type ? (/^\d/.test(g.type) ? g.type + 'BR' : g.type) : '',
+    type: g.type ? (/^\d/.test(g.type) ? g.type.match(/^\d+/)[0] + 'BR' : g.type) : (beds ? beds + 'BR' : ''),
+    beds,
+    size: g.size || '',
+    ref: g.ref || '',
     roi: g.roi || '',
     appreciation: g.appreciation || '',
     market: g.market ? detectMarket(g.market) : (defaults.market || 'offplan'),
     payment: g.payment || '',
     description: g.description || '',
     geo,
-    images: g.image && /^https?:\/\//.test(g.image) ? [g.image] : [],
+    images: img ? [img] : [],
     materials: g.brochure && /^https?:\/\//.test(g.brochure) ? [{ label: 'Брошюра', url: g.brochure }] : [],
     _src: raw._src || 'import',
   };
