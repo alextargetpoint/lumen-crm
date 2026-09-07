@@ -914,185 +914,154 @@ function scoreRing(v, size) {
 /* ============================================================ СТРАНИЦЫ */
 const PAGES = {};
 
-/* ---------------- ОБЗОР ---------------- */
+/* ---------------- ОБЗОР (конструктор виджетов) ---------------- */
+let OV_EDIT = false;
+const OV_DEFAULT = ['attention', 'kpi', 'tasks', 'meetings', 'funnel'];
+const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
+function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
+function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
+
+/* реестр виджетов обзора: key → { name, icon, full, render(ctx)→html } */
+const OV_W = {
+  kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, render: (c) => {
+    const f = c.f, an = c.an;
+    const cards = [
+      { go: 'funnel', ic: I.plus, v: f.new + f.touch, k: 'Новые лиды', s: 'касание ≤ 1 мин' },
+      { go: 'inbox', ic: I.chat, v: f.dialog + f.touch + f.dialog, k: 'В работе у ИИ', s: `${f.dialog} в живом диалоге` },
+      { go: 'funnel', ic: I.spark, v: f.qualified + f.handover + f.viewing + f.deal, k: 'Квалифицировано', s: `${f.deal} дошло до сделки` },
+      { go: 'analytics', ic: I.send, v: an.wa.sentToday, k: 'Отправлено сегодня', s: `${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%` },
+    ];
+    return `<div class="ov2-kpis">${cards.map(x => `<button class="ov2-kpi" data-ovgo="${x.go}"><span class="ov2-kpi-ic">${ic(x.ic)}</span><span class="ov2-kpi-b"><span class="ov2-kpi-v">${x.v}</span><span class="ov2-kpi-k">${x.k}</span><span class="ov2-kpi-s">${x.s}</span></span></button>`).join('')}</div>`;
+  } },
+  attention: { name: 'Требует внимания', icon: () => I.spark, full: true, render: (c) => {
+    const now = Date.now(), leads = c.leads, f = c.f;
+    const waiting = leads.filter(l => l.lastDir === 'in' && !['lost', 'deal'].includes(l.stage));
+    const needHuman = leads.filter(l => (l.tags || []).includes('нужен человек') && l.stage !== 'lost');
+    const hotViews = leads.filter(l => l.lastViewAt && (now - l.lastViewAt) < 24 * 3600e3 && !['lost', 'deal'].includes(l.stage));
+    const overdueNa = leads.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < now && !['lost', 'deal'].includes(l.stage));
+    const att = [
+      { n: needHuman.length, k: 'просят живого менеджера', ic: I.shield, cls: 'bad', lead: needHuman[0], go: 'inbox' },
+      { n: waiting.length, k: 'ждут вашего ответа', ic: I.chat, cls: 'warn', lead: waiting[0], go: 'inbox' },
+      { n: hotViews.length, k: 'смотрели подборку сегодня', ic: I.eye, cls: 'ok', lead: hotViews[0], go: 'inbox' },
+      { n: overdueNa.length, k: 'просрочен следующий шаг', ic: I.clock, cls: 'warn', lead: overdueNa[0], go: 'funnel' },
+    ].filter(a => a.n > 0);
+    if (!att.length) return `<div class="ov2-clean">${ic(I.check)}Всё под контролем — ничего срочного</div>`;
+    return `<div class="ov2-attn">${att.map(a => `<button class="ov2-att ${a.cls}" ${a.lead ? `data-ovlead="${a.lead.id}"` : `data-ovgo="${a.go}"`}>
+      <span class="ov2-att-ic">${ic(a.ic)}</span>
+      <span class="ov2-att-b"><span class="ov2-att-n">${a.n}</span><span class="ov2-att-k">${a.k}</span></span>
+      ${a.lead ? `<span class="ov2-att-who">${esc((a.lead.name || '').split(' ')[0])}${a.n > 1 ? ' +' + (a.n - 1) : ''}</span>` : ''}
+    </button>`).join('')}</div>`;
+  } },
+  funnel: { name: 'Воронка', icon: () => I.funnel, full: true, render: (c) => {
+    const f = c.f; const shown = STAGES.filter(s => !['lost', 'sleeping'].includes(s.id));
+    const max = Math.max(...shown.map(s => f[s.id] || 0), 1);
+    return `<div class="ov2-fun">${shown.map((s, i) => {
+      const v = f[s.id] || 0; const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0;
+      const conv = i > 0 && prevV > 0 ? Math.round(v / prevV * 100) : null;
+      return `<button class="ov2-fun-row" data-ovgo="funnel"><span class="ov2-fun-nm">${s.name}${conv != null && conv <= 100 ? `<i>${conv}%</i>` : ''}</span><span class="ov2-fun-bar"><i style="width:${Math.round((v / max) * 100)}%;background:${stageColor(s.id)}"></i></span><span class="ov2-fun-v">${v}</span></button>`;
+    }).join('')}</div>`;
+  } },
+  tasks: { name: 'Мои задачи', icon: () => I.task, full: false, render: (c) => {
+    const tsk = c.tsk, d2 = c.dstr2;
+    const open = (tsk.tasks || []).filter(t => t.status !== 'done').sort((a, b) => { const ao = a.due && d2(a.due) < tsk.today, bo = b.due && d2(b.due) < tsk.today; if (ao !== bo) return ao ? -1 : 1; return (a.due || a.scheduled || 0) > (b.due || b.scheduled || 0) ? 1 : -1; }).slice(0, 6);
+    const rows = open.map(t => { const over = t.due && d2(t.due) < tsk.today; return `<div class="ov2-task" data-ovtask="${t.id}"><button class="ov2-task-ck" data-ovdone="${t.id}" title="Выполнено">${ic(I.check, 2.4)}</button><span class="ov2-task-t">${esc(t.title || 'Задача')}${t.due ? `<i class="${over ? 'over' : ''}">${over ? 'просрочено · ' : ''}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i>` : ''}</span></div>`; }).join('');
+    const sug = (tsk.suggestions || []).slice(0, 2).map(s => `<div class="ov2-task sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'><button class="ov2-task-ck add" title="Добавить">${ic(I.plus)}</button><span class="ov2-task-t">${esc(s.title)}<i>предложение ИИ</i></span></div>`).join('');
+    return `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просроч.' : ''}</span><button class="btn btn-sm" data-ovgo="tasks">Все</button></div>${(rows || sug) ? rows + sug : '<div class="ov2-empty">Задач нет — красиво 🙌</div>'}`;
+  } },
+  meetings: { name: 'Встречи', icon: () => I.cal, full: false, render: (c) => {
+    const tsk = c.tsk, KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
+    const ms = (tsk.meetings || []).slice(0, 6);
+    const body = ms.length ? ms.map(mt => { const d = new Date(mt.at); const today = c.dstr2(mt.at) === tsk.today; return `<div class="ov2-meet" data-ovlead="${mt.leadId}"><div class="ov2-meet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${esc(mt.leadName)}</div><div class="ov2-meet-k">${KIND[mt.kind] || mt.kind}</div></div>${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}</div>`; }).join('') : '<div class="ov2-empty">Встреч нет — назначайте из карточки лида</div>';
+    return `<div class="ov2-card-hd">${ic(I.cal)}Ближайшие встречи<span>${(tsk.meetings || []).length}</span><button class="btn btn-sm" data-ovgo="meetings">Календарь</button></div>${body}`;
+  } },
+  activity: { name: 'Активность', icon: () => I.bolt, full: false, render: (c) => {
+    const evs = (c.events || []).slice(0, 8);
+    const body = evs.length ? evs.map(e => `<div class="ov2-act ${c.feedCls(e.type)}"><span class="ov2-act-ic">${ic(c.feedIcon(e.type))}</span><span class="ov2-act-t">${esc(e.text || '')}</span><span class="ov2-act-tm">${ago(e.at)}</span></div>`).join('') : '<div class="ov2-empty">Пока тихо</div>';
+    return `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>${body}`;
+  } },
+  spark: { name: 'Приток лидов', icon: () => I.plus, full: false, render: (c) => {
+    const leads = c.leads;
+    const days = Array.from({ length: 14 }, (_, i) => { const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - (13 - i)); return leads.filter(l => l.createdAt >= +d0 && l.createdAt < +d0 + 864e5).length; });
+    const max = Math.max(...days, 1); const wk = days.slice(7).reduce((a, b) => a + b, 0);
+    const pts = days.map((v, i) => `${(i / 13 * 100).toFixed(1)},${(30 - v / max * 26).toFixed(1)}`).join(' ');
+    return `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div><div class="ov2-spark"><div class="ov2-spark-n">${wk}<i>за неделю</i></div><svg viewBox="0 0 100 32" preserveAspectRatio="none" class="ov2-spark-svg"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+  } },
+  onboarding: { name: 'Запуск агентства', icon: () => I.bolt, full: true, render: () => {
+    const s2 = STATE.settings;
+    const steps = [
+      { ok: !!(s2.agency && s2.agency.logo), t: 'Логотип агентства', d: 'встанет на подборки, PDF и вход', go: 'agency' },
+      { ok: !!(s2.wa && s2.wa.tokenSet && s2.wa.phoneId), t: 'Боевой WhatsApp', d: 'токен Cloud API в «Подключениях»', go: 'settings' },
+      { ok: (STATE.sequences || []).some(q => q.active), t: 'Цепочка касаний включена', d: 'дожим молчунов', go: 'sequences' },
+      { ok: (STATE.brokers || []).some(b2 => b2.photo), t: 'Фото брокеров', d: 'живые лица в карточках', go: 'brokers' },
+    ];
+    const done = steps.filter(x => x.ok).length;
+    return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done} из ${steps.length}</span></div><div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? '' : ic(I.arrow, 2)}</button>`).join('')}</div>`;
+  } },
+};
+
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] }))]);
-  const f = an.funnel;
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-  const inDialog = f.dialog + f.touch;
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
-  const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
+  const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', qual: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
+  const ctx = { an, events, leads, tsk, f: an.funnel, dstr2, feedIcon, feedCls };
+  let layout = ovGetLayout();
 
-  /* спарклайн: новые лиды по дням за 14 дней */
-  const spark = (() => {
-    const days = Array.from({ length: 14 }, (_, i) => {
-      const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - (13 - i));
-      const d1 = +d0 + 864e5;
-      return leads.filter(l => l.createdAt >= +d0 && l.createdAt < d1).length;
-    });
-    const max = Math.max(...days, 1);
-    const pts = days.map((v, i) => `${(i / 13 * 100).toFixed(1)},${(30 - v / max * 26).toFixed(1)}`).join(' ');
-    return `<svg class="kpi-spark" viewBox="0 0 100 32" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="url(#spg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <defs><linearGradient id="spg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#93B4FF"/><stop offset="1" stop-color="#2563EB"/></linearGradient></defs>
-    </svg>`;
-  })();
-  /* дельты неделя-к-неделе — только там, где есть честные данные (createdAt / события) */
-  const _wk = 7 * 864e5, _now = Date.now();
-  const kd = (cur, prev) => {
-    if (!cur && !prev) return '';
-    if (!prev) return '<span class="kd up">новое</span>';
-    const p = Math.round((cur - prev) / prev * 100);
-    if (Math.abs(p) < 3) return '<span class="kd flat">ровно</span>';
-    if (p > 500) return `<span class="kd up">×${Math.round(cur / prev)}</span>`;
-    return `<span class="kd ${p > 0 ? 'up' : 'dn'}">${p > 0 ? '+' : ''}${p}%</span>`;
+  const paint = () => {
+    root.innerHTML = `
+      <div class="ov2-head">
+        <div class="ov2-h-t">${ic(I.grid)}Обзор</div>
+        <div class="ov2-h-acts">
+          ${OV_EDIT ? `<button class="btn btn-sm" id="ovAdd">${ic(I.plus)}Виджет</button><button class="btn btn-sm" id="ovReset">Сбросить</button>` : ''}
+          <button class="btn btn-sm ${OV_EDIT ? 'btn-accent' : ''}" id="ovEdit">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}${OV_EDIT ? 'Готово' : 'Править'}</button>
+        </div>
+      </div>
+      <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
+        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; return `<div class="ov-w ${w.full ? 'full' : ''}" data-w="${k}">
+          ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
+          <div class="ov-w-body glass card">${w.render(ctx)}</div>
+        </div>`; }).join('')}
+      </div>`;
+    /* переходы/действия */
+    $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+    $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
+    $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const row = b.closest('.ov2-task'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
+    $$('[data-ovsug]', root).forEach(b => b.querySelector('.ov2-task-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
+    /* конструктор */
+    $('#ovEdit', root).addEventListener('click', () => { OV_EDIT = !OV_EDIT; paint(); });
+    if (OV_EDIT) {
+      const rm = $('#ovReset', root); if (rm) rm.addEventListener('click', () => { layout = OV_DEFAULT.slice(); ovSetLayout(layout); paint(); });
+      const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', () => {
+        const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
+        if (!avail.length) { toast('Все виджеты уже на месте'); return; }
+        const lb = modal({ title: 'Добавить виджет', body: `<div class="ov2-lib">${avail.map(k => `<button class="ov2-lib-i" data-add="${k}">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b></button>`).join('')}</div>`, actions: [{ label: 'Закрыть' }] });
+        $$('[data-add]', lb).forEach(x => x.addEventListener('click', () => { layout = [...layout, x.dataset.add]; ovSetLayout(layout); closeModal(); paint(); }));
+      });
+      $$('[data-wrm]', root).forEach(b => b.addEventListener('click', () => { layout = layout.filter(k => k !== b.closest('[data-w]').dataset.w); ovSetLayout(layout); paint(); }));
+      ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
+    }
   };
-  const _newTs = leads.map(l => l.createdAt).filter(Boolean);
-  const _qualTs = (events || []).filter(e => ['qual', 'qualified', 'handover', 'deal'].includes(e.type)).map(e => e.at);
-  const _cnt = (arr, from, to) => arr.filter(t => t > from && t <= to).length;
-  const kdNew = kd(_cnt(_newTs, _now - _wk, _now), _cnt(_newTs, _now - 2 * _wk, _now - _wk));
-  const kdQual = kd(_cnt(_qualTs, _now - _wk, _now), _cnt(_qualTs, _now - 2 * _wk, _now - _wk));
-  root.innerHTML = `
-    <div class="kpis">
-      <div class="kpi glass ov-click" data-ovgo="funnel" title="Открыть воронку"><div class="lbl">${ic(I.plus)}Новые лиды</div><div class="val">${f.new + f.touch}${kdNew}</div><div class="delta">касание ≤ 1 мин</div>${spark}</div>
-      <div class="kpi glass ov-click" data-ovgo="inbox" title="Открыть диалоги"><div class="lbl">${ic(I.chat)}В работе у ИИ</div><div class="val">${inDialog + f.dialog}</div><div class="delta">${f.dialog} в живом диалоге</div></div>
-      <div class="kpi glass ov-click" data-ovgo="funnel" title="Открыть воронку"><div class="lbl">${ic(I.spark)}Квалифицировано</div><div class="val">${f.qualified + f.handover + f.viewing + f.deal}${kdQual}</div><div class="delta">${f.deal} дошло до сделки</div></div>
-      <div class="kpi glass ov-click" data-ovgo="analytics" title="Открыть аналитику"><div class="lbl">${ic(I.send)}Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div><div class="delta">${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%</div></div>
-    </div>
-    ${(() => {
-      const waiting = leads.filter(l => l.lastDir === 'in' && l.stage !== 'lost').length;
-      const needHuman = leads.filter(l => (l.tags || []).includes('нужен человек')).length;
-      const sleeping = f.sleeping || 0;
-      const meetWeek = (an.meetingsWeek != null) ? an.meetingsWeek : null;
-      const jump = [
-        { go: 'inbox', ic: I.chat, v: waiting, k: 'ждут ответа', hot: waiting > 0 },
-        { go: 'inbox', ic: I.shield, v: needHuman, k: 'нужен человек', hot: needHuman > 0 },
-        { go: 'meetings', ic: I.cal, v: (an.meetingsWeek != null ? an.meetingsWeek : '—'), k: 'встреч на неделе' },
-        { go: 'wake', ic: I.moon, v: sleeping, k: 'спящих — разбудить' },
-        { go: 'ads', ic: I.target, v: (an.adLeads != null ? an.adLeads : '—'), k: 'лидов с рекламы' },
-        { go: 'brokers', ic: I.users, v: (STATE.brokers || []).filter(b => b.active !== false).length, k: 'брокеров в работе' },
-      ];
-      return `<div class="ov-jump">${jump.map(j => `<button class="ov-jcard ${j.hot ? 'hot' : ''}" data-ovgo="${j.go}">
-        <span class="ov-jic">${ic(j.ic)}</span>
-        <span class="ov-jv">${j.v}</span>
-        <span class="ov-jk">${j.k}</span>
-      </button>`).join('')}</div>`;
-    })()}
-    ${(() => {
-      /* онбординг-чеклист агентства: тихий, исчезает когда всё готово */
-      const s2 = STATE.settings;
-      const steps = [
-        { ok: !!(s2.agency && s2.agency.logo), t: 'Логотип агентства', d: 'встанет на подборки, PDF и вход', go: 'agency' },
-        { ok: !!(s2.wa && s2.wa.tokenSet && s2.wa.phoneId), t: 'Боевой WhatsApp', d: 'токен Cloud API в «Подключениях»', go: 'connections' },
-        { ok: (STATE.sequences || []).some(q => q.active), t: 'Цепочка касаний включена', d: 'дожим молчунов 18 дней', go: 'sequences' },
-        { ok: !!(s2.reports && s2.reports.tgChatId), t: 'Отчёты владельцу в Telegram', d: 'ежедневная сводка и алерты', go: 'automations' },
-        { ok: (STATE.brokers || []).some(b2 => b2.photo), t: 'Фото брокеров', d: 'живые лица в карточках и подборках', go: 'brokers' },
-      ];
-      const done = steps.filter(x => x.ok).length;
-      if (done === steps.length) return '';
-      return `<div class="glass card mb ob-check">${coll(`Запуск агентства · ${done} из ${steps.length}`, steps.map(st2 => `
-        <button class="ob-row ${st2.ok ? 'ok' : ''}" data-obgo="${st2.go}">
-          <span class="ob-dot">${st2.ok ? ic(I.check, 2.4) : ''}</span>
-          <span class="ob-t">${st2.t}<i>${st2.d}</i></span>
-          ${st2.ok ? '' : `<span class="ob-go">${ic(I.arrow, 2)}</span>`}
-        </button>`).join(''), { open: done < 2, count: null, icon: I.bolt })}</div>`;
-    })()}
-    <div class="card mb f3card">
-      <div class="card-title">${ic(I.funnel)}Воронка<span class="sub">${leads.length} ${plural(leads.length, 'лид', 'лида', 'лидов')}</span></div>
-      ${(() => {
-        const shown = STAGES.filter(s => !['lost'].includes(s.id));
-        const TIER = { new: 0, touch: 0, dialog: 1, qualified: 2, handover: 2, sleeping: -1 };
-        const rows = shown.map((s, i) => {
-          const v = f[s.id] || 0;
-          const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0;
-          const conv = i > 0 && prevV > 0 ? Math.round(v / prevV * 100) : null;
-          const prevName = i > 0 ? shown[i - 1].name : null;
-          const tier = TIER[s.id] != null ? TIER[s.id] : 3;
-          return `<div class="f3row" data-f3go data-tier="${tier}" style="--fd:${i * 45}ms">
-            <div class="f3txt">
-              <div class="f3name">${s.name}</div>
-              <div class="f3conv">${s.id === 'sleeping' ? 'реанимация будит волнами' : i === 0 ? 'вход воронки' : conv != null && conv <= 100 ? conv + '% из «' + prevName.toLowerCase() + '»' : ''}</div>
-            </div>
-            <div class="f3num">${v}</div>
-          </div>`;
-        });
-        return `<div class="f3 v2">
-          <div class="f3side left">${rows.slice(0, 4).join('')}</div>
-          <div class="f3stage">
-            <div class="f3glow"></div>
-            ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<i class="f3p" style="--pd:${(i * 0.42).toFixed(2)}s;--px:${(i * 37) % 120 - 60}px"></i>`).join('')}
-            <div class="f3funwrap">
-              <img class="f3fun" src="assets/funnel-cut.png" alt="">
-              <b class="f3t" data-t3="0" style="top:3%;width:96%;height:26%"></b>
-              <b class="f3t" data-t3="1" style="top:31%;width:70%;height:20%"></b>
-              <b class="f3t" data-t3="2" style="top:52%;width:52%;height:17%"></b>
-              <b class="f3t" data-t3="3" style="top:70%;width:38%;height:20%"></b>
-            </div>
-          </div>
-          <div class="f3side right">${rows.slice(4).join('')}</div>
-        </div>`;
-      })()}
-    </div>
-    ${(() => {
-      /* «Что требует внимания сейчас» — живая полезная сводка вместо витринных цифр */
-      const now = Date.now();
-      const waiting = leads.filter(l => l.lastDir === 'in' && !['lost', 'deal'].includes(l.stage));
-      const needHuman = leads.filter(l => (l.tags || []).includes('нужен человек') && l.stage !== 'lost');
-      const hotViews = leads.filter(l => l.lastViewAt && (now - l.lastViewAt) < 24 * 3600e3 && !['lost', 'deal'].includes(l.stage));
-      const overdueNa = leads.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < now && !['lost', 'deal'].includes(l.stage));
-      const att = [
-        { n: needHuman.length, k: 'просят живого менеджера', ic: I.shield, cls: 'bad', lead: needHuman[0], go: 'inbox' },
-        { n: waiting.length, k: 'ждут вашего ответа', ic: I.chat, cls: 'warn', lead: waiting[0], go: 'inbox' },
-        { n: hotViews.length, k: 'смотрели подборку сегодня — звоните', ic: I.eye, cls: 'ok', lead: hotViews[0], go: 'inbox' },
-        { n: overdueNa.length, k: 'просрочен следующий шаг', ic: I.clock, cls: 'warn', lead: overdueNa[0], go: 'funnel' },
-      ].filter(a => a.n > 0);
-      if (!att.length) return '';
-      return `<div class="glass card mb ov-attn"><div class="card-title">${ic(I.spark)}Что требует внимания сейчас</div>
-        <div class="attn-row">${att.map(a => `<button class="attn-c ${a.cls}" ${a.lead ? `data-ovlead="${a.lead.id}"` : `data-ovgo="${a.go}"`}><span class="attn-ic">${ic(a.ic)}</span><span class="attn-n">${a.n}</span><span class="attn-k">${a.k}</span>${a.lead ? `<span class="attn-who">${esc((a.lead.name || '').split(' ')[0])}${a.n > 1 ? ' +' + (a.n - 1) : ''}</span>` : ''}</button>`).join('')}</div></div>`;
-    })()}
-    <div class="ov-grid">
-      <div class="glass card">
-        <div class="card-title">${ic(I.check)}Мои задачи<span class="sub">${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просрочено' : ''}</span><button class="btn btn-sm" data-ovgo="tasks" style="margin-left:auto">Все задачи</button></div>
-        ${(() => {
-          const open = (tsk.tasks || []).filter(t => t.status !== 'done').sort((a, b) => {
-            const ao = a.due && dstr2(a.due) < tsk.today, bo = b.due && dstr2(b.due) < tsk.today;
-            if (ao !== bo) return ao ? -1 : 1; return (a.due || a.scheduled || 0) > (b.due || b.scheduled || 0) ? 1 : -1;
-          }).slice(0, 6);
-          const rows = open.map(t => { const over = t.due && dstr2(t.due) < tsk.today; return `<div class="ovtask" data-ovtask="${t.id}">
-            <button class="ovtask-ck" data-ovdone="${t.id}" title="Выполнено">${ic(I.check)}</button>
-            <span class="ovtask-t">${esc(t.title || 'Задача')}${t.due ? `<i class="${over ? 'over' : ''}">${over ? 'просрочено · ' : ''}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i>` : ''}</span>
-          </div>`; }).join('');
-          const sug = (tsk.suggestions || []).slice(0, 3).map(s => `<div class="ovtask sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'>
-            <button class="ovtask-ck add" title="Добавить в задачи">${ic(I.plus)}</button><span class="ovtask-t">${esc(s.title)}<i>предложение ИИ</i></span></div>`).join('');
-          return (rows || sug) ? rows + sug : '<div class="empty" style="padding:16px">Задач нет — красиво 🙌</div>';
-        })()}
-      </div>
-      <div class="glass card">
-        <div class="card-title">${ic(I.cal)}Ближайшие встречи<span class="sub">${(tsk.meetings || []).length}</span><button class="btn btn-sm" data-ovgo="meetings" style="margin-left:auto">Календарь</button></div>
-        ${(() => {
-          const KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
-          const ms = (tsk.meetings || []).slice(0, 6);
-          if (!ms.length) return '<div class="empty" style="padding:16px">Встреч пока нет — назначайте из карточки лида</div>';
-          return ms.map(mt => { const d = new Date(mt.at); const today = dstr2(mt.at) === tsk.today; const day = today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); return `<div class="ovmeet" data-ovlead="${mt.leadId}">
-            <div class="ovmeet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${day}</i></div>
-            <div class="ovmeet-b"><div class="ovmeet-n">${esc(mt.leadName)}</div><div class="ovmeet-k">${KIND[mt.kind] || mt.kind}</div></div>
-            ${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}
-          </div>`; }).join('');
-        })()}
-      </div>
-    </div>`;
-  $$('[data-obgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.obgo)));
-  $$('[data-ovgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.ovgo)));
-  $$('[data-ovlead]', root).forEach(b2 => b2.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b2.dataset.ovlead); }));
-  $$('[data-ovdone]', root).forEach(b2 => b2.addEventListener('click', async (e) => { e.stopPropagation(); const row = b2.closest('.ovtask'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b2.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
-  $$('[data-ovsug]', root).forEach(b2 => b2.querySelector('.ovtask-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b2.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
-  $$('[data-f3go]', root).forEach(r => {
-    r.addEventListener('click', () => go('funnel'));
-    /* наведение на стадию подсвечивает соответствующий ярус стеклянной воронки */
-    r.addEventListener('mouseenter', () => { const t = $(`.f3t[data-t3="${r.dataset.tier}"]`, root); if (t) t.classList.add('on'); });
-    r.addEventListener('mouseleave', () => $$('.f3t.on', root).forEach(x => x.classList.remove('on')));
-  });
+  paint();
 };
+/* перетаскивание виджетов обзора (за grip) в режиме конструктора */
+function ovWireReorder(grid, getLayout, onChange) {
+  grid.querySelectorAll('.ov-w [data-grip]').forEach(grip => {
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); const w = grip.closest('.ov-w'); const key = w.dataset.w; let moved = false; const sx = e.clientX, sy = e.clientY;
+      const move = (ev) => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; moved = true; w.classList.add('drag'); const el2 = document.elementFromPoint(ev.clientX, ev.clientY); const tw = el2 && el2.closest('.ov-w'); grid.querySelectorAll('.ov-w').forEach(x => x.classList.toggle('ov-over', tw && tw !== w && x === tw)); };
+      const up = (ev) => {
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+        w.classList.remove('drag'); grid.querySelectorAll('.ov-w').forEach(x => x.classList.remove('ov-over'));
+        if (!moved) return;
+        const el2 = document.elementFromPoint(ev.clientX, ev.clientY); const tw = el2 && el2.closest('.ov-w'); if (!tw || tw === w) return;
+        const arr = getLayout().filter(x => x !== key); const idx = arr.indexOf(tw.dataset.w);
+        const r = tw.getBoundingClientRect(); const before = ev.clientY < r.top + r.height / 2;
+        arr.splice(before ? idx : idx + 1, 0, key); onChange(arr);
+      };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    });
+  });
+}
 
 /* ============================================================
    УНИВЕРСАЛЬНЫЙ ДВИЖОК МАССОВОГО ВЫДЕЛЕНИЯ (лиды/объекты/подборки/…)
