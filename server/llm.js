@@ -585,4 +585,29 @@ ${geo ? 'Направление/гео: ' + geo + '\n' : ''}Тема/вводн�
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+/* Умный поиск данных о лонче/проекте: из текста страницы (по ссылке) или по названию.
+   opts: {sourceText, query}. Если есть sourceText — извлекаем ТОЛЬКО факты из текста (без выдумки). */
+async function extractLaunch(opts = {}) {
+  const src = String(opts.sourceText || '').slice(0, 8000);
+  const query = String(opts.query || '').slice(0, 200);
+  const grounded = !!src;
+  const prompt = `Ты — аналитик по недвижимости. Собери карточку фактов о проекте/лонче для карусели брокера.
+${grounded
+    ? 'ИСТОЧНИК (текст страницы) — извлекай факты ТОЛЬКО отсюда, ничего не додумывай. Чего нет — оставляй пустым.\n"""' + src + '"""'
+    : 'Проект по названию: "' + query + '". Дай оценку по общеизвестным данным, но честно проставь confidence и note — брокер обязан перепроверить цифры.'}
+Верни строго JSON:
+{"name":"название проекта/ЖК","location":"район, город, страна","priceFrom":"стартовая цена (как есть, с валютой)","payment":"условия рассрочки/оплаты","roi":"доходность/ROI если есть","handover":"срок сдачи","units":"типы юнитов (студии/1BR…)","highlights":["до 5 ключевых фишек одной строкой"],"confidence":"высокая|средняя|низкая","note":"1 строка: что проверить/чего не хватает"}`;
+  const out = await callGemini(prompt, 30000, 1500);
+  if (!out) throw new Error('bad launch');
+  const S = (v, n) => String(v == null ? '' : v).replace(/<[^>]*>/g, '').slice(0, n);
+  return {
+    name: S(out.name, 160), location: S(out.location, 160), priceFrom: S(out.priceFrom, 120),
+    payment: S(out.payment, 200), roi: S(out.roi, 120), handover: S(out.handover, 120), units: S(out.units, 160),
+    highlights: Array.isArray(out.highlights) ? out.highlights.slice(0, 5).map(x => S(x, 160)).filter(Boolean) : [],
+    confidence: ['высокая', 'средняя', 'низкая'].includes(out.confidence) ? out.confidence : (grounded ? 'средняя' : 'низкая'),
+    note: S(out.note, 240),
+    grounded,
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

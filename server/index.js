@@ -260,6 +260,7 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.carousels) db.carousels = [];
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
+  if (!db.brokerTasks) db.brokerTasks = [];     // личный таск-менеджер брокера (Today + встречи + приоритеты + стрики)
   if (!db.folders) db.folders = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
@@ -1266,7 +1267,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (m[2] === 'inbound') engine.inbound(db, lead, b.text || '', { simulated: true });
-      if (m[2] === 'handover') engine.handover(db, lead, b.brokerId);
+      if (m[2] === 'handover') engine.handover(db, lead, b.brokerId, { clientMsg: b.clientMsg });
       if (m[2] === 'analyze') { ai.screen(db, lead); if (lead.stage === 'qualified') lead.summary = ai.buildSummary(db, lead); }
       store.save();
       const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
@@ -1283,6 +1284,12 @@ const server = http.createServer(async (req, res) => {
         const out = await llm.composeFirstTouch(db, lead, b.draft ? String(b.draft) : '', db.settings.agency.name);
         return json(res, 200, out);
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+    /* предпросмотр передачи брокеру: что уйдёт клиенту + саммари брокеру */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/handover-preview$/)) && req.method === 'GET') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      return json(res, 200, engine.handoverPreview(db, lead, u.searchParams.get('brokerId') || null));
     }
     /* ИИ психо-профиль лида: тип покупателя + подход + отработка возражений + готовые ответы */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/psych$/)) && req.method === 'POST') {
@@ -1812,6 +1819,30 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, item);
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
+    /* умный поиск данных о лонче: по ссылке (грузим страницу) или по названию проекта */
+    if (p === '/api/social/launch-lookup' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
+      const b = await readBody(req);
+      const url = String(b.url || '').trim();
+      const query = String(b.query || '').trim();
+      let sourceText = String(b.text || '').trim();
+      if (!url && !query && !sourceText) return json(res, 400, { error: 'дайте ссылку или название проекта' });
+      if (url && !sourceText) {
+        try {
+          const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
+          const host = uu.hostname;
+          if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(host)) return json(res, 400, { error: 'ссылка недоступна' });
+          const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 12000);
+          const rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 LumenBot' } });
+          clearTimeout(to);
+          const html = (await rr.text()).slice(0, 400000);
+          sourceText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
+          if (!sourceText) return json(res, 400, { error: 'страница пустая или не отдала текст' });
+        } catch (e) { return json(res, 400, { error: 'не удалось загрузить страницу — вставьте текст вручную' }); }
+      }
+      try { const facts = await llm.extractLaunch({ sourceText, query }); return json(res, 200, facts); }
+      catch (e) { return json(res, 500, { error: e.message }); }
+    }
     /* копилка идей: список / добавить (текст или диктовка/свайп) / удалить */
     if (p === '/api/social/ideas' && req.method === 'GET') {
       return json(res, 200, db.ideaBank.slice(0, 300));
@@ -1827,6 +1858,83 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/social\/ideas\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
       db.ideaBank = db.ideaBank.filter(x => x.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- личный таск-менеджер брокера ----------------
+       Методики топ-приложений: Today-фокус (Sunsama/Things), приоритеты P1–P4 (Todoist),
+       матрица Эйзенхауэра, тайм-блокинг вокруг встреч, стрики/импульс (Habitica), умные подсказки. */
+    {
+      const TASK_PRI = new Set(['p1', 'p2', 'p3', 'p4']);
+      const dstr = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+      const todayStr = dstr(Date.now());
+      const sanTask = (b, t) => {
+        t = t || {};
+        if (b.title != null) t.title = String(b.title).replace(/<[^>]*>/g, '').slice(0, 300);
+        if (b.notes != null) t.notes = String(b.notes).replace(/<[^>]*>/g, '').slice(0, 2000);
+        if (b.priority != null) t.priority = TASK_PRI.has(b.priority) ? b.priority : 'p3';
+        if (b.status != null) { t.status = b.status === 'done' ? 'done' : 'todo'; t.doneAt = t.status === 'done' ? (t.doneAt || Date.now()) : null; }
+        if (b.due !== undefined) t.due = b.due ? +b.due : null;
+        if (b.scheduled !== undefined) t.scheduled = b.scheduled ? String(b.scheduled).slice(0, 10) : null;
+        if (b.leadId !== undefined) t.leadId = b.leadId ? String(b.leadId).slice(0, 40) : null;
+        if (b.meetingId !== undefined) t.meetingId = b.meetingId ? String(b.meetingId).slice(0, 60) : null;
+        return t;
+      };
+      if (p === '/api/tasks' && req.method === 'GET') {
+        const tasks = db.brokerTasks.slice();
+        /* стрик: подряд идущие дни с ≥1 выполненной задачей, заканчивая сегодня/вчера */
+        const doneDays = new Set(tasks.filter(t => t.status === 'done' && t.doneAt).map(t => dstr(t.doneAt)));
+        let streak = 0; const cur = new Date();
+        if (!doneDays.has(dstr(cur.getTime()))) cur.setDate(cur.getDate() - 1); /* сегодня ещё нет — считаем от вчера */
+        for (;;) { if (doneDays.has(dstr(cur.getTime()))) { streak++; cur.setDate(cur.getDate() - 1); } else break; }
+        const weekAgo = Date.now() - 7 * 864e5;
+        const stats = {
+          todayTotal: tasks.filter(t => t.status !== 'done' && (t.scheduled === todayStr || (t.due && dstr(t.due) <= todayStr))).length,
+          todayDone: tasks.filter(t => t.status === 'done' && t.doneAt && dstr(t.doneAt) === todayStr).length,
+          overdue: tasks.filter(t => t.status !== 'done' && t.due && dstr(t.due) < todayStr).length,
+          weekDone: tasks.filter(t => t.status === 'done' && t.doneAt && t.doneAt >= weekAgo).length,
+          streak, open: tasks.filter(t => t.status !== 'done').length,
+        };
+        /* встречи на сегодня+ (тайм-блоки) */
+        const now = Date.now();
+        const meetings = (db.meetings || []).filter(mt => mt.at && mt.at > now - 6 * 3600e3 && mt.at < now + 8 * 864e5)
+          .sort((a, b2) => a.at - b2.at).slice(0, 12).map(mt => {
+            const lead = db.leads.find(l => l.id === mt.leadId) || {};
+            return { id: mt.id, at: mt.at, kind: mt.kind || 'call', leadId: mt.leadId, leadName: lead.name || 'Клиент', link: mt.link || '' };
+          });
+        /* умные подсказки: подготовка к встрече, если под неё нет задачи */
+        const linked = new Set(tasks.filter(t => t.meetingId).map(t => t.meetingId));
+        const kindRu = { call: 'созвону', video: 'видео-показу', tour: 'показу' };
+        const suggestions = [];
+        for (const mt of meetings) {
+          if (linked.has(mt.id)) continue;
+          const hh = new Date(mt.at); const tm = `${String(hh.getHours()).padStart(2, '0')}:${String(hh.getMinutes()).padStart(2, '0')}`;
+          const day = dstr(mt.at) === todayStr ? 'сегодня' : dstr(mt.at);
+          suggestions.push({ kind: 'meeting-prep', meetingId: mt.id, leadId: mt.leadId, priority: 'p2', title: `Подготовиться к ${kindRu[mt.kind] || 'встрече'} с ${mt.leadName} (${day} ${tm})`, scheduled: dstr(mt.at) });
+        }
+        /* горячие лиды без задачи-follow-up */
+        const leadTaskIds = new Set(tasks.filter(t => t.leadId && t.status !== 'done').map(t => t.leadId));
+        for (const l of db.leads.filter(l => ['qualified', 'viewing', 'handover'].includes(l.stage)).slice(0, 6)) {
+          if (leadTaskIds.has(l.id)) continue;
+          suggestions.push({ kind: 'lead-followup', leadId: l.id, priority: 'p2', title: `Дожать: ${l.name || 'лид'} — ${l.geoName || ''} (${({ qualified: 'квалифицирован', viewing: 'показ', handover: 'у брокера' })[l.stage] || l.stage})`, scheduled: todayStr });
+        }
+        return json(res, 200, { tasks, meetings, stats, suggestions: suggestions.slice(0, 6), today: todayStr });
+      }
+      if (p === '/api/tasks' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!String(b.title || '').trim()) return json(res, 400, { error: 'пустая задача' });
+        const t = sanTask(b, { id: crypto.randomBytes(5).toString('hex'), priority: 'p3', status: 'todo', due: null, scheduled: null, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null });
+        db.brokerTasks.unshift(t); db.brokerTasks = db.brokerTasks.slice(0, 1000); store.save();
+        return json(res, 200, t);
+      }
+      if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
+        const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
+        sanTask(await readBody(req), t); store.save();
+        return json(res, 200, t);
+      }
+      if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+        db.brokerTasks = db.brokerTasks.filter(x => x.id !== m[1]); store.save();
+        return json(res, 200, { ok: true });
+      }
     }
 
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
@@ -2874,7 +2982,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const slides = (c.slides || []).map((s, i) => {
         const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
         const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
-        const hasPat = !hasVid && !hasBg && !!s.bgpat;
+        const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';

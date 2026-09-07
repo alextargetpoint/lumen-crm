@@ -679,8 +679,20 @@ body > .cs-list.show, body > .dtp-pop.show { display: block; animation: gsIn .22
 .lp-ai-state svg { width: 18px; height: 18px; color: var(--accent); }
 .lp-ai-state b { display: block; font-size: 13px; color: var(--navy-900); }
 .lp-ai-state span { font-size: 11.5px; color: var(--ink-3); }
-.lp-quick { display: flex; gap: 6px; align-items: center; }
+.lp-quick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .lp-quick .btn { text-decoration: none; }
+.lp-airow { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 11px; border-radius: var(--r-md); background: var(--surface-2, #F4F7FC); border: 1px solid var(--stroke-soft); }
+.lp-ai-lbl { font-size: 12.5px; font-weight: 600; color: var(--navy-900); }
+/* предпросмотр передачи брокеру */
+.hp-note, .hp-extra { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md); margin-bottom: 10px; font-size: 12.5px; line-height: 1.5; }
+.hp-note { background: rgba(37, 211, 102, .10); border: 1px solid rgba(37, 211, 102, .25); }
+.hp-extra { background: var(--violet-bg); }
+.hp-note svg, .hp-extra svg { width: 16px; height: 16px; flex: 0 0 16px; margin-top: 1px; }
+.hp-note svg { color: #12925a; }
+.hp-extra svg { color: var(--violet); }
+.hp-note b, .hp-extra b { display: block; color: var(--navy-900); }
+.hp-note span, .hp-extra span { color: var(--ink-2); }
+.hp-sum { font-size: 12.8px; line-height: 1.55; color: var(--ink-2); background: var(--surface-2, #F4F7FC); border: 1px solid var(--stroke-soft); border-radius: var(--r-md); padding: 10px 12px; }
 .axr-list { border: 1px solid var(--stroke-soft); border-radius: var(--r-md); overflow: hidden; }
 .axr { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-bottom: 1px solid var(--stroke-soft); background: var(--card); }
 .axr:last-child { border-bottom: none; }
@@ -2291,3 +2303,73 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .cl-layout { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
 .cl-layout > .cl-config { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow: auto; }
 @media (max-width: 900px) { .cl-layout { grid-template-columns: 1fr; } .cl-layout > .cl-config { position: static; max-height: none; } }
+
+/* ═══════════════ ТАСК-МЕНЕДЖЕР БРОКЕРА ═══════════════ */
+.tk-top { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+.tk-hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; flex-wrap: wrap; }
+.tk-hero-t { display: flex; align-items: center; gap: 9px; font-family: var(--font-display); font-size: 21px; font-weight: 600; color: var(--navy-900); }
+.tk-hero-t svg { width: 20px; height: 20px; color: var(--accent); }
+.tk-motive { font-size: 13px; color: var(--ink-2); margin-top: 5px; }
+.tk-stats { display: flex; align-items: center; gap: 20px; }
+.tk-stat { display: flex; align-items: center; gap: 9px; }
+.tk-stat-ic svg { width: 22px; height: 22px; }
+.tk-stat b { font-size: 20px; font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.tk-stat i { display: block; font-size: 10.5px; font-style: normal; color: var(--ink-3); }
+.tk-ring { position: relative; display: flex; align-items: center; gap: 9px; }
+.tk-ring-svg { width: 48px; height: 48px; }
+.tk-ring-v { position: absolute; left: 0; width: 48px; text-align: center; font-size: 12px; font-weight: 700; color: var(--navy-900); }
+.tk-ring i { font-size: 10.5px; font-style: normal; color: var(--ink-3); line-height: 1.3; }
+.tk-cap { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.tk-cap-in { flex: 1; border: none; background: transparent; font-size: 14px; color: var(--ink); outline: none; padding: 4px 2px; }
+.tk-cap-pri { display: flex; gap: 6px; }
+.tk-pdot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid transparent; background: var(--pc); opacity: .4; transition: opacity .14s, transform .14s, box-shadow .14s; }
+.tk-pdot:hover { opacity: .8; transform: scale(1.12); }
+.tk-pdot.on { opacity: 1; box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--pc); }
+.tk-seg { margin-bottom: 14px; }
+.tk-suggest { margin-bottom: 14px; padding: 14px 16px; }
+.tk-sug-hd { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--navy-900); margin-bottom: 10px; }
+.tk-sug-hd svg { width: 16px; height: 16px; color: var(--accent); }
+.tk-sug-hd .sub { font-weight: 400; font-size: 11.5px; color: var(--ink-3); margin-left: auto; }
+.tk-sug { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--stroke); }
+.tk-sug:first-of-type { border-top: none; }
+.tk-sug-t { flex: 1; font-size: 13px; color: var(--ink-2); }
+.tk-list { display: flex; flex-direction: column; gap: 7px; }
+.tk-sec-lbl { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 16px 0 4px; }
+.tk-sec-lbl svg { width: 13px; height: 13px; }
+.tk-sec-lbl.od { color: var(--bad); }
+.tk-sec-lbl.done { color: var(--ok); }
+.tk-block { display: flex; align-items: center; gap: 13px; padding: 11px 15px; border-radius: var(--r-md); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, var(--card)), var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke)); box-shadow: var(--shadow); }
+.tk-block-t { font-size: 14px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; flex: none; width: 48px; }
+.tk-block-b { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tk-block-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--accent); }
+.tk-block-link svg { width: 13px; height: 13px; }
+.tk-row { display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-radius: var(--r-md); background: var(--card); border: 1px solid var(--stroke); box-shadow: var(--shadow); transition: box-shadow var(--dur-fast), transform var(--dur-fast), opacity var(--dur-fast); }
+.tk-row:hover { box-shadow: 0 8px 20px -10px rgba(16, 43, 92, .28); transform: translateY(-1px); }
+.tk-row.done { opacity: .55; }
+.tk-row.done .tk-title { text-decoration: line-through; color: var(--ink-3); }
+.tk-check { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--stroke); background: var(--card); display: grid; place-items: center; color: transparent; transition: all .16s cubic-bezier(.4, 0, .2, 1); }
+.tk-check svg { width: 13px; height: 13px; }
+.tk-check:hover { border-color: var(--ok); }
+.tk-check.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tk-flag { flex: none; width: 22px; height: 22px; display: grid; place-items: center; color: var(--pc, var(--ink-3)); border-radius: 6px; transition: background .14s, transform .14s; }
+.tk-flag svg { width: 15px; height: 15px; fill: color-mix(in srgb, var(--pc) 18%, transparent); }
+.tk-flag:hover { background: var(--bg-2); transform: scale(1.08); }
+.tk-main { flex: 1; min-width: 0; }
+.tk-title { font-size: 13.5px; color: var(--ink); line-height: 1.35; cursor: text; }
+.tk-edit { width: 100%; border: 1.5px solid var(--accent); border-radius: 7px; padding: 5px 8px; font-size: 13.5px; font-family: inherit; outline: none; background: var(--card); color: var(--ink); }
+.tk-meta { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+.tk-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-3); background: var(--bg-2); border-radius: 20px; padding: 2px 8px; }
+.tk-chip svg { width: 11px; height: 11px; }
+.tk-chip.od { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.tk-acts { display: flex; gap: 3px; opacity: 0; transition: opacity var(--dur-fast); flex: none; }
+.tk-row:hover .tk-acts { opacity: 1; }
+.tk-mini { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--ink-3); transition: background .14s, color .14s; }
+.tk-mini svg { width: 15px; height: 15px; }
+.tk-mini:hover { background: var(--bg-2); color: var(--accent); }
+.tk-mini.del:hover { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.tk-block .tk-mini { opacity: .6; }
+.tk-block .tk-mini:hover { opacity: 1; }
+@media (max-width: 720px) {
+  .tk-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .tk-acts { opacity: 1; }
+}

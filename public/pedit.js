@@ -38,12 +38,15 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .peth-dot{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--td) 50%,var(--tb) 50%);transition:transform .15s}
 .peth-dot:hover{transform:scale(1.15)}
 .peth-dot.on{border-color:#fff;box-shadow:0 0 0 2px #2563EB}
-.edbtn{background:#2563EB;color:#fff;border:none;border-radius:9px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;gap:6px;align-items:center;transition:background .15s,box-shadow .2s;box-shadow:0 6px 16px -6px rgba(37,99,235,.5)}
-.edbtn:hover{background:#1D54D6}
+.edbtn{background:linear-gradient(180deg,#3B78FF,#2563EB);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;gap:6px;align-items:center;transition:transform .14s cubic-bezier(.4,0,.2,1),box-shadow .16s,filter .14s;box-shadow:0 6px 16px -6px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.22)}
+.edbtn:hover{transform:translateY(-1px);box-shadow:0 11px 24px -6px rgba(37,99,235,.72),inset 0 1px 0 rgba(255,255,255,.25);filter:brightness(1.05)}
+.edbtn:active{transform:translateY(0)}
 .edbtn.g{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);box-shadow:none}
-.edbtn.g:hover{background:rgba(255,255,255,.18)}
+.edbtn.g:hover{background:rgba(255,255,255,.18);transform:translateY(-1px);filter:none}
 .edbtn.ai{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
-.edbtn:disabled{opacity:.5;cursor:default}
+.edbtn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none;filter:none}
+.btool button:hover{background:rgba(255,255,255,.16)!important;transform:translateY(-1px)}
+.peth-dot:hover{transform:scale(1.13)}
 .btool{position:absolute;top:10px;left:10px;z-index:7;display:flex;gap:4px;background:rgba(6,17,38,.82);border:1px solid rgba(255,255,255,.14);border-radius:11px;padding:4px;opacity:0;transition:opacity .15s;box-shadow:0 6px 20px rgba(0,0,0,.35);backdrop-filter:blur(8px)}
 section[data-bid]:hover .btool{opacity:1}
 .btool button{width:30px;height:30px;border-radius:7px;border:none;background:transparent;color:#fff;cursor:pointer;font-size:14px;display:grid;place-items:center;font-family:inherit}

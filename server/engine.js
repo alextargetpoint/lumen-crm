@@ -162,7 +162,22 @@ function pickBroker(db, lead) {
 }
 
 /* ---------- передача брокеру ---------- */
-function handover(db, lead, brokerId) {
+/* предпросмотр передачи: что уйдёт клиенту и что увидит брокер (без изменения данных) */
+function handoverPreview(db, lead, brokerId) {
+  let broker = brokerId ? db.brokers.find(b => b.id === brokerId) : null;
+  if (!broker) broker = pickBroker(db, lead);
+  const tpl = db.templates.find(t => t.id === 'tpl_slot');
+  const clientMsg = tpl ? renderTemplate(db, tpl, Object.assign({}, lead, { broker: broker.id })) : '';
+  const auto = db.settings.automations || {};
+  let preannounce = '';
+  if (auto.handoverPreannounce && broker && broker.phone) {
+    const first = lead.name.split(' ')[0];
+    preannounce = `${first}, с вами свяжется ${broker.name}, ваш персональный эксперт по ${db.settings.geoNames[lead.geo] || lead.geo} — напишет сюда или с номера ${broker.phone}. Это тот же наш отдел, продолжите с ним.`;
+  }
+  return { broker: broker ? { id: broker.id, name: broker.name } : null, clientMsg, preannounce, summary: lead.summary || ai.buildSummary(db, lead) };
+}
+
+function handover(db, lead, brokerId, opts = {}) {
   let broker = brokerId ? db.brokers.find(b => b.id === brokerId) : null;
   if (!broker) broker = pickBroker(db, lead);
   lead.broker = broker.id;
@@ -174,7 +189,8 @@ function handover(db, lead, brokerId) {
   if (!lead.nextAction) lead.nextAction = { text: `Позвонить в течение 30 мин (передан от ИИ)`, at: Date.now() + 30 * 60e3 };
   if (module.exports.onHandover) module.exports.onHandover(db, lead);
   const tpl = db.templates.find(t => t.id === 'tpl_slot');
-  if (tpl) send(db, lead, renderTemplate(db, tpl, lead), 'ai');
+  const clientMsg = (opts.clientMsg && String(opts.clientMsg).trim()) ? String(opts.clientMsg).trim() : (tpl ? renderTemplate(db, tpl, lead) : '');
+  if (clientMsg) send(db, lead, clientMsg, 'ai');
   /* Вариант B: брокер пишет с личного номера — тёплый преданонс с того же (центрального)
      номера, чтобы сообщение брокера не выглядело холодным незнакомым номером */
   const auto = db.settings.automations || {};
@@ -691,4 +707,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment };
+module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment };

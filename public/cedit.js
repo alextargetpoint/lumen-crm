@@ -80,6 +80,15 @@
 .cpat:hover{border-color:var(--cb);transform:translateY(-1px);box-shadow:0 6px 14px -6px rgba(37,99,235,.4)}
 .cpat.on{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
 .cpat.none{display:flex;align-items:center;justify-content:center;font-size:10px;color:#9aa1b2;font-weight:700;background:#fff}
+.cdrop{margin-top:8px;border:1.5px dashed #C6D2EA;border-radius:12px;background:linear-gradient(180deg,#FAFCFF,#F2F6FE);padding:18px 12px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.cdrop:hover{border-color:var(--cb);background:#EEF4FF}
+.cdrop.over{border-color:var(--cb);background:#E5EEFF;transform:scale(1.01)}
+.cdrop-ic{font-size:26px;line-height:1}
+.cdrop-t{font-size:12.5px;color:#5E6470;margin-top:7px;line-height:1.45}
+.cdrop-t b{color:var(--cb)}
+.cthumb{margin-top:9px;border-radius:10px;overflow:hidden;max-height:150px}
+.cthumb:empty{display:none}
+.cthumb img,.cthumb video{width:100%;display:block;object-fit:cover;max-height:150px}
 .swrow{display:flex;align-items:center;gap:10px;font-weight:600;font-size:12.5px;color:#2A3346}
 .sw{position:relative;width:40px;height:23px;border-radius:999px;background:#D2DAEA;cursor:pointer;transition:.15s;flex:0 0 40px}
 .sw.on{background:var(--cb)}.sw:after{content:'';position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.15s}.sw.on:after{left:20px}
@@ -195,13 +204,15 @@ body.cpanel-on{padding-right:308px!important}
     sl.dataset[key] = val;
     const pos = sl.dataset.pos || 'center', al = sl.dataset.align || 'left', sz = sl.dataset.size || 'm';
     const bgcls = (sl.dataset.bg || sl.dataset.bgv || (sl.dataset.bgc && isDark(sl.dataset.bgc))) ? ' hasbg' : '';
-    sl.className = 'slide' + bgcls + ` pos-${pos} al-${al} sz-${sz} sel`;
+    const pat = (!sl.dataset.bg && !sl.dataset.bgv && !sl.dataset.bgc && sl.dataset.bgpat) ? ` pat-${sl.dataset.bgpat}` : '';
+    sl.className = 'slide' + bgcls + ` pos-${pos} al-${al} sz-${sz}` + pat + ' sel';
     dirty = true;
   }
   /* live-применение фона */
   function setBg(i, kind, val) {
     const sl = slideEl(i); if (!sl) return;
     delete sl.dataset.bg; delete sl.dataset.bgv; delete sl.dataset.bgc;
+    if (kind !== 'none') { delete sl.dataset.bgpat; sl.className = sl.className.replace(/\bpat-\w+/g, '').replace(/\s+/g, ' ').trim(); }
     sl.style.background = ''; sl.style.backgroundImage = '';
     const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove();
     sl.classList.remove('hasbg');
@@ -215,6 +226,25 @@ body.cpanel-on{padding-right:308px!important}
     const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка загрузки'); return j.url;
   }
   function pickFile(accept, cb) { const inp = el(`<input type="file" accept="${accept}" style="display:none">`); document.body.appendChild(inp); inp.addEventListener('change', () => { if (inp.files[0]) cb(inp.files[0]); inp.remove(); }); inp.click(); }
+
+  /* ---------- выделение текста цветом (несколько цветов + снятие) ---------- */
+  function nodeMark(n, host) { let e = n && (n.nodeType === 1 ? n : n.parentElement); while (e && e !== host) { if (e.tagName === 'MARK') return e; e = e.parentElement; } return null; }
+  function marksIn(range, host) { return $$('mark', host).filter(m => { try { return range.intersectsNode(m); } catch (_) { return false; } }); }
+  function unwrap(m) { const p = m.parentNode; if (!p) return; while (m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); }
+  function markSel(key, host) {
+    const s2 = document.getSelection(); if (!s2 || !s2.rangeCount) return;
+    const range = s2.getRangeAt(0);
+    const sm = nodeMark(range.startContainer, host), em = nodeMark(range.endContainer, host);
+    if (sm && sm === em) { if (key === 'off') unwrap(sm); else sm.className = 'hl-' + key; host.normalize(); dirty = true; return; }
+    if (key === 'off') { marksIn(range, host).forEach(unwrap); host.normalize(); dirty = true; return; }
+    marksIn(range, host).forEach(unwrap);
+    const sel3 = document.getSelection(); if (!sel3.rangeCount) { dirty = true; return; }
+    const r2 = sel3.getRangeAt(0);
+    const mk = document.createElement('mark'); mk.className = 'hl-' + key;
+    try { r2.surroundContents(mk); } catch (_) { try { const f = r2.extractContents(); mk.appendChild(f); r2.insertNode(mk); } catch (e2) { dirty = true; return; } }
+    [...mk.querySelectorAll('mark')].forEach(unwrap);
+    host.normalize(); dirty = true;
+  }
 
   /* ---------- рендер тела панели ---------- */
   function renderBody() {
@@ -295,10 +325,17 @@ body.cpanel-on{padding-right:308px!important}
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
       const anc = s2.anchorNode && (s2.anchorNode.nodeType === 1 ? s2.anchorNode : s2.anchorNode.parentElement);
-      if (!anc || !anc.closest('[data-ce]')) { flash('Выделите текст внутри слайда'); return; }
-      if (cmd === 'bold') document.execCommand('bold'); else if (cmd === 'italic') document.execCommand('italic'); else if (cmd === 'clear') document.execCommand('removeFormat');
-      else if (cmd === 'mark') { const t = s2.toString(); document.execCommand('insertHTML', false, '<mark>' + t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</mark>'); }
-      dirty = true;
+      const host = anc && anc.closest('[data-ce]');
+      if (!host) { flash('Выделите текст внутри слайда'); return; }
+      if (cmd === 'bold') { document.execCommand('bold'); dirty = true; }
+      else if (cmd === 'italic') { document.execCommand('italic'); dirty = true; }
+      else if (cmd === 'clear') { const r = s2.getRangeAt(0); marksIn(r, host).forEach(unwrap); host.normalize(); document.execCommand('removeFormat'); dirty = true; }
+      else if (cmd === 'mark') {
+        const rc = b.getBoundingClientRect();
+        const sw = HL.map(([k, c]) => `<span class="hlsw" data-hl="${k}" title="Выделение" style="background:${c}"></span>`).join('');
+        const pp = openPop(`<div class="hlpop"><div class="hlrow">${sw}</div><button class="hloff" data-hl="off">Снять выделение</button></div>`, rc.left - 96, rc.bottom + 8);
+        pp.addEventListener('mousedown', (ev) => { const t = ev.target.closest('[data-hl]'); if (!t) return; ev.preventDefault(); markSel(t.dataset.hl, host); closePop(); });
+      }
     });
     $$('[data-mv]', body).forEach(b => b.addEventListener('click', () => {
       const arr = serialize(); const kind = b.dataset.mv;
@@ -313,8 +350,24 @@ body.cpanel-on{padding-right:308px!important}
       if (k === 'color') { extra.innerHTML = `<input type="color" class="ccolor" id="cCol" value="${slideEl(i).dataset.bgc || '#0A1833'}">`; $('#cCol', extra).addEventListener('input', (e) => setBgLive(i, 'color', e.target.value)); $('#cCol', extra).addEventListener('change', (e) => setBg(i, 'color', e.target.value)); return; }
       if (k === 'photo' || k === 'video') {
         const isV = k === 'video';
-        extra.innerHTML = `<div class="cbtn-row" style="margin-top:8px"><button class="cwbtn" id="cUp">${isV ? 'Загрузить видео' : 'Загрузить фото'}</button></div><input class="cinp" id="cUrl" placeholder="или вставьте ссылку…"><div class="cnote">${isV ? 'MP4/WebM до 25 МБ. Видео зациклится, звук выключен.' : 'JPG/PNG/WebP до 25 МБ.'}</div>`;
-        $('#cUp', extra).addEventListener('click', () => pickFile(isV ? 'video/mp4,video/webm' : 'image/*', async (file) => { flash('Загружаю…', 0); try { const url = await uploadAsset(file); setBg(i, isV ? 'video' : 'photo', url); flash('Фон обновлён ✓'); } catch (err) { flash('Ошибка: ' + err.message); } }));
+        const cur = slideEl(i).dataset[isV ? 'bgv' : 'bg'] || '';
+        extra.innerHTML = `<div class="cdrop" id="cDrop"><div class="cdrop-ic">${isV ? '🎬' : '🖼'}</div><div class="cdrop-t">Перетащите ${isV ? 'видео' : 'фото'} сюда<br>или <b>выберите файл</b></div></div>
+          <input class="cinp" id="cUrl" placeholder="…или вставьте ссылку (URL)" value="${esc(/^https?:/.test(cur) ? cur : '')}">
+          <div class="cnote">${isV ? 'MP4 / WebM · до 25 МБ · зациклится без звука. Лучше 9:16 или 1:1.' : 'JPG / PNG / WebP · до 25 МБ. Лучше вертикаль 4:5 или квадрат 1:1 — под формат карусели.'}</div>
+          <div class="cthumb" id="cThumb">${cur ? (isV ? `<video src="${esc(cur)}" muted playsinline></video>` : `<img src="${esc(cur)}" alt="">`) : ''}</div>`;
+        const drop = $('#cDrop', extra);
+        const doUp = async (file) => {
+          if (!file) return;
+          const okImg = /^image\//.test(file.type), okVid = /^video\/(mp4|webm)/.test(file.type);
+          if ((isV && !okVid) || (!isV && !okImg)) { flash(isV ? 'Нужен файл MP4/WebM' : 'Нужен JPG/PNG/WebP'); return; }
+          if (file.size > 25e6) { flash('Файл больше 25 МБ'); return; }
+          flash('Загружаю…', 0);
+          try { const url = await uploadAsset(file); setBg(i, isV ? 'video' : 'photo', url); flash('Фон обновлён ✓'); } catch (err) { flash('Ошибка: ' + err.message); }
+        };
+        drop.addEventListener('click', () => pickFile(isV ? 'video/mp4,video/webm' : 'image/*', doUp));
+        ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+        ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+        drop.addEventListener('drop', (e) => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) doUp(f); });
         $('#cUrl', extra).addEventListener('change', (e) => { const v = e.target.value.trim(); if (v) setBg(i, isV ? 'video' : 'photo', v); });
         return;
       }
@@ -324,6 +377,22 @@ body.cpanel-on{padding-right:308px!important}
         return;
       }
     }));
+    /* узор фона */
+    const pats = $('#cPats', body);
+    if (pats) pats.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-pat]'); if (!t) return;
+      const kk = t.dataset.pat; const sl = slideEl(i); if (!sl) return;
+      $$('.cpat', pats).forEach(x => x.classList.toggle('on', x === t));
+      sl.className = sl.className.replace(/\bpat-\w+/g, '').replace(/\s+/g, ' ').trim();
+      if (kk === 'none') { delete sl.dataset.bgpat; }
+      else {
+        delete sl.dataset.bg; delete sl.dataset.bgv; delete sl.dataset.bgc;
+        const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove();
+        sl.style.background = ''; sl.style.backgroundImage = ''; sl.classList.remove('hasbg');
+        sl.dataset.bgpat = kk; sl.classList.add('pat-' + kk);
+      }
+      dirty = true; save(false); renderBody();
+    });
   }
   /* цвет вживую без сохранения (сохраняем на change) */
   function setBgLive(i, kind, val) { const sl = slideEl(i); if (!sl) return; if (kind === 'color') { sl.dataset.bgc = val; delete sl.dataset.bg; delete sl.dataset.bgv; const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove(); sl.style.backgroundImage = ''; sl.style.background = val; sl.classList.toggle('hasbg', isDark(val)); } }
