@@ -349,7 +349,7 @@ const NAV = {
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
   ads:       { name: 'Реклама', icon: I.target, sub: '' },
   comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
-  social:    { name: 'Соц-помощник', icon: I.layers, sub: '' },
+  social:    { name: 'Контент-цех', icon: I.layers, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: '' },
@@ -1019,6 +1019,22 @@ function ovAnimateCounts(root) {
     elm.textContent = '0' + suf; requestAnimationFrame(step);
   });
 }
+/* премиум-празднование выполнения задачи: кольцо-рябь + разлёт частиц над галочкой */
+function celebrateCheck(el) {
+  if (!el) return;
+  try {
+    el.classList.add('tk-pop');
+    const r = el.getBoundingClientRect();
+    const burst = document.createElement('div');
+    burst.className = 'tk-burst';
+    burst.style.left = (r.left + r.width / 2) + 'px';
+    burst.style.top = (r.top + r.height / 2) + 'px';
+    const N = 9, COLORS = ['#12855F', '#2FA98C', '#4FD1A0', '#E0A82E'];
+    for (let i = 0; i < N; i++) { const p = document.createElement('i'); const a = (i / N) * Math.PI * 2; const dist = 20 + (i % 3) * 5; p.style.setProperty('--tx', (Math.cos(a) * dist).toFixed(1) + 'px'); p.style.setProperty('--ty', (Math.sin(a) * dist).toFixed(1) + 'px'); p.style.background = COLORS[i % COLORS.length]; p.style.animationDelay = (i % 3) * 20 + 'ms'; burst.appendChild(p); }
+    document.body.appendChild(burst);
+    setTimeout(() => burst.remove(), 700);
+  } catch (_) {}
+}
 /* мини-спарклайн с градиентной заливкой площади; pts = массив чисел */
 function sparkSvg(pts, opts = {}) {
   const w = opts.w || 100, h = opts.h || 30, max = Math.max(...pts, 1), min = Math.min(...pts, 0);
@@ -1608,7 +1624,7 @@ PAGES.overview = async (root) => {
     $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
     $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
     $$('[data-ovcase]', root).forEach(b => b.addEventListener('click', () => openCaseModal((ctx.cases || []).find(k => k.id === b.dataset.ovcase))));
-    $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const row = b.closest('.ov2-task'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
+    $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); celebrateCheck(b); const row = b.closest('.ov2-task'); if (row) { row.classList.add('tk-cleared'); } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 520); }));
     $$('[data-ovsug]', root).forEach(b => b.querySelector('.ov2-task-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
     /* тиндер идей: локальная перерисовка только тела виджета (без рефетча всего обзора) */
     const ideaBox = root.querySelector('[data-w="ideas"] .ov-w-body');
@@ -3773,13 +3789,7 @@ PAGES.properties = async (root) => {
           ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}
         </div>
       </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
-    </div>
-    <div style="margin-top:16px">${coll('Источники инвентаря и листинги', `
-      <div class="muted" style="font-size:11.8px;margin:8px 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» вверху: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
-      ${Object.entries(st.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
-        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
-        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('')}
-      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`, { open: false, icon: I.link, count: Object.keys(st.portals || {}).length })}</div>`;
+    </div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
   PROP_FOLDERS = folders;
@@ -3857,13 +3867,6 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
     });
     $('#impTableGo', bd).addEventListener('click', async () => { const csv = $('#impTable', bd).value.trim(); if (!csv) return toast('Вставьте таблицу'); done(await api.post('/properties/import', { csv, defaults: defaults() })); });
     $('#impJsonGo', bd).addEventListener('click', async () => { const j = $('#impJson', bd).value.trim(); if (!j) return toast('Вставьте JSON'); done(await api.post('/properties/import', { json: j, defaults: defaults() })); });
-  });
-  $('#portalSave')?.addEventListener('click', async () => {
-    const body = {};
-    $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
-    await api.patch('/portals', body);
-    toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
-    await loadState(); render();
   });
 };
 
@@ -4921,7 +4924,7 @@ PAGES.social = async (root) => {
   const tool = SOCIAL_TOOLS[SOCIAL_TOOL] ? SOCIAL_TOOL : 'scripts';
   root.innerHTML = `
     <div class="sh-head">
-      <div class="sh-h-t">${ic(I.layers)}Соцсети<span>карманный контент-цех для брокера — сценарии, идеи, карусели и посты под недвижимость</span></div>
+      <div class="sh-h-t">${ic(I.layers)}Контент-цех<span>твоя личная контент-машина: сценарии, охота за идеями, карусели и посты — собери пост за 2 минуты</span></div>
     </div>
     <div class="sh-wrap">
       <nav class="sh-rail">
@@ -5550,7 +5553,7 @@ PAGES.tasks = async (root) => {
   $$('.tk-row[data-tk]', root).forEach(rowEl => rowEl.addEventListener('click', async (e) => {
     const act = e.target.closest('[data-act]'); if (!act) return;
     const id = rowEl.dataset.tk; const a = act.dataset.act; const t = byId[id];
-    if (a === 'done') { await api.patch('/tasks/' + id, { status: rowEl.classList.contains('done') ? 'todo' : 'done' }); render(); return; }
+    if (a === 'done') { const turnOn = !rowEl.classList.contains('done'); if (turnOn) celebrateCheck(act); await api.patch('/tasks/' + id, { status: turnOn ? 'done' : 'todo' }); render(); return; }
     if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
     if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; await api.patch('/tasks/' + id, { priority: order[(order.indexOf(rowEl.dataset.pri) + 1) % 4] }); render(); return; }
     if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
@@ -6563,7 +6566,22 @@ PAGES.settings = async (root) => {
           </div>
         </div>
       </div>
+    </div>
+    <div class="glass card" style="margin-top:16px">
+      <div class="card-title">${ic(I.link)}Источники инвентаря и листинги<span class="sub">откуда тянутся объекты в базу</span></div>
+      <div class="muted" style="font-size:11.8px;margin:6px 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» в разделе «База объектов»: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
+      ${Object.entries(s.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
+        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
+        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('') || '<div class="muted" style="font-size:12px">Порталы не заданы</div>'}
+      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>
     </div>`;
+  $('#portalSave')?.addEventListener('click', async () => {
+    const body = {};
+    $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
+    await api.patch('/portals', body);
+    toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
+    await loadState(); PAGES.settings(root);
+  });
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
   const whc = $('#whCopy');
@@ -6852,8 +6870,8 @@ function quickIdeaModal() {
     body: `<div class="form-row"><label>Идея</label><textarea id="qiText" placeholder="напр. разбор: почему рассрочка 0% выгоднее ипотеки — с цифрами" autofocus></textarea></div>
       <div class="form-row"><label>Направление (необязательно)</label><select id="qiGeo"><option value="">—</option>${(st.agency.geos || []).map(g => `<option value="${g}">${esc(st.geoNames[g] || g)}</option>`).join('')}</select></div>`,
     actions: [
-      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => { const t = $('#qiText', bd).value.trim(); if (!t) { toast('Пустая идея'); return false; } await api.post('/social/ideas', { text: t, geo: $('#qiGeo', bd).value, source: 'быстрая' }); toast('Идея сохранена', 'В копилке «Соц-помощник»', true); } },
-      { label: 'Открыть Соц-помощник', onClick: () => go('social') },
+      { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => { const t = $('#qiText', bd).value.trim(); if (!t) { toast('Пустая идея'); return false; } await api.post('/social/ideas', { text: t, geo: $('#qiGeo', bd).value, source: 'быстрая' }); toast('Идея сохранена', 'В копилке «Контент-цех»', true); } },
+      { label: 'Открыть Контент-цех', onClick: () => go('social') },
       { label: 'Отмена' },
     ],
   });
