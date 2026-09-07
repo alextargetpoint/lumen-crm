@@ -59,6 +59,13 @@ section[data-bid]:hover .btool{opacity:1}
 .pi.ptile:hover{border-color:#2563EB;background:#F5F8FF;box-shadow:0 10px 26px -12px rgba(37,99,235,.4);transform:translateY(-2px)}
 .pi.ptile.tpl{border-color:#C3D6FA;background:linear-gradient(180deg,#F5F8FF,#fff)}
 .pi.ptile.tpl:hover{border-color:#2563EB}
+.pico{display:inline-block;vertical-align:middle}
+.pi.ptile i{display:grid;place-items:center}
+.pi.ptile .pico{width:26px;height:26px;color:#2563EB}
+.pi .pico{width:18px;height:18px;color:#2563EB;margin-right:2px}
+.peth-i{display:grid;place-items:center}
+.peth-i .pico{width:16px;height:16px;color:#9DB8FF}
+.peth.drag .peth-i .pico,.peth:hover .peth-i .pico{color:#fff}
 section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:-3px;opacity:.75}
 .plib{aspect-ratio:4/3;border-radius:9px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent}
 .plib:hover{border-color:#2563EB}
@@ -366,7 +373,36 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
 
   /* ---------- палитра блоков ---------- */
   const PALETTE = ['proj', 'hero', 'amenities', 'guarantee', 'textimg', 'text', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta'];
-  const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦', amenities: '🏊', hero: '🌅', guarantee: '🛡' };
+  /* SVG-иконки блоков в стиле дашборда (тонкая линия) — вместо эмодзи */
+  const PICO = {
+    text: '<path d="M5 6h14M5 11h14M5 16h9"/>',
+    textimg: '<rect x="3" y="4" width="8" height="16" rx="1.5"/><path d="M14 8h6M14 12h6M14 16h4"/>',
+    image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-4-8 6"/>',
+    gallery: '<rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/>',
+    video: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/>',
+    quote: '<path d="M9 7c-2.5 0-4 2-4 4.5S6.5 16 8.5 16M20 7c-2.5 0-4 2-4 4.5S17.5 16 19.5 16"/>',
+    stats: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
+    bignum: '<path d="M7 8l3-2v12M14 20h4"/>',
+    benefits: '<path d="M12 3l2.4 5.6L20 9l-4 3.8L17 19l-5-3-5 3 1-6.2L4 9l5.6-.4z"/>',
+    checklist: '<path d="M4 6h9M4 12h9M4 18h9M16 6l1.4 1.4L20.5 4.5M16 12l1.4 1.4L20.5 10.5M16 18l1.4 1.4L20.5 16.5"/>',
+    compare: '<path d="M12 3v18M7 8l-3.5 4L7 16M17 8l3.5 4L17 16"/>',
+    timeline: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><path d="M6 8v8M10 6h11M10 18h11"/>',
+    steps: '<path d="M4 20h3v-4h4v-4h4V8h4V4"/>',
+    pricecards: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M6 15h4"/>',
+    team: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5M16 6a3 3 0 010 6"/>',
+    faq: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.8.5-1 1-1 1.8M12 17h.01"/>',
+    sep: '<path d="M3 12h18"/>',
+    cta: '<path d="M4 9v6h3l6 4V5L7 9z"/><path d="M16 9a4 4 0 010 6"/>',
+    proj: '<path d="M4 21h16M6 21V7l6-4 6 4v14M10 11h4M10 15h4"/>',
+    cover: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/>',
+    hero: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-4 4 3 3-2 6 5"/><circle cx="8" cy="9" r="1.5"/>',
+    amenities: '<path d="M4 20h16M6 20v-6M18 20v-6M5 14c2-2.5 5-2.5 7-2.5s5 0 7 2.5"/>',
+    guarantee: '<path d="M12 3l7 3v6c0 4-3 6.8-7 8.5C8 18.8 5 16 5 12V6z"/><path d="M9 12l2 2 4-4"/>',
+    hello: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14s1.3 1.8 3.5 1.8 3.5-1.8 3.5-1.8M9 9.5h.01M15 9.5h.01"/>',
+    why: '<path d="M12 3l2.4 5.6L20 9l-4 3.8L17 19l-5-3-5 3 1-6.2L4 9l5.6-.4z"/>',
+    final: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>',
+  };
+  const pico = (t) => `<svg class="pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${PICO[t] || PICO.text}</svg>`;
   /* готовые страницы — бандлы блоков в едином стиле, вставляются одним кликом */
   const TEMPLATES = [
     { id: 'hero_intro', name: 'Хиро + крючок', ic: '🌅', blocks: ['hero', 'text'] },
@@ -377,8 +413,8 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     { id: 'closing', name: 'Отзыв + призыв', ic: '📣', blocks: ['quote', 'cta'] },
   ].map((t) => Object.assign({}, t, { blocks: t.blocks.filter((b) => P.types[b]) })).filter((t) => t.blocks.length);
   function openPalette(afterSec, x, y) {
-    const tpls = TEMPLATES.map((t) => `<div class="pi ptile tpl" data-tpl="${t.id}" title="${t.blocks.length} блок(ов)"><i>${t.ic}</i><span>${t.name}</span></div>`).join('');
-    const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi ptile" data-add="${t}"><i>${PICONS[t] || '▢'}</i><span>${TYPE(t).name}</span></div>`).join('');
+    const tpls = TEMPLATES.map((t) => `<div class="pi ptile tpl" data-tpl="${t.id}" title="${t.blocks.length} блок(ов)"><i>${pico(t.blocks[0])}</i><span>${t.name}</span></div>`).join('');
+    const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi ptile" data-add="${t}"><i>${pico(t)}</i><span>${TYPE(t).name}</span></div>`).join('');
     const el = openPop(`${tpls ? `<div class="psec">✦ Готовые страницы</div><div class="pgrid">${tpls}</div>` : ''}<div class="psec">Отдельные блоки</div><div class="pgrid">${items}</div>`, x, y);
     el.addEventListener('click', async (e) => {
       const tp = e.target.closest('[data-tpl]');
@@ -389,7 +425,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
       if (t === 'proj') {
         const props = P.props || [];
         if (!props.length) { flash('В подборке нет объектов'); return; }
-        el.innerHTML = `<div class="psec">Какой объект?</div>` + props.map((p2) => `<div class="pi" data-prj="${p2.id}"><i>🏙</i>${p2.name}</div>`).join('');
+        el.innerHTML = `<div class="psec">Какой объект?</div>` + props.map((p2) => `<div class="pi" data-prj="${p2.id}"><i>${pico('proj')}</i>${p2.name}</div>`).join('');
         el.addEventListener('click', async (e2) => {
           const pj = e2.target.closest('[data-prj]');
           if (pj) await addBlock(afterSec, 'proj', { pid: pj.dataset.prj });
@@ -710,7 +746,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     rail.innerHTML = '<div class="perail-hd">Страницы</div>' + $$('section[data-bid]').map((sec, i) => {
       const t = sec.dataset.bt;
       return `<div class="peth ${sec.dataset.bhid === '1' ? 'hid' : ''}" data-peth="${sec.dataset.bid}">
-        <span class="peth-n">${i + 1}</span><span class="peth-i">${PICONS[t] || '▢'}</span>
+        <span class="peth-n">${i + 1}</span><span class="peth-i">${pico(t)}</span>
         <span class="peth-t">${TYPE(t).name}</span>
         <span class="peth-grip">⠿</span>
       </div>`;
