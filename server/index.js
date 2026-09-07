@@ -598,6 +598,15 @@ const FONT_LIB = {
   badscript:  { name: 'Bad Script',      cat: 'hand',    gf: 'family=Bad+Script', fam: "'Bad Script',cursive" },
   neucha:     { name: 'Neucha',          cat: 'hand',    gf: 'family=Neucha', fam: "'Neucha',cursive" },
   pangolin:   { name: 'Pangolin',        cat: 'hand',    gf: 'family=Pangolin', fam: "'Pangolin',cursive" },
+  /* дополнение до полного списка референса */
+  adventpro:  { name: 'Advent Pro',      cat: 'sans',    gf: 'family=Advent+Pro:wght@500;600;700', fam: "'Advent Pro',sans-serif" },
+  firacode:   { name: 'Fira Code',       cat: 'sans',    gf: 'family=Fira+Code:wght@500;600;700', fam: "'Fira Code',monospace" },
+  elmessiri:  { name: 'El Messiri',      cat: 'sans',    gf: 'family=El+Messiri:wght@500;600;700', fam: "'El Messiri',sans-serif" },
+  robotocond: { name: 'Roboto Condensed',cat: 'sans',    gf: 'family=Roboto+Condensed:wght@500;600;700', fam: "'Roboto Condensed',sans-serif" },
+  triodion:   { name: 'Triodion',        cat: 'display', gf: 'family=Triodion', fam: "'Triodion',serif" },
+  balsamiq:   { name: 'Balsamiq Sans',   cat: 'hand',    gf: 'family=Balsamiq+Sans:wght@400;700', fam: "'Balsamiq Sans',cursive" },
+  handjet:    { name: 'Handjet',         cat: 'display', gf: 'family=Handjet:wght@500;600;700', fam: "'Handjet',sans-serif" },
+  comicrelief:{ name: 'Comic Relief',    cat: 'hand',    gf: 'family=Comic+Relief:wght@400;700', fam: "'Comic Relief',cursive" },
 };
 
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
@@ -2106,6 +2115,23 @@ const server = http.createServer(async (req, res) => {
         const t = sanTask(b, { id: crypto.randomBytes(5).toString('hex'), brokerId: TASK_OWNER, priority: 'p3', status: 'todo', due: null, scheduled: null, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null });
         db.brokerTasks.unshift(t); db.brokerTasks = db.brokerTasks.slice(0, 1000); store.save();
         return json(res, 200, t);
+      }
+      /* умное добавление: надиктованный/написанный текст → ИИ извлекает суть + дедлайн */
+      if (p === '/api/tasks/smart' && req.method === 'POST') {
+        if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+        const b = await readBody(req);
+        const raw = String(b.text || '').trim();
+        if (!raw) return json(res, 400, { error: 'пустой текст' });
+        const _d = new Date(); const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+        const dowRu = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][_d.getDay()];
+        try {
+          const pt = await llm.parseTask(raw, today, dowRu);
+          let due = null;
+          if (pt.date) { const dt = new Date(`${pt.date}T${pt.time || '09:00'}:00`); if (!isNaN(dt)) due = dt.getTime(); }
+          const t = { id: crypto.randomBytes(5).toString('hex'), brokerId: TASK_OWNER, title: pt.title, priority: pt.priority, status: 'todo', due, scheduled: pt.scheduled || pt.date || today, leadId: null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null };
+          db.brokerTasks.unshift(t); db.brokerTasks = db.brokerTasks.slice(0, 1000); store.save();
+          return json(res, 200, { task: t, parsed: pt });
+        } catch (e) { return json(res, 500, { error: e.message }); }
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
         const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
