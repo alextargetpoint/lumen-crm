@@ -618,4 +618,23 @@ ${grounded
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+/* Разбор надиктованной/написанной задачи в структуру с умным дедлайном (естественный язык → дата/время). */
+async function parseTask(text, todayStr, dow) {
+  const prompt = `Сегодня ${todayStr}${dow ? ' (' + dow + ')' : ''}. Преврати фразу брокера недвижимости в задачу и извлеки срок из естественной речи («завтра», «в пятницу к 15:00», «через 3 дня», «до конца недели», «послезавтра утром»).
+Фраза: "${String(text || '').slice(0, 500)}"
+Правила: title — чистая суть задачи без слов о сроке; если срок не назван — date/time пустые; priority p1 если «срочно/важно/горит/сегодня», иначе p3.
+Верни СТРОГО JSON:
+{"title":"суть задачи","priority":"p1|p2|p3|p4","date":"YYYY-MM-DD или пусто","time":"HH:MM или пусто","scheduled":"YYYY-MM-DD день плана или пусто"}`;
+  const out = await callGemini(prompt, 15000, 400);
+  if (!out || !out.title) throw new Error('bad task');
+  const dre = /^\d{4}-\d{2}-\d{2}$/, tre = /^\d{1,2}:\d{2}$/;
+  return {
+    title: String(out.title).replace(/<[^>]*>/g, '').slice(0, 300),
+    priority: ['p1', 'p2', 'p3', 'p4'].includes(out.priority) ? out.priority : 'p3',
+    date: dre.test(String(out.date || '')) ? out.date : '',
+    time: tre.test(String(out.time || '')) ? out.time : '',
+    scheduled: dre.test(String(out.scheduled || '')) ? out.scheduled : '',
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

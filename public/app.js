@@ -4503,7 +4503,7 @@ async function shPost(main) {
    приоритеты P1–P4 (Todoist), матрица Эйзенхауэра, тайм-блокинг вокруг встреч,
    стрик/импульс (Habitica), умные подсказки. Минимализм, премиум, мотивация. */
 const TPRI = { p1: { c: '#E5484D', n: 'Срочно' }, p2: { c: '#E8912B', n: 'Важно' }, p3: { c: '#4F7DFF', n: 'Обычная' }, p4: { c: '#97A2B5', n: 'Потом' } };
-const TASK_VIEWS = [['today', 'Сегодня'], ['week', 'Неделя'], ['calendar', 'Календарь'], ['all', 'Все'], ['inbox', 'Инбокс']];
+const TASK_VIEWS = [['today', 'Сегодня'], ['week', 'Неделя'], ['calendar', 'Календарь'], ['kanban', 'Канбан'], ['all', 'Все'], ['inbox', 'Инбокс']];
 let TASK_VIEW = 'today';
 let TASK_NEWPRI = 'p3';
 let TASK_WEEK = 0; /* смещение недели в календаре */
@@ -4815,126 +4815,6 @@ PAGES.tasks = async (root) => {
       await api.patch('/tasks/' + id, body); render();
     }, (id) => openTaskDetail(byId[id], leadMap));
   }
-};
-PAGES.tasks = async (root) => {
-  const [d, leads] = await Promise.all([api.get('/tasks'), api.get('/leads')]);
-  const leadMap = Object.fromEntries(leads.map(l => [l.id, l.name]));
-  const s = d.stats, today = d.today;
-  const tomorrow = dstrLocal((() => { const x = new Date(); x.setDate(x.getDate() + 1); return x; })());
-  const plannedToday = s.todayDone + s.todayTotal;
-  const pct = plannedToday ? Math.round(s.todayDone / plannedToday * 100) : (s.todayDone ? 100 : 0);
-  const open = d.tasks.filter(t => t.status !== 'done');
-  const doneToday = d.tasks.filter(t => t.status === 'done' && t.doneAt && dstrLocal(new Date(t.doneAt)) === today);
-  const byPri = (a, b) => (a.priority > b.priority ? 1 : a.priority < b.priority ? -1 : (a.due || 9e15) - (b.due || 9e15));
-
-  /* тело списка под текущий вид */
-  let listHtml = '';
-  if (TASK_VIEW === 'today') {
-    const overdue = open.filter(t => t.due && dstrLocal(new Date(t.due)) < today).sort(byPri);
-    const todays = open.filter(t => !overdue.includes(t) && (t.scheduled === today || (t.due && dstrLocal(new Date(t.due)) === today))).sort(byPri);
-    /* тайм-блоки встреч + задачи с временем — общая лента по времени */
-    const blocks = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === today).map(mt => ({ at: mt.at, mt }));
-    const timeline = blocks.sort((a, b) => a.at - b.at).map(({ mt }) => {
-      const tm = new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      return `<div class="tk-block" data-mtid="${mt.id}" data-mtlead="${mt.leadId || ''}">
-        <div class="tk-block-t">${tm}</div>
-        <div class="tk-block-b"><b>${esc(KIND_RU[mt.kind] || 'Встреча')} · ${esc(mt.leadName)}</b>${mt.link ? `<a href="${esc(mt.link)}" target="_blank" class="tk-block-link">${ic(I.link)}ссылка</a>` : ''}</div>
-        <button class="tk-mini" data-mtprep title="Задача-подготовка">${ic(I.plus)}</button>
-      </div>`;
-    }).join('');
-    listHtml = `
-      ${timeline ? `<div class="tk-sec-lbl">${ic(I.cal)}Встречи сегодня</div>${timeline}` : ''}
-      ${overdue.length ? `<div class="tk-sec-lbl od">${ic(I.clock)}Просрочено · ${overdue.length}</div>${overdue.map(t => taskRow(t, leadMap)).join('')}` : ''}
-      <div class="tk-sec-lbl">${ic(I.sun)}На сегодня · ${todays.length}</div>
-      ${todays.length ? todays.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">На сегодня пусто. Добавь задачу или подтяни из подсказок ниже.</div>'}
-      ${doneToday.length ? `<div class="tk-sec-lbl done">${ic(I.check)}Сделано сегодня · ${doneToday.length}</div>${doneToday.map(t => taskRow(t, leadMap)).join('')}` : ''}`;
-  } else if (TASK_VIEW === 'week') {
-    const days = Array.from({ length: 7 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return dstrLocal(x); });
-    listHtml = days.map(ds => {
-      const dd = new Date(ds + 'T12:00:00');
-      const items = open.filter(t => t.scheduled === ds || (t.due && dstrLocal(new Date(t.due)) === ds)).sort(byPri);
-      const mts = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === ds);
-      if (!items.length && !mts.length) return '';
-      return `<div class="tk-sec-lbl">${dd.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'short' })}${ds === today ? ' · сегодня' : ''}</div>
-        ${mts.map(mt => `<div class="tk-block"><div class="tk-block-t">${new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div><div class="tk-block-b"><b>${esc(KIND_RU[mt.kind] || 'Встреча')} · ${esc(mt.leadName)}</b></div></div>`).join('')}
-        ${items.map(t => taskRow(t, leadMap)).join('')}`;
-    }).join('') || '<div class="glass card empty">На неделю задач нет</div>';
-  } else if (TASK_VIEW === 'inbox') {
-    const inbox = open.filter(t => !t.scheduled && !t.due).sort(byPri);
-    listHtml = inbox.length ? inbox.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">Инбокс пуст. Кидай сюда всё, что пришло в голову — разберёшь потом.</div>';
-  } else {
-    const all = open.slice().sort(byPri);
-    listHtml = all.length ? all.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">Открытых задач нет 👏</div>';
-  }
-
-  root.innerHTML = `
-    <div class="tk-top">
-      <div class="tk-hero glass">
-        <div class="tk-hero-l">
-          <div class="tk-hero-t">${ic(I.sun)}Мои задачи</div>
-          <div class="tk-motive">${esc(taskMotive(s))}</div>
-        </div>
-        <div class="tk-stats">
-          <div class="tk-stat"><span class="tk-stat-ic" style="color:#E8912B">${ic(I.flame)}</span><div><b>${s.streak}</b><i>${plural(s.streak, 'день', 'дня', 'дней')} стрик</i></div></div>
-          <div class="tk-ring">${taskRing(pct)}<i>сегодня<br>${s.todayDone}/${plannedToday}</i></div>
-          <div class="tk-stat"><span class="tk-stat-ic" style="color:#2FA98C">${ic(I.trophy)}</span><div><b>${s.weekDone}</b><i>за неделю</i></div></div>
-        </div>
-      </div>
-      <div class="tk-cap glass">
-        <input id="tkNew" class="tk-cap-in" placeholder="Быстро добавить задачу…  ⏎">
-        <div class="tk-cap-pri" id="tkNewPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === TASK_NEWPRI ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
-        <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
-      </div>
-    </div>
-    <div class="seg-toggle tk-seg">${TASK_VIEWS.map(([k, n]) => `<button class="seg-btn ${k === TASK_VIEW ? 'on' : ''}" data-tv="${k}">${n}${k === 'all' && s.open ? ` · ${s.open}` : ''}</button>`).join('')}</div>
-    ${d.suggestions.length ? `<div class="glass card tk-suggest"><div class="tk-sug-hd">${ic(I.spark)}Умные подсказки<span class="sub">на основе встреч и горячих лидов</span></div>${d.suggestions.map((sg, i) => `<div class="tk-sug" data-sug="${i}"><span class="tk-sug-t">${esc(sg.title)}</span><button class="btn btn-sm btn-accent" data-sugadd="${i}">${ic(I.plus)}В задачи</button></div>`).join('')}</div>` : ''}
-    <div id="tkList" class="tk-list">${listHtml}</div>`;
-
-  /* быстрый ввод */
-  const addTask = async (extra) => {
-    const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title && !extra) { toast('Пустая задача'); return; }
-    const body = Object.assign({ title, priority: TASK_NEWPRI, scheduled: (TASK_VIEW === 'inbox' ? null : today) }, extra || {});
-    try { await api.post('/tasks', body); inp.value = ''; render(); } catch (e) { toast('Не вышло', e.message); }
-  };
-  $('#tkAdd', root).addEventListener('click', () => addTask());
-  $('#tkNew', root).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
-  $$('#tkNewPri .tk-pdot', root).forEach(b => b.addEventListener('click', () => { TASK_NEWPRI = b.dataset.np; $$('#tkNewPri .tk-pdot', root).forEach(x => x.classList.toggle('on', x === b)); }));
-  $$('.tk-seg [data-tv]', root).forEach(b => b.addEventListener('click', () => { TASK_VIEW = b.dataset.tv; render(); }));
-
-  /* подсказки → задачи */
-  $$('[data-sugadd]', root).forEach(b => b.addEventListener('click', async () => {
-    const sg = d.suggestions[+b.dataset.sugadd]; if (!sg) return;
-    try { await api.post('/tasks', { title: sg.title, priority: sg.priority || 'p2', scheduled: sg.scheduled || today, leadId: sg.leadId || null, meetingId: sg.meetingId || null }); toast('Добавлено в задачи', null, true); render(); }
-    catch (e) { toast('Не вышло', e.message); }
-  }));
-
-  /* тайм-блок встречи → задача-подготовка */
-  $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', async (e) => {
-    const blk = e.target.closest('[data-mtid]'); if (!blk) return;
-    const lead = leadMap[blk.dataset.mtlead] || 'клиентом';
-    try { await api.post('/tasks', { title: `Подготовиться к встрече с ${lead}`, priority: 'p2', scheduled: today, leadId: blk.dataset.mtlead || null, meetingId: blk.dataset.mtid }); toast('Задача-подготовка создана', null, true); render(); }
-    catch (e2) { toast('Не вышло', e2.message); }
-  }));
-
-  /* действия по задаче */
-  $$('[data-tk]', root).forEach(rowEl => rowEl.addEventListener('click', async (e) => {
-    const act = e.target.closest('[data-act]'); if (!act) return;
-    const id = rowEl.dataset.tk; const a = act.dataset.act;
-    if (a === 'done') { const on = rowEl.classList.contains('done'); await api.patch('/tasks/' + id, { status: on ? 'todo' : 'done' }); render(); return; }
-    if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
-    if (a === 'today') { await api.patch('/tasks/' + id, { scheduled: today, due: null }); toast('Перенесено на сегодня', null, true); render(); return; }
-    if (a === 'tmrw') { await api.patch('/tasks/' + id, { scheduled: tomorrow, due: null }); toast('Перенесено на завтра', null, true); render(); return; }
-    if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; const cur = rowEl.dataset.pri; const nx = order[(order.indexOf(cur) + 1) % 4]; await api.patch('/tasks/' + id, { priority: nx }); render(); return; }
-    if (a === 'edit' && !act.dataset.editing) {
-      act.dataset.editing = '1'; const cur = act.textContent;
-      act.innerHTML = `<input class="tk-edit" value="${esc(cur)}">`;
-      const inp = act.querySelector('input'); inp.focus(); inp.select();
-      let done0 = false;
-      const fin = async (saveIt) => { if (done0) return; done0 = true; const v = inp.value.trim(); if (saveIt && v && v !== cur) await api.patch('/tasks/' + id, { title: v }); render(); };
-      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') fin(true); if (ev.key === 'Escape') fin(false); });
-      inp.addEventListener('blur', () => fin(true));
-    }
-  }));
 };
 
 PAGES.numbers = async (root) => {
