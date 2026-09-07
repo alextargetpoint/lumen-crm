@@ -110,6 +110,17 @@
 body.cpanel-on{padding-right:308px!important}
 @media print{.cbar,.cpanel,.cstatus{display:none!important}body{padding-right:0!important}}
 @media(max-width:820px){.cpanel{width:86vw}.cpanel.closed{transform:translateX(90vw)}body.cpanel-on{padding-right:0!important}}
+.csec{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#8a90a0;padding:8px 2px 3px;font-weight:700}
+.cpi{display:flex;gap:8px;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;cursor:pointer;font-weight:600;font-size:13px;background:#EEF3FF;color:#2563EB;margin-top:4px}
+.cpi:hover{background:#e0eaff}
+.celem-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px;max-height:230px;overflow:auto}
+.celem{aspect-ratio:1;border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#2A3346;padding:8px}
+.celem:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
+.celem svg{width:100%;height:100%}
+.celem.cimgpick{background-size:cover;background-position:center;padding:0}
+.celem-frames{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}
+.celem-fr{border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;padding:12px 8px;font-weight:600;font-size:12.5px;color:#2A3346}
+.celem-fr:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -157,10 +168,11 @@ body.cpanel-on{padding-right:308px!important}
     return $$('.slide').map((sl) => {
       const i = sl.dataset.idx;
       const h = sl.querySelector(`[data-ce="${i}:heading"]`); const s = sl.querySelector(`[data-ce="${i}:sub"]`); const ey = sl.querySelector(`[data-ce="${i}:eyebrow"]`);
+      const layers = $$('[data-l]', sl).map(le => { try { return JSON.parse(le.getAttribute('data-l')); } catch (e) { return null; } }).filter(Boolean);
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '',
-        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm',
+        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', layers,
       };
     });
   }
@@ -191,9 +203,36 @@ body.cpanel-on{padding-right:308px!important}
   }
   document.body.addEventListener('click', (e) => {
     const sl = e.target.closest('.slide'); if (!sl) return;
-    if (e.target.closest('[data-ce]')) { selectSlide(+sl.dataset.idx, false); return; }  /* правка текста — без переключения вкладки */
+    if (e.target.closest('.s-lyr, .s-frame, [data-ce]')) { selectSlide(+sl.dataset.idx, false); return; }  /* слои/текст — без смены вкладки */
+    selLayer(null);
     selectSlide(+sl.dataset.idx, true);
   });
+
+  /* ---------- слои: выбор / перетаскивание / размер / порядок / удаление ---------- */
+  function selLayer(lyr) { $$('.s-lyr.lsel,.s-frame.lsel').forEach(x => x.classList.remove('lsel')); if (lyr) lyr.classList.add('lsel'); }
+  function updL(lyr, patch) { let o = {}; try { o = JSON.parse(lyr.getAttribute('data-l')) || {}; } catch (e) {} Object.assign(o, patch); lyr.setAttribute('data-l', JSON.stringify(o)); return o; }
+  document.addEventListener('pointerdown', (e) => {
+    const tb = e.target.closest('.lyr-tools button');
+    if (tb) { e.preventDefault(); e.stopPropagation(); const lyr = tb.closest('.s-lyr,.s-frame'); if (!lyr) return;
+      if (tb.hasAttribute('data-ldel')) { lyr.remove(); dirty = true; save(false); return; }
+      const dir = tb.hasAttribute('data-lup') ? 1 : -1; const o = updL(lyr, {}); const nz = Math.max(0, (o.z || 0) + dir); updL(lyr, { z: nz }); lyr.style.zIndex = 10 + nz; dirty = true; save(false); return;
+    }
+    const rs = e.target.closest('.lyr-rs');
+    if (rs) { e.preventDefault(); e.stopPropagation(); const lyr = rs.closest('.s-lyr'); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const startW = lyr.offsetWidth, startX = e.clientX; selLayer(lyr);
+      const mv = (ev) => { const w = Math.max(3, Math.min(130, (startW + (ev.clientX - startX)) / sr.width * 100)); lyr.style.width = w + '%'; updL(lyr, { w: +w.toFixed(1) }); };
+      const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); dirty = true; save(false); };
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
+    }
+    const lyr = e.target.closest('.s-lyr');
+    if (lyr) { e.preventDefault(); e.stopPropagation(); selLayer(lyr); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const o = updL(lyr, {}); const sxp = o.x || 0, syp = o.y || 0, sx = e.clientX, sy = e.clientY; let moved = false;
+      const mv = (ev) => { const cx = Math.max(-30, Math.min(120, sxp + (ev.clientX - sx) / sr.width * 100)); const cy = Math.max(-30, Math.min(120, syp + (ev.clientY - sy) / sr.height * 100)); lyr.style.left = cx + '%'; lyr.style.top = cy + '%'; updL(lyr, { x: +cx.toFixed(1), y: +cy.toFixed(1) }); moved = true; };
+      const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); if (moved) { dirty = true; save(false); } };
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
+    }
+    const fr = e.target.closest('.s-frame'); if (fr) { selLayer(fr); }
+  });
+  /* правка текста-слоя по двойному клику */
+  document.addEventListener('dblclick', (e) => { const lyr = e.target.closest('.s-lyr.lyr-text'); if (!lyr) return; e.preventDefault(); const o = updL(lyr, {}); const t = prompt('Текст элемента:', o.text || ''); if (t != null) { const sp = lyr.querySelector('.lyr-tx'); if (sp) sp.textContent = t; updL(lyr, { text: t.slice(0, 140) }); dirty = true; save(false); } });
 
   /* ---------- панель: вкладки ---------- */
   $$('.cpanel-tab', panel).forEach(t => t.addEventListener('click', () => { tab = t.dataset.tab; $$('.cpanel-tab').forEach(x => x.classList.toggle('on', x === t)); renderBody(); }));
@@ -311,7 +350,17 @@ body.cpanel-on{padding-right:308px!important}
       <button data-cmd="mark" title="Выделение цветом — выбор палитры"><mark style="padding:0 3px;border-radius:3px">A</mark></button>
       <button data-cmd="clear" title="Убрать формат и выделение">✕</button>
     </div><div class="cnote">Выделите текст в заголовке/подписи, затем нажмите. «A» — палитра цветов выделения.</div></div>
-    <div class="cgrp"><label>Порядок и удаление</label><div class="cbtn-row">
+    <div class="cgrp"><label>Элементы на слайде</label>
+      <div class="cbtn-row">
+        <button class="cwbtn" data-add="shape">◆ Фигура</button>
+        <button class="cwbtn" data-add="sticker">✦ Стикер</button>
+        <button class="cwbtn" data-add="frame">▢ Рамка</button>
+        <button class="cwbtn" data-add="text">T Текст</button>
+        <button class="cwbtn wide" data-add="photo">🖼 Фото-слой</button>
+      </div>
+      <div class="cnote">Добавь элемент → тяни его на макете, угол — размер, стрелки над ним — слои вперёд/назад.</div>
+    </div>
+    <div class="cgrp"><label>Порядок и удаление слайда</label><div class="cbtn-row">
       <button class="cwbtn" data-mv="up">↑ Выше</button>
       <button class="cwbtn" data-mv="down">↓ Ниже</button>
       <button class="cwbtn wide dng" data-mv="del">Удалить слайд</button>
@@ -342,6 +391,41 @@ body.cpanel-on{padding-right:308px!important}
       if (kind === 'del') { if (arr.length <= 1) { flash('Оставьте хотя бы 1 слайд'); return; } arr.splice(i, 1); return save(true, { slides: arr }); }
       if (kind === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; return save(true, { slides: arr }); }
       if (kind === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; return save(true, { slides: arr }); }
+    }));
+    /* добавление элементов-слоёв */
+    const accent = ((P.themes[P.theme] || {}).blue) || '#1D34D8';
+    const addLayer = (layer) => { const arr = serialize(); arr[i].layers = arr[i].layers || []; layer.z = Math.max(0, ...arr[i].layers.map(l => l.z || 0)) + 1; arr[i].layers.push(layer); save(true, { slides: arr }); };
+    const shapeMini = (s) => ({ rect: '<rect x="3" y="3" width="18" height="18" rx="3"/>', circle: '<circle cx="12" cy="12" r="9"/>', ring: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3"/>', line: '<rect x="2" y="10" width="20" height="4" rx="2"/>', triangle: '<polygon points="12,3 21,21 3,21"/>', blob: '<circle cx="12" cy="12" r="9"/>', arrow: '<path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>', badge: '<rect x="3" y="3" width="18" height="18" rx="6"/>', diamond: '<polygon points="12,3 21,12 12,21 3,12"/>' }[s] || '<rect x="3" y="3" width="18" height="18"/>');
+    $$('[data-add]', body).forEach(b => b.addEventListener('click', (e) => {
+      const kind = b.dataset.add;
+      if (kind === 'shape') {
+        const pp = openPop(`<div class="celem-grid">${(P.shapes || []).map(s => `<button class="celem" data-shape="${s}" title="${s}"><svg viewBox="0 0 24 24" fill="currentColor">${shapeMini(s)}</svg></button>`).join('')}</div>`, e.clientX - 120, e.clientY);
+        pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-shape]'); if (!t) return; closePop(); addLayer({ t: 'shape', shape: t.dataset.shape, color: accent, fill: true, x: 34, y: 34, w: 26, round: 10 }); });
+      } else if (kind === 'sticker') {
+        const pp = openPop(`<div class="celem-grid">${Object.entries(P.stickers || {}).map(([k, path]) => `<button class="celem" data-stick="${k}" title="${k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
+        pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-stick]'); if (!t) return; closePop(); const sl = slideEl(i); const white = sl.classList.contains('hasbg'); addLayer({ t: 'sticker', key: t.dataset.stick, color: white ? '#FFFFFF' : accent, x: 40, y: 38, w: 16 }); });
+      } else if (kind === 'frame') {
+        const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
+        const pp = openPop(`<div class="celem-frames">${(P.frames || []).map(f => `<button class="celem-fr" data-frame="${f}">${FN[f] || f}</button>`).join('')}</div>`, e.clientX - 120, e.clientY);
+        pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-frame]'); if (!t) return; closePop(); const sl = slideEl(i); addLayer({ t: 'frame', frame: t.dataset.frame, color: sl.classList.contains('hasbg') ? '#FFFFFF' : accent }); });
+      } else if (kind === 'text') {
+        addLayer({ t: 'text', text: 'Текст', color: slideEl(i).classList.contains('hasbg') ? '#FFFFFF' : '#0A1833', tsize: 24, tw: 'sans', tb: true, x: 30, y: 42, w: 40 });
+      } else if (kind === 'photo') {
+        const pp = openPop(`<div class="csec">Фото-слой</div>
+          <div class="cpi" data-ph="file">⤴ Загрузить файл</div>
+          <div class="csec">или ссылка на фото</div><input class="cinp" id="cLpUrl" placeholder="https://…"><div class="cpi" data-ph="url">Вставить по ссылке</div>
+          <div class="csec">или собрать со страницы</div><input class="cinp" id="cLpPage" placeholder="ссылка на страницу проекта"><div class="cpi" data-ph="scan">🔎 Найти фото на странице</div>
+          <div id="cLpGrid" class="celem-grid"></div>`, e.clientX - 200, e.clientY);
+        pp.addEventListener('click', async (ev) => {
+          const it = ev.target.closest('[data-ph]'); if (it) {
+            const k2 = it.dataset.ph;
+            if (k2 === 'file') { pickFile('image/*', async (f) => { flash('Загружаю…', 0); try { const url = await uploadAsset(f); closePop(); addLayer({ t: 'img', url, x: 22, y: 22, w: 42, round: 12 }); } catch (er) { flash('Ошибка: ' + er.message); } }); return; }
+            if (k2 === 'url') { const v = $('#cLpUrl', pp).value.trim(); if (v) { closePop(); addLayer({ t: 'img', url: v, x: 22, y: 22, w: 42, round: 12 }); } return; }
+            if (k2 === 'scan') { const v = $('#cLpPage', pp).value.trim(); if (!v) { flash('Вставьте ссылку на страницу'); return; } flash('Сканирую фото…', 0); try { const r = await fetch(`/api/social/scrape-images`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: v }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash((j.images || []).length + ' фото — кликните нужное', 2000); $('#cLpGrid', pp).innerHTML = (j.images || []).slice(0, 24).map(u => `<button class="celem cimgpick" data-imgu="${esc(u)}" style="background-image:url('${esc(u)}')"></button>`).join(''); } catch (er) { flash('Не вышло: ' + er.message); } return; }
+          }
+          const pk = ev.target.closest('[data-imgu]'); if (pk) { closePop(); addLayer({ t: 'img', url: pk.dataset.imgu, x: 20, y: 20, w: 44, round: 12 }); }
+        });
+      }
     }));
     /* фон */
     $$('[data-bg]', body).forEach(b => b.addEventListener('click', () => {
