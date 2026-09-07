@@ -659,11 +659,13 @@ function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const solo = IS_SOLO();
-  const hidePages = (me && me.hidePages) || [];
+  const rt = (me && me.roleType) || 'broker';
+  const hardBroker = isBroker && rt === 'broker';   /* жёсткий список — только для брокера; маркетологу/менеджеру нужны реклама/аналитика */
+  const hidePages = (me && me.hidePages) || [];      /* сервер уже собрал: дефолт роли ∪ индивидуальное скрытие */
+  const isHidden = (pg) => isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg));
   $$('.nav-item').forEach(btn => {
-    const hideB = isBroker && (BROKER_HIDDEN_PAGES.includes(btn.dataset.page) || hidePages.includes(btn.dataset.page));
     const hideS = solo && btn.dataset.page === 'brokers';
-    btn.style.display = (hideB || hideS) ? 'none' : '';
+    btn.style.display = (isHidden(btn.dataset.page) || hideS) ? 'none' : '';
   });
   /* баннер «просмотр кабинета брокера» для владельца */
   const existing = document.getElementById('previewBanner');
@@ -680,9 +682,10 @@ function applyRoleUi() {
     while (el2 && !el2.classList.contains('nav-label')) { if (el2.style.display !== 'none') any = true; el2 = el2.nextElementSibling; }
     lb.style.display = isBroker && !any ? 'none' : '';
   });
-  if (isBroker && BROKER_HIDDEN_PAGES.includes(CUR)) go('inbox');
+  if (isBroker && isHidden(CUR)) go('overview');
+  const RT_NAME = { broker: 'брокер', assistant: 'ассистент', marketer: 'маркетолог', manager: 'менеджер' };
   const foot = $('.side-foot .agency');
-  if (foot && isBroker && !foot.dataset.roleBadge) { foot.dataset.roleBadge = '1'; foot.insertAdjacentHTML('beforeend', `<div style="font-size:9.5px;color:#86AFFF;margin-top:3px">брокер · ${esc(me.name || '')}</div>`); }
+  if (foot && isBroker && !foot.dataset.roleBadge) { foot.dataset.roleBadge = '1'; foot.insertAdjacentHTML('beforeend', `<div style="font-size:9.5px;color:#86AFFF;margin-top:3px">${RT_NAME[rt] || 'сотрудник'} · ${esc(me.name || '')}</div>`); }
 }
 
 async function loadState() {
@@ -1229,7 +1232,7 @@ const SELCFG_LEADS = {
     { id: 'archive', label: 'В архив', ic: I.moon, run: (cfg) => selBulk(cfg, 'archive', null, { title: `Архивировать ${n} лид(ов)?`, sub: 'В «Потерянные», ИИ выключится. Обратимо.', ok: 'В архив' }) },
     { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} лид(ов) навсегда?`, sub: 'Карточки и переписка — безвозвратно. Обычно лучше «В архив».', ok: 'Удалить навсегда', danger: true }) },
   ],
-  ctxHead: (one) => { const items = []; if (one) { items.push({ ic: I.user, label: 'Открыть карточку', onClick: () => openLeadModal(one) }); const l = LEAD_LOOKUP[one]; if (l) items.push({ ic: I.chat, label: 'Написать в WhatsApp', onClick: () => window.open('https://wa.me/' + l.phone.replace(/\D/g, ''), '_blank') }); items.push({ sep: true }); } return items; },
+  ctxHead: (one) => { const items = []; if (one) { items.push({ ic: I.user, label: 'Открыть карточку', onClick: () => openLeadModal(one) }); const l = LEAD_LOOKUP[one]; if (l) items.push({ ic: I.chat, label: 'Написать в WhatsApp', onClick: () => window.open('https://wa.me/' + l.phone.replace(/\D/g, ''), '_blank') }); if (l) items.push({ ic: I.task, label: 'Поставить задачу', onClick: () => openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo }) }); items.push({ sep: true }); } return items; },
 };
 function wireLeadSelect(root) { wireSelectable(root, SELCFG_LEADS); }
 
@@ -2027,6 +2030,7 @@ async function openLeadModal(id) {
       } },
       { label: 'Собрать подборку', onClick: () => { PAGE_STATE.collLead = l.id; go('collections'); } },
       { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
+      { label: '＋ Задача', onClick: () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo }); return false; } },
       { label: 'Печать / PDF', onClick: () => { window.open('/lead/' + l.id + '/print', '_blank'); return false; } },
       { label: 'Закрыть' },
     ],
@@ -4586,7 +4590,8 @@ function tkMeta(t, leadMap) {
   if (t.due) chips.push(`<span class="tk-chip ${overdue ? 'od' : ''}" data-act="due">${ic(I.clock)}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}${tkTime(t.due) ? ' ' + tkTime(t.due) : ''}</span>`);
   const subs = t.subtasks || []; if (subs.length) chips.push(`<span class="tk-chip" data-act="open">${ic(I.task)}${subs.filter(s => s.done).length}/${subs.length}</span>`);
   const atts = t.attachments || []; if (atts.length) chips.push(`<span class="tk-chip" data-act="open">${ic(atts.some(a => a.kind === 'audio') ? I.mic : I.doc)}${atts.length}</span>`);
-  if (t.leadId && leadMap[t.leadId]) chips.push(`<span class="tk-chip">${ic(I.user)}${esc(leadMap[t.leadId])}</span>`);
+  const lead = t.lead || (t.leadId && leadMap[t.leadId] ? { name: leadMap[t.leadId] } : null);
+  if (lead) chips.push(`<span class="tk-chip lead" data-act="open">${ic(I.user)}${esc(lead.name)}${lead.stageName ? ' · ' + esc(lead.stageName) : ''}</span>`);
   if (t.meetingId) chips.push(`<span class="tk-chip">${ic(I.cal)}встреча</span>`);
   return chips.join('');
 }
@@ -4656,6 +4661,7 @@ function openTaskDetail(t, leadMap) {
       <div class="td-row"><span class="td-lbl">Дедлайн</span><div class="td-dl"><input type="date" id="tdDate" value="${dstr2}"><input type="time" id="tdTime" value="${tstr}"><button class="btn btn-sm" id="tdDclear" ${t.due ? '' : 'style="display:none"'}>Убрать</button></div></div>
       <div class="td-row"><span class="td-lbl">Подзадачи</span><div class="td-subs" id="tdSubs"></div></div>
       <div class="td-row"><span class="td-lbl">Вложения</span><div class="td-atts" id="tdAtts"></div></div>
+      <div class="td-row"><span class="td-lbl">Лид</span><div class="td-lead" id="tdLead"></div></div>
       <div class="td-row"><span class="td-lbl">Заметки</span><textarea class="td-notes" id="tdNotes" data-nodic placeholder="Детали, контекст…">${esc(t.notes || '')}</textarea></div>
     </div>`,
     actions: [{ label: 'Готово', cls: 'btn-accent' }],
@@ -4669,6 +4675,29 @@ function openTaskDetail(t, leadMap) {
   $('#tdDate', bd).addEventListener('change', applyDue); $('#tdTime', bd).addEventListener('change', applyDue);
   $('#tdDclear', bd).addEventListener('click', () => { $('#tdDate', bd).value = ''; $('#tdTime', bd).value = ''; applyDue(); });
   $('#tdNotes', bd).addEventListener('change', e => patch({ notes: e.target.value }));
+  /* лид: сводка + ссылка на карточку + привязка/отвязка */
+  const leadEl = $('#tdLead', bd);
+  const paintLead = () => {
+    const L = t.lead;
+    if (L) {
+      leadEl.innerHTML = `<div class="td-lead-card">
+        <div class="td-lead-main"><b>${esc(L.name)}</b><span>${[L.geoName, L.stageName, L.phone].filter(Boolean).map(esc).join(' · ')}</span>${(L.purpose || L.budget) ? `<i>${[L.purpose, L.budget].filter(Boolean).map(esc).join(' · ')}</i>` : ''}</div>
+        <div class="td-lead-acts"><button class="btn btn-sm btn-accent" data-lopen>${ic(I.user)}Открыть карточку</button><button class="btn-ghost" data-lunlink title="Отвязать">${ic(I.x)}</button></div>
+      </div>`;
+      leadEl.querySelector('[data-lopen]').addEventListener('click', () => { closeModal(); openLeadModal(L.id); });
+      leadEl.querySelector('[data-lunlink]').addEventListener('click', () => { t.lead = null; patch({ leadId: null }); paintLead(); });
+    } else {
+      leadEl.innerHTML = `<button class="btn btn-sm" data-llink>${ic(I.plus)}Привязать лида</button>`;
+      leadEl.querySelector('[data-llink]').addEventListener('click', async () => {
+        const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
+        const lb = modal({ title: 'Привязать лида', body: `<div class="form-row"><input id="llq" placeholder="Поиск по имени/телефону…" style="margin-bottom:8px"><div class="td-lead-list" id="llList">${leads.slice(0, 40).map(l => `<button class="td-lead-opt" data-lid="${l.id}">${esc(l.name)} <span>${esc(l.geoName || '')}${l.phone ? ' · ' + esc(l.phone) : ''}</span></button>`).join('')}</div></div>`, actions: [{ label: 'Отмена' }] });
+        const paint = (q) => { $('#llList', lb).innerHTML = leads.filter(l => !q || (l.name || '').toLowerCase().includes(q) || (l.phone || '').includes(q)).slice(0, 40).map(l => `<button class="td-lead-opt" data-lid="${l.id}">${esc(l.name)} <span>${esc(l.geoName || '')}${l.phone ? ' · ' + esc(l.phone) : ''}</span></button>`).join(''); wireOpts(); };
+        const wireOpts = () => $$('.td-lead-opt', lb).forEach(o => o.addEventListener('click', () => { const l = leads.find(x => x.id === o.dataset.lid); t.lead = { id: l.id, name: l.name, geoName: l.geoName || '', stageName: '', phone: l.phone || '' }; patch({ leadId: l.id }); closeModal(); openTaskDetail(t, leadMap); }));
+        $('#llq', lb).addEventListener('input', e => paint(e.target.value.trim().toLowerCase())); wireOpts();
+      });
+    }
+  };
+  paintLead();
   /* подзадачи */
   const subsEl = $('#tdSubs', bd);
   const paintSubs = () => {
@@ -4698,6 +4727,26 @@ function openTaskDetail(t, leadMap) {
     });
   };
   paintAtts();
+}
+/* быстрая постановка задачи по лиду (из карточки лида / контекст-меню) — с авто-привязкой */
+function openQuickTask(lead) {
+  if (!lead) return;
+  let pri = 'p3', dueMs = null;
+  const bd = modal({
+    title: 'Задача по лиду', sub: `${esc(lead.name || '—')}${lead.geoName || lead.geo ? ' · ' + esc(lead.geoName || lead.geo) : ''}`,
+    body: `<div class="form-row"><label>Что сделать</label><input id="qtTitle" placeholder="перезвонить, отправить подборку, подготовить договор…"></div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px">
+        <div class="tk-cap-pri" id="qtPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === 'p3' ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
+        <button class="btn btn-sm" id="qtDue">${ic(I.cal)}Срок</button><span class="muted" id="qtDueLbl" style="font-size:12px"></span>
+      </div>`,
+    actions: [{ label: 'Поставить задачу', cls: 'btn-accent', onClick: async () => {
+      const title = $('#qtTitle', bd).value.trim(); if (!title) { toast('Что сделать?'); return false; }
+      try { await api.post('/tasks', { title, leadId: lead.id, priority: pri, due: dueMs, scheduled: dueMs ? dstrLocal(new Date(dueMs)) : dstrLocal(new Date()) }); toast('Задача поставлена', esc(lead.name || ''), true); } catch (e) { toast('Не вышло', e.message); return false; }
+    } }, { label: 'Отмена' }],
+  });
+  $$('#qtPri .tk-pdot', bd).forEach(b => b.addEventListener('click', () => { pri = b.dataset.np; $$('#qtPri .tk-pdot', bd).forEach(x => x.classList.toggle('on', x === b)); }));
+  $('#qtDue', bd).addEventListener('click', async () => { const ms = await tkDatePop($('#qtDue', bd), dueMs); if (ms !== undefined) { dueMs = ms; $('#qtDueLbl', bd).textContent = ms ? new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : ''; } });
+  setTimeout(() => { const i = $('#qtTitle', bd); if (i) i.focus(); }, 30);
 }
 PAGES.tasks = async (root) => {
   const [d, leads] = await Promise.all([api.get('/tasks'), api.get('/leads')]);
@@ -5219,14 +5268,20 @@ function openProvisionModal(id) {
     ['full', 'Полный доступ', 'все разделы, без обучалок'],
   ];
   const bd = modal({
-    title: `Выдать доступ · ${br.name || 'брокер'}`, sub: 'Кабинет соберётся сам — PIN, формат и стартовый чеклист',
-    body: `<div class="form-row"><label>Формат кабинета</label><select id="pvPreset">${PRESETS.map(([k, n, d]) => `<option value="${k}">${n} — ${d}</option>`).join('')}</select></div>
-      <div class="form-row"><label>PIN брокеру (пусто = сгенерируем сами)</label><input id="pvPin" placeholder="мин. 6 символов · или оставь пустым"></div>
+    title: `Выдать доступ · ${br.name || 'сотрудник'}`, sub: 'Кабинет соберётся сам — роль, PIN, формат и стартовый чеклист',
+    body: `<div class="form-row"><label>Роль сотрудника</label><select id="pvRole">
+        <option value="broker">Брокер — только свои лиды, диалоги, встречи</option>
+        <option value="assistant">Ассистент — все диалоги/задачи/встречи, помогает команде</option>
+        <option value="marketer">Маркетолог — реклама, комментарии, соцсети, аналитика (без клиентских лидов)</option>
+        <option value="manager">Менеджер — почти всё, кроме настроек/команды/оплаты</option>
+      </select><div class="muted" style="font-size:11px;margin-top:4px">Разделы под роль скрываются автоматически; тонко настроить видимость можно в карточке сотрудника.</div></div>
+      <div class="form-row"><label>Формат кабинета</label><select id="pvPreset">${PRESETS.map(([k, n, d]) => `<option value="${k}">${n} — ${d}</option>`).join('')}</select></div>
+      <div class="form-row"><label>PIN сотруднику (пусто = сгенерируем сами)</label><input id="pvPin" placeholder="мин. 6 символов · или оставь пустым"></div>
       <div id="pvResult"></div>`,
     actions: [{ label: 'Выдать доступ', cls: 'btn-accent', onClick: async (bd2) => {
       const btn = bd2.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Готовлю…'; }
       try {
-        const r = await api.post('/brokers/' + id + '/provision', { preset: $('#pvPreset', bd2).value, pin: $('#pvPin', bd2).value.trim() });
+        const r = await api.post('/brokers/' + id + '/provision', { preset: $('#pvPreset', bd2).value, roleType: $('#pvRole', bd2).value, pin: $('#pvPin', bd2).value.trim() });
         const link = r.link || location.origin + '/';
         const msg = `Доступ в Lumen CRM 🔑\nСсылка: ${link}\nВаш код входа: ${r.pin}\n(введите код на странице входа)`;
         $('#pvResult', bd2).innerHTML = `<div class="pv-done">

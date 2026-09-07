@@ -397,6 +397,35 @@ function audit(db, req, action, extra) {
   if (db.audit.length > 500) db.audit.length = 500;
   store.save();
 }
+/* ── RBAC: типы сотрудников и их права (для крупных агентств) ──
+   Все не-владельцы держат session.role='broker'; фактические права — из roleType сотрудника.
+   leads: 'own' (только свои) | 'all' (все диалоги). allow: доп. группы API поверх базового брокера. */
+const ROLE_CAPS = {
+  broker: { name: 'Брокер', leads: 'own', allow: [] },
+  assistant: { name: 'Ассистент', leads: 'all', allow: ['reports', 'voice'] },
+  marketer: { name: 'Маркетолог', leads: 'own', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports'] },
+  manager: { name: 'Менеджер', leads: 'all', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports', 'sequences', 'voice', 'templates', 'numbers'] },
+};
+/* дефолтное скрытие разделов под роль (владелец может переопределить hidePages у сотрудника) */
+const ROLE_DEFAULT_HIDE = {
+  broker: [],
+  assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
+  marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
+};
+/* заблокирован ли путь для НЕ-владельца с данным набором грантов.
+   ⚠️ При granted=[] воспроизводит ТОЧНО прежнее поведение брокера (не сломать доступы). */
+function nonOwnerBlocked(p, method, granted) {
+  const g = (p.match(/^\/api\/([a-z-]+)/) || [])[1] || '';
+  if (g === 'billing' || g === 'vault') return true;                                  /* никогда */
+  if (['settings', 'brokers', 'agency', 'import', 'demo'].includes(g)) return method !== 'GET';  /* только чтение, запись — владелец */
+  const FULL = ['numbers', 'templates', 'ads', 'audit', 'campaigns', 'wake', 'comments', 'wa'];   /* брокеру закрыто целиком */
+  if (FULL.includes(g)) return !granted.has(g);
+  const WRITEONLY = ['sequences', 'reports', 'voice'];                                /* брокеру чтение да, запись нет */
+  if (WRITEONLY.includes(g)) return method !== 'GET' && !granted.has(g);
+  return false;                                                                       /* leads/inbox/meetings/tasks/collections/properties/social/carousels/analytics/events */
+}
+
 /* маскировка телефона для чужих лидов у роли broker */
 const maskPhone = (ph) => String(ph || '').replace(/^(\+?\d{2,4})\d+(\d{2})$/, '$1•••••$2');
 
@@ -1231,10 +1260,13 @@ const server = http.createServer(async (req, res) => {
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
     const IS_BROKER = ROLE && ROLE.role === 'broker';
-    if (IS_BROKER && /^\/api\/(settings|brokers|numbers|templates|sequences|campaigns|wake|ads|agency|reports|audit|import|demo|voice|comments|wa)/.test(p) && req.method !== 'GET') return json(res, 403, { error: 'недоступно для брокера' });
-    if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake|comments|wa)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
-    /* видимость лида для брокера: только свои */
-    const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
+    /* RBAC: права не-владельца из roleType сотрудника (broker=дефолт → прежнее поведение) */
+    const MEMBER = IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}) : null;
+    const CAP = IS_BROKER ? (ROLE_CAPS[MEMBER.roleType] || ROLE_CAPS.broker) : null;
+    const GRANTED = CAP ? new Set(CAP.allow) : new Set();
+    if (IS_BROKER && p.startsWith('/api/') && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
+    /* видимость лида: own — только свои, all — все (ассистент/менеджер) */
+    const canSeeLead = (l) => !IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId;
     /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
     const RR_STATE = realRole(req);
     const showSecret = RR_STATE && RR_STATE.role === 'owner' && !RR_STATE.previewAs;
@@ -1261,7 +1293,7 @@ const server = http.createServer(async (req, res) => {
         templates: db.templates, sequences: db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
-        me: ROLE ? { role: ROLE.role, brokerId: ROLE.brokerId, name: IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}).name : null, preview: !!ROLE.previewOwner, hidePages: IS_BROKER ? ((db.brokers.find(b => b.id === ROLE.brokerId) || {}).hidePages || []) : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])] : [] } : null,
       }); return;
     }
     /* журнал доступа (только владелец) */
@@ -1614,6 +1646,7 @@ const server = http.createServer(async (req, res) => {
       const ph = sha(pin);
       if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
       br.pinHash = ph; br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
+      if (ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* тип сотрудника: broker/assistant/marketer/manager */
       /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
       let seeded = 0;
       if (!br.onboarded) {
@@ -1697,6 +1730,8 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
+      if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
       /* поля публичной визитки брокера (/b/:id) */
       if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
       if (b.email != null) br.email = String(b.email).slice(0, 80);
@@ -2151,8 +2186,11 @@ const server = http.createServer(async (req, res) => {
       };
       const TASK_OWNER = IS_BROKER ? ROLE.brokerId : null; /* чьи задачи: брокер видит свои, владелец — свои (null) */
       const mineLead = (l) => !IS_BROKER || l.broker === TASK_OWNER;
+      /* сводка по лиду для задачи: имя/гео/стадия/телефон + ссылка на карточку */
+      const STAGE_RU = { new: 'Новый', touch: 'Первое касание', dialog: 'В диалоге', qualified: 'Квалифицирован', handover: 'У брокера', viewing: 'Показ', deal: 'Сделка', sleeping: 'Спящий', lost: 'Закрыт' };
+      const leadBrief = (lid) => { const l = db.leads.find(x => x.id === lid); if (!l) return null; const q = l.quals || {}; return { id: l.id, name: l.name || '—', geoName: (db.settings.geoNames || {})[l.geo] || l.geo || '', stage: l.stage, stageName: STAGE_RU[l.stage] || l.stage, phone: l.phone || '', purpose: (q.purpose || {}).value || '', budget: (q.budget || {}).value || '' }; };
       if (p === '/api/tasks' && req.method === 'GET') {
-        const tasks = db.brokerTasks.filter(t => (t.brokerId || null) === TASK_OWNER);
+        const tasks = db.brokerTasks.filter(t => (t.brokerId || null) === TASK_OWNER).map(t => t.leadId ? Object.assign({}, t, { lead: leadBrief(t.leadId) }) : t);
         /* стрик: подряд идущие дни с ≥1 выполненной задачей, заканчивая сегодня/вчера */
         const doneDays = new Set(tasks.filter(t => t.status === 'done' && t.doneAt).map(t => dstr(t.doneAt)));
         let streak = 0; const cur = new Date();
@@ -2218,8 +2256,12 @@ const server = http.createServer(async (req, res) => {
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
         const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
         if ((t.brokerId || null) !== TASK_OWNER) return json(res, 403, { error: 'чужая задача' });
-        sanTask(await readBody(req), t); store.save();
-        return json(res, 200, t);
+        const wasDone = t.status === 'done';
+        sanTask(await readBody(req), t);
+        /* синхрон с лидом: закрыл задачу по лиду → отметка в его хронологии */
+        if (t.leadId && t.status === 'done' && !wasDone) { const l = db.leads.find(x => x.id === t.leadId); if (l) ai.pushEvent(db, { type: 'qual', leadId: l.id, text: `✓ Задача выполнена: ${String(t.title).slice(0, 120)}` }); }
+        store.save();
+        return json(res, 200, Object.assign({}, t, t.leadId ? { lead: leadBrief(t.leadId) } : {}));
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
         db.brokerTasks = db.brokerTasks.filter(x => !(x.id === m[1] && (x.brokerId || null) === TASK_OWNER)); store.save();
