@@ -1026,6 +1026,43 @@ function scrapeImagesFromHtml(html, baseHref) {
   }
   return res2;
 }
+/* скачать картинку в локальные ассеты + отфильтровать мусор по РАЗМЕРУ (логотипы/иконки — крошечные) */
+async function downloadImageToAsset(url) {
+  try {
+    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 11000);
+    let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
+    if (!r.ok) return null;
+    const ct = r.headers.get('content-type') || '';
+    if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;   /* только растровые фото, не svg/gif */
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 12000 || buf.length > 12e6) return null;      /* <12КБ = иконка/логотип; >12МБ — мимо */
+    const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
+    fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
+    const fn = `car/src-${crypto.randomBytes(5).toString('hex')}.${ext}`;
+    fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
+    return { url: '/assets/' + fn, size: buf.length };
+  } catch (e) { return null; }
+}
+/* открытые источники фото (Openverse — бесплатно, без ключа, CC-лицензия) по ключевым словам */
+async function openverseImages(query, n = 8) {
+  try {
+    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 10000);
+    let r; try { r = await fetch('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(query) + '&page_size=' + Math.min(20, n) + '&mature=false', { signal: ctrl.signal, headers: { 'User-Agent': 'LumenBot/1.0 (real-estate carousel)' } }); } finally { clearTimeout(to); }
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.results || []).map(x => x.url).filter(u => /^https?:\/\//.test(String(u || '')));
+  } catch (e) { return []; }
+}
+/* собрать НАСТОЯЩИЕ фото для лонча: скачать выбранные ПАРАЛЛЕЛЬНО (фильтр по размеру), мало → добрать из открытых источников */
+async function gatherLaunchPhotos(picks, query, want) {
+  const grab = async (urls, cap) => (await Promise.all((urls || []).slice(0, cap).map(u => downloadImageToAsset(u).catch(() => null)))).filter(Boolean).map(x => x.url);
+  let good = (await grab(picks, 12)).slice(0, want);
+  if (good.length < 3 && query) {
+    const ov = await openverseImages(query, 12);
+    good = good.concat(await grab(ov, 10)).slice(0, Math.max(want, 5));
+  }
+  return good;
+}
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -2046,12 +2083,22 @@ const server = http.createServer(async (req, res) => {
         try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo); title = out.title; slides = out.slides; }
         catch (e) { /* ИИ не справился — стартовые слайды */ }
       }
-      /* умная раскладка фото: 1-й слайд (обложка) — крупный кадр; далее фото на смысловые слайды; последний (CTA) оставляем чистым градиентом */
-      const pics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))).slice(0, 12) : [];
-      if (pics.length && slides.length) {
-        slides[0] = Object.assign({}, slides[0], { bg: pics[0], pos: slides[0].pos || 'bottom', size: slides[0].size || 'l' });
-        let pi = 1;
-        for (let i = 1; i < slides.length - 1 && pi < pics.length; i++) { slides[i] = Object.assign({}, slides[i], { bg: pics[pi++], pos: slides[i].pos || 'bottom' }); }
+      /* Фото: скачиваем ВЫБРАННЫЕ (фильтр по размеру — логотипы/иконки отсекаются), мало → добираем из открытых источников.
+         Раскладка вкусная и КОНСИСТЕНТНАЯ: обложка — крупный кадр; смысловые слайды — чистый текст (тёмная тема);
+         отдельный слайд-галерея с реальными фото плиткой. Не мажем случайную картинку под каждый слайд. */
+      if (b.ai && slides.length && (Array.isArray(b.images) && b.images.length || b.template === 'launch')) {
+        const rawPics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))) : [];
+        const q = [String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
+        const good = await gatherLaunchPhotos(rawPics, q, 6);
+        if (good.length) {
+          slides[0] = Object.assign({}, slides[0], { bg: good[0], pos: 'bottom', size: 'l' });
+          const rest = good.slice(1);
+          if (rest.length >= 2) {
+            const gal = rest.slice(0, 4);
+            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 22 : 60, w: 42, h: 33, z: gi + 1, round: 12 }));
+            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: 'Виды и планировки', sub: '', eyebrow: 'Галерея', pos: 'top', size: 'm', layers }));
+          }
+        }
       }
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
@@ -2183,6 +2230,7 @@ const server = http.createServer(async (req, res) => {
         pinned: !!b.pinned, reactions: {},
       };
       db.feed.unshift(post); db.feed = db.feed.slice(0, 300); store.save();
+      if (b.notifyTg) { const TN = { news: '📰 Новость', material: '📎 Материал', ref: '🔗 Референс', congrats: '🏆 Поздравление', announce: '📢 Объявление' }; try { engine.sendReport(db, `${TN[post.type] || '📢'} · ${who}\n${post.title ? post.title + '\n' : ''}${post.text || ''}${post.link ? '\n' + post.link.url : ''}`); } catch (e) {} }
       return json(res, 200, post);
     }
     if (p === '/api/feed/link-preview' && req.method === 'POST') {

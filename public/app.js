@@ -1081,9 +1081,10 @@ PAGES.feed = async (root) => {
     const ava = p.authorPhoto ? `<img src="${esc(p.authorPhoto)}">` : esc((p.authorName || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase());
     const media = (p.media || []);
     const mediaHtml = media.length ? `<div class="fd-media m${Math.min(media.length, 4)}">${media.slice(0, 4).map(mn => mn.kind === 'video' ? `<video src="${esc(mn.url)}" controls playsinline></video>` : `<div class="fd-ph" style="background-image:url('${esc(mn.url)}')"></div>`).join('')}</div>` : '';
-    const linkHtml = p.link ? `<a class="fd-link" href="${esc(p.link.url)}" target="_blank">${p.link.image ? `<div class="fd-link-img" style="background-image:url('${esc(p.link.image)}')"></div>` : ''}<div class="fd-link-b"><b>${esc(p.link.title || p.link.url)}</b><span>${esc((p.link.url || '').replace(/^https?:\/\//, '').split('/')[0])}</span></div></a>` : '';
+    const dom = (p.link ? (p.link.url || '') : '').replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+    const linkHtml = p.link ? `<a class="fd-link" href="${esc(p.link.url)}" target="_blank">${p.link.image ? `<div class="fd-link-img" style="background-image:url('${esc(p.link.image)}')"></div>` : `<div class="fd-link-img noimg"><span>${esc((dom[0] || '#').toUpperCase())}</span></div>`}<div class="fd-link-b"><span class="fd-link-dom">${ic(I.link)}${esc(dom)}</span><b>${esc(p.link.title || p.link.url)}</b><span class="fd-link-go">Открыть ссылку ${ic(I.arrow || I.chev)}</span></div></a>` : '';
     const mine = myReact(p.reactions);
-    return `<div class="fd-post" data-fp="${p.id}">
+    return `<div class="fd-post" data-fp="${p.id}" style="--tcol:${tc}">
       ${p.pinned ? `<div class="fd-pin">${ic(I.shield)}Закреплено</div>` : ''}
       <div class="fd-head"><div class="fd-ava">${ava}</div><div class="fd-meta"><b>${esc(p.authorName)}</b><span>${ago(p.at)}</span></div><span class="fd-type" style="--tc:${tc}">${tn}</span>${canPost ? `<div class="fd-tools"><button data-fpin="${p.id}" title="Закрепить">${ic(I.shield)}</button><button data-fdel="${p.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}</div>
       ${p.title ? `<div class="fd-title">${esc(p.title)}</div>` : ''}
@@ -1108,6 +1109,7 @@ PAGES.feed = async (root) => {
             <button class="btn btn-sm" id="fdMedia">${ic(I.plus)}Фото/видео</button>
             <button class="btn btn-sm" id="fdLink">${ic(I.link)}Референс-ссылка</button>
             <label class="fd-pinlbl"><input type="checkbox" id="fdPinNew"> закрепить</label>
+            <label class="fd-pinlbl" title="Отправить пуш в Telegram команде (нужен бот в «Автоматизациях»)"><input type="checkbox" id="fdTg"> ${ic(I.send)}в Telegram</label>
             <span class="tb-spacer"></span>
             <button class="btn btn-accent btn-sm" id="fdPublish">${ic(I.send)}Опубликовать</button>
           </div>
@@ -1142,7 +1144,7 @@ PAGES.feed = async (root) => {
   $('#fdPublish', root).addEventListener('click', async () => {
     const title = $('#fdTitle', root).value.trim(), text = $('#fdText', root).value.trim();
     if (!title && !text && !FEED_MEDIA.length && !FEED_LINK) { toast('Пустой пост'); return; }
-    await api.post('/feed', { type: curType, title, text, media: FEED_MEDIA, link: FEED_LINK, pinned: $('#fdPinNew', root).checked });
+    await api.post('/feed', { type: curType, title, text, media: FEED_MEDIA, link: FEED_LINK, pinned: $('#fdPinNew', root).checked, notifyTg: $('#fdTg', root).checked });
     FEED_MEDIA = []; FEED_LINK = null; toast('Опубликовано', 'Вся команда увидит в ленте', true); PAGES.feed(root);
   });
 };
