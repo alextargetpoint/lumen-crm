@@ -2177,7 +2177,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 
 .b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
 .foot{margin-top:22px;text-align:center;font-size:11px;color:#5E6E96}
 .hd{display:flex;justify-content:center;margin-bottom:20px}
+.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;z-index:0}
+body::before{z-index:1}.card{z-index:2}
 </style></head><body>
+<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg" src="/assets/skyline-bg.mp4"></video>
 <div class="card">
   <div class="hd">${brandTop}</div>
   <div class="ava">${br.photo ? `<img src="${esc(br.photo)}" alt="">` : esc(initials)}</div>

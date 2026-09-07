@@ -1221,9 +1221,11 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pd2-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 17, 38, .55), rgba(6, 17, 38, .82)); }
 .pd2-in { position: relative; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; min-height: inherit; }
 .pd2-top { display: flex; gap: 9px; align-items: center; }
-.pd2-ghost { background: rgba(255, 255, 255, .1); color: #fff; border: 1px solid rgba(255, 255, 255, .18); }
-.pd2-ghost:hover { background: rgba(255, 255, 255, .18); }
-.pd2-ghost.danger:hover { background: rgba(224, 82, 82, .35); border-color: rgba(224, 82, 82, .5); }
+.pd2-ghost { background: rgba(6, 17, 38, .5); color: #fff; border: 1px solid rgba(255, 255, 255, .3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+.pd2-ghost:hover { background: rgba(6, 17, 38, .72); border-color: rgba(255, 255, 255, .5); }
+.pd2-ghost.danger:hover { background: rgba(224, 82, 82, .55); border-color: rgba(224, 82, 82, .7); }
+/* #prBack — «Все объекты»: чуть заметнее, стрелка ясная */
+#prBack { padding-left: 12px; }
 .pd2-save { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; color: #9DB8FF; }
 .pd2-save svg { width: 12px; height: 12px; }
 .pd2-main { display: flex; gap: 20px; align-items: flex-end; margin-top: auto; flex-wrap: wrap; }
@@ -1596,11 +1598,14 @@ html[data-night] .cmt-group-hd { color: var(--ink); }
 .lead-card:hover .top, .lead-card.sel .top { padding-left: 24px; }
 .lc-check { position: absolute; top: 12px; left: 10px; width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid var(--stroke); background: var(--card); display: grid; place-items: center; cursor: pointer; opacity: 0; transform: scale(.6); transform-origin: 10px 10px; transition: opacity .18s var(--ease-spring, ease), transform .22s var(--ease-spring, ease), background .12s; z-index: 3; }
 .lc-check svg { width: 12px; height: 12px; color: #fff; opacity: 0; transition: opacity .12s; }
-.lead-card:hover .lc-check, .lead-card.sel .lc-check { opacity: 1; transform: scale(1); }
-.lead-card.sel .lc-check { background: var(--accent); border-color: var(--accent); }
-.lead-card.sel .lc-check svg { opacity: 1; }
+.lead-card:hover .lc-check, .lead-card.sel .lc-check,
+.prop-card:hover .lc-check, .prop-card.sel .lc-check,
+.cl2-card:hover .lc-check, .cl2-card.sel .lc-check { opacity: 1; transform: scale(1); }
+.lead-card.sel .lc-check, .prop-card.sel .lc-check, .cl2-card.sel .lc-check { background: var(--accent); border-color: var(--accent); }
+.lead-card.sel .lc-check svg, .prop-card.sel .lc-check svg, .cl2-card.sel .lc-check svg { opacity: 1; }
 /* выделение — рамкой ВНУТРЬ (inset box-shadow), чтобы не обрезалось краем колонки */
 .lead-card.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.prop-card.sel, .cl2-card.sel { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow); }
 .lc-check.tbl { position: static; opacity: .5; width: 18px; height: 18px; flex: 0 0 18px; }
 tr.sel { background: rgba(37,99,235,.08); }
 tr.sel .lc-check.tbl { opacity: 1; background: var(--accent); border-color: var(--accent); }
@@ -1791,6 +1796,12 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke); }
 
 /* первое касание в карточке лида */
+.lc-ft { display: flex; flex-direction: column; gap: 9px; }
+.lc-ft > * { width: 100%; margin: 0; }
+.lc-ft textarea { display: block; width: 100%; box-sizing: border-box; }
+.lc-ft #lcCreoBtn { width: auto; align-self: flex-start; }
+.lc-ft .lc-note-row { display: flex; gap: 8px; }
+.lc-ft .lc-note-row .btn { flex: 1; justify-content: center; }
 .lc-creo { border: 1px dashed var(--stroke); border-radius: 10px; min-height: 56px; display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 12px; background: var(--bg-2); overflow: hidden; text-align: center; padding: 8px; }
 .lc-creo.has { border-style: solid; padding: 0; }
 .lc-creo img { width: 100%; max-height: 180px; object-fit: cover; display: block; }
@@ -1913,20 +1924,22 @@ html[data-night] .bill-plan.on .bp-price, html[data-night] .bill-plan.on .bp-sub
 
 /* Сегментный переключатель под-разделов рабочего пространства (над страницей) */
 .ws-tabs {
-  display: flex; gap: 2px; padding: 3px; margin: 0 0 20px;
-  background: rgba(140,165,230,.06); border: 1px solid var(--line);
+  display: flex; gap: 4px; padding: 5px; margin: 0 0 20px;
+  background: var(--card); border: 1px solid var(--stroke);
   border-radius: 13px; width: max-content; max-width: 100%;
-  overflow-x: auto; scrollbar-width: none;
+  overflow-x: auto; scrollbar-width: none; box-shadow: var(--shadow);
 }
 .ws-tabs::-webkit-scrollbar { display: none; }
 .ws-tab {
   display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
-  padding: 8px 15px; border-radius: 10px; font-size: 13px; font-weight: 550;
-  color: var(--ink-2); background: transparent; border: 0; cursor: pointer;
-  transition: color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast);
+  padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 600;
+  color: var(--ink-3); background: transparent; border: 0; cursor: pointer;
+  transition: color var(--dur-fast), background var(--dur-fast);
 }
 .ws-tab svg { width: 15px; height: 15px; stroke-width: 1.7; opacity: .8; }
-.ws-tab:hover { color: var(--ink); background: rgba(140,175,255,.09); }
-.ws-tab.on { color: #fff; background: rgba(120,160,255,.20); box-shadow: inset 0 0 0 1px rgba(150,185,255,.28); }
+.ws-tab:hover { color: var(--ink); background: var(--bg-2); }
+.ws-tab.on { color: #fff; background: linear-gradient(180deg, var(--navy-700), var(--navy-900)); box-shadow: 0 6px 16px -6px rgba(16, 43, 92, .5); }
 .ws-tab.on svg { opacity: 1; color: var(--blue-300); }
+html[data-night] .ws-tabs { background: var(--card); border-color: var(--stroke); }
+html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 @media (max-width: 760px) { .ws-tabs { width: 100%; } }
