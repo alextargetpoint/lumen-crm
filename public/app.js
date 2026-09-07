@@ -4119,8 +4119,14 @@ function openShareMenu(it) {
 
 /* карточка карусели (общая для «Карусели» и «Карусель из лонча») */
 function carCardHTML(c) {
+  const s0 = c.slides[0] || {};
+  const abs = (u) => !u ? '' : (/^https?:/.test(u) ? u : '/' + String(u).replace(/^\//, ''));
+  const head = esc(String(s0.heading || 'Слайд').replace(/<[^>]*>/g, ''));
+  /* превью подтягивает ПЕРВЫЙ слайд: его фон (фото/цвет), иначе — градиент темы */
+  const prevStyle = s0.bg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.55)),url('${esc(abs(s0.bg))}');background-size:cover;background-position:center` : s0.bgc ? `background:${esc(s0.bgc)}` : '';
+  const prevCls = s0.bg ? 'hasbg' : s0.bgc ? 'hascolor' : 'th-' + esc(c.theme);
   return `<div class="glass car-card" data-car="${c.id}">
-    <div class="car-prev ${esc(c.format)} th-${esc(c.theme)}"><span class="car-h">${esc((c.slides[0] || {}).heading || 'Слайд')}</span></div>
+    <div class="car-prev ${esc(c.format)} ${prevCls}" style="${prevStyle}"><span class="car-h">${head}</span></div>
     <div class="car-body">
       <div class="nm">${esc(c.title)}</div>
       <div class="muted" style="font-size:11.5px">${c.slides.length} слайдов · ${CAR_TPL[c.template] || ''} · ${ago(c.createdAt)}</div>
