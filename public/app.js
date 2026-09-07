@@ -5414,6 +5414,7 @@ PAGES.agency = async (root) => {
           <div class="ag-name-row"><span class="ag-h">${esc(s.agency.name)}</span><span class="ag-edition">${ic(edition === 'solo' ? I.user : I.building)}${edition === 'solo' ? 'Solo' : 'Агентство'}</span></div>
           <div class="ag-tag">${(s.agency.manager || {}).name ? 'Менеджер — ' + esc(s.agency.manager.name) : 'Агентство недвижимости'}${(s.agency.manager || {}).phone ? ' · ' + esc(s.agency.manager.phone) : ''}</div>
           <div class="ag-dirs">${geos.map(g => `<span class="ag-dir">${ic(I.pin || I.building)}${esc(s.geoNames[g] || g)}</span>`).join('')}</div>
+          ${(s.agency.badges || []).length ? `<div class="ag-badges">${s.agency.badges.map(b => `<span class="ag-badge">${esc(b)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="ag-stats">
           <button class="ag-stat" data-ovgo="brokers"><b>${brokersN}</b><span>${plural(brokersN, 'брокер', 'брокера', 'брокеров')}</span></button>
@@ -5440,6 +5441,17 @@ PAGES.agency = async (root) => {
             <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
           </div>
           <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.spark)}Позиционирование<span class="sub">бейджи доверия на профиле и подборках</span></div>
+          <div class="ag-badge-edit" id="agBadges">${(s.agency.badges || []).map((b, i) => `<span class="ag-badge-chip" data-bi="${i}">${esc(b)}<button data-brm="${i}" title="Убрать">${ic(I.x)}</button></span>`).join('') || '<span class="muted" style="font-size:12px">Пока пусто — добавьте ниже</span>'}</div>
+          <div class="lc-note-row" style="margin-top:9px"><input id="agBadgeInp" placeholder="напр. 7 лет на рынке · 300+ сделок · Люкс-сегмент" maxlength="40"><button class="btn btn-sm" id="agBadgeAdd">${ic(I.plus)}</button></div>
+          <div class="chips-row" style="margin-top:8px">${['Люкс-сегмент', 'Только проверенные объекты', 'Полное сопровождение', 'Работаем с ВНЖ', 'Рассрочка 0%'].map(p => `<button type="button" class="chip-t" data-bpreset="${esc(p)}">${ic(I.plus)}${p}</button>`).join('')}</div>
+        </div>
+        <div class="glass card mb">
+          <div class="card-title">${ic(I.pin || I.building)}Направления работы<span class="sub">можно одно или несколько</span></div>
+          <div class="ag-geo-grid">${Object.entries(s.geoNames || {}).map(([k, n]) => `<button type="button" class="ag-geo ${geos.includes(k) ? 'on' : ''}" data-geo="${k}">${ic(I.pin || I.building)}${esc(n)}</button>`).join('')}</div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Отмеченные направления доступны в лидах, объектах, цепочках и профиле. Агентство может работать хоть по одной локации.</div>
         </div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
@@ -5540,6 +5552,21 @@ PAGES.agency = async (root) => {
     toast('Сохранено', null, true);
     await loadState();
   });
+  /* позиционирование: бейджи */
+  const saveBadges = async (arr) => { await api.patch('/settings', { agency: { badges: arr.slice(0, 8) } }); await loadState(); render(); };
+  const curBadges = () => [...(STATE.settings.agency.badges || [])];
+  const addBadge = async (txt) => { const t = (txt || '').trim().slice(0, 40); if (!t) return; const arr = curBadges(); if (arr.includes(t)) { toast('Уже есть'); return; } arr.push(t); await saveBadges(arr); };
+  $('#agBadgeAdd')?.addEventListener('click', () => addBadge($('#agBadgeInp').value));
+  $('#agBadgeInp')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') addBadge(e.target.value); });
+  $$('[data-bpreset]', root).forEach(b => b.addEventListener('click', () => addBadge(b.dataset.bpreset)));
+  $$('[data-brm]', root).forEach(b => b.addEventListener('click', async () => { const arr = curBadges(); arr.splice(+b.dataset.brm, 1); await saveBadges(arr); }));
+  /* направления работы: тумблеры гео (минимум одно) */
+  $$('[data-geo]', root).forEach(b => b.addEventListener('click', async () => {
+    const g = b.dataset.geo; let arr = [...(STATE.settings.agency.geos || [])];
+    if (arr.includes(g)) { if (arr.length <= 1) { toast('Оставьте хотя бы одно направление'); return; } arr = arr.filter(x => x !== g); }
+    else arr.push(g);
+    await api.patch('/settings', { agency: { geos: arr } }); await loadState(); render();
+  }));
   $('#abSave').addEventListener('click', async () => {
     await api.patch('/settings', { agency: { about: {
       intro: $('#abIntro').value,

@@ -1991,6 +1991,19 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .ag-dirs { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
 .ag-dir { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 11px; }
 .ag-dir svg { width: 13px; height: 13px; color: var(--accent); }
+.ag-badges { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+.ag-badge { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; letter-spacing: .01em; color: #fff; background: linear-gradient(120deg, var(--accent), var(--accent-2, #5B2BD8)); border-radius: 20px; padding: 4px 12px; box-shadow: 0 4px 12px -4px rgba(37,99,235,.5); }
+.ag-badge-edit { display: flex; gap: 7px; flex-wrap: wrap; }
+.ag-badge-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--navy-900); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 6px 4px 11px; }
+.ag-badge-chip button { border: none; background: none; cursor: pointer; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--ink-3); }
+.ag-badge-chip button:hover { background: var(--bad-bg); color: var(--bad); }
+.ag-badge-chip button svg { width: 11px; height: 11px; }
+.ag-geo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ag-geo { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: var(--card, #fff); border: 1.5px solid var(--stroke); border-radius: 11px; padding: 9px 12px; cursor: pointer; transition: border-color .12s, background .12s, color .12s; text-align: left; }
+.ag-geo svg { width: 14px; height: 14px; color: var(--ink-3); }
+.ag-geo:hover { border-color: var(--accent); }
+.ag-geo.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--navy-900); box-shadow: inset 0 0 0 1px var(--accent); }
+.ag-geo.on svg { color: var(--accent); }
 .ag-stats { display: flex; gap: 10px; padding-bottom: 4px; }
 .ag-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 80px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .2s; }
 .ag-stat:hover { border-color: #B9CBEE; background: var(--card); box-shadow: var(--shadow); }
