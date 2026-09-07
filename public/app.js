@@ -1171,7 +1171,13 @@ const SELCFG_PROPS = {
   onOpen: (id) => { PAGE_STATE.propView = id; render(); },
   actions: (n) => [
     { id: 'folder', label: 'В папку', ic: I.copy, run: (cfg, c) => ctxPopup(c.x, c.y, [{ ic: I.x, label: 'Без папки', onClick: () => selBulk(cfg, 'folder', null) }].concat(PROP_FOLDERS.map(f => ({ ic: I.copy, label: f.name, onClick: () => selBulk(cfg, 'folder', f.id) })))) },
-    { id: 'collect', label: 'Собрать подборку', ic: I.layers, run: async (cfg) => { const ids = [...selSet('properties')]; const c = await api.post('/collections', { title: 'Подборка · ' + ids.length + ' объектов', propertyIds: ids }); selSet('properties').clear(); toast('Подборка собрана', ids.length + ' объектов', true); go('collections'); } },
+    { id: 'collect', label: 'Собрать подборку', ic: I.layers, run: async (cfg, c0) => {
+      const ids = [...selSet('properties')];
+      const cols = await api.get('/collections').catch(() => []);
+      const items = [{ ic: I.plus, label: `Новая подборка · ${ids.length} об.`, onClick: async () => { await api.post('/collections', { title: 'Подборка · ' + ids.length + ' объектов', propertyIds: ids }); selSet('properties').clear(); toast('Подборка собрана', ids.length + ' объектов', true); go('collections'); } }];
+      cols.slice(0, 6).forEach(col => items.push({ ic: I.layers, label: `+ в «${col.title}»`, onClick: async () => { await api.patch('/collections/' + col.id, { addPropertyIds: ids }); selSet('properties').clear(); toast('Добавлено в подборку', `«${col.title}»`, true); go('collections'); } }));
+      ctxPopup(c0.x, c0.y, items);
+    } },
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'delete', label: 'Удалить', ic: I.x, danger: true, run: (cfg) => selBulk(cfg, 'delete', null, { title: `Удалить ${n} объект(ов)?`, sub: 'Карточки объектов удалятся. Подборки, где они были, не тронутся.', ok: 'Удалить', danger: true }) },
   ],

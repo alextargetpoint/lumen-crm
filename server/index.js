@@ -1670,6 +1670,17 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.folderId !== undefined) c.folderId = b.folderId || null;
       if (b.title) c.title = String(b.title).slice(0, 200);
+      /* быстрое добавление объектов в существующую подборку */
+      if (Array.isArray(b.addPropertyIds) && b.addPropertyIds.length) {
+        const add = b.addPropertyIds.filter(id => db.properties.some(p2 => p2.id === id));
+        c.propertyIds = [...new Set([...(c.propertyIds || []), ...add])].slice(0, 40);
+        /* если подборка уже собрана блоками — дописываем proj-блоки для новых объектов */
+        if (Array.isArray(c.blocks) && c.blocks.length) {
+          const have = new Set(c.blocks.filter(x => x.t === 'proj').map(x => x.data && x.data.pid));
+          for (const pid of add) if (!have.has(pid)) c.blocks.push({ id: 'b_p_' + pid + '_' + crypto.randomBytes(2).toString('hex'), t: 'proj', v: 'full', data: { pid } });
+        }
+        c.addedCount = add.length;
+      }
       store.save();
       return json(res, 200, c);
     }
