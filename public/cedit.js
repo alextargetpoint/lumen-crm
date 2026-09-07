@@ -229,13 +229,39 @@ body.cpanel-on{padding-right:308px!important}
       };
     });
   }
+  /* live-перерисовка макета БЕЗ перезагрузки страницы (никакого мигания):
+     тянем свежий серверный рендер, подменяем только .wrap, заново вешаем per-node обработчики.
+     Делегированные слушатели (click/contextmenu/pointerdown на document/body) переживают подмену. */
+  async function liveRefresh() {
+    try {
+      const r = await fetch(`/car/${P.cid}?edit=1&key=${encodeURIComponent(KEY)}`, { headers: { 'X-Requested-With': 'fetch' } });
+      const html = await r.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const fresh = doc.querySelector('.wrap'), cur = document.querySelector('.wrap');
+      if (!fresh || !cur) { location.reload(); return; }
+      const sy = window.scrollY;
+      cur.style.transition = 'opacity .16s ease'; cur.style.opacity = '0';
+      await new Promise(res => setTimeout(res, 120));
+      cur.innerHTML = fresh.innerHTML;
+      rewireLive();
+      requestAnimationFrame(() => { window.scrollTo({ top: sy }); cur.style.opacity = '1'; });
+    } catch (e) { location.reload(); }
+  }
+  function rewireLive() {
+    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); }); });
+    const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
+    $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
+    renderBody();
+  }
   async function save(reload, extra) {
     flash('Сохраняю…', 0);
     const body = Object.assign({ slides: serialize(), title: P.title }, extra || {});
     const r = await fetch(`/api/carousels/${P.cid}?key=${encodeURIComponent(KEY)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) { flash('Ошибка сохранения'); return false; }
     dirty = false;
-    if (reload) location.reload(); else flash('Сохранено ✓');
+    if (reload === 'hard') location.reload();
+    else if (reload) { await liveRefresh(); flash('Сохранено ✓'); }
+    else flash('Сохранено ✓');
     return true;
   }
   $('#cSave').addEventListener('click', () => save(false));
@@ -432,15 +458,15 @@ body.cpanel-on{padding-right:308px!important}
         const url = $('#cAiUrl', pp).value.trim(), topic = $('#cAiTopic', pp).value.trim();
         if (!url && !topic) { flash('Вставьте ссылку или тему'); return; }
         closePop(); flash('✦ ИИ собирает карусель (10–25с)…', 0);
-        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic, angle }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => location.reload(), 700); } catch (err) { flash('Не вышло: ' + err.message); }
+        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic, angle }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => liveRefresh(), 350); } catch (err) { flash('Не вышло: ' + err.message); }
       });
     });
     /* готовые шаблоны: категории + применение ко всем слайдам */
     const grid = $('#cTplGrid', body);
     $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
-    grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save(true, { theme: tpl.theme, font: tpl.font, slides: arr }); });
-    $$('.cth', body).forEach(d => d.addEventListener('click', () => save(true, { theme: d.dataset.theme })));
-    $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save(true, { format: b.dataset.f }); });
+    grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save('hard', { theme: tpl.theme, font: tpl.font, slides: arr }); });
+    $$('.cth', body).forEach(d => d.addEventListener('click', () => save('hard', { theme: d.dataset.theme })));
+    $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save('hard', { format: b.dataset.f }); });
     $('#cAddSlide', body).addEventListener('click', (e) => {
       const cats = Object.keys(P.slideTpls || {});
       if (!cats.length) { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
@@ -466,7 +492,7 @@ body.cpanel-on{padding-right:308px!important}
       let curCat = ''; const q = $('#cFq', pp), list = $('#cFlist', pp);
       q.addEventListener('input', () => list.innerHTML = rows(q.value.trim().toLowerCase(), curCat));
       $('#cFcat', pp).addEventListener('click', (ev) => { const b2 = ev.target.closest('[data-cat]'); if (!b2) return; curCat = b2.dataset.cat; $$('#cFcat button', pp).forEach(x => x.classList.toggle('on', x === b2)); list.innerHTML = rows(q.value.trim().toLowerCase(), curCat); });
-      pp.addEventListener('click', (e2) => { const t = e2.target.closest('[data-fp]'); if (t) { closePop(); save(true, { font: t.dataset.fp }); } });
+      pp.addEventListener('click', (e2) => { const t = e2.target.closest('[data-fp]'); if (t) { closePop(); save('hard', { font: t.dataset.fp }); } });
       setTimeout(() => q.focus(), 30);
     });
   }
