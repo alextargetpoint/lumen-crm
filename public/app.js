@@ -1142,7 +1142,16 @@ const OV_PREV = {
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
 const FEED_REACTS = ['👍', '❤️', '🔥', '👏', '🎉'];
-let FEED_MEDIA = [], FEED_LINK = null;
+const FEED_PROV = { youtube: ['#FF0000', 'YouTube'], tiktok: ['#111', 'TikTok'], instagram: ['#E1306C', 'Instagram'], vk: ['#0077FF', 'VK'], telegram: ['#2AABEE', 'Telegram'], web: ['#2563EB', ''] };
+/* заготовки постов по типу — быстрый красивый старт (вставляются в заголовок+текст) */
+const FEED_TEMPLATES = {
+  news: [['📈 Итоги недели', 'Итоги недели', 'За неделю: ___ новых лидов, ___ показов, ___ сделки. Спасибо команде — держим темп!'], ['🏙 Новый объект в базе', 'Новый объект: ___', 'Добавили в базу: ___. Цена ___, ___ м². Кому актуально для клиентов — забирайте в подборки.']],
+  material: [['📚 Полезный материал', 'Гайд: как ___', 'Собрал короткий разбор по теме «___». Внутри: ___. Пользуйтесь в диалогах с клиентами.'], ['🎬 Скрипт для Reels', 'Скрипт Reels: ___', 'Готовый сценарий на 15 сек: 1) хук ___ 2) ___ 3) призыв ___']],
+  ref: [['🔗 Референс', 'Смотрите, как это делают', 'Нашёл сильный пример подачи. Обратите внимание на ___. Можем адаптировать под наши объекты.']],
+  congrats: [['🏆 Поздравляем!', 'Поздравляем ___!', '___ закрыл(а) сделку по ___! Так держать 👏 Пример для всех нас.'], ['🎂 С днём рождения', 'С днём рождения, ___!', 'Команда поздравляет ___ 🎉 Желаем крупных сделок и лёгких клиентов!']],
+  announce: [['📢 Важно', 'Объявление', 'Коллеги, ___. Просьба ознакомиться сегодня.'], ['📅 Планёрка', 'Планёрка ___ в ___', 'Собираемся ___. Повестка: разбор кейсов, план на неделю. Не опаздываем 🙌']],
+};
+let FEED_MEDIA = [], FEED_LINK = null, FEED_POLL = null, FEED_AUD = { mode: 'all', ids: [] };
 PAGES.feed = async (root) => {
   const data = await api.get('/feed').catch(() => ({ posts: [], board: [] }));
   const posts = data.posts || [], board = data.board || [];
@@ -1151,20 +1160,35 @@ PAGES.feed = async (root) => {
   const myUid = me.role === 'owner' ? 'owner' : me.brokerId;
   const reactCount = (r) => Object.values(r || {}).reduce((s, a) => s + (a ? a.length : 0), 0);
   const myReact = (r) => { for (const [k, a] of Object.entries(r || {})) if (a && a.includes(myUid)) return k; return null; };
+  const linkCard = (lk) => {
+    if (!lk) return '';
+    const dom = (lk.url || '').replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+    const [pcol, pname] = FEED_PROV[lk.provider] || FEED_PROV.web;
+    const isVideo = ['youtube', 'tiktok', 'instagram'].includes(lk.provider);
+    const cover = `<div class="fd-link-cov ${isVideo ? 'vid' : ''}" style="--pc:${pcol}"><span class="fd-link-glyph">${esc(((pname || dom)[0] || '#').toUpperCase())}</span>${lk.image ? `<img src="${esc(lk.image)}" alt="" ${lk.imageFallback ? `data-fb="${esc(lk.imageFallback)}"` : ''} onerror="this.dataset.fb?(this.src=this.dataset.fb,this.removeAttribute('data-fb')):(this.style.display='none')">` : ''}${isVideo ? `<span class="fd-link-play">${ic(I.play)}</span>` : ''}</div>`;
+    return `<a class="fd-link prov-${lk.provider || 'web'}" href="${esc(lk.url)}" target="_blank" rel="noopener">${cover}<div class="fd-link-b"><span class="fd-link-dom">${pname ? `<b style="color:${pcol}">${esc(pname)}</b> · ` : ic(I.link)}${esc(dom)}</span><b class="fd-link-t">${esc(lk.title || lk.url)}</b><span class="fd-link-go">${isVideo ? 'Смотреть' : 'Открыть'} ${ic(I.arrow || I.chev)}</span></div></a>`;
+  };
+  const pollCard = (p) => {
+    if (!p.poll) return '';
+    const pl = p.poll, total = pl.total || 0, voted = pl.myVote != null;
+    return `<div class="fd-poll" data-pollpost="${p.id}"><div class="fd-poll-q">${ic(I.bars)}${esc(pl.q)}</div>${pl.options.map((o, i) => {
+      const c = pl.counts[i] || 0, pct = total ? Math.round(c / total * 100) : 0, mine = pl.myVote === i;
+      return `<button class="fd-poll-opt ${mine ? 'mine' : ''} ${voted ? 'voted' : ''}" data-pollopt="${i}"><i class="fd-poll-fill" style="width:${voted ? pct : 0}%"></i><span class="fd-poll-txt">${esc(o)}</span>${voted ? `<span class="fd-poll-pct">${pct}%</span>` : ''}</button>`;
+    }).join('')}<div class="fd-poll-tot">${total} ${plural(total, 'голос', 'голоса', 'голосов')}${voted ? ' · нажмите ещё раз, чтобы отозвать' : ''}</div></div>`;
+  };
   const postCard = (p) => {
     const [tn, tc] = FEED_TYPES[p.type] || FEED_TYPES.news;
     const ava = p.authorPhoto ? `<img src="${esc(p.authorPhoto)}">` : esc((p.authorName || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase());
     const media = (p.media || []);
     const mediaHtml = media.length ? `<div class="fd-media m${Math.min(media.length, 4)}">${media.slice(0, 4).map(mn => mn.kind === 'video' ? `<video src="${esc(mn.url)}" controls playsinline></video>` : `<div class="fd-ph" style="background-image:url('${esc(mn.url)}')"></div>`).join('')}</div>` : '';
-    const dom = (p.link ? (p.link.url || '') : '').replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
-    const linkHtml = p.link ? `<a class="fd-link" href="${esc(p.link.url)}" target="_blank">${p.link.image ? `<div class="fd-link-img" style="background-image:url('${esc(p.link.image)}')"></div>` : `<div class="fd-link-img noimg"><span>${esc((dom[0] || '#').toUpperCase())}</span></div>`}<div class="fd-link-b"><span class="fd-link-dom">${ic(I.link)}${esc(dom)}</span><b>${esc(p.link.title || p.link.url)}</b><span class="fd-link-go">Открыть ссылку ${ic(I.arrow || I.chev)}</span></div></a>` : '';
     const mine = myReact(p.reactions);
+    const audBadge = (canPost && p.audMode && p.audMode !== 'all') ? `<span class="fd-aud" title="Ограниченный просмотр">${ic(I.shield)}${p.audMode === 'only' ? 'узкий круг' : 'скрыто от части'}</span>` : '';
     return `<div class="fd-post" data-fp="${p.id}" style="--tcol:${tc}">
       ${p.pinned ? `<div class="fd-pin">${ic(I.shield)}Закреплено</div>` : ''}
-      <div class="fd-head"><div class="fd-ava">${ava}</div><div class="fd-meta"><b>${esc(p.authorName)}</b><span>${ago(p.at)}</span></div><span class="fd-type" style="--tc:${tc}">${tn}</span>${canPost ? `<div class="fd-tools"><button data-fpin="${p.id}" title="Закрепить">${ic(I.shield)}</button><button data-fdel="${p.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}</div>
+      <div class="fd-head"><div class="fd-ava">${ava}</div><div class="fd-meta"><b>${esc(p.authorName)}</b><span>${ago(p.at)}${audBadge}</span></div><span class="fd-type" style="--tc:${tc}">${tn}</span>${canPost ? `<div class="fd-tools"><button data-fpin="${p.id}" title="Закрепить">${ic(I.shield)}</button><button data-fdel="${p.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}</div>
       ${p.title ? `<div class="fd-title">${esc(p.title)}</div>` : ''}
       ${p.text ? `<div class="fd-text">${esc(p.text).replace(/\n/g, '<br>')}</div>` : ''}
-      ${mediaHtml}${linkHtml}
+      ${mediaHtml}${linkCard(p.link)}${pollCard(p)}
       <div class="fd-reacts">${FEED_REACTS.map(e => { const n = (p.reactions && p.reactions[e] || []).length; return `<button class="fd-react ${mine === e ? 'on' : ''}" data-freact="${p.id}" data-emo="${e}">${e}${n ? `<b>${n}</b>` : ''}</button>`; }).join('')}<span class="fd-rtotal">${reactCount(p.reactions) || ''}</span></div>
     </div>`;
   };
@@ -1177,15 +1201,20 @@ PAGES.feed = async (root) => {
       <div class="fd-main">
         ${canPost ? `<div class="glass card fd-composer">
           <div class="fd-comp-tabs">${Object.entries(FEED_TYPES).map(([k, [n, c]], i) => `<button class="fd-ct ${i === 0 ? 'on' : ''}" data-ct="${k}" style="--tc:${c}">${n}</button>`).join('')}</div>
-          <input id="fdTitle" class="fd-inp-title" placeholder="Заголовок (необязательно)">
-          <textarea id="fdText" placeholder="Поделитесь с командой: новость, материал, поздравление…"></textarea>
+          <div class="fd-inp-wrap"><input id="fdTitle" class="fd-inp-title" placeholder="Заголовок (необязательно)"><button type="button" class="fd-mic dic-btn" id="fdTitleMic" title="Надиктовать — ИИ причешет">${ic(I.mic)}</button></div>
+          <textarea id="fdText" placeholder="Поделитесь с командой: новость, материал, поздравление… или надиктуйте 🎤 — ИИ причешет и структурирует"></textarea>
+          <div class="fd-tpls" id="fdTpls"></div>
           <div id="fdAttach" class="fd-attach"></div>
+          <div id="fdPollBox" class="fd-pollbox" style="display:none"></div>
           <div class="fd-comp-foot">
             <button class="btn btn-sm" id="fdMedia">${ic(I.plus)}Фото/видео</button>
-            <button class="btn btn-sm" id="fdLink">${ic(I.link)}Референс-ссылка</button>
-            <label class="fd-pinlbl"><input type="checkbox" id="fdPinNew"> закрепить</label>
-            <label class="fd-pinlbl" title="Отправить пуш в Telegram команде (нужен бот в «Автоматизациях»)"><input type="checkbox" id="fdTg"> ${ic(I.send)}в Telegram</label>
+            <button class="btn btn-sm" id="fdLink">${ic(I.link)}Ссылка</button>
+            <button class="btn btn-sm" id="fdPoll">${ic(I.bars)}Опрос</button>
+            <button class="btn btn-sm" id="fdWand" title="ИИ причешет и структурирует текст">${ic(I.spark)}Причесать</button>
+            <button class="btn btn-sm" id="fdPrivacy" title="Кто увидит пост">${ic(I.shield)}<span id="fdPrivLbl">Все</span></button>
             <span class="tb-spacer"></span>
+            <label class="fd-toggle" title="Закрепить пост вверху ленты"><input type="checkbox" id="fdPinNew"><span class="fd-toggle-tr"></span>Закрепить</label>
+            <label class="fd-toggle" title="Отправить пуш в Telegram команде"><input type="checkbox" id="fdTg"><span class="fd-toggle-tr"></span>${ic(I.send)}Telegram</label>
             <button class="btn btn-accent btn-sm" id="fdPublish">${ic(I.send)}Опубликовать</button>
           </div>
         </div>` : ''}
@@ -1203,26 +1232,91 @@ PAGES.feed = async (root) => {
   /* реакции */
   $('#fdPosts', root)?.addEventListener('click', async (e) => {
     const rb = e.target.closest('[data-freact]');
-    if (rb) { const r = await api.post(`/feed/${rb.dataset.freact}/react`, { emoji: rb.dataset.emo }); PAGES.feed(root); return; }
+    if (rb) { await api.post(`/feed/${rb.dataset.freact}/react`, { emoji: rb.dataset.emo }); PAGES.feed(root); return; }
+    const po = e.target.closest('[data-pollopt]');
+    if (po) { const post = po.closest('[data-pollpost]'); const r = await api.post(`/feed/${post.dataset.pollpost}/vote`, { option: +po.dataset.pollopt }); updatePollDom(post, r); return; }
     const pin = e.target.closest('[data-fpin]'); if (pin) { await api.post(`/feed/${pin.dataset.fpin}/pin`, {}); PAGES.feed(root); return; }
     const del = e.target.closest('[data-fdel]'); if (del) { await fetch('/api/feed/' + del.dataset.fdel, { method: 'DELETE' }); toast('Удалено', null, true); PAGES.feed(root); return; }
   });
   if (!canPost) return;
   /* композер */
-  FEED_MEDIA = []; FEED_LINK = null;
+  FEED_MEDIA = []; FEED_LINK = null; FEED_POLL = null; FEED_AUD = { mode: 'all', ids: [] };
   let curType = 'news';
-  const renderAttach = () => { const box = $('#fdAttach', root); if (!box) return; box.innerHTML = FEED_MEDIA.map((mn, i) => `<div class="fd-att">${mn.kind === 'video' ? '🎬' : `<img src="${esc(mn.url)}">`}<button data-attrm="${i}">${ic(I.x)}</button></div>`).join('') + (FEED_LINK ? `<div class="fd-att-link">${ic(I.link)}${esc(FEED_LINK.title || FEED_LINK.url)}<button data-linkrm>${ic(I.x)}</button></div>` : ''); };
+  const renderAttach = () => { const box = $('#fdAttach', root); if (!box) return; box.innerHTML = FEED_MEDIA.map((mn, i) => `<div class="fd-att">${mn.kind === 'video' ? '🎬' : `<img src="${esc(mn.url)}">`}<button data-attrm="${i}">${ic(I.x)}</button></div>`).join('') + (FEED_LINK ? `<div class="fd-att-link">${FEED_PROV[FEED_LINK.provider] ? `<b>${esc((FEED_PROV[FEED_LINK.provider] || [])[1] || '')}</b> ` : ic(I.link)}${esc(FEED_LINK.title || FEED_LINK.url)}<button data-linkrm>${ic(I.x)}</button></div>` : ''); };
   $('#fdAttach', root).addEventListener('click', (e) => { const rm = e.target.closest('[data-attrm]'); if (rm) { FEED_MEDIA.splice(+rm.dataset.attrm, 1); renderAttach(); } if (e.target.closest('[data-linkrm]')) { FEED_LINK = null; renderAttach(); } });
-  $$('.fd-ct', root).forEach(b => b.addEventListener('click', () => { curType = b.dataset.ct; $$('.fd-ct', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  /* заготовки постов под текущий тип */
+  const renderTpls = () => { const box = $('#fdTpls', root); if (!box) return; const tpls = FEED_TEMPLATES[curType] || []; box.innerHTML = tpls.map((t, i) => `<button class="fd-tpl" data-tpl="${i}">${esc(t[0])}</button>`).join(''); };
+  $('#fdTpls', root).addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; const tpl = (FEED_TEMPLATES[curType] || [])[+t.dataset.tpl]; if (!tpl) return; $('#fdTitle', root).value = tpl[1]; $('#fdText', root).value = tpl[2]; $('#fdText', root).focus(); });
+  $$('.fd-ct', root).forEach(b => b.addEventListener('click', () => { curType = b.dataset.ct; $$('.fd-ct', root).forEach(x => x.classList.toggle('on', x === b)); renderTpls(); }));
+  renderTpls();
+  /* диктовка: заголовок (яйка) + описание (через wireDictate) */
+  dicBind($('#fdTitle', root), $('#fdTitleMic', root));
+  wireDictate($('#fdText', root).closest('.fd-composer') || root);
+  /* ИИ причёсывает/структурирует набранный текст */
+  $('#fdWand', root).addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const ta = $('#fdText', root); const txt = ta.value.trim();
+    if (!txt) { toast('Сначала наберите или надиктуйте текст'); return; }
+    btn.disabled = true; btn.classList.add('busy');
+    try { const r = await api.post('/ai/text', { text: txt, mode: 'improve', ctx: 'пост во внутренней ленте агентства недвижимости — структурируй по смыслу, живой тон, без клише' }); if (r.text) { ta.value = r.text; toast('Готово', 'ИИ причесал текст', true); } }
+    catch (er) { toast('Не вышло', er.message); }
+    btn.disabled = false; btn.classList.remove('busy');
+  });
   $('#fdMedia', root).addEventListener('click', () => { const inp = el('<input type="file" accept="image/*,video/mp4,video/webm" style="display:none">'); document.body.appendChild(inp); inp.addEventListener('change', async () => { const f = inp.files[0]; inp.remove(); if (!f) return; toast('Загружаю…', null, true); try { const r = await fetch(`/api/feed/asset?filename=${encodeURIComponent(f.name)}`, { method: 'POST', body: f }); const j = await r.json(); if (!r.ok) throw new Error(j.error); FEED_MEDIA.push(j); renderAttach(); } catch (er) { toast('Не вышло', er.message); } }); inp.click(); });
-  $('#fdLink', root).addEventListener('click', () => modal({ title: 'Референс-ссылка', sub: 'Видео/пост конкурента, статья — соберём красивую карточку', body: `<div class="form-row"><label>Ссылка</label><input id="fdLinkUrl" placeholder="https://…"></div>`, actions: [{ label: 'Подтянуть превью', cls: 'btn-accent', onClick: async (bd) => { const u2 = $('#fdLinkUrl', bd).value.trim(); if (!u2) return false; try { const r = await api.post('/feed/link-preview', { url: u2 }); FEED_LINK = { url: r.url, title: r.title, image: r.image }; renderAttach(); toast('Превью готово', null, true); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] }));
+  $('#fdLink', root).addEventListener('click', () => modal({ title: 'Ссылка / референс', sub: 'YouTube, TikTok, Instagram Reels, статья — соберём красивую карточку с обложкой', body: `<div class="form-row"><label>Ссылка</label><input id="fdLinkUrl" placeholder="https://youtube.com/…  ·  instagram.com/reel/…"></div>`, actions: [{ label: 'Подтянуть превью', cls: 'btn-accent', onClick: async (bd) => { const u2 = $('#fdLinkUrl', bd).value.trim(); if (!u2) return false; try { const r = await api.post('/feed/link-preview', { url: u2 }); FEED_LINK = { url: r.url, title: r.title, image: r.image, imageFallback: r.imageFallback || '', provider: r.provider || 'web' }; renderAttach(); toast(r.image ? 'Обложка подтянулась' : 'Превью готово', r.image ? null : 'Обложку соцсеть не отдала — карточка с фирменным фоном', true); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] }));
+  /* опросник */
+  const renderPoll = () => {
+    const box = $('#fdPollBox', root); if (!box) return;
+    if (!FEED_POLL) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    box.innerHTML = `<div class="fd-poll-hd">${ic(I.bars)}Опрос<button type="button" class="fd-poll-x" id="fdPollDel" title="Убрать опрос">${ic(I.x)}</button></div>
+      <input class="fd-poll-qin" id="fdPollQ" placeholder="Вопрос опроса" value="${esc(FEED_POLL.q || '')}">
+      <div id="fdPollOpts">${FEED_POLL.options.map((o, i) => `<div class="fd-poll-oi"><input data-poi="${i}" placeholder="Вариант ${i + 1}" value="${esc(o)}">${FEED_POLL.options.length > 2 ? `<button type="button" class="fd-poll-orm" data-porm="${i}">${ic(I.x)}</button>` : ''}</div>`).join('')}</div>
+      ${FEED_POLL.options.length < 6 ? `<button type="button" class="fd-poll-add" id="fdPollAdd">${ic(I.plus)}Добавить вариант</button>` : ''}`;
+    $('#fdPollDel', box).addEventListener('click', () => { FEED_POLL = null; renderPoll(); });
+    $('#fdPollQ', box).addEventListener('input', (e) => FEED_POLL.q = e.target.value);
+    $$('[data-poi]', box).forEach(inp => inp.addEventListener('input', (e) => FEED_POLL.options[+inp.dataset.poi] = e.target.value));
+    $$('[data-porm]', box).forEach(b => b.addEventListener('click', () => { FEED_POLL.options.splice(+b.dataset.porm, 1); renderPoll(); }));
+    const add = $('#fdPollAdd', box); if (add) add.addEventListener('click', () => { FEED_POLL.options.push(''); renderPoll(); });
+  };
+  $('#fdPoll', root).addEventListener('click', () => { if (!FEED_POLL) FEED_POLL = { q: '', options: ['', ''] }; else FEED_POLL = null; renderPoll(); });
+  /* приватность просмотра */
+  const updatePrivLbl = () => { const l = $('#fdPrivLbl', root); if (l) l.textContent = FEED_AUD.mode === 'all' ? 'Все' : (FEED_AUD.mode === 'only' ? `Только ${FEED_AUD.ids.length}` : `Скрыт от ${FEED_AUD.ids.length}`); $('#fdPrivacy', root).classList.toggle('on', FEED_AUD.mode !== 'all'); };
+  $('#fdPrivacy', root).addEventListener('click', () => openFeedPrivacy(() => updatePrivLbl()));
   $('#fdPublish', root).addEventListener('click', async () => {
     const title = $('#fdTitle', root).value.trim(), text = $('#fdText', root).value.trim();
-    if (!title && !text && !FEED_MEDIA.length && !FEED_LINK) { toast('Пустой пост'); return; }
-    await api.post('/feed', { type: curType, title, text, media: FEED_MEDIA, link: FEED_LINK, pinned: $('#fdPinNew', root).checked, notifyTg: $('#fdTg', root).checked });
-    FEED_MEDIA = []; FEED_LINK = null; toast('Опубликовано', 'Вся команда увидит в ленте', true); PAGES.feed(root);
+    let poll = null;
+    if (FEED_POLL) { const opts = (FEED_POLL.options || []).map(o => (o || '').trim()).filter(Boolean); if (!FEED_POLL.q.trim() || opts.length < 2) { toast('Опрос неполный', 'Нужен вопрос и минимум 2 варианта'); return; } poll = { q: FEED_POLL.q.trim(), options: opts }; }
+    if (!title && !text && !FEED_MEDIA.length && !FEED_LINK && !poll) { toast('Пустой пост'); return; }
+    const audience = FEED_AUD.mode !== 'all' && FEED_AUD.ids.length ? { mode: FEED_AUD.mode, ids: FEED_AUD.ids } : null;
+    await api.post('/feed', { type: curType, title, text, media: FEED_MEDIA, link: FEED_LINK, poll, audience, pinned: $('#fdPinNew', root).checked, notifyTg: $('#fdTg', root).checked });
+    FEED_MEDIA = []; FEED_LINK = null; FEED_POLL = null; FEED_AUD = { mode: 'all', ids: [] }; toast('Опубликовано', audience ? 'Видно ограниченному кругу' : 'Вся команда увидит в ленте', true); PAGES.feed(root);
   });
 };
+/* мгновенное обновление опроса в DOM после голоса (без перерисовки всей ленты) */
+function updatePollDom(postEl, r) {
+  const opts = $$('[data-pollopt]', postEl);
+  opts.forEach((b, i) => {
+    const pct = r.total ? Math.round((r.counts[i] || 0) / r.total * 100) : 0;
+    b.classList.toggle('voted', r.myVote != null); b.classList.toggle('mine', r.myVote === i);
+    let fill = b.querySelector('.fd-poll-fill'); if (fill) fill.style.width = (r.myVote != null ? pct : 0) + '%';
+    let pc = b.querySelector('.fd-poll-pct');
+    if (r.myVote != null) { if (!pc) { pc = el('<span class="fd-poll-pct"></span>'); b.appendChild(pc); } pc.textContent = pct + '%'; }
+    else if (pc) pc.remove();
+  });
+  const tot = postEl.querySelector('.fd-poll-tot'); if (tot) tot.textContent = `${r.total} ${plural(r.total, 'голос', 'голоса', 'голосов')}${r.myVote != null ? ' · нажмите ещё раз, чтобы отозвать' : ''}`;
+}
+/* окно приватности просмотра поста: все / только выбранным / скрыть от выбранных */
+function openFeedPrivacy(onDone) {
+  const brokers = (STATE.brokers || []).filter(b => b.active !== false);
+  const modeBtn = (m, ic2, t) => `<button type="button" class="fp-mode ${FEED_AUD.mode === m ? 'on' : ''}" data-fpmode="${m}">${ic(ic2)}${t}</button>`;
+  const md = modal({
+    title: 'Кто увидит пост', sub: 'По умолчанию — вся команда. Можно сузить круг или скрыть от отдельных людей.', wide: false,
+    body: `<div class="fp-modes">${modeBtn('all', I.users, 'Вся команда')}${modeBtn('only', I.shield, 'Только выбранным')}${modeBtn('hide', I.eye, 'Скрыть от выбранных')}</div>
+      <div class="fp-list" id="fpList" style="${FEED_AUD.mode === 'all' ? 'display:none' : ''}">${brokers.map(b => `<label class="fp-row"><input type="checkbox" data-fpid="${b.id}" ${FEED_AUD.ids.includes(b.id) ? 'checked' : ''}><span class="fp-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc((b.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}</span><span>${esc(b.name)}${b.roleType && b.roleType !== 'broker' ? ` · ${esc(b.roleType)}` : ''}</span></label>`).join('') || '<div class="muted">Нет сотрудников</div>'}</div>`,
+    actions: [{ label: 'Готово', cls: 'btn-accent', onClick: (bd) => { FEED_AUD.ids = $$('[data-fpid]', bd).filter(x => x.checked).map(x => x.dataset.fpid); if (FEED_AUD.mode !== 'all' && !FEED_AUD.ids.length) FEED_AUD.mode = 'all'; onDone && onDone(); } }],
+  });
+  $$('[data-fpmode]', md).forEach(b => b.addEventListener('click', () => { FEED_AUD.mode = b.dataset.fpmode; $$('[data-fpmode]', md).forEach(x => x.classList.toggle('on', x === b)); $('#fpList', md).style.display = FEED_AUD.mode === 'all' ? 'none' : 'block'; }));
+}
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk, feedD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] }))]);
   const ovBoard = (feedD.board || []).filter(b => b.deals > 0 || b.dealsMonth > 0);
@@ -5562,18 +5656,23 @@ function isOnShift(b) {
 /* ---------------- АНАЛИТИКА ---------------- */
 PAGES.analytics = async (root) => {
   const an = await api.get('/analytics');
+  const cmpRows = [
+    { k: 'Скорость первого контакта', ai: an.compare.aiLine.firstContact, hum: an.compare.human.firstContact, pct: false },
+    { k: 'Конверсия в диалог', ai: an.compare.aiLine.dialogConv, hum: an.compare.human.dialogConv, pct: true },
+    { k: 'Лид → квалификация', ai: an.compare.aiLine.qualConv, hum: an.compare.human.qualConv, pct: true },
+    { k: 'Время на квалификацию', ai: an.compare.aiLine.qualTime, hum: an.compare.human.qualTime, pct: false },
+  ];
   root.innerHTML = `
-    ${heroArt('assets/art/chart.png', `
-      <div class="ha-title">${ic(I.bars)}Аналитика<span class="sub">человек против ИИ — живые цифры</span></div>
-      ${[
-        ['Первый контакт', an.compare.aiLine.firstContact, an.compare.human.firstContact],
-        ['Конверсия в диалог', an.compare.aiLine.dialogConv + '%', an.compare.human.dialogConv + '%'],
-        ['Лид → квалификация', an.compare.aiLine.qualConv + '%', an.compare.human.qualConv + '%'],
-      ].map(([k, ai2, hum]) => `<div class="ha-row" data-ha>
-        <span class="nm2">${k}</span><span class="sp2"></span>
-        <span class="sub2">человек: ${hum}</span><span class="val2" style="min-width:64px;text-align:right">${ai2}</span>
-      </div>`).join('')}
-    `, { v: 'left', hue: '#0FA98E' })}
+    <div class="an-hero glass card mb">
+      <div class="an-hero-hd">${ic(I.spark)}<div><b>Человек против ИИ</b><span>первая линия · живые цифры за 30 дней</span></div><span class="an-hero-tag">${ic(I.bolt)}Lumen AI ведёт</span></div>
+      <div class="an-hero-rows">
+        ${cmpRows.map(r => {
+          const bar = r.pct ? `<div class="anh-bars"><div class="anh-bar ai"><i style="width:${Math.min(100, r.ai)}%"></i><b>${r.ai}%</b></div><div class="anh-bar hu"><i style="width:${Math.min(100, r.hum)}%"></i><b>${r.hum}%</b></div></div>`
+            : `<div class="anh-vals"><span class="anh-v ai">${esc(String(r.ai))}<i>ИИ</i></span><span class="anh-v hu">${esc(String(r.hum))}<i>человек</i></span></div>`;
+          return `<div class="anh-row"><div class="anh-k">${esc(r.k)}</div>${bar}</div>`;
+        }).join('')}
+      </div>
+    </div>
     <div class="glass card mb">
       <div class="card-title">${ic(I.bars)}Показатели первой линии</div>
       <div class="vs">

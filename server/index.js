@@ -995,6 +995,49 @@ async function safeFetchPage(url) {
   const html = (await rr.text()).slice(0, 900000);
   return { html, finalUrl: rr.url || uu.href };
 }
+/* безопасный GET с произвольным UA (для oEmbed JSON / соцсетей, которые блокируют ботов) */
+async function safeFetch(url, ua) {
+  const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
+  if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(uu.hostname)) throw new Error('ссылка недоступна');
+  const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': ua || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'ru,en;q=0.8' } });
+    const text = (await rr.text()).slice(0, 900000);
+    return { text, finalUrl: rr.url || uu.href, ok: rr.ok };
+  } finally { clearTimeout(to); }
+}
+/* богатое превью ссылки: YouTube/TikTok через oEmbed + детерминированные обложки, Instagram/прочее через og:image.
+   Возвращает {url, title, image, provider}. Никогда не бросает по мелочи — отдаёт что смог. */
+function ytId(u) {
+  const m = String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : '';
+}
+async function richLinkPreview(url) {
+  const host = (() => { try { return new URL(/^https?:\/\//.test(url) ? url : 'https://' + url).hostname.replace(/^www\./, ''); } catch (_) { return ''; } })();
+  const provider = /youtu\.?be|youtube/.test(host) ? 'youtube' : /tiktok/.test(host) ? 'tiktok' : /instagram/.test(host) ? 'instagram' : /vk\.com|vk\.ru/.test(host) ? 'vk' : /t\.me|telegram/.test(host) ? 'telegram' : 'web';
+  // YouTube: обложка детерминирована по id; заголовок через oEmbed (без ключа)
+  if (provider === 'youtube') {
+    const id = ytId(url);
+    let title = '', image = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+    try { const { text } = await safeFetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`); const j = JSON.parse(text); if (j.title) title = j.title; if (j.thumbnail_url) image = j.thumbnail_url; } catch (_) {}
+    // maxres, если доступен (падаем на hq, если нет — обрабатывается на фронте onerror)
+    if (id) image = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+    return { url, title: (title || 'Видео на YouTube').slice(0, 200), image, imageFallback: id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '', provider };
+  }
+  // TikTok: oEmbed без ключа
+  if (provider === 'tiktok') {
+    try { const { text } = await safeFetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`); const j = JSON.parse(text); return { url, title: (j.title || j.author_name || 'Видео в TikTok').slice(0, 200), image: j.thumbnail_url || '', provider }; }
+    catch (_) { return { url, title: 'Видео в TikTok', image: '', provider }; }
+  }
+  // Instagram / VK / прочее: og:image с браузерным UA
+  try {
+    const { text, finalUrl } = await safeFetch(url);
+    const t = (text.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)/i) || text.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)/i) || text.match(/<title[^>]*>([^<]+)/i) || [])[1] || '';
+    const imgs = scrapeImagesFromHtml(text, finalUrl);
+    const ogImg = (text.match(/<meta[^>]+property=["']og:image[^"']*["'][^>]*content=["']([^"']+)/i) || [])[1] || '';
+    return { url: finalUrl, title: t.replace(/&[a-z#0-9]+;/gi, ' ').trim().slice(0, 200), image: ogImg || imgs[0] || '', provider };
+  } catch (e) { return { url, title: '', image: '', provider }; }
+}
 /* извлечение фото/рендеров со страницы (og/twitter, <img>, srcset, data-src, background-image) */
 function scrapeImagesFromHtml(html, baseHref) {
   let base = null; try { base = new URL(baseHref); } catch (e) {}
@@ -2223,10 +2266,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ================= ЛЕНТА АГЕНТСТВА (корпоративная стена) ================= */
+    const feedUid = () => ROLE ? (ROLE.role === 'owner' ? 'owner' : ROLE.brokerId) : 'anon';
+    const canSeePost = (pv, uid, isOwner) => {
+      const a = pv.audience; if (!a || a.mode === 'all' || !a.mode) return true;
+      if (isOwner) return true;
+      const authored = pv.authorId && pv.authorId === uid; if (authored) return true;
+      const ids = Array.isArray(a.ids) ? a.ids : [];
+      if (a.mode === 'only') return ids.includes(uid);
+      if (a.mode === 'hide') return !ids.includes(uid);
+      return true;
+    };
     if (p === '/api/feed' && req.method === 'GET') {
-      const posts = db.feed.slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.at - a.at).slice(0, 100).map(pv => {
+      const uid = feedUid(); const isOwner = ROLE && ROLE.role === 'owner';
+      const posts = db.feed.slice().filter(pv => canSeePost(pv, uid, isOwner)).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.at - a.at).slice(0, 100).map(pv => {
         const au = db.brokers.find(x => x.id === pv.authorId);
-        return Object.assign({}, pv, { authorName: pv.author || (au ? au.name : 'Агентство'), authorPhoto: au ? au.photo : null });
+        let poll = null;
+        if (pv.poll && Array.isArray(pv.poll.options)) {
+          const votes = pv.poll.votes || {};
+          const counts = pv.poll.options.map((_, i) => Object.values(votes).filter(v => v === i).length);
+          poll = { q: pv.poll.q, options: pv.poll.options, counts, total: Object.keys(votes).length, myVote: (uid in votes) ? votes[uid] : null };
+        }
+        return Object.assign({}, pv, { poll, authorName: pv.author || (au ? au.name : 'Агентство'), authorPhoto: au ? au.photo : null, audMode: (pv.audience && pv.audience.mode) || 'all' });
       });
       /* доска лидеров: сделки по брокерам (за 30 дней и за всё время) */
       const now = Date.now(), mAgo = now - 30 * 864e5;
@@ -2243,13 +2303,25 @@ const server = http.createServer(async (req, res) => {
       if (!canPostFeed()) return json(res, 403, { error: 'публиковать может владелец, менеджер или маркетолог' });
       const b = await readBody(req);
       const who = ROLE.role === 'owner' ? (db.settings.agency.name || 'Агентство') : ((db.brokers.find(x => x.id === ROLE.brokerId) || {}).name || 'Сотрудник');
+      /* опросник: вопрос + 2–6 непустых вариантов */
+      let poll = null;
+      if (b.poll && b.poll.q && Array.isArray(b.poll.options)) {
+        const opts = b.poll.options.map(o => String(o || '').trim().slice(0, 120)).filter(Boolean).slice(0, 6);
+        if (opts.length >= 2) poll = { q: String(b.poll.q).slice(0, 200), options: opts, votes: {} };
+      }
+      /* приватность просмотра: all / only (белый список) / hide (чёрный список) */
+      let audience = null;
+      if (b.audience && ['only', 'hide'].includes(b.audience.mode) && Array.isArray(b.audience.ids)) {
+        const ids = b.audience.ids.map(x => String(x)).filter(id => db.brokers.some(br => br.id === id)).slice(0, 200);
+        if (ids.length) audience = { mode: b.audience.mode, ids };
+      }
       const post = {
         id: crypto.randomBytes(5).toString('hex'), at: Date.now(), authorId: ROLE.role === 'owner' ? null : ROLE.brokerId, author: who,
         type: ['news', 'material', 'ref', 'congrats', 'announce'].includes(b.type) ? b.type : 'news',
         title: String(b.title || '').slice(0, 160), text: String(b.text || '').slice(0, 4000),
         media: Array.isArray(b.media) ? b.media.filter(mn => mn && mn.url && /^(assets\/|\/assets\/|https?:\/\/)/.test(mn.url)).slice(0, 8).map(mn => ({ url: String(mn.url).slice(0, 500), kind: mn.kind === 'video' ? 'video' : 'image' })) : [],
-        link: b.link && b.link.url ? { url: String(b.link.url).slice(0, 500), title: String(b.link.title || '').slice(0, 200), image: /^https?:\/\//.test(String(b.link.image || '')) ? String(b.link.image).slice(0, 500) : '' } : null,
-        pinned: !!b.pinned, reactions: {},
+        link: b.link && b.link.url ? { url: String(b.link.url).slice(0, 500), title: String(b.link.title || '').slice(0, 200), image: /^https?:\/\//.test(String(b.link.image || '')) ? String(b.link.image).slice(0, 500) : '', imageFallback: /^https?:\/\//.test(String(b.link.imageFallback || '')) ? String(b.link.imageFallback).slice(0, 500) : '', provider: String(b.link.provider || 'web').slice(0, 20) } : null,
+        poll, audience, pinned: !!b.pinned, reactions: {},
       };
       db.feed.unshift(post); db.feed = db.feed.slice(0, 300); store.save();
       if (b.notifyTg) { const TN = { news: '📰 Новость', material: '📎 Материал', ref: '🔗 Референс', congrats: '🏆 Поздравление', announce: '📢 Объявление' }; try { engine.sendReport(db, `${TN[post.type] || '📢'} · ${who}\n${post.title ? post.title + '\n' : ''}${post.text || ''}${post.link ? '\n' + post.link.url : ''}`); } catch (e) {} }
@@ -2257,11 +2329,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/feed/link-preview' && req.method === 'POST') {
       const b = await readBody(req); const url = String(b.url || '').trim(); if (!url) return json(res, 400, { error: 'дайте ссылку' });
-      try { const { html, finalUrl } = await safeFetchPage(url);
-        const t = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)/i) || html.match(/<title[^>]*>([^<]+)/i) || [])[1] || '';
-        const imgs = scrapeImagesFromHtml(html, finalUrl);
-        return json(res, 200, { url: finalUrl, title: t.replace(/&[a-z#0-9]+;/gi, ' ').trim().slice(0, 200), image: imgs[0] || '' });
-      } catch (e) { return json(res, 400, { error: 'не удалось загрузить: ' + e.message }); }
+      try { const pv = await richLinkPreview(url); return json(res, 200, pv); }
+      catch (e) { return json(res, 400, { error: 'не удалось загрузить: ' + e.message }); }
     }
     if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)\/react$/)) && req.method === 'POST') {
       const post = db.feed.find(x => x.id === m[1]); if (!post) return json(res, 404, { error: 'not found' });
@@ -2270,6 +2339,16 @@ const server = http.createServer(async (req, res) => {
       post.reactions = post.reactions || {}; post.reactions[emo] = post.reactions[emo] || [];
       const idx = post.reactions[emo].indexOf(uid); if (idx >= 0) post.reactions[emo].splice(idx, 1); else { post.reactions[emo].push(uid); for (const k of Object.keys(post.reactions)) if (k !== emo) { const j = post.reactions[k].indexOf(uid); if (j >= 0) post.reactions[k].splice(j, 1); } }
       store.save(); return json(res, 200, { reactions: post.reactions });
+    }
+    if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)\/vote$/)) && req.method === 'POST') {
+      const post = db.feed.find(x => x.id === m[1]); if (!post || !post.poll) return json(res, 404, { error: 'нет опроса' });
+      const b = await readBody(req); const opt = +b.option; const uid = feedUid();
+      if (!(opt >= 0 && opt < post.poll.options.length)) return json(res, 400, { error: 'неверный вариант' });
+      post.poll.votes = post.poll.votes || {};
+      if (post.poll.votes[uid] === opt) delete post.poll.votes[uid]; else post.poll.votes[uid] = opt;
+      store.save();
+      const counts = post.poll.options.map((_, i) => Object.values(post.poll.votes).filter(v => v === i).length);
+      return json(res, 200, { counts, total: Object.keys(post.poll.votes).length, myVote: (uid in post.poll.votes) ? post.poll.votes[uid] : null });
     }
     if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)\/pin$/)) && req.method === 'POST') { if (!canPostFeed()) return json(res, 403, { error: 'нет прав' }); const post = db.feed.find(x => x.id === m[1]); if (!post) return json(res, 404, { error: 'nf' }); post.pinned = !post.pinned; store.save(); return json(res, 200, { pinned: post.pinned }); }
     if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)$/)) && req.method === 'DELETE') { if (!canPostFeed()) return json(res, 403, { error: 'нет прав' }); db.feed = db.feed.filter(x => x.id !== m[1]); store.save(); return json(res, 200, { ok: true }); }
@@ -3787,7 +3866,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=16"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=17"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

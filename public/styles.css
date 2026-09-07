@@ -2989,3 +2989,106 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 @keyframes ideaFlyL { to { transform: translateX(-40px) rotate(-6deg); opacity: 0; } }
 @keyframes ideaFlyR { to { transform: translateX(40px) rotate(6deg); opacity: 0; } }
 @keyframes ideaFlyD { to { transform: translateY(24px); opacity: 0; } }
+
+/* ============ Аналитика: светлый hero «человек против ИИ» (замена тёмного графика) ============ */
+.an-hero { padding: 20px 22px; }
+.an-hero-hd { display: flex; align-items: center; gap: 11px; margin-bottom: 18px; }
+.an-hero-hd > svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
+.an-hero-hd b { font-size: 16px; font-weight: 750; color: var(--navy-900); display: block; }
+.an-hero-hd span { font-size: 12px; color: var(--ink-3); }
+.an-hero-tag { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 11%, transparent); border-radius: 20px; padding: 5px 12px; }
+.an-hero-tag svg { width: 13px; height: 13px; }
+.an-hero-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 26px; }
+.anh-row { min-width: 0; }
+.anh-k { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+.anh-bars { display: flex; flex-direction: column; gap: 6px; }
+.anh-bar { position: relative; display: flex; align-items: center; gap: 8px; }
+.anh-bar i { display: block; height: 9px; border-radius: 6px; min-width: 4px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.anh-bar.ai i { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.anh-bar.hu i { background: var(--stroke); }
+.anh-bar b { font-size: 12px; font-weight: 750; flex: none; }
+.anh-bar.ai b { color: var(--accent); }
+.anh-bar.hu b { color: var(--ink-3); }
+.anh-vals { display: flex; gap: 10px; }
+.anh-v { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 17px; font-weight: 800; padding: 8px 12px; border-radius: 10px; }
+.anh-v i { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
+.anh-v.ai { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.anh-v.hu { color: var(--ink-2); background: var(--bg-2); }
+@media (max-width: 720px) { .an-hero-rows { grid-template-columns: 1fr; } }
+
+/* ============ Лента: богатые карточки ссылок / опрос / диктовка / приватность / тумблеры ============ */
+/* обложка ссылки: картинка поверх фирменного градиента-заглушки; play для видео */
+.fd-link-cov { position: relative; width: 168px; flex: 0 0 168px; min-height: 108px; overflow: hidden;
+  background: linear-gradient(140deg, var(--pc, var(--accent)), color-mix(in srgb, var(--pc, var(--accent)) 55%, #000)); display: grid; place-items: center; }
+.fd-link-cov img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fd-link-glyph { font-size: 42px; font-weight: 800; color: rgba(255,255,255,.9); font-family: var(--font-display, 'Fraunces'), serif; }
+.fd-link-play { position: absolute; z-index: 2; width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.5); backdrop-filter: blur(2px); display: grid; place-items: center; border: 2px solid rgba(255,255,255,.85); }
+.fd-link-play svg { width: 20px; height: 20px; color: #fff; fill: #fff; margin-left: 2px; }
+.fd-link-t { display: block; font-size: 14px; color: var(--navy-900); line-height: 1.35; font-weight: 650; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.fd-link-dom b { text-transform: none; letter-spacing: 0; }
+@media (max-width: 520px) { .fd-link-cov { width: 108px; flex-basis: 108px; min-height: 92px; } .fd-link-glyph { font-size: 30px; } }
+/* заголовок с яйкой (микрофон) */
+.fd-inp-wrap { position: relative; display: flex; align-items: center; }
+.fd-inp-wrap .fd-inp-title { flex: 1; margin-bottom: 8px; padding-right: 34px; }
+.fd-mic { position: absolute; right: 2px; top: 2px; width: 28px; height: 28px; border-radius: 8px; border: none; background: var(--bg-2); color: var(--ink-3); display: grid; place-items: center; cursor: pointer; }
+.fd-mic svg { width: 15px; height: 15px; }
+.fd-mic:hover { color: var(--accent); }
+.fd-mic.rec { background: #C0392B; color: #fff; animation: dicPulse 1.1s infinite; }
+.fd-mic.busy { background: var(--accent); color: #fff; }
+/* заготовки постов */
+.fd-tpls { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.fd-tpl { border: 1px dashed var(--stroke); background: var(--bg-2); border-radius: 20px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.fd-tpl:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+/* аккуратные тумблеры (Закрепить / Telegram) — заменяют кривые чекбоксы */
+.fd-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; padding: 5px 10px 5px 6px; border-radius: 20px; border: 1px solid var(--stroke); user-select: none; line-height: 1; }
+.fd-toggle svg { width: 14px; height: 14px; }
+.fd-toggle input { display: none; }
+.fd-toggle .fd-toggle-tr { width: 30px; height: 17px; border-radius: 10px; background: var(--stroke); position: relative; flex: none; transition: background .15s; }
+.fd-toggle .fd-toggle-tr::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.fd-toggle input:checked + .fd-toggle-tr { background: var(--accent); }
+.fd-toggle input:checked + .fd-toggle-tr::after { transform: translateX(13px); }
+.fd-toggle:has(input:checked) { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+#fdPrivacy.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+#fdWand.busy { opacity: .6; pointer-events: none; }
+/* опрос в композере */
+.fd-pollbox { border: 1px solid var(--stroke); border-radius: 12px; padding: 12px; margin-top: 10px; background: var(--bg-2); }
+.fd-poll-hd { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--navy-900); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px; }
+.fd-poll-hd svg { width: 15px; height: 15px; color: var(--accent); }
+.fd-poll-x { margin-left: auto; border: none; background: none; cursor: pointer; color: var(--ink-3); display: grid; place-items: center; }
+.fd-poll-x svg { width: 15px; height: 15px; }
+.fd-poll-qin { width: 100%; border: 1px solid var(--stroke); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; font-weight: 650; margin-bottom: 8px; outline: none; background: var(--card, #fff); color: var(--navy-900); }
+.fd-poll-qin:focus { border-color: var(--accent); }
+.fd-poll-oi { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.fd-poll-oi input { flex: 1; border: 1px solid var(--stroke); border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none; background: var(--card, #fff); color: var(--navy-900); }
+.fd-poll-oi input:focus { border-color: var(--accent); }
+.fd-poll-orm { border: none; background: none; cursor: pointer; color: var(--ink-3); display: grid; place-items: center; padding: 4px; }
+.fd-poll-orm svg { width: 14px; height: 14px; }
+.fd-poll-add { border: 1px dashed var(--stroke); background: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.fd-poll-add svg { width: 13px; height: 13px; }
+/* опрос в посте */
+.fd-poll { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+.fd-poll-q { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: var(--navy-900); margin-bottom: 2px; }
+.fd-poll-q svg { width: 16px; height: 16px; color: var(--accent); }
+.fd-poll-opt { position: relative; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--stroke); border-radius: 10px; padding: 10px 13px; font-size: 13.5px; cursor: pointer; background: var(--card, #fff); overflow: hidden; text-align: left; font-family: inherit; }
+.fd-poll-opt:hover { border-color: var(--accent); }
+.fd-poll-opt.voted { cursor: pointer; }
+.fd-poll-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in srgb, var(--accent) 13%, transparent); transition: width .5s cubic-bezier(.4,0,.2,1); z-index: 0; }
+.fd-poll-opt.mine .fd-poll-fill { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.fd-poll-opt.mine { border-color: var(--accent); }
+.fd-poll-txt { position: relative; z-index: 1; flex: 1; color: var(--navy-900); font-weight: 600; }
+.fd-poll-pct { position: relative; z-index: 1; font-weight: 800; color: var(--accent); font-size: 13px; }
+.fd-poll-tot { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+/* бейдж ограниченного просмотра */
+.fd-aud { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--warn, #B8860B); margin-left: 8px; }
+.fd-aud svg { width: 11px; height: 11px; }
+/* окно приватности */
+.fp-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.fp-mode { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1.5px solid var(--stroke); border-radius: 12px; padding: 12px 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; background: var(--card, #fff); text-align: center; }
+.fp-mode svg { width: 20px; height: 20px; }
+.fp-mode.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.fp-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.fp-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.fp-row:hover { background: var(--bg-2); }
+.fp-ava { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: linear-gradient(150deg, var(--accent), var(--accent-2, #5B2BD8)); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+.fp-ava img { width: 100%; height: 100%; object-fit: cover; }
