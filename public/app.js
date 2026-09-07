@@ -957,7 +957,7 @@ const OV_W = {
   funnel: { name: 'Воронка', icon: () => I.funnel, full: true, render: (c) => {
     const f = c.f; const shown = STAGES.filter(s => !['lost', 'sleeping'].includes(s.id));
     const max = Math.max(...shown.map(s => f[s.id] || 0), 1);
-    return `<div class="ov2-fun">${shown.map((s, i) => {
+    return `<div class="ov2-fun ov2-fun-hero">${shown.map((s, i) => {
       const v = f[s.id] || 0; const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0;
       const conv = i > 0 && prevV > 0 ? Math.round(v / prevV * 100) : null;
       return `<button class="ov2-fun-row" data-ovgo="funnel"><span class="ov2-fun-nm">${s.name}${conv != null && conv <= 100 ? `<i>${conv}%</i>` : ''}</span><span class="ov2-fun-bar"><i style="width:${Math.round((v / max) * 100)}%;background:${stageColor(s.id)}"></i></span><span class="ov2-fun-v">${v}</span></button>`;
@@ -1072,7 +1072,7 @@ PAGES.feed = async (root) => {
   const data = await api.get('/feed').catch(() => ({ posts: [], board: [] }));
   const posts = data.posts || [], board = data.board || [];
   const me = STATE.me || {};
-  const canPost = me.role === 'owner' || ['manager', 'marketer'].includes(me.roleType);
+  const canPost = me.role === 'owner' || me.feedPost === true || ['manager', 'marketer'].includes(me.roleType);
   const myUid = me.role === 'owner' ? 'owner' : me.brokerId;
   const reactCount = (r) => Object.values(r || {}).reduce((s, a) => s + (a ? a.length : 0), 0);
   const myReact = (r) => { for (const [k, a] of Object.entries(r || {})) if (a && a.includes(myUid)) return k; return null; };
@@ -5413,11 +5413,12 @@ function openProvisionModal(id) {
       </select><div class="muted" style="font-size:11px;margin-top:4px">Разделы под роль скрываются автоматически; тонко настроить видимость можно в карточке сотрудника.</div></div>
       <div class="form-row"><label>Формат кабинета</label><select id="pvPreset">${PRESETS.map(([k, n, d]) => `<option value="${k}">${n} — ${d}</option>`).join('')}</select></div>
       <div class="form-row"><label>PIN сотруднику (пусто = сгенерируем сами)</label><input id="pvPin" placeholder="мин. 6 символов · или оставь пустым"></div>
+      <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin:2px 0 6px"><input type="checkbox" id="pvFeed"><span style="font-size:13px">Может публиковать в Ленту агентства</span></label>
       <div id="pvResult"></div>`,
     actions: [{ label: 'Выдать доступ', cls: 'btn-accent', onClick: async (bd2) => {
       const btn = bd2.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Готовлю…'; }
       try {
-        const r = await api.post('/brokers/' + id + '/provision', { preset: $('#pvPreset', bd2).value, roleType: $('#pvRole', bd2).value, pin: $('#pvPin', bd2).value.trim() });
+        const r = await api.post('/brokers/' + id + '/provision', { preset: $('#pvPreset', bd2).value, roleType: $('#pvRole', bd2).value, feedPost: $('#pvFeed', bd2).checked, pin: $('#pvPin', bd2).value.trim() });
         const link = r.link || location.origin + '/';
         const msg = `Доступ в Lumen CRM 🔑\nСсылка: ${link}\nВаш код входа: ${r.pin}\n(введите код на странице входа)`;
         $('#pvResult', bd2).innerHTML = `<div class="pv-done">

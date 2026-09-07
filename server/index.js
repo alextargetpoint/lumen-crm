@@ -1029,13 +1029,13 @@ function scrapeImagesFromHtml(html, baseHref) {
 /* скачать картинку в локальные ассеты + отфильтровать мусор по РАЗМЕРУ (логотипы/иконки — крошечные) */
 async function downloadImageToAsset(url) {
   try {
-    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 11000);
+    const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
     let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;   /* только растровые фото, не svg/gif */
     const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length < 12000 || buf.length > 12e6) return null;      /* <12КБ = иконка/логотип; >12МБ — мимо */
+    if (buf.length < 8000 || buf.length > 12e6) return null;       /* <8КБ = иконка/логотип; >12МБ — мимо */
     const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
     fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
     const fn = `car/src-${crypto.randomBytes(5).toString('hex')}.${ext}`;
@@ -1054,14 +1054,21 @@ async function openverseImages(query, n = 8) {
   } catch (e) { return []; }
 }
 /* собрать НАСТОЯЩИЕ фото для лонча: скачать выбранные ПАРАЛЛЕЛЬНО (фильтр по размеру), мало → добрать из открытых источников */
+/* многие лендинги (Tilda и пр.) в статике отдают LQIP-заглушки 20x — поднимаем до полноразмера */
+function upgradeCdnUrl(u) {
+  try {
+    return String(u)
+      .replace(/(tildacdn\.com\/[^?#]*?\/-\/(?:resize|resizeb))\/\d+x\d*\//i, '$1/1280x/')
+      .replace(/(tildacdn\.com\/[^?#]*?\/-\/cover)\/\d+x\d+\//i, '$1/1280x1280/')
+      .replace(/([?&](?:w|width|imwidth))=\d+/i, '$1=1600');
+  } catch (e) { return u; }
+}
 async function gatherLaunchPhotos(picks, query, want) {
-  const grab = async (urls, cap) => (await Promise.all((urls || []).slice(0, cap).map(u => downloadImageToAsset(u).catch(() => null)))).filter(Boolean).map(x => x.url);
-  let good = (await grab(picks, 12)).slice(0, want);
-  if (good.length < 3 && query) {
-    const ov = await openverseImages(query, 12);
-    good = good.concat(await grab(ov, 10)).slice(0, Math.max(want, 5));
-  }
-  return good;
+  const grab = async (urls, cap) => (await Promise.all([...new Set(urls || [])].slice(0, cap).map(u => downloadImageToAsset(u).catch(() => null)))).filter(Boolean);
+  /* крупнейшие файлы = настоящие фото; логотипы/мелочь оседают вниз и не используются */
+  let items = (await grab((picks || []).map(upgradeCdnUrl), 24)).sort((a, b) => b.size - a.size);
+  if (items.length < 2 && query) { const ov = await openverseImages(query, 12); items = items.concat((await grab(ov, 10)).sort((a, b) => b.size - a.size)); }
+  return items.map(x => x.url).slice(0, Math.max(want, 5));
 }
 
 const server = http.createServer(async (req, res) => {
@@ -1371,7 +1378,7 @@ const server = http.createServer(async (req, res) => {
         templates: db.templates, sequences: db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
-        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])] : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])] : [] } : null,
       }); return;
     }
     /* журнал доступа (только владелец) */
@@ -1725,6 +1732,7 @@ const server = http.createServer(async (req, res) => {
       if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
       br.pinHash = ph; br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
       if (ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* тип сотрудника: broker/assistant/marketer/manager */
+      if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту */
       /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
       let seeded = 0;
       if (!br.onboarded) {
@@ -1810,6 +1818,7 @@ const server = http.createServer(async (req, res) => {
       if (b.capacity != null) br.capacity = +b.capacity;
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
+      if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту агентства */
       /* поля публичной визитки брокера (/b/:id) */
       if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
       if (b.email != null) br.email = String(b.email).slice(0, 80);
@@ -2095,8 +2104,8 @@ const server = http.createServer(async (req, res) => {
           const rest = good.slice(1);
           if (rest.length >= 2) {
             const gal = rest.slice(0, 4);
-            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 22 : 60, w: 42, h: 33, z: gi + 1, round: 12 }));
-            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: 'Виды и планировки', sub: '', eyebrow: 'Галерея', pos: 'top', size: 'm', layers }));
+            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 30 : 64, w: 42, h: 31, z: gi + 1, round: 12 }));
+            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: 'Виды и планировки', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
           }
         }
       }
@@ -2216,7 +2225,7 @@ const server = http.createServer(async (req, res) => {
       }).sort((a, b) => b.dealsMonth - a.dealsMonth || b.deals - a.deals);
       return json(res, 200, { posts, board: board.slice(0, 8) });
     }
-    const canPostFeed = () => { if (!ROLE) return false; if (ROLE.role === 'owner') return true; const mm = db.brokers.find(x => x.id === ROLE.brokerId) || {}; return ['manager', 'marketer'].includes(mm.roleType); };
+    const canPostFeed = () => { if (!ROLE) return false; if (ROLE.role === 'owner') return true; const mm = db.brokers.find(x => x.id === ROLE.brokerId) || {}; return mm.feedPost === true || ['manager', 'marketer'].includes(mm.roleType); };
     if (p === '/api/feed' && req.method === 'POST') {
       if (!canPostFeed()) return json(res, 403, { error: 'публиковать может владелец, менеджер или маркетолог' });
       const b = await readBody(req);
