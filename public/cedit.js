@@ -26,6 +26,8 @@
   };
   const isDark = (h) => { const x = String(h || '').replace('#', ''); const s = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s.slice(0, 2), 16), g = parseInt(s.slice(2, 4), 16), b = parseInt(s.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
   let dirty = false, pop = null, popOutside = null, sel = 0, panelOpen = true;
+  /* углы подачи карусели (ключи совпадают с CAROUSEL_ANGLES на сервере) */
+  const CAR_ANGLES = [['auto', 'Универсальный', 'сбалансированно'], ['urgency', 'Срочность', 'войти первым, старт'], ['discount', 'Спецусловия', 'цена, рассрочка'], ['luxury', 'Люкс', 'эстетика, фото, планировки'], ['investment', 'Инвестиции', 'доход, ROI'], ['lifestyle', 'Образ жизни', 'район, атмосфера']];
 
   const css = document.createElement('style');
   css.textContent = `
@@ -150,6 +152,13 @@ body.cpanel-on{padding-right:308px!important}
 .celem-add-ic svg{width:19px;height:19px}
 .caibtn{background:linear-gradient(120deg,#2563EB,#5B2BD8)!important;color:#fff!important;border:none!important;box-shadow:0 8px 22px -8px rgba(91,43,216,.6)}
 .caibtn:hover{filter:brightness(1.06)}
+.cangles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.cang{display:flex;flex-direction:column;gap:1px;align-items:flex-start;text-align:left;border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-family:inherit;transition:border-color .12s,background .12s,transform .12s}
+.cang b{font-size:12px;font-weight:700;color:#2A3346}
+.cang i{font-style:normal;font-size:10px;color:#9aa1b2;font-weight:600;line-height:1.25}
+.cang:hover{border-color:var(--cb);transform:translateY(-1px)}
+.cang.on{border-color:var(--cb);background:#EEF3FF;box-shadow:inset 0 0 0 1px var(--cb)}
+.cang.on b{color:var(--cb)}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -385,16 +394,20 @@ body.cpanel-on{padding-right:308px!important}
     /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
     const aiBtn = $('#cAiCompose', body);
     if (aiBtn) aiBtn.addEventListener('click', (e) => {
+      let angle = 'auto';
       const pp = openPop(`<div class="csec">Оформить с ИИ</div>
         <input class="cinp" id="cAiUrl" placeholder="ссылка на объект/ЖК (URL)" style="margin-top:2px">
         <input class="cinp" id="cAiTopic" placeholder="или тема/вводные текстом">
-        <button class="cwbtn wide" id="cAiGo2" style="margin-top:8px">✦ Собрать карусель</button>
-        <div class="cnote">ИИ вытянет факты и фото со страницы, напишет слайды, разложит кадры и добавит слайд-галерею. Проверьте цифры после.</div>`, e.clientX - 250, e.clientY);
+        <div class="csec" style="margin-top:9px">Угол подачи</div>
+        <div class="cangles" id="cAngles">${CAR_ANGLES.map(([k, n, d], i) => `<button data-ang="${k}" class="cang${i === 0 ? ' on' : ''}" title="${d}"><b>${n}</b><i>${d}</i></button>`).join('')}</div>
+        <button class="cwbtn wide" id="cAiGo2" style="margin-top:9px">✦ Собрать карусель</button>
+        <div class="cnote">ИИ вытянет факты и фото со страницы, напишет слайды под выбранный угол, разложит кадры и добавит галерею. Проверьте цифры после.</div>`, e.clientX - 262, e.clientY);
+      pp.querySelectorAll('.cang').forEach(bn => bn.addEventListener('click', () => { angle = bn.dataset.ang; pp.querySelectorAll('.cang').forEach(x => x.classList.toggle('on', x === bn)); }));
       $('#cAiGo2', pp).addEventListener('click', async () => {
         const url = $('#cAiUrl', pp).value.trim(), topic = $('#cAiTopic', pp).value.trim();
         if (!url && !topic) { flash('Вставьте ссылку или тему'); return; }
         closePop(); flash('✦ ИИ собирает карусель (10–25с)…', 0);
-        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => location.reload(), 700); } catch (err) { flash('Не вышло: ' + err.message); }
+        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic, angle }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => location.reload(), 700); } catch (err) { flash('Не вышло: ' + err.message); }
       });
     });
     /* готовые шаблоны: категории + применение ко всем слайдам */

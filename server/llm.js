@@ -350,22 +350,34 @@ const CAROUSEL_TEMPLATES = {
   tips: { name: 'Гид покупателя', brief: 'полезные советы по покупке недвижимости за рубежом: по одному совету на слайд, экспертно, финальный призыв' },
   launch: { name: 'Новый запуск / старт продаж', brief: 'анонс старта продаж/лонча объекта: сильный крючок про запуск, что за объект, ключевые условия входа (цена «от», рассрочка, доходность), почему сейчас/дедлайн оффера, финальный призыв с кодовым словом' },
 };
-async function composeCarousel(topic, templateKey, count, agencyName, geo) {
+/* «Углы» подачи карусели: одна и та же тема, разная стратегия убеждения.
+   photo — сколько визуала тянуть (high=фото-first галерея, low=текст-first). */
+const CAROUSEL_ANGLES = {
+  auto:       { name: 'Универсальный',       photo: 'medium', hint: '' },
+  urgency:    { name: 'Срочность · войти первым', photo: 'medium', hint: 'УГОЛ ПОДАЧИ: ограниченное предложение и «войти первым». Дефицит, старт продаж, лучшие лоты и цены разбирают первыми, спецусловия только на старте — но БЕЗ фальшивого давления и выдуманных дедлайнов. Тон энергичный, собранный. Рубрики в духе «СТАРТ», «ПЕРВЫМ», «ОСТАЛОСЬ». Последний слайд — призыв не откладывать.' },
+  discount:   { name: 'Спецусловия · цена',  photo: 'medium', hint: 'УГОЛ ПОДАЧИ: выгода и условия входа — рассрочка, спецусловия на старте, цена входа, механика «лучшей цены»/аукциона. Конкретные числа используй ТОЛЬКО если они есть во вводных, иначе — «специальные условия на старте», без выдумок. Рубрики «ЦЕНА», «РАССРОЧКА», «ВЫГОДА».' },
+  luxury:     { name: 'Люкс · эстетика',     photo: 'high',   hint: 'УГОЛ ПОДАЧИ: эстетика и статус. Минимум текста, максимум образа — архитектура, виды, свет, материалы, планировки, атмосфера. Заголовки короткие и «дорогие», подписи-намёки, без восклицаний и клише. Рубрики «ВИД», «АРХИТЕКТУРА», «ПРОСТРАНСТВО». Оставь смысловое место под фото-галерею и планировки.' },
+  investment: { name: 'Инвестиции · доход',  photo: 'low',    hint: 'УГОЛ ПОДАЧИ: инвестиция. Доходность, рост капитализации, арендный поток, рассрочка как рычаг, ликвидность и выход. Рационально и по делу, языком инвестора. Числа НЕ выдумывай. Рубрики «ДОХОД», «ROI», «АКТИВ».' },
+  lifestyle:  { name: 'Образ жизни',         photo: 'high',   hint: 'УГОЛ ПОДАЧИ: образ жизни. Район и инфраструктура, море/город, ритм дня, для кого этот дом и как в нём живётся. Тепло, образно, по-человечески. Рубрики «ЖИЗНЬ», «РАЙОН», «РЯДОМ».' },
+};
+
+async function composeCarousel(topic, templateKey, count, agencyName, geo, angleKey) {
   const t = CAROUSEL_TEMPLATES[templateKey] || CAROUSEL_TEMPLATES.project;
+  const a = CAROUSEL_ANGLES[angleKey] || CAROUSEL_ANGLES.auto;
   const n = Math.max(4, Math.min(10, +count || 6));
   const prompt = `Ты — SMM-копирайтер агентства недвижимости «${String(agencyName || 'агентство').slice(0, 80)}». Сделай текст для карусели в Instagram/Threads на ${n} слайдов.
 Формат: ${t.name} — ${t.brief}.
-${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}${geo ? 'Направление: ' + geo + '\n' : ''}
-Правила: живой человеческий язык, без клише и канцелярита. КОРОТКО и РОВНО по объёму на всех слайдах: eyebrow — 1-2 слова (рубрика КАПСОМ, напр. «ЗАПУСК», «ЦИФРЫ», «ДОХОД»); заголовок — 2-4 слова (≤ 32 символов, НЕ переносить на 3 строки); подпись — ровно 1-2 коротких предложения (≤ 110 символов). Первый слайд — сильный крючок. Последний — призыв с кодовым словом (написать слово в директ). Цифры не выдумывай — если их нет во вводных, говори обтекаемо.
+${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}${geo ? 'Направление: ' + geo + '\n' : ''}${a.hint ? a.hint + '\n' : ''}
+Правила: живой человеческий язык, без клише и канцелярита. КОРОТКО и РОВНО по объёму на всех слайдах: eyebrow — 1-2 слова (рубрика КАПСОМ, напр. «ЗАПУСК», «ЦИФРЫ», «ДОХОД»); заголовок — 2-4 слова (≤ 32 символов, НЕ переносить на 3 строки); подпись — ровно 1-2 коротких предложения (≤ 110 символов). Первый слайд — сильный крючок под выбранный угол. Последний — призыв с кодовым словом (написать слово в директ). Цифры не выдумывай — если их нет во вводных, говори обтекаемо.
 Верни строго JSON:
 {"title":"название карусели (для внутреннего списка)",
  "slides":[{"eyebrow":"РУБРИКА","heading":"короткий заголовок","sub":"подпись 1-2 предложения"}]}  // ровно ${n} слайдов`;
   const out = await callGemini(prompt, 25000, 2000);
   if (!out || !Array.isArray(out.slides) || !out.slides.length) throw new Error('bad carousel');
   const slides = out.slides.slice(0, 10);
-  const last = slides.length - 1;
   return {
     title: String(out.title || t.name).slice(0, 120),
+    photoBias: a.photo,
     /* единая editorial-раскладка: текст прижат к низу на ВСЕХ слайдах (ровно, не «косо»),
        крупнее на обложке и финале; рубрика-eyebrow даёт структуру */
     slides: slides.map((s, i) => ({
@@ -648,4 +660,4 @@ async function parseTask(text, todayStr, dow) {
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

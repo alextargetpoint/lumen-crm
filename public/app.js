@@ -932,7 +932,42 @@ const PAGES = {};
 
 /* ---------------- ОБЗОР (конструктор виджетов) ---------------- */
 let OV_EDIT = false;
-const OV_DEFAULT = ['attention', 'kpi', 'leaders', 'tasks', 'meetings', 'funnel'];
+/* Тиндер идей: утренняя колода ИИ-идей — свайп «в работу / в копилку / пропустить».
+   Колода живёт на уровне модуля, чтобы переживать перерисовку виджета. Генерация только по кнопке (cost-safe). */
+let IDEA_DECK = { cards: [], loaded: false, loading: false };
+const IDEA_ANGLE_COL = { 'миф': '#8B7BD8', 'кейс': '#2FA98C', 'ошибка': '#E4694E', 'закулисье': '#4F7DFF', 'тренд': '#E0A82E', 'гайд': '#3AA0C9', 'съёмка': '#D14D8B' };
+const effortCls = (e) => /низ/i.test(e) ? 'low' : /выс/i.test(e) ? 'high' : 'mid';
+async function ideaGenerate() {
+  if (IDEA_DECK.loading) return;
+  IDEA_DECK.loading = true;
+  try {
+    const ag = (STATE.settings && STATE.settings.agency) || {};
+    const geo = (ag.geos && ag.geos[0]) || '';
+    const r = await api.post('/social/hunt', { geo, count: 7, angle: 'all', context: '' });
+    IDEA_DECK.cards = r.ideas || [];
+    IDEA_DECK.loaded = true;
+  } catch (e) { toast('ИИ недоступен', e.message || 'нет ключей LLM'); }
+  IDEA_DECK.loading = false;
+}
+/* свайп текущей карточки: skip (мимо) / keep (в копилку) / take (в работу) */
+async function ideaSwipe(kind, ctx, repaint) {
+  const card = IDEA_DECK.cards[0]; if (!card) return;
+  if (kind !== 'skip') {
+    const ag = (STATE.settings && STATE.settings.agency) || {};
+    const geo = (ag.geos && ag.geos[0]) || '';
+    try {
+      await api.post('/social/ideas', {
+        text: card.title + (card.hook ? ('\nХук: ' + card.hook) : ''), hook: card.hook || '', format: card.format || '',
+        source: kind === 'take' ? 'в работу' : 'копилка', geo, refWhat: card.refWhat || '', refQuery: card.refQuery || '', platform: card.platform || '',
+      });
+      toast(kind === 'take' ? 'В работу ✓' : 'В копилку 🔖', kind === 'take' ? 'Идея сохранена — превратите в сценарий в «Хантинге»' : 'Лежит в «Копилке идей»', true);
+    } catch (_) { toast('Не сохранилось'); }
+  }
+  IDEA_DECK.cards.shift();
+  repaint();
+}
+
+const OV_DEFAULT = ['attention', 'kpi', 'leaders', 'tasks', 'ideas', 'meetings', 'funnel'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -1058,6 +1093,31 @@ const OV_W = {
     const list = rest.map((b, i) => `<div class="ov2-lead-row"><span class="ov2-lr-rank">${i + 4}</span><span class="ov2-lr-name">${esc(b.name)}</span><b>${b.dealsMonth || b.deals}</b></div>`).join('');
     return hd + `<div class="ov2-lead-hero">${podium}</div>${list}`;
   } },
+  ideas: { name: 'Тиндер идей', icon: () => I.spark, full: false, render: () => {
+    const hd = `<div class="ov2-card-hd">${ic(I.spark)}Идея дня<span>свайп-колода контента</span><button class="btn btn-sm" data-ovgo="social">Хантинг</button></div>`;
+    if (IDEA_DECK.loading) return hd + `<div class="idea-deck"><div class="idea-empty"><div class="idea-spin">${ic(I.spark)}</div><div class="idea-empty-t">ИИ придумывает идеи…</div><div class="idea-empty-s">15–20 секунд</div></div></div>`;
+    const card = IDEA_DECK.cards[0];
+    if (!card) return hd + `<div class="idea-deck"><div class="idea-empty">${ic(I.bolt)}
+      <div class="idea-empty-t">${IDEA_DECK.loaded ? 'Колода пройдена 🙌' : 'Идеи на сегодня'}</div>
+      <div class="idea-empty-s">${IDEA_DECK.loaded ? 'Все разобраны. Загляните в «Копилку идей» — или соберите новую колоду.' : 'ИИ подберёт 7 идей под ваше направление. Свайпайте: в работу, в копилку или мимо.'}</div>
+      <button class="btn btn-accent btn-sm idea-genbtn" data-idea-gen>${ic(I.spark)}${IDEA_DECK.loaded ? 'Ещё колоду' : 'Собрать идеи'}</button></div></div>`;
+    const col = IDEA_ANGLE_COL[card.angle] || 'var(--accent)';
+    const ref = card.refWhat ? `<div class="idea-ref">${ic(I.eye, 2)}<span><b>Приём топов:</b> ${esc(card.refWhat)}${card.refQuery ? ` · ищи «${esc(card.refQuery)}»` : ''}</span></div>` : '';
+    return hd + `<div class="idea-deck"><div class="idea-count">${IDEA_DECK.cards.length} ${plural(IDEA_DECK.cards.length, 'идея', 'идеи', 'идей')} в колоде</div>
+      <div class="idea-card" style="--acol:${col}">
+        ${card.angle ? `<span class="idea-angle">${esc(card.angle)}</span>` : ''}
+        <div class="idea-title">${esc(card.title)}</div>
+        ${card.hook ? `<div class="idea-hook">«${esc(card.hook)}»</div>` : ''}
+        ${card.why ? `<div class="idea-why">${ic(I.spark, 2)}<span>${esc(card.why)}</span></div>` : ''}
+        <div class="idea-meta">${card.format ? `<span class="idea-fmt">${ic(I.play, 2)}${esc(card.format)}</span>` : ''}${card.effort ? `<span class="idea-eff e-${effortCls(card.effort)}">съёмка: ${esc(card.effort)}</span>` : ''}${card.platform ? `<span class="idea-plat">${esc(card.platform)}</span>` : ''}</div>
+        ${ref}
+      </div>
+      <div class="idea-acts">
+        <button class="idea-act skip" data-idea-act="skip" title="Пропустить (не сохранять)">${ic(I.x, 2.2)}</button>
+        <button class="idea-act keep" data-idea-act="keep" title="Отложить в копилку">${ic(I.moon, 2)}<span>В копилку</span></button>
+        <button class="idea-act take" data-idea-act="take" title="Взять в работу">${ic(I.check, 2.4)}<span>В работу</span></button>
+      </div></div>`;
+  } },
 };
 
 /* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
@@ -1077,6 +1137,7 @@ const OV_PREV = {
   spark: () => `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div><div class="ov2-spark"><div class="ov2-spark-n">18<i>за неделю</i></div><svg viewBox="0 0 100 32" preserveAspectRatio="none" class="ov2-spark-svg"><polyline points="0,26 8,20 15,24 23,12 31,16 38,8 46,14 54,6 62,12 69,4 77,10 85,5 92,9 100,3" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`,
   onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
   leaders: () => `<div class="ov2-card-hd">${ic(I.flame)}Доска лидеров<span>сделки за месяц</span></div><div class="ov2-lead-hero"><div class="ov2-lead-podium">${[['Дарья', 5, 1], ['Амир', 3, 2], ['Кетут', 2, 3]].map(([n, d, r]) => `<div class="ov2-lp p${r}"><div class="ov2-lp-ava">${n[0]}<span class="ov2-lp-rank">${r}</span></div><b>${n}</b><i>${d} сделок</i></div>`).join('')}</div></div>`,
+  ideas: () => `<div class="ov2-card-hd">${ic(I.spark)}Идея дня<span>свайп-колода</span></div><div class="idea-deck"><div class="idea-count">6 идей в колоде</div><div class="idea-card" style="--acol:#2FA98C"><span class="idea-angle">кейс</span><div class="idea-title">Как клиент отбил виллу за 3 года аренды</div><div class="idea-hook">«Купил за $180k — сдаёт за $2k/мес. Считаем на пальцах»</div><div class="idea-why">${ic(I.spark, 2)}<span>Закрывает страх «а окупится ли»</span></div><div class="idea-meta"><span class="idea-fmt">${ic(I.play, 2)}говорящая голова + графика</span><span class="idea-eff e-low">съёмка: низкий</span></div></div><div class="idea-acts"><button class="idea-act skip">${ic(I.x, 2.2)}</button><button class="idea-act keep">${ic(I.moon, 2)}<span>В копилку</span></button><button class="idea-act take">${ic(I.check, 2.4)}<span>В работу</span></button></div></div>`,
 };
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
@@ -1189,6 +1250,19 @@ PAGES.overview = async (root) => {
     $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
     $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const row = b.closest('.ov2-task'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
     $$('[data-ovsug]', root).forEach(b => b.querySelector('.ov2-task-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
+    /* тиндер идей: локальная перерисовка только тела виджета (без рефетча всего обзора) */
+    const ideaBox = root.querySelector('[data-w="ideas"] .ov-w-body');
+    if (ideaBox) {
+      const repaintIdeas = () => { ideaBox.innerHTML = OV_W.ideas.render(ctx); };
+      ideaBox.addEventListener('click', async (e) => {
+        if (e.target.closest('[data-idea-gen]')) { IDEA_DECK.loading = true; repaintIdeas(); await ideaGenerate(); repaintIdeas(); return; }
+        const act = e.target.closest('[data-idea-act]'); if (!act) return;
+        const kind = act.dataset.ideaAct;
+        const cardEl = ideaBox.querySelector('.idea-card');
+        if (cardEl) { cardEl.classList.add('idea-fly-' + kind); }
+        setTimeout(() => ideaSwipe(kind, ctx, repaintIdeas), cardEl ? 180 : 0);
+      });
+    }
     /* конструктор */
     $('#ovEdit', root).addEventListener('click', () => { OV_EDIT = !OV_EDIT; paint(); });
     if (OV_EDIT) {
@@ -4157,6 +4231,18 @@ function carThemePicker(id, sel) {
 function carFontPicker(id, sel) {
   return `<div class="cpick" data-pick="${id}"><input type="hidden" id="${id}" value="${sel}">${Object.entries(CAR_FONT_META).map(([k, [n, d, fam]]) => `<button type="button" class="cpick-it ${k === sel ? 'on' : ''}" data-v="${k}"><span class="cpick-aa" style="font-family:${fam}">Aa</span><span class="cpick-l"><b style="font-family:${fam}">${n}</b><i>${d}</i></span></button>`).join('')}</div>`;
 }
+/* углы подачи (ключи совпадают с CAROUSEL_ANGLES на сервере) — одна тема, разная стратегия убеждения */
+const CAR_ANGLE_META = {
+  auto:       ['Универсальный', 'сбалансированно, ИИ сам', I.spark],
+  urgency:    ['Срочность', 'войти первым · старт продаж', I.flame || I.target],
+  discount:   ['Спецусловия', 'цена · рассрочка · аукцион', I.tag || I.doc],
+  luxury:     ['Люкс · эстетика', 'визуал · фото · планировки', I.eye || I.layers],
+  investment: ['Инвестиции', 'доход · ROI · капитализация', I.chart || I.funnel],
+  lifestyle:  ['Образ жизни', 'район · атмосфера · для кого', I.home || I.pin],
+};
+function carAnglePicker(id, sel) {
+  return `<div class="cpick cpick-ang" data-pick="${id}"><input type="hidden" id="${id}" value="${sel || 'auto'}">${Object.entries(CAR_ANGLE_META).map(([k, [n, d, icon]]) => `<button type="button" class="cpick-it ${k === (sel || 'auto') ? 'on' : ''}" data-v="${k}"><span class="cpick-angi">${ic(icon)}</span><span class="cpick-l"><b>${n}</b><i>${d}</i></span></button>`).join('')}</div>`;
+}
 let CAR_FONTS_LOADED = false;
 function wireCarPickers(scope) {
   if (!CAR_FONTS_LOADED) { CAR_FONTS_LOADED = true; Object.values(CAR_FONT_META).forEach(([, , , gf]) => { if (gf) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + gf + '&display=swap'; document.head.appendChild(l); } }); }
@@ -4272,13 +4358,14 @@ function openCarouselModal() {
       </div>
       <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
       <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+      <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— стратегия текста</span></span>${carAnglePicker('carAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('carTheme', 'klein')}</div>
       <div class="cpick-row"><span class="cpick-hd">Шрифт заголовков</span>${carFontPicker('carFont', 'fraunces')}</div>
       <label class="switch-row" style="display:flex;align-items:center;gap:9px;margin-top:4px"><input type="checkbox" id="carAi" checked><span style="font-size:13px">✦ Написать тексты слайдов с ИИ</span></label>`,
     actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
       const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
       try {
-        const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, ai: $('#carAi', bd).checked });
+        const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, angle: ($('#carAngle', bd) || {}).value || 'auto', ai: $('#carAi', bd).checked });
         toast('Карусель собрана', 'Открываю редактор', true);
         window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
         render();
@@ -4560,6 +4647,7 @@ async function shLaunch(main) {
         <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
         <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
       </div>
+      <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— под какую стратегию писать</span></span>${carAnglePicker('lcAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('lcTheme', 'klein')}</div>
       <div class="cpick-row"><span class="cpick-hd">Шрифт заголовков</span>${carFontPicker('lcFont', 'fraunces')}</div>
       <div class="sh-gen-foot"><span class="tb-spacer"></span><button class="btn btn-accent" id="lcGo">${ic(I.spark)}Собрать карусель</button></div>
@@ -4604,7 +4692,7 @@ async function shLaunch(main) {
     const topic = `Старт продаж / лонч: ${name}. Условия и факты: ${facts || '—'}`;
     const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
     try {
-      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, images: [...lcPicked], ai: true });
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', images: [...lcPicked], ai: true });
       toast('Карусель собрана', 'Открываю редактор', true);
       window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
       render();

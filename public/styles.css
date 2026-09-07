@@ -2465,6 +2465,9 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .cpick-l { display: flex; flex-direction: column; line-height: 1.2; }
 .cpick-l b { font-size: 12.5px; font-weight: 700; color: var(--navy-900); }
 .cpick-l i { font-size: 10.5px; font-style: normal; color: var(--ink-3); white-space: nowrap; }
+.cpick-angi { width: 30px; height: 30px; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
+.cpick-angi svg { width: 17px; height: 17px; }
+.cpick-it.on .cpick-angi { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
 /* меню быстрой отправки контента */
 .sh-shr { color: var(--ink-3); }
@@ -2927,3 +2930,54 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .dic-inp-btn svg { width: 13px; height: 13px; }
 .dic-inp-btn.rec { opacity: 1; background: #C0392B; animation: dicPulse 1.1s infinite; }
 .dic-inp-btn.busy { opacity: 1; background: var(--accent); }
+
+/* ============ Тиндер идей (виджет обзора) ============ */
+.idea-deck { display: flex; flex-direction: column; gap: 12px; }
+.idea-count { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; text-align: center; }
+.idea-card { position: relative; border: 1px solid var(--stroke); border-radius: 16px; padding: 16px 16px 15px; background:
+    linear-gradient(180deg, color-mix(in srgb, var(--acol, var(--accent)) 7%, var(--card)) 0%, var(--card) 60%);
+  box-shadow: 0 8px 26px -14px color-mix(in srgb, var(--acol, var(--accent)) 60%, transparent); overflow: hidden; }
+.idea-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--acol, var(--accent)); }
+.idea-angle { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--acol, var(--accent)); background: color-mix(in srgb, var(--acol, var(--accent)) 14%, transparent); border-radius: 7px; padding: 3px 9px; margin-bottom: 9px; }
+.idea-title { font-size: 15.5px; font-weight: 750; line-height: 1.3; color: var(--navy-900); }
+.idea-hook { font-size: 13px; color: var(--ink-2); font-style: italic; margin-top: 7px; line-height: 1.45; }
+.idea-why { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.4; }
+.idea-why svg { width: 14px; height: 14px; color: var(--acol, var(--accent)); flex: none; margin-top: 1px; }
+.idea-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.idea-meta span { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border-radius: 7px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px; }
+.idea-meta svg { width: 12px; height: 12px; }
+.idea-eff.e-low { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.idea-eff.e-mid { color: #B8860B; background: rgba(224, 168, 46, .13); }
+.idea-eff.e-high { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.idea-plat { text-transform: capitalize; }
+.idea-ref { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; color: var(--ink-3); margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--stroke); line-height: 1.4; }
+.idea-ref svg { width: 13px; height: 13px; flex: none; margin-top: 1px; color: var(--ink-3); }
+.idea-ref b { color: var(--ink-2); font-weight: 650; }
+.idea-acts { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px; }
+.idea-act { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--stroke);
+  background: var(--card); border-radius: 12px; padding: 11px 10px; font-size: 12.5px; font-weight: 650; color: var(--ink-2);
+  cursor: pointer; font-family: inherit; transition: transform .12s, background .12s, border-color .12s, color .12s; }
+.idea-act svg { width: 16px; height: 16px; }
+.idea-act:hover { transform: translateY(-1px); }
+.idea-act.skip { color: var(--ink-3); width: 46px; padding: 11px; }
+.idea-act.skip:hover { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.idea-act.keep:hover { border-color: #8B7BD8; color: #6C5AC7; background: rgba(139, 123, 216, .09); }
+.idea-act.take { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 6px 18px -8px var(--accent); }
+.idea-act.take:hover { filter: brightness(1.06); }
+/* пустое состояние / генерация */
+.idea-empty { text-align: center; padding: 20px 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.idea-empty > svg { width: 30px; height: 30px; color: var(--accent); opacity: .8; margin-bottom: 4px; }
+.idea-empty-t { font-size: 14px; font-weight: 700; color: var(--navy-900); }
+.idea-empty-s { font-size: 12px; color: var(--ink-3); line-height: 1.45; max-width: 260px; }
+.idea-genbtn { margin-top: 12px; }
+.idea-spin { width: 34px; height: 34px; display: grid; place-items: center; margin-bottom: 6px; }
+.idea-spin svg { width: 26px; height: 26px; color: var(--accent); animation: ideaSpin 1s linear infinite; }
+@keyframes ideaSpin { to { transform: rotate(360deg); } }
+/* вылет карточки при свайпе */
+.idea-fly-skip { animation: ideaFlyL .18s ease-in forwards; }
+.idea-fly-keep { animation: ideaFlyD .18s ease-in forwards; }
+.idea-fly-take { animation: ideaFlyR .18s ease-in forwards; }
+@keyframes ideaFlyL { to { transform: translateX(-40px) rotate(-6deg); opacity: 0; } }
+@keyframes ideaFlyR { to { transform: translateX(40px) rotate(6deg); opacity: 0; } }
+@keyframes ideaFlyD { to { transform: translateY(24px); opacity: 0; } }

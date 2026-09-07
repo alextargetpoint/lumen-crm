@@ -2088,24 +2088,31 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       let slides = [{ heading: 'Заголовок карусели', sub: 'Подпись — кликните, чтобы отредактировать' }, { heading: 'Слайд 2', sub: 'Текст слайда' }, { heading: 'Оставьте заявку', sub: 'Напишите нам в директ' }];
       let title = String(b.title || 'Карусель').slice(0, 120);
+      let photoBias = 'medium';
       if (b.ai && llm.available()) {
-        try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo); title = out.title; slides = out.slides; }
+        try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo, b.angle); title = out.title; slides = out.slides; photoBias = out.photoBias || 'medium'; }
         catch (e) { /* ИИ не справился — стартовые слайды */ }
       }
       /* Фото: скачиваем ВЫБРАННЫЕ (фильтр по размеру — логотипы/иконки отсекаются), мало → добираем из открытых источников.
-         Раскладка вкусная и КОНСИСТЕНТНАЯ: обложка — крупный кадр; смысловые слайды — чистый текст (тёмная тема);
-         отдельный слайд-галерея с реальными фото плиткой. Не мажем случайную картинку под каждый слайд. */
+         Раскладка вкусная и КОНСИСТЕНТНАЯ и зависит от УГЛА подачи:
+         high (люкс/образ жизни) — фото-first: обложка + больше галерей; low (инвестиции) — текст-first: только обложка;
+         medium — обложка + одна галерея. Не мажем случайную картинку под каждый слайд. */
       if (b.ai && slides.length && (Array.isArray(b.images) && b.images.length || b.template === 'launch')) {
         const rawPics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))) : [];
         const q = [String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
-        const good = await gatherLaunchPhotos(rawPics, q, 6);
+        const want = photoBias === 'high' ? 9 : photoBias === 'low' ? 3 : 6;
+        const good = await gatherLaunchPhotos(rawPics, q, want);
         if (good.length) {
           slides[0] = Object.assign({}, slides[0], { bg: good[0], pos: 'bottom', size: 'l' });
           const rest = good.slice(1);
-          if (rest.length >= 2) {
-            const gal = rest.slice(0, 4);
+          /* сколько слайдов-галерей вставить: low — 0, medium — 1 (до 4 фото), high — до 2 (планировки/виды) */
+          const galSlides = photoBias === 'low' ? 0 : photoBias === 'high' ? 2 : 1;
+          const titles = ['Виды и пространство', 'Планировки и детали'];
+          let used = 0;
+          for (let g = 0; g < galSlides && rest.length - used >= 2; g++) {
+            const gal = rest.slice(used, used + 4); used += gal.length;
             const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 30 : 64, w: 42, h: 31, z: gi + 1, round: 12 }));
-            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: 'Виды и планировки', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
+            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
           }
         }
       }
@@ -2186,20 +2193,26 @@ const server = http.createServer(async (req, res) => {
           facts = await llm.extractLaunch({ sourceText, query: topic });
           if (facts) { const parts = [facts.name, facts.units, facts.priceFrom && ('от ' + facts.priceFrom), facts.payment, facts.roi && ('доходность ' + facts.roi), facts.handover && ('сдача ' + facts.handover), facts.location, ...(facts.highlights || [])].filter(Boolean); topic = (facts.name || topic || 'Объект') + '. ' + parts.join(' · '); }
         }
-        const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '');
+        const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '', b.angle);
         let slides = (out.slides || []).map(s => sanSlide(s));
-        /* умная раскладка фото: обложка крупным кадром, контент-слайды с фото, предпоследний — галерея-слой, CTA чистый */
-        const pics = images.slice(0, 10);
-        if (pics.length && slides.length) {
-          slides[0] = Object.assign({}, slides[0], { bg: pics[0], pos: 'bottom', size: 'l' });
-          let pi = 1;
-          for (let i = 1; i < slides.length - 1 && pi < pics.length; i++) { slides[i] = Object.assign({}, slides[i], { bg: pics[pi++] }); }
-          /* слайд-галерея с несколькими фото как слои (если осталось ≥2 кадра) */
-          const rest = pics.slice(pi);
-          if (rest.length >= 2) {
-            const gal = rest.slice(0, 4);
-            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 26 : 60, w: 42, h: 30, z: gi + 1, round: 10 }));
-            slides.splice(slides.length - 1, 0, sanSlide({ heading: facts && facts.name ? 'Планировки и виды' : 'Галерея', sub: '', eyebrow: 'Фото', pos: 'top', size: 'm', layers }));
+        const photoBias = out.photoBias || 'medium';
+        /* Раскладка фото (как в «Карусель из лонча»): скачиваем + фильтруем по размеру (логотипы/LQIP отсекаются),
+           мало — добираем из открытых источников. Обложка — крупный кадр; смысловые слайды чистые; галереи по углу подачи.
+           НЕ мажем случайный кадр под каждый слайд (это давало «коряво где-то фоном»). */
+        const q = [facts && facts.name || String(topic || '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
+        const want = photoBias === 'high' ? 9 : photoBias === 'low' ? 3 : 6;
+        const good = await gatherLaunchPhotos(images, q, want);
+        let pics = good;
+        if (good.length && slides.length) {
+          slides[0] = Object.assign({}, slides[0], { bg: good[0], pos: 'bottom', size: 'l' });
+          const rest = good.slice(1);
+          const galSlides = photoBias === 'low' ? 0 : photoBias === 'high' ? 2 : 1;
+          const titles = [facts && facts.name ? 'Планировки и виды' : 'Виды и пространство', 'Детали и материалы'];
+          let used = 0;
+          for (let g = 0; g < galSlides && rest.length - used >= 2; g++) {
+            const gal = rest.slice(used, used + 4); used += gal.length;
+            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 30 : 64, w: 42, h: 31, z: gi + 1, round: 12 }));
+            slides.splice(Math.max(1, slides.length - 1), 0, sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'Галерея', pos: 'top', size: 's', layers }));
           }
         }
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
