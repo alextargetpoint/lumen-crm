@@ -368,6 +368,19 @@ const BASE_STAGES = [
 ];
 let STAGES = BASE_STAGES.slice();
 
+/* эстетичная цветовая градация стадий (приглушённая палитра 2026, без неона) */
+const STAGE_COLORS = {
+  new: '#6B7A99', touch: '#7C8FE0', dialog: '#4F7DFF', qualified: '#2FA98C',
+  handover: '#8B7BD8', viewing: '#C9922E', deal: '#129B6E', sleeping: '#97A2B5', lost: '#C77B7B',
+};
+const STAGE_PALETTE = ['#4F7DFF', '#2FA98C', '#8B7BD8', '#C9922E', '#129B6E', '#E08A6B', '#5AAFD6', '#B07CC9'];
+function stageColor(id) {
+  if (STAGE_COLORS[id]) return STAGE_COLORS[id];
+  /* кастомным стадиям — стабильный цвет из палитры по хешу id */
+  let h = 0; for (let i = 0; i < String(id).length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return STAGE_PALETTE[h % STAGE_PALETTE.length];
+}
+
 /* полные названия языков для этикеток брокеров (код → человекочитаемое) */
 const LANG_NAMES = { ru: 'Русский', en: 'Английский', ar: 'Арабский', id: 'Индонезийский', es: 'Испанский', de: 'Немецкий', fr: 'Французский', it: 'Итальянский', zh: 'Китайский', pt: 'Португальский', tr: 'Турецкий', fa: 'Персидский', hi: 'Хинди', uk: 'Украинский', pl: 'Польский', nl: 'Нидерландский' };
 const langName = (lg) => LANG_NAMES[lg] || (lg ? lg.charAt(0).toUpperCase() + lg.slice(1) : lg);
@@ -1194,8 +1207,8 @@ PAGES.funnel = async (root) => {
     <div class="kanban">
       ${STAGES.map(st => {
         const items = leads.filter(l => l.stage === st.id);
-        return `<div class="kb-col" data-stage="${st.id}">
-          <div class="kb-head"><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
+        return `<div class="kb-col" data-stage="${st.id}" style="--stg:${stageColor(st.id)}">
+          <div class="kb-head"><span class="kb-dot"></span><span class="kb-ic">${ic(I[st.icon])}</span><span class="nm">${st.name}</span><span class="ct" data-selcol title="Выделить все в стадии">${items.length}</span></div>
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
