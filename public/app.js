@@ -37,7 +37,7 @@ const I = {
   grid: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   funnel: '<path d="M3 5.5h18M6.5 12h11M10 18.5h4"/>',
   chat: '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5z"/>',
-  spark: '<path d="M12 2l1.9 5.8L20 9.7l-5 3.9 1.6 6.2L12 16.4l-4.6 3.4L9 13.6 4 9.7l6.1-1.9L12 2z"/>',
+  spark: '<path d="M12 3c.3 3.4 2.3 5.4 5.7 5.7 .4 0 .4.6 0 .6C14.3 9.6 12.3 11.6 12 15c0 .4-.6.4-.6 0C11.1 11.6 9.1 9.6 5.7 9.3c-.4 0-.4-.6 0-.6C9.1 8.4 11.1 6.4 11.4 3c0-.4.6-.4.6 0z"/><path d="M18.5 14.5c.15 1.6 1.1 2.5 2.7 2.7.2 0 .2.4 0 .4-1.6.15-2.55 1.1-2.7 2.7 0 .2-.4.2-.4 0-.15-1.6-1.1-2.55-2.7-2.7-.2 0-.2-.4 0-.4 1.6-.15 2.55-1.1 2.7-2.7 0-.2.4-.2.4 0z"/>',
   chain: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M6 8.5v7M11 6h7M11 18h7"/>',
   wake: '<path d="M12 3v2M5.6 5.6L7 7M3 12h2M19 12h2M17 7l1.4-1.4M8 17a4 4 0 1 1 8 0M4 21h16"/>',
   sim: '<rect x="5" y="2" width="14" height="20" rx="3"/><path d="M9 18h6"/>',
@@ -73,11 +73,13 @@ const I = {
   card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
   /* доп. иконки для таск-менеджера — единый тонкий лайн-стиль */
   task: '<path d="M4 6.5l1.6 1.6L8.5 5M4 12.5l1.6 1.6L8.5 11M4 18.5l1.6 1.6L8.5 17"/><path d="M11.5 6.5h9M11.5 12.5h9M11.5 18.5h6"/>',
-  flag: '<path d="M5 21V4M5 4c3-1.6 6 1.6 9 0v8c-3 1.6-6-1.6-9 0"/>',
+  flag: '<path d="M5 21V4M5 5c2.5-1.4 5 1.4 7.5 0S17 3.6 19 5v9c-2 1.4-4-1.4-6.5 0S7.5 15.4 5 14"/>',
   inbox: '<path d="M4 13h4l1.6 2.6a1 1 0 0 0 .9.4h3a1 1 0 0 0 .9-.4L16 13h4"/><path d="M5.5 5.5h13l1.5 7.5v4a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17v-4l1.5-7.5z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  trophy: '<path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M9 16h6M8 20h8M12 13v3"/>',
+  trophy: '<path d="M6 4h12v5a6 6 0 0 1-12 0V4z"/><path d="M6 6H3.5v1.5A3.5 3.5 0 0 0 6.5 11M18 6h2.5v1.5A3.5 3.5 0 0 1 17.5 11M9.5 20h5M8 20a4 4 0 0 1 8 0M12 15v3"/>',
   circle: '<circle cx="12" cy="12" r="8.5"/>',
+  grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
+  bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
 };
 
 /* ---------- сворачиваемые группы (стекло-стиль, spring-раскрытие) ---------- */
@@ -911,8 +913,9 @@ const PAGES = {};
 
 /* ---------------- ОБЗОР ---------------- */
 PAGES.overview = async (root) => {
-  const [an, events, leads] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads')]);
+  const [an, events, leads, tsk] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] }))]);
   const f = an.funnel;
+  const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const inDialog = f.dialog + f.touch;
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
@@ -1027,36 +1030,59 @@ PAGES.overview = async (root) => {
         </div>`;
       })()}
     </div>
+    ${(() => {
+      /* «Что требует внимания сейчас» — живая полезная сводка вместо витринных цифр */
+      const now = Date.now();
+      const waiting = leads.filter(l => l.lastDir === 'in' && !['lost', 'deal'].includes(l.stage));
+      const needHuman = leads.filter(l => (l.tags || []).includes('нужен человек') && l.stage !== 'lost');
+      const hotViews = leads.filter(l => l.lastViewAt && (now - l.lastViewAt) < 24 * 3600e3 && !['lost', 'deal'].includes(l.stage));
+      const overdueNa = leads.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < now && !['lost', 'deal'].includes(l.stage));
+      const att = [
+        { n: needHuman.length, k: 'просят живого менеджера', ic: I.shield, cls: 'bad', lead: needHuman[0], go: 'inbox' },
+        { n: waiting.length, k: 'ждут вашего ответа', ic: I.chat, cls: 'warn', lead: waiting[0], go: 'inbox' },
+        { n: hotViews.length, k: 'смотрели подборку сегодня — звоните', ic: I.eye, cls: 'ok', lead: hotViews[0], go: 'inbox' },
+        { n: overdueNa.length, k: 'просрочен следующий шаг', ic: I.clock, cls: 'warn', lead: overdueNa[0], go: 'funnel' },
+      ].filter(a => a.n > 0);
+      if (!att.length) return '';
+      return `<div class="glass card mb ov-attn"><div class="card-title">${ic(I.spark)}Что требует внимания сейчас</div>
+        <div class="attn-row">${att.map(a => `<button class="attn-c ${a.cls}" ${a.lead ? `data-ovlead="${a.lead.id}"` : `data-ovgo="${a.go}"`}><span class="attn-ic">${ic(a.ic)}</span><span class="attn-n">${a.n}</span><span class="attn-k">${a.k}</span>${a.lead ? `<span class="attn-who">${esc((a.lead.name || '').split(' ')[0])}${a.n > 1 ? ' +' + (a.n - 1) : ''}</span>` : ''}</button>`).join('')}</div></div>`;
+    })()}
     <div class="ov-grid">
-      <div>
-        <div class="glass card">
-          <div class="card-title">${ic(I.bars)}Первая линия: показатели</div>
-          <div class="vs">
-            <div class="vs-col"><div class="hd">Ручная линия</div>
-              <div class="vs-row"><span class="k">Первый контакт</span><span class="v">${an.compare.human.firstContact}</span></div>
-              <div class="vs-row"><span class="k">Конверсия в диалог</span><span class="v">${an.compare.human.dialogConv}%</span></div>
-              <div class="vs-row"><span class="k">Лид → квалификация</span><span class="v">${an.compare.human.qualConv}%</span></div>
-              <div class="vs-row"><span class="k">Время квалификации</span><span class="v">${an.compare.human.qualTime}</span></div>
-            </div>
-            <div class="vs-col ai"><div class="hd">Lumen AI</div>
-              <div class="vs-row"><span class="k">Первый контакт</span><span class="v">${an.compare.aiLine.firstContact}</span></div>
-              <div class="vs-row"><span class="k">Конверсия в диалог</span><span class="v">${an.compare.aiLine.dialogConv}%</span></div>
-              <div class="vs-row"><span class="k">Лид → квалификация</span><span class="v">${an.compare.aiLine.qualConv}%</span></div>
-              <div class="vs-row"><span class="k">Время квалификации</span><span class="v">${an.compare.aiLine.qualTime}</span></div>
-            </div>
-          </div>
-        </div>
+      <div class="glass card">
+        <div class="card-title">${ic(I.check)}Мои задачи<span class="sub">${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просрочено' : ''}</span><button class="btn btn-sm" data-ovgo="tasks" style="margin-left:auto">Все задачи</button></div>
+        ${(() => {
+          const open = (tsk.tasks || []).filter(t => t.status !== 'done').sort((a, b) => {
+            const ao = a.due && dstr2(a.due) < tsk.today, bo = b.due && dstr2(b.due) < tsk.today;
+            if (ao !== bo) return ao ? -1 : 1; return (a.due || a.scheduled || 0) > (b.due || b.scheduled || 0) ? 1 : -1;
+          }).slice(0, 6);
+          const rows = open.map(t => { const over = t.due && dstr2(t.due) < tsk.today; return `<div class="ovtask" data-ovtask="${t.id}">
+            <button class="ovtask-ck" data-ovdone="${t.id}" title="Выполнено">${ic(I.check)}</button>
+            <span class="ovtask-t">${esc(t.title || 'Задача')}${t.due ? `<i class="${over ? 'over' : ''}">${over ? 'просрочено · ' : ''}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i>` : ''}</span>
+          </div>`; }).join('');
+          const sug = (tsk.suggestions || []).slice(0, 3).map(s => `<div class="ovtask sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'>
+            <button class="ovtask-ck add" title="Добавить в задачи">${ic(I.plus)}</button><span class="ovtask-t">${esc(s.title)}<i>предложение ИИ</i></span></div>`).join('');
+          return (rows || sug) ? rows + sug : '<div class="empty" style="padding:16px">Задач нет — красиво 🙌</div>';
+        })()}
       </div>
       <div class="glass card">
-        <div class="card-title">${ic(I.bolt)}Живая лента</div>
-        <div class="feed">
-          ${events.slice(0, 8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join('') || '<div class="empty">Событий пока нет</div>'}
-        </div>
-        ${events.length > 8 ? coll(`Раньше`, events.slice(8).map(e => `<div class="feed-item"><div class="feed-dot ${feedCls(e.type)}">${ic(feedIcon(e.type))}</div><div><div class="feed-text">${esc(e.text)}</div><div class="feed-time">${ago(e.at)}</div></div></div>`).join(''), { open: false, count: events.length - 8, icon: I.clock }) : ''}
+        <div class="card-title">${ic(I.cal)}Ближайшие встречи<span class="sub">${(tsk.meetings || []).length}</span><button class="btn btn-sm" data-ovgo="meetings" style="margin-left:auto">Календарь</button></div>
+        ${(() => {
+          const KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
+          const ms = (tsk.meetings || []).slice(0, 6);
+          if (!ms.length) return '<div class="empty" style="padding:16px">Встреч пока нет — назначайте из карточки лида</div>';
+          return ms.map(mt => { const d = new Date(mt.at); const today = dstr2(mt.at) === tsk.today; const day = today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); return `<div class="ovmeet" data-ovlead="${mt.leadId}">
+            <div class="ovmeet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${day}</i></div>
+            <div class="ovmeet-b"><div class="ovmeet-n">${esc(mt.leadName)}</div><div class="ovmeet-k">${KIND[mt.kind] || mt.kind}</div></div>
+            ${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}
+          </div>`; }).join('');
+        })()}
       </div>
     </div>`;
   $$('[data-obgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.obgo)));
   $$('[data-ovgo]', root).forEach(b2 => b2.addEventListener('click', () => go(b2.dataset.ovgo)));
+  $$('[data-ovlead]', root).forEach(b2 => b2.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b2.dataset.ovlead); }));
+  $$('[data-ovdone]', root).forEach(b2 => b2.addEventListener('click', async (e) => { e.stopPropagation(); const row = b2.closest('.ovtask'); if (row) { row.style.opacity = '.4'; row.style.pointerEvents = 'none'; } await api.patch('/tasks/' + b2.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 400); }));
+  $$('[data-ovsug]', root).forEach(b2 => b2.querySelector('.ovtask-ck').addEventListener('click', async (e) => { e.stopPropagation(); let d = {}; try { d = JSON.parse(b2.dataset.ovsug); } catch (_) {} await api.post('/tasks', d); toast('Задача добавлена', null, true); PAGES.overview(root); }));
   $$('[data-f3go]', root).forEach(r => {
     r.addEventListener('click', () => go('funnel'));
     /* наведение на стадию подсвечивает соответствующий ярус стеклянной воронки */
@@ -4477,11 +4503,67 @@ async function shPost(main) {
    приоритеты P1–P4 (Todoist), матрица Эйзенхауэра, тайм-блокинг вокруг встреч,
    стрик/импульс (Habitica), умные подсказки. Минимализм, премиум, мотивация. */
 const TPRI = { p1: { c: '#E5484D', n: 'Срочно' }, p2: { c: '#E8912B', n: 'Важно' }, p3: { c: '#4F7DFF', n: 'Обычная' }, p4: { c: '#97A2B5', n: 'Потом' } };
-const TASK_VIEWS = [['today', 'Сегодня'], ['week', 'Неделя'], ['all', 'Все'], ['inbox', 'Инбокс']];
+const TASK_VIEWS = [['today', 'Сегодня'], ['week', 'Неделя'], ['calendar', 'Календарь'], ['all', 'Все'], ['inbox', 'Инбокс']];
 let TASK_VIEW = 'today';
 let TASK_NEWPRI = 'p3';
+let TASK_WEEK = 0; /* смещение недели в календаре */
 const dstrLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const KIND_RU = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
+/* минималистичный пикер срока: быстрые варианты + сетка месяца. onPick(ms|null) */
+function tkDatePop(anchor, curMs) {
+  return new Promise((resolve) => {
+    const now = new Date();
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const addD = (n) => { const x = new Date(now); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() + n); return x; };
+    const nextDow = (t) => { const x = new Date(now); x.setHours(12, 0, 0, 0); let diff = (t - x.getDay() + 7) % 7; if (diff === 0) diff = 7; x.setDate(x.getDate() + diff); return x; };
+    const quick = [['Сегодня', addD(0)], ['Завтра', addD(1)], ['Через 3 дня', addD(3)], ['Выходные', nextDow(6)], ['След. неделя', nextDow(1)]];
+    const cur = curMs ? new Date(curMs) : null;
+    const view = { y: (cur || now).getFullYear(), m: (cur || now).getMonth() };
+    const pop = el('<div class="dtp-pop tk-dp"></div>');
+    let settled = false;
+    const done = (v) => { if (settled) return; settled = true; closePop(); resolve(v); };
+    const pick = (ds) => done(new Date(ds + 'T12:00:00').getTime());
+    const build = () => {
+      const first = new Date(view.y, view.m, 1); const shift = (first.getDay() + 6) % 7; const days = new Date(view.y, view.m + 1, 0).getDate();
+      const selStr = cur ? fmt(cur) : '';
+      pop.innerHTML = `
+        <div class="tk-dp-quick">${quick.map(([n, d]) => `<button type="button" class="tk-dp-q" data-q="${fmt(d)}">${n}</button>`).join('')}</div>
+        <div class="dtp-head"><button type="button" class="dtp-nav" data-d="-1">${ic(I.chev, 2)}</button><b>${MONTHS_N[view.m]} ${view.y}</b><button type="button" class="dtp-nav" data-d="1">${ic(I.chev, 2)}</button></div>
+        <div class="dtp-grid">${DOW.map(d => `<span class="dtp-dow">${d}</span>`).join('')}${Array.from({ length: shift }, () => '<span></span>').join('')}${Array.from({ length: days }, (_, i) => { const ds = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`; return `<button type="button" class="dtp-day ${selStr === ds ? 'sel' : ''} ${fmt(now) === ds ? 'today' : ''}" data-day="${ds}">${i + 1}</button>`; }).join('')}</div>
+        ${curMs ? '<button type="button" class="tk-dp-clear" data-clear>Убрать срок</button>' : ''}`;
+      $$('.tk-dp-q', pop).forEach(b => b.addEventListener('click', () => pick(b.dataset.q)));
+      $$('.dtp-nav', pop).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); view.m += +b.dataset.d; if (view.m < 0) { view.m = 11; view.y--; } if (view.m > 11) { view.m = 0; view.y++; } build(); }));
+      $$('.dtp-day', pop).forEach(b => b.addEventListener('click', () => pick(b.dataset.day)));
+      const cl = $('[data-clear]', pop); if (cl) cl.addEventListener('click', () => done(null));
+    };
+    build();
+    openPop(anchor, anchor, pop);
+    const obs = setInterval(() => { if (!CUR_POP || CUR_POP.pop !== pop) { clearInterval(obs); if (!settled) { settled = true; resolve(undefined); } } }, 250);
+  });
+}
+/* голосовое добавление задачи: запись → транскрипт → ИИ извлекает суть+срок */
+function tkVoiceAdd(btn, onDone) {
+  if (btn.classList.contains('rec')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
+  if (DIC_ACTIVE) { toast('Уже идёт запись'); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const rec = new MediaRecorder(stream); const parts = [];
+    rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop()); btn.classList.remove('rec'); btn.classList.add('busy'); DIC_ACTIVE = null;
+      try {
+        const r = await fetch('/api/voice/dictate?clean=1&filename=task.webm', { method: 'POST', body: new Blob(parts, { type: 'audio/webm' }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка');
+        if (!j.text) { toast('Ничего не распознал', 'Ближе к микрофону'); btn.classList.remove('busy'); return; }
+        const sr = await api.post('/tasks/smart', { text: j.text });
+        const due = sr.task.due ? new Date(sr.task.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : null;
+        toast('Задача добавлена', due ? 'Срок: ' + due : sr.task.title, true);
+        onDone && onDone();
+      } catch (e) { toast('Не вышло', e.message); }
+      btn.classList.remove('busy');
+    };
+    DIC_ACTIVE = rec; rec.start(); btn.classList.add('rec');
+  }).catch(() => toast('Нет доступа к микрофону', 'Разреши доступ в браузере'));
+}
 function taskMotive(s) {
   if (s.overdue > 0) return `${s.overdue} ${plural(s.overdue, 'задача', 'задачи', 'задач')} просрочено — разбери, чтобы не копилось`;
   if (s.todayTotal === 0 && s.open === 0) return 'Чисто. Закинь первую задачу — и погнали 🚀';
@@ -4494,27 +4576,246 @@ function taskRing(pct) {
   const r = 20, c = 2 * Math.PI * r;
   return `<svg viewBox="0 0 48 48" class="tk-ring-svg"><circle cx="24" cy="24" r="${r}" stroke="var(--stroke)" stroke-width="4" fill="none"/><circle cx="24" cy="24" r="${r}" stroke="var(--accent)" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="${(c * pct / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 24 24)"/></svg><span class="tk-ring-v">${pct}%</span>`;
 }
+let TD_REC = null; /* MediaRecorder для голосового вложения в детали задачи */
+const tkTime = (ms) => { const d = new Date(ms); return (d.getHours() !== 12 || d.getMinutes() !== 0) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''; };
+const placeDay = (t) => t.scheduled || (t.due ? dstrLocal(new Date(t.due)) : null);
+function tkMeta(t, leadMap) {
+  const done = t.status === 'done';
+  const overdue = !done && t.due && dstrLocal(new Date(t.due)) < dstrLocal(new Date());
+  const chips = [];
+  if (t.due) chips.push(`<span class="tk-chip ${overdue ? 'od' : ''}" data-act="due">${ic(I.clock)}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}${tkTime(t.due) ? ' ' + tkTime(t.due) : ''}</span>`);
+  const subs = t.subtasks || []; if (subs.length) chips.push(`<span class="tk-chip" data-act="open">${ic(I.task)}${subs.filter(s => s.done).length}/${subs.length}</span>`);
+  const atts = t.attachments || []; if (atts.length) chips.push(`<span class="tk-chip" data-act="open">${ic(atts.some(a => a.kind === 'audio') ? I.mic : I.doc)}${atts.length}</span>`);
+  if (t.leadId && leadMap[t.leadId]) chips.push(`<span class="tk-chip">${ic(I.user)}${esc(leadMap[t.leadId])}</span>`);
+  if (t.meetingId) chips.push(`<span class="tk-chip">${ic(I.cal)}встреча</span>`);
+  return chips.join('');
+}
 function taskRow(t, leadMap) {
   const done = t.status === 'done';
   const pri = TPRI[t.priority] || TPRI.p3;
-  const overdue = !done && t.due && dstrLocal(new Date(t.due)) < dstrLocal(new Date());
-  const dchip = t.due ? `<span class="tk-chip ${overdue ? 'od' : ''}">${ic(I.clock)}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>` : '';
-  const lchip = t.leadId && leadMap[t.leadId] ? `<span class="tk-chip">${ic(I.user)}${esc(leadMap[t.leadId])}</span>` : '';
-  const mchip = t.meetingId ? `<span class="tk-chip">${ic(I.cal)}встреча</span>` : '';
+  const meta = tkMeta(t, leadMap);
   return `<div class="tk-row ${done ? 'done' : ''}" data-tk="${t.id}" data-pri="${t.priority}">
     <button class="tk-check ${done ? 'on' : ''}" data-act="done" title="Готово">${ic(I.check, 2.4)}</button>
     <button class="tk-flag" data-act="pri" style="--pc:${pri.c}" title="Приоритет: ${pri.n}">${ic(I.flag)}</button>
-    <div class="tk-main">
-      <div class="tk-title" data-act="edit">${esc(t.title)}</div>
-      ${(dchip || lchip || mchip) ? `<div class="tk-meta">${dchip}${lchip}${mchip}</div>` : ''}
+    <div class="tk-main" data-act="open">
+      <div class="tk-title">${esc(t.title)}</div>
+      ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
     </div>
     <div class="tk-acts">
-      <button class="tk-mini" data-act="today" title="На сегодня">${ic(I.sun)}</button>
-      <button class="tk-mini" data-act="tmrw" title="На завтра">${ic(I.arrow)}</button>
+      <button class="tk-mini" data-act="due" title="Срок">${ic(I.cal)}</button>
       <button class="tk-mini del" data-act="del" title="Удалить">${ic(I.x)}</button>
     </div>
   </div>`;
 }
+function tkChip(t) {
+  const pri = TPRI[t.priority] || TPRI.p3; const done = t.status === 'done';
+  const time = t.due ? tkTime(t.due) : '';
+  const sub = (t.subtasks || []).length ? `<span class="tk-chip-sub">${(t.subtasks).filter(s => s.done).length}/${t.subtasks.length}</span>` : '';
+  return `<div class="tk-chip-card ${done ? 'done' : ''}" data-tk="${t.id}" style="--pc:${pri.c}"><span class="tk-chip-dot"></span><span class="tk-chip-x">${esc(t.title)}</span>${time ? `<span class="tk-chip-t">${time}</span>` : ''}${sub}</div>`;
+}
+function tkMtChip(mt) {
+  return `<div class="tk-chip-card mt" title="Встреча"><span class="tk-chip-dot"></span><span class="tk-chip-x">${new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · ${esc(KIND_RU[mt.kind] || 'Встреча')}${mt.leadName ? ' · ' + esc(mt.leadName) : ''}</span></div>`;
+}
+/* pointer-DnD: карточки .tk-chip-card[data-tk] → зоны [data-drop]; клик без перетаскивания = открыть */
+function tkWireDnD(root, onDrop, onOpen) {
+  root.querySelectorAll('.tk-chip-card[data-tk]:not(.mt)').forEach(chip => {
+    chip.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const sx = e.clientX, sy = e.clientY, id = chip.dataset.tk; let ghost = null, moved = false;
+      const move = (ev) => {
+        if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
+        moved = true;
+        if (!ghost) { ghost = chip.cloneNode(true); ghost.classList.add('tk-ghost'); ghost.style.width = chip.offsetWidth + 'px'; document.body.appendChild(ghost); chip.classList.add('dragging'); }
+        ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px';
+        const z = (document.elementFromPoint(ev.clientX, ev.clientY) || {}).closest ? document.elementFromPoint(ev.clientX, ev.clientY).closest('[data-drop]') : null;
+        root.querySelectorAll('[data-drop]').forEach(x => x.classList.toggle('over', x === z));
+      };
+      const up = (ev) => {
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+        chip.classList.remove('dragging'); if (ghost) ghost.remove();
+        root.querySelectorAll('[data-drop]').forEach(x => x.classList.remove('over'));
+        if (!moved) { onOpen && onOpen(id); return; }
+        const el2 = document.elementFromPoint(ev.clientX, ev.clientY); const z = el2 && el2.closest('[data-drop]');
+        if (z) onDrop(id, z.dataset.drop);
+      };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    });
+  });
+}
+/* детальная карточка задачи: правка, дедлайн (день+время), подзадачи, вложения (голос/файл), заметки */
+function openTaskDetail(t, leadMap) {
+  if (!t) return;
+  const dueD = t.due ? new Date(t.due) : null;
+  const dstr2 = dueD ? dstrLocal(dueD) : '';
+  const tstr = dueD && (dueD.getHours() !== 12 || dueD.getMinutes() !== 0) ? `${String(dueD.getHours()).padStart(2, '0')}:${String(dueD.getMinutes()).padStart(2, '0')}` : '';
+  const bd = modal({
+    wide: true, title: 'Задача',
+    body: `<div class="td">
+      <input class="td-title" id="tdTitle" value="${esc(t.title)}">
+      <div class="td-row"><span class="td-lbl">Приоритет</span><div class="seg-toggle td-pri">${Object.entries(TPRI).map(([k, v]) => `<button class="seg-btn ${k === t.priority ? 'on' : ''}" data-tp="${k}"><span class="td-pdot" style="background:${v.c}"></span>${v.n}</button>`).join('')}</div></div>
+      <div class="td-row"><span class="td-lbl">Дедлайн</span><div class="td-dl"><input type="date" id="tdDate" value="${dstr2}"><input type="time" id="tdTime" value="${tstr}"><button class="btn btn-sm" id="tdDclear" ${t.due ? '' : 'style="display:none"'}>Убрать</button></div></div>
+      <div class="td-row"><span class="td-lbl">Подзадачи</span><div class="td-subs" id="tdSubs"></div></div>
+      <div class="td-row"><span class="td-lbl">Вложения</span><div class="td-atts" id="tdAtts"></div></div>
+      <div class="td-row"><span class="td-lbl">Заметки</span><textarea class="td-notes" id="tdNotes" data-nodic placeholder="Детали, контекст…">${esc(t.notes || '')}</textarea></div>
+    </div>`,
+    actions: [{ label: 'Готово', cls: 'btn-accent' }],
+  });
+  const mo = new MutationObserver(() => { if (!document.body.contains(bd)) { mo.disconnect(); render(); } });
+  mo.observe(document.body, { childList: true });
+  const patch = async (body) => { Object.assign(t, body); try { await api.patch('/tasks/' + t.id, body); } catch (e) { toast('Не сохранилось', e.message); } };
+  $('#tdTitle', bd).addEventListener('change', e => patch({ title: e.target.value.trim() || t.title }));
+  $$('.td-pri .seg-btn', bd).forEach(b => b.addEventListener('click', () => { $$('.td-pri .seg-btn', bd).forEach(x => x.classList.toggle('on', x === b)); patch({ priority: b.dataset.tp }); }));
+  const applyDue = () => { const ds = $('#tdDate', bd).value; if (!ds) { patch({ due: null }); $('#tdDclear', bd).style.display = 'none'; return; } const tm = $('#tdTime', bd).value || '12:00'; patch({ due: new Date(`${ds}T${tm}:00`).getTime(), scheduled: ds }); $('#tdDclear', bd).style.display = ''; };
+  $('#tdDate', bd).addEventListener('change', applyDue); $('#tdTime', bd).addEventListener('change', applyDue);
+  $('#tdDclear', bd).addEventListener('click', () => { $('#tdDate', bd).value = ''; $('#tdTime', bd).value = ''; applyDue(); });
+  $('#tdNotes', bd).addEventListener('change', e => patch({ notes: e.target.value }));
+  /* подзадачи */
+  const subsEl = $('#tdSubs', bd);
+  const paintSubs = () => {
+    const arr = t.subtasks || [];
+    subsEl.innerHTML = arr.map(s => `<div class="td-sub ${s.done ? 'done' : ''}" data-sid="${s.id}"><button class="tk-check sm ${s.done ? 'on' : ''}" data-sd>${ic(I.check, 2.4)}</button><span class="td-sub-x">${esc(s.text)}</span><button class="btn-ghost" data-sx>${ic(I.x)}</button></div>`).join('') + `<div class="td-sub-add"><input id="tdSubNew" placeholder="+ подзадача (Enter)"></div>`;
+    subsEl.querySelectorAll('[data-sid]').forEach(row => {
+      const sid = row.dataset.sid;
+      row.querySelector('[data-sd]').addEventListener('click', () => { const s = t.subtasks.find(x => x.id === sid); s.done = !s.done; patch({ subtasks: t.subtasks }); paintSubs(); });
+      row.querySelector('[data-sx]').addEventListener('click', () => { t.subtasks = t.subtasks.filter(x => x.id !== sid); patch({ subtasks: t.subtasks }); paintSubs(); });
+    });
+    const ni = $('#tdSubNew', subsEl);
+    ni.addEventListener('keydown', e => { if (e.key === 'Enter' && ni.value.trim()) { t.subtasks = t.subtasks || []; t.subtasks.push({ id: Math.random().toString(36).slice(2, 8), text: ni.value.trim(), done: false }); patch({ subtasks: t.subtasks }); paintSubs(); setTimeout(() => { const n2 = $('#tdSubNew', subsEl); if (n2) n2.focus(); }, 0); } });
+  };
+  paintSubs();
+  /* вложения */
+  const attsEl = $('#tdAtts', bd);
+  const upload = async (blob, filename) => { try { const r = await fetch(`/api/tasks/${t.id}/attach?filename=${encodeURIComponent(filename)}`, { method: 'POST', body: blob }); const j = await r.json(); if (!r.ok) throw new Error(j.error); t.attachments = t.attachments || []; t.attachments.push(j); paintAtts(); toast('Вложение добавлено', null, true); } catch (e) { toast('Не вышло', e.message); } };
+  const paintAtts = () => {
+    const arr = t.attachments || [];
+    attsEl.innerHTML = arr.map(a => `<div class="td-att" data-aid="${a.id}">${a.kind === 'audio' ? `<audio controls src="${esc(a.url)}"></audio>` : a.kind === 'image' ? `<a href="${esc(a.url)}" target="_blank"><img src="${esc(a.url)}"></a>` : `<a class="td-att-file" href="${esc(a.url)}" target="_blank">${ic(I.doc)}${esc(a.name || 'файл')}</a>`}<button class="btn-ghost" data-ax>${ic(I.x)}</button></div>`).join('') + `<div class="td-att-add"><button class="btn btn-sm" id="tdMic">${ic(I.mic)}Голосовое</button><button class="btn btn-sm" id="tdFile">${ic(I.doc)}Файл</button></div>`;
+    attsEl.querySelectorAll('[data-aid]').forEach(row => row.querySelector('[data-ax]').addEventListener('click', async () => { await fetch(`/api/tasks/${t.id}/attach/${row.dataset.aid}`, { method: 'DELETE' }); t.attachments = t.attachments.filter(a => a.id !== row.dataset.aid); paintAtts(); }));
+    $('#tdFile', attsEl).addEventListener('click', () => { const inp = el('<input type="file" style="display:none">'); document.body.appendChild(inp); inp.addEventListener('change', () => { if (inp.files[0]) upload(inp.files[0], inp.files[0].name); inp.remove(); }); inp.click(); });
+    const mic = $('#tdMic', attsEl);
+    mic.addEventListener('click', () => {
+      if (mic.classList.contains('rec')) { TD_REC && TD_REC.stop(); return; }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => { const rec = new MediaRecorder(stream); const parts = []; rec.ondataavailable = e => { if (e.data.size) parts.push(e.data); }; rec.onstop = () => { stream.getTracks().forEach(x => x.stop()); mic.classList.remove('rec'); TD_REC = null; upload(new Blob(parts, { type: 'audio/webm' }), 'voice.webm'); }; TD_REC = rec; rec.start(); mic.classList.add('rec'); }).catch(() => toast('Нет доступа к микрофону'));
+    });
+  };
+  paintAtts();
+}
+PAGES.tasks = async (root) => {
+  const [d, leads] = await Promise.all([api.get('/tasks'), api.get('/leads')]);
+  const leadMap = Object.fromEntries(leads.map(l => [l.id, l.name]));
+  const byId = Object.fromEntries(d.tasks.map(t => [t.id, t]));
+  const s = d.stats, today = d.today;
+  const plannedToday = s.todayDone + s.todayTotal;
+  const pct = plannedToday ? Math.round(s.todayDone / plannedToday * 100) : (s.todayDone ? 100 : 0);
+  const open = d.tasks.filter(t => t.status !== 'done');
+  const doneToday = d.tasks.filter(t => t.status === 'done' && t.doneAt && dstrLocal(new Date(t.doneAt)) === today);
+  const byPri = (a, b) => (a.priority > b.priority ? 1 : a.priority < b.priority ? -1 : (a.due || 9e15) - (b.due || 9e15));
+
+  let listHtml = '', isBoard = false;
+  if (TASK_VIEW === 'today') {
+    const overdue = open.filter(t => t.due && dstrLocal(new Date(t.due)) < today).sort(byPri);
+    const todays = open.filter(t => !overdue.includes(t) && (t.scheduled === today || (t.due && dstrLocal(new Date(t.due)) === today))).sort(byPri);
+    const timeline = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === today).sort((a, b) => a.at - b.at).map(mt => `<div class="tk-block" data-mtid="${mt.id}" data-mtlead="${mt.leadId || ''}"><div class="tk-block-t">${new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div><div class="tk-block-b"><b>${esc(KIND_RU[mt.kind] || 'Встреча')} · ${esc(mt.leadName)}</b>${mt.link ? `<a href="${esc(mt.link)}" target="_blank" class="tk-block-link">${ic(I.link)}ссылка</a>` : ''}</div><button class="tk-mini" data-mtprep title="Задача-подготовка">${ic(I.plus)}</button></div>`).join('');
+    listHtml = `
+      ${timeline ? `<div class="tk-sec-lbl">${ic(I.cal)}Встречи сегодня</div>${timeline}` : ''}
+      ${overdue.length ? `<div class="tk-sec-lbl od">${ic(I.clock)}Просрочено · ${overdue.length}</div>${overdue.map(t => taskRow(t, leadMap)).join('')}` : ''}
+      <div class="tk-sec-lbl">${ic(I.sun)}На сегодня · ${todays.length}</div>
+      ${todays.length ? todays.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">На сегодня пусто. Добавь задачу или подтяни из подсказок ниже.</div>'}
+      ${doneToday.length ? `<div class="tk-sec-lbl done">${ic(I.check)}Сделано сегодня · ${doneToday.length}</div>${doneToday.map(t => taskRow(t, leadMap)).join('')}` : ''}`;
+  } else if (TASK_VIEW === 'week') {
+    const days = Array.from({ length: 7 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return dstrLocal(x); });
+    listHtml = days.map(ds => {
+      const dd = new Date(ds + 'T12:00:00');
+      const items = open.filter(t => placeDay(t) === ds).sort(byPri);
+      const mts = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === ds);
+      if (!items.length && !mts.length) return '';
+      return `<div class="tk-sec-lbl">${dd.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'short' })}${ds === today ? ' · сегодня' : ''}</div>
+        ${mts.map(mt => `<div class="tk-block"><div class="tk-block-t">${new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div><div class="tk-block-b"><b>${esc(KIND_RU[mt.kind] || 'Встреча')} · ${esc(mt.leadName)}</b></div></div>`).join('')}
+        ${items.map(t => taskRow(t, leadMap)).join('')}`;
+    }).join('') || '<div class="glass card empty">На неделю задач нет</div>';
+  } else if (TASK_VIEW === 'calendar') {
+    isBoard = true;
+    const base = new Date(); base.setHours(12, 0, 0, 0); base.setDate(base.getDate() + TASK_WEEK * 7);
+    const monday = new Date(base); monday.setDate(base.getDate() - ((base.getDay() + 6) % 7));
+    const days = Array.from({ length: 7 }, (_, i) => { const x = new Date(monday); x.setDate(monday.getDate() + i); return x; });
+    listHtml = `<div class="tk-cal-nav"><button class="btn btn-sm" data-wk="p">${ic(I.chev)}</button><b>${days[0].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — ${days[6].toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</b><button class="btn btn-sm" data-wk="n">${ic(I.chev)}</button>${TASK_WEEK ? '<button class="btn btn-sm" data-wk="0">Сегодня</button>' : ''}</div>
+      <div class="tk-cal">${days.map(dd => { const ds = dstrLocal(dd); const items = open.filter(t => placeDay(t) === ds).sort(byPri); const mts = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === ds).sort((a, b) => a.at - b.at); return `<div class="tk-cal-col ${ds === today ? 'today' : ''}" data-drop="day:${ds}"><div class="tk-cal-hd"><b>${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][(dd.getDay() + 6) % 7]}</b><span>${dd.getDate()}</span></div><div class="tk-cal-body">${mts.map(tkMtChip).join('')}${items.map(tkChip).join('')}</div></div>`; }).join('')}</div>`;
+  } else if (TASK_VIEW === 'kanban') {
+    isBoard = true;
+    const wkEnd = dstrLocal((() => { const x = new Date(); x.setDate(x.getDate() + 7); return x; })());
+    const bucket = (t) => { if (t.status === 'done') return 'done'; const ds = placeDay(t); if (!ds) return 'inbox'; if (ds <= today) return 'today'; if (ds <= wkEnd) return 'week'; return 'later'; };
+    const cols = [['inbox', 'Инбокс'], ['today', 'Сегодня'], ['week', 'На неделе'], ['later', 'Позже'], ['done', 'Готово']];
+    const grouped = {}; cols.forEach(([k]) => grouped[k] = []);
+    d.tasks.forEach(t => grouped[bucket(t)].push(t));
+    listHtml = `<div class="tk-kan">${cols.map(([k, n]) => `<div class="tk-kan-col" data-drop="kan:${k}"><div class="tk-kan-hd">${esc(n)}<span>${grouped[k].length}</span></div><div class="tk-kan-body">${grouped[k].sort(byPri).map(tkChip).join('') || '<div class="tk-kan-empty">—</div>'}</div></div>`).join('')}</div>`;
+  } else if (TASK_VIEW === 'inbox') {
+    const inbox = open.filter(t => !t.scheduled && !t.due).sort(byPri);
+    listHtml = inbox.length ? inbox.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">Инбокс пуст. Кидай сюда всё, что пришло в голову — разберёшь потом.</div>';
+  } else {
+    const all = open.slice().sort(byPri);
+    listHtml = all.length ? all.map(t => taskRow(t, leadMap)).join('') : '<div class="glass card empty">Открытых задач нет 👏</div>';
+  }
+
+  root.innerHTML = `
+    <div class="tk-top">
+      <div class="tk-hero glass">
+        <div class="tk-hero-l">
+          <div class="tk-hero-t">${ic(I.sun)}Мои задачи</div>
+          <div class="tk-motive">${esc(taskMotive(s))}</div>
+        </div>
+        <div class="tk-stats">
+          <div class="tk-stat"><span class="tk-stat-ic" style="color:#E8912B">${ic(I.flame)}</span><div><b>${s.streak}</b><i>${plural(s.streak, 'день', 'дня', 'дней')} стрик</i></div></div>
+          <div class="tk-ring">${taskRing(pct)}<i>сегодня<br>${s.todayDone}/${plannedToday}</i></div>
+          <div class="tk-stat"><span class="tk-stat-ic" style="color:#2FA98C">${ic(I.trophy)}</span><div><b>${s.weekDone}</b><i>за неделю</i></div></div>
+        </div>
+      </div>
+      <div class="tk-cap glass">
+        <button class="tk-mic" id="tkMic" title="Надиктовать — ИИ поймёт срок">${ic(I.mic)}</button>
+        <input id="tkNew" class="tk-cap-in" placeholder="Задача текстом или голосом — «завтра позвонить в 15:00»…  ⏎">
+        <div class="tk-cap-pri" id="tkNewPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === TASK_NEWPRI ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
+        <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
+      </div>
+    </div>
+    <div class="seg-toggle tk-seg">${TASK_VIEWS.map(([k, n]) => `<button class="seg-btn ${k === TASK_VIEW ? 'on' : ''}" data-tv="${k}">${n}${k === 'all' && s.open ? ` · ${s.open}` : ''}</button>`).join('')}</div>
+    ${d.suggestions.length && !isBoard ? `<div class="glass card tk-suggest"><div class="tk-sug-hd">${ic(I.spark)}Умные подсказки<span class="sub">на основе встреч и горячих лидов</span></div>${d.suggestions.map((sg, i) => `<div class="tk-sug" data-sug="${i}"><span class="tk-sug-t">${esc(sg.title)}</span><button class="btn btn-sm btn-accent" data-sugadd="${i}">${ic(I.plus)}В задачи</button></div>`).join('')}</div>` : ''}
+    <div id="tkList" class="tk-list ${isBoard ? 'board' : ''}">${listHtml}</div>`;
+
+  const addTask = async () => { const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title) { toast('Пустая задача'); return; } try { await api.post('/tasks', { title, priority: TASK_NEWPRI, scheduled: (TASK_VIEW === 'inbox' ? null : today) }); inp.value = ''; render(); } catch (e) { toast('Не вышло', e.message); } };
+  $('#tkAdd', root).addEventListener('click', addTask);
+  $('#tkNew', root).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+  $('#tkMic', root).addEventListener('click', () => tkVoiceAdd($('#tkMic', root), () => render()));
+  $$('#tkNewPri .tk-pdot', root).forEach(b => b.addEventListener('click', () => { TASK_NEWPRI = b.dataset.np; $$('#tkNewPri .tk-pdot', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  $$('.tk-seg [data-tv]', root).forEach(b => b.addEventListener('click', () => { TASK_VIEW = b.dataset.tv; render(); }));
+  $$('[data-wk]', root).forEach(b => b.addEventListener('click', () => { const v = b.dataset.wk; TASK_WEEK = v === '0' ? 0 : v === 'p' ? TASK_WEEK - 1 : TASK_WEEK + 1; render(); }));
+
+  $$('[data-sugadd]', root).forEach(b => b.addEventListener('click', async () => { const sg = d.suggestions[+b.dataset.sugadd]; if (!sg) return; try { await api.post('/tasks', { title: sg.title, priority: sg.priority || 'p2', scheduled: sg.scheduled || today, leadId: sg.leadId || null, meetingId: sg.meetingId || null }); toast('Добавлено в задачи', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
+  $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', async (e) => { const blk = e.target.closest('[data-mtid]'); if (!blk) return; const lead = leadMap[blk.dataset.mtlead] || 'клиентом'; try { await api.post('/tasks', { title: `Подготовиться к встрече с ${lead}`, priority: 'p2', scheduled: today, leadId: blk.dataset.mtlead || null, meetingId: blk.dataset.mtid }); toast('Задача-подготовка создана', null, true); render(); } catch (e2) { toast('Не вышло', e2.message); } }));
+
+  /* строки-списки */
+  $$('.tk-row[data-tk]', root).forEach(rowEl => rowEl.addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]'); if (!act) return;
+    const id = rowEl.dataset.tk; const a = act.dataset.act; const t = byId[id];
+    if (a === 'done') { await api.patch('/tasks/' + id, { status: rowEl.classList.contains('done') ? 'todo' : 'done' }); render(); return; }
+    if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
+    if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; await api.patch('/tasks/' + id, { priority: order[(order.indexOf(rowEl.dataset.pri) + 1) % 4] }); render(); return; }
+    if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
+    if (a === 'open') { openTaskDetail(t, leadMap); return; }
+  }));
+
+  /* доски: календарь / канбан — перетаскивание */
+  if (TASK_VIEW === 'calendar') {
+    tkWireDnD($('#tkList', root), async (id, drop) => { const ds = drop.split(':')[1]; await api.patch('/tasks/' + id, { scheduled: ds }); render(); }, (id) => openTaskDetail(byId[id], leadMap));
+  } else if (TASK_VIEW === 'kanban') {
+    const tomorrow = dstrLocal((() => { const x = new Date(); x.setDate(x.getDate() + 1); return x; })());
+    const in3 = dstrLocal((() => { const x = new Date(); x.setDate(x.getDate() + 3); return x; })());
+    const in10 = dstrLocal((() => { const x = new Date(); x.setDate(x.getDate() + 10); return x; })());
+    tkWireDnD($('#tkList', root), async (id, drop) => {
+      const k = drop.split(':')[1];
+      const body = k === 'inbox' ? { scheduled: null, due: null } : k === 'today' ? { scheduled: today } : k === 'week' ? { scheduled: in3 } : k === 'later' ? { scheduled: in10 } : { status: 'done' };
+      if (k !== 'done' && byId[id] && byId[id].status === 'done') body.status = 'todo';
+      await api.patch('/tasks/' + id, body); render();
+    }, (id) => openTaskDetail(byId[id], leadMap));
+  }
+};
 PAGES.tasks = async (root) => {
   const [d, leads] = await Promise.all([api.get('/tasks'), api.get('/leads')]);
   const leadMap = Object.fromEntries(leads.map(l => [l.id, l.name]));
