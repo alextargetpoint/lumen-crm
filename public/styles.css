@@ -2731,7 +2731,10 @@ body.has-preview { padding-top: 38px; }
 @media (max-width: 760px) { .ov2-grid { grid-template-columns: 1fr; } .ov-w.full { grid-column: auto; } }
 
 /* Плавающая кнопка быстрых действий (правый нижний угол) */
-.qfab { position: fixed; right: 22px; bottom: 22px; z-index: 850; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+/* pointer-events:none у контейнера — его «пустая» колонка над кнопкой раньше перехватывала клики
+   по поповерам/элементам под ней («сейв-зона»). Кликабельны только сама кнопка и открытое меню. */
+.qfab { position: fixed; right: 22px; bottom: 22px; z-index: 850; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+.qfab-main { pointer-events: auto; }
 .qfab-main { position: relative; width: 58px; height: 58px; border: none; border-radius: 50%; cursor: pointer; background: none; padding: 0; display: grid; place-items: center; }
 .qfab-orb { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #6E9BFF, #2563EB 45%, #1226A8 100%); box-shadow: 0 10px 30px -6px rgba(37, 99, 235, .6), inset 0 2px 6px rgba(255, 255, 255, .35), inset 0 -6px 12px rgba(6, 17, 38, .5); transition: transform .25s cubic-bezier(.2,1.4,.4,1); }
 .qfab-orb::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: radial-gradient(circle, rgba(37, 99, 235, .5), transparent 70%); filter: blur(6px); opacity: .7; animation: qfabPulse 2.8s ease-in-out infinite; z-index: -1; }

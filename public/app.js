@@ -195,7 +195,7 @@ function openPop(wrap, btn, pop) {
   POP_GUARD = Date.now();
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
-  Object.assign(pop.style, { position: 'fixed', zIndex: 400, visibility: 'hidden' });
+  Object.assign(pop.style, { position: 'fixed', zIndex: 900, visibility: 'hidden' });
   /* ширину по кнопке подгоняем ТОЛЬКО у select-дропдаунов (.cs-list). Календарю/пикеру времени это ломало
      ширину (широкий якорь → огромный попап, перекрывал верхние кнопки) — им ширину задаёт их CSS. */
   if (pop.classList.contains('cs-list')) pop.style.minWidth = r.width + 'px';
