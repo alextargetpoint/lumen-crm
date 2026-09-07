@@ -874,6 +874,16 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }
 
+    /* ИИ-заполнение «Об агентстве» (из профиля агентства) */
+    if (p === '/api/ai/agency-about' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth required' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      try {
+        const out = await llm.composeAgencyAbout(db.settings.agency.name, db.settings.agency.geos);
+        return json(res, 200, out);
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+
     if (p.startsWith('/api/') && !getSession(req)) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */

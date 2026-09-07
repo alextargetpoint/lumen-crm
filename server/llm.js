@@ -261,6 +261,21 @@ ${propLines}
   };
 }
 
+/* ИИ-заполнение блока «Об агентстве» для профиля/обложек подборок */
+async function composeAgencyAbout(name, geos) {
+  const prompt = `Ты — маркетолог агентства недвижимости «${String(name || 'наше агентство').slice(0, 80)}». Направления работы: ${(Array.isArray(geos) ? geos.join(', ') : '') || 'зарубежная недвижимость'}.
+Напиши тексты для страниц «Привет» и «Почему мы» в персональных подборках клиентам. Живой человеческий язык, без канцелярита и рекламных клише («уникальная возможность», «команда профессионалов»). Конкретика и польза для клиента.
+Верни строго JSON:
+{"intro":"1-2 предложения от лица менеджера: кто мы и чем полезны (идёт после «Меня зовут …»)",
+ "bullets":["4-5 конкретных фактов об агентстве (опыт, объекты, сопровождение сделки, юрподдержка) — короткие строки"],
+ "whyUs":["3-4 причины выбрать нас, глазами клиента — короткие строки"],
+ "freeNote":"1 короткая фраза, что подбор и консультация бесплатны и ни к чему не обязывают"}`;
+  const out = await callGemini(prompt, 20000, 1500);
+  if (!out || typeof out.intro !== 'string') throw new Error('bad about');
+  const arr = (a) => Array.isArray(a) ? a.slice(0, 6).map(x => String(x).slice(0, 200)).filter(Boolean) : [];
+  return { intro: String(out.intro || '').slice(0, 600), bullets: arr(out.bullets), whyUs: arr(out.whyUs), freeNote: String(out.freeNote || '').slice(0, 200) };
+}
+
 /* ИИ-генерация картинок для конструктора подборок (OpenAI gpt-image-1).
    Возвращает Buffer PNG. Стоимость ~$0.02–0.07/шт (medium 1536×1024). */
 async function generateImage(prompt, opts = {}) {
@@ -283,4 +298,4 @@ async function generateImage(prompt, opts = {}) {
   return Buffer.from(b64, 'base64');
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, generateImage, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, generateImage, hasImage: () => !!OKEY, MODEL };

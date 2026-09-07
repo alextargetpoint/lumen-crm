@@ -3904,18 +3904,23 @@ PAGES.agency = async (root) => {
         </div>
       </div>
       <div>
+        <div class="glass card mb" style="padding:0;overflow:hidden">
+          <div class="card-title" style="padding:16px 18px 0">${ic(I.eye)}Как агентство выглядит клиенту<span class="sub">обложка подборки</span></div>
+          <div id="agPreview" style="margin:14px 0 0"></div>
+        </div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы» в подборках</span></div>
-          <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro">${esc((s.agency.about || {}).intro || '')}</textarea></div>
+          <div class="card-title">${ic(I.building)}Об агентстве<span class="sub">страницы «Привет» и «Почему мы»</span>
+            <button class="btn btn-sm btn-accent" id="abAi" style="margin-left:auto">${ic(I.spark)}Заполнить ИИ</button></div>
+          <div class="form-row"><label>Кто мы (после «Меня зовут {менеджер},»)</label><textarea id="abIntro" class="ab-live">${esc((s.agency.about || {}).intro || '')}</textarea></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Факты об агентстве (по строкам)</label><textarea id="abBullets" style="min-height:96px">${esc(((s.agency.about || {}).bullets || []).join('\n'))}</textarea></div>
-            <div class="form-row"><label>«Почему мы» (по строкам)</label><textarea id="abWhy" style="min-height:96px">${esc(((s.agency.about || {}).whyUs || []).join('\n'))}</textarea></div>
+            <div class="form-row"><label>Факты об агентстве (по строкам)</label><textarea id="abBullets" class="ab-live" style="min-height:96px">${esc(((s.agency.about || {}).bullets || []).join('\n'))}</textarea></div>
+            <div class="form-row"><label>«Почему мы» (по строкам)</label><textarea id="abWhy" class="ab-live" style="min-height:96px">${esc(((s.agency.about || {}).whyUs || []).join('\n'))}</textarea></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Приписка про бесплатность</label><input id="abFree" value="${esc((s.agency.about || {}).freeNote || '')}"></div>
+            <div class="form-row"><label>Приписка про бесплатность</label><input id="abFree" class="ab-live" value="${esc((s.agency.about || {}).freeNote || '')}"></div>
             <div class="form-row"><label>Офис (адрес)</label><input id="abOffice" value="${esc(((s.agency.about || {}).office || {}).address || '')}"></div>
           </div>
-          <button class="btn" id="abSave">Сохранить</button>
+          <button class="btn btn-accent" id="abSave">Сохранить</button>
         </div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.shield)}Пароль входа</div>
@@ -3942,6 +3947,45 @@ PAGES.agency = async (root) => {
     toast(ch.dataset.edition === 'solo' ? 'Режим Solo включён' : 'Режим агентства включён', null, true);
     render();
   }));
+  /* живой бренд-превью: как агентство видит клиент на обложке подборки */
+  const agPreview = () => {
+    const name = ($('#agName') ? $('#agName').value : s.agency.name) || 'Агентство';
+    const mgr = { name: $('#mgrName') ? $('#mgrName').value : '', phone: $('#mgrPhone') ? $('#mgrPhone').value : '' };
+    const intro = $('#abIntro') ? $('#abIntro').value.trim() : '';
+    const bullets = $('#abBullets') ? $('#abBullets').value.split('\n').map(x => x.trim()).filter(Boolean) : [];
+    const logo = s.agency.logo;
+    const box = $('#agPreview', root);
+    if (!box) return;
+    box.innerHTML = `
+      <div style="background:linear-gradient(150deg,#0A1833,#061126);padding:26px 22px;color:#fff;text-align:center">
+        ${logo ? `<img src="${esc(logo)}" style="max-height:44px;max-width:150px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(120,160,255,.35))">` : `<div style="font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:.02em">${esc(name)}</div>`}
+        ${logo ? `<div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#86AFFF;margin-top:9px">${esc(name)}</div>` : ''}
+        <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(134,175,255,.4),transparent);margin:16px 34px"></div>
+        <div style="font-size:12.5px;color:#B9C7E8">Персональная подборка недвижимости</div>
+      </div>
+      <div style="padding:18px 20px;background:#fff">
+        <div style="font-size:13px;color:#3D4A63;line-height:1.55"><b style="color:#111827">Меня зовут ${esc(mgr.name || '{менеджер}')}${mgr.phone ? ` · ${esc(mgr.phone)}` : ''}.</b> ${esc(intro || 'Кратко о нас и чем полезны — заполните «Об агентстве» или нажмите «Заполнить ИИ».')}</div>
+        ${bullets.length ? `<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">${bullets.slice(0, 5).map(b => `<div style="font-size:12.5px;color:#3D4A63;display:flex;gap:8px"><span style="color:#2563EB">↳</span><span>${esc(b)}</span></div>`).join('')}</div>` : ''}
+      </div>`;
+  };
+  agPreview();
+  $$('.ab-live', root).forEach(el => el.addEventListener('input', agPreview));
+  ['#agName', '#mgrName', '#mgrPhone'].forEach(sel => { const el = $(sel, root); if (el) el.addEventListener('input', agPreview); });
+  $('#abAi').addEventListener('click', async () => {
+    const btn = $('#abAi'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '✦ ИИ пишет…';
+    try {
+      const r = await fetch('/api/ai/agency-about', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      if (j.intro) $('#abIntro').value = j.intro;
+      if (j.bullets && j.bullets.length) $('#abBullets').value = j.bullets.join('\n');
+      if (j.whyUs && j.whyUs.length) $('#abWhy').value = j.whyUs.join('\n');
+      if (j.freeNote) $('#abFree').value = j.freeNote;
+      agPreview();
+      toast('ИИ заполнил «Об агентстве»', 'Проверьте и нажмите «Сохранить»', true);
+    } catch (e) { toast('ИИ не справился', e.message); }
+    finally { btn.disabled = false; btn.innerHTML = orig; }
+  });
   $('#agSave').addEventListener('click', async () => {
     await api.patch('/settings', { agency: { name: $('#agName').value.trim() || 'Агентство' } });
     toast('Сохранено', null, true);
