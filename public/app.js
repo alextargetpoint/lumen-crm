@@ -1029,6 +1029,24 @@ const OV_W = {
   } },
 };
 
+/* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
+const OV_PREV = {
+  kpi: () => `<div class="ov2-kpis">${[[I.plus, '14', 'Новые лиды'], [I.chat, '8', 'В работе'], [I.spark, '10', 'Квалиф.'], [I.send, '332', 'Отправлено']].map(([i, v, k]) => `<div class="ov2-kpi"><span class="ov2-kpi-ic">${ic(i)}</span><span class="ov2-kpi-b"><span class="ov2-kpi-v">${v}</span><span class="ov2-kpi-k">${k}</span></span></div>`).join('')}</div>`,
+  attention: () => `<div class="ov2-attn">${[['bad', I.shield, '2', 'просят живого менеджера', 'Олег'], ['warn', I.chat, '9', 'ждут ответа', 'Артём']].map(([c, i, n, k, w]) => `<div class="ov2-att ${c}"><span class="ov2-att-ic">${ic(i)}</span><span class="ov2-att-b"><span class="ov2-att-n">${n}</span><span class="ov2-att-k">${k}</span></span><span class="ov2-att-who">${w}</span></div>`).join('')}</div>`,
+  funnel: () => `<div class="ov2-card-hd">${ic(I.funnel)}Воронка<span>39 лидов</span></div><div class="ov2-fun">${[['Новые', 14, 100, '#6B7A99'], ['В диалоге', 9, 64, '#4F7DFF'], ['Квалиф.', 6, 43, '#2FA98C'], ['У брокера', 4, 28, '#8B7BD8']].map(([n, v, w, col]) => `<div class="ov2-fun-row"><span class="ov2-fun-nm">${n}</span><span class="ov2-fun-bar"><i style="width:${w}%;background:${col}"></i></span><span class="ov2-fun-v">${v}</span></div>`).join('')}</div>`,
+  tasks: () => `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>13 открыто</span></div>${['Перезвонить по задатку|просрочено · 5 сент', 'Отправить КП семье Ивановых|сегодня', 'Показ ЖК Sky Gardens|8 сент'].map(t => { const [a, b] = t.split('|'); return `<div class="ov2-task"><button class="ov2-task-ck">${ic(I.check, 2.4)}</button><span class="ov2-task-t">${a}<i>${b}</i></span></div>`; }).join('')}`,
+  meetings: () => `<div class="ov2-card-hd">${ic(I.cal)}Ближайшие встречи<span>3</span></div>${[['14:00', 'сегодня', 'Ярослав Кузилек', 'Созвон'], ['11:30', '8 сент', 'Мария Власова', 'Видео-показ']].map(([tm, d, n, k]) => `<div class="ov2-meet"><div class="ov2-meet-tm"><b>${tm}</b><i>${d}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${n}</div><div class="ov2-meet-k">${k}</div></div></div>`).join('')}`,
+  recent: () => `<div class="ov2-card-hd">${ic(I.plus)}Свежие лиды<span>39</span></div>${[['Denis Grinberg', 'Дубай · Meta', 'только что'], ['Мария Власова', 'Бали · Facebook', '12 мин'], ['Ярослав К.', 'Дубай · сайт', '1 ч']].map(([n, s, t]) => `<div class="ov2-lrow"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${n}</div><div class="ov2-lrow-s">${s}</div></div><span class="ov2-lrow-t">${t}</span></div>`).join('')}`,
+  brokers: () => `<div class="ov2-card-hd">${ic(I.users)}Загрузка брокеров<span>3 в работе</span></div><div class="ov2-fun">${[['Амир Хусейн', 60, '12/20'], ['Дарья Соколова', 95, '19/20'], ['Кетут Арта', 35, '7/20']].map(([n, w, v]) => `<div class="ov2-fun-row"><span class="ov2-fun-nm">${n}</span><span class="ov2-fun-bar"><i style="width:${w}%;background:${w >= 90 ? 'var(--bad)' : 'var(--accent)'}"></i></span><span class="ov2-fun-v">${v}</span></div>`).join('')}</div>`,
+  numbers: () => `<div class="ov2-card-hd">${ic(I.sim)}Здоровье WhatsApp</div><div class="ov2-mini3">${[['332', 'отправлено'], ['4', 'активных'], ['75%', 'качество']].map(([v, k]) => `<div class="ov2-mini"><b>${v}</b><i>${k}</i></div>`).join('')}</div>`,
+  geo: () => `<div class="ov2-card-hd">${ic(I.target)}Конверсия по направлениям</div><div class="ov2-fun">${[['Дубай', 32, '8/25'], ['Бали', 24, '5/21'], ['Пхукет', 18, '3/17']].map(([n, c, q]) => `<div class="ov2-fun-row"><span class="ov2-fun-nm">${n}<i>${q} квал.</i></span><span class="ov2-fun-bar"><i style="width:${c}%;background:var(--ok)"></i></span><span class="ov2-fun-v">${c}%</span></div>`).join('')}</div>`,
+  aivs: () => `<div class="ov2-card-hd">${ic(I.spark)}ИИ против человека</div><div class="ov2-vs"><div class="ov2-vs-h"><span></span><b>ИИ</b><i>человек</i></div>${[['Первый контакт', '≈1 мин', '47 мин'], ['Диалог → ответ', '62%', '40%'], ['Ответ → квал.', '38%', '30%']].map(([k, a, h]) => `<div class="ov2-vs-r"><span>${k}</span><b>${a}</b><i>${h}</i></div>`).join('')}</div>`,
+  chains: () => `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>2 активны</span></div>${[['Стандартная · RU', 'Все гео · 6 касаний', 1], ['Онбординг FB-лидов', 'Дубай · 5 касаний', 0]].map(([n, s, on]) => `<div class="ov2-lrow"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${n}</div><div class="ov2-lrow-s">${s}</div></div><span class="ov2-chip ${on ? 'on' : ''}">${on ? 'вкл' : 'выкл'}</span></div>`).join('')}`,
+  activity: () => `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>${[['ok', I.flame, 'Сделка: Denis Grinberg', '5 мин'], ['', I.chat, 'Новое сообщение · Мария', '18 мин'], ['ok', I.spark, 'Квалифицирован · Ярослав', '1 ч']].map(([c, i, t, tm]) => `<div class="ov2-act ${c}"><span class="ov2-act-ic">${ic(i)}</span><span class="ov2-act-t">${t}</span><span class="ov2-act-tm">${tm}</span></div>`).join('')}`,
+  spark: () => `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div><div class="ov2-spark"><div class="ov2-spark-n">18<i>за неделю</i></div><svg viewBox="0 0 100 32" preserveAspectRatio="none" class="ov2-spark-svg"><polyline points="0,26 8,20 15,24 23,12 31,16 38,8 46,14 54,6 62,12 69,4 77,10 85,5 92,9 100,3" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`,
+  onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
+};
+
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] }))]);
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -1073,7 +1091,7 @@ function ovLibrary(ctx, layout, onChange) {
     title: 'Библиотека виджетов', wide: 'card', sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
     body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => `<div class="ov2-lib-i" data-add="${k}">
         <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
-        <div class="ov2-lib-prev"><div class="ov2-lib-prev-in glass card">${OV_W[k].render(ctx)}</div></div>
+        <div class="ov2-lib-prev"><div class="ov2-lib-prev-in glass card">${OV_PREV[k] ? OV_PREV[k]() : OV_W[k].render(ctx)}</div></div>
       </div>`).join('')}</div>` : '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>'}
       ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`,
     actions: [{ label: 'Закрыть' }],
@@ -6069,8 +6087,10 @@ function mountFab() {
   const ALL = [
     { k: 'search', ic: I.search || I.doc, label: 'Поиск', hint: 'лиды · объекты · задачи (⌘K)', run: () => { const s = $('#gsInput'); if (s) { s.focus(); s.select(); } } },
     { k: 'task', ic: I.check, label: 'Быстрая задача', run: () => quickTaskModal() },
+    { k: 'object', ic: I.building || I.plus, label: 'Добавить объект', page: 'properties', run: () => quickPropertyModal() },
+    { k: 'import', ic: I.doc, label: 'Подгрузить объекты', page: 'properties', run: () => { go('properties'); setTimeout(() => { const b = $('#prImport'); if (b) b.click(); }, 350); } },
+    { k: 'idea', ic: I.spark, label: 'Идея для соцсетей', page: 'social', run: () => quickIdeaModal() },
     { k: 'waiting', ic: I.chat, label: 'Ждут ответа', page: 'inbox', run: () => go('inbox') },
-    { k: 'idea', ic: I.spark, label: 'Идея для соцсетей', page: 'social', run: () => go('social') },
     { k: 'meet', ic: I.cal, label: 'Назначить встречу', page: 'meetings', run: () => go('meetings') },
   ];
   const acts = ALL.filter(a => !a.page || canPage(a.page));
