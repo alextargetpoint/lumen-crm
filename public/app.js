@@ -1644,7 +1644,7 @@ PAGES.meetings = async (root) => {
         </span></div>
       <div class="cal-grid" style="--hpx:${HPX}px">
         <div class="cal-hours">${Array.from({ length: H1 - H0 }, (_, i) => `<div>${H0 + i}:00</div>`).join('')}</div>
-        ${dayCols.map(d => `<div class="cal-day ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" data-day="${d.toISOString().slice(0, 10)}">
+        ${dayCols.map(d => `<div class="cal-day ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" data-day="${dstrLocal(d)}">
           <div class="cal-dhead">${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][(d.getDay() + 6) % 7]} <b>${d.getDate()}</b></div>
           <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${d.toDateString() === new Date().toDateString() && new Date().getHours() >= H0 && new Date().getHours() < H1 ? `<div class="cal-now" style="top:${(new Date().getHours() + new Date().getMinutes() / 60 - H0) * HPX}px"></div>` : ''}${calBlocks(d)}
             ${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cal-slot" style="top:${i * HPX}px" data-h="${H0 + i}"></div>`).join('')}</div>
@@ -1659,7 +1659,7 @@ PAGES.meetings = async (root) => {
     (byDay[d] = byDay[d] || []).push(mt);
   }
   const mtWeek = listF.filter(mt => { const t = new Date(mt.at); return t >= mon && t < new Date(+mon + 7 * 864e5); });
-  const mtNext = list.filter(mt => mt.at > Date.now() && mt.status === 'planned').sort((a2, b2) => a2.at - b2.at)[0];
+  const mtNext = list.filter(mt => mt.at > Date.now() && mt.status === 'scheduled').sort((a2, b2) => a2.at - b2.at)[0];
   root.innerHTML = heroArt('assets/art/calendar.png', `
       <div class="ha-title">${ic(I.cal)}Встречи<span class="sub">показы, звонки и Zoom — подтверждения уходят в WhatsApp сами</span></div>
       ${[

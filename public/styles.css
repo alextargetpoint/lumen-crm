@@ -1082,12 +1082,13 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 @media (max-width: 900px) { .pb-layout { grid-template-columns: 1fr; } .pb-nav { position: static; } .pb-cat-t i { display: none; } }
 
 /* ---------- WhatsApp-эмулятор в конструкторе цепочек ---------- */
-.wa-phone { position: sticky; top: 6px; }
+.wa-phone { position: sticky; top: 6px; background: var(--card); border: 1px solid var(--stroke); border-radius: var(--r-lg); padding: 16px 16px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; }
+.wa-phone .wa-note { align-self: flex-start; }
 .wa-note { font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; display: flex; gap: 6px; align-items: center; }
 .wa-note svg { width: 13px; height: 13px; }
 /* Реалистичный iPhone (Pro, титан): рамка, Dynamic Island, статус-бар, боковые кнопки, home-индикатор */
 .iph {
-  position: relative; width: 300px; margin: 0 auto; padding: 11px; border-radius: 54px;
+  position: relative; width: 272px; max-width: 100%; margin: 0 auto; padding: 10px; border-radius: 50px;
   background: linear-gradient(150deg, #3a3d42, #17181c 32%, #202227 70%, #303338);
   box-shadow: 0 30px 70px -24px rgba(8, 10, 16, .62), inset 0 0 0 2px rgba(255, 255, 255, .06), inset 0 0 3px 3px rgba(0, 0, 0, .5);
 }
@@ -1473,7 +1474,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 @media (max-width: 900px) { .ha.v-mark .ha-stage { position: static; transform: none; width: auto; opacity: 1; } .ha.v-mark .ha-body { padding: 4px 0; } .ha.v-mark { grid-template-columns: 1fr; } .ha.v-right { grid-template-columns: 1fr; } .ha.v-right .ha-stage { order: -1; } }
 
 /* эмулятор: спокойный статичный режим + шкала дней */
-.wa-scrub { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.wa-scrub { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; }
 .wa-sc { border: 1px solid var(--stroke, #E1E8F4); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--ink-2, #3A4256); cursor: pointer; font-family: inherit; transition: all .15s; }
 .wa-sc:hover, .wa-sc.on { border-color: #2563EB; color: #2563EB; background: #EFF4FF; }
 .wa-msg.calm { animation: waCalm .5s var(--ease-spring, ease) both; animation-delay: calc(var(--wi) * 90ms); }
