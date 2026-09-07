@@ -611,6 +611,59 @@ const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
   .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
   .replace(/<\s*(\/?)(b|strong|i|em|u|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
   .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '');
+/* ── Слои слайда: фигуры, стикеры, рамки, фото, текст (drag/resize/z-order) ── */
+const CAR_SHAPES = new Set(['rect', 'circle', 'ring', 'line', 'triangle', 'blob', 'arrow', 'badge', 'diamond']);
+const CAR_FRAMES = new Set(['thin', 'double', 'corners', 'inset', 'film', 'tape']);
+const CAR_STICKERS = AMEN_ICONS;   /* переиспользуем тонкие линейные иконки как стикеры (~34 шт) */
+const CAR_LTYPES = new Set(['img', 'shape', 'sticker', 'frame', 'text']);
+const hex = (v, d) => /^#[0-9a-fA-F]{3,8}$/.test(String(v)) ? v : d;
+const sanLayer = (l) => {
+  if (!l || !CAR_LTYPES.has(l.t)) return null;
+  const num = (v, d, lo, hi) => { const n = +v; return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); };
+  const o = { t: l.t, x: num(l.x, 12, -30, 130), y: num(l.y, 12, -30, 130), w: num(l.w, 26, 3, 130), z: num(l.z, 1, 0, 99) | 0, rot: num(l.rot, 0, -180, 180) };
+  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); }
+  else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); }
+  else if (l.t === 'sticker') { if (!CAR_STICKERS[l.key]) return null; o.key = l.key; o.color = hex(l.color, '#FFFFFF'); }
+  else if (l.t === 'frame') { o.frame = CAR_FRAMES.has(l.frame) ? l.frame : 'thin'; o.color = hex(l.color, '#FFFFFF'); }
+  else if (l.t === 'text') { o.text = String(l.text || '').replace(/<[^>]*>/g, '').slice(0, 140); o.color = hex(l.color, '#FFFFFF'); o.tsize = num(l.tsize, 20, 8, 90); o.tw = l.tw === 'serif' ? 'serif' : 'sans'; o.tb = !!l.tb; }
+  return o;
+};
+/* SVG фигуры (масштабируются по контейнеру) */
+function carShapeSVG(shape, color, fill) {
+  const f = fill ? color : 'none', st = fill ? 'none' : color, sw = fill ? 0 : 4;
+  const S = (vb, inner) => `<svg viewBox="${vb}" preserveAspectRatio="none" style="width:100%;height:100%;display:block">${inner}</svg>`;
+  switch (shape) {
+    case 'circle': return S('0 0 100 100', `<circle cx="50" cy="50" r="49" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
+    case 'ring': return S('0 0 100 100', `<circle cx="50" cy="50" r="46" fill="none" stroke="${color}" stroke-width="7"/>`);
+    case 'line': return S('0 0 100 8', `<rect width="100" height="8" rx="4" fill="${color}"/>`);
+    case 'triangle': return S('0 0 100 100', `<polygon points="50,3 97,97 3,97" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
+    case 'diamond': return S('0 0 100 100', `<polygon points="50,3 97,50 50,97 3,50" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
+    case 'blob': return `<svg viewBox="0 0 200 200" style="width:100%;height:100%;display:block"><path fill="${f}" stroke="${st}" stroke-width="${sw}" d="M52,-63C64,-53,68,-33,70,-14C72,5,71,24,62,39C52,54,34,64,15,69C-5,74,-27,73,-44,63C-61,53,-73,34,-76,14C-79,-7,-72,-30,-59,-45C-46,-60,-27,-67,-6,-65C15,-63,40,-73,52,-63Z" transform="translate(100 100) scale(1.25)"/></svg>`;
+    case 'arrow': return S('0 0 100 100', `<path d="M18 50h55M52 28l24 22-24 22" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`);
+    case 'badge': return S('0 0 100 100', `<rect x="2" y="2" width="96" height="96" rx="22" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
+    default: return S('0 0 100 100', `<rect x="1" y="1" width="98" height="98" rx="6" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
+  }
+}
+
+/* отрисовка слоёв слайда (фигуры/стикеры/рамки/фото/текст) — общий для просмотра и редактора */
+function renderCarLayers(layers, isEdit) {
+  if (!Array.isArray(layers) || !layers.length) return '';
+  const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
+  const handles = isEdit ? '<span class="lyr-h lyr-rs" data-lrs title="Размер"></span><span class="lyr-tools"><button data-lup title="Вперёд">↑</button><button data-ldn title="Назад">↓</button><button data-ldel title="Удалить">✕</button></span>' : '';
+  return layers.map((l, i) => {
+    const z = 10 + (l.z || 0);
+    const de = isEdit ? ` data-lyr="${i}"` : '';
+    if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
+    const geo = `left:${l.x}%;top:${l.y}%;width:${l.w}%;z-index:${z};transform:rotate(${l.rot || 0}deg)`;
+    let inner = '';
+    if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:cover;border-radius:${l.round || 0}px;display:block">`;
+    else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : 'aspect-ratio:1;'}">${carShapeSVG(l.shape, l.color, l.fill)}</div>`;
+    else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
+    else if (l.t === 'text') inner = `<span class="lyr-tx" style="color:${esc(l.color)};font-size:${l.tsize}px;font-family:${l.tw === 'serif' ? 'var(--disp)' : "'Manrope',sans-serif"};font-weight:${l.tb ? 800 : 600};line-height:1.1;display:block">${esc(l.text)}</span>`;
+    return `<div class="s-lyr lyr-${l.t}" style="${geo}"${de}>${inner}${handles}</div>`;
+  }).join('');
+}
+
 const sanSlide = (s) => ({
   heading: sanCarInline(s.heading).slice(0, 240),
   sub: sanCarInline(s.sub).slice(0, 380),
@@ -622,6 +675,7 @@ const sanSlide = (s) => ({
   pos: CAR_POS.has(s.pos) ? s.pos : '',
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
+  layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 
 /* библиотека иконок удобств/гарантий в стиле дашборда (тонкая линия) — вместо эмодзи в блоках */
@@ -1090,7 +1144,10 @@ const server = http.createServer(async (req, res) => {
     if (IS_BROKER && /^\/api\/(numbers|templates|ads|audit|campaigns|wake|comments|wa)/.test(p)) return json(res, 403, { error: 'недоступно для брокера' });
     /* видимость лида для брокера: только свои */
     const canSeeLead = (l) => !IS_BROKER || l.broker === ROLE.brokerId;
-    const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; return c2; };
+    /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
+    const RR_STATE = realRole(req);
+    const showSecret = RR_STATE && RR_STATE.role === 'owner' && !RR_STATE.previewAs;
+    const brokerPub = (b) => { const c2 = Object.assign({}, b); delete c2.pinHash; if (!showSecret) delete c2.pinPlain; return c2; };
 
     /* ---------------- биллинг подписки (личный кабинет, только владелец) ---------------- */
     if (p.startsWith('/api/billing')) {
@@ -1465,7 +1522,7 @@ const server = http.createServer(async (req, res) => {
       else { let tries = 0; do { pin = String(Math.floor(100000 + Math.random() * 900000)); tries++; } while ((sha(pin) === db.settings.auth.passHash || db.brokers.some(x => x.pinHash === sha(pin))) && tries < 40); }
       const ph = sha(pin);
       if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
-      br.pinHash = ph; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice();
+      br.pinHash = ph; br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
       /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
       let seeded = 0;
       if (!br.onboarded) {
@@ -1559,7 +1616,7 @@ const server = http.createServer(async (req, res) => {
         const ph = sha(String(b.pin));
         if (String(b.pin).length < 6) return json(res, 400, { error: 'PIN короче 6 символов' });
         if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
-        br.pinHash = ph;
+        br.pinHash = ph; br.pinPlain = String(b.pin); br.accessAt = Date.now();
         audit(db, req, 'задан PIN брокеру', { broker: br.name });
       }
       /* kill-switch: отключение доступа + переназначение лидов + сброс сессий брокера */
@@ -3120,6 +3177,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             <p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>
             <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
+          ${renderCarLayers(s.layers, isEdit)}
         </div>`;
       }).join('');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -3137,6 +3195,27 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
 .slide .s-in{position:relative;z-index:1}
+/* слои: фигуры/стикеры/фото/текст */
+.s-lyr{position:absolute}
+.s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
+.s-lyr.lyr-sticker{aspect-ratio:1}.s-lyr .lyr-ic{height:100%}
+.s-lyr .lyr-shape svg{filter:drop-shadow(0 6px 16px rgba(0,0,0,.18))}
+/* рамки (оверлей на весь слайд) */
+.s-frame{position:absolute;inset:0;pointer-events:none;border-radius:20px}
+.frame-thin{border:2px solid var(--fc);margin:14px;border-radius:12px}
+.frame-double{border:5px double var(--fc);margin:14px;border-radius:6px}
+.frame-inset{box-shadow:inset 0 0 0 2px var(--fc);margin:0}
+.frame-corners{background:
+  linear-gradient(var(--fc),var(--fc)) left 14px top 14px/34px 2px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) left 14px top 14px/2px 34px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) right 14px top 14px/34px 2px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) right 14px top 14px/2px 34px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) left 14px bottom 14px/34px 2px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) left 14px bottom 14px/2px 34px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) right 14px bottom 14px/34px 2px no-repeat,
+  linear-gradient(var(--fc),var(--fc)) right 14px bottom 14px/2px 34px no-repeat}
+.frame-film{border:14px solid var(--fc);border-image:repeating-linear-gradient(90deg,var(--fc) 0 10px,transparent 10px 18px) 14}
+.frame-tape{box-shadow:inset 0 0 0 3px var(--fc);margin:10px;border-radius:2px}
 .slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
 .slide .s-h mark,.slide .s-s mark{background:var(--blue);color:#fff;padding:0 .14em;border-radius:.14em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .slide mark.hl-cobalt{background:var(--blue);color:#fff}
@@ -3181,11 +3260,21 @@ ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparen
 .s-pick{position:absolute;top:10px;right:10px;z-index:6;width:32px;height:32px;border-radius:9px;background:rgba(6,17,38,.72);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s,background .15s;backdrop-filter:blur(6px)}
 .slide:hover .s-pick{opacity:1}
 .s-pick:hover{background:var(--blue)}
-${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}` : ''}
+${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}
+.s-lyr{cursor:grab}.s-lyr:active{cursor:grabbing}
+.s-lyr.lsel,.s-frame.lsel{outline:2px solid #2563EB;outline-offset:2px}
+.lyr-h{position:absolute;z-index:30}
+.lyr-rs{right:-8px;bottom:-8px;width:16px;height:16px;background:#2563EB;border:2px solid #fff;border-radius:50%;cursor:nwse-resize;opacity:0}
+.s-lyr.lsel .lyr-rs{opacity:1}
+.lyr-tools{position:absolute;top:-13px;right:-6px;display:none;gap:3px;z-index:31}
+.s-lyr.lsel .lyr-tools,.s-frame.lsel .lyr-tools{display:flex}
+.s-frame .lyr-tools{top:16px;right:16px;pointer-events:auto}
+.lyr-tools button{width:24px;height:24px;border:none;border-radius:7px;background:rgba(6,17,38,.85);color:#fff;font-size:12px;cursor:pointer;backdrop-filter:blur(6px)}
+.lyr-tools button:hover{background:#2563EB}` : ''}
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=4"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=5"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
