@@ -553,6 +553,45 @@ const FONT_PRESETS = {
   tech: { name: 'Модерн', gf: 'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700', disp: "'Space Grotesk',sans-serif", body: "'Inter',sans-serif" },
 };
 
+/* библиотека иконок удобств/гарантий в стиле дашборда (тонкая линия) — вместо эмодзи в блоках */
+const AMEN_ICONS = {
+  pool: '<path d="M3 18c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M7 14V6a2 2 0 014 0M7 10h4"/>',
+  gym: '<path d="M4 9v6M20 9v6M4 12h16M6 7v10M18 7v10"/>',
+  beach: '<path d="M4 20h16M12 20V9M12 9c-3 0-6 2-7 5 4-1 7-2 7-5 0 3 3 4 7 5-1-3-4-5-7-5zM12 4v2"/>',
+  concierge: '<path d="M5 18h14M12 8a6 6 0 016 6H6a6 6 0 016-6zM12 6V4"/>',
+  parking: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 16V8h3a2 2 0 010 4H9"/>',
+  park: '<path d="M12 22v-6M8 16a4 4 0 118 0zM12 12a3 3 0 100-6 3 3 0 000 6z"/>',
+  spa: '<path d="M12 22c4-3 7-6 7-11 0 3-3 4-7 4M12 22c-4-3-7-6-7-11 0 3 3 4 7 4M12 22V7"/>',
+  sauna: '<rect x="4" y="8" width="16" height="12" rx="1"/><path d="M8 12c0-1 1-1 1-2M12 12c0-1 1-1 1-2M16 12c0-1 1-1 1-2"/>',
+  restaurant: '<path d="M6 3v8a2 2 0 004 0V3M8 11v10M17 3c-1.5 0-2 2-2 4s.5 4 2 4v10"/>',
+  security: '<path d="M12 3l7 3v6c0 4-3 6.8-7 8.5C8 18.8 5 16 5 12V6z"/>',
+  elevator: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 9l1.5-2L12 9M13 15l1.5 2L16 15"/>',
+  kids: '<circle cx="12" cy="5" r="2"/><path d="M12 7v7M8 10h8M9 21l3-5 3 5"/>',
+  pets: '<circle cx="7" cy="9" r="1.5"/><circle cx="17" cy="9" r="1.5"/><circle cx="10" cy="6" r="1.5"/><circle cx="14" cy="6" r="1.5"/><path d="M12 12c-2.5 0-4 2-4 4a2 2 0 002 2c1 0 1.5-.5 2-.5s1 .5 2 .5a2 2 0 002-2c0-2-1.5-4-4-4z"/>',
+  wifi: '<path d="M5 12a10 10 0 0114 0M8 15a6 6 0 018 0M12 18h.01"/>',
+  view: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.5"/>',
+  marina: '<path d="M12 22V7M12 7a2 2 0 100-4 2 2 0 000 4zM6 11h12M6 11a6 6 0 0012 0"/>',
+  golf: '<path d="M12 3v13M12 6l5 2-5 2M6 21c1.5-1 4-1.5 6-1.5s4.5.5 6 1.5"/>',
+  tennis: '<circle cx="12" cy="12" r="9"/><path d="M5 5c4 3 4 11 0 14M19 5c-4 3-4 11 0 14"/>',
+  bbq: '<circle cx="12" cy="9" r="6"/><path d="M9 15l-2 6M15 15l2 6M9 9h.01M13 8h.01M11 11h.01"/>',
+  rooftop: '<path d="M3 21h18M5 21v-8l7-4 7 4v8M9 21v-4h6v4"/>',
+  lounge: '<path d="M4 11a2 2 0 012-2h12a2 2 0 012 2v5H4zM4 16v3M20 16v3M7 9V7a2 2 0 012-2h6a2 2 0 012 2v2"/>',
+  coworking: '<rect x="3" y="5" width="18" height="11" rx="1"/><path d="M8 20h8M12 16v4"/>',
+  cinema: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3zM3 9h4M17 9h4M3 15h4M17 15h4"/>',
+  shop: '<path d="M4 8h16l-1 12H5zM8 8V6a4 4 0 018 0v2"/>',
+  metro: '<rect x="5" y="4" width="14" height="12" rx="3"/><path d="M8 16l-2 4M16 16l2 4M8 12h8M9 8h6"/>',
+  school: '<path d="M3 9l9-4 9 4-9 4zM7 11v5c0 1 2 2 5 2s5-1 5-2v-5"/>',
+  gate: '<path d="M4 20V6h4l4-2 4 2h4v14M9 20v-8h6v8"/>',
+  garden: '<path d="M12 20v-5M12 15c-3 0-5-2-5-5 3 0 5 1 5 4 0-3 2-4 5-4 0 3-2 5-5 5zM7 20h10"/>',
+  shield: '<path d="M12 3l7 3v6c0 4-3 6.8-7 8.5C8 18.8 5 16 5 12V6z"/><path d="M9 12l2 2 4-4"/>',
+  doc: '<path d="M6 3h8l4 4v14H6zM14 3v4h4"/>',
+  handshake: '<path d="M8 11l3-3 3 2 3-2M4 9l4-1 4 4M20 9l-4-1M8 11l-3 3M12 13l3 3M15 16l2-2"/>',
+  key: '<circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M17 17l2-2M15 15l2-2"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  award: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
+};
+const amenIcon = (v) => AMEN_ICONS[v] ? `<svg class="amn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[v]}</svg>` : (v ? `<span class="amn-emoji">${String(v).slice(0, 3)}</span>` : '');
+
 function pbDefaults(t) {
   switch (t) {
     case 'text': return { title: 'Заголовок', body: 'Текст блока — кликните, чтобы отредактировать.' };
@@ -571,9 +610,9 @@ function pbDefaults(t) {
     case 'checklist': return { title: 'Проверим за вас', bullets: ['Репутация застройщика и история сдач', 'Юридическая чистота юнита', 'Реальная аренда в районе, а не обещанная', 'Скрытые платежи и сервисные сборы'] };
     case 'textimg': return { title: 'Заголовок раздела', body: 'Пара абзацев текста рядом с фотографией — район, концепция проекта или история клиента.', img: '' };
     case 'team': return { title: 'Кто будет с вами на связи', items: [{ name: 'Ваш менеджер', role: 'подбор и переговоры' }, { name: 'Юрист', role: 'договор и проверка' }, { name: 'После сделки', role: 'аренда и управление' }] };
-    case 'amenities': return { title: 'Инфраструктура комплекса', items: [{ icon: '🏊', label: 'Бассейн-инфинити' }, { icon: '🏋️', label: 'Фитнес 24/7' }, { icon: '🏖️', label: 'Пляж в 5 минутах' }, { icon: '🛎️', label: 'Консьерж-сервис' }, { icon: '🅿️', label: 'Подземный паркинг' }, { icon: '🌳', label: 'Ландшафтный парк' }] };
+    case 'amenities': return { title: 'Инфраструктура комплекса', items: [{ icon: 'pool', label: 'Бассейн-инфинити' }, { icon: 'gym', label: 'Фитнес 24/7' }, { icon: 'beach', label: 'Пляж в 5 минутах' }, { icon: 'concierge', label: 'Консьерж-сервис' }, { icon: 'parking', label: 'Подземный паркинг' }, { icon: 'park', label: 'Ландшафтный парк' }] };
     case 'hero': return { img: '', heading: 'Место, где хочется остаться', sub: 'Локация, вид и стиль жизни — одним кадром.' };
-    case 'guarantee': return { title: 'Ваша сделка под защитой', items: [{ icon: '🛡', title: 'Юридическая проверка', text: 'Каждый объект — на чистоту и репутацию застройщика.' }, { icon: '📄', title: 'Официальный договор', text: 'SPA напрямую с застройщиком, все условия прозрачны.' }, { icon: '🤝', title: 'Сопровождение до ключей', text: 'Платежи, регистрация и передача — берём на себя.' }] };
+    case 'guarantee': return { title: 'Ваша сделка под защитой', items: [{ icon: 'shield', title: 'Юридическая проверка', text: 'Каждый объект — на чистоту и репутацию застройщика.' }, { icon: 'doc', title: 'Официальный договор', text: 'SPA напрямую с застройщиком, все условия прозрачны.' }, { icon: 'handshake', title: 'Сопровождение до ключей', text: 'Платежи, регистрация и передача — берём на себя.' }] };
     default: return {};
   }
 }
@@ -630,13 +669,13 @@ function sanitizeBlocks(raw) {
     if (b.t === 'gallery') putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; });
     if (b.t === 'stats') putList('items', (x) => x && (x.k || x.v) ? { k: str(x.k, 120), v: str(x.v, 60) } : null);
     if (b.t === 'faq') putList('items', (x) => x && (x.q || x.a) ? { q: str(x.q, 300), a: str(x.a, 1000) } : null);
-    if (b.t === 'steps' || b.t === 'benefits') putList('items', (x) => x && (x.title || x.text) ? { icon: str(x.icon, 8), title: str(x.title, 200), text: str(x.text, 600) } : null);
+    if (b.t === 'steps' || b.t === 'benefits') putList('items', (x) => x && (x.title || x.text) ? { icon: str(x.icon, 20), title: str(x.title, 200), text: str(x.text, 600) } : null);
     if (b.t === 'compare') { put('headA', 120); put('headB', 120); putList('items', (x) => x && (x.k || x.a || x.b) ? { k: str(x.k, 160), a: str(x.a, 200), b: str(x.b, 200) } : null); }
     if (b.t === 'timeline') putList('items', (x) => x && (x.when || x.title) ? { when: str(x.when, 80), title: str(x.title, 200), text: str(x.text, 500) } : null);
     if (b.t === 'pricecards') putList('items', (x) => x && (x.name || x.price) ? { name: str(x.name, 120), price: str(x.price, 80), text: str(x.text, 600) } : null);
     if (b.t === 'team') putList('items', (x) => x && (x.name || x.role) ? { name: str(x.name, 120), role: str(x.role, 200) } : null);
-    if (b.t === 'amenities') putList('items', (x) => x && (x.icon || x.label) ? { icon: str(x.icon, 8), label: str(x.label, 120) } : null);
-    if (b.t === 'guarantee') putList('items', (x) => x && (x.icon || x.title || x.text) ? { icon: str(x.icon, 8), title: str(x.title, 200), text: str(x.text, 600) } : null);
+    if (b.t === 'amenities') putList('items', (x) => x && (x.icon || x.label) ? { icon: str(x.icon, 20), label: str(x.label, 120) } : null);
+    if (b.t === 'guarantee') putList('items', (x) => x && (x.icon || x.title || x.text) ? { icon: str(x.icon, 20), title: str(x.title, 200), text: str(x.text, 600) } : null);
     if (b.t === 'hero') { put('heading', 200); put('sub', 400); }
     if (b.t === 'bignum') { put('v', 60); put('k', 300); }
     if (b.t === 'hello' || b.t === 'why' || b.t === 'checklist') putList('bullets', (x) => str(x, 400).trim() || null);
@@ -2793,7 +2832,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
           return `<section class="pg">
   <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Инфраструктура')}</h2>
   <div class="amn ${b.v === 'compact' ? 'cmp' : ''}" data-plist="${b.id}:items">
-    ${items.map((it, i2) => `<div class="amn-i"><span class="amn-ic">${esc(it.icon || '•')}</span><span class="amn-l"${be(b.id, 'items', i2 + ':label')}>${esc(it.label || '')}</span></div>`).join('')}
+    ${items.map((it, i2) => `<div class="amn-i"><span class="amn-ic"${isEdit ? ` data-bicon="${b.id}:items:${i2}:icon" data-ico="${esc(it.icon || '')}" title="Сменить иконку"` : ''}>${amenIcon(it.icon)}</span><span class="amn-l"${be(b.id, 'items', i2 + ':label')}>${esc(it.label || '')}</span></div>`).join('')}
   </div>
   <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
@@ -2814,7 +2853,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
           return `<section class="pg ${b.v === 'blue' ? 'blue' : ''}">
   <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Ваша сделка под защитой')}</h2>
   <div class="grt" data-plist="${b.id}:items">
-    ${items.map((it, i2) => `<div class="grt-i"><span class="grt-ic">${esc(it.icon || '✓')}</span><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title || '')}</b><span class="grt-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text || '')}</span></div>`).join('')}
+    ${items.map((it, i2) => `<div class="grt-i"><span class="grt-ic"${isEdit ? ` data-bicon="${b.id}:items:${i2}:icon" data-ico="${esc(it.icon || '')}" title="Сменить иконку"` : ''}>${amenIcon(it.icon)}</span><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title || '')}</b><span class="grt-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text || '')}</span></div>`).join('')}
   </div>
   <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
@@ -3089,7 +3128,11 @@ h2:not(.hi){font-family:var(--disp)}
 .amn.cmp{grid-template-columns:repeat(3,1fr);gap:12px}
 .amn-i{display:flex;align-items:center;gap:13px;padding:15px 16px;background:var(--bg);border-radius:14px;border:1px solid var(--line)}
 .amn.cmp .amn-i{flex-direction:column;text-align:center;gap:8px;padding:18px 12px}
-.amn-ic{font-size:24px;line-height:1;width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,var(--paper));border-radius:12px}
+.amn-ic{font-size:22px;line-height:1;width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,var(--paper));border-radius:12px;color:var(--blue)}
+.amn-ic .amn-svg,.grt-ic .amn-svg{width:26px;height:26px}
+.amn-ic .amn-emoji,.grt-ic .amn-emoji{font-size:22px}
+[data-bicon]{cursor:pointer;transition:box-shadow .15s}
+[data-bicon]:hover{box-shadow:0 0 0 2px var(--blue)}
 .amn.cmp .amn-ic{width:52px;height:52px;flex:0 0 52px}
 .amn-l{font-size:14px;font-weight:600;color:var(--ink);min-width:0}
 /* блок: фото-хиро */
@@ -3103,7 +3146,7 @@ h2:not(.hi){font-family:var(--disp)}
 .grt{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
 .blue .grt-i{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
 .grt-i{padding:20px 18px;background:var(--bg);border-radius:16px;border:1px solid var(--line)}
-.grt-ic{font-size:26px;line-height:1;display:block;margin-bottom:12px}
+.grt-ic{font-size:24px;line-height:1;display:inline-grid;place-items:center;width:44px;height:44px;margin-bottom:12px;color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--paper));border-radius:12px}
 .grt-i b{font-size:15.5px;font-weight:700;display:block;margin-bottom:6px}
 .grt-t{font-size:13px;line-height:1.55;color:var(--mut)}
 .blue .grt-t{color:rgba(255,255,255,.8)}
@@ -3158,7 +3201,8 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         theme: c.theme || 'klein',
         themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
         fontPreset: c.fontPreset || 'soft',
-        fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name }])),
+        fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])),
+        icons: AMEN_ICONS,
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
         lib: (() => { try { return fs.readdirSync(path.join(PUBLIC, 'assets', 'lib')).filter(f => /\.(jpe?g|png|webp)$/i.test(f)).map(f => '/assets/lib/' + f); } catch (e) { return []; } })(),

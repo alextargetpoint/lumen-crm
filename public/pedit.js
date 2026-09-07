@@ -66,6 +66,12 @@ section[data-bid]:hover .btool{opacity:1}
 .peth-i{display:grid;place-items:center}
 .peth-i .pico{width:16px;height:16px;color:#9DB8FF}
 .peth.drag .peth-i .pico,.peth:hover .peth-i .pico{color:#fff}
+.pgrid.ico-grid{grid-template-columns:repeat(6,1fr);max-width:322px;gap:6px}
+.ico-pick{padding:9px 6px;display:grid;place-items:center;border:1px solid #E7ECF3;border-radius:10px;cursor:pointer;background:#fff}
+.ico-pick svg{width:22px;height:22px;color:#3D4A63}
+.ico-pick:hover{border-color:#2563EB;background:#F5F8FF}
+.ico-pick:hover svg,.ico-pick.on svg{color:#2563EB}
+.ico-pick.on{border-color:#2563EB;background:#F5F8FF}
 section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:-3px;opacity:.75}
 .plib{aspect-ratio:4/3;border-radius:9px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent}
 .plib:hover{border-color:#2563EB}
@@ -196,6 +202,12 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
         const val = (el.dataset.bival || '').trim();
         if (parts.length === 2) { if (val) b.data[field] = val; else delete b.data[field]; return; }
         (b.data[field] = b.data[field] || [])[+parts[2]] = val;
+      });
+      /* иконки удобств/гарантий */
+      $$('[data-bicon]', sec).forEach((el) => {
+        const parts = el.dataset.bicon.split(':');            /* bid:field:idx:sub */
+        const arr = b.data[parts[1]] = b.data[parts[1]] || [];
+        (arr[+parts[2]] = arr[+parts[2]] || {})[parts[3]] = el.dataset.ico || '';
       });
       /* видео */
       if (b.t === 'video') b.data.url = sec.dataset.vurl || '';
@@ -576,6 +588,26 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     $('#peVOk', el).addEventListener('click', () => applyV($('#peVUrl', el).value.trim()));
     const rm = $('#peVRm', el);
     if (rm) rm.addEventListener('click', () => applyV(''));
+  }, true);
+
+  /* ---------- пикер иконок удобств/гарантий ---------- */
+  document.body.addEventListener('click', (e) => {
+    const hot = e.target.closest('[data-bicon]');
+    if (!hot) return;
+    e.preventDefault(); e.stopPropagation();
+    const icons = P.icons || {};
+    const grid = Object.entries(icons).map(([k, sv]) => `<div class="pi ptile ico-pick ${k === hot.dataset.ico ? 'on' : ''}" data-pico="${k}" title="${k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${sv}</svg></div>`).join('');
+    const el = openPop(`<div class="psec">Иконка</div><div class="pgrid ico-grid">${grid}</div>`, e.clientX, e.clientY);
+    el.addEventListener('click', async (e2) => {
+      const p2 = e2.target.closest('[data-pico]');
+      if (!p2) return;
+      const k = p2.dataset.pico;
+      hot.dataset.ico = k;
+      hot.innerHTML = `<svg class="amn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icons[k]}</svg>`;
+      dirty = true;
+      closePop();
+      await save(false);
+    });
   }, true);
 
   /* ---------- ИИ-переписывание текстов ---------- */
