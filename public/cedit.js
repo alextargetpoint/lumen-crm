@@ -134,6 +134,10 @@ body.cpanel-on{padding-right:308px!important}
 .ctpl:hover{border-color:#2563EB;transform:translateY(-2px)}
 .ctpl-aa{font-size:26px;line-height:1}
 .ctpl i{font-style:normal;font-size:10.5px;color:#fff;opacity:.92;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cctx{display:flex;flex-direction:column;min-width:180px}
+.cctx button{display:block;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#2A3346;cursor:pointer;font-family:inherit}
+.cctx button:hover{background:#EEF3FF;color:#2563EB}
+.cctx button.dng:hover{background:#FDEEEC;color:#E0483D}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -214,11 +218,33 @@ body.cpanel-on{padding-right:308px!important}
     if (switchTab) { tab = 'slide'; $$('.cpanel-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === 'slide')); }
     if (tab === 'slide') renderBody();
   }
+  /* быстрые действия слайда (ховер-панель + правый клик): edit/photo/dup/up/down/del/insert */
+  function slideAction(act, i) {
+    const arr = serialize();
+    if (act === 'edit') { selectSlide(i, true); return; }
+    if (act === 'del') { if (arr.length <= 1) { flash('Оставьте хотя бы 1 слайд'); return; } arr.splice(i, 1); return save(true, { slides: arr }); }
+    if (act === 'dup') { arr.splice(i + 1, 0, JSON.parse(JSON.stringify(arr[i]))); return save(true, { slides: arr }); }
+    if (act === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; return save(true, { slides: arr }); }
+    if (act === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; return save(true, { slides: arr }); }
+    if (act === 'insert') { arr.splice(i + 1, 0, { heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
+    if (act === 'photo') { selectSlide(i, true); setTimeout(() => { const b = $('#cBody [data-bg="photo"]'); if (b) b.click(); }, 60); return; }
+  }
   document.body.addEventListener('click', (e) => {
+    const sa = e.target.closest('[data-sact]');
+    if (sa) { e.stopPropagation(); const sl0 = sa.closest('.slide'); if (sl0) slideAction(sa.dataset.sact, +sl0.dataset.idx); return; }
     const sl = e.target.closest('.slide'); if (!sl) return;
     if (e.target.closest('.s-lyr, .s-frame, [data-ce]')) { selectSlide(+sl.dataset.idx, false); return; }  /* слои/текст — без смены вкладки */
     selLayer(null);
     selectSlide(+sl.dataset.idx, true);
+  });
+  /* правый клик по слайду — быстрое меню */
+  document.body.addEventListener('contextmenu', (e) => {
+    const sl = e.target.closest('.slide'); if (!sl) return;
+    e.preventDefault();
+    const i = +sl.dataset.idx;
+    const items = [['edit', '✎ Редактировать'], ['photo', '🖼 Фото-фон'], ['dup', '⧉ Дублировать'], ['insert', '＋ Слайд после'], ['up', '↑ Выше'], ['down', '↓ Ниже'], ['del', '✕ Удалить']];
+    const pp = openPop(`<div class="cctx">${items.map(([a, n]) => `<button data-ctx="${a}" class="${a === 'del' ? 'dng' : ''}">${n}</button>`).join('')}</div>`, e.clientX, e.clientY);
+    pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-ctx]'); if (!b) return; closePop(); slideAction(b.dataset.ctx, i); });
   });
 
   /* ---------- слои: выбор / перетаскивание / размер / порядок / удаление ---------- */

@@ -3498,9 +3498,14 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-brand img{height:26px;max-width:130px;object-fit:contain}
 [data-ce]{outline:1.5px dashed transparent;border-radius:4px;transition:outline .12s}
 ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}.s-eye:empty:before{content:'ЭЙБРОУ';opacity:.4}` : ''}
-.s-pick{position:absolute;top:10px;right:10px;z-index:6;width:32px;height:32px;border-radius:9px;background:rgba(6,17,38,.72);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s,background .15s;backdrop-filter:blur(6px)}
-.slide:hover .s-pick{opacity:1}
-.s-pick:hover{background:var(--blue)}
+.s-bar{position:absolute;top:10px;right:10px;z-index:8;display:flex;gap:4px;opacity:0;transition:opacity .15s;background:rgba(6,17,38,.66);backdrop-filter:blur(8px);border-radius:10px;padding:4px}
+.slide:hover .s-bar{opacity:1}
+.s-bar button{width:28px;height:28px;border:none;border-radius:7px;background:transparent;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:'Manrope',sans-serif;transition:background .12s}
+.s-bar button:hover{background:var(--blue)}
+.s-bar button[data-sact="del"]:hover{background:#E0483D}
+.s-ins{position:absolute;left:50%;bottom:-13px;transform:translateX(-50%);z-index:9;border:none;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;font-size:11.5px;font-weight:700;padding:5px 14px;opacity:0;transition:opacity .15s,transform .12s;box-shadow:0 6px 16px -4px rgba(37,99,235,.6);font-family:'Manrope',sans-serif;white-space:nowrap}
+.slide:hover .s-ins{opacity:1}
+.s-ins:hover{transform:translateX(-50%) scale(1.06)}
 ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}
 .s-lyr{cursor:grab}.s-lyr:active{cursor:grabbing}
 .s-lyr.lsel,.s-frame.lsel{outline:2px solid #2563EB;outline-offset:2px}
@@ -3513,10 +3518,10 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 .slide:hover .s-frame .lyr-tools{opacity:1}
 .lyr-tools button{width:24px;height:24px;border:none;border-radius:7px;background:rgba(6,17,38,.85);color:#fff;font-size:12px;cursor:pointer;backdrop-filter:blur(6px)}
 .lyr-tools button:hover{background:#2563EB}` : ''}
-@media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
+@media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=10"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=11"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
