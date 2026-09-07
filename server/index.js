@@ -2247,7 +2247,7 @@ const server = http.createServer(async (req, res) => {
       if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
       const b = await readBody(req);
       try {
-        const out = await llm.huntIdeas({ geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name, angle: b.angle, count: b.count });
+        const out = await llm.huntIdeas({ geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name, angle: b.angle, count: b.count, context: String(b.context || '').slice(0, 800) });
         return json(res, 200, { ideas: out.ideas });
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
@@ -3588,10 +3588,10 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.al-center .s-num{left:50%;transform:translateX(-50%)}
 .s-eye{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}
 .slide.hasbg .s-eye{color:#fff;opacity:.9}
-.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
-.slide.sz-l .s-h{font-size:clamp(32px,8vw,52px);line-height:1.02}
+.slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
 .slide.hasbg .s-h{color:#fff}
 .s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%}
 .slide.al-center .s-s{max-width:100%}

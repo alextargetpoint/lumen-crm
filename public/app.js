@@ -4421,6 +4421,7 @@ async function shHunt(main) {
   main.innerHTML = `
     <div class="glass card sh-gen">
       <div class="sh-gen-hd">${ic(I.spark)}Хантинг идей<span class="sub">листай карточки как в Tinder — что нравится, летит в копилку (← мимо · → в копилку)</span></div>
+      <div class="form-row"><label>Контекст (необязательно) — ИИ разберёт на ключевые слова и будет хантить точнее</label><textarea id="shHCtx" placeholder="напр. запускаем виллы на Бали под инвесторов из РФ, упор на доходность и управление; хочу идеи под Reels и сторис"></textarea></div>
       <div class="sh-gen-foot">
         <select id="shAngle" class="sh-sel">${ANGLES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
         <select id="shHGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
@@ -4465,7 +4466,7 @@ async function shHunt(main) {
   paintDeck();
   $('#shHunt', main).addEventListener('click', async () => {
     const btn = $('#shHunt', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ думает…';
-    try { const r = await api.post('/social/hunt', { angle: $('#shAngle', main).value, geo: $('#shHGeo', main).value, count: 8 }); HUNT_DECK = r.ideas || []; HUNT_I = 0; HUNT_LIKES = 0; paintDeck(); }
+    try { const r = await api.post('/social/hunt', { angle: $('#shAngle', main).value, geo: $('#shHGeo', main).value, context: $('#shHCtx', main).value.trim(), count: 8 }); HUNT_DECK = r.ideas || []; HUNT_I = 0; HUNT_LIKES = 0; paintDeck(); }
     catch (e) { toast('Не вышло', e.message); }
     btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Нахантить идеи';
   });
