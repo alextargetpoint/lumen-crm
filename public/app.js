@@ -329,8 +329,10 @@ function enhanceControls(root) {
   });
 }
 
+const I_FEED = '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h7"/>';
 const NAV = {
   overview:  { name: 'Обзор', icon: I.grid, sub: '' },
+  feed:      { name: 'Лента', icon: I_FEED, sub: '' },
   funnel:    { name: 'Воронка', icon: I.funnel, sub: '' },
   inbox:     { name: 'Диалоги', icon: I.chat, sub: '' },
   properties: { name: 'Объекты', icon: I.building, sub: '' },
@@ -1047,6 +1049,87 @@ const OV_PREV = {
   onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
 };
 
+const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
+const FEED_REACTS = ['👍', '❤️', '🔥', '👏', '🎉'];
+let FEED_MEDIA = [], FEED_LINK = null;
+PAGES.feed = async (root) => {
+  const data = await api.get('/feed').catch(() => ({ posts: [], board: [] }));
+  const posts = data.posts || [], board = data.board || [];
+  const me = STATE.me || {};
+  const canPost = me.role === 'owner' || ['manager', 'marketer'].includes(me.roleType);
+  const myUid = me.role === 'owner' ? 'owner' : me.brokerId;
+  const reactCount = (r) => Object.values(r || {}).reduce((s, a) => s + (a ? a.length : 0), 0);
+  const myReact = (r) => { for (const [k, a] of Object.entries(r || {})) if (a && a.includes(myUid)) return k; return null; };
+  const postCard = (p) => {
+    const [tn, tc] = FEED_TYPES[p.type] || FEED_TYPES.news;
+    const ava = p.authorPhoto ? `<img src="${esc(p.authorPhoto)}">` : esc((p.authorName || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase());
+    const media = (p.media || []);
+    const mediaHtml = media.length ? `<div class="fd-media m${Math.min(media.length, 4)}">${media.slice(0, 4).map(mn => mn.kind === 'video' ? `<video src="${esc(mn.url)}" controls playsinline></video>` : `<div class="fd-ph" style="background-image:url('${esc(mn.url)}')"></div>`).join('')}</div>` : '';
+    const linkHtml = p.link ? `<a class="fd-link" href="${esc(p.link.url)}" target="_blank">${p.link.image ? `<div class="fd-link-img" style="background-image:url('${esc(p.link.image)}')"></div>` : ''}<div class="fd-link-b"><b>${esc(p.link.title || p.link.url)}</b><span>${esc((p.link.url || '').replace(/^https?:\/\//, '').split('/')[0])}</span></div></a>` : '';
+    const mine = myReact(p.reactions);
+    return `<div class="fd-post" data-fp="${p.id}">
+      ${p.pinned ? `<div class="fd-pin">${ic(I.shield)}Закреплено</div>` : ''}
+      <div class="fd-head"><div class="fd-ava">${ava}</div><div class="fd-meta"><b>${esc(p.authorName)}</b><span>${ago(p.at)}</span></div><span class="fd-type" style="--tc:${tc}">${tn}</span>${canPost ? `<div class="fd-tools"><button data-fpin="${p.id}" title="Закрепить">${ic(I.shield)}</button><button data-fdel="${p.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}</div>
+      ${p.title ? `<div class="fd-title">${esc(p.title)}</div>` : ''}
+      ${p.text ? `<div class="fd-text">${esc(p.text).replace(/\n/g, '<br>')}</div>` : ''}
+      ${mediaHtml}${linkHtml}
+      <div class="fd-reacts">${FEED_REACTS.map(e => { const n = (p.reactions && p.reactions[e] || []).length; return `<button class="fd-react ${mine === e ? 'on' : ''}" data-freact="${p.id}" data-emo="${e}">${e}${n ? `<b>${n}</b>` : ''}</button>`; }).join('')}<span class="fd-rtotal">${reactCount(p.reactions) || ''}</span></div>
+    </div>`;
+  };
+  root.innerHTML = `
+    ${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I_FEED)}Лента агентства<span class="sub">новости, материалы, референсы — вся команда в курсе</span></div>
+      <div class="ha-row" data-ha><span class="nm2">${posts.length} ${plural(posts.length, 'публикация', 'публикации', 'публикаций')} · ${board.length} в команде</span></div>
+    `, { v: 'right', hue: '#7C3AED' })}
+    <div class="fd-grid">
+      <div class="fd-main">
+        ${canPost ? `<div class="glass card fd-composer">
+          <div class="fd-comp-tabs">${Object.entries(FEED_TYPES).map(([k, [n, c]], i) => `<button class="fd-ct ${i === 0 ? 'on' : ''}" data-ct="${k}" style="--tc:${c}">${n}</button>`).join('')}</div>
+          <input id="fdTitle" class="fd-inp-title" placeholder="Заголовок (необязательно)">
+          <textarea id="fdText" placeholder="Поделитесь с командой: новость, материал, поздравление…"></textarea>
+          <div id="fdAttach" class="fd-attach"></div>
+          <div class="fd-comp-foot">
+            <button class="btn btn-sm" id="fdMedia">${ic(I.plus)}Фото/видео</button>
+            <button class="btn btn-sm" id="fdLink">${ic(I.link)}Референс-ссылка</button>
+            <label class="fd-pinlbl"><input type="checkbox" id="fdPinNew"> закрепить</label>
+            <span class="tb-spacer"></span>
+            <button class="btn btn-accent btn-sm" id="fdPublish">${ic(I.send)}Опубликовать</button>
+          </div>
+        </div>` : ''}
+        <div id="fdPosts">${posts.map(postCard).join('') || '<div class="glass card empty">Пока пусто. ' + (canPost ? 'Опубликуйте первую новость ↑' : 'Скоро здесь появятся новости агентства') + '</div>'}</div>
+      </div>
+      <div class="fd-side">
+        <div class="glass card fd-board">
+          <div class="card-title">${ic(I.flame)}Доска лидеров<span class="sub">по сделкам за месяц</span></div>
+          ${board.length ? `<div class="fd-podium">${board.slice(0, 3).map((b, i) => `<div class="fd-pod p${i + 1}"><div class="fd-pod-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc((b.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase())}<span class="fd-pod-rank">${i + 1}</span></div><b>${esc((b.name || '').split(' ')[0])}</b><i>${b.dealsMonth} ${plural(b.dealsMonth, 'сделка', 'сделки', 'сделок')}</i></div>`).join('')}</div>
+          ${board.slice(3).map((b, i) => `<div class="fd-brow"><span class="fd-brank">${i + 4}</span><span class="fd-bname">${esc(b.name)}</span><b>${b.dealsMonth}</b></div>`).join('')}` : '<div class="muted" style="font-size:12.5px;padding:10px 2px">Пока нет сделок за месяц — доска заполнится с первыми продажами</div>'}
+        </div>
+      </div>
+    </div>`;
+  wireHeroArt(root);
+  /* реакции */
+  $('#fdPosts', root)?.addEventListener('click', async (e) => {
+    const rb = e.target.closest('[data-freact]');
+    if (rb) { const r = await api.post(`/feed/${rb.dataset.freact}/react`, { emoji: rb.dataset.emo }); PAGES.feed(root); return; }
+    const pin = e.target.closest('[data-fpin]'); if (pin) { await api.post(`/feed/${pin.dataset.fpin}/pin`, {}); PAGES.feed(root); return; }
+    const del = e.target.closest('[data-fdel]'); if (del) { await fetch('/api/feed/' + del.dataset.fdel, { method: 'DELETE' }); toast('Удалено', null, true); PAGES.feed(root); return; }
+  });
+  if (!canPost) return;
+  /* композер */
+  FEED_MEDIA = []; FEED_LINK = null;
+  let curType = 'news';
+  const renderAttach = () => { const box = $('#fdAttach', root); if (!box) return; box.innerHTML = FEED_MEDIA.map((mn, i) => `<div class="fd-att">${mn.kind === 'video' ? '🎬' : `<img src="${esc(mn.url)}">`}<button data-attrm="${i}">${ic(I.x)}</button></div>`).join('') + (FEED_LINK ? `<div class="fd-att-link">${ic(I.link)}${esc(FEED_LINK.title || FEED_LINK.url)}<button data-linkrm>${ic(I.x)}</button></div>` : ''); };
+  $('#fdAttach', root).addEventListener('click', (e) => { const rm = e.target.closest('[data-attrm]'); if (rm) { FEED_MEDIA.splice(+rm.dataset.attrm, 1); renderAttach(); } if (e.target.closest('[data-linkrm]')) { FEED_LINK = null; renderAttach(); } });
+  $$('.fd-ct', root).forEach(b => b.addEventListener('click', () => { curType = b.dataset.ct; $$('.fd-ct', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  $('#fdMedia', root).addEventListener('click', () => { const inp = el('<input type="file" accept="image/*,video/mp4,video/webm" style="display:none">'); document.body.appendChild(inp); inp.addEventListener('change', async () => { const f = inp.files[0]; inp.remove(); if (!f) return; toast('Загружаю…', null, true); try { const r = await fetch(`/api/feed/asset?filename=${encodeURIComponent(f.name)}`, { method: 'POST', body: f }); const j = await r.json(); if (!r.ok) throw new Error(j.error); FEED_MEDIA.push(j); renderAttach(); } catch (er) { toast('Не вышло', er.message); } }); inp.click(); });
+  $('#fdLink', root).addEventListener('click', () => modal({ title: 'Референс-ссылка', sub: 'Видео/пост конкурента, статья — соберём красивую карточку', body: `<div class="form-row"><label>Ссылка</label><input id="fdLinkUrl" placeholder="https://…"></div>`, actions: [{ label: 'Подтянуть превью', cls: 'btn-accent', onClick: async (bd) => { const u2 = $('#fdLinkUrl', bd).value.trim(); if (!u2) return false; try { const r = await api.post('/feed/link-preview', { url: u2 }); FEED_LINK = { url: r.url, title: r.title, image: r.image }; renderAttach(); toast('Превью готово', null, true); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] }));
+  $('#fdPublish', root).addEventListener('click', async () => {
+    const title = $('#fdTitle', root).value.trim(), text = $('#fdText', root).value.trim();
+    if (!title && !text && !FEED_MEDIA.length && !FEED_LINK) { toast('Пустой пост'); return; }
+    await api.post('/feed', { type: curType, title, text, media: FEED_MEDIA, link: FEED_LINK, pinned: $('#fdPinNew', root).checked });
+    FEED_MEDIA = []; FEED_LINK = null; toast('Опубликовано', 'Вся команда увидит в ленте', true); PAGES.feed(root);
+  });
+};
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] }))]);
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };

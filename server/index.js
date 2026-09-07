@@ -258,6 +258,7 @@ const DEFAULT_PASS = 'lumen2026';
   ];
   if (!db.collections) db.collections = [];
   if (!db.carousels) db.carousels = [];
+  if (!db.feed) db.feed = [];                    // лента агентства (корпоративная стена: новости/материалы/референсы/поздравления)
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
   if (!db.brokerTasks) db.brokerTasks = [];     // личный таск-менеджер брокера (Today + встречи + приоритеты + стрики)
@@ -2150,6 +2151,67 @@ const server = http.createServer(async (req, res) => {
         store.save();
         return json(res, 200, { ok: true, count: c.slides.length, images: pics.length, hasGallery: pics.length >= 3, factsName: facts && facts.name || null });
       } catch (e) { return json(res, 500, { error: 'ИИ-оформление не удалось: ' + e.message }); }
+    }
+
+    /* ================= ЛЕНТА АГЕНТСТВА (корпоративная стена) ================= */
+    if (p === '/api/feed' && req.method === 'GET') {
+      const posts = db.feed.slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.at - a.at).slice(0, 100).map(pv => {
+        const au = db.brokers.find(x => x.id === pv.authorId);
+        return Object.assign({}, pv, { authorName: pv.author || (au ? au.name : 'Агентство'), authorPhoto: au ? au.photo : null });
+      });
+      /* доска лидеров: сделки по брокерам (за 30 дней и за всё время) */
+      const now = Date.now(), mAgo = now - 30 * 864e5;
+      const dealEv = (db.events || []).filter(e => e.type === 'deal');
+      const board = db.brokers.filter(b => b.active !== false).map(b => {
+        const deals = db.leads.filter(l => l.broker === b.id && l.stage === 'deal');
+        const dealsM = deals.filter(l => (db.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at > mAgo)).length;
+        return { id: b.id, name: b.name, photo: b.photo || null, deals: deals.length, dealsMonth: dealsM };
+      }).sort((a, b) => b.dealsMonth - a.dealsMonth || b.deals - a.deals);
+      return json(res, 200, { posts, board: board.slice(0, 8) });
+    }
+    const canPostFeed = () => { if (!ROLE) return false; if (ROLE.role === 'owner') return true; const mm = db.brokers.find(x => x.id === ROLE.brokerId) || {}; return ['manager', 'marketer'].includes(mm.roleType); };
+    if (p === '/api/feed' && req.method === 'POST') {
+      if (!canPostFeed()) return json(res, 403, { error: 'публиковать может владелец, менеджер или маркетолог' });
+      const b = await readBody(req);
+      const who = ROLE.role === 'owner' ? (db.settings.agency.name || 'Агентство') : ((db.brokers.find(x => x.id === ROLE.brokerId) || {}).name || 'Сотрудник');
+      const post = {
+        id: crypto.randomBytes(5).toString('hex'), at: Date.now(), authorId: ROLE.role === 'owner' ? null : ROLE.brokerId, author: who,
+        type: ['news', 'material', 'ref', 'congrats', 'announce'].includes(b.type) ? b.type : 'news',
+        title: String(b.title || '').slice(0, 160), text: String(b.text || '').slice(0, 4000),
+        media: Array.isArray(b.media) ? b.media.filter(mn => mn && mn.url && /^(assets\/|\/assets\/|https?:\/\/)/.test(mn.url)).slice(0, 8).map(mn => ({ url: String(mn.url).slice(0, 500), kind: mn.kind === 'video' ? 'video' : 'image' })) : [],
+        link: b.link && b.link.url ? { url: String(b.link.url).slice(0, 500), title: String(b.link.title || '').slice(0, 200), image: /^https?:\/\//.test(String(b.link.image || '')) ? String(b.link.image).slice(0, 500) : '' } : null,
+        pinned: !!b.pinned, reactions: {},
+      };
+      db.feed.unshift(post); db.feed = db.feed.slice(0, 300); store.save();
+      return json(res, 200, post);
+    }
+    if (p === '/api/feed/link-preview' && req.method === 'POST') {
+      const b = await readBody(req); const url = String(b.url || '').trim(); if (!url) return json(res, 400, { error: 'дайте ссылку' });
+      try { const { html, finalUrl } = await safeFetchPage(url);
+        const t = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)/i) || html.match(/<title[^>]*>([^<]+)/i) || [])[1] || '';
+        const imgs = scrapeImagesFromHtml(html, finalUrl);
+        return json(res, 200, { url: finalUrl, title: t.replace(/&[a-z#0-9]+;/gi, ' ').trim().slice(0, 200), image: imgs[0] || '' });
+      } catch (e) { return json(res, 400, { error: 'не удалось загрузить: ' + e.message }); }
+    }
+    if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)\/react$/)) && req.method === 'POST') {
+      const post = db.feed.find(x => x.id === m[1]); if (!post) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req); const emo = String(b.emoji || '👍').slice(0, 4);
+      const uid = ROLE ? (ROLE.role === 'owner' ? 'owner' : ROLE.brokerId) : 'anon';
+      post.reactions = post.reactions || {}; post.reactions[emo] = post.reactions[emo] || [];
+      const idx = post.reactions[emo].indexOf(uid); if (idx >= 0) post.reactions[emo].splice(idx, 1); else { post.reactions[emo].push(uid); for (const k of Object.keys(post.reactions)) if (k !== emo) { const j = post.reactions[k].indexOf(uid); if (j >= 0) post.reactions[k].splice(j, 1); } }
+      store.save(); return json(res, 200, { reactions: post.reactions });
+    }
+    if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)\/pin$/)) && req.method === 'POST') { if (!canPostFeed()) return json(res, 403, { error: 'нет прав' }); const post = db.feed.find(x => x.id === m[1]); if (!post) return json(res, 404, { error: 'nf' }); post.pinned = !post.pinned; store.save(); return json(res, 200, { pinned: post.pinned }); }
+    if ((m = p.match(/^\/api\/feed\/([a-f0-9]+)$/)) && req.method === 'DELETE') { if (!canPostFeed()) return json(res, 403, { error: 'нет прав' }); db.feed = db.feed.filter(x => x.id !== m[1]); store.save(); return json(res, 200, { ok: true }); }
+    if (p === '/api/feed/asset' && req.method === 'POST') {
+      if (!canPostFeed()) return json(res, 403, { error: 'нет прав' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(jpe?g|png|webp|gif|mp4|webm)$/i); if (!extM) return json(res, 400, { error: 'формат: jpg/png/webp/gif/mp4/webm' });
+      const chunks = []; let size = 0; await new Promise((rs) => { req.on('data', ch => { size += ch.length; if (size > 30e6) req.destroy(); else chunks.push(ch); }); req.on('end', rs); req.on('close', rs); });
+      if (!size || size > 30e6) return json(res, 400, { error: 'файл до 30 МБ' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'feed'), { recursive: true });
+      const fname = `feed/${crypto.randomBytes(5).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      return json(res, 200, { url: '/assets/' + fname, kind: /mp4|webm/i.test(extM[1]) ? 'video' : 'image' });
     }
 
     /* ---------------- соц-движки: сценарии Reels / хантинг идей / посты ----------------
@@ -4275,7 +4337,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=27"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=29"></script>` : ''}
 </body></html>`);
       return;
     }
