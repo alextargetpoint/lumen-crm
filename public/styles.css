@@ -2904,3 +2904,16 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-fun-hero .ov2-fun-nm i { color: #9DB8FF; }
 .ov2-fun-hero .ov2-fun-bar { background: rgba(255,255,255,.14); }
 .ov2-fun-hero .ov2-fun-v { color: #fff; }
+
+/* Карточка лида — визуальная иерархия: ядро управления промінентно, инструменты-аккордеоны вторичны */
+.lc-right .coll { margin: 7px 0; border: 1px solid var(--stroke-soft); border-radius: var(--r-md); overflow: hidden; background: var(--bg); }
+.lc-right .coll-head { padding: 10px 12px; font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.lc-right .coll-head:hover { background: var(--bg-2); }
+.lc-right .coll[open] .coll-head, .lc-right .coll.open .coll-head { color: var(--navy-900); }
+/* ядро: стадия/брокер/след.шаг/квалификация — в единый выделенный блок */
+.lc-3sel { padding: 12px; background: var(--card, #fff); border: 1px solid var(--stroke); border-radius: var(--r-md); box-shadow: var(--shadow-sm, 0 1px 3px rgba(6,17,38,.05)); }
+.lc-right .lp-sec:first-of-type { margin-top: 14px; }
+.lc-right .lp-sec { color: var(--navy-900); font-weight: 700; opacity: .78; }
+/* ИИ-помощник — мягко выделенный, но не кричащий */
+.lc-ai.on { border-color: color-mix(in srgb, var(--accent) 35%, var(--stroke)); background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
+.lc-ai-head b { font-size: 13.5px; }
