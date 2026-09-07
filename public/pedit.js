@@ -227,6 +227,13 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
         const arr = b.data[parts[1]] = b.data[parts[1]] || [];
         (arr[+parts[2]] = arr[+parts[2]] || {})[parts[3]] = el.dataset.ico || '';
       });
+      /* ручной ресайз/фокус картинок: высота + точка фокуса фона */
+      const fitEl = sec.querySelector('[data-bfit]');
+      if (fitEl) {
+        if (fitEl.dataset.imgh) b.data.imgH = +fitEl.dataset.imgh;
+        if (fitEl.dataset.imgfx != null && fitEl.dataset.imgfx !== '') b.data.imgFx = +fitEl.dataset.imgfx;
+        if (fitEl.dataset.imgfy != null && fitEl.dataset.imgfy !== '') b.data.imgFy = +fitEl.dataset.imgfy;
+      }
       /* видео */
       if (b.t === 'video') b.data.url = sec.dataset.vurl || '';
       /* своя ссылка CTA-кнопки (пусто = дефолтный WhatsApp менеджера) */
@@ -866,4 +873,58 @@ body{padding-right:190px}
   document.head.appendChild(railCss);
 
   renumber();
+
+  /* ---------- ручной ресайз + фокус картинок конструктора ---------- */
+  const fitCss = document.createElement('style');
+  fitCss.textContent = `
+[data-bfit]{cursor:grab}
+[data-bfit]:active{cursor:grabbing}
+.imgrs{position:absolute;left:0;right:0;bottom:0;height:16px;cursor:ns-resize;z-index:7;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px}
+.imgrs::after{content:'';width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.9);box-shadow:0 1px 4px rgba(0,0,0,.4);opacity:0;transition:opacity .15s}
+[data-bfit]:hover .imgrs::after{opacity:.85}
+.imgrs.on::after{opacity:1;background:#2563EB}
+[data-bfit].fitting{outline:2px solid #2563EB;outline-offset:-2px}`;
+  document.head.appendChild(fitCss);
+
+  /* инициализация dataset из уже сохранённых inline-значений (чтобы пересохранение не теряло размер/фокус) */
+  $$('[data-bfit]').forEach((fitEl) => {
+    const h = fitEl.style.height; if (h && /px$/.test(h)) fitEl.dataset.imgh = parseInt(h);
+    const bp = fitEl.style.backgroundPosition; const mm = bp && bp.match(/([\d.]+)%\s+([\d.]+)%/); if (mm) { fitEl.dataset.imgfx = mm[1]; fitEl.dataset.imgfy = mm[2]; }
+  });
+
+  /* растягивание высоты за нижнюю кромку */
+  $$('.imgrs').forEach((rs) => {
+    rs.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const fitEl = rs.closest('[data-bfit]'); rs.classList.add('on'); fitEl.classList.add('fitting');
+      const startY = e.clientY, startH = fitEl.getBoundingClientRect().height;
+      const onMove = (ev) => { const h = Math.max(80, Math.min(1400, Math.round(startH + (ev.clientY - startY)))); fitEl.style.height = h + 'px'; fitEl.style.minHeight = '0'; fitEl.style.flex = '0 0 auto'; fitEl.dataset.imgh = h; };
+      const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); rs.classList.remove('on'); fitEl.classList.remove('fitting'); dirty = true; flash('Высота изменена — не забудьте «Сохранить»', 1500); };
+      document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
+    });
+  });
+
+  /* перетаскивание фокуса фона (какая часть картинки видна) */
+  const FIT_SKIP = '[data-be],[data-bimg],.imghot,.imgrs,.ctabtn,.cin,h1,h2,h3,p,a,button,.badge,.brand,span';
+  $$('[data-bfit]').forEach((fitEl) => {
+    fitEl.addEventListener('pointerdown', (e) => {
+      if (e.target.closest(FIT_SKIP)) return;            /* по тексту/кнопкам не таскаем */
+      if (!fitEl.style.backgroundImage) return;          /* нет картинки — нечего фокусировать */
+      const startX = e.clientX, startY = e.clientY;
+      let fx = +fitEl.dataset.imgfx; if (isNaN(fx)) fx = 50;
+      let fy = +fitEl.dataset.imgfy; if (isNaN(fy)) fy = 50;
+      const rect = fitEl.getBoundingClientRect(); let moved = false;
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if (!moved && Math.hypot(dx, dy) < 5) return;
+        moved = true; fitEl.classList.add('fitting');
+        const nfx = Math.max(0, Math.min(100, fx - dx / rect.width * 100));
+        const nfy = Math.max(0, Math.min(100, fy - dy / rect.height * 100));
+        fitEl.style.backgroundPosition = `${nfx.toFixed(1)}% ${nfy.toFixed(1)}%`;
+        fitEl.dataset.imgfx = nfx.toFixed(1); fitEl.dataset.imgfy = nfy.toFixed(1);
+      };
+      const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); fitEl.classList.remove('fitting'); if (moved) { dirty = true; flash('Фокус кадра сдвинут — «Сохранить»', 1400); } };
+      document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
+    });
+  });
 })();

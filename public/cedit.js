@@ -10,6 +10,20 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const FMT = { square: '1:1', portrait: '4:5', story: '9:16' };
   const CAT = { serif: 'С засечками', sans: 'Гротеск', display: 'Акцидентные', hand: 'Рукописные' };
+  /* палитра выделения текста (несколько цветов) — ключ hl-*, цвет свотча */
+  const HL = [['cobalt', '#2563EB'], ['gold', '#E8B84B'], ['mint', '#34C79A'], ['rose', '#F2748F'], ['lav', '#9B8CFF'], ['sky', '#4FB6F2'], ['ink', '#0B0B0F'], ['under', 'linear-gradient(180deg,transparent 62%,#2563EB55 62%)']];
+  /* узоры-фоны (превью для свотчей — нейтральный акцент) */
+  const PATS = [['none', 'нет'], ['dots', 'точки'], ['grid', 'сетка'], ['diag', 'диагональ'], ['cross', 'крестики'], ['waves', 'волны'], ['rings', 'кольца'], ['carbon', 'карбон'], ['topo', 'топо']];
+  const PATV = {
+    dots: 'radial-gradient(#2563EB66 1.4px,transparent 1.5px);background-size:9px 9px',
+    grid: 'linear-gradient(#2563EB44 1px,transparent 1px),linear-gradient(90deg,#2563EB44 1px,transparent 1px);background-size:11px 11px',
+    diag: 'repeating-linear-gradient(45deg,#2563EB44 0 2px,transparent 2px 8px)',
+    cross: 'radial-gradient(circle,#2563EB55 1px,transparent 1.4px),radial-gradient(circle,#2563EB55 1px,transparent 1.4px);background-size:12px 12px;background-position:0 0,6px 6px',
+    waves: 'repeating-radial-gradient(circle at 0 100%,transparent 0 8px,#2563EB44 8px 9px)',
+    rings: 'repeating-radial-gradient(circle at 80% 15%,#2563EB44 0 1px,transparent 1px 12px)',
+    carbon: 'linear-gradient(27deg,#2563EB33 3px,transparent 3px),linear-gradient(207deg,#2563EB33 3px,transparent 3px);background-size:8px 8px',
+    topo: 'repeating-radial-gradient(ellipse 60% 40% at 30% 20%,transparent 0 10px,#2563EB33 10px 12px)',
+  };
   const isDark = (h) => { const x = String(h || '').replace('#', ''); const s = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s.slice(0, 2), 16), g = parseInt(s.slice(2, 4), 16), b = parseInt(s.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
   let dirty = false, pop = null, sel = 0, panelOpen = true;
 
@@ -19,10 +33,12 @@
 .cbar{position:fixed;top:0;left:0;right:0;z-index:900;background:rgba(9,18,38,.82);backdrop-filter:blur(14px);color:#fff;display:flex;gap:10px;align-items:center;padding:9px 14px;font-family:Manrope,sans-serif;font-size:13px;border-bottom:1px solid rgba(134,175,255,.14)}
 .cbar b{font-family:Fraunces,serif;font-weight:600;font-size:14px;opacity:.9}
 .cbar .sp{flex:1}
-.cbtn{background:var(--cb);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer;font-family:Manrope,sans-serif;display:inline-flex;gap:6px;align-items:center}
-.cbtn.g{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16)}
-.cbtn.g:hover{background:rgba(255,255,255,.16)}
-.cbtn:disabled{opacity:.5}
+.cbtn{background:linear-gradient(180deg,#3B78FF,#2563EB);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:Manrope,sans-serif;display:inline-flex;gap:6px;align-items:center;box-shadow:0 6px 16px -6px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.22);transition:transform .14s cubic-bezier(.4,0,.2,1),box-shadow .14s,filter .14s}
+.cbtn:hover{transform:translateY(-1px);box-shadow:0 11px 24px -6px rgba(37,99,235,.72),inset 0 1px 0 rgba(255,255,255,.25);filter:brightness(1.05)}
+.cbtn:active{transform:translateY(0)}
+.cbtn.g{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);box-shadow:none}
+.cbtn.g:hover{background:rgba(255,255,255,.18);transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.5);filter:none}
+.cbtn:disabled{opacity:.5;transform:none;box-shadow:none;filter:none}
 /* боковая панель */
 .cpanel{position:fixed;top:52px;right:0;bottom:0;width:308px;z-index:880;background:#fff;border-left:1px solid #E7ECF3;box-shadow:-14px 0 40px rgba(6,17,38,.10);display:flex;flex-direction:column;font-family:Manrope,sans-serif;transition:transform .22s cubic-bezier(.4,0,.2,1)}
 .cpanel.closed{transform:translateX(308px)}
@@ -33,22 +49,37 @@
 .cgrp{margin-bottom:16px}
 .cgrp>label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a90a0;font-weight:700;margin-bottom:8px}
 .cdots{display:flex;flex-wrap:wrap;gap:7px}
-.cth-dot{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--d) 50%,var(--b) 50%)}
-.cth-dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--cb)}
+.cth-dot{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--d) 50%,var(--b) 50%);transition:transform .14s,box-shadow .14s}
+.cth-dot:hover{transform:scale(1.12)}
+.cth-dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--cb),0 4px 10px -3px rgba(37,99,235,.5)}
 .cseg{display:flex;background:#EEF2FA;border-radius:10px;padding:3px;gap:2px}
 .cseg button{flex:1;border:none;background:none;padding:8px 6px;border-radius:7px;font-weight:600;font-size:12.5px;cursor:pointer;color:#5E6470;font-family:inherit}
 .cseg button.on{background:#fff;color:var(--cb);box-shadow:0 1px 4px rgba(6,17,38,.12)}
 .cbtn-row{display:flex;gap:7px;flex-wrap:wrap}
-.cwbtn{flex:1;min-width:calc(50% - 4px);border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:10px;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;color:#2A3346;display:flex;align-items:center;justify-content:center;gap:6px}
-.cwbtn:hover{border-color:var(--cb);background:#EEF3FF;color:var(--cb)}
+.cwbtn{flex:1;min-width:calc(50% - 4px);border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:11px;padding:10px;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;color:#2A3346;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 2px rgba(6,17,38,.05);transition:transform .15s cubic-bezier(.4,0,.2,1),border-color .15s,background .15s,box-shadow .15s,color .15s}
+.cwbtn:hover{border-color:var(--cb);background:linear-gradient(180deg,#F3F7FF,#E8F0FF);color:var(--cb);transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(37,99,235,.42)}
+.cwbtn:active{transform:translateY(0)}
 .cwbtn.wide{min-width:100%}
-.cwbtn.dng:hover{border-color:#E0483D;background:#FDEEEC;color:#E0483D}
+.cwbtn.on{border-color:var(--cb);background:linear-gradient(180deg,#EAF1FF,#DBE7FF);color:var(--cb);box-shadow:inset 0 0 0 1px var(--cb)}
+.cwbtn.dng:hover{border-color:#E0483D;background:#FDEEEC;color:#E0483D;box-shadow:0 8px 18px -8px rgba(224,72,61,.42)}
 .cfontbtn{width:100%;border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:11px 12px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;color:#2A3346;display:flex;align-items:center;gap:10px;text-align:left}
 .cfontbtn .aa{font-size:20px}
 .cfontbtn:hover{border-color:var(--cb)}
 .cfmtbar{display:flex;gap:6px}
-.cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:#fff;border-radius:9px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346}
-.cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF}
+.cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
+.cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
+/* поповер выделения (цвета) + узоры */
+.hlpop{display:flex;flex-direction:column;gap:9px}
+.hlrow{display:flex;gap:8px;flex-wrap:wrap;max-width:214px}
+.hlsw{width:30px;height:30px;border-radius:9px;border:2px solid #fff;box-shadow:0 0 0 1px #E1E8F4,0 3px 8px -3px rgba(6,17,38,.3);cursor:pointer;transition:transform .12s,box-shadow .12s}
+.hlsw:hover{transform:scale(1.13);box-shadow:0 0 0 1px var(--cb),0 6px 13px -3px rgba(6,17,38,.4)}
+.hloff{border:1.5px solid #E1E8F4;background:#fff;border-radius:9px;padding:9px;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;color:#5E6470;transition:all .14s}
+.hloff:hover{border-color:#E0483D;color:#E0483D;background:#FDEEEC}
+.cpats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+.cpat{aspect-ratio:1;border:1.5px solid #E1E8F4;border-radius:10px;cursor:pointer;background-color:#F7F9FE;transition:transform .14s,border-color .14s,box-shadow .14s}
+.cpat:hover{border-color:var(--cb);transform:translateY(-1px);box-shadow:0 6px 14px -6px rgba(37,99,235,.4)}
+.cpat.on{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
+.cpat.none{display:flex;align-items:center;justify-content:center;font-size:10px;color:#9aa1b2;font-weight:700;background:#fff}
 .swrow{display:flex;align-items:center;gap:10px;font-weight:600;font-size:12.5px;color:#2A3346}
 .sw{position:relative;width:40px;height:23px;border-radius:999px;background:#D2DAEA;cursor:pointer;transition:.15s;flex:0 0 40px}
 .sw.on{background:var(--cb)}.sw:after{content:'';position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.15s}.sw.on:after{left:20px}
@@ -108,8 +139,9 @@ body.cpanel-on{padding-right:308px!important}
   document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
 
   const cleanHtml = (h) => String(h || '').replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
-    .replace(/<\s*(\/?)(b|strong|i|em|u|mark|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
-    .replace(/<(?!\/?(?:b|strong|i|em|u|mark|br)>)[^>]*>/gi, '').replace(/&nbsp;/g, ' ').trim();
+    .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
+    .replace(/<\s*(\/?)(b|strong|i|em|u|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
+    .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '').replace(/&nbsp;/g, ' ').trim();
 
   const slideEl = (i) => document.querySelector(`.slide[data-idx="${i}"]`);
   function serialize() {
@@ -118,7 +150,7 @@ body.cpanel-on{padding-right:308px!important}
       const h = sl.querySelector(`[data-ce="${i}:heading"]`); const s = sl.querySelector(`[data-ce="${i}:sub"]`); const ey = sl.querySelector(`[data-ce="${i}:eyebrow"]`);
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
-        bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '',
+        bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm',
       };
     });
@@ -242,12 +274,13 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
       <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
       <button data-cmd="italic" title="Курсив"><i>К</i></button>
-      <button data-cmd="mark" title="Выделение цветом"><mark style="padding:0 3px;border-radius:3px">A</mark></button>
-      <button data-cmd="clear" title="Убрать формат">✕</button>
-    </div><div class="cnote">Выделите текст в заголовке/подписи, затем нажмите.</div></div>
+      <button data-cmd="mark" title="Выделение цветом — выбор палитры"><mark style="padding:0 3px;border-radius:3px">A</mark></button>
+      <button data-cmd="clear" title="Убрать формат и выделение">✕</button>
+    </div><div class="cnote">Выделите текст в заголовке/подписи, затем нажмите. «A» — палитра цветов выделения.</div></div>
     <div class="cgrp"><label>Порядок и удаление</label><div class="cbtn-row">
       <button class="cwbtn" data-mv="up">↑ Выше</button>
       <button class="cwbtn" data-mv="down">↓ Ниже</button>

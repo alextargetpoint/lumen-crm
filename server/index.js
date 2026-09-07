@@ -591,17 +591,22 @@ const FONT_LIB = {
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
 const CAR_POS = new Set(['top', 'center', 'bottom']);
 const CAR_SIZE = new Set(['s', 'm', 'l']);
-/* нормализация слайда карусели при записи: ограниченный инлайн-HTML в заголовке/подписи + мета текста */
+/* узоры-фоны слайда (как в реф-боте): CSS-паттерны, тонированные акцентом темы. Без ассетов. */
+const CAR_PATTERNS = new Set(['dots', 'grid', 'diag', 'cross', 'waves', 'rings', 'carbon', 'topo']);
+/* нормализация инлайн-HTML заголовка/подписи: B/I/U + <mark> с классом-цветом hl-* (несколько цветов выделения) */
 const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
-  .replace(/<\s*(\/?)(b|strong|i|em|u|mark|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
-  .replace(/<(?!\/?(?:b|strong|i|em|u|mark|br)>)[^>]*>/gi, '');
+  .replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
+  .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
+  .replace(/<\s*(\/?)(b|strong|i|em|u|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
+  .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '');
 const sanSlide = (s) => ({
-  heading: sanCarInline(s.heading).slice(0, 200),
-  sub: sanCarInline(s.sub).slice(0, 320),
+  heading: sanCarInline(s.heading).slice(0, 240),
+  sub: sanCarInline(s.sub).slice(0, 380),
   eyebrow: String(s.eyebrow || '').replace(/<[^>]*>/g, '').slice(0, 40),
   bg: /^(assets\/|\/assets\/|https?:\/\/)/.test(String(s.bg || '')) ? String(s.bg).slice(0, 500) : '',
   bgv: /^(assets\/|\/assets\/|https?:\/\/).+\.(mp4|webm)/i.test(String(s.bgv || '')) ? String(s.bgv).slice(0, 500) : '',
   bgc: /^#[0-9a-fA-F]{3,8}$/.test(String(s.bgc || '')) ? s.bgc : '',
+  bgpat: CAR_PATTERNS.has(s.bgpat) ? s.bgpat : '',
   pos: CAR_POS.has(s.pos) ? s.pos : '',
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
@@ -718,6 +723,9 @@ function sanitizeBlocks(raw) {
     put('hookTitle', 200); put('blurb', 800); put('officeText', 800);
     put('lede', 200); put('aboutHeading', 200); put('recTitle', 200); put('brandName', 120); put('note', 400);
     putImg('img'); putImg('photo');
+    /* ручной ресайз/фокус картинок конструктора: высота и точка фокуса фона */
+    const num = (k, lo, hi) => { if (d[k] != null && d[k] !== '') { const n = Math.max(lo, Math.min(hi, Math.round(+d[k]))); if (!isNaN(n)) nb.data[k] = n; } };
+    num('imgH', 80, 1400); num('imgFx', 0, 100); num('imgFy', 0, 100);
     if (b.t === 'video') { const v2 = str(d.url, 500).trim(); if (v2 && /^(assets\/|\/assets\/|https?:\/\/)/.test(v2)) nb.data.url = v2; }
     if (b.t === 'proj') { nb.data.pid = str(d.pid, 30); putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; }); putList('whyRent', (x) => str(x, 300).trim() || null); }
     if (b.t === 'gallery') putList('imgs', (x) => { const s2 = str(x, 500).trim(); return s2 && okUrl(s2) ? s2 : null; });
@@ -2855,19 +2863,22 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const brandTxt = footer.on ? (footer.text || AG) : AG;
       const ce = (f, i) => isEdit ? ` data-ce="${i}:${f}"` : '';
       const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
-      /* инлайн-форматирование (B/I/выделение) — храним ограниченный HTML */
+      /* инлайн-форматирование (B/I/выделение цветом) — храним ограниченный HTML + класс цвета выделения */
       const sanInline = (h) => String(h == null ? '' : h).slice(0, 900)
-        .replace(/<\s*(\/?)(b|strong|i|em|u|mark|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
-        .replace(/<(?!\/?(?:b|strong|i|em|u|mark|br)>)[^>]*>/gi, '');
+        .replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
+        .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
+        .replace(/<\s*(\/?)(b|strong|i|em|u|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
+        .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '');
       const dims = c.format === 'story' ? { ar: '9/16', w: 420 } : c.format === 'portrait' ? { ar: '4/5', w: 460 } : { ar: '1/1', w: 560 };
       const isDarkHex = (h) => { const x = String(h || '').replace('#', ''); const s2 = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
       const slides = (c.slides || []).map((s, i) => {
         const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
         const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
-        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`].join(' ');
+        const hasPat = !hasVid && !hasBg && !!s.bgpat;
+        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''} style="${style}">
+        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           ${isEdit ? `<div class="s-pick" data-sop="pick" title="Редактировать слайд">✎</div>` : ''}
           <div class="s-in">
@@ -2895,7 +2906,25 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
 .slide .s-in{position:relative;z-index:1}
 .slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
-.slide .s-h mark{background:var(--blue);color:#fff;padding:0 .12em;border-radius:.12em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.slide .s-h mark,.slide .s-s mark{background:var(--blue);color:#fff;padding:0 .14em;border-radius:.14em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.slide mark.hl-cobalt{background:var(--blue);color:#fff}
+.slide mark.hl-gold{background:#E8B84B;color:#241F14}
+.slide mark.hl-mint{background:#34C79A;color:#06251C}
+.slide mark.hl-rose{background:#F2748F;color:#fff}
+.slide mark.hl-lav{background:#9B8CFF;color:#fff}
+.slide mark.hl-sky{background:#4FB6F2;color:#08243A}
+.slide mark.hl-ink{background:var(--ink);color:var(--paper)}
+.slide mark.hl-under{background:transparent;color:inherit;box-shadow:inset 0 -.42em 0 color-mix(in srgb,var(--blue) 34%,transparent);border-radius:0;padding:0 .04em}
+/* узоры-фоны (тонированы акцентом темы) */
+.slide[class*=pat-]{background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 16%,var(--paper)),var(--paper))}
+.slide.pat-dots{background-image:radial-gradient(color-mix(in srgb,var(--blue) 26%,transparent) 1.5px,transparent 1.6px);background-size:20px 20px}
+.slide.pat-grid{background-image:linear-gradient(color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px);background-size:28px 28px}
+.slide.pat-diag{background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--blue) 12%,transparent) 0 2px,transparent 2px 14px)}
+.slide.pat-cross{background-image:radial-gradient(circle,color-mix(in srgb,var(--blue) 22%,transparent) 1px,transparent 1.5px),radial-gradient(circle,color-mix(in srgb,var(--blue) 22%,transparent) 1px,transparent 1.5px);background-size:26px 26px;background-position:0 0,13px 13px}
+.slide.pat-waves{background-image:repeating-radial-gradient(circle at 0 100%,transparent 0 18px,color-mix(in srgb,var(--blue) 12%,transparent) 18px 19px)}
+.slide.pat-rings{background-image:repeating-radial-gradient(circle at 82% 12%,color-mix(in srgb,var(--blue) 16%,transparent) 0 1px,transparent 1px 26px)}
+.slide.pat-carbon{background-image:linear-gradient(27deg,color-mix(in srgb,var(--blue) 10%,transparent) 5px,transparent 5px),linear-gradient(207deg,color-mix(in srgb,var(--blue) 10%,transparent) 5px,transparent 5px);background-size:14px 14px}
+.slide.pat-topo{background-image:repeating-radial-gradient(ellipse 60% 40% at 30% 20%,transparent 0 22px,color-mix(in srgb,var(--blue) 11%,transparent) 22px 24px)}
 .s-in{position:relative;padding:11% 10%;display:flex;flex-direction:column;justify-content:center;width:100%;gap:13px}
 .slide.pos-top .s-in{justify-content:flex-start;padding-top:15%}
 .slide.pos-bottom .s-in{justify-content:flex-end;padding-bottom:15%}
@@ -2924,7 +2953,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=3"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])) }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=4"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
@@ -2968,6 +2997,10 @@ ${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchPara
       const abs = (u2) => u2 && /^assets\//.test(u2) ? '/' + u2 : u2;   /* страница живёт на /p/… — пути только абсолютные */
       const bg = (url) => url ? `style="background-image:url('${esc(abs(url))}')"` : '';
       const bimg = (bid, f, idx, url) => isEdit ? ` data-bimg="${bid}:${f}${idx != null ? ':' + idx : ''}" data-bival="${esc(url || '')}"` : '';
+      /* ручной ресайз/фокус: фон + позиция (fx/fy%) + высота (px) из block.data */
+      const fit = (url, d) => { let s = url ? `background-image:url('${esc(abs(url))}')` : ''; if (d) { if (d.imgFx != null && d.imgFy != null) s += `${s ? ';' : ''}background-position:${Math.max(0, Math.min(100, +d.imgFx))}% ${Math.max(0, Math.min(100, +d.imgFy))}%`; if (d.imgH) s += `${s ? ';' : ''}height:${Math.max(80, Math.min(1400, +d.imgH))}px;min-height:0;flex:0 0 auto`; } return s ? `style="${s}"` : ''; };
+      const fitA = (bid) => isEdit ? ` data-bfit="${bid}"` : '';
+      const rsH = isEdit ? '<div class="imgrs" data-bresize title="Потяните за низ — изменить высоту · перетащите картинку — сдвинуть фокус"></div>' : '';
       const ytId = (url) => { const mm = String(url || '').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,20})/); return mm ? mm[1] : null; };
       const vimeoId = (url) => { const mm = String(url || '').match(/vimeo\.com\/(\d{6,12})/); return mm ? mm[1] : null; };
 
@@ -2983,10 +3016,10 @@ ${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchPara
   <h1${be(b.id, 'title')}>${esc(title)}</h1>
   ${d.sub || isEdit ? `<p class="csub"${be(b.id, 'sub')}>${esc(d.sub || '')}</p>` : ''}
   ${badge || isEdit ? `<div class="badge"${be(b.id, 'badge')}>${esc(badge)}</div>` : ''}`;
-          if (b.v === 'split') return `<section class="cover csplit"><div class="cs-l blue">${inner}</div><div class="cs-r" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div></section>`;
-          if (b.v === 'photo') return `<section class="cover cphoto" ${bg(img)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</section>`;
-          if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : ''}</section>`;
-          return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
+          if (b.v === 'split') return `<section class="cover csplit"><div class="cs-l blue">${inner}</div><div class="cs-r" ${fit(img, d)}${fitA(b.id)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : ''}</div></section>`;
+          if (b.v === 'photo') return `<section class="cover cphoto" ${fit(img, d)}${fitA(b.id)}><div class="cshade"></div><div class="cin">${inner}<div class="csp"></div></div>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : ''}</section>`;
+          if (b.v === 'light') return `<section class="cover clight">${inner.replace('class="brand"', 'class="brand dark"')}${img ? `<div class="coverimg" ${fit(img, d)}${fitA(b.id)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : ''}</div>` : ''}</section>`;
+          return `<section class="cover blue">${inner}${img ? `<div class="coverimg" ${fit(img, d)}${fitA(b.id)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : ''}</div>` : `<div class="coverimg grad"><span>${esc(nProj)}</span></div>`}</section>`;
         },
         hello(b) {
           const d = b.data;
@@ -3009,8 +3042,8 @@ ${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchPara
           const d = b.data;
           const img = d.img || heroImg;
           const cls = b.v === 'light' ? 'sep slight' : b.v === 'photo' ? 'sep sphoto' : 'sep blue';
-          return `<section class="${cls}" ${b.v === 'photo' ? bg(img) : ''}>${b.v === 'photo' ? '<div class="cshade"></div>' : ''}
-  ${b.v !== 'photo' ? `<div class="sepimg" ${bg(img)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : ''}</div>` : (isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>` : '')}
+          return `<section class="${cls}" ${b.v === 'photo' ? fit(img, d) : ''}${b.v === 'photo' ? fitA(b.id) : ''}>${b.v === 'photo' ? '<div class="cshade"></div>' : ''}
+  ${b.v !== 'photo' ? `<div class="sepimg" ${fit(img, d)}${fitA(b.id)}>${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : ''}</div>` : (isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, img)}>🖼 Заменить</div>${rsH}` : '')}
   <h2 class="sin"${be(b.id, 'heading')}>${esc(d.heading || nProj + ' под ваш запрос')}</h2>
 </section>`;
         },
@@ -3068,7 +3101,7 @@ ${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchPara
         },
         image(b) {
           const d = b.data;
-          const im = `<div class="bigimg ${b.v === 'inset' ? 'inset' : ''}" ${bg(d.img)}>${d.img ? '' : '<span class="phold">Картинка — кликните 🖼, чтобы добавить</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼 Заменить</div>` : ''}</div>`;
+          const im = `<div class="bigimg ${b.v === 'inset' ? 'inset' : ''}" ${fit(d.img, d)}${fitA(b.id)}>${d.img ? '' : '<span class="phold">Картинка — кликните 🖼, чтобы добавить</span>'}${isEdit ? `<div class="imghot" ${bimg(b.id, 'img', null, d.img)}>🖼 Заменить</div>${rsH}` : ''}</div>`;
           return `<section class="pg imgpg">${im}${d.caption || isEdit ? `<div class="cap"${be(b.id, 'caption')}>${esc(d.caption || '')}</div>` : ''}</section>`;
         },
         gallery(b) {
@@ -3581,7 +3614,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=24"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=26"></script>` : ''}
 </body></html>`);
       return;
     }
