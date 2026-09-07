@@ -50,7 +50,7 @@ const I = {
   user: '<circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
   send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  flame: '<path d="M12 2s5.5 4.6 5.5 9.5a5.5 5.5 0 0 1-11 0C6.5 8.6 8 7.5 8.5 6c.8 1.5 2 2 2 2C10.5 5.5 12 2 12 2z"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2 2.5z"/>',
   phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
@@ -59,7 +59,7 @@ const I = {
   pause: '<path d="M7 4h4v16H7zM13 4h4v16h-4z"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   shield: '<path d="M12 2l8 3.5v5.2c0 5-3.4 9.6-8 11.3-4.6-1.7-8-6.3-8-11.3V5.5L12 2z"/>',
-  handover: '<path d="M4 14a4 4 0 0 1 6-3.5L12 12l2-1.5a4 4 0 0 1 6 3.5M12 12v6M8 21h8"/>',
+  handover: '<path d="M3 12h11M10 8l4 4-4 4"/><path d="M17 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/>',
   eye: '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   cal: '<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2v4M16 2v4"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
@@ -4104,9 +4104,24 @@ function renderScriptSet(it) {
     ${open ? `<div class="sh-set-body">${(it.scripts || []).map(renderScriptCard).join('')}</div>` : ''}
   </div>`;
 }
+/* реальные ссылки на живые примеры (без выдуманных URL — открываем поиск платформ по запросу) */
+function refSearchUrl(plat, q) {
+  const e = encodeURIComponent(q || '');
+  if (plat === 'tiktok') return 'https://www.tiktok.com/search?q=' + e;
+  if (plat === 'shorts') return 'https://www.youtube.com/results?search_query=' + e + '%20shorts';
+  return 'https://www.instagram.com/explore/search/keyword/?q=' + e;
+}
+function refLinksHtml(query, plat) {
+  if (!query) return '';
+  const order = [plat, 'reels', 'tiktok', 'shorts'].filter((v, i, a) => a.indexOf(v) === i);
+  const names = { reels: 'Reels', tiktok: 'TikTok', shorts: 'Shorts' };
+  return `<div class="sh-treflinks"><span class="sh-tref-lbl">${ic(I.play)}Живые примеры</span>${order.map(pl => `<a class="sh-reflink" href="${refSearchUrl(pl, query)}" target="_blank" rel="noopener">${names[pl]}</a>`).join('')}</div>`;
+}
 function renderIdeaCard(i) {
   return `<div class="glass sh-idea" data-idea="${i.id}" data-text="${esc(i.text)}">
     <div class="sh-idea-x">${esc(i.text)}</div>
+    ${i.refWhat ? `<div class="sh-tref"><span class="sh-tref-lbl">Референс</span>${esc(i.refWhat)}</div>` : ''}
+    ${refLinksHtml(i.refQuery, i.platform)}
     <div class="sh-idea-foot"><span class="mini-badge">${esc(i.source || 'идея')}</span>${i.geo ? `<span class="muted" style="font-size:11px">${esc(STATE.settings.geoNames[i.geo] || i.geo)}</span>` : ''}<span class="muted" style="font-size:11px">${ago(i.createdAt)}</span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent" data-iact="script">${ic(I.play)}Сценарий</button><button class="btn-ghost" data-iact="del" title="Удалить">${ic(I.x)}</button></div>
   </div>`;
 }
@@ -4246,6 +4261,8 @@ async function shHunt(main) {
         ${idea.hook ? `<div class="sh-thook">«${esc(idea.hook)}»</div>` : ''}
         ${idea.why ? `<div class="sh-twhy">${esc(idea.why)}</div>` : ''}
         <div class="sh-tmeta">${idea.format ? `<span class="sh-broll-i">${esc(idea.format)}</span>` : ''}${idea.effort ? `<span class="sh-broll-i">съёмка: ${esc(idea.effort)}</span>` : ''}</div>
+        ${idea.refWhat ? `<div class="sh-tref"><span class="sh-tref-lbl">Референс-приём</span>${esc(idea.refWhat)}</div>` : ''}
+        ${refLinksHtml(idea.refQuery, idea.platform)}
       </div>
       <div class="sh-tbtns">
         <button class="sh-tbtn skip" id="shSkip" title="Мимо (←)">${ic(I.x)}</button>
@@ -4255,7 +4272,7 @@ async function shHunt(main) {
     $('#shSkip', deck).addEventListener('click', () => { const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-l'); setTimeout(() => { HUNT_I++; paintDeck(); }, 160); });
     $('#shLike', deck).addEventListener('click', async () => {
       const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-r');
-      try { await api.post('/social/ideas', { text: idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : ''), hook: idea.hook, format: idea.format, source: 'хантинг', geo: $('#shHGeo', main).value }); HUNT_LIKES++; toast('В копилке', 'Идея сохранена', true); }
+      try { await api.post('/social/ideas', { text: idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : ''), hook: idea.hook, format: idea.format, source: 'хантинг', geo: $('#shHGeo', main).value, refWhat: idea.refWhat, refQuery: idea.refQuery, platform: idea.platform }); HUNT_LIKES++; toast('В копилке', 'Идея сохранена', true); }
       catch (e) { toast('Не сохранилось', e.message); }
       setTimeout(() => { HUNT_I++; paintDeck(); }, 160);
     });

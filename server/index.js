@@ -758,6 +758,49 @@ function tzFromPhone(phone) {
   return best ? best[1] : 4;
 }
 
+/* безопасная загрузка страницы (SSRF-гард) — для скрейпинга инфы и фото лонча */
+async function safeFetchPage(url) {
+  const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
+  if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(uu.hostname)) throw new Error('ссылка недоступна');
+  const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 12000);
+  let rr;
+  try { rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)' } }); }
+  finally { clearTimeout(to); }
+  const html = (await rr.text()).slice(0, 900000);
+  return { html, finalUrl: rr.url || uu.href };
+}
+/* извлечение фото/рендеров со страницы (og/twitter, <img>, srcset, data-src, background-image) */
+function scrapeImagesFromHtml(html, baseHref) {
+  let base = null; try { base = new URL(baseHref); } catch (e) {}
+  const abs = (u) => { if (!u) return null; u = String(u).trim().replace(/&amp;/g, '&'); if (/^data:/i.test(u)) return null; try { return base ? new URL(u, base).href : u; } catch (e) { return null; } };
+  const out = new Set();
+  const push = (u) => { const a = abs(u); if (a && /^https?:\/\//.test(a)) out.add(a); };
+  let m;
+  const reMeta = /<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*content=["']([^"']+)["']/gi;
+  while ((m = reMeta.exec(html))) push(m[1]);
+  const reMeta2 = /<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/gi;
+  while ((m = reMeta2.exec(html))) push(m[1]);
+  const reImg = /<img[^>]+(?:data-src|data-lazy-src|data-original|src)=["']([^"']+)["']/gi;
+  while ((m = reImg.exec(html))) push(m[1]);
+  const reSs = /(?:srcset|data-srcset)=["']([^"']+)["']/gi;
+  while ((m = reSs.exec(html))) m[1].split(',').forEach((s) => push(s.trim().split(/\s+/)[0]));
+  const reBg = /background-image\s*:\s*url\((["']?)([^)"']+)\1\)/gi;
+  while ((m = reBg.exec(html))) push(m[2]);
+  const bad = /(sprite|icon|logo|favicon|placeholder|pixel|1x1|blank|spacer|loader|\.svg(\?|$)|tracking|analytics)/i;
+  const seen = new Set(); const res2 = [];
+  for (const u of out) {
+    const p = u.split('#')[0];
+    if (bad.test(u)) continue;
+    const isImg = /\.(jpe?g|png|webp|avif)(\?|$)/i.test(p) || /(\/image|\/photo|\/render|\/media|\/gallery|cdn|upload|images?\.)/i.test(u);
+    if (!isImg) continue;
+    const keyu = p.replace(/\?.*$/, '');
+    if (seen.has(keyu)) continue; seen.add(keyu);
+    res2.push(u);
+    if (res2.length >= 30) break;
+  }
+  return res2;
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
@@ -1851,7 +1894,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const text = String(b.text || '').trim().slice(0, 1200);
       if (!text) return json(res, 400, { error: 'пустая идея' });
-      const item = { id: crypto.randomBytes(5).toString('hex'), text, source: String(b.source || 'ручная').slice(0, 40), geo: String(b.geo || '').slice(0, 40), hook: String(b.hook || '').slice(0, 300), format: String(b.format || '').slice(0, 80), createdAt: Date.now() };
+      const item = { id: crypto.randomBytes(5).toString('hex'), text, source: String(b.source || 'ручная').slice(0, 40), geo: String(b.geo || '').slice(0, 40), hook: String(b.hook || '').slice(0, 300), format: String(b.format || '').slice(0, 80), refWhat: String(b.refWhat || '').slice(0, 160), refQuery: String(b.refQuery || '').slice(0, 80), platform: ['reels', 'tiktok', 'shorts'].includes(b.platform) ? b.platform : '', createdAt: Date.now() };
       db.ideaBank.unshift(item); db.ideaBank = db.ideaBank.slice(0, 300); store.save();
       return json(res, 200, item);
     }
