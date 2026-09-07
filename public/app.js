@@ -1364,7 +1364,7 @@ function openFeedPrivacy(onDone) {
   });
   $$('[data-fpmode]', md).forEach(b => b.addEventListener('click', () => { FEED_AUD.mode = b.dataset.fpmode; $$('[data-fpmode]', md).forEach(x => x.classList.toggle('on', x === b)); $('#fpList', md).style.display = FEED_AUD.mode === 'all' ? 'none' : 'block'; }));
 }
-/* карточка сохранённого кейса из базы (академия) */
+/* карточка сохранённого кейса из базы (академия) — вывод + видео разбора + транскрипт */
 function openCaseModal(k) {
   if (!k) return;
   const OC = { 'Выиграли': 'win', 'Проиграли': 'lose', 'В работе': 'wip', 'Урок': 'lesson' };
@@ -1373,13 +1373,41 @@ function openCaseModal(k) {
     sub: `${esc(k.geoName || '')} · эксперт: ${esc(k.broker || '—')} · разбор от ${new Date(k.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} · ${esc(k.savedBy || '')}`,
     body: `${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}" style="margin-bottom:10px;display:inline-block">${esc(k.outcome)}</span>` : ''}
       <div class="case-verdict">${k.verdict ? esc(k.verdict).replace(/\n/g, '<br>') : '<span class="muted">Вывод не заполнен</span>'}</div>
-      ${(k.tags || []).length ? `<div class="tags" style="margin-top:12px">${k.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}`,
+      ${(k.tags || []).length ? `<div class="tags" style="margin-top:12px">${k.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="case-vid" id="caseVid"></div>`,
     actions: [
       { label: 'Открыть лида', onClick: () => { closeModal(); openLeadModal(k.leadId); } },
       { label: 'Пересмотреть кейс', cls: 'btn-accent', onClick: () => window.open('/cases?ids=' + k.leadId, '_blank') },
       { label: 'Удалить из базы', danger: true, onClick: async () => { await fetch('/api/cases/' + k.id, { method: 'DELETE' }); toast('Убрано из базы', null, true); if (CUR === 'overview') go('overview'); } },
     ],
   });
+  const vbox = $('#caseVid', md);
+  const paintVid = () => {
+    vbox.innerHTML = `<div class="case-vid-t">${ic(I.play)}Видео разбора</div>
+      ${k.videoUrl ? `<video class="case-vplayer" src="${esc(k.videoUrl)}" controls playsinline preload="metadata"></video>` : '<div class="muted" style="font-size:12.5px;margin:4px 0 8px">Запись планёрки, ролевой игры или звонка — для обучения команды</div>'}
+      <div class="case-vid-acts">
+        <button class="btn btn-sm" id="caseVidUp">${ic(I.plus)}${k.videoUrl ? 'Заменить видео' : 'Загрузить видео'}</button>
+        ${k.videoUrl && !k.transcript ? `<button class="btn btn-sm" id="caseVidTr">${ic(I.spark)}Транскрибировать</button>` : ''}
+      </div>
+      ${k.transcript ? `<div class="case-tr"><div class="case-tr-t">${ic(I.doc)}Транскрипт</div><div class="case-tr-b">${esc(k.transcript).replace(/\n/g, '<br>')}</div></div>` : ''}`;
+    $('#caseVidUp', vbox).addEventListener('click', () => {
+      const inp = el('<input type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none">'); document.body.appendChild(inp);
+      inp.addEventListener('change', async () => {
+        const f = inp.files[0]; inp.remove(); if (!f) return;
+        toast('Загружаю видео…', f.size > 24e6 ? 'Большое — транскрипт будет недоступен (>24 МБ)' : null, true);
+        try { const r = await fetch(`/api/cases/${k.id}/video?filename=${encodeURIComponent(f.name)}`, { method: 'POST', body: f }); const j = await r.json(); if (!r.ok) throw new Error(j.error); k.videoUrl = j.videoUrl; k.videoSize = j.size; paintVid(); toast('Видео прикреплено', null, true); }
+        catch (e) { toast('Не вышло', e.message); }
+      });
+      inp.click();
+    });
+    const tr = $('#caseVidTr', vbox);
+    if (tr) tr.addEventListener('click', async () => {
+      tr.disabled = true; tr.textContent = 'Распознаю…';
+      try { const r = await api.post(`/cases/${k.id}/transcribe`, {}); k.transcript = r.transcript; paintVid(); toast('Транскрипт готов', null, true); }
+      catch (e) { toast('Не вышло', e.message); tr.disabled = false; paintVid(); }
+    });
+  };
+  paintVid();
   return md;
 }
 /* контроль посадочных мест (анти-фрод подписки) — рендер в #seatBody */

@@ -3184,3 +3184,12 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-oc.wip { background: rgba(224,168,46,.16); color: #B8860B; }
 .ov2-oc.lesson { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .case-verdict { font-size: 13.5px; line-height: 1.6; color: var(--ink); background: var(--bg-2); border-radius: 10px; padding: 13px 15px; }
+
+/* ============ Видео разбора кейса ============ */
+.case-vid { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+.case-vid-t, .case-tr-t { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 700; margin-bottom: 8px; }
+.case-vid-t svg, .case-tr-t svg { width: 14px; height: 14px; color: var(--accent); }
+.case-vplayer { width: 100%; border-radius: 10px; background: #000; max-height: 320px; margin-bottom: 8px; }
+.case-vid-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.case-tr { margin-top: 12px; }
+.case-tr-b { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); background: var(--bg-2); border-radius: 10px; padding: 12px 14px; max-height: 200px; overflow-y: auto; }

@@ -3339,6 +3339,30 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#102B5C;ma
       db.caseBase = (db.caseBase || []).filter(x => x.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
     }
+    /* видео разбора кейса: загрузка (для «показа на ТВ» / обучения) */
+    if ((m = p.match(/^\/api\/cases\/([a-f0-9]+)\/video$/)) && req.method === 'POST') {
+      if (!ROLE) return json(res, 401, { error: 'auth' });
+      const kase = (db.caseBase || []).find(x => x.id === m[1]); if (!kase) return json(res, 404, { error: 'кейс не найден' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(mp4|webm|mov|m4v)$/i); if (!extM) return json(res, 400, { error: 'формат: mp4/webm/mov' });
+      const chunks = []; let size = 0; await new Promise((rs) => { req.on('data', ch => { size += ch.length; if (size > 200e6) req.destroy(); else chunks.push(ch); }); req.on('end', rs); req.on('close', rs); });
+      if (!size || size > 200e6) return json(res, 400, { error: 'видео до 200 МБ' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'cases'), { recursive: true });
+      const fname = `cases/${crypto.randomBytes(6).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      kase.videoUrl = '/assets/' + fname; kase.videoSize = size; store.save();
+      return json(res, 200, { videoUrl: kase.videoUrl, size, transcribable: size <= 24e6 });
+    }
+    /* транскрибация видео разбора (Whisper, по кнопке = cost-safe; лимит 24 МБ) */
+    if ((m = p.match(/^\/api\/cases\/([a-f0-9]+)\/transcribe$/)) && req.method === 'POST') {
+      if (!ROLE) return json(res, 401, { error: 'auth' });
+      const kase = (db.caseBase || []).find(x => x.id === m[1]); if (!kase || !kase.videoUrl) return json(res, 400, { error: 'нет видео' });
+      if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для распознавания' });
+      const fp = path.join(PUBLIC, kase.videoUrl.replace(/^\//, '').replace(/^assets\//, 'assets/'));
+      let buf; try { buf = fs.readFileSync(fp); } catch (e) { return json(res, 400, { error: 'файл видео не найден' }); }
+      if (buf.length > 24e6) return json(res, 400, { error: 'видео больше 24 МБ — Whisper не примет; загрузите короче или вырежьте аудио' });
+      try { kase.transcript = await llm.transcribe(buf, 'case' + path.extname(fp)); store.save(); return json(res, 200, { transcript: kase.transcript }); }
+      catch (e) { return json(res, 500, { error: 'не распозналось: ' + e.message }); }
+    }
     if (p === '/cases' && req.method === 'GET') {
       if (!getSession(req)) { res.writeHead(302, { Location: '/' }); res.end(); return; }
       const ids = String(u.searchParams.get('ids') || '').split(',').map(s => s.trim()).filter(Boolean);
