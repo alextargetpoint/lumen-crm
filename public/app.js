@@ -1956,31 +1956,60 @@ async function openLeadModal(id) {
 }
 
 /* ---------------- ДИАЛОГИ ---------------- */
+const INBOX_SEGS = [['all', 'Все'], ['wait', 'Ждут ответа'], ['hot', 'Горячие'], ['human', 'Нужен человек'], ['ai', 'На ИИ'], ['sleeping', 'Спящие']];
 PAGES.inbox = async (root) => {
+  PAGE_STATE.inboxSeg = PAGE_STATE.inboxSeg || 'all';
+  const brokers = (STATE.brokers || []).filter(b => b.active !== false);
   root.innerHTML = `<div class="inbox">
-    <div class="glass conv-list" id="convList"></div>
+    <div class="glass conv-list" id="convList">
+      <div class="conv-head">
+        <div class="conv-search-wrap">${ic(I.search || I.doc)}<input class="conv-search" id="convSearch" placeholder="Имя или телефон" value="${esc(PAGE_STATE.inboxSearch || '')}"></div>
+        <select id="convBroker" class="conv-broker"><option value="">Все брокеры</option><option value="__none">Без брокера</option>${brokers.map(b => `<option value="${b.id}" ${PAGE_STATE.inboxBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+        <div class="conv-segs">${INBOX_SEGS.map(([k, n]) => `<button class="conv-seg ${(PAGE_STATE.inboxSeg || 'all') === k ? 'on' : ''}" data-seg="${k}">${n}</button>`).join('')}</div>
+      </div>
+      <div class="conv-items" id="convItems"></div>
+    </div>
     <div class="glass chat" id="chatPane"><div class="chat-empty"><img class="ce-art" src="assets/art/chat.png" alt=""><div>Выберите диалог слева</div></div></div>
     <div class="glass lead-panel" id="leadPanel"><div class="empty">Данные лида появятся здесь</div></div>
   </div>`;
+  const search = $('#convSearch', root);
+  let deb; search.addEventListener('input', () => { PAGE_STATE.inboxSearch = search.value; clearTimeout(deb); deb = setTimeout(() => refreshInbox(false), 200); });
+  $('#convBroker', root).addEventListener('change', (e) => { PAGE_STATE.inboxBroker = e.target.value; refreshInbox(false); });
+  $$('.conv-seg', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.inboxSeg = b.dataset.seg; $$('.conv-seg', root).forEach(x => x.classList.toggle('on', x === b)); refreshInbox(false); }));
   await refreshInbox(true);
 };
 PAGES.inbox.refresh = () => refreshInbox(false);
 
+function inboxMatch(l) {
+  const seg = PAGE_STATE.inboxSeg || 'all';
+  const q = (PAGE_STATE.inboxSearch || '').trim().toLowerCase();
+  const brk = PAGE_STATE.inboxBroker || '';
+  if (brk === '__none') { if (l.broker) return false; } else if (brk && l.broker !== brk) return false;
+  if (q && !((l.name || '').toLowerCase().includes(q) || (l.phone || '').replace(/\s/g, '').includes(q.replace(/\s/g, '')))) return false;
+  if (seg === 'wait' && l.lastDir !== 'in') return false;
+  if (seg === 'hot' && !((l.tags || []).includes('горячий') || ['qualified', 'handover', 'viewing'].includes(l.stage))) return false;
+  if (seg === 'human' && !(l.tags || []).includes('нужен человек')) return false;
+  if (seg === 'ai' && !(l.ai && l.ai.enabled)) return false;
+  if (seg === 'sleeping' && l.stage !== 'sleeping') return false;
+  return true;
+}
 async function refreshInbox(first) {
   if (CUR !== 'inbox') return;
-  const leads = (await api.get('/leads')).filter(l => l.lastText || l.stage !== 'lost');
-  const list = $('#convList');
+  const all = (await api.get('/leads')).filter(l => l.lastText || l.stage !== 'lost');
+  const leads = all.filter(inboxMatch);
+  const list = $('#convItems');
   if (!list) return;
-  if (!PAGE_STATE.inboxLead && leads.length) PAGE_STATE.inboxLead = leads[0].id;
+  if ((!PAGE_STATE.inboxLead || !leads.some(l => l.id === PAGE_STATE.inboxLead)) && leads.length) PAGE_STATE.inboxLead = leads[0].id;
   list.innerHTML = leads.map(l => `
     <div class="conv ${l.id === PAGE_STATE.inboxLead ? 'active' : ''}" data-id="${l.id}">
       ${avaHtml(l)}
       <div class="meta"><div class="nm">${esc(l.name)}</div><div class="prev">${esc(l.lastText || 'нет сообщений')}</div></div>
       <div class="tm">${l.lastMsgAt ? tmm(l.lastMsgAt) : ''}</div>
       ${l.lastDir === 'in' ? '<div class="unread"></div>' : ''}
-    </div>`).join('');
-  $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; refreshInbox(true); }));
-  if (PAGE_STATE.inboxLead) await renderChat(PAGE_STATE.inboxLead, first);
+    </div>`).join('') || `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
+  $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; $$('.conv', list).forEach(x => x.classList.toggle('active', x === c)); renderChat(c.dataset.id, true); }));
+  if (PAGE_STATE.inboxLead && leads.length) await renderChat(PAGE_STATE.inboxLead, first);
+  else if (!leads.length) { const cp = $('#chatPane'); if (cp) cp.innerHTML = '<div class="chat-empty"><div>Нет диалогов по фильтру</div></div>'; }
 }
 
 async function renderChat(id, rebuild) {
