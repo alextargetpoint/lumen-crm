@@ -2581,3 +2581,17 @@ body.has-preview { padding-top: 38px; }
 .td-notes { width: 100%; min-height: 70px; border: 1px solid var(--stroke); border-radius: 10px; padding: 9px 11px; font-family: inherit; font-size: 13px; color: var(--ink); background: var(--card); outline: none; resize: vertical; }
 .td-notes:focus { border-color: var(--accent); }
 @media (max-width: 640px) { .td-row { grid-template-columns: 1fr; } .td-lbl { padding-top: 0; } }
+
+/* задача ↔ лид: панель сводки в деталях + чип */
+.tk-chip.lead { cursor: pointer; }
+.tk-chip.lead:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg-2)); color: var(--accent); }
+.td-lead-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-2); border: 1px solid var(--stroke); border-radius: var(--r-md); padding: 11px 13px; }
+.td-lead-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.td-lead-main b { font-size: 13.5px; color: var(--navy-900); }
+.td-lead-main span { font-size: 11.5px; color: var(--ink-3); }
+.td-lead-main i { font-size: 11.5px; font-style: normal; color: var(--ink-2); }
+.td-lead-acts { display: flex; align-items: center; gap: 6px; flex: none; }
+.td-lead-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow: auto; }
+.td-lead-opt { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; padding: 9px 11px; border: 1px solid var(--stroke); border-radius: 9px; background: var(--card); font-size: 13px; color: var(--ink); text-align: left; transition: border-color .14s, background .14s; }
+.td-lead-opt:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.td-lead-opt span { font-size: 11px; color: var(--ink-3); }
