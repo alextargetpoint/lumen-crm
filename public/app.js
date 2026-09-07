@@ -4052,30 +4052,44 @@ PAGES.analytics = async (root) => {
 /* ---------------- ПРОФИЛЬ АГЕНТСТВА (открывается из футера сайдбара) ---------------- */
 PAGES.agency = async (root) => {
   const s = STATE.settings;
+  const brokersN = (STATE.brokers || []).filter(b => b.active !== false).length;
+  const geos = s.agency.geos || [];
+  const edition = s.agency.edition || 'agency';
   root.innerHTML = `
+    <div class="ag-profile">
+      <div class="ag-cover"><video class="ag-cover-v" autoplay muted loop playsinline poster="assets/skyline-poster.jpg" src="assets/skyline-bg.mp4"></video></div>
+      <div class="ag-ident">
+        <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.55">`}</div>
+        <div class="ag-id-main">
+          <div class="ag-name-row"><span class="ag-h">${esc(s.agency.name)}</span><span class="ag-edition">${edition === 'solo' ? '👤 Solo' : '🏢 Агентство'}</span></div>
+          <div class="ag-tag">${(s.agency.manager || {}).name ? 'Менеджер — ' + esc(s.agency.manager.name) : 'Агентство недвижимости'}${(s.agency.manager || {}).phone ? ' · ' + esc(s.agency.manager.phone) : ''}</div>
+          <div class="ag-dirs">${geos.map(g => `<span class="ag-dir">${ic(I.pin || I.building)}${esc(s.geoNames[g] || g)}</span>`).join('')}</div>
+        </div>
+        <div class="ag-stats">
+          <button class="ag-stat" data-ovgo="brokers"><b>${brokersN}</b><span>${plural(brokersN, 'брокер', 'брокера', 'брокеров')}</span></button>
+          <button class="ag-stat" data-ovgo="properties"><b>${geos.length}</b><span>${plural(geos.length, 'направление', 'направления', 'направлений')}</span></button>
+          <button class="ag-stat" data-ovgo="collections"><b>${ic(I.layers)}</b><span>подборки</span></button>
+        </div>
+      </div>
+    </div>
     <div class="two-col">
       <div>
         <div class="glass card mb">
-          <div class="card-title">${ic(I.building)}Агентство<span class="sub">бренд на подборках, PDF и в системе</span></div>
+          <div class="card-title">${ic(I.building)}Идентификация бренда<span class="sub">лого, название, формат</span></div>
           <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Формат работы</label>
             <div class="chips-row">
-              <button type="button" class="chip-t ${(s.agency.edition || 'agency') === 'agency' ? 'on' : ''}" data-edition="agency">🏢 Агентство · команда брокеров</button>
-              <button type="button" class="chip-t ${s.agency.edition === 'solo' ? 'on' : ''}" data-edition="solo">👤 Solo · работаю один</button>
+              <button type="button" class="chip-t ${edition === 'agency' ? 'on' : ''}" data-edition="agency">🏢 Агентство · команда брокеров</button>
+              <button type="button" class="chip-t ${edition === 'solo' ? 'on' : ''}" data-edition="solo">👤 Solo · работаю один</button>
             </div>
             <div class="muted" style="font-size:11px;margin-top:6px">Solo прячет команду, распределение и SLA — все лиды ведёте вы, «передача» становится «взять в работу»</div>
           </div>
-          <div style="display:flex;gap:16px;align-items:center">
-            <div class="ag-logo" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.4">`}</div>
-            <div style="flex:1">
-              <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
-                <input type="file" id="agLogoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none">
-                <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
-              </div>
-              <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
-            </div>
+          <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
+            <input type="file" id="agLogoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none">
+            <button class="btn btn-accent btn-sm" id="agSave">Сохранить</button>
           </div>
+          <div class="muted" style="font-size:11px;margin-top:7px">PNG/SVG до 3 МБ, лучше светлый/белый — он встаёт на синие обложки подборок и в шапку PDF</div>
         </div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.user)}Подпись менеджера<span class="sub">обложка подборок и PDF</span></div>
@@ -4131,6 +4145,7 @@ PAGES.agency = async (root) => {
     toast(ch.dataset.edition === 'solo' ? 'Режим Solo включён' : 'Режим агентства включён', null, true);
     render();
   }));
+  $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   /* живой бренд-превью: как агентство видит клиент на обложке подборки */
   const agPreview = () => {
     const name = ($('#agName') ? $('#agName').value : s.agency.name) || 'Агентство';

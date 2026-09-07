@@ -1798,6 +1798,30 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 /* 2. Ripple убран (Material-волна «раскрывала» кнопки при клике — не в стиле продукта) */
 .btn > *, .nav-item > *, .seg-btn > * { position: relative; z-index: 1; }
 
+/* профиль агентства — соц-страница (organizer) */
+.ag-profile { border-radius: 18px; overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow); background: var(--card); border: 1px solid var(--stroke); }
+.ag-cover { position: relative; height: 156px; background: linear-gradient(120deg, #0A1833, #102B5C); overflow: hidden; }
+.ag-cover-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .6; }
+.ag-cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 17, 38, .1), rgba(6, 17, 38, .55)); }
+.ag-ident { display: flex; align-items: flex-end; gap: 18px; padding: 0 24px 20px; margin-top: -46px; position: relative; }
+.ag-ava { width: 96px; height: 96px; border-radius: 22px; flex: 0 0 96px; background: var(--card); border: 3px solid var(--card); box-shadow: 0 10px 30px -8px rgba(6, 17, 38, .4); display: grid; place-items: center; overflow: hidden; }
+.ag-ava img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+.ag-id-main { flex: 1; min-width: 0; padding-bottom: 4px; }
+.ag-name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ag-h { font-family: var(--font-display); font-optical-sizing: auto; font-weight: 600; font-size: 26px; letter-spacing: -.02em; color: var(--navy-900); }
+.ag-edition { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--blue-100); border: 1px solid #C3D6FA; border-radius: 20px; padding: 3px 11px; }
+.ag-tag { font-size: 13.5px; color: var(--ink-3); margin-top: 4px; }
+.ag-dirs { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+.ag-dir { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 11px; }
+.ag-dir svg { width: 13px; height: 13px; color: var(--accent); }
+.ag-stats { display: flex; gap: 10px; padding-bottom: 4px; }
+.ag-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 80px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .2s; }
+.ag-stat:hover { border-color: #B9CBEE; background: var(--card); box-shadow: var(--shadow); }
+.ag-stat b { font-size: 20px; font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; }
+.ag-stat b svg { width: 18px; height: 18px; color: var(--accent); }
+.ag-stat span { font-size: 11px; color: var(--ink-3); }
+@media (max-width: 760px) { .ag-ident { flex-wrap: wrap; } .ag-stats { width: 100%; } .ag-ava { width: 78px; height: 78px; flex-basis: 78px; } }
+
 /* обзор: кликабельные KPI + быстрые переходы */
 .ov-click { cursor: pointer; transition: transform .15s var(--ease-spring), box-shadow .2s, border-color .15s; }
 .ov-click:hover { border-color: #B9CBEE; box-shadow: var(--shadow-lift); }
