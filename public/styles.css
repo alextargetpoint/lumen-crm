@@ -1957,6 +1957,34 @@ html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke)
 .lc-ft-an { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--ink-2); background: var(--violet-bg); border-radius: 9px; padding: 8px 10px; display: flex; gap: 7px; align-items: flex-start; }
 .lc-ft-an svg { width: 14px; height: 14px; color: var(--violet); flex: 0 0 14px; margin-top: 2px; }
 
+/* Психо-профиль лида */
+.lc-psy { display: flex; flex-direction: column; gap: 9px; padding-top: 4px; }
+.psy-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.psy-head b { font-size: 15px; font-weight: 700; color: var(--navy-900); }
+.psy-conf { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: .02em; }
+.psy-conf.hi { background: rgba(16, 158, 106, .13); color: #0E9E6A; }
+.psy-conf.mid { background: rgba(47, 107, 255, .12); color: var(--accent); }
+.psy-conf.lo { background: rgba(160, 120, 30, .14); color: #A8791F; }
+.psy-sum { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); background: var(--violet-bg); border-radius: 9px; padding: 9px 11px; }
+.psy-axes { display: flex; flex-direction: column; gap: 6px; margin: 2px 0; }
+.psy-ax { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--ink-2); font-weight: 600; }
+.psy-ax > span { flex: 0 0 118px; }
+.psy-bar { flex: 1; height: 7px; border-radius: 999px; background: #E8EDF6; overflow: hidden; }
+.psy-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2, #5B2BD8)); }
+.psy-sec { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); margin: 7px 0 1px; }
+.psy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.psy-list li { font-size: 12.5px; line-height: 1.5; color: var(--navy-900); padding-left: 20px; position: relative; }
+.psy-list li.psy-good::before { content: '↗'; position: absolute; left: 2px; color: #0E9E6A; font-weight: 700; }
+.psy-list li.psy-bad::before { content: '✕'; position: absolute; left: 3px; color: #E0483D; font-weight: 700; font-size: 11px; }
+.psy-obj { font-size: 12.3px; line-height: 1.5; margin-bottom: 6px; }
+.psy-obj b { display: block; color: var(--navy-900); }
+.psy-obj span { color: var(--ink-2); }
+.psy-rep { background: var(--surface-2, #F4F7FC); border: 1px solid var(--line, #E7ECF3); border-radius: 11px; padding: 10px 12px; margin-bottom: 7px; }
+.psy-rep-t { font-size: 12.8px; line-height: 1.55; color: var(--navy-900); }
+.psy-rep-a { display: flex; gap: 4px; margin-top: 7px; }
+.psy-rep-a .btn-ghost { font-size: 11.5px; padding: 4px 8px; }
+.psy-meta { font-size: 10.5px; color: var(--ink-3); }
+
 /* 3. Мягкая пульсация горячих лидов — привлекает внимание к важному */
 .lead-card.hot { position: relative; }
 .lead-card.hot::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(224,129,61,.5); animation: hotPulse 2.6s ease-in-out infinite; pointer-events: none; }

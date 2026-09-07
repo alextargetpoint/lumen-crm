@@ -408,4 +408,181 @@ ${history || '(переписки пока мало)'}
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, CAROUSEL_TEMPLATES, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+/* ═══════════════════ ДВИЖКИ ДЛЯ СОЦСЕТЕЙ (Reels/контент для брокеров) ═══════════════════
+   Референс — проверенный контент-бот TargetPoint: сильный хук → многоуровневая структура
+   с конкретной пользой по пунктам → призыв через кодовое слово. Стиль ниже вшит как якорь тона. */
+
+const SHOOT_FORMATS = {
+  talking:  { name: 'Говорящая голова', brief: 'спикер говорит прямо в камеру, крупный план, динамичная нарезка с подрезками пауз; текст под запись от первого лица, живой разговорный ритм' },
+  dialogue: { name: 'Диалог 50/50',     brief: 'два человека / вопрос-ответ, экран поделён или склейки реплик; распиши реплики по ролям A (ведущий/скептик) и B (эксперт)' },
+  vlog:     { name: 'Влог / на объекте', brief: 'съёмка в движении на объекте или локации, живые перебивки b-roll, закадровый голос; распиши что снимаем в кадре + закадровый текст' },
+};
+
+/* якорь тона: как звучит сильный риэлторский Reels (данные-факты-конкретика, без воды, кодовое слово в CTA) */
+const REELS_TONE_ANCHOR = `Пример тона (НЕ копировать дословно, только регистр и подача):
+«Лид за 500 ₽ принёс нам больше сделок, чем 10 по 50. И нет, я не оговорился. Большинство агентств гонятся за дешёвыми лидами — это ловушка. Дешёвый лид просто кликнул. Дорогой — хочет купить. Вот что мы проверили на 50+ кампаниях в Meta: [пункт 1 с конкретной цифрой], [пункт 2], [пункт 3]. Если хотите разбор вашей рекламы — напишите слово «аудит» в комментарии.»
+Признаки: цепляющее контр-интуитивное утверждение в первой строке, короткие рубленые фразы, конкретная польза по пунктам, живой человеческий голос без канцелярита и клише, финал — призыв написать кодовое слово в комментарии/директ.`;
+
+function _reelScriptShape(n) {
+  return `Верни СТРОГО JSON:
+{"title":"общее название пачки (по теме, для списка)",
+ "scripts":[{
+   "format":"человекочитаемое имя формата съёмки",
+   "format_key":"talking|dialogue|vlog",
+   "duration_sec":30,
+   "goal_fit":"1 строка: под какую цель/этап воронки этот ролик (охват/прогрев/заявки)",
+   "hooks":["хук 1 — слом ожидания","хук 2 — заход с середины истории","хук 3 — цена бездействия"],
+   "hook_note":"1 короткая заметка почему эти хуки цепляют именно тут",
+   "beats":[{"t":"0-3с","role":"кадр/роль (для диалога — A или B)","say":"что говорим дословно","onscreen":"что на экране / подпись"}],
+   "full_script":"цельный текст под запись — можно читать с телефона, живым языком, абзацами",
+   "codeword":"кодовое слово для CTA (1 слово)","leadmagnet":"что человек получит за него (напр. разбор/подборка/чек-лист)",
+   "cta":"финальный призыв 1-2 предложения с кодовым словом",
+   "caption":"подпись под рилс для ленты (с 1-2 эмодзи максимум, без хэштег-спама)",
+   "broll":["3-6 идей что доснять для видеоряда"],
+   "why_works":"1-2 предложения почему этот ролик залетит"
+ }]}  // ровно ${n} сценариев`;
+}
+
+/* Генератор сценариев Reels. opts: {topic, geo, agencyName, formats:[keys], mode:'idea'|'rewrite', sourceText} */
+async function composeScripts(opts = {}) {
+  const agencyName = String(opts.agencyName || 'агентство недвижимости').slice(0, 80);
+  const geo = opts.geo ? String(opts.geo).slice(0, 60) : '';
+  const fmtKeys = (Array.isArray(opts.formats) ? opts.formats : []).filter(k => SHOOT_FORMATS[k]).slice(0, 3);
+  const formats = fmtKeys.length ? fmtKeys : ['talking'];
+  const n = formats.length;
+  const fmtLines = formats.map((k, i) => `${i + 1}) ${SHOOT_FORMATS[k].name} [${k}] — ${SHOOT_FORMATS[k].brief}`).join('\n');
+  const isRewrite = opts.mode === 'rewrite' && opts.sourceText;
+  const topic = String(opts.topic || '').slice(0, 1200);
+  const src = String(opts.sourceText || '').slice(0, 4000);
+
+  const task = isRewrite
+    ? `ЗАДАЧА: переписать чужой рилс под НАШУ нишу (недвижимость) и другой угол — так, чтобы НЕ было дублирования оригинала (другой пример, другие формулировки, свой заход), но сохранить рабочую драматургию.
+ИСХОДНЫЙ РИЛС (транскрипт/описание/ссылка-контекст):
+"""${src}"""
+${topic ? 'Наш угол/своя мысль, которую вплести: ' + topic + '\n' : ''}`
+    : `ЗАДАЧА: собрать сценарии рилс по идее брокера.
+Идея/тема/вводные: ${topic || '(идея не задана — предложи сильную тему по нише недвижимости)'}\n`;
+
+  const prompt = `Ты — сценарист вирусных Reels для агентства недвижимости «${agencyName}». Пишешь как топовый SMM-щик и продавец, а не как нейросеть.
+${geo ? 'Направление/гео: ' + geo + '\n' : ''}${task}
+Сделай ${n} ${n === 1 ? 'сценарий' : 'сценария'} — по одному под КАЖДЫЙ выбранный формат съёмки:
+${fmtLines}
+
+${REELS_TONE_ANCHOR}
+
+Жёсткие правила: первые 3 секунды решают — хук должен останавливать пролистывание; короткие рубленые фразы; конкретика и польза, а не общие слова; НЕ выдумывай точные цифры/кейсы, которых нет во вводных — если цифр нет, говори обтекаемо («в разы», «заметно») или предложи брокеру подставить свою; финал каждого ролика — призыв написать кодовое слово. Пиши на русском, живым языком.
+${_reelScriptShape(n)}`;
+
+  const out = await callGemini(prompt, 55000, 6000);
+  if (!out || !Array.isArray(out.scripts) || !out.scripts.length) throw new Error('bad scripts');
+  const arr = (a, n2) => Array.isArray(a) ? a.slice(0, n2).map(x => String(x).slice(0, 300)).filter(Boolean) : [];
+  return {
+    title: String(out.title || (isRewrite ? 'Рерайт рилса' : 'Сценарии Reels')).slice(0, 120),
+    scripts: out.scripts.slice(0, 3).map(s => ({
+      format: String(s.format || '').slice(0, 60),
+      format_key: SHOOT_FORMATS[s.format_key] ? s.format_key : (formats[0]),
+      duration_sec: Math.max(10, Math.min(90, parseInt(s.duration_sec) || 30)),
+      goal_fit: String(s.goal_fit || '').slice(0, 200),
+      hooks: arr(s.hooks, 3),
+      hook_note: String(s.hook_note || '').slice(0, 260),
+      beats: Array.isArray(s.beats) ? s.beats.slice(0, 12).map(b => ({
+        t: String((b || {}).t || '').slice(0, 24), role: String((b || {}).role || '').slice(0, 60),
+        say: String((b || {}).say || '').slice(0, 500), onscreen: String((b || {}).onscreen || '').slice(0, 200),
+      })).filter(b => b.say || b.role) : [],
+      full_script: String(s.full_script || '').slice(0, 3000),
+      codeword: String(s.codeword || '').slice(0, 40),
+      leadmagnet: String(s.leadmagnet || '').slice(0, 160),
+      cta: String(s.cta || '').slice(0, 400),
+      caption: String(s.caption || '').slice(0, 700),
+      broll: arr(s.broll, 6),
+      why_works: String(s.why_works || '').slice(0, 400),
+    })),
+  };
+}
+
+/* Хантинг идей: банк идей под нишу (съёмки/форматы/рубрики). opts:{geo, agencyName, angle, count} */
+async function huntIdeas(opts = {}) {
+  const agencyName = String(opts.agencyName || 'агентство недвижимости').slice(0, 80);
+  const geo = opts.geo ? String(opts.geo).slice(0, 60) : '';
+  const n = Math.max(4, Math.min(12, +opts.count || 8));
+  const ANGLES = {
+    all: 'разные углы: разрушение мифов, кейсы, разбор ошибок, закулисье работы брокера, тренды рынка, гайды покупателю, боли аудитории',
+    myths: 'разрушение мифов и заблуждений о покупке/инвестициях в недвижимость',
+    cases: 'кейсы и истории клиентов (доход, переезд, удачная сделка)',
+    mistakes: 'типичные ошибки покупателей и инвесторов',
+    behind: 'закулисье работы брокера/агентства, «как это на самом деле»',
+    trends: 'тренды и новости рынка недвижимости направления',
+    guide: 'полезные гайды и лайфхаки для покупателя',
+    shoot: 'идеи именно под съёмку: динамичные форматы на объекте, до/после, обзоры, рум-туры',
+  };
+  const angle = ANGLES[opts.angle] || ANGLES.all;
+  const prompt = `Ты — контент-стратег агентства недвижимости «${agencyName}». Наханть ${n} свежих идей для Reels/постов, которые реально заходят у брокеров.
+${geo ? 'Направление/гео: ' + geo + '\n' : ''}Фокус идей: ${angle}.
+Правила: каждая идея — самостоятельная, конкретная (не «расскажите про район», а с чётким углом и крючком); разнообразие форматов; без банальщины и клише; ориентир на прогрев и заявки.
+Верни СТРОГО JSON:
+{"ideas":[{
+  "title":"суть идеи одной фразой (крючок)",
+  "angle":"тип: миф|кейс|ошибка|закулисье|тренд|гайд|съёмка",
+  "hook":"вариант первой фразы ролика",
+  "why":"почему зайдёт / чью боль закрывает (1 строка)",
+  "format":"под какой формат снимать (говорящая голова / диалог / влог на объекте)",
+  "effort":"низкий|средний|высокий — сложность съёмки"
+}]}  // ровно ${n} идей, отсортируй сильные первыми`;
+  const out = await callGemini(prompt, 40000, 3500);
+  if (!out || !Array.isArray(out.ideas) || !out.ideas.length) throw new Error('bad ideas');
+  return {
+    ideas: out.ideas.slice(0, 12).map(i => ({
+      title: String((i || {}).title || '').slice(0, 200),
+      angle: String((i || {}).angle || '').slice(0, 40),
+      hook: String((i || {}).hook || '').slice(0, 300),
+      why: String((i || {}).why || '').slice(0, 300),
+      format: String((i || {}).format || '').slice(0, 80),
+      effort: String((i || {}).effort || '').slice(0, 20),
+    })).filter(i => i.title),
+  };
+}
+
+/* Быстрый пост/сторис/тред в нужном стиле. opts:{topic, geo, agencyName, kind:'post'|'story'|'thread', style} */
+async function composePost(opts = {}) {
+  const agencyName = String(opts.agencyName || 'агентство недвижимости').slice(0, 80);
+  const geo = opts.geo ? String(opts.geo).slice(0, 60) : '';
+  const topic = String(opts.topic || '').slice(0, 1000);
+  const STYLES = {
+    expert: 'экспертный, по делу, с цифрами и аргументами, вызывает доверие',
+    warm: 'тёплый, человеческий, эмпатичный, будто пишет близкий консультант',
+    lux: 'премиальный, элегантный, сдержанный люкс, без пафоса',
+    bold: 'провокационный, цепляющий, с контр-интуитивными утверждениями',
+    friendly: 'дружелюбный, лёгкий, разговорный, с юмором в меру',
+  };
+  const style = STYLES[opts.style] || STYLES.expert;
+  const kind = ['post', 'story', 'thread'].includes(opts.kind) ? opts.kind : 'post';
+  const KIND_BRIEF = {
+    post: 'пост в ленту Instagram: сильный первый абзац-крючок, тело с пользой, финальный CTA; + первый комментарий (продолжение/ссылка)',
+    story: 'серия из 4-6 сторис: каждая — короткий экран (1-2 строки текста на экран) + подсказка что показать; последняя со стикером-действием',
+    thread: 'тред в Threads: 4-7 коротких постов подряд, первый — хук, каждый развивает мысль, последний — CTA',
+  };
+  const prompt = `Ты — SMM-копирайтер агентства недвижимости «${agencyName}». Напиши ${KIND_BRIEF[kind]}.
+${geo ? 'Направление/гео: ' + geo + '\n' : ''}Тема/вводные: ${topic || '(тема не задана — выбери сильную по нише)'}
+Тон: ${style}. Живой человеческий язык, без клише и канцелярита. Цифры не выдумывай, если их нет во вводных.
+Верни СТРОГО JSON:
+{"title":"короткое название для списка",
+ "body":"основной текст (для сторис/треда — с разделителем '\\n---\\n' между экранами/постами)",
+ "openers":["2 альтернативных первых строки/крючка"],
+ "hashtags":["5-8 уместных хэштегов без решётки"],
+ "cta":"призыв к действию 1 строка",
+ "first_comment":"текст первого комментария (для post; иначе пусто)"}`;
+  const out = await callGemini(prompt, 40000, 3000);
+  if (!out || !out.body) throw new Error('bad post');
+  const arr = (a, n2) => Array.isArray(a) ? a.slice(0, n2).map(x => String(x).slice(0, 200)).filter(Boolean) : [];
+  return {
+    kind,
+    title: String(out.title || 'Пост').slice(0, 120),
+    body: String(out.body || '').slice(0, 4000),
+    openers: arr(out.openers, 2),
+    hashtags: arr(out.hashtags, 8).map(h => h.replace(/^#+/, '')),
+    cta: String(out.cta || '').slice(0, 300),
+    first_comment: String(out.first_comment || '').slice(0, 600),
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, composeLeadPsych, composeScripts, huntIdeas, composePost, CAROUSEL_TEMPLATES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

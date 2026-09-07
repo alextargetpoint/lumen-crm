@@ -258,6 +258,8 @@ const DEFAULT_PASS = 'lumen2026';
   ];
   if (!db.collections) db.collections = [];
   if (!db.carousels) db.carousels = [];
+  if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
+  if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
   if (!db.folders) db.folders = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
@@ -1274,6 +1276,23 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, out);
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }
+    /* ИИ психо-профиль лида: тип покупателя + подход + отработка возражений + готовые ответы */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/psych$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      /* собираем историю: переписка (кто→что) + расшифровки звонков */
+      const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at).slice(-40);
+      let hist = msgs.map(x => `${x.dir === 'in' ? 'КЛИЕНТ' : 'БРОКЕР'}: ${x.text}`).join('\n');
+      const trs = (lead.transcripts || []).slice(-3).map(t => `[звонок] ${t.text || t.summary || ''}`).join('\n');
+      if (trs) hist += (hist ? '\n' : '') + trs;
+      if (lead.custom && lead.custom.notes) hist += `\n[заметка брокера] ${lead.custom.notes}`;
+      try {
+        const out = await llm.composeLeadPsych(db, lead, hist.slice(0, 6000));
+        lead.psych = out; store.save();
+        return json(res, 200, out);
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
     /* загрузка креатива объявления к лиду (для первого касания) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/creative$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
@@ -1733,6 +1752,71 @@ const server = http.createServer(async (req, res) => {
         fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
         return json(res, 200, { url: '/assets/' + fname });
       } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+
+    /* ---------------- соц-движки: сценарии Reels / хантинг идей / посты ----------------
+       История генераций (db.socialContent) + копилка идей брокера (db.ideaBank). */
+    if (p === '/api/social/content' && req.method === 'GET') {
+      const kind = u.searchParams.get('kind');
+      let list = db.socialContent;
+      if (kind) list = list.filter(x => x.kind === kind);
+      return json(res, 200, list.slice(0, 200));
+    }
+    if ((m = p.match(/^\/api\/social\/content\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      db.socialContent = db.socialContent.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* сценарии Reels (по идее брокера / из копилки / рерайт чужого рилса) */
+    if (p === '/api/social/scripts' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
+      const b = await readBody(req);
+      let topic = String(b.topic || '');
+      if (b.ideaId) { const idea = db.ideaBank.find(x => x.id === b.ideaId); if (idea) topic = idea.text + (topic ? ('\n' + topic) : ''); }
+      try {
+        const out = await llm.composeScripts({
+          topic, geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name,
+          formats: b.formats, mode: b.mode === 'rewrite' ? 'rewrite' : 'idea', sourceText: b.sourceText,
+        });
+        const item = { id: crypto.randomBytes(5).toString('hex'), kind: 'script', title: out.title, geo: b.geo || '', mode: b.mode === 'rewrite' ? 'rewrite' : 'idea', scripts: out.scripts, createdAt: Date.now() };
+        db.socialContent.unshift(item); db.socialContent = db.socialContent.slice(0, 300); store.save();
+        return json(res, 200, item);
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* хантинг идей (банк идей под нишу) */
+    if (p === '/api/social/hunt' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
+      const b = await readBody(req);
+      try {
+        const out = await llm.huntIdeas({ geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name, angle: b.angle, count: b.count });
+        return json(res, 200, { ideas: out.ideas });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* быстрый пост / сторис / тред */
+    if (p === '/api/social/post' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
+      const b = await readBody(req);
+      try {
+        const out = await llm.composePost({ topic: b.topic, geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name, kind: b.kind, style: b.style });
+        const item = { id: crypto.randomBytes(5).toString('hex'), kind: 'post', postKind: out.kind, title: out.title, geo: b.geo || '', payload: out, createdAt: Date.now() };
+        db.socialContent.unshift(item); db.socialContent = db.socialContent.slice(0, 300); store.save();
+        return json(res, 200, item);
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* копилка идей: список / добавить (текст или диктовка/свайп) / удалить */
+    if (p === '/api/social/ideas' && req.method === 'GET') {
+      return json(res, 200, db.ideaBank.slice(0, 300));
+    }
+    if (p === '/api/social/ideas' && req.method === 'POST') {
+      const b = await readBody(req);
+      const text = String(b.text || '').trim().slice(0, 1200);
+      if (!text) return json(res, 400, { error: 'пустая идея' });
+      const item = { id: crypto.randomBytes(5).toString('hex'), text, source: String(b.source || 'ручная').slice(0, 40), geo: String(b.geo || '').slice(0, 40), hook: String(b.hook || '').slice(0, 300), format: String(b.format || '').slice(0, 80), createdAt: Date.now() };
+      db.ideaBank.unshift(item); db.ideaBank = db.ideaBank.slice(0, 300); store.save();
+      return json(res, 200, item);
+    }
+    if ((m = p.match(/^\/api\/social\/ideas\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      db.ideaBank = db.ideaBank.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
     }
 
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */

@@ -1767,6 +1767,28 @@ function openMeetingModal(lead, after) {
 }
 
 
+/* тело панели «Психо-профиль и подход» лида */
+function psychBody(p) {
+  const go = `<button class="btn btn-sm btn-accent" id="lcPsychGo" style="margin-top:4px">${ic(I.spark)}${p ? 'Обновить разбор' : 'Разобрать лида (Gemini)'}</button>`;
+  if (!p) return `<div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:9px">ИИ разберёт переписку и звонки → тип покупателя, на какие точки давить, что избегать, отработку возражений и готовые ответы в чат.</div>${go}`;
+  const conf = { 'высокая': 'hi', 'средняя': 'mid', 'низкая': 'lo' }[String(p.confidence || '').toLowerCase()] || 'mid';
+  const bars = Object.entries(p.axes || {}).map(([k, v]) => `<div class="psy-ax"><span>${esc(k)}</span><div class="psy-bar"><i style="width:${Math.max(3, v)}%"></i></div></div>`).join('');
+  const press = (p.press || []).map(x => `<li class="psy-good">${esc(x)}</li>`).join('');
+  const avoid = (p.avoid || []).map(x => `<li class="psy-bad">${esc(x)}</li>`).join('');
+  const obj = (p.objections || []).map(o => `<div class="psy-obj"><b>«${esc(o.q)}»</b><span>${esc(o.a)}</span></div>`).join('');
+  const replies = (p.replies || []).map((r, i) => `<div class="psy-rep"><div class="psy-rep-t">${esc(r)}</div><div class="psy-rep-a"><button class="btn-ghost" data-psyuse="${i}">${ic(I.send)}В касание</button><button class="btn-ghost" data-psycopy="${i}">${ic(I.copy)}Копировать</button></div></div>`).join('');
+  return `
+    <div class="psy-head"><b>${esc(p.type)}</b><span class="psy-conf ${conf}">уверенность: ${esc(p.confidence || 'средняя')}</span></div>
+    ${p.summary ? `<div class="psy-sum">${esc(p.summary)}</div>` : ''}
+    <div class="psy-axes">${bars}</div>
+    ${press ? `<div class="psy-sec">На что давить</div><ul class="psy-list">${press}</ul>` : ''}
+    ${avoid ? `<div class="psy-sec">Чего избегать</div><ul class="psy-list">${avoid}</ul>` : ''}
+    ${obj ? `<div class="psy-sec">Возражения → ответ</div>${obj}` : ''}
+    ${replies ? `<div class="psy-sec">Готовые ответы в чат</div>${replies}` : ''}
+    <div class="psy-meta">Разбор ${p.at ? ago(p.at) : ''}</div>
+    ${go}`;
+}
+
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
@@ -1857,6 +1879,7 @@ async function openLeadModal(id) {
               </div>
               <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
             </div>`, { open: ['new', 'touch'].includes(l.stage), icon: I.send })}
+          ${coll('🧠 Психо-профиль и подход', `<div id="lcPsych" class="lc-psy">${psychBody(l.psych)}</div>`, { open: !!l.psych, icon: I.spark })}
           <div class="lc-3sel">
             <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
@@ -2010,6 +2033,27 @@ async function openLeadModal(id) {
       await api.post(`/leads/${id}/message`, { text });
       toast('Первое касание отправлено', 'Ушло клиенту в WhatsApp', true);
       openLeadModal(id);
+    });
+  }
+  /* психо-профиль: разбор + вставка/копирование готовых ответов */
+  const psyWrap = $('#lcPsych', bd);
+  if (psyWrap) {
+    psyWrap.addEventListener('click', async (e) => {
+      const go = e.target.closest('#lcPsychGo');
+      if (go) {
+        const orig = go.innerHTML; go.disabled = true; go.innerHTML = '✦ Gemini анализирует…';
+        try {
+          const r = await fetch(`/api/leads/${id}/psych`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+          l.psych = j; psyWrap.innerHTML = psychBody(j);
+          toast('Разбор готов', 'Психотип и подход обновлены', true);
+        } catch (e2) { toast('ИИ не справился', e2.message); go.disabled = false; go.innerHTML = orig; }
+        return;
+      }
+      const use = e.target.closest('[data-psyuse]');
+      if (use) { const t = (l.psych.replies || [])[+use.dataset.psyuse] || ''; const ta = $('#lcFtText', bd); if (ta) { ta.value = t; ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); ta.focus(); } toast('Ответ вставлен в «Первое касание»', 'Проверьте и отправьте', true); return; }
+      const cp = e.target.closest('[data-psycopy]');
+      if (cp) { const t = (l.psych.replies || [])[+cp.dataset.psycopy] || ''; try { await navigator.clipboard.writeText(t); toast('Скопировано', null, true); } catch (_) { toast('Не удалось скопировать'); } return; }
     });
   }
   const saveContacts = async (contacts) => { await api.post(`/leads/${id}/contacts`, { contacts }); openLeadModal(id); };
