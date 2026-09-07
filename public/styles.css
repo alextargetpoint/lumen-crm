@@ -1960,6 +1960,8 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 /* эмулятор прогрева номеров */
 .warmup-warn { display: flex; gap: 10px; font-size: 12px; line-height: 1.55; color: var(--ink-2); background: var(--warn-bg); border: 1px solid #F0DCA8; border-radius: 12px; padding: 12px 14px; }
 .warmup-warn svg { width: 18px; height: 18px; color: var(--warn); flex: 0 0 18px; margin-top: 1px; }
+.wu-danger { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.55; color: var(--navy-900); background: color-mix(in srgb, var(--bad) 8%, transparent); border: 1px solid color-mix(in srgb, var(--bad) 30%, transparent); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+.wu-danger svg { width: 18px; height: 18px; color: var(--bad); flex: 0 0 18px; margin-top: 1px; }
 .warmup-live { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--navy-900); background: var(--ok-bg); border: 1px solid #BDE7D4; border-radius: 11px; padding: 10px 14px; }
 .warmup-live svg { width: 16px; height: 16px; color: var(--ok); }
 .warmup-log { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 230px; overflow-y: auto; }
