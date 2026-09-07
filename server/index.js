@@ -684,6 +684,7 @@ const sanSlide = (s) => ({
   pos: CAR_POS.has(s.pos) ? s.pos : '',
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
+  tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 
@@ -725,6 +726,9 @@ const AMEN_ICONS = {
   award: '<circle cx="12" cy="9" r="5"/><path d="M9 13l-1 8 4-2 4 2-1-8"/>',
 };
 const CAR_STICKERS = AMEN_ICONS;   /* переиспользуем тонкие линейные иконки как стикеры (~34 шт) */
+/* пресеты оформления текста заголовка («Стиль» из референса) */
+const CAR_TSTYLES = { plain: 'Обычный', outline: 'Контур', block: 'Плашка', underline: 'Подчерк', huge: 'Крупный', caps: 'Капс', gradient: 'Градиент', shadow: 'Тень', italic: 'Курсив', quote: 'Кавычки', boxed: 'В рамке', bar: 'Полоса', glow: 'Свечение', gold: 'Золото', neon: 'Неон', retro: 'Ретро', pill: 'Пилюля', spaced: 'Разрядка' };
+const CAR_TSTYLES_SET = new Set(Object.keys(CAR_TSTYLES));
 const amenIcon = (v) => AMEN_ICONS[v] ? `<svg class="amn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[v]}</svg>` : (v ? `<span class="amn-emoji">${String(v).slice(0, 3)}</span>` : '');
 
 function pbDefaults(t) {
@@ -2065,6 +2069,7 @@ const server = http.createServer(async (req, res) => {
         if (b.scheduled !== undefined) t.scheduled = b.scheduled ? String(b.scheduled).slice(0, 10) : null;
         if (b.leadId !== undefined) t.leadId = b.leadId ? String(b.leadId).slice(0, 40) : null;
         if (b.meetingId !== undefined) t.meetingId = b.meetingId ? String(b.meetingId).slice(0, 60) : null;
+        if (Array.isArray(b.subtasks)) t.subtasks = b.subtasks.slice(0, 30).map(st => ({ id: String(st.id || crypto.randomBytes(3).toString('hex')).slice(0, 12), text: String(st.text || '').replace(/<[^>]*>/g, '').slice(0, 200), done: !!st.done })).filter(st => st.text);
         return t;
       };
       const TASK_OWNER = IS_BROKER ? ROLE.brokerId : null; /* чьи задачи: брокер видит свои, владелец — свои (null) */
@@ -2141,6 +2146,31 @@ const server = http.createServer(async (req, res) => {
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
         db.brokerTasks = db.brokerTasks.filter(x => !(x.id === m[1] && (x.brokerId || null) === TASK_OWNER)); store.save();
+        return json(res, 200, { ok: true });
+      }
+      /* вложение к задаче: голосовое (webm) или файл (raw body ≤20МБ) → assets/tasks/ */
+      if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)\/attach$/)) && req.method === 'POST') {
+        const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
+        if ((t.brokerId || null) !== TASK_OWNER) return json(res, 403, { error: 'чужая задача' });
+        const fn = String(u.searchParams.get('filename') || 'file');
+        const extM = fn.match(/\.(webm|mp3|m4a|wav|ogg|jpe?g|png|webp|gif|pdf|docx?|xlsx?|txt|heic)$/i);
+        const ext = extM ? extM[1].toLowerCase() : 'bin';
+        const kind = /^(webm|mp3|m4a|wav|ogg)$/.test(ext) ? 'audio' : /^(jpe?g|png|webp|gif|heic)$/.test(ext) ? 'image' : 'file';
+        const chunks = []; let size = 0;
+        await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 20e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
+        if (!size || size > 20e6) return json(res, 400, { error: 'файл до 20 МБ' });
+        const dir = path.join(PUBLIC, 'assets', 'tasks'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const name = `${t.id}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+        fs.writeFileSync(path.join(dir, name), Buffer.concat(chunks));
+        t.attachments = t.attachments || [];
+        const att = { id: crypto.randomBytes(4).toString('hex'), kind, url: '/assets/tasks/' + name, name: fn.slice(0, 80), at: Date.now() };
+        t.attachments.push(att); store.save();
+        return json(res, 200, att);
+      }
+      if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)\/attach\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+        const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
+        if ((t.brokerId || null) !== TASK_OWNER) return json(res, 403, { error: 'чужая задача' });
+        t.attachments = (t.attachments || []).filter(a => a.id !== m[2]); store.save();
         return json(res, 200, { ok: true });
       }
     }
@@ -3194,13 +3224,13 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
+        return `<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           ${isEdit ? `<div class="s-pick" data-sop="pick" title="Редактировать слайд">✎</div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
-            <h2 class="s-h"${ce('heading', i)}>${sanInline(s.heading)}</h2>
+            <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}>${sanInline(s.heading)}</h2>
             <p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>
             <div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>
           </div>
@@ -3245,6 +3275,24 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .frame-tape{box-shadow:inset 0 0 0 3px var(--fc);margin:10px;border-radius:2px}
 .slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
 .slide .s-h mark,.slide .s-s mark{background:var(--blue);color:#fff;padding:0 .14em;border-radius:.14em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+/* пресеты «Стиль» заголовка */
+.s-h.ts-outline{-webkit-text-stroke:1.6px currentColor;color:transparent}
+.s-h.ts-block{background:var(--blue);color:#fff;display:inline;padding:.04em .22em;box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:.08em}
+.s-h.ts-underline{box-shadow:inset 0 -.16em color-mix(in srgb,var(--blue) 60%,transparent)}
+.s-h.ts-huge{font-size:clamp(40px,11vw,84px);line-height:.98;letter-spacing:-.03em}
+.s-h.ts-caps{text-transform:uppercase;letter-spacing:.08em}
+.s-h.ts-gradient{background:linear-gradient(120deg,var(--blue),#7C3AED);-webkit-background-clip:text;background-clip:text;color:transparent}
+.s-h.ts-shadow{text-shadow:3px 4px 0 rgba(0,0,0,.28)}
+.s-h.ts-italic{font-style:italic}
+.s-h.ts-quote::before{content:'«'}.s-h.ts-quote::after{content:'»'}.s-h.ts-quote{opacity:1}
+.s-h.ts-boxed{border:2px solid currentColor;padding:.16em .3em;display:inline-block;border-radius:.1em}
+.s-h.ts-bar{padding-left:.5em;border-left:.18em solid var(--blue)}
+.s-h.ts-glow{text-shadow:0 0 20px color-mix(in srgb,var(--blue) 85%,transparent)}
+.s-h.ts-gold{color:#E8B84B}
+.s-h.ts-neon{color:#fff;text-shadow:0 0 6px #4FB6F2,0 0 18px #4FB6F2,0 0 30px #4FB6F2}
+.s-h.ts-retro{text-shadow:2px 2px 0 #E8B84B,4px 4px 0 var(--blue)}
+.s-h.ts-pill{background:rgba(255,255,255,.16);padding:.12em .48em;border-radius:.6em;display:inline-block;backdrop-filter:blur(4px)}
+.s-h.ts-spaced{letter-spacing:.16em;text-transform:uppercase;font-size:clamp(20px,5vw,34px)}
 .slide mark.hl-cobalt{background:var(--blue);color:#fff}
 .slide mark.hl-gold{background:#E8B84B;color:#241F14}
 .slide mark.hl-mint{background:#34C79A;color:#06251C}
@@ -3302,7 +3350,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=5"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=6"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

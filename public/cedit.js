@@ -121,6 +121,12 @@ body.cpanel-on{padding-right:308px!important}
 .celem-frames{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}
 .celem-fr{border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;padding:12px 8px;font-weight:600;font-size:12.5px;color:#2A3346}
 .celem-fr:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
+.ctstyles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+.ctst{display:flex;flex-direction:column;align-items:center;gap:3px;border:1.5px solid #E1E8F4;border-radius:10px;background:#0A1833;cursor:pointer;padding:10px 4px 6px;overflow:hidden}
+.ctst .s-h{color:#fff;line-height:1;--blue:#4F7BFF;--disp:'Fraunces',serif}
+.ctst i{font-style:normal;font-size:9.5px;color:#9fb2d6;font-weight:600}
+.ctst:hover{border-color:#2563EB}
+.ctst.on{border-color:#2563EB;box-shadow:0 0 0 1px #2563EB inset}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -172,7 +178,7 @@ body.cpanel-on{padding-right:308px!important}
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '',
-        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', layers,
+        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', layers,
       };
     });
   }
@@ -343,6 +349,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="cgrp"><label>Стиль заголовка</label><div class="ctstyles" id="cTStyle">${Object.entries(P.tstyles || { plain: 'Обычный' }).map(([k, n]) => { const on = (sl.dataset.tstyle || 'plain') === k; return `<button class="ctst ${on ? 'on' : ''}" data-ts="${k}" title="${n}"><span class="s-h ts-${k}" style="font-size:19px;font-family:var(--disp)">Aa</span><i>${n}</i></button>`; }).join('')}</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
       <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
@@ -370,6 +377,7 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
+    const tsEl = $('#cTStyle', body); if (tsEl) tsEl.addEventListener('click', (e) => { const b = e.target.closest('[data-ts]'); if (!b) return; const k = b.dataset.ts; const sl = slideEl(i); sl.dataset.tstyle = k; const h = sl.querySelector('.s-h'); if (h) h.className = 's-h' + (k !== 'plain' ? ' ts-' + k : ''); $$('#cTStyle button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(false); });
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
