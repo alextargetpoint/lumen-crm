@@ -2702,3 +2702,30 @@ body.has-preview { padding-top: 38px; }
 .ov2-ob-t i { display: block; font-size: 11px; font-style: normal; color: var(--ink-3); }
 .ov2-ob-row.ok .ov2-ob-t { color: var(--ink-3); }
 @media (max-width: 760px) { .ov2-grid { grid-template-columns: 1fr; } .ov-w.full { grid-column: auto; } }
+
+/* Плавающая кнопка быстрых действий (правый нижний угол) */
+.qfab { position: fixed; right: 22px; bottom: 22px; z-index: 850; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.qfab-main { position: relative; width: 58px; height: 58px; border: none; border-radius: 50%; cursor: pointer; background: none; padding: 0; display: grid; place-items: center; }
+.qfab-orb { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #6E9BFF, #2563EB 45%, #1226A8 100%); box-shadow: 0 10px 30px -6px rgba(37, 99, 235, .6), inset 0 2px 6px rgba(255, 255, 255, .35), inset 0 -6px 12px rgba(6, 17, 38, .5); transition: transform .25s cubic-bezier(.2,1.4,.4,1); }
+.qfab-orb::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: radial-gradient(circle, rgba(37, 99, 235, .5), transparent 70%); filter: blur(6px); opacity: .7; animation: qfabPulse 2.8s ease-in-out infinite; z-index: -1; }
+@keyframes qfabPulse { 0%,100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.18); opacity: .85; } }
+.qfab-plus { position: relative; width: 24px; height: 24px; color: #fff; transition: transform .28s cubic-bezier(.2,1.4,.4,1); filter: drop-shadow(0 1px 2px rgba(6,17,38,.4)); }
+.qfab-main:hover .qfab-orb { transform: scale(1.06); }
+.qfab.open .qfab-plus { transform: rotate(135deg); }
+.qfab-menu { display: flex; flex-direction: column; align-items: flex-end; gap: 9px; pointer-events: none; }
+.qfab-act { display: flex; align-items: center; gap: 10px; border: none; background: none; cursor: pointer; opacity: 0; transform: translateY(14px) scale(.92); transition: opacity .2s, transform .2s; pointer-events: none; }
+.qfab.open .qfab-menu { pointer-events: auto; }
+.qfab.open .qfab-act { opacity: 1; transform: none; pointer-events: auto; }
+.qfab.open .qfab-act:nth-child(1) { transition-delay: .02s; }
+.qfab.open .qfab-act:nth-child(2) { transition-delay: .06s; }
+.qfab.open .qfab-act:nth-child(3) { transition-delay: .10s; }
+.qfab.open .qfab-act:nth-child(4) { transition-delay: .14s; }
+.qfab.open .qfab-act:nth-child(5) { transition-delay: .18s; }
+.qfab-lbl { background: #0A1833; color: #fff; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 10px; box-shadow: 0 8px 22px -8px rgba(6, 17, 38, .6); white-space: nowrap; line-height: 1.2; }
+.qfab-lbl i { display: block; font-style: normal; font-size: 10.5px; color: #9DB8FF; font-weight: 500; }
+.qfab-ai { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 8px 22px -8px rgba(6, 17, 38, .45); border: 1px solid var(--stroke, #E1E8F4); }
+.qfab-ai svg { width: 19px; height: 19px; color: var(--accent, #2563EB); }
+.qfab-act:hover .qfab-ai { background: var(--accent, #2563EB); }
+.qfab-act:hover .qfab-ai svg { color: #fff; }
+@media print { .qfab { display: none !important; } }
+html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }

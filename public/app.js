@@ -6015,6 +6015,49 @@ window.addEventListener('hashchange', () => {
     return;
   }
   go(startPage());
+  mountFab();
   /* прелоадеру — минимум 900мс жизни, чтобы вихрь успел «дохнуть» */
   setTimeout(hidePreloader, Math.max(0, 900 - (Date.now() - t0)));
 })();
+
+/* ---------- плавающая кнопка быстрых действий (правый нижний угол) ---------- */
+function mountFab() {
+  if (document.getElementById('qfab')) return;
+  const me = STATE && STATE.me;
+  /* набор действий — самые частые в ежедневной работе; фильтруется по правам роли */
+  const canPage = (pg) => { const h = (me && me.hidePages) || []; if (me && me.role === 'broker' && me.roleType === 'broker' && BROKER_HIDDEN_PAGES.includes(pg)) return false; return !h.includes(pg); };
+  const ALL = [
+    { k: 'search', ic: I.search || I.doc, label: 'Поиск', hint: 'лиды · объекты · задачи (⌘K)', run: () => { const s = $('#gsInput'); if (s) { s.focus(); s.select(); } } },
+    { k: 'task', ic: I.check, label: 'Быстрая задача', run: () => quickTaskModal() },
+    { k: 'waiting', ic: I.chat, label: 'Ждут ответа', page: 'inbox', run: () => go('inbox') },
+    { k: 'idea', ic: I.spark, label: 'Идея для соцсетей', page: 'social', run: () => go('social') },
+    { k: 'meet', ic: I.cal, label: 'Назначить встречу', page: 'meetings', run: () => go('meetings') },
+  ];
+  const acts = ALL.filter(a => !a.page || canPage(a.page));
+  const fab = el(`<div id="qfab" class="qfab">
+    <div class="qfab-menu">${acts.map(a => `<button class="qfab-act" data-qf="${a.k}"><span class="qfab-lbl">${a.label}${a.hint ? `<i>${a.hint}</i>` : ''}</span><span class="qfab-ai">${ic(a.ic)}</span></button>`).join('')}</div>
+    <button class="qfab-main" title="Быстрые действия" aria-label="Быстрые действия">
+      <span class="qfab-orb"></span>
+      <svg class="qfab-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>`);
+  document.body.appendChild(fab);
+  const main = fab.querySelector('.qfab-main');
+  const toggle = (on) => fab.classList.toggle('open', on == null ? !fab.classList.contains('open') : on);
+  main.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+  fab.querySelector('.qfab-menu').addEventListener('click', (e) => { const b = e.target.closest('[data-qf]'); if (!b) return; const a = acts.find(x => x.k === b.dataset.qf); toggle(false); if (a) a.run(); });
+  document.addEventListener('click', (e) => { if (!fab.contains(e.target)) toggle(false); });
+}
+function quickTaskModal() {
+  const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  modal({
+    title: 'Быстрая задача', sub: 'Появится в «Мои задачи» на сегодня',
+    body: `<div class="form-row"><label>Что сделать</label><input id="qtTitle" placeholder="напр. перезвонить Алексею по подборке" autofocus></div>
+      <div class="form-row"><label>Когда</label><select id="qtWhen"><option value="today">Сегодня</option><option value="">Без даты (инбокс)</option></select></div>`,
+    actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
+      const t = $('#qtTitle', bd).value.trim(); if (!t) { toast('Пустая задача'); return false; }
+      await api.post('/tasks', { title: t, priority: 'p2', scheduled: $('#qtWhen', bd).value === 'today' ? today : null });
+      toast('Задача добавлена', null, true); if (CUR === 'tasks' || CUR === 'overview') render();
+    } }, { label: 'Отмена' }],
+  });
+}
