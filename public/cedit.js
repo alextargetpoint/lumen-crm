@@ -336,7 +336,17 @@ body.cpanel-on{padding-right:308px!important}
     grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save(true, { theme: tpl.theme, font: tpl.font, slides: arr }); });
     $$('.cth-dot', body).forEach(d => d.addEventListener('click', () => save(true, { theme: d.dataset.theme })));
     $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save(true, { format: b.dataset.f }); });
-    $('#cAddSlide', body).addEventListener('click', async () => { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); await save(true, { slides: arr }); });
+    $('#cAddSlide', body).addEventListener('click', (e) => {
+      const cats = Object.keys(P.slideTpls || {});
+      if (!cats.length) { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
+      const th = (P.themes || {})[P.theme] || { blue: '#2563EB', body: '#0A1833' };
+      const tile = (t, ci, ti) => `<button class="ctpl" data-sti="${ci}:${ti}" style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 20%,${th.body}),${th.body})"><span class="ctpl-aa" style="font-family:var(--disp);color:${th.blue};font-size:14px">${esc((t.s.heading || 'Aa').slice(0, 14))}</span><i>${t.name}</i></button>`;
+      const catHtml = (ci) => (P.slideTpls[cats[ci]] || []).map((t, ti) => tile(t, ci, ti)).join('');
+      const pp = openPop(`<div class="csec" style="padding-top:2px">Готовый слайд</div><div class="cseg ctpl-cats" id="cStCats">${cats.map((c, i) => `<button data-c="${i}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div><div class="ctpl-grid" id="cStGrid">${catHtml(0)}</div><button class="cwbtn wide" id="cStBlank" style="margin-top:8px">+ Пустой слайд</button>`, e.clientX - 250, e.clientY);
+      $('#cStCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cStCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cStGrid', pp).innerHTML = catHtml(+b.dataset.c); });
+      $('#cStGrid', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-sti]'); if (!b) return; const [ci, ti] = b.dataset.sti.split(':').map(Number); const t = (P.slideTpls[cats[ci]] || [])[ti]; if (!t) return; const arr = serialize(); arr.push(Object.assign({}, t.s)); closePop(); save(true, { slides: arr }); });
+      $('#cStBlank', pp).addEventListener('click', () => { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); closePop(); save(true, { slides: arr }); });
+    });
     let ftOn = (P.footer || {}).on;
     $('#cFtSw', body).addEventListener('click', () => { ftOn = !ftOn; $('#cFtSw', body).classList.toggle('on', ftOn); dirty = true; });
     const persistFooter = () => save(true, { footer: { on: ftOn, text: $('#cFtTxt', body).value.trim() } });

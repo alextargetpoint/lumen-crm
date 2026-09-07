@@ -787,6 +787,46 @@ const CAR_STICKERS = {
 /* пресеты оформления текста заголовка («Стиль» из референса) */
 const CAR_TSTYLES = { plain: 'Обычный', outline: 'Контур', block: 'Плашка', underline: 'Подчерк', huge: 'Крупный', caps: 'Капс', gradient: 'Градиент', shadow: 'Тень', italic: 'Курсив', quote: 'Кавычки', boxed: 'В рамке', bar: 'Полоса', glow: 'Свечение', gold: 'Золото', neon: 'Неон', retro: 'Ретро', pill: 'Пилюля', spaced: 'Разрядка' };
 const CAR_TSTYLES_SET = new Set(Object.keys(CAR_TSTYLES));
+/* библиотека готовых СЛАЙДОВ по подкатегориям (для «+ Добавить слайд») */
+const CAR_SLIDE_TPLS = {
+  'Обложки': [
+    { name: 'Оффер', s: { eyebrow: 'Новый проект', heading: 'Название ЖК — старт продаж', sub: 'Локация · формат · главный крючок', pos: 'bottom', size: 'l', tstyle: 'plain' } },
+    { name: 'Оффер·плашка', s: { eyebrow: 'Инвестиции', heading: 'Дубай стал ближе', sub: 'Первая линия у моря', pos: 'bottom', size: 'l', tstyle: 'block' } },
+    { name: 'Оффер·золото', s: { eyebrow: 'Премиум', heading: 'Резиденция вашей мечты', sub: 'Ограниченное предложение', pos: 'center', align: 'center', size: 'l', tstyle: 'gold' } },
+    { name: 'Оффер·крупно', s: { heading: 'СТАРТ ПРОДАЖ', sub: 'Успейте по стартовой цене', pos: 'center', align: 'center', size: 'l', tstyle: 'huge' } },
+  ],
+  'Заголовки': [
+    { name: 'Заявление', s: { heading: 'Почему именно сейчас', sub: '', pos: 'center', size: 'l', tstyle: 'plain' } },
+    { name: 'Контур', s: { heading: 'Смотрите сами', sub: '', pos: 'center', align: 'center', size: 'l', tstyle: 'outline' } },
+    { name: 'Подчёрк', s: { heading: 'Главное о проекте', sub: 'коротко и по делу', pos: 'bottom', size: 'm', tstyle: 'underline' } },
+  ],
+  'Локация': [
+    { name: 'Где это', s: { eyebrow: 'Локация', heading: 'Dubai Marina', sub: '5 минут до пляжа · 15 до Downtown', pos: 'bottom', size: 'm', tstyle: 'plain' } },
+    { name: 'Инфраструктура', s: { eyebrow: 'Рядом', heading: 'Всё для жизни в шаге', sub: 'Школы · рестораны · парки · море', pos: 'center', size: 'm', tstyle: 'plain' } },
+  ],
+  'Цифры': [
+    { name: 'Одна цифра', s: { eyebrow: 'Доходность', heading: 'до 8%', sub: 'годовых от сдачи в аренду', pos: 'center', align: 'center', size: 'l', tstyle: 'huge' } },
+    { name: 'Цена от', s: { eyebrow: 'Старт', heading: 'от $180 000', sub: 'рассрочка 0% на 3 года', pos: 'center', align: 'center', size: 'l', tstyle: 'gradient' } },
+    { name: 'Три цифры', s: { heading: '8% · 0% · 2027', sub: 'доходность · рассрочка · сдача', pos: 'center', size: 'm', tstyle: 'spaced' } },
+  ],
+  'Списки': [
+    { name: 'Преимущества', s: { eyebrow: 'Почему мы', heading: 'Что вы получаете', sub: '— юр. сопровождение\n— рассрочка\n— управление арендой', pos: 'top', size: 'm', tstyle: 'plain' } },
+    { name: 'Чек-лист', s: { heading: 'Всё включено', sub: '✓ мебель\n✓ отделка\n✓ управление', pos: 'center', size: 'm', tstyle: 'plain' } },
+  ],
+  'Цитаты': [
+    { name: 'Отзыв', s: { eyebrow: 'Клиент', heading: 'Купил за 2 недели — всё чётко', sub: 'Алексей, инвестор из Москвы', pos: 'center', size: 'm', tstyle: 'quote' } },
+    { name: 'Мысль', s: { heading: 'Недвижимость — это спокойствие', sub: '', pos: 'center', align: 'center', size: 'l', tstyle: 'italic' } },
+  ],
+  'Фото': [
+    { name: 'Кадр + подпись', s: { heading: 'Вид, ради которого стоит', sub: 'панорамные окна в пол', pos: 'bottom', size: 'm', tstyle: 'plain' } },
+    { name: 'Планировка', s: { eyebrow: 'Планировка', heading: '1BR · 62 м²', sub: 'продуманная до метра', pos: 'bottom', size: 'm', tstyle: 'plain' } },
+  ],
+  'Финал (CTA)': [
+    { name: 'Напишите', s: { heading: 'Хотите планировки?', sub: 'Напишите в директ — пришлём подборку', pos: 'center', align: 'center', size: 'm', tstyle: 'plain' } },
+    { name: 'Заявка', s: { eyebrow: 'Осталось 3 юнита', heading: 'Забронировать', sub: 'Ответим за 5 минут', pos: 'center', align: 'center', size: 'l', tstyle: 'block' } },
+    { name: 'Контакты', s: { heading: 'Свяжитесь с нами', sub: '@ваш_аккаунт · WhatsApp', pos: 'bottom', align: 'center', size: 'm', tstyle: 'plain' } },
+  ],
+};
 /* готовые шаблоны карусели по категориям (как в референсе): тема+шрифт+узор+стиль заголовка одним кликом */
 const CAR_TEMPLATES = {
   'Тёмные': [
@@ -3469,7 +3509,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-pick{display:none}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=8"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=9"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
