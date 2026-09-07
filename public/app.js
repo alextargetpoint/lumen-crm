@@ -2466,16 +2466,32 @@ PAGES.sequences = async (root) => {
       </div>
       <div>
         <div class="wa-phone">
-          <div class="wa-note">${ic(I.eye)}Превью</div>
+          <div class="wa-note">${ic(I.eye)}Превью на телефоне клиента</div>
           <div class="wa-scrub" id="waScrub"></div>
-          <div class="wa-device">
-            <div class="wa-top">
-              <span class="wa-back">‹</span>
-              <div class="wa-ava">${esc((STATE.settings.agency.name || 'A').slice(0, 1))}</div>
-              <div class="wa-peer"><b>${esc(STATE.settings.agency.name || 'Агентство')}</b><i>онлайн</i></div>
-              <span class="wa-dots">⋮</span>
+          <div class="iph">
+            <span class="iph-side iph-silent"></span>
+            <span class="iph-side iph-volup"></span>
+            <span class="iph-side iph-voldn"></span>
+            <span class="iph-side iph-power"></span>
+            <div class="iph-screen">
+              <div class="iph-island"><i class="iph-cam"></i></div>
+              <div class="iph-status">
+                <span class="iph-time">9:41</span>
+                <span class="iph-sys">
+                  <svg viewBox="0 0 20 12" width="17" height="11"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+                  <svg viewBox="0 0 16 12" width="16" height="11"><path d="M8 10.5a1.4 1.4 0 100 .01M3.2 6.8a7 7 0 019.6 0M.7 4.2a10.6 10.6 0 0114.6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  <svg viewBox="0 0 26 13" width="24" height="12"><rect x="1" y="1.5" width="21" height="10" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><rect x="2.5" y="3" width="17" height="7" rx="1.5"/><rect x="23" y="4.5" width="1.8" height="4" rx="1"/></svg>
+                </span>
+              </div>
+              <div class="wa-top">
+                <span class="wa-back">‹</span>
+                <div class="wa-ava">${STATE.settings.agency.logo ? `<img src="${esc(STATE.settings.agency.logo)}" alt="">` : esc((STATE.settings.agency.name || 'A').slice(0, 1))}</div>
+                <div class="wa-peer"><b>${esc(STATE.settings.agency.name || 'Агентство')}</b><i>онлайн</i></div>
+                <span class="wa-call">${ic(I.phone)}</span>
+              </div>
+              <div class="wa-body" id="waBody"></div>
+              <div class="iph-home"></div>
             </div>
-            <div class="wa-body" id="waBody"></div>
           </div>
         </div>
       </div>
