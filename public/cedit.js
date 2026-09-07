@@ -28,6 +28,9 @@
   let dirty = false, pop = null, popOutside = null, sel = 0, panelOpen = true;
   /* углы подачи карусели (ключи совпадают с CAROUSEL_ANGLES на сервере) */
   const CAR_ANGLES = [['auto', 'Универсальный', 'сбалансированно'], ['urgency', 'Срочность', 'войти первым, старт'], ['discount', 'Спецусловия', 'цена, рассрочка'], ['luxury', 'Люкс', 'эстетика, фото, планировки'], ['investment', 'Инвестиции', 'доход, ROI'], ['lifestyle', 'Образ жизни', 'район, атмосфера']];
+  /* подкатегории фигур и стикеров (ключи существуют в P.shapes / P.stickers) */
+  const SHAPE_CATS = { 'Базовые': ['rect', 'circle', 'ring', 'line'], 'Акценты': ['triangle', 'diamond', 'badge', 'blob', 'arrow'] };
+  const STICK_CATS = { 'Акценты': ['sparkle', 'star', 'star4', 'sun', 'bolt', 'fire', 'crown', 'diamond'], 'Метки': ['pin', 'tag', 'target', 'ring', 'plus', 'arrowc', 'check'], 'Декор': ['quote', 'wave', 'dots', 'circles', 'underline', 'ribbon', 'heart'] };
 
   const css = document.createElement('style');
   css.textContent = `
@@ -51,10 +54,12 @@
 .cpanel-body{flex:1;overflow-y:auto;padding:14px 14px 40px}
 .cgrp{margin-bottom:16px}
 .cgrp>label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a90a0;font-weight:700;margin-bottom:8px}
-.cdots{display:flex;flex-wrap:wrap;gap:7px}
-.cth-dot{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--d) 50%,var(--b) 50%);transition:transform .14s,box-shadow .14s}
-.cth-dot:hover{transform:scale(1.12)}
-.cth-dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--cb),0 4px 10px -3px rgba(37,99,235,.5)}
+.cthemes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.cth{position:relative;aspect-ratio:1;border-radius:11px;border:1.5px solid #E7ECF3;cursor:pointer;overflow:hidden;background:linear-gradient(150deg,color-mix(in srgb,var(--d) 30%,var(--b)),var(--b));transition:transform .14s,box-shadow .14s,border-color .14s;padding:0}
+.cth:before{content:'';position:absolute;left:8px;bottom:8px;width:15px;height:15px;border-radius:50%;background:var(--d);box-shadow:0 1px 4px rgba(0,0,0,.35),inset 0 0 0 1.5px rgba(255,255,255,.3)}
+.cth:hover{transform:translateY(-2px);box-shadow:0 8px 18px -8px rgba(6,17,38,.4);border-color:#CBD6EA}
+.cth.on{border-color:var(--cb);box-shadow:0 0 0 1.5px var(--cb)}
+.cth.on:after{content:'';position:absolute;top:6px;right:6px;width:15px;height:15px;border-radius:50%;background:var(--cb);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");background-size:11px;background-position:center;background-repeat:no-repeat;box-shadow:0 2px 6px rgba(6,17,38,.4)}
 .cseg{display:flex;background:#EEF2FA;border-radius:10px;padding:3px;gap:2px}
 .cseg button{flex:1;border:none;background:none;padding:8px 6px;border-radius:7px;font-weight:600;font-size:12.5px;cursor:pointer;color:#5E6470;font-family:inherit}
 .cseg button.on{background:#fff;color:var(--cb);box-shadow:0 1px 4px rgba(6,17,38,.12)}
@@ -121,6 +126,12 @@ body.cpanel-on{padding-right:308px!important}
 .celem:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
 .celem svg{width:100%;height:100%}
 .celem.cimgpick{background-size:cover;background-position:center;padding:0}
+.celem{touch-action:none}
+.celem-ghost{position:fixed;z-index:985;width:52px;height:52px;transform:translate(-50%,-50%);pointer-events:none;color:var(--cb);display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 8px 18px rgba(6,17,38,.45));opacity:.95}
+.celem-ghost svg{width:100%;height:100%}
+.slide.drop-hi{outline:3px solid var(--blue,#2563EB);outline-offset:-3px;box-shadow:0 0 0 6px color-mix(in srgb,var(--blue,#2563EB) 22%,transparent)!important}
+.celem-hint{font-size:11px;color:#9aa1b2;margin-top:7px;line-height:1.45;display:flex;align-items:center;gap:6px}
+.celem-hint svg{width:13px;height:13px;flex:0 0 13px}
 .celem-frames{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}
 .celem-fr{border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;padding:12px 8px;font-weight:600;font-size:12.5px;color:#2A3346}
 .celem-fr:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
@@ -132,11 +143,14 @@ body.cpanel-on{padding-right:308px!important}
 .ctst.on{border-color:#2563EB;box-shadow:0 0 0 1px #2563EB inset}
 .ctpl-cats{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap}
 .ctpl-cats button{flex:0 0 auto}
-.ctpl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
-.ctpl{aspect-ratio:4/3;border:1.5px solid #E1E8F4;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;overflow:hidden;padding:8px}
-.ctpl:hover{border-color:#2563EB;transform:translateY(-2px)}
-.ctpl-aa{font-size:26px;line-height:1}
-.ctpl i{font-style:normal;font-size:10.5px;color:#fff;opacity:.92;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.ctpl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:8px}
+.ctpl{border:1.5px solid #E7ECF3;border-radius:13px;cursor:pointer;display:flex;flex-direction:column;overflow:hidden;padding:0;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s}
+.ctpl:hover{border-color:#2563EB;transform:translateY(-2px);box-shadow:0 10px 22px -10px rgba(37,99,235,.45)}
+.ctpl-cv{position:relative;aspect-ratio:4/5;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;padding:12px 12px 13px;overflow:hidden}
+.ctpl-cv .cv-eye{font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;opacity:.92}
+.ctpl-cv .cv-h{font-size:15px;font-weight:600;line-height:1.05;color:#fff;letter-spacing:-.01em}
+.ctpl-cv .cv-brand{position:absolute;left:12px;top:11px;font-size:7.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;opacity:.55;color:#fff}
+.ctpl i{font-style:normal;font-size:11px;color:#2A3346;font-weight:600;padding:7px 10px;border-top:1px solid #EEF1F6;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cpop.cpop-ctx{background:rgba(11,20,38,.94);border:1px solid rgba(134,175,255,.18);box-shadow:0 24px 64px rgba(6,17,38,.6);padding:6px;width:auto;min-width:206px;backdrop-filter:blur(18px)}
 .cctx{display:flex;flex-direction:column;gap:1px}
 .cctx button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;color:#DCE6FF;cursor:pointer;font-family:'Manrope',sans-serif;transition:background .12s,color .12s}
@@ -369,7 +383,18 @@ body.cpanel-on{padding-right:308px!important}
   function tplTile(tpl) {
     const th = (P.themes || {})[tpl.theme] || { blue: '#2563EB', body: '#0A1833' };
     const ff = ((P.fonts || {})[tpl.font] || {}).fam || 'serif';
-    return `<button class="ctpl" data-tpl='${esc(JSON.stringify(tpl))}' style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 22%,${th.body}),${th.body})"><span class="ctpl-aa" style="font-family:${ff};color:${th.blue}">Aa</span><i>${tpl.name}</i></button>`;
+    const dark = isDark(th.body);
+    const txt = dark ? '#fff' : '#132446';
+    const bg = `linear-gradient(155deg,color-mix(in srgb,${th.blue} 26%,${th.body}),${th.body})`;
+    /* превью — мини-обложка с реальным примером текста в шрифте/теме шаблона (не просто «Aa») */
+    return `<button class="ctpl" data-tpl='${esc(JSON.stringify(tpl))}'>
+      <div class="ctpl-cv" style="background:${bg}">
+        <span class="cv-brand" style="color:${txt}">Агентство</span>
+        <span class="cv-eye" style="color:${th.blue}">СТАРТ ПРОДАЖ</span>
+        <span class="cv-h" style="font-family:${ff};color:${txt}">Новый проект у моря</span>
+      </div>
+      <i>${esc(tpl.name)}</i>
+    </button>`;
   }
   function designHtml() {
     const cats = Object.keys(P.templates || {});
@@ -380,7 +405,7 @@ body.cpanel-on{padding-right:308px!important}
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
       <div class="cnote">Один клик — тема, шрифт, узор и стиль текста применятся ко всем слайдам.</div>
     </div>
-    <div class="cgrp"><label>Цветовая тема</label><div class="cdots">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
+    <div class="cgrp"><label>Цветовая тема</label><div class="cthemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
     <div class="cgrp"><label>Шрифт заголовков</label><button class="cfontbtn" id="cFontBtn"><span class="aa" style="font-family:${curFont.fam}">Aa</span> <span style="flex:1">${curFont.name}</span> ▾</button></div>
     <div class="cgrp"><label>Формат</label><div class="cseg" id="cFmt">${['square', 'portrait', 'story'].map(f => `<button data-f="${f}" class="${P.format === f ? 'on' : ''}">${FMT[f]}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Футер слайдов</label>
@@ -414,13 +439,14 @@ body.cpanel-on{padding-right:308px!important}
     const grid = $('#cTplGrid', body);
     $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
     grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save(true, { theme: tpl.theme, font: tpl.font, slides: arr }); });
-    $$('.cth-dot', body).forEach(d => d.addEventListener('click', () => save(true, { theme: d.dataset.theme })));
+    $$('.cth', body).forEach(d => d.addEventListener('click', () => save(true, { theme: d.dataset.theme })));
     $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save(true, { format: b.dataset.f }); });
     $('#cAddSlide', body).addEventListener('click', (e) => {
       const cats = Object.keys(P.slideTpls || {});
       if (!cats.length) { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
       const th = (P.themes || {})[P.theme] || { blue: '#2563EB', body: '#0A1833' };
-      const tile = (t, ci, ti) => `<button class="ctpl" data-sti="${ci}:${ti}" style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 20%,${th.body}),${th.body})"><span class="ctpl-aa" style="font-family:var(--disp);color:${th.blue};font-size:14px">${esc((t.s.heading || 'Aa').slice(0, 14))}</span><i>${t.name}</i></button>`;
+      const dark = isDark(th.body), txt = dark ? '#fff' : '#132446';
+      const tile = (t, ci, ti) => `<button class="ctpl" data-sti="${ci}:${ti}"><div class="ctpl-cv" style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 24%,${th.body}),${th.body})">${t.s.eyebrow ? `<span class="cv-eye" style="color:${th.blue}">${esc(String(t.s.eyebrow).slice(0, 16))}</span>` : ''}<span class="cv-h" style="font-family:var(--disp);color:${txt};font-size:13px">${esc((t.s.heading || 'Слайд').slice(0, 26))}</span></div><i>${esc(t.name)}</i></button>`;
       const catHtml = (ci) => (P.slideTpls[cats[ci]] || []).map((t, ti) => tile(t, ci, ti)).join('');
       const pp = openPop(`<div class="csec" style="padding-top:2px">Готовый слайд</div><div class="cseg ctpl-cats" id="cStCats">${cats.map((c, i) => `<button data-c="${i}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div><div class="ctpl-grid" id="cStGrid">${catHtml(0)}</div><button class="cwbtn wide" id="cStBlank" style="margin-top:8px">+ Пустой слайд</button>`, e.clientX - 250, e.clientY);
       $('#cStCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cStCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cStGrid', pp).innerHTML = catHtml(+b.dataset.c); });
@@ -520,16 +546,63 @@ body.cpanel-on{padding-right:308px!important}
     }));
     /* добавление элементов-слоёв */
     const accent = ((P.themes[P.theme] || {}).blue) || '#1D34D8';
-    const addLayer = (layer) => { const arr = serialize(); arr[i].layers = arr[i].layers || []; layer.z = Math.max(0, ...arr[i].layers.map(l => l.z || 0)) + 1; arr[i].layers.push(layer); save(true, { slides: arr }); };
+    const addLayerAt = (layer, slideIdx) => { const ti = (slideIdx == null ? i : slideIdx); const arr = serialize(); if (!arr[ti]) return; arr[ti].layers = arr[ti].layers || []; layer.z = Math.max(0, ...arr[ti].layers.map(l => l.z || 0)) + 1; arr[ti].layers.push(layer); save(true, { slides: arr }); };
+    const addLayer = (layer) => addLayerAt(layer, null);
     const shapeMini = (s) => ({ rect: '<rect x="3" y="3" width="18" height="18" rx="3"/>', circle: '<circle cx="12" cy="12" r="9"/>', ring: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3"/>', line: '<rect x="2" y="10" width="20" height="4" rx="2"/>', triangle: '<polygon points="12,3 21,21 3,21"/>', blob: '<circle cx="12" cy="12" r="9"/>', arrow: '<path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>', badge: '<rect x="3" y="3" width="18" height="18" rx="6"/>', diamond: '<polygon points="12,3 21,12 12,21 3,12"/>' }[s] || '<rect x="3" y="3" width="18" height="18"/>');
+    /* Пикер с подкатегориями + перетаскивание на слайд.
+       cats: {Категория:[ключи]}; tileInner(k)→SVG; make(k, drop|null)→слой. Клик = по центру; перетаскивание = в точку дропа. */
+    function elemPicker(title, cats, tileSvg, make, x, y) {
+      const keys = Object.keys(cats);
+      const gridHtml = (ci) => (cats[keys[ci]] || []).map(k => `<button class="celem" data-elk="${esc(k)}" title="${esc(k)}">${tileSvg(k)}</button>`).join('');
+      const pp = openPop(`<div class="csec" style="padding-top:2px">${title}</div>
+        <div class="cseg ctpl-cats" id="cElCats">${keys.map((c, ci) => `<button data-c="${ci}" class="${ci === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
+        <div class="celem-grid" id="cElGrid">${gridHtml(0)}</div>
+        <div class="celem-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg>Клик — по центру. Или перетащи прямо на нужный слайд.</div>`, x, y);
+      $('#cElCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cElCats button', pp).forEach(z => z.classList.toggle('on', z === b)); $('#cElGrid', pp).innerHTML = gridHtml(+b.dataset.c); });
+      /* перетаскивание тайла на макет (pointer-события; HTML5-DnD в проекте не используем) */
+      pp.addEventListener('pointerdown', (ev) => {
+        const tile = ev.target.closest('[data-elk]'); if (!tile) return;
+        ev.preventDefault();
+        const k = tile.dataset.elk, sx = ev.clientX, sy = ev.clientY; let moved = false, ghost = null;
+        const clearHi = () => $$('.slide.drop-hi').forEach(s => s.classList.remove('drop-hi'));
+        const mv = (e2) => {
+          if (!moved && Math.hypot(e2.clientX - sx, e2.clientY - sy) < 7) return;
+          moved = true;
+          if (!ghost) { ghost = el(`<div class="celem-ghost">${tile.querySelector('svg').outerHTML}</div>`); document.body.appendChild(ghost); pp.style.pointerEvents = 'none'; document.body.style.cursor = 'grabbing'; }
+          ghost.style.left = e2.clientX + 'px'; ghost.style.top = e2.clientY + 'px';
+          ghost.style.display = 'none'; const under = document.elementFromPoint(e2.clientX, e2.clientY); ghost.style.display = '';
+          clearHi(); const sl = under && under.closest('.slide'); if (sl) sl.classList.add('drop-hi');
+        };
+        const up = (e2) => {
+          document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+          document.body.style.cursor = ''; pp.style.pointerEvents = ''; clearHi();
+          if (ghost) ghost.remove();
+          if (!moved) { closePop(); addLayer(make(k, null)); return; }
+          ghost && (ghost.style.display = 'none');
+          const under = document.elementFromPoint(e2.clientX, e2.clientY);
+          const sl = under && under.closest('.slide');
+          if (!sl) return; /* мимо слайда — отмена */
+          const idx = +sl.dataset.idx, rr = sl.getBoundingClientRect();
+          const px = (e2.clientX - rr.left) / rr.width * 100, py = (e2.clientY - rr.top) / rr.height * 100;
+          closePop(); addLayerAt(make(k, { x: px, y: py, slideIdx: idx }), idx);
+        };
+        document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+      });
+      return pp;
+    }
     $$('[data-add]', body).forEach(b => b.addEventListener('click', (e) => {
       const kind = b.dataset.add;
+      const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
       if (kind === 'shape') {
-        const pp = openPop(`<div class="celem-grid">${(P.shapes || []).map(s => `<button class="celem" data-shape="${s}" title="${s}"><svg viewBox="0 0 24 24" fill="currentColor">${shapeMini(s)}</svg></button>`).join('')}</div>`, e.clientX - 120, e.clientY);
-        pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-shape]'); if (!t) return; closePop(); addLayer({ t: 'shape', shape: t.dataset.shape, color: accent, fill: true, x: 34, y: 34, w: 26, round: 10 }); });
+        elemPicker('Фигуры', SHAPE_CATS,
+          (k) => `<svg viewBox="0 0 24 24" fill="currentColor">${shapeMini(k)}</svg>`,
+          (k, drop) => ({ t: 'shape', shape: k, color: accent, fill: true, w: 26, round: 10, x: drop ? +clamp(drop.x - 13, -20, 110).toFixed(1) : 34, y: drop ? +clamp(drop.y - 13, -20, 110).toFixed(1) : 34 }),
+          e.clientX - 130, e.clientY);
       } else if (kind === 'sticker') {
-        const pp = openPop(`<div class="celem-grid">${Object.entries(P.stickers || {}).map(([k, path]) => `<button class="celem" data-stick="${k}" title="${k}"><svg viewBox="0 0 24 24">${path}</svg></button>`).join('')}</div>`, e.clientX - 150, e.clientY);
-        pp.addEventListener('click', (ev) => { const t = ev.target.closest('[data-stick]'); if (!t) return; closePop(); const sl = slideEl(i); const white = sl.classList.contains('hasbg'); addLayer({ t: 'sticker', key: t.dataset.stick, color: white ? '#FFFFFF' : accent, x: 40, y: 38, w: 16 }); });
+        elemPicker('Стикеры', STICK_CATS,
+          (k) => `<svg viewBox="0 0 24 24">${(P.stickers || {})[k] || ''}</svg>`,
+          (k, drop) => { const white = slideEl(drop ? drop.slideIdx : i).classList.contains('hasbg'); return { t: 'sticker', key: k, color: white ? '#FFFFFF' : accent, w: 16, x: drop ? +clamp(drop.x - 8, -20, 110).toFixed(1) : 40, y: drop ? +clamp(drop.y - 8, -20, 110).toFixed(1) : 38 }; },
+          e.clientX - 160, e.clientY);
       } else if (kind === 'frame') {
         const FN = { thin: 'Тонкая', double: 'Двойная', corners: 'Уголки', inset: 'Внутренняя', film: 'Плёнка', tape: 'Кант' };
         const pp = openPop(`<div class="celem-frames">${(P.frames || []).map(f => `<button class="celem-fr" data-frame="${f}">${FN[f] || f}</button>`).join('')}</div>`, e.clientX - 120, e.clientY);
