@@ -2144,7 +2144,7 @@ PAGES.meetings = async (root) => {
     const mins = yToMin(body, e.clientY);
     const hh = pad2(H0 + Math.floor(mins / 60)), mm = pad2(mins % 60);
     const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
-    modal({
+    const md = modal({
       title: 'Встреча · ' + new Date(day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + hh + ':' + mm,
       sub: 'Клиент получит WhatsApp-подтверждение (для видео — со ссылкой на комнату)',
       body: `
@@ -2153,7 +2153,8 @@ PAGES.meetings = async (root) => {
           <div class="form-row"><label>Тип</label><select id="csKind"><option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option></select></div>
           <div class="form-row"><label>Время</label><input id="csTime" type="time" step="900" value="${hh}:${mm}"></div>
           <div class="form-row"><label>Длит.</label><select id="csDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div>
-        </div>`,
+        </div>
+        <div id="csTzHint"></div>`,
       actions: [
         { label: 'Назначить', cls: 'btn-accent', onClick: async (bd) => {
           const at = new Date(day + 'T' + $('#csTime', bd).value).getTime();
@@ -2163,15 +2164,37 @@ PAGES.meetings = async (root) => {
         { label: 'Отмена' },
       ],
     });
+    const paintTz = () => { const l = leads.find(x => x.id === $('#csLead', md).value); const h = $('#csTzHint', md); if (h && l) h.innerHTML = tzHintHtml(day, $('#csTime', md).value, l.tz, l.geoName); };
+    $('#csLead', md).addEventListener('change', paintTz); $('#csTime', md).addEventListener('input', paintTz); paintTz();
   }));
 };
 
+/* калькулятор часовых поясов: во сколько встреча будет ПО ВРЕМЕНИ КЛИЕНТА.
+   Введённое время трактуем в поясе менеджера (браузер); клиентский пояс — lead.tz (offset от UTC). */
+function tzHintHtml(dateStr, timeStr, clientTz, clientLabel) {
+  if (!dateStr || !timeStr || clientTz == null || isNaN(clientTz)) return '';
+  const managerOffset = -new Date().getTimezoneOffset() / 60;
+  const diff = clientTz - managerOffset;
+  const base = new Date(dateStr + 'T' + timeStr);
+  if (isNaN(+base)) return '';
+  const client = new Date(base.getTime() + diff * 3600e3);
+  const clientT = pad2(client.getHours()) + ':' + pad2(client.getMinutes());
+  const dCmp = (a) => `${a.getFullYear()}-${pad2(a.getMonth() + 1)}-${pad2(a.getDate())}`;
+  const shift = dCmp(client) > dateStr ? ' <i>(+1 день)</i>' : dCmp(client) < dateStr ? ' <i>(−1 день)</i>' : '';
+  const gmt = 'GMT' + (clientTz >= 0 ? '+' : '') + clientTz;
+  const badHour = client.getHours() < 8 || client.getHours() >= 22;
+  const same = Math.abs(diff) < 0.01;
+  return `<div class="tz-hint ${badHour ? 'warn' : ''}">${ic(I.clock || I.cal)}<div class="tzh-b">
+    <span class="tzh-you">У вас: <b>${timeStr}</b></span>
+    <span class="tzh-cl">${same ? 'Тот же пояс, что у клиента' : `У клиента (${esc(clientLabel || '')}, ${gmt}): <b>${clientT}${shift}</b>`}</span>
+  </div>${badHour ? `<span class="tzh-warn">неудобное время для клиента</span>` : ''}</div>`;
+}
 function openMeetingModal(lead, after) {
   const brokers = STATE.brokers.filter(b => b.geo === lead.geo).concat(STATE.brokers.filter(b => b.geo !== lead.geo));
   /* локальные компоненты, не toISOString — UTC-сдвиг даёт «вчера» ночью */
   const tomorrow = new Date(Date.now() + 24 * 3600e3);
   const defDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-  modal({
+  const md = modal({
     title: 'Назначить встречу',
     sub: `${esc(lead.name)} · ${lead.geoName}. Клиент получит WhatsApp-подтверждение сразу после назначения.`,
     body: `
@@ -2180,6 +2203,7 @@ function openMeetingModal(lead, after) {
         <div class="form-row"><label>Время</label><input id="mtTime" type="time" step="900" value="11:00"></div>
         <div class="form-row"><label>Длительность</label><select id="mtDur">${[15, 30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} мин</option>`).join('')}</select></div>
       </div>
+      <div id="mtTzHint"></div>
       <div class="form-row"><label>Тип</label><select id="mtKind">
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
@@ -2195,6 +2219,9 @@ function openMeetingModal(lead, after) {
       { label: 'Отмена' },
     ],
   });
+  /* живой калькулятор часовых поясов */
+  const paintTz = () => { const h = $('#mtTzHint', md); if (h) h.innerHTML = tzHintHtml($('#mtDate', md).value, $('#mtTime', md).value, lead.tz, lead.geoName); };
+  $('#mtDate', md).addEventListener('input', paintTz); $('#mtTime', md).addEventListener('input', paintTz); paintTz();
 }
 
 
