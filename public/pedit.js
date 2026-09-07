@@ -23,7 +23,9 @@ div[data-be],h1[data-be],h2[data-be],p[data-be],li[data-be]{display:block}
 .imghot:hover{background:#2563EB;border-color:transparent}
 .imghot.vhot{top:auto;bottom:14px;right:14px}
 .edbar{position:fixed;top:0;left:0;right:0;z-index:900;background:linear-gradient(100deg,#0A1833,#061126);color:#fff;display:flex;gap:9px;align-items:center;padding:11px 16px;font-size:13px;flex-wrap:wrap;font-family:Manrope,sans-serif;border-bottom:1px solid rgba(134,175,255,.16);box-shadow:0 4px 24px rgba(6,17,38,.3)}
-.edbar b{font-weight:700;font-family:Fraunces,serif;font-size:15px;letter-spacing:.01em}
+.edbar b{font-weight:700;font-family:Manrope,sans-serif;font-size:14px;letter-spacing:.01em}
+.pefont{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:600;font-family:Manrope,sans-serif;cursor:pointer;outline:none}
+.pefont option{color:#0B1220}
 .edbar .hint{opacity:.6;font-size:11.5px;color:#9DB8FF}
 .edbar .sp{flex:1}
 .pethemes{display:inline-flex;gap:6px;align-items:center;margin-left:10px}
@@ -107,9 +109,10 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   /* ---------- верхняя панель ---------- */
   const bar = document.createElement('div');
   bar.className = 'edbar';
-  bar.innerHTML = `<b>Конструктор подборки</b>
-    <span class="hint">клик по тексту — правка · правый клик — меню блока и пунктов</span>
+  bar.innerHTML = `<b>Конструктор</b>
+    <span class="hint">клик по тексту — правка · правый клик — меню блока</span>
     <span class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</span>
+    ${Object.keys(P.fonts || {}).length ? `<select class="pefont" title="Шрифт подборки">${Object.entries(P.fonts).map(([k, f]) => `<option value="${k}" ${k === P.fontPreset ? 'selected' : ''}>Aa · ${f.name}</option>`).join('')}</select>` : ''}
     <span class="sp"></span>
     <button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button>
     <button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button>
@@ -127,6 +130,16 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     else flash('Ошибка темы');
   }));
+  const pfSel = bar.querySelector('.pefont');
+  if (pfSel) pfSel.addEventListener('change', async () => {
+    flash('Меняю шрифт…', 0);
+    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks: serialize(), fontPreset: pfSel.value }),
+    });
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+    else flash('Ошибка шрифта');
+  });
 
   /* ---------- попап-хелпер ---------- */
   let pop = null;

@@ -535,6 +535,22 @@ const PAGE_THEMES = {
   emerald: { name: 'Emerald', blue: '#0E7A5F', ink: '#07211A', mut: '#5E7068', bg: '#F1F6F3', body: '#D7E2DC', paper: '#ffffff', line: '#DCE6E0' },
   champagne: { name: 'Champagne', blue: '#A8791F', ink: '#241F14', mut: '#7A6F58', bg: '#F8F4EB', body: '#E7DFCE', paper: '#FFFDF8', line: '#E8E0CE' },
   noir: { name: 'Noir', blue: '#C9A96A', ink: '#EDEDF0', mut: '#9A9AA5', bg: '#191922', body: '#0B0B12', paper: '#14141D', line: '#2A2A38', dark: true },
+  /* люкс-палитры 2025–26: тёплые нейтрали и приглушённые драгоценные тона */
+  mocha: { name: 'Mocha', blue: '#7A5C43', ink: '#2A2018', mut: '#8A7A6A', bg: '#F5EFE8', body: '#E4D9CC', paper: '#FFFDFA', line: '#EAE0D4' },
+  sage: { name: 'Sage', blue: '#5C6E5A', ink: '#1E2620', mut: '#6E786A', bg: '#F1F3ED', body: '#DCE1D6', paper: '#FCFDFB', line: '#DEE4D8' },
+  bordeaux: { name: 'Bordeaux', blue: '#7C2D3A', ink: '#241318', mut: '#7A5A60', bg: '#F7F0EF', body: '#E7D8D7', paper: '#FFFCFB', line: '#EBDCDB' },
+  slate: { name: 'Slate', blue: '#3E4A5B', ink: '#141922', mut: '#66707E', bg: '#F1F4F7', body: '#DCE1E7', paper: '#FFFFFF', line: '#E1E6EC' },
+  terracotta: { name: 'Terracotta', blue: '#B0532E', ink: '#2A1810', mut: '#8A6A5A', bg: '#F9F1EA', body: '#EBDBCF', paper: '#FFFCF8', line: '#EDDDD0' },
+  midnight: { name: 'Midnight', blue: '#C7B08A', ink: '#ECEAF2', mut: '#9AA0B0', bg: '#111524', body: '#080A14', paper: '#191E31', line: '#2A3048', dark: true },
+};
+
+/* шрифтовые пресеты подборки: люкс-пары дисплей+текст (персонализация типографики) */
+const FONT_PRESETS = {
+  soft: { name: 'Мягкий люкс', gf: 'family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800', disp: "'Fraunces',Georgia,serif", body: "'Manrope',sans-serif" },
+  editorial: { name: 'Глянец', gf: 'family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700', disp: "'Playfair Display',Georgia,serif", body: "'Inter',sans-serif" },
+  studio: { name: 'Дизайн-студия', gf: 'family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700', disp: "'Bricolage Grotesque',sans-serif", body: "'Manrope',sans-serif" },
+  minimal: { name: 'Минимал', gf: 'family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700', disp: "'Instrument Serif',Georgia,serif", body: "'Manrope',sans-serif" },
+  tech: { name: 'Модерн', gf: 'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700', disp: "'Space Grotesk',sans-serif", body: "'Inter',sans-serif" },
 };
 
 function pbDefaults(t) {
@@ -1780,6 +1796,7 @@ const server = http.createServer(async (req, res) => {
       c.histFwd = [];
       c.blocks = blocks;
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
+      if (b.fontPreset && FONT_PRESETS[b.fontPreset]) c.fontPreset = b.fontPreset;
       const cover = blocks.find(x => x.t === 'cover');
       if (cover && cover.data.title) c.title = cover.data.title.slice(0, 200);
       store.save();
@@ -2530,6 +2547,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const cTitle = hasBlocks ? c.title : (cust.title || c.title);   /* legacy custom — только до первого сохранения блоков */
       const cIntro = hasBlocks ? c.intro : (cust.intro != null ? cust.intro : c.intro);
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
+      const font = FONT_PRESETS[c.fontPreset] || FONT_PRESETS.soft;
       const star = db.settings.agency.logo
         ? `<img class="star" src="${esc(db.settings.agency.logo)}" style="width:auto;max-width:150px;height:44px;object-fit:contain">`
         : '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
@@ -2843,10 +2861,10 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(cTitle)} — ${esc(AG)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?${font.gf}&display=swap" rel="stylesheet">
 <style>
-:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:'Fraunces',Georgia,serif}
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Manrope',-apple-system,'Segoe UI',sans-serif;background:${theme.body};color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${font.disp}}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:${font.body},-apple-system,'Segoe UI',sans-serif;background:${theme.body};color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 h1,h2,h3,p,li,td,span,div{overflow-wrap:break-word;word-break:normal}
 .book{max-width:680px;margin:0 auto;background:var(--paper);box-shadow:0 0 60px rgba(0,0,0,${'${theme.dark ? ".45" : ".15"}'})}
 section{page-break-after:always;position:relative}
@@ -3138,14 +3156,16 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         key: u.searchParams.get('key'),
         llm: llm.available(),
         theme: c.theme || 'klein',
-        themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])),
+        themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
+        fontPreset: c.fontPreset || 'soft',
+        fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name }])),
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
         lib: (() => { try { return fs.readdirSync(path.join(PUBLIC, 'assets', 'lib')).filter(f => /\.(jpe?g|png|webp)$/i.test(f)).map(f => '/assets/lib/' + f); } catch (e) { return []; } })(),
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=23"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=24"></script>` : ''}
 </body></html>`);
       return;
     }
