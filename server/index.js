@@ -2110,6 +2110,47 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { url: '/assets/' + fname });
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
+    /* ⭐ ИИ-оформление карусели по ссылке/теме: тянет инфо+фото → тексты слайдов + умная раскладка фото + слайд-галерея */
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/ai-compose$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const url = String(b.url || '').trim();
+      let topic = String(b.topic || '').trim();
+      let images = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(x)) : [];
+      let facts = null;
+      try {
+        if (url) {
+          const { html, finalUrl } = await safeFetchPage(url);
+          if (!images.length) images = scrapeImagesFromHtml(html, finalUrl);
+          const sourceText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
+          facts = await llm.extractLaunch({ sourceText, query: topic });
+          if (facts) { const parts = [facts.name, facts.units, facts.priceFrom && ('от ' + facts.priceFrom), facts.payment, facts.roi && ('доходность ' + facts.roi), facts.handover && ('сдача ' + facts.handover), facts.location, ...(facts.highlights || [])].filter(Boolean); topic = (facts.name || topic || 'Объект') + '. ' + parts.join(' · '); }
+        }
+        const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '');
+        let slides = (out.slides || []).map(s => sanSlide(s));
+        /* умная раскладка фото: обложка крупным кадром, контент-слайды с фото, предпоследний — галерея-слой, CTA чистый */
+        const pics = images.slice(0, 10);
+        if (pics.length && slides.length) {
+          slides[0] = Object.assign({}, slides[0], { bg: pics[0], pos: 'bottom', size: 'l' });
+          let pi = 1;
+          for (let i = 1; i < slides.length - 1 && pi < pics.length; i++) { slides[i] = Object.assign({}, slides[i], { bg: pics[pi++] }); }
+          /* слайд-галерея с несколькими фото как слои (если осталось ≥2 кадра) */
+          const rest = pics.slice(pi);
+          if (rest.length >= 2) {
+            const gal = rest.slice(0, 4);
+            const layers = gal.map((u2, gi) => sanLayer({ t: 'img', url: u2, x: gi % 2 === 0 ? 6 : 52, y: gi < 2 ? 26 : 60, w: 42, h: 30, z: gi + 1, round: 10 }));
+            slides.splice(slides.length - 1, 0, sanSlide({ heading: facts && facts.name ? 'Планировки и виды' : 'Галерея', sub: '', eyebrow: 'Фото', pos: 'top', size: 'm', layers }));
+          }
+        }
+        c.slides = slides.slice(0, 12).map(s => sanSlide(s));
+        if (out.title) c.title = String(out.title).slice(0, 120);
+        store.save();
+        return json(res, 200, { ok: true, count: c.slides.length, images: pics.length, hasGallery: pics.length >= 3, factsName: facts && facts.name || null });
+      } catch (e) { return json(res, 500, { error: 'ИИ-оформление не удалось: ' + e.message }); }
+    }
 
     /* ---------------- соц-движки: сценарии Reels / хантинг идей / посты ----------------
        История генераций (db.socialContent) + копилка идей брокера (db.ideaBank). */
@@ -3523,7 +3564,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=13"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=14"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
@@ -4234,7 +4275,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=26"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=27"></script>` : ''}
 </body></html>`);
       return;
     }

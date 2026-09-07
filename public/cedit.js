@@ -143,6 +143,8 @@ body.cpanel-on{padding-right:308px!important}
 .celem-add:hover{border-color:#2563EB;color:#2563EB;transform:translateY(-2px)}
 .celem-add-ic{width:34px;height:34px;border-radius:10px;background:#EEF3FF;display:flex;align-items:center;justify-content:center;color:#2563EB}
 .celem-add-ic svg{width:19px;height:19px}
+.caibtn{background:linear-gradient(120deg,#2563EB,#5B2BD8)!important;color:#fff!important;border:none!important;box-shadow:0 8px 22px -8px rgba(91,43,216,.6)}
+.caibtn:hover{filter:brightness(1.06)}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -345,6 +347,7 @@ body.cpanel-on{padding-right:308px!important}
   function designHtml() {
     const cats = Object.keys(P.templates || {});
     return `
+    ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>` : ''}
     <div class="cgrp"><label>Готовые шаблоны</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
@@ -361,6 +364,21 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cnote">Тема, шрифт, формат и футер применяются ко всей карусели.</div>`;
   }
   function wireDesign(body) {
+    /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
+    const aiBtn = $('#cAiCompose', body);
+    if (aiBtn) aiBtn.addEventListener('click', (e) => {
+      const pp = openPop(`<div class="csec">Оформить с ИИ</div>
+        <input class="cinp" id="cAiUrl" placeholder="ссылка на объект/ЖК (URL)" style="margin-top:2px">
+        <input class="cinp" id="cAiTopic" placeholder="или тема/вводные текстом">
+        <button class="cwbtn wide" id="cAiGo2" style="margin-top:8px">✦ Собрать карусель</button>
+        <div class="cnote">ИИ вытянет факты и фото со страницы, напишет слайды, разложит кадры и добавит слайд-галерею. Проверьте цифры после.</div>`, e.clientX - 250, e.clientY);
+      $('#cAiGo2', pp).addEventListener('click', async () => {
+        const url = $('#cAiUrl', pp).value.trim(), topic = $('#cAiTopic', pp).value.trim();
+        if (!url && !topic) { flash('Вставьте ссылку или тему'); return; }
+        closePop(); flash('✦ ИИ собирает карусель (10–25с)…', 0);
+        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => location.reload(), 700); } catch (err) { flash('Не вышло: ' + err.message); }
+      });
+    });
     /* готовые шаблоны: категории + применение ко всем слайдам */
     const grid = $('#cTplGrid', body);
     $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
