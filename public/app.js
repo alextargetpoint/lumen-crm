@@ -988,11 +988,11 @@ function ovSetPal(k, p) { const m = ovGetPals(); if (!p || p === 'cobalt') delet
 const OV_PAL = { cobalt: ['#2563EB', '#5B2BD8', 'Кобальт'], emerald: ['#0E9E6A', '#12855F', 'Изумруд'], violet: ['#7C3AED', '#5B2BD8', 'Фиолет'], amber: ['#D9982B', '#C9721C', 'Янтарь'], rose: ['#E1467C', '#C22E6A', 'Роза'], graphite: ['#475569', '#1E293B', 'Графит'] };
 /* готовые паки оформления всей обзорной страницы: раскладка + форматы + фон + палитра */
 const OV_PACKS = {
-  focus: { name: 'Фокус', desc: 'Минимум блоков, чистый вид', layout: ['attention', 'kpi', 'tasks', 'meetings'], vars: { kpi: 'hero' }, skins: {}, pals: {} },
-  command: { name: 'Командный центр', desc: 'Насыщенно, для владельца', layout: ['kpi', 'attention', 'leaders', 'funnel', 'hotleads', 'goal', 'tasks', 'meetings'], vars: { funnel: 'steps', leaders: 'podium', goal: 'ring', kpi: 'tiles' }, skins: { leaders: 'tint', goal: 'accent' }, pals: {} },
-  data: { name: 'Данные', desc: 'Плотно, цифры и графики', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'list', funnel: 'donut', goal: 'stat', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
-  premium: { name: 'Тёмный премиум', desc: 'Видеофоны, глубокий вид', layout: ['attention', 'kpi', 'leaders', 'goal', 'ideas', 'meetings'], vars: { kpi: 'hero', leaders: 'top1', goal: 'ring' }, skins: { kpi: 'video', leaders: 'video', goal: 'frost', ideas: 'tint' }, pals: {} },
-  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['ideas', 'kpi', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'list', hotleads: 'cards' }, skins: { ideas: 'accent' }, pals: { ideas: 'violet' } },
+  focus: { name: 'Фокус', desc: 'Минимум блоков, чистый вид', layout: ['attention', 'kpi', 'tasks', 'meetings'], vars: { kpi: 'bento' }, skins: {}, pals: {} },
+  command: { name: 'Командный центр', desc: 'Насыщенно, для владельца', layout: ['kpi', 'attention', 'leaders', 'funnel', 'hotleads', 'goal', 'tasks', 'meetings'], vars: { funnel: 'steps', leaders: 'spotlight', goal: 'gauge', kpi: 'tiles' }, skins: { leaders: 'tint', goal: 'accent' }, pals: {} },
+  data: { name: 'Данные', desc: 'Плотно, цифры и графики', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'trend', funnel: 'donut', goal: 'stat', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
+  premium: { name: 'Тёмный премиум', desc: 'Видеофоны, глубокий вид', layout: ['attention', 'kpi', 'leaders', 'goal', 'ideas', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge' }, skins: { kpi: 'video', leaders: 'video', goal: 'frost', ideas: 'tint' }, pals: {} },
+  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['ideas', 'kpi', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'editorial', hotleads: 'cards' }, skins: { ideas: 'accent' }, pals: { ideas: 'violet' } },
 };
 function ovApplyPack(id) {
   const p = OV_PACKS[id]; if (!p) return;
@@ -1004,24 +1004,94 @@ function ovApplyPack(id) {
   } catch (_) {}
 }
 
-/* реестр виджетов обзора: key → { name, icon, full, render(ctx)→html } */
+/* ─── премиум-утилиты вёрстки виджетов (тренды дашбордов 2025-26) ─── */
+let _gradSeq = 0;
+/* уникальный id для SVG-градиента (нельзя переиспользовать между инстансами) */
+function gradId() { return 'g' + (_gradSeq++); }
+/* число с count-up анимацией: <span class="cup" data-to="N" data-suf="%">0</span> */
+function cup(n, suf) { return `<span class="cup" data-to="${n}" ${suf ? `data-suf="${suf}"` : ''}>0${suf || ''}</span>`; }
+function ovAnimateCounts(root) {
+  root.querySelectorAll('.cup').forEach(elm => {
+    const to = parseFloat(elm.dataset.to) || 0, suf = elm.dataset.suf || '';
+    if (to <= 0) { elm.textContent = '0' + suf; return; }
+    const t0 = performance.now(), dur = 700;
+    const step = (t) => { const p = Math.min(1, (t - t0) / dur); const e = 1 - Math.pow(1 - p, 3); elm.textContent = Math.round(to * e) + suf; if (p < 1) requestAnimationFrame(step); };
+    elm.textContent = '0' + suf; requestAnimationFrame(step);
+  });
+}
+/* мини-спарклайн с градиентной заливкой площади; pts = массив чисел */
+function sparkSvg(pts, opts = {}) {
+  const w = opts.w || 100, h = opts.h || 30, max = Math.max(...pts, 1), min = Math.min(...pts, 0);
+  const rng = (max - min) || 1;
+  const xy = pts.map((v, i) => [(i / (pts.length - 1)) * w, h - 3 - ((v - min) / rng) * (h - 6)]);
+  const line = xy.map(p => p.join(',')).join(' ');
+  const area = `0,${h} ` + line + ` ${w},${h}`;
+  const gid = gradId();
+  return `<svg class="ov-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#${gid})"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+/* дельта-чип ▲/▼ с процентом */
+function deltaChip(cur, prev) {
+  if (prev == null) return '';
+  const d = cur - prev, pct = prev > 0 ? Math.round(d / prev * 100) : (cur > 0 ? 100 : 0);
+  if (d === 0) return `<span class="ov-delta flat">— 0%</span>`;
+  return `<span class="ov-delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(pct)}%</span>`;
+}
+/* новые лиды по дням за N дней (для спарклайнов/дельт) */
+function leadsByDay(leads, n) {
+  return Array.from({ length: n }, (_, i) => { const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - (n - 1 - i)); return leads.filter(l => l.createdAt >= +d0 && l.createdAt < +d0 + 864e5).length; });
+}
+/* полукруговой gauge (arc) с градиентным штрихом; pct 0..100 */
+function gaugeSvg(pct) {
+  const gid = gradId(); const R = 46, cx = 60, cy = 58;
+  const a0 = Math.PI, a1 = Math.PI * (1 + Math.min(100, pct) / 100);
+  const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
+  const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  const track = `M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy}`;
+  const val = `M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}`;
+  return `<svg class="ov-gauge" viewBox="0 0 120 68"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><path d="${track}" fill="none" stroke="var(--stroke)" stroke-width="9" stroke-linecap="round"/><path d="${val}" fill="none" stroke="url(#${gid})" stroke-width="9" stroke-linecap="round"/></svg>`;
+}
+
+/* реестр виджетов обзора: key → { name, icon, full, render(ctx, variant)→html } */
 const OV_W = {
-  kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, variants: [['tiles', 'Плитки'], ['hero', 'Главная цифра'], ['list', 'Список']], render: (c, v) => {
-    const f = c.f, an = c.an;
+  kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, variants: [['tiles', 'Плитки'], ['bento', 'Бенто'], ['trend', 'Тренд'], ['editorial', 'Крупно']], render: (c, v) => {
+    const f = c.f, an = c.an, leads = c.leads || [];
     const cards = [
       { go: 'funnel', ic: I.plus, v: f.new + f.touch, k: 'Новые лиды', s: 'касание ≤ 1 мин' },
       { go: 'inbox', ic: I.chat, v: f.dialog + f.touch + f.dialog, k: 'В работе у ИИ', s: `${f.dialog} в живом диалоге` },
       { go: 'funnel', ic: I.spark, v: f.qualified + f.handover + f.viewing + f.deal, k: 'Квалифицировано', s: `${f.deal} дошло до сделки` },
       { go: 'analytics', ic: I.send, v: an.wa.sentToday, k: 'Отправлено сегодня', s: `${an.wa.numbersActive} ${plural(an.wa.numbersActive, 'номер', 'номера', 'номеров')} · ${an.wa.avgQuality}%` },
     ];
-    if (v === 'hero') {
-      const [main, ...rest] = cards;
-      return `<div class="ov2-kpi-hero"><button class="ov2-kh-main" data-ovgo="${main.go}"><span class="ov2-kh-ic">${ic(main.ic)}</span><span class="ov2-kh-v">${main.v}</span><span class="ov2-kh-k">${main.k}</span><span class="ov2-kh-s">${main.s}</span></button><div class="ov2-kh-side">${rest.map(x => `<button class="ov2-kh-row" data-ovgo="${x.go}"><span class="ov2-kh-rv">${x.v}</span><span class="ov2-kh-rk">${x.k}</span></button>`).join('')}</div></div>`;
+    const d14 = leadsByDay(leads, 14);
+    const wkNow = d14.slice(7).reduce((a, b) => a + b, 0), wkPrev = d14.slice(0, 7).reduce((a, b) => a + b, 0);
+    /* БЕНТО: асимметрия — крупная плитка с мешем + спарклайн, три компактных */
+    if (v === 'bento') {
+      const [m, ...rest] = cards;
+      return `<div class="kpi-bento">
+        <button class="kb-hero" data-ovgo="${m.go}"><div class="kb-hero-glow"></div>
+          <span class="kb-ic">${ic(m.ic)}</span>
+          <span class="kb-lbl">${m.k}</span>
+          <span class="kb-num">${cup(m.v)}</span>
+          <span class="kb-sub">${deltaChip(wkNow, wkPrev)} к прошлой неделе</span>
+          <div class="kb-spark">${sparkSvg(d14, { w: 160, h: 40 })}</div>
+        </button>
+        <div class="kb-side">${rest.map(x => `<button class="kb-cell" data-ovgo="${x.go}"><span class="kb-c-ic">${ic(x.ic)}</span><span class="kb-c-num">${cup(x.v)}</span><span class="kb-c-lbl">${x.k}</span></button>`).join('')}</div>
+      </div>`;
     }
-    if (v === 'list') {
-      return `<div class="ov2-kpi-list">${cards.map(x => `<button class="ov2-kl-row" data-ovgo="${x.go}"><span class="ov2-kl-ic">${ic(x.ic)}</span><span class="ov2-kl-k">${x.k}<i>${x.s}</i></span><span class="ov2-kl-v">${x.v}</span></button>`).join('')}</div>`;
+    /* ТРЕНД: аналитический ряд — крупный спарклайн-герой + компактные метрики с дельтами */
+    if (v === 'trend') {
+      const dConv = null;
+      return `<div class="kpi-trend">
+        <button class="kt-hero" data-ovgo="funnel"><div class="kt-hero-hd"><span class="kt-lbl">Приток лидов · 14 дней</span><span class="kt-big">${cup(wkNow)}<i>за неделю</i></span>${deltaChip(wkNow, wkPrev)}</div><div class="kt-spark">${sparkSvg(d14, { w: 260, h: 56 })}</div></button>
+        <div class="kt-rows">${cards.slice(1).map(x => `<button class="kt-row" data-ovgo="${x.go}"><span class="kt-r-k">${x.k}</span><span class="kt-r-v">${cup(x.v)}</span></button>`).join('')}</div>
+      </div>`;
     }
-    return `<div class="ov2-kpis">${cards.map(x => `<button class="ov2-kpi" data-ovgo="${x.go}"><span class="ov2-kpi-ic">${ic(x.ic)}</span><span class="ov2-kpi-b"><span class="ov2-kpi-v">${x.v}</span><span class="ov2-kpi-k">${x.k}</span><span class="ov2-kpi-s">${x.s}</span></span></button>`).join('')}</div>`;
+    /* КРУПНО (editorial): огромные числа, волосяные линии, без иконок */
+    if (v === 'editorial') {
+      return `<div class="kpi-ed">${cards.map(x => `<button class="ked" data-ovgo="${x.go}"><span class="ked-num">${cup(x.v)}</span><span class="ked-k">${x.k}</span></button>`).join('')}</div>`;
+    }
+    /* ПЛИТКИ (premium default): чип-иконка с градиентом, count-up, тонкий верхний хайлайт */
+    return `<div class="ov2-kpis">${cards.map(x => `<button class="ov2-kpi" data-ovgo="${x.go}"><span class="ov2-kpi-ic">${ic(x.ic)}</span><span class="ov2-kpi-b"><span class="ov2-kpi-v">${cup(x.v)}</span><span class="ov2-kpi-k">${x.k}</span><span class="ov2-kpi-s">${x.s}</span></span></button>`).join('')}</div>`;
   } },
   attention: { name: 'Требует внимания', icon: () => I.spark, full: true, render: (c) => {
     const now = Date.now(), leads = c.leads, f = c.f;
@@ -1042,9 +1112,15 @@ const OV_W = {
       ${a.lead ? `<span class="ov2-att-who">${esc((a.lead.name || '').split(' ')[0])}${a.n > 1 ? ' +' + (a.n - 1) : ''}</span>` : ''}
     </button>`).join('')}</div>`;
   } },
-  funnel: { name: 'Воронка', icon: () => I.funnel, full: true, variants: [['bars', 'Полосы'], ['steps', 'Ступени'], ['donut', 'Кольцо']], render: (c, v) => {
+  funnel: { name: 'Воронка', icon: () => I.funnel, full: true, variants: [['bars', 'Полосы'], ['ribbon', 'Лента'], ['steps', 'Ступени'], ['donut', 'Кольцо']], render: (c, v) => {
     const f = c.f; const shown = STAGES.filter(s => !['lost', 'sleeping'].includes(s.id));
     const max = Math.max(...shown.map(s => f[s.id] || 0), 1);
+    if (v === 'ribbon') {
+      const total = shown.reduce((a, s) => a + (f[s.id] || 0), 0) || 1;
+      const seg = shown.filter(s => f[s.id]).map(s => `<div class="ov2-rib-seg" data-ovgo="funnel" style="flex:${f[s.id] || 0};background:${stageColor(s.id)}" title="${esc(s.name)}: ${f[s.id] || 0}"></div>`).join('');
+      const leg = shown.map((s, i) => { const val = f[s.id] || 0; const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0; const conv = i > 0 && prevV > 0 ? Math.round(val / prevV * 100) : null; return `<button class="ov2-rib-l" data-ovgo="funnel"><i style="background:${stageColor(s.id)}"></i><span>${s.name}</span><b>${val}</b>${conv != null && conv <= 100 ? `<em>${conv}%</em>` : ''}</button>`; }).join('');
+      return `<div class="ov2-ribbon"><div class="ov2-rib-bar">${seg}</div><div class="ov2-rib-leg">${leg}</div></div>`;
+    }
     if (v === 'steps') {
       return `<div class="ov2-fsteps">${shown.map((s, i) => {
         const val = f[s.id] || 0; const prevV = i > 0 ? (f[shown[i - 1].id] || 0) : 0;
@@ -1131,7 +1207,7 @@ const OV_W = {
     const body = seqs.length ? seqs.slice(0, 6).map(s => `<div class="ov2-lrow" data-ovgo="sequences"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(s.name)}</div><div class="ov2-lrow-s">${esc(gn(s.geo))} · ${(s.steps || []).length} касаний</div></div><span class="ov2-chip ${s.active ? 'on' : ''}">${s.active ? 'вкл' : 'выкл'}</span></div>`).join('') : '<div class="ov2-empty">Нет цепочек</div>';
     return `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>${on} активны</span><button class="btn btn-sm" data-ovgo="sequences">Все</button></div>${body}`;
   } },
-  leaders: { name: 'Доска лидеров', icon: () => I.flame, full: false, variants: [['podium', 'Пьедестал'], ['list', 'Рейтинг'], ['top1', 'Чемпион']], render: (c, v) => {
+  leaders: { name: 'Доска лидеров', icon: () => I.flame, full: false, variants: [['podium', 'Пьедестал'], ['list', 'Рейтинг'], ['spotlight', 'Чемпион']], render: (c, v) => {
     const now = Date.now(), mAgo = now - 30 * 864e5;
     const board = (STATE.brokers || []).filter(b => b.active !== false).map(b => {
       const deals = c.leads.filter(l => l.broker === b.id && l.stage === 'deal');
@@ -1145,9 +1221,15 @@ const OV_W = {
       const max = board[0] ? (board[0].dealsMonth || board[0].deals) || 1 : 1;
       return hd + `<div class="ov2-lead-rank">${board.slice(0, 7).map((b, i) => { const val = b.dealsMonth || b.deals; return `<div class="ov2-lrk-row" data-ovgo="brokers"><span class="ov2-lrk-n ${i < 3 ? 'top' : ''}">${i + 1}</span><span class="ov2-lrk-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(ini(b.name))}</span><span class="ov2-lrk-nm">${esc(b.name)}<i style="width:${Math.round(val / max * 100)}%"></i></span><b>${val}</b></div>`; }).join('')}</div>`;
     }
-    if (v === 'top1') {
+    if (v === 'spotlight') {
       const w1 = board[0], val = w1.dealsMonth || w1.deals;
-      return hd + `<div class="ov2-champ" data-ovgo="brokers"><div class="ov2-champ-ava">${w1.photo ? `<img src="${esc(w1.photo)}">` : esc(ini(w1.name))}<span class="ov2-champ-crown">${ic(I.flame)}</span></div><div class="ov2-champ-nm">${esc(w1.name)}</div><div class="ov2-champ-v">${val}<i>${plural(val, 'сделка', 'сделки', 'сделок')} за месяц</i></div>${board[1] ? `<div class="ov2-champ-next">Следом: ${esc((board[1].name || '').split(' ')[0])} · ${board[1].dealsMonth || board[1].deals}</div>` : ''}</div>`;
+      const runners = board.slice(1, 4);
+      return hd + `<div class="ov2-spot" data-ovgo="brokers"><div class="ov2-spot-glow"></div>
+        <div class="ov2-spot-ava">${w1.photo ? `<img src="${esc(w1.photo)}">` : esc(ini(w1.name))}<span class="ov2-spot-crown">${ic(I.flame)}</span></div>
+        <div class="ov2-spot-nm">${esc(w1.name)}</div>
+        <div class="ov2-spot-v">${cup(val)}<i>${plural(val, 'сделка', 'сделки', 'сделок')} за месяц · лидер</i></div>
+        ${runners.length ? `<div class="ov2-spot-run">${runners.map((b, i) => `<span class="ov2-spot-chip">${i + 2}. ${esc((b.name || '').split(' ')[0])} · ${b.dealsMonth || b.deals}</span>`).join('')}</div>` : ''}
+      </div>`;
     }
     const top = board.slice(0, 3), rest = board.slice(3, 6);
     const podium = `<div class="ov2-lead-podium">${top.map((b, i) => `<div class="ov2-lp p${i + 1}"><div class="ov2-lp-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(ini(b.name))}<span class="ov2-lp-rank">${i + 1}</span></div><b>${esc((b.name || '').split(' ')[0])}</b><i>${b.dealsMonth || b.deals} ${plural(b.dealsMonth || b.deals, 'сделка', 'сделки', 'сделок')}</i></div>`).join('')}</div>`;
@@ -1191,7 +1273,7 @@ const OV_W = {
     }).join('');
     return `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${rows || '<div class="ov2-empty">Добавьте направления в профиле агентства</div>'}`;
   } },
-  goal: { name: 'Цель месяца', icon: () => I.target, full: false, variants: [['ring', 'Кольцо'], ['bar', 'Полоса'], ['stat', 'Цифра']], render: (c, v) => {
+  goal: { name: 'Цель месяца', icon: () => I.target, full: false, variants: [['gauge', 'Спидометр'], ['ring', 'Кольцо'], ['bar', 'Полоса'], ['stat', 'Цифра']], render: (c, v) => {
     const now = Date.now(), mAgo = now - 30 * 864e5;
     const target = (STATE.settings.agency.monthGoal) || 10;
     const done = c.leads.filter(l => l.stage === 'deal' && (c.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at > mAgo)).length;
@@ -1199,15 +1281,18 @@ const OV_W = {
     const left = Math.max(0, target - done);
     const hd = `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span><button class="btn btn-sm" data-ovgo="analytics">Детали</button></div>`;
     const note = `<div class="ov2-goal-note">${done >= target ? 'Цель достигнута 🎉' : `Ещё ${left} ${plural(left, 'сделка', 'сделки', 'сделок')} до цели`}</div>`;
+    if (v === 'gauge') {
+      return hd + `<div class="ov2-gauge-wrap">${gaugeSvg(pct)}<div class="ov2-gauge-c"><b>${cup(done)}</b><i>из ${target}</i></div><div class="ov2-gauge-pct">${cup(pct, '%')}</div></div>${note}`;
+    }
     if (v === 'bar') {
-      return hd + `<div class="ov2-goalbar"><div class="ov2-gb-top"><b>${done}</b><span>из ${target} · ${pct}%</span></div><div class="ov2-gb-track"><i style="width:${pct}%"></i></div></div>${note}`;
+      return hd + `<div class="ov2-goalbar"><div class="ov2-gb-top"><b>${cup(done)}</b><span>из ${target} · ${pct}%</span></div><div class="ov2-gb-track"><i style="width:${pct}%"></i></div></div>${note}`;
     }
     if (v === 'stat') {
-      return hd + `<div class="ov2-goalstat"><div class="ov2-gs-big">${done}<span>/${target}</span></div><div class="ov2-gs-pct ${pct >= 100 ? 'done' : ''}">${pct}% цели</div></div>${note}`;
+      return hd + `<div class="ov2-goalstat"><div class="ov2-gs-big">${cup(done)}<span>/${target}</span></div><div class="ov2-gs-pct ${pct >= 100 ? 'done' : ''}">${pct}% цели</div></div>${note}`;
     }
-    const R = 52, C = 2 * Math.PI * R;
-    return hd + `<div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><circle cx="60" cy="60" r="${R}" class="gr-bg"/><circle cx="60" cy="60" r="${R}" class="gr-fg" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/></svg>
-        <div class="ov2-goal-c"><b>${done}</b><i>из ${target}</i></div></div>${note}`;
+    const R = 52, C = 2 * Math.PI * R, gid = gradId();
+    return hd + `<div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><circle cx="60" cy="60" r="${R}" class="gr-bg"/><circle cx="60" cy="60" r="${R}" class="gr-fg" stroke="url(#${gid})" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/></svg>
+        <div class="ov2-goal-c"><b>${cup(done)}</b><i>из ${target}</i></div></div>${note}`;
   } },
   hotleads: { name: 'Горячие лиды', icon: () => I.flame, full: false, variants: [['list', 'Список'], ['cards', 'Карточки']], render: (c, v) => {
     const hot = c.leads.filter(l => !['lost', 'deal'].includes(l.stage)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 6);
@@ -1547,6 +1632,7 @@ PAGES.overview = async (root) => {
       $$('[data-wskin]', root).forEach(b => b.addEventListener('click', () => openWidgetStyle(b.closest('[data-w]').dataset.w, paint)));
       ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
     }
+    ovAnimateCounts(root);
   };
   paint();
 };
