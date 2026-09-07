@@ -970,6 +970,8 @@ async function ideaSwipe(kind, ctx, repaint) {
   repaint();
 }
 
+/* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
+const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 const OV_DEFAULT = ['attention', 'kpi', 'leaders', 'tasks', 'ideas', 'meetings', 'funnel'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
@@ -1121,6 +1123,34 @@ const OV_W = {
         <button class="idea-act take" data-idea-act="take" title="Взять в работу">${ic(I.check, 2.4)}<span>В работу</span></button>
       </div></div>`;
   } },
+  worldclock: { name: 'Часовые пояса', icon: () => I.clock || I.cal, full: false, render: () => {
+    const geos = (STATE.settings.agency.geos || []).slice(0, 6);
+    const now = Date.now();
+    const rows = geos.map(g => {
+      const tz = GEO_TZ[g]; const nm = STATE.settings.geoNames[g] || g;
+      const t = tz == null ? null : new Date(now + (tz * 60 - (-new Date().getTimezoneOffset())) * 60e3);
+      const hh = t ? pad2(t.getHours()) + ':' + pad2(t.getMinutes()) : '—';
+      const bad = t && (t.getHours() < 8 || t.getHours() >= 22);
+      return `<div class="ov2-wc-row"><span class="ov2-wc-nm">${esc(nm)}${tz != null ? ` <i>GMT${tz >= 0 ? '+' : ''}${tz}</i>` : ''}</span><span class="ov2-wc-t ${bad ? 'off' : ''}">${hh}${bad ? ` ${ic(I.moon, 2)}` : ''}</span></div>`;
+    }).join('');
+    return `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${rows || '<div class="ov2-empty">Добавьте направления в профиле агентства</div>'}`;
+  } },
+  goal: { name: 'Цель месяца', icon: () => I.target, full: false, render: (c) => {
+    const now = Date.now(), mAgo = now - 30 * 864e5;
+    const target = (STATE.settings.agency.monthGoal) || 10;
+    const done = c.leads.filter(l => l.stage === 'deal' && (c.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at > mAgo)).length;
+    const pct = Math.min(100, Math.round(done / target * 100));
+    const R = 52, C = 2 * Math.PI * R;
+    return `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span><button class="btn btn-sm" data-ovgo="analytics">Детали</button></div>
+      <div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><circle cx="60" cy="60" r="${R}" class="gr-bg"/><circle cx="60" cy="60" r="${R}" class="gr-fg" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/></svg>
+        <div class="ov2-goal-c"><b>${done}</b><i>из ${target}</i></div></div>
+      <div class="ov2-goal-note">${done >= target ? 'Цель достигнута 🎉' : `Ещё ${target - done} ${plural(target - done, 'сделка', 'сделки', 'сделок')} до цели`}</div>`;
+  } },
+  hotleads: { name: 'Горячие лиды', icon: () => I.flame, full: false, render: (c) => {
+    const hot = c.leads.filter(l => !['lost', 'deal'].includes(l.stage)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 6);
+    const body = hot.length ? hot.map(l => `<div class="ov2-lrow" data-ovlead="${l.id}"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(l.name || '—')}</div><div class="ov2-lrow-s">${esc(l.geoName || '')}${l.stageName ? ' · ' + esc(l.stageName) : ''}</div></div><span class="ov2-hot-score ${(l.score || 0) >= 70 ? 'hi' : (l.score || 0) >= 40 ? 'mid' : ''}">${l.score || 0}</span></div>`).join('') : '<div class="ov2-empty">Пока нет активных лидов</div>';
+    return `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>${body}`;
+  } },
 };
 
 /* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
@@ -1141,6 +1171,9 @@ const OV_PREV = {
   onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
   leaders: () => `<div class="ov2-card-hd">${ic(I.flame)}Доска лидеров<span>сделки за месяц</span></div><div class="ov2-lead-hero"><div class="ov2-lead-podium">${[['Дарья', 5, 1], ['Амир', 3, 2], ['Кетут', 2, 3]].map(([n, d, r]) => `<div class="ov2-lp p${r}"><div class="ov2-lp-ava">${n[0]}<span class="ov2-lp-rank">${r}</span></div><b>${n}</b><i>${d} сделок</i></div>`).join('')}</div></div>`,
   ideas: () => `<div class="ov2-card-hd">${ic(I.spark)}Идея дня<span>свайп-колода</span></div><div class="idea-deck"><div class="idea-count">6 идей в колоде</div><div class="idea-card" style="--acol:#2FA98C"><span class="idea-angle">кейс</span><div class="idea-title">Как клиент отбил виллу за 3 года аренды</div><div class="idea-hook">«Купил за $180k — сдаёт за $2k/мес. Считаем на пальцах»</div><div class="idea-why">${ic(I.spark, 2)}<span>Закрывает страх «а окупится ли»</span></div><div class="idea-meta"><span class="idea-fmt">${ic(I.play, 2)}говорящая голова + графика</span><span class="idea-eff e-low">съёмка: низкий</span></div></div><div class="idea-acts"><button class="idea-act skip">${ic(I.x, 2.2)}</button><button class="idea-act keep">${ic(I.moon, 2)}<span>В копилку</span></button><button class="idea-act take">${ic(I.check, 2.4)}<span>В работу</span></button></div></div>`,
+  worldclock: () => `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${[['Дубай', 'GMT+4', '14:20', false], ['Бали', 'GMT+8', '18:20', false], ['Пхукет', 'GMT+7', '17:20', false], ['Испания', 'GMT+1', '11:20', false]].map(([n, z, t, bad]) => `<div class="ov2-wc-row"><span class="ov2-wc-nm">${n} <i>${z}</i></span><span class="ov2-wc-t ${bad ? 'off' : ''}">${t}</span></div>`).join('')}`,
+  goal: () => `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span></div><div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><circle cx="60" cy="60" r="52" class="gr-bg"/><circle cx="60" cy="60" r="52" class="gr-fg" stroke-dasharray="326.7" stroke-dashoffset="98"/></svg><div class="ov2-goal-c"><b>7</b><i>из 10</i></div></div><div class="ov2-goal-note">Ещё 3 сделки до цели</div>`,
+  hotleads: () => `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span></div>${[['Ислам Керимов', 'Дубай · квалифицирован', 86, 'hi'], ['Мария Власова', 'Бали · в диалоге', 64, 'mid'], ['Настя Рой', 'Дубай · новый', 38, '']].map(([n, s, sc, cl]) => `<div class="ov2-lrow"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${n}</div><div class="ov2-lrow-s">${s}</div></div><span class="ov2-hot-score ${cl}">${sc}</span></div>`).join('')}`,
 };
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
@@ -2173,13 +2206,14 @@ PAGES.meetings = async (root) => {
    Введённое время трактуем в поясе менеджера (браузер); клиентский пояс — lead.tz (offset от UTC). */
 function tzHintHtml(dateStr, timeStr, clientTz, clientLabel) {
   if (!dateStr || !timeStr || clientTz == null || isNaN(clientTz)) return '';
+  const p2 = (n) => String(n).padStart(2, '0');
   const managerOffset = -new Date().getTimezoneOffset() / 60;
   const diff = clientTz - managerOffset;
   const base = new Date(dateStr + 'T' + timeStr);
   if (isNaN(+base)) return '';
   const client = new Date(base.getTime() + diff * 3600e3);
-  const clientT = pad2(client.getHours()) + ':' + pad2(client.getMinutes());
-  const dCmp = (a) => `${a.getFullYear()}-${pad2(a.getMonth() + 1)}-${pad2(a.getDate())}`;
+  const clientT = p2(client.getHours()) + ':' + p2(client.getMinutes());
+  const dCmp = (a) => `${a.getFullYear()}-${p2(a.getMonth() + 1)}-${p2(a.getDate())}`;
   const shift = dCmp(client) > dateStr ? ' <i>(+1 день)</i>' : dCmp(client) < dateStr ? ' <i>(−1 день)</i>' : '';
   const gmt = 'GMT' + (clientTz >= 0 ? '+' : '') + clientTz;
   const badHour = client.getHours() < 8 || client.getHours() >= 22;

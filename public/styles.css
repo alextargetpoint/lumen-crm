@@ -3129,3 +3129,23 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .tz-hint.warn { background: color-mix(in srgb, var(--bad) 7%, transparent); border-color: color-mix(in srgb, var(--bad) 30%, var(--stroke)); }
 .tz-hint.warn > svg { color: var(--bad); }
 .tz-hint .tzh-warn { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--bad); text-align: right; }
+
+/* ============ Новые виджеты обзора: часовые пояса / цель / горячие лиды ============ */
+.ov2-wc-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--stroke-soft); font-size: 13px; }
+.ov2-wc-row:last-child { border-bottom: none; }
+.ov2-wc-nm { color: var(--navy-900); font-weight: 600; }
+.ov2-wc-nm i { font-style: normal; color: var(--ink-3); font-size: 11px; font-weight: 500; margin-left: 4px; }
+.ov2-wc-t { font-weight: 800; color: var(--navy-900); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; }
+.ov2-wc-t.off { color: var(--ink-3); }
+.ov2-wc-t svg { width: 13px; height: 13px; color: #B8860B; }
+.ov2-goal { position: relative; width: 128px; height: 128px; margin: 6px auto 4px; }
+.ov2-goal-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ov2-goal-ring .gr-bg { fill: none; stroke: var(--stroke); stroke-width: 11; }
+.ov2-goal-ring .gr-fg { fill: none; stroke: var(--accent); stroke-width: 11; stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
+.ov2-goal-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ov2-goal-c b { font-size: 32px; font-weight: 800; color: var(--navy-900); line-height: 1; }
+.ov2-goal-c i { font-size: 12px; color: var(--ink-3); font-style: normal; margin-top: 2px; }
+.ov2-goal-note { text-align: center; font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: 4px; }
+.ov2-hot-score { font-size: 13px; font-weight: 800; color: var(--ink-3); background: var(--bg-2); border-radius: 8px; padding: 3px 9px; font-variant-numeric: tabular-nums; flex: none; }
+.ov2-hot-score.mid { color: #B8860B; background: rgba(224,168,46,.13); }
+.ov2-hot-score.hi { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
