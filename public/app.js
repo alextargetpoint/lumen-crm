@@ -68,7 +68,7 @@ const I = {
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   chev: '<path d="M9 6l6 6-6 6"/>',
-  building: '<path d="M3 21V5l7-3v19M10 21V8l8 2v11M3 21h18M6 8h1M6 12h1M6 16h1M14 13h1M14 17h1"/>',
+  building: '<path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M3 22h18"/><path d="M10 7h4M10 11h4M10 15h4"/>',
   layers: '<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
   card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
   /* доп. иконки для таск-менеджера — единый тонкий лайн-стиль */
