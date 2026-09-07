@@ -4621,7 +4621,7 @@ async function shBank(main) {
 async function shCarousels(main) {
   const cars = await api.get('/carousels');
   main.innerHTML = `
-    <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-accent" id="carNew">${ic(I.plus)}Новая карусель</button></div>
+    <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-cta" id="carNew">${ic(I.plus)}Новая карусель</button></div>
     <div class="car-grid">${cars.length ? cars.map(carCardHTML).join('') : '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}</div>`;
   $('#carNew', main).addEventListener('click', openCarouselModal);
   wireCarCards(main);

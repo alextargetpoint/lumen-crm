@@ -234,6 +234,14 @@ textarea { resize: vertical; min-height: 70px; }
   box-shadow: 0 6px 16px -6px rgba(37, 99, 235, .5);
 }
 .btn-accent:hover { background: #1D54D6; border-color: #1D54D6; box-shadow: 0 10px 26px -8px rgba(37, 99, 235, .65); }
+/* заметная CTA-кнопка — не сливается ни со светлым, ни с кобальтовым фоном (градиент + чёткая тень + светлый кант сверху) */
+.btn-cta {
+  background: linear-gradient(120deg, #2E6BFF 0%, #6A3CE0 100%);
+  border: 1px solid rgba(255, 255, 255, .18); color: #fff; font-weight: 700;
+  box-shadow: 0 10px 26px -8px rgba(74, 58, 224, .6), inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+.btn-cta:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 14px 32px -8px rgba(74, 58, 224, .72), inset 0 1px 0 rgba(255, 255, 255, .3); }
+.btn-cta svg { color: #fff; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--ink-3); display: inline-flex; align-items: center; gap: 5px; }
 .btn-ghost:hover { background: var(--bg-2); color: var(--ink); }
 /* страховка: у ic() нет атрибутов размера — любой svg в ghost-кнопке обязан иметь габарит из CSS */
