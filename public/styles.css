@@ -3092,3 +3092,28 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .fp-row:hover { background: var(--bg-2); }
 .fp-ava { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: linear-gradient(150deg, var(--accent), var(--accent-2, #5B2BD8)); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
 .fp-ava img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ============ Контроль посадочных мест (анти-фрод подписки) ============ */
+.seat-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.seat-kpi { background: var(--bg-2); border-radius: 10px; padding: 12px; text-align: center; }
+.seat-kpi b { display: block; font-size: 22px; font-weight: 800; color: var(--navy-900); }
+.seat-kpi i { font-size: 11px; color: var(--ink-3); font-style: normal; }
+.seat-kpi.bad b { color: var(--bad); }
+.seat-kpi.ok b { color: var(--ok); }
+.seat-finds { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.seat-find { display: flex; gap: 10px; align-items: flex-start; border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--stroke)); border-left: 3px solid var(--sc); border-radius: 10px; padding: 10px 12px; background: color-mix(in srgb, var(--sc) 5%, transparent); }
+.seat-find-ic { color: var(--sc); flex: none; }
+.seat-find-ic svg { width: 17px; height: 17px; }
+.seat-find-b b { display: block; font-size: 13px; color: var(--navy-900); font-weight: 650; }
+.seat-find-b span { font-size: 11.5px; color: var(--ink-3); }
+.seat-clean { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.seat-clean svg { width: 17px; height: 17px; flex: none; }
+.seat-sub-t { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 700; margin-bottom: 8px; }
+.seat-list { display: flex; flex-direction: column; gap: 2px; }
+.seat-row { display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-bottom: 1px solid var(--stroke-soft); font-size: 12.5px; }
+.seat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stroke); flex: none; }
+.seat-dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.seat-who { font-weight: 650; color: var(--navy-900); }
+.seat-meta { color: var(--ink-3); margin-left: 4px; }
+.seat-ago { margin-left: auto; color: var(--ink-3); font-size: 11px; }
+.seat-note { font-size: 11px; color: var(--ink-3); line-height: 1.5; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--stroke); }

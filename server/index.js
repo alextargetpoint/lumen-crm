@@ -371,11 +371,69 @@ function getSession(req) {
   if (!m) return null;
   return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
 }
+/* IP клиента (учитываем прокси Railway/Netlify) */
+function clientIp(req) {
+  const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return xf || (req.socket && req.socket.remoteAddress) || '';
+}
+/* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
+function uaFingerprint(ua) {
+  ua = String(ua || '');
+  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '—';
+  const br = /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /YaBrowser/.test(ua) ? 'Yandex' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '—';
+  return `${os} · ${br}`;
+}
+/* анти-фрод посадочных мест: пишем сигнал сессии (IP/устройство) в кольцевой лог, троттлим */
+function recordSeat(req, sid) {
+  try {
+    const db = store.get();
+    const s = db.settings.auth.sessions[sid]; if (!s) return;
+    const ip = clientIp(req), ua = req.headers['user-agent'] || '';
+    const changed = s.ip !== ip || s.ua !== ua;
+    s.ip = ip; s.ua = ua; s.lastSeen = Date.now();
+    if (changed || !s.lastSeatAt || (Date.now() - s.lastSeatAt) > 15 * 60e3) {
+      s.lastSeatAt = Date.now();
+      db.seatLog = db.seatLog || [];
+      db.seatLog.unshift({ at: Date.now(), sid: sid.slice(0, 8), who: s.role === 'owner' ? 'owner' : (s.brokerId || 'broker'), role: s.role || 'owner', ip, fp: uaFingerprint(ua) });
+      if (db.seatLog.length > 1500) db.seatLog.length = 1500;
+      store.save();
+    }
+  } catch (_) {}
+}
+/* сканер злоупотреблений подпиской: одно место — несколько брокеров, один аккаунт — много мест */
+function seatAudit(db) {
+  const now = Date.now(), WIN = 20 * 60e3, WEEK = 7 * 864e5;
+  const brokerName = (id) => id === 'owner' ? 'Владелец' : ((db.brokers.find(b => b.id === id) || {}).name || id);
+  /* активные сессии прямо сейчас (lastSeen в пределах окна) */
+  const active = Object.entries(db.settings.auth.sessions || {})
+    .map(([sid, s]) => ({ sid: sid.slice(0, 8), who: s.role === 'owner' ? 'owner' : (s.brokerId || 'broker'), role: s.role, ip: s.ip || '', fp: uaFingerprint(s.ua), lastSeen: s.lastSeen || s.at || 0 }))
+    .filter(x => x.lastSeen && (now - x.lastSeen) < WIN);
+  const findings = [];
+  /* 1) один IP — несколько разных аккаунтов одновременно */
+  const byIp = {};
+  active.forEach(x => { if (x.ip) (byIp[x.ip] = byIp[x.ip] || new Set()).add(x.who); });
+  for (const [ip, set] of Object.entries(byIp)) if (set.size >= 2) findings.push({ kind: 'ip_multi', severity: 'high', ip, who: [...set].map(brokerName), text: `${set.size} разных аккаунта работают с одного IP прямо сейчас` });
+  /* 2) один аккаунт — несколько IP одновременно (расшаренный доступ) */
+  const byWho = {};
+  active.forEach(x => { if (x.ip) (byWho[x.who] = byWho[x.who] || new Set()).add(x.ip); });
+  for (const [who, set] of Object.entries(byWho)) if (set.size >= 2) findings.push({ kind: 'acct_multi_ip', severity: 'high', who: [brokerName(who)], ips: [...set], text: `Аккаунт «${brokerName(who)}» активен с ${set.size} разных IP одновременно` });
+  /* 3) история за неделю: одно устройство (fp+ip) под несколькими аккаунтами */
+  const log = (db.seatLog || []).filter(e => (now - e.at) < WEEK);
+  const byDev = {};
+  log.forEach(e => { const key = e.ip + '|' + e.fp; (byDev[key] = byDev[key] || new Set()).add(e.who); });
+  for (const [key, set] of Object.entries(byDev)) if (set.size >= 2) {
+    const [ip, fp] = key.split('|');
+    if (!findings.some(f => f.kind === 'ip_multi' && f.ip === ip)) findings.push({ kind: 'dev_shared', severity: 'med', ip, fp, who: [...set].map(brokerName), text: `За неделю с одного устройства (${fp}) заходили ${set.size} аккаунта` });
+  }
+  const seats = Object.values(byWho).length;
+  return { active, findings, seats, brokersTotal: db.brokers.filter(b => b.active !== false).length, generatedAt: now };
+}
 /* роль сессии: owner (пароль агентства) | broker (личный PIN).
    previewAs: владелец может смотреть кабинет брокера — читаем как брокер, но помним, что реально owner. */
 function sessionRole(req) {
   const sid = getSession(req);
   if (!sid) return null;
+  recordSeat(req, sid);
   const s = store.get().settings.auth.sessions[sid];
   const realRole = s.role || 'owner';
   if (realRole === 'owner' && s.previewAs && store.get().brokers.some(b => b.id === s.previewAs)) {
@@ -1321,7 +1379,9 @@ const server = http.createServer(async (req, res) => {
         return json(res, 401, { error: 'wrong password' });
       }
       const sid = crypto.randomBytes(16).toString('hex');
+      sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
       db.settings.auth.sessions[sid] = sess;
+      recordSeat(req, sid);
       if (sess.role === 'broker') { const brName = (db.brokers.find(x => x.id === sess.brokerId) || {}).name; db.audit = db.audit || []; db.audit.unshift({ at: Date.now(), who: brName, role: 'broker', action: 'вход в систему' }); }
       const keys = Object.keys(db.settings.auth.sessions);
       if (keys.length > 20) delete db.settings.auth.sessions[keys[0]];
@@ -3185,6 +3245,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, leadView(db, keep));
     }
 
+    /* анти-фрод подписки: контроль посадочных мест (только владелец) */
+    if (p === '/api/security/seats' && req.method === 'GET') {
+      const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      return json(res, 200, seatAudit(db));
+    }
     if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
     if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));

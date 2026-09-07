@@ -195,7 +195,10 @@ function openPop(wrap, btn, pop) {
   POP_GUARD = Date.now();
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
-  Object.assign(pop.style, { position: 'fixed', zIndex: 400, minWidth: r.width + 'px', visibility: 'hidden' });
+  Object.assign(pop.style, { position: 'fixed', zIndex: 400, visibility: 'hidden' });
+  /* ширину по кнопке подгоняем ТОЛЬКО у select-дропдаунов (.cs-list). Календарю/пикеру времени это ломало
+     ширину (широкий якорь → огромный попап, перекрывал верхние кнопки) — им ширину задаёт их CSS. */
+  if (pop.classList.contains('cs-list')) pop.style.minWidth = r.width + 'px';
   pop.classList.add('show');
   const w = pop.offsetWidth, h = pop.offsetHeight;
   pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 12)) + 'px';
@@ -1316,6 +1319,28 @@ function openFeedPrivacy(onDone) {
     actions: [{ label: 'Готово', cls: 'btn-accent', onClick: (bd) => { FEED_AUD.ids = $$('[data-fpid]', bd).filter(x => x.checked).map(x => x.dataset.fpid); if (FEED_AUD.mode !== 'all' && !FEED_AUD.ids.length) FEED_AUD.mode = 'all'; onDone && onDone(); } }],
   });
   $$('[data-fpmode]', md).forEach(b => b.addEventListener('click', () => { FEED_AUD.mode = b.dataset.fpmode; $$('[data-fpmode]', md).forEach(x => x.classList.toggle('on', x === b)); $('#fpList', md).style.display = FEED_AUD.mode === 'all' ? 'none' : 'block'; }));
+}
+/* контроль посадочных мест (анти-фрод подписки) — рендер в #seatBody */
+async function loadSeats() {
+  const box = document.getElementById('seatBody'); if (!box) return;
+  box.innerHTML = 'Анализирую активность…'; box.className = 'muted';
+  let d; try { d = await api.get('/security/seats'); } catch (e) { box.innerHTML = 'Не удалось загрузить: ' + esc(e.message); return; }
+  const sevCol = { high: 'var(--bad)', med: '#B8860B', low: 'var(--ink-3)' };
+  const findings = (d.findings || []).map(f => `<div class="seat-find s-${f.severity}" style="--sc:${sevCol[f.severity] || 'var(--ink-3)'}">
+    <span class="seat-find-ic">${ic(f.severity === 'high' ? I.shield : I.eye)}</span>
+    <div class="seat-find-b"><b>${esc(f.text)}</b><span>${esc((f.who || []).join(', '))}${f.ip ? ' · IP ' + esc(f.ip) : ''}${f.fp ? ' · ' + esc(f.fp) : ''}${f.ips ? ' · ' + f.ips.map(esc).join(', ') : ''}</span></div>
+  </div>`).join('');
+  const active = (d.active || []).slice(0, 12).map(a => `<div class="seat-row"><span class="seat-dot ${(Date.now() - a.lastSeen) < 5 * 60e3 ? 'on' : ''}"></span><span class="seat-who">${esc(a.role === 'owner' ? 'Владелец' : ((STATE.brokers.find(b => b.id === a.who) || {}).name || a.who))}</span><span class="seat-meta">${esc(a.fp)} · ${esc(a.ip || '—')}</span><span class="seat-ago">${ago(a.lastSeen)}</span></div>`).join('');
+  box.className = '';
+  box.innerHTML = `
+    <div class="seat-sum">
+      <div class="seat-kpi"><b>${d.seats}</b><i>активных мест сейчас</i></div>
+      <div class="seat-kpi"><b>${d.brokersTotal}</b><i>сотрудников в команде</i></div>
+      <div class="seat-kpi ${(d.findings || []).length ? 'bad' : 'ok'}"><b>${(d.findings || []).length || '✓'}</b><i>${(d.findings || []).length ? 'сигналов риска' : 'нарушений нет'}</i></div>
+    </div>
+    ${findings ? `<div class="seat-finds">${findings}</div>` : '<div class="seat-clean">' + ic(I.check) + 'Подозрительной активности не обнаружено. Каждый вход — с ожидаемого места.</div>'}
+    ${active ? `<div class="seat-sub-t">Кто в системе сейчас</div><div class="seat-list">${active}</div>` : ''}
+    <div class="seat-note">Сигнал не блокирует вход автоматически — это подсказка владельцу. Массовый вход разных сотрудников с одного IP/устройства обычно означает передачу одного доступа на несколько человек в обход подписки.</div>`;
 }
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk, feedD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] }))]);
@@ -5802,8 +5827,13 @@ PAGES.agency = async (root) => {
           </div>
           <button class="btn" id="pwSave">Сменить пароль</button>
         </div>
+        ${(STATE.me && STATE.me.role === 'owner') ? `<div class="glass card mb" id="seatCard">
+          <div class="card-title">${ic(I.shield)}Контроль доступа<span class="sub">защита подписки: одно место — один сотрудник</span><button class="btn btn-sm" id="seatRefresh" style="margin-left:auto">${ic(I.refresh || I.spark)}Обновить</button></div>
+          <div id="seatBody" class="muted" style="font-size:12.5px;padding:6px 0">Анализирую активность…</div>
+        </div>` : ''}
       </div>
     </div>`;
+  if (STATE.me && STATE.me.role === 'owner') { loadSeats(); $('#seatRefresh', root)?.addEventListener('click', loadSeats); }
   $('#agLogoBtn').addEventListener('click', () => $('#agLogoFile').click());
   $('#agLogoFile').addEventListener('change', async (e) => {
     const f = e.target.files[0];
