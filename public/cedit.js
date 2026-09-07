@@ -98,7 +98,7 @@
 .cnote{font-size:11.5px;color:#9aa1b2;margin-top:6px;line-height:1.5}
 .cslide-empty{color:#9aa1b2;font-size:13px;text-align:center;padding:30px 10px;line-height:1.6}
 /* поповер (шрифты) */
-.cpop{position:fixed;z-index:950;background:#fff;color:#0B1220;border-radius:14px;box-shadow:0 22px 60px rgba(6,17,38,.32);border:1px solid #E7ECF3;padding:8px;min-width:250px;max-height:70vh;overflow:auto;font-family:Manrope,sans-serif;font-size:13.5px}
+.cpop{position:fixed;z-index:950;background:#fff;color:#0B1220;border-radius:14px;box-shadow:0 22px 60px rgba(6,17,38,.32);border:1px solid #E7ECF3;padding:9px;width:290px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;font-family:Manrope,sans-serif;font-size:13.5px}
 .cpop .srch{width:100%;border:1.5px solid #E1E8F4;border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px}
 .cpop .srch:focus{border-color:var(--cb)}
 .cpop .cseg{margin-bottom:6px}
