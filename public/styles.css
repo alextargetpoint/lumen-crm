@@ -3381,3 +3381,27 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-spot-run { position: relative; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
 .ov2-spot-chip { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border-radius: 20px; padding: 4px 11px; }
 @media (max-width: 620px) { .kpi-bento, .kpi-trend { grid-template-columns: 1fr; } .kpi-ed { grid-template-columns: 1fr 1fr; gap: 14px 0; } }
+
+/* ============ Первое касание: компоновка + эмулятор телефона ============ */
+.lc-ft2 { display: grid; grid-template-columns: 1fr 244px; gap: 18px; align-items: start; }
+.lc-ft-compose { min-width: 0; }
+.lc-ft-phone { display: flex; flex-direction: column; align-items: center; }
+.lc-ft-phone .iph-sm { width: 230px; }
+.lc-ft-phone .wa-note { align-self: flex-start; font-size: 11px; color: var(--ink-3); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+.lc-ft-phone .wa-note svg { width: 13px; height: 13px; }
+.wa-img { display: block; width: 100%; max-width: 190px; border-radius: 10px; margin-bottom: 4px; }
+.wa-ph { font-size: 12px; color: #7a8aa0; text-align: center; padding: 26px 16px; line-height: 1.5; }
+/* чипы персонализации */
+.lc-ft-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.lc-ftc-t { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.lc-ftc { font-size: 11.5px; font-weight: 600; color: var(--navy-900); background: color-mix(in srgb, var(--accent) 8%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--stroke)); border-radius: 20px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 5px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-ftc i { font-style: normal; color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.lc-ftc.muted { color: var(--ink-3); background: var(--bg-2); border-style: dashed; }
+.lc-ftc.muted svg { width: 13px; height: 13px; }
+/* вариант B */
+.lc-ft-varb { margin-top: 10px; border: 1px solid var(--stroke); border-radius: 12px; padding: 11px 13px; background: var(--bg-2); }
+.lc-ftvb-t { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin-bottom: 6px; }
+.lc-ftvb-t svg { width: 13px; height: 13px; color: var(--accent); }
+.lc-ftvb-t i { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--accent); }
+.lc-ftvb-x { font-size: 13px; line-height: 1.5; color: var(--ink); margin-bottom: 9px; }
+@media (max-width: 700px) { .lc-ft2 { grid-template-columns: 1fr; } .lc-ft-phone { order: -1; } .lc-ft-phone .iph-sm { width: 210px; } }
