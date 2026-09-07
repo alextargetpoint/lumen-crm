@@ -348,8 +348,8 @@ section[data-bid].sec-drag{outline:3px dashed rgba(29,52,216,.6);outline-offset:
   }
 
   /* ---------- палитра блоков ---------- */
-  const PALETTE = ['text', 'textimg', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta', 'proj'];
-  const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦' };
+  const PALETTE = ['proj', 'hero', 'amenities', 'guarantee', 'textimg', 'text', 'image', 'gallery', 'video', 'quote', 'stats', 'bignum', 'benefits', 'checklist', 'compare', 'timeline', 'steps', 'pricecards', 'team', 'faq', 'sep', 'cta'];
+  const PICONS = { text: '📄', textimg: '🗞', image: '🖼', gallery: '🎞', video: '🎬', quote: '❝', stats: '📊', bignum: '№', benefits: '💎', checklist: '✅', compare: '⚖️', timeline: '🗓', steps: '🧭', pricecards: '💳', team: '👥', faq: '❔', sep: '▬', cta: '📣', proj: '🏙', cover: '🏷', hello: '👋', why: '⭐', final: '✦', amenities: '🏊', hero: '🌅', guarantee: '🛡' };
   function openPalette(afterSec, x, y) {
     const items = PALETTE.filter((t) => P.types[t]).map((t) => `<div class="pi ptile" data-add="${t}"><i>${PICONS[t] || '▢'}</i><span>${TYPE(t).name}</span></div>`).join('');
     const el = openPop(`<div class="psec">Добавить блок</div><div class="pgrid">${items}</div>`, x, y);

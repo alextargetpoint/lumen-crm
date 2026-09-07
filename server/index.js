@@ -523,6 +523,9 @@ const PB_TYPES = {
   checklist: { name: 'Чек-лист', variants: ['single', 'cols'] },
   textimg: { name: 'Текст + фото', variants: ['imgright', 'imgleft'] },
   team: { name: 'Команда', variants: ['cards', 'strip'] },
+  amenities: { name: 'Инфраструктура', variants: ['grid', 'compact'] },
+  hero: { name: 'Фото-хиро', variants: ['dark', 'light'] },
+  guarantee: { name: 'Гарантии · доверие', variants: ['row', 'blue'] },
 };
 
 /* темы публичной подборки: полная смена палитры страницы */
@@ -552,6 +555,9 @@ function pbDefaults(t) {
     case 'checklist': return { title: 'Проверим за вас', bullets: ['Репутация застройщика и история сдач', 'Юридическая чистота юнита', 'Реальная аренда в районе, а не обещанная', 'Скрытые платежи и сервисные сборы'] };
     case 'textimg': return { title: 'Заголовок раздела', body: 'Пара абзацев текста рядом с фотографией — район, концепция проекта или история клиента.', img: '' };
     case 'team': return { title: 'Кто будет с вами на связи', items: [{ name: 'Ваш менеджер', role: 'подбор и переговоры' }, { name: 'Юрист', role: 'договор и проверка' }, { name: 'После сделки', role: 'аренда и управление' }] };
+    case 'amenities': return { title: 'Инфраструктура комплекса', items: [{ icon: '🏊', label: 'Бассейн-инфинити' }, { icon: '🏋️', label: 'Фитнес 24/7' }, { icon: '🏖️', label: 'Пляж в 5 минутах' }, { icon: '🛎️', label: 'Консьерж-сервис' }, { icon: '🅿️', label: 'Подземный паркинг' }, { icon: '🌳', label: 'Ландшафтный парк' }] };
+    case 'hero': return { img: '', heading: 'Место, где хочется остаться', sub: 'Локация, вид и стиль жизни — одним кадром.' };
+    case 'guarantee': return { title: 'Ваша сделка под защитой', items: [{ icon: '🛡', title: 'Юридическая проверка', text: 'Каждый объект — на чистоту и репутацию застройщика.' }, { icon: '📄', title: 'Официальный договор', text: 'SPA напрямую с застройщиком, все условия прозрачны.' }, { icon: '🤝', title: 'Сопровождение до ключей', text: 'Платежи, регистрация и передача — берём на себя.' }] };
     default: return {};
   }
 }
@@ -613,6 +619,9 @@ function sanitizeBlocks(raw) {
     if (b.t === 'timeline') putList('items', (x) => x && (x.when || x.title) ? { when: str(x.when, 80), title: str(x.title, 200), text: str(x.text, 500) } : null);
     if (b.t === 'pricecards') putList('items', (x) => x && (x.name || x.price) ? { name: str(x.name, 120), price: str(x.price, 80), text: str(x.text, 600) } : null);
     if (b.t === 'team') putList('items', (x) => x && (x.name || x.role) ? { name: str(x.name, 120), role: str(x.role, 200) } : null);
+    if (b.t === 'amenities') putList('items', (x) => x && (x.icon || x.label) ? { icon: str(x.icon, 8), label: str(x.label, 120) } : null);
+    if (b.t === 'guarantee') putList('items', (x) => x && (x.icon || x.title || x.text) ? { icon: str(x.icon, 8), title: str(x.title, 200), text: str(x.text, 600) } : null);
+    if (b.t === 'hero') { put('heading', 200); put('sub', 400); }
     if (b.t === 'bignum') { put('v', 60); put('k', 300); }
     if (b.t === 'hello' || b.t === 'why' || b.t === 'checklist') putList('bullets', (x) => str(x, 400).trim() || null);
     if (b.t === 'cta') { const h = str(d.href, 500).trim(); if (h && /^(https?:\/\/|mailto:|tel:)/.test(h)) nb.data.href = h; }
@@ -2562,6 +2571,37 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
   <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
 </section>`;
         },
+        amenities(b) {
+          const items = b.data.items || [];
+          return `<section class="pg">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Инфраструктура')}</h2>
+  <div class="amn ${b.v === 'compact' ? 'cmp' : ''}" data-plist="${b.id}:items">
+    ${items.map((it, i2) => `<div class="amn-i"><span class="amn-ic">${esc(it.icon || '•')}</span><span class="amn-l"${be(b.id, 'items', i2 + ':label')}>${esc(it.label || '')}</span></div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
+        hero(b) {
+          const d = b.data;
+          const bg = d.img ? `background-image:linear-gradient(180deg,rgba(6,12,40,.15),rgba(6,12,40,.72)),url('${esc(abs(d.img))}')` : '';
+          return `<section class="pg heroblk ${b.v === 'light' ? 'lt' : ''} ${d.img ? 'has' : ''}" style="${bg}">
+    ${isEdit ? `<div class="imghot" data-bimg="${b.id}:img" data-bival="${esc(d.img || '')}">🖼 ${d.img ? 'заменить фон' : 'фоновое фото'}</div>` : ''}
+    <div class="hero-in">
+      <h2 class="hero-h"${be(b.id, 'heading')}>${esc(d.heading || '')}</h2>
+      <p class="hero-s"${be(b.id, 'sub')}>${esc(d.sub || '')}</p>
+    </div>
+</section>`;
+        },
+        guarantee(b) {
+          const items = b.data.items || [];
+          return `<section class="pg ${b.v === 'blue' ? 'blue' : ''}">
+  <h2 class="ph2"${be(b.id, 'title')}>${esc(b.data.title || 'Ваша сделка под защитой')}</h2>
+  <div class="grt" data-plist="${b.id}:items">
+    ${items.map((it, i2) => `<div class="grt-i"><span class="grt-ic">${esc(it.icon || '✓')}</span><b${be(b.id, 'items', i2 + ':title')}>${esc(it.title || '')}</b><span class="grt-t"${be(b.id, 'items', i2 + ':text')}>${esc(it.text || '')}</span></div>`).join('')}
+  </div>
+  <div class="pnum">${String(++pageNo + 1).padStart(2, '0')}</div>
+</section>`;
+        },
         cta(b) {
           const d = b.data;
           const waHref = d.href || `https://wa.me/${(mgr.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('Здравствуйте! По подборке «' + c.title + '» интересует проект №')}`;
@@ -2827,6 +2867,30 @@ h2:not(.hi){font-family:var(--disp)}
 .pg{padding:52px 44px 60px}
 .ph3{padding-bottom:12px}
 .intro,.hello p{font-size:15.5px;line-height:1.72}
+/* блок: инфраструктура */
+.amn{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:24px}
+.amn.cmp{grid-template-columns:repeat(3,1fr);gap:12px}
+.amn-i{display:flex;align-items:center;gap:13px;padding:15px 16px;background:var(--bg);border-radius:14px;border:1px solid var(--line)}
+.amn.cmp .amn-i{flex-direction:column;text-align:center;gap:8px;padding:18px 12px}
+.amn-ic{font-size:24px;line-height:1;width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,var(--paper));border-radius:12px}
+.amn.cmp .amn-ic{width:52px;height:52px;flex:0 0 52px}
+.amn-l{font-size:14px;font-weight:600;color:var(--ink);min-width:0}
+/* блок: фото-хиро */
+.heroblk{min-height:64vh;display:flex;align-items:flex-end;padding:0;background-size:cover;background-position:center;color:#fff}
+.heroblk:not(.has){background:linear-gradient(155deg,color-mix(in srgb,var(--blue) 80%,#fff),color-mix(in srgb,var(--blue) 55%,#000))}
+.heroblk.lt:not(.has){background:var(--bg);color:var(--ink)}
+.hero-in{padding:48px 44px}
+.hero-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:40px;line-height:1.08;letter-spacing:-.02em}
+.hero-s{margin-top:14px;font-size:17px;line-height:1.5;max-width:520px;opacity:.92}
+/* блок: гарантии */
+.grt{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+.blue .grt-i{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+.grt-i{padding:20px 18px;background:var(--bg);border-radius:16px;border:1px solid var(--line)}
+.grt-ic{font-size:26px;line-height:1;display:block;margin-bottom:12px}
+.grt-i b{font-size:15.5px;font-weight:700;display:block;margin-bottom:6px}
+.grt-t{font-size:13px;line-height:1.55;color:var(--mut)}
+.blue .grt-t{color:rgba(255,255,255,.8)}
+@media(max-width:560px){.amn,.amn.cmp,.grt{grid-template-columns:1fr}.hero-h{font-size:28px}.hero-in{padding:32px 24px}.heroblk{min-height:52vh}}
 @media(max-width:560px){.pg{padding:32px 22px 40px}}
 </style></head><body>${isEdit ? `<div id="peload"><div class="plx"><svg viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg><b>LUMEN</b><i>собираем страницу…</i></div></div><script>(function(){try{var t=+sessionStorage.getItem('pe_loading')||0;if(!t||Date.now()-t>15000){document.getElementById('peload').style.display='none';sessionStorage.removeItem('pe_loading');}}catch(e){}})()</${'script'}>` : ''}<div class="book">
 ${bodyHtml}
@@ -2882,7 +2946,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=20"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=21"></script>` : ''}
 </body></html>`);
       return;
     }
