@@ -1825,7 +1825,9 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .ag-id-main { flex: 1; min-width: 0; padding-bottom: 4px; }
 .ag-name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ag-h { font-family: var(--font-display); font-optical-sizing: auto; font-weight: 600; font-size: 26px; letter-spacing: -.02em; color: var(--navy-900); }
-.ag-edition { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--blue-100); border: 1px solid #C3D6FA; border-radius: 20px; padding: 3px 11px; }
+.ag-edition { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--blue-100); border: 1px solid #C3D6FA; border-radius: 20px; padding: 3px 11px; }
+.ag-edition svg { width: 13px; height: 13px; }
+.chip-t svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; }
 .ag-tag { font-size: 13.5px; color: var(--ink-3); margin-top: 4px; }
 .ag-dirs { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
 .ag-dir { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 11px; }

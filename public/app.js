@@ -4109,7 +4109,7 @@ PAGES.agency = async (root) => {
       <div class="ag-ident">
         <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.55">`}</div>
         <div class="ag-id-main">
-          <div class="ag-name-row"><span class="ag-h">${esc(s.agency.name)}</span><span class="ag-edition">${edition === 'solo' ? '👤 Solo' : '🏢 Агентство'}</span></div>
+          <div class="ag-name-row"><span class="ag-h">${esc(s.agency.name)}</span><span class="ag-edition">${ic(edition === 'solo' ? I.user : I.building)}${edition === 'solo' ? 'Solo' : 'Агентство'}</span></div>
           <div class="ag-tag">${(s.agency.manager || {}).name ? 'Менеджер — ' + esc(s.agency.manager.name) : 'Агентство недвижимости'}${(s.agency.manager || {}).phone ? ' · ' + esc(s.agency.manager.phone) : ''}</div>
           <div class="ag-dirs">${geos.map(g => `<span class="ag-dir">${ic(I.pin || I.building)}${esc(s.geoNames[g] || g)}</span>`).join('')}</div>
         </div>
@@ -4126,8 +4126,8 @@ PAGES.agency = async (root) => {
           <div class="card-title">${ic(I.building)}Идентификация бренда<span class="sub">лого, название, формат</span></div>
           <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Формат работы</label>
             <div class="chips-row">
-              <button type="button" class="chip-t ${edition === 'agency' ? 'on' : ''}" data-edition="agency">🏢 Агентство · команда брокеров</button>
-              <button type="button" class="chip-t ${edition === 'solo' ? 'on' : ''}" data-edition="solo">👤 Solo · работаю один</button>
+              <button type="button" class="chip-t ${edition === 'agency' ? 'on' : ''}" data-edition="agency">${ic(I.building)}Агентство · команда брокеров</button>
+              <button type="button" class="chip-t ${edition === 'solo' ? 'on' : ''}" data-edition="solo">${ic(I.user)}Solo · работаю один</button>
             </div>
             <div class="muted" style="font-size:11px;margin-top:6px">Solo прячет команду, распределение и SLA — все лиды ведёте вы, «передача» становится «взять в работу»</div>
           </div>
