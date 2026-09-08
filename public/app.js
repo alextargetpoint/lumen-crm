@@ -988,12 +988,12 @@ function ovSetPal(k, p) { const m = ovGetPals(); if (!p || p === 'cobalt') delet
 const OV_PAL = { cobalt: ['#2563EB', '#5B2BD8', 'Кобальт'], emerald: ['#0E9E6A', '#12855F', 'Изумруд'], violet: ['#7C3AED', '#5B2BD8', 'Фиолет'], amber: ['#D9982B', '#C9721C', 'Янтарь'], rose: ['#E1467C', '#C22E6A', 'Роза'], graphite: ['#475569', '#1E293B', 'Графит'] };
 /* готовые паки оформления всей обзорной страницы: раскладка + форматы + фон + палитра */
 const OV_PACKS = {
-  focus: { name: 'Фокус', desc: 'Минимум блоков, чистый вид', layout: ['attention', 'kpi', 'tasks', 'meetings'], vars: { kpi: 'bento' }, skins: {}, pals: {} },
-  command: { name: 'Командный центр', desc: 'Насыщенно, для владельца', layout: ['kpi', 'attention', 'funnel', 'leaders', 'hotleads', 'goal', 'tasks', 'meetings'], vars: { funnel: 'steps', leaders: 'spotlight', goal: 'gauge', kpi: 'bento' }, skins: { kpi: 'gradient', leaders: 'tint', goal: 'accent' }, pals: {} },
-  data: { name: 'Данные', desc: 'Плотно, цифры и графики', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'trend', funnel: 'donut', goal: 'stat', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
-  studio: { name: 'Студия', desc: 'Светлое + акцентные тёмные плитки', layout: ['kpi', 'attention', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { kpi: 'gradient', goal: 'dark', leaders: 'tint' }, pals: { goal: 'violet' } },
-  premium: { name: 'Тёмный кокпит', desc: 'Единый тёмный вид с акцентом', layout: ['kpi', 'attention', 'funnel', 'leaders', 'goal', 'ideas', 'meetings'], vars: { kpi: 'bento', leaders: 'spotlight', goal: 'gauge', funnel: 'ribbon' }, skins: { kpi: 'gradient', attention: 'midnight', leaders: 'dark', funnel: 'midnight', goal: 'dark', ideas: 'dark', meetings: 'dark' }, pals: {} },
-  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['kpi', 'ideas', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'editorial', hotleads: 'cards' }, skins: { ideas: 'accent' }, pals: { ideas: 'violet' } },
+  focus: { name: 'Фокус', desc: 'Крупный график, минимум блоков', layout: ['kpi', 'attention', 'tasks', 'meetings'], vars: { kpi: 'chart' }, skins: {}, pals: {} },
+  command: { name: 'Командный центр', desc: 'Графика + доска лидеров', layout: ['kpi', 'attention', 'funnel', 'leaders', 'goal', 'hotleads', 'tasks', 'meetings'], vars: { kpi: 'chart', funnel: 'donut', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { goal: 'tint' }, pals: {} },
+  data: { name: 'Данные', desc: 'Максимум графиков', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'chart', funnel: 'donut', goal: 'gauge', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
+  studio: { name: 'Студия', desc: 'Светлое + одна тёмная плитка', layout: ['kpi', 'attention', 'funnel', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'chart', funnel: 'donut', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { goal: 'dark' }, pals: { goal: 'violet' } },
+  mix: { name: 'Тёмный микс', desc: 'Тёмные и светлые плитки вперемешку', layout: ['kpi', 'attention', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'chart', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { kpi: 'dark', leaders: 'dark', goal: 'midnight' }, pals: {} },
+  content: { name: 'Контент', desc: 'Идеи и рост', layout: ['kpi', 'ideas', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'chart', hotleads: 'cards' }, skins: { ideas: 'dark' }, pals: { ideas: 'violet' } },
 };
 function ovApplyPack(id) {
   const p = OV_PACKS[id]; if (!p) return;
@@ -1009,17 +1009,9 @@ function ovApplyPack(id) {
 let _gradSeq = 0;
 /* уникальный id для SVG-градиента (нельзя переиспользовать между инстансами) */
 function gradId() { return 'g' + (_gradSeq++); }
-/* число с count-up анимацией: <span class="cup" data-to="N" data-suf="%">0</span> */
-function cup(n, suf) { return `<span class="cup" data-to="${n}" ${suf ? `data-suf="${suf}"` : ''}>0${suf || ''}</span>`; }
-function ovAnimateCounts(root) {
-  root.querySelectorAll('.cup').forEach(elm => {
-    const to = parseFloat(elm.dataset.to) || 0, suf = elm.dataset.suf || '';
-    if (to <= 0) { elm.textContent = '0' + suf; return; }
-    const t0 = performance.now(), dur = 700;
-    const step = (t) => { const p = Math.min(1, (t - t0) / dur); const e = 1 - Math.pow(1 - p, 3); elm.textContent = Math.round(to * e) + suf; if (p < 1) requestAnimationFrame(step); };
-    elm.textContent = '0' + suf; requestAnimationFrame(step);
-  });
-}
+/* число — статично (без count-up: авто-рефреш обзора проигрывал анимацию каждые ~10с) */
+function cup(n, suf) { return `<span class="cup">${n}${suf || ''}</span>`; }
+function ovAnimateCounts() { /* no-op: числа статичны */ }
 /* премиум-празднование выполнения задачи: кольцо-рябь + разлёт частиц над галочкой */
 function celebrateCheck(el) {
   if (!el) return;
@@ -1046,6 +1038,24 @@ function sparkSvg(pts, opts = {}) {
   const gid = gradId();
   return `<svg class="ov-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#${gid})"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
+/* крупный сглаженный area-chart с градиентной заливкой (главная «графика» виджетов) */
+function areaChart(pts, opts = {}) {
+  const w = opts.w || 260, h = opts.h || 72, pad = 3;
+  const max = Math.max(...pts, 1), min = Math.min(...pts, 0), rng = (max - min) || 1;
+  const X = (i) => (i / (pts.length - 1)) * w;
+  const Y = (v) => h - pad - ((v - min) / rng) * (h - pad * 2 - 4);
+  const P = pts.map((v, i) => [X(i), Y(v)]);
+  let d = `M ${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const area = d + ` L ${w} ${h} L 0 ${h} Z`;
+  const gid = gradId(), last = P[P.length - 1];
+  return `<svg class="ov-area" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".34"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#${gid})"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.4" fill="var(--accent)" vector-effect="non-scaling-stroke"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="7" fill="var(--accent)" opacity=".18"/></svg>`;
+}
 /* дельта-чип ▲/▼ с процентом */
 function deltaChip(cur, prev) {
   if (prev == null) return '';
@@ -1071,7 +1081,7 @@ function gaugeSvg(pct) {
 
 /* реестр виджетов обзора: key → { name, icon, full, render(ctx, variant)→html } */
 const OV_W = {
-  kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, variants: [['tiles', 'Плитки'], ['bento', 'Бенто'], ['trend', 'Тренд'], ['editorial', 'Крупно']], render: (c, v) => {
+  kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, variants: [['chart', 'График'], ['tiles', 'Плитки'], ['bento', 'Бенто'], ['editorial', 'Крупно']], render: (c, v) => {
     const f = c.f, an = c.an, leads = c.leads || [];
     const cards = [
       { go: 'funnel', ic: I.plus, v: f.new + f.touch, k: 'Новые лиды', s: 'касание ≤ 1 мин' },
@@ -1081,6 +1091,7 @@ const OV_W = {
     ];
     const d14 = leadsByDay(leads, 14);
     const wkNow = d14.slice(7).reduce((a, b) => a + b, 0), wkPrev = d14.slice(0, 7).reduce((a, b) => a + b, 0);
+    if (!v || v === 'default') v = 'chart'; /* по умолчанию — графичный формат */
     /* БЕНТО: асимметрия — крупная плитка с мешем + спарклайн, три компактных */
     if (v === 'bento') {
       const [m, ...rest] = cards;
@@ -1095,12 +1106,15 @@ const OV_W = {
         <div class="kbn-side">${rest.map(x => `<button class="kbn-cell" data-ovgo="${x.go}"><span class="kbn-c-ic">${ic(x.ic)}</span><span class="kbn-c-num">${cup(x.v)}</span><span class="kbn-c-lbl">${x.k}</span></button>`).join('')}</div>
       </div>`;
     }
-    /* ТРЕНД: аналитический ряд — крупный спарклайн-герой + компактные метрики с дельтами */
-    if (v === 'trend') {
-      const dConv = null;
-      return `<div class="kpi-trend">
-        <button class="kt-hero" data-ovgo="funnel"><div class="kt-hero-hd"><span class="kt-lbl">Приток лидов · 14 дней</span><span class="kt-big">${cup(wkNow)}<i>за неделю</i></span>${deltaChip(wkNow, wkPrev)}</div><div class="kt-spark">${sparkSvg(d14, { w: 260, h: 56 })}</div></button>
-        <div class="kt-rows">${cards.slice(1).map(x => `<button class="kt-row" data-ovgo="${x.go}"><span class="kt-r-k">${x.k}</span><span class="kt-r-v">${cup(x.v)}</span></button>`).join('')}</div>
+    /* ГРАФИК: крупный area-chart притока лидов — главная графика, минимум мелких цифр */
+    if (v === 'chart') {
+      const [m, ...rest] = cards;
+      return `<div class="kpi-chart">
+        <div class="kc-top">
+          <div class="kc-hd"><span class="kc-lbl">${m.k} · 14 дней</span><span class="kc-num">${cup(wkNow)}<em>${deltaChip(wkNow, wkPrev)}</em></span><span class="kc-sub">${m.v} всего в работе</span></div>
+          <div class="kc-area" data-ovgo="funnel">${areaChart(d14, { w: 300, h: 92 })}</div>
+        </div>
+        <div class="kc-chips">${rest.map(x => `<button class="kc-chip" data-ovgo="${x.go}"><span class="kc-chip-ic">${ic(x.ic)}</span><span class="kc-chip-b"><b>${cup(x.v)}</b><i>${x.k}</i></span></button>`).join('')}</div>
       </div>`;
     }
     /* КРУПНО (editorial): огромные числа, волосяные линии, без иконок */
@@ -1689,14 +1703,16 @@ function openWidgetStyle(k, onChange) {
 /* галерея готовых паков всей обзорной страницы */
 /* реалистичные мини-мокапы паков — чтобы по превью было видно РАЗНИЦУ */
 function ovPackPreview(id) {
-  const mspark = (pts) => { const w = 60, h = 16, mx = Math.max(...pts), pl = pts.map((v, i) => `${(i / (pts.length - 1) * w).toFixed(0)},${(h - v / mx * (h - 2)).toFixed(0)}`).join(' '); return `<svg class="opv-spk" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pl}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`; };
+  const marea = (pts) => { const w = 64, h = 26, mx = Math.max(...pts), pl = pts.map((v, i) => `${(i / (pts.length - 1) * w).toFixed(1)},${(h - 2 - v / mx * (h - 6)).toFixed(1)}`); const line = pl.join(' '); return `<svg class="opv-area" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polygon points="0,${h} ${line} ${w},${h}" fill="currentColor" opacity=".16"/><polyline points="${line}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`; };
   const donut = `<svg class="opv-donut" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--stroke)" stroke-width="6"/><circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" stroke-width="6" stroke-dasharray="52 88" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg>`;
-  if (id === 'focus') return `<div class="opv opv-focus"><div class="opv-big"><span class="opv-n">42</span>${mspark([3, 5, 4, 7, 6, 9, 8])}</div><div class="opv-col"><div class="opv-s"></div><div class="opv-s"></div></div></div>`;
-  if (id === 'command') return `<div class="opv opv-command"><div class="opv-champ"><span class="opv-av"></span><span class="opv-avl"></span></div><div class="opv-steps"><i style="height:60%"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:95%"></i></div><div class="opv-grid4"><span></span><span></span><span></span><span></span></div></div>`;
-  if (id === 'data') return `<div class="opv opv-data"><div class="opv-dcell">${donut}</div><div class="opv-col2"><div class="opv-dcell tall">${mspark([2, 6, 3, 8, 5, 9, 7, 10])}</div><div class="opv-bars"><i style="width:80%"></i><i style="width:55%"></i><i style="width:35%"></i></div></div></div>`;
-  if (id === 'studio') return `<div class="opv opv-studio"><div class="opv-grad"><span class="opv-glow light"></span><span class="opv-n light">42</span>${mspark([3, 5, 4, 7, 6, 9, 8])}</div><div class="opv-col"><div class="opv-dark sm"></div><div class="opv-s"></div></div></div>`;
-  if (id === 'premium') return `<div class="opv opv-premium"><div class="opv-dark big"><span class="opv-glow"></span><span class="opv-n light">42</span></div><div class="opv-col"><div class="opv-dark sm"></div><div class="opv-dark sm"></div></div></div>`;
-  if (id === 'content') return `<div class="opv opv-content"><div class="opv-idea"><span class="opv-tag"></span><span class="opv-line"></span><span class="opv-line w2"></span><span class="opv-line w3"></span></div><div class="opv-col"><div class="opv-row"></div><div class="opv-row"></div><div class="opv-row"></div></div></div>`;
+  const gauge = `<svg class="opv-gaug" viewBox="0 0 40 24"><path d="M4 22 A16 16 0 0 1 36 22" fill="none" stroke="var(--stroke)" stroke-width="5" stroke-linecap="round"/><path d="M4 22 A16 16 0 0 1 30 8" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg>`;
+  const chartCard = (cls) => `<div class="opv-chart ${cls || ''}"><span class="opv-n ${/dark|grad/.test(cls || '') ? 'light' : ''}">42</span>${marea([3, 5, 4, 7, 6, 9, 7, 10])}</div>`;
+  if (id === 'focus') return `<div class="opv">${chartCard('wide')}<div class="opv-col"><div class="opv-s"></div><div class="opv-s"></div></div></div>`;
+  if (id === 'command') return `<div class="opv opv-command">${chartCard('')}<div class="opv-col"><div class="opv-champ"><span class="opv-av"></span></div><div class="opv-dcell mini">${gauge}</div></div></div>`;
+  if (id === 'data') return `<div class="opv opv-data"><div class="opv-dcell">${donut}</div><div class="opv-col2">${chartCard('flat')}<div class="opv-bars"><i style="width:80%"></i><i style="width:55%"></i><i style="width:35%"></i></div></div></div>`;
+  if (id === 'studio') return `<div class="opv">${chartCard('')}<div class="opv-col"><div class="opv-dark sm"><span class="opv-gaug-w">${gauge}</span></div><div class="opv-s"></div></div></div>`;
+  if (id === 'mix') return `<div class="opv">${chartCard('dark')}<div class="opv-col"><div class="opv-s"></div><div class="opv-dark sm"></div></div></div>`;
+  if (id === 'content') return `<div class="opv opv-content">${chartCard('')}<div class="opv-col"><div class="opv-idea"><span class="opv-tag"></span><span class="opv-line"></span><span class="opv-line w2"></span></div></div></div>`;
   return '';
 }
 function openOvPacks(onChange) {

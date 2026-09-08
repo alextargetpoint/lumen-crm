@@ -3497,3 +3497,40 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .opv-studio .opv-grad .opv-spk { color: rgba(255,255,255,.9); }
 .opv-studio .opv-s { flex: 1; background: #fff; border: 1px solid #DCE6FB; border-radius: 8px; }
 .opv-glow.light { background: radial-gradient(circle, rgba(255,255,255,.5), transparent 70%); }
+
+/* ============ KPI «График» (графика вперёд, минимум цифр) ============ */
+.ov-area { width: 100%; height: 100%; display: block; }
+.kpi-chart { display: flex; flex-direction: column; gap: 13px; }
+.kc-top { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 18px; align-items: center; }
+.kc-lbl { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+.kc-num { display: block; font-size: 42px; font-weight: 800; color: var(--navy-900); line-height: 1; letter-spacing: -1.5px; margin: 5px 0 3px; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 8px; }
+.kc-num em { font-style: normal; }
+.kc-sub { font-size: 11.5px; color: var(--ink-3); }
+.kc-area { height: 96px; min-width: 0; cursor: pointer; }
+.kc-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kc-chip { display: flex; align-items: center; gap: 9px; border: 1px solid var(--stroke); border-radius: 13px; padding: 9px 12px; background: var(--card); cursor: pointer; text-align: left; transition: border-color .15s, transform .15s; }
+.kc-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+.kc-chip-ic { width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); display: grid; place-items: center; flex: none; }
+.kc-chip-ic svg { width: 15px; height: 15px; }
+.kc-chip-b b { font-size: 19px; font-weight: 800; color: var(--navy-900); display: block; line-height: 1; font-variant-numeric: tabular-nums; }
+.kc-chip-b i { font-size: 10.5px; color: var(--ink-3); font-style: normal; }
+@media (max-width: 560px) { .kc-top { grid-template-columns: 1fr; } .kc-chips { grid-template-columns: 1fr; } }
+/* глубокий, гармоничный градиент-скин (был неоново-синий, конфликтовал с тёмными) */
+.ov-w.ov-skin-gradient .ov-w-body { background: linear-gradient(150deg, #1E3A8A 0%, #3B2E7E 55%, #4C2A6E 100%); box-shadow: 0 16px 40px -18px rgba(30,58,138,.55); }
+/* ============ Обновлённые мини-мокапы паков (графика вперёд) ============ */
+.pk-focus .ov2-pack-prev, .pk-command .ov2-pack-prev, .pk-content .ov2-pack-prev { background: linear-gradient(160deg, #EEF3FF, #F7F9FE); }
+.pk-data .ov2-pack-prev { background: linear-gradient(160deg, #E9F7F1, #EAF2FF); }
+.pk-studio .ov2-pack-prev { background: linear-gradient(160deg, #EEF2FF, #F6F4FE); }
+.pk-mix .ov2-pack-prev { background: linear-gradient(160deg, #E7ECFB, #EEE9FA); }
+.opv-chart { flex: 1.5; background: #fff; border: 1px solid #DCE6FB; border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; color: #2563EB; box-shadow: 0 4px 12px -8px rgba(37,99,235,.45); overflow: hidden; }
+.opv-chart.wide { flex: 1.9; }
+.opv-chart.flat { flex: none; height: 42px; padding: 6px 9px; }
+.opv-chart.dark { background: linear-gradient(155deg, #12274F, #0B1730); border-color: rgba(122,158,255,.2); color: #6FA0FF; }
+.opv-chart.grad { background: linear-gradient(150deg, #1E3A8A, #4C2A6E); border: none; color: rgba(255,255,255,.85); }
+.opv-area { width: 100%; height: 26px; margin-top: 4px; }
+.opv-chart .opv-n { color: #16223B; }
+.opv-chart.dark .opv-n, .opv-chart.grad .opv-n { color: #fff; }
+.opv-gaug { width: 40px; height: 24px; color: #7C3AED; }
+.opv-gaug-w { color: #9DB8FF; display: block; }
+.opv-dcell.mini { flex: none; height: 34px; }
+.opv-command .opv-champ { flex: none; height: 46px; }
