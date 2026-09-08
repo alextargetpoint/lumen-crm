@@ -898,7 +898,7 @@ const CAR_LAYOUTS = [
 const CAR_BG_ROT = ['grad:glow', 'dots', 'dark', 'grad:sheen', 'grid', 'grad:aurora', 'dark', 'diag', 'grad:dusk', 'waves', ''];
 function stylePass(slides, theme) {
   const darkBody = theme && theme.body ? theme.body : '#0A1833';
-  let li = 1, bi = 0, prevBg = 'cover';   /* старт с 1 — первый нарратив не повторяет обложку (bottom/left/l) */
+  let li = 1, bi = 0, prevBg = 'cover', framed = false;   /* старт с 1 — первый нарратив не повторяет обложку (bottom/left/l) */
   slides.forEach((s, i) => {
     const isCover = i === 0;
     const isCTA = i === slides.length - 1;
@@ -918,6 +918,12 @@ function stylePass(slides, theme) {
     if (!isMode && !hasPhoto && !isCover && !isCTA) {
       const L = CAR_LAYOUTS[li % CAR_LAYOUTS.length]; li++;
       s.pos = L.pos; s.align = L.align; s.size = L.size;
+      /* декоративная рамка-уголки на ОДИН «голый» текстовый слайд — чтобы не был пустым */
+      if (!framed && li >= 2 && !(s.layers && s.layers.length)) {
+        const dark = s.bgc || (theme && theme.dark);
+        s.layers = [{ t: 'frame', frame: 'corners', color: dark ? '#FFFFFF' : (theme && theme.blue) || '#2563EB' }];
+        framed = true;
+      }
     }
     if (isCTA && !hasPhoto) { s.pos = 'center'; s.align = 'center'; s.size = 'l'; }
   });
@@ -977,12 +983,20 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
   /* обложка — первый рендер (иначе первый интерьер) */
   let cover = renders[0] || galleryPool0[0] || null, usedRender = 0;
   if (cover && out[0]) { out[0] = Object.assign({}, out[0], { bg: cover, pos: 'bottom', size: 'l' }); usedRender = renders[0] ? 1 : 0; }
-  /* РАЗДАЁМ ещё 1-2 рендера как полноэкранный фон на смысловые слайды — фото по всей колоде, не только обложка */
+  /* Живые рендеры НЕ только на обложку: контентные слайды (удобства/план/цифры) тоже на реальном фото —
+     иначе голый текст выглядит бедно. Приоритет фото-фона: сначала rich-контент, потом часть нарратива. */
   const spreadRenders = renders.slice(usedRender);
   let sr = 0;
-  for (let idx = 2; idx < out.length - 1 && sr < 2 && spreadRenders.length - sr > 0; idx += 2) {
-    const s = out[idx];
-    if (s && !s.mode && !s.bg && !s.bgv) { out[idx] = Object.assign({}, s, { bg: spreadRenders[sr], pos: sr % 2 ? 'top' : 'bottom', size: 'l' }); sr++; }
+  const photoTargets = [];
+  const last = out.length - 1;
+  out.forEach((s, idx) => { if (idx > 0 && idx < last && (s.mode === 'amenities' || s.mode === 'steps' || s.mode === 'stats')) photoTargets.push(idx); });
+  out.forEach((s, idx) => { if (idx > 1 && idx < last && !s.mode && !s.bg && !s.bgv && idx % 2 === 0) photoTargets.push(idx); });
+  for (const idx of photoTargets) {
+    if (sr >= spreadRenders.length) break;
+    const s = out[idx]; if (s.bg || s.bgv) continue;
+    out[idx] = Object.assign({}, s, { bg: spreadRenders[sr] });
+    if (!s.mode) { out[idx].pos = sr % 2 ? 'top' : 'bottom'; out[idx].size = 'l'; }
+    sr++;
   }
   usedRender += sr;
   const inserts = [];
@@ -4241,7 +4255,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
         const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
         const hasGrad = !hasVid && !hasBg && !hasColor && !hasPat && !!s.grad;
-        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : ''].filter(Boolean).join(' ');
+        const scHeavy = (hasBg || hasVid) && !!s.mode;   /* контент (иконки/цифры) поверх фото — усиленный скрим для читаемости */
+        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
         return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
@@ -4285,6 +4300,7 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
 .slide .s-in{position:relative;z-index:1}
+.slide.sc-heavy::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,22,.52),rgba(8,12,22,.74));z-index:0}
 /* слои: фигуры/стикеры/фото/текст */
 .s-lyr{position:absolute}
 .s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
