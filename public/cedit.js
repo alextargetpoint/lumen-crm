@@ -314,7 +314,7 @@ body.cpanel-on{padding-right:308px!important}
     if (act === 'recompose') {   /* Студия: другая композиция слайда (цикл грамматик на сцен-графе) */
       flash('Другая композиция…', 0);
       (async () => {
-        try { const r = await fetch(`/api/studio/regen-slide?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cid: P.cid, idx: i }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash('Композиция: ' + j.grammar, 1500); await liveRefresh(); } catch (e) { flash('Не вышло: ' + e.message); }
+        try { const r = await fetch(`/api/studio/regen-slide?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cid: P.cid, idx: i }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash('Композиция: ' + j.grammar, 1500); await liveRefresh(); try { recordHist(serialize()); } catch (e2) {} } catch (e) { flash('Не вышло: ' + e.message); }
       })();
       return;
     }
