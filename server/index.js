@@ -702,6 +702,14 @@ const FONT_LIB = {
   comicrelief:{ name: 'Comic Relief',    cat: 'hand',    gf: 'family=Comic+Relief:wght@400;700', fam: "'Comic Relief',cursive" },
 };
 
+/* Шрифты для ПОДБОРОК: комбо-пресеты (disp+body) + ВЕСЬ FONT_LIB (33 дисплей-шрифта, тело — Manrope).
+   Так подборки получают ту же полную палитру шрифтов, что и карусель. Старые ключи-пресеты сохраняются. */
+const COLL_FONTS = Object.assign({}, FONT_PRESETS,
+  Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, {
+    name: v.name, disp: v.fam, body: "'Manrope',sans-serif",
+    gf: v.gf + '&family=Manrope:wght@400;500;600;700;800',
+  }])));
+
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
 const CAR_POS = new Set(['top', 'center', 'bottom']);
 const CAR_SIZE = new Set(['s', 'm', 'l']);
@@ -5079,7 +5087,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         theme: c.theme || 'klein',
         themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
         fontPreset: c.fontPreset || 'soft',
-        fonts: Object.fromEntries(Object.entries(FONT_PRESETS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])),
+        fonts: Object.fromEntries(Object.entries(COLL_FONTS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])),
         icons: AMEN_ICONS,
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
