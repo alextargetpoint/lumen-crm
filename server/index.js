@@ -1528,7 +1528,18 @@ async function gatherLaunchPhotos(picks, query, want) {
   const grab = async (urls, cap) => (await Promise.all([...new Set(urls || [])].slice(0, cap).map(u => downloadImageToAsset(u).catch(() => null)))).filter(Boolean);
   /* крупнейшие файлы = настоящие фото; логотипы/мелочь оседают вниз и не используются */
   let items = (await grab((picks || []).map(upgradeCdnUrl), 24)).sort((a, b) => b.size - a.size);
-  if (items.length < 2 && query) { const ov = await openverseImages(query, 12); items = items.concat((await grab(ov, 10)).sort((a, b) => b.size - a.size)); }
+  /* мало со страницы (или её нет) — добираем реальными атмосферными кадрами из открытых источников
+     по нескольким запросам: имя проекта → локация+недвижимость → пляж/скайлайн (честно, как фон-настроение) */
+  const queries = (Array.isArray(query) ? query : [query]).map(q => String(q || '').trim()).filter(Boolean);
+  const seen = new Set(items.map(x => x.url));
+  for (const q of queries) {
+    if (items.length >= Math.max(want, 4)) break;
+    const ov = await openverseImages(q, 12);
+    const got = (await grab(ov, 8)).filter(x => !seen.has(x.url));
+    got.forEach(x => seen.add(x.url));
+    items = items.concat(got);
+  }
+  items.sort((a, b) => b.size - a.size);
   return items.map(x => x.url).slice(0, Math.max(want, 5));
 }
 
@@ -2553,16 +2564,19 @@ const server = http.createServer(async (req, res) => {
       let title = String(b.title || 'Карусель').slice(0, 120);
       let photoBias = 'medium';
       if (b.ai && llm.available()) {
-        try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo, b.angle); title = out.title; slides = out.slides; photoBias = out.photoBias || 'medium'; }
+        try { const out = await llm.composeCarousel(b.topic || '', b.template, b.count, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo, b.angle, { density: b.density, tone: b.tone }); title = out.title; slides = out.slides; photoBias = out.photoBias || 'medium'; }
         catch (e) { /* ИИ не справился — стартовые слайды */ }
       }
+      if (['low', 'medium', 'high'].includes(b.photos)) photoBias = b.photos;   /* ручной оверрайд плотности фото */
       /* Фото: скачиваем ВЫБРАННЫЕ (фильтр по размеру — логотипы/иконки отсекаются), мало → добираем из открытых источников.
          Раскладка вкусная и КОНСИСТЕНТНАЯ и зависит от УГЛА подачи:
          high (люкс/образ жизни) — фото-first: обложка + больше галерей; low (инвестиции) — текст-first: только обложка;
          medium — обложка + одна галерея. Не мажем случайную картинку под каждый слайд. */
       if (b.ai && slides.length && (Array.isArray(b.images) && b.images.length || b.template === 'launch')) {
         const rawPics = Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(String(x))) : [];
-        const q = [String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
+        const geoQ = db.settings.geoNames[b.geo] || b.geo || '';
+        const nameQ = String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60);
+        const q = [ [nameQ, geoQ, 'luxury real estate'].filter(Boolean).join(' '), [geoQ, 'luxury real estate apartments'].filter(Boolean).join(' '), [geoQ, 'beach skyline'].filter(Boolean).join(' ') ].filter(s => s.trim());
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         const good = await gatherLaunchPhotos(rawPics, q, want);
         if (good.length) {
@@ -2586,7 +2600,10 @@ const server = http.createServer(async (req, res) => {
         createdAt: Date.now(),
       };
       db.carousels.unshift(c); store.save();
-      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret });
+      /* мало исходных фактов → сигнал UI предложить добавить инфо и пересобрать для конкретики */
+      const factPart = (String(b.topic || '').split(/условия и факты:/i)[1] || '').replace(/[—\s·]+/g, ' ').trim();
+      const thin = b.template === 'launch' && factPart.length < 30;
+      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, thin });
     }
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
@@ -2665,7 +2682,10 @@ const server = http.createServer(async (req, res) => {
         /* Раскладка фото (как в «Карусель из лонча»): скачиваем + фильтруем по размеру (логотипы/LQIP отсекаются),
            мало — добираем из открытых источников. Обложка — крупный кадр; смысловые слайды чистые; галереи по углу подачи.
            НЕ мажем случайный кадр под каждый слайд (это давало «коряво где-то фоном»). */
-        const q = [facts && facts.name || String(topic || '').split('.')[0].slice(0, 60), db.settings.geoNames[b.geo] || b.geo || '', 'luxury real estate'].filter(Boolean).join(' ');
+        const geoQ = db.settings.geoNames[b.geo] || b.geo || (facts && facts.location) || '';
+        const nameQ = facts && facts.name || String(topic || '').split('.')[0].slice(0, 60);
+        /* несколько запросов: имя проекта → локация+недвижимость → пляж/скайлайн локации (реальные атмосферные кадры) */
+        const q = [ [nameQ, geoQ, 'luxury real estate'].filter(Boolean).join(' '), [geoQ, 'luxury real estate apartments'].filter(Boolean).join(' '), [geoQ, 'beach skyline'].filter(Boolean).join(' ') ].filter(s => s.trim());
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         const good = await gatherLaunchPhotos(images, q, want);
         let pics = good;
@@ -2818,6 +2838,56 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/social\/content\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
       db.socialContent = db.socialContent.filter(x => x.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
+    }
+
+    /* ═══ Доска мотивации брокера (личный приватный мудборд) ═══ */
+    {
+      const mbUid = () => ROLE ? (ROLE.role === 'owner' ? 'owner' : ROLE.brokerId) : null;
+      if (p === '/api/moodboard' && req.method === 'GET') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        db.moodboard = db.moodboard || {}; return json(res, 200, db.moodboard[uid] || []);
+      }
+      if (p === '/api/moodboard' && req.method === 'POST') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        const b = await readBody(req);
+        if (!b.url || !/^(\/assets\/|https?:\/\/)/.test(String(b.url))) return json(res, 400, { error: 'нет картинки' });
+        db.moodboard = db.moodboard || {}; db.moodboard[uid] = db.moodboard[uid] || [];
+        const n = db.moodboard[uid].length;
+        const item = { id: crypto.randomBytes(5).toString('hex'), type: b.type === 'sticker' ? 'sticker' : 'image', url: String(b.url).slice(0, 500), caption: String(b.caption || '').slice(0, 80), x: +b.x || (40 + (n % 5) * 30), y: +b.y || (40 + (n % 5) * 24), w: Math.max(80, Math.min(440, +b.w || 220)), rot: Math.max(-20, Math.min(20, +b.rot || 0)), at: Date.now() };
+        db.moodboard[uid].unshift(item); db.moodboard[uid] = db.moodboard[uid].slice(0, 80); store.save();
+        return json(res, 200, item);
+      }
+      if ((m = p.match(/^\/api\/moodboard\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        const b = await readBody(req); const it = ((db.moodboard || {})[uid] || []).find(x => x.id === m[1]); if (!it) return json(res, 404, { error: 'nf' });
+        if (b.x != null) it.x = Math.round(+b.x); if (b.y != null) it.y = Math.round(+b.y);
+        if (b.w != null) it.w = Math.max(80, Math.min(440, +b.w)); if (b.rot != null) it.rot = Math.max(-20, Math.min(20, +b.rot));
+        if (b.caption != null) it.caption = String(b.caption).slice(0, 80);
+        store.save(); return json(res, 200, it);
+      }
+      if ((m = p.match(/^\/api\/moodboard\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        db.moodboard = db.moodboard || {}; db.moodboard[uid] = (db.moodboard[uid] || []).filter(x => x.id !== m[1]); store.save();
+        return json(res, 200, { ok: true });
+      }
+      if (p === '/api/moodboard/generate' && req.method === 'POST') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для генерации' });
+        const b = await readBody(req); const want = String(b.prompt || '').slice(0, 400).trim(); if (!want) return json(res, 400, { error: 'что тебя мотивирует?' });
+        const style = b.style === 'sticker' ? ', die-cut sticker style, bold clean vector illustration, subtle drop shadow, vibrant, isolated on clean background' : ', ultra-aesthetic editorial photography, cinematic lighting, luxury lifestyle, rich premium colors, high-end web-design magazine quality, tasteful minimal composition';
+        const prompt = `${want}${style}, motivational vision-board visual, no text, no watermark, no logo`;
+        try {
+          const buf = await llm.generateImage(prompt, { size: '1024x1024', quality: 'medium' });
+          fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
+          const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
+          fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+          db.moodboard = db.moodboard || {}; db.moodboard[uid] = db.moodboard[uid] || [];
+          const n = db.moodboard[uid].length;
+          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: want.slice(0, 60), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
+          db.moodboard[uid].unshift(item); db.moodboard[uid] = db.moodboard[uid].slice(0, 80); store.save();
+          return json(res, 200, item);
+        } catch (e) { return json(res, 500, { error: 'не сгенерировалось: ' + e.message }); }
+      }
     }
     /* сценарии Reels (по идее брокера / из копилки / рерайт чужого рилса) */
     if (p === '/api/social/scripts' && req.method === 'POST') {

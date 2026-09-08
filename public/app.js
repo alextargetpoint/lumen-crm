@@ -345,6 +345,7 @@ const NAV = {
   wake:      { name: 'Реанимация базы', icon: I.wake, sub: '' },
   meetings:  { name: 'Встречи', icon: I.cal, sub: '' },
   tasks:     { name: 'Мои задачи', icon: I.task, sub: '' },
+  moodboard: { name: 'Карта желаний', icon: I.spark, sub: 'личная доска мотивации' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
   ads:       { name: 'Реклама', icon: I.target, sub: '' },
@@ -5142,6 +5143,43 @@ async function shCarousels(main) {
   wireCarCards(main);
 }
 
+/* Премиальный анимационный лоадер сборки карусели (чистый CSS, без затрат на API).
+   Показывает «собираемые» слайды с мерцанием, шаги-подписи меняются по таймеру. */
+function carGenLoader(show) {
+  let el = document.getElementById('carGenLoader');
+  if (!show) { if (el) { el.classList.remove('on'); setTimeout(() => el.remove(), 340); } clearInterval(carGenLoader._t); return; }
+  if (el) return;
+  if (!document.getElementById('carGenLoaderCss')) {
+    const st = document.createElement('style'); st.id = 'carGenLoaderCss';
+    st.textContent = `
+#carGenLoader{position:fixed;inset:0;z-index:4000;display:grid;place-items:center;background:radial-gradient(120% 120% at 50% 0%,rgba(12,26,54,.86),rgba(6,14,32,.94));backdrop-filter:blur(16px);opacity:0;transition:opacity .34s}
+#carGenLoader.on{opacity:1}
+.cgl-stage{width:min(340px,80vw);text-align:center;color:#fff;font-family:Manrope,system-ui,sans-serif}
+.cgl-deck{position:relative;height:210px;margin:0 auto 26px;perspective:1000px}
+.cgl-card{position:absolute;left:50%;top:50%;width:132px;height:172px;margin:-86px 0 0 -66px;border-radius:16px;background:linear-gradient(160deg,rgba(94,140,255,.9),rgba(24,54,132,.92));border:1px solid rgba(150,185,255,.35);box-shadow:0 24px 60px -18px rgba(4,12,30,.7);overflow:hidden;transform-origin:50% 120%;animation:cglFan 2.6s ease-in-out infinite}
+.cgl-card::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.28) 42%,transparent 64%);transform:translateX(-120%);animation:cglSheen 1.7s ease-in-out infinite}
+.cgl-card::after{content:"";position:absolute;left:14px;right:14px;bottom:16px;height:8px;border-radius:4px;background:rgba(255,255,255,.5);box-shadow:0 14px 0 rgba(255,255,255,.34),0 26px 0 rgba(255,255,255,.2)}
+.cgl-card:nth-child(1){animation-delay:0s;--r:-16deg}
+.cgl-card:nth-child(2){animation-delay:.18s;--r:-5deg}
+.cgl-card:nth-child(3){animation-delay:.36s;--r:6deg}
+.cgl-card:nth-child(4){animation-delay:.54s;--r:17deg}
+@keyframes cglFan{0%,100%{transform:rotate(calc(var(--r) * .35)) translateY(6px) scale(.96)}50%{transform:rotate(var(--r)) translateY(-8px) scale(1)}}
+@keyframes cglSheen{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
+.cgl-orb{width:44px;height:44px;margin:0 auto 16px;border-radius:50%;background:conic-gradient(from 0deg,#5E8CFF,#9B8CFF,#4FB6F2,#5E8CFF);animation:cglSpin 1.1s linear infinite;box-shadow:0 0 26px rgba(94,140,255,.6);-webkit-mask:radial-gradient(closest-side,transparent 58%,#000 60%);mask:radial-gradient(closest-side,transparent 58%,#000 60%)}
+@keyframes cglSpin{to{transform:rotate(1turn)}}
+.cgl-t{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.cgl-s{font-size:12.5px;opacity:.7;margin-top:5px;min-height:16px;transition:opacity .3s}`;
+    document.head.appendChild(st);
+  }
+  el = document.createElement('div'); el.id = 'carGenLoader';
+  el.innerHTML = `<div class="cgl-stage"><div class="cgl-deck"><div class="cgl-card"></div><div class="cgl-card"></div><div class="cgl-card"></div><div class="cgl-card"></div></div><div class="cgl-orb"></div><div class="cgl-t">Собираю карусель…</div><div class="cgl-s" id="cglStep">Читаю факты о проекте</div></div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('on'));
+  const steps = ['Читаю факты о проекте', 'Пишу тексты по углу подачи', 'Раскладываю фото по смыслу', 'Подбираю стикеры и акценты', 'Собираю премиальную вёрстку'];
+  let k = 0; const stepEl = () => document.getElementById('cglStep');
+  carGenLoader._t = setInterval(() => { k = (k + 1) % steps.length; const s = stepEl(); if (s) { s.style.opacity = 0; setTimeout(() => { s.textContent = steps[k]; s.style.opacity = .7; }, 300); } }, 1900);
+}
+
 /* ── Карусель из лонча ── */
 async function shLaunch(main) {
   const cars = await api.get('/carousels');
@@ -5162,6 +5200,12 @@ async function shLaunch(main) {
         <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
         <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
         <select id="lcCount"><option value="0">Слайдов: авто</option><option value="5">5 слайдов</option><option value="6">6 слайдов</option><option value="7">7 слайдов</option><option value="8">8 слайдов</option></select>
+      </div>
+      <div class="sh-launch-opts">
+        <select id="lcDensity" title="Сколько текста на слайде"><option value="medium">Текст: средне</option><option value="rich">Текст: подробно</option><option value="brief">Текст: кратко</option></select>
+        <select id="lcPhotos" title="Плотность фото"><option value="">Фото: по углу</option><option value="high">Фото: больше</option><option value="low">Фото: меньше</option></select>
+        <select id="lcStk" title="Смысловые стикеры на слайдах"><option value="1">Стикеры: вкл</option><option value="0">Стикеры: выкл</option></select>
+        <select id="lcTone" title="Тон подачи"><option value="">Тон: авто</option><option value="expert">Тон: экспертный</option><option value="warm">Тон: тёплый</option><option value="bold">Тон: дерзкий</option></select>
       </div>
       <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— под какую стратегию писать</span></span>${carAnglePicker('lcAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('lcTheme', 'klein')}</div>
@@ -5207,12 +5251,15 @@ async function shLaunch(main) {
     if (!name) { toast('Напиши, что запускаем'); return; }
     const topic = `Старт продаж / лонч: ${name}. Условия и факты: ${facts || '—'}`;
     const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
+    carGenLoader(true);
     try {
-      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', count: +(($('#lcCount', main) || {}).value || 0), images: [...lcPicked], ai: true });
-      toast('Карусель собрана', 'Открываю редактор', true);
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', count: +(($('#lcCount', main) || {}).value || 0), density: ($('#lcDensity', main) || {}).value || 'medium', photos: ($('#lcPhotos', main) || {}).value || '', tone: ($('#lcTone', main) || {}).value || '', stickers: (($('#lcStk', main) || {}).value !== '0'), images: [...lcPicked], ai: true });
+      carGenLoader(false);
+      if (r.thin) toast('Карусель собрана', 'Данных было мало — на слайдах общие тезисы. Добавь ссылку застройщика или факты и пересобери для конкретики.', true);
+      else toast('Карусель собрана', 'Открываю редактор', true);
       window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
       render();
-    } catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Собрать карусель'; }
+    } catch (e) { carGenLoader(false); toast('Не вышло', e.message); btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Собрать карусель'; }
   });
   wireCarCards(main);
 }
@@ -5786,6 +5833,61 @@ function tplCard(t, stBadge) {
     <div class="tpl-body">${esc(t.body)}</div>
   </div>`;
 }
+
+/* ---------------- КАРТА ЖЕЛАНИЙ (личная доска мотивации брокера) ---------------- */
+let MB_STYLE = 'photo';
+PAGES.moodboard = async (root) => {
+  const items = await api.get('/moodboard').catch(() => []);
+  const me = STATE.me || {};
+  const who = me.role === 'owner' ? (STATE.settings.agency.name || '') : ((STATE.brokers.find(b => b.id === me.brokerId) || {}).name || '');
+  const pinColors = ['#E1467C', '#2563EB', '#0E9E6A', '#D9982B', '#7C3AED', '#E0483D'];
+  const itemHtml = (it, i) => `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${it.rot || 0}deg)">
+    <span class="mb-pin" style="--pc:${pinColors[i % pinColors.length]}"></span>
+    <img src="${esc(it.url)}" alt="" draggable="false">
+    ${it.caption ? `<div class="mb-cap">${esc(it.caption)}</div>` : ''}
+    <button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button>
+    <span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>
+  </div>`;
+  root.innerHTML = `
+    <div class="mb-wrap">
+      <div class="mb-top">
+        <div class="mb-title"><span class="mb-t-k">Карта желаний</span>${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>
+        <div class="mb-add">
+          <div class="mb-style"><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Стикер</button></div>
+          <div class="mb-inp"><input id="mbQuery" placeholder="Чего ты хочешь? напр. Patek Philippe Nautilus 5711, вилла на Бали, частный джет…" autocomplete="off"><button class="btn btn-accent" id="mbGo">${ic(I.spark)}Создать</button></div>
+        </div>
+      </div>
+      <div class="mb-board" id="mbBoard">
+        ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${ic(I.spark)}<b>Собери свою карту желаний</b><span>Напиши, чего ты хочешь — ИИ создаст эстетичный стикер и прикрепит его на доску. Перетаскивай, убирай, дополняй. Пусть это будет перед глазами каждый день.</span></div>`}
+      </div>
+    </div>`;
+  const board = $('#mbBoard', root);
+  $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  const genBtn = $('#mbGo', root), q = $('#mbQuery', root);
+  const gen = async () => {
+    const prompt = q.value.trim(); if (!prompt) { q.focus(); return; }
+    genBtn.disabled = true; genBtn.innerHTML = '✦ Создаю…';
+    try { await api.post('/moodboard/generate', { prompt, style: MB_STYLE }); q.value = ''; toast('Добавлено на карту', 'Перетащи, куда хочешь', true); PAGES.moodboard(root); }
+    catch (e) { toast('Не вышло', e.message); genBtn.disabled = false; genBtn.innerHTML = `${ic(I.spark)}Создать`; }
+  };
+  genBtn.addEventListener('click', gen);
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') gen(); });
+  board.addEventListener('click', async (e) => { const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); PAGES.moodboard(root); } });
+  /* drag-and-drop стикеров */
+  $$('.mb-item', root).forEach(el2 => {
+    const start = (e) => {
+      if (e.target.closest('[data-mbdel]')) return;
+      e.preventDefault(); const r0 = board.getBoundingClientRect();
+      const ox = e.clientX - el2.offsetLeft, oy = e.clientY - el2.offsetTop;
+      el2.classList.add('drag'); el2.style.zIndex = 50;
+      const move = (ev) => { let nx = ev.clientX - ox, ny = ev.clientY - oy; nx = Math.max(0, Math.min(r0.width - 40, nx)); ny = Math.max(0, Math.min(r0.height - 40, ny)); el2.style.left = nx + 'px'; el2.style.top = ny + 'px'; };
+      const up = async () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); el2.classList.remove('drag'); el2.style.zIndex = ''; await api.patch('/moodboard/' + el2.dataset.mb, { x: parseInt(el2.style.left), y: parseInt(el2.style.top) }).catch(() => {}); };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    };
+    const grip = el2.querySelector('.mb-grip') || el2;
+    grip.addEventListener('pointerdown', start); el2.querySelector('img').addEventListener('pointerdown', start);
+  });
+};
 
 /* ---------------- БРОКЕРЫ ---------------- */
 PAGES.brokers = async (root) => {
