@@ -3534,3 +3534,49 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .opv-gaug-w { color: #9DB8FF; display: block; }
 .opv-dcell.mini { flex: none; height: 34px; }
 .opv-command .opv-champ { flex: none; height: 46px; }
+
+/* ============ Живые (CSS-анимация) и видео-фоны виджетов ============ */
+/* общий скрим-элемент видео + все видео-скины (скайлайн/золото/сияние) */
+.ov-w[class*="ov-skin-vid"] .ov-w-body { position: relative; overflow: hidden; }
+.ov-w[class*="ov-skin-vid"] .ov-skin-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .22; z-index: 0; pointer-events: none; }
+.ov-w[class*="ov-skin-vid"] .ov-w-body::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.ov-w[class*="ov-skin-vid"] .ov-w-body > *:not(.ov-skin-vid) { position: relative; z-index: 2; }
+/* золото/сияние — тёмная база, светлый текст (токен-оверрайды), тёмный скрим */
+.ov-w.ov-skin-vidgold .ov-w-body, .ov-w.ov-skin-vidaurora .ov-w-body, .ov-w.ov-skin-aurora .ov-w-body, .ov-w.ov-skin-silk .ov-w-body {
+  --navy-900: #F1F4FF; --ink: #E6ECFA; --ink-2: #C2CFEC; --ink-3: #93A4CC;
+  --stroke: rgba(255,255,255,.16); --stroke-soft: rgba(255,255,255,.09); --bg-2: rgba(255,255,255,.07); --card: rgba(255,255,255,.06);
+  color: #E6ECFA; border: 1px solid rgba(255,255,255,.12);
+}
+.ov-w.ov-skin-vidgold .ov-w-body::after { background: linear-gradient(160deg, rgba(20,14,4,.62), rgba(10,8,4,.82)); }
+.ov-w.ov-skin-vidaurora .ov-w-body::after { background: linear-gradient(160deg, rgba(8,14,34,.58), rgba(5,8,20,.82)); }
+.ov-w.ov-skin-video .ov-w-body { --navy-900: #F1F4FF; --ink: #E6ECFA; --ink-2: #C2CFEC; --ink-3: #93A4CC; --stroke: rgba(255,255,255,.16); --stroke-soft: rgba(255,255,255,.09); --bg-2: rgba(255,255,255,.07); --card: rgba(255,255,255,.06); color: #E6ECFA; border: 1px solid rgba(255,255,255,.12); }
+.ov-w.ov-skin-video .ov-w-body::after { background: linear-gradient(160deg, rgba(6,17,38,.55), rgba(4,8,20,.8)); }
+/* АВРОРА — живой тёмный кобальт-градиент, плавно перетекает */
+.ov-w.ov-skin-aurora .ov-w-body { background: linear-gradient(125deg, #08122A, #12274F 30%, #24306E 55%, #142a52 78%, #08122A); background-size: 320% 320%; animation: ovFlow 20s ease-in-out infinite; box-shadow: 0 16px 40px -20px rgba(6,17,38,.6); }
+/* ШЁЛК — тёплый золото-угольный поток */
+.ov-w.ov-skin-silk .ov-w-body { background: linear-gradient(125deg, #14100A, #33240D 30%, #5A3E12 52%, #2c1f0b 76%, #14100A); background-size: 320% 320%; animation: ovFlow 24s ease-in-out infinite; box-shadow: 0 16px 40px -20px rgba(0,0,0,.6); }
+/* МЕШ — светлый мягкий мультиградиент, дышит (тёмный текст) */
+.ov-w.ov-skin-mesh .ov-w-body { background:
+    radial-gradient(60% 60% at 18% 22%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(55% 55% at 82% 26%, rgba(124,58,237,.14), transparent 60%),
+    radial-gradient(60% 60% at 62% 92%, rgba(15,158,106,.12), transparent 60%),
+    var(--card); background-size: 200% 200%; animation: ovMesh 26s ease-in-out infinite; }
+@keyframes ovFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes ovMesh { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; } }
+@media (prefers-reduced-motion: reduce) { .ov-w.ov-skin-aurora .ov-w-body, .ov-w.ov-skin-silk .ov-w-body, .ov-w.ov-skin-mesh .ov-w-body { animation: none; } }
+/* группы в пикере фонов */
+.ws-grp { margin-bottom: 9px; }
+.ws-grp-t { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; display: block; margin-bottom: 5px; opacity: .8; }
+.ws-skin.sk-video, .ws-skin.sk-vidgold, .ws-skin.sk-vidaurora, .ws-skin.sk-aurora, .ws-skin.sk-silk, .ws-skin.sk-dark, .ws-skin.sk-midnight, .ws-skin.sk-gradient { color: #fff; border: none; }
+.ws-skin.sk-dark, .ws-skin.sk-video, .ws-skin.sk-vidaurora, .ws-skin.sk-aurora { background: linear-gradient(140deg, #12274F, #0A1730); }
+.ws-skin.sk-midnight { background: linear-gradient(140deg, #12132a, #06080F); }
+.ws-skin.sk-gradient { background: linear-gradient(140deg, #1E3A8A, #4C2A6E); }
+.ws-skin.sk-silk, .ws-skin.sk-vidgold { background: linear-gradient(140deg, #5A3E12, #241a08); }
+.ws-skin.sk-mesh { background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 16%, #fff), #fff); }
+.ws-skin.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* превью пака «Кинофон» — намёк на видео-фоны (анимированные градиенты в превью) */
+.pk-cinema .ov2-pack-prev { background: linear-gradient(160deg, #0A1428, #12132a); }
+.opv-chart.cine-a { position: relative; overflow: hidden; background: linear-gradient(125deg, #08122A, #24306E 55%, #08122A); background-size: 300% 300%; animation: ovFlow 8s ease-in-out infinite; border: 1px solid rgba(122,158,255,.2); color: #9DB8FF; }
+.opv-chart.cine-a .opv-n { color: #fff; }
+.opv-cine-g { flex: 1; border-radius: 8px; background: linear-gradient(125deg, #5A3E12, #241a08 60%, #5A3E12); background-size: 300% 300%; animation: ovFlow 9s ease-in-out infinite; border: 1px solid rgba(255,210,120,.2); }

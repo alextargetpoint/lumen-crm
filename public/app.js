@@ -977,7 +977,17 @@ const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? m
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
 /* скины виджетов (визуальные вариации). По умолчанию — чистый; фон/видео строго опциональны и читаемы */
-const OV_SKINS = [['clean', 'Чистый'], ['tint', 'Кобальт'], ['frost', 'Стекло'], ['accent', 'Акцент'], ['dark', 'Тёмный'], ['midnight', 'Полночь'], ['gradient', 'Градиент'], ['video', 'Видеофон']];
+/* фоны виджетов, сгруппированы: плоские · тёмные · живая анимация (CSS) · видео (Higgsfield) */
+const OV_SKIN_GROUPS = [
+  ['Светлые', [['clean', 'Чистый'], ['tint', 'Кобальт'], ['frost', 'Стекло'], ['accent', 'Акцент']]],
+  ['Тёмные', [['dark', 'Тёмный'], ['midnight', 'Полночь'], ['gradient', 'Градиент']]],
+  ['Живые · анимация', [['aurora', 'Аврора'], ['silk', 'Шёлк'], ['mesh', 'Меш']]],
+  ['Видео · кинофон', [['video', 'Скайлайн'], ['vidgold', 'Золото'], ['vidaurora', 'Сияние']]],
+];
+const OV_SKINS = OV_SKIN_GROUPS.flatMap(g => g[1]);
+/* какие скины — это видео, и их источник */
+const OV_VID = { video: 'assets/skyline-bg.mp4?v=2', vidgold: 'assets/widgets/amb-gold.mp4', vidaurora: 'assets/widgets/amb-aurora.mp4' };
+const OV_VIDPOSTER = { video: 'assets/skyline-poster.jpg?v=2', vidgold: 'assets/widgets/amb-gold.jpg', vidaurora: 'assets/widgets/amb-aurora.jpg' };
 function ovGetSkins() { try { return JSON.parse(localStorage.getItem(ovKey() + '_skin')) || {}; } catch (_) { return {}; } }
 function ovSetSkin(k, s) { const m = ovGetSkins(); if (s === 'clean') delete m[k]; else m[k] = s; try { localStorage.setItem(ovKey() + '_skin', JSON.stringify(m)); } catch (_) {} }
 /* формат виджета (реальная пересборка вёрстки), акцентная палитра */
@@ -985,7 +995,7 @@ function ovGetVars() { try { return JSON.parse(localStorage.getItem(ovKey() + '_
 function ovSetVar(k, v) { const m = ovGetVars(); if (!v || v === 'default') delete m[k]; else m[k] = v; try { localStorage.setItem(ovKey() + '_var', JSON.stringify(m)); } catch (_) {} }
 function ovGetPals() { try { return JSON.parse(localStorage.getItem(ovKey() + '_pal')) || {}; } catch (_) { return {}; } }
 function ovSetPal(k, p) { const m = ovGetPals(); if (!p || p === 'cobalt') delete m[k]; else m[k] = p; try { localStorage.setItem(ovKey() + '_pal', JSON.stringify(m)); } catch (_) {} }
-const OV_PAL = { cobalt: ['#2563EB', '#5B2BD8', 'Кобальт'], emerald: ['#0E9E6A', '#12855F', 'Изумруд'], violet: ['#7C3AED', '#5B2BD8', 'Фиолет'], amber: ['#D9982B', '#C9721C', 'Янтарь'], rose: ['#E1467C', '#C22E6A', 'Роза'], graphite: ['#475569', '#1E293B', 'Графит'] };
+const OV_PAL = { cobalt: ['#2563EB', '#5B2BD8', 'Кобальт'], emerald: ['#0E9E6A', '#12855F', 'Изумруд'], teal: ['#0E9AA7', '#0B6E8C', 'Бирюза'], violet: ['#7C3AED', '#5B2BD8', 'Фиолет'], amber: ['#D9982B', '#C9721C', 'Янтарь'], gold: ['#C79A3E', '#9E6B1E', 'Золото'], rose: ['#E1467C', '#C22E6A', 'Роза'], sunset: ['#F0672E', '#D6371F', 'Закат'], graphite: ['#475569', '#1E293B', 'Графит'] };
 /* готовые паки оформления всей обзорной страницы: раскладка + форматы + фон + палитра */
 const OV_PACKS = {
   focus: { name: 'Фокус', desc: 'Крупный график, минимум блоков', layout: ['kpi', 'attention', 'tasks', 'meetings'], vars: { kpi: 'chart' }, skins: {}, pals: {} },
@@ -993,6 +1003,7 @@ const OV_PACKS = {
   data: { name: 'Данные', desc: 'Максимум графиков', layout: ['kpi', 'funnel', 'goal', 'geo', 'spark', 'hotleads', 'numbers'], vars: { kpi: 'chart', funnel: 'donut', goal: 'gauge', hotleads: 'cards' }, skins: {}, pals: { funnel: 'emerald', goal: 'violet' } },
   studio: { name: 'Студия', desc: 'Светлое + одна тёмная плитка', layout: ['kpi', 'attention', 'funnel', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'chart', funnel: 'donut', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { goal: 'dark' }, pals: { goal: 'violet' } },
   mix: { name: 'Тёмный микс', desc: 'Тёмные и светлые плитки вперемешку', layout: ['kpi', 'attention', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'chart', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { kpi: 'dark', leaders: 'dark', goal: 'midnight' }, pals: {} },
+  cinema: { name: 'Кинофон', desc: 'Живые видео-фоны + светлые плитки', layout: ['kpi', 'attention', 'leaders', 'goal', 'hotleads', 'meetings'], vars: { kpi: 'chart', leaders: 'spotlight', goal: 'gauge', hotleads: 'cards' }, skins: { kpi: 'vidaurora', leaders: 'silk', goal: 'vidgold' }, pals: {} },
   content: { name: 'Контент', desc: 'Идеи и рост', layout: ['kpi', 'ideas', 'hotleads', 'worldclock', 'tasks'], vars: { kpi: 'chart', hotleads: 'cards' }, skins: { ideas: 'dark' }, pals: { ideas: 'violet' } },
 };
 function ovApplyPack(id) {
@@ -1631,7 +1642,7 @@ PAGES.overview = async (root) => {
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
         ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; const skin = skins[k] || 'clean'; const variant = vars[k] || 'default'; const pal = pals[k]; const palStyle = pal && OV_PAL[pal] ? ` style="--accent:${OV_PAL[pal][0]};--accent-2:${OV_PAL[pal][1]}"` : ''; return `<div class="ov-w ${w.full ? 'full' : ''} ov-skin-${skin}" data-w="${k}"${palStyle}>
           ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-skin" data-wskin title="Оформление виджета">${ic(I.spark)}</button><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
-          <div class="ov-w-body glass card">${skin === 'video' ? '<video class="ov-skin-vid" autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="assets/skyline-bg.mp4?v=2"></video>' : ''}${w.render(ctx, variant)}</div>
+          <div class="ov-w-body glass card">${OV_VID[skin] ? `<video class="ov-skin-vid" autoplay muted loop playsinline ${OV_VIDPOSTER[skin] ? `poster="${OV_VIDPOSTER[skin]}"` : ''} src="${OV_VID[skin]}"></video>` : ''}${w.render(ctx, variant)}</div>
         </div>`; }).join('')}
         ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
@@ -1693,7 +1704,7 @@ function openWidgetStyle(k, onChange) {
     body: `
       ${variants.length ? `<div class="ws-sec"><div class="ws-t">Формат</div><div class="ws-vars">${variants.map(([id, n]) => `<button class="ws-var ${id === curVar ? 'on' : ''}" data-wsvar="${id}">${esc(n)}</button>`).join('')}</div></div>` : ''}
       <div class="ws-sec"><div class="ws-t">Акцент</div><div class="ws-pals">${Object.entries(OV_PAL).map(([id, [c1, c2, n]]) => `<button class="ws-pal ${id === curPal ? 'on' : ''}" data-wspal="${id}" title="${esc(n)}" style="--p1:${c1};--p2:${c2}"><i></i></button>`).join('')}</div></div>
-      <div class="ws-sec"><div class="ws-t">Фон карточки</div><div class="ws-vars">${OV_SKINS.map(([id, n]) => `<button class="ws-skin ${id === curSkin ? 'on' : ''}" data-wsskin="${id}">${esc(n)}</button>`).join('')}</div></div>`,
+      <div class="ws-sec"><div class="ws-t">Фон карточки</div>${OV_SKIN_GROUPS.map(([gname, items]) => `<div class="ws-grp"><span class="ws-grp-t">${esc(gname)}</span><div class="ws-vars">${items.map(([id, n]) => `<button class="ws-skin sk-${id} ${id === curSkin ? 'on' : ''}" data-wsskin="${id}">${OV_VID[id] ? '▶ ' : ''}${esc(n)}</button>`).join('')}</div></div>`).join('')}</div>`,
     actions: [{ label: 'Готово', cls: 'btn-accent' }],
   });
   $$('[data-wsvar]', md).forEach(b => b.addEventListener('click', () => { ovSetVar(k, b.dataset.wsvar); $$('[data-wsvar]', md).forEach(x => x.classList.toggle('on', x === b)); onChange && onChange(); }));
@@ -1712,6 +1723,7 @@ function ovPackPreview(id) {
   if (id === 'data') return `<div class="opv opv-data"><div class="opv-dcell">${donut}</div><div class="opv-col2">${chartCard('flat')}<div class="opv-bars"><i style="width:80%"></i><i style="width:55%"></i><i style="width:35%"></i></div></div></div>`;
   if (id === 'studio') return `<div class="opv">${chartCard('')}<div class="opv-col"><div class="opv-dark sm"><span class="opv-gaug-w">${gauge}</span></div><div class="opv-s"></div></div></div>`;
   if (id === 'mix') return `<div class="opv">${chartCard('dark')}<div class="opv-col"><div class="opv-s"></div><div class="opv-dark sm"></div></div></div>`;
+  if (id === 'cinema') return `<div class="opv">${chartCard('cine-a')}<div class="opv-col"><div class="opv-cine-g"></div><div class="opv-s"></div></div></div>`;
   if (id === 'content') return `<div class="opv opv-content">${chartCard('')}<div class="opv-col"><div class="opv-idea"><span class="opv-tag"></span><span class="opv-line"></span><span class="opv-line w2"></span></div></div></div>`;
   return '';
 }
