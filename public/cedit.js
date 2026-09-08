@@ -237,7 +237,7 @@ body.cpanel-on{padding-right:308px!important}
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', layers,
-        mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'check',
+        mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'check', layout: rich.layout || '', hero: rich.hero || null,
       };
     });
   }

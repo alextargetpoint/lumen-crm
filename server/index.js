@@ -821,6 +821,9 @@ const sanSlide = (s) => ({
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
   pmark: ['check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus'].includes(s.pmark) ? s.pmark : 'check',   /* стиль маркера буллетов */
+  /* арт-дирекшн: семейство раскладки слайда (композиция), назначается artDirect с учётом ритма колоды */
+  layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel'].includes(s.layout) ? s.layout : '',
+  hero: s.hero && (s.hero.v || s.hero.k) ? { v: String(s.hero.v || '').slice(0, 16), k: String(s.hero.k || '').slice(0, 40) } : null,   /* крупное число для data-hero слайда */
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 /* подбор иконки удобства по ключевым словам фишки (RU/EN) */
@@ -941,6 +944,80 @@ function stylePass(slides, theme) {
     }
     if (isCTA && !hasPhoto) { s.pos = 'center'; s.align = 'center'; s.size = 'l'; }
   });
+  return slides;
+}
+/* ═══ АРТ-ДИРЕКТОР + РИТМ КОЛОДЫ ═══
+   Не рендерим слайды как одинаковые шаблоны. Сначала story (composeCarousel), потом ритм,
+   потом каждому слайду — своё семейство раскладки (композиция), потом единый стиль.
+   Семейства: cinematic (фото на весь + низ), immersive (тёмное фото + центр, минимум),
+   editorial (светлый, заголовок+тезисы), typo (типографика-first, без фото), data (одно крупное число),
+   split (фото сверху + плашка снизу), panel (фото + плавающая карточка). */
+function heroNumber(s) {
+  const src = [String(s.heading || '').replace(/<[^>]*>/g, ''), ...(s.points || []), s.sub || ''].join(' · ');
+  /* берём только ОСМЫСЛЕННУЮ метрику: цена/валюта, процент, год, крупное число с единицей */
+  const pats = [/(?:от\s*)?[$€£]\s?\d[\d\s.,]*\s?[kкmм]?/i, /\d[\d.,]*\s?%/, /\b20\d{2}\b/, /\b\d{2,}[\d\s.,]*\s?(?:млн|тыс|k|к|м²|м2)\b/i];
+  let v = null;
+  for (const p of pats) { const mm = src.match(p); if (mm) { v = mm[0].replace(/\s+/g, ' ').trim(); break; } }
+  if (!v) return null;
+  const digits = v.replace(/\D/g, '');
+  const hasUnit = /[$€£%]|млн|тыс|20\d{2}|м²|м2|k|к/i.test(v);
+  if ((digits.length < 2 && !hasUnit) || v.length > 14) return null;   /* «1»/«3» без единицы — не метрика */
+  /* подпись к числу — из ключевого слова рядом */
+  const low = src.toLowerCase();
+  const k = /доход|roi|yield|окупа/.test(low) ? 'доходность' : /рассроч/.test(low) ? 'рассрочка' : /от\s*[$€£]?\s?\d/.test(low) ? 'цена входа' : /сдач|202\d|handover/.test(low) ? 'срок сдачи' : /мин|км|beach|пляж|airport/.test(low) ? 'до ключевых точек' : (s.eyebrow || 'ключевая цифра').toLowerCase();
+  return { v, k };
+}
+/* Style DNA: визуальная «днк» колоды из угла подачи + плотности фото + ползунков формы (0-100). */
+function carDNA(b = {}, photoBias = 'medium') {
+  const angle = b.angle || 'auto';
+  const base = {
+    luxury: { image: 82, editorial: 80, minimal: 70, data: 20, dark: 45, experimental: 45 },
+    lifestyle: { image: 85, editorial: 65, minimal: 55, data: 15, dark: 35, experimental: 40 },
+    investment: { image: 45, editorial: 45, minimal: 40, data: 80, dark: 30, experimental: 30 },
+    discount: { image: 50, editorial: 40, minimal: 35, data: 70, dark: 25, experimental: 35 },
+    urgency: { image: 65, editorial: 45, minimal: 35, data: 55, dark: 40, experimental: 55 },
+    auto: { image: 62, editorial: 55, minimal: 45, data: 45, dark: 30, experimental: 35 },
+  }[angle] || { image: 62, editorial: 55, minimal: 45, data: 45, dark: 30, experimental: 35 };
+  const d = Object.assign({}, base);
+  if (photoBias === 'high') d.image = Math.min(100, d.image + 18);
+  if (photoBias === 'low') { d.image = Math.max(15, d.image - 22); d.data += 10; }
+  const ov = (k, key) => { const v = +b[key]; if (!isNaN(v) && v >= 0 && v <= 100) d[k] = v; };   /* ползунки формы перекрывают */
+  ov('image', 'dnaImage'); ov('dark', 'dnaDark'); ov('minimal', 'dnaMinimal'); ov('experimental', 'dnaExp'); ov('editorial', 'dnaEditorial');
+  return d;
+}
+function artDirect(slides, opts = {}) {
+  if (!Array.isArray(slides) || !slides.length) return slides;
+  const dna = opts.dna || {};
+  const IMG = dna.image != null ? dna.image : 60, DARK = dna.dark != null ? dna.dark : 30;
+  const MINIMAL = dna.minimal != null ? dna.minimal : 45, EXP = dna.experimental != null ? dna.experimental : 35;
+  const n = slides.length;
+  const hasPhoto = s => !!(s.bg || s.bgv) || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img' && !l.sticker && (l.w || 0) >= 40));
+  const alt = (fam, photo) => photo ? (fam === 'split' ? 'panel' : fam === 'panel' ? 'cinematic' : 'split') : (fam === 'typo' ? 'editorial' : 'typo');
+  let prev = '', dataUsed = false, immUsed = false, typoUsed = false, surprises = 0;
+  slides.forEach((s, i) => {
+    const cover = i === 0, cta = i === n - 1, photo = hasPhoto(s), num = heroNumber(s);
+    let lay;
+    if (cover) lay = photo ? 'cinematic' : 'typo';
+    else if (cta) lay = photo ? 'immersive' : 'editorial';
+    else if (num && !dataUsed && !s.mode) { lay = 'data'; dataUsed = true; }
+    else if (photo) {
+      lay = (DARK > 55 && !immUsed) ? 'immersive' : (prev === 'split' ? 'panel' : prev === 'panel' ? 'cinematic' : 'split');
+      if (lay === 'immersive') immUsed = true;
+    } else {
+      lay = (!typoUsed && (MINIMAL > 50 || EXP > 55)) ? 'typo' : 'editorial';
+      if (lay === 'typo') typoUsed = true;
+    }
+    if (lay === prev) lay = alt(lay, photo);                     /* ритм: не два подряд одинаковых */
+    if (['immersive', 'typo', 'data'].includes(lay)) surprises++;
+    s.layout = lay; prev = lay;
+    if (lay === 'data') { const h = num || heroNumber(s); if (h) { s.hero = h; s.mode = ''; } }
+    if (lay === 'immersive') { s.pos = 'center'; s.align = 'center'; s.size = 'l'; }
+    else if (lay === 'cinematic') { s.pos = 'bottom'; s.align = 'left'; s.size = cover ? 'l' : 'm'; }
+    else if (lay === 'typo') { s.pos = s.pos === 'top' ? 'top' : 'center'; s.align = 'left'; s.size = 'l'; }
+    else if (lay === 'split' || lay === 'panel') { s.pos = 'bottom'; s.align = 'left'; }
+  });
+  /* хотя бы один «сюрприз» в середине — иначе колода ровная */
+  if (surprises === 0 && n >= 4) { const mid = Math.floor(n / 2); slides[mid].layout = hasPhoto(slides[mid]) ? 'immersive' : 'typo'; slides[mid].pos = 'center'; slides[mid].align = hasPhoto(slides[mid]) ? 'center' : 'left'; slides[mid].size = 'l'; }
   return slides;
 }
 /* ужимаем колоду до N слайдов: всегда обложка+финал; в середине приоритет rich/фото, добор нарративом; порядок сохраняем */
@@ -2093,6 +2170,64 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { notes: lead.notes, contacts: lead.contacts });
     }
 
+    /* файлы в карточку лида: презентации, PDF, картинки, документы — полный менеджмент */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/attach$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const fn = String(u.searchParams.get('filename') || 'file');
+      const extM = fn.match(/\.(jpe?g|png|webp|gif|heic|pdf|docx?|xlsx?|pptx?|txt|csv|key|pages|numbers|zip)$/i);
+      const ext = extM ? extM[1].toLowerCase() : 'bin';
+      const kind = /^(jpe?g|png|webp|gif|heic)$/.test(ext) ? 'image' : ext === 'pdf' ? 'pdf' : /^(pptx?|key)$/.test(ext) ? 'deck' : 'file';
+      const chunks = []; let size = 0;
+      await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 25e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
+      if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
+      const dir = path.join(PUBLIC, 'assets', 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const name = `${lead.id}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(dir, name), Buffer.concat(chunks));
+      lead.attachments = lead.attachments || [];
+      const att = { id: crypto.randomBytes(4).toString('hex'), kind, url: '/assets/leadfiles/' + name, name: fn.slice(0, 100), size, who: String(u.searchParams.get('who') || '').slice(0, 60), at: Date.now() };
+      lead.attachments.unshift(att);
+      ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `Файл в карточке: ${lead.name} · ${att.name}` });
+      store.save();
+      return json(res, 200, att);
+    }
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/attach\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const a = (lead.attachments || []).find(x => x.id === m[2]);
+      if (a) { try { fs.unlinkSync(path.join(PUBLIC, a.url.replace(/^\//, ''))); } catch (_) {} }
+      lead.attachments = (lead.attachments || []).filter(x => x.id !== m[2]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* голосовые комментарии брокера по лиду: аудио + авто-расшифровка (Whisper) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/voice$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const fn = String(u.searchParams.get('filename') || 'voice.webm');
+      const extM = fn.match(/\.(webm|mp3|m4a|wav|ogg)$/i); const ext = extM ? extM[1].toLowerCase() : 'webm';
+      const chunks = []; let size = 0;
+      await new Promise((resolve) => { req.on('data', (c) => { size += c.length; if (size > 24e6) req.destroy(); else chunks.push(c); }); req.on('end', resolve); req.on('close', resolve); });
+      if (!size || size > 24e6) return json(res, 400, { error: 'запись до 24 МБ' });
+      const buf = Buffer.concat(chunks);
+      const dir = path.join(PUBLIC, 'assets', 'leadfiles'); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const name = `${lead.id}-voice-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(dir, name), buf);
+      let transcript = '';
+      if (u.searchParams.get('transcribe') !== '0' && llm.hasImage !== undefined) {
+        try { transcript = ((await llm.transcribe(buf, 'voice.' + ext)) || '').trim().slice(0, 4000); } catch (_) {}
+      }
+      lead.voiceNotes = lead.voiceNotes || [];
+      const vn = { id: crypto.randomBytes(4).toString('hex'), url: '/assets/leadfiles/' + name, dur: +u.searchParams.get('dur') || 0, transcript, who: String(u.searchParams.get('who') || '').slice(0, 60), at: Date.now() };
+      lead.voiceNotes.unshift(vn);
+      ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `Голосовой комментарий по лиду ${lead.name}${transcript ? ': ' + transcript.slice(0, 80) : ''}` });
+      store.save();
+      return json(res, 200, vn);
+    }
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/voice\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const v = (lead.voiceNotes || []).find(x => x.id === m[2]);
+      if (v) { try { fs.unlinkSync(path.join(PUBLIC, v.url.replace(/^\//, ''))); } catch (_) {} }
+      lead.voiceNotes = (lead.voiceNotes || []).filter(x => x.id !== m[2]); store.save();
+      return json(res, 200, { ok: true });
+    }
+
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/(message|inbound|handover|analyze)$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]);
       if (!lead) return json(res, 404, { error: 'not found' });
@@ -2492,7 +2627,7 @@ const server = http.createServer(async (req, res) => {
         if (b.stagesCfg.custom) sc.custom = b.stagesCfg.custom.slice(0, 15).map(x => ({ id: String(x.id).slice(0, 30), name: String(x.name).slice(0, 40) }));
         if (b.stagesCfg.hidden) sc.hidden = b.stagesCfg.hidden.slice(0, 20).map(String);
       }
-      if (b.customFields) db.settings.customFields = b.customFields.slice(0, 20).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: f.type === 'select' ? 'select' : 'text', options: (f.options || []).slice(0, 20).map(String) })).filter(f => f.key && f.label);
+      if (b.customFields) { const CF_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'phone', 'url', 'email', 'select', 'multiselect', 'bool', 'rating']; db.settings.customFields = b.customFields.slice(0, 40).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: CF_TYPES.includes(f.type) ? f.type : 'text', options: (f.options || []).slice(0, 30).map(v => String(v).slice(0, 60)).filter(Boolean), unit: String(f.unit || '').slice(0, 12) })).filter(f => f.key && f.label); }
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
@@ -2632,6 +2767,7 @@ const server = http.createServer(async (req, res) => {
       if (NN) slides = trimToCount(slides, NN);
       slides = stylePass(slides, PAGE_THEMES[b.theme] || {});
       if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });
+      slides = artDirect(slides, { dna: carDNA(b, photoBias) });   /* ритм колоды + семейство раскладки каждому слайду */
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -2743,6 +2879,7 @@ const server = http.createServer(async (req, res) => {
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
         slides = stylePass(slides, PAGE_THEMES[c.theme] || {});    /* разные раскладки + фоны, соседние отличаются */
         if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });   /* уместный стикер по смыслу слайда */
+        slides = artDirect(slides, { dna: carDNA(b, photoBias) });   /* ритм колоды + семейство раскладки каждому слайду */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
@@ -2939,7 +3076,7 @@ const server = http.createServer(async (req, res) => {
           prompt = llm.masterStickerPrompt(st, want, false);   /* текст НЕ запекаем — рендерит фронт отдельным слоем */
           if (st) {
             cap = (st.secondary || st.object || want).slice(0, 60);
-            txt = { mode: st.textMode || 'none', primary: st.primary || '', secondary: st.secondary || '', micro: st.micro || '' };
+            txt = { mode: st.textMode || 'none', primary: st.primary || '', secondary: st.secondary || '', micro: st.micro || '', cat: st.category || '', meaning: st.meaning || '' };
           }
         } else {
           /* фото-режим: чистая реалистичная фотография именно того, что просят, без импровизации */
@@ -4465,14 +4602,15 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
         const hasGrad = !hasVid && !hasBg && !hasColor && !hasPat && !!s.grad;
         const scHeavy = (hasBg || hasVid) && !!s.mode;   /* контент (иконки/цифры) поверх фото — усиленный скрим для читаемости */
-        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : ''].filter(Boolean).join(' ');
+        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : '', s.layout ? `lay-${s.layout}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'check' }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'check', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
+            ${s.hero ? `<div class="s-hero"><b>${esc(s.hero.v)}</b><i>${esc(s.hero.k)}</i></div>` : ''}
             <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]}"` : ''}>${sanInline(s.heading)}</h2>
             ${s.mode === 'stats' && (s.items || []).length ? `<div class="s-stats">${s.items.map(it => `<div class="s-stat"><b>${esc(it.v || it.k)}</b><i>${esc(it.v ? it.k : '')}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
@@ -4511,6 +4649,35 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
 .slide .s-in{position:relative;z-index:1}
 .slide.sc-heavy::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,22,.52),rgba(8,12,22,.74));z-index:0}
+/* ═══ СЕМЕЙСТВА РАСКЛАДКИ (арт-дирекшн) ═══ */
+/* data-hero: одно крупное число доминирует */
+.s-hero{display:flex;flex-direction:column;gap:2px;margin:2px 0 6px}
+.s-hero b{font-family:var(--disp);font-weight:700;line-height:.92;letter-spacing:-.03em;font-size:clamp(56px,17vw,132px)}
+.s-hero i{font-style:normal;font-size:clamp(12px,3vw,16px);letter-spacing:.12em;text-transform:uppercase;opacity:.8;font-weight:700}
+.slide.lay-data{justify-content:center}
+.slide.lay-data .s-h{font-size:clamp(20px,5vw,30px);opacity:.9;letter-spacing:-.01em}
+.slide.lay-data .s-hero b{color:var(--blue)}
+.slide.lay-data.hasbg .s-hero b{color:#fff}
+/* immersive: тёмное фото + центр, максимум эмоции, минимум текста */
+.slide.lay-immersive::after{content:'';position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 45%,rgba(6,10,20,.35),rgba(6,10,20,.72));z-index:0}
+.slide.lay-immersive .s-in{max-width:76%;margin:auto;text-align:center}
+.slide.lay-immersive .s-h{font-size:clamp(30px,8vw,60px);text-wrap:balance}
+.slide.lay-immersive .s-points{display:none}
+.slide.lay-immersive .s-eye{margin-left:auto;margin-right:auto}
+/* typo: типографика-first, без фото — заголовок во весь слайд */
+.slide.lay-typo .s-h{font-size:clamp(40px,11vw,88px);line-height:1.0;letter-spacing:-.03em}
+.slide.lay-typo .s-s{font-size:clamp(15px,3.6vw,19px);max-width:80%}
+/* split: фото сверху + сплошная плашка с контентом снизу */
+.slide.lay-split.hasbg{color:var(--ink)}
+.slide.lay-split .s-in{background:var(--paper);color:var(--ink);margin-top:auto;border-radius:20px 20px 0 0;box-shadow:0 -20px 40px -20px rgba(0,0,0,.4);padding-top:26px}
+.slide.lay-split .s-num{color:var(--mut)}
+.slide.lay-split .s-eye{color:var(--blue)}
+/* panel: фото на весь + плавающая карточка с контентом */
+.slide.lay-panel.hasbg{color:var(--ink)}
+.slide.lay-panel .s-in{background:color-mix(in srgb,var(--paper) 90%,transparent);color:var(--ink);border-radius:18px;margin:auto 7% 7%;box-shadow:0 24px 60px -24px rgba(0,0,0,.55);backdrop-filter:blur(3px);align-self:stretch}
+.slide.lay-panel .s-eye{color:var(--blue)}
+/* cinematic: фото на весь, заголовок крупно снизу (усиленный низовой градиент) */
+.slide.lay-cinematic::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(6,10,20,.72));z-index:0}
 /* слои: фигуры/стикеры/фото/текст */
 .s-lyr{position:absolute}
 .s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
