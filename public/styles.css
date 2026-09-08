@@ -3641,3 +3641,25 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-att:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -16px rgba(16,43,92,.28); }
 /* тёмные скины: на глубоком фоне тень мягче и холоднее, ховер — свечение */
 .ov-w[class*="ov-skin-"]:not(.ov-skin-clean):not(.ov-skin-mesh):not(.full):hover .ov-w-body { box-shadow: 0 22px 50px -20px rgba(6,17,38,.6), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+/* ============ Обогащённые виджеты: Приток (area) + WhatsApp-здоровье (ring) ============ */
+.ov2-spark2 { display: flex; flex-direction: column; gap: 8px; }
+.ov2-spark2-hd { display: flex; align-items: baseline; gap: 10px; }
+.ov2-spark2-hd b { font-size: 30px; font-weight: 800; color: var(--navy-900); letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.ov2-spark2-hd span { font-size: 12px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.ov2-spark2-area { height: 74px; }
+.ov2-wa { display: flex; align-items: center; gap: 16px; }
+.ov2-wa-ring { position: relative; width: 84px; height: 84px; flex: none; }
+.ov2-wa-ring svg { width: 100%; height: 100%; }
+.ov2-wa-ring .war-bg { fill: none; stroke: var(--stroke); stroke-width: 7; }
+.ov2-wa-ring .war-fg { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
+.ov2-wa-ring.bad .war-fg { stroke: var(--bad) !important; }
+.ov2-wa-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.ov2-wa-c b { font-size: 22px; font-weight: 800; color: var(--navy-900); line-height: 1; font-variant-numeric: tabular-nums; }
+.ov2-wa-c b span { font-size: 12px; font-weight: 700; }
+.ov2-wa-c i { font-size: 9.5px; font-style: normal; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.ov2-wa-tiles { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.ov2-wa-t { text-align: left; border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 13px; background: var(--card); cursor: pointer; transition: border-color .15s; }
+.ov2-wa-t:hover { border-color: var(--accent); }
+.ov2-wa-t b { font-size: 20px; font-weight: 800; color: var(--navy-900); display: block; line-height: 1; font-variant-numeric: tabular-nums; }
+.ov2-wa-t i { font-size: 11px; color: var(--ink-3); font-style: normal; }
