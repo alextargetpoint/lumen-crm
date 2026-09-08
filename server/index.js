@@ -738,7 +738,11 @@ const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
   .replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
   .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
   .replace(/<\s*(\/?)(b|strong|i|em|u|br)\b[^>]*>/gi, (mm, s, t) => `<${s}${t.toLowerCase()}>`)
-  .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '');
+  .replace(/<(?!(?:\/?(?:b|strong|i|em|u|mark|br)>)|(?:mark class="hl-[a-z0-9]+">))[^>]*>/gi, '')
+  .replace(/\s+([.,!?;:»])/g, '$1')                    /* нет пробела перед пунктуацией — «.» не уедет на строку */
+  .replace(/([«])\s+/g, '$1')
+  .replace(/\s{2,}/g, ' ')
+  .replace(/(\S)\s+(\S{1,3}[.,!?;:»]?)\s*$/, '$1 $2');   /* приклеиваем короткое последнее слово (анти-«вдова») */
 /* ── Слои слайда: фигуры, стикеры, рамки, фото, текст (drag/resize/z-order) ── */
 const CAR_SHAPES = new Set(['rect', 'circle', 'ring', 'line', 'triangle', 'blob', 'arrow', 'badge', 'diamond']);
 const CAR_FRAMES = new Set(['thin', 'double', 'corners', 'inset', 'film', 'tape']);
@@ -4412,13 +4416,13 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .s-bar{background:rgba(255,255,255,.22)}.slide.hasbg .s-bar.hi{background:#fff}
 .s-barcol i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
-.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;text-wrap:balance}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
 .slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
 .slide.hasbg .s-h{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 26px rgba(0,0,0,.4)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
-.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%}
+.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
 .slide.al-center .s-s{max-width:100%}
 .slide.hasbg .s-s{color:rgba(255,255,255,.94);text-shadow:0 1px 10px rgba(0,0,0,.5)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
