@@ -31,6 +31,59 @@ const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const numOf = (s) => { const m = String(s == null ? '' : s).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
 function handoverKey(h) { const s = String(h || ''); if (/готов|ready/i.test(s)) return 0; const q = s.match(/Q(\d)\s*'?\s*(\d{2,4})/i); if (q) { const y = q[2].length === 2 ? 2000 + (+q[2]) : +q[2]; return (y - 2000) * 4 + (+q[1]); } const y = s.match(/(20\d\d)/); return y ? (y[1] - 2000) * 4 : 99; }
 
+/* ============================================================================
+   Ф2 · Image-intelligence (эвристика, БЕЗ vision-API — $0)
+   Роль изображения выводим из имени файла/URL + позиции в массиве. Focal-point
+   выбираем так, чтобы кроп cover НЕ срезал архитектурный фокус. Планы/карты —
+   contain (никогда не cover-cropped).
+   ========================================================================== */
+function classifyImage(url, i) {
+  const s = String(url || '').toLowerCase().split('?')[0].split('/').pop();
+  let role, focal = '50% 45%', contain = false, plan = false;
+  if (/(floor\s*-?plan|floorplan|\bplan\b|layout|master\s*-?plan|masterplan|site\s*-?plan|siteplan|genplan|\bmap\b|карт|планировк|генплан|схем)/.test(s)) {
+    role = /(\bmap\b|site|master|genplan|генплан|карт|схем)/.test(s) ? 'map' : 'floorplan'; contain = true; plan = true; focal = 'center';
+  } else if (/(aerial|drone|bird|skyline|overview|panorama|masterview)/.test(s)) { role = 'aerial'; focal = '50% 50%'; }
+  else if (/(pool|amenity|amenit|gym|spa|lobby|reception|lounge|rooftop|garden|clubhouse|sauna|jacuzzi|бассейн)/.test(s)) { role = 'amenity'; focal = '50% 52%'; }
+  else if (/(ext|exterior|facade|fasad|building|tower|arch|hero|villa|house|фасад|экстер)/.test(s)) { role = 'exterior'; focal = '50% 40%'; }
+  else if (/(view|balcon|terrace|vista|sea|beach|skyview|вид)/.test(s)) { role = 'view'; focal = '50% 42%'; }
+  else if (/(int|interior|living|bedroom|\bbed\b|bath|kitchen|dining|room|salon|интер|гостин|спальн|кухн)/.test(s)) { role = 'interior'; focal = '50% 52%'; }
+  else if (/(lifestyle|people|couple|family|detail|life|lobby)/.test(s)) { role = 'lifestyle'; focal = '50% 45%'; }
+  else { role = i === 0 ? 'exterior' : 'photo'; focal = i === 0 ? '50% 40%' : '50% 48%'; }
+  return { url, role, focal, contain, plan, i };
+}
+function classifyImages(pr) { return (pr.images || []).filter(Boolean).map((u, i) => classifyImage(u, i)); }
+
+/* курируем набор: hero (лучший экстерьер/аэро), gallery (микс ролей без дублей), планы отдельно */
+function curateImages(pr) {
+  const all = classifyImages(pr);
+  const plans = all.filter(x => x.plan);
+  const photos = all.filter(x => !x.plan);
+  const rank = { aerial: 0, exterior: 1, view: 2, amenity: 3, lifestyle: 4, interior: 5, photo: 6 };
+  const hero = photos.slice().sort((a, b) => (rank[a.role] - rank[b.role]) || (a.i - b.i))[0] || null;
+  const exters = photos.filter(x => x.role === 'exterior' || x.role === 'aerial' || x.role === 'view');
+  const inters = photos.filter(x => x.role === 'interior');
+  const amens = photos.filter(x => x.role === 'amenity' || x.role === 'lifestyle');
+  const gallery = [];
+  const add = (x) => { if (x && !gallery.includes(x)) gallery.push(x); };
+  add(hero);
+  exters.filter(x => x !== hero).slice(0, 1).forEach(add);   /* ещё один вид/экстерьер */
+  inters.slice(0, 3).forEach(add);                            /* 2-3 интерьера */
+  amens.slice(0, 1).forEach(add);                             /* 1 удобство/лайфстайл */
+  photos.forEach(x => { if (gallery.length < 5) add(x); });   /* добить до 5 из оставшихся */
+  return { all, plans, photos, hero, gallery };
+}
+
+/* фаза платежа из ярлыка/процента — для честного cash-flow timeline */
+function payPhase(label, pctNum) {
+  const s = String(label || '').toLowerCase();
+  if (/ключ|сдач|handover|получен|заселен|заверш|complet|final|остаток|balance/.test(s)) return 'handover';
+  if (/перв|взнос|бронь|booking|down|депозит|deposit|старт|start|сейчас|now|при брон|при подписан|подписан/.test(s)) return 'now';
+  if (/строит|строй|construction|during|период|ежемес|monthly|рассроч|installm|график|график/.test(s)) return 'build';
+  if (pctNum != null && pctNum >= 90) return 'handover';   /* 100% полной оплаты трактуем как единый платёж */
+  return 'build';
+}
+function isMonthlyDrip(pct, label) { return /мес|month|ежемес|monthly|\/\s*м\b|per\s*month|в\s*месяц/i.test(String(pct) + ' ' + String(label)); }
+
 /* ---- палитры направлений (muted-premium; без SaaS-фиолета/блёсток) ---- */
 const PALS = {
   editorial:     { paper: '#FAF7F1', ink: '#17130C', mut: '#8A7F6C', line: '#E9E1D2', accent: '#8A5A2B', accentSoft: '#F0E7D8', band: '#14110B', onBand: '#F3ECDD', tint: '#F3EDE1' },
@@ -142,15 +195,16 @@ function artDirect(db, c, props, dna, lead, seed) {
 
   const used = [];
   props.forEach((pr, i) => {
-    const imgs = (pr.images || []).filter(Boolean);
+    const cur = curateImages(pr);
+    const nPhotos = cur.photos.length;   /* планы не считаем фотографиями галереи */
     const rich = (pr.units || []).length >= 3 || ((pr.roi ? 1 : 0) + (pr.appreciation ? 1 : 0) + ((pr.paymentRows || []).length >= 2 ? 1 : 0) >= 2);
     let v;
-    if (imgs.length >= 5 && dna.imageDom !== 'low') v = 'galleryCurated';
-    else if (imgs.length <= 1) v = 'singleHero';
+    if (nPhotos >= 3 && dna.imageDom !== 'low') v = 'galleryCurated';   /* достаточно фото → курируемый микс */
+    else if (nPhotos <= 1) v = 'singleHero';
     else if (rich && dna.dataDepth !== 'minimal') v = 'metricEditorial';
     else v = 'bento';
     /* анти-повтор: не 3-й раз подряд одна композиция */
-    const alts = ['metricEditorial', 'bento', 'singleHero', 'galleryCurated'].filter(x => x !== v && !(x === 'galleryCurated' && imgs.length < 3) && !(x === 'singleHero' && imgs.length > 2 && dna.imageDom === 'high'));
+    const alts = ['metricEditorial', 'bento', 'singleHero', 'galleryCurated'].filter(x => x !== v && !(x === 'galleryCurated' && nPhotos < 3) && !(x === 'singleHero' && nPhotos > 2 && dna.imageDom === 'high'));
     if (used.length >= 2 && used[used.length - 1] === v && used[used.length - 2] === v) v = pick(r, alts.length ? alts : [v]);
     used.push(v);
     plan.push({ role: 'PROJECT_OVERVIEW', v, pid: pr.id, idx: i });
@@ -197,23 +251,38 @@ function renderDesignDoc(db, c, opts) {
 
   /* метрика-рельса (модули варьируются, не один KPI-блок ×N) */
   function metricRail(pr, variant) {
+    /* Ф2 · метрика-библиотека: НИ ОДНОЙ пустой плашки — поле без данных не выводим */
     const items = [];
-    items.push({ k: 'Цена', v: 'от ' + money(pr.priceFrom, pr), sub: pr.type || '' });
-    items.push({ k: 'Сдача', v: esc(pr.handover || '—'), sub: pr.market === 'offplan' ? 'off-plan' : 'готовый' });
+    if (pr.priceFrom) items.push({ k: 'Цена', v: 'от ' + money(pr.priceFrom, pr), sub: pr.type || '' });
+    if (pr.handover) items.push({ k: 'Сдача', v: esc(pr.handover), sub: pr.market === 'offplan' ? 'off-plan' : 'готовый' });
     if (pr.roi && dna.dataDepth !== 'minimal') items.push({ k: 'Доходность', v: esc(pr.roi), sub: 'данные застройщика', src: 1 });
     if (pr.appreciation && dna.dataDepth === 'dashboard') items.push({ k: 'Прирост', v: esc(pr.appreciation), sub: 'к сдаче', src: 1 });
+    if (!items.length) return '';
     if (variant === 'stack') return `<div class="mrail stack">${items.map(m => `<div class="mr"><span class="mr-k">${m.k}</span><b class="mr-v">${m.v}</b>${m.sub ? `<span class="mr-s ${m.src ? 'src' : ''}">${m.sub}</span>` : ''}</div>`).join('')}</div>`;
     if (variant === 'big') return `<div class="mrail big">${items.map((m, i) => `<div class="mr ${i === 0 ? 'lead' : ''}"><b class="mr-v">${m.v}</b><span class="mr-k">${m.k}</span></div>`).join('')}</div>`;
     return `<div class="mrail row">${items.map(m => `<div class="mr"><span class="mr-k">${m.k}</span><b class="mr-v">${m.v}</b>${m.sub ? `<span class="mr-s ${m.src ? 'src' : ''}">${m.sub}</span>` : ''}</div>`).join('')}</div>`;
   }
 
-  /* план оплаты → визуальный milestone-трек (не 3 числа) */
+  /* Ф2 · план оплаты → РЕАЛЬНЫЙ cash-flow: фаза (старт/стройка/ключи) + % + ярлык,
+     накопительная полоса пропорций и tick-паттерн для ежемесячной рассрочки. Не 3 числа. */
+  const PHLB = { now: 'Старт', build: 'Строительство', handover: 'Ключи' };
   function payTrack(pr) {
-    const rows = (pr.paymentRows || []).filter(r => r && r.pct);
-    if (rows.length < 2) return '';
-    const label = pr.market === 'offplan' ? 'Рассрочка' : 'Оплата';
+    const raw = (pr.paymentRows || []).filter(r => r && (r.pct || r.label));
+    if (!raw.length) return '';
+    const label = pr.market === 'offplan' ? 'План рассрочки' : 'Оплата';
+    const rows = raw.map(r => { const pctNum = numOf(r.pct); return { pct: r.pct || '', pctNum, label: r.label || '', phase: payPhase(r.label, pctNum), drip: isMonthlyDrip(r.pct, r.label) }; });
+    /* единый платёж (готовый / ипотека) — честная компактная плашка, не пустота */
+    if (rows.length < 2) {
+      const r = rows[0];
+      return `<div class="pay pay-one">${kicker(label)}<div class="po-one"><b class="po-one-p">${esc(r.pct || '100%')}</b><span class="po-one-l">${esc(r.label || 'Полная оплата')}</span></div></div>`;
+    }
+    const total = rows.reduce((s, r) => s + (r.pctNum || 0), 0) || 100;
+    const bar = `<div class="pt-bar" role="img" aria-label="структура платежей">${rows.map(r => `<span class="pt-seg ph-${r.phase}${r.drip ? ' drip' : ''}" style="width:${((r.pctNum || 0) / total * 100).toFixed(1)}%" title="${esc(r.pct)} · ${esc(r.label)}"></span>`).join('')}</div>`;
+    const phasesShown = [...new Set(rows.map(r => r.phase))];
+    const legend = `<div class="pt-leg">${phasesShown.map(ph => `<span class="pt-lg"><i class="ph-${ph}"></i>${PHLB[ph]}</span>`).join('')}</div>`;
     return `<div class="pay">${kicker(label)}
-      <div class="pt-track"><div class="pt-line"></div>${rows.map((r, i) => `<div class="pt-node" style="--i:${i}"><span class="pt-dot"></span><b class="pt-pct">${esc(r.pct)}</b><span class="pt-lb">${esc(r.label || '')}</span></div>`).join('')}</div></div>`;
+      <div class="pt-track"><div class="pt-line"></div>${rows.map((r, i) => `<div class="pt-node ph-${r.phase}${r.drip ? ' drip' : ''}" style="--i:${i}"><span class="pt-dot"></span><b class="pt-pct">${esc(r.pct)}</b><span class="pt-lb">${esc(r.label)}</span><span class="pt-ph">${PHLB[r.phase]}</span></div>`).join('')}</div>
+      ${bar}${legend}</div>`;
   }
 
   /* локация → drive-time чипы (без авто-эмодзи). skipBlurb — когда текст уже показан как lede */
@@ -242,9 +311,24 @@ function renderDesignDoc(db, c, opts) {
       <tbody>${u.map(x => `<tr><td><b>${esc(x.plan)}</b></td><td>${esc(x.area)}</td><td>${esc(x.floor)}</td><td>${esc(x.view)}</td><td class="r num">${money(x.price, pr)}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
-  function imgCell(url, cls, label) {
-    if (url) return `<div class="ph ${cls || ''}" style="background-image:url('${esc(abs(url))}')"></div>`;
-    return `<div class="ph grad ${cls || ''}"><span>${esc(label || '')}</span></div>`;
+  /* Ф2 · focal-aware изображение. img — классифицированный объект {url,focal,contain,role}
+     или голый URL (фолбэк). Планы/карты → contain (не срезаем), фото → object-position по focal. */
+  function imgEl(img, cls, label) {
+    const o = (img && typeof img === 'object') ? img : { url: img, focal: '50% 45%', contain: false, role: '' };
+    if (!o.url) return `<div class="ph grad ${cls || ''}"><span>${esc(label || '')}</span></div>`;
+    if (o.contain) return `<div class="ph plan ${cls || ''}" data-role="${esc(o.role || '')}" style="background-image:url('${esc(abs(o.url))}');background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--tint)"></div>`;
+    return `<div class="ph ${cls || ''}" data-role="${esc(o.role || '')}" style="background-image:url('${esc(abs(o.url))}');background-position:${esc(o.focal || '50% 45%')}"></div>`;
+  }
+  const imgCell = imgEl;   /* совместимость с прежними вызовами (голый URL допустим) */
+
+  /* Ф2 · выделенный модуль планировок/карт — contained, с подписью; НИКОГДА не в фото-галерее */
+  function floorPlan(plans) {
+    const ps = (plans || []).slice(0, 3);
+    if (!ps.length) return '';
+    const cap = (pl) => pl.role === 'map' ? 'Расположение / генплан' : 'Планировка';
+    return `<div class="fplan">${kicker(ps.length > 1 ? 'Планировки и генплан' : (ps[0].role === 'map' ? 'Расположение' : 'Планировка'))}
+      <div class="fp-grid fp-${ps.length}">${ps.map(pl => `<figure class="fp-cell">${imgEl(pl, 'fp-img')}<figcaption class="fp-cap">${esc(cap(pl))}</figcaption></figure>`).join('')}</div>
+      <p class="fp-note">Планировки и генплан — материалы застройщика, размеры ориентировочные.</p></div>`;
   }
 
   /* ---------- грамматики страниц ---------- */
@@ -254,14 +338,16 @@ function renderDesignDoc(db, c, opts) {
   const G = {
     COVER(pg) {
       const title = c.title || 'Персональная подборка';
-      const hero = props.map(p => (p.images || [])[0]).find(Boolean);
+      /* Ф2 · обложка тоже берёт КУРИРОВАННЫЙ hero (лучший экстерьер/аэро) с его focal-point */
+      const heroProp = props.find(p => curateImages(p).hero);
+      const hero = heroProp ? curateImages(heroProp).hero : null;
       const minP = Math.min(...props.map(p => p.priceFrom || Infinity));
       const badge = isFinite(minP) ? 'от ' + money(minP, props.find(p => p.priceFrom === minP)) : '';
       const geo = geoNames[(props[0] || {}).geo] || '';
       const meta = `<div class="cv-meta"><span>${esc(dna.ctx.nProj)} ${plural(dna.ctx.nProj)}</span>${geo ? `<span class="dot"></span><span>${esc(geo)}</span>` : ''}${badge ? `<span class="dot"></span><span>${esc(badge)}</span>` : ''}</div>`;
       const forWho = lead ? `<div class="cv-for">Подготовлено для<b>${esc(lead.name || '')}</b></div>` : '';
       if (pg.v === 'band') {
-        return `<section class="page cover cv-band ${hero ? 'has' : ''}" ${hero ? `style="background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.72)),url('${esc(abs(hero))}')"` : ''}>
+        return `<section class="page cover cv-band ${hero ? 'has' : ''}" ${hero ? `style="background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.72)),url('${esc(abs(hero.url))}');background-position:${esc(hero.focal || 'center')}"` : ''}>
           <header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
           <div class="cv-mid"><div class="cv-kick">${esc(geo || 'Недвижимость')} · подборка</div><h1 class="cv-h">${esc(title)}</h1>${forWho}</div>
           <footer class="cv-bot">${meta}</footer></section>`;
@@ -305,39 +391,46 @@ function renderDesignDoc(db, c, opts) {
     PROJECT_OVERVIEW(pg) {
       const pr = prById(pg.pid); if (!pr) return '';
       const co = projCopy(c, pg.pid, pr);
-      const imgs = (pr.images || []).filter(Boolean);
+      /* Ф2 · курируем изображения: hero = лучший экстерьер/аэро, gallery = микс ролей, планы отдельно */
+      const cur = curateImages(pr);
+      const photos = cur.photos;
+      const hero = cur.hero;
+      const second = photos.find(x => x !== hero) || null;
+      const fp = floorPlan(cur.plans);
       const head = `<div class="po-head">${kicker('Проект №' + num2(pg.idx + 1) + (pr.developer ? ' · ' + esc(pr.developer) : ''))}<h2 class="po-h">${esc(co.hook)}</h2>${pr.name !== co.hook ? `<div class="po-sub">${esc(pr.name)}${pr.area ? ' · ' + esc(pr.area) : ''}</div>` : (pr.area ? `<div class="po-sub">${esc(pr.area)}</div>` : '')}</div>`;
       const why = co.why.length ? `<div class="rec-inline">${kicker(pr.market === 'offplan' ? 'Почему стоит рассмотреть' : 'Почему этот объект')}<ol class="why">${co.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}</ol></div>` : '';
 
       if (pg.v === 'singleHero') {
         return `<section class="page po po-single ${dna.imageDom === 'high' ? 'domhi' : ''}">
-          <div class="po-hero">${imgCell(imgs[0], 'hero', pr.area || pr.name)}<div class="po-ident"><span class="po-id-k">${esc(geoNames[pr.geo] || '')}</span><b class="po-id-v">${esc(pr.name)}</b></div></div>
+          <div class="po-hero">${imgEl(hero, 'hero', pr.area || pr.name)}<div class="po-ident"><span class="po-id-k">${esc(geoNames[pr.geo] || '')}</span><b class="po-id-v">${esc(pr.name)}</b></div></div>
           ${head}
           ${co.blurb ? `<p class="lede drop">${esc(co.blurb)}</p>` : ''}
           ${metricRail(pr, 'row')}
-          ${driveTimes(pr, true)}${payTrack(pr)}${why}
+          ${driveTimes(pr, true)}${payTrack(pr)}${fp}${why}
           ${foot(esc(pr.name))}</section>`;
       }
       if (pg.v === 'galleryCurated') {
-        const g = imgs.slice(0, 5);
+        const g = cur.gallery;
+        const n = Math.min(g.length, 5);
+        const gridCls = n >= 5 ? 'gal5' : n === 4 ? 'gal4' : 'gal3';
         return `<section class="page po po-gal">
           ${head}
-          <div class="gal5">${imgCell(g[0], 'g-main', pr.area)}${g.slice(1, 5).map((u, i) => imgCell(u, 'g-s', pr.area)).join('')}</div>
+          <div class="${gridCls}">${g.slice(0, 5).map((im, i) => imgEl(im, i === 0 ? 'g-main' : 'g-s', pr.area)).join('')}</div>
           <div class="po-cols"><div class="po-c1">${co.blurb ? `<p class="lede">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}${amenList(pr)}</div>
             <div class="po-c2">${metricRail(pr, 'stack')}${payTrack(pr)}</div></div>
-          ${why}${unitsTable(pr)}
+          ${fp}${why}${unitsTable(pr)}
           ${foot(esc(pr.name))}</section>`;
       }
       if (pg.v === 'bento') {
         return `<section class="page po po-bento">
           ${head}
           <div class="bento">
-            <div class="bt bt-img">${imgCell(imgs[0], '', pr.area)}</div>
+            <div class="bt bt-img">${imgEl(hero, '', pr.area)}</div>
             <div class="bt bt-m">${metricRail(pr, 'big')}</div>
-            ${imgs[1] ? `<div class="bt bt-img2">${imgCell(imgs[1], '', pr.area)}</div>` : ''}
+            ${second ? `<div class="bt bt-img2">${imgEl(second, '', pr.area)}</div>` : ''}
             <div class="bt bt-loc">${driveTimes(pr) || (co.blurb ? `<p class="lede">${esc(co.blurb)}</p>` : '')}</div>
           </div>
-          ${payTrack(pr)}${why}${unitsTable(pr)}
+          ${payTrack(pr)}${fp}${why}${unitsTable(pr)}
           ${foot(esc(pr.name))}</section>`;
       }
       /* metricEditorial — редакторский сплит: текст + рельса метрик, план оплаты трек */
@@ -345,9 +438,9 @@ function renderDesignDoc(db, c, opts) {
         ${head}
         <div class="me-split">
           <div class="me-l">${co.blurb ? `<p class="lede drop">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}${amenList(pr)}</div>
-          <aside class="me-r">${imgCell(imgs[0], 'me-img', pr.area)}${metricRail(pr, 'stack')}</aside>
+          <aside class="me-r">${imgEl(hero, 'me-img', pr.area)}${metricRail(pr, 'stack')}</aside>
         </div>
-        ${payTrack(pr)}${why}${unitsTable(pr)}
+        ${payTrack(pr)}${fp}${why}${unitsTable(pr)}
         ${foot(esc(pr.name))}</section>`;
     },
 
@@ -523,6 +616,39 @@ p{font-size:var(--s-body);line-height:1.6}
 .pt-dot{width:12px;height:12px;border-radius:50%;background:var(--paper);border:2.5px solid var(--accent);position:relative;z-index:1}
 .pt-pct{font-family:var(--disp);font-size:26px;font-weight:600;margin-top:12px;letter-spacing:-.01em}
 .pt-lb{font-size:11.5px;color:var(--mut);margin-top:3px;max-width:15ch;line-height:1.3}
+/* Ф2 · фазы платежа (старт/стройка/ключи) + накопительная полоса cash-flow */
+.pt-ph{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-top:6px}
+.pt-node.ph-build .pt-dot{border-color:color-mix(in srgb,var(--accent) 48%,var(--mut))}
+.pt-node.ph-build .pt-ph{color:color-mix(in srgb,var(--accent) 55%,var(--mut))}
+.pt-node.ph-handover .pt-dot{background:var(--accent);border-color:var(--accent)}
+.pt-node.drip .pt-dot{background:repeating-linear-gradient(45deg,var(--accent) 0 2px,var(--paper) 2px 4px)}
+.pt-bar{display:flex;height:10px;border-radius:100px;overflow:hidden;margin:18px 0 10px;background:var(--tint)}
+.pt-seg{height:100%;display:block;position:relative}
+.pt-seg.ph-now{background:var(--accent)}
+.pt-seg.ph-build{background:color-mix(in srgb,var(--accent) 42%,var(--tint))}
+.pt-seg.ph-handover{background:color-mix(in srgb,var(--ink) 78%,var(--accent))}
+.pt-seg+.pt-seg{box-shadow:-1px 0 0 var(--paper)}
+.pt-seg.drip{background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 2px,transparent 2px 7px)}
+.pt-leg{display:flex;gap:18px;flex-wrap:wrap;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.pt-lg{display:inline-flex;align-items:center;gap:7px}
+.pt-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.pt-lg i.ph-now{background:var(--accent)}.pt-lg i.ph-build{background:color-mix(in srgb,var(--accent) 42%,var(--tint))}.pt-lg i.ph-handover{background:color-mix(in srgb,var(--ink) 78%,var(--accent))}
+/* единый платёж (готовый/ипотека) — компактная плашка вместо пустоты */
+.pay-one .po-one{display:flex;align-items:baseline;gap:16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0}
+.po-one-p{font-family:var(--disp);font-size:var(--s-metric);font-weight:600;letter-spacing:-.01em;color:var(--accent)}
+.po-one-l{font-size:14px;color:var(--ink)}
+/* Ф2 · floor-plan / генплан — contained, не cover-cropped, с подписью */
+.fplan{margin:16px 0 26px}
+.fp-grid{display:grid;gap:12px}
+.fp-grid.fp-1{grid-template-columns:1fr}
+.fp-grid.fp-2{grid-template-columns:1fr 1fr}
+.fp-grid.fp-3{grid-template-columns:repeat(3,1fr)}
+.fp-cell{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--tint)}
+.fp-img{height:300px}
+.fp-grid.fp-2 .fp-img,.fp-grid.fp-3 .fp-img{height:230px}
+.fp-cap{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700;padding:10px 14px;border-top:1px solid var(--line);background:var(--paper)}
+.fp-note{font-size:11.5px;color:var(--mut);font-style:italic;margin-top:12px}
+@media(max-width:640px){.fp-grid.fp-2,.fp-grid.fp-3{grid-template-columns:1fr}.fp-img{height:240px}}
 /* ---- location / drive times ---- */
 .loc{margin:8px 0 26px}
 .loc-b{font-size:14.5px;color:var(--mut);line-height:1.55;max-width:56ch;margin-bottom:14px}
@@ -562,8 +688,13 @@ p{font-size:var(--s-body);line-height:1.6}
 /* ---- PROJECT gallery ---- */
 .gal5{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:200px 150px;gap:8px;margin-bottom:26px}
 .gal5 .g-main{grid-column:1/3;grid-row:1/3;border-radius:var(--radius)}.gal5 .g-s{border-radius:var(--radius)}
+/* Ф2 · адаптив под курируемый набор (3 / 4 фото) — hero всегда крупнее */
+.gal3{display:grid;grid-template-columns:1.35fr 1fr;grid-template-rows:150px 150px;gap:8px;margin-bottom:26px}
+.gal3 .g-main{grid-column:1;grid-row:1/3;border-radius:var(--radius)}.gal3 .g-s{grid-column:2;border-radius:var(--radius)}
+.gal4{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:210px 140px;gap:8px;margin-bottom:26px}
+.gal4 .g-main{grid-column:1/4;grid-row:1;border-radius:var(--radius)}.gal4 .g-s{border-radius:var(--radius)}
 .po-cols{display:grid;grid-template-columns:1.15fr .85fr;gap:36px;align-items:start}
-@media(max-width:640px){.gal5{grid-template-columns:repeat(2,1fr);grid-template-rows:180px 120px 120px}.gal5 .g-main{grid-column:1/3}.po-cols{grid-template-columns:1fr;gap:22px}}
+@media(max-width:640px){.gal5{grid-template-columns:repeat(2,1fr);grid-template-rows:180px 120px 120px}.gal5 .g-main{grid-column:1/3}.gal3{grid-template-columns:1fr 1fr;grid-template-rows:160px 120px}.gal3 .g-main{grid-column:1/3;grid-row:1}.gal4{grid-template-columns:repeat(2,1fr);grid-template-rows:170px 120px}.gal4 .g-main{grid-column:1/3}.po-cols{grid-template-columns:1fr;gap:22px}}
 /* ---- PROJECT bento ---- */
 .bento{display:grid;grid-template-columns:1.4fr 1fr;grid-template-rows:230px 200px;gap:10px;margin-bottom:26px}
 .bento .bt{border-radius:var(--radius);overflow:hidden}
