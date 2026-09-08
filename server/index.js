@@ -827,6 +827,8 @@ function renderCarLayers(layers, isEdit) {
     diag: `linear-gradient(135deg,${from},${to})`, radial: `radial-gradient(120% 100% at 50% 45%,${from},${to})`,
   }[gd] || `linear-gradient(180deg,${from},${to})`);
   const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:1.05em;height:1.05em;flex:none"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  /* светлый текст на фото → мягкая тень для читаемости поверх «занятых» кадров (пальмы, блики) */
+  const isLightHex = (h) => { const x = String(h || '').replace('#', ''); if (x.length < 3) return false; const s2 = x.length <= 4 ? x.split('').slice(0, 3).map(ch => ch + ch).join('') : x.slice(0, 6); const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 155; };
   return layers.map((l, i) => {
     const z = 10 + (l.z || 0);
     const de = isEdit ? ` data-lyr="${i}"${lj(l)}` : '';
@@ -852,7 +854,8 @@ function renderCarLayers(layers, isEdit) {
       const wt = l.wt || (l.tb ? 800 : (isSans ? 600 : 500));
       const fsz = l.fs ? `${l.fs}cqw` : `${l.tsize}px`;
       const ls = l.ls != null ? `${l.ls}em` : (isSans && l.up ? '.1em' : 'normal');
-      const styleTx = `color:${esc(l.color)};font-size:${fsz};font-family:${fam};font-weight:${wt};line-height:${l.lh || 1.1};letter-spacing:${ls};text-align:${l.al || 'left'};${l.up ? 'text-transform:uppercase;' : ''}display:block;text-wrap:balance`;
+      const shadow = isLightHex(l.color) ? `text-shadow:0 1px 18px rgba(8,12,20,.42),0 1px 3px rgba(8,12,20,.3);` : '';
+      const styleTx = `color:${esc(l.color)};font-size:${fsz};font-family:${fam};font-weight:${wt};line-height:${l.lh || 1.1};letter-spacing:${ls};text-align:${l.al || 'left'};${l.up ? 'text-transform:uppercase;' : ''}${shadow}display:block;text-wrap:balance`;
       inner = `<span class="lyr-tx" style="${styleTx}">${esc(l.text)}</span>`;
     }
     return `<div class="${clsL}" style="${geo}"${de}>${inner}${handles}</div>`;

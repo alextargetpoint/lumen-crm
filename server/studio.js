@@ -180,7 +180,7 @@ function LOCATION_STORY(S, T, ctx) {
   const L = []; const on = T.onImg, onm = T.onImgMut, onl = T.onImgLine, acc = T.darkAccent;
   if (ctx.photo) L.push({ t: 'img', url: ctx.photo, x: 0, y: 0, w: 100, h: 100, fit: 'cover', ox: S.ox != null ? S.ox : 50, oy: S.oy != null ? S.oy : 50, z: 0 });
   L.push({ t: 'grad', gd: 'btt', from: '#0a0e14f2', to: '#0a0e1433', x: 0, y: 0, w: 100, h: 100, z: 1 });
-  pageNum(L, ctx, on, 'tr');
+  pageNum(L, ctx, on, 'tl');   /* рубрика справа → номер слева (иначе накладываются) */
   L.push({ t: 'text', text: S.eyebrow || '', ff: 'sans', up: 1, fs: fitEyebrow(S.eyebrow || '', 46, 1.28, 0.18), ls: 0.18, color: onm, x: 48, y: 5.4, w: 46, al: 'right', z: 5 });
   const hfs = fitHead(S.headline, 60, 6.0, 3, 4.4);
   const stack = [
@@ -204,8 +204,8 @@ function LOCATION_STORY(S, T, ctx) {
 /* 5. DATA_HERO — тёмный фон, гигантское число-акцент + колонки фактов + CTA */
 function DATA_HERO(S, T, ctx) {
   const L = []; const on = T.darkInk, onm = T.darkMut, acc = T.darkAccent, line = T.darkLine;
-  if (ctx.photo) { L.push({ t: 'img', url: ctx.photo, x: 0, y: 0, w: 100, h: 100, fit: 'cover', op: 26, filter: 'dark', z: 0 }); }
-  pageNum(L, ctx, onm, 'tr');
+  if (ctx.photo) { L.push({ t: 'img', url: ctx.photo, x: 0, y: 0, w: 100, h: 100, fit: 'cover', op: 22, filter: 'dark', z: 0 }); L.push({ t: 'grad', gd: 'ttb', from: '#0a0e14cc', to: '#0a0e1466', x: 0, y: 0, w: 100, h: 100, z: 1 }); }
+  pageNum(L, ctx, onm, 'tl');   /* рубрика справа → номер слева (иначе накладываются) */
   L.push({ t: 'text', text: S.eyebrow || '', ff: 'sans', up: 1, fs: fitEyebrow(S.eyebrow || '', 46, 1.28, 0.18), ls: 0.18, color: onm, x: 48, y: 5.4, w: 46, al: 'right', z: 5 });
   const hv = (S.hero && S.hero.value) || S.headline;
   const numFs = fitHead(hv, 84, 15.5, 1, 8.5);
@@ -249,7 +249,111 @@ function CINEMATIC_CTA(S, T, ctx) {
   return { layers: L };
 }
 
-const GRAMMARS = { CINEMATIC_HERO, EDITORIAL_LIGHT, IMAGE_CAPTION, LOCATION_STORY, DATA_HERO, CINEMATIC_CTA };
+/* 7. AMENITIES_GRID — сетка удобств (иконка + название + описание), 2 колонки. Светлая или тёмная. */
+function AMENITIES_GRID(S, T, ctx) {
+  const dark = S.tone === 'dark';
+  const L = []; const ink = dark ? T.darkInk : T.ink, mut = dark ? T.darkMut : T.mut, acc = dark ? T.darkAccent : T.accent, line = dark ? T.darkLine : T.line;
+  pageNum(L, ctx, mut, 'tr');
+  L.push({ t: 'text', text: S.eyebrow || 'ИНФРАСТРУКТУРА', ff: 'sans', up: 1, fs: 1.3, ls: 0.24, color: mut, x: MX, y: 5.6, w: 44, z: 5 });
+  L.push({ t: 'line', color: line, th: 1, x: MX, y: 9.6, w: 26, z: 5 });
+  const hfs = fitHead(S.headline || 'Всё для жизни рядом', 62, 5.6, 3, 4.0);
+  const afterY = flowDown(L, 13.5, [{ text: S.headline || 'Всё для жизни рядом', ff: 'disp', fs: hfs, lh: 1.05, wt: 500, color: ink, w: 62, gap: 0 }]);
+  const rows = (S.rows && S.rows.length ? S.rows : (S.facts || [])).slice(0, 6);
+  const cols = 2, colW = 44, gx = 4, startY = Math.max(afterY + 5, 36), rowH = (92 - startY) / Math.ceil(rows.length / cols);
+  rows.forEach((r, i) => {
+    const cx = MX + (i % cols) * (colW + gx), cy = startY + Math.floor(i / cols) * rowH;
+    L.push({ t: 'icon', key: r.icon || 'award', color: acc, sw: 1.5, x: cx, y: cy, w: 5.4, z: 5 });
+    L.push({ t: 'text', text: r.label || r.big || r.v || '', ff: 'sans', fs: 1.7, lh: 1.15, wt: 600, color: ink, x: cx, y: cy + 6.5, w: colW - 2, z: 5 });
+    if (r.big && r.label) L.push({ t: 'text', text: r.big, ff: 'sans', fs: 1.3, lh: 1.3, color: mut, x: cx, y: cy + 10.2, w: colW - 2, z: 5 });
+  });
+  footerMark(L, T, ctx, mut, line);
+  return { bgc: dark ? T.darkBg : T.paper, layers: L };
+}
+
+/* 8. GALLERY_TRIPTYCH — «типы объектов»: ряд из 3-4 фото с подписями (как редакторская витрина). */
+function GALLERY_TRIPTYCH(S, T, ctx) {
+  const L = []; const ink = T.ink, mut = T.mut, acc = T.accent, line = T.line;
+  pageNum(L, ctx, mut, 'tr');
+  L.push({ t: 'text', text: S.eyebrow || '', ff: 'sans', up: 1, fs: 1.3, ls: 0.24, color: mut, x: MX, y: 5.6, w: 44, z: 5 });
+  const hfs = fitHead(S.headline || 'Форматы резиденций', 80, 5.4, 2, 4.0);
+  L.push({ t: 'text', text: S.headline || 'Форматы резиденций', ff: 'disp', fs: hfs, lh: 1.04, wt: 500, color: ink, x: MX, y: 10, w: 80, z: 5 });
+  const gal = (ctx.gallery && ctx.gallery.length ? ctx.gallery : (ctx.photo ? [ctx.photo] : [])).slice(0, 4);
+  const labels = (S.rows || S.facts || []).map(r => r.label || r.v || r.big || '');
+  const n = Math.max(1, gal.length), gap = 2.5, totalW = 88, cardW = (totalW - gap * (n - 1)) / n, y0 = 30, cardH = 44;
+  gal.forEach((url, i) => {
+    const cx = MX + i * (cardW + gap);
+    L.push({ t: 'img', url, x: cx, y: y0, w: cardW, h: cardH, fit: 'cover', round: 3, z: 3 });
+    if (labels[i]) L.push({ t: 'text', text: labels[i], ff: 'sans', up: 1, fs: 1.15, ls: 0.08, wt: 600, color: ink, x: cx, y: y0 + cardH + 2, w: cardW + 2, z: 4 });
+  });
+  if (S.sub) L.push({ t: 'text', text: S.sub, ff: 'sans', fs: 1.85, lh: 1.4, color: mut, x: MX, y: 84, w: 62, z: 5 });
+  footerMark(L, T, ctx, mut, line);
+  return { bgc: T.paper, layers: L };
+}
+
+/* 9. TYPOGRAPHIC_STATEMENT — тихий типографский разворот без фото (пауза в ритме). */
+function TYPOGRAPHIC_STATEMENT(S, T, ctx) {
+  const dark = S.tone === 'dark';
+  const L = []; const ink = dark ? T.darkInk : T.ink, mut = dark ? T.darkMut : T.mut, acc = dark ? T.darkAccent : T.accent, line = dark ? T.darkLine : T.line;
+  pageNum(L, ctx, mut, 'tr');
+  L.push({ t: 'line', color: acc, th: 2, x: MX, y: 26, w: 8, z: 5 });
+  if (S.eyebrow) L.push({ t: 'text', text: S.eyebrow, ff: 'sans', up: 1, fs: 1.3, ls: 0.24, color: mut, x: MX, y: 30, w: 60, z: 5 });
+  const hfs = fitHead(S.headline || '', 82, 8.4, 4, 4.6);
+  const stack = [
+    { text: S.headline || '', ff: 'disp', fs: hfs, lh: 1.03, wt: 500, color: ink, w: 82, gap: S.eyebrow ? 3 : 0 },
+    S.sub && { text: S.sub, ff: 'sans', fs: 1.95, lh: 1.45, color: mut, w: 58, gap: 3 },
+  ].filter(Boolean);
+  flowDown(L, S.eyebrow ? 34 : 34, stack);
+  footerMark(L, T, ctx, mut, line);
+  return { bgc: dark ? T.darkBg : T.paper, layers: L };
+}
+
+/* 10. PAYMENT_TIMELINE — план оплаты как горизонтальный таймлайн (этап: % + подпись). */
+function PAYMENT_TIMELINE(S, T, ctx) {
+  const dark = S.tone !== 'light';
+  const L = []; const ink = dark ? T.darkInk : T.ink, mut = dark ? T.darkMut : T.mut, acc = dark ? T.darkAccent : T.accent, line = dark ? T.darkLine : T.line;
+  if (dark && ctx.photo) { L.push({ t: 'img', url: ctx.photo, x: 0, y: 0, w: 100, h: 100, fit: 'cover', op: 18, filter: 'dark', z: 0 }); }
+  pageNum(L, ctx, mut, 'tr');
+  L.push({ t: 'text', text: S.eyebrow || 'ПЛАН ОПЛАТЫ', ff: 'sans', up: 1, fs: 1.3, ls: 0.24, color: mut, x: MX, y: 5.6, w: 44, z: 5 });
+  const hfs = fitHead(S.headline || 'Гибкая рассрочка', 70, 5.6, 2, 4.0);
+  L.push({ t: 'text', text: S.headline || 'Гибкая рассрочка', ff: 'disp', fs: hfs, lh: 1.05, wt: 500, color: ink, x: MX, y: 11, w: 70, z: 5 });
+  if (S.sub) L.push({ t: 'text', text: S.sub, ff: 'sans', fs: 1.85, lh: 1.4, color: mut, x: MX, y: 26, w: 58, z: 5 });
+  const stages = (S.facts && S.facts.length ? S.facts : (S.rows || [])).slice(0, 4);
+  const n = Math.max(1, stages.length), y0 = 52, span = 88, step = span / n;
+  L.push({ t: 'line', color: line, th: 1, x: MX + 1, y: y0 + 1.6, w: span - step + 2, z: 4 });   /* соединительная линия */
+  stages.forEach((s, i) => {
+    const cx = MX + i * step;
+    L.push({ t: 'shape', shape: 'circle', color: acc, fill: true, x: cx, y: y0, w: 2.4, z: 5 });
+    L.push({ t: 'text', text: s.v || s.big || '', ff: 'disp', fs: 4.0, wt: 500, color: acc, x: cx, y: y0 + 5, w: step - 2, z: 5 });
+    L.push({ t: 'text', text: s.label || '', ff: 'sans', up: 1, fs: 1.1, ls: 0.06, lh: 1.35, color: mut, x: cx, y: y0 + 11, w: step - 1, z: 5 });
+  });
+  if (S.cta) L.push({ t: 'btn', text: S.cta, style: 'outline', color: acc, tcolor: ink, arrow: true, up: 1, fs: 1.55, ls: 0.12, x: MX, y: 80, z: 6 });
+  footerMark(L, T, ctx, mut, line);
+  return { bgc: dark ? T.darkBg : T.paper, layers: L };
+}
+
+/* 11. FLOORPLAN_SHOWCASE — планировка на светлом фоне + характеристики. */
+function FLOORPLAN_SHOWCASE(S, T, ctx) {
+  const L = []; const ink = T.ink, mut = T.mut, acc = T.accent, line = T.line;
+  pageNum(L, ctx, mut, 'tr');
+  L.push({ t: 'text', text: S.eyebrow || 'ПЛАНИРОВКИ', ff: 'sans', up: 1, fs: 1.3, ls: 0.24, color: mut, x: MX, y: 5.6, w: 44, z: 5 });
+  const hfs = fitHead(S.headline || 'Продуманные планировки', 60, 5.2, 2, 3.8);
+  L.push({ t: 'text', text: S.headline || 'Продуманные планировки', ff: 'disp', fs: hfs, lh: 1.05, wt: 500, color: ink, x: MX, y: 10.5, w: 60, z: 5 });
+  if (ctx.photo) L.push({ t: 'img', url: ctx.photo, x: 12, y: 26, w: 76, h: 46, fit: 'contain', z: 3 });
+  const facts = (S.facts || S.rows || []).slice(0, 3);
+  if (facts.length) {
+    const colW = 27, gap = 2.5, y0 = 78;
+    facts.forEach((f, i) => {
+      const cx = MX + i * (colW + gap);
+      if (i > 0) L.push({ t: 'line', color: line, th: 1, vert: 1, h: 9, x: cx - gap / 2, y: y0, z: 5 });
+      L.push({ t: 'text', text: f.v || f.big || '', ff: 'disp', fs: 3.4, wt: 500, color: acc, x: cx, y: y0, w: colW, z: 5 });
+      L.push({ t: 'text', text: f.label || '', ff: 'sans', up: 1, fs: 1.05, ls: 0.06, lh: 1.3, color: mut, x: cx, y: y0 + 4.6, w: colW, z: 5 });
+    });
+  }
+  footerMark(L, T, ctx, mut, line);
+  return { bgc: T.paper, layers: L };
+}
+
+const GRAMMARS = { CINEMATIC_HERO, EDITORIAL_LIGHT, IMAGE_CAPTION, LOCATION_STORY, DATA_HERO, CINEMATIC_CTA, AMENITIES_GRID, GALLERY_TRIPTYCH, TYPOGRAPHIC_STATEMENT, PAYMENT_TIMELINE, FLOORPLAN_SHOWCASE };
 const GRAMMAR_KEYS = Object.keys(GRAMMARS);
 
 /* ── Подбор реального фото проекта под роль слайда (Phase 16) ────────────────── */
@@ -257,7 +361,7 @@ const PHOTO_HINT_ROLE = {
   exterior: ['render_ext', 'lifestyle'], architecture: ['render_ext', 'lifestyle'],
   interior: ['interior', 'amenity'], pool: ['amenity', 'lifestyle', 'render_ext'],
   beach: ['lifestyle', 'map', 'render_ext'], location: ['lifestyle', 'map'],
-  sunset: ['lifestyle', 'render_ext'], amenity: ['amenity', 'interior'],
+  sunset: ['lifestyle', 'render_ext'], amenity: ['amenity', 'interior'], floorplan: ['floorplan'],
 };
 function pickPhoto(hint, photos, used) {
   if (!photos || !photos.length) return null;
@@ -265,6 +369,18 @@ function pickPhoto(hint, photos, used) {
   for (const role of prefs) { const p = photos.find(x => x.role === role && !used.has(x.url)); if (p) { used.add(p.url); return p.url; } }
   const any = photos.find(x => !used.has(x.url) && x.role !== 'floorplan' && x.role !== 'logo'); if (any) { used.add(any.url); return any.url; }
   return photos[0] ? photos[0].url : null;
+}
+/* строгий подбор по роли: url ТОЛЬКО если такой кадр реально есть (иначе null) */
+function pickByRole(role, photos, used) {
+  if (!photos) return null;
+  const p = photos.find(x => x.role === role && !used.has(x.url)); if (p) { used.add(p.url); return p.url; }
+  return null;
+}
+/* пул из k фото для галереи (без повторов, если хватает) */
+function pickGallery(photos, used, k) {
+  const out = [];
+  for (let i = 0; i < k; i++) { const u = pickPhoto('exterior', photos, used); if (u && !out.includes(u)) out.push(u); else if (!u) break; }
+  return out;
 }
 
 /* ════════════════════ КРЕАТИВНЫЙ ДИРЕКТОР (ArtDirectionPlan + копирайт) ══════ */
@@ -276,6 +392,11 @@ async function artDirectionPlan(project, opts = {}) {
     'LOCATION_STORY — фото локации/пляжа, заголовок + 3-4 ряда дистанций. tone:dark. поля: eyebrow, headline, sub, rows[{icon,big(«3 мин»),label(«до пляжа»)}].',
     'DATA_HERO — тёмный фон, ГИГАНТСКОЕ число-акцент (цена/ROI) + 3 колонки фактов + CTA. tone:dark. поля: eyebrow, kicker(«1BR ОТ»), hero{value(«$185K»)}, sub, facts[{v,label}], cta.',
     'CINEMATIC_CTA — фото-закат, тихий финал + CTA-пилюля + координаты. tone:dark. поля: eyebrow, headline, sub, cta, coords(«7.9763° N 98.3047° E»).',
+    'AMENITIES_GRID — сетка удобств: заголовок + 4-6 иконных плиток (иконка+название+короткое описание). tone:light|dark. поля: eyebrow, headline, rows[{icon,label(название),big(описание)}].',
+    'GALLERY_TRIPTYCH — витрина «форматы/типы»: заголовок + ряд из 3 фото с капс-подписями. tone:light. поля: eyebrow, headline, sub, rows[{label}] (подписи под фото). Нужны ≥2 фото.',
+    'TYPOGRAPHIC_STATEMENT — тихий типографский разворот БЕЗ фото (пауза-цитата в ритме). tone:light|dark. поля: eyebrow, headline(крупная мысль), sub.',
+    'PAYMENT_TIMELINE — план оплаты как таймлайн: заголовок + 2-4 этапа (% + подпись) на линии. tone:dark|light. поля: eyebrow, headline, sub, facts[{v(«20%»),label(«при брони»)}], cta.',
+    'FLOORPLAN_SHOWCASE — планировка на светлом фоне + характеристики. tone:light. поля: eyebrow, headline, facts[{v,label(«спальни»/«м²»)}]. Нужен кадр-план (role floorplan), иначе не выбирай.',
   ].join('\n');
   const iconKeys = 'pin, plane, beach, restaurant, view, window, leaf, terrace, ruler, pool, gym, spa, marina, golf, park, garden, security, concierge, key, clock, shield, doc, award, handshake, metro, shop, school';
   const roleList = (project.photoRoles || []).length ? project.photoRoles.join(', ') : 'render_ext, interior, lifestyle';
@@ -299,7 +420,7 @@ ${dirHint}
 - Сдержанность, точность, иерархия, воздух, специфика. НЕ «гигантский шрифт», НЕ всё тёмное, НЕ золото всюду, НЕ клише.
 - ЗАПРЕЩЁННЫЙ копирайт (общие ИИ-фразы): «место силы», «искусство жить», «эстетика тишины», «ваш путь к новой жизни», «привилегии пяти звёзд», «оазис спокойствия».
 - Копирайт СЖАТЫЙ, конкретный, фактический. Примеры хорошего: «300 М ДО ПЛЯЖА», «1BR ОТ $185K», «HANDOVER 2027», «0% РАССРОЧКА», «SEA-VIEW TERRACES». Числа НЕ выдумывай — бери из вводных, иначе не используй.
-- Ритм колоды: чередуй энергию и свет/тьму (не 6 одинаковых). Ровно ОДИН светлый разворот (EDITORIAL_LIGHT). Обложка — CINEMATIC_HERO. Финал — CINEMATIC_CTA. Один DATA_HERO (цена/доходность).
+- Ритм колоды: чередуй энергию и свет/тьму (не 6 одинаковых, не всё тёмное). Обложка — CINEMATIC_HERO. Финал — CINEMATIC_CTA. Один DATA_HERO (цена/доходность). Минимум 1-2 СВЕТЛЫХ слайда (EDITORIAL_LIGHT / AMENITIES_GRID light / TYPOGRAPHIC_STATEMENT / GALLERY_TRIPTYCH). Используй РАЗНЫЕ грамматики — НЕ повторяй одну дважды подряд и не лепи 3× IMAGE_CAPTION. Подбирай grammar под СМЫСЛ: удобства→AMENITIES_GRID, план оплаты→PAYMENT_TIMELINE, форматы/типы→GALLERY_TRIPTYCH, философия/пауза→TYPOGRAPHIC_STATEMENT, локация→LOCATION_STORY, цена/ROI→DATA_HERO.
 - Заголовки — 2-4 слова или 2-3 короткие строки. Подписи — 1 предложение.
 - eyebrow (рубрика) — КОРОТКО: 1-2 слова, до 18 символов (напр. «ЛОКАЦИЯ», «ИНВЕСТИЦИИ», «АРХИТЕКТУРА»). НЕ длинные фразы.
 
@@ -340,11 +461,17 @@ function composeDeck(project, plan, photos) {
   const used = new Set();
   const total = plan.slides.length;
   const wm = { name: (plan.wordmark && plan.wordmark.name) || project.name || 'RESIDENCES', tag: (plan.wordmark && plan.wordmark.tag) || '' };
+  const NOPHOTO = new Set(['TYPOGRAPHIC_STATEMENT', 'AMENITIES_GRID']);   /* нативные, фон = цвет */
+  const FAINT = new Set(['DATA_HERO', 'PAYMENT_TIMELINE']);               /* фото опционально, приглушённым фоном */
   const slides = plan.slides.map((S, i) => {
     let gk = GRAMMARS[S.grammar] ? S.grammar : (i === 0 ? 'CINEMATIC_HERO' : i === total - 1 ? 'CINEMATIC_CTA' : 'IMAGE_CAPTION');
-    const needsPhoto = gk !== 'DATA_HERO' ? (S.photo !== 'none') : (S.photo && S.photo !== 'none');
-    const photo = needsPhoto ? pickPhoto(S.photo || 'exterior', photos, used) : (gk === 'DATA_HERO' ? pickPhoto('amenity', photos, used) : null);
-    const ctx = { photo, pageNum: `${String(i + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`, total, wordmark: wm };
+    let photo = null, gallery = null;
+    if (gk === 'GALLERY_TRIPTYCH') { gallery = pickGallery(photos, used, 3); photo = gallery[0] || null; }
+    else if (gk === 'FLOORPLAN_SHOWCASE') { photo = pickByRole('floorplan', photos, used); }   /* только настоящий план; иначе без картинки */
+    else if (NOPHOTO.has(gk)) { photo = null; }
+    else if (FAINT.has(gk)) { photo = (S.photo && S.photo !== 'none') ? pickPhoto(S.photo, photos, used) : pickPhoto('amenity', photos, used); }
+    else { photo = (S.photo !== 'none') ? pickPhoto(S.photo || 'exterior', photos, used) : null; }
+    const ctx = { photo, gallery, pageNum: `${String(i + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`, total, wordmark: wm };
     const g = GRAMMARS[gk](S, T, ctx);
     return {
       sg: 1, grammar: gk, role: S.role || '',
