@@ -3810,7 +3810,46 @@ html[data-night] .mb-cap { background: rgba(20,30,50,.7); color: var(--ink); }
 /* фон-свотчи в пикере — мини-версия */
 .mb-bgchip.mb-bg-paper, .mb-bgchip.mb-bg-linen, .mb-bgchip.mb-bg-cork, .mb-bgchip.mb-bg-gradient, .mb-bgchip.mb-bg-blush, .mb-bgchip.mb-bg-dark { background-size: cover, cover, cover; }
 /* крепёж: скотч (CSS — юзеру нравится); булавка/скрепка — реалистичные PNG выше */
-.mb-tape { position: absolute; top: -8px; left: 50%; transform: translateX(-50%) rotate(-3deg); width: 54px; height: 20px; z-index: 3; background: linear-gradient(180deg, rgba(255,240,150,.55), rgba(240,220,120,.5)); border-left: 1px dashed rgba(0,0,0,.06); border-right: 1px dashed rgba(0,0,0,.06); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+/* ═══ ATTACHMENT ART-DIRECTOR ═══ крепёж ≤15% веса объекта, три семейства */
+/* — НАКЛЕЙКА (adhesive): крепежа не видно, объект «приклеен» разной глубиной тени/рамкой — */
+.mb-adh-cutout img { filter: drop-shadow(0 7px 12px rgba(16,43,92,.22)) drop-shadow(0 1px 2px rgba(16,43,92,.18)); }
+.mb-adh-lift img { filter: drop-shadow(0 11px 17px rgba(16,43,92,.28)) drop-shadow(0 2px 3px rgba(16,43,92,.2)); }
+.mb-adh-float img { filter: drop-shadow(0 20px 30px rgba(16,43,92,.34)) drop-shadow(0 4px 7px rgba(16,43,92,.18)); }
+.mb-adh-card img { background: #fff; padding: 7%; border-radius: 12px; filter: none; box-shadow: 0 10px 24px -10px rgba(16,43,92,.34), 0 1px 3px rgba(16,43,92,.12); }
+.mb-adh-polaroid img { background: #fff; padding: 7% 7% 20%; border-radius: 4px; filter: none; box-shadow: 0 12px 26px -12px rgba(16,43,92,.4), 0 1px 3px rgba(16,43,92,.14); }
+html[data-night] .mb-adh-card img, html[data-night] .mb-adh-polaroid img { background: #182338; box-shadow: 0 12px 26px -12px rgba(0,0,0,.6); }
+/* — СКОТЧ (tape): маленький кусочек, 18–32% ширины, разные материалы + расстановка — */
+.mb-tape { position: absolute; height: 22px; z-index: 4; border-radius: 1px; box-shadow: 0 1px 3px rgba(16,43,92,.18); transform: rotate(var(--trot, -3deg)); }
+.mb-tape::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 6px, rgba(255,255,255,.14) 6px 7px); border-radius: inherit; }
+.mb-tape-clear { background: linear-gradient(180deg, rgba(228,236,248,.34), rgba(210,222,240,.3)); border-left: 1px solid rgba(255,255,255,.4); border-right: 1px solid rgba(255,255,255,.4); }
+.mb-tape-white { background: rgba(250,250,248,.82); }
+.mb-tape-beige { background: rgba(216,198,168,.7); }
+.mb-tape-cream { background: rgba(240,232,214,.82); }
+.mb-tape-frosted { background: rgba(238,242,248,.55); backdrop-filter: blur(1px); }
+.mb-tape-washi { background: rgba(206,224,224,.6); }
+.mb-tape-black { background: rgba(28,32,42,.78); }
+.mb-tape-pastel { background: rgba(206,214,242,.62); }
+.mb-tape-torn { background: rgba(244,238,226,.8); clip-path: polygon(0 12%, 6% 0, 14% 10%, 24% 2%, 34% 12%, 46% 3%, 58% 12%, 70% 2%, 82% 11%, 92% 2%, 100% 12%, 100% 88%, 93% 100%, 82% 90%, 70% 99%, 58% 88%, 46% 98%, 34% 88%, 24% 99%, 14% 90%, 6% 100%, 0 88%); }
+/* расстановка скотча (top/left/right/diag/edge/corner) */
+.mb-tp-tc { top: -9px; left: 50%; transform: translateX(-50%) rotate(-3deg); }
+.mb-tp-tl { top: -8px; left: 6%; --trot: -6deg; }
+.mb-tp-tr { top: -8px; right: 6%; --trot: 5deg; }
+.mb-tp-dl { top: -4px; left: 1%; --trot: -20deg; }
+.mb-tp-dr { top: -4px; right: 1%; --trot: 20deg; }
+.mb-tp-le { top: 24%; left: -12px; transform: rotate(90deg); }
+.mb-tp-re { top: 24%; right: -12px; transform: rotate(90deg); }
+.mb-tp-bl { bottom: -8px; left: 8%; --trot: 4deg; }
+.mb-tp-br { bottom: -8px; right: 8%; --trot: -4deg; }
+.mb-tp-cw { top: -6px; left: -6px; --trot: -42deg; }
+/* — 3D-ЭМОДЗИ: маленький глянцевый стикер-чип у угла объекта — */
+.mb-emoji { position: absolute; z-index: 5; line-height: 1; display: grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #fff, #eef1f7 70%, #dfe4ee); box-shadow: 0 4px 10px -3px rgba(16,43,92,.4), inset 0 1px 2px rgba(255,255,255,.8), inset 0 -2px 3px rgba(16,43,92,.12); filter: drop-shadow(0 1px 1px rgba(0,0,0,.1)); }
+html[data-night] .mb-emoji { background: radial-gradient(circle at 34% 28%, #33405a, #232f45 70%, #182135); box-shadow: 0 4px 10px -3px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.14); }
+.mb-emj-tro { top: -0.6em; right: -0.6em; }
+.mb-emj-tlo { top: -0.6em; left: -0.6em; }
+.mb-emj-re { top: 40%; right: -0.7em; }
+.mb-emj-le { top: 40%; left: -0.7em; }
+.mb-emj-bro { bottom: 8%; right: -0.5em; }
+.mb-emj-blo { bottom: 8%; left: -0.5em; }
 /* сворачиваемая карта в «Мои задачи» */
 .mb-embed { margin-bottom: 16px; }
 .mb-embed .mb-board { min-height: 46vh; }

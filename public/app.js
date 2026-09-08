@@ -5732,15 +5732,60 @@ function tplCard(t, stBadge) {
 let MB_STYLE = 'sticker', MB_EDIT = false, MB_ADD_OPEN = false, MB_TEXTMODE = 'auto';
 const MB_FONTS = { fraunces: ['Элегант', "'Fraunces',serif"], playfair: ['Журнал', "'Playfair Display',serif"], caveat: ['От руки', "'Caveat',cursive"], bebas: ['Плакат', "'Bebas Neue',sans-serif"], manrope: ['Чистый', "'Manrope',sans-serif"] };
 const MB_BGS = { paper: 'Бумага', linen: 'Лён', dark: 'Тёмная', cork: 'Пробка', gradient: 'Градиент', blush: 'Румяна' };
-const MB_PINS = { pin: 'Булавка', tape: 'Скотч', clip: 'Скрепка', none: 'Без' };
 /* режимы текста на стикере — арт-директорское решение о микро-копирайте */
 const MB_TEXTMODES = { auto: 'Авто', none: 'Без текста', handwritten: 'От руки', editorial: 'Издательский', goal: 'Цель', mixed: 'Смешанный' };
-/* крепёж: булавка/скрепка — реалистичные вырезанные PNG (Apple-стиль), скотч — CSS */
-function mbPinHtml(style) {
-  if (style === 'none') return '';
-  if (style === 'tape') return '<span class="mb-tape"></span>';
-  if (style === 'clip') return '<img class="mb-fast mb-clip" src="/assets/mood/clip.png?v=1" alt="" draggable="false">';
-  return '<img class="mb-fast mb-pin" src="/assets/mood/pin.png?v=1" alt="" draggable="false">';
+
+/* ═══ ATTACHMENT ART-DIRECTOR (крепёж) ═══
+   3 семейства: Наклейка (adhesive — крепежа не видно, объект «приклеен»), Скотч (tape), Эмодзи (3D-стикер).
+   Скрепка/булавка убраны из дефолтов (гигантские канц-предметы запрещены). Крепёж ≤15% веса объекта.
+   AUTO распределяет по интенсивности с анти-повтором; детерминировано по item.id (стабильно). */
+const MB_ATT_MODES = { auto: 'Авто', adhesive: 'Наклейка', tape: 'Скотч', emoji: 'Эмодзи', none: 'Без' };
+const MB_ATT_INTS = { minimal: 'Минимал', balanced: 'Баланс', expressive: 'Ярко' };
+/* распределение семейств [adhesive, tape, emoji, none] в % */
+const MB_ATT_DIST = { minimal: [70, 15, 5, 10], balanced: [45, 25, 15, 15], expressive: [25, 30, 30, 15] };
+const MB_TAPE_VARIANTS = ['clear', 'white', 'beige', 'cream', 'frosted', 'washi', 'black', 'pastel', 'torn'];
+const MB_TAPE_PLACE = [['tc', 25], ['tl', 15], ['tr', 15], ['dl', 10], ['dr', 10], ['le', 5], ['re', 5], ['bl', 4], ['br', 4], ['cw', 4]];
+const MB_ADH_VARIANTS = ['cutout', 'lift', 'float']; /* card/polaroid бликуют на прозрачном die-cut — только чистые тени */
+const MB_EMOJI_ANCHORS = ['tro', 'tlo', 're', 'le', 'bro', 'blo'];
+/* curated 3D-эмодзи по смыслу (НЕ иллюстрируем объект буквально) */
+const MB_EMOJI_LIB = {
+  wealth: ['💎', '💸', '🪙', '📈'], money: ['💸', '💰', '📈'], achievement: ['🏆', '⭐', '📈'], success: ['🏆', '✨', '⭐'],
+  travel: ['✈️', '🌴', '🗺️'], freedom: ['✈️', '🌊', '🕊️'], realestate: ['🏡', '🔑'], home: ['🏡', '🔑', '🛋️'],
+  career: ['💼', '🚀', '🏆'], luxury: ['💎', '👑', '⭐', '✨'], status: ['👑', '💎', '⭐'], style: ['✨', '👑', '💎'],
+  health: ['💪', '🏃'], discipline: ['💪', '⭐'], lifestyle: ['✨', '🥂', '☀️'], time: ['⏳', '✨'], default: ['✨', '⭐', '💎'],
+};
+/* детерминированный ГПСЧ по строке (mulberry32) */
+function mbSeed(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return () => { h |= 0; h = (h + 0x6D2B79F5) | 0; let t = Math.imul(h ^ (h >>> 15), 1 | h); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function mbPickW(rng, pairs) { const tot = pairs.reduce((a, p) => a + p[1], 0); let r = rng() * tot; for (const [k, w] of pairs) { if ((r -= w) < 0) return k; } return pairs[0][0]; }
+function mbEmojiFor(cat, meaning, rng) {
+  const hay = ((cat || '') + ' ' + (meaning || '')).toLowerCase(); let set = null;
+  for (const k of Object.keys(MB_EMOJI_LIB)) { if (k !== 'default' && hay.includes(k)) { set = MB_EMOJI_LIB[k]; break; } }
+  set = set || MB_EMOJI_LIB.default; return set[Math.floor(rng() * set.length)];
+}
+/* назначить крепёж всем объектам (порядок важен для анти-повтора) */
+function mbAssignAtt(items, mode, intensity) {
+  const dist = MB_ATT_DIST[intensity] || MB_ATT_DIST.balanced;
+  const famPairs = [['adhesive', dist[0]], ['tape', dist[1]], ['emoji', dist[2]], ['none', dist[3]]];
+  let prevFam = null, prevPlace = null, sameRun = 0;
+  return items.map((it) => {
+    const rng = mbSeed(it.id + '|' + mode + '|' + intensity);
+    let fam = (mode && mode !== 'auto') ? mode : mbPickW(rng, famPairs);
+    if (mode === 'auto' || !mode) { let g = 0; while (fam === prevFam && sameRun >= 1 && g < 5) { fam = mbPickW(rng, famPairs); g++; } }
+    sameRun = fam === prevFam ? sameRun + 1 : 0; prevFam = fam;
+    const d = { fam, rot: +((rng() * 2 - 1) * (fam === 'adhesive' ? 2.4 : fam === 'tape' ? 3 : 1.5)).toFixed(1) };
+    if (fam === 'tape') {
+      d.variant = MB_TAPE_VARIANTS[Math.floor(rng() * MB_TAPE_VARIANTS.length)];
+      let pl = mbPickW(rng, MB_TAPE_PLACE); let g = 0; while (pl === prevPlace && g < 4) { pl = mbPickW(rng, MB_TAPE_PLACE); g++; } prevPlace = pl;
+      d.place = pl; d.w = 18 + Math.floor(rng() * 14); d.trot = +((rng() * 2 - 1) * 8).toFixed(1);
+    } else if (fam === 'adhesive') {
+      d.variant = MB_ADH_VARIANTS[Math.floor(rng() * MB_ADH_VARIANTS.length)];
+    } else if (fam === 'emoji') {
+      d.emoji = mbEmojiFor(it.txt && it.txt.cat, it.txt && it.txt.meaning, rng);
+      d.anchor = MB_EMOJI_ANCHORS[Math.floor(rng() * MB_EMOJI_ANCHORS.length)];
+      d.size = 9 + Math.floor(rng() * 7); /* % ширины объекта */
+    }
+    return d;
+  });
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
 async function renderMoodboard(root, opts) {
@@ -5752,7 +5797,9 @@ async function renderMoodboard(root, opts) {
   const title = cfg.title || 'Карта желаний';
   const fontKey = MB_FONTS[cfg.font] ? cfg.font : 'fraunces', fontCss = MB_FONTS[fontKey][1];
   const bg = MB_BGS[cfg.bg] ? cfg.bg : 'paper';
-  const pin = MB_PINS[cfg.pin] ? cfg.pin : 'pin';
+  const attMode = MB_ATT_MODES[cfg.attMode] ? cfg.attMode : 'auto';
+  const attInt = MB_ATT_INTS[cfg.attInt] ? cfg.attInt : 'balanced';
+  const atts = mbAssignAtt(items, attMode, attInt);
   const ed = MB_EDIT, add = MB_ADD_OPEN;
   /* типографика рендерится отдельным слоем (spec #13): без опечаток, не обрезается, точная стилизация по режиму */
   const mbTxt = (it) => {
@@ -5766,12 +5813,19 @@ async function renderMoodboard(root, opts) {
     }
     return it.caption ? `<div class="mb-cap">${esc(it.caption)}</div>` : '';
   };
-  const itemHtml = (it, i) => `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${it.rot || 0}deg);--i:${i}">
-    ${mbPinHtml(pin)}
+  /* крепёж-слой: наклейка (класс+тень) / скотч (оверлей) / эмодзи (3D-чип) — арт-директор, ≤15% */
+  const mbAttHtml = (it, d) => {
+    if (!d || d.fam === 'none') return '';
+    if (d.fam === 'tape') return `<span class="mb-tape mb-tape-${d.variant} mb-tp-${d.place}" style="width:${d.w}%"></span>`;
+    if (d.fam === 'emoji') return `<span class="mb-emoji mb-emj-${d.anchor}" style="font-size:${Math.round(d.size / 100 * (it.w || 220))}px">${d.emoji}</span>`;
+    return '';
+  };
+  const itemHtml = (it, i) => { const d = atts[i] || {}; const jr = (it.rot || 0) + (d.fam === 'adhesive' || d.fam === 'tape' ? (d.rot || 0) : 0); return `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''} ${d.fam === 'adhesive' ? 'mb-adh mb-adh-' + d.variant : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${jr}deg);--i:${i}">
+    ${mbAttHtml(it, d)}
     <img src="${esc(it.url)}" alt="" draggable="false">
     ${mbTxt(it)}
     ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>` : ''}
-  </div>`;
+  </div>`; };
   /* тонкая гравюрная эмблема-компас вместо клипартной иконки */
   const emblem = `<svg class="mb-emblem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2.1 4.3-4.3 2.1 2.1-4.3z"/><circle cx="12" cy="12" r="1"/></svg>`;
   root.innerHTML = `
@@ -5793,7 +5847,8 @@ async function renderMoodboard(root, opts) {
       ${ed ? `<div class="mb-cfg">
         <div class="mb-cfg-g"><span>Шрифт</span>${Object.entries(MB_FONTS).map(([k, [n, css]]) => `<button class="mb-chip ${k === fontKey ? 'on' : ''}" data-mbfont="${k}" style="font-family:${css}">${n}</button>`).join('')}</div>
         <div class="mb-cfg-g"><span>Фон</span>${Object.entries(MB_BGS).map(([k, n]) => `<button class="mb-chip mb-bgchip mb-bg-${k} ${k === bg ? 'on' : ''}" data-mbbg="${k}" title="${n}"></button>`).join('')}</div>
-        <div class="mb-cfg-g"><span>Крепёж</span>${Object.entries(MB_PINS).map(([k, n]) => `<button class="mb-chip ${k === pin ? 'on' : ''}" data-mbpin="${k}">${n}</button>`).join('')}</div>
+        <div class="mb-cfg-g"><span>Крепёж</span>${Object.entries(MB_ATT_MODES).map(([k, n]) => `<button class="mb-chip ${k === attMode ? 'on' : ''}" data-mbatt="${k}">${n}</button>`).join('')}</div>
+        <div class="mb-cfg-g"><span>Интенсивность</span>${Object.entries(MB_ATT_INTS).map(([k, n]) => `<button class="mb-chip ${k === attInt ? 'on' : ''}" data-mbint="${k}">${n}</button>`).join('')}</div>
       </div>` : ''}
       <div class="mb-board mb-bg-${bg}" id="mbBoard">
         ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${emblem}<b>Собери свою карту желаний</b><span>Нажми «Добавить» и напиши, чего ты хочешь — ИИ создаст стикер и прикрепит на доску. Пусть цели будут перед глазами каждый день.</span></div>`}
@@ -5822,7 +5877,8 @@ async function renderMoodboard(root, opts) {
     if (tIn) { let td; tIn.addEventListener('input', () => { clearTimeout(td); td = setTimeout(() => saveCfg({ title: tIn.value.trim() || 'Карта желаний' }), 400); }); }
     $$('[data-mbfont]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ font: b.dataset.mbfont }); rerender(); }));
     $$('[data-mbbg]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ bg: b.dataset.mbbg }); rerender(); }));
-    $$('[data-mbpin]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ pin: b.dataset.mbpin }); rerender(); }));
+    $$('[data-mbatt]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ attMode: b.dataset.mbatt }); rerender(); }));
+    $$('[data-mbint]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ attInt: b.dataset.mbint }); rerender(); }));
     board.addEventListener('click', async (e) => { const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); rerender(); } });
     /* drag только в режиме правки */
     $$('.mb-item', root).forEach(el2 => {

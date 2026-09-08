@@ -3085,6 +3085,8 @@ const server = http.createServer(async (req, res) => {
         if (b.font != null) c.font = String(b.font).slice(0, 24);
         if (b.bg != null) c.bg = String(b.bg).slice(0, 24);
         if (b.pin != null) c.pin = String(b.pin).slice(0, 24);
+        if (b.attMode != null) c.attMode = String(b.attMode).slice(0, 16);
+        if (b.attInt != null) c.attInt = String(b.attInt).slice(0, 16);
         store.save(); return json(res, 200, c);
       }
       if (p === '/api/moodboard' && req.method === 'POST') {
