@@ -725,6 +725,8 @@ const COLL_PRESETS = [
   { name: 'Бордо', theme: 'bordeaux', font: 'cormorant' },
   { name: 'Netflix', theme: 'netflix', font: 'oswald' },
 ].filter(p => PAGE_THEMES[p.theme] && COLL_FONTS[p.font]);
+/* самые сильные премиум-палитры для конструктора подборок (новеллти-темы скрыты — они путали) */
+const COLL_STRONG_THEMES = ['klein', 'royal', 'emerald', 'champagne', 'noir', 'mocha', 'sage', 'bordeaux', 'slate'];
 
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
 const CAR_POS = new Set(['top', 'center', 'bottom']);
@@ -4407,8 +4409,8 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
 .s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-amen-i{color:rgba(255,255,255,.92)}
-.s-amen-ic{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,transparent);color:var(--blue)}
-.slide.hasbg .s-amen-ic{background:rgba(255,255,255,.14);color:#fff}
+.s-amen-ic{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue);box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 26%,transparent)}
+.slide.hasbg .s-amen-ic{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
 .s-amen-ic svg{width:20px;height:20px}
 .s-bars{display:flex;align-items:flex-end;gap:22px;margin-top:12px;padding-left:4px}
 .s-barcol{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 78px}
@@ -4897,8 +4899,9 @@ h2.hi{font-size:34px;font-weight:800;letter-spacing:-.4px}
 .hello{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:24px;margin-top:26px}
 .hello p{font-size:15.5px;line-height:1.6;min-width:0}.hello b{font-weight:700}
 .mgrph{aspect-ratio:3/4;border-radius:6px;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 78%,#fff),color-mix(in srgb,var(--blue) 62%,#000)) center/cover;display:grid;place-items:center;color:#fff;font-size:34px;font-weight:800;position:relative}
-.arrows{margin-top:30px}.arrows div{display:flex;gap:14px;font-size:15px;line-height:1.55;padding:10px 0}
-.arrows i{color:var(--blue);font-style:normal;font-weight:800;flex:0 0 18px}
+.arrows{margin-top:30px}.arrows div{display:flex;gap:14px;font-size:15px;line-height:1.55;padding:10px 0;align-items:flex-start}
+/* маркер-чип с гарантированным контрастом на любом фоне (светлом/тёмном/фото) — не сливается */
+.arrows i{color:#fff;background:var(--blue);font-style:normal;font-weight:800;flex:0 0 24px;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:12px;line-height:1;margin-top:2px;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.14)}
 .arrows span{min-width:0;flex:1}
 .arrows b{font-weight:700}
 .intro{font-size:16px;line-height:1.7;white-space:pre-line;margin-top:26px;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
@@ -5162,10 +5165,11 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         key: u.searchParams.get('key'),
         llm: llm.available(),
         theme: c.theme || 'klein',
-        themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
+        /* только самые сильные премиум-палитры — новеллти (matrix/batman/goldlux/netflix/midnight/terracotta) убраны из конструктора подборок */
+        themes: Object.fromEntries(Object.entries(PAGE_THEMES).filter(([k]) => COLL_STRONG_THEMES.includes(k)).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
         fontPreset: c.fontPreset || 'soft',
         fonts: Object.fromEntries(Object.entries(COLL_FONTS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])),
-        presets: COLL_PRESETS.map(p => ({ name: p.name, theme: p.theme, font: p.font, blue: (PAGE_THEMES[p.theme] || {}).blue, body: (PAGE_THEMES[p.theme] || {}).body, disp: (COLL_FONTS[p.font] || {}).disp })),
+        presets: COLL_PRESETS.filter(p => COLL_STRONG_THEMES.includes(p.theme)).map(p => ({ name: p.name, theme: p.theme, font: p.font, blue: (PAGE_THEMES[p.theme] || {}).blue, body: (PAGE_THEMES[p.theme] || {}).body, disp: (COLL_FONTS[p.font] || {}).disp })),
         icons: AMEN_ICONS,
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
@@ -5173,7 +5177,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=34"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=35"></script>` : ''}
 </body></html>`);
       return;
     }

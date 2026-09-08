@@ -29,6 +29,10 @@ body{overflow-x:hidden;padding-left:0!important;padding-right:0!important}
 .pep-lbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7C9BFF;font-weight:700}
 .pep-row{display:flex;gap:6px;flex-wrap:wrap}
 .pep-foot{padding:12px 14px;border-top:1px solid rgba(134,175,255,.14);display:flex;flex-direction:column;gap:8px}
+.pehist{position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:901;display:flex;align-items:center;gap:6px;padding:6px 8px;background:linear-gradient(180deg,rgba(10,24,51,.96),rgba(6,17,38,.96));backdrop-filter:blur(14px);border:1px solid rgba(134,175,255,.16);border-radius:14px;box-shadow:0 18px 44px -20px rgba(6,17,38,.6);font-family:Manrope,sans-serif}
+.pehist .edbtn{padding:7px 10px;font-size:13px}
+.pehist-sep{width:1px;height:20px;background:rgba(134,175,255,.2);margin:0 2px}
+@media(max-width:720px){.pehist{top:auto;bottom:12px}}
 .pep-hint{font-size:10px;line-height:1.5;color:#7A8AB5;margin-top:4px}
 .edbtn.wide{width:100%;justify-content:center}
 .pethemes{flex-wrap:wrap;margin-left:0}
@@ -163,9 +167,8 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     <div class="pep-top"><button class="edbtn g" id="peExit" title="Сохранить и выйти в CRM">←</button><b>Конструктор</b></div>
     <div class="pep-body">
       ${(P.presets || []).length ? `<div class="pep-sec"><div class="pep-lbl">Стиль</div><div class="pepresets">${P.presets.map((p, i) => `<button class="pepreset" data-preset="${i}" title="${p.name}" style="background:linear-gradient(150deg,color-mix(in srgb,${p.blue} 26%,${p.body}),${p.body})"><span class="pp-aa" style="font-family:${p.disp || 'serif'};color:${p.blue}">Aa</span><i>${p.name}</i></button>`).join('')}</div></div>` : ''}
-      <div class="pep-sec"><div class="pep-lbl">Тема</div><div class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</div></div>
+      <div class="pep-sec"><div class="pep-lbl">Цвет</div><div class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</div></div>
       ${Object.keys(P.fonts || {}).length ? `<div class="pep-sec"><div class="pep-lbl">Шрифт</div><button class="edbtn g pefont-btn wide" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button></div>` : ''}
-      <div class="pep-sec"><div class="pep-lbl">История</div><div class="pep-row"><button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button><button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button><button class="edbtn g wide" id="peVers">Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button></div></div>
       ${P.llm ? `<div class="pep-sec"><button class="edbtn ai wide" id="peCompose">✦ Собрать тексты ИИ</button></div>` : ''}
     </div>
     <div class="pep-foot">
@@ -174,6 +177,11 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
       <div class="pep-hint">⌘S сохранить · ⌘Z отменить · клик по тексту — правка · правый клик — меню блока</div>
     </div>`;
   document.body.appendChild(bar);
+  /* отдельная мини-панель истории/версий слева сверху — вынесена из правой панели (была нелогична там) */
+  const hist = document.createElement('div');
+  hist.className = 'pehist';
+  hist.innerHTML = `<button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button><button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button><span class="pehist-sep"></span><button class="edbtn g" id="peVers" title="Именованные версии">⎘ Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button>`;
+  document.body.appendChild(hist);
   $$('.peth-dot', bar).forEach((d) => d.addEventListener('click', async () => {
     flash('Применяю тему…', 0);
     const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
@@ -352,7 +360,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'save', name }),
       });
       const j = await r.json().catch(() => ({}));
-      if (r.ok) { P.versions = j.versions; $('#peVers').textContent = 'Версии · ' + j.versions.length; flash('Версия сохранена ✓'); }
+      if (r.ok) { P.versions = j.versions; $('#peVers').textContent = '⎘ Версии · ' + j.versions.length; flash('Версия сохранена ✓'); }
       else flash(j.error || 'Ошибка');
     });
     el.addEventListener('click', async (e2) => {
