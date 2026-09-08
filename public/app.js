@@ -5652,7 +5652,8 @@ PAGES.tasks = async (root) => {
   const moodWrap = $('#tkMood', root);
   if (moodWrap) {
     const openMood = localStorage.getItem('lumen_mood_open') === '1';
-    moodWrap.innerHTML = `<div class="glass card mb-collcard"><button class="mb-coll-hd" id="mbCollHd">${ic(I.spark)}<b>Карта желаний</b><span class="sub">твоя мотивация — цели перед глазами</span><i class="mb-coll-ar ${openMood ? 'op' : ''}">${ic(I.chev || I.arrow, 2)}</i></button><div class="mb-coll-body" id="mbCollBody" style="${openMood ? '' : 'display:none'}"></div></div>`;
+    const mbEm = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2.1 4.3-4.3 2.1 2.1-4.3z"/><circle cx="12" cy="12" r="1"/></svg>`;
+    moodWrap.innerHTML = `<div class="glass card mb-collcard"><button class="mb-coll-hd" id="mbCollHd"><span class="mb-ch-em">${mbEm}</span><span class="mb-ch-t"><b>Карта желаний</b><span class="sub">твоя мотивация — цели перед глазами каждый день</span></span><i class="mb-coll-ar ${openMood ? 'op' : ''}">${ic(I.chev || I.arrow, 2)}</i></button><div class="mb-coll-body" id="mbCollBody" style="${openMood ? '' : 'display:none'}"></div></div>`;
     const mbBody = $('#mbCollBody', moodWrap), mbHd = $('#mbCollHd', moodWrap);
     let mbMounted = false;
     if (openMood) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; }
@@ -5870,16 +5871,18 @@ function tplCard(t, stBadge) {
 }
 
 /* ---------------- КАРТА ЖЕЛАНИЙ (личная доска мотивации брокера) ---------------- */
-let MB_STYLE = 'photo', MB_EDIT = false;
+let MB_STYLE = 'sticker', MB_EDIT = false, MB_ADD_OPEN = false, MB_TEXTMODE = 'auto';
 const MB_FONTS = { fraunces: ['Элегант', "'Fraunces',serif"], playfair: ['Журнал', "'Playfair Display',serif"], caveat: ['От руки', "'Caveat',cursive"], bebas: ['Плакат', "'Bebas Neue',sans-serif"], manrope: ['Чистый', "'Manrope',sans-serif"] };
 const MB_BGS = { paper: 'Бумага', linen: 'Лён', dark: 'Тёмная', cork: 'Пробка', gradient: 'Градиент', blush: 'Румяна' };
 const MB_PINS = { pin: 'Булавка', tape: 'Скотч', clip: 'Скрепка', none: 'Без' };
-const MB_PINCOLORS = ['#E1467C', '#2563EB', '#0E9E6A', '#D9982B', '#7C3AED', '#E0483D'];
-function mbPinHtml(style, color) {
+/* режимы текста на стикере — арт-директорское решение о микро-копирайте */
+const MB_TEXTMODES = { auto: 'Авто', none: 'Без текста', handwritten: 'От руки', editorial: 'Издательский', goal: 'Цель', mixed: 'Смешанный' };
+/* крепёж: булавка/скрепка — реалистичные вырезанные PNG (Apple-стиль), скотч — CSS */
+function mbPinHtml(style) {
   if (style === 'none') return '';
   if (style === 'tape') return '<span class="mb-tape"></span>';
-  if (style === 'clip') return `<span class="mb-clip"><svg viewBox="0 0 24 24" fill="none" stroke="#8a94a8" stroke-width="2" stroke-linecap="round"><path d="M8 7v9a4 4 0 0 0 8 0V6a2.5 2.5 0 0 0-5 0v10"/></svg></span>`;
-  return `<span class="mb-pin" style="--pc:${color}"></span>`;
+  if (style === 'clip') return '<img class="mb-fast mb-clip" src="/assets/mood/clip.png?v=1" alt="" draggable="false">';
+  return '<img class="mb-fast mb-pin" src="/assets/mood/pin.png?v=1" alt="" draggable="false">';
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
 async function renderMoodboard(root, opts) {
@@ -5892,21 +5895,41 @@ async function renderMoodboard(root, opts) {
   const fontKey = MB_FONTS[cfg.font] ? cfg.font : 'fraunces', fontCss = MB_FONTS[fontKey][1];
   const bg = MB_BGS[cfg.bg] ? cfg.bg : 'paper';
   const pin = MB_PINS[cfg.pin] ? cfg.pin : 'pin';
-  const ed = MB_EDIT;
-  const itemHtml = (it, i) => `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${it.rot || 0}deg)">
-    ${mbPinHtml(pin, MB_PINCOLORS[i % MB_PINCOLORS.length])}
+  const ed = MB_EDIT, add = MB_ADD_OPEN;
+  /* типографика рендерится отдельным слоем (spec #13): без опечаток, не обрезается, точная стилизация по режиму */
+  const mbTxt = (it) => {
+    const t = it.txt;
+    if (t && t.mode && t.mode !== 'none' && (t.primary || t.secondary || t.micro)) {
+      return `<div class="mb-txt mb-txt-${esc(t.mode)}">
+        ${t.primary ? `<div class="mb-tx-pri">${esc(t.primary)}</div>` : ''}
+        ${t.secondary ? `<div class="mb-tx-sec">${esc(t.secondary)}</div>` : ''}
+        ${t.micro ? `<div class="mb-tx-mic">${esc(t.micro)}</div>` : ''}
+      </div>`;
+    }
+    return it.caption ? `<div class="mb-cap">${esc(it.caption)}</div>` : '';
+  };
+  const itemHtml = (it, i) => `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${it.rot || 0}deg);--i:${i}">
+    ${mbPinHtml(pin)}
     <img src="${esc(it.url)}" alt="" draggable="false">
-    ${it.caption ? `<div class="mb-cap">${esc(it.caption)}</div>` : ''}
+    ${mbTxt(it)}
     ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>` : ''}
   </div>`;
+  /* тонкая гравюрная эмблема-компас вместо клипартной иконки */
+  const emblem = `<svg class="mb-emblem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2.1 4.3-4.3 2.1 2.1-4.3z"/><circle cx="12" cy="12" r="1"/></svg>`;
   root.innerHTML = `
     <div class="mb-wrap ${ed ? 'mb-editing' : ''}">
       <div class="mb-top">
-        <div class="mb-title">${ed ? `<input class="mb-title-edit" id="mbTitle" maxlength="60" value="${esc(title)}" style="font-family:${fontCss}">` : `<span class="mb-t-k" style="font-family:${fontCss}">${esc(title)}</span>`}${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>
-        <div class="mb-add">
-          <div class="mb-style"><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Вырезать (стикер)</button></div>
-          <div class="mb-inp"><input id="mbQuery" placeholder="Чего ты хочешь? напр. Patek Philippe Nautilus 5711, вилла на Бали, частный джет…" autocomplete="off"><button class="btn btn-accent" id="mbGo">${ic(I.spark)}Создать</button></div>
-          <button class="btn btn-sm mb-editbtn ${ed ? 'on' : ''}" id="mbEdit">${ic(ed ? I.check : (I.edit || I.doc))}${ed ? 'Готово' : 'Править'}</button>
+        <div class="mb-title">${emblem}${ed ? `<input class="mb-title-edit" id="mbTitle" maxlength="60" value="${esc(title)}" style="font-family:${fontCss}">` : `<span class="mb-t-k" style="font-family:${fontCss}">${esc(title)}</span>`}${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>
+        <div class="mb-tools">
+          <button class="mb-iconbtn ${add ? 'on' : ''}" id="mbAddToggle" title="Добавить желание">${ic(I.plus)}<span>Добавить</span></button>
+          <button class="mb-iconbtn ${ed ? 'on' : ''}" id="mbEdit" title="${ed ? 'Готово' : 'Править доску'}">${ic(ed ? I.check : (I.edit || I.doc))}</button>
+        </div>
+      </div>
+      <div class="mb-addpanel ${add ? 'open' : ''}" id="mbAddPanel">
+        <div class="mb-inp"><input id="mbQuery" placeholder="Чего ты хочешь? Patek Philippe Nautilus, вилла на Бали, частный джет, €1M капитала…" autocomplete="off"><button class="btn btn-accent" id="mbGo">${ic(I.spark)}Создать</button></div>
+        <div class="mb-addopts">
+          <div class="mb-seg mb-style"><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Стикер</button><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button></div>
+          <label class="mb-tm ${MB_STYLE === 'sticker' ? '' : 'off'}" id="mbTmWrap"><span>Текст</span><select id="mbTextMode" class="mb-select">${Object.entries(MB_TEXTMODES).map(([k, n]) => `<option value="${k}" ${k === MB_TEXTMODE ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         </div>
       </div>
       ${ed ? `<div class="mb-cfg">
@@ -5915,18 +5938,21 @@ async function renderMoodboard(root, opts) {
         <div class="mb-cfg-g"><span>Крепёж</span>${Object.entries(MB_PINS).map(([k, n]) => `<button class="mb-chip ${k === pin ? 'on' : ''}" data-mbpin="${k}">${n}</button>`).join('')}</div>
       </div>` : ''}
       <div class="mb-board mb-bg-${bg}" id="mbBoard">
-        ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${ic(I.spark)}<b>Собери свою карту желаний</b><span>Напиши, чего ты хочешь — ИИ создаст картинку и прикрепит на доску. Нажми «Править», чтобы двигать и убирать. Пусть цели будут перед глазами каждый день.</span></div>`}
+        ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${emblem}<b>Собери свою карту желаний</b><span>Нажми «Добавить» и напиши, чего ты хочешь — ИИ создаст стикер и прикрепит на доску. Пусть цели будут перед глазами каждый день.</span></div>`}
       </div>
     </div>`;
   const rerender = () => renderMoodboard(root, opts);
   const board = $('#mbBoard', root);
-  $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); const tm = $('#mbTmWrap', root); if (tm) tm.classList.toggle('off', MB_STYLE !== 'sticker'); }));
   $('#mbEdit', root).addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
+  const addToggle = $('#mbAddToggle', root), addPanel = $('#mbAddPanel', root);
+  addToggle.addEventListener('click', () => { MB_ADD_OPEN = !MB_ADD_OPEN; addToggle.classList.toggle('on', MB_ADD_OPEN); addPanel.classList.toggle('open', MB_ADD_OPEN); if (MB_ADD_OPEN) setTimeout(() => { const qq = $('#mbQuery', root); if (qq) qq.focus(); }, 60); });
+  const tmSel = $('#mbTextMode', root); if (tmSel) tmSel.addEventListener('change', () => { MB_TEXTMODE = tmSel.value; });
   const genBtn = $('#mbGo', root), q = $('#mbQuery', root);
   const gen = async () => {
     const prompt = q.value.trim(); if (!prompt) { q.focus(); return; }
     genBtn.disabled = true; genBtn.innerHTML = '✦ Создаю…';
-    try { await api.post('/moodboard/generate', { prompt, style: MB_STYLE }); q.value = ''; toast('Добавлено на карту', MB_EDIT ? 'Перетащи, куда хочешь' : 'Нажми «Править», чтобы двигать', true); rerender(); }
+    try { await api.post('/moodboard/generate', { prompt, style: MB_STYLE, textMode: MB_TEXTMODE }); q.value = ''; toast('Добавлено на карту', MB_EDIT ? 'Перетащи, куда хочешь' : 'Нажми «Править», чтобы двигать', true); rerender(); }
     catch (e) { toast('Не вышло', e.message); genBtn.disabled = false; genBtn.innerHTML = `${ic(I.spark)}Создать`; }
   };
   genBtn.addEventListener('click', gen);

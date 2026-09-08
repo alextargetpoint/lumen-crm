@@ -237,7 +237,7 @@ body.cpanel-on{padding-right:308px!important}
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', layers,
-        mode: rich.mode || '', items: rich.items || [],
+        mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'check',
       };
     });
   }
@@ -547,6 +547,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'check'; const OPT = [['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}">${g}</button>`).join('')}</div><div class="cnote">Стиль маркера у тезисов слайда.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Цвет текста</label><div class="ctcolors" id="cTColor"><button class="ctc ${!sl.dataset.tcolor ? 'on' : ''}" data-tc="" title="Авто">A</button>${Object.entries(P.tcolors || {}).map(([k, v]) => `<button class="ctc ${sl.dataset.tcolor === k ? 'on' : ''}" data-tc="${k}" title="${k}" style="--tc:${v}"></button>`).join('')}</div><div class="cnote">«A» — авто (по фону). Пресет перекрывает цвет заголовка и подписи.</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
@@ -577,6 +578,7 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
+    { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = b.dataset.pm; sl.dataset.rich = JSON.stringify(r); $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save('hard', { slides: serialize() }); }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;

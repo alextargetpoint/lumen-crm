@@ -375,6 +375,73 @@ async function generateImage(prompt, opts = {}) {
   return Buffer.from(b64, 'base64');
 }
 
+/* ═══════════════ КАРТА ЖЕЛАНИЙ — мастер-стиль стикеров (единая арт-дирекшн) ═══════════════
+   Меняется только объект; арт-дирекшн, паста-бордер, тени, грейдинг, типографика — постоянны.
+   Слой 1: structureVisionSticker() — ИИ определяет ТОЧНУЮ модель + арт-директорское решение о тексте.
+   Слой 2: masterStickerPrompt() — собирает мастер-промпт с подставленным объектом и типографикой. */
+const MB_TEXT_MODES = { auto: 'Авто', none: 'Без текста', handwritten: 'От руки', editorial: 'Издательский', goal: 'Цель', mixed: 'Смешанный' };
+
+async function structureVisionSticker(input, forcedMode = 'auto') {
+  const raw = String(input || '').slice(0, 300).trim();
+  const modeLine = (forcedMode && forcedMode !== 'auto')
+    ? `Пользователь ПРИНУДИТЕЛЬНО выбрал режим текста: "${forcedMode}" (none=без текста, handwritten=надпись от руки, editorial=чистый издательский лейбл, goal=числовая цель, mixed=от руки + лейбл). Следуй ему.`
+    : 'Режим текста выбери сам как арт-директор, исходя из смысла объекта (auto).';
+  const prompt = `Ты арт-директор премиальной vision board (карта желаний, стиль 2026 luxury editorial).
+Пользователь ввёл объект мечты одним словом/фразой: "${raw}".
+
+СНАЧАЛА определи ТОЧНО, что это, для фотореалистичного стикера. Если это бренд/модель без уточнения — ЗАФИКСИРУЙ конкретное актуальное поколение + ракурс (напр. "G-Wagon" → "Mercedes-AMG G 63, current generation, front three-quarter view"; "Rolex GMT Sprite" → "Rolex GMT-Master II 126720VTNR Sprite, three-quarter product view").
+
+ЗАТЕМ прими арт-директорское решение о тексте. ${modeLine}
+Определи символический смысл объекта на доске (Wealth/Freedom/Status/Travel/Health/Career/Real Estate/Experience/Discipline/Growth/Lifestyle) и подбери короткий копирайт СВЯЗАННЫЙ с этим смыслом — НЕ клише (запрещено: SUCCESS, BE RICH, HUSTLE, DREAM BIG, MILLIONAIRE MINDSET, BOSS LIFE). Для Rolex → "OWN YOUR TIME", джет → "THE WORLD, CLOSER", вилла → "A LIFE WELL BUILT". Числа/валюты/даты/номера моделей из ввода НЕ меняй. Если во вводе есть измеримая цель ("100k AED/мес") — режим goal, крупное чистое число.
+
+Верни СТРОГО JSON:
+{"object":"бренд+тип","model":"конкретная модель/референс/поколение или пусто","characteristics":["3-6 узнаваемых визуальных деталей: материалы, цвет, ракурс three-quarter, силуэт"],"category":"Luxury|Achievement|Wealth|Freedom|Travel|Real Estate|Lifestyle|Style|Health|Career","meaning":"1-3 слова символики","textMode":"none|handwritten|editorial|goal|mixed","primary":"ОДНА эмоц. фраза 1-5 слов (или пусто если none)","secondary":"фактический лейбл-название объекта 1-4 слова (или пусто)","micro":"крошечный editorial микро-копирайт напр. TARGET / 2027, DXB → WORLD (или пусто)","layout":"1-2 фразы: где объект и где какой текст","material":"чем набран текст: handwritten on background | small warm-white torn-paper label | masking tape | clean uppercase sans below"}`;
+  const out = await callGemini(prompt, 15000, 650);
+  if (!out || !out.object) return null;
+  const s = k => String(out[k] || '').slice(0, 140);
+  return {
+    object: s('object'), model: s('model'),
+    characteristics: Array.isArray(out.characteristics) ? out.characteristics.slice(0, 6).map(x => String(x).slice(0, 90)) : [],
+    category: s('category'), meaning: s('meaning'),
+    textMode: MB_TEXT_MODES[out.textMode] ? out.textMode : (forcedMode !== 'auto' ? forcedMode : 'handwritten'),
+    primary: s('primary'), secondary: s('secondary'), micro: s('micro'), layout: s('layout'), material: s('material'),
+  };
+}
+
+function masterStickerPrompt(st, fallback, bakeText) {
+  const obj = st ? `${st.object}${st.model ? ', ' + st.model : ''}` : String(fallback || '').slice(0, 200);
+  const chars = st && st.characteristics.length ? `\nVISUAL CHARACTERISTICS: ${st.characteristics.join(', ')}.` : '';
+  /* по умолчанию текст НЕ запекаем в картинку (spec #13): надписи рендерит фронт отдельным слоем —
+     так они всегда без опечаток, не обрезаются кадром и стилизуются точно. Картинка = чистый объект. */
+  let typo = '\nTEXT: absolutely no text, letters, numbers, captions, labels or watermarks anywhere in the image — a purely visual object sticker. Keep any incidental print on the object\'s own surface (dials, plates) clean and legible or softly out of focus, never garbled.';
+  if (bakeText && st && st.textMode && st.textMode !== 'none') {
+    const bits = [];
+    if (st.primary) bits.push(`PRIMARY message "${st.primary}"`);
+    if (st.secondary) bits.push(`SECONDARY factual label "${st.secondary}"`);
+    if (st.micro) bits.push(`tiny MICRO-copy "${st.micro}"`);
+    const modeDesc = {
+      handwritten: 'real black marker / ink handwriting by a creative director — natural, slightly imperfect, confident, editorial, masculine/unisex, varying baseline, realistic pen pressure; NOT childish, comic, graffiti or wedding calligraphy. Small hand-drawn marks (→ ↗ underline circle) allowed, naturally drawn.',
+      editorial: 'clean modern Swiss / neo-grotesk uppercase editorial typography — geometric, neutral, premium, strong kerning, generous spacing, highly legible (do NOT reproduce a copyrighted commercial font, use its visual characteristics).',
+      goal: 'the number LARGE, clean and visually powerful (never alter the figure/currency/date), with a small clean uppercase label beneath and an optional tiny handwritten annotation.',
+      mixed: 'handwritten primary phrase + a clean small uppercase sans-serif factual label; optionally on a small warm-white torn-paper label with realistic imperfect edges and soft shadow.',
+    }[st.textMode] || 'clean editorial typography';
+    typo = `\nTYPOGRAPHY (${st.textMode}): ${bits.join(', ')}. Style: ${modeDesc}\nPLACEMENT: ${st.layout || 'below / beside the object, integrated into the collage'}. MATERIAL: ${st.material || 'directly on background'}.\nHIERARCHY — STRICT: the OBJECT is the hero and by far the largest element. Keep ALL typography small and clearly secondary: the primary phrase must be no taller than ~1/9 of the sticker height and its total width must NOT exceed the object's width; secondary label smaller still; micro-copy tiny. Text must never dominate, never span edge-to-edge, never be a giant headline. Set text in one calm block below (or neatly beside) the object with breathing room.\nCRITICAL: all visible text MUST be spelled exactly and correctly — never invent letters, distort words, create pseudo-English, repeat words, or alter model names / numbers / currencies. Any incidental small print ON the object's own surface (dials, labels) must stay clean and legible or softly out of focus — never render it as garbled fake lettering.`;
+  }
+  return `Create ONE standalone premium vision-board sticker featuring: ${obj}.${chars}
+If a specific brand/product/model is given, preserve its recognizable real-world design, proportions, materials, silhouette and signature details so it is immediately recognizable as the requested model.
+VISUAL DIRECTION: sophisticated 2026 luxury lifestyle / success vision board — contemporary luxury editorial collage, premium fashion-magazine moodboard, modern Pinterest/Are.na creative-director board, subtle analog scrapbook character; aspirational but tasteful, expensive without looking flashy; realistic object photography mixed with handmade collage; clean, masculine, sophisticated modern-2026 language (NOT an old motivational poster).
+OBJECT RENDERING: render the object as a highly realistic premium product photograph — realistic materials, reflections, physically believable soft studio lighting, crisp details, natural proportions, subtle depth, slightly warm neutral color grading, high-end editorial finish. Do NOT make it a cartoon, emoji, flat vector icon, childish illustration, exaggerated 3D icon, plastic toy or clipart — the object stays photorealistic.
+STICKER CUTOUT: isolate the object completely; physical die-cut sticker look — irregular but elegant contour following the object, ~8–16px white/off-white paper border, subtle paper thickness, extremely soft contact shadow underneath, slight elevation, realistic cut-paper edge, no heavy or black outline, no excessive glow. It should feel like a premium photo physically cut out and stuck to a designer's board.
+COLLAGE CHARACTER: subtle imperfections — slightly imperfect paper contour, tiny 1–4° rotation, very light paper + photographic grain, warm editorial grading. Keep minimal and sophisticated.${typo}
+PALETTE: warm whites #F7F5F0 / #FAF9F6, ivory, black, charcoal, natural metallic silver, subtle champagne/beige, plus the object's natural colors. Avoid oversaturation and overly yellow vintage paper.
+LIGHTING: soft diffused studio, realistic directional highlights, gentle shadows, neutral-to-warm white balance.
+COMPOSITION — IMPORTANT: ONE independent sticker; center the object; the object occupies roughly 55–65% of the frame with a CLEAR EMPTY MARGIN on all four sides — never fill the frame, never let the object or its die-cut border touch or bleed off the edges, never crop any part of it; the complete silhouette is fully visible with comfortable padding; works at small and medium sizes on a larger board.
+BACKGROUND: output on a FULLY TRANSPARENT background (alpha channel) — the object is a die-cut sticker isolated with NOTHING behind it: no warm-white fill, no khaki, no room, scenery, table or environment. Only the object, its thin white paper die-cut border, and a soft contact shadow remain; everything else is transparent so it drops cleanly onto any board.
+CONSISTENCY: part of an ongoing collection — same photographic realism, paper treatment, border thickness, shadow softness, warm grading, typography philosophy, collage aesthetic and scale, as if one art director made every sticker in one photoshoot for one luxury vision board.
+DO NOT USE: cartoon/emoji/glossy app-icon aesthetics, childish 3D, excessive gradients, neon glow, thick black outlines, generic Canva templates, old motivational-poster design, random decorative elements, excessive text, multiple objects (unless requested), busy backgrounds, fake luxury logos, distorted brand marks.
+OUTPUT: one isolated premium vision-board sticker, high resolution, sharp, full object visible, warm-white clean background, realistic die-cut paper border, soft natural shadow, modern luxury editorial collage aesthetic.`;
+}
+
 /* ИИ-генератор карусели для соцсетей (недвижимость): заголовок + слайды */
 const CAROUSEL_TEMPLATES = {
   project: { name: 'Новый проект', brief: 'обзор нового жилого проекта/ЖК: крючок, локация, планировки/цены, инфраструктура, доходность, призыв' },
@@ -405,6 +472,11 @@ async function composeCarousel(topic, templateKey, count, agencyName, geo, angle
   const prompt = `Ты — SMM-копирайтер агентства недвижимости «${String(agencyName || 'агентство').slice(0, 80)}». Сделай текст для карусели в Instagram/Threads на ${n} слайдов.
 Формат: ${t.name} — ${t.brief}.
 ${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}${geo ? 'Направление: ' + geo + '\n' : ''}${a.hint ? a.hint + '\n' : ''}${toneHint ? toneHint + '\n' : ''}
+КОПИРАЙТИНГ — работай по проверенным формулам продаж, а не «общими словами»:
+• Драматургия колоды: Крючок → Проблема/желание аудитории → Объект как решение → Доказательства (цифры, факты, локация) → Условия входа/выгода → Оффер/почему сейчас → Призыв. Каждый слайд двигает к заявке.
+• Крючок (1-й слайд) — по одной из формул: разрыв шаблона / конкретное число / вопрос-боль / «большинство ошибается» / инсайд «что скрывают». НЕ «Новый проект», а зацепка, от которой хочется листать.
+• PAS/AIDA: сначала задень боль или желание, потом покажи, как объект её закрывает — конкретикой, не эпитетами. Каждый тезис = выгода для клиента («доход в валюте», «сдал — живёшь у моря»), а не свойство ради свойства.
+• Финал — один чёткий следующий шаг + кодовое слово в директ. Без «звоните нам».
 Правила: живой человеческий язык, без клише и канцелярита. eyebrow — 1-2 слова (рубрика КАПСОМ, напр. «ЗАПУСК», «ЦИФРЫ», «ДОХОД»); заголовок — 2-4 слова (≤ 32 символов, НЕ переносить на 3 строки); подпись — 1-2 коротких предложения (≤ 120 символов). Цифры не выдумывай — если их нет во вводных, говори обтекаемо.
 ПЛОТНОСТЬ: слайд НЕ должен быть пустым (только заголовок + одна фраза — плохо).${ptsRange === '0' ? ' Режим «кратко»: НЕ давай points, только сильные заголовок+подпись.' : ` На КАЖДОМ СРЕДНЕМ (не первом и не последнем) слайде дай "points" — ${ptsRange} коротких тезиса-буллета по 3-6 слов каждый (≤ 46 символов): конкретика, польза, факты, «что внутри». Первый слайд (крючок) и последний (призыв с кодовым словом в директ) — БЕЗ points, только заголовок+подпись. Тезисы разные на разных слайдах, не повторяй.`}
 Верни строго JSON:
@@ -830,4 +902,4 @@ async function parseTask(text, todayStr, dow) {
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

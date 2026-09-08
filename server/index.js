@@ -820,6 +820,7 @@ const sanSlide = (s) => ({
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
+  pmark: ['check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus'].includes(s.pmark) ? s.pmark : 'check',   /* стиль маркера буллетов */
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 /* подбор иконки удобства по ключевым словам фишки (RU/EN) */
@@ -1504,7 +1505,9 @@ async function downloadImageToAsset(url) {
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length < 8000 || buf.length > 12e6) return null;       /* <8КБ = иконка/логотип; >12МБ — мимо */
     const dim = imgDims(buf);                                       /* отсекаем низкое разрешение/пикселизацию */
-    if (dim && Math.max(dim.w, dim.h) < 640) return null;
+    if (dim && Math.max(dim.w, dim.h) < 720) return null;
+    if (dim && Math.min(dim.w, dim.h) < 420) return null;           /* узкие/мелкие миниатюры (пикселят на слайде) */
+    if (dim && buf.length < (dim.w * dim.h) * 0.12) return null;    /* байт/пиксель мало = сильно пережато/апскейл → каша */
     const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
     fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
     const fn = `car/src-${crypto.randomBytes(5).toString('hex')}.${ext}`;
@@ -2944,7 +2947,7 @@ const server = http.createServer(async (req, res) => {
         }
         try {
           const buf = await llm.generateImage(prompt, isSticker
-            ? { size: '1024x1024', quality: 'high' }   /* стикер: тёпло-белый паста-фон запечён промптом, макс. реализм */
+            ? { size: '1024x1024', quality: 'high', background: 'transparent', output_format: 'png' }   /* вырезанный стикер на прозрачном фоне */
             : { size: '1024x1024', quality: 'medium' });
           fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
           const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
@@ -4465,7 +4468,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'check' }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
@@ -4477,7 +4480,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
-            ${!s.mode && (s.points || []).length ? `<ul class="s-points">${s.points.map(pt => `<li><span class="s-pt-m"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
+            ${!s.mode && (s.points || []).length ? `<ul class="s-points pm-${s.pmark || 'check'}">${s.points.map((pt, pi) => `<li><span class="s-pt-m" data-n="${pi + 1}"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
             ${(s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -4618,11 +4621,30 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-points{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
 .s-points li{display:flex;gap:11px;align-items:flex-start;font-size:clamp(13.5px,3.5vw,16px);line-height:1.32;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
 .slide.hasbg .s-points li{color:rgba(255,255,255,.94);text-shadow:0 1px 8px rgba(6,10,20,.4)}
-/* маркер-чип: контраст на любом фоне (акцент+белая галка), не сливается */
-.s-pt-m{flex:0 0 20px;width:20px;height:20px;border-radius:7px;margin-top:1px;background:var(--blue);position:relative;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.16)}
-.s-pt-m::after{content:"";position:absolute;left:6px;top:4px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
-.slide.hasbg .s-pt-m{background:rgba(255,255,255,.92)}
-.slide.hasbg .s-pt-m::after{border-color:var(--blue)}
+/* маркер-чип: контраст на любом фоне (акцент+белый глиф), не сливается. Стиль задаёт .pm-* на списке */
+.s-pt-m{flex:0 0 20px;width:20px;height:20px;border-radius:7px;margin-top:1px;background:var(--blue);position:relative;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.16);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;line-height:1}
+.slide.hasbg .s-pt-m{background:rgba(255,255,255,.92);color:var(--blue)}
+/* галка (по умолчанию) */
+.pm-check .s-pt-m::after{content:"";position:absolute;left:6px;top:4px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.slide.hasbg .pm-check .s-pt-m::after{border-color:var(--blue)}
+/* точка (сплошной кружок) */
+.pm-dot .s-pt-m{width:11px;height:11px;border-radius:50%;margin-top:6px;flex-basis:20px}
+/* кольцо (полый кружок) */
+.pm-ring .s-pt-m{background:transparent;border-radius:50%;box-shadow:none;border:3px solid var(--blue);width:15px;height:15px;margin-top:4px}
+.slide.hasbg .pm-ring .s-pt-m{border-color:rgba(255,255,255,.92)}
+/* тире */
+.pm-dash .s-pt-m{background:transparent;box-shadow:none;border-radius:0;width:16px;height:20px}
+.pm-dash .s-pt-m::after{content:"";position:absolute;left:2px;top:9px;width:13px;height:2.5px;border-radius:2px;background:var(--blue)}
+.slide.hasbg .pm-dash .s-pt-m::after{background:#fff}
+/* глифы через ::after (стрелка/ромб/звезда/плюс) — цвет наследуется от чипа */
+.pm-arrow .s-pt-m::after{content:"→"}
+.pm-diamond .s-pt-m{background:transparent;box-shadow:none}.pm-diamond .s-pt-m::after{content:"◆";color:var(--blue)}
+.slide.hasbg .pm-diamond .s-pt-m::after{color:#fff}
+.pm-star .s-pt-m{background:transparent;box-shadow:none}.pm-star .s-pt-m::after{content:"★";color:var(--blue);font-size:15px}
+.slide.hasbg .pm-star .s-pt-m::after{color:#fff}
+.pm-plus .s-pt-m::after{content:"+";font-size:14px}
+/* нумерация */
+.pm-num .s-pt-m::after{content:attr(data-n)}
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
 .s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-amen-i{color:rgba(255,255,255,.92)}
@@ -4680,7 +4702,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=29"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=30"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
