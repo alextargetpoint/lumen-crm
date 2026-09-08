@@ -2599,6 +2599,27 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, count: c.slides.length, images: pics.length, hasGallery: pics.length >= 3, factsName: facts && facts.name || null });
       } catch (e) { return json(res, 500, { error: 'ИИ-оформление не удалось: ' + e.message }); }
     }
+    /* ИИ-выделение главных слов на ВСЕХ слайдах разом (1 или 2 цвета) */
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/ai-highlight$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const palette = b.colors === 2 ? ['cobalt', 'gold'] : b.colors === 'gold' ? ['gold'] : ['cobalt'];
+      try {
+        const heads = c.slides.map(s => String(s.heading || '').replace(/<[^>]*>/g, ''));
+        const marked = await llm.highlightHeadings(heads);
+        let ci = 0, applied = 0;
+        c.slides.forEach((s, i) => {
+          const mk = marked[i]; if (!mk || !/\*\*.+?\*\*/.test(mk)) return;
+          const html = mk.replace(/\*\*(.+?)\*\*/g, (_, w) => { const col = palette[ci % palette.length]; ci++; return `<mark class="hl-${col}">${w}</mark>`; });
+          s.heading = sanCarInline(html).slice(0, 240); applied++;
+        });
+        store.save();
+        return json(res, 200, { ok: true, applied });
+      } catch (e) { return json(res, 500, { error: 'ИИ-выделение не удалось: ' + e.message }); }
+    }
 
     /* ================= ЛЕНТА АГЕНТСТВА (корпоративная стена) ================= */
     const feedUid = () => ROLE ? (ROLE.role === 'owner' ? 'owner' : ROLE.brokerId) : 'anon';
@@ -4366,10 +4387,11 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
 .slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
-.slide.hasbg .s-h{color:#fff}
+.slide.hasbg .s-h{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 26px rgba(0,0,0,.4)}
+.slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
 .s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%}
 .slide.al-center .s-s{max-width:100%}
-.slide.hasbg .s-s{color:rgba(255,255,255,.92)}
+.slide.hasbg .s-s{color:rgba(255,255,255,.94);text-shadow:0 1px 10px rgba(0,0,0,.5)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
 .slide.al-center .s-brand{left:50%;transform:translateX(-50%)}
 .s-brand img{height:26px;max-width:130px;object-fit:contain}
@@ -4402,7 +4424,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=23"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=24"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

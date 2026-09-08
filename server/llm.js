@@ -470,6 +470,22 @@ async function classifyPhotos(urls) {
   return res;
 }
 
+/* ИИ-выделение: для каждого заголовка выбрать 1-2 САМЫХ важных слова и обернуть их **…**.
+   Сервер потом превратит **…** в цветной <mark>. Одним махом на все слайды. */
+async function highlightHeadings(headings) {
+  const list = (headings || []).map((h, i) => `${i}: ${String(h || '').replace(/<[^>]*>/g, '').slice(0, 120)}`).join('\n');
+  if (!list.trim()) return [];
+  const prompt = `Ты — арт-директор соцсетей. Ниже заголовки слайдов карусели по недвижимости. Для КАЖДОГО выдели самое важное — 1, максимум 2 ключевых слова/короткую фразу — обернув их в **двойные звёздочки**. Это акцент для взгляда: цифры, выгода, суть. НЕ выделяй всё подряд, НЕ выделяй служебные слова, НЕ меняй сам текст (только расставь **). Если в заголовке нечего выделять — верни его без изменений.
+ЗАГОЛОВКИ:
+${list}
+Верни строго JSON: {"items":[{"i":0,"marked":"текст с **акцентом**"}, ...]} — по одному на каждый индекс.`;
+  const out = await callGemini(prompt, 20000, 1200);
+  const items = Array.isArray(out && out.items) ? out.items : [];
+  const byI = {};
+  items.forEach(it => { if (it && typeof it.i === 'number') byI[it.i] = String(it.marked || '').slice(0, 200); });
+  return headings.map((h, i) => byI[i] || String(h || ''));
+}
+
 async function composeLeadPsych(db, lead, history) {
   const q = lead.quals || {};
   const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
@@ -739,4 +755,4 @@ async function parseTask(text, todayStr, dow) {
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, generateImage, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL };

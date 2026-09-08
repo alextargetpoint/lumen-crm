@@ -440,7 +440,8 @@ body.cpanel-on{padding-right:308px!important}
   function designHtml() {
     const cats = Object.keys(P.templates || {});
     return `
-    ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>` : ''}
+    ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>
+    <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><div class="cnote">ИИ сам подсветит ключевые слова во всех заголовках разом.</div></div>` : ''}
     <div class="cgrp"><label>Готовые шаблоны</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
@@ -457,6 +458,12 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cnote">Тема, шрифт, формат и футер применяются ко всей карусели.</div>`;
   }
   function wireDesign(body) {
+    /* ИИ-выделение главных слов на всех слайдах */
+    const runHl = async (colors) => {
+      flash('✦ ИИ подсвечивает главное…', 0);
+      try { const r = await fetch(`/api/carousels/${P.cid}/ai-highlight?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Выделено на ${j.applied} слайдах ✓`, 1500); liveRefresh(); } catch (err) { flash('Не вышло: ' + err.message); }
+    };
+    { const h1 = $('#cHl1', body), h2 = $('#cHl2', body); if (h1) h1.addEventListener('click', () => runHl(1)); if (h2) h2.addEventListener('click', () => runHl(2)); }
     /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
     const aiBtn = $('#cAiCompose', body);
     if (aiBtn) aiBtn.addEventListener('click', (e) => {
