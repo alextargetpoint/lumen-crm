@@ -3776,3 +3776,44 @@ html[data-night] .mb-cap { background: rgba(20,30,50,.7); color: var(--ink); }
 .mb-empty b { font-size: 17px; color: var(--navy-900); font-weight: 700; }
 .mb-empty span { font-size: 13px; color: var(--ink-3); max-width: 440px; line-height: 1.55; }
 @media (max-width: 640px) { .mb-inp input { width: 100%; } .mb-top { flex-direction: column; align-items: stretch; } .mb-add { align-items: stretch; } }
+
+/* ============ Карта желаний · правка, шрифты, фоны, крепёж ============ */
+.mb-editbtn.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mb-title-edit { font-size: 30px; font-weight: 600; color: var(--navy-900); border: none; border-bottom: 2px dashed var(--stroke); background: none; outline: none; padding: 0 2px 3px; max-width: 60vw; letter-spacing: -.02em; }
+.mb-title-edit:focus { border-color: var(--accent); }
+.mb-cfg { display: flex; flex-wrap: wrap; gap: 18px; padding: 12px 16px; background: var(--bg-2); border-radius: 14px; margin-bottom: 12px; }
+.mb-cfg-g { display: flex; align-items: center; gap: 6px; }
+.mb-cfg-g > span { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; margin-right: 3px; }
+.mb-chip { border: 1.5px solid var(--stroke); background: var(--card); border-radius: 18px; padding: 5px 13px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; font-family: inherit; }
+.mb-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mb-bgchip { width: 30px; height: 26px; padding: 0; border-radius: 8px; }
+.mb-bgchip.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* фоны доски */
+.mb-bg-paper { background: radial-gradient(circle at 20px 20px, rgba(16,43,92,.03) 1.5px, transparent 1.6px) 0 0 / 40px 40px, linear-gradient(160deg, #FBFAF7, #F3F1EC); }
+.mb-bg-linen { background: repeating-linear-gradient(45deg, rgba(0,0,0,.012) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,.012) 0 2px, transparent 2px 4px), #F6F4EF; }
+.mb-bg-dark { background: radial-gradient(circle at 20px 20px, rgba(255,255,255,.03) 1.5px, transparent 1.6px) 0 0 / 40px 40px, linear-gradient(160deg, #0e1a30, #0a1120); }
+.mb-bg-cork { background: radial-gradient(circle at 30% 30%, rgba(120,72,20,.1) 0 2px, transparent 3px) 0 0 / 14px 14px, linear-gradient(160deg, #D9B382, #CBA06A); }
+.mb-bg-gradient { background: radial-gradient(120% 90% at 15% 10%, color-mix(in srgb, var(--accent) 16%, #fff), transparent 55%), radial-gradient(100% 80% at 90% 90%, rgba(124,58,237,.14), transparent 55%), #F5F7FC; }
+.mb-bg-blush { background: radial-gradient(circle at 20px 20px, rgba(200,60,110,.03) 1.5px, transparent 1.6px) 0 0 / 40px 40px, linear-gradient(160deg, #FCF1F3, #F7E8EC); }
+.mb-bg-dark .mb-cap { background: rgba(20,30,50,.72); color: #eef; }
+/* фон-свотчи в пикере — мини-версия */
+.mb-bgchip.mb-bg-paper, .mb-bgchip.mb-bg-linen, .mb-bgchip.mb-bg-cork, .mb-bgchip.mb-bg-gradient, .mb-bgchip.mb-bg-blush, .mb-bgchip.mb-bg-dark { background-size: cover, cover, cover; }
+/* стикеры (вырезанные, прозрачный фон) — без белой подложки, с мягкой тенью-контуром */
+.mb-item.stk img { background: none; box-shadow: none; border-radius: 0; filter: drop-shadow(0 10px 12px rgba(16,43,92,.32)) drop-shadow(0 2px 3px rgba(16,43,92,.25)); }
+/* крепёж: скотч и скрепка */
+.mb-tape { position: absolute; top: -8px; left: 50%; transform: translateX(-50%) rotate(-3deg); width: 54px; height: 20px; z-index: 3; background: linear-gradient(180deg, rgba(255,240,150,.55), rgba(240,220,120,.5)); border-left: 1px dashed rgba(0,0,0,.06); border-right: 1px dashed rgba(0,0,0,.06); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.mb-clip { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 22px; height: 30px; z-index: 3; }
+.mb-clip svg { width: 100%; height: 100%; }
+/* сворачиваемая карта в «Мои задачи» */
+.mb-embed { margin-bottom: 16px; }
+.mb-embed .mb-board { min-height: 46vh; }
+
+/* сворачиваемая карта желаний в «Мои задачи» */
+.mb-collcard { padding: 0; overflow: hidden; margin-bottom: 16px; }
+.mb-coll-hd { width: 100%; display: flex; align-items: center; gap: 9px; padding: 14px 18px; background: none; border: none; cursor: pointer; text-align: left; font-size: 14px; font-weight: 650; color: var(--navy-900); }
+.mb-coll-hd svg { width: 17px; height: 17px; color: var(--accent); }
+.mb-coll-hd .sub { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.mb-coll-ar { margin-left: auto; color: var(--ink-3); display: grid; place-items: center; transition: transform .2s; }
+.mb-coll-ar.op { transform: rotate(180deg); }
+.mb-coll-ar svg { width: 16px; height: 16px; }
+.mb-coll-body { padding: 0 16px 16px; }

@@ -2845,7 +2845,17 @@ const server = http.createServer(async (req, res) => {
       const mbUid = () => ROLE ? (ROLE.role === 'owner' ? 'owner' : ROLE.brokerId) : null;
       if (p === '/api/moodboard' && req.method === 'GET') {
         const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
-        db.moodboard = db.moodboard || {}; return json(res, 200, db.moodboard[uid] || []);
+        db.moodboard = db.moodboard || {}; db.moodboardCfg = db.moodboardCfg || {};
+        return json(res, 200, { items: db.moodboard[uid] || [], cfg: db.moodboardCfg[uid] || {} });
+      }
+      if (p === '/api/moodboard/config' && req.method === 'PATCH') {
+        const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
+        const b = await readBody(req); db.moodboardCfg = db.moodboardCfg || {}; const c = db.moodboardCfg[uid] = db.moodboardCfg[uid] || {};
+        if (b.title != null) c.title = String(b.title).slice(0, 60);
+        if (b.font != null) c.font = String(b.font).slice(0, 24);
+        if (b.bg != null) c.bg = String(b.bg).slice(0, 24);
+        if (b.pin != null) c.pin = String(b.pin).slice(0, 24);
+        store.save(); return json(res, 200, c);
       }
       if (p === '/api/moodboard' && req.method === 'POST') {
         const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
@@ -2874,10 +2884,15 @@ const server = http.createServer(async (req, res) => {
         const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
         if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для генерации' });
         const b = await readBody(req); const want = String(b.prompt || '').slice(0, 400).trim(); if (!want) return json(res, 400, { error: 'что тебя мотивирует?' });
-        const style = b.style === 'sticker' ? ', die-cut sticker style, bold clean vector illustration, subtle drop shadow, vibrant, isolated on clean background' : ', ultra-aesthetic editorial photography, cinematic lighting, luxury lifestyle, rich premium colors, high-end web-design magazine quality, tasteful minimal composition';
-        const prompt = `${want}${style}, motivational vision-board visual, no text, no watermark, no logo`;
+        const isSticker = b.style === 'sticker';
+        /* без «импровизации» стилем — чистая реалистичная картинка именно того, что просят */
+        const prompt = isSticker
+          ? `${want}, realistic high-resolution photo of the subject only, cleanly cut out and isolated, centered, sharp focus, natural lighting, no background, no text, no watermark, no logo`
+          : `${want}, realistic high-resolution photograph, clean, crisp, well-lit, professional, no text, no watermark, no logo`;
         try {
-          const buf = await llm.generateImage(prompt, { size: '1024x1024', quality: 'medium' });
+          const buf = await llm.generateImage(prompt, isSticker
+            ? { size: '1024x1024', quality: 'medium', background: 'transparent', output_format: 'png' }
+            : { size: '1024x1024', quality: 'medium' });
           fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
           const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
           fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);

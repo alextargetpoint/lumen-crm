@@ -4768,7 +4768,7 @@ const SOCIAL_TOOLS = {
   bank:      { name: 'Копилка идей',   icon: I.wake,   sub: 'поймал мысль — запиши', hue: '#8B7BD8' },
   carousels: { name: 'Карусели',       icon: I.layers, sub: 'слайды для ленты',       hue: '#7C5BD8' },
   launch:    { name: 'Карусель из лонча', icon: I.target, sub: 'старт продаж → слайды', hue: '#E08A6B' },
-  post:      { name: 'Посты и сторис', icon: I.chat,   sub: 'текст в нужном стиле',    hue: '#4F7DFF' },
+  /* post (Посты и сторис) временно скрыт по просьбе — блок будем дорабатывать позже */
 };
 let SOCIAL_TOOL = 'scripts';
 let SOCIAL_SCRIPT_FMTS = new Set(['talking']);
@@ -5617,6 +5617,7 @@ PAGES.tasks = async (root) => {
   }
 
   root.innerHTML = `
+    <div id="tkMood" class="mb-embed"></div>
     <div class="tk-top">
       <div class="tk-hero glass">
         <div class="tk-hero-l">
@@ -5640,6 +5641,21 @@ PAGES.tasks = async (root) => {
     ${d.suggestions.length && !isBoard ? `<div class="glass card tk-suggest"><div class="tk-sug-hd">${ic(I.spark)}Умные подсказки<span class="sub">на основе встреч и горячих лидов</span></div>${d.suggestions.map((sg, i) => `<div class="tk-sug" data-sug="${i}"><span class="tk-sug-t">${esc(sg.title)}</span><button class="btn btn-sm btn-accent" data-sugadd="${i}">${ic(I.plus)}В задачи</button></div>`).join('')}</div>` : ''}
     <div id="tkList" class="tk-list ${isBoard ? 'board' : ''}">${listHtml}</div>`;
 
+  /* сворачиваемая «Карта желаний» сверху (напоминает о целях, но не занимает место всегда) */
+  const moodWrap = $('#tkMood', root);
+  if (moodWrap) {
+    const openMood = localStorage.getItem('lumen_mood_open') === '1';
+    moodWrap.innerHTML = `<div class="glass card mb-collcard"><button class="mb-coll-hd" id="mbCollHd">${ic(I.spark)}<b>Карта желаний</b><span class="sub">твоя мотивация — цели перед глазами</span><i class="mb-coll-ar ${openMood ? 'op' : ''}">${ic(I.chev || I.arrow, 2)}</i></button><div class="mb-coll-body" id="mbCollBody" style="${openMood ? '' : 'display:none'}"></div></div>`;
+    const mbBody = $('#mbCollBody', moodWrap), mbHd = $('#mbCollHd', moodWrap);
+    let mbMounted = false;
+    if (openMood) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; }
+    mbHd.addEventListener('click', () => {
+      const isOpen = mbBody.style.display !== 'none';
+      $('.mb-coll-ar', mbHd).classList.toggle('op', !isOpen);
+      if (isOpen) { mbBody.style.display = 'none'; localStorage.setItem('lumen_mood_open', '0'); }
+      else { mbBody.style.display = ''; localStorage.setItem('lumen_mood_open', '1'); if (!mbMounted) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; } }
+    });
+  }
   const addTask = async () => { const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title) { toast('Пустая задача'); return; } try { await api.post('/tasks', { title, priority: TASK_NEWPRI, scheduled: (TASK_VIEW === 'inbox' ? null : today) }); inp.value = ''; render(); } catch (e) { toast('Не вышло', e.message); } };
   $('#tkAdd', root).addEventListener('click', addTask);
   $('#tkNew', root).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
@@ -5847,59 +5863,91 @@ function tplCard(t, stBadge) {
 }
 
 /* ---------------- КАРТА ЖЕЛАНИЙ (личная доска мотивации брокера) ---------------- */
-let MB_STYLE = 'photo';
-PAGES.moodboard = async (root) => {
-  const items = await api.get('/moodboard').catch(() => []);
+let MB_STYLE = 'photo', MB_EDIT = false;
+const MB_FONTS = { fraunces: ['Элегант', "'Fraunces',serif"], playfair: ['Журнал', "'Playfair Display',serif"], caveat: ['От руки', "'Caveat',cursive"], bebas: ['Плакат', "'Bebas Neue',sans-serif"], manrope: ['Чистый', "'Manrope',sans-serif"] };
+const MB_BGS = { paper: 'Бумага', linen: 'Лён', dark: 'Тёмная', cork: 'Пробка', gradient: 'Градиент', blush: 'Румяна' };
+const MB_PINS = { pin: 'Булавка', tape: 'Скотч', clip: 'Скрепка', none: 'Без' };
+const MB_PINCOLORS = ['#E1467C', '#2563EB', '#0E9E6A', '#D9982B', '#7C3AED', '#E0483D'];
+function mbPinHtml(style, color) {
+  if (style === 'none') return '';
+  if (style === 'tape') return '<span class="mb-tape"></span>';
+  if (style === 'clip') return `<span class="mb-clip"><svg viewBox="0 0 24 24" fill="none" stroke="#8a94a8" stroke-width="2" stroke-linecap="round"><path d="M8 7v9a4 4 0 0 0 8 0V6a2.5 2.5 0 0 0-5 0v10"/></svg></span>`;
+  return `<span class="mb-pin" style="--pc:${color}"></span>`;
+}
+PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
+async function renderMoodboard(root, opts) {
+  opts = opts || {};
+  const data = await api.get('/moodboard').catch(() => ({ items: [], cfg: {} }));
+  const items = data.items || [], cfg = data.cfg || {};
   const me = STATE.me || {};
   const who = me.role === 'owner' ? (STATE.settings.agency.name || '') : ((STATE.brokers.find(b => b.id === me.brokerId) || {}).name || '');
-  const pinColors = ['#E1467C', '#2563EB', '#0E9E6A', '#D9982B', '#7C3AED', '#E0483D'];
+  const title = cfg.title || 'Карта желаний';
+  const fontKey = MB_FONTS[cfg.font] ? cfg.font : 'fraunces', fontCss = MB_FONTS[fontKey][1];
+  const bg = MB_BGS[cfg.bg] ? cfg.bg : 'paper';
+  const pin = MB_PINS[cfg.pin] ? cfg.pin : 'pin';
+  const ed = MB_EDIT;
   const itemHtml = (it, i) => `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${it.rot || 0}deg)">
-    <span class="mb-pin" style="--pc:${pinColors[i % pinColors.length]}"></span>
+    ${mbPinHtml(pin, MB_PINCOLORS[i % MB_PINCOLORS.length])}
     <img src="${esc(it.url)}" alt="" draggable="false">
     ${it.caption ? `<div class="mb-cap">${esc(it.caption)}</div>` : ''}
-    <button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button>
-    <span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>
+    ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>` : ''}
   </div>`;
   root.innerHTML = `
-    <div class="mb-wrap">
+    <div class="mb-wrap ${ed ? 'mb-editing' : ''}">
       <div class="mb-top">
-        <div class="mb-title"><span class="mb-t-k">Карта желаний</span>${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>
+        <div class="mb-title">${ed ? `<input class="mb-title-edit" id="mbTitle" maxlength="60" value="${esc(title)}" style="font-family:${fontCss}">` : `<span class="mb-t-k" style="font-family:${fontCss}">${esc(title)}</span>`}${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>
         <div class="mb-add">
-          <div class="mb-style"><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Стикер</button></div>
+          <div class="mb-style"><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Вырезать (стикер)</button></div>
           <div class="mb-inp"><input id="mbQuery" placeholder="Чего ты хочешь? напр. Patek Philippe Nautilus 5711, вилла на Бали, частный джет…" autocomplete="off"><button class="btn btn-accent" id="mbGo">${ic(I.spark)}Создать</button></div>
+          <button class="btn btn-sm mb-editbtn ${ed ? 'on' : ''}" id="mbEdit">${ic(ed ? I.check : (I.edit || I.doc))}${ed ? 'Готово' : 'Править'}</button>
         </div>
       </div>
-      <div class="mb-board" id="mbBoard">
-        ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${ic(I.spark)}<b>Собери свою карту желаний</b><span>Напиши, чего ты хочешь — ИИ создаст эстетичный стикер и прикрепит его на доску. Перетаскивай, убирай, дополняй. Пусть это будет перед глазами каждый день.</span></div>`}
+      ${ed ? `<div class="mb-cfg">
+        <div class="mb-cfg-g"><span>Шрифт</span>${Object.entries(MB_FONTS).map(([k, [n, css]]) => `<button class="mb-chip ${k === fontKey ? 'on' : ''}" data-mbfont="${k}" style="font-family:${css}">${n}</button>`).join('')}</div>
+        <div class="mb-cfg-g"><span>Фон</span>${Object.entries(MB_BGS).map(([k, n]) => `<button class="mb-chip mb-bgchip mb-bg-${k} ${k === bg ? 'on' : ''}" data-mbbg="${k}" title="${n}"></button>`).join('')}</div>
+        <div class="mb-cfg-g"><span>Крепёж</span>${Object.entries(MB_PINS).map(([k, n]) => `<button class="mb-chip ${k === pin ? 'on' : ''}" data-mbpin="${k}">${n}</button>`).join('')}</div>
+      </div>` : ''}
+      <div class="mb-board mb-bg-${bg}" id="mbBoard">
+        ${items.length ? items.map(itemHtml).join('') : `<div class="mb-empty">${ic(I.spark)}<b>Собери свою карту желаний</b><span>Напиши, чего ты хочешь — ИИ создаст картинку и прикрепит на доску. Нажми «Править», чтобы двигать и убирать. Пусть цели будут перед глазами каждый день.</span></div>`}
       </div>
     </div>`;
+  const rerender = () => renderMoodboard(root, opts);
   const board = $('#mbBoard', root);
   $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); }));
+  $('#mbEdit', root).addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
   const genBtn = $('#mbGo', root), q = $('#mbQuery', root);
   const gen = async () => {
     const prompt = q.value.trim(); if (!prompt) { q.focus(); return; }
     genBtn.disabled = true; genBtn.innerHTML = '✦ Создаю…';
-    try { await api.post('/moodboard/generate', { prompt, style: MB_STYLE }); q.value = ''; toast('Добавлено на карту', 'Перетащи, куда хочешь', true); PAGES.moodboard(root); }
+    try { await api.post('/moodboard/generate', { prompt, style: MB_STYLE }); q.value = ''; toast('Добавлено на карту', MB_EDIT ? 'Перетащи, куда хочешь' : 'Нажми «Править», чтобы двигать', true); rerender(); }
     catch (e) { toast('Не вышло', e.message); genBtn.disabled = false; genBtn.innerHTML = `${ic(I.spark)}Создать`; }
   };
   genBtn.addEventListener('click', gen);
   q.addEventListener('keydown', (e) => { if (e.key === 'Enter') gen(); });
-  board.addEventListener('click', async (e) => { const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); PAGES.moodboard(root); } });
-  /* drag-and-drop стикеров */
-  $$('.mb-item', root).forEach(el2 => {
-    const start = (e) => {
-      if (e.target.closest('[data-mbdel]')) return;
-      e.preventDefault(); const r0 = board.getBoundingClientRect();
-      const ox = e.clientX - el2.offsetLeft, oy = e.clientY - el2.offsetTop;
-      el2.classList.add('drag'); el2.style.zIndex = 50;
-      const move = (ev) => { let nx = ev.clientX - ox, ny = ev.clientY - oy; nx = Math.max(0, Math.min(r0.width - 40, nx)); ny = Math.max(0, Math.min(r0.height - 40, ny)); el2.style.left = nx + 'px'; el2.style.top = ny + 'px'; };
-      const up = async () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); el2.classList.remove('drag'); el2.style.zIndex = ''; await api.patch('/moodboard/' + el2.dataset.mb, { x: parseInt(el2.style.left), y: parseInt(el2.style.top) }).catch(() => {}); };
-      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
-    };
-    const grip = el2.querySelector('.mb-grip') || el2;
-    grip.addEventListener('pointerdown', start); el2.querySelector('img').addEventListener('pointerdown', start);
-  });
-};
+  /* конфиг (только в режиме правки) */
+  if (ed) {
+    const saveCfg = async (patch) => { await api.patch('/moodboard/config', patch).catch(() => {}); };
+    const tIn = $('#mbTitle', root);
+    if (tIn) { let td; tIn.addEventListener('input', () => { clearTimeout(td); td = setTimeout(() => saveCfg({ title: tIn.value.trim() || 'Карта желаний' }), 400); }); }
+    $$('[data-mbfont]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ font: b.dataset.mbfont }); rerender(); }));
+    $$('[data-mbbg]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ bg: b.dataset.mbbg }); rerender(); }));
+    $$('[data-mbpin]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ pin: b.dataset.mbpin }); rerender(); }));
+    board.addEventListener('click', async (e) => { const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); rerender(); } });
+    /* drag только в режиме правки */
+    $$('.mb-item', root).forEach(el2 => {
+      const startDrag = (e) => {
+        if (e.target.closest('[data-mbdel]')) return;
+        e.preventDefault(); const r0 = board.getBoundingClientRect();
+        const ox = e.clientX - el2.offsetLeft, oy = e.clientY - el2.offsetTop;
+        el2.classList.add('drag'); el2.style.zIndex = 50;
+        const move = (ev) => { let nx = ev.clientX - ox, ny = ev.clientY - oy; nx = Math.max(0, Math.min(r0.width - 40, nx)); ny = Math.max(0, Math.min(r0.height - 40, ny)); el2.style.left = nx + 'px'; el2.style.top = ny + 'px'; };
+        const up = async () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); el2.classList.remove('drag'); el2.style.zIndex = ''; await api.patch('/moodboard/' + el2.dataset.mb, { x: parseInt(el2.style.left), y: parseInt(el2.style.top) }).catch(() => {}); };
+        document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+      };
+      el2.addEventListener('pointerdown', startDrag);
+    });
+  }
+}
 
 /* ---------------- БРОКЕРЫ ---------------- */
 PAGES.brokers = async (root) => {

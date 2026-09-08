@@ -363,6 +363,8 @@ async function generateImage(prompt, opts = {}) {
       prompt: String(prompt).slice(0, 3200),
       size: opts.size || '1536x1024',
       quality: opts.quality || 'medium',
+      ...(opts.background ? { background: opts.background } : {}),
+      ...(opts.output_format ? { output_format: opts.output_format } : {}),
       n: 1,
     }),
   });
