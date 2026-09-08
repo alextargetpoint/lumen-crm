@@ -4930,15 +4930,25 @@ function renderScriptSet(it) {
 /* реальные ссылки на живые примеры (без выдуманных URL — открываем поиск платформ по запросу) */
 function refSearchUrl(plat, q) {
   const e = encodeURIComponent(q || '');
-  if (plat === 'tiktok') return 'https://www.tiktok.com/search?q=' + e;
+  const tag = String(q || '').replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
+  if (plat === 'tiktok') return 'https://www.tiktok.com/search?q=' + e;                         /* поиск TikTok сортирует по «Top» */
   if (plat === 'shorts') return 'https://www.youtube.com/results?search_query=' + e + '%20shorts';
+  if (plat === 'tag' && tag) return 'https://www.instagram.com/explore/tags/' + encodeURIComponent(tag) + '/';  /* топ по хэштегу */
   return 'https://www.instagram.com/explore/search/keyword/?q=' + e;
 }
+/* Блок «живых примеров»: главная кнопка — платформа идеи (открывает залетевшие ролики по запросу),
+   рядом альтернативные площадки. Клик → брокер смотрит реальные примеры конкурентов. */
 function refLinksHtml(query, plat) {
   if (!query) return '';
-  const order = [plat, 'reels', 'tiktok', 'shorts'].filter((v, i, a) => a.indexOf(v) === i);
-  const names = { reels: 'Reels', tiktok: 'TikTok', shorts: 'Shorts' };
-  return `<div class="sh-treflinks"><span class="sh-tref-lbl">${ic(I.play)}Живые примеры</span>${order.map(pl => `<a class="sh-reflink" href="${refSearchUrl(pl, query)}" target="_blank" rel="noopener">${names[pl]}</a>`).join('')}</div>`;
+  const primary = plat || 'reels';
+  const rest = ['reels', 'tiktok', 'shorts'].filter(v => v !== primary);
+  const names = { reels: 'Instagram Reels', tiktok: 'TikTok', shorts: 'YouTube Shorts' };
+  const short = { reels: 'Reels', tiktok: 'TikTok', shorts: 'Shorts' };
+  const tagLink = (primary === 'reels') ? `<a class="sh-reflink" href="${refSearchUrl('tag', query)}" target="_blank" rel="noopener" title="Топ по хэштегу">#хэштег</a>` : '';
+  return `<div class="sh-treflinks">
+    <a class="sh-refcta" href="${refSearchUrl(primary, query)}" target="_blank" rel="noopener" title="Открыть залетевшие ролики по запросу «${esc(query)}»">${ic(I.play)}Смотреть залетевшие примеры<span class="sh-refcta-p">${names[primary]}</span></a>
+    <div class="sh-reflinks-alt"><span class="sh-tref-lbl">ещё площадки</span>${rest.map(pl => `<a class="sh-reflink" href="${refSearchUrl(pl, query)}" target="_blank" rel="noopener">${short[pl]}</a>`).join('')}${tagLink}</div>
+  </div>`;
 }
 function renderIdeaCard(i) {
   return `<div class="glass sh-idea" data-idea="${i.id}" data-text="${esc(i.text)}">
