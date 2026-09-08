@@ -731,6 +731,7 @@ const CAR_POS = new Set(['top', 'center', 'bottom']);
 const CAR_SIZE = new Set(['s', 'm', 'l']);
 /* узоры-фоны слайда (как в реф-боте): CSS-паттерны, тонированные акцентом темы. Без ассетов. */
 const CAR_PATTERNS = new Set(['dots', 'grid', 'diag', 'cross', 'waves', 'rings', 'carbon', 'topo']);
+const CAR_GRADS = new Set(['glow', 'dusk', 'sheen', 'aurora']);   /* эстетичные градиент-фоны (тон темы), не только узоры */
 /* нормализация инлайн-HTML заголовка/подписи: B/I/U + <mark> с классом-цветом hl-* (несколько цветов выделения) */
 const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
   .replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
@@ -798,6 +799,7 @@ const sanSlide = (s) => ({
   bgv: /^(assets\/|\/assets\/|https?:\/\/).+\.(mp4|webm)/i.test(String(s.bgv || '')) ? String(s.bgv).slice(0, 500) : '',
   bgc: /^#[0-9a-fA-F]{3,8}$/.test(String(s.bgc || '')) ? s.bgc : '',
   bgpat: CAR_PATTERNS.has(s.bgpat) ? s.bgpat : '',
+  grad: CAR_GRADS.has(s.grad) ? s.grad : '',
   pos: CAR_POS.has(s.pos) ? s.pos : '',
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
@@ -890,7 +892,7 @@ const CAR_LAYOUTS = [
   { pos: 'center', align: 'center', size: 'm' },
   { pos: 'bottom', align: 'center', size: 'l' },
 ];
-const CAR_BG_ROT = ['', 'dots', 'dark', 'grid', '', 'diag', 'dark', 'waves', 'cross', ''];
+const CAR_BG_ROT = ['grad:glow', 'dots', 'dark', 'grad:sheen', 'grid', 'grad:aurora', 'dark', 'diag', 'grad:dusk', 'waves', ''];
 function stylePass(slides, theme) {
   const darkBody = theme && theme.body ? theme.body : '#0A1833';
   let li = 1, bi = 0, prevBg = 'cover';   /* старт с 1 — первый нарратив не повторяет обложку (bottom/left/l) */
@@ -903,9 +905,10 @@ function stylePass(slides, theme) {
     if (!hasPhoto && !isCover) {
       let guard = 0, bg;
       do { bg = CAR_BG_ROT[bi % CAR_BG_ROT.length]; bi++; guard++; } while (bg === prevBg && guard < CAR_BG_ROT.length);
-      if (bg === 'dark') { s.bgc = darkBody; s.bgpat = ''; }
-      else if (bg) { s.bgpat = bg; s.bgc = ''; }
-      else { s.bgpat = ''; s.bgc = ''; }
+      if (bg === 'dark') { s.bgc = darkBody; s.bgpat = ''; s.grad = ''; }
+      else if (bg.indexOf('grad:') === 0) { s.grad = bg.slice(5); s.bgpat = ''; s.bgc = ''; }
+      else if (bg) { s.bgpat = bg; s.bgc = ''; s.grad = ''; }
+      else { s.bgpat = ''; s.bgc = ''; s.grad = ''; }
       prevBg = bg;
     } else { prevBg = hasPhoto ? 'photo' : prevBg; }
     /* раскладка текста: узорным/градиентным нарративным слайдам — разные композиции; mode/фото не трогаем */
@@ -4234,10 +4237,11 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
         const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
         const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
-        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : ''].filter(Boolean).join(' ');
+        const hasGrad = !hasVid && !hasBg && !hasColor && !hasPat && !!s.grad;
+        const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
@@ -4329,6 +4333,12 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide mark.hl-ink{background:var(--ink);color:var(--paper)}
 .slide mark.hl-under{background:transparent;color:inherit;box-shadow:inset 0 -.42em 0 color-mix(in srgb,var(--blue) 34%,transparent);border-radius:0;padding:0 .04em}
 /* узоры-фоны (тонированы акцентом темы) */
+/* эстетичные градиент-фоны (тонированы акцентом темы) — мягкая альтернатива узорам */
+.slide.grad-glow{background:radial-gradient(120% 85% at 18% 12%,color-mix(in srgb,var(--blue) 26%,var(--paper)),var(--paper) 68%)}
+.slide.grad-dusk{background:linear-gradient(180deg,var(--paper),color-mix(in srgb,var(--blue) 30%,var(--body)))}
+.slide.grad-sheen{background:linear-gradient(125deg,color-mix(in srgb,var(--blue) 22%,var(--paper)),var(--paper) 55%,color-mix(in srgb,var(--blue) 10%,var(--paper)))}
+.slide.grad-aurora{background:radial-gradient(90% 70% at 85% 8%,color-mix(in srgb,var(--blue) 30%,var(--paper)),transparent 60%),linear-gradient(160deg,color-mix(in srgb,var(--blue) 12%,var(--paper)),var(--paper))}
+.slide.grad-dusk{color:var(--ink)}
 .slide[class*=pat-]{background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 16%,var(--paper)),var(--paper))}
 .slide.pat-dots{background-image:radial-gradient(color-mix(in srgb,var(--blue) 26%,transparent) 1.5px,transparent 1.6px);background-size:20px 20px}
 .slide.pat-grid{background-image:linear-gradient(color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px);background-size:28px 28px}
@@ -4424,7 +4434,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=24"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=25"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
