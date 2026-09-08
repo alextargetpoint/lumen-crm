@@ -3028,8 +3028,13 @@ const server = http.createServer(async (req, res) => {
         photos = imgs.map((url, k) => ({ url, role: roles[k] || 'other' }));
       }
       const project = { name: String(b.name || b.title || 'Проект').slice(0, 120), geo: String(b.geo || '').slice(0, 120), brief: String(b.brief || b.topic || '').slice(0, 1600), wordmark: b.wordmark && typeof b.wordmark === 'object' ? { name: String(b.wordmark.name || '').slice(0, 40), tag: String(b.wordmark.tag || '').slice(0, 40) } : null, photoRoles: [...new Set(photos.map(p2 => p2.role))] };
+      /* Phase 13: референс-картинка → анализ ТИРА → bias директора (не клон) */
+      let refBias = null;
+      const refB = String(b.refImage || '').replace(/^data:image\/\w+;base64,/, '');
+      if (refB && refB.length > 200) { try { refBias = await studio.analyzeReference(refB); } catch (e) { /* */ } }
+      else if (b.refImage && /^\/assets\/[\w./-]+\.(png|jpe?g)$/.test(String(b.refImage))) { try { const buf = fs.readFileSync(path.join(PUBLIC, String(b.refImage).replace(/^\/assets\//, 'assets/'))); refBias = await studio.analyzeReference(buf.toString('base64')); } catch (e) { /* */ } }
       let plan, deck;
-      try { plan = await studio.artDirectionPlan(project, { count: b.count }); }
+      try { plan = await studio.artDirectionPlan(project, { count: b.count, refBias }); }
       catch (e) { return json(res, 500, { error: 'director: ' + e.message }); }
       try { deck = studio.composeDeck(project, plan, photos); }
       catch (e) { return json(res, 500, { error: 'compose: ' + e.message }); }

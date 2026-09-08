@@ -407,6 +407,8 @@ async function artDirectionPlan(project, opts = {}) {
     investment: 'НАПРАВЛЕНИЕ C — «Инвестиционный интеллект»: данные и цифры (ROI, цена, план оплаты), графит/сталь холодная палитра, чаще DATA_HERO и LOCATION_STORY, деловой тон, акцент НЕ золото.',
   };
   const dirHint = opts.direction && DIRECTIONS[opts.direction] ? '\n★ ' + DIRECTIONS[opts.direction] + ' Держи это направление во ВСЕЙ колоде (палитра, сетка грамматик, тон копирайта), но оставайся премиум-тиром.\n' : '';
+  const rb = opts.refBias;
+  const refHint = rb ? `\n★ ОРИЕНТИР ПО ТИРУ (вдохновись УРОВНЕМ и характером, НЕ копируй раскладку/контент/палитру дословно): настроение=${rb.mood || ''}; типографика=${rb.typography || ''}; палитра-характер=${rb.palette || ''}; плотность=${rb.density || ''}; композиция=${rb.composition || ''}. Сделай СВОЙ оригинальный дизайн того же уровня.\n` : '';
   const prompt = `Ты — АРТ-ДИРЕКТОР премиального дизайн-бюро (архитектурно-гостиничная эстетика, tier как у сильной студии недвижимости; НЕ Canva). Спроектируй Instagram-карусель (${n} слайдов, портрет 4:5) для проекта недвижимости.
 
 ПРОЕКТ:
@@ -415,7 +417,7 @@ async function artDirectionPlan(project, opts = {}) {
 Бренд-вордмарк: ${String(project.wordmark && project.wordmark.name || project.name || '').slice(0, 40)} / ${String(project.wordmark && project.wordmark.tag || '').slice(0, 40)}
 Факты/вводные: ${String(project.brief || '').slice(0, 1400)}
 Доступные роли фото проекта: ${roleList}
-${dirHint}
+${dirHint}${refHint}
 ПРИНЦИПЫ ПРЕМИУМА (строго):
 - Сдержанность, точность, иерархия, воздух, специфика. НЕ «гигантский шрифт», НЕ всё тёмное, НЕ золото всюду, НЕ клише.
 - ЗАПРЕЩЁННЫЙ копирайт (общие ИИ-фразы): «место силы», «искусство жить», «эстетика тишины», «ваш путь к новой жизни», «привилегии пяти звёзд», «оазис спокойствия».
@@ -453,6 +455,13 @@ ${grammarsDoc}
   const out = await Providers.creativeDirector(prompt, 45000, 4600);
   if (!out || !Array.isArray(out.slides) || !out.slides.length) throw new Error('director: пустой план');
   return out;
+}
+
+/* Phase 13: анализ РЕФЕРЕНСА — извлекаем ТИР/характер (не контент), чтобы вдохновить новый дизайн. */
+async function analyzeReference(imageB64) {
+  const parts = [{ text: `Ты — арт-директор. На изображении ЭТАЛОН качества дизайна карусели недвижимости. Опиши КРАТКО его ТИР и художественный характер (НЕ конкретный текст/бренд), чтобы вдохновить НОВЫЙ оригинальный дизайн того же уровня — НЕ копию. Верни JSON: {"mood":"настроение 2-4 слова","typography":"сериф/гротеск + характер","palette":"температура и характер палитры","density":"low|medium|high","composition":"соотношение фото/типографики, воздух","level":"1 фраза о премиальности"}` }];
+  parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } });
+  try { return await Providers.visionInterpret(parts, 500); } catch (e) { return null; }
 }
 
 /* ── Сборка колоды: план + фото → сцен-граф слайды ──────────────────────────── */
@@ -590,5 +599,5 @@ function assembleInterpreted(out, matchUrl, brief) {
 
 module.exports = {
   Providers, resolveTokens, carouselTheme, artDirectionPlan, composeDeck, GRAMMARS, GRAMMAR_KEYS,
-  critique, applyOps, visualTarget, interpret, assembleInterpreted, pickPhoto,
+  critique, applyOps, visualTarget, interpret, assembleInterpreted, pickPhoto, analyzeReference,
 };
