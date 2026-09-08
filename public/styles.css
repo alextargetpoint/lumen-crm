@@ -3726,3 +3726,47 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 .sh-psych svg { width: 14px; height: 14px; color: var(--accent); flex: none; margin-top: 1px; }
 .sh-psych b { color: var(--navy-900); font-weight: 700; }
 .sh-gen-foot .sh-sel { max-width: 220px; }
+
+/* ============ Карта желаний (мудборд брокера) ============ */
+.mb-wrap { display: flex; flex-direction: column; gap: 16px; }
+.mb-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.mb-title { display: flex; flex-direction: column; gap: 2px; }
+.mb-t-k { font-family: var(--font-display, 'Fraunces'), serif; font-size: 30px; font-weight: 600; color: var(--navy-900); letter-spacing: -.02em; line-height: 1; }
+.mb-t-n { font-size: 13px; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; }
+.mb-add { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.mb-style { display: inline-flex; gap: 4px; background: var(--bg-2); border-radius: 20px; padding: 3px; }
+.mb-st { border: none; background: none; border-radius: 16px; padding: 5px 14px; font-size: 12px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
+.mb-st.on { background: var(--card); color: var(--accent); box-shadow: 0 2px 6px -3px rgba(16,43,92,.2); }
+.mb-inp { display: flex; gap: 8px; }
+.mb-inp input { width: 460px; max-width: 60vw; border: 1px solid var(--stroke); border-radius: 12px; padding: 11px 14px; font-size: 13.5px; outline: none; background: var(--card); }
+.mb-inp input:focus { border-color: var(--accent); }
+/* доска — эстетичный минимализм: тёплая бумага + мягкая сетка */
+.mb-board { position: relative; min-height: 64vh; border-radius: 22px; overflow: hidden; border: 1px solid var(--stroke);
+  background:
+    radial-gradient(circle at 20px 20px, rgba(16,43,92,.03) 1.5px, transparent 1.6px) 0 0 / 40px 40px,
+    linear-gradient(160deg, #FBFAF7, #F3F1EC);
+  box-shadow: inset 0 2px 20px rgba(16,43,92,.05); }
+html[data-night] .mb-board { background: radial-gradient(circle at 20px 20px, rgba(255,255,255,.03) 1.5px, transparent 1.6px) 0 0 / 40px 40px, linear-gradient(160deg, #0c1424, #0a1120); }
+.mb-item { position: absolute; cursor: grab; user-select: none; touch-action: none; transition: box-shadow .2s; }
+.mb-item img { display: block; width: 100%; border-radius: 10px; box-shadow: 0 10px 26px -10px rgba(16,43,92,.35), 0 2px 6px rgba(16,43,92,.15); background: #fff; }
+.mb-item.stk img { border-radius: 14px; box-shadow: 0 8px 20px -8px rgba(16,43,92,.3); }
+.mb-item.drag { cursor: grabbing; }
+.mb-item.drag img { box-shadow: 0 24px 50px -14px rgba(16,43,92,.5); }
+/* булавка */
+.mb-pin { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; border-radius: 50%; z-index: 3;
+  background: radial-gradient(circle at 35% 30%, #fff5, transparent 45%), var(--pc, #E1467C);
+  box-shadow: 0 3px 5px rgba(0,0,0,.3), inset 0 -2px 3px rgba(0,0,0,.25); }
+.mb-pin::after { content: ''; position: absolute; top: 13px; left: 50%; transform: translateX(-50%); width: 2px; height: 7px; background: linear-gradient(#0003, #0001); border-radius: 2px; }
+.mb-cap { margin-top: 6px; text-align: center; font-size: 12px; font-weight: 600; color: var(--navy-900); background: rgba(255,255,255,.7); backdrop-filter: blur(3px); border-radius: 8px; padding: 3px 8px; }
+html[data-night] .mb-cap { background: rgba(20,30,50,.7); color: var(--ink); }
+.mb-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--bad); color: #fff; display: none; place-items: center; cursor: pointer; z-index: 4; box-shadow: 0 3px 8px -2px rgba(0,0,0,.4); }
+.mb-del svg { width: 12px; height: 12px; }
+.mb-item:hover .mb-del { display: grid; }
+.mb-grip { position: absolute; bottom: 4px; right: 4px; width: 22px; height: 22px; border-radius: 7px; background: rgba(255,255,255,.85); color: var(--ink-3); display: none; place-items: center; cursor: grab; z-index: 3; }
+.mb-grip svg { width: 13px; height: 13px; }
+.mb-item:hover .mb-grip { display: grid; }
+.mb-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 30px; }
+.mb-empty svg { width: 34px; height: 34px; color: var(--accent); opacity: .8; }
+.mb-empty b { font-size: 17px; color: var(--navy-900); font-weight: 700; }
+.mb-empty span { font-size: 13px; color: var(--ink-3); max-width: 440px; line-height: 1.55; }
+@media (max-width: 640px) { .mb-inp input { width: 100%; } .mb-top { flex-direction: column; align-items: stretch; } .mb-add { align-items: stretch; } }
