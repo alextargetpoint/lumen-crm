@@ -80,6 +80,8 @@ const I = {
   circle: '<circle cx="12" cy="12" r="8.5"/>',
   grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
   bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  star: '<path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 18.9 6.2 21l1.1-6.45-4.7-4.6 6.5-.95L12 2.6z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/>',
 };
 
 /* ---------- сворачиваемые группы (стекло-стиль, spring-раскрытие) ---------- */
@@ -2433,7 +2435,14 @@ function ftChipsHtml(l) {
   if (l.geoName) chips.push(['гео', l.geoName]);
   const AXN = { purpose: 'цель', budget: 'бюджет', timeline: 'срок', type: 'тип' };
   for (const a of Object.keys(AXN)) { const q = (l.quals || {})[a]; if (q && q.value) chips.push([AXN[a], q.value]); }
-  if (l.custom && typeof l.custom === 'object') Object.entries(l.custom).filter(([, v]) => v).slice(0, 3).forEach(([k, v]) => chips.push([k, String(v)]));
+  if (l.custom && typeof l.custom === 'object') {
+    const defs = STATE.settings.customFields || [];
+    Object.entries(l.custom).slice(0, 6).forEach(([k, v]) => {
+      const f = defs.find(d => d.key === k);
+      const s = cfShort(f, v);
+      if (s) chips.push([f ? f.label : k, s]);
+    });
+  }
   if (!chips.length) return `<span class="lc-ftc muted">${ic(I.spark, 2)}Данных для персонализации мало — ИИ зайдёт от проекта и гео</span>`;
   return `<span class="lc-ftc-t">Персонализация:</span>` + chips.slice(0, 7).map(([k, v]) => `<span class="lc-ftc"><i>${esc(k)}</i>${esc(String(v).slice(0, 40))}</span>`).join('');
 }
@@ -2470,6 +2479,88 @@ function psychBody(p) {
     <div class="psy-meta">Разбор ${p.at ? ago(p.at) : ''}</div>
     ${go}`;
 }
+
+/* ---------- свои поля: 12 типов ---------- */
+const CF_TYPES = [
+  ['text', 'Текст'], ['textarea', 'Абзац'], ['number', 'Число'], ['money', 'Деньги'],
+  ['date', 'Дата'], ['phone', 'Телефон'], ['url', 'Ссылка'], ['email', 'E-mail'],
+  ['select', 'Выбор'], ['multiselect', 'Мультивыбор'], ['bool', 'Да/нет'], ['rating', 'Рейтинг'],
+];
+const CF_TYPE_RU = Object.fromEntries(CF_TYPES);
+function cfSlug(label) {
+  const map = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+  const s = String(label || '').toLowerCase().split('').map(c => (map[c] != null ? map[c] : c)).join('')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+  return 'cf_' + (s || Math.random().toString(36).slice(2, 8));
+}
+function cfTypeDesc(f) {
+  const nm = CF_TYPE_RU[f.type] || 'Текст';
+  if ((f.type === 'select' || f.type === 'multiselect') && (f.options || []).length) return nm + ': ' + esc(f.options.join(', '));
+  if ((f.type === 'number' || f.type === 'money') && f.unit) return nm + ' · ' + esc(f.unit);
+  return nm;
+}
+/* короткая строка значения свого поля — для «чипов персонализации» и т.п. */
+function cfShort(f, v) {
+  if (v == null || v === '' || (Array.isArray(v) && !v.length)) return '';
+  if (!f) return Array.isArray(v) ? v.join(', ') : String(v);
+  if (f.type === 'bool') return (v === true || v === 'true') ? 'да' : '';
+  if (f.type === 'rating') { const n = +v || 0; return n ? '★'.repeat(n) : ''; }
+  if (Array.isArray(v)) return v.join(', ');
+  let s = String(v);
+  if ((f.type === 'money' || f.type === 'number') && f.unit) s += ' ' + f.unit;
+  return s;
+}
+/* один контрол под тип поля; хранит значение в data-cf, тип в data-cft */
+function cfControl(f, val) {
+  const key = esc(f.key), t = f.type;
+  const v = (val == null ? '' : val);
+  if (t === 'select') return `<select data-cf="${key}" data-cft="select"><option value="">—</option>${(f.options || []).map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  if (t === 'textarea') return `<textarea data-cf="${key}" data-cft="textarea" data-nodic rows="2" style="min-height:52px" placeholder="—">${esc(v)}</textarea>`;
+  if (t === 'number' || t === 'money') return `<div class="cf-unit"><input type="number" data-cf="${key}" data-cft="${t}" data-nodic value="${esc(v)}" placeholder="—">${(f.unit || (t === 'money' ? '€' : '')) ? `<span class="cf-unit-s">${esc(f.unit || '€')}</span>` : ''}</div>`;
+  if (t === 'date') return `<input type="date" data-cf="${key}" data-cft="date" value="${esc(v)}">`;
+  if (t === 'bool') return `<label class="switch cf-bool"><input type="checkbox" data-cf="${key}" data-cft="bool" ${(v === true || v === 'true') ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`;
+  if (t === 'rating') { const n = +v || 0; return `<div class="cf-stars" data-cf="${key}" data-cft="rating" data-val="${n}">${[1, 2, 3, 4, 5].map(i => `<button type="button" class="cf-star ${i <= n ? 'on' : ''}" data-star="${i}">${ic(I.star, 1.4)}</button>`).join('')}</div>`; }
+  if (t === 'multiselect') { const arr = Array.isArray(v) ? v : (v ? String(v).split(',').map(x => x.trim()) : []); return `<div class="cf-chips" data-cf="${key}" data-cft="multiselect">${(f.options || []).length ? (f.options).map(o => `<button type="button" class="cf-chip ${arr.includes(o) ? 'on' : ''}" data-opt="${esc(o)}">${esc(o)}</button>`).join('') : '<span class="muted" style="font-size:11px">нет вариантов — задайте в «Настроить»</span>'}</div>`; }
+  if (t === 'url' || t === 'email') { const href = t === 'email' ? 'mailto:' + v : v; return `<div class="cf-link"><input type="${t === 'email' ? 'email' : 'url'}" data-cf="${key}" data-cft="${t}" data-nodic value="${esc(v)}" placeholder="—">${v ? `<a class="cf-link-open" href="${esc(href)}" target="_blank" title="Открыть">${ic(I.link, 2)}</a>` : ''}</div>`; }
+  const itype = t === 'phone' ? 'tel' : 'text';
+  return `<input type="${itype}" data-cf="${key}" data-cft="${t}" value="${esc(v)}" placeholder="—">`;
+}
+
+/* ---------- карточка лида: файлы + голосовые ---------- */
+function fvSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1).replace(/\.0$/, '') + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ'; }
+function fvDur(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function fvBody(l) {
+  const atts = l.attachments || [], vns = l.voiceNotes || [];
+  const kindIc = { image: I.image, pdf: I.doc, deck: I.layers, file: I.doc };
+  const empty = !atts.length && !vns.length;
+  const tiles = atts.map(a => `<div class="lc-fv-tile" data-attid="${a.id}">
+    ${a.kind === 'image'
+      ? `<a class="lc-fv-thumb" href="${esc(a.url)}" target="_blank"><img src="${esc(a.url)}" alt=""></a>`
+      : `<a class="lc-fv-thumb ic ${a.kind}" href="${esc(a.url)}" target="_blank">${ic(kindIc[a.kind] || I.doc)}</a>`}
+    <div class="lc-fv-meta"><a class="lc-fv-nm" href="${esc(a.url)}" target="_blank" title="${esc(a.name)}">${esc(a.name)}</a>
+      <span class="lc-fv-sub">${fvSize(a.size)} · ${ago(a.at)}</span></div>
+    <button class="btn-ghost lc-fv-x" data-attdel="${a.id}" title="Удалить">${ic(I.x)}</button>
+  </div>`).join('');
+  const voices = vns.map(v => `<div class="lc-fv-voice" data-vnid="${v.id}">
+    <button class="lc-fv-play" type="button" data-vnplay="${esc(v.url)}" title="Прослушать">${ic(I.play)}</button>
+    <div class="lc-fv-vbody">
+      <div class="lc-fv-vhead"><span class="lc-fv-dur">${fvDur(v.dur)}</span><span class="lc-fv-sub">${v.who ? esc(v.who) + ' · ' : ''}${ago(v.at)}</span></div>
+      ${v.transcript ? `<div class="lc-fv-tr">${esc(v.transcript)}</div>` : '<div class="lc-fv-tr muted">расшифровка не распозналась</div>'}
+    </div>
+    <button class="btn-ghost lc-fv-x" data-vndel="${v.id}" title="Удалить">${ic(I.x)}</button>
+  </div>`).join('');
+  return `
+    <div class="lc-fv-actions">
+      <button class="btn btn-sm" id="lcFVFile" type="button">${ic(I.plus)}Файл</button>
+      <button class="btn btn-sm" id="lcFVMic" type="button">${ic(I.mic)}Записать</button>
+      <span class="lc-fv-hint muted">до 25 МБ · презентация, PDF, изображение</span>
+    </div>
+    <div id="lcFVProg" class="lc-fv-prog" style="display:none"></div>
+    ${empty ? `<div class="lc-fv-empty">${ic(I.layers)}Прикрепите презентацию, PDF или запишите голосовой комментарий по лиду</div>` : ''}
+    ${atts.length ? `<div class="lc-fv-grid">${tiles}</div>` : ''}
+    ${vns.length ? `<div class="lc-fv-voices">${voices}</div>` : ''}`;
+}
+let LC_AUDIO = null;
 
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
@@ -2592,14 +2683,16 @@ async function openLeadModal(id) {
             <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn-ghost" id="cfGear" title="Настроить поля">${ic(I.gear)}Настроить</button></div>
             <div id="cfEditor" style="display:none">
               ${(STATE.settings.customFields || []).map((f, fi) => `<div class="lc-note-row" style="margin-bottom:6px"><input data-cfl="${fi}" value="${esc(f.label)}"><button class="btn-ghost" data-cfx="${fi}">${ic(I.x)}</button></div>`).join('')}
-              <div class="lc-note-row"><input id="cfNewName" placeholder="Новое поле (напр. Паспорт/ВНЖ)"><select id="cfNewType" style="width:96px;flex:0 0 96px"><option value="text">Текст</option><option value="select">Выбор</option></select><button class="btn btn-sm" id="cfNewAdd">${ic(I.plus)}</button></div>
+              <div class="lc-note-row"><input id="cfNewName" placeholder="Новое поле (напр. Паспорт/ВНЖ)"><select id="cfNewType" style="width:128px;flex:0 0 128px">${CF_TYPES.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select><button class="btn btn-sm" id="cfNewAdd">${ic(I.plus)}</button></div>
+              <div class="muted" style="font-size:11px;margin:2px 0 4px">Варианты для «выбора» и единицы для «числа» — задаются в Настройках → «Свои поля».</div>
               <button class="btn btn-sm btn-accent" id="cfApply" style="margin:8px 0">Применить поля</button>
             </div>
             ${(STATE.settings.customFields || []).length ? `
-            <div class="lc-3sel">${STATE.settings.customFields.map(f => `<div><label class="lc-lbl">${esc(f.label)}</label>
-              ${f.type === 'select' ? `<select data-cf="${esc(f.key)}"><option value="">—</option>${(f.options || []).map(o => `<option ${((l.custom || {})[f.key] === o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
-              : `<input data-cf="${esc(f.key)}" value="${esc((l.custom || {})[f.key] || '')}" placeholder="—">`}</div>`).join('')}</div>` : '<div class="muted" style="font-size:12px;padding-bottom:4px">Полей пока нет — добавьте через «Настроить»</div>'}`,
+            <div class="lc-3sel">${STATE.settings.customFields.map(f => `<div class="cf-cell cf-t-${f.type}"><label class="lc-lbl">${esc(f.label)}</label>
+              ${cfControl(f, (l.custom || {})[f.key])}</div>`).join('')}</div>` : '<div class="muted" style="font-size:12px;padding-bottom:4px">Полей пока нет — добавьте через «Настроить»</div>'}`,
     { open: false, icon: I.layers, count: (STATE.settings.customFields || []).length || null })}
+          ${coll('Файлы и голосовые', `<div id="lcFVWrap">${fvBody(l)}</div>`,
+    { open: !!((l.attachments || []).length || (l.voiceNotes || []).length), icon: I.doc, count: ((l.attachments || []).length + (l.voiceNotes || []).length) || null })}
           ${coll('Контакты', `
             <div id="lcContacts" style="margin-top:6px">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
             <div class="lc-note-row" style="margin:7px 0 4px">
@@ -2663,15 +2756,109 @@ async function openLeadModal(id) {
     $$('#cfEditor [data-cfl]', bd).forEach(inp => { const f = STATE.settings.customFields[+inp.dataset.cfl]; if (f) fields.push({ ...f, label: inp.value.trim() || f.label }); });
     $$('#cfEditor [data-cfl-new]', bd).forEach(inp => {
       const label = inp.value.trim();
-      if (label) fields.push({ key: 'cf_' + label.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '_').slice(0, 30), label, type: inp.dataset.cft || 'text', options: [] });
+      if (label) fields.push({ key: cfSlug(label), label, type: inp.dataset.cft || 'text', options: [], unit: '' });
     });
     await api.patch('/settings', { customFields: fields });
     await loadState();
     openLeadModal(id);
   });
-  $$('[data-cf]', bd).forEach(inp => inp.addEventListener('change', async () => {
-    await api.patch('/leads/' + l.id, { custom: { [inp.dataset.cf]: inp.value } });
-  }));
+  const saveCf = async (key, value) => { l.custom = l.custom || {}; l.custom[key] = value; await api.patch('/leads/' + l.id, { custom: { [key]: value } }); };
+  $$('[data-cf]', bd).forEach(ctl => {
+    const t = ctl.dataset.cft, key = ctl.dataset.cf;
+    if (t === 'multiselect') {
+      $$('.cf-chip', ctl).forEach(ch => ch.addEventListener('click', () => {
+        ch.classList.toggle('on');
+        saveCf(key, $$('.cf-chip.on', ctl).map(x => x.dataset.opt));
+      }));
+    } else if (t === 'rating') {
+      $$('.cf-star', ctl).forEach(st => st.addEventListener('click', () => {
+        let n = +st.dataset.star; if (+ctl.dataset.val === n) n = 0; ctl.dataset.val = n;
+        $$('.cf-star', ctl).forEach(x => x.classList.toggle('on', +x.dataset.star <= n));
+        saveCf(key, n);
+      }));
+    } else if (t === 'bool') {
+      ctl.addEventListener('change', () => saveCf(key, ctl.checked));
+    } else if (t === 'number' || t === 'money') {
+      ctl.addEventListener('change', () => saveCf(key, ctl.value === '' ? '' : +ctl.value));
+    } else {
+      ctl.addEventListener('change', () => saveCf(key, ctl.value));
+    }
+  });
+  /* --- файлы + голосовые по лиду --- */
+  let lcRec = null, lcRecStart = 0, lcRecTimer = null;
+  const paintFV = () => { const w = $('#lcFVWrap', bd); if (w) { w.innerHTML = fvBody(l); wireFV(); } };
+  function wireFV() {
+    const fileBtn = $('#lcFVFile', bd), micBtn = $('#lcFVMic', bd), prog = $('#lcFVProg', bd);
+    if (fileBtn) fileBtn.addEventListener('click', () => {
+      const inp = el('<input type="file" multiple style="display:none">');
+      document.body.appendChild(inp);
+      inp.addEventListener('change', async () => {
+        const files = Array.from(inp.files || []); inp.remove();
+        if (!files.length) return;
+        prog.style.display = '';
+        let ok = 0;
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          if (f.size > 25e6) { toast('Файл больше 25 МБ', f.name); continue; }
+          prog.textContent = `Загружаю ${i + 1}/${files.length}: ${f.name}`;
+          try {
+            const r = await fetch(`/api/leads/${l.id}/attach?filename=${encodeURIComponent(f.name)}&who=${encodeURIComponent('Менеджер')}`, { method: 'POST', body: f });
+            const j = await r.json(); if (!r.ok) throw new Error(j.error);
+            l.attachments = l.attachments || []; l.attachments.unshift(j); ok++;
+          } catch (e) { toast('Не вышло', e.message); }
+        }
+        prog.style.display = 'none'; paintFV();
+        if (ok) toast('Файлы прикреплены', ok + (ok === 1 ? ' файл' : ' файла'), true);
+      });
+      inp.click();
+    });
+    $$('[data-attdel]', bd).forEach(b => b.addEventListener('click', async () => {
+      const aid = b.dataset.attdel;
+      await fetch(`/api/leads/${l.id}/attach/${aid}`, { method: 'DELETE' });
+      l.attachments = (l.attachments || []).filter(a => a.id !== aid); paintFV();
+    }));
+    $$('[data-vndel]', bd).forEach(b => b.addEventListener('click', async () => {
+      const vid = b.dataset.vndel;
+      await fetch(`/api/leads/${l.id}/voice/${vid}`, { method: 'DELETE' });
+      l.voiceNotes = (l.voiceNotes || []).filter(v => v.id !== vid); paintFV();
+    }));
+    $$('[data-vnplay]', bd).forEach(b => b.addEventListener('click', () => {
+      const url = b.dataset.vnplay;
+      if (LC_AUDIO && LC_AUDIO._btn === b) { if (LC_AUDIO.paused) LC_AUDIO.play(); else LC_AUDIO.pause(); return; }
+      if (LC_AUDIO) { LC_AUDIO.pause(); if (LC_AUDIO._btn) LC_AUDIO._btn.innerHTML = ic(I.play); }
+      const a = new Audio(url); a._btn = b; LC_AUDIO = a;
+      a.addEventListener('play', () => b.innerHTML = ic(I.pause));
+      a.addEventListener('pause', () => b.innerHTML = ic(I.play));
+      a.addEventListener('ended', () => b.innerHTML = ic(I.play));
+      a.play().catch(() => toast('Не воспроизвести'));
+    }));
+    if (micBtn) micBtn.addEventListener('click', async () => {
+      if (lcRec) { lcRec.stop(); return; }
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch (e) { toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); return; }
+      const rec = new MediaRecorder(stream); const parts = [];
+      lcRecStart = Date.now();
+      rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        clearInterval(lcRecTimer); lcRecTimer = null; lcRec = null;
+        const dur = Math.round((Date.now() - lcRecStart) / 1000);
+        micBtn.classList.remove('rec'); micBtn.classList.add('busy'); micBtn.innerHTML = ic(I.spark) + 'Расшифровываю…';
+        try {
+          const r = await fetch(`/api/leads/${l.id}/voice?filename=voice.webm&dur=${dur}&who=${encodeURIComponent('Менеджер')}&transcribe=1`, { method: 'POST', body: new Blob(parts, { type: 'audio/webm' }) });
+          const j = await r.json(); if (!r.ok) throw new Error(j.error);
+          l.voiceNotes = l.voiceNotes || []; l.voiceNotes.unshift(j);
+          paintFV();
+          toast('Голосовой добавлен', j.transcript ? 'Расшифрован ИИ' : null, true);
+        } catch (e) { toast('Не вышло', e.message); micBtn.classList.remove('busy'); micBtn.innerHTML = ic(I.mic) + 'Записать'; }
+      };
+      lcRec = rec; rec.start(); micBtn.classList.add('rec');
+      const tick = () => { const s = Math.round((Date.now() - lcRecStart) / 1000); micBtn.innerHTML = ic(I.pause) + 'Стоп · ' + fvDur(s); };
+      tick(); lcRecTimer = setInterval(tick, 500);
+    });
+  }
+  wireFV();
   $$('[data-mtst]', bd).forEach(b => b.addEventListener('click', async () => {
     const [mid, st] = b.dataset.mtst.split('|');
     await api.patch('/meetings/' + mid, { status: st });
@@ -3963,11 +4150,13 @@ PAGES.wake.refresh = async () => {
 };
 
 function cmpCard(c) {
-  const stateBadge = { draft: '<span class="badge">черновик</span>', running: '<span class="badge ok"><i></i>идёт</span>', paused: '<span class="badge warn">пауза</span>', done: '<span class="badge">завершена</span>' }[c.state];
+  const stateBadge = { draft: '<span class="badge">черновик</span>', scheduled: '<span class="badge acc"><i></i>запланирована</span>', running: '<span class="badge ok"><i></i>идёт</span>', paused: '<span class="badge warn">пауза</span>', done: '<span class="badge">завершена</span>' }[c.state] || '';
   const total = c.recipients.length || 0;
   const done = Math.min(c.cursor, total);
-  return `<div class="glass cmp-card" data-cmp="${c.id}">
+  const startStr = c.startAt ? new Date(c.startAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div class="glass cmp-card ${c.state === 'scheduled' ? 'sched' : ''}" data-cmp="${c.id}">
     <div class="cmp-head"><div class="nm">${esc(c.name)}</div>${stateBadge}</div>
+    ${c.state === 'scheduled' && startStr ? `<div class="cmp-sched">${ic(I.clock, 2)}Запланирована на <b>${startStr}</b> · запустится сама</div>` : ''}
     <div class="muted" style="font-size:11.5px;margin-top:4px">пачка ${c.batchSize} · пауза ${c.pauseMin[0]}–${c.pauseMin[1]} ${STATE.settings.demo.accelerate ? 'сек (демо)' : 'мин'} · окно ${c.window[0]}:00–${c.window[1]}:00 по поясу клиента</div>
     <div class="cmp-stats">
       <div class="cmp-stat"><div class="v">${c.stats.sent}</div><div class="k">отправлено</div></div>
@@ -3978,6 +4167,7 @@ function cmpCard(c) {
     ${total ? `<div class="progress"><i style="width:${total ? done / total * 100 : 0}%"></i></div><div class="muted" style="font-size:11px;margin-top:5px">${done} из ${total}</div>` : ''}
     <div style="display:flex;gap:8px;margin-top:12px">
       ${c.state === 'draft' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить</button>` : ''}
+      ${c.state === 'scheduled' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить сейчас</button><button class="btn btn-danger btn-sm" data-act="stop">Отменить</button>` : ''}
       ${c.state === 'running' ? `<button class="btn btn-sm" data-act="pause">${ic(I.pause)}Пауза</button>` : ''}
       ${c.state === 'paused' ? `<button class="btn btn-accent btn-sm" data-act="resume">${ic(I.play)}Продолжить</button>` : ''}
       ${['running', 'paused'].includes(c.state) ? `<button class="btn btn-danger btn-sm" data-act="stop">Остановить</button>` : ''}
@@ -3992,16 +4182,36 @@ function wireCampaigns(root) {
     PAGES.wake.refresh();
   }));
 }
+/* демо-заливка переменных шаблона для превью */
+function cmpDemoFill(txt, geoName) {
+  return String(txt || '')
+    .replace(/\{name\}/g, 'Алекс').replace(/\{geo\}/g, geoName || 'Дубай')
+    .replace(/\{ad\}/g, '«студии JVC»').replace(/\{month\}/g, 'этом месяце')
+    .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name)
+    .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ')
+    .replace(/\{[a-zA-Z]+\}/g, '…');
+}
 function newCampaignModal() {
   const s = STATE.settings;
   const marketingTpls = STATE.templates.filter(t => t.category === 'marketing');
-  modal({
+  const olderOpts = [['0', 'любой срок'], ['14', 'больше 14 дней'], ['30', 'больше 30 дней'], ['60', 'больше 60 дней'], ['90', 'больше 90 дней']];
+  const segOpts = [['', 'Все сегменты'], ['A', 'A · будить первыми'], ['B', 'B · вторая волна'], ['C', 'C · фон']];
+  const bd = modal({
     title: 'Новая кампания реанимации',
     sub: 'Рассылка идёт по скорингу: сначала сегмент A, безопасными пачками, в окне по поясу клиента',
+    wide: true,
     body: `
       <div class="form-row"><label>Название</label><input id="cName" value="Пробуждение базы"></div>
-      <div class="form-row"><label>Направление</label><select id="cGeo"><option value="">Все</option>${s.agency.geos.map(g => `<option value="${g}">${s.geoNames[g]}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Шаблон (Marketing, прошёл модерацию)</label><select id="cTpl">${marketingTpls.map(t => `<option value="${t.id}" ${t.status !== 'approved' ? 'disabled' : ''}>${esc(t.name)}${t.status !== 'approved' ? ' · на модерации' : ''}</option>`).join('')}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="cGeo"><option value="">Все</option>${s.agency.geos.map(g => `<option value="${g}">${s.geoNames[g]}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Молчат дольше</label><select id="cOlder">${olderOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row"><label>Сегмент</label><select id="cSeg">${segOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
+      <div class="cmp-count" id="cCountBox"><span class="cmp-count-dot"></span><b id="cCount">…</b> получателей под эти условия</div>
+      <div class="form-row" style="margin-top:2px"><label style="display:flex;align-items:center;justify-content:space-between">Шаблон первого касания <button class="btn-ghost" id="cTplNew" type="button" style="font-size:11px">${ic(I.plus)}Создать шаблон реанимации</button></label>
+        <select id="cTpl">${marketingTpls.length ? marketingTpls.map(t => `<option value="${t.id}" ${t.status !== 'approved' ? 'disabled' : ''}>${esc(t.name)}${t.status !== 'approved' ? ' · на модерации' : ''}</option>`).join('') : '<option value="" disabled>Нет marketing-шаблонов — создайте</option>'}</select></div>
+      <div class="cmp-prev" id="cPrev"></div>
+      <div class="lp-sec" style="margin-top:14px">Темп рассылки</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div class="form-row"><label>Пачка</label><input id="cBatch" type="number" value="3" min="1" max="10"></div>
         <div class="form-row"><label>Пауза от</label><input id="cP1" type="number" value="20"></div>
@@ -4010,20 +4220,54 @@ function newCampaignModal() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Окно с (час клиента)</label><input id="cW1" type="number" value="10" min="0" max="23"></div>
         <div class="form-row"><label>Окно до</label><input id="cW2" type="number" value="20" min="1" max="24"></div>
+      </div>
+      <div class="lp-sec" style="margin-top:6px">Запланировать запуск <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">— необязательно, иначе создастся черновиком</span></div>
+      <div style="display:grid;grid-template-columns:1fr 150px;gap:10px">
+        <div class="form-row"><label>Дата запуска</label><input id="cDate" type="date"></div>
+        <div class="form-row"><label>Время</label><input id="cTime" type="time" value="10:00"></div>
       </div>`,
     actions: [
-      { label: 'Создать', cls: 'btn-accent', onClick: async (bd) => {
-        await api.post('/campaigns', {
+      { label: 'Создать кампанию', cls: 'btn-accent', onClick: async (bd) => {
+        const dv = $('#cDate', bd).value, tv = $('#cTime', bd).value || '10:00';
+        const startAt = dv ? new Date(dv + 'T' + tv).getTime() : null;
+        const body = {
           name: $('#cName', bd).value, templateId: $('#cTpl', bd).value,
-          filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null },
+          filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null, olderDays: +$('#cOlder', bd).value || 0, segment: $('#cSeg', bd).value || null },
           batchSize: +$('#cBatch', bd).value, pauseMin: [+$('#cP1', bd).value, +$('#cP2', bd).value],
           window: [+$('#cW1', bd).value, +$('#cW2', bd).value],
-        });
+        };
+        if (startAt && startAt > Date.now() + 30000) body.startAt = startAt;
+        await api.post('/campaigns', body);
+        toast(body.startAt ? 'Кампания запланирована' : 'Кампания создана', body.startAt ? 'Запустится сама в срок' : 'Черновик — запустите вручную', true);
         PAGES.wake.refresh();
       } },
       { label: 'Отмена' },
     ],
   });
+  const geoNameOf = () => { const g = $('#cGeo', bd).value; return g ? s.geoNames[g] : 'Дубай'; };
+  const paintPrev = () => {
+    const box = $('#cPrev', bd); const tid = $('#cTpl', bd).value;
+    const t = marketingTpls.find(x => x.id === tid);
+    if (!t) { box.innerHTML = `<div class="cmp-prev-empty">${ic(I.spark, 2)}Нет выбранного шаблона — создайте шаблон реанимации кнопкой выше</div>`; return; }
+    box.innerHTML = `<div class="cmp-prev-h">${ic(I.eye, 2)}Превью первого касания</div><div class="cmp-prev-b">${esc(cmpDemoFill(t.body, geoNameOf())).replace(/\n/g, '<br>')}</div>`;
+  };
+  let cntT = null;
+  const paintCount = () => {
+    clearTimeout(cntT);
+    cntT = setTimeout(async () => {
+      const geo = $('#cGeo', bd).value, older = $('#cOlder', bd).value, seg = $('#cSeg', bd).value;
+      const cnt = $('#cCount', bd); if (cnt) cnt.textContent = '…';
+      try {
+        const qs = `?stages=sleeping&geo=${encodeURIComponent(geo)}&olderDays=${encodeURIComponent(older || 0)}&segment=${encodeURIComponent(seg)}`;
+        const list = await api.get('/wake/preview' + qs);
+        const c2 = $('#cCount', bd); if (c2) c2.textContent = Array.isArray(list) ? list.length : 0;
+      } catch (e) { const c2 = $('#cCount', bd); if (c2) c2.textContent = '—'; }
+    }, 240);
+  };
+  ['#cGeo', '#cOlder', '#cSeg'].forEach(sel => { const e = $(sel, bd); if (e) e.addEventListener('change', () => { paintCount(); if (sel === '#cGeo') paintPrev(); }); });
+  $('#cTpl', bd)?.addEventListener('change', paintPrev);
+  $('#cTplNew', bd)?.addEventListener('click', () => { closeModal(); go('templates'); setTimeout(() => { const b = $('#newTpl'); if (b) b.click(); }, 520); });
+  paintPrev(); paintCount();
 }
 
 /* ---------------- АВТОМАТИЗАЦИИ ---------------- */
@@ -4134,13 +4378,14 @@ PAGES.automations = async (root) => {
         </div>
         <div class="glass card" data-ag="build">
           <div class="card-title">${ic(I.doc)}Свои поля карточки лида</div>
-          <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. Тип «выбор» — свои варианты через запятую.</div>
-          <div id="cfList">${(s.customFields || []).map((f, i) => `<div class="set-row"><div class="sp"><div class="sl">${esc(f.label)}</div><div class="sd">${f.type === 'select' ? 'выбор: ' + esc((f.options || []).join(', ')) : 'текст'}</div></div><button class="btn-ghost" data-cfdel="${i}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;padding:6px 0">Полей пока нет</div>'}</div>
+          <div class="muted" style="font-size:11.8px;margin-bottom:10px">Поля агентства — видны в карточке каждого лида. 12 типов: текст, число, деньги, дата, выбор, рейтинг и другие.</div>
+          <div id="cfList">${(s.customFields || []).map((f, i) => `<div class="set-row"><div class="sp"><div class="sl">${esc(f.label)}<span class="cf-tbadge">${CF_TYPE_RU[f.type] || 'Текст'}</span></div><div class="sd">${cfTypeDesc(f)}</div></div><button class="btn-ghost" data-cfdel="${i}">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="font-size:12px;padding:6px 0">Полей пока нет</div>'}</div>
           <div class="lc-note-row" style="margin-top:10px">
             <input id="cfLabel" placeholder="Название поля (напр. Паспорт/ВНЖ)">
-            <select id="cfType" style="width:110px;flex:0 0 110px"><option value="text">Текст</option><option value="select">Выбор</option></select>
+            <select id="cfType" style="width:150px;flex:0 0 150px">${CF_TYPES.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select>
           </div>
-          <input id="cfOptions" placeholder="Варианты через запятую (для типа «выбор»)" style="width:100%;margin-top:8px;display:none">
+          <input id="cfOptions" placeholder="Варианты через запятую (для «Выбор» / «Мультивыбор»)" style="width:100%;margin-top:8px;display:none">
+          <input id="cfUnit" placeholder="Единица измерения (напр. м², €, %) — для «Число» / «Деньги»" style="width:100%;margin-top:8px;display:none">
           <button class="btn btn-accent btn-sm" id="cfAdd" style="margin-top:10px">${ic(I.plus)}Добавить поле</button>
         </div>
     </div>`;
@@ -4238,11 +4483,20 @@ PAGES.automations = async (root) => {
     $$('[data-stmv]', row).forEach(b2 => b2.addEventListener('click', () => { const sib = +b2.dataset.stmv < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) (+b2.dataset.stmv < 0 ? sib.before(row) : sib.after(row)); }));
     $('#stNew').value = '';
   });
-  $('#cfType').addEventListener('change', (e) => { $('#cfOptions').style.display = e.target.value === 'select' ? '' : 'none'; });
+  $('#cfType').addEventListener('change', (e) => {
+    const t = e.target.value;
+    $('#cfOptions').style.display = (t === 'select' || t === 'multiselect') ? '' : 'none';
+    $('#cfUnit').style.display = (t === 'number' || t === 'money') ? '' : 'none';
+  });
   $('#cfAdd').addEventListener('click', async () => {
     const label = $('#cfLabel').value.trim();
     if (!label) return;
-    const f = { key: 'cf_' + label.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '_').slice(0, 30), label, type: $('#cfType').value, options: $('#cfOptions').value.split(',').map(x => x.trim()).filter(Boolean) };
+    const type = $('#cfType').value;
+    const f = {
+      key: cfSlug(label), label, type,
+      options: (type === 'select' || type === 'multiselect') ? $('#cfOptions').value.split(',').map(x => x.trim()).filter(Boolean) : [],
+      unit: (type === 'number' || type === 'money') ? $('#cfUnit').value.trim() : '',
+    };
     await api.patch('/settings', { customFields: [...(s.customFields || []), f] });
     await loadState();
     render();
