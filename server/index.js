@@ -1213,10 +1213,12 @@ function collBlocks(c) {
   b.push({ id: 'b_cover', t: 'cover', v: 'blue', data: {} });
   b.push({ id: 'b_hello', t: 'hello', v: 'std', hidden: hid.includes('hello'), data: {} });
   b.push({ id: 'b_sep', t: 'sep', v: 'blue', hidden: hid.includes('sep'), data: {} });
-  for (const pid of ids) {
+  /* чередуем варианты карточек объектов — соседние проекты выглядят по-разному (не «всё full») */
+  const projVars = ['full', 'gallery', 'full', 'compact'];
+  ids.forEach((pid, i) => {
     const ov = (cust.props || {})[pid] || {};
-    b.push({ id: 'b_p_' + pid, t: 'proj', v: 'full', data: { pid, hookTitle: ov.hookTitle || '', blurb: ov.blurb || '', whyRent: ov.whyRent || null } });
-  }
+    b.push({ id: 'b_p_' + pid, t: 'proj', v: (ov.v || projVars[i % projVars.length]), data: { pid, hookTitle: ov.hookTitle || '', blurb: ov.blurb || '', whyRent: ov.whyRent || null } });
+  });
   b.push({ id: 'b_cta', t: 'cta', v: 'blue', hidden: hid.includes('cta'), data: {} });
   b.push({ id: 'b_why', t: 'why', v: 'std', hidden: hid.includes('why'), data: {} });
   b.push({ id: 'b_final', t: 'final', v: 'blue', hidden: hid.includes('final'), data: {} });
