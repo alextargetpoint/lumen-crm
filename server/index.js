@@ -820,7 +820,7 @@ const sanSlide = (s) => ({
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
-  pmark: ['check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus'].includes(s.pmark) ? s.pmark : 'check',   /* стиль маркера буллетов */
+  pmark: ['index', 'check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus'].includes(s.pmark) ? s.pmark : 'index',   /* стиль маркера буллетов (по умолч. — редакторский индекс, не чек-лист) */
   /* арт-дирекшн: семейство раскладки слайда (композиция), назначается artDirect с учётом ритма колоды */
   layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel', 'mosaic'].includes(s.layout) ? s.layout : '',
   hero: s.hero && (s.hero.v || s.hero.k) ? { v: String(s.hero.v || '').slice(0, 16), k: String(s.hero.k || '').slice(0, 40) } : null,   /* крупное число для data-hero слайда */
@@ -4787,8 +4787,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const scHeavy = (hasBg || hasVid) && !!s.mode;   /* контент (иконки/цифры) поверх фото — усиленный скрим для читаемости */
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : '', s.layout ? `lay-${s.layout}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
-        const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'check', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        const style = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';   /* чистое фото; контраст даёт per-family скрим (не мутный тёмный бокс на всём)*/
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
@@ -4801,7 +4801,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
-            ${!s.mode && (s.points || []).length ? `<ul class="s-points pm-${s.pmark || 'check'}">${s.points.map((pt, pi) => `<li><span class="s-pt-m" data-n="${pi + 1}"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
+            ${!s.mode && (s.points || []).length ? `<ul class="s-points pm-${s.pmark || 'index'}">${s.points.map((pt, pi) => `<li><span class="s-pt-m" data-n="${String(pi + 1).padStart(2, '0')}"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
             ${(s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -4834,33 +4834,41 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.sc-heavy::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,22,.52),rgba(8,12,22,.74));z-index:0}
 /* ═══ СЕМЕЙСТВА РАСКЛАДКИ (арт-дирекшн) ═══ */
 /* data-hero: одно крупное число доминирует */
-.s-hero{display:flex;flex-direction:column;gap:2px;margin:2px 0 6px}
-.s-hero b{font-family:var(--disp);font-weight:700;line-height:.92;letter-spacing:-.03em;font-size:clamp(56px,17vw,132px)}
-.s-hero i{font-style:normal;font-size:clamp(12px,3vw,16px);letter-spacing:.12em;text-transform:uppercase;opacity:.8;font-weight:700}
+.s-hero{display:flex;flex-direction:column;gap:0;margin:0 0 6px}
+.s-hero b{font-family:var(--disp);font-weight:700;line-height:.82;letter-spacing:-.05em;font-size:clamp(84px,26vw,190px)}
+.s-hero i{font-style:normal;font-size:clamp(12px,3.2vw,17px);letter-spacing:.16em;text-transform:uppercase;opacity:.75;font-weight:700;margin-top:6px}
 .slide.lay-data{justify-content:center}
 .slide.lay-data .s-h{font-size:clamp(20px,5vw,30px);opacity:.9;letter-spacing:-.01em}
 .slide.lay-data .s-hero b{color:var(--blue)}
 .slide.lay-data.hasbg .s-hero b{color:#fff}
 /* immersive: тёмное фото + центр, максимум эмоции, минимум текста */
 .slide.lay-immersive::after{content:'';position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 45%,rgba(6,10,20,.35),rgba(6,10,20,.72));z-index:0}
-.slide.lay-immersive .s-in{max-width:76%;margin:auto;text-align:center}
-.slide.lay-immersive .s-h{font-size:clamp(30px,8vw,60px);text-wrap:balance}
+.slide.lay-immersive .s-in{max-width:82%;margin:auto;text-align:center}
+.slide.lay-immersive .s-h{font-size:clamp(40px,9.4vw,78px);line-height:1.0;letter-spacing:-.03em;text-wrap:balance}
 .slide.lay-immersive .s-points{display:none}
 .slide.lay-immersive .s-eye{margin-left:auto;margin-right:auto}
 /* typo: типографика-first, без фото — заголовок во весь слайд */
-.slide.lay-typo .s-h{font-size:clamp(40px,11vw,88px);line-height:1.0;letter-spacing:-.03em}
-.slide.lay-typo .s-s{font-size:clamp(15px,3.6vw,19px);max-width:80%}
+.slide.lay-typo .s-h{font-size:clamp(52px,14.5vw,146px);line-height:.9;letter-spacing:-.045em;font-weight:600}
+.slide.lay-typo .s-s{font-size:clamp(14px,3.4vw,18px);max-width:70%;margin-top:18px}
+.slide.lay-typo .s-points{display:none}   /* типографика-first: только заголовок+микрокопия */
 /* split: фото сверху + сплошная плашка с контентом снизу */
 .slide.lay-split.hasbg{color:var(--ink)}
-.slide.lay-split .s-in{background:var(--paper);color:var(--ink);margin-top:auto;border-radius:20px 20px 0 0;box-shadow:0 -20px 40px -20px rgba(0,0,0,.4);padding-top:26px}
+/* split: фото сверху + сплошная плашка снизу — БЕЗ скруглений/теней (редакторская, не карточка), тонкая линейка-акцент */
+.slide.lay-split .s-in{background:var(--paper);color:var(--ink);margin-top:auto;padding-top:24px;border-top:2px solid var(--blue)}
 .slide.lay-split .s-num{color:var(--mut)}
 .slide.lay-split .s-eye{color:var(--blue)}
 /* panel: фото на весь + плавающая карточка с контентом */
-.slide.lay-panel.hasbg{color:var(--ink)}
-.slide.lay-panel .s-in{background:color-mix(in srgb,var(--paper) 90%,transparent);color:var(--ink);border-radius:18px;margin:auto 7% 7%;box-shadow:0 24px 60px -24px rgba(0,0,0,.55);backdrop-filter:blur(3px);align-self:stretch}
-.slide.lay-panel .s-eye{color:var(--blue)}
-/* cinematic: фото на весь, заголовок крупно снизу (усиленный низовой градиент) */
-.slide.lay-cinematic::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(6,10,20,.72));z-index:0}
+/* panel: фото на весь + РЕЗКИЙ цвет-блок флешем к нижнему краю (постер-блок, не плавающая карточка) */
+.slide.lay-panel{color:#fff}
+.slide.lay-panel .s-in{background:var(--ink);color:var(--paper);margin:auto 0 0;align-self:stretch;width:auto;max-width:none;padding:9% 10% 10%}
+.slide.lay-panel .s-h{color:var(--paper)}
+.slide.lay-panel .s-eye{color:color-mix(in srgb,var(--blue) 55%,#fff)}
+.slide.lay-panel .s-points li{color:rgba(255,255,255,.9)}
+.slide.lay-panel .s-points.pm-index li{border-top-color:rgba(255,255,255,.22)}
+.slide.lay-panel .pm-index .s-pt-m{color:#fff}
+/* cinematic: двусторонний скрим — тёмный верх (метаданные) + низ (заголовок), центр чистый */
+.slide.lay-cinematic::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,20,.5) 0%,transparent 24%,transparent 46%,rgba(6,10,20,.84));z-index:0}
+.slide.lay-split{background-color:#0b0f18}
 /* слои: фигуры/стикеры/фото/текст */
 .s-lyr{position:absolute}
 .s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
@@ -4943,10 +4951,13 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.pos-top .s-in{justify-content:flex-start;padding-top:15%}
 .slide.pos-bottom .s-in{justify-content:flex-end;padding-bottom:15%}
 .slide.al-center .s-in{text-align:center;align-items:center}
-.s-num{position:absolute;top:8%;left:10%;font-size:13px;font-weight:600;color:var(--mut);letter-spacing:.05em}
+.s-num{position:absolute;top:7.5%;left:10%;font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.16em;font-variant-numeric:tabular-nums}
 .slide.al-center .s-num{left:50%;transform:translateX(-50%)}
-.s-eye{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}
-.slide.hasbg .s-eye{color:#fff;opacity:.9}
+/* eyebrow — редакторская микро-рубрика с короткой линейкой-акцентом */
+.s-eye{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--blue)}
+.s-eye::before{content:"";width:22px;height:1.5px;background:currentColor;opacity:.9;flex:0 0 auto}
+.slide.al-center .s-eye{justify-content:center}
+.slide.hasbg .s-eye{color:#fff;opacity:.92}
 .s-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;margin-top:8px}
 .s-stat b{display:block;font-family:var(--disp);font-optical-sizing:auto;font-size:clamp(22px,5.6vw,36px);font-weight:600;line-height:1.02;letter-spacing:-.02em;color:var(--blue);overflow-wrap:anywhere}
 .slide.hasbg .s-stat b{color:#fff}
@@ -4968,9 +4979,15 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .gg-fg{stroke:#fff}.slide.hasbg .gg-t{fill:#fff}
 .s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
-.s-points{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
-.s-points li{display:flex;gap:11px;align-items:flex-start;font-size:clamp(13.5px,3.5vw,16px);line-height:1.32;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
-.slide.hasbg .s-points li{color:rgba(255,255,255,.94);text-shadow:0 1px 8px rgba(6,10,20,.4)}
+.s-points{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:0}
+.s-points li{display:flex;gap:14px;align-items:baseline;font-size:clamp(14px,3.6vw,17px);line-height:1.3;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
+.slide.hasbg .s-points li{color:rgba(255,255,255,.95);text-shadow:0 1px 8px rgba(6,10,20,.4)}
+/* ⭐ РЕДАКТОРСКИЙ ИНДЕКС (по умолчанию вместо чек-листа): тонкая линейка + трекнутый номер, как в журнале */
+.s-points.pm-index li{border-top:1px solid color-mix(in srgb,var(--ink) 16%,transparent);padding:11px 0}
+.slide.hasbg .s-points.pm-index li{border-top-color:rgba(255,255,255,.24)}
+.pm-index .s-pt-m{flex:0 0 auto;width:auto;height:auto;background:none;box-shadow:none;border:0;border-radius:0;color:var(--blue);font-family:var(--disp);font-optical-sizing:auto;font-size:15px;font-weight:700;letter-spacing:.02em;opacity:.85}
+.slide.hasbg .pm-index .s-pt-m{color:#fff}
+.pm-index .s-pt-m::after{content:attr(data-n)}
 /* маркер-чип: контраст на любом фоне (акцент+белый глиф), не сливается. Стиль задаёт .pm-* на списке */
 .s-pt-m{flex:0 0 20px;width:20px;height:20px;border-radius:7px;margin-top:1px;background:var(--blue);position:relative;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.16);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;line-height:1}
 .slide.hasbg .s-pt-m{background:rgba(255,255,255,.92);color:var(--blue)}
@@ -5011,10 +5028,10 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .s-bar{background:rgba(255,255,255,.22)}.slide.hasbg .s-bar.hi{background:#fff}
 .s-barcol i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
-.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;text-wrap:balance}
-.slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
-.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
-.slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.02;letter-spacing:-.025em;overflow-wrap:break-word;text-wrap:balance}
+.slide.sz-s .s-h{font-size:clamp(24px,5.6vw,38px)}
+.slide.sz-m .s-h{font-size:clamp(31px,7.6vw,54px)}
+.slide.sz-l .s-h{font-size:clamp(40px,10vw,76px);line-height:.98;letter-spacing:-.035em}
 .slide.hasbg .s-h{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 26px rgba(0,0,0,.4)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
 .s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
@@ -5052,7 +5069,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=31"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=32"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
