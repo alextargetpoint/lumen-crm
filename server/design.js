@@ -11,7 +11,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&'
 
 /* ---- 6 осей 1-го уровня (для UI и валидации). Всё по умолчанию = auto ---- */
 const AXES = {
-  style:     { label: 'Стиль',            def: 'auto', opts: [['auto', 'Авто'], ['editorial', 'Editorial Luxury'], ['premiumweb', 'Premium Web'], ['architectural', 'Architectural Minimal'], ['investment', 'Investment Intelligence'], ['cinematic', 'Cinematic']] },
+  style:     { label: 'Стиль',            def: 'auto', opts: [['auto', 'Авто'], ['editorial', 'Editorial Luxury'], ['premiumweb', 'Premium Web'], ['architectural', 'Architectural Minimal'], ['investment', 'Investment Intelligence'], ['cinematic', 'Cinematic'], ['darkluxury', 'Dark Luxury']] },
   artDir:    { label: 'Арт-дирекшн',      def: 'auto', opts: [['auto', 'Авто'], ['minimal', 'Минимал'], ['balanced', 'Баланс'], ['expressive', 'Выразительно'], ['artdirected', 'Арт-дирекшн']] },
   density:   { label: 'Плотность',        def: 'auto', opts: [['auto', 'Авто'], ['light', 'Лёгкая'], ['standard', 'Стандарт'], ['detailed', 'Детальная']] },
   imageDom:  { label: 'Доминанта фото',   def: 'auto', opts: [['auto', 'Авто'], ['low', 'Низкая'], ['medium', 'Средняя'], ['high', 'Высокая']] },
@@ -91,6 +91,8 @@ const PALS = {
   architectural: { paper: '#FEFEFE', ink: '#14161A', mut: '#7C818A', line: '#E7E9EC', accent: '#22252B', accentSoft: '#EEF0F2', band: '#101216', onBand: '#EEF0F3', tint: '#F4F5F6' },
   investment:    { paper: '#F8F9FB', ink: '#0C1424', mut: '#5C6578', line: '#E1E6EF', accent: '#0F5C4A', accentSoft: '#E6F0EC', band: '#0B1322', onBand: '#E7EDF6', tint: '#EEF2F7' },
   cinematic:     { paper: '#F6F4F0', ink: '#141210', mut: '#877F72', line: '#E4DED2', accent: '#A9803E', accentSoft: '#EFE6D5', band: '#0B0B0D', onBand: '#F2ECDF', tint: '#EFE9DD' },
+  /* Dark Luxury — тёмная система ПО УМОЛЧАНИЮ: глубокий charcoal-navy + шампань-золото */
+  darkluxury:    { paper: '#12141C', ink: '#ECEAE2', mut: '#8C90A4', line: '#262B3A', accent: '#C7A667', accentSoft: '#1C2130', band: '#0A0B12', onBand: '#ECEAE2', tint: '#191E2A' },
 };
 const DARK = {
   editorial:     { paper: '#14110B', ink: '#F1EADB', mut: '#A79A82', line: '#2A241A', accent: '#C8944F', accentSoft: '#241D12', band: '#0C0A06', onBand: '#F1EADB', tint: '#1B160E' },
@@ -98,6 +100,7 @@ const DARK = {
   architectural: { paper: '#111318', ink: '#ECEEF2', mut: '#8A8F99', line: '#232732', accent: '#C7CCD4', accentSoft: '#1A1E26', band: '#0A0B0E', onBand: '#ECEEF2', tint: '#181B22' },
   investment:    { paper: '#0B1322', ink: '#E7EDF6', mut: '#8791A3', line: '#1D2740', accent: '#3BC79A', accentSoft: '#0F1C2C', band: '#060C16', onBand: '#E7EDF6', tint: '#111B2C' },
   cinematic:     { paper: '#0C0C0F', ink: '#F1ECE1', mut: '#9A9182', line: '#241F18', accent: '#C9A15B', accentSoft: '#1C160D', band: '#050506', onBand: '#F1ECE1', tint: '#161310' },
+  darkluxury:    { paper: '#12141C', ink: '#ECEAE2', mut: '#8C90A4', line: '#262B3A', accent: '#C7A667', accentSoft: '#1C2130', band: '#0A0B12', onBand: '#ECEAE2', tint: '#191E2A' },
 };
 
 /* геолокационный оттенок для brandMode=imagederived (грубая аппроксимация без пикселей) */
@@ -110,9 +113,10 @@ const FONTS = {
   architectural: { disp: "'Space Grotesk',system-ui,sans-serif", meta: "'Inter',system-ui,sans-serif", opsz: 0 },
   investment:    { disp: "'Fraunces',Georgia,serif", meta: "'Inter',system-ui,sans-serif", opsz: 1 },
   cinematic:     { disp: "'Fraunces',Georgia,serif", meta: "'Manrope',system-ui,sans-serif", opsz: 1 },
+  darkluxury:    { disp: "'Fraunces',Georgia,serif", meta: "'Manrope',system-ui,sans-serif", opsz: 1 },
 };
 
-const STYLE_NAMES = { editorial: 'Editorial Luxury', premiumweb: 'Premium Web', architectural: 'Architectural Minimal', investment: 'Investment Intelligence', cinematic: 'Cinematic' };
+const STYLE_NAMES = { editorial: 'Editorial Luxury', premiumweb: 'Premium Web', architectural: 'Architectural Minimal', investment: 'Investment Intelligence', cinematic: 'Cinematic', darkluxury: 'Dark Luxury' };
 
 /* ---------- контекст документа: что за данные у нас на руках ---------- */
 function docContext(db, c, props) {
@@ -120,7 +124,13 @@ function docContext(db, c, props) {
   const avgImg = imgs.length ? imgs.reduce((a, b) => a + b, 0) / imgs.length : 0;
   const dataScore = props.reduce((s, p) => s + ((p.units || []).length >= 2 ? 1 : 0) + (p.roi ? 1 : 0) + (p.appreciation ? 1 : 0) + ((p.paymentRows || []).length >= 2 ? 1 : 0), 0) / Math.max(1, props.length);
   const hasTimes = props.some(p => p.district && (p.district.times || []).length);
-  return { avgImg, maxImg: Math.max(0, ...imgs), dataScore, hasTimes, nProj: props.length };
+  /* сигнал «премиум/брендированное» — для Auto-выбора Dark Luxury (только из текста данных) */
+  const brandedRe = /(бренд|branded|кондо\s*-?\s*отел|residenc|резиденц|signature|penthouse|пентхаус|luxury|люкс|beachfront|waterfront|private\s*resid)/i;
+  const brandBag = (String(c.title || '') + ' ' + props.map(p => [p.name, p.developer, p.type, p.hookTitle, (p.district || {}).blurb, p.description].filter(Boolean).join(' ')).join(' '));
+  const brandedSignal = brandedRe.test(brandBag);
+  const prices = props.map(p => p.priceFrom).filter(n => n > 0);
+  const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+  return { avgImg, maxImg: Math.max(0, ...imgs), dataScore, hasTimes, nProj: props.length, brandedSignal, avgPrice };
 }
 
 /* ---------- разрешение осей (auto → конкретика по контексту) ---------- */
@@ -128,10 +138,16 @@ function resolveAxes(ax, ctx, r) {
   const a = Object.assign({}, ax);
   if (!a.style || a.style === 'auto') {
     if (ctx.dataScore >= 2.2 && ctx.avgImg < 3) a.style = 'investment';
+    else if (ctx.brandedSignal && ctx.avgImg >= 3 && (ctx.avgPrice >= 300000 || ctx.dataScore < 1.6)) a.style = 'darkluxury'; /* высокобюджетные брендированные резиденции */
     else if (ctx.avgImg >= 4) a.style = 'cinematic';
     else a.style = 'editorial';
   }
   if (!PALS[a.style]) a.style = 'editorial';
+  /* Cinematic — жанр «фото главенствует»: крупная доминанта + выразительность */
+  if (a.style === 'cinematic') {
+    if (!a.imageDom || a.imageDom === 'auto') a.imageDom = 'high';
+    if (!a.artDir || a.artDir === 'auto') a.artDir = 'expressive';
+  }
   if (!a.artDir || a.artDir === 'auto') a.artDir = ctx.avgImg >= 3 ? 'expressive' : 'balanced';
   if (!a.density || a.density === 'auto') a.density = ctx.dataScore >= 2 ? 'detailed' : 'standard';
   if (!a.imageDom || a.imageDom === 'auto') a.imageDom = ctx.avgImg >= 4 ? 'high' : ctx.avgImg <= 1.2 ? 'low' : 'medium';
@@ -145,7 +161,7 @@ function deriveDNA(db, c, props, ax0, seed) {
   const ctx = docContext(db, c, props);
   const r = rng(seed);
   const ax = resolveAxes(ax0 || {}, ctx, r);
-  const dark = ax.brandMode === 'dark' || (PALS[ax.style] && ax.brandMode === 'brand' && false);
+  const dark = ax.brandMode === 'dark' || ax.style === 'darkluxury';
   const pal = Object.assign({}, (dark ? DARK : PALS)[ax.style]);
   if (ax.brandMode === 'imagederived') { const g = GEO_HUE[(props[0] || {}).geo] || pal.accent; pal.accent = g; }
   if (ax.brandMode === 'neutral') { pal.accent = dark ? '#C9CCD2' : '#2A2D33'; }
@@ -377,9 +393,36 @@ function artDirect(db, c, props, dna, lead, seed) {
   const hasCriteria = lead && (q.budget || q.purpose || q.timeline || q.type || lead.geo);
   if (hasCriteria) plan.push({ role: 'CLIENT_CRITERIA', v: dna.ax.style === 'investment' ? 'ledger' : 'brief', qc: qcFlat({ imageFit: 0.9, dataFit: 0.9 }) });
 
+  /* Ф4 · разделители-открывашки между проектами дают ритм. Нужен hero; в лёгких/минимальных
+     макетах убираем ради плотности. Первый проект получает открывашку только если его hero
+     отличается от обложки (иначе — типографический вариант), чтобы не дублировать кадр. */
+  const coverHero = (() => { const hp = props.find(p => curateImages(p).hero); return hp ? (curateImages(hp).hero || {}).url : null; })();
+  const wantOpeners = dna.intensity !== 'minimal' && dna.density !== 'light' && props.length >= 1;
+  const openerUsed = [];
+  const chooseOpener = (pr, idx, heroUrl) => {
+    const oseed = (seed ^ hashStr('op|' + pr.id) ^ Math.imul(idx + 1, 0x27D4EB2F)) >>> 0;
+    const rr = rng(oseed);
+    let pool;
+    if (dna.ax.style === 'cinematic' || dna.imageDom === 'high') pool = ['fullbleed', 'fullbleed', 'split'];
+    else if (dna.ax.style === 'investment' || dna.imageDom === 'low') pool = ['split', 'type'];
+    else pool = ['fullbleed', 'split', 'type'];
+    if (!heroUrl) pool = ['type'];
+    if (idx === 0 && heroUrl && heroUrl === coverHero) pool = ['type', 'split']; /* не повторять кадр обложки */
+    let v = pick(rr, pool);
+    const n = openerUsed.length;                                   /* анти-повтор: не 3× подряд один вид */
+    if (n >= 2 && openerUsed[n - 1] === v && openerUsed[n - 2] === v) { const alt = pool.filter(x => x !== v); if (alt.length) v = pick(rng(oseed ^ 0x9E37), alt); }
+    return v;
+  };
+
   const used = [];
   props.forEach((pr, i) => {
     const prof = projProfile(db, c, pr, dna);
+    if (wantOpeners && prof.heroOk) {
+      const heroUrl = (prof.cur.hero || {}).url || null;
+      const ov = chooseOpener(pr, i, heroUrl);
+      openerUsed.push(ov);
+      plan.push({ role: 'PROJECT_OPENER', v: ov, pid: pr.id, idx: i, qc: qcFlat({ imageFit: heroUrl && ov !== 'type' ? 1 : 0.8, density: 0.85, balance: 0.9 }) });
+    }
     const dec = decideGrammar(pr, prof, dna, used, seed, pseeds[pr.id] || 0, locks[pr.id]);
     used.push(dec.v);
     plan.push({ role: 'PROJECT_OVERVIEW', v: dec.v, pid: pr.id, idx: i, locked: dec.locked, repaired: dec.repaired, qc: dec.qc });
@@ -390,9 +433,26 @@ function artDirect(db, c, props, dna, lead, seed) {
     const cmpV = dna.dataDepth === 'editorial' ? 'cards' : shareMetrics ? pick(r, ['matrix', 'scoreboard']) : 'cards';
     plan.push({ role: 'COMPARISON', v: cmpV, qc: qcFlat({ dataFit: shareMetrics ? 1 : 0.7, density: 0.9 }) });
   }
-  const recV = dna.ax.style === 'investment' ? 'thesis' : dna.ax.style === 'editorial' || dna.ax.style === 'cinematic' ? 'editorNote' : pick(r, ['editorNote', 'marginNote', 'thesis']);
+  const recV = dna.ax.style === 'investment' ? 'thesis' : dna.ax.style === 'editorial' || dna.ax.style === 'cinematic' || dna.ax.style === 'darkluxury' ? 'editorNote' : pick(r, ['editorNote', 'marginNote', 'thesis']);
   plan.push({ role: 'RECOMMENDATION', v: recV, qc: qcFlat({ density: 0.85 }) });
-  plan.push({ role: 'CLOSING', v: dna.dark ? 'band' : pick(r, ['band', 'plate']), qc: qcFlat({ density: 0.9 }) });
+
+  /* Ф4 · завершающая дуга: процесс → агент → агентство → тихая задняя обложка.
+     Каждую страницу выкидываем, если под неё нет честных данных (никаких выдуманных цифр). */
+  const S = db.settings || {};
+  const agency = S.agency || {};
+  const about = agency.about || {};
+  const mgr = agency.manager || {};
+  const broker = lead && lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
+  const mgrReal = mgr.name && !/^ваш менеджер$/i.test(String(mgr.name).trim()) && (mgr.phone || mgr.email);
+  const agent = broker || (mgrReal ? { name: mgr.name, title: mgr.title || '', phone: mgr.phone, email: mgr.email, bio: '' } : null);
+
+  plan.push({ role: 'NEXT_STEPS', v: dna.dataDepth === 'editorial' ? 'stack' : pick(r, ['row', 'stack']), qc: qcFlat({ density: 0.85, balance: 0.95 }) });
+  if (agent) plan.push({ role: 'AGENT_PROFILE', v: agent.photo ? (dna.ax.style === 'investment' ? 'split' : 'editorial') : 'minimal', qc: qcFlat({ imageFit: agent.photo ? 1 : 0.85, density: 0.8, balance: 0.9 }) });
+  const proofBullets = (about.bullets || []).filter(Boolean);
+  const proofStatement = about.intro || (about.whyUs || [])[0] || '';
+  const hasProof = proofBullets.length || (about.whyUs || []).length || proofStatement;
+  if (hasProof) plan.push({ role: 'AGENCY_PROOF', v: proofBullets.filter(b => /^\s*\d/.test(b)).length >= 2 ? 'stats' : 'statement', qc: qcFlat({ dataFit: 0.85, density: 0.85 }) });
+  plan.push({ role: 'BACK_COVER', v: dna.dark ? 'band' : pick(r, ['plate', 'band']), qc: qcFlat({ density: 0.9, balance: 0.95 }) });
   return plan;
 }
 
@@ -439,6 +499,7 @@ function blockOp(db, c, proj, action) {
 function renderDesignDoc(db, c, opts) {
   opts = opts || {};
   const S = db.settings || {};
+  const agency = S.agency || {};
   const AG = (S.agency && S.agency.name) || 'Lumen';
   const mgr = (S.agency && S.agency.manager) || {};
   const about = (S.agency && S.agency.about) || {};
@@ -447,9 +508,20 @@ function renderDesignDoc(db, c, opts) {
   const prById = (pid) => db.properties.find(x => x.id === pid);
   const props = (c.propertyIds || []).map(prById).filter(Boolean);
   const lead = c.leadId ? db.leads.find(l => l.id === c.leadId) : null;
+  /* Ф4 · агент, подготовивший подборку: назначенный брокер лида → иначе реальный менеджер агентства.
+     Плейсхолдер «Ваш менеджер» с пустыми контактами агентом НЕ считаем. */
+  const broker = lead && lead.broker ? (db.brokers || []).find(b => b.id === lead.broker) : null;
+  const mgrReal = mgr.name && !/^ваш менеджер$/i.test(String(mgr.name).trim()) && (mgr.phone || mgr.email);
+  const agent = broker || (mgrReal ? { name: mgr.name, title: mgr.title || '', phone: mgr.phone, email: mgr.email, bio: '', geo: '', langs: [] } : null);
+  /* «подписант» для рекомендаций/CTA: агент, иначе слабый менеджер (совместимость) */
+  const signer = agent || { name: mgr.name || AG, title: mgr.title || 'ваш менеджер', phone: mgr.phone || '', email: mgr.email || '' };
 
   const seed = (opts.seed != null ? (+opts.seed >>> 0) : ((c.design && c.design.seed) || hashStr(c.id))) >>> 0;
-  const dna = deriveDNA(db, c, props, (c.design || {}), seed);
+  /* превью-оверрайды осей из query (?style=…&brand=…) — НЕ пишутся в базу, только рендер */
+  const axIn = Object.assign({}, c.design || {});
+  if (opts.style && AXES.style.opts.some(o => o[0] === opts.style)) axIn.style = opts.style;
+  if (opts.brand && AXES.brandMode.opts.some(o => o[0] === opts.brand)) axIn.brandMode = opts.brand;
+  const dna = deriveDNA(db, c, props, axIn, seed);
   const plan = artDirect(db, c, props, dna, lead, seed);
   const P = dna.pal;
   const cur = (p) => p && p.currency === 'EUR' ? '€' : '$';
@@ -480,6 +552,18 @@ function renderDesignDoc(db, c, opts) {
   /* Ф2 · план оплаты → РЕАЛЬНЫЙ cash-flow: фаза (старт/стройка/ключи) + % + ярлык,
      накопительная полоса пропорций и tick-паттерн для ежемесячной рассрочки. Не 3 числа. */
   const PHLB = { now: 'Старт', build: 'Строительство', handover: 'Ключи' };
+  /* векторная полоса структуры платежей — <rect> с CSS-fill (чёткая в печати, масштабируемая) */
+  function svgBar(rows, total) {
+    const W = 1000, H = 18; let x = 0; const parts = [];
+    rows.forEach((r, i) => {
+      const w = (r.pctNum || 0) / total * W; if (w <= 0) return;
+      const gap = i < rows.length - 1 ? 2.5 : 0;                 /* тонкий зазор между фазами */
+      parts.push(`<rect class="pt-svgseg ph-${r.phase}" x="${x.toFixed(2)}" y="0" width="${Math.max(0, w - gap).toFixed(2)}" height="${H}" shape-rendering="crispEdges"><title>${esc(r.pct)} · ${esc(r.label)}</title></rect>`);
+      if (r.drip) parts.push(`<rect x="${x.toFixed(2)}" y="0" width="${Math.max(0, w - gap).toFixed(2)}" height="${H}" fill="url(#ptDrip)"></rect>`);
+      x += w;
+    });
+    return `<svg class="pt-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="структура платежей по фазам"><defs><pattern id="ptDrip" width="12" height="${H}" patternUnits="userSpaceOnUse"><rect width="3.5" height="${H}" fill="rgba(255,255,255,.5)"></rect></pattern></defs>${parts.join('')}</svg>`;
+  }
   function payTrack(pr) {
     const raw = (pr.paymentRows || []).filter(r => r && (r.pct || r.label));
     if (!raw.length) return '';
@@ -491,7 +575,8 @@ function renderDesignDoc(db, c, opts) {
       return `<div class="pay pay-one">${kicker(label)}<div class="po-one"><b class="po-one-p">${esc(r.pct || '100%')}</b><span class="po-one-l">${esc(r.label || 'Полная оплата')}</span></div></div>`;
     }
     const total = rows.reduce((s, r) => s + (r.pctNum || 0), 0) || 100;
-    const bar = `<div class="pt-bar" role="img" aria-label="структура платежей">${rows.map(r => `<span class="pt-seg ph-${r.phase}${r.drip ? ' drip' : ''}" style="width:${((r.pctNum || 0) / total * 100).toFixed(1)}%" title="${esc(r.pct)} · ${esc(r.label)}"></span>`).join('')}</div>`;
+    /* Ф4 · накопительная полоса cash-flow как ВЕКТОРНЫЙ SVG (в PDF печатается чётко, не растр) */
+    const bar = svgBar(rows, total);
     const phasesShown = [...new Set(rows.map(r => r.phase))];
     const legend = `<div class="pt-leg">${phasesShown.map(ph => `<span class="pt-lg"><i class="ph-${ph}"></i>${PHLB[ph]}</span>`).join('')}</div>`;
     return `<div class="pay">${kicker(label)}
@@ -711,7 +796,8 @@ function renderDesignDoc(db, c, opts) {
       else if (topRoi) pts.push([`Доходность`, `У ${esc(topRoi.name)} — ${esc(topRoi.roi)}.`]);
       if (topAppr) pts.push([`Горизонт роста`, `${esc(topAppr.name)} — прирост ${esc(topAppr.appreciation)}.`]);
       if (early && /готов|ready|Q[1-4]/i.test(String(early.handover))) pts.push([`Сроки`, `${esc(early.name)} — ближайшая ${/готов|ready/i.test(String(early.handover)) ? 'готовность' : 'сдача'} (${esc(early.handover)}).`]);
-      const sign = `<div class="rc-sign"><div class="rc-ava">${esc(initials(mgr.name))}</div><div><b>${esc(mgr.name || AG)}</b><span>${esc(mgr.title || 'ваш менеджер')}</span></div></div>`;
+      const sAva = signer.photo ? `<div class="rc-ava rc-ava-ph" style="background-image:url('${esc(abs(signer.photo))}')"></div>` : `<div class="rc-ava">${esc(initials(signer.name))}</div>`;
+      const sign = `<div class="rc-sign">${sAva}<div><b>${esc(signer.name || AG)}</b><span>${esc(signer.title || 'ваш менеджер')}</span></div></div>`;
       const geo = geoNames[(props[0] || {}).geo] || '';
 
       if (pg.v === 'thesis') {
@@ -747,6 +833,140 @@ function renderDesignDoc(db, c, opts) {
         ${wa ? `<a class="cl-btn" href="${esc(wa)}">Написать в WhatsApp</a>` : ''}</div>`;
       if (pg.v === 'plate') return `<section class="page cover cl-plate"><div class="cl-in">${inner}</div></section>`;
       return `<section class="page cover cl-band">${inner}</section>`;
+    },
+
+    /* Ф4 · РАЗДЕЛИТЕЛЬ/ОТКРЫВАШКА проекта — крупный номер + имя, переиспользует hero проекта.
+       fullbleed (кадр на всю страницу) · split (номер+имя слева, кадр справа) · type (типографика). */
+    PROJECT_OPENER(pg) {
+      const pr = prById(pg.pid); if (!pr) return '';
+      const cur = curateImages(pr); const hero = cur.hero;
+      const co = projCopy(c, pg.pid, pr);
+      const no = num2(pg.idx + 1);
+      const geo = geoNames[pr.geo] || '';
+      const kick = 'Проект ' + no + ' из ' + num2(props.length);
+      const meta = [geo, pr.area].filter(Boolean).map(esc).join(' · ');
+      if (pg.v === 'fullbleed' && hero) {
+        return `<section class="page opener op-full" style="background-image:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.20) 42%,rgba(0,0,0,.66)),url('${esc(abs(hero.url))}');background-position:${esc(hero.focal || 'center')}">
+          <div class="op-top">${wordmark()}<span class="op-tag">${esc(kick)}</span></div>
+          <div class="op-mid"><div class="op-no">${no}</div><h2 class="op-h">${esc(pr.name)}</h2>${meta ? `<div class="op-meta">${meta}</div>` : ''}</div>
+          <div class="op-bot">${co.hook && co.hook !== pr.name ? `<p class="op-lede">${esc(co.hook)}</p>` : (pr.priceFrom ? `<p class="op-lede">от ${money(pr.priceFrom, pr)}</p>` : '')}</div>
+        </section>`;
+      }
+      if (pg.v === 'split' && hero) {
+        return `<section class="page opener op-split">
+          <div class="op-l"><span class="op-tag dark">${esc(kick)}</span><div class="op-no big">${no}</div><h2 class="op-h">${esc(pr.name)}</h2>${meta ? `<div class="op-meta">${meta}</div>` : ''}${pr.priceFrom ? `<div class="op-price">от ${money(pr.priceFrom, pr)}</div>` : ''}</div>
+          <div class="op-r">${imgEl(hero, 'op-img', pr.area)}</div>
+        </section>`;
+      }
+      return `<section class="page opener op-type">
+        <div class="op-ty-top">${wordmark()}<span class="op-tag dark">${esc(kick)}</span></div>
+        <div class="op-ty-mid"><div class="op-no huge">${no}</div><div class="op-ty-tx"><h2 class="op-h xl">${esc(pr.name)}</h2>${meta ? `<div class="op-meta">${meta}</div>` : ''}${co.hook && co.hook !== pr.name ? `<p class="op-lede">${esc(co.hook)}</p>` : ''}</div></div>
+        <div class="op-ty-bot">${pr.priceFrom ? `<span>от ${money(pr.priceFrom, pr)}</span>` : ''}${pr.priceFrom && pr.handover ? '<span class="dot"></span>' : ''}${pr.handover ? `<span>${esc(pr.handover)}</span>` : ''}</div>
+      </section>`;
+    },
+
+    /* Ф4 · ДАЛЬНЕЙШИЕ ШАГИ — честный обобщённый процесс (без выдуманной конкретики) + контакт агента. */
+    NEXT_STEPS(pg) {
+      const steps = [
+        ['Подобрали', 'Собрали объекты строго под ваш запрос — с проверкой застройщика и цифр.'],
+        ['Обсудим', 'Созвонимся, разберём доходность и условия оплаты, ответим на все вопросы.'],
+        ['Бронирование', 'Резерв выбранного юнита и проверка документов по сделке.'],
+        ['Сделка', 'Оплата по графику и сопровождение до получения ключей.'],
+      ];
+      const phone = (signer.phone || '').replace(/\D/g, '');
+      const wa = phone ? `https://wa.me/${phone}?text=${encodeURIComponent('Здравствуйте! По подборке «' + (c.title || '') + '» — хочу обсудить проект №')}` : '';
+      const who = signer.name ? `<div class="ns-who">${signer.photo ? `<span class="ns-ava" style="background-image:url('${esc(abs(signer.photo))}')"></span>` : `<span class="ns-ava txt">${esc(initials(signer.name))}</span>`}<div><b>${esc(signer.name)}</b>${signer.title ? `<span>${esc(signer.title)}</span>` : ''}${signer.phone ? `<span>${esc(signer.phone)}</span>` : ''}</div></div>` : '';
+      const cta = (who || wa) ? `<div class="ns-cta">${who}${wa ? `<a class="ns-btn" href="${esc(wa)}">Написать в WhatsApp</a>` : ''}</div>` : '';
+      const list = pg.v === 'row'
+        ? `<div class="ns-row">${steps.map(([k, v], i) => `<div class="ns-step"><span class="ns-no">${num2(i + 1)}</span><b class="ns-k">${esc(k)}</b><p class="ns-v">${esc(v)}</p></div>`).join('')}</div>`
+        : `<div class="ns-stack">${steps.map(([k, v], i) => `<div class="ns-sr"><span class="ns-no">${num2(i + 1)}</span><div><b class="ns-k">${esc(k)}</b><p class="ns-v">${esc(v)}</p></div></div>`).join('')}</div>`;
+      return `<section class="page pg ns">${kicker('Как мы работаем')}<h2 class="h2">Дальнейшие шаги</h2>
+        <p class="lede">Прозрачный процесс — от подбора до ключей, без спешки и давления.</p>
+        ${list}${cta}${foot('процесс')}</section>`;
+    },
+
+    /* Ф4 · АГЕНТ — только реальные поля брокера/менеджера (портрет если есть; иначе инициалы).
+       editorial/split (с портретом) · minimal (без портрета) — не «портрет+простыня+буллеты». */
+    AGENT_PROFILE(pg) {
+      if (!agent) return '';
+      const geo = agent.geo ? (geoNames[agent.geo] || agent.geo) : '';
+      const LANG = { ru: 'русский', en: 'английский', ar: 'арабский', id: 'индонезийский', th: 'тайский', es: 'испанский', de: 'немецкий', fr: 'французский' };
+      const langs = (agent.langs || []).map(l => LANG[l] || l).filter(Boolean);
+      const deals = (typeof agent.deals90 === 'number' && agent.deals90 > 0) ? agent.deals90 : null;
+      const portrait = agent.photo ? `<div class="ag-ph" style="background-image:url('${esc(abs(agent.photo))}')"></div>` : `<div class="ag-ph ag-ph-txt">${esc(initials(agent.name))}</div>`;
+      const facts = [];
+      if (geo) facts.push(['Рынок', geo]);
+      if (langs.length) facts.push(['Языки', langs.join(', ')]);
+      if (deals) facts.push(['Сделок за 90 дней', String(deals)]);
+      const factsHtml = facts.length ? `<div class="ag-facts">${facts.map(([k, v]) => `<div class="ag-f"><span class="ag-fk">${esc(k)}</span><b class="ag-fv">${esc(v)}</b></div>`).join('')}</div>` : '';
+      const note = agent.bio ? `<p class="ag-note">${esc(agent.bio)}</p>` : '';
+      const contact = []; if (agent.phone) contact.push(esc(agent.phone)); if (agent.email) contact.push(esc(agent.email));
+      const contactHtml = contact.length ? `<div class="ag-contact">${contact.join('<span class="dot"></span>')}</div>` : '';
+      const nameBlock = `<div class="ag-name"><h2 class="ag-h">${esc(agent.name)}</h2>${agent.title ? `<div class="ag-role">${esc(agent.title)}</div>` : ''}</div>`;
+      if (pg.v === 'split') {
+        return `<section class="page pg ag ag-split">${kicker('Ваш эксперт по подборке')}
+          <div class="ag-sp"><div class="ag-sp-l">${portrait}${contactHtml}</div>
+          <div class="ag-sp-r">${nameBlock}${note}${factsHtml}</div></div>
+          ${foot('эксперт')}</section>`;
+      }
+      if (pg.v === 'editorial') {
+        return `<section class="page pg ag ag-edi">${kicker('Ваш эксперт по подборке')}
+          <div class="ag-edi-top">${portrait}<div class="ag-edi-id">${nameBlock}${factsHtml}</div></div>
+          ${note}${contactHtml}
+          ${foot('эксперт')}</section>`;
+      }
+      return `<section class="page pg ag ag-min">${kicker('Ваш эксперт по подборке')}
+        <div class="ag-min-head">${portrait}${nameBlock}</div>
+        ${note}${factsHtml}${contactHtml}
+        ${foot('эксперт')}</section>`;
+    },
+
+    /* Ф4 · АГЕНТСТВО — только реальные факты из settings.agency.about (цифры = слова агентства).
+       stats (плитки из числовых буллетов) · statement (сдержанное заявление + столпы). */
+    AGENCY_PROOF(pg) {
+      const bullets = (about.bullets || []).filter(Boolean);
+      const whyUs = (about.whyUs || []).filter(Boolean);
+      const intro = about.intro || '';
+      const freeNote = about.freeNote || '';
+      const office = about.office || {};
+      const geoSet = [];
+      (agency.geos || []).forEach(g => { const n = geoNames[g] || g; if (n && !geoSet.includes(n)) geoSet.push(n); });
+      (db.brokers || []).forEach(b => { if (b.geo) { const n = geoNames[b.geo] || b.geo; if (n && !geoSet.includes(n)) geoSet.push(n); } });
+      const markets = geoSet.length ? `<div class="pf-markets">${kicker('Направления')}<div class="pf-mk">${geoSet.map(g => `<span class="pf-mc">${esc(g)}</span>`).join('')}</div></div>` : '';
+      if (pg.v === 'stats') {
+        const tiles = [], statements = [];
+        bullets.forEach(b => { const m = String(b).match(/^\s*([\d][\d\s.,+%]*)\s*(.*)$/); if (m) { let lbl = m[2].replace(/^[—–:\s]+/, '').split(/[:.]/)[0].trim(); tiles.push([m[1].trim().replace(/\s+/g, ' '), lbl]); } else statements.push(b); });
+        return `<section class="page pg pf pf-stats">${kicker('Об агентстве')}<h2 class="h2">${esc(AG)}</h2>
+          ${intro ? `<p class="lede">${esc(intro)}</p>` : ''}
+          ${tiles.length ? `<div class="pf-grid">${tiles.map(([n, l]) => `<div class="pf-t"><b class="pf-n">${esc(n)}</b>${l ? `<span class="pf-l">${esc(l)}</span>` : ''}</div>`).join('')}</div>` : ''}
+          ${markets}
+          ${statements.length ? `<ul class="pf-list">${statements.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+          ${freeNote ? `<p class="pf-free">${esc(freeNote)}</p>` : ''}
+          <p class="cc-note">Цифры и факты приведены со слов агентства.</p>
+          ${foot('агентство')}</section>`;
+      }
+      return `<section class="page pg pf pf-statement">${kicker('Об агентстве')}<h2 class="h2">${esc(AG)}</h2>
+        ${intro ? `<p class="pf-intro">${esc(intro)}</p>` : ''}
+        ${whyUs.length ? `<div class="pf-pillars">${whyUs.slice(0, 3).map((w, i) => `<div class="pf-pil"><span class="pf-pno">${num2(i + 1)}</span><p>${esc(w)}</p></div>`).join('')}</div>` : ''}
+        ${markets}
+        ${office.blurb ? `<p class="pf-office">${esc(office.blurb)}</p>` : ''}
+        ${freeNote ? `<p class="pf-free">${esc(freeNote)}</p>` : ''}
+        <p class="cc-note">Факты приведены со слов агентства.</p>
+        ${foot('агентство')}</section>`;
+    },
+
+    /* Ф4 · ЗАДНЯЯ ОБЛОЖКА — тихое закрытие: знак агентства + контакт + строка конфиденциальности. */
+    BACK_COVER(pg) {
+      const contact = []; if (signer.phone) contact.push(esc(signer.phone)); if (signer.email) contact.push(esc(signer.email));
+      const office = about.office || {};
+      const inner = `<div class="bk-brand">${wordmark()}</div>
+        <div class="bk-mid"><p class="bk-line">Спасибо, что уделили время подборке.</p>
+        ${signer.name ? `<div class="bk-who">${esc(signer.name)}${signer.title ? ' · ' + esc(signer.title) : ''}</div>` : ''}
+        ${contact.length ? `<div class="bk-contact">${contact.join(' · ')}</div>` : ''}
+        ${(office.city || office.address) ? `<div class="bk-office">${[office.address, office.city].filter(Boolean).map(esc).join(', ')}</div>` : ''}</div>
+        <div class="bk-foot"><span class="bk-conf">Материал подготовлен персонально. Цены и условия — со слов застройщиков, могут меняться; не является публичной офертой. Просьба не распространять.</span></div>`;
+      if (pg.v === 'plate') return `<section class="page cover bk bk-plate"><div class="bk-in">${inner}</div></section>`;
+      return `<section class="page cover bk bk-band">${inner}</section>`;
     },
   };
 
@@ -999,12 +1219,126 @@ p{font-size:var(--s-body);line-height:1.6}
 .cl-mgr span{color:rgba(255,255,255,.68)}
 .cl-btn{display:inline-flex;align-items:center;background:var(--accent);color:#fff;padding:15px 28px;border-radius:100px;font-weight:700;font-size:14px;text-decoration:none;letter-spacing:.01em}
 @media(max-width:640px){.cl-in{max-width:none;padding:44px 30px}}
+/* ---- Ф4 · SVG cash-flow bar (векторная, чёткая в печати) ---- */
+.pt-svg{width:100%;height:11px;display:block;border-radius:100px;overflow:hidden;background:var(--tint);margin:18px 0 10px}
+.pt-svgseg.ph-now{fill:var(--accent)}
+.pt-svgseg.ph-build{fill:color-mix(in srgb,var(--accent) 42%,var(--tint))}
+.pt-svgseg.ph-handover{fill:color-mix(in srgb,var(--ink) 78%,var(--accent))}
+/* ---- Ф4 · PROJECT_OPENER (разделители-ритм) ---- */
+.opener{position:relative;min-height:1180px;display:flex;flex-direction:column;color:var(--ink);overflow:hidden;background:var(--paper)}
+.op-tag{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700}
+.op-tag.dark{color:var(--accent)}
+.op-no{font-family:var(--disp);font-size:26px;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.op-meta{margin-top:14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.op-full{color:#fff;background:var(--band) center/cover no-repeat;padding:var(--pad-y) var(--pad-x)}
+.op-full .op-top{display:flex;justify-content:space-between;align-items:center}
+.op-full .wm-tx{color:#fff}.op-full .op-tag{color:rgba(255,255,255,.82)}
+.op-full .op-mid{margin-top:auto}
+.op-full .op-mid,.op-full .op-bot,.op-full .op-top{text-shadow:0 2px 26px rgba(0,0,0,.42)}
+.op-full .op-no{color:#F1D9A6}
+.op-full .op-h{font-family:var(--disp);font-size:calc(var(--s-disp)*.98);line-height:1.02;font-weight:600;letter-spacing:-.02em;max-width:16ch;margin-top:8px}
+.op-full .op-meta{color:rgba(255,255,255,.86)}
+.op-full .op-bot{margin-top:26px}
+.op-lede{font-size:17px;color:rgba(255,255,255,.9);max-width:46ch;line-height:1.5}
+.op-split{display:grid;grid-template-columns:1fr 1fr;min-height:1180px}
+.op-split .op-l{padding:var(--pad-y) 44px var(--pad-y) var(--pad-x);display:flex;flex-direction:column;justify-content:center;background:var(--paper)}
+.op-split .op-no.big{font-size:64px;line-height:1;margin:14px 0 12px}
+.op-split .op-h{font-family:var(--disp);font-size:var(--s-h1);line-height:1.04;font-weight:600;letter-spacing:-.015em;max-width:14ch}
+.op-price{font-family:var(--disp);font-size:24px;font-weight:600;color:var(--accent);margin-top:22px}
+.op-split .op-r{position:relative}.op-split .op-img{position:absolute;inset:0}
+.op-type{padding:var(--pad-y) var(--pad-x);justify-content:space-between}
+.op-ty-top{display:flex;justify-content:space-between;align-items:center}
+.op-ty-mid{display:flex;gap:36px;align-items:flex-start;margin:auto 0}
+.op-no.huge{font-size:150px;line-height:.8;color:var(--accent);flex:0 0 auto}
+.op-h.xl{font-family:var(--disp);font-size:calc(var(--s-disp)*1.02);line-height:1;font-weight:600;letter-spacing:-.02em;max-width:16ch}
+.op-ty-tx .op-lede{color:var(--mut);margin-top:18px;max-width:48ch}
+.op-ty-bot{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;border-top:1px solid var(--line);padding-top:20px}
+.op-ty-bot .dot{width:4px;height:4px;border-radius:50%;background:var(--mut);opacity:.6}
+@media(max-width:640px){.opener,.op-split{min-height:auto}.op-split{grid-template-columns:1fr}.op-split .op-r{min-height:300px}.op-no.huge{font-size:92px}.op-ty-mid{gap:18px}.op-h.xl{font-size:calc(var(--s-disp)*.9)}}
+/* ---- Ф4 · NEXT_STEPS ---- */
+.ns-row{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin:10px 0 26px}
+.ns-step{border-top:2px solid var(--accent);padding-top:16px}
+.ns-no{font-family:var(--disp);font-size:15px;color:var(--accent);font-weight:600}
+.ns-k{display:block;font-family:var(--disp);font-size:19px;font-weight:600;letter-spacing:-.01em;margin:8px 0}
+.ns-v{font-size:13.5px;line-height:1.5;color:var(--mut)}
+.ns-stack{margin:10px 0 26px;border-top:1px solid var(--line)}
+.ns-sr{display:flex;gap:20px;padding:20px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.ns-sr .ns-no{flex:0 0 auto;font-size:16px}.ns-sr .ns-k{margin:0 0 5px;font-size:20px}
+.ns-cta{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;background:var(--tint);border-radius:var(--radius);padding:22px 26px;margin-top:8px}
+.ns-who{display:flex;align-items:center;gap:14px}
+.ns-ava{width:50px;height:50px;border-radius:50%;background:var(--accent) center/cover no-repeat;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--disp);font-weight:600;font-size:17px}
+.ns-who b{display:block;font-size:15px}.ns-who span{display:block;font-size:12.5px;color:var(--mut)}
+.ns-btn{display:inline-flex;align-items:center;background:var(--accent);color:#fff;padding:14px 26px;border-radius:100px;font-weight:700;font-size:14px;text-decoration:none}
+@media(max-width:640px){.ns-row{grid-template-columns:1fr 1fr}}
+/* ---- Ф4 · AGENT_PROFILE ---- */
+.ag-ph{width:120px;height:120px;border-radius:50%;background:var(--tint) center/cover no-repeat;flex:0 0 auto}
+.ag-ph-txt{display:flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-family:var(--disp);font-weight:600;font-size:40px}
+.ag-h{font-family:var(--disp);font-size:var(--s-h2);font-weight:600;letter-spacing:-.01em;line-height:1.1}
+.ag-role{font-size:12px;letter-spacing:.05em;color:var(--accent);font-weight:700;margin-top:8px;text-transform:uppercase}
+.ag-note{font-size:16px;line-height:1.62;color:var(--ink);max-width:60ch;margin:22px 0}
+.ag-facts{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0 18px}
+.ag-f{padding:14px 28px 14px 0;border-right:1px solid var(--line)}.ag-f:last-child{border-right:0}
+.ag-fk{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);font-weight:700;display:block}
+.ag-fv{font-family:var(--disp);font-size:20px;font-weight:600;margin-top:6px;display:block}
+.ag-contact{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--mut);margin-top:8px;flex-wrap:wrap}
+.ag-contact .dot{width:4px;height:4px;border-radius:50%;background:var(--mut);opacity:.6;display:inline-block}
+.ag-min-head{display:flex;align-items:center;gap:24px;margin:8px 0 4px}
+.ag-min-head .ag-ph{width:92px;height:92px}.ag-min-head .ag-ph-txt{font-size:32px}
+.ag-edi-top{display:flex;gap:30px;align-items:center;margin:8px 0 4px}.ag-edi-id{flex:1}
+.ag-sp{display:grid;grid-template-columns:.72fr 1.28fr;gap:40px;align-items:start;margin-top:8px}
+.ag-sp-l{display:flex;flex-direction:column;gap:18px}
+.ag-sp-l .ag-ph{width:100%;height:auto;aspect-ratio:1;border-radius:var(--radius)}
+.ag-sp-l .ag-contact{flex-direction:column;align-items:flex-start;gap:6px}.ag-sp-l .ag-contact .dot{display:none}
+@media(max-width:640px){.ag-sp{grid-template-columns:1fr}.ag-min-head,.ag-edi-top{flex-direction:column;align-items:flex-start}}
+/* ---- Ф4 · AGENCY_PROOF ---- */
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:16px 0 22px}
+.pf-t{background:var(--paper);padding:26px 22px}
+.pf-n{font-family:var(--disp);font-size:44px;font-weight:600;color:var(--accent);letter-spacing:-.02em;line-height:1;display:block}
+.pf-l{font-size:12.5px;color:var(--mut);margin-top:10px;display:block;line-height:1.35}
+.pf-intro{font-family:var(--disp);font-size:27px;line-height:1.3;font-weight:500;letter-spacing:-.01em;max-width:28ch;margin:6px 0 28px}
+.pf-pillars{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-bottom:22px}
+.pf-pil{display:flex;gap:22px;padding:20px 0;border-bottom:1px solid var(--line)}
+.pf-pno{font-family:var(--disp);font-size:15px;color:var(--accent);font-weight:600;flex:0 0 auto;padding-top:2px}
+.pf-pil p{font-size:15px;line-height:1.58}
+.pf-markets{margin:18px 0}.pf-mk{display:flex;flex-wrap:wrap;gap:8px}
+.pf-mc{font-size:13px;border:1px solid var(--line);padding:8px 15px;border-radius:100px;background:var(--tint)}
+.pf-list{list-style:none;margin:12px 0 18px}
+.pf-list li{padding:11px 0 11px 22px;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.5;position:relative}
+.pf-list li:last-child{border-bottom:0}
+.pf-list li::before{content:"";position:absolute;left:0;top:19px;width:12px;height:1px;background:var(--accent)}
+.pf-office,.pf-free{font-size:13.5px;color:var(--mut);line-height:1.55;margin-top:14px}.pf-free{font-style:italic}
+/* ---- Ф4 · BACK_COVER ---- */
+.bk-band{background:var(--band);color:var(--on-band);padding:var(--pad-y) var(--pad-x);display:flex;flex-direction:column;min-height:1180px}
+.bk-plate{align-items:center;justify-content:center}
+.bk-in{background:var(--band);color:var(--on-band);border-radius:var(--radius);padding:64px 56px;max-width:80%;margin:auto;display:flex;flex-direction:column;min-height:64%}
+.bk .wm-tx{color:#fff}
+.bk-brand{margin-bottom:auto}
+.bk-mid{margin:auto 0}
+.bk-line{font-family:var(--disp);font-size:30px;font-weight:500;letter-spacing:-.01em;line-height:1.3;color:var(--on-band);max-width:20ch}
+.bk-who{font-size:15px;color:var(--on-band);margin-top:26px;font-weight:600}
+.bk-contact{font-size:14px;color:rgba(255,255,255,.72);margin-top:8px;letter-spacing:.02em}
+.bk-office{font-size:13px;color:rgba(255,255,255,.58);margin-top:6px}
+.bk-foot{margin-top:auto;padding-top:44px}
+.bk-conf{font-size:11px;color:rgba(255,255,255,.5);line-height:1.5;letter-spacing:.02em;max-width:60ch;display:block}
+@media(max-width:640px){.bk-band,.bk-plate{min-height:auto}.bk-in{max-width:none;padding:44px 30px}}
+/* ---- Ф4 · направления-акценты ---- */
+.style-cinematic .po-single .po-hero{height:660px}
+.style-cinematic .cv-h,.style-cinematic .op-full .op-h{letter-spacing:-.026em}
+.style-cinematic .op-full .op-h{font-size:calc(var(--s-disp)*1.08)}
+.style-darkluxury .kick,.style-darkluxury .op-tag.dark{letter-spacing:.24em}
+.style-darkluxury .cv-h,.style-darkluxury .po-h,.style-darkluxury .h2,.style-darkluxury .bk-line{font-weight:500}
 /* ---- print ---- */
 @media print{
   body{background:#fff}
   .doc{max-width:none;padding:0}
   .page{box-shadow:none;margin:0;min-height:auto;page-break-after:always;break-after:page}
   .page:last-child{page-break-after:auto}
+  /* полностраничные (full-bleed) роли заполняют A4 целиком; текстовые — по контенту */
+  .cover,.opener,.op-split,.bk-band,.bk-plate{min-height:0;height:100vh}
+  .bk-plate{display:flex}
+  /* атомарные блоки не рвём между границами A4 */
+  .mrail,.pt-track,.pt-svg,.pay,.pay-one,.fplan,.fp-cell,.cmpc,.units tr,.th,.cc-item,.cc-lr,.dt-r,.pf-t,.pf-pil,.ns-step,.ns-sr,.ns-cta,.ag-facts,.ag-min-head,.rc-sign,.rec-inline,.why li{break-inside:avoid;page-break-inside:avoid}
+  .h2,.po-h,.cv-h,.op-h,.ag-h,.pf-intro{break-after:avoid;page-break-after:avoid}
   @page{size:A4;margin:0}
 }
 .recompose-bar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:8px;background:rgba(12,14,22,.9);backdrop-filter:blur(14px);padding:8px 10px 8px 16px;border-radius:100px;box-shadow:0 18px 50px -18px rgba(0,0,0,.6);z-index:50;align-items:center}

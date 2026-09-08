@@ -5518,6 +5518,8 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
         const html = design.renderDesignDoc(db, c, {
           print: u.searchParams.get('print') === '1',
           seed: seedQ != null && /^\d+$/.test(seedQ) ? +seedQ : undefined,
+          style: u.searchParams.get('style') || undefined,   /* превью направления (?style=darkluxury/cinematic) */
+          brand: u.searchParams.get('brand') || undefined,
           canEdit: hasKey, key: hasKey ? db.settings.hooks.secret : '',
         });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
