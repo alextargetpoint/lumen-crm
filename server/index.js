@@ -4764,7 +4764,15 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
       const isPrint = u.searchParams.get('print') === '1';
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
-      const hf = FONT_LIB[c.font] || FONT_LIB.fraunces;
+      /* ⭐ КИРИЛЛИЦА как first-class: у Fraunces/Cormorant/Instrument/EB/Space Grotesk/Unbounded/Bebas НЕТ кириллицы →
+         RU-заголовки падали в Times («bulky»). Детектим кириллицу в тексте колоды и подменяем на шрифт с кириллицей того же характера. */
+      const FONT_CYR = new Set(['playfair', 'ptserif', 'manrope', 'inter', 'montser', 'oswald', 'russo', 'tektur', 'rusdisplay', 'comfortaa', 'caveat', 'badscript', 'neucha', 'pangolin', 'adventpro', 'robotocond']);
+      const allTxt = (c.slides || []).map(s => `${s.heading || ''} ${s.sub || ''} ${s.eyebrow || ''} ${(s.points || []).join(' ')}`).join(' ');
+      const isCyr = /[Ѐ-ӿ]/.test(allTxt);
+      let hf = FONT_LIB[c.font] || FONT_LIB.fraunces;
+      if (isCyr && !FONT_CYR.has(c.font)) { const cat = (hf.cat === 'sans') ? 'manrope' : 'playfair'; hf = FONT_LIB[cat]; }   /* editorial serif с кириллицей = Playfair */
+      /* стек с кириллическим сериф-фолбэком, чтобы латинский дисплей-шрифт не ронял кириллицу в Times */
+      const dispStack = hf.cat === 'sans' ? hf.fam.replace(/,sans-serif$/, ",'Manrope',sans-serif") : hf.fam.replace(/,(serif|cursive)$/, ",'PT Serif',serif");
       const AG = db.settings.agency.name;
       const logo = db.settings.agency.logo;
       const footer = c.footer || {};
@@ -4818,9 +4826,9 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.title)} — ${esc(AG)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&${hf.gf}&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&${hf.gf}${isCyr ? '&family=PT+Serif:wght@400;700' : ''}&display=swap" rel="stylesheet">
 <style>
-:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${hf.fam}}
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${dispStack}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
 .wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
@@ -4835,7 +4843,7 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 /* ═══ СЕМЕЙСТВА РАСКЛАДКИ (арт-дирекшн) ═══ */
 /* data-hero: одно крупное число доминирует */
 .s-hero{display:flex;flex-direction:column;gap:0;margin:0 0 6px}
-.s-hero b{font-family:var(--disp);font-weight:700;line-height:.82;letter-spacing:-.05em;font-size:clamp(84px,26vw,190px)}
+.s-hero b{font-family:var(--disp);font-weight:600;line-height:.84;letter-spacing:-.045em;font-size:clamp(72px,22vw,168px)}
 .s-hero i{font-style:normal;font-size:clamp(12px,3.2vw,17px);letter-spacing:.16em;text-transform:uppercase;opacity:.75;font-weight:700;margin-top:6px}
 .slide.lay-data{justify-content:center}
 .slide.lay-data .s-h{font-size:clamp(20px,5vw,30px);opacity:.9;letter-spacing:-.01em}
@@ -4844,12 +4852,12 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 /* immersive: тёмное фото + центр, максимум эмоции, минимум текста */
 .slide.lay-immersive::after{content:'';position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 45%,rgba(6,10,20,.35),rgba(6,10,20,.72));z-index:0}
 .slide.lay-immersive .s-in{max-width:82%;margin:auto;text-align:center}
-.slide.lay-immersive .s-h{font-size:clamp(40px,9.4vw,78px);line-height:1.0;letter-spacing:-.03em;text-wrap:balance}
+.slide.lay-immersive .s-h{font-size:clamp(34px,8vw,62px);line-height:1.04;letter-spacing:-.02em;font-weight:500;text-wrap:balance}
 .slide.lay-immersive .s-points{display:none}
 .slide.lay-immersive .s-eye{margin-left:auto;margin-right:auto}
 /* typo: типографика-first, без фото — заголовок во весь слайд */
-.slide.lay-typo .s-h{font-size:clamp(52px,14.5vw,146px);line-height:.9;letter-spacing:-.045em;font-weight:600}
-.slide.lay-typo .s-s{font-size:clamp(14px,3.4vw,18px);max-width:70%;margin-top:18px}
+.slide.lay-typo .s-h{font-size:clamp(44px,11vw,104px);line-height:.96;letter-spacing:-.03em;font-weight:500}
+.slide.lay-typo .s-s{font-size:clamp(14px,3.4vw,18px);max-width:66%;margin-top:20px}
 .slide.lay-typo .s-points{display:none}   /* типографика-first: только заголовок+микрокопия */
 /* split: фото сверху + сплошная плашка с контентом снизу */
 .slide.lay-split.hasbg{color:var(--ink)}
@@ -5028,15 +5036,15 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .s-bar{background:rgba(255,255,255,.22)}.slide.hasbg .s-bar.hi{background:#fff}
 .s-barcol i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
-.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.02;letter-spacing:-.025em;overflow-wrap:break-word;text-wrap:balance}
-.slide.sz-s .s-h{font-size:clamp(24px,5.6vw,38px)}
-.slide.sz-m .s-h{font-size:clamp(31px,7.6vw,54px)}
-.slide.sz-l .s-h{font-size:clamp(40px,10vw,76px);line-height:.98;letter-spacing:-.035em}
-.slide.hasbg .s-h{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 26px rgba(0,0,0,.4)}
+.s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:500;line-height:1.08;letter-spacing:-.015em;overflow-wrap:break-word;text-wrap:balance}
+.slide.sz-s .s-h{font-size:clamp(22px,5vw,32px)}
+.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,44px)}
+.slide.sz-l .s-h{font-size:clamp(32px,7.6vw,58px);line-height:1.02;letter-spacing:-.02em}
+.slide.hasbg .s-h{color:#fff;text-shadow:0 1px 14px rgba(0,0,0,.32)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
 .s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
 .slide.al-center .s-s{max-width:100%}
-.slide.hasbg .s-s{color:rgba(255,255,255,.94);text-shadow:0 1px 10px rgba(0,0,0,.5)}
+.slide.hasbg .s-s{color:rgba(255,255,255,.92);text-shadow:0 1px 10px rgba(0,0,0,.35)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
 .slide.al-center .s-brand{left:50%;transform:translateX(-50%)}
 .s-brand img{height:26px;max-width:130px;object-fit:contain}
