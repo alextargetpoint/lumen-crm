@@ -31,6 +31,8 @@ const llm = require('./llm');
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
+const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
+const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
 const playbook = require('./playbook');
 const billing = require('./billing');
 const { MARKET } = require('./marketdata');
@@ -748,22 +750,55 @@ const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
 /* ── Слои слайда: фигуры, стикеры, рамки, фото, текст (drag/resize/z-order) ── */
 const CAR_SHAPES = new Set(['rect', 'circle', 'ring', 'line', 'triangle', 'blob', 'arrow', 'badge', 'diamond']);
 const CAR_FRAMES = new Set(['thin', 'double', 'corners', 'inset', 'film', 'tape']);
-const CAR_LTYPES = new Set(['img', 'shape', 'sticker', 'frame', 'text']);
+/* Сцен-граф (AI Design Engine): к старым типам добавлены нативные редакторские слои —
+   grad (градиент-скрим), line (тонкая линейка/разделитель), icon (тонкая линия-иконка), btn (CTA-пилюля). */
+const CAR_LTYPES = new Set(['img', 'shape', 'sticker', 'frame', 'text', 'grad', 'line', 'icon', 'btn']);
+const CAR_GDIRS = new Set(['ttb', 'btt', 'ltr', 'rtl', 'diag', 'radial']);
+const CAR_IMGFIT = new Set(['cover', 'contain']);
+const CAR_IMGFILT = new Set(['none', 'grayscale', 'warm', 'dark', 'contrast']);
 const hex = (v, d) => /^#[0-9a-fA-F]{3,8}$/.test(String(v)) ? v : d;
 const sanLayer = (l) => {
   if (!l || !CAR_LTYPES.has(l.t)) return null;
   const num = (v, d, lo, hi) => { const n = +v; return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); };
-  const o = { t: l.t, x: num(l.x, 12, -30, 130), y: num(l.y, 12, -30, 130), w: num(l.w, 26, 3, 130), z: num(l.z, 1, 0, 99) | 0, rot: num(l.rot, 0, -180, 180) };
-  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); if (l.avatar) o.avatar = 1; if (l.sticker || /\/stickers\//.test(o.url)) o.sticker = 1; }
-  else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); }
+  const o = { t: l.t, x: num(l.x, 12, -40, 140), y: num(l.y, 12, -40, 140), w: num(l.w, 26, 1, 160), z: num(l.z, 1, 0, 99) | 0, rot: num(l.rot, 0, -180, 180) };
+  if (l.h != null) o.h = num(l.h, 0, 0, 160);                 /* высота в % высоты слайда (0 = авто) */
+  if (l.op != null) o.op = num(l.op, 100, 0, 100);            /* непрозрачность 0-100 */
+  if (l.t === 'img') {
+    if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null;
+    o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 160);
+    if (l.avatar) o.avatar = 1; if (l.sticker || /\/stickers\//.test(o.url)) o.sticker = 1;
+    if (l.fit && CAR_IMGFIT.has(l.fit)) o.fit = l.fit;
+    if (l.ox != null) o.ox = num(l.ox, 50, 0, 100); if (l.oy != null) o.oy = num(l.oy, 50, 0, 100);   /* object-position % (кроп-фокус) */
+    if (l.filter && CAR_IMGFILT.has(l.filter)) o.filter = l.filter;
+    if (l.shadow) o.shadow = 1;
+  }
+  else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); if (l.sw != null) o.sw = num(l.sw, 4, 1, 20); if (l.shadow) o.shadow = 1; }
   else if (l.t === 'sticker') { if (!CAR_STICKERS[l.key]) return null; o.key = l.key; o.color = hex(l.color, '#FFFFFF'); }
   else if (l.t === 'frame') { o.frame = CAR_FRAMES.has(l.frame) ? l.frame : 'thin'; o.color = hex(l.color, '#FFFFFF'); }
-  else if (l.t === 'text') { o.text = String(l.text || '').replace(/<[^>]*>/g, '').slice(0, 140); o.color = hex(l.color, '#FFFFFF'); o.tsize = num(l.tsize, 20, 8, 90); o.tw = l.tw === 'serif' ? 'serif' : 'sans'; o.tb = !!l.tb; }
+  else if (l.t === 'grad') { o.gd = CAR_GDIRS.has(l.gd) ? l.gd : 'ttb'; o.from = hex(l.from, '#00000000'); o.to = hex(l.to, '#000000cc'); if (o.h == null) o.h = num(l.h, 100, 0, 160); }
+  else if (l.t === 'line') { o.color = hex(l.color, '#FFFFFF'); o.th = num(l.th, 2, 1, 16); if (l.vert) o.vert = 1; }
+  else if (l.t === 'icon') { const key = String(l.key || ''); if (!(typeof AMEN_ICONS !== 'undefined' && AMEN_ICONS[key])) return null; o.key = key; o.color = hex(l.color, '#FFFFFF'); o.sw = num(l.sw, 1.6, 0.6, 4); }
+  else if (l.t === 'btn') { o.text = String(l.text || '').replace(/<[^>]*>/g, '').slice(0, 60); o.color = hex(l.color, '#FFFFFF'); o.tcolor = hex(l.tcolor, ''); o.style = l.style === 'solid' ? 'solid' : 'outline'; o.arrow = l.arrow !== false; o.fs = num(l.fs, 2.1, 1, 8); o.up = l.up !== false; o.ls = num(l.ls, 0.12, -0.05, 0.5); }
+  else if (l.t === 'text') {
+    o.text = String(l.text || '').replace(/<(?!\/?(?:b|i|em|strong|br)\b)[^>]*>/gi, '').slice(0, 220);
+    o.color = hex(l.color, '#FFFFFF');
+    o.tsize = num(l.tsize, 20, 8, 90);                        /* legacy px-размер (старые слои) */
+    o.tw = l.tw === 'serif' ? 'serif' : 'sans'; o.tb = !!l.tb;
+    /* редакторская типографика сцен-графа */
+    if (l.ff) { const ff = String(l.ff); if (ff === 'disp' || ff === 'sans' || (typeof FONT_LIB !== 'undefined' && FONT_LIB[ff])) o.ff = ff; }
+    if (l.fs != null) o.fs = num(l.fs, 0, 0.8, 40);           /* размер в cqw (% ширины слайда) — масштабируется на любом рендере */
+    if (l.lh != null) o.lh = num(l.lh, 1.05, 0.78, 2.4);
+    if (l.ls != null) o.ls = num(l.ls, 0, -0.1, 0.6);         /* letter-spacing, em */
+    if (l.wt != null) o.wt = Math.round(num(l.wt, 500, 100, 900) / 100) * 100;
+    o.al = l.al === 'center' ? 'center' : l.al === 'right' ? 'right' : 'left';
+    if (l.up) o.up = 1;
+    if (l.mw != null) o.mw = num(l.mw, 0, 0, 160);            /* max-width % (перенос строк) */
+  }
   return o;
 };
 /* SVG фигуры (масштабируются по контейнеру) */
-function carShapeSVG(shape, color, fill) {
-  const f = fill ? color : 'none', st = fill ? 'none' : color, sw = fill ? 0 : 4;
+function carShapeSVG(shape, color, fill, strokeW) {
+  const f = fill ? color : 'none', st = fill ? 'none' : color, sw = fill ? 0 : (strokeW || 4);
   const S = (vb, inner) => `<svg viewBox="${vb}" preserveAspectRatio="none" style="width:100%;height:100%;display:block">${inner}</svg>`;
   switch (shape) {
     case 'circle': return S('0 0 100 100', `<circle cx="50" cy="50" r="49" fill="${f}" stroke="${st}" stroke-width="${sw}"/>`);
@@ -784,19 +819,41 @@ function renderCarLayers(layers, isEdit) {
   const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
   const handles = isEdit ? '<span class="lyr-h lyr-rs" data-lrs title="Размер"></span><span class="lyr-tools"><button data-lup title="Вперёд">↑</button><button data-ldn title="Назад">↓</button><button data-ldel title="Удалить">✕</button></span>' : '';
   const lj = (l) => isEdit ? ` data-l='${JSON.stringify(l).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : '';
+  const IMG_FILT = { grayscale: 'grayscale(1)', warm: 'sepia(.22) saturate(1.12) brightness(1.02)', dark: 'brightness(.72)', contrast: 'contrast(1.08) saturate(1.06)' };
+  const GRAD_CSS = (gd, from, to) => ({
+    ttb: `linear-gradient(180deg,${from},${to})`, btt: `linear-gradient(0deg,${from},${to})`,
+    ltr: `linear-gradient(90deg,${from},${to})`, rtl: `linear-gradient(270deg,${from},${to})`,
+    diag: `linear-gradient(135deg,${from},${to})`, radial: `radial-gradient(120% 100% at 50% 45%,${from},${to})`,
+  }[gd] || `linear-gradient(180deg,${from},${to})`);
+  const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:1.05em;height:1.05em;flex:none"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   return layers.map((l, i) => {
     const z = 10 + (l.z || 0);
     const de = isEdit ? ` data-lyr="${i}"${lj(l)}` : '';
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
-    const geo = `left:${l.x}%;top:${l.y}%;width:${l.w}%;z-index:${z};transform:rotate(${l.rot || 0}deg)`;
+    const hasH = l.h != null && l.h > 0;
+    const opv = (l.op != null && l.op < 100) ? `;opacity:${(l.op / 100).toFixed(3)}` : '';
+    const autoW = (l.t === 'btn');                                     /* пилюля — по контенту, не по ширине-боксу */
+    const geo = `left:${l.x}%;top:${l.y}%;${autoW ? '' : `width:${l.w}%;`}${hasH ? `height:${l.h}%;` : ''}z-index:${z};transform:rotate(${l.rot || 0}deg)${opv}`;
     let inner = '';
     const isStk = l.t === 'img' && (l.sticker || /\/stickers\//.test(String(l.url || '')));   /* стикер = прозрачный PNG, без рамочной тени */
-    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '');
+    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '') + (l.t === 'icon' && !hasH ? ' lyr-sq' : '');
     if (l.t === 'img' && l.avatar) inner = `<div style="width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 8px 26px -8px rgba(6,17,38,.55)"><img src="${esc(abs(l.url))}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
-    else if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:${isStk ? 'contain' : 'cover'};border-radius:${isStk ? 0 : (l.round || 0)}px;display:block">`;
-    else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : 'aspect-ratio:1;'}">${carShapeSVG(l.shape, l.color, l.fill)}</div>`;
+    else if (l.t === 'img') { const filt = l.filter && IMG_FILT[l.filter] ? `filter:${IMG_FILT[l.filter]};` : ''; const sh = l.shadow ? '' : (isStk ? '' : ''); inner = `<img src="${esc(abs(l.url))}" style="width:100%;height:${hasH ? '100%' : 'auto'};object-fit:${isStk ? 'contain' : (l.fit || 'cover')};object-position:${l.ox != null ? l.ox : 50}% ${l.oy != null ? l.oy : 50}%;border-radius:${isStk ? 0 : (l.round || 0)}px;display:block;${filt}">`; }
+    else if (l.t === 'grad') inner = `<div style="width:100%;height:${hasH ? '100%' : '40%'};background:${GRAD_CSS(l.gd, esc(l.from), esc(l.to))}"></div>`;
+    else if (l.t === 'line') inner = l.vert ? `<div style="width:${l.th}px;height:100%;background:${esc(l.color)}"></div>` : `<div style="width:100%;height:${l.th}px;background:${esc(l.color)}"></div>`;
+    else if (l.t === 'icon') inner = `<span class="lyr-ic" style="color:${esc(l.color)};display:block;width:100%;height:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${l.sw || 1.6}" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%;display:block">${AMEN_ICONS[l.key] || ''}</svg></span>`;
+    else if (l.t === 'btn') { const solid = l.style === 'solid'; const tcol = l.tcolor || (solid ? '#0d0f13' : l.color); inner = `<span class="lyr-btn" style="border:1.4px solid ${esc(l.color)};${solid ? `background:${esc(l.color)};` : ''}color:${esc(tcol)};font-size:${l.fs || 2.1}cqw;letter-spacing:${l.ls != null ? l.ls : 0.12}em;${l.up ? 'text-transform:uppercase;' : ''}">${esc(l.text)}${l.arrow ? ARROW : ''}</span>`; }
+    else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : hasH ? 'height:100%;' : 'aspect-ratio:1;'}${l.shadow ? '' : 'filter:none;'}">${carShapeSVG(l.shape, l.color, l.fill, l.sw)}</div>`;
     else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
-    else if (l.t === 'text') inner = `<span class="lyr-tx" style="color:${esc(l.color)};font-size:${l.tsize}px;font-family:${l.tw === 'serif' ? 'var(--disp)' : "'Manrope',sans-serif"};font-weight:${l.tb ? 800 : 600};line-height:1.1;display:block">${esc(l.text)}</span>`;
+    else if (l.t === 'text') {
+      const isSans = l.ff ? (l.ff === 'sans') : (l.tw !== 'serif');
+      const fam = isSans ? "'Manrope',sans-serif" : 'var(--disp)';
+      const wt = l.wt || (l.tb ? 800 : (isSans ? 600 : 500));
+      const fsz = l.fs ? `${l.fs}cqw` : `${l.tsize}px`;
+      const ls = l.ls != null ? `${l.ls}em` : (isSans && l.up ? '.1em' : 'normal');
+      const styleTx = `color:${esc(l.color)};font-size:${fsz};font-family:${fam};font-weight:${wt};line-height:${l.lh || 1.1};letter-spacing:${ls};text-align:${l.al || 'left'};${l.up ? 'text-transform:uppercase;' : ''}display:block;text-wrap:balance`;
+      inner = `<span class="lyr-tx" style="${styleTx}">${esc(l.text)}</span>`;
+    }
     return `<div class="${clsL}" style="${geo}"${de}>${inner}${handles}</div>`;
   }).join('');
 }
@@ -824,7 +881,12 @@ const sanSlide = (s) => ({
   /* арт-дирекшн: семейство раскладки слайда (композиция), назначается artDirect с учётом ритма колоды */
   layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel', 'mosaic'].includes(s.layout) ? s.layout : '',
   hero: s.hero && (s.hero.v || s.hero.k) ? { v: String(s.hero.v || '').slice(0, 16), k: String(s.hero.k || '').slice(0, 40) } : null,   /* крупное число для data-hero слайда */
-  layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
+  /* ⭐ Сцен-граф (AI Design Engine, режим «Студия»): sg=1 → слайд рендерит ТОЛЬКО фон + слои (без шаблонного блока
+     заголовок/подпись). Вся композиция задана нативными редактируемыми слоями (text/img/grad/line/icon/btn/shape). */
+  sg: s.sg ? 1 : 0,
+  grammar: typeof s.grammar === 'string' ? s.grammar.slice(0, 32) : '',   /* семейство композиции (для «пересобрать» и критика) */
+  role: typeof s.role === 'string' ? s.role.slice(0, 24) : '',            /* смысловая роль слайда (hook/architecture/location/investment/cta…) */
+  layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 40) : [],
 });
 /* подбор иконки удобства по ключевым словам фишки (RU/EN) */
 function amenIconFor(text) {
@@ -1330,6 +1392,14 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
 
 /* библиотека иконок удобств/гарантий в стиле дашборда (тонкая линия) — вместо эмодзи в блоках */
 const AMEN_ICONS = {
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  arrowdiag: '<path d="M7 17L17 7M9 7h8v8"/>',
+  pin: '<path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/>',
+  plane: '<path d="M10.5 13.5L3 12l1-2 7.5.5L16 5c.7-.7 2-1 2.6-.4.6.6.3 1.9-.4 2.6l-5.5 4.5.5 7.5-2 1-1.5-7.5z"/>',
+  window: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>',
+  leaf: '<path d="M4 20c8 1 15-4 15-15C10 5 4 10 4 20zM4 20c4-6 8-8 12-9"/>',
+  terrace: '<path d="M3 21h18M5 21v-8h14v8M5 13l7-6 7 6M9 21v-4h6v4"/>',
+  ruler: '<path d="M3 8l5-5 13 13-5 5zM7 7l2 2M10 4l2 2M13 7l2 2M16 10l2 2"/>',
   pool: '<path d="M3 18c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M7 14V6a2 2 0 014 0M7 10h4"/>',
   gym: '<path d="M4 9v6M20 9v6M4 12h16M6 7v10M18 7v10"/>',
   beach: '<path d="M4 20h16M12 20V9M12 9c-3 0-6 2-7 5 4-1 7-2 7-5 0 3 3 4 7 5-1-3-4-5-7-5zM12 4v2"/>',
@@ -2067,7 +2137,9 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }
 
-    if (p.startsWith('/api/') && !getSession(req)) return json(res, 401, { error: 'auth required' });
+    /* Студия (AI Design Engine) — админ-инструмент, допускаем редакторский ключ (роуты повторно проверяют ключ внутри) */
+    const studioKeyOk = p.startsWith('/api/studio/') && u.searchParams.get('key') === db.settings.hooks.secret;
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -2924,6 +2996,89 @@ const server = http.createServer(async (req, res) => {
       const thin = b.template === 'launch' && factPart.length < 30;
       return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, thin });
     }
+    /* ════════════ AI DESIGN ENGINE («Студия») ════════════
+       Креативный директор (ArtDirectionPlan + сжатый копирайт) → грамматики → сцен-граф-слайды. */
+    if (p === '/api/studio/generate' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY (нужен креативный директор)' });
+      const b = await readBody(req);
+      const host = req.headers.host;
+      /* пул фото проекта с ролями */
+      let photos = [];
+      const imgs = (Array.isArray(b.images) ? b.images : []).filter(x => /^(https?:\/\/|\/assets\/)/.test(String(x))).slice(0, 16);
+      if (imgs.length) {
+        const absP = imgs.map(u2 => u2[0] === '/' ? `http://${host}${u2}` : u2);
+        let roles = imgs.map(() => 'other');
+        try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — роли other */ }
+        photos = imgs.map((url, k) => ({ url, role: roles[k] || 'other' }));
+      }
+      const project = { name: String(b.name || b.title || 'Проект').slice(0, 120), geo: String(b.geo || '').slice(0, 120), brief: String(b.brief || b.topic || '').slice(0, 1600), wordmark: b.wordmark && typeof b.wordmark === 'object' ? { name: String(b.wordmark.name || '').slice(0, 40), tag: String(b.wordmark.tag || '').slice(0, 40) } : null, photoRoles: [...new Set(photos.map(p2 => p2.role))] };
+      let plan, deck;
+      try { plan = await studio.artDirectionPlan(project, { count: b.count }); }
+      catch (e) { return json(res, 500, { error: 'director: ' + e.message }); }
+      try { deck = studio.composeDeck(project, plan, photos); }
+      catch (e) { return json(res, 500, { error: 'compose: ' + e.message }); }
+      const c = {
+        id: crypto.randomBytes(5).toString('hex'), title: deck.title, template: 'studio',
+        format: 'portrait', theme: deck.theme, font: deck.font, footer: { on: false, text: '' },
+        slides: deck.slides.map(s => sanSlide(s)),
+        studio: { mode: 'smart', concept: String(plan.concept || '').slice(0, 200), tokens: deck.tokens, project },
+        createdAt: Date.now(),
+      };
+      db.carousels.unshift(c); store.save();
+      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, concept: plan.concept, slides: c.slides.length, grammars: c.slides.map(s => s.grammar) });
+    }
+    /* Визуальный критик: скриншот рендера + референс-эталон → правки сцен-графа (авто-коррекция). */
+    if (p === '/api/studio/critique' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY' });
+      const b = await readBody(req);
+      const c = db.carousels.find(x => x.id === b.cid);
+      if (!c) return json(res, 404, { error: 'нет карусели' });
+      const idx = Math.max(0, Math.min((c.slides || []).length - 1, +b.idx || 0));
+      const slide = c.slides[idx];
+      if (!slide || !slide.sg) return json(res, 400, { error: 'слайд не сцен-граф' });
+      const renderB64 = String(b.renderB64 || '').replace(/^data:image\/\w+;base64,/, '');
+      if (renderB64.length < 100) return json(res, 400, { error: 'нет renderB64 (скриншот рендера)' });
+      let refB64 = String(b.refB64 || '').replace(/^data:image\/\w+;base64,/, '');
+      if (!refB64) { try { refB64 = fs.readFileSync(path.join(PUBLIC, 'assets', 'ref', 'layan-benchmark.png')).toString('base64'); } catch (e) { return json(res, 400, { error: 'нет референса' }); } }
+      let out;
+      try { out = await studio.critique(renderB64, refB64, slide); }
+      catch (e) { return json(res, 500, { error: 'critic: ' + e.message }); }
+      const applied = studio.applyOps(slide, out.ops);
+      c.slides[idx] = sanSlide(slide);
+      store.save();
+      return json(res, 200, { scores: out.scores, verdict: out.verdict, notes: out.notes, opsApplied: applied, ops: out.ops });
+    }
+    /* MODE 2 (Studio AI, флагман): визуальный таргет (gpt-image-1) → интерпретатор → сцен-граф-слайд. */
+    if (p === '/api/studio/studio-slide' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVisual()) return json(res, 400, { error: 'нет OPENAI_API_KEY (визуальный таргет)' });
+      const b = await readBody(req);
+      const brief = b.brief && typeof b.brief === 'object' ? b.brief : { role: 'hook', headline: String(b.headline || '').slice(0, 120), sub: String(b.sub || '').slice(0, 200), eyebrow: String(b.eyebrow || '').slice(0, 40), photo: b.photo || 'coastal modern residence' };
+      let tgtBuf;
+      try { tgtBuf = await studio.visualTarget(brief, { quality: b.quality || 'high' }); }
+      catch (e) { return json(res, 500, { error: 'target: ' + e.message }); }
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+      const tname = `lib/tgt-${crypto.randomBytes(5).toString('hex')}.png`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', tname), tgtBuf);
+      const targetUrl = '/assets/' + tname;
+      let sg;
+      try { sg = await studio.interpret(tgtBuf.toString('base64'), { eyebrow: brief.eyebrow, headline: brief.headline, sub: brief.sub, cta: brief.cta }, ['disp', 'sans'], { w: 1080, h: 1350 }); }
+      catch (e) { return json(res, 500, { error: 'interpret: ' + e.message, targetUrl }); }
+      /* подстановка реального фото проекта в img-слои (asset matching); иначе — сам таргет как фон */
+      const matchUrl = (Array.isArray(b.images) && b.images[0]) || targetUrl;
+      const layers = (Array.isArray(sg && sg.layers) ? sg.layers : []).map(l => {
+        if (l.t === 'img') return Object.assign({}, l, { url: /^(https?:\/\/|\/?assets\/)/.test(String(l.url || '')) ? l.url : matchUrl });
+        return l;
+      });
+      const slide = sanSlide({ sg: 1, grammar: 'STUDIO_' + (brief.role || 'hook'), role: brief.role || 'hook', bgc: sg && sg.bg && sg.bg.type === 'color' ? sg.bg.color : '', heading: brief.headline || '', sub: brief.sub || '', eyebrow: brief.eyebrow || '', layers });
+      let c = b.cid ? db.carousels.find(x => x.id === b.cid) : null;
+      let created = false;
+      if (!c) { c = { id: crypto.randomBytes(5).toString('hex'), title: 'Studio AI', template: 'studio', format: 'portrait', theme: 'champagne', font: 'playfair', footer: { on: false, text: '' }, slides: [], studio: { mode: 'studio' }, createdAt: Date.now() }; db.carousels.unshift(c); created = true; }
+      c.slides.push(slide); store.save();
+      return json(res, 200, { cid: c.id, idx: c.slides.length - 1, targetUrl, editKey: db.settings.hooks.secret, created, layers: layers.length });
+    }
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
       const c = db.carousels.find(x => x.id === m[1]);
@@ -3730,6 +3885,14 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.folderId !== undefined) c.folderId = b.folderId || null;
       if (b.title) c.title = String(b.title).slice(0, 200);
+      /* Ф1: оси дизайна документа (Style/Art-Dir/Density/Image-Dom/Data-Depth/Brand) + seed арт-директора */
+      if (b.design && typeof b.design === 'object') {
+        const AX = design.AXES; const d = c.design || {};
+        for (const k of Object.keys(AX)) { if (b.design[k] != null && AX[k].opts.some(o => o[0] === b.design[k])) d[k] = b.design[k]; }
+        if (b.design.auto != null) d.auto = !!b.design.auto;
+        if (b.design.seed != null) d.seed = (+b.design.seed) >>> 0;
+        c.design = d;
+      }
       /* быстрое добавление объектов в существующую подборку */
       if (Array.isArray(b.addPropertyIds) && b.addPropertyIds.length) {
         const add = b.addPropertyIds.filter(id => db.properties.some(p2 => p2.id === id));
@@ -3761,8 +3924,19 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/collections' && req.method === 'POST') {
       const b = await readBody(req);
       const c = { id: crypto.randomBytes(5).toString('hex'), leadId: b.leadId || null, title: b.title || 'Подборка', intro: String(b.intro || '').slice(0, 1500), propertyIds: (b.propertyIds || []).slice(0, 30), createdAt: Date.now(), views: 0 };
+      /* Ф1: оси дизайна документа (по умолчанию всё auto) */
+      { const AX = design.AXES; const d = {}; if (b.design && typeof b.design === 'object') { for (const k of Object.keys(AX)) { if (b.design[k] != null && AX[k].opts.some(o => o[0] === b.design[k])) d[k] = b.design[k]; } } c.design = d; }
       db.collections.unshift(c); store.save();
       return json(res, 200, c);
+    }
+    /* Ф1: «Другой вариант / Перекомпоновать» — новый seed → арт-директор строит другой макет */
+    if ((m = p.match(/^\/api\/collections\/([^/]+)\/recompose$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      c.design = Object.assign({}, c.design, { seed: (crypto.randomBytes(4).readUInt32BE(0)) >>> 0 });
+      store.save();
+      return json(res, 200, { ok: true, seed: c.design.seed });
     }
     if ((m = p.match(/^\/api\/collections\/([^/]+)\/send$/)) && req.method === 'POST') {
       const c = db.collections.find(x => x.id === m[1]);
@@ -4763,7 +4937,13 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       if (!c) { res.writeHead(404); res.end('not found'); return; }
       const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
       const isPrint = u.searchParams.get('print') === '1';
+      /* raw=1 → чистая поверхность захвата фиксированного размера (1080×1350) для визуального QA-цикла;
+         only=N → рендерить единственный слайд (для покадрового скриншота критиком). */
+      const isRaw = u.searchParams.get('raw') === '1';
+      const onlyIdx = u.searchParams.get('only') != null ? Math.max(0, parseInt(u.searchParams.get('only'), 10) || 0) : -1;
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
+      /* панель-инструментов слайда в редакторе (общая для sg- и обычных слайдов) */
+      const SG_SBAR = `<div class="s-bar"><button data-sact="edit" title="Редактировать">✎</button><button data-sact="dup" title="Дублировать">⧉</button><button data-sact="up" title="Выше">↑</button><button data-sact="down" title="Ниже">↓</button><button data-sact="del" title="Удалить">✕</button></div><button class="s-ins" data-sact="insert" title="Добавить слайд после">＋ Слайд</button>`;
       /* ⭐ КИРИЛЛИЦА как first-class: у Fraunces/Cormorant/Instrument/EB/Space Grotesk/Unbounded/Bebas НЕТ кириллицы →
          RU-заголовки падали в Times («bulky»). Детектим кириллицу в тексте колоды и подменяем на шрифт с кириллицей того же характера. */
       const FONT_CYR = new Set(['playfair', 'ptserif', 'manrope', 'inter', 'montser', 'oswald', 'russo', 'tektur', 'rusdisplay', 'comfortaa', 'caveat', 'badscript', 'neucha', 'pangolin', 'adventpro', 'robotocond']);
@@ -4788,11 +4968,18 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const dims = c.format === 'story' ? { ar: '9/16', w: 420 } : c.format === 'portrait' ? { ar: '4/5', w: 460 } : { ar: '1/1', w: 560 };
       const isDarkHex = (h) => { const x = String(h || '').replace('#', ''); const s2 = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
       const slides = (c.slides || []).map((s, i) => {
+        if (onlyIdx >= 0 && i !== onlyIdx) return '';
         const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
         const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
         const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
         const hasGrad = !hasVid && !hasBg && !hasColor && !hasPat && !!s.grad;
         const scHeavy = (hasBg || hasVid) && !!s.mode;   /* контент (иконки/цифры) поверх фото — усиленный скрим для читаемости */
+        /* ⭐ Сцен-граф слайд (режим «Студия»): фон + нативные слои, БЕЗ шаблонного s-in блока */
+        if (s.sg) {
+          const bgSt = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : hasGrad ? '' : '';
+          const dAttr = `data-idx="${i}" data-sg="1"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''} data-grammar="${esc(s.grammar || '')}" data-role="${esc(s.role || '')}"`;
+          return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide sg${hasGrad ? ` grad-${s.grad}` : ''}" ${dAttr} style="${bgSt}">${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video>` : ''}${renderCarLayers(s.layers, isEdit)}</div>${isEdit ? SG_SBAR : ''}`;
+        }
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : '', s.layout ? `lay-${s.layout}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';   /* чистое фото; контраст даёт per-family скрим (не мутный тёмный бокс на всём)*/
@@ -4834,8 +5021,16 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
 .cslot{position:relative}
 .cslot:hover{z-index:6}
-.slide{position:relative;aspect-ratio:${dims.ar};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex}
+.slide{position:relative;aspect-ratio:${dims.ar};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex;container-type:inline-size}
 .slide.hasbg{color:#fff}
+/* ═══ Сцен-граф (AI Design Engine): нативные слои ═══ */
+.slide.sg{display:block}
+.slide.sg .s-lyr{position:absolute}
+.lyr-btn{display:inline-flex;align-items:center;gap:.6em;padding:.85em 1.35em;border-radius:100px;font-family:'Manrope',sans-serif;font-weight:600;white-space:nowrap;line-height:1}
+.s-lyr.lyr-sq{aspect-ratio:1}
+.s-lyr.lyr-btn{white-space:nowrap}
+.s-lyr .lyr-tx{margin:0}
+${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;width:1080px;gap:0;margin:0}.slide{width:1080px!important;height:${c.format === 'story' ? 1920 : c.format === 'square' ? 1080 : 1350}px!important;aspect-ratio:auto!important;border-radius:0!important;box-shadow:none!important}` : ''}
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
 .slide .s-in{position:relative;z-index:1}
@@ -5142,6 +5337,18 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       }
       c.lastViewAt = Date.now();
       store.save();
+      /* Ф1: движок арт-дирекшна — отдельный премиум-рендер того же объекта c (та же ссылка/токен) */
+      if (u.searchParams.get('design') === '1' || (c.design && c.design.auto)) {
+        const hasKey = u.searchParams.get('key') === db.settings.hooks.secret;
+        const seedQ = u.searchParams.get('seed');
+        const html = design.renderDesignDoc(db, c, {
+          print: u.searchParams.get('print') === '1',
+          seed: seedQ != null && /^\d+$/.test(seedQ) ? +seedQ : undefined,
+          canEdit: hasKey, key: hasKey ? db.settings.hooks.secret : '',
+        });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(html); return;
+      }
       const isEdit = u.searchParams.get('edit') === '1' && u.searchParams.get('key') === db.settings.hooks.secret;
       const isPrint = u.searchParams.get('print') === '1';
       const cust = c.custom || {};

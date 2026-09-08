@@ -4457,3 +4457,24 @@ html[data-night] .cmp-prev-b { background: rgba(80, 140, 90, .16); border-color:
 .ov-ghost-p:nth-child(3) { transform: rotate(7deg) translate(6px, 1px); z-index: 1; opacity: .75; }
 .ov-ghost-t { font-size: 13.5px; font-weight: 700; color: var(--ink); }
 .ov-ghost-s { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; max-width: 260px; }
+
+/* ===== Ф1: панель дизайн-движка подборок (конструктор + модалка) ===== */
+.ds-fold { border: 1px solid var(--stroke); border-radius: 14px; margin: 6px 0 4px; overflow: hidden; background: var(--card, #fff); }
+.ds-fold-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; cursor: pointer; padding: 12px 14px; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.ds-fold-h svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--brand, #2563EB); }
+.ds-fold-h .ds-hint { margin-left: 4px; font-weight: 500; font-size: 11.5px; color: var(--ink-3); }
+.ds-fold-h .ds-caret { margin-left: auto; display: flex; transition: transform .25s var(--ease-spring, ease); transform: rotate(90deg); }
+.ds-fold-h .ds-caret svg { width: 15px; height: 15px; color: var(--ink-3); }
+.ds-fold.open .ds-fold-h .ds-caret { transform: rotate(-90deg); }
+.ds-fold-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--ease-spring, ease); }
+.ds-fold.open .ds-fold-b { grid-template-rows: 1fr; }
+.ds-fold-b > * { min-height: 0; overflow: hidden; }
+.ds-fold-b .ds-grid { padding: 4px 14px 10px; }
+.ds-fold.open .ds-fold-b > * { overflow: visible; }
+.ds-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.ds-ax label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 5px 2px; }
+.ds-note { padding: 0 14px 14px; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+.ds-modal .ds-lead { font-size: 13.5px; color: var(--ink-2, var(--ink)); line-height: 1.55; margin-bottom: 16px; }
+.ds-modal .ds-grid { margin-bottom: 8px; }
+.ds-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+@media (max-width: 560px) { .ds-grid { grid-template-columns: 1fr; } }

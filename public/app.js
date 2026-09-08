@@ -4107,6 +4107,41 @@ function openShareModal(id, leadId, title) {
   const chat = $('#shChat', bd);
   if (chat) chat.addEventListener('click', async () => { await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат лиду', null, true); closeModal(); });
 }
+/* Ф1: оси дизайн-движка подборок (1-й уровень — 6 осей, всё по умолчанию Авто) */
+const DESIGN_AXES = {
+  style:     { label: 'Стиль',          opts: [['auto', 'Авто'], ['editorial', 'Editorial Luxury'], ['premiumweb', 'Premium Web'], ['architectural', 'Architectural Minimal'], ['investment', 'Investment Intelligence'], ['cinematic', 'Cinematic']] },
+  artDir:    { label: 'Арт-дирекшн',    opts: [['auto', 'Авто'], ['minimal', 'Минимал'], ['balanced', 'Баланс'], ['expressive', 'Выразительно'], ['artdirected', 'Арт-дирекшн']] },
+  density:   { label: 'Плотность',      opts: [['auto', 'Авто'], ['light', 'Лёгкая'], ['standard', 'Стандарт'], ['detailed', 'Детальная']] },
+  imageDom:  { label: 'Доминанта фото', opts: [['auto', 'Авто'], ['low', 'Низкая'], ['medium', 'Средняя'], ['high', 'Высокая']] },
+  dataDepth: { label: 'Глубина данных', opts: [['auto', 'Авто'], ['minimal', 'Минимум'], ['dashboard', 'Дашборд'], ['editorial', 'Editorial']] },
+  brandMode: { label: 'Бренд',          opts: [['auto', 'Авто'], ['brand', 'Бренд'], ['neutral', 'Нейтральный'], ['imagederived', 'От фото'], ['dark', 'Тёмный']] },
+};
+function dsSelects(prefix, cur) {
+  cur = cur || {};
+  return Object.entries(DESIGN_AXES).map(([k, ax]) => `<div class="ds-ax"><label>${ax.label}</label>
+    <select id="${prefix}${k}">${ax.opts.map(([v, t]) => `<option value="${v}" ${(cur[k] || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`).join('');
+}
+function dsCollect(prefix) { const d = {}; for (const k of Object.keys(DESIGN_AXES)) { const el = $('#' + prefix + k); if (el) d[k] = el.value; } return d; }
+async function openDesignModal(id, title) {
+  let cur = {};
+  try { const list = await api.get('/collections'); const c = list.find(x => x.id === id); cur = (c && c.design) || {}; } catch (e) {}
+  const key = (COLL_KEY && COLL_KEY[id]) || '';
+  modal({
+    title: 'Дизайн документа', wide: true,
+    body: `<div class="ds-modal">
+      <p class="ds-lead">Шесть осей 1-го уровня. Всё на <b>Авто</b> — движок арт-дирекшна сам подбирает композицию под данные объектов и запрос лида. Меняйте точечно.</p>
+      <div class="ds-grid">${dsSelects('dm', cur)}</div>
+      <div class="ds-actions"><a class="btn" href="/p/${id}?design=1&key=${key}" target="_blank">${ic(I.eye)}Открыть арт-документ</a>
+      <button class="btn" id="dmRecompose">${ic(I.bolt)}Другой вариант (новый seed)</button></div>
+    </div>`,
+    actions: [
+      { label: 'Сохранить и открыть', cls: 'btn-accent', onClick: async (bd) => { await api.patch('/collections/' + id, { design: dsCollect('dm') }); window.open('/p/' + id + '?design=1&key=' + key, '_blank'); } },
+      { label: 'Сохранить', onClick: async (bd) => { await api.patch('/collections/' + id, { design: dsCollect('dm') }); toast('Дизайн сохранён', null, true); } },
+      { label: 'Отмена' },
+    ],
+  });
+  setTimeout(() => { const rb = $('#dmRecompose'); if (rb) rb.addEventListener('click', async () => { const r = await api.post('/collections/' + id + '/recompose?key=' + key); window.open('/p/' + id + '?design=1&key=' + key, '_blank'); }); }, 60);
+}
 PAGES.collections = async (root) => {
   const [cols0, props, leads, allFolders] = await Promise.all([api.get('/collections'), api.get('/properties'), api.get('/leads'), api.get('/folders')]);
   const cFolders = allFolders.filter(f => f.kind === 'coll');
@@ -4137,6 +4172,13 @@ PAGES.collections = async (root) => {
         <div class="form-row"><label>Для лида</label><select id="clLead"><option value="">— без лида (общая)</option>${active.map(l => `<option value="${l.id}" ${selLead === l.id ? 'selected' : ''}>${esc(l.name)} · ${l.geoName}</option>`).join('')}</select></div>
         <div class="form-row"><label>Название</label><input id="clTitle" value="${selLead ? 'Подборка под ваш запрос' : 'Подборка'}"></div>
         <div class="form-row"><label>Вступление (первая страница)</label><textarea id="clIntro" style="min-height:84px">${selLead ? esc(((active.find(l => l.id === selLead) || {}).name || '').split(' ')[0] + ', добрый день!\nПодготовил для вас подборку самых интересных проектов по выгодным ценам и с рассрочкой.\nЧто заинтересует — я на связи, посчитаю доходность по понравившимся.') : ''}</textarea></div>
+        <div class="ds-fold ${PAGE_STATE.collDsOpen ? 'open' : ''}">
+          <button type="button" class="ds-fold-h" id="clDsToggle">${ic(I.layers)}Дизайн документа<span class="ds-hint">арт-движок · всё Авто</span><span class="ds-caret">${ic(I.chev)}</span></button>
+          <div class="ds-fold-b">
+            <div class="ds-grid">${dsSelects('clDs', {})}</div>
+            <div class="ds-note">Движок сам решит композицию под данные объектов и запрос лида. Точная настройка — на карточке подборки.</div>
+          </div>
+        </div>
         <div class="lp-sec">Объекты ${selLead ? '· отсортированы под запрос лида' : ''}</div>
         <div class="cl-props">
           ${ordered.map(pr => `<label class="cl-prop"><input type="checkbox" value="${pr.id}" ${pr.matchScore >= 2 || PAGE_STATE.collPreselect === pr.id ? 'checked' : ''}>
@@ -4171,9 +4213,11 @@ PAGES.collections = async (root) => {
             <div class="cl2-meta">${c.propertyIds.length} ${plural(c.propertyIds.length, 'объект', 'объекта', 'объектов')}${c.leadName ? ' · для ' + esc(c.leadName) : ''} · ${ago(c.createdAt)}</div>
             ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
             <div class="cl2-acts">
-              <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
+              <a class="btn btn-sm btn-accent" href="/p/${c.id}?design=1&key=${c.editKey}" target="_blank" title="Премиум арт-документ (движок арт-дирекшна)">${ic(I.layers)}Арт-документ</a>
+              <a class="btn btn-sm" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
+              <button class="btn btn-sm" data-act="design" title="Настроить дизайн (6 осей)">${ic(I.gear)}Дизайн</button>
               <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
-              <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть">${ic(I.eye)}</a>
+              <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
               <span class="tb-spacer"></span>
               <button class="btn-ghost" data-act="del" title="Удалить">${ic(I.x)}</button>
             </div>
@@ -4194,10 +4238,11 @@ PAGES.collections = async (root) => {
   COLL_FOLDERS = cFolders; COLL_KEY = Object.fromEntries(cols0.map(c => [c.id, c.editKey]));
   wireCollSelect(root);
   $('#clLead').addEventListener('change', (e) => { PAGE_STATE.collLead = e.target.value; render(); });
+  const dsT = $('#clDsToggle'); if (dsT) dsT.addEventListener('click', () => { PAGE_STATE.collDsOpen = !PAGE_STATE.collDsOpen; dsT.closest('.ds-fold').classList.toggle('open', PAGE_STATE.collDsOpen); });
   $('#clCreate').addEventListener('click', async () => {
     const ids = $$('.cl-prop input:checked', root).map(x => x.value);
     if (!ids.length) { toast('Отметьте хотя бы один объект'); return; }
-    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids });
+    await api.post('/collections', { leadId: $('#clLead').value || null, title: $('#clTitle').value, intro: $('#clIntro').value, propertyIds: ids, design: dsCollect('clDs') });
     render();
   });
   $$('[data-cl]', root).forEach(card => card.addEventListener('click', async (e) => {
@@ -4206,6 +4251,7 @@ PAGES.collections = async (root) => {
     const id = card.dataset.cl;
     if (act.dataset.act === 'copy') { navigator.clipboard.writeText(location.origin + '/p/' + id); toast('Ссылка скопирована', null, true); }
     if (act.dataset.act === 'share') { openShareModal(id, card.dataset.cllead, card.dataset.title); return; }
+    if (act.dataset.act === 'design') { openDesignModal(id, card.dataset.title); return; }
     if (act.dataset.act === 'send') { const r = await api.post(`/collections/${id}/send`); toast('Подборка ушла в чат', r.url, true); }
     if (act.dataset.act === 'del') { await fetch('/api/collections/' + id, { method: 'DELETE' }); render(); }
     if (act.dataset.act === 'ren' && !act.dataset.editing) {
@@ -6113,7 +6159,7 @@ function tplCard(t, stBadge) {
 /* ---------------- КАРТА ЖЕЛАНИЙ (личная доска мотивации брокера) ---------------- */
 let MB_STYLE = 'sticker', MB_EDIT = false, MB_ADD_OPEN = false, MB_TEXTMODE = 'auto', MB_PENDING = [];
 /* пересечение объектов (для подсказки «включи Править, чтобы разложить») */
-function mbOverlap(items) { for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const a = items[i], b = items[j], aw = a.w || 200, ah = (a.w || 200) * 1.15, bw = b.w || 200, bh = (b.w || 200) * 1.15; if (a.x < b.x + bw && a.x + aw > b.x && a.y < b.y + bh && a.y + ah > b.y) return true; } return false; }
+function mbOverlap(items) { for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const a = items[i], b = items[j], aw = a.w || 200, ah = (a.w || 200) * 1.15, bw = b.w || 200, bh = (b.w || 200) * 1.15; const ox = Math.min(a.x + aw, b.x + bw) - Math.max(a.x, b.x), oy = Math.min(a.y + ah, b.y + bh) - Math.max(a.y, b.y); if (ox > 0 && oy > 0 && (ox * oy) / Math.min(aw * ah, bw * bh) > 0.32) return true; } return false; } /* только ЗАМЕТНОЕ перекрытие (>32%) — не нагаем после аккуратной компоновки */
 const MB_FONTS = { fraunces: ['Элегант', "'Fraunces',serif"], playfair: ['Журнал', "'Playfair Display',serif"], caveat: ['От руки', "'Caveat',cursive"], bebas: ['Плакат', "'Bebas Neue',sans-serif"], manrope: ['Чистый', "'Manrope',sans-serif"] };
 const MB_BGS = { paper: 'Бумага', linen: 'Лён', dark: 'Тёмная', cork: 'Пробка', gradient: 'Градиент', blush: 'Румяна' };
 /* режимы текста на стикере — арт-директорское решение о микро-копирайте */
@@ -6367,10 +6413,8 @@ async function renderMoodboard(root, opts) {
       <div class="mb-top">
         ${opts.embedded ? '' : `<div class="mb-title">${emblem}${ed ? `<input class="mb-title-edit" id="mbTitle" maxlength="60" value="${esc(title)}" style="font-family:${fontCss}">` : `<span class="mb-t-k" style="font-family:${fontCss}">${esc(title)}</span>`}${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>`}
         <div class="mb-tools">
-          ${items.length >= 2 ? `<button class="mb-iconbtn" id="mbCompose" title="Собрать в единый арт-коллаж">${ic(I.layers)}<span>Скомпоновать</span></button>
-          <button class="mb-iconbtn" id="mbShuffle" title="Другая композиция">${ic(I.bolt)}</button>` : ''}
           <button class="mb-iconbtn ${add ? 'on' : ''}" id="mbAddToggle" title="Добавить желание">${ic(I.plus)}<span>Добавить</span></button>
-          <button class="mb-iconbtn ${ed ? 'on' : ''}" id="mbEdit" title="${ed ? 'Готово' : 'Править доску'}">${ic(ed ? I.check : (I.edit || I.doc))}</button>
+          ${items.length ? `<button class="mb-iconbtn ${ed ? 'on' : ''}" id="mbEdit" title="${ed ? 'Готово' : 'Править доску'}">${ic(ed ? I.check : (I.edit || I.doc))}</button>` : ''}
         </div>
       </div>
       <div class="mb-addpanel ${add ? 'open' : ''}" id="mbAddPanel">
@@ -6381,6 +6425,7 @@ async function renderMoodboard(root, opts) {
         </div>
       </div>
       ${ed ? `<div class="mb-cfg">
+        ${items.length >= 2 ? `<div class="mb-cfg-g"><span>Композиция</span><button class="mb-chip" id="mbCompose">${ic(I.layers, 2)}Скомпоновать</button><button class="mb-chip" id="mbShuffle">${ic(I.bolt, 2)}Другая</button></div>` : ''}
         ${opts.embedded ? '' : `<div class="mb-cfg-g"><span>Шрифт</span>${Object.entries(MB_FONTS).map(([k, [n, css]]) => `<button class="mb-chip ${k === fontKey ? 'on' : ''}" data-mbfont="${k}" style="font-family:${css}">${n}</button>`).join('')}</div>`}
         <div class="mb-cfg-g"><span>Фон</span>${Object.entries(MB_BGS).map(([k, n]) => `<button class="mb-chip mb-bgchip mb-bg-${k} ${k === bg ? 'on' : ''}" data-mbbg="${k}" title="${n}"></button>`).join('')}</div>
         <div class="mb-cfg-g"><span>Крепёж</span>${Object.entries(MB_ATT_MODES).map(([k, n]) => `<button class="mb-chip ${k === attMode ? 'on' : ''}" data-mbatt="${k}">${n}</button>`).join('')}</div>
@@ -6392,7 +6437,7 @@ async function renderMoodboard(root, opts) {
           MB_PENDING.map((p, i) => `<div class="mb-item mb-pending" style="left:${60 + (i % 4) * 46}px;top:${64 + (i % 4) * 34}px;width:190px">
             <div class="mb-pending-box"><span class="mb-pending-orb"></span><span class="mb-pending-t">${esc(p.prompt)}</span><span class="mb-pending-s">генерирую…</span></div>
           </div>`).join('') +
-          (!ed && items.length >= 2 && mbOverlap(items) ? `<button class="mb-hint" data-mbedithint>${ic(I.grip || I.plus, 2)}Править — чтобы разложить</button>` : '')
+          (!ed && items.length >= 2 && mbOverlap(items) ? `<button class="mb-hint" data-mbcomposehint>${ic(I.layers, 2)}Разложить красиво</button>` : '')
         ) : `<div class="mb-empty mb-empty-anim">
           <video class="mb-empty-vid" autoplay muted loop playsinline poster="/assets/widgets/amb-gold.jpg"><source src="/assets/widgets/amb-gold.mp4" type="video/mp4"></video>
           <div class="mb-empty-ov"></div>
@@ -6403,7 +6448,7 @@ async function renderMoodboard(root, opts) {
   const rerender = () => renderMoodboard(root, opts);
   const board = $('#mbBoard', root);
   $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); const tm = $('#mbTmWrap', root); if (tm) tm.classList.toggle('off', MB_STYLE !== 'sticker'); }));
-  $('#mbEdit', root).addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
+  $('#mbEdit', root)?.addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
   /* КОМПОЗИЦИЯ: «Скомпоновать» (текущий сид) / «Другая композиция» (новый сид, анти-повтор) */
   $('#mbCompose', root)?.addEventListener('click', () => { if (!MB_SEED) MB_SEED = 's' + Math.floor(Math.random() * 1e9); mbApplyCompose(root, opts, items, board, MB_SEED); });
   $('#mbShuffle', root)?.addEventListener('click', () => { let s; do { s = 's' + Math.floor(Math.random() * 1e9); } while (s === MB_SEED); MB_SEED = s; mbApplyCompose(root, opts, items, board, s); });
@@ -6427,7 +6472,7 @@ async function renderMoodboard(root, opts) {
   genBtn.addEventListener('click', gen);
   q.addEventListener('keydown', (e) => { if (e.key === 'Enter') gen(); });
   $('[data-mbaddempty]', root)?.addEventListener('click', () => { MB_ADD_OPEN = true; rerender().then(() => { const qq = $('#mbQuery', root); if (qq) qq.focus(); }); });
-  $('[data-mbedithint]', root)?.addEventListener('click', () => { MB_EDIT = true; rerender(); });
+  $('[data-mbcomposehint]', root)?.addEventListener('click', () => { if (!MB_SEED) MB_SEED = 's' + Math.floor(Math.random() * 1e9); mbApplyCompose(root, opts, items, board, MB_SEED); });
   /* конфиг (только в режиме правки) */
   if (ed) {
     const saveCfg = async (patch) => { await api.patch('/moodboard/config', patch).catch(() => {}); };
