@@ -4891,7 +4891,7 @@ function openCarouselModal() {
 /* карточка одного сценария (зеркалит проверенный контент-бот, но под недвижимость) */
 function renderScriptCard(s) {
   const hookTags = ['Слом ожидания', 'С середины истории', 'Цена бездействия'];
-  const hooks = (s.hooks || []).map((h, j) => `<div class="sh-hook"><div class="sh-hook-top"><span class="sh-hook-tag">${esc(hookTags[j] || 'Хук')}</span>${cpBtn(h, '')}</div><div class="sh-hook-x">${esc(h)}</div></div>`).join('');
+  const hooks = (s.hooks || []).map((h, j) => `<div class="sh-hook"><div class="sh-hook-top"><span class="sh-hook-tag">${esc((s.hook_formulas && s.hook_formulas[j]) || hookTags[j] || 'Хук')}</span>${cpBtn(h, '')}</div><div class="sh-hook-x">${esc(h)}</div></div>`).join('');
   const beats = (s.beats || []).map(b => `<div class="sh-beat"><div class="sh-beat-t">${esc(b.t || '')}</div><div class="sh-beat-b"><div class="sh-beat-role">${esc(b.role || '')}</div><div class="sh-beat-say">${esc(b.say || '')}</div>${b.onscreen ? `<div class="sh-beat-os">На экране: ${esc(b.onscreen)}</div>` : ''}</div></div>`).join('');
   const broll = (s.broll || []).map(x => `<span class="sh-broll-i">${esc(x)}</span>`).join('');
   const allText = [(s.format || '') + (s.duration_sec ? ' · ~' + s.duration_sec + 'с' : ''), '',
