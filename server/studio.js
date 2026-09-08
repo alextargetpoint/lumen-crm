@@ -280,6 +280,12 @@ async function artDirectionPlan(project, opts = {}) {
   const iconKeys = 'pin, plane, beach, restaurant, view, window, leaf, terrace, ruler, pool, gym, spa, marina, golf, park, garden, security, concierge, key, clock, shield, doc, award, handshake, metro, shop, school';
   const roleList = (project.photoRoles || []).length ? project.photoRoles.join(', ') : 'render_ext, interior, lifestyle';
   const n = Math.max(4, Math.min(8, +opts.count || 6));
+  const DIRECTIONS = {
+    editorial: 'НАПРАВЛЕНИЕ A — «Редакторский люкс»: эмоция и образ жизни, крупные атмосферные фото, тёплая палитра, выразительный сериф-дисплей, больше CINEMATIC/IMAGE-грамматик. display:serif.',
+    minimal: 'НАПРАВЛЕНИЕ B — «Архитектурный минимал»: максимум воздуха и геометрии, светлая/холодная палитра, много EDITORIAL_LIGHT и TYPO, сдержанная типографика, минимум украшений, крупные поля. display:modern или serif.',
+    investment: 'НАПРАВЛЕНИЕ C — «Инвестиционный интеллект»: данные и цифры (ROI, цена, план оплаты), графит/сталь холодная палитра, чаще DATA_HERO и LOCATION_STORY, деловой тон, акцент НЕ золото.',
+  };
+  const dirHint = opts.direction && DIRECTIONS[opts.direction] ? '\n★ ' + DIRECTIONS[opts.direction] + ' Держи это направление во ВСЕЙ колоде (палитра, сетка грамматик, тон копирайта), но оставайся премиум-тиром.\n' : '';
   const prompt = `Ты — АРТ-ДИРЕКТОР премиального дизайн-бюро (архитектурно-гостиничная эстетика, tier как у сильной студии недвижимости; НЕ Canva). Спроектируй Instagram-карусель (${n} слайдов, портрет 4:5) для проекта недвижимости.
 
 ПРОЕКТ:
@@ -288,7 +294,7 @@ async function artDirectionPlan(project, opts = {}) {
 Бренд-вордмарк: ${String(project.wordmark && project.wordmark.name || project.name || '').slice(0, 40)} / ${String(project.wordmark && project.wordmark.tag || '').slice(0, 40)}
 Факты/вводные: ${String(project.brief || '').slice(0, 1400)}
 Доступные роли фото проекта: ${roleList}
-
+${dirHint}
 ПРИНЦИПЫ ПРЕМИУМА (строго):
 - Сдержанность, точность, иерархия, воздух, специфика. НЕ «гигантский шрифт», НЕ всё тёмное, НЕ золото всюду, НЕ клише.
 - ЗАПРЕЩЁННЫЙ копирайт (общие ИИ-фразы): «место силы», «искусство жить», «эстетика тишины», «ваш путь к новой жизни», «привилегии пяти звёзд», «оазис спокойствия».

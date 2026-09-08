@@ -33,6 +33,7 @@ const comments = require('./comments');
 const inventory = require('./inventory');
 const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
+const shot = require('./shot'); /* серверный скриншот (chrome-headless-shell) для автономного QA-цикла */
 const playbook = require('./playbook');
 const billing = require('./billing');
 const { MARKET } = require('./marketdata');
@@ -3039,6 +3040,35 @@ const server = http.createServer(async (req, res) => {
       db.carousels.unshift(c); store.save();
       return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, concept: plan.concept, slides: c.slides.length, grammars: c.slides.map(s => s.grammar) });
     }
+    /* Phase 33: 3 РАЗНЫХ визуальных направления из одних данных (A редакторский / B минимал / C инвест). */
+    if (p === '/api/studio/directions' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY' });
+      const b = await readBody(req);
+      const host = req.headers.host;
+      let photos = [];
+      const imgs = (Array.isArray(b.images) ? b.images : []).filter(x => /^(https?:\/\/|\/assets\/)/.test(String(x))).slice(0, 16);
+      if (imgs.length) {
+        const absP = imgs.map(u2 => u2[0] === '/' ? `http://${host}${u2}` : u2);
+        let roles = imgs.map(() => 'other');
+        try { roles = await llm.classifyPhotos(absP); } catch (e) { /* */ }
+        photos = imgs.map((url, k) => ({ url, role: roles[k] || 'other' }));
+      }
+      const project = { name: String(b.name || b.title || 'Проект').slice(0, 120), geo: String(b.geo || '').slice(0, 120), brief: String(b.brief || b.topic || '').slice(0, 1600), wordmark: b.wordmark && typeof b.wordmark === 'object' ? { name: String(b.wordmark.name || '').slice(0, 40), tag: String(b.wordmark.tag || '').slice(0, 40) } : null, photoRoles: [...new Set(photos.map(p2 => p2.role))] };
+      const dirs = [{ key: 'editorial', name: 'Редакторский люкс' }, { key: 'minimal', name: 'Архитектурный минимал' }, { key: 'investment', name: 'Инвестиционный интеллект' }];
+      const out = [];
+      for (const d of dirs) {
+        try {
+          const plan = await studio.artDirectionPlan(project, { count: b.count, direction: d.key });
+          const deck = studio.composeDeck(project, plan, photos);
+          const c = { id: crypto.randomBytes(5).toString('hex'), title: deck.title + ' · ' + d.name, template: 'studio', format: 'portrait', theme: deck.theme, font: deck.font, footer: { on: false, text: '' }, slides: deck.slides.map(s => sanSlide(s)), studio: { mode: 'smart', direction: d.key, concept: String(plan.concept || '').slice(0, 200), tokens: deck.tokens, project, plan, photos }, createdAt: Date.now() };
+          db.carousels.unshift(c);
+          out.push({ direction: d.key, name: d.name, id: c.id, concept: plan.concept, grammars: c.slides.map(s => s.grammar) });
+        } catch (e) { out.push({ direction: d.key, error: e.message }); }
+      }
+      store.save();
+      return json(res, 200, { editKey: db.settings.hooks.secret, directions: out });
+    }
     /* Визуальный критик: скриншот рендера + референс-эталон → правки сцен-графа (авто-коррекция). */
     if (p === '/api/studio/critique' && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
@@ -3060,6 +3090,51 @@ const server = http.createServer(async (req, res) => {
       c.slides[idx] = sanSlide(slide);
       store.save();
       return json(res, 200, { scores: out.scores, verdict: out.verdict, notes: out.notes, opsApplied: applied, ops: out.ops });
+    }
+    /* ⭐ АВТОНОМНЫЙ визуальный QA-цикл по всей колоде: рендер(headless) → критик → правки → рендер снова (≤N раз/слайд). */
+    if (p === '/api/studio/autopolish' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY' });
+      if (!shot.available()) return json(res, 400, { error: 'headless-браузер недоступен на этом хосте (chrome-headless-shell не найден) — QA-цикл драйвится из редактора/Playwright' });
+      const b = await readBody(req);
+      const c = db.carousels.find(x => x.id === b.cid);
+      if (!c) return json(res, 404, { error: 'нет карусели' });
+      const host = req.headers.host;
+      const maxPasses = Math.max(1, Math.min(4, +b.maxPasses || 2));
+      let refB64 = String(b.refB64 || '').replace(/^data:image\/\w+;base64,/, '');
+      if (!refB64) { try { refB64 = fs.readFileSync(path.join(PUBLIC, 'assets', 'ref', 'layan-benchmark.png')).toString('base64'); } catch (e) { refB64 = ''; } }
+      const rh = c.format === 'story' ? 1920 : c.format === 'square' ? 1080 : 1350;
+      const results = [];
+      const onlyOne = b.idx != null ? Math.max(0, Math.min(c.slides.length - 1, +b.idx)) : -1;
+      for (let i = 0; i < c.slides.length; i++) {
+        if (onlyOne >= 0 && i !== onlyOne) continue;
+        if (!c.slides[i] || !c.slides[i].sg) continue;
+        let passes = 0, lastVerdict = '';
+        const notes = [];
+        const avgOf = (sc) => { const v = Object.values(sc || {}); return v.length ? v.reduce((a, x) => a + (+x || 0), 0) / v.length : 0; };
+        /* держим ЛУЧШУЮ по среднему баллу версию среди проходов → авто-полировка НЕ ухудшает слайд (revert-on-regress) */
+        let best = JSON.parse(JSON.stringify(c.slides[i])), bestAvg = -1;
+        try {
+          for (let pass = 0; pass < maxPasses; pass++) {
+            const buf = await shot.capture(`http://${host}/car/${c.id}?raw=1&only=${i}`, { w: 1080, h: rh, wait: 1100 });
+            if (!buf) { notes.push('capture failed'); break; }
+            const out = await studio.critique(buf.toString('base64'), refB64, c.slides[i]);
+            const avg = avgOf(out.scores);
+            lastVerdict = out.verdict; if (out.notes && out.notes.length) notes.push(...out.notes);
+            if (avg > bestAvg) { bestAvg = avg; best = JSON.parse(JSON.stringify(c.slides[i])); }   /* запоминаем лучший кадр */
+            if (out.verdict === 'pass' || !out.ops.length) break;
+            const applied = studio.applyOps(c.slides[i], out.ops);
+            c.slides[i] = sanSlide(c.slides[i]);
+            passes++;
+            if (!applied) break;
+          }
+        } catch (e) { notes.push('err: ' + e.message); }
+        c.slides[i] = best;                                       /* ← ставим ЛУЧШУЮ версию, а не последнюю */
+        const lastScores = { avg: +bestAvg.toFixed(1) };
+        results.push({ idx: i, grammar: c.slides[i].grammar, passes, verdict: lastVerdict, scores: lastScores, notes: notes.slice(0, 6) });
+      }
+      store.save();
+      return json(res, 200, { cid: c.id, polished: results.length, results });
     }
     /* MODE 2 (Studio AI, флагман): визуальный таргет (gpt-image-1) → интерпретатор → сцен-граф-слайд. */
     if (p === '/api/studio/studio-slide' && req.method === 'POST') {
