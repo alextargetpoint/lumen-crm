@@ -1061,6 +1061,38 @@ function heroBars(pts) {
   return `<div class="ovx-bars">${pts.map((v, i) => `<span class="ovx-bar ${i === pts.length - 1 ? 'now' : ''}" title="${v}"><i style="height:${Math.max(8, Math.round(v / max * 100))}%"></i></span>`).join('')}</div>`;
 }
 
+/* кольцо-скор (радиальный индикатор здоровья/скоринга) — общий примитив */
+function scoreRing(pct, opts = {}) {
+  const R = opts.r || 28, sz = opts.sz || 70, sw = opts.sw || 6, C = 2 * Math.PI * R, gid = gradId(), c = sz / 2;
+  const col = opts.stroke || `url(#${gid})`;
+  return `<svg class="ov-ring" viewBox="0 0 ${sz} ${sz}"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="var(--gauge-track)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - Math.min(100, pct) / 100)).toFixed(1)}" transform="rotate(-90 ${c} ${c})"/></svg>`;
+}
+/* человекочитаемое имя стадии по id */
+function ovStageName(id) { const s = STAGES.find(x => x.id === id); return s ? s.name : id; }
+/* состояние загрузки брокера: 0-40 свободен / 40-75 норма / 75-90 высокая / 90+ перегруз */
+function capState(load, capacity) {
+  const cap = capacity || 20, raw = Math.round((load || 0) / cap * 100);
+  let st = 'Свободен', cls = 'low';
+  if (raw >= 90) { st = 'Перегруз'; cls = 'over'; }
+  else if (raw >= 75) { st = 'Высокая'; cls = 'high'; }
+  else if (raw >= 40) { st = 'Норма'; cls = 'norm'; }
+  return { pct: Math.min(raw, 100), raw, st, cls, cap };
+}
+/* пустое состояние виджета: иконка-призрак + текст + опц. действие (компактно, без резерва высоты) */
+function ovEmpty(icon, title, sub, action) {
+  return `<div class="ov-empty2">${icon ? `<span class="ov-empty2-ic">${ic(icon, 2)}</span>` : ''}<div class="ov-empty2-t">${esc(title)}</div>${sub ? `<div class="ov-empty2-s">${esc(sub)}</div>` : ''}${action ? `<button class="ov-empty2-btn" data-ovgo="${action.go}">${action.icon ? ic(action.icon, 2) : ''}${esc(action.label)}</button>` : ''}</div>`;
+}
+
+/* поверхности виджетов: операционные — мягкий офф-вайт (surf-1), интеллект/связь — цветной тинт (surface-3),
+   цель — белый elevated (surf-2), лидерборд — золото; hero (kpi) — тёмный навигатор внутри самого виджета */
+const OV_SURF = {
+  funnel: 'ov-surf-1', tasks: 'ov-surf-1', meetings: 'ov-surf-1', activity: 'ov-surf-1',
+  recent: 'ov-surf-1', brokers: 'ov-surf-1', geo: 'ov-surf-1', worldclock: 'ov-surf-1',
+  onboarding: 'ov-surf-1', casebase: 'ov-surf-1', spark: 'ov-surf-1', hotleads: 'ov-surf-1',
+  goal: 'ov-surf-2', numbers: 'ov-tint-mint', aivs: 'ov-tint-violet',
+  chains: 'ov-tint-blue', ideas: 'ov-tint-violet', leaders: 'ov-tint-amber',
+};
+
 /* реестр виджетов обзора: key → { name, icon, full, render(ctx)→html } — один фиксированный премиум-вид на виджет */
 const OV_W = {
   kpi: { name: 'Ключевые метрики', icon: () => I.bars, full: true, render: (c) => {
@@ -1115,27 +1147,41 @@ const OV_W = {
   } },
   tasks: { name: 'Мои задачи', icon: () => I.task, full: false, render: (c) => {
     const tsk = c.tsk, d2 = c.dstr2;
-    const open = (tsk.tasks || []).filter(t => t.status !== 'done').sort((a, b) => { const ao = a.due && d2(a.due) < tsk.today, bo = b.due && d2(b.due) < tsk.today; if (ao !== bo) return ao ? -1 : 1; return (a.due || a.scheduled || 0) > (b.due || b.scheduled || 0) ? 1 : -1; }).slice(0, 6);
-    const rows = open.map(t => { const over = t.due && d2(t.due) < tsk.today; return `<div class="ov2-task" data-ovtask="${t.id}"><button class="ov2-task-ck" data-ovdone="${t.id}" title="Выполнено">${ic(I.check, 2.4)}</button><span class="ov2-task-t">${esc(t.title || 'Задача')}${t.due ? `<i class="${over ? 'over' : ''}">${over ? 'просрочено · ' : ''}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i>` : ''}</span></div>`; }).join('');
-    const sug = (tsk.suggestions || []).slice(0, 2).map(s => `<div class="ov2-task sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'><button class="ov2-task-ck add" title="Добавить">${ic(I.plus)}</button><span class="ov2-task-t">${esc(s.title)}<i>предложение ИИ</i></span></div>`).join('');
-    return `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просроч.' : ''}</span><button class="btn btn-sm" data-ovgo="tasks">Все</button></div>${(rows || sug) ? rows + sug : '<div class="ov2-empty">Задач нет — красиво 🙌</div>'}`;
+    const open = (tsk.tasks || []).filter(t => t.status !== 'done');
+    const isOver = (t) => t.due && d2(t.due) < tsk.today;
+    const isToday = (t) => (t.due && d2(t.due) === tsk.today) || (!t.due && (!t.scheduled || d2(t.scheduled) <= tsk.today));
+    const byDate = (a, b) => (a.due || a.scheduled || 0) - (b.due || b.scheduled || 0);
+    const today = open.filter(t => isOver(t) || isToday(t)).sort((a, b) => (isOver(b) - isOver(a)) || byDate(a, b)).slice(0, 5);
+    const soon = open.filter(t => !today.includes(t)).sort(byDate).slice(0, 3);
+    const sug = (tsk.suggestions || []).slice(0, 2);
+    const taskRow = (t) => { const over = isOver(t); return `<div class="ov2-task" data-ovtask="${t.id}"><button class="ov2-task-ck" data-ovdone="${t.id}" title="Выполнено">${ic(I.check, 2.4)}</button><span class="ov2-task-t">${esc(t.title || 'Задача')}${t.due ? `<i class="${over ? 'over' : ''}">${over ? '<span class="ov-tk-flag"></span>просрочено · ' : ''}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i>` : ''}</span></div>`; };
+    const sec = (label, rows) => rows.length ? `<div class="ov-sec">${label}</div>${rows.join('')}` : '';
+    const body = [
+      sec('Сегодня', today.map(taskRow)),
+      sec('Ближайшие', soon.map(taskRow)),
+      sec('Предложения ИИ', sug.map(s => `<div class="ov2-task sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'><button class="ov2-task-ck add" title="Добавить">${ic(I.plus)}</button><span class="ov2-task-t">${esc(s.title)}<i>${ic(I.spark, 2)}предложение ИИ</i></span></div>`)),
+    ].join('');
+    return `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просроч.' : ''}</span><button class="btn btn-sm" data-ovgo="tasks">Все</button></div>${body || ovEmpty(I.check, 'Задач нет', 'Чисто — новые появятся из карточек лидов')}`;
   } },
   meetings: { name: 'Встречи', icon: () => I.cal, full: false, render: (c) => {
     const tsk = c.tsk, KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
     const ms = (tsk.meetings || []).slice(0, 6);
-    const body = ms.length ? ms.map(mt => { const d = new Date(mt.at); const today = c.dstr2(mt.at) === tsk.today; return `<div class="ov2-meet" data-ovlead="${mt.leadId}"><div class="ov2-meet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${esc(mt.leadName)}</div><div class="ov2-meet-k">${KIND[mt.kind] || mt.kind}</div></div>${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}</div>`; }).join('') : '<div class="ov2-empty">Встреч нет — назначайте из карточки лида</div>';
+    const body = ms.length ? ms.map(mt => { const d = new Date(mt.at); const today = c.dstr2(mt.at) === tsk.today; return `<div class="ov2-meet" data-ovlead="${mt.leadId}"><div class="ov2-meet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${esc(mt.leadName)}</div><div class="ov2-meet-k">${KIND[mt.kind] || mt.kind}</div></div>${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}</div>`; }).join('') : ovEmpty(I.cal, 'Встреч нет', 'Назначайте показы и созвоны из карточки лида');
     return `<div class="ov2-card-hd">${ic(I.cal)}Ближайшие встречи<span>${(tsk.meetings || []).length}</span><button class="btn btn-sm" data-ovgo="meetings">Календарь</button></div>${body}`;
   } },
   activity: { name: 'Активность', icon: () => I.bolt, full: false, render: (c) => {
     const evs = (c.events || []).slice(0, 8);
-    const body = evs.length ? evs.map(e => `<div class="ov2-act ${c.feedCls(e.type)}"><span class="ov2-act-ic">${ic(c.feedIcon(e.type))}</span><span class="ov2-act-t">${esc(e.text || '')}</span><span class="ov2-act-tm">${ago(e.at)}</span></div>`).join('') : '<div class="ov2-empty">Пока тихо</div>';
+    if (!evs.length) return `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>` + ovEmpty(I.bolt, 'Пока тихо', 'События команды появятся здесь в реальном времени');
+    const body = `<div class="ov-tl">${evs.map(e => `<div class="ov-tl-i ${c.feedCls(e.type)}"><span class="ov-tl-node">${ic(c.feedIcon(e.type))}</span><div class="ov-tl-b"><span class="ov-tl-t">${esc(e.text || '')}</span><span class="ov-tl-tm">${ago(e.at)}</span></div></div>`).join('')}</div>`;
     return `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>${body}`;
   } },
   spark: { name: 'Приток лидов', icon: () => I.plus, full: false, render: (c) => {
     const days = leadsByDay(c.leads, 14);
+    const total = days.reduce((a, b) => a + b, 0);
+    const hd = `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div>`;
+    if (total === 0) return hd + `<div class="ov-metric-empty"><div class="ov-metric-empty-n">0</div><div class="ov-metric-empty-b"><b>новых лидов</b><i>Последние 14 дней · притока нет</i></div><button class="ov-metric-empty-btn" data-ovgo="analytics">${ic(I.target, 2)}Проверить кампании</button></div>`;
     const wk = days.slice(7).reduce((a, b) => a + b, 0), wkPrev = days.slice(0, 7).reduce((a, b) => a + b, 0);
-    return `<div class="ov2-card-hd">${ic(I.plus)}Приток лидов<span>14 дней</span></div>
-      <div class="ov2-spark2"><div class="ov2-spark2-hd"><b>${cup(wk)}</b><span>за неделю ${deltaChip(wk, wkPrev)}</span></div><div class="ov2-spark2-area">${areaChart(days, { w: 280, h: 72 })}</div></div>`;
+    return hd + `<div class="ov2-spark2"><div class="ov2-spark2-hd"><b>${cup(wk)}</b><span>за неделю ${deltaChip(wk, wkPrev)}</span></div><div class="ov2-spark2-area">${areaChart(days, { w: 280, h: 72 })}</div></div>`;
   } },
   onboarding: { name: 'Запуск агентства', icon: () => I.bolt, full: true, render: () => {
     const s2 = STATE.settings;
@@ -1149,37 +1195,103 @@ const OV_W = {
     return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done} из ${steps.length}</span></div><div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? '' : ic(I.arrow, 2)}</button>`).join('')}</div>`;
   } },
   recent: { name: 'Свежие лиды', icon: () => I.plus, full: false, render: (c) => {
+    const now = Date.now();
     const ls = c.leads.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 6);
-    const body = ls.length ? ls.map(l => `<div class="ov2-lrow" data-ovlead="${l.id}"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(l.name || '—')}</div><div class="ov2-lrow-s">${esc(l.geoName || '')}${l.source ? ' · ' + esc(l.source) : ''}</div></div><span class="ov2-lrow-t">${ago(l.createdAt)}</span></div>`).join('') : '<div class="ov2-empty">Пока нет лидов</div>';
-    return `<div class="ov2-card-hd">${ic(I.plus)}Свежие лиды<span>${c.leads.length}</span><button class="btn btn-sm" data-ovgo="funnel">Все</button></div>${body}`;
+    const ini = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    if (!ls.length) return `<div class="ov2-card-hd">${ic(I.plus)}Свежие лиды<button class="btn btn-sm" data-ovgo="funnel">Все</button></div>` + ovEmpty(I.plus, 'Пока нет лидов', 'Новые заявки появятся здесь по мере поступления');
+    const body = ls.map(l => { const age = now - (l.createdAt || 0); const fresh = age < 48 * 3600e3, stale = age > 14 * 864e5; return `<div class="ov-lr ${fresh ? 'fresh' : ''} ${stale ? 'stale' : ''}" data-ovlead="${l.id}">
+      <span class="ov-lr-ava">${esc(ini(l.name))}${fresh ? '<span class="ov-lr-dot"></span>' : ''}</span>
+      <div class="ov-lr-b"><div class="ov-lr-n">${esc(l.name || '—')}</div><div class="ov-lr-s">${esc(l.geoName || '')}${l.source ? ' · ' + esc(l.source) : ''}</div></div>
+      <span class="ov-lr-t">${fresh ? `<span class="ov-lr-badge">new</span>` : ''}${ago(l.createdAt)}</span>
+    </div>`; }).join('');
+    return `<div class="ov2-card-hd">${ic(I.plus)}Свежие лиды<span>${c.leads.length} всего</span><button class="btn btn-sm" data-ovgo="funnel">Все</button></div>${body}`;
   } },
   brokers: { name: 'Загрузка брокеров', icon: () => I.users, full: false, render: () => {
     const brs = (STATE.brokers || []).filter(b => b.active !== false).slice(0, 6);
-    const body = brs.length ? brs.map(b => { const pct = Math.min(Math.round((b.load || 0) / (b.capacity || 20) * 100), 100); return `<div class="ov2-fun-row" data-ovgo="brokers"><span class="ov2-fun-nm">${esc(b.name)}</span><span class="ov2-fun-bar"><i style="width:${pct}%;background:${pct >= 90 ? 'var(--bad)' : 'var(--accent)'}"></i></span><span class="ov2-fun-v">${b.load || 0}/${b.capacity || 20}</span></div>`; }).join('') : '<div class="ov2-empty">Нет брокеров</div>';
-    return `<div class="ov2-card-hd">${ic(I.users)}Загрузка брокеров<span>${brs.length} в работе</span><button class="btn btn-sm" data-ovgo="brokers">Все</button></div>${body}`;
+    const ini = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    if (!brs.length) return `<div class="ov2-card-hd">${ic(I.users)}Загрузка брокеров<button class="btn btn-sm" data-ovgo="brokers">Все</button></div>` + ovEmpty(I.users, 'Нет брокеров в работе', 'Добавьте команду в разделе «Брокеры»', { label: 'К брокерам', go: 'brokers', icon: I.arrow });
+    const body = brs.map(b => { const cs = capState(b.load || 0, b.capacity); return `<div class="ov-cap" data-ovgo="brokers">
+      <span class="ov-cap-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(ini(b.name))}</span>
+      <div class="ov-cap-b"><div class="ov-cap-top"><span class="ov-cap-nm">${esc(b.name)}</span><span class="ov-cap-st ${cs.cls}">${cs.st}</span></div>
+        <div class="ov-cap-track"><i class="${cs.cls}" style="width:${cs.pct}%"></i></div></div>
+      <span class="ov-cap-v">${b.load || 0}<i>/${cs.cap}</i></span>
+    </div>`; }).join('');
+    return `<div class="ov2-card-hd">${ic(I.users)}Загрузка брокеров<span>${brs.length} в работе</span><button class="btn btn-sm" data-ovgo="brokers">Все</button></div><div class="ov-caps">${body}</div>`;
   } },
   numbers: { name: 'Здоровье WhatsApp', icon: () => I.sim, full: false, render: (c) => {
-    const w = c.an.wa; const q = w.avgQuality || 0; const R = 30, C = 2 * Math.PI * R, gid = gradId();
+    const w = c.an.wa; const q = w.avgQuality || 0;
+    const nums = STATE.numbers || []; const total = nums.length, active = w.numbersActive;
     const cls = q >= 70 ? 'ok' : q >= 40 ? 'mid' : 'bad';
-    return `<div class="ov2-card-hd">${ic(I.sim)}Здоровье WhatsApp<button class="btn btn-sm" data-ovgo="settings">Номера</button></div>
-      <div class="ov2-wa"><div class="ov2-wa-ring ${cls}"><svg viewBox="0 0 80 80"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><circle cx="40" cy="40" r="${R}" class="war-bg"/><circle cx="40" cy="40" r="${R}" class="war-fg" stroke="url(#${gid})" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - q / 100)).toFixed(1)}" transform="rotate(-90 40 40)"/></svg><div class="ov2-wa-c"><b>${q}<span>%</span></b><i>качество</i></div></div>
-        <div class="ov2-wa-tiles"><button class="ov2-wa-t" data-ovgo="settings"><b>${cup(w.sentToday)}</b><i>отправлено сегодня</i></button><button class="ov2-wa-t" data-ovgo="settings"><b>${cup(w.numbersActive)}</b><i>активных номеров</i></button></div></div>`;
+    const label = q >= 70 ? 'Здоров' : q >= 40 ? 'Внимание' : 'Риск';
+    const rows = [
+      { ok: active > 0, t: 'WhatsApp API', v: active > 0 ? 'На связи' : 'Нет активных' },
+      { ok: q >= 70, t: 'Качество номеров', v: q + '%' },
+      { ok: active === total && total > 0, t: 'Активные номера', v: active + '/' + total },
+    ];
+    return `<div class="ov2-card-hd">${ic(I.sim)}Здоровье WhatsApp<span>инфраструктура рассылки</span><button class="btn btn-sm" data-ovgo="settings">Номера</button></div>
+      <div class="ov-mon">
+        <div class="ov-mon-score ${cls}"><div class="ov-mon-ring">${scoreRing(q, { r: 30, sz: 76, sw: 7 })}<div class="ov-mon-ring-c"><b>${q}<span>%</span></b><i>${label}</i></div></div></div>
+        <div class="ov-mon-side">
+          <div class="ov-mon-stats"><button class="ov-mon-stat" data-ovgo="analytics"><b>${cup(w.sentToday)}</b><i>${plural(w.sentToday, 'сообщение', 'сообщения', 'сообщений')} сегодня</i></button><button class="ov-mon-stat" data-ovgo="settings"><b>${cup(total)}</b><i>${plural(total, 'номер', 'номера', 'номеров')} в пуле</i></button></div>
+          <div class="ov-mon-rows">${rows.map(s => `<div class="ov-mon-r ${s.ok ? 'ok' : 'bad'}"><span class="ov-mon-dot"></span><span class="ov-mon-t">${s.t}</span><b>${s.v}</b></div>`).join('')}</div>
+        </div>
+      </div>`;
   } },
   geo: { name: 'Конверсия по гео', icon: () => I.target, full: false, render: (c) => {
     const gs = Object.values(c.an.geoStats || {}).filter(g => g.total).sort((a, b) => b.conv - a.conv).slice(0, 6);
-    const body = gs.length ? gs.map(g => `<div class="ov2-fun-row" data-ovgo="analytics"><span class="ov2-fun-nm">${esc(g.name)}<i>${g.qualified}/${g.total} квал.</i></span><span class="ov2-fun-bar"><i style="width:${g.conv}%;background:var(--ok)"></i></span><span class="ov2-fun-v">${g.conv}%</span></div>`).join('') : '<div class="ov2-empty">Нет данных</div>';
-    return `<div class="ov2-card-hd">${ic(I.target)}Конверсия по направлениям<button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>${body}`;
+    const hd = `<div class="ov2-card-hd">${ic(I.target)}Конверсия по направлениям<span>квалы к лидам</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>`;
+    if (!gs.length) return hd + ovEmpty(I.target, 'Недостаточно данных', 'Конверсия появится с первыми лидами по направлениям');
+    const body = gs.map((g, i) => { const low = g.total < 5; return `<div class="ov-geo ${i === 0 && !low ? 'top' : ''}" data-ovgo="analytics">
+      <div class="ov-geo-top"><span class="ov-geo-nm">${i === 0 && !low ? `<span class="ov-geo-crown">${ic(I.flame, 2)}</span>` : ''}${esc(g.name)}</span><span class="ov-geo-v">${low ? '<span class="ov-geo-low">Мало данных</span>' : g.conv + '%'}</span></div>
+      <div class="ov-geo-track"><i style="width:${low ? 6 : g.conv}%" class="${low ? 'low' : ''}"></i></div>
+      <div class="ov-geo-sub">${g.qualified}/${g.total} квалифицировано</div>
+    </div>`; }).join('');
+    return hd + `<div class="ov-geos">${body}</div>`;
   } },
   aivs: { name: 'ИИ против человека', icon: () => I.spark, full: false, render: (c) => {
     const a = c.an.compare.aiLine, h = c.an.compare.human;
-    const rows = [['Первый контакт', a.firstContact, h.firstContact], ['Диалог → ответ', a.dialogConv + '%', h.dialogConv + '%'], ['Ответ → квал.', a.qualConv + '%', h.qualConv + '%'], ['Время до квал.', a.qualTime, h.qualTime]];
-    return `<div class="ov2-card-hd">${ic(I.spark)}ИИ против человека<button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div><div class="ov2-vs"><div class="ov2-vs-h"><span></span><b>ИИ</b><i>человек</i></div>${rows.map(([k, av, hv]) => `<div class="ov2-vs-r"><span>${k}</span><b>${av}</b><i>${hv}</i></div>`).join('')}</div>`;
+    /* парсинг человеческого времени в минуты (для скорости-бара) */
+    const toMin = (s) => { s = String(s); const n = parseFloat(s.replace(',', '.')) || 1; if (/дн|day/i.test(s)) return n * 1440; if (/час|hour|\bч\b/i.test(s)) return n * 60; if (/сек/i.test(s)) return n / 60; return n; };
+    /* строки: conv-метрики (больше=лучше, ширина=значение); время (меньше=лучше, ширина∝скорость) */
+    const speed = (av, hv) => { const am = toMin(av), hm = toMin(hv), aS = 1 / am, hS = 1 / hm, mx = Math.max(aS, hS); return [Math.round(aS / mx * 100), Math.round(hS / mx * 100)]; };
+    const [fcA, fcH] = speed(a.firstContact, h.firstContact);
+    const [qtA, qtH] = speed(a.qualTime, h.qualTime);
+    const rows = [
+      { k: 'Первый контакт', av: a.firstContact, hv: h.firstContact, aw: fcA, hw: fcH },
+      { k: 'Диалог → ответ', av: a.dialogConv + '%', hv: h.dialogConv + '%', aw: a.dialogConv, hw: h.dialogConv },
+      { k: 'Ответ → квал.', av: a.qualConv + '%', hv: h.qualConv + '%', aw: a.qualConv, hw: h.qualConv },
+      { k: 'Время до квал.', av: a.qualTime, hv: h.qualTime, aw: qtA, hw: qtH },
+    ];
+    const ratio = Math.round(toMin(h.firstContact) / Math.max(1, toMin(a.firstContact)));
+    const insight = ratio >= 2 ? `ИИ выходит на первый контакт ~${ratio}× быстрее` : '';
+    return `<div class="ov2-card-hd">${ic(I.spark)}ИИ против человека<span>скорость и конверсия</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
+      <div class="ov-cmp">
+        <div class="ov-cmp-leg"><span class="ov-cmp-key ai"><i></i>ИИ</span><span class="ov-cmp-key hu"><i></i>человек</span></div>
+        ${rows.map(r => `<div class="ov-cmp-row"><div class="ov-cmp-k">${r.k}</div>
+          <div class="ov-cmp-bars">
+            <div class="ov-cmp-bar ai"><i style="width:${Math.max(3, r.aw)}%"></i><b>${r.av}</b></div>
+            <div class="ov-cmp-bar hu"><i style="width:${Math.max(3, r.hw)}%"></i><b>${r.hv}</b></div>
+          </div></div>`).join('')}
+        ${insight ? `<div class="ov-insight">${ic(I.spark, 2)}<span>${insight}</span></div>` : ''}
+      </div>`;
   } },
-  chains: { name: 'Цепочки касаний', icon: () => I.chain, full: false, render: () => {
+  chains: { name: 'Цепочки касаний', icon: () => I.chain, full: false, render: (c) => {
     const seqs = STATE.sequences || []; const on = seqs.filter(s => s.active).length;
     const gn = (g) => g === 'all' ? 'Все гео' : (STATE.settings.geoNames[g] || g);
-    const body = seqs.length ? seqs.slice(0, 6).map(s => `<div class="ov2-lrow" data-ovgo="sequences"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${esc(s.name)}</div><div class="ov2-lrow-s">${esc(gn(s.geo))} · ${(s.steps || []).length} касаний</div></div><span class="ov2-chip ${s.active ? 'on' : ''}">${s.active ? 'вкл' : 'выкл'}</span></div>`).join('') : '<div class="ov2-empty">Нет цепочек</div>';
-    return `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>${on} активны</span><button class="btn btn-sm" data-ovgo="sequences">Все</button></div>${body}`;
+    const leads = c.leads || [];
+    const hd = `<div class="ov2-card-hd">${ic(I.chain)}Цепочки касаний<span>${on} активны</span><button class="btn btn-sm" data-ovgo="sequences">Все</button></div>`;
+    if (!seqs.length) return hd + ovEmpty(I.chain, 'Нет цепочек', 'Соберите цепочку дожима в разделе «Касания»', { label: 'Создать', go: 'sequences', icon: I.plus });
+    const body = seqs.slice(0, 5).map(s => {
+      const steps = (s.steps || []).length;
+      const activeLeads = leads.filter(l => l.geo && (s.geo === 'all' || l.geo === s.geo) && l.ai && l.ai.enabled && !['deal', 'lost'].includes(l.stage)).length;
+      const nodes = Array.from({ length: Math.min(steps, 6) }, (_, i) => `<span class="ov-seq-node ${s.active ? 'on' : ''}"></span>${i < Math.min(steps, 6) - 1 ? '<span class="ov-seq-link"></span>' : ''}`).join('');
+      return `<div class="ov-chain ${s.active ? 'on' : ''}" data-ovgo="sequences">
+        <div class="ov-chain-top"><span class="ov-chain-nm">${esc(s.name)}</span><span class="ov2-chip ${s.active ? 'on' : ''}">${s.active ? 'вкл' : 'выкл'}</span></div>
+        <div class="ov-chain-seq">${nodes || '<span class="ov-seq-node"></span>'}</div>
+        <div class="ov-chain-meta">${esc(gn(s.geo))}<span>·</span>${steps} ${plural(steps, 'касание', 'касания', 'касаний')}${s.active && activeLeads ? `<span>·</span>${activeLeads} в работе` : ''}</div>
+      </div>`;
+    }).join('');
+    return hd + `<div class="ov-chains">${body}</div>`;
   } },
   leaders: { name: 'Доска лидеров', icon: () => I.flame, full: false, render: (c) => {
     const now = Date.now(), mAgo = now - 30 * 864e5;
@@ -1237,32 +1349,48 @@ const OV_W = {
     return `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${rows || '<div class="ov2-empty">Добавьте направления в профиле агентства</div>'}`;
   } },
   goal: { name: 'Цель месяца', icon: () => I.target, full: false, render: (c) => {
-    const now = Date.now(), mAgo = now - 30 * 864e5;
+    const now = new Date();
+    const monthStart = +new Date(now.getFullYear(), now.getMonth(), 1);
     const target = (STATE.settings.agency.monthGoal) || 10;
-    const done = c.leads.filter(l => l.stage === 'deal' && (c.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at > mAgo)).length;
+    const done = c.leads.filter(l => l.stage === 'deal' && (c.events || []).some(e => e.leadId === l.id && e.type === 'deal' && e.at >= monthStart)).length;
     const pct = Math.min(100, Math.round(done / target * 100));
     const left = Math.max(0, target - done);
-    const hd = `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span><button class="btn btn-sm" data-ovgo="analytics">Детали</button></div>`;
-    const note = `<div class="ov2-goal-note">${done >= target ? 'Цель достигнута' : `Ещё ${left} ${plural(left, 'сделка', 'сделки', 'сделок')} до цели`}</div>`;
-    return hd + `<div class="ov2-gauge-wrap">${gaugeSvg(pct)}<div class="ov2-gauge-c"><b>${cup(done)}</b><i>из ${target}</i></div><div class="ov2-gauge-pct">${cup(pct, '%')}</div></div>${note}`;
+    const day = now.getDate(), dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), daysLeft = dim - day;
+    const projected = day >= 2 ? Math.round(done / day * dim) : null;
+    const hd = `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки в этом месяце</span><button class="btn btn-sm" data-ovgo="analytics">Детали</button></div>`;
+    const projMark = projected != null ? Math.min(100, Math.round(projected / target * 100)) : null;
+    return hd + `<div class="ov-goal2">
+      <div class="ov-goal2-hero"><div class="ov-goal2-num"><b>${cup(done)}</b><span>/ ${target}</span></div><div class="ov-goal2-lbl">${done >= target ? 'Цель достигнута 🎯' : `Ещё ${left} ${plural(left, 'сделка', 'сделки', 'сделок')}`}<i>сделок закрыто</i></div></div>
+      <div class="ov-goal2-track"><i style="width:${pct}%"></i>${projMark != null && projMark < 100 && projMark > pct ? `<span class="ov-goal2-proj" style="left:${projMark}%" title="прогноз"></span>` : ''}</div>
+      <div class="ov-goal2-pace">
+        <div class="ov-goal2-p"><b>${projected != null ? projected : '—'}</b><i>прогноз к концу месяца</i></div>
+        <div class="ov-goal2-p"><b>${daysLeft}</b><i>${plural(daysLeft, 'день', 'дня', 'дней')} осталось</i></div>
+      </div>
+      ${projected != null ? `<div class="ov-goal2-note ${projected >= target ? 'ok' : 'warn'}">${ic(projected >= target ? I.check : I.clock, 2)}<span>При текущем темпе: ~${projected}/${target}${projected >= target ? ' — идём в план' : ' — темп ниже цели'}</span></div>` : ''}
+    </div>`;
   } },
   hotleads: { name: 'Горячие лиды', icon: () => I.flame, full: false, render: (c) => {
     const hot = c.leads.filter(l => !['lost', 'deal'].includes(l.stage)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 4);
+    const ini = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
     const hd = `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
-    if (!hot.length) return hd + '<div class="ov2-empty">Пока нет активных лидов</div>';
-    return hd + `<div class="ovx-hotgrid">${hot.map(l => { const sc = l.score || 0; const R = 18, C = 2 * Math.PI * R; return `<div class="ovx-hc" data-ovlead="${l.id}">
-      <div class="ovx-hc-top">
-        <div class="ovx-hc-ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="${R}" class="hc-bg"/><circle cx="22" cy="22" r="${R}" class="hc-fg" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - Math.min(100, sc) / 100)).toFixed(1)}" transform="rotate(-90 22 22)"/></svg><b>${sc}</b></div>
-        <div class="ovx-hc-id"><div class="ovx-hc-nm">${esc((l.name || '—').split(' ')[0])}</div><div class="ovx-hc-loc">${esc(l.geoName || '—')}</div></div>
+    if (!hot.length) return hd + ovEmpty(I.flame, 'Пока нет активных лидов', 'Горячие лиды поднимутся сюда по мере скоринга');
+    return hd + `<div class="ov-urg">${hot.map(l => { const sc = l.score || 0; const u = Math.min(1, sc / 100); const ts = l.lastMsgAt || l.createdAt; return `<div class="ov-urg-c" data-ovlead="${l.id}" style="--u:${u.toFixed(2)}">
+      <span class="ov-urg-rail"></span>
+      <div class="ov-urg-h">
+        <span class="ov-urg-ava">${esc(ini(l.name))}</span>
+        <div class="ov-urg-id"><span class="ov-urg-nm">${esc((l.name || '—').split(' ')[0])}</span><span class="ov-urg-meta">${esc(l.geoName || '—')} · ${esc(ovStageName(l.stage))}</span></div>
+        <span class="ov-urg-score">${sc}</span>
       </div>
-      <div class="ovx-hc-acts"><span class="ovx-hc-btn">${ic(I.phone, 2)}</span><span class="ovx-hc-btn">${ic(I.chat, 2)}</span><span class="ovx-hc-arrow">${ic(I.arrow, 2)}</span></div>
+      <div class="ov-urg-foot"><span class="ov-urg-ago">${ts ? ago(ts) : '—'}</span><span class="ov-urg-acts"><span class="ov-urg-btn" title="Позвонить">${ic(I.phone, 2)}</span><span class="ov-urg-btn" title="Написать">${ic(I.chat, 2)}</span><span class="ov-urg-open">${ic(I.arrow, 2)}</span></span></div>
     </div>`; }).join('')}</div>`;
   } },
   casebase: { name: 'База кейсов', icon: () => I.doc, full: false, render: (c) => {
     const OC = { 'Выиграли': 'win', 'Проиграли': 'lose', 'В работе': 'wip', 'Урок': 'lesson' };
     const cs = (c.cases || []).slice(0, 6);
-    const body = cs.length ? cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('') : '<div class="ov2-empty">Разберите лиды на планёрке → «Сохранить в базу кейсов»</div>';
-    return `<div class="ov2-card-hd">${ic(I.doc)}База кейсов<span>${(c.cases || []).length} ${plural((c.cases || []).length, 'разбор', 'разбора', 'разборов')}</span></div>${body}`;
+    const hd = `<div class="ov2-card-hd">${ic(I.doc)}База кейсов<span>${(c.cases || []).length} ${plural((c.cases || []).length, 'разбор', 'разбора', 'разборов')}</span></div>`;
+    if (!cs.length) return hd + `<div class="ov-ghost"><div class="ov-ghost-stack">${ic(I.doc, 2)}<span class="ov-ghost-p"></span><span class="ov-ghost-p"></span></div><div class="ov-ghost-t">База кейсов пуста</div><div class="ov-ghost-s">Разберите лиды на планёрке и сохраните вывод — команда будет учиться на реальных сделках</div></div>`;
+    const body = cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('');
+    return hd + body;
   } },
 };
 
@@ -1553,7 +1681,7 @@ PAGES.overview = async (root) => {
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
         ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; return `<div class="ov-w ${w.full ? 'full' : ''}" data-w="${k}">
           ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
-          <div class="ov-w-body glass card">${w.render(ctx)}</div>
+          <div class="ov-w-body glass card ${OV_SURF[k] || ''}">${w.render(ctx)}</div>
         </div>`; }).join('')}
         ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
