@@ -5283,18 +5283,31 @@ function openStudioModal() {
       </div>
       <div class="form-row"><label>Факты и вводные</label><textarea id="stBrief" placeholder="1BR от $185K · доходность 8–12% · рассрочка 0% на 36 мес · сдача 2027 · 300 м до пляжа · панорамное остекление · натуральные материалы…"></textarea></div>
       <div class="form-row"><label>Фото проекта — ссылки (по одной на строке, /assets/… или https://…)</label><textarea id="stImgs" placeholder="/assets/lib/gen-....png"></textarea></div>
-      <div class="form-row" style="max-width:180px"><label>Сколько слайдов</label><select id="stCount"><option value="6">6</option><option value="5">5</option><option value="7">7</option><option value="8">8</option></select></div>`,
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center">
+        <div class="form-row" style="max-width:150px"><label>Слайдов</label><select id="stCount"><option value="6">6</option><option value="5">5</option><option value="7">7</option><option value="8">8</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label class="switch-row" style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="stDirs"><span style="font-size:13px">✦ 3 направления сразу (A редакторский · B минимал · C инвест)</span></label>
+          <label class="switch-row" style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="stPolish"><span style="font-size:13px">🔍 Авто-полировка визуальным критиком (локально)</span></label>
+        </div>
+      </div>`,
     actions: [{ label: 'Сгенерировать дизайн', cls: 'btn-accent', onClick: async (bd) => {
-      const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Директор работает…'; }
+      const btn = bd.parentNode.querySelector('.btn-accent');
+      const setB = (t) => { if (btn) { btn.disabled = true; btn.textContent = t; } };
       try {
         const images = ($('#stImgs', bd).value || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        const r = await api.post('/studio/generate', {
-          name: $('#stName', bd).value, geo: $('#stGeo', bd).value, brief: $('#stBrief', bd).value,
-          wordmark: { name: $('#stWm', bd).value, tag: $('#stWt', bd).value },
-          images, count: +($('#stCount', bd).value || 6),
-        });
-        toast('Дизайн собран', 'Открываю редактор — ' + (r.concept || ''), true);
-        window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+        const payload = { name: $('#stName', bd).value, geo: $('#stGeo', bd).value, brief: $('#stBrief', bd).value, wordmark: { name: $('#stWm', bd).value, tag: $('#stWt', bd).value }, images, count: +($('#stCount', bd).value || 6) };
+        if ($('#stDirs', bd).checked) {
+          setB('Директор рисует 3 направления…');
+          const r = await api.post('/studio/directions', payload);
+          (r.directions || []).filter(d => d.id).forEach(d => window.open('/car/' + d.id + '?edit=1&key=' + r.editKey, '_blank'));
+          toast('3 направления собраны', (r.directions || []).map(d => d.name).join(' · '), true);
+        } else {
+          setB('Директор работает…');
+          const r = await api.post('/studio/generate', payload);
+          if ($('#stPolish', bd).checked) { setB('Критик полирует…'); try { await api.post('/studio/autopolish', { cid: r.id, maxPasses: 2 }); } catch (e) { toast('Полировка пропущена', e.message); } }
+          toast('Дизайн собран', 'Открываю редактор — ' + (r.concept || ''), true);
+          window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+        }
         render();
       } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Сгенерировать дизайн'; } return false; }
     } }, { label: 'Отмена' }],
