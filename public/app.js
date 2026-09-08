@@ -4757,6 +4757,8 @@ function wireCarPickers(scope) {
   $$('.cpick', scope).forEach(pick => pick.addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; pick.querySelector('input').value = b.dataset.v; $$('[data-v]', pick).forEach(x => x.classList.toggle('on', x === b)); }));
 }
 const SHOOT_FMT = { talking: 'Говорящая голова', dialogue: 'Диалог 50/50', vlog: 'Влог / на объекте' };
+/* проверенные вирусные формулы (психо-механика) — для пикера; логика/каркасы на сервере (REELS_FORMULAS) */
+const REEL_FORMULAS_UI = { pas: 'PAS · Боль → Решение', contrarian: 'Контр-интуиция', openloop: 'Открытая петля', mythbust: 'Разрушение мифа', listicle: 'Список · N ошибок', insider: 'Инсайд «скрывают»', casereveal: 'Кейс с цифрой', bab: 'Было → Стало → Мост', fomo: 'FOMO · срочность', storypov: 'История / POV', question: 'Вопрос-крючок' };
 const SOCIAL_TOOLS = {
   scripts:   { name: 'Сценарии Reels', icon: I.play,   sub: 'хук → структура → CTA', hue: '#2FA98C' },
   hunt:      { name: 'Хантинг идей',   icon: I.spark,  sub: 'листай как в Tinder',   hue: '#C9922E' },
@@ -4898,7 +4900,8 @@ function renderScriptCard(s) {
     s.cta ? 'ПРИЗЫВ: ' + s.cta : '', s.codeword ? ('КОДОВОЕ СЛОВО: ' + s.codeword + (s.leadmagnet ? (' → ' + s.leadmagnet) : '')) : '', '',
     s.caption ? 'ПОДПИСЬ:\n' + s.caption : '', broll ? 'ВИДЕОРЯД: ' + (s.broll || []).join(' · ') : ''].filter(Boolean).join('\n');
   return `<div class="sh-card">
-    <div class="sh-card-hd"><div><span class="sh-badge">${esc(s.format || SHOOT_FMT[s.format_key] || '')}</span>${s.duration_sec ? `<span class="sh-dur">~${s.duration_sec} сек</span>` : ''}</div>${cpBtn(allText, 'Весь вариант')}</div>
+    <div class="sh-card-hd"><div>${s.formula_name ? `<span class="sh-formula">${ic(I.spark, 2)}${esc(s.formula_name)}</span>` : ''}<span class="sh-badge">${esc(s.format || SHOOT_FMT[s.format_key] || '')}</span>${s.duration_sec ? `<span class="sh-dur">~${s.duration_sec} сек</span>` : ''}</div>${cpBtn(allText, 'Весь вариант')}</div>
+    ${s.psych ? `<div class="sh-psych">${ic(I.eye, 2)}<span><b>Психология:</b> ${esc(s.psych)}</span></div>` : ''}
     ${s.goal_fit ? `<div class="sh-goalfit">${esc(s.goal_fit)}</div>` : ''}
     <div class="sh-seclbl">Хуки — 3 захода на первые секунды</div><div class="sh-hooks">${hooks}</div>
     ${s.hook_note ? `<div class="sh-note">${esc(s.hook_note)}</div>` : ''}
@@ -4998,6 +5001,7 @@ async function shScripts(main) {
       <div class="sh-fmts"><span class="sh-lbl">Формат съёмки</span>${Object.entries(SHOOT_FMT).map(([k, n]) => `<button type="button" class="chip-t ${SOCIAL_SCRIPT_FMTS.has(k) ? 'on' : ''}" data-fmt="${k}">${n}</button>`).join('')}<span class="muted sh-fmts-note">на каждый формат — свой вариант сценария</span></div>
       <div class="sh-gen-foot">
         <select id="shGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <select id="shFormula" class="sh-sel" title="Психо-формула сценария"><option value="">Формула — авто (ИИ подберёт)</option>${Object.entries(REEL_FORMULAS_UI).map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('')}</select>
         <span class="tb-spacer"></span>
         <button class="btn btn-accent" id="shGo">${ic(I.spark)}Собрать сценарии</button>
       </div>
@@ -5037,7 +5041,7 @@ async function shScripts(main) {
     if (SOCIAL_SCRIPT_MODE === 'idea' && !topic) { toast('Опиши идею — текстом или голосом 🎤'); return; }
     btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ пишет сценарии…';
     try {
-      const item = await api.post('/social/scripts', { topic, sourceText: src, mode: SOCIAL_SCRIPT_MODE, formats: [...SOCIAL_SCRIPT_FMTS], geo: $('#shGeo', main).value });
+      const item = await api.post('/social/scripts', { topic, sourceText: src, mode: SOCIAL_SCRIPT_MODE, formats: [...SOCIAL_SCRIPT_FMTS], geo: $('#shGeo', main).value, formula: ($('#shFormula', main) || {}).value || '' });
       SC_OPEN.add(item.id); hist.unshift(item); paintOut();
       toast('Готово', 'Сценарии собраны', true);
       out.scrollIntoView({ behavior: 'smooth', block: 'start' });

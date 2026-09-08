@@ -816,6 +816,8 @@ const sanSlide = (s) => ({
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
   mode: ['stats', 'steps', 'gauges', 'amenities', 'bars'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
+  /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
+  points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
 /* подбор иконки удобства по ключевым словам фишки (RU/EN) */
@@ -953,6 +955,63 @@ function trimToCount(slides, N) {
   for (const i of modes) { if (budget <= 0) break; keep.add(i); budget--; }
   for (const i of plain) { if (budget <= 0) break; keep.add(i); budget--; }
   return slides.filter((_, i) => keep.has(i));
+}
+
+/* ═══ Смысловые стикеры: ИИ-подстановка уместного стикера по смыслу слайда ═══
+   Из нарезанных паков (public/assets/stickers/index.json) с keywords+cat.
+   Ставит 1 стикер в угол на уверенных совпадениях (не засоряет): обложка/инвест/локация/CTA. */
+let _stkIdx = null;
+function stickerIndex() {
+  if (_stkIdx) return _stkIdx;
+  _stkIdx = [];
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'assets', 'stickers', 'index.json'), 'utf8'));
+    (j.packs || []).forEach(p => (p.items || []).forEach(it => _stkIdx.push({ key: it.key, label: it.label, cat: it.cat || 'generic', kw: it.kw || [], pack: p.slug })));
+  } catch (e) { _stkIdx = []; }
+  return _stkIdx;
+}
+function attachSemanticStickers(slides, opts = {}) {
+  const idx = stickerIndex(); if (!idx.length || !Array.isArray(slides)) return slides;
+  const angle = opts.angle || 'auto';
+  const angleCat = { luxury: 'luxury', lifestyle: 'lifestyle', investment: 'invest', discount: 'invest', urgency: 'urgency' }[angle] || '';
+  const norm = s => String(s == null ? '' : s).toLowerCase().replace(/ё/g, 'е');
+  const used = new Set();
+  let placed = 0; const MAXP = Math.min(5, Math.max(2, Math.ceil(slides.length / 2)));
+  slides.forEach((s, i) => {
+    if (placed >= MAXP) return;
+    if (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img')) return;   /* галерея/локация/фото-слой — не перегружаем */
+    const last = i === slides.length - 1;
+    const txt = norm([s.eyebrow, String(s.heading || '').replace(/<[^>]*>/g, ''), s.sub, (s.items || []).map(it => (it.k || '') + ' ' + (it.text || it.v || '')).join(' ')].join(' '));
+    let cat = 'generic';
+    if (i === 0) cat = angle === 'urgency' ? 'urgency' : 'cover';
+    else if (['stats', 'bars', 'gauges'].includes(s.mode)) cat = 'invest';
+    else if (s.mode === 'amenities') cat = 'amenity';
+    else if (/локац|район|\bгде\b|\bкарт|адрес|метро|пляж|центр|марин|downtown|beach/.test(txt)) cat = 'location';
+    else if (last || /запиш|оставь|заявк|\bсвяж|\bсвяз|контакт|whatsapp|звони|консультац|бронир|\bbook|запрос|подбор/.test(txt)) cat = 'cta';
+    else if (/рассроч|цена|доход|roi|окупа|инвест|прибыл|актив/.test(txt)) cat = 'invest';
+    else if (angleCat) cat = angleCat;
+    let best = null, bestSc = 0;
+    for (const st of idx) {
+      if (used.has(st.key)) continue;
+      let sc = 0;
+      if (st.cat === cat) sc += 4;
+      else if (cat === 'cover' && ['urgency', 'deal', 'luxury'].includes(st.cat)) sc += 2;
+      else if (cat === 'cta' && ['contact', 'deal'].includes(st.cat)) sc += 3;
+      for (const k of st.kw) { const w = norm(k).split(/\s+/)[0]; if (w.length >= 4 && txt.includes(w.slice(0, 5))) sc += 2; }
+      if (st.pack === 'realty' || st.pack === 'broker') sc += 1;   /* на-тему паки предпочтительнее iOS-иконок */
+      if (sc > bestSc) { bestSc = sc; best = st; }
+    }
+    if (best && bestSc >= 5) {
+      used.add(best.key); placed++;
+      const url = '/assets/stickers/' + best.key + '.png';
+      const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);
+      const L = i === 0
+        ? { t: 'img', url, x: 60, y: 10, w: badge ? 34 : 22, round: 0, z: 6, rot: -4 }
+        : { t: 'img', url, x: 70, y: 8, w: badge ? 26 : 17, round: 0, z: 6, rot: 4 };
+      const sl = sanLayer(L); if (sl) { s.layers = Array.isArray(s.layers) ? s.layers : []; s.layers.push(sl); }
+    }
+  });
+  return slides;
 }
 
 /* галерея-раскладки: чередуем композиции, чтобы слайды не были однотипными
@@ -2517,6 +2576,7 @@ const server = http.createServer(async (req, res) => {
       const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
       if (NN) slides = trimToCount(slides, NN);
       slides = stylePass(slides, PAGE_THEMES[b.theme] || {});
+      if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -2619,6 +2679,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
         slides = stylePass(slides, PAGE_THEMES[c.theme] || {});    /* разные раскладки + фоны, соседние отличаются */
+        if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });   /* уместный стикер по смыслу слайда */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
@@ -2766,7 +2827,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const out = await llm.composeScripts({
           topic, geo: db.settings.geoNames[b.geo] || b.geo, agencyName: db.settings.agency.name,
-          formats: b.formats, mode: b.mode === 'rewrite' ? 'rewrite' : 'idea', sourceText: b.sourceText,
+          formats: b.formats, mode: b.mode === 'rewrite' ? 'rewrite' : 'idea', sourceText: b.sourceText, formula: b.formula || '',
         });
         const item = { id: crypto.randomBytes(5).toString('hex'), kind: 'script', title: out.title, geo: b.geo || '', mode: b.mode === 'rewrite' ? 'rewrite' : 'idea', scripts: out.scripts, createdAt: Date.now() };
         db.socialContent.unshift(item); db.socialContent = db.socialContent.slice(0, 300); store.save();
@@ -4277,7 +4338,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
-            ${(s.mode || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
+            ${!s.mode && (s.points || []).length ? `<ul class="s-points">${s.points.map(pt => `<li><span class="s-pt-m"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
+            ${(s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
         </div>${isEdit ? `<div class="s-bar">
