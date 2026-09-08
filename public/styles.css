@@ -3663,3 +3663,50 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-wa-t:hover { border-color: var(--accent); }
 .ov2-wa-t b { font-size: 20px; font-weight: 800; color: var(--navy-900); display: block; line-height: 1; font-variant-numeric: tabular-nums; }
 .ov2-wa-t i { font-size: 11px; color: var(--ink-3); font-style: normal; }
+
+/* ============ Керамика-2026: тактильные матовые поверхности виджетов ============ */
+/* светлая керамика: мягкий матовый градиент, многослойная амбиентная тень + верхний внутренний хайлайт */
+.ov-w.ov-skin-clean .ov-w-body,
+.ov-w:not([class*="ov-skin-"]) .ov-w-body {
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,.55);
+  background: linear-gradient(180deg, #FFFFFF 0%, color-mix(in srgb, var(--card) 90%, #EAF0F8) 100%);
+  box-shadow:
+    0 1px 1px rgba(16,43,92,.03),
+    0 10px 22px -14px rgba(16,43,92,.13),
+    0 28px 54px -30px rgba(16,43,92,.16),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+.ov-w:not(.full):hover .ov-w-body { transform: translateY(-3px); box-shadow:
+    0 2px 3px rgba(16,43,92,.04),
+    0 16px 30px -14px rgba(16,43,92,.16),
+    0 40px 70px -34px rgba(16,43,92,.22),
+    inset 0 1px 0 rgba(255,255,255,.95); }
+/* тёмная керамика: матовая глубина + холодный внутренний хайлайт сверху */
+.ov-w.ov-skin-dark .ov-w-body, .ov-w.ov-skin-midnight .ov-w-body, .ov-w.ov-skin-aurora .ov-w-body, .ov-w.ov-skin-silk .ov-w-body {
+  border-radius: 22px;
+  box-shadow: 0 16px 40px -20px rgba(6,17,38,.55), inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(122,158,255,.06);
+}
+.ov-w.ov-skin-gradient .ov-w-body { border-radius: 22px; box-shadow: 0 18px 42px -18px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.18); }
+/* иконки-чипы — керамическое тиснение (мягкий градиент + внутренний свет + микро-тень) */
+.ov2-kpi-ic, .kc-chip-ic, .kbn-c-ic, .kb-c-ic, .ov2-att-ic {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 20%, #fff), color-mix(in srgb, var(--accent) 10%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 2px color-mix(in srgb, var(--accent) 14%, transparent), 0 3px 8px -4px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+/* внутренние под-карточки (плитки/чипы/строки-кнопки) — матовая керамика */
+.kc-chip, .ov2-kh-row, .kbn-cell, .kt-row, .ov2-hc, .ov2-wa-t, .ov2-kpi {
+  border: 1px solid rgba(255,255,255,.6);
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--card) 94%, #EEF2F8));
+  box-shadow: 0 1px 2px rgba(16,43,92,.04), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.kc-chip:hover, .ov2-hc:hover, .ov2-wa-t:hover, .ov2-kpi:hover { box-shadow: 0 6px 16px -8px rgba(16,43,92,.2), inset 0 1px 0 rgba(255,255,255,.9); }
+/* заголовки виджетов — чуть воздушнее, буквица тоньше */
+.ov2-card-hd { letter-spacing: -.015em; }
+/* мягкая пружинная анимация */
+.ov-w-body, .ov2-kpi, .ov2-hc, .kc-chip { transition: box-shadow .3s cubic-bezier(.34,1.3,.5,1), transform .3s cubic-bezier(.34,1.3,.5,1), border-color .2s; }
+
+/* библиотека виджетов: реалистичные превью (реальный рендер), full-виджеты во всю ширину */
+.ov2-lib-i.wide { grid-column: 1 / -1; }
+.ov2-lib-i.wide .ov2-lib-prev { height: 150px; }
+.ov2-lib-prev-in.ov-w-body { border-radius: 0; border: none; background: transparent; box-shadow: none; }
+.ov2-lib-prev { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--bg-2)), var(--bg-2)); }

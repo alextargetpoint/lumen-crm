@@ -1686,10 +1686,10 @@ function ovLibrary(ctx, layout, onChange) {
   const isDefault = layout.length === OV_DEFAULT.length && layout.join() === OV_DEFAULT.join();
   const lb = modal({
     title: 'Библиотека виджетов', wide: true, sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
-    body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => `<div class="ov2-lib-i" data-add="${k}">
+    body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => { let inner; try { inner = OV_W[k].render(ctx, 'default'); } catch (_) { inner = OV_PREV[k] ? OV_PREV[k]() : ''; } return `<div class="ov2-lib-i ${OV_W[k].full ? 'wide' : ''}" data-add="${k}">
         <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
-        <div class="ov2-lib-prev"><div class="ov2-lib-prev-in glass card">${OV_PREV[k] ? OV_PREV[k]() : OV_W[k].render(ctx)}</div></div>
-      </div>`).join('')}</div>` : '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>'}
+        <div class="ov2-lib-prev"><div class="ov-w-body glass card ov2-lib-prev-in">${inner}</div></div>
+      </div>`; }).join('')}</div>` : '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>'}
       ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`,
     actions: [{ label: 'Закрыть' }],
   });
