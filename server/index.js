@@ -910,7 +910,10 @@ function stylePass(slides, theme) {
   slides.forEach((s, i) => {
     const isCover = i === 0;
     const isCTA = i === slides.length - 1;
-    const hasPhoto = !!(s.bg || s.bgv);
+    /* стикеры добавляются ПОСЛЕ stylePass, значит любой img-слой здесь = фото-слайд (галерея/локация) —
+       его pos:'top' и раскладку НЕ перебивать (иначе фото наезжали на заголовок) */
+    const hasLayerPhoto = Array.isArray(s.layers) && s.layers.some(l => l.t === 'img');
+    const hasPhoto = !!(s.bg || s.bgv) || hasLayerPhoto;
     const isMode = !!s.mode;
     /* фон: не трогаем фото-слайды; обложку/финал оставляем; остальным — ротация, сосед ≠ */
     if (!hasPhoto && !isCover) {
