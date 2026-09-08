@@ -420,7 +420,7 @@ ${topic ? 'Тема/вводные: ' + String(topic).slice(0, 400) + '\n' : ''}
       eyebrow: String(s.eyebrow || '').replace(/<[^>]*>/g, '').slice(0, 22),
       heading: String(s.heading || '').slice(0, 90),
       sub: String(s.sub || '').slice(0, 200),
-      points: (i > 0 && i < arr.length - 1 && Array.isArray(s.points)) ? s.points.map(p => String(p).replace(/<[^>]*>/g, '').slice(0, 60)).filter(Boolean).slice(0, 3) : [],
+      points: (density !== 'brief' && i > 0 && i < arr.length - 1 && Array.isArray(s.points)) ? s.points.map(p => String(p).replace(/<[^>]*>/g, '').slice(0, 60)).filter(Boolean).slice(0, density === 'rich' ? 3 : 3) : [],
       pos: 'bottom', align: 'left', size: i === 0 ? 'l' : 'm',
     })),
   };
