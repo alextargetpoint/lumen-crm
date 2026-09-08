@@ -4478,3 +4478,125 @@ html[data-night] .cmp-prev-b { background: rgba(80, 140, 90, .16); border-color:
 .ds-modal .ds-grid { margin-bottom: 8px; }
 .ds-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
 @media (max-width: 560px) { .ds-grid { grid-template-columns: 1fr; } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ОБЗОР v3 — углубление иерархии/контраста/плотности + motion-слой.
+   Строится ПОВЕРХ v2 (surfaces/архетипы). Блок в конце файла — намеренно
+   перекрывает предыдущие правила по каскаду.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --r-xl: 22px; --r-card: 18px; --r-analytics: 16px; --r-nested: 12px; --r-chip: 9px; --r-pill: 999px;
+  --shadow-subtle: 0 1px 2px rgba(20,33,58,.04), 0 4px 14px -8px rgba(20,33,58,.10);
+  --shadow-elevated: 0 10px 30px -14px rgba(20,33,58,.20);
+  --shadow-hero: 0 18px 44px -18px rgba(11,30,69,.55);
+}
+html[data-night] {
+  --shadow-subtle: 0 1px 2px rgba(0,0,0,.30), 0 6px 18px -10px rgba(0,0,0,.45);
+  --shadow-elevated: 0 12px 32px -14px rgba(0,0,0,.55);
+  --shadow-hero: 0 18px 44px -18px rgba(0,0,0,.7);
+}
+
+/* ── асимметр. сетка: dense-упаковка + пер-виджет спаны (стаггер, но выровнено) ── */
+.ov2-grid { grid-auto-flow: row dense; }
+.ov-w.ov-span-4 { grid-column: span 4; }
+.ov-w.ov-span-5 { grid-column: span 5; }
+.ov-w.ov-span-6 { grid-column: span 6; }
+.ov-w.ov-span-7 { grid-column: span 7; }
+.ov-w.ov-span-8 { grid-column: span 8; }
+@media (max-width:1180px){ .ov-w[class*="ov-span-"] { grid-column: span 6; } }
+@media (max-width:760px){ .ov-w[class*="ov-span-"] { grid-column: span 1; } }
+
+/* ── плотность +10-15%: меньше воздуха в оболочке и заголовке, но не тесно ── */
+.ov2-grid .ov-w-body { padding: 16px 17px; }
+.ov2-card-hd { margin-bottom: 13px; }
+.ov2-task, .ov2-meet { min-height: 40px; padding: 6px 8px; }
+
+/* ── карт-варианты: единая иерархия радиус/тень/бордер (не «всё одинаково плывёт») ── */
+.ov2-grid:not(.editing) .ov-w-body { border-radius: var(--r-card); }
+.ov2-grid:not(.editing) .ov-w-body.cv-standard { box-shadow: var(--shadow-subtle); }
+/* аналитика — БЕЗ тени: контраст держим поверхностью + 1px бордер */
+.ov2-grid:not(.editing) .ov-w-body.cv-analytics { box-shadow: none; border-radius: var(--r-analytics); border-color: color-mix(in srgb, var(--stroke) 88%, transparent); }
+.ov2-grid:not(.editing) .ov-w-body.cv-analytics:hover { transform: translateY(-1px); box-shadow: var(--shadow-subtle); }
+/* тинт-архетипы (связь/интеллект/лидеры) — плоско, играем цветом поверхности */
+.ov2-grid:not(.editing) .ov-w-body.cv-tinted,
+.ov2-grid:not(.editing) .ov-w-body.cv-system,
+.ov2-grid:not(.editing) .ov-w-body.cv-editorial { box-shadow: none; }
+.ov2-grid:not(.editing) .ov-w-body.cv-tinted:hover,
+.ov2-grid:not(.editing) .ov-w-body.cv-system:hover,
+.ov2-grid:not(.editing) .ov-w-body.cv-editorial:hover { transform: translateY(-1px); box-shadow: var(--shadow-subtle); }
+/* AI-виджеты — фиолет + мягкая тень; акцент-бордер */
+.ov2-grid:not(.editing) .ov-w-body.cv-ai { box-shadow: var(--shadow-subtle); border-color: var(--surf-line-violet); }
+.ov2-grid:not(.editing) .ov-w-body.cv-ai:hover { transform: translateY(-2px); box-shadow: var(--shadow-elevated); }
+/* цель месяца — приподнятый фокус */
+.ov2-grid:not(.editing) .ov-w-body.cv-goal { box-shadow: var(--shadow-elevated); border-radius: var(--r-xl); }
+.ov2-grid:not(.editing) .ov-w-body.cv-goal:hover { transform: translateY(-2px); box-shadow: var(--shadow-hero); }
+/* инсет — «утоплённая» вспомогательная плитка (низкий приоритет: часовые пояса) */
+.ov2-grid:not(.editing) .ov-w-body.cv-inset { box-shadow: none; background: var(--bg-2); border-color: transparent; border-radius: var(--r-analytics); }
+.ov2-grid:not(.editing) .ov-w-body.cv-standard:hover { transform: translateY(-2px); box-shadow: var(--shadow-elevated); }
+/* горячие лиды — тёплый контейнер (премиум, не аларм-красный) */
+.ov2-grid:not(.editing) .ov-w-body.cv-urgent { background: linear-gradient(180deg, color-mix(in srgb, #EF4F3D 5%, var(--surface-1)), var(--surface-1) 60%); border-color: color-mix(in srgb, #EF4F3D 22%, var(--stroke)); box-shadow: var(--shadow-subtle); border-radius: var(--r-xl); }
+.ov2-grid:not(.editing) .ov-w-body.cv-urgent:hover { transform: translateY(-2px); box-shadow: var(--shadow-elevated); }
+.cv-urgent .ov2-card-hd svg { color: #EF4F3D; }
+/* онбординг — setup-journey, слейт-блю тинт (не аналитика) */
+.ov2-grid:not(.editing) .ov-w-body.cv-setup { background: var(--surf-tint-blue); border-color: var(--surf-line-blue); box-shadow: var(--shadow-subtle); }
+
+/* ── онбординг: сегментированный прогресс + done/pending ── */
+.ov-setup-prog { display: flex; align-items: center; gap: 13px; margin-bottom: 14px; }
+.ov-setup-segs { display: flex; gap: 5px; flex: 1; }
+.ov-setup-seg { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--gauge-track); transition: background .5s var(--ease-spring); }
+.ov-setup-seg.on { background: linear-gradient(90deg, var(--ov-cat-blue), var(--ov-cat-purple)); }
+.ov-setup-frac { font-size: 13px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; flex: none; }
+.ov-setup-frac i { font-weight: 500; color: var(--ink-3); font-style: normal; }
+.ov-setup-done { margin-left: auto; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ov-cat-green); background: var(--ov-soft-green); border-radius: var(--r-pill); padding: 2px 9px; }
+
+/* ── активность: семантичные чипы события + тише таймстемпы ── */
+.ov-tl-tm { display: inline-flex; align-items: center; gap: 7px; }
+.ov-tl-chip { font-size: 9.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 8px; border-radius: var(--r-pill); }
+.ov-tl-chip.c-price { color: var(--ov-cat-green); background: var(--ov-soft-green); }
+.ov-tl-chip.c-neg { color: var(--ov-cat-red); background: var(--ov-soft-red); }
+.ov-tl-chip.c-interest { color: var(--ov-cat-blue); background: var(--ov-soft-blue); }
+.ov-tl-chip.c-mortgage { color: var(--ov-cat-purple); background: var(--ov-soft-purple); }
+.ov-tl-chip.c-loc { color: var(--ov-cat-amber); background: var(--ov-soft-amber); }
+.ov-tl-chip.c-q { color: var(--ink-2); background: var(--ov-chip-gray); }
+
+/* ── AI-vs-человек: инсайт как градиент-вывод (не плоская полоска) ── */
+.ov-insight { margin-top: 14px; padding: 11px 13px; border-radius: var(--r-nested); border: 1px solid var(--surf-line-violet);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--ov-cat-purple) 17%, transparent), color-mix(in srgb, var(--ov-cat-purple) 6%, transparent));
+  color: var(--ov-cat-purple); font-weight: 700; }
+
+/* ═══ MOTION-СЛОЙ: тонкая видео-атмосфера под hero/AI-зонами ═══ */
+.ovm { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.ovm-poster, .ovm-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ovm-poster { z-index: 0; }
+.ovm-vid { z-index: 1; }
+.ovm-scrim { position: absolute; inset: 0; z-index: 2; }
+.ovm-subtle .ovm-poster, .ovm-subtle .ovm-vid { opacity: .32; }
+.ovm-soft .ovm-poster, .ovm-soft .ovm-vid { opacity: .5; }
+/* scrim держит текст читаемым (WCAG) */
+.ovm-scrim-navyHero { background: linear-gradient(120deg, rgba(9,20,46,.58), rgba(11,26,60,.30) 55%, rgba(15,34,80,.24)); }
+.ovm-scrim-ai { background: linear-gradient(160deg, rgba(30,22,58,.80), rgba(20,16,42,.66)); }
+.ovm-scrim-warmGoal { background: linear-gradient(160deg, rgba(20,14,4,.60), rgba(10,8,4,.72)); }
+/* светлый scrim для AI-empty (Идея дня) — остаётся светлой поверхностью с еле-движущимся тинтом */
+.ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(245,242,255,.84), rgba(238,235,255,.93)); }
+html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(30,25,58,.82), rgba(17,14,36,.90)); }
+/* reduced-motion / мобайл → только постер (без видео) */
+@media (prefers-reduced-motion: reduce) { .ovm-vid { display: none !important; } }
+@media (max-width: 760px) { .ovm-vid { display: none !important; } }
+
+/* Идея дня: motion-подложка под пустым AI-состоянием (текст остаётся читаемым) */
+.idea-deck-motion { position: relative; overflow: hidden; border-radius: 16px; }
+.idea-deck-motion .idea-empty { position: relative; z-index: 3; }
+.idea-deck-motion .idea-empty-t { color: var(--ink); }
+.idea-deck-motion .idea-empty-s { color: var(--ink-3); }
+
+/* задачи не должны доминировать по высоте: контролируемый скролл при длинном списке */
+.ov-tasks-body { max-height: 400px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.ov-tasks-body::-webkit-scrollbar { width: 6px; }
+.ov-tasks-body::-webkit-scrollbar-thumb { background: var(--stroke); border-radius: 999px; }
+.ov-tasks-body { scrollbar-width: thin; }
+
+/* тумблер «Меньше движения» в панели обзора */
+.ov2-motion { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 10px; font-size: 12.5px; font-weight: 600; color: var(--ink-3); background: transparent; opacity: .75; transition: opacity .15s, background .15s, color .15s; }
+.ov2-motion svg { width: 14px; height: 14px; }
+.ov2-motion:hover { opacity: 1; background: var(--bg-2); color: var(--ink); }
+.ov2-motion.off { opacity: 1; color: var(--ink-2); background: var(--bg-2); }

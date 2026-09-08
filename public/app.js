@@ -1014,32 +1014,42 @@ function motionSurface(key, opts = {}) {
     <span class="ovm-scrim ovm-scrim-${opts.scrim || key}"></span>
   </div>`;
 }
+/* создать/проиграть видео на motion-поверхности (muted+playsinline+loop+autoplay) */
+function ovAttachVideo(s) {
+  const m = OV_MOTION_LIB[s.dataset.ovm]; if (!m) return;
+  let v = s.querySelector('video.ovm-vid');
+  if (!v) {
+    v = document.createElement('video');
+    v.className = 'ovm-vid'; v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.setAttribute('autoplay', ''); v.setAttribute('loop', '');
+    v.preload = 'metadata'; v.poster = m.poster; v.src = m.src;
+    v.addEventListener('loadeddata', () => { v.play().catch(() => {}); }, { once: true });
+    s.insertBefore(v, s.querySelector('.ovm-scrim'));
+  }
+  v.play().catch(() => {});
+}
 let _ovMotionIO = null;
 function ensureMotionIO() {
   if (_ovMotionIO) return _ovMotionIO;
   _ovMotionIO = new IntersectionObserver((entries) => {
     entries.forEach(en => {
-      const s = en.target; let v = s.querySelector('video.ovm-vid');
-      if (en.isIntersecting) {
-        const m = OV_MOTION_LIB[s.dataset.ovm]; if (!m) return;
-        if (!v) {
-          v = document.createElement('video');
-          v.className = 'ovm-vid'; v.muted = true; v.loop = true; v.playsInline = true;
-          v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.preload = 'metadata'; v.poster = m.poster; v.src = m.src;
-          s.insertBefore(v, s.querySelector('.ovm-scrim'));
-        }
-        v.play().catch(() => {});
-      } else if (v) { v.pause(); }
+      const s = en.target, v = s.querySelector('video.ovm-vid');
+      if (en.isIntersecting) ovAttachVideo(s);
+      else if (v) v.pause();
     });
-  }, { rootMargin: '160px', threshold: 0.12 });
+  }, { rootMargin: '200px', threshold: 0.01 });
   return _ovMotionIO;
 }
-/* активация motion в поддереве root: ленивое видео у входящих в вьюпорт поверхностей */
+/* активация motion в поддереве root: сразу играем видимые (не ждём IO), IO — для оффскрин-паузы/лейзи */
 function wireMotion(root) {
   const surfaces = $$('.ovm[data-ovm]', root || document);
   if (!motionPlayable()) { surfaces.forEach(s => { const v = s.querySelector('video.ovm-vid'); if (v) v.remove(); }); return; }
   const io = ensureMotionIO();
-  surfaces.forEach(s => { if (!s._ovmWired) { s._ovmWired = true; io.observe(s); } });
+  surfaces.forEach(s => {
+    if (!s._ovmWired) { s._ovmWired = true; io.observe(s); }
+    const r = s.getBoundingClientRect();
+    if (r.bottom > -200 && r.top < (window.innerHeight + 200) && r.width > 0) ovAttachVideo(s);
+  });
 }
 
 /* ─── премиум-утилиты вёрстки виджетов (тренды дашбордов 2025-26) ─── */
@@ -1233,7 +1243,7 @@ const OV_W = {
       sec('Ближайшие', soon.map(taskRow)),
       sec('Предложения ИИ', sug.map(s => `<div class="ov2-task sug" data-ovsug='${esc(JSON.stringify({ title: s.title, leadId: s.leadId || '', scheduled: s.scheduled || tsk.today }))}'><button class="ov2-task-ck add" title="Добавить">${ic(I.plus)}</button><span class="ov2-task-t">${esc(s.title)}<i>${ic(I.spark, 2)}предложение ИИ</i></span></div>`)),
     ].join('');
-    return `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просроч.' : ''}</span><button class="btn btn-sm" data-ovgo="tasks">Все</button></div>${body || ovEmpty(I.check, 'Задач нет', 'Чисто — новые появятся из карточек лидов')}`;
+    return `<div class="ov2-card-hd">${ic(I.task)}Мои задачи<span>${(tsk.stats && tsk.stats.open) || 0} открыто${tsk.stats && tsk.stats.overdue ? ' · ' + tsk.stats.overdue + ' просроч.' : ''}</span><button class="btn btn-sm" data-ovgo="tasks">Все</button></div><div class="ov-tasks-body">${body || ovEmpty(I.check, 'Задач нет', 'Чисто — новые появятся из карточек лидов')}</div>`;
   } },
   meetings: { name: 'Встречи', icon: () => I.cal, full: false, render: (c) => {
     const tsk = c.tsk, KIND = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
