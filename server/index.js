@@ -943,9 +943,10 @@ function trimToCount(slides, N) {
   const last = slides.length - 1;
   const keep = new Set([0, last]);
   const mid = []; for (let i = 1; i < last; i++) mid.push(i);
-  const modes = mid.filter(i => slides[i].mode);                                                   /* цифры/гейджи/бары/аменити/план — самое ценное */
-  const photos = mid.filter(i => !slides[i].mode && (slides[i].bg || slides[i].bgv || (slides[i].layers && slides[i].layers.length)));
-  const plain = mid.filter(i => !slides[i].mode && !slides[i].bg && !slides[i].bgv && !(slides[i].layers && slides[i].layers.length));
+  const rich = i => slides[i].mode || (slides[i].points && slides[i].points.length >= 2);            /* цифры/бары/аменити ИЛИ плотные тезисы */
+  const modes = mid.filter(rich);                                                                  /* самое ценное содержимое */
+  const photos = mid.filter(i => !rich(i) && (slides[i].bg || slides[i].bgv || (slides[i].layers && slides[i].layers.length)));
+  const plain = mid.filter(i => !rich(i) && !slides[i].bg && !slides[i].bgv && !(slides[i].layers && slides[i].layers.length));
   let budget = N - 2;
   const modeQuota = Math.max(0, Math.min(modes.length, Math.round((N - 2) * 0.5)));                /* до половины — под rich-данные */
   const plainQuota = Math.max(1, Math.round((N - 2) * 0.3));                                       /* немного нарратива для истории */
@@ -1004,10 +1005,10 @@ function attachSemanticStickers(slides, opts = {}) {
     if (best && bestSc >= 5) {
       used.add(best.key); placed++;
       const url = '/assets/stickers/' + best.key + '.png';
-      const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);
+      const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);   /* текст-бейджи выше/уже, чтобы не залезать на текст */
       const L = i === 0
-        ? { t: 'img', url, x: 60, y: 10, w: badge ? 34 : 22, round: 0, z: 6, rot: -4 }
-        : { t: 'img', url, x: 70, y: 8, w: badge ? 26 : 17, round: 0, z: 6, rot: 4 };
+        ? { t: 'img', url, x: badge ? 62 : 68, y: 9, w: badge ? 30 : 20, round: 0, z: 6, rot: -4 }
+        : { t: 'img', url, x: badge ? 78 : 80, y: 5, w: badge ? 17 : 13, round: 0, z: 6, rot: 4 };
       const sl = sanLayer(L); if (sl) { s.layers = Array.isArray(s.layers) ? s.layers : []; s.layers.push(sl); }
     }
   });
@@ -4468,6 +4469,14 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide.hasbg .gg-fg{stroke:#fff}.slide.hasbg .gg-t{fill:#fff}
 .s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
+.s-points{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.s-points li{display:flex;gap:11px;align-items:flex-start;font-size:clamp(13.5px,3.5vw,16px);line-height:1.32;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
+.slide.hasbg .s-points li{color:rgba(255,255,255,.94);text-shadow:0 1px 8px rgba(6,10,20,.4)}
+/* маркер-чип: контраст на любом фоне (акцент+белая галка), не сливается */
+.s-pt-m{flex:0 0 20px;width:20px;height:20px;border-radius:7px;margin-top:1px;background:var(--blue);position:relative;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.16)}
+.s-pt-m::after{content:"";position:absolute;left:6px;top:4px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.slide.hasbg .s-pt-m{background:rgba(255,255,255,.92)}
+.slide.hasbg .s-pt-m::after{border-color:var(--blue)}
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
 .s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-amen-i{color:rgba(255,255,255,.92)}
