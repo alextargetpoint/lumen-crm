@@ -259,7 +259,8 @@ function AMENITIES_GRID(S, T, ctx) {
   const hfs = fitHead(S.headline || 'Всё для жизни рядом', 62, 5.6, 3, 4.0);
   const afterY = flowDown(L, 13.5, [{ text: S.headline || 'Всё для жизни рядом', ff: 'disp', fs: hfs, lh: 1.05, wt: 500, color: ink, w: 62, gap: 0 }]);
   const rows = (S.rows && S.rows.length ? S.rows : (S.facts || [])).slice(0, 6);
-  const cols = 2, colW = 44, gx = 4, startY = Math.max(afterY + 5, 36), rowH = (92 - startY) / Math.ceil(rows.length / cols);
+  const cols = 2, colW = 44, gx = 4, gridRows = Math.ceil(rows.length / cols);
+  const startY = Math.max(afterY + 6, 40), rowH = Math.min(16, (90 - startY) / Math.max(1, gridRows));   /* компактно, без гигантского зазора */
   rows.forEach((r, i) => {
     const cx = MX + (i % cols) * (colW + gx), cy = startY + Math.floor(i / cols) * rowH;
     L.push({ t: 'icon', key: r.icon || 'award', color: acc, sw: 1.5, x: cx, y: cy, w: 5.4, z: 5 });
@@ -425,6 +426,7 @@ ${dirHint}${refHint}
 - Ритм колоды: чередуй энергию и свет/тьму (не 6 одинаковых, не всё тёмное). Обложка — CINEMATIC_HERO. Финал — CINEMATIC_CTA. Один DATA_HERO (цена/доходность). Минимум 1-2 СВЕТЛЫХ слайда (EDITORIAL_LIGHT / AMENITIES_GRID light / TYPOGRAPHIC_STATEMENT / GALLERY_TRIPTYCH). Используй РАЗНЫЕ грамматики — НЕ повторяй одну дважды подряд и не лепи 3× IMAGE_CAPTION. Подбирай grammar под СМЫСЛ: удобства→AMENITIES_GRID, план оплаты→PAYMENT_TIMELINE, форматы/типы→GALLERY_TRIPTYCH, философия/пауза→TYPOGRAPHIC_STATEMENT, локация→LOCATION_STORY, цена/ROI→DATA_HERO.
 - Заголовки — 2-4 слова или 2-3 короткие строки. Подписи — 1 предложение.
 - eyebrow (рубрика) — КОРОТКО: 1-2 слова, до 18 символов (напр. «ЛОКАЦИЯ», «ИНВЕСТИЦИИ», «АРХИТЕКТУРА»). НЕ длинные фразы.
+- ВЕСЬ текст — реальные, правильные русские (или общепринятые англ.) слова. НЕ выдумывай термины/бренды. CTA — понятное действие: «Получить презентацию», «Запросить каталог», «Забронировать просмотр», «Связаться в WhatsApp/Telegram» — без жаргона и несуществующих слов.
 
 ПАЛИТРА — КРИТИЧНО: выбери палитру под ХАРАКТЕР ИМЕННО этого проекта. НЕ по умолчанию тёпло-бежевый+золото. Палитра ОБЯЗАНА заметно отличаться между разными проектами (тропики ≠ мегаполис ≠ горы). Ориентиры-направления (выбери подходящее или создай своё, но БЕЗ кислотности):
   • тропики/побережье → тёплый песок/слоновая кость + приглушённый лес/океан + мягкое золото;
