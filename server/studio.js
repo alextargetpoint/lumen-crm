@@ -399,20 +399,58 @@ Output: a finished, beautiful design concept image. Text may be lorem/placeholde
   return Providers.visualGen(prompt, { size: '1024x1536', quality: opts.quality || 'high' });
 }
 async function interpret(imageB64, content, fonts, canvas) {
-  const parts = [{ text: `Ты — DESIGN INTERPRETER. На изображении — премиальный дизайн-таргет слайда (creative ground truth). Реконструируй его ЛОГИКУ дизайна как редактируемый сцен-граф из нативных слоёв (НЕ пиксельная сегментация). Заголовок→text(ff:disp сериф), подпись→text(ff:sans), тёмный оверлей→grad, тонкая линия→line, число→text, иконка→icon.
+  /* ⚠️ LLM ненадёжны в СЫРЫХ координатах фото → просим ENUM региона фото; сам img-слой строим кодом.
+     Текстовые координаты Gemini даёт разумно — их берём. */
+  const parts = [{ text: `Ты — DESIGN INTERPRETER. На изображении — премиальный дизайн-таргет слайда (creative ground truth). Реконструируй ЛОГИКУ дизайна как редактируемый сцен-граф из нативных слоёв (НЕ пиксельная сегментация). Заголовок→text(ff:disp сериф), подпись/рубрика→text(ff:sans), тонкая линия→line, число→text(ff:disp), иконка→icon, CTA-пилюля→btn.
 
-Канвас: ${canvas.w}×${canvas.h} (портрет). Координаты: x/w в % ширины, y/h в % высоты (0-100). fs в cqw (% ширины): заголовок ~6-9, подпись ~1.8-2.2, рубрика ~1.3, гигантское число ~14-16.
-РЕАЛЬНЫЙ КОНТЕНТ (используй ВМЕСТО текста с картинки — на картинке текст может быть с ошибками): eyebrow="${content.eyebrow || ''}", headline="${content.headline || ''}", sub="${content.sub || ''}"${content.cta ? ', cta="' + content.cta + '"' : ''}.
-Шрифты: ff='disp' (сериф-дисплей, кириллица ОК) для заголовков/чисел, ff='sans' (гротеск) для рубрик/подписей/CTA. Кириллица обязана быть качественной.
-Цвета — из палитры изображения (hex). Для фото-областей верни слой img со ВСЕМ кадром (url будет подставлен позже) — просто пометь t:"img", role:"photo", x/y/w/h/ox/oy.
+Канвас ${canvas.w}×${canvas.h} (портрет). Координаты: x/w в % ширины, y/h в % высоты (0-100), верх-лево = 0,0. fs в cqw (% ширины): заголовок ~5.5-8.5, подпись ~1.8-2.2, рубрика ~1.3, гигантское число ~14-16.
+РЕАЛЬНЫЙ КОНТЕНТ (ставь его ВМЕСТО текста с картинки — там могут быть опечатки): eyebrow="${content.eyebrow || ''}", headline="${content.headline || ''}", sub="${content.sub || ''}"${content.cta ? ', cta="' + content.cta + '"' : ''}.
+Шрифты: ff='disp' (сериф-дисплей, кириллица ОК) — заголовки/числа; ff='sans' (гротеск) — рубрики/подписи/CTA.
+Цвета из палитры изображения (hex). ВАЖНО про контраст: если фото занимает область под текстом (тёмное) — текст СВЕТЛЫЙ (#FFFFFF/светлый); на светлой бумаге — тёмный.
 
-Верни СТРОГО JSON: {"bg":{"type":"image|color","color":"#.."},"layers":[{"t":"img|text|grad|line|icon|btn","role":"photo","text":"...","ff":"disp|sans","fs":7,"lh":1.05,"ls":0,"wt":500,"up":false,"al":"left","color":"#..","x":6,"y":50,"w":76,"h":0,"ox":50,"oy":50,"gd":"btt","from":"#00000000","to":"#000000e6","key":"arrow","z":1}]}` }];
+ФОТО не описывай координатами. Вместо этого верни:
+"photo": {"region":"full|top|bottom|left|right|none","focus":{"ox":0-100,"oy":0-100}}
+  full = фото на весь кадр; top/bottom = фото в верхней/нижней ~половине (рамкой); left/right = боковая колонка; none = фото нет (только цвет/типографика).
+
+Верни СТРОГО JSON: {"bg":{"type":"image|color","color":"#.."},"photo":{"region":"...","focus":{"ox":50,"oy":50}},"textOnPhoto":true|false,"layers":[{"t":"text|line|icon|btn","text":"...","ff":"disp|sans","fs":7,"lh":1.05,"ls":0,"wt":500,"up":false,"al":"left","color":"#..","x":6,"y":50,"w":76,"key":"arrow","style":"outline","arrow":true}]}
+НЕ включай t:"img" в layers.` }];
   parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } });
-  const out = await Providers.visionInterpret(parts, 2800);
+  const out = await Providers.visionInterpret(parts, 2600);
   return out;
+}
+/* Сборка редактируемого слайда из интерпретации: строим img по региону (детерминированно) + скрим + слои. */
+const PHOTO_REGIONS = {
+  full: { x: 0, y: 0, w: 100, h: 100, z: 0 },
+  top: { x: 5, y: 8, w: 90, h: 48, z: 0 },
+  bottom: { x: 5, y: 46, w: 90, h: 48, z: 0 },
+  left: { x: 0, y: 0, w: 52, h: 100, z: 0 },
+  right: { x: 50, y: 8, w: 50, h: 62, z: 0 },
+};
+function assembleInterpreted(out, matchUrl, brief) {
+  const layers = [];
+  const region = out && out.photo && PHOTO_REGIONS[out.photo.region] ? out.photo.region : (out && out.photo && out.photo.region === 'none' ? 'none' : 'full');
+  const focus = (out && out.photo && out.photo.focus) || {};
+  const full = region === 'full';
+  if (region !== 'none' && matchUrl) {
+    const g = PHOTO_REGIONS[region];
+    layers.push({ t: 'img', url: matchUrl, x: g.x, y: g.y, w: g.w, h: g.h, fit: 'cover', ox: focus.ox != null ? focus.ox : 50, oy: focus.oy != null ? focus.oy : 50, z: 0 });
+    /* скрим только если текст лежит НА фото (full или textOnPhoto) */
+    if (full && out.textOnPhoto !== false) {
+      layers.push({ t: 'grad', gd: 'ttb', from: '#0a0e14a6', to: '#0a0e1400', x: 0, y: 0, w: 100, h: 24, z: 1 });
+      layers.push({ t: 'grad', gd: 'btt', from: '#0a0e14f0', to: '#0a0e1400', x: 0, y: 34, w: 100, h: 66, z: 1 });
+    }
+  }
+  /* текстовые/векторные слои интерпретатора поверх (z ≥ 5), фильтруем img (их не берём) */
+  (Array.isArray(out && out.layers) ? out.layers : []).forEach((l, i) => {
+    if (!l || l.t === 'img') return;
+    const o = Object.assign({}, l); o.z = (o.z != null && o.z >= 5) ? o.z : 5 + i;
+    layers.push(o);
+  });
+  const bgc = out && out.bg && out.bg.type === 'color' ? out.bg.color : (region === 'full' ? '' : (out && out.bg && out.bg.color) || '#EFEAE2');
+  return { bgc, layers };
 }
 
 module.exports = {
   Providers, resolveTokens, carouselTheme, artDirectionPlan, composeDeck, GRAMMARS, GRAMMAR_KEYS,
-  critique, applyOps, visualTarget, interpret, pickPhoto,
+  critique, applyOps, visualTarget, interpret, assembleInterpreted, pickPhoto,
 };

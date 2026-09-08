@@ -3067,28 +3067,31 @@ const server = http.createServer(async (req, res) => {
       if (!studio.Providers.hasVisual()) return json(res, 400, { error: 'нет OPENAI_API_KEY (визуальный таргет)' });
       const b = await readBody(req);
       const brief = b.brief && typeof b.brief === 'object' ? b.brief : { role: 'hook', headline: String(b.headline || '').slice(0, 120), sub: String(b.sub || '').slice(0, 200), eyebrow: String(b.eyebrow || '').slice(0, 40), photo: b.photo || 'coastal modern residence' };
-      let tgtBuf;
-      try { tgtBuf = await studio.visualTarget(brief, { quality: b.quality || 'high' }); }
-      catch (e) { return json(res, 500, { error: 'target: ' + e.message }); }
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
-      const tname = `lib/tgt-${crypto.randomBytes(5).toString('hex')}.png`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', tname), tgtBuf);
-      const targetUrl = '/assets/' + tname;
+      let tgtBuf, targetUrl;
+      /* reuseTarget — пере-интерпретировать УЖЕ сгенерённый таргет (без повторной оплаты gpt-image-1) */
+      if (b.reuseTarget && /^\/assets\/[\w./-]+\.png$/.test(String(b.reuseTarget))) {
+        try { tgtBuf = fs.readFileSync(path.join(PUBLIC, String(b.reuseTarget).replace(/^\/assets\//, 'assets/'))); targetUrl = b.reuseTarget; }
+        catch (e) { return json(res, 400, { error: 'reuseTarget не найден' }); }
+      } else {
+        try { tgtBuf = await studio.visualTarget(brief, { quality: b.quality || 'high' }); }
+        catch (e) { return json(res, 500, { error: 'target: ' + e.message }); }
+        fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+        const tname = `lib/tgt-${crypto.randomBytes(5).toString('hex')}.png`;
+        fs.writeFileSync(path.join(PUBLIC, 'assets', tname), tgtBuf);
+        targetUrl = '/assets/' + tname;
+      }
       let sg;
       try { sg = await studio.interpret(tgtBuf.toString('base64'), { eyebrow: brief.eyebrow, headline: brief.headline, sub: brief.sub, cta: brief.cta }, ['disp', 'sans'], { w: 1080, h: 1350 }); }
       catch (e) { return json(res, 500, { error: 'interpret: ' + e.message, targetUrl }); }
-      /* подстановка реального фото проекта в img-слои (asset matching); иначе — сам таргет как фон */
+      /* реальное фото проекта под область (asset matching, Phase 16); иначе — сам таргет */
       const matchUrl = (Array.isArray(b.images) && b.images[0]) || targetUrl;
-      const layers = (Array.isArray(sg && sg.layers) ? sg.layers : []).map(l => {
-        if (l.t === 'img') return Object.assign({}, l, { url: /^(https?:\/\/|\/?assets\/)/.test(String(l.url || '')) ? l.url : matchUrl });
-        return l;
-      });
-      const slide = sanSlide({ sg: 1, grammar: 'STUDIO_' + (brief.role || 'hook'), role: brief.role || 'hook', bgc: sg && sg.bg && sg.bg.type === 'color' ? sg.bg.color : '', heading: brief.headline || '', sub: brief.sub || '', eyebrow: brief.eyebrow || '', layers });
+      const asm = studio.assembleInterpreted(sg, matchUrl, brief);   /* img по региону строим кодом (LLM врёт в координатах) */
+      const slide = sanSlide({ sg: 1, grammar: 'STUDIO_' + (brief.role || 'hook'), role: brief.role || 'hook', bgc: asm.bgc, heading: brief.headline || '', sub: brief.sub || '', eyebrow: brief.eyebrow || '', layers: asm.layers });
       let c = b.cid ? db.carousels.find(x => x.id === b.cid) : null;
       let created = false;
       if (!c) { c = { id: crypto.randomBytes(5).toString('hex'), title: 'Studio AI', template: 'studio', format: 'portrait', theme: 'champagne', font: 'playfair', footer: { on: false, text: '' }, slides: [], studio: { mode: 'studio' }, createdAt: Date.now() }; db.carousels.unshift(c); created = true; }
       c.slides.push(slide); store.save();
-      return json(res, 200, { cid: c.id, idx: c.slides.length - 1, targetUrl, editKey: db.settings.hooks.secret, created, layers: layers.length });
+      return json(res, 200, { cid: c.id, idx: c.slides.length - 1, targetUrl, editKey: db.settings.hooks.secret, created, layers: (slide.layers || []).length, region: (sg && sg.photo && sg.photo.region) || '' });
     }
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
