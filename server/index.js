@@ -4328,7 +4328,11 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .frame-film{border:14px solid var(--fc);border-image:repeating-linear-gradient(90deg,var(--fc) 0 10px,transparent 10px 18px) 14}
 .frame-tape{box-shadow:inset 0 0 0 3px var(--fc);margin:10px;border-radius:2px}
 .slide.hasbg .s-num,.slide.hasbg .s-brand{color:rgba(255,255,255,.85)}
-.slide .s-h mark,.slide .s-s mark{background:var(--blue);color:#fff;padding:0 .14em;border-radius:.14em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.slide .s-h mark,.slide .s-s mark{background:var(--blue);color:#fff;padding:.02em .16em;border-radius:.16em;box-decoration-break:clone;-webkit-box-decoration-break:clone;-webkit-box-decoration-break:clone}
+/* при выделении даём строкам воздух — иначе плашка <mark> (line-height 1.08) наползает на строку сверху */
+.slide .s-h:has(mark){line-height:1.32}
+.slide .s-s:has(mark){line-height:1.6}
+.slide .s-h mark{box-shadow:0 1px 6px rgba(6,10,20,.16)}
 /* пресеты «Стиль» заголовка */
 .s-h.ts-outline{-webkit-text-stroke:1.6px currentColor;color:transparent}
 .s-h.ts-block{background:var(--blue);color:#fff;display:inline;padding:.04em .22em;box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:.08em}
@@ -4457,7 +4461,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=27"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=28"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

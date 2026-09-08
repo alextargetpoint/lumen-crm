@@ -4,6 +4,9 @@
 (() => {
   const P = window.CEDIT || {};
   const KEY = P.key || '';
+  /* растровые паки стикеров (нарезанные из шитов) + смысловой индекс для авто-подстановки */
+  let STK_PACKS = null; const STK_LABEL = {};
+  fetch('/assets/stickers/index.json').then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; })); }).catch(() => { STK_PACKS = []; });
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const el = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
@@ -671,17 +674,19 @@ body.cpanel-on{padding-right:308px!important}
       } else if (kind === 'sticker') {
         /* SVG-подкатегории + сгенерированные растровые паки (Telegram-style, прозрачный PNG).
            Ключи паков — «dir/name», рендерятся <img> и вставляются как img-слой. */
-        const IMG_PACKS = {
+        const IMG_PACKS = {};
+        (STK_PACKS || []).forEach(p => { if (p.items && p.items.length) IMG_PACKS[p.title] = p.items.map(it => it.key); });   /* нарезанные паки — ПЕРВЫМИ */
+        Object.assign(IMG_PACKS, {
           'Недвижимость': ['realestate/house', 'realestate/building', 'realestate/key', 'realestate/pin', 'realestate/plan'],
           'Стекло': ['realestate-glass/house', 'realestate-glass/building', 'realestate-glass/key', 'realestate-glass/pin', 'realestate-glass/roi'],
           'AUS': ['aus/app', 'aus/camera', 'aus/chat', 'aus/star', 'aus/check'],
-        };
+        });
         const NUMS = { 'Цифры': [] };   /* нумерация: залитые 1..9 + контурные 1..9 */
         for (let n = 1; n <= 9; n++) NUMS['Цифры'].push('num' + n);
         for (let n = 1; n <= 9; n++) NUMS['Цифры'].push('numo' + n);
         const cats = Object.assign({}, IMG_PACKS, NUMS, STICK_CATS);   /* трендовые паки + цифры — ПЕРВЫМИ */
         elemPicker('Стикеры и нумерация', cats,
-          (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24" style="color:${/^num\d/.test(k) ? accent : 'inherit'}">${(P.stickers || {})[k] || ''}</svg>`,
+          (k) => k.includes('/') ? `<img src="/assets/stickers/${k}.png" alt="" title="${esc(STK_LABEL[k] || '')}" style="width:100%;height:100%;object-fit:contain">` : `<svg viewBox="0 0 24 24" style="color:${/^num\d/.test(k) ? accent : 'inherit'}">${(P.stickers || {})[k] || ''}</svg>`,
           (k, drop) => {
             if (k.includes('/')) return { t: 'img', url: `/assets/stickers/${k}.png`, w: 24, round: 0, x: drop ? +clamp(drop.x - 12, -20, 110).toFixed(1) : 38, y: drop ? +clamp(drop.y - 12, -20, 110).toFixed(1) : 36 };
             const isNum = /^num\d/.test(k);   /* залитые цифры — всегда акцент (белая цифра читается на любом фоне) */
