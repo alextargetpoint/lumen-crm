@@ -4873,7 +4873,10 @@ function openCarouselModal() {
         <div class="form-row"><label>Формат</label><select id="carFmt"><option value="square">1:1 квадрат (пост)</option><option value="portrait">4:5 вертикаль</option><option value="story">9:16 сторис / Reels</option></select></div>
       </div>
       <div class="form-row"><label>Тема / объект / вводные для ИИ</label><textarea id="carTopic" placeholder="напр. ЖК Marina Vista, 1BR от $180k, рассрочка 0%, доходность 8%"></textarea></div>
-      <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="carGeo"><option value="">—</option>${STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Сколько слайдов</label><select id="carCount"><option value="0">Авто</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
+      </div>
       <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— стратегия текста</span></span>${carAnglePicker('carAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('carTheme', 'klein')}</div>
       <div class="cpick-row"><span class="cpick-hd">Шрифт заголовков</span>${carFontPicker('carFont', 'fraunces')}</div>
@@ -4881,7 +4884,7 @@ function openCarouselModal() {
     actions: [{ label: 'Собрать', cls: 'btn-accent', onClick: async (bd) => {
       const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'ИИ собирает…'; }
       try {
-        const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, angle: ($('#carAngle', bd) || {}).value || 'auto', ai: $('#carAi', bd).checked });
+        const r = await api.post('/carousels', { template: $('#carTpl', bd).value, format: $('#carFmt', bd).value, topic: $('#carTopic', bd).value, geo: $('#carGeo', bd).value, theme: $('#carTheme', bd).value, font: $('#carFont', bd).value, angle: ($('#carAngle', bd) || {}).value || 'auto', count: +(($('#carCount', bd) || {}).value || 0), ai: $('#carAi', bd).checked });
         toast('Карусель собрана', 'Открываю редактор', true);
         window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
         render();
@@ -5162,6 +5165,7 @@ async function shLaunch(main) {
       <div class="sh-launch-opts">
         <select id="lcFmt"><option value="portrait">4:5 вертикаль</option><option value="square">1:1 квадрат</option><option value="story">9:16 сторис</option></select>
         <select id="lcGeo"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <select id="lcCount"><option value="0">Слайдов: авто</option><option value="5">5 слайдов</option><option value="6">6 слайдов</option><option value="7">7 слайдов</option><option value="8">8 слайдов</option></select>
       </div>
       <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— под какую стратегию писать</span></span>${carAnglePicker('lcAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('lcTheme', 'klein')}</div>
@@ -5208,7 +5212,7 @@ async function shLaunch(main) {
     const topic = `Старт продаж / лонч: ${name}. Условия и факты: ${facts || '—'}`;
     const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
     try {
-      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', images: [...lcPicked], ai: true });
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', count: +(($('#lcCount', main) || {}).value || 0), images: [...lcPicked], ai: true });
       toast('Карусель собрана', 'Открываю редактор', true);
       window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
       render();

@@ -460,20 +460,24 @@ body.cpanel-on{padding-right:308px!important}
     /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
     const aiBtn = $('#cAiCompose', body);
     if (aiBtn) aiBtn.addEventListener('click', (e) => {
-      let angle = 'auto';
+      let angle = 'auto', count = 0;
+      const CNTS = [['0', 'Авто'], ['5', '5'], ['6', '6'], ['7', '7'], ['8', '8']];
       const pp = openPop(`<div class="csec">Оформить с ИИ</div>
         <input class="cinp" id="cAiUrl" placeholder="ссылка на объект/ЖК (URL)" style="margin-top:2px">
         <input class="cinp" id="cAiTopic" placeholder="или тема/вводные текстом">
+        <div class="csec" style="margin-top:9px">Сколько слайдов</div>
+        <div class="cseg" id="cAiCnt">${CNTS.map(([v, n], i) => `<button data-cnt="${v}" class="${i === 0 ? 'on' : ''}">${n}</button>`).join('')}</div>
         <div class="csec" style="margin-top:9px">Угол подачи</div>
         <div class="cangles" id="cAngles">${CAR_ANGLES.map(([k, n, d], i) => `<button data-ang="${k}" class="cang${i === 0 ? ' on' : ''}" title="${d}"><b>${n}</b><i>${d}</i></button>`).join('')}</div>
         <button class="cwbtn wide" id="cAiGo2" style="margin-top:9px">✦ Собрать карусель</button>
-        <div class="cnote">ИИ вытянет факты и фото со страницы, напишет слайды под выбранный угол, разложит кадры и добавит галерею. Проверьте цифры после.</div>`, e.clientX - 262, e.clientY);
+        <div class="cnote">ИИ уместит всю инфо в заданное число слайдов, разложит их разными композициями и подберёт фото по смыслу. Проверьте цифры после.</div>`, e.clientX - 262, e.clientY);
       pp.querySelectorAll('.cang').forEach(bn => bn.addEventListener('click', () => { angle = bn.dataset.ang; pp.querySelectorAll('.cang').forEach(x => x.classList.toggle('on', x === bn)); }));
+      $('#cAiCnt', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-cnt]'); if (!b) return; count = +b.dataset.cnt; pp.querySelectorAll('#cAiCnt button').forEach(x => x.classList.toggle('on', x === b)); });
       $('#cAiGo2', pp).addEventListener('click', async () => {
         const url = $('#cAiUrl', pp).value.trim(), topic = $('#cAiTopic', pp).value.trim();
         if (!url && !topic) { flash('Вставьте ссылку или тему'); return; }
         closePop(); flash('✦ ИИ собирает карусель (10–25с)…', 0);
-        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic, angle }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => liveRefresh(), 350); } catch (err) { flash('Не вышло: ' + err.message); }
+        try { const r = await fetch(`/api/carousels/${P.cid}/ai-compose?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, topic, angle, count }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Готово · слайдов ${j.count}${j.images ? ', фото ' + j.images : ''}`, 1500); setTimeout(() => liveRefresh(), 350); } catch (err) { flash('Не вышло: ' + err.message); }
       });
     });
     /* готовые шаблоны: категории + применение ко всем слайдам */

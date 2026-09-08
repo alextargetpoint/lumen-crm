@@ -779,7 +779,7 @@ const sanSlide = (s) => ({
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
   tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
-  mode: ['stats', 'steps', 'gauges', 'amenities'].includes(s.mode) ? s.mode : '',
+  mode: ['stats', 'steps', 'gauges', 'amenities', 'bars'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
@@ -808,12 +808,21 @@ function factSlides(facts) {
   if (!facts) return out;
   /* короткие «пунчевые» значения для сетки цифр (факты приходят фразами — вытаскиваем суть) */
   const short = (s, n = 16) => { s = String(s || '').trim(); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; };
+  /* обрезка по границе слова (без «рубленых» фраз) */
+  const clip = (s, n) => { s = String(s).replace(/^[-–•\s]+/, '').trim(); if (s.length <= n) return s; const cut = s.slice(0, n); const sp = cut.lastIndexOf(' '); return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[,;:.\s]+$/, '') + '…'; };
   const price = facts.priceFrom ? (String(facts.priceFrom).match(/(?:от\s*)?[$€£]?\s?[\d.,]+\s?(?:k|к|тыс|млн|m|mln)?/i) || [String(facts.priceFrom)])[0].trim() : '';
   const year = facts.handover ? (String(facts.handover).match(/\b(20\d{2})\b/) || [])[1] : '';
   const unitsN = facts.units ? String(facts.units).split(/[,;•]/).map(x => x.trim()).filter(Boolean).length : 0;
   /* проценты из доходности → кольцевые диаграммы (гейджи): честные значения из фактов */
   const roiMatches = facts.roi ? (String(facts.roi).match(/\d+(?:[.,]\d+)?\s*%/g) || []).slice(0, 2) : [];
-  const gauges = roiMatches.map((m, idx) => { const n = parseFloat(m.replace(',', '.')); return { v: m.replace(/\s+/g, ''), k: idx === 0 ? 'Доходность' : 'Рост цены', pct: Math.max(4, Math.min(100, n)) }; });
+  const pctNums = roiMatches.map(m => parseFloat(m.replace(',', '.')));
+  /* доходность → кольцо (первый %); рост капитала → бар-проекция «старт→к сдаче» (второй %) */
+  const gauges = roiMatches.length ? [{ v: roiMatches[0].replace(/\s+/g, ''), k: 'Доходность', pct: Math.max(4, Math.min(100, pctNums[0])) }] : [];
+  let growthBars = null;
+  if (roiMatches.length >= 2 && pctNums[1] > 0) {
+    const g = pctNums[1];
+    growthBars = [{ k: 'Старт', v: 'база', pct: Math.round(100 / (100 + g) * 100), base: true }, { k: 'К сдаче', v: '+' + roiMatches[1].replace(/\s+/g, ''), pct: 100 }];
+  }
   const stat = [];
   if (price) stat.push({ k: 'Старт цены', v: short(price, 14) });
   if (!gauges.length && facts.roi) stat.push({ k: 'Доходность', v: short(facts.roi, 14) });
@@ -823,10 +832,10 @@ function factSlides(facts) {
   if (year) stat.push({ k: 'Сдача', v: year });
   else if (facts.handover) stat.push({ k: 'Сдача', v: short(facts.handover, 14) });
   if (stat.length >= 2) out.push(sanSlide({ eyebrow: 'ЦИФРЫ', heading: 'Коротко о главном', mode: 'stats', items: stat.slice(0, 4), pos: 'center', size: 'm' }));
-  if (gauges.length) out.push(sanSlide({ eyebrow: 'ДОХОДНОСТЬ', heading: 'Инвест-показатели', mode: 'gauges', items: gauges, pos: 'center', size: 'm' }));
+  if (gauges.length) out.push(sanSlide({ eyebrow: 'ДОХОДНОСТЬ', heading: 'Доходность аренды', mode: 'gauges', items: gauges, pos: 'center', size: 'm' }));
+  if (growthBars) out.push(sanSlide({ eyebrow: 'ПОТЕНЦИАЛ', heading: 'Рост капитала к сдаче', mode: 'bars', items: growthBars, pos: 'center', size: 'm' }));
   /* Удобства — иконочная сетка из ключевых фишек проекта */
   if (Array.isArray(facts.highlights) && facts.highlights.length >= 3) {
-    const clip = (s, n) => { s = String(s).replace(/^[-–•\s]+/, '').trim(); if (s.length <= n) return s; const cut = s.slice(0, n); const sp = cut.lastIndexOf(' '); return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[,;:.\s]+$/, '') + '…'; };
     const amen = facts.highlights.slice(0, 6).map(h => ({ icon: amenIconFor(h), text: clip(h, 38) }));
     out.push(sanSlide({ eyebrow: 'УДОБСТВА', heading: 'Что внутри', mode: 'amenities', items: amen, pos: 'top', size: 's' }));
   }
@@ -837,11 +846,71 @@ function factSlides(facts) {
     steps = payPcts.slice(0, 4).map((p, idx, a) => ({ text: p.replace(/\s+/g, '') + ' — ' + (idx === 0 ? 'при бронировании' : idx === a.length - 1 ? 'при получении ключей' : 'в рассрочку по графику стройки') }));
   } else {
     steps = [{ text: 'Бронирование — фиксируем лот и цену старта' }];
-    steps.push({ text: facts.payment ? String(facts.payment) : 'Гибкий план оплаты по графику проекта' });
+    steps.push({ text: facts.payment ? clip(facts.payment, 90) : 'Гибкий план оплаты по графику проекта' });
     steps.push({ text: (facts.handover ? 'Сдача ' + facts.handover + ' — ' : '') + 'получение ключей и заселение' });
   }
   out.push(sanSlide({ eyebrow: 'ПЛАН', heading: 'План оплаты', mode: 'steps', items: steps.slice(0, 4), pos: 'top', size: 's' }));
   return out;
+}
+
+/* ═══ Стиль-пасс: РАЗНЫЕ раскладки текста и фоны по слайдам (соседние заметно отличаются) ═══
+   Убирает монотонную «bottom editorial» на всех слайдах. Библиотека композиций текста + ротация фонов
+   (плоский градиент / тёмная заливка темы / тонкий узор), с проверкой, что два подряд не совпадают. */
+const CAR_LAYOUTS = [
+  { pos: 'bottom', align: 'left', size: 'l' },
+  { pos: 'center', align: 'left', size: 'm' },
+  { pos: 'top', align: 'left', size: 'm' },
+  { pos: 'center', align: 'center', size: 'l' },
+  { pos: 'bottom', align: 'left', size: 'm' },
+  { pos: 'top', align: 'center', size: 's' },
+  { pos: 'center', align: 'center', size: 'm' },
+  { pos: 'bottom', align: 'center', size: 'l' },
+];
+const CAR_BG_ROT = ['', 'dots', 'dark', 'grid', '', 'diag', 'dark', 'waves', 'cross', ''];
+function stylePass(slides, theme) {
+  const darkBody = theme && theme.body ? theme.body : '#0A1833';
+  let li = 1, bi = 0, prevBg = 'cover';   /* старт с 1 — первый нарратив не повторяет обложку (bottom/left/l) */
+  slides.forEach((s, i) => {
+    const isCover = i === 0;
+    const isCTA = i === slides.length - 1;
+    const hasPhoto = !!(s.bg || s.bgv);
+    const isMode = !!s.mode;
+    /* фон: не трогаем фото-слайды; обложку/финал оставляем; остальным — ротация, сосед ≠ */
+    if (!hasPhoto && !isCover) {
+      let guard = 0, bg;
+      do { bg = CAR_BG_ROT[bi % CAR_BG_ROT.length]; bi++; guard++; } while (bg === prevBg && guard < CAR_BG_ROT.length);
+      if (bg === 'dark') { s.bgc = darkBody; s.bgpat = ''; }
+      else if (bg) { s.bgpat = bg; s.bgc = ''; }
+      else { s.bgpat = ''; s.bgc = ''; }
+      prevBg = bg;
+    } else { prevBg = hasPhoto ? 'photo' : prevBg; }
+    /* раскладка текста: узорным/градиентным нарративным слайдам — разные композиции; mode/фото не трогаем */
+    if (!isMode && !hasPhoto && !isCover && !isCTA) {
+      const L = CAR_LAYOUTS[li % CAR_LAYOUTS.length]; li++;
+      s.pos = L.pos; s.align = L.align; s.size = L.size;
+    }
+    if (isCTA && !hasPhoto) { s.pos = 'center'; s.align = 'center'; s.size = 'l'; }
+  });
+  return slides;
+}
+/* ужимаем колоду до N слайдов: всегда обложка+финал; в середине приоритет rich/фото, добор нарративом; порядок сохраняем */
+function trimToCount(slides, N) {
+  if (!N || slides.length <= N) return slides;
+  const last = slides.length - 1;
+  const keep = new Set([0, last]);
+  const mid = []; for (let i = 1; i < last; i++) mid.push(i);
+  const modes = mid.filter(i => slides[i].mode);                                                   /* цифры/гейджи/бары/аменити/план — самое ценное */
+  const photos = mid.filter(i => !slides[i].mode && (slides[i].bg || slides[i].bgv || (slides[i].layers && slides[i].layers.length)));
+  const plain = mid.filter(i => !slides[i].mode && !slides[i].bg && !slides[i].bgv && !(slides[i].layers && slides[i].layers.length));
+  let budget = N - 2;
+  const modeQuota = Math.max(0, Math.min(modes.length, Math.round((N - 2) * 0.5)));                /* до половины — под rich-данные */
+  const plainQuota = Math.max(1, Math.round((N - 2) * 0.3));                                       /* немного нарратива для истории */
+  for (const i of modes.slice(0, modeQuota)) { if (budget <= 0) break; keep.add(i); budget--; }
+  for (const i of plain.slice(0, plainQuota)) { if (budget <= 0) break; keep.add(i); budget--; }
+  for (const i of photos) { if (budget <= 0) break; keep.add(i); budget--; }
+  for (const i of modes) { if (budget <= 0) break; keep.add(i); budget--; }
+  for (const i of plain) { if (budget <= 0) break; keep.add(i); budget--; }
+  return slides.filter((_, i) => keep.has(i));
 }
 
 /* галерея-раскладки: чередуем композиции, чтобы слайды не были однотипными
@@ -873,10 +942,19 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
   const renders = B.render_ext.concat(B.lifestyle, B.other);          /* логотипы НЕ используем как фон */
   const galleryPool0 = B.interior.concat(B.amenity);
   const plans = B.floorplan, maps = B.map;
+  const roleOf = {}; photos.forEach((u, i) => { roleOf[u] = roles[i] || 'other'; });
   const out = slides.map(s => Object.assign({}, s));
   /* обложка — первый рендер (иначе первый интерьер) */
   let cover = renders[0] || galleryPool0[0] || null, usedRender = 0;
   if (cover && out[0]) { out[0] = Object.assign({}, out[0], { bg: cover, pos: 'bottom', size: 'l' }); usedRender = renders[0] ? 1 : 0; }
+  /* РАЗДАЁМ ещё 1-2 рендера как полноэкранный фон на смысловые слайды — фото по всей колоде, не только обложка */
+  const spreadRenders = renders.slice(usedRender);
+  let sr = 0;
+  for (let idx = 2; idx < out.length - 1 && sr < 2 && spreadRenders.length - sr > 0; idx += 2) {
+    const s = out[idx];
+    if (s && !s.mode && !s.bg && !s.bgv) { out[idx] = Object.assign({}, s, { bg: spreadRenders[sr], pos: sr % 2 ? 'top' : 'bottom', size: 'l' }); sr++; }
+  }
+  usedRender += sr;
   const inserts = [];
   /* Планировки — целиком, по центру (1) или бок-о-бок (2) */
   if (plans.length && bias !== 'low') {
@@ -886,19 +964,29 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
       : [sanLayer({ t: 'img', url: p[0], x: 15, y: 24, w: 70, round: 8, z: 1 })];
     inserts.push(sanSlide({ heading: 'Планировки', sub: '', eyebrow: 'ПЛАНЫ', pos: 'top', size: 's', layers }));
   }
-  /* Локация — карта в рамке по центру */
+  /* Локация — заголовок + буллеты «что рядом» сверху, карта картой ниже */
   if (maps.length && bias !== 'low') {
-    inserts.push(sanSlide({ heading: 'Локация', sub: String(opts.geoName || ''), eyebrow: 'ГДЕ', pos: 'top', size: 's', layers: [sanLayer({ t: 'img', url: maps[0], x: 8, y: 26, w: 84, round: 12, z: 1 })] }));
+    const nearby = Array.isArray(opts.nearby) ? opts.nearby.slice(0, 3) : [];
+    const sub = nearby.length ? nearby.join('   ·   ') : String(opts.geoName || '');
+    inserts.push(sanSlide({ heading: 'Локация', sub, eyebrow: 'ГДЕ', pos: 'top', size: 's', layers: [sanLayer({ t: 'img', url: maps[0], x: 8, y: 46, w: 84, round: 12, z: 1 })] }));
   }
   /* Галерея видов/интерьеров — коллаж 2×2 (≥3 кадра) или два крупных бок-о-бок (2) */
   const pool = galleryPool0.concat(renders.slice(usedRender)).concat(B.amenity);
   const seen = new Set(); const uniq = pool.filter(u => (u && !seen.has(u)) ? (seen.add(u), true) : false);
   const galSlides = bias === 'high' ? 2 : bias === 'low' ? 0 : 1;
-  const titles = ['Виды и интерьеры', 'Пространство'];
+  /* честное имя галереи по фактическому содержимому набора (не «интерьеры», если их нет) */
+  const galTitle = (set) => {
+    const cnt = { interior: 0, render_ext: 0, amenity: 0, lifestyle: 0 };
+    set.forEach(u => { const r = roleOf[u]; if (cnt[r] != null) cnt[r]++; });
+    if (cnt.interior >= Math.ceil(set.length / 2)) return 'Интерьеры';
+    if (cnt.amenity >= Math.ceil(set.length / 2)) return 'Инфраструктура';
+    if (cnt.interior && cnt.render_ext) return 'Проект вблизи';
+    return 'Виды проекта';
+  };
   let gi = 0;
   for (let g = 0; g < galSlides && uniq.length - gi >= 2; g++) {
     const set = uniq.slice(gi, gi + 4); gi += set.length;
-    inserts.push(sanSlide({ heading: titles[g] || 'Галерея', sub: '', eyebrow: 'ГАЛЕРЕЯ', pos: 'top', size: 's', layers: galleryLayout(set, g) }));
+    inserts.push(sanSlide({ heading: galTitle(set), sub: '', eyebrow: 'ГАЛЕРЕЯ', pos: 'top', size: 's', layers: galleryLayout(set, g) }));
   }
   const at = Math.max(1, out.length - 1);                              /* перед финальным CTA */
   out.splice(at, 0, ...inserts);
@@ -1242,6 +1330,13 @@ function scrapeImagesFromHtml(html, baseHref) {
   while ((m = reSs.exec(html))) m[1].split(',').forEach((s) => push(s.trim().split(/\s+/)[0]));
   const reBg = /background-image\s*:\s*url\((["']?)([^)"']+)\1\)/gi;
   while ((m = reBg.exec(html))) push(m[2]);
+  const reSrc = /<source[^>]+(?:data-srcset|srcset)=["']([^"']+)["']/gi;                 /* <picture><source> */
+  while ((m = reSrc.exec(html))) m[1].split(',').forEach((s) => push(s.trim().split(/\s+/)[0]));
+  const reDataBg = /data-(?:bg|background|background-image|bg-src)=["']([^"']+)["']/gi;   /* ленивые фоны */
+  while ((m = reDataBg.exec(html))) push(m[1]);
+  /* JSON-LD: часто содержит image даже когда контент рисует JS */
+  const reLd = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  while ((m = reLd.exec(html))) { const urls = m[1].match(/"(?:image|contentUrl|thumbnailUrl)"\s*:\s*(?:"([^"]+)"|\[([^\]]+)\])/g) || []; urls.forEach(u => (u.match(/https?:\/\/[^"'\\ ]+/g) || []).forEach(push)); }
   const bad = /(sprite|icon|logo|favicon|placeholder|pixel|1x1|blank|spacer|loader|\.svg(\?|$)|tracking|analytics)/i;
   const seen = new Set(); const res2 = [];
   for (const u of out) {
@@ -1257,6 +1352,28 @@ function scrapeImagesFromHtml(html, baseHref) {
   return res2;
 }
 /* скачать картинку в локальные ассеты + отфильтровать мусор по РАЗМЕРУ (логотипы/иконки — крошечные) */
+/* размеры картинки из заголовка буфера (PNG/JPEG/WebP) — для фильтра низкого разрешения, без зависимостей */
+function imgDims(buf) {
+  try {
+    if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };  /* PNG IHDR */
+    if (buf.length > 30 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {              /* WebP */
+      const fmt = buf.toString('ascii', 12, 16);
+      if (fmt === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+      if (fmt === 'VP8L') { const b = buf.readUInt32LE(21); return { w: (b & 0x3fff) + 1, h: ((b >> 14) & 0x3fff) + 1 }; }
+      if (fmt === 'VP8X') return { w: (buf.readUIntLE(24, 3) & 0xffffff) + 1, h: (buf.readUIntLE(27, 3) & 0xffffff) + 1 };
+    }
+    if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {                                                              /* JPEG SOFn */
+      let o = 2;
+      while (o < buf.length - 8) {
+        if (buf[o] !== 0xff) { o++; continue; }
+        const marker = buf[o + 1];
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { h: buf.readUInt16BE(o + 5), w: buf.readUInt16BE(o + 7) };
+        o += 2 + buf.readUInt16BE(o + 2);
+      }
+    }
+  } catch (e) {}
+  return null;
+}
 async function downloadImageToAsset(url) {
   try {
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
@@ -1266,11 +1383,13 @@ async function downloadImageToAsset(url) {
     if (!/^image\/(jpe?g|png|webp|avif)/i.test(ct)) return null;   /* только растровые фото, не svg/gif */
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length < 8000 || buf.length > 12e6) return null;       /* <8КБ = иконка/логотип; >12МБ — мимо */
+    const dim = imgDims(buf);                                       /* отсекаем низкое разрешение/пикселизацию */
+    if (dim && Math.max(dim.w, dim.h) < 640) return null;
     const ext = /png/i.test(ct) ? 'png' : /webp/i.test(ct) ? 'webp' : /avif/i.test(ct) ? 'avif' : 'jpg';
     fs.mkdirSync(path.join(PUBLIC, 'assets', 'car'), { recursive: true });
     const fn = `car/src-${crypto.randomBytes(5).toString('hex')}.${ext}`;
     fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
-    return { url: '/assets/' + fn, size: buf.length };
+    return { url: '/assets/' + fn, size: buf.length, w: dim ? dim.w : 0, h: dim ? dim.h : 0 };
   } catch (e) { return null; }
 }
 /* открытые источники фото (Openverse — бесплатно, без ключа, CC-лицензия) по ключевым словам */
@@ -2343,6 +2462,9 @@ const server = http.createServer(async (req, res) => {
           slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });
         }
       }
+      const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
+      if (NN) slides = trimToCount(slides, NN);
+      slides = stylePass(slides, PAGE_THEMES[b.theme] || {});
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -2420,7 +2542,8 @@ const server = http.createServer(async (req, res) => {
           facts = await llm.extractLaunch({ sourceText, query: topic });
           if (facts) { const parts = [facts.name, facts.units, facts.priceFrom && ('от ' + facts.priceFrom), facts.payment, facts.roi && ('доходность ' + facts.roi), facts.handover && ('сдача ' + facts.handover), facts.location, ...(facts.highlights || [])].filter(Boolean); topic = (facts.name || topic || 'Объект') + '. ' + parts.join(' · '); }
         }
-        const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '', b.angle);
+        const N = Math.max(4, Math.min(10, +b.count || 0)) || 0;   /* заданное число слайдов (0 = авто) */
+        const out = await llm.composeCarousel(topic || 'Объект недвижимости', c.template || 'project', N || 6, db.settings.agency.name, db.settings.geoNames[b.geo] || b.geo || '', b.angle);
         let slides = (out.slides || []).map(s => sanSlide(s));
         const photoBias = out.photoBias || 'medium';
         /* фактические rich-слайды (цифры/план оплаты) из скрейпа — перед финальным CTA */
@@ -2438,8 +2561,12 @@ const server = http.createServer(async (req, res) => {
           const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);   /* локальные /assets → абсолютные для vision */
           try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — по порядку */ }
           console.error('[ai-compose] photo roles:', roles.join(',') || '(none)');
-          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });
+          /* «что рядом» — буллеты близости для слайда «Локация» (из фишек с расстоянием/ориентиром) */
+          const nearby = (facts && Array.isArray(facts.highlights) ? facts.highlights : []).filter(h => /(\d+\s*(?:мин|min|км|km|м\b))|пляж|beach|аэропорт|airport|марин|marina|центр|downtown|метро|moll|молл/i.test(String(h))).slice(0, 3).map(h => String(h).replace(/^[-–•\s]+/, '').slice(0, 32));
+          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '', nearby });
         }
+        if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
+        slides = stylePass(slides, PAGE_THEMES[c.theme] || {});    /* разные раскладки + фоны, соседние отличаются */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
@@ -4073,6 +4200,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'gauges' && (s.items || []).length ? `<div class="s-gauges">${s.items.map(it => { const C = 2 * Math.PI * 32, off = (C * (1 - (it.pct || 0) / 100)).toFixed(1); return `<div class="s-gauge"><svg viewBox="0 0 80 80"><circle class="gg-bg" cx="40" cy="40" r="32"/><circle class="gg-fg" cx="40" cy="40" r="32" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off}"/><text class="gg-t" x="40" y="46" text-anchor="middle">${esc(it.v)}</text></svg><i>${esc(it.k)}</i></div>`; }).join('')}</div>` : ''}
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
+            ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>` : ''}
             ${(s.mode || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
@@ -4198,6 +4326,16 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-amen-ic{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 12%,transparent);color:var(--blue)}
 .slide.hasbg .s-amen-ic{background:rgba(255,255,255,.14);color:#fff}
 .s-amen-ic svg{width:20px;height:20px}
+.s-bars{display:flex;align-items:flex-end;gap:22px;margin-top:12px;padding-left:4px}
+.s-barcol{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 78px}
+.s-bartrack{height:170px;width:100%;display:flex;align-items:flex-end}
+.s-barv{font-family:var(--disp);font-size:16px;font-weight:600;color:var(--mut)}
+.slide.hasbg .s-barv{color:rgba(255,255,255,.85)}
+.s-bar{width:100%;border-radius:12px 12px 4px 4px;background:color-mix(in srgb,var(--blue) 24%,transparent);min-height:8px;transition:height .7s ease}
+.s-bar.hi{background:var(--blue);box-shadow:0 8px 22px -8px color-mix(in srgb,var(--blue) 70%,transparent)}
+.slide.hasbg .s-bar{background:rgba(255,255,255,.22)}.slide.hasbg .s-bar.hi{background:#fff}
+.s-barcol i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
+.slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;line-height:1.08;letter-spacing:-.02em;overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .slide.sz-s .s-h{font-size:clamp(21px,5vw,32px)}
 .slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
@@ -4238,7 +4376,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=22"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=23"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
