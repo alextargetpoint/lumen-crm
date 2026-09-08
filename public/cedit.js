@@ -162,13 +162,17 @@ body.cpanel-on{padding-right:308px!important}
 .cctx button.dng{color:#FF9E93}
 .cctx button.dng:hover{background:#E0483D;color:#fff}
 .cctx-sep{height:1px;background:rgba(134,175,255,.16);margin:4px 6px}
-.celem-add-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
+.celem-add-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
 .celem-add{display:flex;flex-direction:column;align-items:center;gap:6px;border:1.5px solid #E1E8F4;border-radius:12px;background:#fff;cursor:pointer;padding:11px 4px 8px;font-size:11px;font-weight:600;color:#5E6470;font-family:inherit;transition:border-color .12s,color .12s,transform .12s}
 .celem-add:hover{border-color:#2563EB;color:#2563EB;transform:translateY(-2px)}
 .celem-add-ic{width:34px;height:34px;border-radius:10px;background:#EEF3FF;display:flex;align-items:center;justify-content:center;color:#2563EB}
 .celem-add-ic svg{width:19px;height:19px}
 .caibtn{background:linear-gradient(120deg,#2563EB,#5B2BD8)!important;color:#fff!important;border:none!important;box-shadow:0 8px 22px -8px rgba(91,43,216,.6)}
 .caibtn:hover{filter:brightness(1.06)}
+.ctcolors{display:flex;flex-wrap:wrap;gap:7px}
+.ctc{width:28px;height:28px;border-radius:8px;border:1.5px solid #E1E8F4;background:var(--tc,#fff);cursor:pointer;font-size:11px;font-weight:800;color:#5E6470;display:flex;align-items:center;justify-content:center;transition:transform .12s,box-shadow .12s}
+.ctc:hover{transform:scale(1.1)}
+.ctc.on{box-shadow:0 0 0 2px var(--cb),0 0 0 4px #fff inset}
 .cangles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
 .cang{display:flex;flex-direction:column;gap:1px;align-items:flex-start;text-align:left;border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-family:inherit;transition:border-color .12s,background .12s,transform .12s}
 .cang b{font-size:12px;font-weight:700;color:#2A3346}
@@ -228,7 +232,7 @@ body.cpanel-on{padding-right:308px!important}
       let rich = {}; if (sl.dataset.rich) { try { rich = JSON.parse(sl.dataset.rich); } catch (e) {} }   /* сохраняем rich-режим (цифры/план) — он не редактируется в DOM */
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
-        bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '',
+        bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', layers,
         mode: rich.mode || '', items: rich.items || [],
       };
@@ -540,6 +544,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
+    <div class="cgrp"><label>Цвет текста</label><div class="ctcolors" id="cTColor"><button class="ctc ${!sl.dataset.tcolor ? 'on' : ''}" data-tc="" title="Авто">A</button>${Object.entries(P.tcolors || {}).map(([k, v]) => `<button class="ctc ${sl.dataset.tcolor === k ? 'on' : ''}" data-tc="${k}" title="${k}" style="--tc:${v}"></button>`).join('')}</div><div class="cnote">«A» — авто (по фону). Пресет перекрывает цвет заголовка и подписи.</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
       <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
@@ -554,6 +559,7 @@ body.cpanel-on{padding-right:308px!important}
         <button class="celem-add" data-add="frame"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="1"/></svg></span>Рамка</button>
         <button class="celem-add" data-add="text"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 6h14M12 6v13M9 19h6"/></svg></span>Текст</button>
         <button class="celem-add" data-add="photo"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg></span>Фото</button>
+        <button class="celem-add" data-add="avatar"><span class="celem-add-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg></span>Аватар</button>
       </div>
       <div class="cnote">Добавь элемент → тяни его на макете, угол — размер, стрелки над ним — слои вперёд/назад.</div>
     </div>
@@ -567,6 +573,17 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
+    const tcBox = $('#cTColor', body);
+    if (tcBox) tcBox.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tc]'); if (!b) return;
+      const sl = slideEl(i); const key = b.dataset.tc;
+      if (key) sl.dataset.tcolor = key; else delete sl.dataset.tcolor;
+      const col = key ? (P.tcolors || {})[key] : '';
+      const h = sl.querySelector('.s-h'), sub = sl.querySelector('.s-s');
+      if (h) h.style.color = col || ''; if (sub) { sub.style.color = col || ''; sub.style.opacity = col ? '.9' : ''; }
+      $$('#cTColor .ctc', body).forEach(x => x.classList.toggle('on', x === b));
+      dirty = true; save(false);
+    });
     const tsBtn = $('#cTStyleBtn', body);
     if (tsBtn) tsBtn.addEventListener('click', (e) => {
       const sl = slideEl(i); const cur = sl.dataset.tstyle || 'plain';
@@ -693,6 +710,18 @@ body.cpanel-on{padding-right:308px!important}
             if (k2 === 'scan') { const v = $('#cLpPage', pp).value.trim(); if (!v) { flash('Вставьте ссылку на страницу'); return; } flash('Сканирую фото…', 0); try { const r = await fetch(`/api/social/scrape-images`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: v }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash((j.images || []).length + ' фото — кликните нужное', 2000); $('#cLpGrid', pp).innerHTML = (j.images || []).slice(0, 24).map(u => `<button class="celem cimgpick" data-imgu="${esc(u)}" style="background-image:url('${esc(u)}')"></button>`).join(''); } catch (er) { flash('Не вышло: ' + er.message); } return; }
           }
           const pk = ev.target.closest('[data-imgu]'); if (pk) { closePop(); addLayer({ t: 'img', url: pk.dataset.imgu, x: 20, y: 20, w: 44, round: 12 }); }
+        });
+      } else if (kind === 'avatar') {
+        /* круглый аватар брокера — по умолчанию в углу; фото из файла или по ссылке */
+        const AV = { x: 8, y: 64, w: 22 };   /* левый низ (удобно для первого/последнего слайда) */
+        const pp = openPop(`<div class="csec">Аватар брокера</div>
+          <div class="cpi" data-av="file">⤴ Загрузить фото</div>
+          <div class="csec">или ссылка на фото</div><input class="cinp" id="cAvUrl" placeholder="https://…"><div class="cpi" data-av="url">Вставить по ссылке</div>
+          <div class="cnote">Круглый аватар с белым кантом. Тяни его на макете, угол — размер. Хорошо на первом/последнем слайде.</div>`, e.clientX - 200, e.clientY);
+        pp.addEventListener('click', async (ev) => {
+          const it = ev.target.closest('[data-av]'); if (!it) return;
+          if (it.dataset.av === 'file') { pickFile('image/*', async (f) => { flash('Загружаю…', 0); try { const url = await uploadAsset(f); closePop(); addLayer(Object.assign({ t: 'img', url, avatar: true }, AV)); } catch (er) { flash('Ошибка: ' + er.message); } }); }
+          else { const v = $('#cAvUrl', pp).value.trim(); if (v) { closePop(); addLayer(Object.assign({ t: 'img', url: v, avatar: true }, AV)); } }
         });
       }
     }));

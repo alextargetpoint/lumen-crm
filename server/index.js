@@ -732,6 +732,7 @@ const CAR_SIZE = new Set(['s', 'm', 'l']);
 /* узоры-фоны слайда (как в реф-боте): CSS-паттерны, тонированные акцентом темы. Без ассетов. */
 const CAR_PATTERNS = new Set(['dots', 'grid', 'diag', 'cross', 'waves', 'rings', 'carbon', 'topo']);
 const CAR_GRADS = new Set(['glow', 'dusk', 'sheen', 'aurora']);   /* эстетичные градиент-фоны (тон темы), не только узоры */
+const CAR_TCOLORS = { light: '#FFFFFF', dark: '#0A1833', gold: '#E8B84B', accent: 'var(--blue)', mint: '#2FA98C', rose: '#E06A8A', sky: '#4FB6F2', cream: '#F3ECDD' };   /* пресеты цвета текста */
 /* нормализация инлайн-HTML заголовка/подписи: B/I/U + <mark> с классом-цветом hl-* (несколько цветов выделения) */
 const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
   .replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
@@ -747,7 +748,7 @@ const sanLayer = (l) => {
   if (!l || !CAR_LTYPES.has(l.t)) return null;
   const num = (v, d, lo, hi) => { const n = +v; return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); };
   const o = { t: l.t, x: num(l.x, 12, -30, 130), y: num(l.y, 12, -30, 130), w: num(l.w, 26, 3, 130), z: num(l.z, 1, 0, 99) | 0, rot: num(l.rot, 0, -180, 180) };
-  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); }
+  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); if (l.avatar) o.avatar = 1; }
   else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); }
   else if (l.t === 'sticker') { if (!CAR_STICKERS[l.key]) return null; o.key = l.key; o.color = hex(l.color, '#FFFFFF'); }
   else if (l.t === 'frame') { o.frame = CAR_FRAMES.has(l.frame) ? l.frame : 'thin'; o.color = hex(l.color, '#FFFFFF'); }
@@ -783,7 +784,8 @@ function renderCarLayers(layers, isEdit) {
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
     const geo = `left:${l.x}%;top:${l.y}%;width:${l.w}%;z-index:${z};transform:rotate(${l.rot || 0}deg)`;
     let inner = '';
-    if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:cover;border-radius:${l.round || 0}px;display:block">`;
+    if (l.t === 'img' && l.avatar) inner = `<div style="width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 8px 26px -8px rgba(6,17,38,.55)"><img src="${esc(abs(l.url))}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
+    else if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:cover;border-radius:${l.round || 0}px;display:block">`;
     else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : 'aspect-ratio:1;'}">${carShapeSVG(l.shape, l.color, l.fill)}</div>`;
     else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
     else if (l.t === 'text') inner = `<span class="lyr-tx" style="color:${esc(l.color)};font-size:${l.tsize}px;font-family:${l.tw === 'serif' ? 'var(--disp)' : "'Manrope',sans-serif"};font-weight:${l.tb ? 800 : 600};line-height:1.1;display:block">${esc(l.text)}</span>`;
@@ -800,6 +802,7 @@ const sanSlide = (s) => ({
   bgc: /^#[0-9a-fA-F]{3,8}$/.test(String(s.bgc || '')) ? s.bgc : '',
   bgpat: CAR_PATTERNS.has(s.bgpat) ? s.bgpat : '',
   grad: CAR_GRADS.has(s.grad) ? s.grad : '',
+  tcolor: CAR_TCOLORS[s.tcolor] ? s.tcolor : '',
   pos: CAR_POS.has(s.pos) ? s.pos : '',
   align: s.align === 'center' ? 'center' : 'left',
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
@@ -4241,18 +4244,18 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && s.mode ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [] }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
             <span class="s-num">${i + 1} / ${c.slides.length}</span>
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
-            <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}>${sanInline(s.heading)}</h2>
+            <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]}"` : ''}>${sanInline(s.heading)}</h2>
             ${s.mode === 'stats' && (s.items || []).length ? `<div class="s-stats">${s.items.map(it => `<div class="s-stat"><b>${esc(it.v || it.k)}</b><i>${esc(it.v ? it.k : '')}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'steps' && (s.items || []).length ? `<div class="s-steps">${s.items.map((it, n) => `<div class="s-step"><span class="s-step-n">${n + 1}</span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'gauges' && (s.items || []).length ? `<div class="s-gauges">${s.items.map(it => { const C = 2 * Math.PI * 32, off = (C * (1 - (it.pct || 0) / 100)).toFixed(1); return `<div class="s-gauge"><svg viewBox="0 0 80 80"><circle class="gg-bg" cx="40" cy="40" r="32"/><circle class="gg-fg" cx="40" cy="40" r="32" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off}"/><text class="gg-t" x="40" y="46" text-anchor="middle">${esc(it.v)}</text></svg><i>${esc(it.k)}</i></div>`; }).join('')}</div>` : ''}
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
-            ${!s.mode ? `<p class="s-s"${ce('sub', i)}>${sanInline(s.sub)}</p>` : ''}
+            ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
             ${(s.mode || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -4434,7 +4437,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=25"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=27"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
