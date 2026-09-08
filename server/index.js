@@ -969,8 +969,8 @@ function placeProjectPhotos(slides, photos, roles, opts = {}) {
   if (!Array.isArray(photos) || !photos.length || !Array.isArray(slides) || !slides.length) return slides;
   const B = { render_ext: [], interior: [], floorplan: [], map: [], amenity: [], lifestyle: [], logo: [], other: [] };
   photos.forEach((u, i) => { (B[roles[i]] || B.other).push(u); });
-  const renders = B.render_ext.concat(B.lifestyle, B.other);          /* логотипы НЕ используем как фон */
-  const galleryPool0 = B.interior.concat(B.amenity);
+  const renders = B.render_ext.concat(B.lifestyle);                    /* обложка/фон — только чистые рендеры/лайфстайл (НЕ logo/other/collage) */
+  const galleryPool0 = B.interior.concat(B.amenity);                   /* галерея — интерьеры/аменити; other/logo не берём вовсе */
   const plans = B.floorplan, maps = B.map;
   const roleOf = {}; photos.forEach((u, i) => { roleOf[u] = roles[i] || 'other'; });
   const out = slides.map(s => Object.assign({}, s));
