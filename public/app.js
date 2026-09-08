@@ -2703,17 +2703,9 @@ async function openLeadModal(id) {
                   <div id="lcFtVarB" class="lc-ft-varb" style="display:none"></div>
                   <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
                 </div>
-                <div class="lc-ft-phone">
-                  <div class="wa-note">${ic(I.eye)}Как увидит клиент</div>
-                  <div class="iph iph-xs">
-                    <div class="iph-screen">
-                      <div class="iph-island"><i class="iph-cam"></i></div>
-                      <div class="iph-status"><span class="iph-time">9:41</span><span class="iph-sys"><svg viewBox="0 0 20 12" width="15" height="9"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 13" width="20" height="10"><rect x="1" y="1.5" width="21" height="10" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><rect x="2.5" y="3" width="17" height="7" rx="1.5"/><rect x="23" y="4.5" width="1.8" height="4" rx="1"/></svg></span></div>
-                      <div class="wa-top"><span class="wa-back">‹</span><div class="wa-ava">${l.avatarUrl ? `<img src="${esc(l.avatarUrl)}">` : esc((l.name || 'A').slice(0, 1).toUpperCase())}</div><div class="wa-peer"><b>${esc((l.name || 'Клиент').split(' ')[0])}</b><i>онлайн</i></div><span class="wa-call">${ic(I.phone)}</span></div>
-                      <div class="wa-body" id="lcWaBody"></div>
-                      <div class="iph-home"></div>
-                    </div>
-                  </div>
+                <div class="lc-ft-preview">
+                  <div class="lc-fp-head"><div class="lc-fp-ava">${l.avatarUrl ? `<img src="${esc(l.avatarUrl)}">` : esc((l.name || 'К').slice(0, 1).toUpperCase())}</div><div class="lc-fp-who"><b>${esc((l.name || 'Клиент').split(' ')[0])}</b><i>${ic(I.eye, 2)}как увидит клиент</i></div></div>
+                  <div class="wa-body lc-fp-body" id="lcWaBody"></div>
                 </div>
               </div>
             </div>`, { open: ['new', 'touch'].includes(l.stage), icon: I.send })}

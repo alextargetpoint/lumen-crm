@@ -3430,10 +3430,18 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 /* первое касание — стек: чипы сверху, потом compose + компактный телефон (переносится вниз на узком) */
 .lc-ft-grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
 .lc-ft-compose { flex: 1 1 300px; min-width: 0; }
-.lc-ft-phone { flex: 0 0 auto; width: 200px; margin-inline: auto; display: flex; flex-direction: column; align-items: center; }
-.lc-ft-phone .iph-xs { width: 200px; }
-.lc-ft-phone .wa-note { font-size: 11px; color: var(--ink-3); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
-.lc-ft-phone .wa-note svg { width: 13px; height: 13px; }
+/* минимальное превью «как увидит клиент» — компактная карточка чата без громоздкого iPhone */
+.lc-ft-preview { flex: 0 1 236px; min-width: 200px; align-self: flex-start; border: 1px solid var(--stroke); border-radius: 16px; overflow: hidden; background: var(--card); box-shadow: 0 6px 18px -10px rgba(16,43,92,.16); }
+.lc-fp-head { display: flex; align-items: center; gap: 9px; padding: 9px 12px; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--card)), var(--card)); border-bottom: 1px solid var(--stroke-soft); }
+.lc-fp-ava { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(150deg, var(--accent), var(--accent-2)); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; overflow: hidden; flex: none; }
+.lc-fp-ava img { width: 100%; height: 100%; object-fit: cover; }
+.lc-fp-who b { font-size: 13px; color: var(--navy-900); display: block; line-height: 1.15; }
+.lc-fp-who i { font-size: 10.5px; color: var(--ink-3); font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+.lc-fp-who i svg { width: 11px; height: 11px; }
+.lc-fp-body { padding: 12px 11px; min-height: 84px; max-height: 300px; overflow-y: auto; background:
+    radial-gradient(circle at 12px 12px, rgba(0,0,0,.018) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(180deg, #EDE7DF, #E9E2D8); }
+html[data-night] .lc-fp-body { background: #0e1626; }
 /* креатив-дропзона (кликабельный label) */
 .lc-creo2 { display: block; position: relative; border: 1.5px dashed var(--stroke); border-radius: 12px; min-height: 60px; cursor: pointer; overflow: hidden; margin-bottom: 10px; transition: border-color .15s, background .15s; }
 .lc-creo2:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
