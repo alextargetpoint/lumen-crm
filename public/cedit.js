@@ -14,7 +14,7 @@
   const FMT = { square: '1:1', portrait: '4:5', story: '9:16' };
   const CAT = { serif: 'С засечками', sans: 'Гротеск', display: 'Акцидентные', hand: 'Рукописные' };
   /* палитра выделения текста (несколько цветов) — ключ hl-*, цвет свотча */
-  const HL = [['cobalt', '#2563EB'], ['gold', '#E8B84B'], ['mint', '#34C79A'], ['rose', '#F2748F'], ['lav', '#9B8CFF'], ['sky', '#4FB6F2'], ['ink', '#0B0B0F'], ['under', 'linear-gradient(180deg,transparent 62%,#2563EB55 62%)']];
+  const HL = [['cobalt', '#2563EB'], ['gold', '#E8B84B'], ['mint', '#34C79A'], ['rose', '#F2748F'], ['lav', '#9B8CFF'], ['sky', '#4FB6F2'], ['ink', '#0B0B0F'], ['under', 'linear-gradient(180deg,transparent 62%,#2563EB55 62%)'], ['mark', 'linear-gradient(102deg,#2563EB55,#2563EB88)', 'border-radius:5px 10px 6px 9px'], ['markg', 'linear-gradient(102deg,#E8B84B66,#E8B84Baa)', 'border-radius:6px 9px 5px 10px'], ['ring', 'transparent', 'box-shadow:inset 0 0 0 2px #2563EB;border-radius:50%']];
   /* узоры-фоны (превью для свотчей — нейтральный акцент) */
   const PATS = [['none', 'нет'], ['dots', 'точки'], ['grid', 'сетка'], ['diag', 'диагональ'], ['cross', 'крестики'], ['waves', 'волны'], ['rings', 'кольца'], ['carbon', 'карбон'], ['topo', 'топо']];
   const PATV = {
@@ -448,7 +448,7 @@ body.cpanel-on{padding-right:308px!important}
     const cats = Object.keys(P.templates || {});
     return `
     ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>
-    <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><div class="cnote">ИИ сам подсветит ключевые слова во всех заголовках разом.</div></div>` : ''}
+    <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><select class="cinp" id="cHlStyle" style="margin-top:6px"><option value="marker">Стиль: маркер (графика)</option><option value="solid">Стиль: заливка</option><option value="ring">Стиль: обводка</option></select><div class="cnote">ИИ подсветит ключевые слова во всех заголовках. Маркер — как подсветка хайлайтером.</div></div>` : ''}
     <div class="cgrp"><label>Готовые шаблоны</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
@@ -467,8 +467,9 @@ body.cpanel-on{padding-right:308px!important}
   function wireDesign(body) {
     /* ИИ-выделение главных слов на всех слайдах */
     const runHl = async (colors) => {
+      const style = ($('#cHlStyle', body) || {}).value || 'marker';
       flash('✦ ИИ подсвечивает главное…', 0);
-      try { const r = await fetch(`/api/carousels/${P.cid}/ai-highlight?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Выделено на ${j.applied} слайдах ✓`, 1500); liveRefresh(); } catch (err) { flash('Не вышло: ' + err.message); }
+      try { const r = await fetch(`/api/carousels/${P.cid}/ai-highlight?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors, style }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Выделено на ${j.applied} слайдах ✓`, 1500); liveRefresh(); } catch (err) { flash('Не вышло: ' + err.message); }
     };
     { const h1 = $('#cHl1', body), h2 = $('#cHl2', body); if (h1) h1.addEventListener('click', () => runHl(1)); if (h2) h2.addEventListener('click', () => runHl(2)); }
     /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
@@ -605,7 +606,7 @@ body.cpanel-on{padding-right:308px!important}
       else if (cmd === 'clear') { const r = s2.getRangeAt(0); marksIn(r, host).forEach(unwrap); host.normalize(); document.execCommand('removeFormat'); dirty = true; }
       else if (cmd === 'mark') {
         const rc = b.getBoundingClientRect();
-        const sw = HL.map(([k, c]) => `<span class="hlsw" data-hl="${k}" title="Выделение" style="background:${c}"></span>`).join('');
+        const sw = HL.map(([k, c, ex]) => `<span class="hlsw" data-hl="${k}" title="Выделение" style="background:${c};${ex || ''}"></span>`).join('');
         const pp = openPop(`<div class="hlpop"><div class="hlrow">${sw}</div><button class="hloff" data-hl="off">Снять выделение</button></div>`, rc.left - 96, rc.bottom + 8);
         pp.addEventListener('mousedown', (ev) => { const t = ev.target.closest('[data-hl]'); if (!t) return; ev.preventDefault(); markSel(t.dataset.hl, host); closePop(); });
       }

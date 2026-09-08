@@ -2748,7 +2748,11 @@ const server = http.createServer(async (req, res) => {
       const c = db.carousels.find(x => x.id === m[1]);
       if (!c) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
-      const palette = b.colors === 2 ? ['cobalt', 'gold'] : b.colors === 'gold' ? ['gold'] : ['cobalt'];
+      /* стиль выделения: marker (маркер-хайлайтер, по умолч. — это «доп. графика») / solid (заливка) / ring (обводка) */
+      const style = ['solid', 'marker', 'ring'].includes(b.style) ? b.style : 'marker';
+      const palette = style === 'ring' ? ['ring']
+        : style === 'solid' ? (b.colors === 2 ? ['cobalt', 'gold'] : b.colors === 'gold' ? ['gold'] : ['cobalt'])
+          : (b.colors === 2 ? ['mark', 'markg'] : ['mark']);
       try {
         const heads = c.slides.map(s => String(s.heading || '').replace(/<[^>]*>/g, ''));
         const marked = await llm.highlightHeadings(heads);
@@ -2919,20 +2923,27 @@ const server = http.createServer(async (req, res) => {
         if (!llm.hasImage()) return json(res, 400, { error: 'нет OPENAI_API_KEY для генерации' });
         const b = await readBody(req); const want = String(b.prompt || '').slice(0, 400).trim(); if (!want) return json(res, 400, { error: 'что тебя мотивирует?' });
         const isSticker = b.style === 'sticker';
-        /* без «импровизации» стилем — чистая реалистичная картинка именно того, что просят */
-        const prompt = isSticker
-          ? `${want}, realistic high-resolution photo of the subject only, cleanly cut out and isolated, centered, sharp focus, natural lighting, no background, no text, no watermark, no logo`
-          : `${want}, realistic high-resolution photograph, clean, crisp, well-lit, professional, no text, no watermark, no logo`;
+        const textMode = llm.MB_TEXT_MODES[b.textMode] ? b.textMode : 'auto';
+        let prompt, cap = want.slice(0, 60);
+        if (isSticker) {
+          /* слой 1: ИИ фиксирует точную модель + арт-директорское решение о тексте; слой 2: мастер-промпт */
+          let st = null; try { st = await llm.structureVisionSticker(want, textMode); } catch (_) {}
+          prompt = llm.masterStickerPrompt(st, want);
+          if (st) cap = (st.secondary || st.object || want).slice(0, 60);
+        } else {
+          /* фото-режим: чистая реалистичная фотография именно того, что просят, без импровизации */
+          prompt = `${want}, realistic high-resolution photograph, clean, crisp, well-lit, professional, no text, no watermark, no logo`;
+        }
         try {
           const buf = await llm.generateImage(prompt, isSticker
-            ? { size: '1024x1024', quality: 'medium', background: 'transparent', output_format: 'png' }
+            ? { size: '1024x1024', quality: 'high' }   /* стикер: тёпло-белый паста-фон запечён промптом, макс. реализм */
             : { size: '1024x1024', quality: 'medium' });
           fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
           const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
           fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
           db.moodboard = db.moodboard || {}; db.moodboard[uid] = db.moodboard[uid] || [];
           const n = db.moodboard[uid].length;
-          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: want.slice(0, 60), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
+          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
           db.moodboard[uid].unshift(item); db.moodboard[uid] = db.moodboard[uid].slice(0, 80); store.save();
           return json(res, 200, item);
         } catch (e) { return json(res, 500, { error: 'не сгенерировалось: ' + e.message }); }
@@ -4543,6 +4554,12 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .slide mark.hl-sky{background:#4FB6F2;color:#08243A}
 .slide mark.hl-ink{background:var(--ink);color:var(--paper)}
 .slide mark.hl-under{background:transparent;color:inherit;box-shadow:inset 0 -.42em 0 color-mix(in srgb,var(--blue) 34%,transparent);border-radius:0;padding:0 .04em}
+/* графика выделения: маркер-хайлайтер (полупрозрачный, текст сохраняет цвет) + обводка-эллипс «от руки» */
+.slide mark.hl-mark{background:linear-gradient(102deg,transparent .4%,color-mix(in srgb,var(--blue) 30%,transparent) 1.4%,color-mix(in srgb,var(--blue) 40%,transparent) 96%,transparent 99%);color:inherit;padding:.02em .14em;border-radius:5px 10px 6px 9px}
+.slide mark.hl-markg{background:linear-gradient(102deg,transparent .4%,rgba(232,184,75,.4) 1.4%,rgba(232,184,75,.5) 96%,transparent 99%);color:inherit;padding:.02em .14em;border-radius:6px 9px 5px 10px}
+.slide.hasbg mark.hl-mark,.slide.hasbg mark.hl-markg{color:#fff}
+.slide mark.hl-ring{background:transparent;color:inherit;border:.13em solid color-mix(in srgb,var(--blue) 66%,transparent);border-radius:47% 53% 50% 50%/62% 55% 45% 38%;padding:.02em .36em}
+.slide.hasbg mark.hl-ring{border-color:rgba(255,255,255,.8)}
 /* узоры-фоны (тонированы акцентом темы) */
 /* эстетичные градиент-фоны (тонированы акцентом темы) — мягкая альтернатива узорам */
 .slide.grad-glow{background:radial-gradient(120% 85% at 18% 12%,color-mix(in srgb,var(--blue) 26%,var(--paper)),var(--paper) 68%)}
@@ -4653,7 +4670,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=28"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=29"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
