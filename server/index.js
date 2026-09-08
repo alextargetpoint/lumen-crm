@@ -754,7 +754,7 @@ const sanLayer = (l) => {
   if (!l || !CAR_LTYPES.has(l.t)) return null;
   const num = (v, d, lo, hi) => { const n = +v; return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); };
   const o = { t: l.t, x: num(l.x, 12, -30, 130), y: num(l.y, 12, -30, 130), w: num(l.w, 26, 3, 130), z: num(l.z, 1, 0, 99) | 0, rot: num(l.rot, 0, -180, 180) };
-  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); if (l.avatar) o.avatar = 1; }
+  if (l.t === 'img') { if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null; o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 130); if (l.avatar) o.avatar = 1; if (l.sticker || /\/stickers\//.test(o.url)) o.sticker = 1; }
   else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); }
   else if (l.t === 'sticker') { if (!CAR_STICKERS[l.key]) return null; o.key = l.key; o.color = hex(l.color, '#FFFFFF'); }
   else if (l.t === 'frame') { o.frame = CAR_FRAMES.has(l.frame) ? l.frame : 'thin'; o.color = hex(l.color, '#FFFFFF'); }
@@ -790,12 +790,14 @@ function renderCarLayers(layers, isEdit) {
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
     const geo = `left:${l.x}%;top:${l.y}%;width:${l.w}%;z-index:${z};transform:rotate(${l.rot || 0}deg)`;
     let inner = '';
+    const isStk = l.t === 'img' && (l.sticker || /\/stickers\//.test(String(l.url || '')));   /* стикер = прозрачный PNG, без рамочной тени */
+    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '');
     if (l.t === 'img' && l.avatar) inner = `<div style="width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 8px 26px -8px rgba(6,17,38,.55)"><img src="${esc(abs(l.url))}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
-    else if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:cover;border-radius:${l.round || 0}px;display:block">`;
+    else if (l.t === 'img') inner = `<img src="${esc(abs(l.url))}" style="width:100%;${l.h ? `height:${l.h}%;` : ''}object-fit:${isStk ? 'contain' : 'cover'};border-radius:${isStk ? 0 : (l.round || 0)}px;display:block">`;
     else if (l.t === 'shape') inner = `<div class="lyr-shape" style="width:100%;${l.shape === 'line' ? 'aspect-ratio:auto;' : 'aspect-ratio:1;'}">${carShapeSVG(l.shape, l.color, l.fill)}</div>`;
     else if (l.t === 'sticker') inner = `<span class="lyr-ic" style="color:${esc(l.color)}"><svg viewBox="0 0 24 24" style="width:100%;height:100%;display:block">${CAR_STICKERS[l.key] || ''}</svg></span>`;
     else if (l.t === 'text') inner = `<span class="lyr-tx" style="color:${esc(l.color)};font-size:${l.tsize}px;font-family:${l.tw === 'serif' ? 'var(--disp)' : "'Manrope',sans-serif"};font-weight:${l.tb ? 800 : 600};line-height:1.1;display:block">${esc(l.text)}</span>`;
-    return `<div class="s-lyr lyr-${l.t}" style="${geo}"${de}>${inner}${handles}</div>`;
+    return `<div class="${clsL}" style="${geo}"${de}>${inner}${handles}</div>`;
   }).join('');
 }
 
@@ -994,7 +996,7 @@ function attachSemanticStickers(slides, opts = {}) {
     else if (last || /запиш|оставь|заявк|\bсвяж|\bсвяз|контакт|whatsapp|звони|консультац|бронир|\bbook|запрос|подбор/.test(txt)) cat = 'cta';
     else if (/рассроч|цена|доход|roi|окупа|инвест|прибыл|актив/.test(txt)) cat = 'invest';
     else if (angleCat) cat = angleCat;
-    let best = null, bestSc = 0;
+    const cands = [];
     for (const st of idx) {
       if (used.has(st.key)) continue;
       let sc = 0;
@@ -1003,15 +1005,18 @@ function attachSemanticStickers(slides, opts = {}) {
       else if (cat === 'cta' && ['contact', 'deal'].includes(st.cat)) sc += 3;
       for (const k of st.kw) { const w = norm(k).split(/\s+/)[0]; if (w.length >= 4 && txt.includes(w.slice(0, 5))) sc += 2; }
       if (st.pack === 'realty' || st.pack === 'broker') sc += 1;   /* на-тему паки предпочтительнее iOS-иконок */
-      if (sc > bestSc) { bestSc = sc; best = st; }
+      if (sc >= 5) cands.push({ st, sc });
     }
-    if (best && bestSc >= 5) {
+    /* берём НЕ всегда лучший, а случайно из топа (в пределах 2 очков) — иначе один и тот же бейдж на каждой карусели раздражает */
+    let best = null;
+    if (cands.length) { cands.sort((a, b) => b.sc - a.sc); const top = cands.filter(c => c.sc >= cands[0].sc - 2).slice(0, 5); best = top[Math.floor(Math.random() * top.length)].st; }
+    if (best) {
       used.add(best.key); placed++;
       const url = '/assets/stickers/' + best.key + '.png';
       const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);   /* текст-бейджи выше/уже, чтобы не залезать на текст */
       const L = i === 0
-        ? { t: 'img', url, x: badge ? 62 : 68, y: 9, w: badge ? 30 : 20, round: 0, z: 6, rot: -4 }
-        : { t: 'img', url, x: badge ? 78 : 80, y: 5, w: badge ? 17 : 13, round: 0, z: 6, rot: 4 };
+        ? { t: 'img', url, x: badge ? 62 : 68, y: 9, w: badge ? 30 : 20, round: 0, z: 6, rot: -4, sticker: 1 }
+        : { t: 'img', url, x: badge ? 78 : 80, y: 5, w: badge ? 17 : 13, round: 0, z: 6, rot: 4, sticker: 1 };
       const sl = sanLayer(L); if (sl) { s.layers = Array.isArray(s.layers) ? s.layers : []; s.layers.push(sl); }
     }
   });
@@ -2924,12 +2929,15 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req); const want = String(b.prompt || '').slice(0, 400).trim(); if (!want) return json(res, 400, { error: 'что тебя мотивирует?' });
         const isSticker = b.style === 'sticker';
         const textMode = llm.MB_TEXT_MODES[b.textMode] ? b.textMode : 'auto';
-        let prompt, cap = want.slice(0, 60);
+        let prompt, cap = want.slice(0, 60), txt = null;
         if (isSticker) {
-          /* слой 1: ИИ фиксирует точную модель + арт-директорское решение о тексте; слой 2: мастер-промпт */
+          /* слой 1: ИИ фиксирует точную модель + арт-директорское решение о тексте; слой 2: мастер-промпт (объект БЕЗ текста) */
           let st = null; try { st = await llm.structureVisionSticker(want, textMode); } catch (_) {}
-          prompt = llm.masterStickerPrompt(st, want);
-          if (st) cap = (st.secondary || st.object || want).slice(0, 60);
+          prompt = llm.masterStickerPrompt(st, want, false);   /* текст НЕ запекаем — рендерит фронт отдельным слоем */
+          if (st) {
+            cap = (st.secondary || st.object || want).slice(0, 60);
+            txt = { mode: st.textMode || 'none', primary: st.primary || '', secondary: st.secondary || '', micro: st.micro || '' };
+          }
         } else {
           /* фото-режим: чистая реалистичная фотография именно того, что просят, без импровизации */
           prompt = `${want}, realistic high-resolution photograph, clean, crisp, well-lit, professional, no text, no watermark, no logo`;
@@ -2943,7 +2951,7 @@ const server = http.createServer(async (req, res) => {
           fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
           db.moodboard = db.moodboard || {}; db.moodboard[uid] = db.moodboard[uid] || [];
           const n = db.moodboard[uid].length;
-          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
+          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.style === 'sticker' ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, ...(txt ? { txt } : {}), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
           db.moodboard[uid].unshift(item); db.moodboard[uid] = db.moodboard[uid].slice(0, 80); store.save();
           return json(res, 200, item);
         } catch (e) { return json(res, 500, { error: 'не сгенерировалось: ' + e.message }); }
@@ -4504,6 +4512,8 @@ body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EE
 .s-lyr{position:absolute}
 .s-lyr img,.s-lyr .lyr-shape,.s-lyr .lyr-ic{width:100%;height:auto}
 .s-lyr.lyr-img img{box-shadow:0 10px 28px -10px rgba(6,17,38,.5)}
+/* стикеры (прозрачный PNG) — БЕЗ рамочной тени, тень по контуру вырезки, чтобы сливались с фоном как в референсах */
+.s-lyr.lyr-img.is-sticker img{box-shadow:none;border-radius:0;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(6,17,38,.32))}
 .s-lyr.lyr-sticker{aspect-ratio:1}.s-lyr .lyr-ic{height:100%}
 .s-lyr .lyr-shape svg{filter:drop-shadow(0 6px 16px rgba(0,0,0,.18))}
 /* рамки (оверлей на весь слайд) */
