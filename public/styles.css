@@ -3812,6 +3812,18 @@ html[data-night] .mb-cap { background: rgba(20,30,50,.7); color: var(--ink); }
 .mb-grip { position: absolute; bottom: 4px; right: 4px; width: 22px; height: 22px; border-radius: 7px; background: rgba(255,255,255,.85); color: var(--ink-3); display: none; place-items: center; cursor: grab; z-index: 3; }
 .mb-grip svg { width: 13px; height: 13px; }
 .mb-item:hover .mb-grip { display: grid; }
+/* глубина: фоновые (крупные, низкий z) — чуть мягче, чтобы передний план читался ярче */
+.mb-item.mb-soft { filter: saturate(.95); }
+.mb-item.mb-soft img { opacity: .965; }
+.mb-item.mb-soft.stk img { opacity: .965; }
+/* мини-панель действий над объектом (режим правки): герой / вперёд / назад */
+.mb-iacts { position: absolute; top: -8px; left: -8px; display: none; gap: 4px; z-index: 6; }
+.mb-editing .mb-item:hover .mb-iacts { display: inline-flex; }
+.mb-iacts button { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--stroke); background: rgba(255,255,255,.92); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; padding: 0; transition: .14s; box-shadow: 0 3px 8px -3px rgba(16,43,92,.4); }
+.mb-iacts button:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+.mb-iacts button svg { width: 12px; height: 12px; }
+.mb-iacts button[data-mbback] svg { transform: rotate(180deg); }
+html[data-night] .mb-iacts button { background: rgba(20,30,50,.92); }
 .mb-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 30px; }
 .mb-empty svg, .mb-empty .mb-emblem { width: 34px; height: 34px; color: var(--accent); opacity: .8; }
 .mb-empty b { font-size: 17px; color: var(--navy-900); font-weight: 700; font-family: 'Fraunces', serif; }

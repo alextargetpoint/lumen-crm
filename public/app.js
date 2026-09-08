@@ -6044,6 +6044,154 @@ function mbAssignAtt(items, mode, intensity) {
     return d;
   });
 }
+/* ═══ BOARD COMPOSITION ENGINE — «compose first, decorate last» ═══
+   mbCompose(items, boardW, boardH, seed) → детерминированная арт-директорская раскладка коллажа.
+   Иерархия (герой/крупный/средний/мелкий) + смысловые кластеры + архетип композиции +
+   контролируемый нахлёст + глубина(z) + повороты + баланс. НЕ сетка, НЕ рандом. */
+let MB_SEED = null, MB_Z = {}, MB_SOFT = new Set(); /* z и «фон» держим клиентски (сервер z не хранит) */
+const MB_ROLE_RANK = { HERO: 0, PRIMARY: 1, SECONDARY: 2, MICRO: 3 };
+/* кластер из категории (грубая семантическая группа) */
+function mbClusterOf(cat) {
+  const c = String(cat || '').toLowerCase().replace(/[\s_-]+/g, '');
+  if (/family|relationship|health|fitness|spiritual|discipline|kids|child|love|wellbeing|partner/.test(c)) return 'PERSONAL';
+  if (/wealth|business|career|watch|luxury|status|money|success|achiev|invest|finance|capital/.test(c)) return 'WEALTH';
+  return 'LIFESTYLE'; /* realestate/auto/travel/freedom/home/lifestyle/style + всё прочее */
+}
+function mbIsPerson(cat) { return /family|relationship|kids|child|love|person|partner/.test(String(cat || '').toLowerCase()); }
+const MB_HERO_POT = { realestate: 1, estate: 1, property: 1, villa: .95, family: .95, travel: .9, auto: .78, car: .78, automotive: .78, home: .74, house: .74, freedom: .72, luxury: .66, lifestyle: .62, health: .6, watch: .56, career: .5, business: .5, status: .5, wealth: .46 };
+function mbHeroPotential(cat) { const c = String(cat || '').toLowerCase().replace(/[\s_-]+/g, ''); for (const k in MB_HERO_POT) { if (c.includes(k)) return MB_HERO_POT[k]; } return .5; }
+function mbClamp(v, lo, hi) { if (lo > hi) return (lo + hi) / 2; return Math.max(lo, Math.min(hi, v)); }
+/* главный движок: возвращает [{id,x,y,w,rot,z,role,soft}] */
+function mbCompose(items, boardW, boardH, seed, forceHeroId) {
+  const N = items.length; if (!N) return [];
+  boardW = boardW || 900; boardH = boardH || Math.round(boardW * .62);
+  const rng = mbSeed('compose|' + seed + '|' + N);
+  /* 1. РОЛИ по скору (категория + потенциал фото + сид-джиттер) */
+  const scored = items.map((it) => {
+    const cat = it.txt && it.txt.cat;
+    let s = mbHeroPotential(cat) + (it.type === 'image' ? .15 : -.03) + rng() * .12;
+    if (it.id === forceHeroId) s += 10;
+    return { it, cat, cl: mbClusterOf(cat), person: mbIsPerson(cat), score: s };
+  });
+  const order = scored.slice().sort((a, b) => b.score - a.score);
+  const R = N - 1;
+  let nPri = R >= 1 ? Math.max(1, Math.round(R * .3)) : 0;
+  let rem = R - nPri, nSec, nMic;
+  if (N <= 5) { nMic = 0; nSec = rem; } else { nMic = Math.round(rem * .4); nSec = rem - nMic; }
+  order.forEach((o, i) => { o.role = i === 0 ? 'HERO' : i <= nPri ? 'PRIMARY' : i <= nPri + nSec ? 'SECONDARY' : 'MICRO'; });
+  /* 2. ШИРИНА по роли (доля boardW), occupancy-adaptive; никогда не все одинаковые */
+  const sizeMul = N <= 3 ? 1.12 : N >= 9 ? .9 : 1;
+  const WF = { HERO: [.34, .42], PRIMARY: [.24, .30], SECONDARY: [.16, .22], MICRO: [.10, .14] };
+  order.forEach(o => { const f = WF[o.role]; o.w = Math.round(mbClamp(boardW * (f[0] + rng() * (f[1] - f[0])) * sizeMul, 90, 440)); o.h = o.w * 1.12; });
+  /* 3. АРХЕТИП композиции (сид-выбор из пула по N/кол-ву кластеров) */
+  const clusters = [...new Set(scored.map(s => s.cl))]; const clusterCount = clusters.length;
+  const clScore = {}; scored.forEach(s => { clScore[s.cl] = (clScore[s.cl] || 0) + s.score; });
+  const pool = N <= 3 ? ['CONSTELLATION', 'CENTER_GRAVITY'] : ['CONSTELLATION', 'DIAGONAL_ASCENT', 'CENTER_GRAVITY'];
+  if (N > 3 && clusterCount >= 2) pool.push('CLUSTER_ISLANDS', 'TWO_WORLDS');
+  const arche = pool[Math.floor(rng() * pool.length)];
+  /* 4. ОБЛАСТИ кластеров (fx,fy в долях борда) по архетипу */
+  const regions = {};
+  const clOrder = clusters.slice();
+  if (arche === 'CLUSTER_ISLANDS') {
+    const spots = [[.30, .36], [.71, .33], [.51, .71]];
+    const sh = clOrder.slice(); for (let i = sh.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [sh[i], sh[j]] = [sh[j], sh[i]]; }
+    sh.forEach((cl, i) => regions[cl] = spots[i % spots.length]);
+  } else if (arche === 'TWO_WORLDS') {
+    const flip = rng() < .5;
+    regions.PERSONAL = flip ? [.72, .5] : [.28, .5];
+    regions.WEALTH = flip ? [.30, .34] : [.70, .34];
+    regions.LIFESTYLE = flip ? [.34, .66] : [.68, .64];
+    clOrder.forEach(cl => { if (!regions[cl]) regions[cl] = [.5, .5]; });
+  } else if (arche === 'DIAGONAL_ASCENT') {
+    const cls = clOrder.slice().sort((x, y) => (clScore[x] || 0) - (clScore[y] || 0)); /* слабее → низ-лево */
+    cls.forEach((cl, i) => { const t = cls.length === 1 ? .5 : i / (cls.length - 1); regions[cl] = [.24 + t * .54 + (rng() - .5) * .05, .74 - t * .52 + (rng() - .5) * .05]; });
+  } else if (arche === 'CONSTELLATION') {
+    const anchors = [[.37, .43], [.63, .41], [.41, .60], [.60, .58], [.5, .38]];
+    const a = anchors[Math.floor(rng() * anchors.length)];
+    clOrder.forEach(cl => { const ang = rng() * 6.283, rad = .10 + rng() * .06; regions[cl] = [a[0] + Math.cos(ang) * rad, a[1] + Math.sin(ang) * rad]; });
+  } else { /* CENTER_GRAVITY */
+    clOrder.forEach((cl, i) => { const ang = (i / Math.max(1, clOrder.length)) * 6.283 + rng() * .8, rad = .12 + rng() * .05; regions[cl] = [.5 + Math.cos(ang) * rad, .5 + Math.sin(ang) * rad]; });
+  }
+  /* 5. РАЗМЕЩЕНИЕ: герой в центре своей области, остальные орбитой по роли */
+  const byCl = {}; order.forEach(o => { (byCl[o.cl] = byCl[o.cl] || []).push(o); });
+  Object.keys(byCl).forEach(cl => {
+    const reg = regions[cl] || [.5, .5]; const rcx = reg[0] * boardW, rcy = reg[1] * boardH;
+    const grp = byCl[cl].slice().sort((a, b) => MB_ROLE_RANK[a.role] - MB_ROLE_RANK[b.role]);
+    grp.forEach((o, k) => {
+      if (o.role === 'HERO' || k === 0) { o.cx = rcx + (rng() - .5) * boardW * .04; o.cy = rcy + (rng() - .5) * boardH * .04; }
+      else { const baseR = { PRIMARY: .14, SECONDARY: .19, MICRO: .23 }[o.role] || .18; const ang = rng() * 6.283, rad = boardW * (baseR + rng() * .05); o.cx = rcx + Math.cos(ang) * rad; o.cy = rcy + Math.sin(ang) * rad * .85; }
+    });
+  });
+  /* 6. РЕЛАКСАЦИЯ нахлёста: разрешаем ≤~20% перекрытия, растаскиваем более сильное (герой двигается меньше) */
+  for (let iter = 0; iter < 70; iter++) {
+    for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+      const A = order[i], B = order[j];
+      const ix = Math.min(A.cx + A.w / 2, B.cx + B.w / 2) - Math.max(A.cx - A.w / 2, B.cx - B.w / 2);
+      const iy = Math.min(A.cy + A.h / 2, B.cy + B.h / 2) - Math.max(A.cy - A.h / 2, B.cy - B.h / 2);
+      if (ix <= 0 || iy <= 0) continue;
+      const ratio = (ix * iy) / Math.min(A.w * A.h, B.w * B.h);
+      if (ratio <= .20) continue;
+      let dx = B.cx - A.cx, dy = B.cy - A.cy, d = Math.hypot(dx, dy);
+      if (d < .001) { const ang = rng() * 6.283; dx = Math.cos(ang); dy = Math.sin(ang); d = 1; }
+      dx /= d; dy /= d;
+      const push = (ratio - .16) * Math.min(A.w, B.w) * .5;
+      const rA = MB_ROLE_RANK[A.role] + .5, rB = MB_ROLE_RANK[B.role] + .5, tot = rA + rB;
+      A.cx -= dx * push * (rA / tot); A.cy -= dy * push * (rA / tot);
+      B.cx += dx * push * (rB / tot); B.cy += dy * push * (rB / tot);
+    }
+  }
+  /* 6.5 РЕ-ЦЕНТР: bbox-центр коллажа → центр борда (демпфер) — убирает пустую половину, кадрирует композицию */
+  let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+  order.forEach(o => { mnx = Math.min(mnx, o.cx - o.w / 2); mxx = Math.max(mxx, o.cx + o.w / 2); mny = Math.min(mny, o.cy - o.h / 2); mxy = Math.max(mxy, o.cy + o.h / 2); });
+  const rcdx = (boardW / 2 - (mnx + mxx) / 2) * .9, rcdy = (boardH / 2 - (mny + mxy) / 2) * .96;
+  order.forEach(o => { o.cx += rcdx; o.cy += rcdy; });
+  /* 7. БЕЗОПАСНЫЕ ПОЛЯ: центр не в внешние ~5%, коробка почти в борде (мелкий bleed ок) */
+  const bleed = boardW * .02;
+  order.forEach(o => {
+    const hw = o.w / 2, hh = o.h / 2;
+    o.cx = mbClamp(o.cx, Math.max(boardW * .05, hw - bleed), Math.min(boardW * .95, boardW - hw + bleed));
+    o.cy = mbClamp(o.cy, Math.max(boardH * .05, hh - bleed), Math.min(boardH * .95, boardH - hh + bleed));
+  });
+  /* 8. БАЛАНС: визуальный вес слева/справа (площадь ×1.5 для человека/семьи); тяжёлый >70% → сдвиг мелкого */
+  const wOf = o => o.w * o.h * (o.person ? 1.5 : 1);
+  for (let pass = 0; pass < 2; pass++) {
+    let lw = 0, rw = 0; order.forEach(o => { (o.cx < boardW / 2 ? (lw += wOf(o)) : (rw += wOf(o))); });
+    const tot = lw + rw; if (!tot) break;
+    const heavyLeft = lw / tot > .7, heavyRight = rw / tot > .7; if (!heavyLeft && !heavyRight) break;
+    const heavySide = heavyLeft; /* true=left heavy */
+    const cand = order.filter(o => o.role !== 'HERO' && ((o.cx < boardW / 2) === heavySide)).sort((a, b) => MB_ROLE_RANK[b.role] - MB_ROLE_RANK[a.role])[0];
+    if (!cand) break;
+    cand.cx = mbClamp(boardW - cand.cx, cand.w / 2 - bleed, boardW - cand.w / 2 + bleed);
+  }
+  /* 8b. БАЛАНС верх/низ: аналогично, если одна половина >72% веса — зеркалим мелкий по вертикали */
+  for (let pass = 0; pass < 2; pass++) {
+    let tw = 0, bw = 0; order.forEach(o => { (o.cy < boardH / 2 ? (tw += wOf(o)) : (bw += wOf(o))); });
+    const tot = tw + bw; if (!tot) break;
+    const heavyTop = tw / tot > .72, heavyBot = bw / tot > .72; if (!heavyTop && !heavyBot) break;
+    const cand = order.filter(o => o.role !== 'HERO' && ((o.cy < boardH / 2) === heavyTop)).sort((a, b) => MB_ROLE_RANK[b.role] - MB_ROLE_RANK[a.role])[0];
+    if (!cand) break;
+    cand.cy = mbClamp(boardH - cand.cy, cand.h / 2 - bleed, boardH - cand.h / 2 + bleed);
+  }
+  /* 9. ПОВОРОТЫ: ~50% ±1°, ~35% ±2-3°, ~15% ±5-7° */
+  order.forEach(o => { const t = rng(); o.rot = +((t < .5 ? (rng() * 2 - 1) * 1 : t < .85 ? (rng() * 2 - 1) * 3 : (rng() * 2 - 1) * 7)).toFixed(1); });
+  /* 10. ГЛУБИНА z: крупные → фон(низкий z, мягче), мелкие → передний план(высокий z) */
+  const byArea = order.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h));
+  const bgCut = Math.max(1, Math.ceil(N * .3));
+  byArea.forEach((o, i) => { o.z = i + 1; o.soft = i < bgCut && N > 2; });
+  return order.map(o => ({ id: o.it.id, x: Math.round(o.cx - o.w / 2), y: Math.round(o.cy - o.h / 2), w: o.w, rot: o.rot, z: o.z, role: o.role, soft: o.soft }));
+}
+/* применить композицию: посчитать → сохранить (батч PATCH) → перерисовать */
+async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
+  const r = board.getBoundingClientRect();
+  const bw = Math.round(r.width || board.clientWidth || 900);
+  const bh = Math.round(r.height || board.clientHeight || Math.round(bw * .62));
+  const res = mbCompose(items, bw, bh, seed, forceHeroId);
+  MB_Z = {}; MB_SOFT = new Set();
+  res.forEach(x => { MB_Z[x.id] = x.z; if (x.soft) MB_SOFT.add(x.id); });
+  await Promise.all(res.map(x => api.patch('/moodboard/' + x.id, { x: x.x, y: x.y, w: x.w, rot: x.rot }).catch(() => {})));
+  await renderMoodboard(root, opts);
+  toast('Композиция собрана', null, true);
+}
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
 async function renderMoodboard(root, opts) {
   opts = opts || {};
@@ -6077,11 +6225,12 @@ async function renderMoodboard(root, opts) {
     if (d.fam === 'emoji') return `<span class="mb-emoji mb-emj-${d.anchor}" style="font-size:${Math.round(d.size / 100 * (it.w || 220))}px">${d.emoji}</span>`;
     return '';
   };
-  const itemHtml = (it, i) => { const d = atts[i] || {}; const jr = (it.rot || 0) + (d.fam === 'adhesive' || d.fam === 'tape' ? (d.rot || 0) : 0); return `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''} ${d.fam === 'adhesive' ? 'mb-adh mb-adh-' + d.variant : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${jr}deg);--i:${i}">
+  const itemHtml = (it, i) => { const d = atts[i] || {}; const jr = (it.rot || 0) + (d.fam === 'adhesive' || d.fam === 'tape' ? (d.rot || 0) : 0); const zz = MB_Z[it.id]; const soft = MB_SOFT.has(it.id); return `<div class="mb-item ${it.type === 'sticker' ? 'stk' : ''} ${soft ? 'mb-soft' : ''} ${d.fam === 'adhesive' ? 'mb-adh mb-adh-' + d.variant : ''}" data-mb="${it.id}" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;transform:rotate(${jr}deg);--i:${i}${zz != null ? ';z-index:' + zz : ''}">
     ${mbAttHtml(it, d)}
     <img src="${esc(it.url)}" alt="" draggable="false">
     ${mbTxt(it)}
-    ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>` : ''}
+    ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>
+      <div class="mb-iacts"><button data-mbhero="${it.id}" title="Сделать героем">${ic(I.star)}</button><button data-mbfwd="${it.id}" title="На передний план">${ic(I.arrow)}</button><button data-mbback="${it.id}" title="На задний план">${ic(I.arrow)}</button></div>` : ''}
   </div>`; };
   /* тонкая гравюрная эмблема-компас вместо клипартной иконки */
   const emblem = `<svg class="mb-emblem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2.1 4.3-4.3 2.1 2.1-4.3z"/><circle cx="12" cy="12" r="1"/></svg>`;
@@ -6090,6 +6239,8 @@ async function renderMoodboard(root, opts) {
       <div class="mb-top">
         ${opts.embedded ? '' : `<div class="mb-title">${emblem}${ed ? `<input class="mb-title-edit" id="mbTitle" maxlength="60" value="${esc(title)}" style="font-family:${fontCss}">` : `<span class="mb-t-k" style="font-family:${fontCss}">${esc(title)}</span>`}${who ? `<span class="mb-t-n">${esc(who)}</span>` : ''}</div>`}
         <div class="mb-tools">
+          ${items.length >= 2 ? `<button class="mb-iconbtn" id="mbCompose" title="Собрать в единый арт-коллаж">${ic(I.layers)}<span>Скомпоновать</span></button>
+          <button class="mb-iconbtn" id="mbShuffle" title="Другая композиция">${ic(I.bolt)}</button>` : ''}
           <button class="mb-iconbtn ${add ? 'on' : ''}" id="mbAddToggle" title="Добавить желание">${ic(I.plus)}<span>Добавить</span></button>
           <button class="mb-iconbtn ${ed ? 'on' : ''}" id="mbEdit" title="${ed ? 'Готово' : 'Править доску'}">${ic(ed ? I.check : (I.edit || I.doc))}</button>
         </div>
@@ -6125,6 +6276,9 @@ async function renderMoodboard(root, opts) {
   const board = $('#mbBoard', root);
   $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); const tm = $('#mbTmWrap', root); if (tm) tm.classList.toggle('off', MB_STYLE !== 'sticker'); }));
   $('#mbEdit', root).addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
+  /* КОМПОЗИЦИЯ: «Скомпоновать» (текущий сид) / «Другая композиция» (новый сид, анти-повтор) */
+  $('#mbCompose', root)?.addEventListener('click', () => { if (!MB_SEED) MB_SEED = 's' + Math.floor(Math.random() * 1e9); mbApplyCompose(root, opts, items, board, MB_SEED); });
+  $('#mbShuffle', root)?.addEventListener('click', () => { let s; do { s = 's' + Math.floor(Math.random() * 1e9); } while (s === MB_SEED); MB_SEED = s; mbApplyCompose(root, opts, items, board, s); });
   const addToggle = $('#mbAddToggle', root), addPanel = $('#mbAddPanel', root);
   addToggle.addEventListener('click', () => { MB_ADD_OPEN = !MB_ADD_OPEN; addToggle.classList.toggle('on', MB_ADD_OPEN); addPanel.classList.toggle('open', MB_ADD_OPEN); if (MB_ADD_OPEN) setTimeout(() => { const qq = $('#mbQuery', root); if (qq) qq.focus(); }, 60); });
   const tmSel = $('#mbTextMode', root); if (tmSel) tmSel.addEventListener('change', () => { MB_TEXTMODE = tmSel.value; });
@@ -6155,11 +6309,18 @@ async function renderMoodboard(root, opts) {
     $$('[data-mbbg]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ bg: b.dataset.mbbg }); rerender(); }));
     $$('[data-mbatt]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ attMode: b.dataset.mbatt }); rerender(); }));
     $$('[data-mbint]', root).forEach(b => b.addEventListener('click', async () => { await saveCfg({ attInt: b.dataset.mbint }); rerender(); }));
-    board.addEventListener('click', async (e) => { const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); rerender(); } });
+    board.addEventListener('click', async (e) => {
+      const d = e.target.closest('[data-mbdel]'); if (d) { await fetch('/api/moodboard/' + d.dataset.mbdel, { method: 'DELETE' }); toast('Убрано', null, true); rerender(); return; }
+      /* сделать героем → пересборка с акцентом на этот объект */
+      const h = e.target.closest('[data-mbhero]'); if (h) { e.stopPropagation(); if (!MB_SEED) MB_SEED = 's' + Math.floor(Math.random() * 1e9); mbApplyCompose(root, opts, items, board, MB_SEED, h.dataset.mbhero); return; }
+      /* глубина: на передний план / на задний план (клиентски) */
+      const f = e.target.closest('[data-mbfwd]'), bk = e.target.closest('[data-mbback]');
+      if (f || bk) { e.stopPropagation(); const id = (f || bk).dataset[f ? 'mbfwd' : 'mbback']; const cur = MB_Z[id] || 1; const nz = Math.max(1, cur + (f ? 3 : -3)); MB_Z[id] = nz; const node = board.querySelector('.mb-item[data-mb="' + id + '"]'); if (node) node.style.zIndex = nz; toast(f ? 'Вперёд' : 'Назад', null, true); return; }
+    });
     /* drag только в режиме правки */
     $$('.mb-item', root).forEach(el2 => {
       const startDrag = (e) => {
-        if (e.target.closest('[data-mbdel]')) return;
+        if (e.target.closest('[data-mbdel]') || e.target.closest('.mb-iacts')) return;
         e.preventDefault(); const r0 = board.getBoundingClientRect();
         const ox = e.clientX - el2.offsetLeft, oy = e.clientY - el2.offsetTop;
         el2.classList.add('drag'); el2.style.zIndex = 50;
