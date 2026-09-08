@@ -3758,6 +3758,36 @@ html[data-night] .mb-board { background: radial-gradient(circle at 20px 20px, rg
 .mb-item.stk img { background: none; border-radius: 0; box-shadow: none; filter: drop-shadow(0 9px 14px rgba(16,43,92,.26)) drop-shadow(0 2px 3px rgba(16,43,92,.2)); }
 .mb-item.drag { cursor: grabbing; animation: none; opacity: 1 !important; }
 .mb-item.drag img { box-shadow: 0 24px 50px -14px rgba(16,43,92,.5); }
+/* die-cut стикер при перетаскивании: тень по силуэту (не квадратная) */
+.mb-item.stk.drag img { box-shadow: none; filter: drop-shadow(0 20px 28px rgba(16,43,92,.4)) drop-shadow(0 5px 9px rgba(16,43,92,.28)); }
+/* режим правки: понятно, что стикеры двигаются */
+.mb-editing .mb-item { cursor: grab; }
+.mb-editing .mb-item:hover { outline: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 6px; border-radius: 6px; }
+.mb-editing .mb-item .mb-grip, .mb-editing .mb-item .mb-del { display: grid; }
+/* подсказка «разложить» поверх доски (view-mode, при пересечении) */
+.mb-hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 20; display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border: none; border-radius: 999px; background: rgba(16,43,92,.82); color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(16,43,92,.5); backdrop-filter: blur(6px); animation: mbHintIn .4s ease both; }
+.mb-hint svg { width: 15px; height: 15px; }
+.mb-hint:hover { background: rgba(16,43,92,.95); }
+@keyframes mbHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+/* плейсхолдер генерации (шиммер-орб) */
+.mb-pending { pointer-events: none; }
+.mb-pending-box { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 18px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(240,244,251,.8)); border: 1px solid var(--stroke); box-shadow: 0 10px 26px -12px rgba(16,43,92,.3); position: relative; overflow: hidden; }
+.mb-pending-box::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%); transform: translateX(-100%); animation: mbShimmer 1.5s infinite; }
+@keyframes mbShimmer { to { transform: translateX(100%); } }
+.mb-pending-orb { width: 34px; height: 34px; border-radius: 50%; background: conic-gradient(from 0deg, var(--accent), var(--accent-2, #7C3AED), var(--accent)); animation: mbSpin 1s linear infinite; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); position: relative; }
+.mb-pending-orb::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--card); }
+@keyframes mbSpin { to { transform: rotate(360deg); } }
+.mb-pending-t { font-size: 12.5px; font-weight: 600; color: var(--navy-900); text-align: center; line-height: 1.25; z-index: 1; }
+.mb-pending-s { font-size: 11px; color: var(--accent); font-weight: 600; letter-spacing: .04em; z-index: 1; }
+html[data-night] .mb-pending-box { background: linear-gradient(135deg, rgba(30,41,60,.9), rgba(20,30,48,.8)); }
+/* анимированное пустое состояние — золотой Higgsfield-луп + мотивирующий CTA */
+.mb-empty-anim { position: absolute; inset: 0; border-radius: 22px; overflow: hidden; display: grid; place-items: center; background: #0c1424; }
+.mb-empty-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.mb-empty-ov { position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 40%, rgba(12,20,36,.25), rgba(12,20,36,.78)); }
+.mb-empty-c { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 30px; max-width: 480px; }
+.mb-empty-anim .mb-empty-c b { font-family: 'Fraunces', serif; font-weight: 500; font-size: 27px; color: #fff; letter-spacing: .01em; }
+.mb-empty-anim .mb-empty-c span { font-size: 13.5px; color: rgba(255,255,255,.78); line-height: 1.55; }
+.mb-empty-cta { margin-top: 8px; box-shadow: 0 10px 26px -8px rgba(37,99,235,.6); }
 /* крепёж — реалистичные вырезанные PNG (Apple-стиль), поверх стикера */
 .mb-fast { position: absolute; z-index: 4; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(16,43,92,.28)); }
 .mb-pin { top: -20px; left: 50%; width: 40px; transform: translateX(-50%) rotate(-4deg); }
