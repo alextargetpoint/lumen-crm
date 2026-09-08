@@ -271,11 +271,20 @@ body.cpanel-on{padding-right:308px!important}
     const r = await fetch(`/api/carousels/${P.cid}?key=${encodeURIComponent(KEY)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) { flash('Ошибка сохранения'); return false; }
     dirty = false;
+    if (body.slides) recordHist(body.slides);   /* точка истории для undo/redo */
     if (reload === 'hard') location.reload();
     else if (reload) { await liveRefresh(); flash('Сохранено ✓'); }
     else flash('Сохранено ✓');
     return true;
   }
+  /* ── История (undo/redo) на снимках слайдов ── */
+  let HIST = [], HPOS = -1, histLock = false;
+  function recordHist(slides) { if (histLock) return; try { const s = JSON.stringify(slides); if (HIST[HPOS] === s) return; HIST = HIST.slice(0, HPOS + 1); HIST.push(s); if (HIST.length > 40) { HIST.shift(); } HPOS = HIST.length - 1; } catch (e) {} }
+  async function histApply(slides) { histLock = true; flash('…', 0); try { const r = await fetch(`/api/carousels/${P.cid}?key=${encodeURIComponent(KEY)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides, title: P.title }) }); if (r.ok) await liveRefresh(); } catch (e) {} finally { histLock = false; } }
+  function undo() { if (HPOS > 0) { HPOS--; histApply(JSON.parse(HIST[HPOS])); flash('Отменено ↶', 900); } else flash('Нечего отменять', 900); }
+  function redo() { if (HPOS < HIST.length - 1) { HPOS++; histApply(JSON.parse(HIST[HPOS])); flash('Возвращено ↷', 900); } else flash('Нечего вернуть', 900); }
+  document.addEventListener('keydown', (e) => { const mod = e.metaKey || e.ctrlKey; if (!mod) return; const k = (e.key || '').toLowerCase(); if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); } });
+  try { recordHist(serialize()); } catch (e) {}   /* исходное состояние */
   $('#cSave').addEventListener('click', () => save(false));
   $('#cDl').addEventListener('click', async () => { if (dirty) await save(false); window.open(`/car/${P.cid}?print=1`, '_blank'); });
   $('#cExit').addEventListener('click', async () => { if (dirty) await save(false); try { window.close(); } catch (e) {} setTimeout(() => { if (!window.closed) location.href = '/#social'; }, 250); });
@@ -302,6 +311,13 @@ body.cpanel-on{padding-right:308px!important}
     if (act === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; return save(true, { slides: arr }); }
     if (act === 'insert') { arr.splice(i + 1, 0, { heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
     if (act === 'photo') { selectSlide(i, true); setTimeout(() => { const b = $('#cBody [data-bg="photo"]'); if (b) b.click(); }, 60); return; }
+    if (act === 'recompose') {   /* Студия: другая композиция слайда (цикл грамматик на сцен-графе) */
+      flash('Другая композиция…', 0);
+      (async () => {
+        try { const r = await fetch(`/api/studio/regen-slide?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cid: P.cid, idx: i }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash('Композиция: ' + j.grammar, 1500); await liveRefresh(); } catch (e) { flash('Не вышло: ' + e.message); }
+      })();
+      return;
+    }
   }
   document.body.addEventListener('click', (e) => {
     const sa = e.target.closest('[data-sact]');

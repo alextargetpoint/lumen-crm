@@ -3043,6 +3043,47 @@ const server = http.createServer(async (req, res) => {
       db.carousels.unshift(c); store.save();
       return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, concept: plan.concept, slides: c.slides.length, grammars: c.slides.map(s => s.grammar) });
     }
+    /* Phase 32: регенерация НА СЦЕН-ГРАФЕ — одна композиция слайда (цикл грамматик), не трогая остальные. */
+    if (p === '/api/studio/regen-slide' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const c = db.carousels.find(x => x.id === b.cid);
+      if (!c || !c.studio || !c.studio.plan) return json(res, 404, { error: 'нет studio-плана' });
+      const idx = Math.max(0, Math.min(c.slides.length - 1, +b.idx || 0));
+      const S = (c.studio.plan.slides || [])[idx];
+      if (!S) return json(res, 400, { error: 'нет слайда в плане' });
+      const T = studio.resolveTokens(c.studio.plan);
+      const keys = studio.GRAMMAR_KEYS;
+      const cur = c.slides[idx].grammar;
+      /* явная grammar, либо следующая по кругу (кроме hero/cta которые фиксированы по позиции) */
+      let gk = b.grammar && keys.includes(b.grammar) ? b.grammar : keys[(Math.max(0, keys.indexOf(cur)) + 1) % keys.length];
+      try {
+        const used = new Set();
+        const photo = /GALLERY|FLOOR|TYPO|AMENIT/.test(gk) ? null : studio.pickPhoto(S.photo || 'exterior', c.studio.photos || [], used);
+        const gallery = gk === 'GALLERY_TRIPTYCH' ? (c.studio.photos || []).slice(0, 3).map(p2 => p2.url) : null;
+        const g = studio.GRAMMARS[gk](S, T, { photo: photo || (gallery && gallery[0]) || null, gallery, pageNum: `${String(idx + 1).padStart(2, '0')} / ${String(c.slides.length).padStart(2, '0')}`, total: c.slides.length, wordmark: { name: (c.studio.plan.wordmark || {}).name || c.title, tag: (c.studio.plan.wordmark || {}).tag || '' } });
+        c.slides[idx] = sanSlide({ sg: 1, grammar: gk, role: S.role || '', bg: g.bg || '', bgc: g.bgc || '', grad: g.grad || '', heading: S.headline || '', sub: S.sub || '', eyebrow: S.eyebrow || '', layers: g.layers });
+        store.save();
+        return json(res, 200, { ok: true, idx, grammar: gk });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* Phase 32: регенерация всей колоды — copy (новый копирайт) / artdir (новая палитра/направление). */
+    if (p === '/api/studio/regen' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY' });
+      const b = await readBody(req);
+      const c = db.carousels.find(x => x.id === b.cid);
+      if (!c || !c.studio || !c.studio.project) return json(res, 404, { error: 'нет studio-проекта' });
+      const dir = ['editorial', 'minimal', 'investment'].includes(b.direction) ? b.direction : c.studio.direction;
+      try {
+        const plan = await studio.artDirectionPlan(c.studio.project, { count: c.slides.length, direction: dir });
+        const deck = studio.composeDeck(c.studio.project, plan, c.studio.photos || []);
+        c.slides = deck.slides.map(s => sanSlide(s)); c.theme = deck.theme; c.font = deck.font;
+        c.studio = Object.assign({}, c.studio, { concept: String(plan.concept || '').slice(0, 200), tokens: deck.tokens, plan, direction: dir });
+        store.save();
+        return json(res, 200, { ok: true, concept: plan.concept, grammars: c.slides.map(s => s.grammar) });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
     /* Phase 33: 3 РАЗНЫХ визуальных направления из одних данных (A редакторский / B минимал / C инвест). */
     if (p === '/api/studio/directions' && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
@@ -5035,7 +5076,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const onlyIdx = u.searchParams.get('only') != null ? Math.max(0, parseInt(u.searchParams.get('only'), 10) || 0) : -1;
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
       /* панель-инструментов слайда в редакторе (общая для sg- и обычных слайдов) */
-      const SG_SBAR = `<div class="s-bar"><button data-sact="edit" title="Редактировать">✎</button><button data-sact="dup" title="Дублировать">⧉</button><button data-sact="up" title="Выше">↑</button><button data-sact="down" title="Ниже">↓</button><button data-sact="del" title="Удалить">✕</button></div><button class="s-ins" data-sact="insert" title="Добавить слайд после">＋ Слайд</button>`;
+      const SG_SBAR = `<div class="s-bar"><button data-sact="recompose" title="Другая композиция (Студия)">🎲</button><button data-sact="edit" title="Редактировать">✎</button><button data-sact="dup" title="Дублировать">⧉</button><button data-sact="up" title="Выше">↑</button><button data-sact="down" title="Ниже">↓</button><button data-sact="del" title="Удалить">✕</button></div><button class="s-ins" data-sact="insert" title="Добавить слайд после">＋ Слайд</button>`;
       /* ⭐ КИРИЛЛИЦА как first-class: у Fraunces/Cormorant/Instrument/EB/Space Grotesk/Unbounded/Bebas НЕТ кириллицы →
          RU-заголовки падали в Times («bulky»). Детектим кириллицу в тексте колоды и подменяем на шрифт с кириллицей того же характера. */
       const FONT_CYR = new Set(['playfair', 'ptserif', 'manrope', 'inter', 'montser', 'oswald', 'russo', 'tektur', 'rusdisplay', 'comfortaa', 'caveat', 'badscript', 'neucha', 'pangolin', 'adventpro', 'robotocond']);
