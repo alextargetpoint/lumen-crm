@@ -399,7 +399,7 @@ async function artDirectionPlan(project, opts = {}) {
     'PAYMENT_TIMELINE — план оплаты как таймлайн: заголовок + 2-4 этапа (% + подпись) на линии. tone:dark|light. поля: eyebrow, headline, sub, facts[{v(«20%»),label(«при брони»)}], cta.',
     'FLOORPLAN_SHOWCASE — планировка на светлом фоне + характеристики. tone:light. поля: eyebrow, headline, facts[{v,label(«спальни»/«м²»)}]. Нужен кадр-план (role floorplan), иначе не выбирай.',
   ].join('\n');
-  const iconKeys = 'pin, plane, beach, restaurant, view, window, leaf, terrace, ruler, pool, gym, spa, marina, golf, park, garden, security, concierge, key, clock, shield, doc, award, handshake, metro, shop, school';
+  const iconKeys = 'pin, plane, beach, restaurant, view, window, leaf, terrace, ruler, pool, gym, spa, sauna, marina, golf, tennis, bbq, rooftop, lounge, coworking, cinema, kids, pets, wifi, elevator, parking, gate, park, garden, security, concierge, key, clock, shield, doc, award, handshake, metro, shop, school';
   const roleList = (project.photoRoles || []).length ? project.photoRoles.join(', ') : 'render_ext, interior, lifestyle';
   const n = Math.max(4, Math.min(8, +opts.count || 6));
   const DIRECTIONS = {
