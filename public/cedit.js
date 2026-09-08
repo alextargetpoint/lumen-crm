@@ -449,6 +449,14 @@ body.cpanel-on{padding-right:308px!important}
     return `
     ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>
     <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><select class="cinp" id="cHlStyle" style="margin-top:6px"><option value="marker">Стиль: маркер (графика)</option><option value="solid">Стиль: заливка</option><option value="ring">Стиль: обводка</option></select><div class="cnote">ИИ подсветит ключевые слова во всех заголовках. Маркер — как подсветка хайлайтером.</div></div>` : ''}
+    <div class="cgrp"><label>Пересобрать — меняем только незалоченное</label>
+      <div class="cbtn-row"><button class="cwbtn" data-regen="direction">✦ Новое направление</button></div>
+      <div class="cbtn-row"><button class="cwbtn" data-regen="colors">Другие цвета</button><button class="cwbtn" data-regen="typography">Другой шрифт</button></div>
+      <div class="cbtn-row"><button class="cwbtn" data-regen="layout">Другая раскладка</button>${P.llm ? '<button class="cwbtn" data-regen="copy">Другой текст</button>' : ''}</div>
+      <div class="cbtn-row"><button class="cwbtn" data-regen="photos">Другие фото</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:9px;margin-top:8px;font-size:11.5px;opacity:.9">${[['copy', 'Текст'], ['images', 'Фото'], ['typography', 'Шрифт'], ['palette', 'Цвет'], ['layout', 'Раскладка']].map(([k, n]) => `<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none"><input type="checkbox" data-lock="${k}" style="accent-color:#2563EB;width:14px;height:14px">🔒 ${n}</label>`).join('')}</div>
+      <div class="cnote">Доволен фото — залочь «Фото» и меняй дизайн. «Новое направление» меняет цвет+шрифт+раскладку разом.</div>
+    </div>
     <div class="cgrp"><label>Готовые шаблоны</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
@@ -472,6 +480,12 @@ body.cpanel-on{padding-right:308px!important}
       try { const r = await fetch(`/api/carousels/${P.cid}/ai-highlight?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors, style }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash(`Выделено на ${j.applied} слайдах ✓`, 1500); liveRefresh(); } catch (err) { flash('Не вышло: ' + err.message); }
     };
     { const h1 = $('#cHl1', body), h2 = $('#cHl2', body); if (h1) h1.addEventListener('click', () => runHl(1)); if (h2) h2.addEventListener('click', () => runHl(2)); }
+    /* Пересобрать: меняем только незалоченное */
+    $$('[data-regen]', body).forEach(btn => btn.addEventListener('click', async () => {
+      const change = btn.dataset.regen; const locks = {}; $$('[data-lock]', body).forEach(cb => { if (cb.checked) locks[cb.dataset.lock] = true; });
+      flash('✦ Пересобираю…', 0);
+      try { const r = await fetch(`/api/carousels/${P.cid}/regenerate?key=${encodeURIComponent(KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ change, locks }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error); flash('Пересобрано: ' + ((j.changed || []).join(', ') || 'без изменений'), 2000); liveRefresh(); } catch (e) { flash('Не вышло: ' + e.message); }
+    }));
     /* ИИ-оформление по ссылке: инфо+фото → слайды + галерея */
     const aiBtn = $('#cAiCompose', body);
     if (aiBtn) aiBtn.addEventListener('click', (e) => {

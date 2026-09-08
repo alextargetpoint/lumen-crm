@@ -991,7 +991,9 @@ function artDirect(slides, opts = {}) {
   const IMG = dna.image != null ? dna.image : 60, DARK = dna.dark != null ? dna.dark : 30;
   const MINIMAL = dna.minimal != null ? dna.minimal : 45, EXP = dna.experimental != null ? dna.experimental : 35;
   const n = slides.length;
+  const seed = (opts.seed || 0) | 0;                             /* меняем seed при «пересобрать» → другие раскладки */
   const hasPhoto = s => !!(s.bg || s.bgv) || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img' && !l.sticker && (l.w || 0) >= 40));
+  const photoCycle = ['split', 'panel', 'cinematic'];
   const alt = (fam, photo) => photo ? (fam === 'split' ? 'panel' : fam === 'panel' ? 'cinematic' : 'split') : (fam === 'typo' ? 'editorial' : 'typo');
   let prev = '', dataUsed = false, immUsed = false, typoUsed = false, surprises = 0;
   slides.forEach((s, i) => {
@@ -1001,10 +1003,12 @@ function artDirect(slides, opts = {}) {
     else if (cta) lay = photo ? 'immersive' : 'editorial';
     else if (num && !dataUsed && !s.mode) { lay = 'data'; dataUsed = true; }
     else if (photo) {
-      lay = (DARK > 55 && !immUsed) ? 'immersive' : (prev === 'split' ? 'panel' : prev === 'panel' ? 'cinematic' : 'split');
+      lay = (DARK > 55 && !immUsed) ? 'immersive' : photoCycle[(i + seed) % 3];   /* seed сдвигает цикл раскладок */
       if (lay === 'immersive') immUsed = true;
     } else {
-      lay = (!typoUsed && (MINIMAL > 50 || EXP > 55)) ? 'typo' : 'editorial';
+      /* seed-фаза: какой из средних текстовых слайдов станет typo — сдвигается при пересборке */
+      const wantTypo = !typoUsed && ((i + seed) % 2 === 1) && (MINIMAL > 30 || EXP > 30);
+      lay = wantTypo ? 'typo' : 'editorial';
       if (lay === 'typo') typoUsed = true;
     }
     if (lay === prev) lay = alt(lay, photo);                     /* ритм: не два подряд одинаковых */
@@ -2773,6 +2777,8 @@ const server = http.createServer(async (req, res) => {
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
         font: FONT_LIB[b.font] ? b.font : 'fraunces', footer: { on: false, text: '' },
         slides: slides.map(s => sanSlide(s)),
+        /* контекст генерации — чтобы «пересобрать» (текст/фото/направление) переиспользовало вводные */
+        gen: { topic: String(b.topic || '').slice(0, 600), angle: b.angle || 'auto', geo: b.geo || '', template: b.template || 'project', density: b.density || 'medium', tone: b.tone || '', photoBias, images: (Array.isArray(b.images) ? b.images.filter(x => /^https?:\/\//.test(x)) : []).slice(0, 24) },
         createdAt: Date.now(),
       };
       db.carousels.unshift(c); store.save();
@@ -2910,6 +2916,47 @@ const server = http.createServer(async (req, res) => {
         store.save();
         return json(res, 200, { ok: true, applied });
       } catch (e) { return json(res, 500, { error: 'ИИ-выделение не удалось: ' + e.message }); }
+    }
+    /* ⭐ Пересобрать: меняем ТОЛЬКО незалоченное (палитра/шрифт/раскладка/текст/фото), остальное сохраняем.
+       Дизайн-ремиксы (цвет/шрифт/раскладка/направление) — без ИИ и без затрат: тема правит CSS-переменные,
+       artDirect переназначает семейства раскладки с новым seed. Текст/фото — переиспользуют gen-контекст. */
+    if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)\/regenerate$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const c = db.carousels.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const change = ['direction', 'colors', 'typography', 'layout', 'copy', 'photos'].includes(b.change) ? b.change : 'direction';
+      const locks = b.locks || {};
+      const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
+      const pickDiff = (arr, cur) => { const o = arr.filter(x => x && x !== cur); return o.length ? rnd(o) : cur; };
+      const gen = c.gen || {};
+      const dna = carDNA({ angle: gen.angle }, gen.photoBias || 'medium');
+      const seed = 1 + Math.floor(Math.random() * 7);
+      const changed = [];
+      try {
+        if (/colors|direction/.test(change) && !locks.palette) { c.theme = pickDiff(COLL_STRONG_THEMES.filter(k => PAGE_THEMES[k]), c.theme); changed.push('палитра'); }
+        if (/typography|direction/.test(change) && !locks.typography) { c.font = pickDiff(Object.keys(FONT_LIB), c.font); changed.push('шрифт'); }
+        /* текст: переписываем заголовки/подписи/тезисы, сохраняя фото и (если не залочено) обновляя раскладку */
+        if (change === 'copy' && !locks.copy && gen.topic && llm.available()) {
+          const out = await llm.composeCarousel(gen.topic, gen.template || 'project', c.slides.length, db.settings.agency.name, db.settings.geoNames[gen.geo] || gen.geo || '', gen.angle || 'auto', { density: gen.density, tone: gen.tone });
+          const ns = out.slides || [];
+          c.slides.forEach((s, i) => { const nn = ns[i]; if (nn) { s.heading = nn.heading || s.heading; s.sub = nn.sub || ''; s.eyebrow = nn.eyebrow || s.eyebrow; s.points = Array.isArray(nn.points) ? nn.points : []; s.hero = null; } });
+          changed.push('текст');
+        }
+        /* фото: свежая подборка/догенерация — свопаем картинки на слайдах, где они есть (текст/раскладку не трогаем) */
+        if (change === 'photos' && !locks.images) {
+          const q = [gen.topic ? String(gen.topic).split('.')[0].slice(0, 60) : '', db.settings.geoNames[gen.geo] || gen.geo || '', 'luxury real estate'].filter(Boolean);
+          let pics = await gatherLaunchPhotos((gen.images || []), q, 6);
+          if (gen.genPhotos !== false && pics.length < 3) { const g = await genCarouselPhotos(3 - pics.length, { geoName: db.settings.geoNames[gen.geo] || gen.geo || '' }); pics = pics.concat(g); }
+          let pi = 0;
+          if (pics.length) { c.slides.forEach(s => { if (s.bg) { s.bg = pics[pi % pics.length]; pi++; } (s.layers || []).forEach(l => { if (l.t === 'img' && !l.sticker && (l.w || 0) >= 40) { l.url = pics[pi % pics.length]; pi++; } }); }); changed.push('фото'); }
+        }
+        /* раскладка: переназначаем семейства с новым seed (для direction/layout, и после смены текста) */
+        if (/layout|direction/.test(change) || change === 'copy') { if (!locks.layout) { c.slides = artDirect(c.slides.map(s => sanSlide(s)), { dna, seed }); if (!changed.includes('раскладка')) changed.push('раскладка'); } }
+        c.slides = c.slides.slice(0, 12).map(s => sanSlide(s));
+        store.save();
+        return json(res, 200, { ok: true, changed, theme: c.theme, font: c.font });
+      } catch (e) { return json(res, 500, { error: 'Пересборка не удалась: ' + e.message }); }
     }
 
     /* ================= ЛЕНТА АГЕНТСТВА (корпоративная стена) ================= */
@@ -4869,7 +4916,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-bar,.s-ins{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=30"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=31"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
