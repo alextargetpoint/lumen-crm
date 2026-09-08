@@ -3003,6 +3003,17 @@ const server = http.createServer(async (req, res) => {
       if (!studio.Providers.hasVision()) return json(res, 400, { error: 'нет GEMINI_API_KEY (нужен креативный директор)' });
       const b = await readBody(req);
       const host = req.headers.host;
+      /* быстрый пере-сбор из СОХРАНЁННОГО плана (без директора) — для итерации грамматик/раскладки */
+      if (b.recomposeFrom) {
+        const src = db.carousels.find(x => x.id === b.recomposeFrom && x.studio && x.studio.plan);
+        if (!src) return json(res, 404, { error: 'нет исходного плана' });
+        let deck2;
+        try { deck2 = studio.composeDeck(src.studio.project || { name: src.title }, src.studio.plan, src.studio.photos || []); }
+        catch (e) { return json(res, 500, { error: 'compose: ' + e.message }); }
+        const c2 = { id: crypto.randomBytes(5).toString('hex'), title: deck2.title + ' · v', template: 'studio', format: 'portrait', theme: deck2.theme, font: deck2.font, footer: { on: false, text: '' }, slides: deck2.slides.map(s => sanSlide(s)), studio: { mode: 'smart', concept: src.studio.concept, tokens: deck2.tokens, project: src.studio.project, plan: src.studio.plan, photos: src.studio.photos }, createdAt: Date.now() };
+        db.carousels.unshift(c2); store.save();
+        return json(res, 200, { id: c2.id, editKey: db.settings.hooks.secret, slides: c2.slides.length, grammars: c2.slides.map(s => s.grammar), recomposed: true });
+      }
       /* пул фото проекта с ролями */
       let photos = [];
       const imgs = (Array.isArray(b.images) ? b.images : []).filter(x => /^(https?:\/\/|\/assets\/)/.test(String(x))).slice(0, 16);
@@ -3022,7 +3033,7 @@ const server = http.createServer(async (req, res) => {
         id: crypto.randomBytes(5).toString('hex'), title: deck.title, template: 'studio',
         format: 'portrait', theme: deck.theme, font: deck.font, footer: { on: false, text: '' },
         slides: deck.slides.map(s => sanSlide(s)),
-        studio: { mode: 'smart', concept: String(plan.concept || '').slice(0, 200), tokens: deck.tokens, project },
+        studio: { mode: 'smart', concept: String(plan.concept || '').slice(0, 200), tokens: deck.tokens, project, plan, photos },
         createdAt: Date.now(),
       };
       db.carousels.unshift(c); store.save();

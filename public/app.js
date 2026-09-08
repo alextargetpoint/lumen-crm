@@ -982,6 +982,66 @@ const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? m
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
 
+/* ─── v3: карт-варианты (surface/иерархия/контраст/плотность) + асимметр. спаны 12-кол ─── */
+const OV_VARIANT = {
+  kpi: 'cv-borderless', attention: 'cv-borderless',
+  funnel: 'cv-analytics', geo: 'cv-analytics', spark: 'cv-analytics',
+  tasks: 'cv-standard', meetings: 'cv-standard', activity: 'cv-standard', recent: 'cv-standard', brokers: 'cv-standard', casebase: 'cv-standard',
+  hotleads: 'cv-urgent', goal: 'cv-goal', leaders: 'cv-editorial',
+  numbers: 'cv-system', aivs: 'cv-ai', ideas: 'cv-ai', chains: 'cv-tinted',
+  onboarding: 'cv-setup', worldclock: 'cv-inset',
+};
+/* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12 };
+
+/* ─── motion-слой: тонкая видео-атмосфера на hero/AI-зонах (ПРЕМИУМ-АКЦЕНТ, не дефолт) ───
+   cost-safe: переиспользуем уже сгенерённые лупы, НЕ генерим новое видео */
+const OV_MOTION_LIB = {
+  navyHero: { src: 'assets/nebula-bg.mp4', poster: 'assets/nebula-poster.jpg' },
+  ai:       { src: 'assets/widgets/amb-aurora.mp4', poster: 'assets/widgets/amb-aurora.jpg' },
+  warmGoal: { src: 'assets/widgets/amb-gold.mp4', poster: 'assets/widgets/amb-gold.jpg' },
+};
+let LESS_MOTION = (() => { try { return localStorage.getItem('lumen_less_motion') === '1'; } catch (_) { return false; } })();
+const prefersReducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+const isMobileVP = () => { try { return window.matchMedia('(max-width: 760px)').matches; } catch (_) { return false; } };
+/* видео крутим только если: не «меньше движения», не reduced-motion, не мобайл (там — постер) */
+const motionPlayable = () => !LESS_MOTION && !prefersReducedMotion() && !isMobileVP();
+/* motion-поверхность: постер-подложка + (лениво) видео + scrim; контент кладётся ПОВЕРХ */
+function motionSurface(key, opts = {}) {
+  const m = OV_MOTION_LIB[key]; if (!m) return '';
+  return `<div class="ovm ovm-${opts.intensity || 'subtle'}" data-ovm="${key}" aria-hidden="true">
+    <img class="ovm-poster" src="${m.poster}" alt="" loading="lazy">
+    <span class="ovm-scrim ovm-scrim-${opts.scrim || key}"></span>
+  </div>`;
+}
+let _ovMotionIO = null;
+function ensureMotionIO() {
+  if (_ovMotionIO) return _ovMotionIO;
+  _ovMotionIO = new IntersectionObserver((entries) => {
+    entries.forEach(en => {
+      const s = en.target; let v = s.querySelector('video.ovm-vid');
+      if (en.isIntersecting) {
+        const m = OV_MOTION_LIB[s.dataset.ovm]; if (!m) return;
+        if (!v) {
+          v = document.createElement('video');
+          v.className = 'ovm-vid'; v.muted = true; v.loop = true; v.playsInline = true;
+          v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.preload = 'metadata'; v.poster = m.poster; v.src = m.src;
+          s.insertBefore(v, s.querySelector('.ovm-scrim'));
+        }
+        v.play().catch(() => {});
+      } else if (v) { v.pause(); }
+    });
+  }, { rootMargin: '160px', threshold: 0.12 });
+  return _ovMotionIO;
+}
+/* активация motion в поддереве root: ленивое видео у входящих в вьюпорт поверхностей */
+function wireMotion(root) {
+  const surfaces = $$('.ovm[data-ovm]', root || document);
+  if (!motionPlayable()) { surfaces.forEach(s => { const v = s.querySelector('video.ovm-vid'); if (v) v.remove(); }); return; }
+  const io = ensureMotionIO();
+  surfaces.forEach(s => { if (!s._ovmWired) { s._ovmWired = true; io.observe(s); } });
+}
+
 /* ─── премиум-утилиты вёрстки виджетов (тренды дашбордов 2025-26) ─── */
 let _gradSeq = 0;
 /* уникальный id для SVG-градиента (нельзя переиспользовать между инстансами) */
@@ -1069,6 +1129,17 @@ function scoreRing(pct, opts = {}) {
 }
 /* человекочитаемое имя стадии по id */
 function ovStageName(id) { const s = STAGES.find(x => x.id === id); return s ? s.name : id; }
+/* v3: семантика события активности из ТЕКСТА (цена/интерес/ипотека/локация/вопрос/негатив) → тонкий чип */
+function ovActivityChip(text) {
+  const t = (text || '').toLowerCase();
+  if (/(отказ|не интерес|дорого|передума|жалоб|негатив|потерян|проигр)/.test(t)) return { l: 'негатив', c: 'neg' };
+  if (/(ипотек|рассрочк|mortgage|кредит|платёж|payment)/.test(t)) return { l: 'ипотека', c: 'mortgage' };
+  if (/(цена|бюджет|стоим|\$|€|price|млн|тыс)/.test(t)) return { l: 'цена', c: 'price' };
+  if (/(район|локац|гео|город|дубай|бали|пхукет|испан|location|адрес)/.test(t)) return { l: 'локация', c: 'loc' };
+  if (/(вопрос|спрашива|уточн|\?|интересует как)/.test(t)) return { l: 'вопрос', c: 'q' };
+  if (/(интерес|подборк|смотрел|нравит|хочет|заявк|горяч)/.test(t)) return { l: 'интерес', c: 'interest' };
+  return null;
+}
 /* состояние загрузки брокера: 0-40 свободен / 40-75 норма / 75-90 высокая / 90+ перегруз */
 function capState(load, capacity) {
   const cap = capacity || 20, raw = Math.round((load || 0) / cap * 100);
@@ -1108,6 +1179,7 @@ const OV_W = {
     const wkNow = d14.slice(7).reduce((a, b) => a + b, 0), wkPrev = d14.slice(0, 7).reduce((a, b) => a + b, 0);
     return `<div class="ovx-kpi">
       <button class="ovx-hero" data-ovgo="funnel">
+        ${motionSurface('navyHero', { intensity: 'subtle' })}
         <div class="ovx-hero-top"><span class="ovx-hero-lbl">Новые лиды · 14 дней</span>${deltaChip(wkNow, wkPrev)}</div>
         <div class="ovx-hero-num">${cup(wkNow)}</div>
         <div class="ovx-hero-sub">${totalWork} всего в работе</div>
@@ -1172,7 +1244,7 @@ const OV_W = {
   activity: { name: 'Активность', icon: () => I.bolt, full: false, render: (c) => {
     const evs = (c.events || []).slice(0, 8);
     if (!evs.length) return `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>` + ovEmpty(I.bolt, 'Пока тихо', 'События команды появятся здесь в реальном времени');
-    const body = `<div class="ov-tl">${evs.map(e => `<div class="ov-tl-i ${c.feedCls(e.type)}"><span class="ov-tl-node">${ic(c.feedIcon(e.type))}</span><div class="ov-tl-b"><span class="ov-tl-t">${esc(e.text || '')}</span><span class="ov-tl-tm">${ago(e.at)}</span></div></div>`).join('')}</div>`;
+    const body = `<div class="ov-tl">${evs.map(e => { const ch = ovActivityChip(e.text); return `<div class="ov-tl-i ${c.feedCls(e.type)}"><span class="ov-tl-node">${ic(c.feedIcon(e.type))}</span><div class="ov-tl-b"><span class="ov-tl-t">${esc(e.text || '')}</span><span class="ov-tl-tm">${ch ? `<span class="ov-tl-chip c-${ch.c}">${ch.l}</span>` : ''}${ago(e.at)}</span></div></div>`; }).join('')}</div>`;
     return `<div class="ov2-card-hd">${ic(I.bolt)}Активность<span>лента событий</span></div>${body}`;
   } },
   spark: { name: 'Приток лидов', icon: () => I.plus, full: false, render: (c) => {
@@ -1192,7 +1264,8 @@ const OV_W = {
       { ok: (STATE.brokers || []).some(b2 => b2.photo), t: 'Фото брокеров', d: 'живые лица в карточках', go: 'brokers' },
     ];
     const done = steps.filter(x => x.ok).length;
-    return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done} из ${steps.length}</span></div><div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? '' : ic(I.arrow, 2)}</button>`).join('')}</div>`;
+    const seg = `<div class="ov-setup-prog"><div class="ov-setup-segs">${steps.map(x => `<span class="ov-setup-seg ${x.ok ? 'on' : ''}"></span>`).join('')}</div><span class="ov-setup-frac">${done} <i>из ${steps.length}</i></span></div>`;
+    return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done === steps.length ? 'всё готово' : 'шаги настройки'}</span></div>${seg}<div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? `<span class="ov-setup-done">готово</span>` : ic(I.arrow, 2)}</button>`).join('')}</div>`;
   } },
   recent: { name: 'Свежие лиды', icon: () => I.plus, full: false, render: (c) => {
     const now = Date.now();
@@ -1315,7 +1388,7 @@ const OV_W = {
     const hd = `<div class="ov2-card-hd">${ic(I.spark)}Идея дня<span>свайп-колода контента</span><button class="btn btn-sm" data-ovgo="social">Хантинг</button></div>`;
     if (IDEA_DECK.loading) return hd + `<div class="idea-deck"><div class="idea-empty"><div class="idea-spin">${ic(I.spark)}</div><div class="idea-empty-t">ИИ придумывает идеи…</div><div class="idea-empty-s">15–20 секунд</div></div></div>`;
     const card = IDEA_DECK.cards[0];
-    if (!card) return hd + `<div class="idea-deck"><div class="idea-empty">${ic(I.bolt)}
+    if (!card) return hd + `<div class="idea-deck idea-deck-motion">${motionSurface('ai', { intensity: 'soft', scrim: 'aiLight' })}<div class="idea-empty">${ic(I.bolt)}
       <div class="idea-empty-t">${IDEA_DECK.loaded ? 'Колода пройдена 🙌' : 'Идеи на сегодня'}</div>
       <div class="idea-empty-s">${IDEA_DECK.loaded ? 'Все разобраны. Загляните в «Копилку идей» — или соберите новую колоду.' : 'ИИ подберёт 7 идей под ваше направление. Свайпайте: в работу, в копилку или мимо.'}</div>
       <button class="btn btn-accent btn-sm idea-genbtn" data-idea-gen>${ic(I.spark)}${IDEA_DECK.loaded ? 'Ещё колоду' : 'Собрать идеи'}</button></div></div>`;
@@ -1676,12 +1749,13 @@ PAGES.overview = async (root) => {
     root.innerHTML = `
       <div class="ov2-bar">
         ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×  · добавляй виджеты снизу</span>' : ''}
+        <button class="ov2-motion ${LESS_MOTION ? 'off' : 'on'}" id="ovMotion" title="${LESS_MOTION ? 'Движение выключено — включить фон-атмосферу' : 'Меньше движения (постеры вместо видео)'}">${ic(LESS_MOTION ? I.moon : I.spark)}<span>${LESS_MOTION ? 'Движение выкл.' : 'Меньше движения'}</span></button>
         <button class="ov2-edit ${OV_EDIT ? 'on' : ''}" id="ovEdit" title="${OV_EDIT ? 'Готово' : 'Настроить обзор'}">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}<span>${OV_EDIT ? 'Готово' : 'Настроить'}</span></button>
       </div>
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
-        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; return `<div class="ov-w ${w.full ? 'full' : ''}" data-w="${k}">
+        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; const span = (!w.full && OV_SPAN[k]) ? ` ov-span-${OV_SPAN[k]}` : ''; return `<div class="ov-w ${w.full ? 'full' : ''}${span}" data-w="${k}">
           ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
-          <div class="ov-w-body glass card ${OV_SURF[k] || ''}">${w.render(ctx)}</div>
+          <div class="ov-w-body glass card ${OV_SURF[k] || ''} ${OV_VARIANT[k] || 'cv-standard'}">${w.render(ctx)}</div>
         </div>`; }).join('')}
         ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
@@ -1694,7 +1768,7 @@ PAGES.overview = async (root) => {
     /* тиндер идей: локальная перерисовка только тела виджета (без рефетча всего обзора) */
     const ideaBox = root.querySelector('[data-w="ideas"] .ov-w-body');
     if (ideaBox) {
-      const repaintIdeas = () => { ideaBox.innerHTML = OV_W.ideas.render(ctx); };
+      const repaintIdeas = () => { ideaBox.innerHTML = OV_W.ideas.render(ctx); wireMotion(ideaBox); };
       ideaBox.addEventListener('click', async (e) => {
         if (e.target.closest('[data-idea-gen]')) { IDEA_DECK.loading = true; repaintIdeas(); await ideaGenerate(); repaintIdeas(); return; }
         const act = e.target.closest('[data-idea-act]'); if (!act) return;
@@ -1704,6 +1778,9 @@ PAGES.overview = async (root) => {
         setTimeout(() => ideaSwipe(kind, ctx, repaintIdeas), cardEl ? 180 : 0);
       });
     }
+    /* motion-тумблер «Меньше движения» (persist, дефолт — движение ВКЛ, но тонкое) */
+    const mb = $('#ovMotion', root);
+    if (mb) mb.addEventListener('click', () => { LESS_MOTION = !LESS_MOTION; try { localStorage.setItem('lumen_less_motion', LESS_MOTION ? '1' : '0'); } catch (_) {} paint(); });
     /* конструктор */
     $('#ovEdit', root).addEventListener('click', () => { OV_EDIT = !OV_EDIT; paint(); });
     if (OV_EDIT) {
@@ -1712,6 +1789,7 @@ PAGES.overview = async (root) => {
       ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
     }
     ovAnimateCounts(root);
+    wireMotion(root);
   };
   paint();
 };
@@ -5179,6 +5257,40 @@ function openCarouselModal() {
   wireCarPickers(_bd);
 }
 
+/* модалка «Студия · AI-дизайн» — AI Design Engine: креативный директор → сцен-граф → редактируемый премиум-дизайн.
+   Отделяет творческий интеллект от рендера: НЕ шаблоны, а оригинальный арт-дирекшн под каждый проект. */
+function openStudioModal() {
+  modal({
+    title: '✦ Студия · AI-дизайн',
+    body: `<div class="muted" style="font-size:12.5px;margin:-4px 0 10px;line-height:1.5">Креативный директор придумывает арт-дирекшн под ваш проект и собирает <b>редактируемый</b> дизайн премиум-уровня (как сильная студия недвижимости). Каждый элемент можно двигать, менять текст, фото, цвета.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Название проекта</label><input id="stName" placeholder="напр. LAYAN Residences"></div>
+        <div class="form-row"><label>Локация</label><input id="stGeo" placeholder="напр. Пхукет, Таиланд"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Вордмарк (крупно)</label><input id="stWm" placeholder="LAYAN"></div>
+        <div class="form-row"><label>Вордмарк (подпись)</label><input id="stWt" placeholder="RESIDENCES"></div>
+      </div>
+      <div class="form-row"><label>Факты и вводные</label><textarea id="stBrief" placeholder="1BR от $185K · доходность 8–12% · рассрочка 0% на 36 мес · сдача 2027 · 300 м до пляжа · панорамное остекление · натуральные материалы…"></textarea></div>
+      <div class="form-row"><label>Фото проекта — ссылки (по одной на строке, /assets/… или https://…)</label><textarea id="stImgs" placeholder="/assets/lib/gen-....png"></textarea></div>
+      <div class="form-row" style="max-width:180px"><label>Сколько слайдов</label><select id="stCount"><option value="6">6</option><option value="5">5</option><option value="7">7</option><option value="8">8</option></select></div>`,
+    actions: [{ label: 'Сгенерировать дизайн', cls: 'btn-accent', onClick: async (bd) => {
+      const btn = bd.parentNode.querySelector('.btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Директор работает…'; }
+      try {
+        const images = ($('#stImgs', bd).value || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+        const r = await api.post('/studio/generate', {
+          name: $('#stName', bd).value, geo: $('#stGeo', bd).value, brief: $('#stBrief', bd).value,
+          wordmark: { name: $('#stWm', bd).value, tag: $('#stWt', bd).value },
+          images, count: +($('#stCount', bd).value || 6),
+        });
+        toast('Дизайн собран', 'Открываю редактор — ' + (r.concept || ''), true);
+        window.open('/car/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
+        render();
+      } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = 'Сгенерировать дизайн'; } return false; }
+    } }, { label: 'Отмена' }],
+  });
+}
+
 /* карточка одного сценария (зеркалит проверенный контент-бот, но под недвижимость) */
 function renderScriptCard(s) {
   const hookTags = ['Слом ожидания', 'С середины истории', 'Цена бездействия'];
@@ -5437,9 +5549,10 @@ async function shBank(main) {
 async function shCarousels(main) {
   const cars = await api.get('/carousels');
   main.innerHTML = `
-    <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-cta" id="carNew">${ic(I.plus)}Новая карусель</button></div>
+    <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-cta" id="carStudio" title="AI Design Engine — премиум арт-дирекшн, редактируемый дизайн" style="margin-right:8px">${ic(I.spark)}Студия · AI-дизайн</button><button class="btn btn-cta" id="carNew">${ic(I.plus)}Новая карусель</button></div>
     <div class="car-grid">${cars.length ? cars.map(carCardHTML).join('') : '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}</div>`;
   $('#carNew', main).addEventListener('click', openCarouselModal);
+  const _cs = $('#carStudio', main); if (_cs) _cs.addEventListener('click', openStudioModal);
   wireCarCards(main);
 }
 
