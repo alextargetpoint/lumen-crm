@@ -5283,6 +5283,7 @@ function openStudioModal() {
       </div>
       <div class="form-row"><label>Факты и вводные</label><textarea id="stBrief" placeholder="1BR от $185K · доходность 8–12% · рассрочка 0% на 36 мес · сдача 2027 · 300 м до пляжа · панорамное остекление · натуральные материалы…"></textarea></div>
       <div class="form-row"><label>Фото проекта — ссылки (по одной на строке, /assets/… или https://…)</label><textarea id="stImgs" placeholder="/assets/lib/gen-....png"></textarea></div>
+      <div class="form-row"><label>Референс-эталон качества (ссылка на картинку, опц.) — вдохновит тир, не скопирует</label><input id="stRef" placeholder="/assets/ref/… или https://…"></div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center">
         <div class="form-row" style="max-width:150px"><label>Слайдов</label><select id="stCount"><option value="6">6</option><option value="5">5</option><option value="7">7</option><option value="8">8</option></select></div>
         <div style="display:flex;flex-direction:column;gap:6px">
@@ -5295,7 +5296,7 @@ function openStudioModal() {
       const setB = (t) => { if (btn) { btn.disabled = true; btn.textContent = t; } };
       try {
         const images = ($('#stImgs', bd).value || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        const payload = { name: $('#stName', bd).value, geo: $('#stGeo', bd).value, brief: $('#stBrief', bd).value, wordmark: { name: $('#stWm', bd).value, tag: $('#stWt', bd).value }, images, count: +($('#stCount', bd).value || 6) };
+        const payload = { name: $('#stName', bd).value, geo: $('#stGeo', bd).value, brief: $('#stBrief', bd).value, wordmark: { name: $('#stWm', bd).value, tag: $('#stWt', bd).value }, images, count: +($('#stCount', bd).value || 6), refImage: ($('#stRef', bd).value || '').trim() };
         if ($('#stDirs', bd).checked) {
           setB('Директор рисует 3 направления…');
           const r = await api.post('/studio/directions', payload);
