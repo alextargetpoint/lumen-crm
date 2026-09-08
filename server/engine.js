@@ -364,7 +364,7 @@ function wakePreview(db, filters = {}) {
     .map(l => ({ id: l.id, name: l.name, geo: l.geo, phone: l.phone, lastMsgAt: l.lastMsgAt, note: l.summary, wakeScore: wakeScore(db, l) }))
     .sort((a, b) => b.wakeScore - a.wakeScore);
   list.forEach(x => x.segment = segmentOf(x.wakeScore));
-  return list;
+  return filters.segment ? list.filter(x => x.segment === filters.segment) : list;
 }
 
 function startCampaign(db, cmp) {
@@ -445,6 +445,11 @@ function tickSla(db) {
 function tickCampaigns(db) {
   const nowT = Date.now();
   for (const cmp of db.campaigns) {
+    /* авто-старт запланированных кампаний, когда наступило время */
+    if (cmp.state === 'scheduled' && cmp.startAt && nowT >= cmp.startAt) {
+      cmp.log.unshift({ at: nowT, text: 'Автозапуск по расписанию' });
+      startCampaign(db, cmp);
+    }
     if (cmp.state !== 'running') continue;
     if (cmp.nextBatchAt && nowT < cmp.nextBatchAt) continue;
     /* окно отправки по поясу клиента проверяется пер-лидно ниже */

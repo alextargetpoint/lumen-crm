@@ -365,8 +365,10 @@ const NAV = {
    реальной страницей (кнопки действий/счётчики/deep-links живут как прежде),
    меняется только группировка в меню. Минус ~9 пунктов из бокового меню. */
 const WORKSPACES = {
+  pipeline: { label: 'Воронка',       icon: I.funnel,   pages: ['funnel', 'wake'] },
+  dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments'] },
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
-  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'comments', 'social', 'wake'] },
+  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'social'] },
   engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
   config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
@@ -5164,9 +5166,13 @@ function carGenLoader(show) {
   if (!document.getElementById('carGenLoaderCss')) {
     const st = document.createElement('style'); st.id = 'carGenLoaderCss';
     st.textContent = `
-#carGenLoader{position:fixed;inset:0;z-index:4000;display:grid;place-items:center;background:radial-gradient(120% 120% at 50% 0%,rgba(12,26,54,.86),rgba(6,14,32,.94));backdrop-filter:blur(16px);opacity:0;transition:opacity .34s}
+#carGenLoader{position:fixed;inset:0;z-index:4000;display:grid;place-items:center;background:#070f20;overflow:hidden;opacity:0;transition:opacity .34s}
 #carGenLoader.on{opacity:1}
-.cgl-stage{width:min(340px,80vw);text-align:center;color:#fff;font-family:Manrope,system-ui,sans-serif}
+/* сгенерированный премиум-бэкдроп (Higgsfield): медленный дрейф + лёгкий zoom, живёт как «анимация» */
+.cgl-bg{position:absolute;inset:-8%;background:url('/assets/ui/loader-orb.jpg') center/cover no-repeat;filter:saturate(1.05);animation:cglDrift 16s ease-in-out infinite alternate;will-change:transform}
+.cgl-vig{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,transparent 30%,rgba(7,15,32,.55) 70%,rgba(7,15,32,.9) 100%)}
+@keyframes cglDrift{0%{transform:scale(1.06) rotate(-2deg) translate(-1%,1%)}100%{transform:scale(1.16) rotate(2deg) translate(1%,-1%)}}
+.cgl-stage{position:relative;z-index:2;width:min(340px,80vw);text-align:center;color:#fff;font-family:Manrope,system-ui,sans-serif;padding:30px 34px;border-radius:26px;background:radial-gradient(120% 120% at 50% 50%,rgba(7,13,28,.62),rgba(7,13,28,.24) 60%,transparent 80%)}
 .cgl-deck{position:relative;height:210px;margin:0 auto 26px;perspective:1000px}
 .cgl-card{position:absolute;left:50%;top:50%;width:132px;height:172px;margin:-86px 0 0 -66px;border-radius:16px;background:linear-gradient(160deg,rgba(94,140,255,.9),rgba(24,54,132,.92));border:1px solid rgba(150,185,255,.35);box-shadow:0 24px 60px -18px rgba(4,12,30,.7);overflow:hidden;transform-origin:50% 120%;animation:cglFan 2.6s ease-in-out infinite}
 .cgl-card::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.28) 42%,transparent 64%);transform:translateX(-120%);animation:cglSheen 1.7s ease-in-out infinite}
@@ -5179,12 +5185,12 @@ function carGenLoader(show) {
 @keyframes cglSheen{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
 .cgl-orb{width:44px;height:44px;margin:0 auto 16px;border-radius:50%;background:conic-gradient(from 0deg,#5E8CFF,#9B8CFF,#4FB6F2,#5E8CFF);animation:cglSpin 1.1s linear infinite;box-shadow:0 0 26px rgba(94,140,255,.6);-webkit-mask:radial-gradient(closest-side,transparent 58%,#000 60%);mask:radial-gradient(closest-side,transparent 58%,#000 60%)}
 @keyframes cglSpin{to{transform:rotate(1turn)}}
-.cgl-t{font-size:16px;font-weight:700;letter-spacing:-.01em}
-.cgl-s{font-size:12.5px;opacity:.7;margin-top:5px;min-height:16px;transition:opacity .3s}`;
+.cgl-t{font-size:17px;font-weight:700;letter-spacing:-.01em;text-shadow:0 2px 14px rgba(0,0,0,.6)}
+.cgl-s{font-size:12.5px;opacity:.82;margin-top:6px;min-height:16px;transition:opacity .3s;text-shadow:0 1px 10px rgba(0,0,0,.6)}`;
     document.head.appendChild(st);
   }
   el = document.createElement('div'); el.id = 'carGenLoader';
-  el.innerHTML = `<div class="cgl-stage"><div class="cgl-deck"><div class="cgl-card"></div><div class="cgl-card"></div><div class="cgl-card"></div><div class="cgl-card"></div></div><div class="cgl-orb"></div><div class="cgl-t">Собираю карусель…</div><div class="cgl-s" id="cglStep">Читаю факты о проекте</div></div>`;
+  el.innerHTML = `<div class="cgl-bg"></div><div class="cgl-vig"></div><div class="cgl-stage"><div class="cgl-orb"></div><div class="cgl-t">Собираю карусель…</div><div class="cgl-s" id="cglStep">Читаю факты о проекте</div></div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('on'));
   const steps = ['Читаю факты о проекте', 'Пишу тексты по углу подачи', 'Раскладываю фото по смыслу', 'Подбираю стикеры и акценты', 'Собираю премиальную вёрстку'];
@@ -5218,6 +5224,7 @@ async function shLaunch(main) {
         <select id="lcPhotos" title="Плотность фото"><option value="">Фото: по углу</option><option value="high">Фото: больше</option><option value="low">Фото: меньше</option></select>
         <select id="lcStk" title="Смысловые стикеры на слайдах"><option value="1">Стикеры: вкл</option><option value="0">Стикеры: выкл</option></select>
         <select id="lcTone" title="Тон подачи"><option value="">Тон: авто</option><option value="expert">Тон: экспертный</option><option value="warm">Тон: тёплый</option><option value="bold">Тон: дерзкий</option></select>
+        <select id="lcGenPhotos" title="Догенерировать качественные фото ИИ, если со страницы мало (~$0.05/кадр)"><option value="1">ИИ-фото: вкл</option><option value="0">ИИ-фото: выкл</option></select>
       </div>
       <div class="cpick-row"><span class="cpick-hd">Угол подачи <span class="muted" style="font-weight:400">— под какую стратегию писать</span></span>${carAnglePicker('lcAngle', 'auto')}</div>
       <div class="cpick-row"><span class="cpick-hd">Цветовая тема</span>${carThemePicker('lcTheme', 'klein')}</div>
@@ -5265,7 +5272,7 @@ async function shLaunch(main) {
     const btn = $('#lcGo', main); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'ИИ собирает…';
     carGenLoader(true);
     try {
-      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', count: +(($('#lcCount', main) || {}).value || 0), density: ($('#lcDensity', main) || {}).value || 'medium', photos: ($('#lcPhotos', main) || {}).value || '', tone: ($('#lcTone', main) || {}).value || '', stickers: (($('#lcStk', main) || {}).value !== '0'), images: [...lcPicked], ai: true });
+      const r = await api.post('/carousels', { template: 'launch', format: $('#lcFmt', main).value, topic, geo: $('#lcGeo', main).value, theme: $('#lcTheme', main).value, font: $('#lcFont', main).value, angle: ($('#lcAngle', main) || {}).value || 'auto', count: +(($('#lcCount', main) || {}).value || 0), density: ($('#lcDensity', main) || {}).value || 'medium', photos: ($('#lcPhotos', main) || {}).value || '', tone: ($('#lcTone', main) || {}).value || '', stickers: (($('#lcStk', main) || {}).value !== '0'), genPhotos: (($('#lcGenPhotos', main) || {}).value !== '0'), images: [...lcPicked], ai: true });
       carGenLoader(false);
       if (r.thin) toast('Карусель собрана', 'Данных было мало — на слайдах общие тезисы. Добавь ссылку застройщика или факты и пересобери для конкретики.', true);
       else toast('Карусель собрана', 'Открываю редактор', true);

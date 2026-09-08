@@ -1542,6 +1542,30 @@ async function gatherLaunchPhotos(picks, query, want) {
   items.sort((a, b) => b.size - a.size);
   return items.map(x => x.url).slice(0, Math.max(want, 5));
 }
+/* ИИ-догенерация качественных атмосферных кадров, когда со страницы фото мало/нет.
+   Честные mood-рендеры (экстерьер/интерьер/локация), НЕ выдаём за конкретный дом. gpt-image-1 ~$0.04-0.07/шт. */
+async function genCarouselPhotos(need, opts = {}) {
+  if (!llm.hasImage() || need <= 0) return [];
+  const geo = String(opts.geoName || '').trim();
+  const g = geo ? ', ' + geo : '';
+  const base = 'premium real-estate marketing image, photorealistic, cinematic lighting, elegant, high detail, no text, no watermark, no logo, no people faces';
+  const prompts = [
+    `Luxury residential building exterior, modern architecture${g}, golden hour, lush tropical landscaping, ${base}`,
+    `Elegant modern apartment interior with floor-to-ceiling windows${geo ? ', view of ' + geo : ''}, warm designer lighting, ${base}`,
+    `${geo || 'Tropical'} premium lifestyle ambiance, infinity pool and skyline at sunset, ${base}`,
+    `Aerial view of an upscale residential district${g}, coastline and greenery, ${base}`,
+  ].slice(0, Math.min(need, 3));
+  const out = await Promise.all(prompts.map(async (p) => {
+    try {
+      const buf = await llm.generateImage(p, { size: '1024x1024', quality: 'medium' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'lib'), { recursive: true });
+      const fn = `lib/gen-${crypto.randomBytes(4).toString('hex')}.png`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fn), buf);
+      return '/assets/' + fn;
+    } catch (e) { console.error('[genCarouselPhotos] ' + e.message); return null; }
+  }));
+  return out.filter(Boolean);
+}
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -2146,21 +2170,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/wake/preview' && req.method === 'GET') {
-      const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0) };
+      const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0), segment: u.searchParams.get('segment') || null };
       return json(res, 200, engine.wakePreview(db, filters));
     }
 
     if (p === '/api/campaigns' && req.method === 'GET') return json(res, 200, db.campaigns);
     if (p === '/api/campaigns' && req.method === 'POST') {
       const b = await readBody(req);
+      const startAt = b.startAt && +b.startAt > Date.now() + 30000 ? +b.startAt : null;
       const cmp = {
-        id: store.nextId('cmp'), name: b.name || 'Кампания', state: 'draft',
+        id: store.nextId('cmp'), name: b.name || 'Кампания', state: startAt ? 'scheduled' : 'draft',
         filters: b.filters || { stages: ['sleeping'] }, batchSize: b.batchSize || 3,
         pauseMin: b.pauseMin || [20, 60], window: b.window || [10, 20],
-        templateId: b.templateId || 'tpl_wake_ru', text: b.text || '',
+        templateId: b.templateId || 'tpl_wake_ru', text: b.text || '', startAt,
         stats: { sent: 0, delivered: 0, replied: 0, qualified: 0, skipped: 0 },
         recipients: [], cursor: 0, log: [], createdAt: Date.now(), nextBatchAt: null,
       };
+      if (startAt) cmp.log.unshift({ at: Date.now(), text: 'Запланирована на ' + new Date(startAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
       db.campaigns.unshift(cmp); store.save();
       return json(res, 200, cmp);
     }
@@ -2578,7 +2604,10 @@ const server = http.createServer(async (req, res) => {
         const nameQ = String(b.topic || '').replace(/^старт продаж.*?лонч:\s*/i, '').replace(/\.\s*условия.*/i, '').split('.')[0].slice(0, 60);
         const q = [ [nameQ, geoQ, 'luxury real estate'].filter(Boolean).join(' '), [geoQ, 'luxury real estate apartments'].filter(Boolean).join(' '), [geoQ, 'beach skyline'].filter(Boolean).join(' ') ].filter(s => s.trim());
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
-        const good = await gatherLaunchPhotos(rawPics, q, want);
+        let good = await gatherLaunchPhotos(rawPics, q, want);
+        /* мало реальных кадров → догенерим качественные атмосферные ИИ-рендеры (по умолчанию вкл) */
+        const target = photoBias === 'high' ? 4 : photoBias === 'low' ? 2 : 3;
+        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(target - good.length, { geoName: db.settings.geoNames[b.geo] || b.geo || '' }); if (gen.length) good = good.concat(gen); }
         if (good.length) {
           /* классифицируем кадры по роли и раскладываем по правильным слайдам с вариациями */
           let roles = good.map(() => 'other');
@@ -2687,7 +2716,9 @@ const server = http.createServer(async (req, res) => {
         /* несколько запросов: имя проекта → локация+недвижимость → пляж/скайлайн локации (реальные атмосферные кадры) */
         const q = [ [nameQ, geoQ, 'luxury real estate'].filter(Boolean).join(' '), [geoQ, 'luxury real estate apartments'].filter(Boolean).join(' '), [geoQ, 'beach skyline'].filter(Boolean).join(' ') ].filter(s => s.trim());
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
-        const good = await gatherLaunchPhotos(images, q, want);
+        let good = await gatherLaunchPhotos(images, q, want);
+        const target = photoBias === 'high' ? 4 : photoBias === 'low' ? 2 : 3;
+        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(target - good.length, { geoName: geoQ }); if (gen.length) good = good.concat(gen); }
         let pics = good;
         if (good.length && slides.length) {
           let roles = good.map(() => 'other');
