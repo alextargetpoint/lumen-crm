@@ -2352,6 +2352,7 @@ PAGES.meetings = async (root) => {
               <div class="muted" style="font-size:11.5px;margin-top:2px">эксперт: ${esc(mt.brokerName)}${mt.note ? ' · ' + esc(mt.note) : ''}</div>
             </div>
             ${stBadge[mt.status] || ''}
+            <button class="btn btn-sm btn-accent" data-mtprep="${mt.leadId}" title="Открыть карточку лида: заметки, файлы, переписка, подборки, презентация">${ic(I.eye)}Подготовиться</button>
             ${mt.status === 'scheduled' ? `<button class="btn btn-sm" data-mt="${mt.id}" data-st="done">Прошла</button>
             <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>` : ''}
           </div>`).join(''), { open: di < 3, count: items.length, icon: I.cal })).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
@@ -2360,6 +2361,7 @@ PAGES.meetings = async (root) => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
     render();
   }));
+  $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openLeadModal(b.dataset.mtprep); }));
   $('#mtPrint').addEventListener('click', () => window.open('/meetings/print?w=' + (PAGE_STATE.calWeek || 0), '_blank'));
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
@@ -2448,7 +2450,7 @@ PAGES.meetings = async (root) => {
                 await api.patch('/meetings/' + mt.id, { at, dur: +$('#emDur', bd).value });
                 render();
               } },
-              { label: 'Карточка лида', onClick: () => openLeadModal(mt.leadId) },
+              { label: '👁 Подготовиться к встрече', cls: 'btn-accent', onClick: () => { closeModal(); openLeadModal(mt.leadId); } },
               { label: 'Закрыть' },
             ],
           });
