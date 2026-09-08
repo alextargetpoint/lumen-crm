@@ -3427,14 +3427,31 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 @media (max-width: 620px) { .kpi-bento, .kpi-trend { grid-template-columns: 1fr; } .kpi-ed { grid-template-columns: 1fr 1fr; gap: 14px 0; } }
 
 /* ============ Первое касание: компоновка + эмулятор телефона ============ */
-.lc-ft2 { display: grid; grid-template-columns: 1fr 244px; gap: 18px; align-items: start; }
-.lc-ft-compose { min-width: 0; }
-.lc-ft-phone { display: flex; flex-direction: column; align-items: center; }
-.lc-ft-phone .iph-sm { width: 230px; }
-.lc-ft-phone .wa-note { align-self: flex-start; font-size: 11px; color: var(--ink-3); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+/* первое касание — стек: чипы сверху, потом compose + компактный телефон (переносится вниз на узком) */
+.lc-ft-grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.lc-ft-compose { flex: 1 1 300px; min-width: 0; }
+.lc-ft-phone { flex: 0 0 auto; width: 200px; margin-inline: auto; display: flex; flex-direction: column; align-items: center; }
+.lc-ft-phone .iph-xs { width: 200px; }
+.lc-ft-phone .wa-note { font-size: 11px; color: var(--ink-3); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
 .lc-ft-phone .wa-note svg { width: 13px; height: 13px; }
-.wa-img { display: block; width: 100%; max-width: 190px; border-radius: 10px; margin-bottom: 4px; }
-.wa-ph { font-size: 12px; color: #7a8aa0; text-align: center; padding: 26px 16px; line-height: 1.5; }
+/* креатив-дропзона (кликабельный label) */
+.lc-creo2 { display: block; position: relative; border: 1.5px dashed var(--stroke); border-radius: 12px; min-height: 60px; cursor: pointer; overflow: hidden; margin-bottom: 10px; transition: border-color .15s, background .15s; }
+.lc-creo2:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.lc-creo2.has { border-style: solid; border-color: var(--stroke); }
+.lc-creo2 img { width: 100%; max-height: 150px; object-fit: cover; display: block; }
+.lc-creo2-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 15px; color: var(--ink-3); text-align: center; }
+.lc-creo2-ph svg { width: 20px; height: 20px; margin-bottom: 3px; color: var(--accent); }
+.lc-creo2-ph b { font-size: 12.5px; color: var(--ink-2); font-weight: 650; }
+.lc-creo2-ph i { font-size: 11px; font-style: normal; }
+.lc-creo2-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.58); color: #fff; border-radius: 8px; padding: 3px 9px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; backdrop-filter: blur(4px); }
+.lc-creo2-badge svg { width: 12px; height: 12px; }
+/* comfortable textarea + buttons */
+.lc-ft-ta { width: 100%; min-height: 104px; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; font-family: inherit; color: var(--ink); resize: vertical; outline: none; background: var(--card, #fff); transition: border-color .15s; }
+.lc-ft-ta:focus { border-color: var(--accent); }
+.lc-ft-btns { display: flex; gap: 8px; margin-top: 10px; }
+.lc-ft-btns .btn { flex: 1; justify-content: center; }
+.wa-img { display: block; width: 100%; max-width: 150px; border-radius: 8px; margin-bottom: 4px; }
+.wa-ph { font-size: 11.5px; color: #7a8aa0; text-align: center; padding: 22px 14px; line-height: 1.5; }
 /* чипы персонализации */
 .lc-ft-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 .lc-ftc-t { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
@@ -3580,3 +3597,16 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .opv-chart.cine-a { position: relative; overflow: hidden; background: linear-gradient(125deg, #08122A, #24306E 55%, #08122A); background-size: 300% 300%; animation: ovFlow 8s ease-in-out infinite; border: 1px solid rgba(122,158,255,.2); color: #9DB8FF; }
 .opv-chart.cine-a .opv-n { color: #fff; }
 .opv-cine-g { flex: 1; border-radius: 8px; background: linear-gradient(125deg, #5A3E12, #241a08 60%, #5A3E12); background-size: 300% 300%; animation: ovFlow 9s ease-in-out infinite; border: 1px solid rgba(255,210,120,.2); }
+
+/* компактный iPhone-мокап для превью первого касания */
+.iph-xs { padding: 7px; border-radius: 34px; box-shadow: 0 18px 44px -20px rgba(8,10,16,.55), inset 0 0 0 2px rgba(255,255,255,.05); }
+.iph-xs .iph-screen { border-radius: 28px; }
+.iph-xs .iph-island { top: 8px; padding: 4px 12px; }
+.iph-xs .iph-status { padding: 6px 14px 3px; }
+.iph-xs .iph-time { font-size: 11px; }
+.iph-xs .wa-top { padding: 5px 11px 8px; }
+.iph-xs .wa-ava { width: 26px; height: 26px; font-size: 11px; }
+.iph-xs .wa-peer b { font-size: 12px; }
+.iph-xs .wa-body { padding: 10px 9px; }
+.iph-xs .wa-msg { font-size: 12px; padding: 7px 9px; max-width: 88%; }
+.iph-xs .iph-home { bottom: 5px; width: 92px; height: 4px; }

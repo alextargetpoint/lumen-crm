@@ -2686,29 +2686,31 @@ async function openLeadModal(id) {
           </div>
           ${coll('Первое касание', `
             <div class="lc-ft2" style="margin-top:6px">
-              <div class="lc-ft-compose">
-                <div class="lc-ft-chips" id="lcFtChips">${ftChipsHtml(l)}</div>
-                <div id="lcCreoWrap" class="lc-creo ${l.creativeUrl ? 'has' : ''}">${l.creativeUrl ? `<img src="${esc(l.creativeUrl)}" alt="креатив">` : '<span>Креатив объявления не прикреплён</span>'}</div>
-                <input type="file" id="lcCreoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
-                <button class="btn btn-sm" id="lcCreoBtn" style="margin:8px 0 4px">${ic(I.plus)}${l.creativeUrl ? 'Заменить креатив' : 'Прикрепить креатив'}</button>
-                <textarea id="lcFtText" placeholder="Напишите первое сообщение сами — или соберите max-персонализацию через Gemini ✦" style="min-height:96px">${esc(`Здравствуйте, ${(l.name || '').split(' ')[0] || ''}! Это ${STATE.settings.agency.name}. Вы оставили заявку${l.ads && l.ads.adName ? ' по «' + l.ads.adName + '»' : ' по недвижимости — ' + l.geoName}. Подскажу по нему детали. Рассматриваете для себя или под инвестиции?`)}</textarea>
-                <div class="lc-note-row" style="margin-top:8px">
-                  <button class="btn btn-sm btn-accent" id="lcFtAi">${ic(I.spark)}Max-персонализация (Gemini)</button>
-                  <button class="btn btn-sm" id="lcFtSend">${ic(I.send)}Отправить</button>
+              <div class="lc-ft-chips" id="lcFtChips">${ftChipsHtml(l)}</div>
+              <div class="lc-ft-grid">
+                <div class="lc-ft-compose">
+                  <label class="lc-creo2 ${l.creativeUrl ? 'has' : ''}" id="lcCreoWrap">
+                    ${l.creativeUrl ? `<img src="${esc(l.creativeUrl)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>` : `<span class="lc-creo2-ph">${ic(I.image || I.plus)}<b>Прикрепить креатив</b><i>уйдёт первым сообщением</i></span>`}
+                    <input type="file" id="lcCreoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+                  </label>
+                  <textarea id="lcFtText" class="lc-ft-ta" placeholder="Напишите первое сообщение сами — или соберите персонализацию через ИИ ✦">${esc(`Здравствуйте, ${(l.name || '').split(' ')[0] || ''}! Это ${STATE.settings.agency.name}. Вы оставили заявку${l.ads && l.ads.adName ? ' по «' + l.ads.adName + '»' : ' по недвижимости — ' + l.geoName}. Подскажу по нему детали. Рассматриваете для себя или под инвестиции?`)}</textarea>
+                  <div class="lc-ft-btns">
+                    <button class="btn btn-accent" id="lcFtAi">${ic(I.spark)}Персонализировать</button>
+                    <button class="btn" id="lcFtSend">${ic(I.send)}Отправить</button>
+                  </div>
+                  <div id="lcFtVarB" class="lc-ft-varb" style="display:none"></div>
+                  <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
                 </div>
-                <div id="lcFtVarB" class="lc-ft-varb" style="display:none"></div>
-                <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
-              </div>
-              <div class="lc-ft-phone">
-                <div class="wa-note">${ic(I.eye)}Как увидит клиент</div>
-                <div class="iph iph-sm">
-                  <span class="iph-side iph-silent"></span><span class="iph-side iph-volup"></span><span class="iph-side iph-voldn"></span><span class="iph-side iph-power"></span>
-                  <div class="iph-screen">
-                    <div class="iph-island"><i class="iph-cam"></i></div>
-                    <div class="iph-status"><span class="iph-time">9:41</span><span class="iph-sys"><svg viewBox="0 0 20 12" width="16" height="10"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 13" width="22" height="11"><rect x="1" y="1.5" width="21" height="10" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><rect x="2.5" y="3" width="17" height="7" rx="1.5"/><rect x="23" y="4.5" width="1.8" height="4" rx="1"/></svg></span></div>
-                    <div class="wa-top"><span class="wa-back">‹</span><div class="wa-ava">${l.avatarUrl ? `<img src="${esc(l.avatarUrl)}">` : esc((l.name || 'A').slice(0, 1).toUpperCase())}</div><div class="wa-peer"><b>${esc((l.name || 'Клиент').split(' ')[0])}</b><i>онлайн</i></div><span class="wa-call">${ic(I.phone)}</span></div>
-                    <div class="wa-body" id="lcWaBody"></div>
-                    <div class="iph-home"></div>
+                <div class="lc-ft-phone">
+                  <div class="wa-note">${ic(I.eye)}Как увидит клиент</div>
+                  <div class="iph iph-xs">
+                    <div class="iph-screen">
+                      <div class="iph-island"><i class="iph-cam"></i></div>
+                      <div class="iph-status"><span class="iph-time">9:41</span><span class="iph-sys"><svg viewBox="0 0 20 12" width="15" height="9"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 13" width="20" height="10"><rect x="1" y="1.5" width="21" height="10" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><rect x="2.5" y="3" width="17" height="7" rx="1.5"/><rect x="23" y="4.5" width="1.8" height="4" rx="1"/></svg></span></div>
+                      <div class="wa-top"><span class="wa-back">‹</span><div class="wa-ava">${l.avatarUrl ? `<img src="${esc(l.avatarUrl)}">` : esc((l.name || 'A').slice(0, 1).toUpperCase())}</div><div class="wa-peer"><b>${esc((l.name || 'Клиент').split(' ')[0])}</b><i>онлайн</i></div><span class="wa-call">${ic(I.phone)}</span></div>
+                      <div class="wa-body" id="lcWaBody"></div>
+                      <div class="iph-home"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2840,17 +2842,15 @@ async function openLeadModal(id) {
   });
   $('#lcNote', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
   /* --- первое касание: креатив + Gemini + отправка --- */
-  const creoBtn = $('#lcCreoBtn', bd);
-  if (creoBtn) {
+  const ftText = $('#lcFtText', bd);
+  if (ftText) {
     renderFtPhone(bd);
-    const ftText = $('#lcFtText', bd);
-    if (ftText) ftText.addEventListener('input', () => renderFtPhone(bd));
-    creoBtn.addEventListener('click', () => $('#lcCreoFile', bd).click());
+    ftText.addEventListener('input', () => renderFtPhone(bd));
     $('#lcCreoFile', bd).addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
       const r = await fetch(`/api/leads/${id}/creative?filename=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
       const j = await r.json();
-      if (r.ok) { const w = $('#lcCreoWrap', bd); w.classList.add('has'); w.innerHTML = `<img src="${j.url}" alt="креатив">`; renderFtPhone(bd); toast('Креатив прикреплён', 'Уйдёт первым сообщением', true); }
+      if (r.ok) { const w = $('#lcCreoWrap', bd); const inp = $('#lcCreoFile', bd); w.classList.add('has'); w.innerHTML = `<img src="${esc(j.url)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>`; if (inp) w.appendChild(inp); renderFtPhone(bd); toast('Креатив прикреплён', 'Уйдёт первым сообщением', true); }
       else toast('Не загрузилось', j.error);
     });
     $('#lcFtAi', bd).addEventListener('click', async () => {
