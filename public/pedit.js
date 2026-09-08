@@ -61,6 +61,11 @@ body{overflow-x:hidden;padding-left:0!important;padding-right:0!important}
 .peth-dot{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:linear-gradient(135deg,var(--td) 50%,var(--tb) 50%);transition:transform .15s}
 .peth-dot:hover{transform:scale(1.15)}
 .peth-dot.on{border-color:#fff;box-shadow:0 0 0 2px #2563EB}
+.pepresets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pepreset{position:relative;aspect-ratio:16/10;border:1px solid rgba(134,175,255,.18);border-radius:9px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;padding:4px;transition:transform .14s,border-color .14s}
+.pepreset:hover{transform:translateY(-2px);border-color:#7C9BFF}
+.pepreset .pp-aa{font-size:19px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pepreset i{font-style:normal;font-size:8.5px;font-weight:700;color:#fff;opacity:.9;text-shadow:0 1px 3px rgba(0,0,0,.6);white-space:nowrap}
 .edbtn{background:linear-gradient(180deg,#3B78FF,#2563EB);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;gap:6px;align-items:center;transition:transform .14s cubic-bezier(.4,0,.2,1),box-shadow .16s,filter .14s;box-shadow:0 6px 16px -6px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.22)}
 .edbtn:hover{transform:translateY(-1px);box-shadow:0 11px 24px -6px rgba(37,99,235,.72),inset 0 1px 0 rgba(255,255,255,.25);filter:brightness(1.05)}
 .edbtn:active{transform:translateY(0)}
@@ -157,6 +162,7 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
   bar.innerHTML = `
     <div class="pep-top"><button class="edbtn g" id="peExit" title="Сохранить и выйти в CRM">←</button><b>Конструктор</b></div>
     <div class="pep-body">
+      ${(P.presets || []).length ? `<div class="pep-sec"><div class="pep-lbl">Стиль</div><div class="pepresets">${P.presets.map((p, i) => `<button class="pepreset" data-preset="${i}" title="${p.name}" style="background:linear-gradient(150deg,color-mix(in srgb,${p.blue} 26%,${p.body}),${p.body})"><span class="pp-aa" style="font-family:${p.disp || 'serif'};color:${p.blue}">Aa</span><i>${p.name}</i></button>`).join('')}</div></div>` : ''}
       <div class="pep-sec"><div class="pep-lbl">Тема</div><div class="pethemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="peth-dot ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--td:${t.blue};--tb:${t.body}"></button>`).join('')}</div></div>
       ${Object.keys(P.fonts || {}).length ? `<div class="pep-sec"><div class="pep-lbl">Шрифт</div><button class="edbtn g pefont-btn wide" id="peFontBtn" title="Шрифт подборки"><span style="font-family:${(P.fonts[P.fontPreset] || {}).disp || 'serif'};font-size:15px">Aa</span> ${(P.fonts[P.fontPreset] || {}).name || 'Шрифт'} ▾</button></div>` : ''}
       <div class="pep-sec"><div class="pep-lbl">История</div><div class="pep-row"><button class="edbtn g" id="peUndo" title="Отменить (⌘Z)" ${P.undo ? '' : 'disabled'}>↩</button><button class="edbtn g" id="peRedo" title="Повторить (⇧⌘Z)" ${P.redo ? '' : 'disabled'}>↪</button><button class="edbtn g wide" id="peVers">Версии${(P.versions || []).length ? ' · ' + P.versions.length : ''}</button></div></div>
@@ -176,6 +182,16 @@ section[data-bid].sec-drag{outline:3px dashed rgba(37,99,235,.6);outline-offset:
     });
     if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
     else flash('Ошибка темы');
+  }));
+  $$('.pepreset', bar).forEach((b) => b.addEventListener('click', async () => {
+    const p = (P.presets || [])[+b.dataset.preset]; if (!p) return;
+    flash('Применяю стиль…', 0);
+    const r = await fetch(`/p/${P.cid}/blocks?key=${encodeURIComponent(KEY)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks: serialize(), theme: p.theme, fontPreset: p.font }),
+    });
+    if (r.ok) { sessionStorage.setItem('pe_scroll', String(scrollY)); reloadWithLoader(); }
+    else flash('Ошибка стиля');
   }));
   const pfBtn = bar.querySelector('#peFontBtn');
   if (pfBtn) {

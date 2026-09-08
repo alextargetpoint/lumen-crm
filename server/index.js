@@ -710,6 +710,22 @@ const COLL_FONTS = Object.assign({}, FONT_PRESETS,
     gf: v.gf + '&family=Manrope:wght@400;500;600;700;800',
   }])));
 
+/* готовые стили подборки (как «шаблоны» карусели): тема + шрифт в один клик */
+const COLL_PRESETS = [
+  { name: 'Мягкий люкс', theme: 'klein', font: 'fraunces' },
+  { name: 'Глянец', theme: 'champagne', font: 'playfair' },
+  { name: 'Шалфей', theme: 'sage', font: 'cormorant' },
+  { name: 'Мокко', theme: 'mocha', font: 'eb' },
+  { name: 'Нуар', theme: 'noir', font: 'fraunces' },
+  { name: 'Полночь', theme: 'midnight', font: 'playfair' },
+  { name: 'Сланец', theme: 'slate', font: 'spacegro' },
+  { name: 'Изумруд', theme: 'emerald', font: 'fraunces' },
+  { name: 'Терракота', theme: 'terracotta', font: 'unbounded' },
+  { name: 'Роял', theme: 'royal', font: 'cormorant' },
+  { name: 'Бордо', theme: 'bordeaux', font: 'cormorant' },
+  { name: 'Netflix', theme: 'netflix', font: 'oswald' },
+].filter(p => PAGE_THEMES[p.theme] && COLL_FONTS[p.font]);
+
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
 const CAR_POS = new Set(['top', 'center', 'bottom']);
 const CAR_SIZE = new Set(['s', 'm', 'l']);
@@ -3201,7 +3217,7 @@ const server = http.createServer(async (req, res) => {
       c.histFwd = [];
       c.blocks = blocks;
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
-      if (b.fontPreset && FONT_PRESETS[b.fontPreset]) c.fontPreset = b.fontPreset;
+      if (b.fontPreset && COLL_FONTS[b.fontPreset]) c.fontPreset = b.fontPreset;
       const cover = blocks.find(x => x.t === 'cover');
       if (cover && cover.data.title) c.title = cover.data.title.slice(0, 200);
       store.save();
@@ -4468,7 +4484,7 @@ ${isPrint ? '<script>window.print()<\/script>' : ''}
       const cTitle = hasBlocks ? c.title : (cust.title || c.title);   /* legacy custom — только до первого сохранения блоков */
       const cIntro = hasBlocks ? c.intro : (cust.intro != null ? cust.intro : c.intro);
       const theme = PAGE_THEMES[c.theme] || PAGE_THEMES.klein;
-      const font = FONT_PRESETS[c.fontPreset] || FONT_PRESETS.soft;
+      const font = COLL_FONTS[c.fontPreset] || COLL_FONTS.soft;
       const star = db.settings.agency.logo
         ? `<img class="star" src="${esc(db.settings.agency.logo)}" style="width:auto;max-width:150px;height:44px;object-fit:contain">`
         : '<svg class="star" viewBox="0 0 100 120"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
@@ -5088,6 +5104,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body, dark: !!v.dark }])),
         fontPreset: c.fontPreset || 'soft',
         fonts: Object.fromEntries(Object.entries(COLL_FONTS).map(([k, v]) => [k, { name: v.name, disp: v.disp, gf: v.gf }])),
+        presets: COLL_PRESETS.map(p => ({ name: p.name, theme: p.theme, font: p.font, blue: (PAGE_THEMES[p.theme] || {}).blue, body: (PAGE_THEMES[p.theme] || {}).body, disp: (COLL_FONTS[p.font] || {}).disp })),
         icons: AMEN_ICONS,
         types: Object.fromEntries(Object.entries(PB_TYPES).map(([k, v]) => [k, { name: v.name, variants: v.variants, std: !!v.std }])),
         props: (c.propertyIds || []).map(pid => { const pr = prById(pid); return pr ? { id: pr.id, name: pr.name } : null; }).filter(Boolean),
@@ -5095,7 +5112,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
         undo: (c.histBack || []).length,
         redo: (c.histFwd || []).length,
         versions: (c.versions || []).map(v2 => ({ id: v2.id, name: v2.name, at: v2.at })),
-      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=33"></script>` : ''}
+      }).replace(/</g, '\\u003c')}</script><script src="/pedit.js?v=34"></script>` : ''}
 </body></html>`);
       return;
     }
