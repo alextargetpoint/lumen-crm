@@ -180,45 +180,259 @@ function projCopy(c, pid, pr) {
   return { hook, why: (why || []).filter(Boolean), blurb };
 }
 
+/* ============================================================================
+   Ф3 · Variation-engine + Quality-Control + Regenerate/Lock (детерминированно, $0)
+   ─ Профиль проекта (сколько фото/данных) → допустимые грамматики (imageFit/dataFit).
+   ─ QC-скоры 0..1 (hierarchy/balance/density/repetition/imageFit/dataFit) → авто-ремонт
+     свапом грамматики (≤3 итер), если страница проваливает порог.
+   ─ История макетов: не 3× подряд одна композиция; соседние проекты по-разному;
+     на смене seed — другой микс архетипов, а на reseed — другая обложка (в endpoint).
+   ========================================================================== */
+const round2 = (n) => Math.round(n * 100) / 100;
+const pickSeed = (arr, seed) => arr[Math.floor(rng(seed >>> 0)() * arr.length) % arr.length];
+
+/* сколько модулей-метрик реально выведет metricRail (зеркало логики рендера) */
+function metricCount(pr, dna) {
+  let n = 0;
+  if (pr.priceFrom) n++;
+  if (pr.handover) n++;
+  if (pr.roi && dna.dataDepth !== 'minimal') n++;
+  if (pr.appreciation && dna.dataDepth === 'dashboard') n++;
+  return n;
+}
+
+/* профиль контента проекта — вход для fit/density/hierarchy */
+function projProfile(db, c, pr, dna) {
+  const cur = curateImages(pr);
+  const co = projCopy(c, pr.id, pr);
+  const payRows = (pr.paymentRows || []).filter(r => r && (r.pct || r.label)).length;
+  const rich = (pr.units || []).length >= 3 || ((pr.roi ? 1 : 0) + (pr.appreciation ? 1 : 0) + (payRows >= 2 ? 1 : 0) >= 2);
+  return {
+    cur, heroOk: !!cur.hero, nPhotos: cur.photos.length, nGallery: cur.gallery.length, nPlans: cur.plans.length,
+    metrics: metricCount(pr, dna), payRows, nUnits: (pr.units || []).length,
+    nTimes: ((pr.district || {}).times || []).filter(t => t && t.place).length,
+    hasLoc: !!(pr.district && pr.district.name), nAmen: (pr.amenities || []).filter(Boolean).length,
+    hasBlurb: !!(co.blurb && String(co.blurb).trim()), nWhy: (co.why || []).length, rich,
+  };
+}
+
+const ALL_GRAMMARS = ['singleHero', 'galleryCurated', 'bento', 'metricEditorial'];
+
+/* грамматики, проходящие жёсткие гейты (хватает ли фото/данных) */
+function validGrammars(prof, dna) {
+  const out = [];
+  if (prof.heroOk) { out.push('singleHero'); out.push('bento'); }
+  if (prof.nGallery >= 3 && dna.imageDom !== 'low') out.push('galleryCurated');
+  if (prof.heroOk && (prof.rich || prof.metrics >= 2 || prof.payRows >= 2) && dna.dataDepth !== 'minimal') out.push('metricEditorial');
+  return out.length ? out : ['singleHero'];
+}
+
+/* fit-скоры грамматики под профиль (0..1) */
+function grammarFit(g, prof, dna) {
+  let imageFit, dataFit, hierarchy = 1, balance = 1;
+  if (g === 'galleryCurated') {
+    imageFit = prof.nGallery >= 5 ? 1 : prof.nGallery === 4 ? 0.85 : prof.nGallery >= 3 ? 0.7 : 0.3;
+    dataFit = 0.85; hierarchy = prof.nGallery >= 2 ? 1 : 0.6;
+    balance = (prof.hasBlurb || prof.hasLoc) && (prof.metrics || prof.payRows) ? 1 : 0.7;
+  } else if (g === 'singleHero') {
+    imageFit = prof.heroOk ? (prof.nPhotos >= 4 ? 0.7 : 1) : 0.2;
+    dataFit = 0.8; hierarchy = prof.heroOk ? 1 : 0.4;
+    balance = (prof.metrics || prof.hasLoc || prof.payRows || prof.hasBlurb) ? 1 : 0.5;
+  } else if (g === 'bento') {
+    imageFit = prof.nPhotos >= 2 ? 1 : prof.nPhotos === 1 ? 0.6 : 0.2;
+    dataFit = prof.metrics >= 2 ? 1 : 0.6; hierarchy = (prof.heroOk || prof.metrics >= 2) ? 1 : 0.5;
+    balance = (prof.hasLoc || prof.hasBlurb) ? 1 : 0.55;
+  } else { /* metricEditorial */
+    imageFit = prof.heroOk ? 0.9 : 0.4;
+    dataFit = (prof.rich || prof.metrics >= 2 || prof.payRows >= 2) ? 1 : 0.25;
+    hierarchy = (prof.metrics >= 2 || prof.hasBlurb) ? 1 : 0.6;
+    balance = (prof.hasBlurb || prof.hasLoc || prof.nAmen) ? 1 : 0.45;
+  }
+  return { imageFit, dataFit, hierarchy, balance };
+}
+
+/* density: контентная «начинка» проекта против ёмкости грамматики (пусто ↔ переполнено) */
+function grammarDensity(g, prof, dna) {
+  const R = Math.min(prof.nGallery, 5) + prof.metrics + (prof.payRows >= 2 ? 2 : prof.payRows)
+    + (dna.dataDepth === 'dashboard' ? Math.min(prof.nUnits, 4) : 0) + prof.nTimes
+    + (prof.nAmen > 0 ? 1 : 0) + (prof.hasBlurb ? 1 : 0) + Math.min(prof.nWhy, 3);
+  const cap = g === 'galleryCurated' ? 11 : g === 'metricEditorial' ? 8 : 7;
+  let density = 1;
+  if (R < cap * 0.40) density = Math.max(0.2, R / (cap * 0.40));            /* слишком пусто */
+  else if (R > cap * 1.75) density = Math.max(0.35, 1 - (R - cap * 1.75) / cap); /* переполнено */
+  return { density, R, cap };
+}
+
+/* комбинированный fit для взвешенного выбора и ремонта */
+function grammarCombined(g, prof, dna) {
+  const f = grammarFit(g, prof, dna), d = grammarDensity(g, prof, dna);
+  return (f.imageFit * 1.3 + f.dataFit + f.hierarchy + f.balance + d.density) / 5.3;
+}
+
+/* штраф за повтор относительно ранее выбранных грамматик */
+function repFor(v, used) {
+  const n = used.length;
+  if (n >= 2 && used[n - 1] === v && used[n - 2] === v) return 0.3;
+  if (n >= 1 && used[n - 1] === v) return 0.7;
+  if (n >= 2 && used[n - 2] === v) return 0.85;
+  return 1;
+}
+
+/* QC-скоры страницы проекта (0..1) + min/avg */
+function qcScore(g, prof, dna, repetition) {
+  const f = grammarFit(g, prof, dna), d = grammarDensity(g, prof, dna);
+  const s = {
+    hierarchy: round2(f.hierarchy), balance: round2(f.balance), density: round2(d.density),
+    repetition: round2(repetition), imageFit: round2(f.imageFit), dataFit: round2(f.dataFit),
+  };
+  const vals = [s.hierarchy, s.balance, s.density, s.repetition, s.imageFit, s.dataFit];
+  s.min = round2(Math.min(...vals));
+  s.avg = round2(vals.reduce((a, b) => a + b, 0) / vals.length);
+  return s;
+}
+
+/* лучшая альтернативная грамматика (для авто-ремонта): fit + анти-повтор */
+function bestAlt(cur, used, prof, dna) {
+  const valid = validGrammars(prof, dna).filter(g => g !== cur);
+  if (!valid.length) return null;
+  return valid.map(g => ({ g, s: grammarCombined(g, prof, dna) * 0.7 + repFor(g, used) * 0.3 }))
+    .sort((a, b) => b.s - a.s)[0].g;
+}
+
+/* сид-взвешенный выбор грамматики: по fit, но с реальной вариацией от seed */
+function pickProjGrammar(prof, dna, gseed) {
+  const valid = validGrammars(prof, dna);
+  if (valid.length === 1) return valid[0];
+  const weights = valid.map(g => Math.pow(Math.max(0.05, grammarCombined(g, prof, dna)), 3));
+  const tot = weights.reduce((a, b) => a + b, 0);
+  const r = rng(gseed >>> 0);
+  let x = r() * tot;
+  for (let i = 0; i < valid.length; i++) { x -= weights[i]; if (x <= 0) return valid[i]; }
+  return valid[valid.length - 1];
+}
+
+/* анти-повтор: 3× подряд запрещено (жёстко), соседние по-разному (мягко) */
+function enforceVariation(v, used, prof, dna, seed) {
+  const n = used.length;
+  const valid = validGrammars(prof, dna).filter(g => g !== v);
+  if (n >= 2 && used[n - 1] === v && used[n - 2] === v) {              /* жёстко: не 3× подряд */
+    if (valid.length) return bestAlt(v, used, prof, dna) || pickSeed(valid, seed ^ 0x51ED);
+  } else if (n >= 1 && used[n - 1] === v && valid.length) {            /* мягко: соседние различать */
+    const alt = bestAlt(v, used, prof, dna);
+    if (alt && grammarCombined(alt, prof, dna) >= 0.55) return alt;
+  }
+  return v;
+}
+
+const QC_MIN = 0.5, QC_AVG = 0.6;   /* пороги провала страницы */
+
+/* выбор + вариация + авто-ремонт грамматики одного проекта */
+function decideGrammar(pr, prof, dna, used, seed, pseed, lock) {
+  /* Lock: держим зафиксированную грамматику, ремонт не трогает */
+  if (lock && ALL_GRAMMARS.includes(lock)) {
+    return { v: lock, qc: qcScore(lock, prof, dna, repFor(lock, used)), locked: true, repaired: 0 };
+  }
+  const gseed = (seed ^ hashStr(pr.id) ^ Math.imul(pseed >>> 0, 0x85EBCA6B)) >>> 0;
+  let v = pickProjGrammar(prof, dna, gseed);
+  v = enforceVariation(v, used, prof, dna, gseed);
+  let qc = qcScore(v, prof, dna, repFor(v, used));
+  let repaired = 0;
+  while ((qc.min < QC_MIN || qc.avg < QC_AVG) && repaired < 3) {       /* авто-ремонт свапом */
+    const alt = bestAlt(v, used, prof, dna);
+    if (!alt || alt === v) break;
+    const altQc = qcScore(alt, prof, dna, repFor(alt, used));
+    if (altQc.avg <= qc.avg && altQc.min <= qc.min) break;             /* не лучше — стоп */
+    v = alt; qc = altQc; repaired++;
+  }
+  return { v, qc, locked: false, repaired };
+}
+
+/* лёгкий QC для не-проектных страниц (для лога/дебага, без ремонта) */
+function qcFlat(o) {
+  const vals = ['hierarchy', 'balance', 'density', 'repetition', 'imageFit', 'dataFit'].map(k => round2(o[k] != null ? o[k] : 0.9));
+  return { hierarchy: vals[0], balance: vals[1], density: vals[2], repetition: vals[3], imageFit: vals[4], dataFit: vals[5], min: round2(Math.min(...vals)), avg: round2(vals.reduce((a, b) => a + b, 0) / 6) };
+}
+
+/* сигнатура плана — для «genuinely different» на reseed */
+function planSig(plan) { return plan.map(pg => (pg.role[0] + pg.role.slice(-1)) + ':' + pg.v).join('|'); }
+
 /* ---------- AUTO Art-Director → page_plan ----------
    Роли: COVER · CLIENT_CRITERIA? · PROJECT_OVERVIEW×N · COMPARISON? · RECOMMENDATION · CLOSING
-   Композиция объекта выбирается по доступным ассетам/данным; не повторяется >2× подряд. */
+   Композиция объекта выбирается по доступным ассетам/данным; не повторяется >2× подряд;
+   locks/pseed из c.design учитываются (Ф3). */
 function artDirect(db, c, props, dna, lead, seed) {
   const r = rng(seed ^ 0x9E3779B9);
+  const d = c.design || {};
+  const locks = d.locks || {};
+  const pseeds = d.pseed || {};
   const plan = [];
-  const coverV = pick(r, dna.intensity === 'minimal' ? ['type', 'plate'] : ['plate', 'editorial', 'band']);
-  plan.push({ role: 'COVER', v: coverV });
+
+  /* COVER — если нет ни одного hero-фото, обложка с фото невозможна → 'type' */
+  const heroExists = props.some(p => curateImages(p).hero);
+  let coverV = pick(r, dna.intensity === 'minimal' ? ['type', 'plate'] : ['plate', 'editorial', 'band']);
+  if (!heroExists && ['band', 'plate', 'editorial'].includes(coverV)) coverV = 'type';
+  plan.push({ role: 'COVER', v: coverV, qc: qcFlat({ imageFit: heroExists ? 1 : (coverV === 'type' ? 1 : 0.4), density: 0.9, balance: 0.95 }) });
 
   const q = (lead && lead.quals) || {};
   const hasCriteria = lead && (q.budget || q.purpose || q.timeline || q.type || lead.geo);
-  if (hasCriteria) plan.push({ role: 'CLIENT_CRITERIA', v: dna.ax.style === 'investment' ? 'ledger' : 'brief' });
+  if (hasCriteria) plan.push({ role: 'CLIENT_CRITERIA', v: dna.ax.style === 'investment' ? 'ledger' : 'brief', qc: qcFlat({ imageFit: 0.9, dataFit: 0.9 }) });
 
   const used = [];
   props.forEach((pr, i) => {
-    const cur = curateImages(pr);
-    const nPhotos = cur.photos.length;   /* планы не считаем фотографиями галереи */
-    const rich = (pr.units || []).length >= 3 || ((pr.roi ? 1 : 0) + (pr.appreciation ? 1 : 0) + ((pr.paymentRows || []).length >= 2 ? 1 : 0) >= 2);
-    let v;
-    if (nPhotos >= 3 && dna.imageDom !== 'low') v = 'galleryCurated';   /* достаточно фото → курируемый микс */
-    else if (nPhotos <= 1) v = 'singleHero';
-    else if (rich && dna.dataDepth !== 'minimal') v = 'metricEditorial';
-    else v = 'bento';
-    /* анти-повтор: не 3-й раз подряд одна композиция */
-    const alts = ['metricEditorial', 'bento', 'singleHero', 'galleryCurated'].filter(x => x !== v && !(x === 'galleryCurated' && nPhotos < 3) && !(x === 'singleHero' && nPhotos > 2 && dna.imageDom === 'high'));
-    if (used.length >= 2 && used[used.length - 1] === v && used[used.length - 2] === v) v = pick(r, alts.length ? alts : [v]);
-    used.push(v);
-    plan.push({ role: 'PROJECT_OVERVIEW', v, pid: pr.id, idx: i });
+    const prof = projProfile(db, c, pr, dna);
+    const dec = decideGrammar(pr, prof, dna, used, seed, pseeds[pr.id] || 0, locks[pr.id]);
+    used.push(dec.v);
+    plan.push({ role: 'PROJECT_OVERVIEW', v: dec.v, pid: pr.id, idx: i, locked: dec.locked, repaired: dec.repaired, qc: dec.qc });
   });
 
   if (props.length >= 2) {
     const shareMetrics = props.filter(p => p.roi || p.priceFrom).length >= 2;
     const cmpV = dna.dataDepth === 'editorial' ? 'cards' : shareMetrics ? pick(r, ['matrix', 'scoreboard']) : 'cards';
-    plan.push({ role: 'COMPARISON', v: cmpV });
+    plan.push({ role: 'COMPARISON', v: cmpV, qc: qcFlat({ dataFit: shareMetrics ? 1 : 0.7, density: 0.9 }) });
   }
   const recV = dna.ax.style === 'investment' ? 'thesis' : dna.ax.style === 'editorial' || dna.ax.style === 'cinematic' ? 'editorNote' : pick(r, ['editorNote', 'marginNote', 'thesis']);
-  plan.push({ role: 'RECOMMENDATION', v: recV });
-  plan.push({ role: 'CLOSING', v: dna.dark ? 'band' : pick(r, ['band', 'plate']) });
+  plan.push({ role: 'RECOMMENDATION', v: recV, qc: qcFlat({ density: 0.85 }) });
+  plan.push({ role: 'CLOSING', v: dna.dark ? 'band' : pick(r, ['band', 'plate']), qc: qcFlat({ density: 0.9 }) });
   return plan;
+}
+
+/* ---------- Ф3 · Regenerate / Lock одного блока (проекта) ---------- */
+function blockOp(db, c, proj, action) {
+  c.design = c.design || {};
+  const d = c.design;
+  d.locks = d.locks || {};
+  d.pseed = d.pseed || {};
+  const props = (c.propertyIds || []).map(pid => db.properties.find(x => x.id === pid)).filter(Boolean);
+  if (!props.some(p => p.id === proj)) return { error: 'no such project in collection' };
+  const lead = c.leadId ? (db.leads || []).find(l => l.id === c.leadId) : null;
+  const seed = (d.seed || hashStr(c.id)) >>> 0;
+  const grammarOf = () => {
+    const dna = deriveDNA(db, c, props, d, seed);
+    const plan = artDirect(db, c, props, dna, lead, seed);
+    const pg = plan.find(x => x.role === 'PROJECT_OVERVIEW' && x.pid === proj);
+    return pg ? pg.v : null;
+  };
+  if (action === 'lock') {
+    d.locks[proj] = grammarOf() || 'bento';
+    return { ok: true, action: 'lock', proj, grammar: d.locks[proj] };
+  }
+  if (action === 'unlock') {
+    delete d.locks[proj];
+    return { ok: true, action: 'unlock', proj };
+  }
+  if (action === 'regen') {
+    delete d.locks[proj];                         /* реген подразумевает свободу менять */
+    const before = grammarOf();
+    let after = before, changed = false;
+    for (let k = 1; k <= 40; k++) {               /* ищем pseed, дающий другую итоговую грамматику */
+      d.pseed[proj] = Math.imul(hashStr(c.id + '|' + proj + '|' + k + '|' + Date.now()), 2654435761) >>> 0;
+      const g = grammarOf();
+      if (g && g !== before) { after = g; changed = true; break; }
+    }
+    if (!changed) d.pseed[proj] = Math.imul((Date.now() >>> 0) ^ hashStr(proj), 2654435761) >>> 0;
+    return { ok: true, action: 'regen', proj, before, after, changed };
+  }
+  return { error: 'bad action' };
 }
 
 /* ================= РЕНДЕР ================= */
@@ -334,6 +548,14 @@ function renderDesignDoc(db, c, opts) {
   /* ---------- грамматики страниц ---------- */
   let pageNo = 0;
   const foot = (extra) => `<div class="pg-foot"><span class="pf-wm">${esc(AG)}</span><span class="pf-no">${num2(++pageNo)}</span>${extra ? `<span class="pf-x">${extra}</span>` : ''}</div>`;
+  /* Ф3 · пер-проектные контролы 🔒/↻ — ТОЛЬКО при edit-key и не в печати/шаре без ключа */
+  const projCtl = (pg) => {
+    if (!opts.canEdit || isPrint) return '';
+    const locked = pg.locked;
+    return `<div class="blk-ctl" data-proj="${esc(pg.pid)}">`
+      + `<button class="bc-btn${locked ? ' on' : ''}" data-bact="${locked ? 'unlock' : 'lock'}" title="${locked ? 'Снять фиксацию макета проекта' : 'Зафиксировать макет проекта'}">${locked ? '🔒' : '🔓'}</button>`
+      + `<button class="bc-btn" data-bact="regen" title="Другой макет этого проекта">↻</button></div>`;
+  };
 
   const G = {
     COVER(pg) {
@@ -400,8 +622,9 @@ function renderDesignDoc(db, c, opts) {
       const head = `<div class="po-head">${kicker('Проект №' + num2(pg.idx + 1) + (pr.developer ? ' · ' + esc(pr.developer) : ''))}<h2 class="po-h">${esc(co.hook)}</h2>${pr.name !== co.hook ? `<div class="po-sub">${esc(pr.name)}${pr.area ? ' · ' + esc(pr.area) : ''}</div>` : (pr.area ? `<div class="po-sub">${esc(pr.area)}</div>` : '')}</div>`;
       const why = co.why.length ? `<div class="rec-inline">${kicker(pr.market === 'offplan' ? 'Почему стоит рассмотреть' : 'Почему этот объект')}<ol class="why">${co.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}</ol></div>` : '';
 
+      const ctl = projCtl(pg);
       if (pg.v === 'singleHero') {
-        return `<section class="page po po-single ${dna.imageDom === 'high' ? 'domhi' : ''}">
+        return `<section class="page po po-single ${dna.imageDom === 'high' ? 'domhi' : ''}">${ctl}
           <div class="po-hero">${imgEl(hero, 'hero', pr.area || pr.name)}<div class="po-ident"><span class="po-id-k">${esc(geoNames[pr.geo] || '')}</span><b class="po-id-v">${esc(pr.name)}</b></div></div>
           ${head}
           ${co.blurb ? `<p class="lede drop">${esc(co.blurb)}</p>` : ''}
@@ -413,7 +636,7 @@ function renderDesignDoc(db, c, opts) {
         const g = cur.gallery;
         const n = Math.min(g.length, 5);
         const gridCls = n >= 5 ? 'gal5' : n === 4 ? 'gal4' : 'gal3';
-        return `<section class="page po po-gal">
+        return `<section class="page po po-gal">${ctl}
           ${head}
           <div class="${gridCls}">${g.slice(0, 5).map((im, i) => imgEl(im, i === 0 ? 'g-main' : 'g-s', pr.area)).join('')}</div>
           <div class="po-cols"><div class="po-c1">${co.blurb ? `<p class="lede">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}${amenList(pr)}</div>
@@ -422,7 +645,7 @@ function renderDesignDoc(db, c, opts) {
           ${foot(esc(pr.name))}</section>`;
       }
       if (pg.v === 'bento') {
-        return `<section class="page po po-bento">
+        return `<section class="page po po-bento">${ctl}
           ${head}
           <div class="bento">
             <div class="bt bt-img">${imgEl(hero, '', pr.area)}</div>
@@ -434,7 +657,7 @@ function renderDesignDoc(db, c, opts) {
           ${foot(esc(pr.name))}</section>`;
       }
       /* metricEditorial — редакторский сплит: текст + рельса метрик, план оплаты трек */
-      return `<section class="page po po-me">
+      return `<section class="page po po-me">${ctl}
         ${head}
         <div class="me-split">
           <div class="me-l">${co.blurb ? `<p class="lede drop">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}${amenList(pr)}</div>
@@ -527,7 +750,18 @@ function renderDesignDoc(db, c, opts) {
     },
   };
 
-  const body = plan.map(pg => (G[pg.role] ? G[pg.role](pg) : '')).join('\n');
+  /* Ф3 · рендер + скрытый QC-лог (HTML-коммент + data-qc — только для дебага, не виден клиенту) */
+  const body = plan.map(pg => {
+    let html = G[pg.role] ? G[pg.role](pg) : '';
+    if (!html) return '';
+    const qc = pg.qc;
+    if (qc) {
+      const cm = `<!-- qc ${pg.role}${pg.pid ? ' ' + pg.pid : ''}${pg.locked ? ' LOCKED' : ''}${pg.repaired ? ' repaired=' + pg.repaired : ''} h=${qc.hierarchy} b=${qc.balance} d=${qc.density} rep=${qc.repetition} img=${qc.imageFit} data=${qc.dataFit} min=${qc.min} avg=${qc.avg} -->\n`;
+      const attr = `data-qc="min:${qc.min} avg:${qc.avg} h:${qc.hierarchy} b:${qc.balance} d:${qc.density} rep:${qc.repetition} img:${qc.imageFit} data:${qc.dataFit}${pg.locked ? ' locked' : ''}${pg.repaired ? ' repaired:' + pg.repaired : ''}"`;
+      html = cm + html.replace(/<section /, `<section ${attr} `);
+    }
+    return html;
+  }).join('\n');
 
   /* ---- инлайн CSS: DNA через custom properties + классы стиля ---- */
   const F = dna.fonts;
@@ -779,11 +1013,19 @@ p{font-size:var(--s-body);line-height:1.6}
 .recompose-bar button{border:0;background:#fff;color:#111;font:inherit;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:100px;cursor:pointer}
 .recompose-bar a{color:rgba(255,255,255,.65);font-size:12.5px;text-decoration:none;padding:0 6px}
 @media print{.recompose-bar{display:none}}
+/* Ф3 · пер-проектные контролы (только edit-режим) */
+.blk-ctl{position:absolute;top:14px;right:14px;z-index:41;display:flex;gap:7px}
+.bc-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -10px rgba(0,0,0,.5);opacity:.42;transition:opacity .15s,transform .12s}
+.bc-btn:hover{transform:translateY(-1px)}
+.page:hover .bc-btn{opacity:1}
+.bc-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);opacity:1}
+@media print{.blk-ctl{display:none!important}}
 `;
 
   const canEdit = opts.canEdit;
   const bar = (canEdit && !isPrint) ? `<div class="recompose-bar"><span><b>${esc(dna.styleName)}</b> · ${dna.ax.density} · фото ${dna.ax.imageDom}</span><button id="recompose">Другой вариант</button><a href="/p/${c.id}?design=1&print=1" target="_blank">Печать / PDF</a></div>
-<script>(function(){var b=document.getElementById('recompose');if(!b)return;b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key=${esc(opts.key || '')}',{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})}})();</script>` : '';
+<script>(function(){var k='${esc(opts.key || '')}';var b=document.getElementById('recompose');if(b)b.onclick=function(){b.textContent='…';fetch('/api/collections/${c.id}/recompose?key='+k,{method:'POST'}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})};
+document.addEventListener('click',function(ev){var t=ev.target.closest('[data-bact]');if(!t)return;var w=t.closest('[data-proj]');if(!w)return;var proj=w.getAttribute('data-proj'),act=t.getAttribute('data-bact');t.textContent='…';fetch('/api/collections/${c.id}/block?key='+k,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proj:proj,action:act})}).then(function(r){return r.json()}).then(function(){location.reload()}).catch(function(){location.reload()})});})();</script>` : '';
 
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.title || 'Подборка')} — ${esc(AG)}</title>
@@ -797,4 +1039,4 @@ p{font-size:var(--s-body);line-height:1.6}
 
 function plural(n) { n = +n; return n % 10 === 1 && n % 100 !== 11 ? 'проект' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'проекта' : 'проектов'; }
 
-module.exports = { renderDesignDoc, deriveDNA, artDirect, AXES };
+module.exports = { renderDesignDoc, deriveDNA, artDirect, blockOp, planSig, hashStr, AXES };

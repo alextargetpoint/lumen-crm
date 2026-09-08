@@ -2143,7 +2143,10 @@ const server = http.createServer(async (req, res) => {
 
     /* Студия (AI Design Engine) — админ-инструмент, допускаем редакторский ключ (роуты повторно проверяют ключ внутри) */
     const studioKeyOk = p.startsWith('/api/studio/') && u.searchParams.get('key') === db.settings.hooks.secret;
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk) return json(res, 401, { error: 'auth required' });
+    /* Ф3: edit-bar подборки (Перекомпоновать / Lock / Regen) авторизуется тем же edit-ключом,
+       что и конструктор /p/:id/blocks — держатель editKey и так может редактировать блоки */
+    const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -4067,14 +4070,47 @@ const server = http.createServer(async (req, res) => {
       db.collections.unshift(c); store.save();
       return json(res, 200, c);
     }
-    /* Ф1: «Другой вариант / Перекомпоновать» — новый seed → арт-директор строит другой макет */
+    /* Ф1/Ф3: «Другой вариант / Перекомпоновать» — новый seed → арт-директор строит ДРУГОЙ макет.
+       Ф3: перебираем сиды и выбираем тот, чья сигнатура плана И обложка отличаются от недавних. */
     if ((m = p.match(/^\/api\/collections\/([^/]+)\/recompose$/)) && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
       const c = db.collections.find(x => x.id === m[1]);
       if (!c) return json(res, 404, { error: 'not found' });
-      c.design = Object.assign({}, c.design, { seed: (crypto.randomBytes(4).readUInt32BE(0)) >>> 0 });
+      const d = c.design = Object.assign({}, c.design);
+      d.history = Array.isArray(d.history) ? d.history : [];
+      d.covers = Array.isArray(d.covers) ? d.covers : [];
+      const props = (c.propertyIds || []).map(pid => db.properties.find(x => x.id === pid)).filter(Boolean);
+      const lead = c.leadId ? db.leads.find(l => l.id === c.leadId) : null;
+      const recent = d.history.slice(-4), lastCover = d.covers.slice(-1)[0];
+      let chosen = null, chosenSig = null, chosenCover = null, fallback = null;
+      for (let k = 0; k < 16; k++) {
+        const s = (crypto.randomBytes(4).readUInt32BE(0)) >>> 0;
+        const dna = design.deriveDNA(db, c, props, d, s);
+        const plan = design.artDirect(db, c, props, dna, lead, s);
+        const sg = design.planSig(plan);
+        const cov = (plan.find(x => x.role === 'COVER') || {}).v;
+        if (!fallback) fallback = { s, sg, cov };
+        const sigOk = !recent.includes(sg), coverOk = cov !== lastCover;
+        if (sigOk && coverOk) { chosen = s; chosenSig = sg; chosenCover = cov; break; }
+        if (sigOk && !chosen) { chosen = s; chosenSig = sg; chosenCover = cov; }  /* приоритет: другой план */
+      }
+      if (chosen == null) { chosen = fallback.s; chosenSig = fallback.sg; chosenCover = fallback.cov; }
+      d.seed = chosen;
+      d.history.push(chosenSig); if (d.history.length > 8) d.history.shift();
+      if (chosenCover) { d.covers.push(chosenCover); if (d.covers.length > 4) d.covers.shift(); }
       store.save();
-      return json(res, 200, { ok: true, seed: c.design.seed });
+      return json(res, 200, { ok: true, seed: d.seed, sig: chosenSig, cover: chosenCover });
+    }
+    /* Ф3: пер-проектный Lock / Regenerate макета одного объекта (только edit-key) */
+    if ((m = p.match(/^\/api\/collections\/([^/]+)\/block$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const c = db.collections.find(x => x.id === m[1]);
+      if (!c) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const r = design.blockOp(db, c, String(b.proj || ''), String(b.action || ''));
+      if (r.error) return json(res, 400, r);
+      store.save();
+      return json(res, 200, r);
     }
     if ((m = p.match(/^\/api\/collections\/([^/]+)\/send$/)) && req.method === 'POST') {
       const c = db.collections.find(x => x.id === m[1]);
