@@ -822,7 +822,7 @@ const sanSlide = (s) => ({
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
   pmark: ['check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus'].includes(s.pmark) ? s.pmark : 'check',   /* стиль маркера буллетов */
   /* арт-дирекшн: семейство раскладки слайда (композиция), назначается artDirect с учётом ритма колоды */
-  layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel'].includes(s.layout) ? s.layout : '',
+  layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel', 'mosaic'].includes(s.layout) ? s.layout : '',
   hero: s.hero && (s.hero.v || s.hero.k) ? { v: String(s.hero.v || '').slice(0, 16), k: String(s.hero.k || '').slice(0, 40) } : null,   /* крупное число для data-hero слайда */
   layers: Array.isArray(s.layers) ? s.layers.map(sanLayer).filter(Boolean).slice(0, 16) : [],
 });
@@ -1022,6 +1022,141 @@ function artDirect(slides, opts = {}) {
   });
   /* хотя бы один «сюрприз» в середине — иначе колода ровная */
   if (surprises === 0 && n >= 4) { const mid = Math.floor(n / 2); slides[mid].layout = hasPhoto(slides[mid]) ? 'immersive' : 'typo'; slides[mid].pos = 'center'; slides[mid].align = hasPhoto(slides[mid]) ? 'center' : 'left'; slides[mid].size = 'l'; }
+  return slides;
+}
+/* ═══ SPEC-FIRST ПЛАНИРОВЩИК (рефактор): рендер НЕ выбирает раскладку — он исполняет УТВЕРЖДЁННЫЙ спек ═══
+   Пайплайн: purposes → art-direction plan → rhythm-validate → design-critic (силуэты 6 превью) → rebuild → apply.
+   Семейства = «силуэты», не шаблоны. Ассеты назначаются СЕМАНТИЧЕСКИ (по роли↔назначению), без photos[i%len]. */
+const CAR_FAMILIES = {
+  cinematic: { cov: 100, img: true, dom: true, text: false },
+  immersive: { cov: 100, img: true, dom: true, text: false },
+  mosaic: { cov: 80, img: true, dom: true, text: false },
+  split: { cov: 55, img: true, dom: false, text: false },
+  panel: { cov: 100, img: true, dom: false, text: false },
+  data: { cov: 22, img: false, dom: false, text: false },
+  editorial: { cov: 8, img: false, dom: false, text: true },
+  typo: { cov: 0, img: false, dom: false, text: true },
+};
+const PURPOSE_ROLE = {
+  hook: ['render_ext', 'lifestyle'], location: ['map', 'lifestyle', 'render_ext'], project: ['render_ext'],
+  architecture: ['render_ext'], interior: ['interior'], amenities: ['amenity', 'lifestyle'],
+  product: ['interior', 'floorplan'], lifestyle: ['lifestyle', 'amenity'], price: ['render_ext'],
+  roi: ['render_ext'], payment: ['render_ext'], proof: ['lifestyle'], cta: ['lifestyle', 'render_ext'],
+};
+const POS_CYCLE = ['bottom', 'top', 'center', 'bottom', 'center', 'top', 'bottom'];
+function inferPurpose(s, i, n) {
+  if (i === 0) return 'hook'; if (i === n - 1) return 'cta';
+  const t = [s.eyebrow, String(s.heading || '').replace(/<[^>]*>/g, ''), (s.points || []).join(' '), s.sub].join(' ').toLowerCase();
+  if (s.mode === 'amenities' || /удобств|аменити|бассейн|спа|инфраструктур/.test(t)) return 'amenities';
+  if (/локац|район|\bгде\b|\bкарт|метро|пляж|центр|марин|downtown|beach|\bмин\b|\bкм\b/.test(t)) return 'location';
+  if (/планировк|1br|2br|студи|\bм²|метраж|юнит/.test(t)) return 'product';
+  if (/интерьер|гостин|спальн|кухн|дизайн интерь/.test(t)) return 'interior';
+  if (/доход|roi|окупа|прибыл|актив|инвест/.test(t)) return 'roi';
+  if (/рассроч|\bплат|payment|бронир/.test(t)) return 'payment';
+  if (/цена|от \$|стоимост|прайс/.test(t)) return 'price';
+  if (/архитектур|фасад|\bформа|\bсвет/.test(t)) return 'architecture';
+  return 'project';
+}
+function carSilhouette(fam, pos, align) {
+  const f = CAR_FAMILIES[fam] || CAR_FAMILIES.editorial;
+  const covB = f.cov >= 85 ? 'full' : f.cov >= 45 ? 'half' : f.cov >= 15 ? 'small' : 'none';
+  return `${covB}|${pos}|${align}|${f.dom ? 'D' : f.text ? 'T' : 'M'}`;
+}
+/* строим последовательность семейств, БЮДЖЕТ-ОСОЗНАННО (1 ассет = 1 фото-слайд; mosaic=2 только при излишке),
+   под правила: ≥4 image, ≥2 dominant, ≤1 text-only, ≥4 семейств; варьируем seed'ом */
+function buildFamilySeq(n, poolSize, numSet, dna, seed) {
+  const hasNum = numSet && numSet.size > 0;
+  const seq = new Array(n).fill('editorial');
+  const imgSlots = Math.max(2, Math.min(poolSize, Math.min(4, n - 1)));   /* сколько фото-слайдов реально потянем */
+  seq[0] = poolSize >= 1 ? 'cinematic' : 'typo';
+  seq[n - 1] = poolSize >= 2 ? 'immersive' : 'editorial';
+  let usedImg = (CAR_FAMILIES[seq[0]].img ? 1 : 0) + (CAR_FAMILIES[seq[n - 1]].img ? 1 : 0);
+  let assetUse = usedImg;
+  const mids = []; for (let i = 1; i < n - 1; i++) mids.push(i);
+  const off = mids.length ? seed % mids.length : 0;
+  const order = mids.slice(off).concat(mids.slice(0, off));
+  /* 1) фото-середины 1-ассетными семействами (split/panel), mosaic только если излишек */
+  let fi = 0;
+  for (const i of order) {
+    if (usedImg >= imgSlots || assetUse >= poolSize) break;
+    let f = (fi + seed) % 2 === 0 ? 'split' : 'panel'; fi++;
+    if (poolSize - assetUse >= 2 && fi % 3 === 0) f = 'mosaic';
+    if (f === seq[i - 1]) f = f === 'split' ? 'panel' : 'split';
+    seq[i] = f; usedImg++; assetUse += (f === 'mosaic' ? 2 : 1);
+  }
+  /* 2) оставшиеся середины: одна data (если есть метрика), не более одной text-only, прочее — data */
+  let dataPlaced = false, textCount = (CAR_FAMILIES[seq[0]].text ? 1 : 0) + (CAR_FAMILIES[seq[n - 1]].text ? 1 : 0);
+  /* data ставим на слайд, где РЕАЛЬНО есть метрика (иначе он деградирует в editorial → лишний text-only) */
+  const numMids = order.filter(i => seq[i] === 'editorial' && numSet && numSet.has(i));
+  if (numMids.length) { seq[numMids[0]] = 'data'; dataPlaced = true; }
+  for (const i of order) {
+    if (seq[i] !== 'editorial') continue;
+    if (textCount < 1) { seq[i] = 'editorial'; textCount++; }
+    else if (numSet && numSet.has(i)) seq[i] = 'data';
+    else seq[i] = 'editorial';   /* нет метрики и лимит text исчерпан — оставляем (крайний случай малого пула) */
+  }
+  return seq;
+}
+function planCarousel(slides, opts = {}) {
+  const dna = opts.dna || {}, theme = opts.theme || {};
+  const darkBody = theme.body || '#0A1833';
+  const n = slides.length;
+  const pool = (opts.pool || []).filter(a => a && a.url);
+  const baseUsed = new Set(); slides.forEach(s => { if (s.bg) baseUsed.add(s.bg); (s.layers || []).forEach(l => { if (l.t === 'img' && l.url && (l.w || 0) >= 40) baseUsed.add(l.url); }); });
+  const hasAsset = s => !!s.bg || (s.layers || []).some(l => l.t === 'img' && !l.sticker && (l.w || 0) >= 40);
+  const poolSize = pool.length + slides.filter(hasAsset).length;   /* всего пригодных ассетов (пул + уже на слайдах) */
+  const numSet = new Set(slides.map((s, i) => heroNumber(s) ? i : -1).filter(i => i > 0 && i < n - 1));
+  slides.forEach((s, i) => { s._purpose = inferPurpose(s, i, n); });
+  const imgTarget = Math.min(4, poolSize, n - 1);
+  /* design-critic: выбираем последовательность с максимумом различных силуэтов и минимумом нарушений */
+  let bestSeq = null, bestScore = -1e9;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const seq = buildFamilySeq(n, poolSize, numSet, dna, attempt);
+    const sils = new Set(seq.map((f, i) => carSilhouette(f, f === 'immersive' ? 'center' : f === 'cinematic' ? 'bottom' : f === 'mosaic' ? 'top' : POS_CYCLE[(i + attempt) % POS_CYCLE.length], f === 'immersive' ? 'center' : 'left')));
+    const distinct = sils.size;
+    const fams = new Set(seq).size;
+    const img = seq.filter(x => CAR_FAMILIES[x].img).length, dom = seq.filter(x => CAR_FAMILIES[x].dom).length, text = seq.filter(x => CAR_FAMILIES[x].text).length;
+    let issues = 0;
+    if (fams < 4) issues++; if (dom < 2) issues++; if (img < imgTarget) issues++; if (text > 1) issues++;
+    const score = distinct * 10 + fams * 3 - issues * 100 + attempt * 0.1;
+    if (score > bestScore) { bestScore = score; bestSeq = { seq, attempt }; }
+    if (issues === 0 && distinct >= Math.min(4, n)) break;   /* утверждено */
+  }
+  const { seq, attempt } = bestSeq;
+  const used = new Set(baseUsed);
+  const takeAsset = (purpose) => {
+    const want = PURPOSE_ROLE[purpose] || ['render_ext', 'lifestyle'];
+    for (const role of want) { const a = pool.find(x => !used.has(x.url) && x.role === role); if (a) { used.add(a.url); return a.url; } }
+    const any = pool.find(x => !used.has(x.url)); if (any) { used.add(any.url); return any.url; } return null;
+  };
+  /* APPLY утверждённого спека к render-полям */
+  seq.forEach((fam, i) => {
+    const s = slides[i];
+    if (fam === 'mosaic') {
+      const set = []; if (s.bg) { set.push(s.bg); s.bg = ''; }
+      while (set.length < 2) { const u = takeAsset(s._purpose); if (!u) break; set.push(u); }   /* 2 кадра — бережём пул */
+      if (set.length >= 2) { s.layers = [...(s.layers || []).filter(l => l.t !== 'img'), ...galleryLayout(set.slice(0, 2), i)]; }
+      else if (set.length === 1) { s.bg = set[0]; fam = 'cinematic'; }
+      else { fam = 'editorial'; }
+    }
+    if (fam === 'cinematic' || fam === 'immersive' || fam === 'split' || fam === 'panel') {
+      if (!s.bg && !(s.layers || []).some(l => l.t === 'img' && !l.sticker && (l.w || 0) >= 40)) { const u = takeAsset(s._purpose); if (u) s.bg = u; else fam = 'editorial'; }
+    }
+    if (fam === 'data') { const h = heroNumber(s); if (h) { s.hero = h; s.mode = ''; } else fam = 'editorial'; }
+    if (!CAR_FAMILIES[fam].img) {   /* нефото → фон-стратегия (градиент/узор/тёмный), соседи различаются */
+      s.bg = ''; s.bgv = '';
+      const bg = CAR_BG_ROT[(i + attempt) % CAR_BG_ROT.length];
+      if (bg === 'dark') { s.bgc = darkBody; s.bgpat = ''; s.grad = ''; }
+      else if (bg.indexOf('grad:') === 0) { s.grad = bg.slice(5); s.bgpat = ''; s.bgc = ''; }
+      else if (bg) { s.bgpat = bg; s.bgc = ''; s.grad = ''; }
+      else { s.bgpat = 'dots'; s.bgc = ''; s.grad = ''; }
+    }
+    /* textRegion — ПОСЛЕ финализации семейства (порядок чтения не ломается) */
+    s.pos = fam === 'immersive' ? 'center' : fam === 'cinematic' ? 'bottom' : fam === 'mosaic' ? 'top' : POS_CYCLE[(i + attempt) % POS_CYCLE.length];
+    s.align = fam === 'immersive' ? 'center' : 'left';
+    s.size = fam === 'mosaic' ? 's' : (fam === 'typo' || fam === 'cinematic' || fam === 'immersive') ? 'l' : (i === 0 ? 'l' : 'm');
+    s.layout = fam;
+  });
   return slides;
 }
 /* ужимаем колоду до N слайдов: всегда обложка+финал; в середине приоритет rich/фото, добор нарративом; порядок сохраняем */
@@ -1646,7 +1781,9 @@ async function genCarouselPhotos(need, opts = {}) {
     `Elegant modern apartment interior with floor-to-ceiling windows${geo ? ', view of ' + geo : ''}, warm designer lighting, ${base}`,
     `${geo || 'Tropical'} premium lifestyle ambiance, infinity pool and skyline at sunset, ${base}`,
     `Aerial view of an upscale residential district${g}, coastline and greenery, ${base}`,
-  ].slice(0, Math.min(need, 3));
+    `Resort-style spa and amenity area, serene, natural materials, soft light, ${base}`,
+    `Architectural detail — facade, balconies, greenery, close editorial crop, ${base}`,
+  ].slice(0, Math.min(need, 6));
   const out = await Promise.all(prompts.map(async (p) => {
     try {
       const buf = await llm.generateImage(p, { size: '1024x1024', quality: 'medium' });
@@ -2744,6 +2881,7 @@ const server = http.createServer(async (req, res) => {
         catch (e) { /* ИИ не справился — стартовые слайды */ }
       }
       if (['low', 'medium', 'high'].includes(b.photos)) photoBias = b.photos;   /* ручной оверрайд плотности фото */
+      let carPool = [];   /* пул ассетов с ролями для семантического назначения планировщиком */
       /* Фото: скачиваем ВЫБРАННЫЕ (фильтр по размеру — логотипы/иконки отсекаются), мало → добираем из открытых источников.
          Раскладка вкусная и КОНСИСТЕНТНАЯ и зависит от УГЛА подачи:
          high (люкс/образ жизни) — фото-first: обложка + больше галерей; low (инвестиции) — текст-first: только обложка;
@@ -2756,22 +2894,21 @@ const server = http.createServer(async (req, res) => {
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         let good = await gatherLaunchPhotos(rawPics, q, want);
         /* мало реальных кадров → догенерим качественные атмосферные ИИ-рендеры (по умолчанию вкл) */
-        const target = photoBias === 'high' ? 4 : photoBias === 'low' ? 2 : 3;
-        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(target - good.length, { geoName: db.settings.geoNames[b.geo] || b.geo || '' }); if (gen.length) good = good.concat(gen); }
+        const target = 5;  /* пол ~4-5 ассетов: правило «≥4 фото-слайдов» жёсткое; овер-реквест перекрывает сбои генерации */
+        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(Math.min(5, target - good.length), { geoName: db.settings.geoNames[b.geo] || b.geo || '' }); if (gen.length) good = good.concat(gen); }
         if (good.length) {
           /* классифицируем кадры по роли и раскладываем по правильным слайдам с вариациями */
           let roles = good.map(() => 'other');
           const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);
           try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — падаём на порядок/размер */ }
           console.error('[launch] photo roles:', roles.join(',') || '(none)');
-          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });
+          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));   /* планировщик владеет назначением ассетов (spec #71/#87) */
         }
       }
       const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
       if (NN) slides = trimToCount(slides, NN);
-      slides = stylePass(slides, PAGE_THEMES[b.theme] || {});
+      slides = planCarousel(slides, { pool: carPool, dna: carDNA(b, photoBias), theme: PAGE_THEMES[b.theme] || {}, angle: b.angle });   /* spec-first: purposes→plan→validate→critic→apply */
       if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });
-      slides = artDirect(slides, { dna: carDNA(b, photoBias) });   /* ритм колоды + семейство раскладки каждому слайду */
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -2870,22 +3007,19 @@ const server = http.createServer(async (req, res) => {
         const q = [ [nameQ, geoQ, 'luxury real estate'].filter(Boolean).join(' '), [geoQ, 'luxury real estate apartments'].filter(Boolean).join(' '), [geoQ, 'beach skyline'].filter(Boolean).join(' ') ].filter(s => s.trim());
         const want = photoBias === 'high' ? 10 : photoBias === 'low' ? 4 : 7;
         let good = await gatherLaunchPhotos(images, q, want);
-        const target = photoBias === 'high' ? 4 : photoBias === 'low' ? 2 : 3;
-        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(target - good.length, { geoName: geoQ }); if (gen.length) good = good.concat(gen); }
-        let pics = good;
+        const target = 5;  /* пол ~4-5 ассетов: правило «≥4 фото-слайдов» жёсткое; овер-реквест перекрывает сбои генерации */
+        if (b.genPhotos !== false && good.length < target) { const gen = await genCarouselPhotos(Math.min(5, target - good.length), { geoName: geoQ }); if (gen.length) good = good.concat(gen); }
+        let pics = good, carPool = [];
         if (good.length && slides.length) {
           let roles = good.map(() => 'other');
           const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);   /* локальные /assets → абсолютные для vision */
           try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — по порядку */ }
           console.error('[ai-compose] photo roles:', roles.join(',') || '(none)');
-          /* «что рядом» — буллеты близости для слайда «Локация» (из фишек с расстоянием/ориентиром) */
-          const nearby = (facts && Array.isArray(facts.highlights) ? facts.highlights : []).filter(h => /(\d+\s*(?:мин|min|км|km|м\b))|пляж|beach|аэропорт|airport|марин|marina|центр|downtown|метро|moll|молл/i.test(String(h))).slice(0, 3).map(h => String(h).replace(/^[-–•\s]+/, '').slice(0, 32));
-          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '', nearby });
+          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));   /* планировщик владеет назначением ассетов (spec #71/#87) */
         }
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
-        slides = stylePass(slides, PAGE_THEMES[c.theme] || {});    /* разные раскладки + фоны, соседние отличаются */
+        slides = planCarousel(slides, { pool: carPool, dna: carDNA(b, photoBias), theme: PAGE_THEMES[c.theme] || {}, angle: b.angle });   /* spec-first: purposes→plan→validate→critic→apply */
         if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });   /* уместный стикер по смыслу слайда */
-        slides = artDirect(slides, { dna: carDNA(b, photoBias) });   /* ритм колоды + семейство раскладки каждому слайду */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
