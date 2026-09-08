@@ -1132,7 +1132,7 @@ function heroBars(pts) {
 }
 
 /* кольцо-скор (радиальный индикатор здоровья/скоринга) — общий примитив */
-function scoreRing(pct, opts = {}) {
+function ovScoreRing(pct, opts = {}) {   /* обзорное кольцо (ov-ring) — НЕ путать со scoreRing() карточек лида (score-ring) */
   const R = opts.r || 28, sz = opts.sz || 70, sw = opts.sw || 6, C = 2 * Math.PI * R, gid = gradId(), c = sz / 2;
   const col = opts.stroke || `url(#${gid})`;
   return `<svg class="ov-ring" viewBox="0 0 ${sz} ${sz}"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="var(--gauge-track)" stroke-width="${sw}"/><circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - Math.min(100, pct) / 100)).toFixed(1)}" transform="rotate(-90 ${c} ${c})"/></svg>`;
@@ -1313,7 +1313,7 @@ const OV_W = {
     ];
     return `<div class="ov2-card-hd">${ic(I.sim)}Здоровье WhatsApp<span>инфраструктура рассылки</span><button class="btn btn-sm" data-ovgo="settings">Номера</button></div>
       <div class="ov-mon">
-        <div class="ov-mon-score ${cls}"><div class="ov-mon-ring">${scoreRing(q, { r: 30, sz: 76, sw: 7 })}<div class="ov-mon-ring-c"><b>${q}<span>%</span></b><i>${label}</i></div></div></div>
+        <div class="ov-mon-score ${cls}"><div class="ov-mon-ring">${ovScoreRing(q, { r: 30, sz: 76, sw: 7 })}<div class="ov-mon-ring-c"><b>${q}<span>%</span></b><i>${label}</i></div></div></div>
         <div class="ov-mon-side">
           <div class="ov-mon-stats"><button class="ov-mon-stat" data-ovgo="analytics"><b>${cup(w.sentToday)}</b><i>${plural(w.sentToday, 'сообщение', 'сообщения', 'сообщений')} сегодня</i></button><button class="ov-mon-stat" data-ovgo="settings"><b>${cup(total)}</b><i>${plural(total, 'номер', 'номера', 'номеров')} в пуле</i></button></div>
           <div class="ov-mon-rows">${rows.map(s => `<div class="ov-mon-r ${s.ok ? 'ok' : 'bad'}"><span class="ov-mon-dot"></span><span class="ov-mon-t">${s.t}</span><b>${s.v}</b></div>`).join('')}</div>
