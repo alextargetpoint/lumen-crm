@@ -7,7 +7,7 @@
   /* растровые паки стикеров (нарезанные из шитов) + смысловой индекс для авто-подстановки */
   let STK_PACKS = null; const STK_LABEL = {}, STK_KW = {};
   fetch('/assets/stickers/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; STK_KW[it.key] = it.kw || []; })); }).catch(() => { STK_PACKS = []; });
-  const BULLET_DIRS = ['bullets', 'bullets-3d', 'bullets-neon'];
+  const BULLET_DIRS = ['bullets-modern', 'bullets-lux', 'bullets-ios', 'bullets-flat', 'bullets'];
   /* авто-подбор иконки-буллета по тексту тезисов слайда (совпадение ключевых слов kw) */
   function autoBulletKey(points) {
     const txt = (points || []).join(' ').toLowerCase();
@@ -82,8 +82,16 @@
 .cbar b{font-family:'Manrope',sans-serif;font-weight:700;font-size:13.5px;letter-spacing:-.01em;opacity:.96;max-width:min(46vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cbar .ctag{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8FB0FF;background:rgba(122,158,255,.14);border:1px solid rgba(122,158,255,.22);padding:3px 8px;border-radius:999px;flex:0 0 auto}
 .cbar .sp{flex:1}
+.cundo{display:inline-flex;gap:2px;background:rgba(122,158,255,.10);border:1px solid rgba(122,158,255,.20);border-radius:11px;padding:2px;margin-right:2px}
+.cundo-b{padding:6px 9px!important;display:inline-flex;align-items:center;justify-content:center}
+.cundo-b svg{width:17px;height:17px;display:block}
+.cundo-b.off{opacity:.32;pointer-events:none}
 .cbtn{background:linear-gradient(180deg,#3B78FF,#2563EB);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:Manrope,sans-serif;display:inline-flex;gap:6px;align-items:center;box-shadow:0 6px 16px -6px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.22);transition:transform .14s cubic-bezier(.4,0,.2,1),box-shadow .14s,filter .14s}
 .cbtn:hover{transform:translateY(-1px);box-shadow:0 11px 24px -6px rgba(37,99,235,.72),inset 0 1px 0 rgba(255,255,255,.25);filter:brightness(1.05)}
+/* ⭐ яркая заметная кнопка «Добавить слайд из библиотеки» */
+.cadd{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:13px;padding:14px 16px;font-family:Manrope,sans-serif;font-weight:800;font-size:14px;letter-spacing:-.01em;color:#fff;cursor:pointer;background:linear-gradient(135deg,#3B78FF,#2563EB 55%,#7C3AED);box-shadow:0 10px 26px -8px rgba(37,99,235,.7),inset 0 1px 0 rgba(255,255,255,.28);transition:transform .14s,box-shadow .14s,filter .14s}
+.cadd:hover{transform:translateY(-2px);box-shadow:0 16px 34px -8px rgba(37,99,235,.8),inset 0 1px 0 rgba(255,255,255,.3);filter:brightness(1.06)}
+.cadd svg{width:18px;height:18px;display:block}
 .cbtn:active{transform:translateY(0)}
 .cbtn.g{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);box-shadow:none}
 .cbtn.g:hover{background:rgba(255,255,255,.18);transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.5);filter:none}
@@ -229,6 +237,18 @@ body.cpanel-on{padding-right:308px!important}
 .ctpl-cv .cv-h{font-size:15px;font-weight:600;line-height:1.05;color:#fff;letter-spacing:-.01em}
 .ctpl-cv .cv-brand{position:absolute;left:12px;top:11px;font-size:7.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;opacity:.55;color:#fff}
 .ctpl i{font-style:normal;font-size:11px;color:#2A3346;font-weight:600;padding:7px 10px;border-top:1px solid #EEF1F6;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ⭐ мини-превью структуры шаблона слайда (не просто заголовок — показывает раскладку) */
+.ctpl-cv .cv-sub{font-size:8px;line-height:1.32;opacity:.7;margin-top:3px;max-width:97%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ctpl-cv .cv-rows{display:flex;flex-direction:column;gap:3.5px;margin-top:6px;width:100%}
+.ctpl-cv .cv-row{display:flex;align-items:center;gap:5px}
+.ctpl-cv .cv-dot{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+.ctpl-cv .cv-pct{font-family:var(--disp);font-size:11px;font-weight:700;letter-spacing:-.02em;flex:0 0 auto;min-width:20px}
+.ctpl-cv .cv-ln{height:2px;border-radius:2px;flex:1}
+.ctpl-cv .cv-bul{display:flex;align-items:center;gap:5px;font-size:7.5px;opacity:.85;line-height:1.5}
+.ctpl-cv .cv-bd{width:4px;height:4px;border-radius:50%;flex:0 0 auto}
+.ctpl-cv .cv-tiles{display:flex;gap:5px;margin-top:6px;width:100%}
+.ctpl-cv .cv-tile{flex:1;border-radius:5px;padding:5px 2px;text-align:center;font-family:var(--disp);font-size:11px;font-weight:700;line-height:1}
+.ctpl-cv .cv-big{font-family:var(--disp);font-weight:700;font-size:25px;line-height:.98;letter-spacing:-.03em}
 .cpop.cpop-ctx{background:linear-gradient(180deg,rgba(19,28,50,.96),rgba(11,18,34,.97));border:1px solid rgba(134,175,255,.22);box-shadow:0 28px 70px -18px rgba(4,9,22,.7),inset 0 1px 0 rgba(255,255,255,.08);padding:7px;width:auto;min-width:214px;backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);border-radius:16px}
 .cctx{display:flex;flex-direction:column;gap:2px}
 .cctx button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;background:none;padding:10px 13px;border-radius:11px;font-size:13px;font-weight:600;color:#E4ECFF;cursor:pointer;font-family:'Manrope',sans-serif;transition:background .14s,color .14s,transform .1s}
@@ -279,6 +299,7 @@ body.cpanel-on{padding-right:308px!important}
     <span class="ctag">Карусель</span>
     <b>${esc(P.title || 'Без названия')}</b>
     <span class="sp"></span>
+    <div class="cundo"><button class="cbtn g cundo-b" id="cUndo" title="Отменить (⌘Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button><button class="cbtn g cundo-b" id="cRedo" title="Вернуть (⌘⇧Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button></div>
     <button class="cbtn g" id="cDl" title="Скачать (PDF / картинки)">Скачать</button>
     <button class="cbtn" id="cSave">Сохранить</button>
     <button class="cbtn g" id="cToggle" title="Свернуть панель">⇥</button>
@@ -373,16 +394,19 @@ body.cpanel-on{padding-right:308px!important}
   }
   /* ── История (undo/redo) на снимках слайдов ── */
   let HIST = [], HPOS = -1, histLock = false;
-  function recordHist(slides) { if (histLock) return; try { const s = JSON.stringify(slides); if (HIST[HPOS] === s) return; HIST = HIST.slice(0, HPOS + 1); HIST.push(s); if (HIST.length > 40) { HIST.shift(); } HPOS = HIST.length - 1; } catch (e) {} }
+  function recordHist(slides) { if (histLock) return; try { const s = JSON.stringify(slides); if (HIST[HPOS] === s) return; HIST = HIST.slice(0, HPOS + 1); HIST.push(s); if (HIST.length > 40) { HIST.shift(); } HPOS = HIST.length - 1; } catch (e) {} if (typeof syncUndoBtns === 'function') syncUndoBtns(); }
   async function histApply(slides) { histLock = true; flash('…', 0); try { const r = await fetch(`/api/carousels/${P.cid}?key=${encodeURIComponent(KEY)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides, title: P.title }) }); if (r.ok) await liveRefresh(); } catch (e) {} finally { histLock = false; } }
-  function undo() { if (HPOS > 0) { HPOS--; histApply(JSON.parse(HIST[HPOS])); flash('Отменено ↶', 900); } else flash('Нечего отменять', 900); }
-  function redo() { if (HPOS < HIST.length - 1) { HPOS++; histApply(JSON.parse(HIST[HPOS])); flash('Возвращено ↷', 900); } else flash('Нечего вернуть', 900); }
+  function undo() { if (HPOS > 0) { HPOS--; histApply(JSON.parse(HIST[HPOS])); flash('Отменено ↶', 900); } else flash('Нечего отменять', 900); if (typeof syncUndoBtns === 'function') syncUndoBtns(); }
+  function redo() { if (HPOS < HIST.length - 1) { HPOS++; histApply(JSON.parse(HIST[HPOS])); flash('Возвращено ↷', 900); } else flash('Нечего вернуть', 900); if (typeof syncUndoBtns === 'function') syncUndoBtns(); }
   document.addEventListener('keydown', (e) => { const mod = e.metaKey || e.ctrlKey; if (!mod) return; const k = (e.key || '').toLowerCase(); if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); } });
   try { recordHist(serialize()); } catch (e) {}   /* исходное состояние */
   $('#cSave').addEventListener('click', () => save(false));
   $('#cDl').addEventListener('click', async () => { if (dirty) await save(false); window.open(`/car/${P.cid}?print=1`, '_blank'); });
   $('#cExit').addEventListener('click', async () => { if (dirty) await save(false); try { window.close(); } catch (e) {} setTimeout(() => { if (!window.closed) location.href = '/#social'; }, 250); });
   $('#cToggle').addEventListener('click', () => { panelOpen = !panelOpen; panel.classList.toggle('closed', !panelOpen); document.body.classList.toggle('cpanel-on', panelOpen); });
+  $('#cUndo').addEventListener('click', () => undo());
+  $('#cRedo').addEventListener('click', () => redo());
+  function syncUndoBtns() { const u = $('#cUndo'), r = $('#cRedo'); if (u) u.classList.toggle('off', HPOS <= 0); if (r) r.classList.toggle('off', HPOS >= HIST.length - 1); }
   addEventListener('beforeunload', (e) => { if (dirty) e.preventDefault(); });
 
   /* подгружаем шрифты библиотеки для превью */
@@ -505,7 +529,10 @@ body.cpanel-on{padding-right:308px!important}
       document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
     }
     const lyr = e.target.closest('.s-lyr');
-    if (lyr) { e.preventDefault(); e.stopPropagation(); selLayer(lyr); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const o = updL(lyr, {}); const sxp = o.x || 0, syp = o.y || 0, sx = e.clientX, sy = e.clientY; let moved = false;
+    if (lyr) { e.preventDefault(); e.stopPropagation(); selLayer(lyr); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect();
+      /* ⭐ клик по ФОТО → сразу открыть раздел «Фото-раскладка» (не по стикеру) */
+      if (lyr.classList.contains('lyr-img') && !lyr.classList.contains('is-sticker')) openPhotoLayoutPanel(+slide.dataset.idx);
+      const o = updL(lyr, {}); const sxp = o.x || 0, syp = o.y || 0, sx = e.clientX, sy = e.clientY; let moved = false;
       const mv = (ev) => { const cx = Math.max(-30, Math.min(120, sxp + (ev.clientX - sx) / sr.width * 100)); const cy = Math.max(-30, Math.min(120, syp + (ev.clientY - sy) / sr.height * 100)); lyr.style.left = cx + '%'; lyr.style.top = cy + '%'; updL(lyr, { x: +cx.toFixed(1), y: +cy.toFixed(1) }); moved = true; };
       const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); if (moved) { dirty = true; save(false); } if (qbar && qbar._mode === 'layer' && qbar._t === lyr) posQbar(lyr.getBoundingClientRect()); };
       document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
@@ -739,13 +766,31 @@ body.cpanel-on{padding-right:308px!important}
     L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', pl: 1, z }); });
     save(true, { slides: arr }); flash(urls.length < L.n ? `Разложено ${urls.length} из ${L.n} — добавь фото для остальных` : 'Раскладка применена ✓', 1600);
   }
-  /* применить раскладку: на ДЕЙСТВУЮЩИЕ фото если есть, иначе — подгрузить */
+  /* ⭐ открыть слайд на вкладке «Слайд» и подсветить/прокрутить к разделу «Фото-раскладка» */
+  function openPhotoLayoutPanel(idx) {
+    selectSlide(idx, true);
+    requestAnimationFrame(() => { const sec = ($('#cPlDet') || {}).closest ? $('#cPlDet').closest('.cgrp') : null; if (sec) { sec.scrollIntoView({ block: 'center', behavior: 'smooth' }); sec.style.animation = 'cgrpHl 1.15s ease'; setTimeout(() => { sec.style.animation = ''; }, 1250); } });
+  }
+  /* лучшая курируемая раскладка под N фото (1→в рамке, 2→большое+узкое, 3→герой+пара, 4→сетка с отступом) */
+  function bestLayoutFor(n) {
+    n = Math.max(1, Math.min(4, n));
+    const cands = PHOTO_LAYOUTS.filter(l => l.n === n);
+    const best = { 1: 'f1-frame', 2: 'f2-bigsmall', 3: 'f3-hero2', 4: 'f4-gap' }[n];
+    return cands.find(l => l.k === best) || cands[0];
+  }
+  /* применить раскладку: на ДЕЙСТВУЮЩИЕ фото если есть, иначе — подгрузить.
+     ⭐ НИКОГДА не теряем фото: если на слайде БОЛЬШЕ фото, чем боксов в выбранной раскладке,
+        авто-повышаем до раскладки под реальное число (иначе лишние фото затирались). */
   function applyPhotoLayout(i, L) {
     const have = slidePhotos(i);
-    if (have.length) { applyPhotoLayoutTo(i, L, have); return; }
+    if (have.length) {
+      let LL = L;
+      if (have.length > L.n) { LL = bestLayoutFor(have.length); flash(`На слайде ${have.length} фото — разложил все (раскладка на ${LL.n}), ничего не потеряно`, 1900); }
+      applyPhotoLayoutTo(i, LL, have); return;
+    }
     pickFiles('image/*', async (files) => {
       if (!files.length) return; flash('Загружаю фото…', 0);
-      try { const urls = []; for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f)); applyPhotoLayoutTo(i, L, urls); } catch (er) { flash('Ошибка: ' + er.message); }
+      try { const urls = []; for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f)); const LL = urls.length > L.n ? bestLayoutFor(urls.length) : L; applyPhotoLayoutTo(i, LL, urls); } catch (er) { flash('Ошибка: ' + er.message); }
     });
   }
   /* ✨ авто: понять число фото на слайде и применить подходящую композицию */
@@ -753,12 +798,7 @@ body.cpanel-on{padding-right:308px!important}
     const have = slidePhotos(i);
     if (!have.length) { flash('На слайде нет фото — подгрузи или выбери раскладку'); return; }
     const n = Math.min(have.length, 4);
-    const cands = PHOTO_LAYOUTS.filter(l => l.n === n);
-    if (!cands.length) { flash('Нет раскладки для ' + n + ' фото'); return; }
-    /* курируем «лучшую» по числу: 1→в рамке, 2→большое+узкое, 3→герой+пара, 4→сетка с отступом */
-    const best = { 1: 'f1-frame', 2: 'f2-bigsmall', 3: 'f3-hero2', 4: 'f4-gap' }[n];
-    const L = cands.find(l => l.k === best) || cands[0];
-    applyPhotoLayoutTo(i, L, have);
+    applyPhotoLayoutTo(i, bestLayoutFor(n), have);
     flash('Авто-раскладка на ' + n + ' фото ✓', 1400);
   }
   function tplTile(tpl) {
@@ -799,7 +839,7 @@ body.cpanel-on{padding-right:308px!important}
       <div class="swrow" style="margin-top:8px"><span class="sw ${(P.footer || {}).on ? 'on' : ''}" id="cFtSw"></span> Свой текст вместо агентства</div>
       <input class="cinp" id="cFtTxt" placeholder="@ваш_аккаунт · сайт.ru" value="${esc((P.footer || {}).text || '')}">
     </div>
-    <div class="cgrp"><button class="cwbtn wide" id="cAddSlide">+ Добавить слайд</button></div>
+    <div class="cgrp"><button class="cadd" id="cAddSlide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg> Добавить слайд из библиотеки</button><div class="cnote">Готовые форматы: обложки, цифры, план оплаты, списки, цитаты, фото, CTA — с превью структуры.</div></div>
     <div class="cnote">Тема, шрифт, формат и футер применяются ко всей карусели.</div>`;
   }
   function wireDesign(body) {
@@ -850,12 +890,48 @@ body.cpanel-on{padding-right:308px!important}
     { const tm = $('#cThemesMore', body), tg = $('#cThemes', body); if (tm && tg) tm.addEventListener('click', () => { const cl = tg.classList.toggle('clamped'); tm.textContent = cl ? 'все ▾' : 'свернуть ▴'; }); }
     $$('.cth', body).forEach(d => d.addEventListener('click', () => save('hard', { theme: d.dataset.theme })));
     $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save('hard', { format: b.dataset.f }); });
+    /* ⭐ мини-превью шаблона слайда: вертикальное позиционирование как на реальном слайде */
+    function stMiniPos(s) {
+      const j = s.pos === 'top' ? 'flex-start' : s.pos === 'center' ? 'center' : 'flex-end';
+      const ai = s.align === 'center' ? 'center' : 'flex-start';
+      const ta = s.align === 'center' ? 'center' : 'left';
+      return `justify-content:${j};align-items:${ai};text-align:${ta}`;
+    }
+    /* ⭐ мини-превью структуры (payplan/цифра/список/цитата/plain) — чтобы шаблоны НЕ были одинаковыми */
+    function stMini(s, th, txt) {
+      const acc = th.blue, ts = s.tstyle || 'plain', sz = s.size || 'm';
+      const eye = s.eyebrow ? `<span class="cv-eye" style="color:${acc}">${esc(String(s.eyebrow).slice(0, 16))}</span>` : '';
+      const hbase = sz === 'l' ? 16 : sz === 's' ? 12 : 13;
+      const hfs = (ts === 'huge' || ts === 'gradient') ? 21 : hbase;
+      let hstyle = `font-family:var(--disp);color:${txt};font-size:${hfs}px`;
+      if (ts === 'gold') hstyle = `font-family:var(--disp);color:#E8B84B;font-size:${hfs}px`;
+      else if (ts === 'outline') hstyle = `font-family:var(--disp);font-size:${hfs}px;color:transparent;-webkit-text-stroke:.7px ${txt}`;
+      else if (ts === 'gradient') hstyle = `font-family:var(--disp);font-size:${hfs}px;background:linear-gradient(120deg,${acc},#7C3AED);-webkit-background-clip:text;background-clip:text;color:transparent`;
+      const head = (s.heading || 'Слайд').slice(0, 30);
+      const hHtml = ts === 'block'
+        ? `<span class="cv-h" style="font-family:var(--disp);font-size:${hfs}px;background:${acc};color:#fff;padding:1px 5px;border-radius:3px;display:inline-block">${esc(head)}</span>`
+        : `<span class="cv-h" style="${hstyle}">${esc(head)}</span>`;
+      let body = '';
+      if (s.mode === 'payplan' && (s.items || []).length) {
+        body = `<div class="cv-rows">${s.items.slice(0, 3).map(it => `<div class="cv-row"><span class="cv-dot" style="background:${acc}"></span><span class="cv-pct" style="color:${acc}">${esc(it.v || (it.pct + '%'))}</span><span class="cv-ln" style="background:${acc};opacity:.4"></span></div>`).join('')}</div>`;
+      } else if ((s.mode === 'stats' || s.mode === 'gauges') && (s.items || []).length) {
+        body = `<div class="cv-tiles">${s.items.slice(0, 3).map(it => `<span class="cv-tile" style="background:color-mix(in srgb,${acc} 22%,transparent);color:${txt}">${esc((it.v || it.k || '').toString().slice(0, 4))}</span>`).join('')}</div>`;
+      } else if (s.mode === 'steps' && (s.items || []).length) {
+        body = `<div class="cv-rows">${s.items.slice(0, 3).map((it, n) => `<div class="cv-bul"><span class="cv-bd" style="background:${acc}"></span><span style="color:${txt}">${esc((it.text || it.k || '').slice(0, 22))}</span></div>`).join('')}</div>`;
+      } else if (/\n|—|✓|•/.test(s.sub || '')) {
+        const lines = String(s.sub).split(/\n|(?=—)|(?=✓)/).map(x => x.replace(/^[—✓•\s]+/, '').trim()).filter(Boolean).slice(0, 3);
+        body = `<div class="cv-rows">${lines.map(l => `<div class="cv-bul"><span class="cv-bd" style="background:${acc}"></span><span style="color:${txt};opacity:.85">${esc(l.slice(0, 22))}</span></div>`).join('')}</div>`;
+      } else if (s.sub) {
+        body = `<span class="cv-sub" style="color:${txt}">${esc(String(s.sub).slice(0, 46))}</span>`;
+      }
+      return eye + hHtml + body;
+    }
     $('#cAddSlide', body).addEventListener('click', (e) => {
       const cats = Object.keys(P.slideTpls || {});
       if (!cats.length) { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
       const th = (P.themes || {})[P.theme] || { blue: '#2563EB', body: '#0A1833' };
       const dark = isDark(th.body), txt = dark ? '#fff' : '#132446';
-      const tile = (t, ci, ti) => `<button class="ctpl" data-sti="${ci}:${ti}"><div class="ctpl-cv" style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 24%,${th.body}),${th.body})">${t.s.eyebrow ? `<span class="cv-eye" style="color:${th.blue}">${esc(String(t.s.eyebrow).slice(0, 16))}</span>` : ''}<span class="cv-h" style="font-family:var(--disp);color:${txt};font-size:13px">${esc((t.s.heading || 'Слайд').slice(0, 26))}</span></div><i>${esc(t.name)}</i></button>`;
+      const tile = (t, ci, ti) => `<button class="ctpl" data-sti="${ci}:${ti}" title="${esc(t.name)}"><div class="ctpl-cv" style="background:linear-gradient(155deg,color-mix(in srgb,${th.blue} 24%,${th.body}),${th.body});${stMiniPos(t.s)}">${stMini(t.s, th, txt)}</div><i>${esc(t.name)}</i></button>`;
       const catHtml = (ci) => (P.slideTpls[cats[ci]] || []).map((t, ti) => tile(t, ci, ti)).join('');
       const pp = openPop(`<div class="csec" style="padding-top:2px">Готовый слайд</div><div class="cseg ctpl-cats" id="cStCats">${cats.map((c, i) => `<button data-c="${i}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div><div class="ctpl-grid" id="cStGrid">${catHtml(0)}</div><button class="cwbtn wide" id="cStBlank" style="margin-top:8px">+ Пустой слайд</button>`, e.clientX - 250, e.clientY);
       $('#cStCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cStCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cStGrid', pp).innerHTML = catHtml(+b.dataset.c); });

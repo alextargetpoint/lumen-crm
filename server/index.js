@@ -5945,7 +5945,7 @@ ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparen
 .s-tbar button svg{width:16px;height:16px;display:block}
 .s-tbar button:hover{background:var(--blue);color:#fff}
 .s-tbar button[data-sact="del"]:hover{background:#E0483D}
-.s-ins{position:absolute;left:50%;bottom:-13px;transform:translateX(-50%);z-index:12;border:none;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;font-size:11.5px;font-weight:700;padding:7px 15px 7px 12px;opacity:0;transition:opacity .15s,transform .12s,box-shadow .12s;box-shadow:0 6px 18px -5px rgba(37,99,235,.7);font-family:'Manrope',sans-serif;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.s-ins{position:absolute;left:50%;bottom:-13px;transform:translateX(-50%);z-index:12;border:none;border-radius:999px;background:var(--blue);color:#fff;cursor:pointer;font-size:11.5px;font-weight:700;padding:7px 15px 7px 12px;opacity:.42;transition:opacity .15s,transform .12s,box-shadow .12s;box-shadow:0 6px 18px -5px rgba(37,99,235,.7);font-family:'Manrope',sans-serif;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .s-ins:hover{transform:translateX(-50%) translateY(-1px);box-shadow:0 10px 24px -6px rgba(37,99,235,.85);filter:brightness(1.05)}
 .s-ins svg{width:14px;height:14px;display:block}
 .cslot:hover .s-ins{opacity:1}
@@ -5966,7 +5966,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=51"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=53"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

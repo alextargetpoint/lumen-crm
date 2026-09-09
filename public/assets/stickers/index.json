@@ -1,6 +1,2271 @@
 {
   "packs": [
     {
+      "title": "Буллеты · Модерн",
+      "dir": "bullets-modern",
+      "items": [
+        {
+          "slug": "bullets-modern-01",
+          "label": "Готово · заливка",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка",
+            "есть",
+            "преимущество",
+            "включено"
+          ],
+          "key": "bullets-modern/01"
+        },
+        {
+          "slug": "bullets-modern-02",
+          "label": "Готово · беж",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка",
+            "есть"
+          ],
+          "key": "bullets-modern/02"
+        },
+        {
+          "slug": "bullets-modern-03",
+          "label": "Готово · контур",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка",
+            "лёгкий",
+            "контур"
+          ],
+          "key": "bullets-modern/03"
+        },
+        {
+          "slug": "bullets-modern-04",
+          "label": "Стрелка · тёмная",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "стрелка",
+            "переход"
+          ],
+          "key": "bullets-modern/04"
+        },
+        {
+          "slug": "bullets-modern-05",
+          "label": "Стрелка · беж",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "стрелка",
+            "переход"
+          ],
+          "key": "bullets-modern/05"
+        },
+        {
+          "slug": "bullets-modern-06",
+          "label": "Стрелка · контур",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "стрелка",
+            "контур"
+          ],
+          "key": "bullets-modern/06"
+        },
+        {
+          "slug": "bullets-modern-07",
+          "label": "Стрелка · квадрат",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "стрелка",
+            "акцент"
+          ],
+          "key": "bullets-modern/07"
+        },
+        {
+          "slug": "bullets-modern-08",
+          "label": "Стрелка · квадрат беж",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "стрелка"
+          ],
+          "key": "bullets-modern/08"
+        },
+        {
+          "slug": "bullets-modern-09",
+          "label": "Звезда",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "премиум",
+            "рейтинг",
+            "избранное",
+            "лучшее"
+          ],
+          "key": "bullets-modern/09"
+        },
+        {
+          "slug": "bullets-modern-10",
+          "label": "Звезда · контур",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "контур",
+            "рейтинг",
+            "избранное"
+          ],
+          "key": "bullets-modern/10"
+        },
+        {
+          "slug": "bullets-modern-11",
+          "label": "Точка · золото",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт",
+            "буллет"
+          ],
+          "key": "bullets-modern/11"
+        },
+        {
+          "slug": "bullets-modern-12",
+          "label": "Точка в кольце",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "кольцо",
+            "маркер",
+            "пункт",
+            "фокус"
+          ],
+          "key": "bullets-modern/12"
+        },
+        {
+          "slug": "bullets-modern-13",
+          "label": "Точка · мелкая",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт",
+            "мелкая"
+          ],
+          "key": "bullets-modern/13"
+        },
+        {
+          "slug": "bullets-modern-14",
+          "label": "Мишень",
+          "cat": "invest",
+          "kw": [
+            "мишень",
+            "цель",
+            "фокус",
+            "точность",
+            "точка"
+          ],
+          "key": "bullets-modern/14"
+        },
+        {
+          "slug": "bullets-modern-15",
+          "label": "Точка · шалфей",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт",
+            "зелёная"
+          ],
+          "key": "bullets-modern/15"
+        },
+        {
+          "slug": "bullets-modern-16",
+          "label": "Полукруг",
+          "cat": "nav",
+          "kw": [
+            "полукруг",
+            "этап",
+            "прогресс",
+            "маркер"
+          ],
+          "key": "bullets-modern/16"
+        },
+        {
+          "slug": "bullets-modern-17",
+          "label": "Кольцо",
+          "cat": "nav",
+          "kw": [
+            "кольцо",
+            "круг",
+            "контур",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-modern/17"
+        },
+        {
+          "slug": "bullets-modern-18",
+          "label": "Точка в круге",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "круг",
+            "маркер",
+            "пункт",
+            "фокус"
+          ],
+          "key": "bullets-modern/18"
+        },
+        {
+          "slug": "bullets-modern-19",
+          "label": "Точка в квадрате",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "квадрат",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-modern/19"
+        },
+        {
+          "slug": "bullets-modern-20",
+          "label": "Искра",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка",
+            "особенное",
+            "вау",
+            "акцент",
+            "изюминка"
+          ],
+          "key": "bullets-modern/20"
+        },
+        {
+          "slug": "bullets-modern-21",
+          "label": "Искра · контур",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка",
+            "особенное",
+            "контур",
+            "акцент"
+          ],
+          "key": "bullets-modern/21"
+        },
+        {
+          "slug": "bullets-modern-22",
+          "label": "1",
+          "cat": "nav",
+          "kw": [
+            "1",
+            "шаг",
+            "номер",
+            "первый",
+            "пункт"
+          ],
+          "key": "bullets-modern/22"
+        },
+        {
+          "slug": "bullets-modern-23",
+          "label": "2",
+          "cat": "nav",
+          "kw": [
+            "2",
+            "шаг",
+            "номер",
+            "второй",
+            "пункт"
+          ],
+          "key": "bullets-modern/23"
+        },
+        {
+          "slug": "bullets-modern-24",
+          "label": "3",
+          "cat": "nav",
+          "kw": [
+            "3",
+            "шаг",
+            "номер",
+            "третий",
+            "пункт"
+          ],
+          "key": "bullets-modern/24"
+        },
+        {
+          "slug": "bullets-modern-25",
+          "label": "4",
+          "cat": "nav",
+          "kw": [
+            "4",
+            "шаг",
+            "номер",
+            "четвёртый",
+            "пункт"
+          ],
+          "key": "bullets-modern/25"
+        },
+        {
+          "slug": "bullets-modern-26",
+          "label": "5",
+          "cat": "nav",
+          "kw": [
+            "5",
+            "шаг",
+            "номер",
+            "пятый",
+            "пункт"
+          ],
+          "key": "bullets-modern/26"
+        },
+        {
+          "slug": "bullets-modern-27",
+          "label": "Локация",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "место",
+            "район",
+            "адрес",
+            "гео",
+            "на карте"
+          ],
+          "key": "bullets-modern/27"
+        },
+        {
+          "slug": "bullets-modern-28",
+          "label": "Локация · беж",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "место",
+            "район",
+            "адрес",
+            "гео"
+          ],
+          "key": "bullets-modern/28"
+        },
+        {
+          "slug": "bullets-modern-29",
+          "label": "Локация · контур",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "место",
+            "адрес",
+            "гео",
+            "контур"
+          ],
+          "key": "bullets-modern/29"
+        },
+        {
+          "slug": "bullets-modern-30",
+          "label": "Точка · акцент",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "акцент",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-modern/30"
+        },
+        {
+          "slug": "bullets-modern-31",
+          "label": "Веха · золото",
+          "cat": "plan",
+          "kw": [
+            "веха",
+            "этап",
+            "точка",
+            "срок",
+            "график"
+          ],
+          "key": "bullets-modern/31"
+        },
+        {
+          "slug": "bullets-modern-32",
+          "label": "Веха · контур",
+          "cat": "plan",
+          "kw": [
+            "веха",
+            "этап",
+            "точка",
+            "срок",
+            "контур"
+          ],
+          "key": "bullets-modern/32"
+        },
+        {
+          "slug": "bullets-modern-33",
+          "label": "Плей · беж",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "смотреть",
+            "видео",
+            "запуск",
+            "тур"
+          ],
+          "key": "bullets-modern/33"
+        },
+        {
+          "slug": "bullets-modern-34",
+          "label": "Плей · тёмный",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "смотреть",
+            "видео",
+            "запуск",
+            "тур"
+          ],
+          "key": "bullets-modern/34"
+        },
+        {
+          "slug": "bullets-modern-35",
+          "label": "Плей · золото",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "смотреть",
+            "видео",
+            "запуск",
+            "премиум"
+          ],
+          "key": "bullets-modern/35"
+        },
+        {
+          "slug": "bullets-modern-36",
+          "label": "Перемотка",
+          "cat": "cta",
+          "kw": [
+            "перемотка",
+            "быстро",
+            "вперёд",
+            "далее"
+          ],
+          "key": "bullets-modern/36"
+        },
+        {
+          "slug": "bullets-modern-37",
+          "label": "Плюс · квадрат беж",
+          "cat": "nav",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "больше"
+          ],
+          "key": "bullets-modern/37"
+        },
+        {
+          "slug": "bullets-modern-38",
+          "label": "Плюс · квадрат",
+          "cat": "nav",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "больше",
+            "акцент"
+          ],
+          "key": "bullets-modern/38"
+        },
+        {
+          "slug": "bullets-modern-39",
+          "label": "Закрыть · беж",
+          "cat": "nav",
+          "kw": [
+            "закрыть",
+            "нет",
+            "отмена",
+            "минус",
+            "убрать"
+          ],
+          "key": "bullets-modern/39"
+        },
+        {
+          "slug": "bullets-modern-40",
+          "label": "Закрыть · тёмный",
+          "cat": "nav",
+          "kw": [
+            "закрыть",
+            "нет",
+            "отмена",
+            "минус",
+            "убрать"
+          ],
+          "key": "bullets-modern/40"
+        },
+        {
+          "slug": "bullets-modern-41",
+          "label": "Лист",
+          "cat": "lifestyle",
+          "kw": [
+            "лист",
+            "эко",
+            "природа",
+            "зелень",
+            "чистота",
+            "устойчивость"
+          ],
+          "key": "bullets-modern/41"
+        },
+        {
+          "slug": "bullets-modern-42",
+          "label": "Лист · контур",
+          "cat": "lifestyle",
+          "kw": [
+            "лист",
+            "эко",
+            "природа",
+            "зелень",
+            "контур"
+          ],
+          "key": "bullets-modern/42"
+        },
+        {
+          "slug": "bullets-modern-43",
+          "label": "Ромб · золото",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "премиум",
+            "эксклюзив",
+            "качество",
+            "ценность"
+          ],
+          "key": "bullets-modern/43"
+        },
+        {
+          "slug": "bullets-modern-44",
+          "label": "Ромб · контур",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "премиум",
+            "контур",
+            "эксклюзив"
+          ],
+          "key": "bullets-modern/44"
+        },
+        {
+          "slug": "bullets-modern-45",
+          "label": "Ромб в ромбе",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "премиум",
+            "акцент",
+            "эксклюзив"
+          ],
+          "key": "bullets-modern/45"
+        },
+        {
+          "slug": "bullets-modern-46",
+          "label": "Ромб · тёмный",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "премиум",
+            "эксклюзив"
+          ],
+          "key": "bullets-modern/46"
+        },
+        {
+          "slug": "bullets-modern-47",
+          "label": "Ромб · беж",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "премиум",
+            "беж",
+            "эксклюзив"
+          ],
+          "key": "bullets-modern/47"
+        },
+        {
+          "slug": "bullets-modern-48",
+          "label": "Шеврон вверх",
+          "cat": "nav",
+          "kw": [
+            "шеврон",
+            "вверх",
+            "рост",
+            "приоритет",
+            "важно"
+          ],
+          "key": "bullets-modern/48"
+        },
+        {
+          "slug": "bullets-modern-49",
+          "label": "Шеврон · золото",
+          "cat": "nav",
+          "kw": [
+            "шеврон",
+            "далее",
+            "вперёд",
+            "переход"
+          ],
+          "key": "bullets-modern/49"
+        },
+        {
+          "slug": "bullets-modern-50",
+          "label": "Закладка",
+          "cat": "lifestyle",
+          "kw": [
+            "закладка",
+            "сохранить",
+            "отметить",
+            "избранное"
+          ],
+          "key": "bullets-modern/50"
+        },
+        {
+          "slug": "bullets-modern-51",
+          "label": "Закладка · контур",
+          "cat": "lifestyle",
+          "kw": [
+            "закладка",
+            "сохранить",
+            "отметить",
+            "контур"
+          ],
+          "key": "bullets-modern/51"
+        },
+        {
+          "slug": "bullets-modern-52",
+          "label": "Закладка · золото",
+          "cat": "lifestyle",
+          "kw": [
+            "закладка",
+            "сохранить",
+            "избранное",
+            "премиум"
+          ],
+          "key": "bullets-modern/52"
+        },
+        {
+          "slug": "bullets-modern-53",
+          "label": "Кольцо · золото",
+          "cat": "invest",
+          "kw": [
+            "кольцо",
+            "цель",
+            "100%",
+            "итог",
+            "круг"
+          ],
+          "key": "bullets-modern/53"
+        },
+        {
+          "slug": "bullets-modern-54",
+          "label": "Точка-мишень",
+          "cat": "invest",
+          "kw": [
+            "мишень",
+            "цель",
+            "точка",
+            "фокус",
+            "итог"
+          ],
+          "key": "bullets-modern/54"
+        },
+        {
+          "slug": "bullets-modern-55",
+          "label": "Плюс · тонкий",
+          "cat": "nav",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "минимал"
+          ],
+          "key": "bullets-modern/55"
+        }
+      ]
+    },
+    {
+      "title": "Буллеты · Люкс",
+      "dir": "bullets-lux",
+      "items": [
+        {
+          "slug": "bullets-lux-01",
+          "label": "Готово",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/01"
+        },
+        {
+          "slug": "bullets-lux-02",
+          "label": "Готово · мята",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/02"
+        },
+        {
+          "slug": "bullets-lux-03",
+          "label": "Готово · контур",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/03"
+        },
+        {
+          "slug": "bullets-lux-04",
+          "label": "Готово · беж",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/04"
+        },
+        {
+          "slug": "bullets-lux-05",
+          "label": "Готово · плашка",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/05"
+        },
+        {
+          "slug": "bullets-lux-06",
+          "label": "Готово · светлый",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да"
+          ],
+          "key": "bullets-lux/06"
+        },
+        {
+          "slug": "bullets-lux-07",
+          "label": "1",
+          "cat": "nav",
+          "kw": [
+            "1",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-lux/07"
+        },
+        {
+          "slug": "bullets-lux-08",
+          "label": "2",
+          "cat": "nav",
+          "kw": [
+            "2",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-lux/08"
+        },
+        {
+          "slug": "bullets-lux-09",
+          "label": "3",
+          "cat": "nav",
+          "kw": [
+            "3",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-lux/09"
+        },
+        {
+          "slug": "bullets-lux-10",
+          "label": "4",
+          "cat": "nav",
+          "kw": [
+            "4",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-lux/10"
+        },
+        {
+          "slug": "bullets-lux-11",
+          "label": "5",
+          "cat": "nav",
+          "kw": [
+            "5",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-lux/11"
+        },
+        {
+          "slug": "bullets-lux-12",
+          "label": "Стрелка · контур",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "переход"
+          ],
+          "key": "bullets-lux/12"
+        },
+        {
+          "slug": "bullets-lux-13",
+          "label": "Стрелка · тёмная",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-lux/13"
+        },
+        {
+          "slug": "bullets-lux-14",
+          "label": "Стрелка · беж",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-lux/14"
+        },
+        {
+          "slug": "bullets-lux-15",
+          "label": "Стрелка · тонкая",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-lux/15"
+        },
+        {
+          "slug": "bullets-lux-16",
+          "label": "Стрелка · тонкая",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-lux/16"
+        },
+        {
+          "slug": "bullets-lux-17",
+          "label": "Готово в круге",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/17"
+        },
+        {
+          "slug": "bullets-lux-18",
+          "label": "Готово · золото",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "премиум"
+          ],
+          "key": "bullets-lux/18"
+        },
+        {
+          "slug": "bullets-lux-19",
+          "label": "Готово · контур",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/19"
+        },
+        {
+          "slug": "bullets-lux-20",
+          "label": "Готово · квадрат",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-lux/20"
+        },
+        {
+          "slug": "bullets-lux-21",
+          "label": "Готово · печать",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "одобрено",
+            "знак",
+            "качество"
+          ],
+          "key": "bullets-lux/21"
+        },
+        {
+          "slug": "bullets-lux-22",
+          "label": "Готово",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да"
+          ],
+          "key": "bullets-lux/22"
+        },
+        {
+          "slug": "bullets-lux-23",
+          "label": "05",
+          "cat": "nav",
+          "kw": [
+            "05",
+            "номер",
+            "шаг"
+          ],
+          "key": "bullets-lux/23"
+        },
+        {
+          "slug": "bullets-lux-24",
+          "label": "Вперёд",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "шаг",
+            "вперёд"
+          ],
+          "key": "bullets-lux/24"
+        },
+        {
+          "slug": "bullets-lux-25",
+          "label": "Стрелка · акцент",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "главное"
+          ],
+          "key": "bullets-lux/25"
+        },
+        {
+          "slug": "bullets-lux-26",
+          "label": "Точка · кольцо",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "кольцо",
+            "маркер"
+          ],
+          "key": "bullets-lux/26"
+        },
+        {
+          "slug": "bullets-lux-27",
+          "label": "Точка · беж",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер"
+          ],
+          "key": "bullets-lux/27"
+        },
+        {
+          "slug": "bullets-lux-28",
+          "label": "Полукруг",
+          "cat": "nav",
+          "kw": [
+            "полукруг",
+            "этап",
+            "прогресс"
+          ],
+          "key": "bullets-lux/28"
+        },
+        {
+          "slug": "bullets-lux-29",
+          "label": "Звезда · золото",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "рейтинг"
+          ],
+          "key": "bullets-lux/29"
+        },
+        {
+          "slug": "bullets-lux-30",
+          "label": "Звезда · контур",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "рейтинг"
+          ],
+          "key": "bullets-lux/30"
+        },
+        {
+          "slug": "bullets-lux-31",
+          "label": "Звезда · половина",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "рейтинг",
+            "половина"
+          ],
+          "key": "bullets-lux/31"
+        },
+        {
+          "slug": "bullets-lux-32",
+          "label": "Искра · тонкая",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка"
+          ],
+          "key": "bullets-lux/32"
+        },
+        {
+          "slug": "bullets-lux-33",
+          "label": "Звезда · тёмная",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ"
+          ],
+          "key": "bullets-lux/33"
+        },
+        {
+          "slug": "bullets-lux-34",
+          "label": "Звезда · беж",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "рейтинг"
+          ],
+          "key": "bullets-lux/34"
+        },
+        {
+          "slug": "bullets-lux-35",
+          "label": "Бриллиант",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "премиум",
+            "эксклюзив"
+          ],
+          "key": "bullets-lux/35"
+        },
+        {
+          "slug": "bullets-lux-36",
+          "label": "Корона",
+          "cat": "luxury",
+          "kw": [
+            "корона",
+            "премиум",
+            "статус"
+          ],
+          "key": "bullets-lux/36"
+        },
+        {
+          "slug": "bullets-lux-37",
+          "label": "Лист",
+          "cat": "lifestyle",
+          "kw": [
+            "эко",
+            "природа",
+            "зелень"
+          ],
+          "key": "bullets-lux/37"
+        },
+        {
+          "slug": "bullets-lux-38",
+          "label": "Молния",
+          "cat": "urgency",
+          "kw": [
+            "быстро",
+            "энергия",
+            "старт"
+          ],
+          "key": "bullets-lux/38"
+        },
+        {
+          "slug": "bullets-lux-39",
+          "label": "Щит",
+          "cat": "contact",
+          "kw": [
+            "защита",
+            "гарантия",
+            "сопровождение"
+          ],
+          "key": "bullets-lux/39"
+        },
+        {
+          "slug": "bullets-lux-40",
+          "label": "Сердце",
+          "cat": "lifestyle",
+          "kw": [
+            "избранное",
+            "нравится"
+          ],
+          "key": "bullets-lux/40"
+        },
+        {
+          "slug": "bullets-lux-41",
+          "label": "Дом",
+          "cat": "amenity",
+          "kw": [
+            "дом",
+            "жильё",
+            "квартира"
+          ],
+          "key": "bullets-lux/41"
+        },
+        {
+          "slug": "bullets-lux-42",
+          "label": "Здание",
+          "cat": "amenity",
+          "kw": [
+            "здание",
+            "новостройка",
+            "комплекс"
+          ],
+          "key": "bullets-lux/42"
+        },
+        {
+          "slug": "bullets-lux-43",
+          "label": "Локация",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "место",
+            "адрес",
+            "гео"
+          ],
+          "key": "bullets-lux/43"
+        },
+        {
+          "slug": "bullets-lux-44",
+          "label": "Ключ",
+          "cat": "amenity",
+          "kw": [
+            "ключ",
+            "сдача",
+            "под ключ"
+          ],
+          "key": "bullets-lux/44"
+        },
+        {
+          "slug": "bullets-lux-45",
+          "label": "Документ",
+          "cat": "contact",
+          "kw": [
+            "документ",
+            "договор",
+            "условия"
+          ],
+          "key": "bullets-lux/45"
+        },
+        {
+          "slug": "bullets-lux-46",
+          "label": "График",
+          "cat": "invest",
+          "kw": [
+            "график",
+            "рост",
+            "показатели"
+          ],
+          "key": "bullets-lux/46"
+        },
+        {
+          "slug": "bullets-lux-47",
+          "label": "Смотреть",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "видео",
+            "смотреть"
+          ],
+          "key": "bullets-lux/47"
+        },
+        {
+          "slug": "bullets-lux-48",
+          "label": "Смотреть · беж",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "видео"
+          ],
+          "key": "bullets-lux/48"
+        },
+        {
+          "slug": "bullets-lux-49",
+          "label": "Смотреть · контур",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "видео"
+          ],
+          "key": "bullets-lux/49"
+        },
+        {
+          "slug": "bullets-lux-50",
+          "label": "Пауза",
+          "cat": "nav",
+          "kw": [
+            "пауза",
+            "стоп"
+          ],
+          "key": "bullets-lux/50"
+        },
+        {
+          "slug": "bullets-lux-51",
+          "label": "Стоп",
+          "cat": "nav",
+          "kw": [
+            "стоп",
+            "квадрат"
+          ],
+          "key": "bullets-lux/51"
+        },
+        {
+          "slug": "bullets-lux-52",
+          "label": "Запись",
+          "cat": "urgency",
+          "kw": [
+            "запись",
+            "точка",
+            "важно"
+          ],
+          "key": "bullets-lux/52"
+        },
+        {
+          "slug": "bullets-lux-53",
+          "label": "Квадрат",
+          "cat": "nav",
+          "kw": [
+            "квадрат",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-lux/53"
+        },
+        {
+          "slug": "bullets-lux-54",
+          "label": "Квадрат · контур",
+          "cat": "nav",
+          "kw": [
+            "квадрат",
+            "маркер"
+          ],
+          "key": "bullets-lux/54"
+        },
+        {
+          "slug": "bullets-lux-55",
+          "label": "Ромб",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "эксклюзив"
+          ],
+          "key": "bullets-lux/55"
+        },
+        {
+          "slug": "bullets-lux-56",
+          "label": "Плюс",
+          "cat": "nav",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё"
+          ],
+          "key": "bullets-lux/56"
+        },
+        {
+          "slug": "bullets-lux-57",
+          "label": "Поделиться",
+          "cat": "cta",
+          "kw": [
+            "поделиться",
+            "отправить"
+          ],
+          "key": "bullets-lux/57"
+        },
+        {
+          "slug": "bullets-lux-58",
+          "label": "Ссылка",
+          "cat": "cta",
+          "kw": [
+            "ссылка",
+            "перейти",
+            "сайт"
+          ],
+          "key": "bullets-lux/58"
+        },
+        {
+          "slug": "bullets-lux-59",
+          "label": "Открыть",
+          "cat": "cta",
+          "kw": [
+            "открыть",
+            "перейти",
+            "внешняя"
+          ],
+          "key": "bullets-lux/59"
+        },
+        {
+          "slug": "bullets-lux-60",
+          "label": "Скачать",
+          "cat": "cta",
+          "kw": [
+            "скачать",
+            "загрузить",
+            "каталог"
+          ],
+          "key": "bullets-lux/60"
+        },
+        {
+          "slug": "bullets-lux-61",
+          "label": "Загрузить",
+          "cat": "cta",
+          "kw": [
+            "загрузить",
+            "выгрузка"
+          ],
+          "key": "bullets-lux/61"
+        },
+        {
+          "slug": "bullets-lux-62",
+          "label": "Удалить",
+          "cat": "nav",
+          "kw": [
+            "удалить",
+            "корзина"
+          ],
+          "key": "bullets-lux/62"
+        },
+        {
+          "slug": "bullets-lux-63",
+          "label": "Точка · тёмная",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-lux/63"
+        },
+        {
+          "slug": "bullets-lux-64",
+          "label": "Кольцо",
+          "cat": "nav",
+          "kw": [
+            "кольцо",
+            "круг",
+            "маркер"
+          ],
+          "key": "bullets-lux/64"
+        },
+        {
+          "slug": "bullets-lux-65",
+          "label": "Точка в круге · золото",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "круг",
+            "фокус"
+          ],
+          "key": "bullets-lux/65"
+        },
+        {
+          "slug": "bullets-lux-66",
+          "label": "Прогресс · старт",
+          "cat": "plan",
+          "kw": [
+            "прогресс",
+            "этап",
+            "старт"
+          ],
+          "key": "bullets-lux/66"
+        },
+        {
+          "slug": "bullets-lux-67",
+          "label": "25%",
+          "cat": "invest",
+          "kw": [
+            "25%",
+            "прогресс"
+          ],
+          "key": "bullets-lux/67"
+        },
+        {
+          "slug": "bullets-lux-68",
+          "label": "Прогресс",
+          "cat": "plan",
+          "kw": [
+            "прогресс",
+            "этап",
+            "готовность"
+          ],
+          "key": "bullets-lux/68"
+        },
+        {
+          "slug": "bullets-lux-69",
+          "label": "75%",
+          "cat": "invest",
+          "kw": [
+            "75%",
+            "прогресс",
+            "почти"
+          ],
+          "key": "bullets-lux/69"
+        },
+        {
+          "slug": "bullets-lux-70",
+          "label": "100%",
+          "cat": "invest",
+          "kw": [
+            "100%",
+            "готово",
+            "итог"
+          ],
+          "key": "bullets-lux/70"
+        },
+        {
+          "slug": "bullets-lux-71",
+          "label": "Искра · тонкая",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка",
+            "акцент"
+          ],
+          "key": "bullets-lux/71"
+        },
+        {
+          "slug": "bullets-lux-72",
+          "label": "Искра · контур",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка"
+          ],
+          "key": "bullets-lux/72"
+        },
+        {
+          "slug": "bullets-lux-73",
+          "label": "Ромб",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "эксклюзив"
+          ],
+          "key": "bullets-lux/73"
+        },
+        {
+          "slug": "bullets-lux-74",
+          "label": "Кольца",
+          "cat": "luxury",
+          "kw": [
+            "кольца",
+            "связь",
+            "единство",
+            "цикл"
+          ],
+          "key": "bullets-lux/74"
+        }
+      ]
+    },
+    {
+      "title": "Буллеты · iOS",
+      "dir": "bullets-ios",
+      "items": [
+        {
+          "slug": "bullets-ios-01",
+          "label": "Готово",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-ios/01"
+        },
+        {
+          "slug": "bullets-ios-02",
+          "label": "Готово · мята",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "галка"
+          ],
+          "key": "bullets-ios/02"
+        },
+        {
+          "slug": "bullets-ios-03",
+          "label": "Закрыть",
+          "cat": "nav",
+          "kw": [
+            "закрыть",
+            "нет",
+            "отмена"
+          ],
+          "key": "bullets-ios/03"
+        },
+        {
+          "slug": "bullets-ios-04",
+          "label": "Ошибка",
+          "cat": "urgency",
+          "kw": [
+            "нет",
+            "ошибка",
+            "стоп",
+            "важно"
+          ],
+          "key": "bullets-ios/04"
+        },
+        {
+          "slug": "bullets-ios-05",
+          "label": "Минус",
+          "cat": "nav",
+          "kw": [
+            "минус",
+            "убрать",
+            "пункт"
+          ],
+          "key": "bullets-ios/05"
+        },
+        {
+          "slug": "bullets-ios-06",
+          "label": "Минус",
+          "cat": "nav",
+          "kw": [
+            "минус",
+            "убрать",
+            "пункт"
+          ],
+          "key": "bullets-ios/06"
+        },
+        {
+          "slug": "bullets-ios-07",
+          "label": "Ещё",
+          "cat": "nav",
+          "kw": [
+            "меню",
+            "ещё",
+            "опции"
+          ],
+          "key": "bullets-ios/07"
+        },
+        {
+          "slug": "bullets-ios-08",
+          "label": "Ещё · контур",
+          "cat": "nav",
+          "kw": [
+            "меню",
+            "ещё",
+            "опции"
+          ],
+          "key": "bullets-ios/08"
+        },
+        {
+          "slug": "bullets-ios-09",
+          "label": "Стрелка вправо",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "переход"
+          ],
+          "key": "bullets-ios/09"
+        },
+        {
+          "slug": "bullets-ios-10",
+          "label": "Стрелка · заливка",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-ios/10"
+        },
+        {
+          "slug": "bullets-ios-11",
+          "label": "Стрелка · светлая",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд"
+          ],
+          "key": "bullets-ios/11"
+        },
+        {
+          "slug": "bullets-ios-12",
+          "label": "Стрелка вверх-вправо",
+          "cat": "nav",
+          "kw": [
+            "рост",
+            "вверх",
+            "переход"
+          ],
+          "key": "bullets-ios/12"
+        },
+        {
+          "slug": "bullets-ios-13",
+          "label": "Стрелка влево",
+          "cat": "nav",
+          "kw": [
+            "назад",
+            "влево"
+          ],
+          "key": "bullets-ios/13"
+        },
+        {
+          "slug": "bullets-ios-14",
+          "label": "1",
+          "cat": "nav",
+          "kw": [
+            "1",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/14"
+        },
+        {
+          "slug": "bullets-ios-15",
+          "label": "2",
+          "cat": "nav",
+          "kw": [
+            "2",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/15"
+        },
+        {
+          "slug": "bullets-ios-16",
+          "label": "3",
+          "cat": "nav",
+          "kw": [
+            "3",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/16"
+        },
+        {
+          "slug": "bullets-ios-17",
+          "label": "6",
+          "cat": "nav",
+          "kw": [
+            "6",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/17"
+        },
+        {
+          "slug": "bullets-ios-18",
+          "label": "7",
+          "cat": "nav",
+          "kw": [
+            "7",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/18"
+        },
+        {
+          "slug": "bullets-ios-19",
+          "label": "8",
+          "cat": "nav",
+          "kw": [
+            "8",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/19"
+        },
+        {
+          "slug": "bullets-ios-20",
+          "label": "9",
+          "cat": "nav",
+          "kw": [
+            "9",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/20"
+        },
+        {
+          "slug": "bullets-ios-21",
+          "label": "10",
+          "cat": "nav",
+          "kw": [
+            "10",
+            "шаг",
+            "номер"
+          ],
+          "key": "bullets-ios/21"
+        },
+        {
+          "slug": "bullets-ios-22",
+          "label": "Смотреть",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "видео",
+            "смотреть"
+          ],
+          "key": "bullets-ios/22"
+        },
+        {
+          "slug": "bullets-ios-23",
+          "label": "Смотреть · заливка",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "видео",
+            "смотреть"
+          ],
+          "key": "bullets-ios/23"
+        },
+        {
+          "slug": "bullets-ios-24",
+          "label": "Пауза",
+          "cat": "nav",
+          "kw": [
+            "пауза",
+            "стоп"
+          ],
+          "key": "bullets-ios/24"
+        },
+        {
+          "slug": "bullets-ios-25",
+          "label": "Стоп",
+          "cat": "nav",
+          "kw": [
+            "стоп",
+            "квадрат"
+          ],
+          "key": "bullets-ios/25"
+        },
+        {
+          "slug": "bullets-ios-26",
+          "label": "Точка",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-ios/26"
+        },
+        {
+          "slug": "bullets-ios-27",
+          "label": "Точка · кольцо",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "кольцо",
+            "маркер"
+          ],
+          "key": "bullets-ios/27"
+        },
+        {
+          "slug": "bullets-ios-28",
+          "label": "Ещё",
+          "cat": "nav",
+          "kw": [
+            "меню",
+            "ещё",
+            "опции"
+          ],
+          "key": "bullets-ios/28"
+        },
+        {
+          "slug": "bullets-ios-29",
+          "label": "Точка",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-ios/29"
+        },
+        {
+          "slug": "bullets-ios-30",
+          "label": "Точка · кольцо",
+          "cat": "nav",
+          "kw": [
+            "точка",
+            "кольцо"
+          ],
+          "key": "bullets-ios/30"
+        },
+        {
+          "slug": "bullets-ios-31",
+          "label": "Мишень",
+          "cat": "invest",
+          "kw": [
+            "мишень",
+            "цель",
+            "фокус"
+          ],
+          "key": "bullets-ios/31"
+        },
+        {
+          "slug": "bullets-ios-32",
+          "label": "Ромб · контур",
+          "cat": "luxury",
+          "kw": [
+            "ромб",
+            "люкс",
+            "эксклюзив"
+          ],
+          "key": "bullets-ios/32"
+        },
+        {
+          "slug": "bullets-ios-33",
+          "label": "Звезда",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "рейтинг"
+          ],
+          "key": "bullets-ios/33"
+        },
+        {
+          "slug": "bullets-ios-34",
+          "label": "Звезда · контур",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "рейтинг"
+          ],
+          "key": "bullets-ios/34"
+        },
+        {
+          "slug": "bullets-ios-35",
+          "label": "Вперёд",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "шаг",
+            "вперёд"
+          ],
+          "key": "bullets-ios/35"
+        },
+        {
+          "slug": "bullets-ios-36",
+          "label": "Вперёд · светлый",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "шаг"
+          ],
+          "key": "bullets-ios/36"
+        },
+        {
+          "slug": "bullets-ios-37",
+          "label": "Компас",
+          "cat": "location",
+          "kw": [
+            "компас",
+            "направление",
+            "гид"
+          ],
+          "key": "bullets-ios/37"
+        },
+        {
+          "slug": "bullets-ios-38",
+          "label": "Поделиться",
+          "cat": "cta",
+          "kw": [
+            "поделиться",
+            "отправить",
+            "share"
+          ],
+          "key": "bullets-ios/38"
+        },
+        {
+          "slug": "bullets-ios-39",
+          "label": "Бриллиант",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "премиум",
+            "эксклюзив",
+            "качество"
+          ],
+          "key": "bullets-ios/39"
+        },
+        {
+          "slug": "bullets-ios-40",
+          "label": "Корона",
+          "cat": "luxury",
+          "kw": [
+            "корона",
+            "премиум",
+            "лучшее",
+            "статус"
+          ],
+          "key": "bullets-ios/40"
+        },
+        {
+          "slug": "bullets-ios-41",
+          "label": "Лист",
+          "cat": "lifestyle",
+          "kw": [
+            "эко",
+            "природа",
+            "зелень"
+          ],
+          "key": "bullets-ios/41"
+        },
+        {
+          "slug": "bullets-ios-42",
+          "label": "Молния",
+          "cat": "urgency",
+          "kw": [
+            "быстро",
+            "энергия",
+            "мощь",
+            "старт"
+          ],
+          "key": "bullets-ios/42"
+        },
+        {
+          "slug": "bullets-ios-43",
+          "label": "Огонь",
+          "cat": "urgency",
+          "kw": [
+            "хит",
+            "горячее",
+            "спрос",
+            "тренд"
+          ],
+          "key": "bullets-ios/43"
+        },
+        {
+          "slug": "bullets-ios-44",
+          "label": "Сердце",
+          "cat": "lifestyle",
+          "kw": [
+            "избранное",
+            "нравится",
+            "желание"
+          ],
+          "key": "bullets-ios/44"
+        },
+        {
+          "slug": "bullets-ios-45",
+          "label": "Закладка",
+          "cat": "lifestyle",
+          "kw": [
+            "закладка",
+            "сохранить"
+          ],
+          "key": "bullets-ios/45"
+        },
+        {
+          "slug": "bullets-ios-46",
+          "label": "Щит",
+          "cat": "contact",
+          "kw": [
+            "защита",
+            "гарантия",
+            "безопасность",
+            "сопровождение"
+          ],
+          "key": "bullets-ios/46"
+        },
+        {
+          "slug": "bullets-ios-47",
+          "label": "Круг",
+          "cat": "nav",
+          "kw": [
+            "круг",
+            "маркер",
+            "пункт"
+          ],
+          "key": "bullets-ios/47"
+        },
+        {
+          "slug": "bullets-ios-48",
+          "label": "Прогресс · старт",
+          "cat": "plan",
+          "kw": [
+            "прогресс",
+            "этап",
+            "старт"
+          ],
+          "key": "bullets-ios/48"
+        },
+        {
+          "slug": "bullets-ios-49",
+          "label": "Прогресс",
+          "cat": "plan",
+          "kw": [
+            "прогресс",
+            "этап",
+            "готовность"
+          ],
+          "key": "bullets-ios/49"
+        },
+        {
+          "slug": "bullets-ios-50",
+          "label": "75%",
+          "cat": "invest",
+          "kw": [
+            "75%",
+            "прогресс",
+            "почти"
+          ],
+          "key": "bullets-ios/50"
+        },
+        {
+          "slug": "bullets-ios-51",
+          "label": "100%",
+          "cat": "invest",
+          "kw": [
+            "100%",
+            "готово",
+            "итог",
+            "полностью"
+          ],
+          "key": "bullets-ios/51"
+        },
+        {
+          "slug": "bullets-ios-52",
+          "label": "Календарь",
+          "cat": "plan",
+          "kw": [
+            "срок",
+            "дата",
+            "график",
+            "сдача"
+          ],
+          "key": "bullets-ios/52"
+        },
+        {
+          "slug": "bullets-ios-53",
+          "label": "Часы",
+          "cat": "plan",
+          "kw": [
+            "время",
+            "срок",
+            "скоро"
+          ],
+          "key": "bullets-ios/53"
+        },
+        {
+          "slug": "bullets-ios-54",
+          "label": "График",
+          "cat": "invest",
+          "kw": [
+            "график",
+            "рост",
+            "статистика",
+            "показатели"
+          ],
+          "key": "bullets-ios/54"
+        },
+        {
+          "slug": "bullets-ios-55",
+          "label": "Рост",
+          "cat": "invest",
+          "kw": [
+            "рост",
+            "тренд",
+            "доходность",
+            "вверх"
+          ],
+          "key": "bullets-ios/55"
+        },
+        {
+          "slug": "bullets-ios-56",
+          "label": "Клиент",
+          "cat": "contact",
+          "kw": [
+            "клиент",
+            "профиль",
+            "вы"
+          ],
+          "key": "bullets-ios/56"
+        },
+        {
+          "slug": "bullets-ios-57",
+          "label": "Команда",
+          "cat": "contact",
+          "kw": [
+            "команда",
+            "люди",
+            "семья"
+          ],
+          "key": "bullets-ios/57"
+        },
+        {
+          "slug": "bullets-ios-58",
+          "label": "Добавить клиента",
+          "cat": "contact",
+          "kw": [
+            "клиент",
+            "добавить",
+            "заявка"
+          ],
+          "key": "bullets-ios/58"
+        },
+        {
+          "slug": "bullets-ios-59",
+          "label": "Дом",
+          "cat": "amenity",
+          "kw": [
+            "дом",
+            "жильё",
+            "квартира"
+          ],
+          "key": "bullets-ios/59"
+        },
+        {
+          "slug": "bullets-ios-60",
+          "label": "Здание",
+          "cat": "amenity",
+          "kw": [
+            "здание",
+            "новостройка",
+            "комплекс"
+          ],
+          "key": "bullets-ios/60"
+        },
+        {
+          "slug": "bullets-ios-61",
+          "label": "Ключ",
+          "cat": "amenity",
+          "kw": [
+            "ключ",
+            "сдача",
+            "заселение",
+            "под ключ"
+          ],
+          "key": "bullets-ios/61"
+        },
+        {
+          "slug": "bullets-ios-62",
+          "label": "Документ",
+          "cat": "contact",
+          "kw": [
+            "документ",
+            "договор",
+            "условия"
+          ],
+          "key": "bullets-ios/62"
+        },
+        {
+          "slug": "bullets-ios-63",
+          "label": "Искра",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка",
+            "особенное"
+          ],
+          "key": "bullets-ios/63"
+        },
+        {
+          "slug": "bullets-ios-64",
+          "label": "Искра",
+          "cat": "luxury",
+          "kw": [
+            "искра",
+            "новинка",
+            "особенное"
+          ],
+          "key": "bullets-ios/64"
+        },
+        {
+          "slug": "bullets-ios-65",
+          "label": "Загрузка",
+          "cat": "nav",
+          "kw": [
+            "загрузка",
+            "процесс",
+            "ожидание"
+          ],
+          "key": "bullets-ios/65"
+        },
+        {
+          "slug": "bullets-ios-66",
+          "label": "Мишень",
+          "cat": "invest",
+          "kw": [
+            "мишень",
+            "цель",
+            "фокус",
+            "итог"
+          ],
+          "key": "bullets-ios/66"
+        },
+        {
+          "slug": "bullets-ios-67",
+          "label": "Линия",
+          "cat": "nav",
+          "kw": [
+            "линия",
+            "разделитель",
+            "штрих"
+          ],
+          "key": "bullets-ios/67"
+        },
+        {
+          "slug": "bullets-ios-68",
+          "label": "Вперёд",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "шаг",
+            "вперёд"
+          ],
+          "key": "bullets-ios/68"
+        }
+      ]
+    },
+    {
       "title": "Буллеты",
       "dir": "bullets",
       "items": [
@@ -392,799 +2657,6 @@
             "продажи"
           ],
           "key": "bullets/28"
-        }
-      ]
-    },
-    {
-      "title": "Буллеты · 3D",
-      "dir": "bullets-3d",
-      "items": [
-        {
-          "slug": "bullets-3d-01",
-          "label": "Круг",
-          "cat": "checks",
-          "kw": [
-            "точка",
-            "пункт",
-            "круг",
-            "список"
-          ],
-          "key": "bullets-3d/01"
-        },
-        {
-          "slug": "bullets-3d-02",
-          "label": "Круг · акцент",
-          "cat": "checks",
-          "kw": [
-            "акцент",
-            "важно",
-            "ключевое"
-          ],
-          "key": "bullets-3d/02"
-        },
-        {
-          "slug": "bullets-3d-03",
-          "label": "Точка",
-          "cat": "checks",
-          "kw": [
-            "точка",
-            "пункт",
-            "список",
-            "буллет"
-          ],
-          "key": "bullets-3d/03"
-        },
-        {
-          "slug": "bullets-3d-04",
-          "label": "Квадрат",
-          "cat": "checks",
-          "kw": [
-            "пункт",
-            "блок",
-            "квадрат"
-          ],
-          "key": "bullets-3d/04"
-        },
-        {
-          "slug": "bullets-3d-05",
-          "label": "Квадрат · акцент",
-          "cat": "checks",
-          "kw": [
-            "акцент",
-            "важно",
-            "ключевое"
-          ],
-          "key": "bullets-3d/05"
-        },
-        {
-          "slug": "bullets-3d-06",
-          "label": "Галочка",
-          "cat": "checks",
-          "kw": [
-            "галка",
-            "да",
-            "готово",
-            "преимущество"
-          ],
-          "key": "bullets-3d/06"
-        },
-        {
-          "slug": "bullets-3d-07",
-          "label": "Галочка в круге",
-          "cat": "checks",
-          "kw": [
-            "точка",
-            "пункт",
-            "круг",
-            "список"
-          ],
-          "key": "bullets-3d/07"
-        },
-        {
-          "slug": "bullets-3d-08",
-          "label": "Плюс",
-          "cat": "checks",
-          "kw": [
-            "плюс",
-            "добавить",
-            "ещё",
-            "бонус"
-          ],
-          "key": "bullets-3d/08"
-        },
-        {
-          "slug": "bullets-3d-09",
-          "label": "Стрелка вправо",
-          "cat": "accent",
-          "kw": [
-            "стрелка",
-            "далее",
-            "переход",
-            "результат"
-          ],
-          "key": "bullets-3d/09"
-        },
-        {
-          "slug": "bullets-3d-10",
-          "label": "Стрелка в круге",
-          "cat": "accent",
-          "kw": [
-            "точка",
-            "пункт",
-            "круг",
-            "список"
-          ],
-          "key": "bullets-3d/10"
-        },
-        {
-          "slug": "bullets-3d-11",
-          "label": "Двойная стрелка",
-          "cat": "accent",
-          "kw": [
-            "стрелка",
-            "далее",
-            "переход",
-            "результат"
-          ],
-          "key": "bullets-3d/11"
-        },
-        {
-          "slug": "bullets-3d-12",
-          "label": "Треугольник",
-          "cat": "accent",
-          "kw": [
-            "старт",
-            "play",
-            "запуск",
-            "процесс"
-          ],
-          "key": "bullets-3d/12"
-        },
-        {
-          "slug": "bullets-3d-13",
-          "label": "Ромб",
-          "cat": "accent",
-          "kw": [
-            "ценность",
-            "акцент",
-            "грань"
-          ],
-          "key": "bullets-3d/13"
-        },
-        {
-          "slug": "bullets-3d-14",
-          "label": "Звезда",
-          "cat": "accent",
-          "kw": [
-            "звезда",
-            "топ",
-            "лучшее",
-            "рейтинг",
-            "премиум"
-          ],
-          "key": "bullets-3d/14"
-        },
-        {
-          "slug": "bullets-3d-15",
-          "label": "Сердце",
-          "cat": "accent",
-          "kw": [
-            "забота",
-            "комфорт",
-            "любовь",
-            "сервис"
-          ],
-          "key": "bullets-3d/15"
-        },
-        {
-          "slug": "bullets-3d-16",
-          "label": "Огонь",
-          "cat": "accent",
-          "kw": [
-            "тренд",
-            "хит",
-            "спрос",
-            "горячо",
-            "популярно"
-          ],
-          "key": "bullets-3d/16"
-        },
-        {
-          "slug": "bullets-3d-17",
-          "label": "Лист",
-          "cat": "accent",
-          "kw": [
-            "эко",
-            "природа",
-            "зелень",
-            "парк",
-            "воздух"
-          ],
-          "key": "bullets-3d/17"
-        },
-        {
-          "slug": "bullets-3d-18",
-          "label": "Локация",
-          "cat": "accent",
-          "kw": [
-            "локация",
-            "адрес",
-            "район",
-            "где",
-            "карта",
-            "пляж",
-            "центр"
-          ],
-          "key": "bullets-3d/18"
-        },
-        {
-          "slug": "bullets-3d-19",
-          "label": "Часы",
-          "cat": "accent",
-          "kw": [
-            "время",
-            "срок",
-            "сдача",
-            "график",
-            "этап"
-          ],
-          "key": "bullets-3d/19"
-        },
-        {
-          "slug": "bullets-3d-20",
-          "label": "График",
-          "cat": "accent",
-          "kw": [
-            "рост",
-            "график",
-            "доход",
-            "инвестиции",
-            "динамика"
-          ],
-          "key": "bullets-3d/20"
-        },
-        {
-          "slug": "bullets-3d-21",
-          "label": "Пользователи",
-          "cat": "accent",
-          "kw": [
-            "команда",
-            "люди",
-            "жильцы",
-            "соседи"
-          ],
-          "key": "bullets-3d/21"
-        },
-        {
-          "slug": "bullets-3d-22",
-          "label": "Корона",
-          "cat": "accent",
-          "kw": [
-            "статус",
-            "престиж",
-            "элита",
-            "vip",
-            "люкс"
-          ],
-          "key": "bullets-3d/22"
-        },
-        {
-          "slug": "bullets-3d-23",
-          "label": "Бриллиант",
-          "cat": "accent",
-          "kw": [
-            "ценность",
-            "инвестиции",
-            "люкс",
-            "капитал",
-            "стоимость"
-          ],
-          "key": "bullets-3d/23"
-        },
-        {
-          "slug": "bullets-3d-24",
-          "label": "Ракета",
-          "cat": "accent",
-          "kw": [
-            "старт",
-            "запуск",
-            "начало",
-            "рост",
-            "продажи"
-          ],
-          "key": "bullets-3d/24"
-        },
-        {
-          "slug": "bullets-3d-25",
-          "label": "Документ",
-          "cat": "meta",
-          "kw": [
-            "документ",
-            "договор",
-            "условия",
-            "детали",
-            "план"
-          ],
-          "key": "bullets-3d/25"
-        },
-        {
-          "slug": "bullets-3d-26",
-          "label": "Сообщение",
-          "cat": "meta",
-          "kw": [
-            "связь",
-            "чат",
-            "контакт",
-            "общение"
-          ],
-          "key": "bullets-3d/26"
-        },
-        {
-          "slug": "bullets-3d-27",
-          "label": "Настройки",
-          "cat": "meta",
-          "kw": [
-            "настройка",
-            "сервис",
-            "процесс",
-            "управление"
-          ],
-          "key": "bullets-3d/27"
-        },
-        {
-          "slug": "bullets-3d-28",
-          "label": "Солнце",
-          "cat": "meta",
-          "kw": [
-            "климат",
-            "тепло",
-            "лето",
-            "энергия",
-            "день"
-          ],
-          "key": "bullets-3d/28"
-        },
-        {
-          "slug": "bullets-3d-29",
-          "label": "Луна",
-          "cat": "meta",
-          "kw": [
-            "ночь",
-            "спокойствие",
-            "отдых"
-          ],
-          "key": "bullets-3d/29"
-        },
-        {
-          "slug": "bullets-3d-30",
-          "label": "Щит",
-          "cat": "meta",
-          "kw": [
-            "защита",
-            "гарантия",
-            "безопасность",
-            "надёжность",
-            "застройщик"
-          ],
-          "key": "bullets-3d/30"
-        },
-        {
-          "slug": "bullets-3d-31",
-          "label": "Молния",
-          "cat": "meta",
-          "kw": [
-            "энергия",
-            "скорость",
-            "мощь"
-          ],
-          "key": "bullets-3d/31"
-        },
-        {
-          "slug": "bullets-3d-32",
-          "label": "Бесконечность",
-          "cat": "meta",
-          "kw": [
-            "навсегда",
-            "безлимит",
-            "вечность"
-          ],
-          "key": "bullets-3d/32"
-        }
-      ]
-    },
-    {
-      "title": "Буллеты · Неон",
-      "dir": "bullets-neon",
-      "items": [
-        {
-          "slug": "bullets-neon-01",
-          "label": "Чек",
-          "cat": "checks",
-          "kw": [
-            "галка",
-            "чек",
-            "да",
-            "готово",
-            "преимущество",
-            "плюс"
-          ],
-          "key": "bullets-neon/01"
-        },
-        {
-          "slug": "bullets-neon-02",
-          "label": "Успех",
-          "cat": "checks",
-          "kw": [
-            "успех",
-            "готово",
-            "выполнено",
-            "да",
-            "одобрено"
-          ],
-          "key": "bullets-neon/02"
-        },
-        {
-          "slug": "bullets-neon-03",
-          "label": "Контур",
-          "cat": "checks",
-          "kw": [
-            "галка",
-            "контур",
-            "да",
-            "минимал"
-          ],
-          "key": "bullets-neon/03"
-        },
-        {
-          "slug": "bullets-neon-04",
-          "label": "Премиум",
-          "cat": "checks",
-          "kw": [
-            "премиум",
-            "люкс",
-            "галка",
-            "важное"
-          ],
-          "key": "bullets-neon/04"
-        },
-        {
-          "slug": "bullets-neon-05",
-          "label": "Стрелка",
-          "cat": "checks",
-          "kw": [
-            "стрелка",
-            "далее",
-            "переход",
-            "результат"
-          ],
-          "key": "bullets-neon/05"
-        },
-        {
-          "slug": "bullets-neon-06",
-          "label": "Стрелка · акцент",
-          "cat": "checks",
-          "kw": [
-            "акцент",
-            "важно",
-            "ключевое"
-          ],
-          "key": "bullets-neon/06"
-        },
-        {
-          "slug": "bullets-neon-07",
-          "label": "Далее",
-          "cat": "checks",
-          "kw": [
-            "далее",
-            "шаг",
-            "продолжение",
-            "вперёд"
-          ],
-          "key": "bullets-neon/07"
-        },
-        {
-          "slug": "bullets-neon-08",
-          "label": "Плюс",
-          "cat": "checks",
-          "kw": [
-            "плюс",
-            "добавить",
-            "ещё",
-            "бонус"
-          ],
-          "key": "bullets-neon/08"
-        },
-        {
-          "slug": "bullets-neon-09",
-          "label": "Точка",
-          "cat": "accent",
-          "kw": [
-            "точка",
-            "пункт",
-            "список",
-            "буллет"
-          ],
-          "key": "bullets-neon/09"
-        },
-        {
-          "slug": "bullets-neon-10",
-          "label": "Точка · контур",
-          "cat": "accent",
-          "kw": [
-            "галка",
-            "контур",
-            "да",
-            "минимал"
-          ],
-          "key": "bullets-neon/10"
-        },
-        {
-          "slug": "bullets-neon-11",
-          "label": "Активный",
-          "cat": "accent",
-          "kw": [
-            "активно",
-            "включено",
-            "да",
-            "онлайн"
-          ],
-          "key": "bullets-neon/11"
-        },
-        {
-          "slug": "bullets-neon-12",
-          "label": "Неактивный",
-          "cat": "accent",
-          "kw": [
-            "активно",
-            "включено",
-            "да",
-            "онлайн"
-          ],
-          "key": "bullets-neon/12"
-        },
-        {
-          "slug": "bullets-neon-13",
-          "label": "Искра",
-          "cat": "accent",
-          "kw": [
-            "новинка",
-            "особенное",
-            "вау",
-            "акцент"
-          ],
-          "key": "bullets-neon/13"
-        },
-        {
-          "slug": "bullets-neon-14",
-          "label": "Звезда",
-          "cat": "accent",
-          "kw": [
-            "звезда",
-            "топ",
-            "лучшее",
-            "рейтинг",
-            "премиум"
-          ],
-          "key": "bullets-neon/14"
-        },
-        {
-          "slug": "bullets-neon-15",
-          "label": "Сердце",
-          "cat": "accent",
-          "kw": [
-            "забота",
-            "комфорт",
-            "любовь",
-            "сервис"
-          ],
-          "key": "bullets-neon/15"
-        },
-        {
-          "slug": "bullets-neon-16",
-          "label": "Огонь",
-          "cat": "accent",
-          "kw": [
-            "тренд",
-            "хит",
-            "спрос",
-            "горячо",
-            "популярно"
-          ],
-          "key": "bullets-neon/16"
-        },
-        {
-          "slug": "bullets-neon-17",
-          "label": "Лист",
-          "cat": "accent",
-          "kw": [
-            "эко",
-            "природа",
-            "зелень",
-            "парк",
-            "воздух"
-          ],
-          "key": "bullets-neon/17"
-        },
-        {
-          "slug": "bullets-neon-18",
-          "label": "Локация",
-          "cat": "accent",
-          "kw": [
-            "локация",
-            "адрес",
-            "район",
-            "где",
-            "карта",
-            "пляж",
-            "центр"
-          ],
-          "key": "bullets-neon/18"
-        },
-        {
-          "slug": "bullets-neon-19",
-          "label": "Время",
-          "cat": "accent",
-          "kw": [
-            "время",
-            "срок",
-            "сдача",
-            "этап"
-          ],
-          "key": "bullets-neon/19"
-        },
-        {
-          "slug": "bullets-neon-20",
-          "label": "График",
-          "cat": "accent",
-          "kw": [
-            "рост",
-            "график",
-            "доход",
-            "инвестиции",
-            "динамика"
-          ],
-          "key": "bullets-neon/20"
-        },
-        {
-          "slug": "bullets-neon-21",
-          "label": "Люди",
-          "cat": "accent",
-          "kw": [
-            "команда",
-            "люди",
-            "жильцы",
-            "соседи"
-          ],
-          "key": "bullets-neon/21"
-        },
-        {
-          "slug": "bullets-neon-22",
-          "label": "Образование",
-          "cat": "accent",
-          "kw": [
-            "образование",
-            "знания",
-            "экспертиза",
-            "обучение"
-          ],
-          "key": "bullets-neon/22"
-        },
-        {
-          "slug": "bullets-neon-23",
-          "label": "Ценность",
-          "cat": "accent",
-          "kw": [
-            "ценность",
-            "инвестиции",
-            "люкс",
-            "капитал"
-          ],
-          "key": "bullets-neon/23"
-        },
-        {
-          "slug": "bullets-neon-24",
-          "label": "Статус",
-          "cat": "accent",
-          "kw": [
-            "статус"
-          ],
-          "key": "bullets-neon/24"
-        },
-        {
-          "slug": "bullets-neon-25",
-          "label": "Документ",
-          "cat": "meta",
-          "kw": [
-            "документ",
-            "договор",
-            "условия",
-            "детали",
-            "план"
-          ],
-          "key": "bullets-neon/25"
-        },
-        {
-          "slug": "bullets-neon-26",
-          "label": "Сообщение",
-          "cat": "meta",
-          "kw": [
-            "связь",
-            "чат",
-            "контакт",
-            "общение"
-          ],
-          "key": "bullets-neon/26"
-        },
-        {
-          "slug": "bullets-neon-27",
-          "label": "Настройки",
-          "cat": "meta",
-          "kw": [
-            "настройка",
-            "сервис",
-            "процесс",
-            "управление"
-          ],
-          "key": "bullets-neon/27"
-        },
-        {
-          "slug": "bullets-neon-28",
-          "label": "Солнце",
-          "cat": "meta",
-          "kw": [
-            "климат",
-            "тепло",
-            "лето",
-            "энергия",
-            "день"
-          ],
-          "key": "bullets-neon/28"
-        },
-        {
-          "slug": "bullets-neon-29",
-          "label": "Луна",
-          "cat": "meta",
-          "kw": [
-            "ночь",
-            "спокойствие",
-            "отдых"
-          ],
-          "key": "bullets-neon/29"
-        },
-        {
-          "slug": "bullets-neon-30",
-          "label": "Защита",
-          "cat": "meta",
-          "kw": [
-            "защита",
-            "гарантия",
-            "безопасность",
-            "надёжность",
-            "застройщик"
-          ],
-          "key": "bullets-neon/30"
-        },
-        {
-          "slug": "bullets-neon-31",
-          "label": "Энергия",
-          "cat": "meta",
-          "kw": [
-            "энергия",
-            "скорость",
-            "мощь"
-          ],
-          "key": "bullets-neon/31"
-        },
-        {
-          "slug": "bullets-neon-32",
-          "label": "Бесконечность",
-          "cat": "meta",
-          "kw": [
-            "навсегда",
-            "безлимит",
-            "вечность"
-          ],
-          "key": "bullets-neon/32"
         }
       ]
     },
