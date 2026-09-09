@@ -4979,6 +4979,16 @@ ${SCR}
       const cat = u.searchParams.get('cat');
       return json(res, 200, cat ? academy.byCategory(cat) : academy.CARDS);
     }
+    /* Полная расшифровка ролика-источника (для «читать подробно» в академии). */
+    if (p === '/api/academy/transcript' && req.method === 'GET') {
+      const vid = u.searchParams.get('vid');
+      try {
+        const TR = require('./academy_transcripts.json');
+        const t = TR[vid];
+        if (!t) return json(res, 404, { error: 'нет расшифровки' });
+        return json(res, 200, { vid, title: academy.VTITLES[vid] || vid, url: academy.ytUrl(vid), text: t });
+      } catch (e) { return json(res, 500, { error: 'нет файла расшифровок' }); }
+    }
     /* Оценка звонка: транскрипт → скоринг по рубрике + фидбэк + скрипты. Можно привязать к лиду. */
     if (p === '/api/call-review' && req.method === 'POST') {
       if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
