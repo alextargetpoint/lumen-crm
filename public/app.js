@@ -6372,6 +6372,10 @@ function mbIsPerson(cat) { return /family|relationship|kids|child|love|person|pa
 const MB_HERO_POT = { realestate: 1, estate: 1, property: 1, villa: .95, family: .95, travel: .9, auto: .78, car: .78, automotive: .78, home: .74, house: .74, freedom: .72, luxury: .66, lifestyle: .62, health: .6, watch: .56, career: .5, business: .5, status: .5, wealth: .46 };
 function mbHeroPotential(cat) { const c = String(cat || '').toLowerCase().replace(/[\s_-]+/g, ''); for (const k in MB_HERO_POT) { if (c.includes(k)) return MB_HERO_POT[k]; } return .5; }
 function mbClamp(v, lo, hi) { if (lo > hi) return (lo + hi) / 2; return Math.max(lo, Math.min(hi, v)); }
+/* есть ли у объекта текст-слой (.mb-txt) — влияет на эффективную высоту в раскладке */
+function mbHasCap(it) { const t = it && it.txt; return !!(t && t.mode && t.mode !== 'none' && (t.primary || t.secondary || t.micro)); }
+/* высота полосы подписи в px (0 если подписи нет) — ~соответствует .mb-txt в styles.css по режимам */
+function mbCapH(it) { const t = it && it.txt; if (!mbHasCap(it)) return 0; const m = t.mode; let h = 9; if (t.primary) h += (m === 'goal' ? 40 : (m === 'handwritten' || m === 'mixed') ? 34 : m === 'editorial' ? 27 : 20); if (t.secondary) h += 17; if (t.micro) h += 15; return h; }
 /* главный движок: возвращает [{id,x,y,w,rot,z,role,soft}] */
 function mbCompose(items, boardW, boardH, seed, forceHeroId) {
   const N = items.length; if (!N) return [];
@@ -6391,9 +6395,14 @@ function mbCompose(items, boardW, boardH, seed, forceHeroId) {
   if (N <= 5) { nMic = 0; nSec = rem; } else { nMic = Math.round(rem * .4); nSec = rem - nMic; }
   order.forEach((o, i) => { o.role = i === 0 ? 'HERO' : i <= nPri ? 'PRIMARY' : i <= nPri + nSec ? 'SECONDARY' : 'MICRO'; });
   /* 2. ШИРИНА по роли (доля boardW), occupancy-adaptive; никогда не все одинаковые */
-  const sizeMul = N <= 3 ? 1.12 : N >= 9 ? .9 : 1;
+  const few = N <= 4; /* малый набор: раскладываем с воздухом, а не тесным комком в центре */
+  const sizeMul = few ? 1.1 : N >= 9 ? .9 : 1;
   const WF = { HERO: [.34, .42], PRIMARY: [.24, .30], SECONDARY: [.16, .22], MICRO: [.10, .14] };
-  order.forEach(o => { const f = WF[o.role]; o.w = Math.round(mbClamp(boardW * (f[0] + rng() * (f[1] - f[0])) * sizeMul, 90, 440)); o.h = o.w * 1.12; });
+  order.forEach(o => { const f = WF[o.role]; o.w = Math.round(mbClamp(boardW * (f[0] + rng() * (f[1] - f[0])) * sizeMul, 90, 440)); });
+  if (few && order[0]) order[0].w = Math.round(mbClamp(order[0].w * 1.14, 90, 480)); /* явный герой при малом наборе */
+  /* эффективная высота = картинка (~w×1.08) + полоса подписи; без подписи — компактно w×1.15.
+     captioned-объекты «выше» → релаксация растаскивает их так, что подписи соседей не сталкиваются */
+  order.forEach(o => { o.capH = mbCapH(o.it); o.imgH = Math.round(o.w * 1.08); o.h = o.capH ? o.imgH + o.capH : Math.round(o.w * 1.15); });
   /* 3. АРХЕТИП композиции (сид-выбор из пула по N/кол-ву кластеров) */
   const clusters = [...new Set(scored.map(s => s.cl))]; const clusterCount = clusters.length;
   const clScore = {}; scored.forEach(s => { clScore[s.cl] = (clScore[s.cl] || 0) + s.score; });
@@ -6423,16 +6432,25 @@ function mbCompose(items, boardW, boardH, seed, forceHeroId) {
   } else { /* CENTER_GRAVITY */
     clOrder.forEach((cl, i) => { const ang = (i / Math.max(1, clOrder.length)) * 6.283 + rng() * .8, rad = .12 + rng() * .05; regions[cl] = [.5 + Math.cos(ang) * rad, .5 + Math.sin(ang) * rad]; });
   }
-  /* 5. РАЗМЕЩЕНИЕ: герой в центре своей области, остальные орбитой по роли */
-  const byCl = {}; order.forEach(o => { (byCl[o.cl] = byCl[o.cl] || []).push(o); });
-  Object.keys(byCl).forEach(cl => {
-    const reg = regions[cl] || [.5, .5]; const rcx = reg[0] * boardW, rcy = reg[1] * boardH;
-    const grp = byCl[cl].slice().sort((a, b) => MB_ROLE_RANK[a.role] - MB_ROLE_RANK[b.role]);
-    grp.forEach((o, k) => {
-      if (o.role === 'HERO' || k === 0) { o.cx = rcx + (rng() - .5) * boardW * .04; o.cy = rcy + (rng() - .5) * boardH * .04; }
-      else { const baseR = { PRIMARY: .14, SECONDARY: .19, MICRO: .23 }[o.role] || .18; const ang = rng() * 6.283, rad = boardW * (baseR + rng() * .05); o.cx = rcx + Math.cos(ang) * rad; o.cy = rcy + Math.sin(ang) * rad * .85; }
+  /* 5. РАЗМЕЩЕНИЕ */
+  if (few) {
+    /* малый набор (≤4): разносим по борду с намеренным воздухом — не комкаем в центр */
+    const SP = { 1: [[.5, .5]], 2: [[.33, .40], [.67, .61]], 3: [[.30, .35], [.69, .42], [.49, .71]], 4: [[.27, .33], [.71, .31], [.31, .71], [.72, .69]] }[N] || [[.5, .5]];
+    const flip = rng() < .5; /* сид-вариативность: зеркалим набор слотов */
+    const slots = SP.map(s => [flip ? 1 - s[0] : s[0], s[1]]);
+    order.forEach((o, i) => { const s = slots[i] || [.5, .5]; o.cx = s[0] * boardW + (rng() - .5) * boardW * .02; o.cy = s[1] * boardH + (rng() - .5) * boardH * .02; });
+  } else {
+    /* герой в центре своей области, остальные орбитой по роли */
+    const byCl = {}; order.forEach(o => { (byCl[o.cl] = byCl[o.cl] || []).push(o); });
+    Object.keys(byCl).forEach(cl => {
+      const reg = regions[cl] || [.5, .5]; const rcx = reg[0] * boardW, rcy = reg[1] * boardH;
+      const grp = byCl[cl].slice().sort((a, b) => MB_ROLE_RANK[a.role] - MB_ROLE_RANK[b.role]);
+      grp.forEach((o, k) => {
+        if (o.role === 'HERO' || k === 0) { o.cx = rcx + (rng() - .5) * boardW * .04; o.cy = rcy + (rng() - .5) * boardH * .04; }
+        else { const baseR = { PRIMARY: .14, SECONDARY: .19, MICRO: .23 }[o.role] || .18; const ang = rng() * 6.283, rad = boardW * (baseR + rng() * .05); o.cx = rcx + Math.cos(ang) * rad; o.cy = rcy + Math.sin(ang) * rad * .85; }
+      });
     });
-  });
+  }
   /* 6. РЕЛАКСАЦИЯ нахлёста: разрешаем ≤~20% перекрытия, растаскиваем более сильное (герой двигается меньше) */
   for (let iter = 0; iter < 70; iter++) {
     for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
@@ -6451,6 +6469,30 @@ function mbCompose(items, boardW, boardH, seed, forceHeroId) {
       B.cx += dx * push * (rB / tot); B.cy += dy * push * (rB / tot);
     }
   }
+  /* 6b. РАЗВОД ПОДПИСЕЙ: полоса текста не должна ложиться на картинку/подпись соседа.
+     Нахлёст КАРТИНОК (5–18%) оставляем — двигаем по вертикали только когда пересекаются ТЕКСТ-полосы. */
+  const capRect = (o) => { const hw = o.w / 2, top = o.cy - o.h / 2, imgB = top + (o.h - (o.capH || 0)); return { l: o.cx - hw, r: o.cx + hw, t: top, ib: imgB, cl: o.cx - o.w * .41, cr: o.cx + o.w * .41, ct: imgB, cb: top + o.h }; };
+  const hov = (aL, aR, bL, bR) => Math.min(aR, bR) - Math.max(aL, bL);
+  const vov = (aT, aB, bT, bB) => Math.min(aB, bB) - Math.max(aT, bT);
+  for (let iter = 0; iter < 44; iter++) {
+    let moved = false;
+    for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+      const A = order[i], B = order[j];
+      if (!A.capH && !B.capH) continue;
+      const Ra = capRect(A), Rb = capRect(B);
+      let ov = 0;
+      const test = (hL, hR, vT, vB, oL, oR, oT, oB) => { if (hov(hL, hR, oL, oR) > 5) { const v = vov(vT, vB, oT, oB); if (v > ov) ov = v; } };
+      if (A.capH) { test(Ra.cl, Ra.cr, Ra.ct, Ra.cb, Rb.l, Rb.r, Rb.t, Rb.ib); if (B.capH) test(Ra.cl, Ra.cr, Ra.ct, Ra.cb, Rb.cl, Rb.cr, Rb.ct, Rb.cb); }
+      if (B.capH) { test(Rb.cl, Rb.cr, Rb.ct, Rb.cb, Ra.l, Ra.r, Ra.t, Ra.ib); }
+      if (ov <= 1) continue;
+      const rA = MB_ROLE_RANK[A.role] + .5, rB = MB_ROLE_RANK[B.role] + .5, tot = rA + rB;
+      const dir = A.cy <= B.cy ? 1 : -1; /* A выше → A вверх, B вниз */
+      const push = (ov + 3) * .6;
+      A.cy -= dir * push * (rA / tot); B.cy += dir * push * (rB / tot);
+      moved = true;
+    }
+    if (!moved) break;
+  }
   /* 6.5 РЕ-ЦЕНТР: bbox-центр коллажа → центр борда (демпфер) — убирает пустую половину, кадрирует композицию */
   let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
   order.forEach(o => { mnx = Math.min(mnx, o.cx - o.w / 2); mxx = Math.max(mxx, o.cx + o.w / 2); mny = Math.min(mny, o.cy - o.h / 2); mxy = Math.max(mxy, o.cy + o.h / 2); });
@@ -6463,9 +6505,10 @@ function mbCompose(items, boardW, boardH, seed, forceHeroId) {
     o.cx = mbClamp(o.cx, Math.max(boardW * .05, hw - bleed), Math.min(boardW * .95, boardW - hw + bleed));
     o.cy = mbClamp(o.cy, Math.max(boardH * .05, hh - bleed), Math.min(boardH * .95, boardH - hh + bleed));
   });
-  /* 8. БАЛАНС: визуальный вес слева/справа (площадь ×1.5 для человека/семьи); тяжёлый >70% → сдвиг мелкого */
+  /* 8. БАЛАНС: визуальный вес слева/справа (площадь ×1.5 для человека/семьи); тяжёлый >70% → сдвиг мелкого.
+     При малом наборе (≤4) баланс НЕ трогаем — spread уже арт-директорский, зеркаление сломало бы воздух. */
   const wOf = o => o.w * o.h * (o.person ? 1.5 : 1);
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 2 && !few; pass++) {
     let lw = 0, rw = 0; order.forEach(o => { (o.cx < boardW / 2 ? (lw += wOf(o)) : (rw += wOf(o))); });
     const tot = lw + rw; if (!tot) break;
     const heavyLeft = lw / tot > .7, heavyRight = rw / tot > .7; if (!heavyLeft && !heavyRight) break;
@@ -6474,8 +6517,8 @@ function mbCompose(items, boardW, boardH, seed, forceHeroId) {
     if (!cand) break;
     cand.cx = mbClamp(boardW - cand.cx, cand.w / 2 - bleed, boardW - cand.w / 2 + bleed);
   }
-  /* 8b. БАЛАНС верх/низ: аналогично, если одна половина >72% веса — зеркалим мелкий по вертикали */
-  for (let pass = 0; pass < 2; pass++) {
+  /* 8b. БАЛАНС верх/низ: аналогично, если одна половина >72% веса — зеркалим мелкий по вертикали (не при малом наборе) */
+  for (let pass = 0; pass < 2 && !few; pass++) {
     let tw = 0, bw = 0; order.forEach(o => { (o.cy < boardH / 2 ? (tw += wOf(o)) : (bw += wOf(o))); });
     const tot = tw + bw; if (!tot) break;
     const heavyTop = tw / tot > .72, heavyBot = bw / tot > .72; if (!heavyTop && !heavyBot) break;
