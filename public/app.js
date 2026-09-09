@@ -6798,14 +6798,11 @@ function tkWireDnD(root, onDrop, onOpen) {
   });
 }
 /* детальная карточка задачи: правка, дедлайн (день+время), подзадачи, вложения (голос/файл), заметки */
-function openTaskDetail(t, leadMap) {
-  if (!t) return;
+function tdBody(t) {
   const dueD = t.due ? new Date(t.due) : null;
   const dstr2 = dueD ? dstrLocal(dueD) : '';
   const tstr = dueD && (dueD.getHours() !== 12 || dueD.getMinutes() !== 0) ? `${String(dueD.getHours()).padStart(2, '0')}:${String(dueD.getMinutes()).padStart(2, '0')}` : '';
-  const bd = modal({
-    wide: true, title: 'Задача',
-    body: `<div class="td">
+  return `<div class="td">
       <input class="td-title" id="tdTitle" value="${esc(t.title)}">
       <div class="td-row"><span class="td-lbl">Приоритет</span><div class="seg-toggle td-pri">${Object.entries(TPRI).map(([k, v]) => `<button class="seg-btn ${k === t.priority ? 'on' : ''}" data-tp="${k}"><span class="td-pdot" style="background:${v.c}"></span>${v.n}</button>`).join('')}</div></div>
       <div class="td-row"><span class="td-lbl">Дедлайн</span><div class="td-dl"><input type="date" id="tdDate" value="${dstr2}"><input type="time" id="tdTime" value="${tstr}"><button class="btn btn-sm" id="tdDclear" ${t.due ? '' : 'style="display:none"'}>Убрать</button></div></div>
@@ -6813,11 +6810,18 @@ function openTaskDetail(t, leadMap) {
       <div class="td-row"><span class="td-lbl">Вложения</span><div class="td-atts" id="tdAtts"></div></div>
       <div class="td-row"><span class="td-lbl">Лид</span><div class="td-lead" id="tdLead"></div></div>
       <div class="td-row"><span class="td-lbl">Заметки</span><textarea class="td-notes" id="tdNotes" data-nodic placeholder="Детали, контекст…">${esc(t.notes || '')}</textarea></div>
-    </div>`,
-    actions: [{ label: 'Готово', cls: 'btn-accent' }],
-  });
-  const mo = new MutationObserver(() => { if (!document.body.contains(bd)) { mo.disconnect(); render(); } });
-  mo.observe(document.body, { childList: true });
+    </div>`;
+}
+function openTaskDetail(t, leadMap, inlineEl) {
+  if (!t) return;
+  let bd;
+  if (inlineEl) { inlineEl.innerHTML = tdBody(t); bd = inlineEl; }
+  else {
+    bd = modal({ wide: true, title: 'Задача', body: tdBody(t), actions: [{ label: 'Готово', cls: 'btn-accent' }] });
+    const mo = new MutationObserver(() => { if (!document.body.contains(bd)) { mo.disconnect(); render(); } });
+    mo.observe(document.body, { childList: true });
+  }
+  const inline = !!inlineEl;
   const patch = async (body) => { Object.assign(t, body); try { await api.patch('/tasks/' + t.id, body); } catch (e) { toast('Не сохранилось', e.message); } };
   $('#tdTitle', bd).addEventListener('change', e => patch({ title: e.target.value.trim() || t.title }));
   $$('.td-pri .seg-btn', bd).forEach(b => b.addEventListener('click', () => { $$('.td-pri .seg-btn', bd).forEach(x => x.classList.toggle('on', x === b)); patch({ priority: b.dataset.tp }); }));
@@ -6834,7 +6838,7 @@ function openTaskDetail(t, leadMap) {
         <div class="td-lead-main"><b>${esc(L.name)}</b><span>${[L.geoName, L.stageName, L.phone].filter(Boolean).map(esc).join(' · ')}</span>${(L.purpose || L.budget) ? `<i>${[L.purpose, L.budget].filter(Boolean).map(esc).join(' · ')}</i>` : ''}</div>
         <div class="td-lead-acts"><button class="btn btn-sm btn-accent" data-lopen>${ic(I.user)}Открыть карточку</button><button class="btn-ghost" data-lunlink title="Отвязать">${ic(I.x)}</button></div>
       </div>`;
-      leadEl.querySelector('[data-lopen]').addEventListener('click', () => { closeModal(); openLeadModal(L.id); });
+      leadEl.querySelector('[data-lopen]').addEventListener('click', () => { if (!inline) closeModal(); openLeadModal(L.id); });
       leadEl.querySelector('[data-lunlink]').addEventListener('click', () => { t.lead = null; patch({ leadId: null }); paintLead(); });
     } else {
       leadEl.innerHTML = `<button class="btn btn-sm" data-llink>${ic(I.plus)}Привязать лида</button>`;
@@ -6842,7 +6846,7 @@ function openTaskDetail(t, leadMap) {
         const leads = (await api.get('/leads')).filter(l => !['lost'].includes(l.stage));
         const lb = modal({ title: 'Привязать лида', body: `<div class="form-row"><input id="llq" placeholder="Поиск по имени/телефону…" style="margin-bottom:8px"><div class="td-lead-list" id="llList">${leads.slice(0, 40).map(l => `<button class="td-lead-opt" data-lid="${l.id}">${esc(l.name)} <span>${esc(l.geoName || '')}${l.phone ? ' · ' + esc(l.phone) : ''}</span></button>`).join('')}</div></div>`, actions: [{ label: 'Отмена' }] });
         const paint = (q) => { $('#llList', lb).innerHTML = leads.filter(l => !q || (l.name || '').toLowerCase().includes(q) || (l.phone || '').includes(q)).slice(0, 40).map(l => `<button class="td-lead-opt" data-lid="${l.id}">${esc(l.name)} <span>${esc(l.geoName || '')}${l.phone ? ' · ' + esc(l.phone) : ''}</span></button>`).join(''); wireOpts(); };
-        const wireOpts = () => $$('.td-lead-opt', lb).forEach(o => o.addEventListener('click', () => { const l = leads.find(x => x.id === o.dataset.lid); t.lead = { id: l.id, name: l.name, geoName: l.geoName || '', stageName: '', phone: l.phone || '' }; patch({ leadId: l.id }); closeModal(); openTaskDetail(t, leadMap); }));
+        const wireOpts = () => $$('.td-lead-opt', lb).forEach(o => o.addEventListener('click', () => { const l = leads.find(x => x.id === o.dataset.lid); t.lead = { id: l.id, name: l.name, geoName: l.geoName || '', stageName: '', phone: l.phone || '' }; patch({ leadId: l.id }); closeModal(); openTaskDetail(t, leadMap, inlineEl); }));
         $('#llq', lb).addEventListener('input', e => paint(e.target.value.trim().toLowerCase())); wireOpts();
       });
     }
@@ -7052,7 +7056,20 @@ PAGES.tasks = async (root) => {
     if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
     if (a === 'playaud') { e.stopPropagation(); const url = act.dataset.url; if (window._tkAud && window._tkAud._u === url && !window._tkAud.paused) { window._tkAud.pause(); act.classList.remove('playing'); return; } if (window._tkAud) { try { window._tkAud.pause(); } catch (_) {} } document.querySelectorAll('.tk-att.playing').forEach(x => x.classList.remove('playing')); const au = new Audio(url); au._u = url; window._tkAud = au; act.classList.add('playing'); au.onended = () => act.classList.remove('playing'); au.play().catch(() => { toast('Не удалось воспроизвести'); act.classList.remove('playing'); }); return; }
     if (a === 'subs') { e.stopPropagation(); const wrap = rowEl.closest('.tk-rowwrap'); const sb = wrap && wrap.querySelector('.tk-subs'); if (sb) { const opening = sb.hidden; sb.hidden = !opening; rowEl.classList.toggle('subs-open', opening); const disc = rowEl.querySelector('.tk-disc'); if (disc) disc.classList.toggle('open', opening); } return; }
-    if (a === 'open') { openTaskDetail(t, leadMap); return; }
+    if (a === 'open') {
+      e.stopPropagation();
+      const wrap = rowEl.closest('.tk-rowwrap');
+      const existing = wrap.querySelector('.tk-detail');
+      if (existing) { existing.style.maxHeight = existing.scrollHeight + 'px'; requestAnimationFrame(() => { existing.style.maxHeight = '0'; }); rowEl.classList.remove('tk-open'); setTimeout(() => existing.remove(), 260); return; }
+      root.querySelectorAll('.tk-detail').forEach(d => d.remove());
+      root.querySelectorAll('.tk-row.tk-open').forEach(r => r.classList.remove('tk-open'));
+      const det = el('<div class="tk-detail"></div>');
+      wrap.appendChild(det); rowEl.classList.add('tk-open');
+      openTaskDetail(t, leadMap, det);   /* весь функционал попапа — теперь разворотом снизу */
+      det.style.maxHeight = '0'; requestAnimationFrame(() => { det.style.maxHeight = det.scrollHeight + 'px'; });
+      setTimeout(() => { if (rowEl.classList.contains('tk-open')) det.style.maxHeight = 'none'; }, 300);
+      return;
+    }
   }));
   /* инлайн-переключение подзадачи (готово/нет) прямо в списке */
   $$('.tk-subs[data-tksubs]', root).forEach(sb => sb.addEventListener('click', async (e) => {

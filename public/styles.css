@@ -2520,6 +2520,12 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-row.subs-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .tk-subs { display: flex; flex-direction: column; gap: 2px; margin: -1px 0 0; padding: 6px 14px 8px 46px; background: var(--bg-2); border: 1px solid var(--stroke); border-top: none; border-radius: 0 0 var(--r-md) var(--r-md); }
 .tk-subs[hidden] { display: none; }
+/* ⭐ инлайн-разворот задачи снизу (вместо попапа): весь функционал детали задачи */
+.tk-detail { overflow: hidden; max-height: 0; transition: max-height .28s var(--ease-soft); }
+.tk-detail > .td { margin: -1px 0 0; padding: 15px 16px 16px; background: var(--bg-2); border: 1px solid var(--stroke); border-top: none; border-radius: 0 0 var(--r-md) var(--r-md); animation: tkDetIn .3s var(--ease-soft); }
+@keyframes tkDetIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.tk-row.tk-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: 0 -1px 0 var(--accent) inset, var(--shadow); }
+.tk-row.tk-open .tk-mini[data-act="open"], .tk-main[data-act="open"] { cursor: pointer; }
 .tk-sub { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 8px; text-align: left; color: var(--ink-2); font-size: 13px; transition: background .12s; }
 .tk-sub:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .tk-sub.done .tk-sub-x { text-decoration: line-through; color: var(--ink-3); }
