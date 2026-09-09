@@ -183,6 +183,15 @@ body.cpanel-on{padding-right:308px!important}
 .cang:hover{border-color:var(--cb);transform:translateY(-1px)}
 .cang.on{border-color:var(--cb);background:#EEF3FF;box-shadow:inset 0 0 0 1px var(--cb)}
 .cang.on b{color:var(--cb)}
+/* ⭐ контекстный плавающий тулбар: свои кнопки для текста / слоя (фото, стикер) */
+.cqt{position:fixed;z-index:945;display:none;align-items:center;gap:2px;background:rgba(11,20,38,.95);backdrop-filter:blur(18px);border:1px solid rgba(134,175,255,.22);border-radius:12px;padding:4px;box-shadow:0 18px 50px -14px rgba(6,12,28,.72);font-family:Manrope,sans-serif}
+.cqt.on{display:inline-flex}
+.cqt button{min-width:30px;height:30px;padding:0 8px;border:none;border-radius:8px;background:transparent;color:#DCE6FF;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:background .12s,color .12s;font-family:inherit;line-height:1}
+.cqt button:hover{background:rgba(37,99,235,.92);color:#fff}
+.cqt button.dng:hover{background:#E0483D}
+.cqt button svg{width:16px;height:16px;display:block}
+.cqt-sep{width:1px;height:18px;background:rgba(134,175,255,.22);margin:0 3px;flex:0 0 1px}
+.cqt-sw{width:15px;height:15px;border-radius:4px;display:inline-block}
 `;
   document.head.appendChild(css);
   document.querySelector('.wrap').style.marginTop = '8px';
@@ -221,7 +230,7 @@ body.cpanel-on{padding-right:308px!important}
   const persistUI = () => { try { sessionStorage.setItem(UIKEY, JSON.stringify({ tab, sel })); } catch (_) {} };
   try { const st = JSON.parse(sessionStorage.getItem(UIKEY) || '{}'); if (st.tab === 'slide' || st.tab === 'design') tab = st.tab; if (Number.isInteger(st.sel) && st.sel >= 0) sel = st.sel; } catch (_) {}
 
-  $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); }); });
+  $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); e.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== e && qbar && qbar._mode === 'text' && !(pop && pop.contains(document.activeElement))) hideQbar(); }, 140); }); });
 
   /* очистка вставки — только текст */
   document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
@@ -265,7 +274,7 @@ body.cpanel-on{padding-right:308px!important}
     } catch (e) { location.reload(); }
   }
   function rewireLive() {
-    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); }); });
+    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); e.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== e && qbar && qbar._mode === 'text' && !(pop && pop.contains(document.activeElement))) hideQbar(); }, 140); }); });
     const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
     renderBody();
@@ -356,7 +365,7 @@ body.cpanel-on{padding-right:308px!important}
   });
 
   /* ---------- слои: выбор / перетаскивание / размер / порядок / удаление ---------- */
-  function selLayer(lyr) { $$('.s-lyr.lsel,.s-frame.lsel').forEach(x => x.classList.remove('lsel')); if (lyr) lyr.classList.add('lsel'); }
+  function selLayer(lyr) { $$('.s-lyr.lsel,.s-frame.lsel').forEach(x => x.classList.remove('lsel')); if (lyr) { lyr.classList.add('lsel'); showLayerQbar(lyr); } else hideQbar(); }
   function updL(lyr, patch) { let o = {}; try { o = JSON.parse(lyr.getAttribute('data-l')) || {}; } catch (e) {} Object.assign(o, patch); lyr.setAttribute('data-l', JSON.stringify(o)); return o; }
   document.addEventListener('pointerdown', (e) => {
     const tb = e.target.closest('.lyr-tools button');
@@ -383,7 +392,7 @@ body.cpanel-on{padding-right:308px!important}
     const lyr = e.target.closest('.s-lyr');
     if (lyr) { e.preventDefault(); e.stopPropagation(); selLayer(lyr); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const o = updL(lyr, {}); const sxp = o.x || 0, syp = o.y || 0, sx = e.clientX, sy = e.clientY; let moved = false;
       const mv = (ev) => { const cx = Math.max(-30, Math.min(120, sxp + (ev.clientX - sx) / sr.width * 100)); const cy = Math.max(-30, Math.min(120, syp + (ev.clientY - sy) / sr.height * 100)); lyr.style.left = cx + '%'; lyr.style.top = cy + '%'; updL(lyr, { x: +cx.toFixed(1), y: +cy.toFixed(1) }); moved = true; };
-      const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); if (moved) { dirty = true; save(false); } };
+      const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); if (moved) { dirty = true; save(false); } if (qbar && qbar._mode === 'layer' && qbar._t === lyr) posQbar(lyr.getBoundingClientRect()); };
       document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
     }
     const fr = e.target.closest('.s-frame'); if (fr) { selLayer(fr); }
@@ -446,6 +455,84 @@ body.cpanel-on{padding-right:308px!important}
     [...mk.querySelectorAll('mark')].forEach(unwrap);
     host.normalize(); dirty = true;
   }
+
+  /* ---------- ⭐ контекстный плавающий тулбар (умные быстрые кнопки под объект) ---------- */
+  let qbar = null;
+  const ensureQbar = () => { if (!qbar) { qbar = el('<div class="cqt"></div>'); document.body.appendChild(qbar); qbar.addEventListener('mousedown', onQbar); qbar.addEventListener('pointerdown', e => e.stopPropagation()); } return qbar; };
+  const hideQbar = () => { if (qbar) { qbar.classList.remove('on'); qbar._mode = null; qbar._t = null; } };
+  function selRect(field) { const s = document.getSelection(); if (s && s.rangeCount && !s.isCollapsed) { const rs = s.getRangeAt(0).getClientRects(); if (rs && rs[0] && (rs[0].width + rs[0].height) > 0) return rs[0]; } return field.getBoundingClientRect(); }
+  function posQbar(rect) { const q = qbar; q.classList.add('on'); const qw = q.offsetWidth, qh = q.offsetHeight; let x = rect.left + rect.width / 2; x = Math.max(qw / 2 + 8, Math.min(x, innerWidth - qw / 2 - 8)); let top = rect.top - qh - 10; if (top < 62) { top = rect.bottom + 10; } q.style.left = x + 'px'; q.style.top = top + 'px'; q.style.transform = 'translateX(-50%)'; }
+  function showTextQbar(field) {
+    if (!field || !field.dataset || !field.dataset.ce) return;
+    const isHead = /:heading$/.test(field.dataset.ce);
+    const q = ensureQbar(); q._mode = 'text'; q._t = field;
+    q.innerHTML = `<button data-q="bold" title="Жирный"><b>Ж</b></button><button data-q="italic" title="Курсив"><i style="font-family:Georgia,serif">К</i></button><button data-q="mark" title="Выделить цветом"><span class="cqt-sw" style="background:linear-gradient(102deg,#2563EBcc,#7C3AEDcc)"></span></button><span class="cqt-sep"></span>` +
+      (isHead ? `<button data-q="sdown" title="Меньше заголовок">A<small>−</small></button><button data-q="sup" title="Больше заголовок">A<small>+</small></button><button data-q="style" title="Стиль текста">Стиль&nbsp;▾</button><span class="cqt-sep"></span>` : '') +
+      `<button data-q="color" title="Цвет текста"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button>`;
+    requestAnimationFrame(() => posQbar(selRect(field)));
+  }
+  function showLayerQbar(lyr) {
+    if (!lyr) return;
+    let o = {}; try { o = JSON.parse(lyr.getAttribute('data-l') || '{}'); } catch (_) {}
+    const isImg = o.t === 'img' || lyr.classList.contains('lyr-img');
+    const q = ensureQbar(); q._mode = 'layer'; q._t = lyr;
+    q.innerHTML = `<button data-q="lfront" title="На передний план"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><button data-q="lback" title="На задний план"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button><span class="cqt-sep"></span><button data-q="ldup" title="Дублировать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>` + (isImg ? `<button data-q="lrepl" title="Заменить фото"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>` : '') + `<span class="cqt-sep"></span><button data-q="ldel" class="dng" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+    requestAnimationFrame(() => posQbar(lyr.getBoundingClientRect()));
+  }
+  /* z-порядок слоя: на самый верх / самый низ (как .lyr-tools) */
+  function layerZ(lyr, toFront) {
+    const slide = lyr.closest('.slide'); const sibs = $$('.s-lyr,.s-frame', slide);
+    const zOf = (x) => { try { return JSON.parse(x.getAttribute('data-l') || '{}').z || 0; } catch (_) { return 0; } };
+    if (toFront) { const nz = Math.max(0, ...sibs.filter(x => x !== lyr).map(zOf)) + 1; updL(lyr, { z: nz }); lyr.style.zIndex = 10 + nz; }
+    else { sibs.forEach(x => { if (x !== lyr) { const nz = zOf(x) + 1; updL(x, { z: nz }); x.style.zIndex = 10 + nz; } }); updL(lyr, { z: 0 }); lyr.style.zIndex = 10; }
+    dirty = true; save(false);
+  }
+  function onQbar(e) {
+    const b = e.target.closest('[data-q]'); if (!b) return; e.preventDefault();
+    const q = qbar, t = q._t, a = b.dataset.q;
+    if (q._mode === 'text') {
+      const field = t; const host = field;
+      const needSel = () => { const s = document.getSelection(); if (!s || s.isCollapsed || !s.toString()) { flash('Сначала выделите текст'); return false; } return true; };
+      if (a === 'bold') { if (!needSel()) return; document.execCommand('bold'); dirty = true; }
+      else if (a === 'italic') { if (!needSel()) return; document.execCommand('italic'); dirty = true; }
+      else if (a === 'mark') {
+        if (!needSel()) return; const rc = b.getBoundingClientRect();
+        const sw = HL.map(([k, c, ex]) => `<span class="hlsw" data-hl="${k}" style="background:${c};${ex || ''}"></span>`).join('');
+        const pp = openPop(`<div class="hlpop"><div class="hlrow">${sw}</div><button class="hloff" data-hl="off">Снять выделение</button></div>`, rc.left - 96, rc.bottom + 8);
+        pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-hl]'); if (!x) return; ev.preventDefault(); markSel(x.dataset.hl, host); closePop(); save(false); });
+      }
+      else if (a === 'sdown' || a === 'sup') {
+        const i = +field.closest('.slide').dataset.idx; const order = ['s', 'm', 'l']; const cur = slideEl(i).dataset.size || 'm';
+        let ni = order.indexOf(cur) + (a === 'sup' ? 1 : -1); ni = Math.max(0, Math.min(2, ni));
+        applyMeta(i, 'size', order[ni]); save(false); if (tab === 'slide') renderBody(); requestAnimationFrame(() => { field.focus(); posQbar(field.getBoundingClientRect()); });
+      }
+      else if (a === 'style') {
+        const i = +field.closest('.slide').dataset.idx; const sl = slideEl(i); const rc = b.getBoundingClientRect();
+        const grid = Object.entries(P.tstyles || { plain: 'Обычный' }).map(([k, n]) => `<button class="ctst ${(sl.dataset.tstyle || 'plain') === k ? 'on' : ''}" data-ts="${k}"><span class="s-h ts-${k}" style="font-size:17px;font-family:var(--disp)">Aa</span><i>${n}</i></button>`).join('');
+        const pp = openPop(`<div class="ctstyles">${grid}</div>`, rc.left - 120, rc.bottom + 8);
+        pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-ts]'); if (!x) return; ev.preventDefault(); const k = x.dataset.ts; sl.dataset.tstyle = k; const h = sl.querySelector('.s-h'); if (h) h.className = 's-h' + (k !== 'plain' ? ' ts-' + k : ''); dirty = true; closePop(); save(false); if (tab === 'slide') renderBody(); });
+        return;
+      }
+      else if (a === 'color') {
+        const i = +field.closest('.slide').dataset.idx; const sl = slideEl(i); const rc = b.getBoundingClientRect();
+        const sws = `<span class="hlsw" data-tc="" title="Авто" style="background:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#5E6470">A</span>` + Object.entries(P.tcolors || {}).map(([k, v]) => `<span class="hlsw" data-tc="${k}" style="background:${v}"></span>`).join('');
+        const pp = openPop(`<div class="hlpop"><div class="hlrow">${sws}</div></div>`, rc.left - 96, rc.bottom + 8);
+        pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-tc]'); if (!x) return; ev.preventDefault(); const key = x.dataset.tc; if (key) sl.dataset.tcolor = key; else delete sl.dataset.tcolor; const col = key ? (P.tcolors || {})[key] : ''; const h = sl.querySelector('.s-h'), sub = sl.querySelector('.s-s'); if (h) h.style.color = col || ''; if (sub) { sub.style.color = col || ''; sub.style.opacity = col ? '.9' : ''; } dirty = true; closePop(); save(false); });
+        return;
+      }
+      closePop && closePop();
+    } else if (q._mode === 'layer') {
+      const lyr = t; if (!lyr || !document.body.contains(lyr)) { hideQbar(); return; }
+      if (a === 'lfront') layerZ(lyr, true);
+      else if (a === 'lback') layerZ(lyr, false);
+      else if (a === 'ldel') { lyr.remove(); selLayer(null); hideQbar(); dirty = true; save(false); }
+      else if (a === 'ldup') { const i = +lyr.closest('.slide').dataset.idx; let o = {}; try { o = JSON.parse(lyr.getAttribute('data-l') || '{}'); } catch (_) {} const arr = serialize(); if (arr[i]) { arr[i].layers = arr[i].layers || []; const cp = Object.assign({}, o, { x: (o.x || 20) + 5, y: (o.y || 20) + 5 }); cp.z = Math.max(0, ...arr[i].layers.map(l => l.z || 0)) + 1; arr[i].layers.push(cp); save(true, { slides: arr }); hideQbar(); } }
+      else if (a === 'lrepl') { pickFile('image/*', async (f) => { flash('Загружаю…', 0); try { const url = await uploadAsset(f); updL(lyr, { url }); const im = lyr.querySelector('img'); if (im) im.src = url; dirty = true; save(false); flash('Фото заменено ✓'); } catch (er) { flash('Ошибка: ' + er.message); } }); }
+    }
+  }
+  addEventListener('scroll', hideQbar, true);
+  addEventListener('resize', hideQbar);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideQbar(); });
 
   /* ---------- рендер тела панели ---------- */
   function renderBody() {
