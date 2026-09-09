@@ -980,7 +980,8 @@ async function ideaSwipe(kind, ctx, repaint) {
 
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
-const OV_DEFAULT = ['kpi', 'attention', 'funnel', 'tasks', 'hotleads', 'goal', 'meetings', 'leaders'];
+/* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
+const OV_DEFAULT = ['kpi', 'attention', 'funnel', 'tasks', 'hotleads', 'goal', 'aivs', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
