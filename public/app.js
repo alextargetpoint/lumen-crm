@@ -5952,6 +5952,77 @@ function renderPostItem(it) {
   </div>`;
 }
 
+/* ⭐ Parlo — живой переводчик звонков + копилот продаж (десктоп-приложение). Промо-страница в CRM. */
+const parloAppIcon = (sz) => `<svg viewBox="0 0 120 120" width="${sz}" height="${sz}" class="plo-appicon" aria-hidden="true">
+  <defs>
+    <linearGradient id="ploG" x1="8" y1="8" x2="112" y2="112" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3E74FF"/><stop offset=".52" stop-color="#5C49E6"/><stop offset="1" stop-color="#9A3ED6"/></linearGradient>
+    <linearGradient id="ploGloss" x1="0" y1="6" x2="0" y2="66" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="ploSh" x="-20%" y="-10%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#2A1B6B" flood-opacity=".28"/></filter>
+  </defs>
+  <g filter="url(#ploSh)"><rect x="8" y="8" width="104" height="104" rx="29" fill="url(#ploG)"/></g>
+  <rect x="8" y="8" width="104" height="60" rx="29" fill="url(#ploGloss)"/>
+  <path d="M36 41h48a11 11 0 0 1 11 11v20a11 11 0 0 1-11 11H62l-13 12v-12h-13a11 11 0 0 1-11-11V52a11 11 0 0 1 11-11z" fill="#fff"/>
+  <g><rect x="45" y="56" width="6.5" height="14" rx="3.25" fill="#5C49E6"/><rect x="56" y="50" width="6.5" height="26" rx="3.25" fill="#3E74FF"/><rect x="67" y="54" width="6.5" height="18" rx="3.25" fill="#7A46E0"/><rect x="78" y="48" width="6.5" height="30" rx="3.25" fill="#9A3ED6"/></g>
+</svg>`;
+PAGES.parlo = async (root) => {
+  const apple = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16.4 12.5c0-2 1.6-2.9 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 8 .7 1 1.4 2 2.4 2 1 0 1.3-.6 2.5-.6 1.2 0 1.5.6 2.5.6 1 0 1.7-1 2.3-2 .7-1.1 1-2.2 1-2.3-.1 0-2-.8-2.1-3.1zM14.6 6.3c.5-.7.9-1.6.8-2.5-.8 0-1.7.5-2.3 1.2-.5.6-.9 1.5-.8 2.4.9.1 1.8-.4 2.3-1.1z"/></svg>';
+  const win = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zM11.6 4.2 21 3v8.5h-9.4zM3 12.5h7.5v7.1L3 18.5zM11.6 12.5H21V21l-9.4-1.2z"/></svg>';
+  const feats = [
+    { ic: I.mic, t: 'Ваш голос — на их языке', d: 'Клонируем ваш голос: вы говорите по-русски, клиент слышит именно вас — на английском, итальянском, немецком или французском.' },
+    { ic: I.phone, t: 'Поверх любого звонка', d: 'Zoom, Google Meet, Teams, WhatsApp, Telegram — работает через виртуальное аудио, ничего не переключая во время созвона.' },
+    { ic: I.spark, t: 'Копилот продаж', d: 'Пока клиент говорит — 2–3 варианта ответа в вашем стиле. Нажали ▶ — и реплика уходит в звонок вашим голосом.' },
+    { ic: I.chat, t: 'Субтитры речи клиента', d: 'Речь собеседника бежит русскими субтитрами в боковой шторке — не упустите ни одной детали сделки.' },
+    { ic: I.doc, t: 'Авто-сводка звонка', d: 'После звонка — транскрипт, ИИ-итоги и следующие шаги. Копия в Telegram и PDF, привязка к карточке лида.' },
+    { ic: I.shield, t: 'Контекст сделки', d: 'Подтягивает историю клиента и банк возражений — подсказки бьют точно в контекст, а разговоры остаются у вас.' },
+  ];
+  const dl = () => {
+    const bd = modal({
+      title: 'Скачать Parlo',
+      body: `<div class="plo-dl-modal"><div class="plo-dl-ic">${parloAppIcon(64)}</div>
+        <div class="plo-dl-mt">Живой переводчик звонков — бесплатно для команды Lumen.</div>
+        <div class="plo-dl-rows"><button class="plo-btn primary" data-plo-os="mac">${apple}macOS (Apple Silicon / Intel)</button><button class="plo-btn" data-plo-os="win">${win}Windows 10/11</button></div>
+        <div class="plo-dl-note">После установки Parlo сам подхватит ваши ключи и глоссарий из Lumen — настраивать ничего не нужно.</div></div>`,
+      actions: [{ label: 'Готово' }],
+    });
+    if (bd && bd.querySelectorAll) bd.querySelectorAll('[data-plo-os]').forEach(b => b.addEventListener('click', () => toast('Готовим установщик', 'Пришлём ссылку на Parlo для ' + (b.dataset.ploOs === 'mac' ? 'macOS' : 'Windows') + ' вам в Telegram в течение пары минут', true)));
+  };
+  root.innerHTML = `<div class="plo-wrap">
+    <div class="plo-hero glass card">
+      <div class="plo-hero-l">
+        <div class="plo-badge">${ic(I.spark, 2)}Помощник продаж · звонки с иностранцами</div>
+        <h1 class="plo-h1">Закрывайте сделки <span>голосом</span>,<br>а не текстом</h1>
+        <p class="plo-sub">Parlo переводит ваш звонок в реальном времени <b>вашим же голосом</b> и подсказывает, что ответить. Для брокеров, которые звонят покупателям в Дубае, на Бали и Пхукете.</p>
+        <div class="plo-cta">
+          <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать для Mac</button>
+          <button class="plo-btn lg" data-plo-dl>${win}Windows</button>
+          <button class="plo-btn ghost lg" data-plo-how>Как это работает</button>
+        </div>
+        <div class="plo-langs"><span class="plo-dot"></span>Переводит на <b>EN · IT · DE · FR</b> · работает в Zoom, Meet, Teams, WhatsApp</div>
+      </div>
+      <div class="plo-hero-r">
+        <div class="plo-halo"></div>
+        <div class="plo-icon-wrap">${parloAppIcon(150)}</div>
+        <div class="plo-name">Parlo</div>
+        <div class="plo-tag">живой переводчик звонков</div>
+      </div>
+    </div>
+    <div class="plo-feats">${feats.map(f => `<div class="plo-feat glass card"><span class="plo-feat-ic">${ic(f.ic)}</span><b>${esc(f.t)}</b><span>${esc(f.d)}</span></div>`).join('')}</div>
+    <div class="plo-how glass card" id="ploHow">
+      <div class="plo-how-hd">${ic(I.bolt, 2)}<span>Как это работает — за 3 шага</span></div>
+      <div class="plo-steps">
+        <div class="plo-step"><span class="plo-step-n">1</span><b>Скачали и открыли</b><span>Один клик. Приложение само настроит виртуальное аудио и подтянет ключи из Lumen.</span></div>
+        <div class="plo-step"><span class="plo-step-n">2</span><b>Позвонили клиенту</b><span>В любом мессенджере или Zoom. Говорите по-русски — клиент слышит вас на своём языке, вашим голосом.</span></div>
+        <div class="plo-step"><span class="plo-step-n">3</span><b>Закрыли — получили сводку</b><span>Итоги, следующие шаги и транскрипт сами лягут в карточку лида и Telegram.</span></div>
+      </div>
+    </div>
+    <div class="plo-band glass card">
+      <div><div class="plo-band-t">Звучите увереннее на любом языке</div><div class="plo-band-s">Бесплатно для команды Lumen · macOS и Windows</div></div>
+      <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать Parlo</button>
+    </div>
+  </div>`;
+  $$('[data-plo-dl]', root).forEach(b => b.addEventListener('click', dl));
+  $('[data-plo-how]', root)?.addEventListener('click', () => $('#ploHow', root)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+};
 PAGES.social = async (root) => {
   CP = [];
   const tool = SOCIAL_TOOLS[SOCIAL_TOOL] ? SOCIAL_TOOL : 'scripts';
