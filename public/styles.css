@@ -3817,6 +3817,8 @@ html[data-night] .mb-pending-box { background: linear-gradient(135deg, rgba(30,4
 .mb-empty-anim .mb-empty-c b { font-family: 'Fraunces', serif; font-weight: 500; font-size: 27px; color: #fff; letter-spacing: .01em; }
 .mb-empty-anim .mb-empty-c span { font-size: 13.5px; color: rgba(255,255,255,.78); line-height: 1.55; }
 .mb-empty-cta { margin-top: 8px; box-shadow: 0 10px 26px -8px rgba(37,99,235,.6); }
+/* плюс на синей CTA должен быть БЕЛЫМ + мелким (перебиваем .mb-empty svg{color:accent;width:34px} — та же (0,1,1), но объявлена позже; поэтому даём (0,2,1)) */
+.mb-empty-anim .mb-empty-cta svg { color: #fff; width: 16px; height: 16px; opacity: 1; }
 /* крепёж — реалистичные вырезанные PNG (Apple-стиль), поверх стикера */
 .mb-fast { position: absolute; z-index: 4; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(16,43,92,.28)); }
 .mb-pin { top: -20px; left: 50%; width: 40px; transform: translateX(-50%) rotate(-4deg); }

@@ -7305,6 +7305,8 @@ async function renderMoodboard(root, opts) {
   genBtn.addEventListener('click', gen);
   q.addEventListener('keydown', (e) => { if (e.key === 'Enter') gen(); });
   $('[data-mbaddempty]', root)?.addEventListener('click', () => { MB_ADD_OPEN = true; rerender().then(() => { const qq = $('#mbQuery', root); if (qq) qq.focus(); }); });
+  /* явный старт видеофона пустого состояния — autoplay+<source> у скрытого-в-аккордеоне элемента не срабатывает сам */
+  const _ev = $('.mb-empty-vid', root); if (_ev) { _ev.muted = true; const _p = _ev.play(); if (_p && _p.catch) _p.catch(() => {}); }
   $('[data-mbcomposehint]', root)?.addEventListener('click', () => { if (!MB_SEED) MB_SEED = 's' + Math.floor(Math.random() * 1e9); mbApplyCompose(root, opts, items, board, MB_SEED); });
   /* конфиг (только в режиме правки) */
   if (ed) {
