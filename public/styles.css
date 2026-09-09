@@ -3735,6 +3735,13 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 /* тот же приём для встроенной шапки Карты желаний в «Мои задачи» (раскрытый блок) */
 .mb-collcard.op .mb-coll-hd { opacity: .5; transition: opacity .24s var(--ease-soft); }
 .mb-collcard.op .mb-coll-hd:hover { opacity: 1; }
+/* встроенная Карта в «Мои задачи»: кнопки Добавить/Править — В ОДНУ СТРОКУ с заголовком блока
+   (не отдельным рядом) → холст сразу под заголовком, без лишнего вертикального ряда */
+.mb-collcard { position: relative; }
+.mb-collcard.op .mb-coll-body { padding-top: 0; }
+.mb-collcard.op .mb-coll-body .mb-top { position: absolute; top: 12px; right: 50px; width: auto; margin: 0; z-index: 4; }
+.mb-collcard.op .mb-coll-body .mb-top .mb-tools { opacity: .7; }
+.mb-collcard.op .mb-coll-body .mb-top:hover .mb-tools { opacity: 1; }
 .mb-title { display: flex; align-items: center; gap: 11px; }
 .mb-emblem { width: 26px; height: 26px; color: var(--accent); opacity: .85; flex: 0 0 auto; }
 .mb-t-k { font-family: 'Fraunces', serif; font-size: 25px; font-weight: 500; color: var(--navy-900); letter-spacing: .01em; line-height: 1; }

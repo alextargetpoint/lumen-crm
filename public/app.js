@@ -350,8 +350,9 @@ const NAV = {
   moodboard: { name: 'Карта желаний', icon: I.spark, sub: 'личная доска мотивации' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
-  ads:       { name: 'Реклама', icon: I.target, sub: '' },
+  ads:       { name: 'Атрибуция · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление' },
   mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
+  adsAnalytics: { name: 'Аналитика', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка' },
   comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
   social:    { name: 'Контент-цех', icon: I.layers, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
@@ -371,7 +372,7 @@ const WORKSPACES = {
   pipeline: { label: 'Воронка',       icon: I.funnel,   pages: ['funnel', 'wake'] },
   dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments'] },
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
-  growth: { label: 'Привлечение',    icon: I.target,   pages: ['ads', 'social'] },
+  ads:    { label: 'Реклама',         icon: I.target,   pages: ['mediaplan', 'adsAnalytics', 'ads'] },
   engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
   config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
@@ -780,11 +781,11 @@ function initNav() {
 function syncNavSub() {
   $$('.nav-sub').forEach(sub => {
     const ws = WORKSPACES[sub.dataset.subws];
-    const open = ws.pages.includes(CUR);
+    const open = !!ws && ws.pages.includes(CUR);   /* защита: неизвестный workspace не роняет initNav (мульти-сессия добавила nav без WORKSPACES) */
     sub.classList.toggle('open', open);
     sub.querySelectorAll('.nav-subitem').forEach(sb => sb.classList.toggle('on', sb.dataset.subpage === CUR));
   });
-  $$('.nav-item[data-ws]').forEach(b => b.classList.toggle('ws-open', WORKSPACES[b.dataset.ws].pages.includes(CUR)));
+  $$('.nav-item[data-ws]').forEach(b => { const w = WORKSPACES[b.dataset.ws]; b.classList.toggle('ws-open', !!w && w.pages.includes(CUR)); });
 }
 /* Сегментный переключатель под-разделов пространства — вставляется первым
    элементом в #content, поверх любой страницы, входящей в пространство. */
@@ -4840,7 +4841,7 @@ PAGES.ads = async (root) => {
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
-      <div class="ha-title">${ic(I.target || I.bolt)}Реклама<span class="sub">атрибуция лидов до объявления</span></div>
+      <div class="ha-title">${ic(I.target || I.bolt)}Атрибуция · Meta CAPI<span class="sub">события рекламы · лид → объявление</span></div>
       ${[
         ['Объявлений в базе', d.ads.length, 'связаны с лидами по ad_id'],
         ['Лидов с рекламы', adLeads, 'через мост и CTWA'],
@@ -5128,7 +5129,14 @@ function mpAnalyticsHtml(an, contractors, plans) {
   return filterBar + headline + pacing + ctCards + chBlock + geoBlock + bundleBlock;
 }
 
+/* Аналитика рекламы = страница медиаплана, открытая на вкладке «Аналитика».
+   Отдельная под-страница хаба «Реклама» (боковое меню + ws-вкладки); логику не дублируем. */
+PAGES.adsAnalytics = async (root) => PAGES.mediaplan(root);
+
 PAGES.mediaplan = async (root) => {
+  /* вкладка «Аналитика» рекламного хаба — та же страница, но с активной аналитикой.
+     Источник правды — CUR: /mediaplan → Планы, /adsAnalytics → Аналитика. */
+  MP_VIEW = (CUR === 'adsAnalytics') ? 'analytics' : 'plans';
   const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
 
   /* Фаза 2: если активна вкладка «Аналитика» — тянем агрегаты план-факт */
@@ -5257,10 +5265,12 @@ PAGES.mediaplan = async (root) => {
   `}
   `;
 
-  /* сегмент Планы | Аналитика */
+  /* сегмент Планы | Аналитика — маршрутизирует между под-страницами хаба «Реклама»,
+     чтобы боковое меню и ws-вкладки оставались синхронными (MP_VIEW ведётся от CUR) */
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;
-    MP_VIEW = v; render();
+    const targetPage = v === 'analytics' ? 'adsAnalytics' : 'mediaplan';
+    if (targetPage !== CUR) go(targetPage); else { MP_VIEW = v; render(); }
   }));
 
   if (MP_VIEW === 'analytics') {
