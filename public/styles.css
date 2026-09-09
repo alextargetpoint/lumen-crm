@@ -5279,3 +5279,44 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .cr-hchip i{color:var(--muted,#9fb0d0)}
 /* fix: constrain inline icons inside review block headers */
 .cr-block h4 svg,.cr-hd svg{width:15px;height:15px;flex:0 0 auto}
+
+/* ===== Академия: «второй формат» — источник и глубокое чтение ===== */
+.ac-srcbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line,#2a3550)}
+.ac-srcbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;border:1px solid #7C9BFF55;background:rgba(124,155,255,.1);color:#7C9BFF;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;transition:.15s}
+.ac-srcbtn:hover{background:rgba(124,155,255,.2)}
+.ac-srcbtn.ghost{background:transparent;border-color:var(--line,#2a3550);color:var(--muted,#9fb0d0)}
+.ac-srcbtn svg{width:14px;height:14px;flex:0 0 auto}
+.ac-modal-ov{position:fixed;inset:0;z-index:400;background:rgba(4,10,24,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:grid;place-items:center;padding:24px;animation:reveal .2s ease both}
+.ac-modal{position:relative;width:760px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;padding:24px 26px;border-radius:18px}
+.ac-modal-x{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted,#9fb0d0);font-size:18px;cursor:pointer;line-height:1}
+.ac-modal-hd{font-size:17px;font-weight:700;padding-right:30px}
+.ac-modal-sub{font-size:12.5px;color:var(--muted,#9fb0d0);margin:6px 0 14px}
+.ac-modal-body{overflow-y:auto;font-size:14px;line-height:1.62;color:var(--ink,#dbe4f7)}
+.ac-modal-body p{margin:0 0 11px}
+
+/* ⭐ RBAC — роли и доступы (матрица команды) */
+.rbac-card { padding: 18px 20px; margin-bottom: 16px; }
+.rbac-hd { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 650; color: var(--navy-900); margin-bottom: 14px; }
+.rbac-hd svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.rbac-hd span { font-weight: 400; font-size: 12px; color: var(--ink-3); margin-left: auto; }
+.rbac-list { display: flex; flex-direction: column; gap: 8px; }
+.rbac-row { border: 1px solid var(--stroke); border-radius: 14px; overflow: hidden; background: var(--card); }
+.rbac-row.open { border-color: color-mix(in srgb, var(--accent) 32%, var(--stroke)); }
+.rbac-main { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: none; cursor: pointer; text-align: left; }
+.rbac-ava { width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #4F5BD5, #7C4DFF); overflow: hidden; }
+.rbac-ava img { width: 100%; height: 100%; object-fit: cover; }
+.rbac-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rbac-nm b { font-size: 14px; font-weight: 650; color: var(--navy-900); }
+.rbac-nm i { font-style: normal; font-size: 12px; color: var(--ink-3); }
+.rbac-chev { color: var(--ink-3); transition: transform .2s; } .rbac-chev svg { width: 16px; height: 16px; }
+.rbac-row.open .rbac-chev { transform: rotate(90deg); }
+.rbac-body { padding: 4px 14px 14px; border-top: 1px solid var(--stroke); }
+.rbac-role { display: flex; align-items: center; gap: 12px; margin: 12px 0 14px; }
+.rbac-role span { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.rbac-secs { display: flex; flex-wrap: wrap; gap: 7px; }
+.rbac-sec { font-size: 12px; font-weight: 600; border-radius: 9px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--stroke); font-family: inherit; transition: all .13s; }
+.rbac-sec.on { background: color-mix(in srgb, #2FA98C 12%, transparent); border-color: color-mix(in srgb, #2FA98C 40%, var(--stroke)); color: #1F8A70; }
+.rbac-sec.off { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink-3); text-decoration: line-through; }
+.rbac-sec.locked { opacity: .5; cursor: not-allowed; text-decoration: none; }
+.rbac-sec:not(.locked):hover { transform: translateY(-1px); }
+.rbac-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 12px; }

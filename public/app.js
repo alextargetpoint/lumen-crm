@@ -4932,14 +4932,41 @@ PAGES.academy = async (root) => {
         ${les.intro ? `<div class="ac-intro">${acMd(les.intro)}</div>` : ''}
         ${(les.sections || []).map((sec, ix) => `<div class="pb-acc ${ix === 0 ? 'open' : ''}" data-acc>
           <button class="pb-acc-hd"><span class="pb-num">${String(ix + 1).padStart(2, '0')}</span><span class="pb-acc-t">${esc(sec.heading || '')}</span><span class="chev">${ic(I.chev, 2)}</span></button>
-          <div class="pb-acc-body"><div class="pb-acc-inner"><div class="pb-b">${acMd(sec.body)}</div></div></div>
+          <div class="pb-acc-body"><div class="pb-acc-inner"><div class="pb-b">${acMd(sec.body)}</div>${sec.src ? `<div class="ac-srcbar">
+            <button class="ac-srcbtn" data-acsrc="${sec.src}" data-achd="${esc(sec.heading || '')}">${ic(I.doc)} Читать подробно из источника</button>
+            <a class="ac-srcbtn ghost" href="https://www.youtube.com/watch?v=${sec.src}" target="_blank" rel="noopener">▶ Смотреть ролик</a>
+          </div>` : ''}</div></div>
         </div>`).join('')}
       </div>
     </div>`;
   $$('[data-acmod]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.acMod = +b.dataset.acmod; PAGE_STATE.acLes = 0; render(); }));
   $$('[data-acles]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.acLes = +b.dataset.acles; render(); }));
   $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  $$('[data-acsrc]', root).forEach(b => b.addEventListener('click', () => acadDetail(b.dataset.acsrc, b.dataset.achd)));
 };
+// «Второй формат»: глубокое чтение — полная расшифровка ролика-источника + ссылка на видео.
+async function acadDetail(vid, heading) {
+  const ov = el(`<div class="ac-modal-ov"><div class="ac-modal glass">
+    <button class="ac-modal-x" aria-label="Закрыть">✕</button>
+    <div class="ac-modal-hd">${esc(heading || 'Источник')}</div>
+    <div class="ac-modal-sub">Загружаю полную расшифровку ролика…</div>
+    <div class="ac-modal-body"></div></div></div>`);
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  ov.querySelector('.ac-modal-x').addEventListener('click', close);
+  const esc2 = () => { document.removeEventListener('keydown', onK); };
+  const onK = e => { if (e.key === 'Escape') { close(); esc2(); } };
+  document.addEventListener('keydown', onK);
+  try {
+    const d = await api.get('/academy/transcript?vid=' + encodeURIComponent(vid));
+    ov.querySelector('.ac-modal-sub').innerHTML = `${esc(d.title || '')} · <a href="${d.url}" target="_blank" rel="noopener" style="color:#7C9BFF">▶ смотреть на YouTube</a>`;
+    const paras = String(d.text || '').split(/\n{2,}/).map(p => p.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join('');
+    ov.querySelector('.ac-modal-body').innerHTML = paras || '<p style="color:var(--muted)">Расшифровка недоступна.</p>';
+  } catch (e) {
+    ov.querySelector('.ac-modal-sub').textContent = 'Не удалось загрузить расшифровку.';
+  }
+}
 
 /* ---------------- ОЦЕНКА ЗВОНКА (ИИ-разбор по методологии) ---------------- */
 function crBarColor(n) { return n >= 70 ? '#4ADE80' : (n >= 45 ? '#F5B77E' : '#F87171'); }
@@ -7738,6 +7765,33 @@ async function renderMoodboard(root, opts) {
 }
 
 /* ---------------- БРОКЕРЫ ---------------- */
+/* RBAC (зеркало серверных ROLE_CAPS/ROLE_DEFAULT_HIDE — сервер остаётся источником enforcement) */
+const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', manager: 'Менеджер' };
+const RBAC_DEFHIDE = {
+  broker: [],
+  assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
+  marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
+};
+const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
+function rbacCardHtml() {
+  const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return `<div class="glass card rbac-card">
+    <div class="rbac-hd">${ic(I.users)}Роли и доступы<span>кто какие разделы видит · права применяются на сервере</span></div>
+    <div class="rbac-list">${(STATE.brokers || []).map(b => {
+      const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = RBAC_DEFHIDE[rt] || [];
+      const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
+      return `<div class="rbac-row" data-rbacid="${b.id}">
+        <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b><i>${RBAC_ROLES[rt]} · доступ к ${shown} из ${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
+        <div class="rbac-body" hidden>
+          <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+          <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
+          <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать сотруднику. Серые закрыты ролью.</div>
+        </div>
+      </div>`;
+    }).join('') || '<div class="muted" style="padding:8px">Нет сотрудников. Добавьте команду ниже.</div>'}</div>
+  </div>`;
+}
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
   let auditLog = [];
@@ -7765,6 +7819,7 @@ PAGES.brokers = async (root) => {
       ['Режим распределения', 'По загрузке, по очереди или по сменам — в «Автоматизациях»'],
       ['Саммари вместе с лидом', '4 оси с цитатами, источник, история диалога'],
       ['Авто-задача', '«Позвонить в течение 30 минут» при передаче']])}</div>
+  ${rbacCardHtml()}
   <div class="broker-grid">
     ${STATE.brokers.map(b => {
       const mine = leads.filter(l => l.broker === b.id);
@@ -7844,6 +7899,20 @@ PAGES.brokers = async (root) => {
   ${auditLog.length ? `<div style="margin-top:16px">${coll('Журнал доступа · безопасность базы', `<div style="font-size:12px;line-height:1.9;padding:6px 2px">${auditLog.slice(0, 40).map(a => `<div><span class="muted">${new Date(a.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <b>${esc(a.who || '—')}</b> — ${esc(a.action)}${a.lead ? ' · ' + esc(a.lead) : ''}</div>`).join('')}</div>`, { open: false, count: auditLog.length, icon: I.shield })}</div>` : ''}
   `;
   $('#brAutoLink').addEventListener('click', () => go('automations'));
+  /* ⭐ RBAC-матрица: раскрытие + смена роли + пер-секционное скрытие (пишет roleType/hidePages, enforcement на сервере) */
+  $$('.rbac-row', root).forEach(rowEl => {
+    const id = rowEl.dataset.rbacid;
+    rowEl.querySelector('[data-rbactoggle]').addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
+    const sel = rowEl.querySelector('.rbac-roleSel');
+    if (sel) sel.addEventListener('change', async () => { try { await api.patch('/brokers/' + id, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } });
+    rowEl.querySelectorAll('.rbac-sec:not(.locked)').forEach(chip => chip.addEventListener('click', async () => {
+      const b = (STATE.brokers || []).find(x => x.id === id); if (!b) return;
+      const ind = new Set(b.hidePages || []); const s = chip.dataset.sec;
+      if (ind.has(s)) ind.delete(s); else ind.add(s);
+      const arr = [...ind]; chip.classList.toggle('off'); chip.classList.toggle('on');
+      try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+    }));
+  });
   $('#brAdd').addEventListener('click', async () => {
     const nb = await api.post('/brokers', { name: 'Новый брокер' });
     await loadState();
