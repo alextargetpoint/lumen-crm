@@ -23,10 +23,26 @@ corners = np.concatenate([arr[0:46, 0:46].reshape(-1, 3), arr[0:46, W-46:W].resh
                           arr[H-46:H, 0:46].reshape(-1, 3), arr[H-46:H, W-46:W].reshape(-1, 3)])
 bg = np.median(corners, axis=0)
 
-# сетка 8×4 (замерено по листам 1536×1024 этой серии)
-xs = [138 + round(i * (1440 - 138) / 7) for i in range(8)]
-ys = [225, 420, 612, 802]
-HALF_X = 92
+# ⭐ АВТО-детект центров колонок/рядов по центроиду ярких пикселей в бине (устойчиво к смещению
+# сетки листа — раньше хардкод давал систематическую обрезку справа).
+gdist = np.sqrt(((arr - bg) ** 2).sum(axis=2))
+strong = gdist > 55
+band = strong.copy(); band[:140] = False; band[int(H * 0.93):] = False
+def centroids(mask, n, a0, a1, axis):
+    cs = []
+    for i in range(n):
+        s0 = int(a0 + i * (a1 - a0) / n); s1 = int(a0 + (i + 1) * (a1 - a0) / n)
+        sub = mask[:, s0:s1] if axis == 1 else mask[s0:s1, :]
+        proj = sub.sum(axis=0) if axis == 1 else sub.sum(axis=1)
+        if proj.sum() > 0:
+            c = s0 + int((np.arange(len(proj)) * proj).sum() / proj.sum())
+        else:
+            c = (s0 + s1) // 2
+        cs.append(c)
+    return cs
+xs = centroids(band, 8, 0, W, 1)
+ys = centroids(band, 4, 140, int(H * 0.93), 0)
+HALF_X = 100
 saved = 0
 for r in range(4):
     for c in range(8):
