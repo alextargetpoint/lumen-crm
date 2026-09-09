@@ -851,6 +851,27 @@ body.cpanel-on{padding-right:308px!important}
     { k: 'f4-grid', n: 4, name: 'Сетка 2×2', boxes: [[0, 0, 50, 50, 0, 0], [50, 0, 50, 50, 0, 0], [0, 50, 50, 50, 0, 0], [50, 50, 50, 50, 0, 0]] },
     { k: 'f4-gap', n: 4, name: 'Сетка с отступом', boxes: [[3, 3, 45.5, 45.5, 10, 0], [51.5, 3, 45.5, 45.5, 10, 0], [3, 51.5, 45.5, 45.5, 10, 0], [51.5, 51.5, 45.5, 45.5, 10, 0]] },
     { k: 'f4-hero3', n: 4, name: 'Герой + 3 ленты', boxes: [[0, 0, 100, 55, 0, 0], [0, 55, 33.4, 45, 0, 0], [33.3, 55, 33.4, 45, 0, 0], [66.6, 55, 33.4, 45, 0, 0]] },
+    /* ⭐ ×2 вариаций: больше стильных схем под 1/2/3/4 фото */
+    // 1 фото — доп.
+    { k: 'f1-portrait', n: 1, name: 'Портрет', boxes: [[20, 4, 60, 92, 12, 0]] },
+    { k: 'f1-wideband', n: 1, name: 'Широкая полоса', boxes: [[0, 20, 100, 60, 0, 0]] },
+    { k: 'f1-circle', n: 1, name: 'Круг', boxes: [[20, 8, 60, 60, 999, 0]] },
+    { k: 'f1-tilt', n: 1, name: 'С наклоном', boxes: [[12, 12, 76, 72, 14, -4]] },
+    // 2 фото — доп.
+    { k: 'f2-stack', n: 2, name: 'Стопка', boxes: [[8, 6, 66, 58, 14, -4], [30, 34, 64, 58, 14, 4]] },
+    { k: 'f2-pip', n: 2, name: 'Кадр в кадре', boxes: [[0, 0, 100, 100, 8, 0], [58, 58, 38, 38, 10, 0]] },
+    { k: 'f2-tallpair', n: 2, name: 'Две вертикали', boxes: [[2, 4, 47, 92, 12, 0], [51, 4, 47, 92, 12, 0]] },
+    { k: 'f2-diag', n: 2, name: 'По диагонали', boxes: [[4, 4, 54, 54, 12, -3], [42, 42, 54, 54, 12, 3]] },
+    { k: 'f2-topbottom', n: 2, name: 'Верх + низ (отступ)', boxes: [[6, 3, 88, 46, 12, 0], [6, 51, 88, 46, 12, 0]] },
+    // 3 фото — доп.
+    { k: 'f3-strip', n: 3, name: 'Плёнка (полоса)', boxes: [[0, 30, 33.4, 40, 6, 0], [33.3, 30, 33.4, 40, 6, 0], [66.6, 30, 33.4, 40, 6, 0]] },
+    { k: 'f3-stagger', n: 3, name: 'Лесенка', boxes: [[2, 2, 44, 52, 12, 0], [30, 26, 44, 52, 12, 0], [56, 48, 42, 50, 12, 0]] },
+    { k: 'f3-Lshape', n: 3, name: 'Г-образно', boxes: [[0, 0, 64, 62, 10, 0], [66, 0, 34, 62, 10, 0], [0, 64, 100, 36, 10, 0]] },
+    { k: 'f3-bigleft', n: 3, name: 'Крупное слева', boxes: [[0, 0, 56, 100, 0, 0], [58, 0, 42, 49, 0, 0], [58, 51, 42, 49, 0, 0]] },
+    // 4 фото — доп.
+    { k: 'f4-strip', n: 4, name: 'Лента из 4', boxes: [[0, 34, 25, 32, 6, 0], [25, 34, 25, 32, 6, 0], [50, 34, 25, 32, 6, 0], [75, 34, 25, 32, 6, 0]] },
+    { k: 'f4-pinwheel', n: 4, name: 'Вертушка', boxes: [[4, 4, 46, 46, 12, -4], [50, 6, 46, 46, 12, 4], [4, 50, 46, 46, 12, 4], [50, 50, 46, 46, 12, -4]] },
+    { k: 'f4-bighero', n: 4, name: 'Большое + 3 сбоку', boxes: [[0, 0, 66, 100, 0, 0], [68, 0, 32, 32.4, 0, 0], [68, 33.8, 32, 32.4, 0, 0], [68, 67.6, 32, 32.4, 0, 0]] },
   ];
   /* ═══ Библиотека раскладок слайда (Gamma-стиль): одна структура контента → разные способы подачи.
      Меняет ТОЛЬКО s.layout (грамматику рендера lay-*) — применяется ВРУЧНУЮ по кнопке, НЕ при генерации. ═══ */
@@ -966,6 +987,15 @@ body.cpanel-on{padding-right:308px!important}
       if (!files.length) return; flash('Загружаю фото…', 0);
       try { const urls = []; for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f)); const LL = urls.length > L.n ? bestLayoutFor(urls.length) : L; applyPhotoLayoutTo(i, LL, urls); } catch (er) { flash('Ошибка: ' + er.message); }
     });
+  }
+  /* ⭐ стиль оформления фото-раскладки (стекло/полароид/скотч/скрепка/тень) — на все передние фото слайда */
+  function applyPhotoStyle(i, style) {
+    const arr = serialize(); const s = arr[i]; if (!s) return;
+    const photos = (s.layers || []).filter(l => l.t === 'img' && !l.sticker && !l.avatar && !l.pl);
+    if (!photos.length) { flash('Нет фото-раскладки на слайде (полноэкранное фото не оформляется)', 1800); return; }
+    photos.forEach(l => { if (style === 'none') delete l.pstyle; else l.pstyle = style; });
+    save(true, { slides: arr });
+    flash(style === 'none' ? 'Оформление снято ✓' : 'Стиль фото применён ✓', 1300);
   }
   /* ✨ авто: понять число фото на слайде и применить подходящую композицию */
   function autoPhotoLayout(i) {
@@ -1166,6 +1196,16 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n) => `<button data-pln="${n}" class="${n === detN ? 'on' : ''}">${n} фото</button>`).join('')}</div>
       <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === detN).map(plTile).join('')}</div>
       <div class="cnote">Фото раскладываются <b>рядом с текстом</b> (в свободной зоне — не перекрывают заголовок) и остаются <b>подвижными</b>: тяни за центр, размер — за угол (пропорция сохраняется). «Во весь слайд» — единственная кладёт фон под текст. «Авто» сам поймёт число фото.</div>
+      <label style="margin-top:10px">Стиль фото</label>
+      <div class="cbtn-row" id="cPhStyle" style="flex-wrap:wrap">
+        <button class="cwbtn" data-ps="none">Обычное</button>
+        <button class="cwbtn" data-ps="glass">Стекло</button>
+        <button class="cwbtn" data-ps="polaroid">Полароид</button>
+        <button class="cwbtn" data-ps="shadow">Тень</button>
+        <button class="cwbtn" data-ps="tape">Скотч</button>
+        <button class="cwbtn" data-ps="clip">Скрепка</button>
+      </div>
+      <div class="cnote">Оформление фото-раскладки: стеклянная рамка, полароид, скотч или скрепка — как на мудборде. Не применяется к «Во весь слайд».</div>
     </div>
     ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} const cur = r.layout || ''; const h = r.hero || {}; return `<div class="cgrp"><label>Раскладка слайда <span class="cnote-inline">библиотека структур</span></label>
       <div class="clay-grid" id="cLayGrid">${LAYOUTS.map(l => layTile(l, cur)).join('')}</div>
@@ -1343,6 +1383,7 @@ body.cpanel-on{padding-right:308px!important}
         pgr.addEventListener('click', (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; const L = PHOTO_LAYOUTS.find(x => x.k === b.dataset.pl); if (L) applyPhotoLayout(i, L); });
       }
       const pa = $('#cPlAuto', body); if (pa) pa.addEventListener('click', () => autoPhotoLayout(i)); }
+    { const ps = $('#cPhStyle', body); if (ps) ps.addEventListener('click', (e) => { const b = e.target.closest('[data-ps]'); if (!b) return; $$('#cPhStyle button', body).forEach(x => x.classList.toggle('on', x === b)); applyPhotoStyle(i, b.dataset.ps); }); }
     /* свободное размещение текст-блока (двигать/масштабировать) */
     { const fr = $('#cFree', body); if (fr) fr.addEventListener('click', () => { const sl = slideEl(i); const on = sl.dataset.free !== '1'; if (on) { sl.dataset.free = '1'; if (!sl.dataset.tx) sl.dataset.tx = '10'; if (!sl.dataset.ty) sl.dataset.ty = '16'; if (!sl.dataset.tscale) sl.dataset.tscale = '1'; } else { delete sl.dataset.free; } fr.classList.toggle('on', on); dirty = true; save(true, { slides: serialize() }); }); }
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {

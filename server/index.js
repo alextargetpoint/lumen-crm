@@ -788,6 +788,7 @@ const sanLayer = (l) => {
     if (l.ox != null) o.ox = num(l.ox, 50, 0, 100); if (l.oy != null) o.oy = num(l.oy, 50, 0, 100);   /* object-position % (кроп-фокус) */
     if (l.filter && CAR_IMGFILT.has(l.filter)) o.filter = l.filter;
     if (l.shadow) o.shadow = 1;
+    if (l.pstyle && ['glass', 'polaroid', 'tape', 'clip', 'shadow', 'soft'].includes(l.pstyle)) o.pstyle = l.pstyle;   /* стиль оформления фото (стекло/полароид/скотч/скрепка/тень) */
   }
   else if (l.t === 'shape') { o.shape = CAR_SHAPES.has(l.shape) ? l.shape : 'rect'; o.color = hex(l.color, '#1D34D8'); o.fill = l.fill !== false; o.round = num(l.round, 10, 0, 50); if (l.sw != null) o.sw = num(l.sw, 4, 1, 20); if (l.shadow) o.shadow = 1; }
   else if (l.t === 'sticker') { if (!CAR_STICKERS[l.key]) return null; o.key = l.key; o.color = hex(l.color, '#FFFFFF'); }
@@ -856,7 +857,8 @@ function renderCarLayers(layers, isEdit) {
     const geo = `left:${l.x}%;top:${l.y}%;${autoW ? '' : `width:${l.w}%;`}${hasH ? `height:${l.h}%;` : ''}z-index:${z};transform:rotate(${l.rot || 0}deg)${opv}`;
     let inner = '';
     const isStk = l.t === 'img' && (l.sticker || /\/stickers\//.test(String(l.url || '')));   /* стикер = прозрачный PNG, без рамочной тени */
-    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '') + (isPl ? ' is-plbg' : '') + (l.t === 'icon' && !hasH ? ' lyr-sq' : '');
+    const pst = (l.t === 'img' && l.pstyle && !isStk && !l.avatar && !isPl) ? ' pst-' + l.pstyle : '';
+    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '') + (isPl ? ' is-plbg' : '') + (l.t === 'icon' && !hasH ? ' lyr-sq' : '') + pst;
     if (l.t === 'img' && l.avatar) inner = `<div style="width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 8px 26px -8px rgba(6,17,38,.55)"><img src="${esc(abs(l.url))}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
     else if (l.t === 'img') { const filt = l.filter && IMG_FILT[l.filter] ? `filter:${IMG_FILT[l.filter]};` : ''; const sh = l.shadow ? '' : (isStk ? '' : ''); inner = `<img src="${esc(abs(l.url))}" style="width:100%;height:${hasH ? '100%' : 'auto'};object-fit:${isStk ? 'contain' : (l.fit || 'cover')};object-position:${l.ox != null ? l.ox : 50}% ${l.oy != null ? l.oy : 50}%;border-radius:${isStk ? 0 : (l.round || 0)}px;display:block;${filt}">`; }
     else if (l.t === 'grad') inner = `<div style="width:100%;height:${hasH ? '100%' : '40%'};background:${GRAD_CSS(l.gd, esc(l.from), esc(l.to))}"></div>`;
@@ -5703,6 +5705,19 @@ body{font-family:var(--body);background:${theme.dark ? '#0B0D14' : '#EEF1F5'};co
 .lyr-btn{display:inline-flex;align-items:center;gap:.6em;padding:.85em 1.35em;border-radius:100px;font-family:'Manrope',sans-serif;font-weight:600;white-space:nowrap;line-height:1}
 .s-lyr.lyr-sq{aspect-ratio:1}
 .s-lyr.lyr-btn{white-space:nowrap}
+/* ⭐ стили оформления фото: стекло / полароид / скотч / скрепка / тень / мягкое */
+.pst-shadow img{box-shadow:0 14px 34px -12px rgba(8,14,38,.5)!important;border-radius:10px!important}
+.pst-soft img{border-radius:16px!important;box-shadow:0 10px 28px -12px rgba(8,14,38,.42)!important}
+.pst-glass{padding:5px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.42);border-radius:16px;box-shadow:0 16px 40px -16px rgba(8,14,38,.5),inset 0 1px 0 rgba(255,255,255,.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.pst-glass img{border-radius:12px!important;width:100%!important;height:100%!important;object-fit:cover!important;display:block}
+.pst-polaroid{padding:7% 7% 20%;background:#fff;border-radius:4px;box-shadow:0 18px 40px -14px rgba(8,14,38,.5)}
+.pst-polaroid img{border-radius:1px!important;width:100%!important;height:100%!important;object-fit:cover!important;display:block}
+.pst-tape::before,.pst-tape::after{content:'';position:absolute;width:42%;height:15px;background:linear-gradient(180deg,rgba(226,210,142,.5),rgba(214,196,120,.4));box-shadow:0 2px 6px rgba(0,0,0,.14);z-index:5;pointer-events:none}
+.pst-tape::before{top:-7px;left:5%;transform:rotate(-5deg)}
+.pst-tape::after{top:-7px;right:5%;transform:rotate(5deg)}
+.pst-tape img{border-radius:3px!important;box-shadow:0 10px 26px -12px rgba(8,14,38,.4)!important}
+.pst-clip::after{content:'';position:absolute;top:-13px;left:12%;width:20px;height:46px;z-index:5;pointer-events:none;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 52'%3E%3Cpath d='M16 6v33a6 6 0 01-12 0V8a4 4 0 018 0v29a2 2 0 01-4 0V11' fill='none' stroke='%23c2cad6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E");filter:drop-shadow(0 3px 4px rgba(0,0,0,.22))}
+.pst-clip img{border-radius:9px!important;box-shadow:0 12px 30px -12px rgba(8,14,38,.45)!important}
 .s-lyr .lyr-tx{margin:0}
 ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;width:1080px;gap:0;margin:0}.slide{width:1080px!important;height:${c.format === 'story' ? 1920 : c.format === 'square' ? 1080 : 1350}px!important;aspect-ratio:auto!important;border-radius:0!important;box-shadow:none!important}` : ''}
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
@@ -6042,7 +6057,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=67"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=68"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
