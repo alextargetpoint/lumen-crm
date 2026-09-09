@@ -2415,7 +2415,13 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-bal-main { display: flex; align-items: center; gap: 22px; }
 .tk-wheel { flex: 0 0 auto; width: 168px; }
 .tk-wheel-svg { width: 168px; height: 168px; display: block; }
-.tk-wheel-svg path { transition: fill-opacity .5s ease; }
+.tk-wheel-svg path { transition: fill-opacity .3s ease, transform .24s cubic-bezier(.2, .8, .25, 1); }
+/* ⭐ интерактив: наведение на сферу подсвечивает и увеличивает лепесток (и наоборот из легенды) */
+.tk-wheel-svg .tk-petal { transform-origin: 96px 96px; cursor: pointer; }
+.tk-wheel-svg .tk-petal:hover, .tk-wheel-svg .tk-petal.hot { fill-opacity: .92; transform: scale(1.07); }
+.tk-leg-i { cursor: pointer; border-radius: 8px; padding: 2px 5px; margin: -2px -5px; transition: background .15s; }
+.tk-leg-i:hover, .tk-leg-i.hot { background: rgba(255, 255, 255, .12); }
+.tk-leg-i.hot .tk-leg-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc) 40%, transparent); }
 .tk-leg { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; align-content: center; }
 .tk-leg-i { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
 .tk-leg-i.z { opacity: .5; }
@@ -4969,13 +4975,13 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .mpa-hero { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 22px; margin-bottom: 16px; }
 .mpa-stat { display: flex; flex-direction: column; gap: 6px; }
 .mpa-stat-k { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; }
-.mpa-stat b { font-size: 21px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; font-family: var(--font-display); letter-spacing: -.01em; }
+.mpa-stat b { font-size: 21px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; font-family: var(--font); letter-spacing: -.01em; }
 .mpa-stat b i { font-size: 13px; font-weight: 500; font-style: normal; color: var(--ink-3); font-family: var(--font); margin-left: 4px; }
 .mpa-stat .mp-bar { margin: 2px 0 0; }
 .mpa-stat-s { font-size: 11px; color: var(--ink-3); }
 .mpa-h-cpl { display: flex; flex-direction: column; gap: 6px; justify-content: center; padding-left: 22px; border-left: 1px solid var(--stroke-soft); }
 .mpa-h-k { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; }
-.mpa-h-cpl b { font-size: 22px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; font-family: var(--font-display); }
+.mpa-h-cpl b { font-size: 22px; font-weight: 750; color: var(--navy-900); font-variant-numeric: tabular-nums; font-family: var(--font); }
 .mpa-h-cpl b i { font-style: normal; color: var(--ink-3); margin: 0 4px; font-size: 17px; }
 .mpa-h-cpl.good b { color: var(--ok); }
 .mpa-h-cpl.bad b { color: var(--bad); }

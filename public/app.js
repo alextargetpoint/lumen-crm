@@ -6547,13 +6547,13 @@ function tkWheelSVG(sw) {
     const [x0, y0] = pt(r, a0), [x1, y1] = pt(r, a1);
     const large = (a1 - a0) > Math.PI ? 1 : 0;
     const path = `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r.toFixed(1)},${r.toFixed(1)} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`;
-    return `<path d="${path}" fill="${sp.c}" fill-opacity="${v ? .62 : .12}" stroke="${sp.c}" stroke-opacity="${v ? .9 : .3}" stroke-width="1" stroke-linejoin="round"><title>${sp.n}: ${v} за 7 дней</title></path>`;
+    return `<path class="tk-petal" data-sp="${k}" d="${path}" fill="${sp.c}" fill-opacity="${v ? .62 : .12}" stroke="${sp.c}" stroke-opacity="${v ? .9 : .3}" stroke-width="1" stroke-linejoin="round"><title>${sp.n}: ${v} за 7 дней</title></path>`;
   }).join('');
   return `<svg viewBox="0 0 192 192" class="tk-wheel-svg">${rings}${wedges}<circle cx="${cx}" cy="${cy}" r="3" fill="rgba(255,255,255,.6)"/></svg>`;
 }
 function tkBalanceHtml(sw) {
   const total = SPHERE_KEYS.reduce((s, k) => s + (sw[k] || 0), 0);
-  const legend = SPHERE_KEYS.map(k => { const v = sw[k] || 0; const sp = SPHERES[k]; return `<div class="tk-leg-i ${v ? '' : 'z'}"><span class="tk-leg-dot" style="--sc:${sp.c}"></span><span class="tk-leg-n">${sp.n}</span><span class="tk-leg-v">${v}</span></div>`; }).join('');
+  const legend = SPHERE_KEYS.map(k => { const v = sw[k] || 0; const sp = SPHERES[k]; return `<div class="tk-leg-i ${v ? '' : 'z'}" data-sp="${k}"><span class="tk-leg-dot" style="--sc:${sp.c}"></span><span class="tk-leg-n">${sp.n}</span><span class="tk-leg-v">${v}</span></div>`; }).join('');
   const zeros = SPHERE_KEYS.filter(k => !(sw[k])); const low = zeros.length ? zeros[0] : SPHERE_KEYS.slice().sort((a, b) => (sw[a] || 0) - (sw[b] || 0))[0];
   const top = SPHERE_KEYS.slice().sort((a, b) => (sw[b] || 0) - (sw[a] || 0))[0];
   const nudge = total ? (SPHERE_NUDGES[low] || [''])[0] : 'Отмечай сферу у задач — колесо покажет, на что уходит неделя и где перекос. Начни с одной задачи в важной для тебя сфере.';
@@ -6822,7 +6822,6 @@ PAGES.tasks = async (root) => {
         <div class="tk-cap-row">
           <button class="tk-mic" id="tkMic" title="Надиктовать — ИИ поймёт срок">${ic(I.mic)}</button>
           <input id="tkNew" class="tk-cap-in" placeholder="Задача текстом или голосом — «завтра позвонить в 15:00»…  ⏎">
-          <div class="tk-cap-pri" id="tkNewPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === TASK_NEWPRI ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
           <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
         </div>
         <div class="tk-cap-row tk-cap-meta">
@@ -6876,7 +6875,11 @@ PAGES.tasks = async (root) => {
   /* ⭐ рутина брокера: попап-палитра шаблонов по сферам */
   $('#tkRoutine', root) && $('#tkRoutine', root).addEventListener('click', (e) => { e.stopPropagation(); openRoutinePop(e.currentTarget, today, () => render()); });
   /* ⭐ колесо баланса */
-  { const bal = $('#tkBalance', root); if (bal) bal.innerHTML = tkBalanceHtml(s.sphereWeek || {}); }
+  { const bal = $('#tkBalance', root); if (bal) { bal.innerHTML = tkBalanceHtml(s.sphereWeek || {});
+      /* ⭐ подсветка: наведение на сферу (легенда↔лепесток) синхронно выделяет */
+      const hot = (sp, on) => { $$(`.tk-petal[data-sp="${sp}"], .tk-leg-i[data-sp="${sp}"]`, bal).forEach(x => x.classList.toggle('hot', on)); };
+      $$('.tk-petal[data-sp], .tk-leg-i[data-sp]', bal).forEach(el => { const sp = el.dataset.sp; el.addEventListener('mouseenter', () => hot(sp, true)); el.addEventListener('mouseleave', () => hot(sp, false)); });
+    } }
   $('#tkNew', root).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
   $('#tkMic', root).addEventListener('click', () => tkVoiceAdd($('#tkMic', root), () => render()));
   $$('#tkNewPri .tk-pdot', root).forEach(b => b.addEventListener('click', () => { TASK_NEWPRI = b.dataset.np; $$('#tkNewPri .tk-pdot', root).forEach(x => x.classList.toggle('on', x === b)); }));
@@ -7370,8 +7373,8 @@ function mbDemoStickers() {
   for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[cells[i], cells[j]] = [cells[j], cells[i]]; }
   const cw = 100 / cols, ch = 100 / rows;
   return pool.slice(0, n).map((f, i) => { const [c, r] = cells[i % cells.length]; return {
-    f, x: +(c * cw + cw * 0.18 + Math.random() * cw * 0.5).toFixed(1), y: +(r * ch + ch * 0.14 + Math.random() * ch * 0.5).toFixed(1),
-    w: +(6 + Math.random() * 3.5).toFixed(1), r: +(Math.random() * 14 - 7).toFixed(1), d: +(i * 0.09 + Math.random() * 0.16).toFixed(2) }; });
+    f, x: +(c * cw + cw * 0.10 + Math.random() * cw * 0.34).toFixed(1), y: +(r * ch + ch * 0.08 + Math.random() * ch * 0.30).toFixed(1),
+    w: +(13 + Math.random() * 7).toFixed(1), r: +(Math.random() * 16 - 8).toFixed(1), d: +(i * 0.10 + Math.random() * 0.16).toFixed(2) }; });
 }
 async function renderMoodboard(root, opts) {
   opts = opts || {};
