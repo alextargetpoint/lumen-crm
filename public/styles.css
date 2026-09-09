@@ -3822,8 +3822,11 @@ html[data-night] .mb-pending-box { background: linear-gradient(135deg, rgba(30,4
 /* ⭐ анимированная демо-доска: реальные стикеры «влетают» на доску (мотивация собрать свою) */
 .mb-demo { position: absolute; inset: 0; overflow: hidden; }
 .mb-demo-board { position: absolute; inset: 0; }
-.mb-demo-st { position: absolute; transform-origin: 50% 50%; opacity: 0; filter: drop-shadow(0 11px 18px rgba(16,43,92,.30)) drop-shadow(0 2px 4px rgba(16,43,92,.22)); animation: mbDemoPop .72s cubic-bezier(.34,1.5,.5,1) var(--d, 0s) both; }
+/* влёт (pop) → затем непрерывное плавание (drift), чтобы доска «жила» */
+.mb-demo-st { position: absolute; transform-origin: 50% 50%; opacity: 0; filter: drop-shadow(0 11px 18px rgba(16,43,92,.30)) drop-shadow(0 2px 4px rgba(16,43,92,.22)); animation: mbDemoPop .72s cubic-bezier(.34,1.5,.5,1) var(--d, 0s) both, mbFloat var(--fdur, 7s) ease-in-out calc(var(--d, 0s) + .72s) infinite; }
 @keyframes mbDemoPop { 0% { opacity: 0; transform: translateY(-22px) scale(.72) rotate(calc(var(--r) - 10deg)); } 62% { opacity: 1; } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(var(--r)); } }
+@keyframes mbFloat { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(calc(var(--amp, 8px) * -1)) rotate(calc(var(--r) + 1.6deg)); } }
+.mb-demo-st:hover { animation-play-state: paused; }
 .mb-demo-fade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 44%, color-mix(in srgb, var(--navy-900) 10%, transparent) 78%, color-mix(in srgb, var(--navy-900) 26%, transparent)); }
 .mb-demo .mb-empty-c { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 3; max-width: 540px; padding: 19px 26px; border-radius: 20px; background: color-mix(in srgb, var(--card) 80%, transparent); backdrop-filter: blur(16px) saturate(1.25); -webkit-backdrop-filter: blur(16px) saturate(1.25); border: 1px solid color-mix(in srgb, #fff 28%, var(--stroke)); box-shadow: 0 18px 44px -16px rgba(16,43,92,.42); }
 .mb-demo .mb-empty-c b { font-family: 'Fraunces', serif; font-weight: 550; font-size: 22px; color: var(--navy-900); letter-spacing: .01em; text-wrap: balance; hyphens: none; }

@@ -7202,21 +7202,20 @@ async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
   toast('Композиция собрана', null, true);
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
-/* демо-стикеры для пустого состояния (нарезаны из реального референса-визиона) — {файл, x%, y%, ширина%, поворот, задержка} */
-const MB_DEMO_STICKERS = [
-  { f: 'jet', x: 5, y: 7, w: 17, r: -3, d: 0.0 },      // частный джет
-  { f: 'villa', x: 37, y: 3, w: 20, r: 1, d: 0.5 },    // вилла Дубай
-  { f: 'skyline', x: 74, y: 5, w: 21, r: -2, d: 0.8 }, // скайлайн Дубай
-  { f: 'watch', x: 2, y: 38, w: 11, r: -7, d: 1.0 },   // Rolex
-  { f: 'books', x: 20, y: 40, w: 15, r: 3, d: 0.7 },   // книги
-  { f: 'car', x: 57, y: 28, w: 24, r: 1, d: 1.1 },     // G63
-  { f: 'bag', x: 86, y: 42, w: 12, r: 5, d: 1.4 },     // Givenchy
-  { f: 'macbook', x: 5, y: 64, w: 20, r: -2, d: 0.55 },// MacBook
-  { f: 'money', x: 32, y: 66, w: 14, r: -4, d: 1.2 },  // деньги
-  { f: 'bulldog', x: 49, y: 57, w: 13, r: 2, d: 1.8 }, // бульдог
-  { f: 'islands', x: 76, y: 66, w: 18, r: -2, d: 1.5 },// острова
-  { f: 'note', x: 65, y: 30, w: 9, r: 6, d: 2.0 },     // рукописная заметка
-];
+/* ⭐ готовые die-cut стикеры-визион (28 шт, /assets/vision-board) — заменили кривую нарезку */
+const MB_VISION = ['01_better_version_note', '02_rolex_gmt_master', '03_private_jet_global_7500', '04_more_freedom_note', '05_dream_home_dubai', '06_location_independent_income', '07_dubai_burj_khalifa_photo', '08_healthy_strong_man', '09_self_development_books', '10_invest_highest_dividends_note', '11_disciplined_focused_wealthy_free', '12_mercedes_g63', '13_givenchy_bag', '14_good_taste_note', '15_big_goals_bigger_actions', '16_macbook_pro', '17_iphone_16_pro', '18_boarding_pass_travel', '19_see_more_world_note', '20_tropical_destination_photo', '21_destinations_experiences_note', '22_dubai_dinner_photo', '23_fashion_outfit', '24_multiple_income_streams_cash', '25_build_something_bigger_office', '26_french_bulldog', '27_happy_life_for_us_note', '28_freedom_anytime_anywhere_pool'];
+/* РАНДОМНО берём 7–9 стикеров, раскидываем по слабой сетке (без жёсткого перекрытия), поворот+стаггер+плавание */
+function mbDemoStickers() {
+  const pool = MB_VISION.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const n = 7 + Math.floor(Math.random() * 3);
+  const cols = 4, rows = 3, cells = []; for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) cells.push([c, r]);
+  for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[cells[i], cells[j]] = [cells[j], cells[i]]; }
+  const cw = 100 / cols, ch = 100 / rows;
+  return pool.slice(0, n).map((f, i) => { const [c, r] = cells[i % cells.length]; return {
+    f, x: +(c * cw + cw * 0.10 + Math.random() * cw * 0.34).toFixed(1), y: +(r * ch + ch * 0.08 + Math.random() * ch * 0.30).toFixed(1),
+    w: +(13 + Math.random() * 7).toFixed(1), r: +(Math.random() * 16 - 8).toFixed(1), d: +(i * 0.10 + Math.random() * 0.18).toFixed(2),
+    fdur: +(5.5 + Math.random() * 3.5).toFixed(1), amp: Math.round(6 + Math.random() * 9) }; });
+}
 async function renderMoodboard(root, opts) {
   opts = opts || {};
   const data = await api.get('/moodboard').catch(() => ({ items: [], cfg: {} }));
@@ -7290,7 +7289,7 @@ async function renderMoodboard(root, opts) {
           </div>`).join('') +
           (!ed && items.length >= 2 && mbOverlap(items) ? `<button class="mb-hint" data-mbcomposehint>${ic(I.layers, 2)}Разложить красиво</button>` : '')
         ) : `<div class="mb-empty mb-demo">
-          <div class="mb-demo-board">${MB_DEMO_STICKERS.map(s => `<img class="mb-demo-st" src="/assets/moodboard-demo/${s.f}.png" style="left:${s.x}%;top:${s.y}%;width:${s.w}%;--r:${s.r}deg;--d:${s.d}s" alt="" draggable="false" loading="lazy">`).join('')}</div>
+          <div class="mb-demo-board">${mbDemoStickers().map(s => `<img class="mb-demo-st" src="/assets/vision-board/${s.f}.png" style="left:${s.x}%;top:${s.y}%;width:${s.w}%;--r:${s.r}deg;--d:${s.d}s;--fdur:${s.fdur}s;--amp:${s.amp}px" alt="" draggable="false" loading="lazy">`).join('')}</div>
           <div class="mb-demo-fade"></div>
           <div class="mb-empty-c"><b>Твоя карта желаний — перед глазами каждый день</b><span>Напиши, чего ты хочешь: Rolex, вилла на Бали, частный джет, €1M капитала — ИИ вырежет стикер и приколет на доску.</span><button class="btn btn-accent mb-empty-cta" data-mbaddempty>${ic(I.plus)}Собрать свою доску</button></div>
         </div>`}

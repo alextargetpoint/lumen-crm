@@ -409,6 +409,585 @@
       ]
     },
     {
+      "title": "Недвижимость · 2026",
+      "dir": "re-2026",
+      "items": [
+        {
+          "slug": "01_dubai_uae",
+          "label": "Дубай · ОАЭ",
+          "cat": "location",
+          "kw": [
+            "дубай",
+            "оаэ",
+            "uae",
+            "локация",
+            "город"
+          ],
+          "key": "re-2026/01_dubai_uae",
+          "big": 1,
+          "geo": "dubai"
+        },
+        {
+          "slug": "02_invest_live_grow",
+          "label": "Invest · Live · Grow",
+          "cat": "invest",
+          "kw": [
+            "инвестиции",
+            "жизнь",
+            "рост",
+            "invest"
+          ],
+          "key": "re-2026/02_invest_live_grow",
+          "big": 1
+        },
+        {
+          "slug": "03_price_growth_24",
+          "label": "Рост цены +24%",
+          "cat": "invest",
+          "kw": [
+            "рост цены",
+            "динамика",
+            "подорожание",
+            "прирост",
+            "24"
+          ],
+          "key": "re-2026/03_price_growth_24",
+          "big": 1
+        },
+        {
+          "slug": "04_real_opportunities",
+          "label": "Real Opportunities",
+          "cat": "invest",
+          "kw": [
+            "возможности",
+            "реальные",
+            "люди",
+            "opportunities"
+          ],
+          "key": "re-2026/04_real_opportunities",
+          "big": 1
+        },
+        {
+          "slug": "05_new_launch",
+          "label": "New Launch",
+          "cat": "urgency",
+          "kw": [
+            "новый запуск",
+            "старт",
+            "launch",
+            "предстарт"
+          ],
+          "key": "re-2026/05_new_launch",
+          "big": 1
+        },
+        {
+          "slug": "06_modern_living_villa",
+          "label": "Modern Living · вилла",
+          "cat": "luxury",
+          "kw": [
+            "вилла",
+            "современно",
+            "экстерьер",
+            "modern",
+            "резиденция"
+          ],
+          "key": "re-2026/06_modern_living_villa",
+          "big": 1,
+          "auto": 0
+        },
+        {
+          "slug": "07_city_beach_toggle",
+          "label": "Город / Пляж",
+          "cat": "lifestyle",
+          "kw": [
+            "город",
+            "пляж",
+            "выбор",
+            "city",
+            "beach",
+            "образ жизни"
+          ],
+          "key": "re-2026/07_city_beach_toggle",
+          "big": 1
+        },
+        {
+          "slug": "08_high_roi",
+          "label": "High ROI",
+          "cat": "invest",
+          "kw": [
+            "roi",
+            "доходность",
+            "высокий",
+            "прибыль"
+          ],
+          "key": "re-2026/08_high_roi",
+          "big": 1
+        },
+        {
+          "slug": "09_payment_plan_60_40",
+          "label": "План оплаты 60/40",
+          "cat": "deal",
+          "kw": [
+            "план оплаты",
+            "рассрочка",
+            "payment",
+            "60",
+            "40",
+            "условия"
+          ],
+          "key": "re-2026/09_payment_plan_60_40",
+          "big": 1
+        },
+        {
+          "slug": "10_keys_next_home",
+          "label": "Ключи · твой дом",
+          "cat": "amenity",
+          "kw": [
+            "ключи",
+            "дом",
+            "заселение",
+            "сдача",
+            "под ключ",
+            "next home"
+          ],
+          "key": "re-2026/10_keys_next_home",
+          "big": 1
+        },
+        {
+          "slug": "11_limited_units",
+          "label": "Limited Units",
+          "cat": "urgency",
+          "kw": [
+            "ограничено",
+            "юниты",
+            "мало",
+            "limited",
+            "осталось"
+          ],
+          "key": "re-2026/11_limited_units",
+          "big": 1
+        },
+        {
+          "slug": "12_off_plan_opportunity",
+          "label": "Off-Plan",
+          "cat": "invest",
+          "kw": [
+            "офф-план",
+            "котлован",
+            "off plan",
+            "старт",
+            "до сдачи"
+          ],
+          "key": "re-2026/12_off_plan_opportunity",
+          "big": 1
+        },
+        {
+          "slug": "13_dream_property_reminder",
+          "label": "Напоминание · мечта",
+          "cat": "contact",
+          "kw": [
+            "напоминание",
+            "мечта",
+            "dream",
+            "уведомление"
+          ],
+          "key": "re-2026/13_dream_property_reminder",
+          "big": 1
+        },
+        {
+          "slug": "14_better_views_polaroid",
+          "label": "Better Views · фото",
+          "cat": "luxury",
+          "kw": [
+            "виды",
+            "панорама",
+            "better views",
+            "фото",
+            "вид"
+          ],
+          "key": "re-2026/14_better_views_polaroid",
+          "big": 1,
+          "auto": 0
+        },
+        {
+          "slug": "15_prime_location",
+          "label": "Prime Location",
+          "cat": "location",
+          "kw": [
+            "прайм",
+            "локация",
+            "место",
+            "prime",
+            "центр"
+          ],
+          "key": "re-2026/15_prime_location",
+          "big": 1
+        },
+        {
+          "slug": "16_location_map",
+          "label": "Карта локации",
+          "cat": "location",
+          "kw": [
+            "карта",
+            "локация",
+            "расположение",
+            "map",
+            "район"
+          ],
+          "key": "re-2026/16_location_map",
+          "big": 1
+        },
+        {
+          "slug": "17_luxury_lifestyle",
+          "label": "Luxury Lifestyle",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "образ жизни",
+            "luxury",
+            "премиум"
+          ],
+          "key": "re-2026/17_luxury_lifestyle",
+          "big": 1
+        },
+        {
+          "slug": "18_palm_tree",
+          "label": "Пальма",
+          "cat": "lifestyle",
+          "kw": [
+            "пальма",
+            "тропики",
+            "курорт",
+            "palm",
+            "море"
+          ],
+          "key": "re-2026/18_palm_tree",
+          "big": 1
+        },
+        {
+          "slug": "19_sustainable_tomorrow",
+          "label": "Sustainable Tomorrow",
+          "cat": "lifestyle",
+          "kw": [
+            "эко",
+            "устойчивость",
+            "природа",
+            "sustainable",
+            "зелёный"
+          ],
+          "key": "re-2026/19_sustainable_tomorrow",
+          "big": 1
+        },
+        {
+          "slug": "20_feature_checklist",
+          "label": "Чек-лист преимуществ",
+          "cat": "amenity",
+          "kw": [
+            "чек-лист",
+            "локация",
+            "аменити",
+            "roi",
+            "checklist",
+            "преимущества"
+          ],
+          "key": "re-2026/20_feature_checklist",
+          "big": 1
+        },
+        {
+          "slug": "21_good_investment",
+          "label": "Good Investment",
+          "cat": "invest",
+          "kw": [
+            "инвестиция",
+            "better life",
+            "выгодно",
+            "good investment"
+          ],
+          "key": "re-2026/21_good_investment",
+          "big": 1
+        },
+        {
+          "slug": "22_sold_out",
+          "label": "Sold Out",
+          "cat": "urgency",
+          "kw": [
+            "продано",
+            "sold out",
+            "распродано",
+            "нет мест"
+          ],
+          "key": "re-2026/22_sold_out",
+          "big": 1
+        },
+        {
+          "slug": "23_exclusive_listing_photo",
+          "label": "Exclusive Listing · фото",
+          "cat": "luxury",
+          "kw": [
+            "эксклюзив",
+            "листинг",
+            "exclusive",
+            "фото",
+            "бассейн"
+          ],
+          "key": "re-2026/23_exclusive_listing_photo",
+          "big": 1,
+          "auto": 0
+        },
+        {
+          "slug": "24_price_drop",
+          "label": "Price Drop",
+          "cat": "deal",
+          "kw": [
+            "снижение цены",
+            "скидка",
+            "price drop",
+            "дешевле"
+          ],
+          "key": "re-2026/24_price_drop",
+          "big": 1
+        },
+        {
+          "slug": "25_percent_symbol",
+          "label": "Процент %",
+          "cat": "deal",
+          "kw": [
+            "процент",
+            "ставка",
+            "рассрочка",
+            "доходность",
+            "годовых"
+          ],
+          "key": "re-2026/25_percent_symbol",
+          "big": 1
+        },
+        {
+          "slug": "26_real_estate_quote",
+          "label": "Цитата о недвижимости",
+          "cat": "contact",
+          "kw": [
+            "цитата",
+            "будущее",
+            "quote",
+            "мысль"
+          ],
+          "key": "re-2026/26_real_estate_quote",
+          "big": 1
+        },
+        {
+          "slug": "27_global_investment",
+          "label": "Global Investment",
+          "cat": "invest",
+          "kw": [
+            "глобально",
+            "мир",
+            "global",
+            "экспертиза",
+            "международно"
+          ],
+          "key": "re-2026/27_global_investment",
+          "big": 1
+        },
+        {
+          "slug": "28_ready_2027",
+          "label": "Ready 2027",
+          "cat": "plan",
+          "kw": [
+            "сдача",
+            "2027",
+            "готовность",
+            "ready",
+            "срок"
+          ],
+          "key": "re-2026/28_ready_2027",
+          "big": 1
+        },
+        {
+          "slug": "29_property_types",
+          "label": "Типы жилья",
+          "cat": "amenity",
+          "kw": [
+            "типы",
+            "виллы",
+            "апартаменты",
+            "таунхаусы",
+            "пентхаусы",
+            "property"
+          ],
+          "key": "re-2026/29_property_types",
+          "big": 1
+        },
+        {
+          "slug": "30_villa_cutout",
+          "label": "Вилла · фото",
+          "cat": "luxury",
+          "kw": [
+            "вилла",
+            "экстерьер",
+            "дом",
+            "villa",
+            "резиденция"
+          ],
+          "key": "re-2026/30_villa_cutout",
+          "big": 1,
+          "auto": 0
+        },
+        {
+          "slug": "31_high_demand",
+          "label": "High Demand",
+          "cat": "urgency",
+          "kw": [
+            "спрос",
+            "востребовано",
+            "demand",
+            "ажиотаж"
+          ],
+          "key": "re-2026/31_high_demand",
+          "big": 1
+        },
+        {
+          "slug": "32_trusted_investors",
+          "label": "Trusted by Investors",
+          "cat": "invest",
+          "kw": [
+            "доверие",
+            "инвесторы",
+            "рейтинг",
+            "звёзды",
+            "trusted"
+          ],
+          "key": "re-2026/32_trusted_investors",
+          "big": 1
+        },
+        {
+          "slug": "33_more_than_property",
+          "label": "More Than Property",
+          "cat": "luxury",
+          "kw": [
+            "больше чем",
+            "property",
+            "смысл",
+            "эмоция"
+          ],
+          "key": "re-2026/33_more_than_property",
+          "big": 1
+        },
+        {
+          "slug": "34_dubai_global_city",
+          "label": "Dubai · Global City",
+          "cat": "location",
+          "kw": [
+            "дубай",
+            "город",
+            "skyline",
+            "global",
+            "dubai"
+          ],
+          "key": "re-2026/34_dubai_global_city",
+          "big": 1,
+          "geo": "dubai"
+        },
+        {
+          "slug": "35_invest_explore_belong",
+          "label": "Invest · Explore · Belong",
+          "cat": "invest",
+          "kw": [
+            "инвестиции",
+            "путешествие",
+            "belong",
+            "переезд"
+          ],
+          "key": "re-2026/35_invest_explore_belong",
+          "big": 1
+        },
+        {
+          "slug": "36_build_wealth_legacy",
+          "label": "Build Wealth · Legacy",
+          "cat": "invest",
+          "kw": [
+            "капитал",
+            "наследие",
+            "wealth",
+            "legacy",
+            "свобода"
+          ],
+          "key": "re-2026/36_build_wealth_legacy",
+          "big": 1
+        },
+        {
+          "slug": "37_nature_meets_luxury",
+          "label": "Nature meets Luxury",
+          "cat": "lifestyle",
+          "kw": [
+            "природа",
+            "люкс",
+            "зелень",
+            "nature",
+            "гармония"
+          ],
+          "key": "re-2026/37_nature_meets_luxury",
+          "big": 1
+        },
+        {
+          "slug": "38_spaces_that_inspire",
+          "label": "Spaces that Inspire · фото",
+          "cat": "luxury",
+          "kw": [
+            "интерьер",
+            "вдохновение",
+            "spaces",
+            "фото",
+            "дизайн"
+          ],
+          "key": "re-2026/38_spaces_that_inspire",
+          "big": 1,
+          "auto": 0
+        },
+        {
+          "slug": "39_rental_yield_8_2",
+          "label": "Rental Yield 8.2%",
+          "cat": "invest",
+          "kw": [
+            "доходность",
+            "аренда",
+            "yield",
+            "годовых",
+            "8",
+            "rental"
+          ],
+          "key": "re-2026/39_rental_yield_8_2",
+          "big": 1
+        },
+        {
+          "slug": "40_dream_plan_invest",
+          "label": "Dream · Plan · Invest",
+          "cat": "invest",
+          "kw": [
+            "мечта",
+            "план",
+            "инвестиции",
+            "dream"
+          ],
+          "key": "re-2026/40_dream_plan_invest",
+          "big": 1,
+          "geo": "dubai"
+        },
+        {
+          "slug": "41_investment_opportunity_notification",
+          "label": "Уведомление · возможность",
+          "cat": "contact",
+          "kw": [
+            "уведомление",
+            "возможность",
+            "notification",
+            "инвест"
+          ],
+          "key": "re-2026/41_investment_opportunity_notification",
+          "big": 1
+        }
+      ]
+    },
+    {
       "title": "Буллеты · Модерн",
       "dir": "bullets-modern",
       "items": [
