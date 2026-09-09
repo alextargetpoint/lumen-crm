@@ -896,7 +896,7 @@ const sanSlide = (s) => ({
   free: !!s.free, tx: s.free ? Math.max(-5, Math.min(95, +s.tx || 10)) : 0, ty: s.free ? Math.max(-5, Math.min(95, +s.ty || 16)) : 0, tscale: s.free ? Math.max(0.5, Math.min(1.9, +s.tscale || 1)) : 1,   /* свободное размещение текст-блока */
   bodyScale: Math.max(0.7, Math.min(1.5, +s.bodyScale || 1)),   /* размер основного текста (подпись+тезисы) */
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
-  mode: ['stats', 'steps', 'gauges', 'amenities', 'bars'].includes(s.mode) ? s.mode : '',
+  mode: ['stats', 'steps', 'gauges', 'amenities', 'bars', 'payplan'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
@@ -1503,6 +1503,11 @@ const CAR_SLIDE_TPLS = {
     { name: 'Заявление', s: { heading: 'Почему именно сейчас', sub: '', pos: 'center', size: 'l', tstyle: 'plain' } },
     { name: 'Контур', s: { heading: 'Смотрите сами', sub: '', pos: 'center', align: 'center', size: 'l', tstyle: 'outline' } },
     { name: 'Подчёрк', s: { heading: 'Главное о проекте', sub: 'коротко и по делу', pos: 'bottom', size: 'm', tstyle: 'underline' } },
+  ],
+  'Оплата': [
+    { name: 'План оплаты', s: { eyebrow: 'УСЛОВИЯ', heading: 'Гибкий план оплаты', mode: 'payplan', items: [{ v: '10%', k: 'Бронирование', text: 'при подписании договора' }, { v: '30%', k: 'В ходе строительства', text: 'равными траншами' }, { v: '40%', k: 'До ввода в эксплуатацию', text: 'по графику проекта' }, { v: '20%', k: 'При получении ключей', text: 'финальный платёж' }], pos: 'top', size: 's' } },
+    { name: 'Рассрочка 0%', s: { eyebrow: 'РАССРОЧКА', heading: 'Рассрочка без процентов', mode: 'payplan', items: [{ v: '20%', k: 'Первый взнос', text: 'старт бронирования' }, { v: '40%', k: 'До ключей', text: '0% переплаты' }, { v: '40%', k: 'После сдачи', text: 'на 2 года' }], pos: 'top', size: 's' } },
+    { name: 'Пост-хендовер', s: { eyebrow: 'POST-HANDOVER', heading: 'Платите после сдачи', mode: 'payplan', items: [{ v: '30%', k: 'На старте', text: 'бронь + договор' }, { v: '30%', k: 'Строительство', text: 'по этапам' }, { v: '40%', k: 'После сдачи', text: 'рассрочка 3 года' }], pos: 'top', size: 's' } },
   ],
   'Локация': [
     { name: 'Где это', s: { eyebrow: 'Локация', heading: 'Dubai Marina', sub: '5 минут до пляжа · 15 до Downtown', pos: 'bottom', size: 'm', tstyle: 'plain' } },
@@ -5599,6 +5604,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'gauges' && (s.items || []).length ? `<div class="s-gauges">${s.items.map(it => { const C = 2 * Math.PI * 32, off = (C * (1 - (it.pct || 0) / 100)).toFixed(1); return `<div class="s-gauge"><svg viewBox="0 0 80 80"><circle class="gg-bg" cx="40" cy="40" r="32"/><circle class="gg-fg" cx="40" cy="40" r="32" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off}"/><text class="gg-t" x="40" y="46" text-anchor="middle">${esc(it.v)}</text></svg><i>${esc(it.k)}</i></div>`; }).join('')}</div>` : ''}
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
+            ${s.mode === 'payplan' && (s.items || []).length ? `<div class="s-payplan">${s.items.map(it => `<div class="s-pp-row"><span class="s-pp-dot"></span><span class="s-pp-pct">${esc(it.v || it.pct + '%')}</span><span class="s-pp-txt"><b>${esc(it.k)}</b>${it.text ? `<i>${esc(it.text)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
             ${!s.mode && (s.points || []).length ? (() => { const pm = s.pmark || 'index'; const isImg = /^img:/.test(pm); const iu = isImg ? '/assets/stickers/' + pm.slice(4) + '.png' : ''; return `<ul class="s-points pm-${isImg ? 'img' : pm}">${s.points.map((pt, pi) => `<li><span class="s-pt-m"${isImg ? ` style="background-image:url('${esc(iu)}')"` : ''} data-n="${String(pi + 1).padStart(2, '0')}"></span><span${isEdit ? ` data-pt="${pi}"` : ''}>${sanInline(pt)}</span></li>`).join('')}</ul>`; })() : ''}
             ${(footerHide || s.noBrand || s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand fb-${footerStyle}">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
@@ -5811,6 +5817,19 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-stat i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.02em;margin-top:5px;display:block}
 .slide.hasbg .s-stat i{color:rgba(255,255,255,.82)}
 .s-steps{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+/* ⭐ План оплаты — премиум-таймлайн вех (этап · % · заметка), спайн по левому краю */
+.s-payplan{display:flex;flex-direction:column;margin-top:14px;position:relative}
+.s-payplan::before{content:"";position:absolute;left:5px;top:22px;bottom:22px;width:2px;background:color-mix(in srgb,var(--blue) 28%,transparent)}
+.s-pp-row{display:grid;grid-template-columns:12px minmax(58px,auto) 1fr;align-items:center;gap:16px;padding:13px 0;position:relative;z-index:1}
+.s-pp-row:not(:last-child){border-bottom:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.s-pp-dot{width:11px;height:11px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 16%,var(--paper))}
+.s-pp-pct{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:clamp(24px,6cqw,38px);color:var(--blue);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.s-pp-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.s-pp-txt b{font-size:clamp(14px,3.6cqw,17px);font-weight:700;color:var(--ink);line-height:1.2}
+.s-pp-txt i{font-style:normal;font-size:clamp(12px,3cqw,14px);color:var(--mut);line-height:1.3}
+.slide.hasbg .s-pp-txt b{color:#fff}.slide.hasbg .s-pp-txt i{color:rgba(255,255,255,.82)}
+.slide.hasbg .s-pp-row:not(:last-child){border-bottom-color:rgba(255,255,255,.2)}
+.slide.hasbg .s-pp-dot{box-shadow:0 0 0 4px rgba(255,255,255,.18)}
 .s-step{display:flex;align-items:center;gap:13px;font-size:clamp(14px,3.6cqw,17px);line-height:1.35;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-step{color:rgba(255,255,255,.92)}
 .s-step-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;font-family:'Manrope',sans-serif}
