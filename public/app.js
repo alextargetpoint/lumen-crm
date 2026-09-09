@@ -351,6 +351,7 @@ const NAV = {
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
   ads:       { name: 'Реклама', icon: I.target, sub: '' },
+  mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
   comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
   social:    { name: 'Контент-цех', icon: I.layers, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
@@ -1125,10 +1126,13 @@ function gaugeSvg(pct) {
   const val = `M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}`;
   return `<svg class="ov-gauge" viewBox="0 0 120 68"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><path d="${track}" fill="none" stroke="var(--gauge-track)" stroke-width="9" stroke-linecap="round"/><path d="${val}" fill="none" stroke="url(#${gid})" stroke-width="9" stroke-linecap="round"/></svg>`;
 }
-/* мини-гистограмма активности для тёмного hero (столбики притока лидов; последний — «сегодня») */
+/* мини-гистограмма притока лидов по дням для тёмного hero (последний столбик — «сегодня»).
+   При нуле новых лидов НЕ показываем пустые квадратики — рисуем спокойную базовую линию + подпись. */
 function heroBars(pts) {
+  const total = pts.reduce((a, b) => a + b, 0);
+  if (!total) return `<div class="ovx-bars is-empty"><span class="ovx-bars-line"></span><span class="ovx-bars-note">Новых лидов за 14 дней пока нет</span></div>`;
   const max = Math.max(...pts, 1);
-  return `<div class="ovx-bars">${pts.map((v, i) => `<span class="ovx-bar ${i === pts.length - 1 ? 'now' : ''}" title="${v}"><i style="height:${Math.max(8, Math.round(v / max * 100))}%"></i></span>`).join('')}</div>`;
+  return `<div class="ovx-bars">${pts.map((v, i) => `<span class="ovx-bar${i === pts.length - 1 ? ' now' : ''}${v === 0 ? ' z' : ''}" title="${v} ${plural(v, 'лид', 'лида', 'лидов')}"><i style="height:${v === 0 ? 0 : Math.max(14, Math.round(v / max * 100))}%"></i></span>`).join('')}</div>`;
 }
 
 /* кольцо-скор (радиальный индикатор здоровья/скоринга) — общий примитив */
@@ -4963,6 +4967,319 @@ PAGES.ads = async (root) => {
   });
 };
 
+/* ---------------- МЕДИАПЛАНЫ (подрядчики трафика · план/факт · согласование) ---------------- */
+const MP_CHANNELS = ['Meta', 'Google', 'TikTok', 'YouTube', 'Yandex', 'Telegram Ads', 'Influencers', 'Другое'];
+const MP_STATUS = {
+  draft: { name: 'Черновик', cls: 'warn' },
+  sent: { name: 'Отправлен', cls: 'acc' },
+  approved: { name: 'Утверждён', cls: 'ok' },
+  rejected: { name: 'Отклонён', cls: 'bad' },
+};
+const mpSym = (cur) => cur === 'EUR' ? '€' : cur === 'USD' ? '$' : '';
+const mpMoney = (n, cur) => { const v = Math.round(+n || 0).toLocaleString('ru-RU'); const s = mpSym(cur); return s ? s + v : v + ' ' + (cur || 'USD'); };
+const mpGeoName = (g) => (STATE && STATE.settings.geoNames && STATE.settings.geoNames[g]) || (g ? g.charAt(0).toUpperCase() + g.slice(1) : '—');
+const mpMonthShort = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const mpFmtD = (s) => { if (!s) return '—'; const a = String(s).split('-'); return a[2] ? (+a[2]) + ' ' + mpMonthShort[(+a[1]) - 1] + ' ' + a[0] : s; };
+const mpPeriod = (mp) => (mp.period && (mp.period.from || mp.period.to)) ? (mpFmtD(mp.period.from) + ' — ' + mpFmtD(mp.period.to)) : 'без периода';
+
+PAGES.mediaplan = async (root) => {
+  const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
+
+  /* сводка для hero */
+  const sumBudget = plans.reduce((s, mp) => s + (mp.totals ? mp.totals.budgetPlan : 0), 0);
+  const sumLeads = plans.reduce((s, mp) => s + (mp.totals ? mp.totals.leadsPlan : 0), 0);
+  const avgCpl = sumLeads ? Math.round(sumBudget / sumLeads) : 0;
+
+  /* агрегат по подрядчикам для карточки сравнения */
+  const byCt = {};
+  for (const mp of plans) { const k = mp.contractorId || '__none'; (byCt[k] = byCt[k] || []).push(mp); }
+  const cmpRows = Object.entries(byCt).map(([cid, mps]) => {
+    const ct = contractors.find(c => c.id === cid);
+    const agg = mps.reduce((a, mp) => { const t = mp.totals || {}; a.bp += t.budgetPlan || 0; a.lp += t.leadsPlan || 0; a.bf += t.budgetFact || 0; a.lf += t.leadsFact || 0; a.hasFact = a.hasFact || t.hasFact; return a; }, { bp: 0, lp: 0, bf: 0, lf: 0, hasFact: false });
+    const cur = (mps[0] && mps[0].currency) || 'USD';
+    return { name: ct ? ct.name : (mps[0] && mps[0].contractorName) || 'Без подрядчика', plans: mps.length, cur, cplPlan: agg.lp ? Math.round(agg.bp / agg.lp) : 0, cplFact: agg.lf ? Math.round(agg.bf / agg.lf) : 0, ...agg };
+  }).sort((a, b) => b.bp - a.bp);
+
+  /* группы планов по подрядчику */
+  const groups = contractors.map(ct => ({ ct, mps: plans.filter(mp => mp.contractorId === ct.id) }));
+  const orphan = plans.filter(mp => !contractors.some(c => c.id === mp.contractorId));
+  if (orphan.length) groups.push({ ct: null, mps: orphan });
+
+  const planCard = (mp) => {
+    const t = mp.totals || {};
+    const st = MP_STATUS[mp.status] || MP_STATUS.draft;
+    const cur = mp.currency;
+    const factBar = t.hasFact
+      ? `<div class="mp-pf">
+          <div class="mp-pf-row"><span>Бюджет</span><b>${mpMoney(t.budgetFact, cur)}</b><i>из ${mpMoney(t.budgetPlan, cur)}</i></div>
+          <div class="mp-bar"><span style="width:${Math.min(100, t.budgetPct)}%"></span></div>
+          <div class="mp-pf-row"><span>Лиды</span><b>${t.leadsFact}</b><i>из ${t.leadsPlan}</i></div>
+          <div class="mp-bar"><span style="width:${Math.min(100, t.leadsPct)}%"></span></div>
+          <div class="mp-pf-row cpl"><span>CPL факт</span><b class="${t.cplFact && t.cplFact <= t.cplPlan ? 'good' : (t.cplFact ? 'bad' : '')}">${t.cplFact ? mpMoney(t.cplFact, cur) : '—'}</b><i>план ${t.cplPlan ? mpMoney(t.cplPlan, cur) : '—'}</i></div>
+        </div>`
+      : `<div class="mp-nofact">Факт ещё не внесён · вносится вручную</div>`;
+    /* разбивка одного плана по каналам + гео */
+    const byCh = {}, byGeo = {};
+    for (const ln of (mp.lines || [])) {
+      byCh[ln.channel || '—'] = (byCh[ln.channel || '—'] || 0) + (+ln.budgetPlan || 0);
+      byGeo[ln.geo || '—'] = (byGeo[ln.geo || '—'] || 0) + (+ln.budgetPlan || 0);
+    }
+    const breakdown = (mp.lines || []).length ? coll('Разбивка плана · каналы и гео', `
+      <div class="mp-bd">
+        <div><div class="mp-bd-h">По каналам</div>${Object.entries(byCh).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="mp-bd-row"><span>${esc(k)}</span><i class="mp-bd-bar"><span style="width:${t.budgetPlan ? Math.round(v / t.budgetPlan * 100) : 0}%"></span></i><b>${mpMoney(v, cur)}</b></div>`).join('')}</div>
+        <div><div class="mp-bd-h">По гео</div>${Object.entries(byGeo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="mp-bd-row"><span>${esc(mpGeoName(k))}</span><i class="mp-bd-bar"><span style="width:${t.budgetPlan ? Math.round(v / t.budgetPlan * 100) : 0}%"></span></i><b>${mpMoney(v, cur)}</b></div>`).join('')}</div>
+      </div>`, { open: false, count: (mp.lines || []).length, icon: I.bars }) : '';
+    return `<div class="glass card mp-card" data-mp="${mp.id}">
+      <div class="mp-card-hd">
+        <div>
+          <div class="mp-title">${esc(mp.title)}</div>
+          <div class="mp-sub">${esc(mpPeriod(mp))} · ${(mp.lines || []).length} стр. · ${esc(cur)}</div>
+        </div>
+        <span class="badge ${st.cls}"><i></i>${st.name}</span>
+      </div>
+      <div class="mp-metrics">
+        <div class="mp-m"><span>План бюджета</span><b>${mpMoney(t.budgetPlan, cur)}</b></div>
+        <div class="mp-m"><span>План лидов</span><b>${t.leadsPlan || 0}</b></div>
+        <div class="mp-m"><span>CPL план</span><b class="accent">${t.cplPlan ? mpMoney(t.cplPlan, cur) : '—'}</b></div>
+      </div>
+      ${factBar}
+      ${breakdown}
+      <div class="mp-acts">
+        <button class="btn btn-sm btn-accent" data-mpopen="${mp.id}">${ic(I.doc)}Открыть</button>
+        <button class="btn btn-sm" data-mpshare="${mp.id}">${ic(I.link)}Поделиться</button>
+        <button class="btn btn-sm" data-mpdup="${mp.id}">${ic(I.copy)}Дублировать</button>
+        <button class="btn btn-sm btn-danger" data-mpdel="${mp.id}">${ic(I.x)}</button>
+      </div>
+    </div>`;
+  };
+
+  root.innerHTML = `
+    ${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I.bars)}Медиапланы<span class="sub">подрядчики трафика · план/факт · согласование</span></div>
+      ${[
+        ['Медиапланов', plans.length, 'по всем подрядчикам'],
+        ['Подрядчиков', contractors.length, 'поставщики трафика'],
+        ['Плановый бюджет', mpMoney(sumBudget, 'USD'), `${sumLeads} лидов · CPL ${avgCpl ? mpMoney(avgCpl, 'USD') : '—'}`],
+      ].map(([k, v, sub]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
+    `, { v: 'right', hue: '#3E7BE0' })}
+    <div class="mp-toolbar">
+      <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
+      <button class="btn" id="mpContractors">${ic(I.users)}Подрядчики <span class="muted">· ${contractors.length}</span></button>
+      <div class="mp-hint muted">${ic(I.spark)}Факт вносится вручную. Синхронизация из рекламного кабинета — в следующей фазе.</div>
+    </div>
+    ${cmpRows.length > 1 ? `<div class="glass card mb">
+      <div class="card-title">${ic(I.bars)}Сравнение подрядчиков<span class="sub">план vs факт · CPL</span></div>
+      <table class="tbl mp-cmp"><thead><tr><th>Подрядчик</th><th>Планов</th><th>Бюджет план</th><th>Бюджет факт</th><th>Лиды план</th><th>Лиды факт</th><th>CPL план</th><th>CPL факт</th></tr></thead><tbody>
+        ${cmpRows.map(r => `<tr>
+          <td><b>${esc(r.name)}</b></td>
+          <td>${r.plans}</td>
+          <td>${mpMoney(r.bp, r.cur)}</td>
+          <td>${r.hasFact ? mpMoney(r.bf, r.cur) : '<span class="muted">—</span>'}</td>
+          <td>${r.lp}</td>
+          <td>${r.hasFact ? r.lf : '<span class="muted">—</span>'}</td>
+          <td><b class="accent">${r.cplPlan ? mpMoney(r.cplPlan, r.cur) : '—'}</b></td>
+          <td>${r.cplFact ? `<b class="${r.cplFact <= r.cplPlan ? 'mp-good' : 'mp-bad'}">${mpMoney(r.cplFact, r.cur)}</b>` : '<span class="muted">—</span>'}</td>
+        </tr>`).join('')}
+      </tbody></table>
+    </div>` : ''}
+    ${plans.length ? groups.filter(g => g.mps.length).map(g => `
+      <div class="mp-group">
+        <div class="mp-group-hd">${ic(I.target)}<b>${esc(g.ct ? g.ct.name : 'Без подрядчика')}</b>${g.ct && (g.ct.channels || []).length ? `<span class="muted">· ${g.ct.channels.map(esc).join(', ')}</span>` : ''}${g.ct && (g.ct.geos || []).length ? `<span class="muted">· ${g.ct.geos.map(mpGeoName).map(esc).join(', ')}</span>` : ''}</div>
+        <div class="mp-grid">${g.mps.map(planCard).join('')}</div>
+      </div>`).join('')
+    : `<div class="glass card"><div class="empty" style="padding:36px;text-align:center">
+        <div style="font-size:15px;font-weight:650;margin-bottom:6px">Медиапланов пока нет</div>
+        <div class="muted" style="margin-bottom:16px">Создайте первый медиаплан под подрядчика трафика — с планом по каналам, гео и связкам.</div>
+        <button class="btn btn-accent" id="mpNew2">${ic(I.plus)}Новый медиаплан</button>
+      </div></div>`}
+  `;
+
+  const openNew = () => openMpBuilder(null, contractors);
+  $('#mpNew', root) && $('#mpNew', root).addEventListener('click', openNew);
+  $('#mpNew2', root) && $('#mpNew2', root).addEventListener('click', openNew);
+  $('#mpContractors', root).addEventListener('click', () => openContractorsModal());
+
+  $$('[data-mpopen]', root).forEach(b => b.addEventListener('click', () => openMpBuilder(plans.find(x => x.id === b.dataset.mpopen), contractors)));
+  $$('[data-mpshare]', root).forEach(b => b.addEventListener('click', () => {
+    const mp = plans.find(x => x.id === b.dataset.mpshare);
+    const url = `${location.origin}/mp/${mp.id}?key=${mp.editKey}`;
+    navigator.clipboard.writeText(url);
+    toast('Ссылка на медиаплан скопирована', 'Подрядчик откроет и утвердит план по этой ссылке', true);
+  }));
+  $$('[data-mpdup]', root).forEach(b => b.addEventListener('click', async () => {
+    const mp = plans.find(x => x.id === b.dataset.mpdup);
+    await api.post('/mediaplans', { contractorId: mp.contractorId, title: mp.title + ' (копия)', period: mp.period, currency: mp.currency, lines: mp.lines, note: mp.note });
+    toast('Медиаплан дублирован', null, true); render();
+  }));
+  $$('[data-mpdel]', root).forEach(b => b.addEventListener('click', () => {
+    const mp = plans.find(x => x.id === b.dataset.mpdel);
+    modal({ title: 'Удалить медиаплан?', sub: esc(mp.title), body: '<div class="muted">Действие необратимо.</div>', actions: [
+      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/mediaplans/' + mp.id, { method: 'DELETE' }); toast('Медиаплан удалён', null, true); render(); } },
+      { label: 'Отмена' },
+    ] });
+  }));
+};
+
+/* ---- билдер медиаплана (модалка): шапка + строки план/факт + живые итоги ---- */
+function openMpBuilder(mp, contractors) {
+  const isNew = !mp;
+  mp = mp || { id: null, contractorId: (contractors[0] || {}).id || null, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
+  const lineRow = (ln) => {
+    ln = ln || {};
+    return `<tr data-lrow data-lid="${esc(ln.id || '')}" data-note="${esc(ln.note || '')}">
+      <td><input class="li" data-k="channel" list="mpChList" value="${esc(ln.channel || '')}" placeholder="Meta"></td>
+      <td><input class="li" data-k="geo" value="${esc(ln.geo || '')}" placeholder="dubai"></td>
+      <td><input class="li" data-k="bundle" value="${esc(ln.bundle || '')}" placeholder="Связка / креатив → цель"></td>
+      <td><input class="li num" data-k="budgetPlan" type="number" min="0" value="${ln.budgetPlan || ''}" placeholder="0"></td>
+      <td><input class="li num" data-k="leadsPlan" type="number" min="0" value="${ln.leadsPlan || ''}" placeholder="0"></td>
+      <td class="mp-cpl" data-cpl>—</td>
+      <td><input class="li num fct" data-k="budgetFact" type="number" min="0" value="${ln.budgetFact || ''}" placeholder="0"></td>
+      <td><input class="li num fct" data-k="leadsFact" type="number" min="0" value="${ln.leadsFact || ''}" placeholder="0"></td>
+      <td class="mp-cpl" data-cplf>—</td>
+      <td class="mp-delc"><button type="button" class="mp-delrow" data-delrow title="Удалить строку">${ic(I.x)}</button></td>
+    </tr>`;
+  };
+  const body = `
+    <datalist id="mpChList">${MP_CHANNELS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <div class="mp-b-top">
+      <div class="form-row" style="flex:2;min-width:220px"><label>Название плана</label><input id="mpTitle" value="${esc(mp.title)}" placeholder="Дубай · Сентябрь"></div>
+      <div class="form-row" style="flex:1.4;min-width:180px"><label>Подрядчик</label>
+        <select id="mpCt">${contractors.map(c => `<option value="${c.id}" ${c.id === mp.contractorId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ Новый подрядчик…</option></select>
+      </div>
+      <div class="form-row" style="flex:0 0 110px"><label>Валюта</label>
+        <select id="mpCur">${['USD', 'EUR', 'AED', 'RUB'].map(c => `<option value="${c}" ${c === mp.currency ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="mp-b-top">
+      <div class="form-row" style="flex:1;min-width:150px"><label>Период с</label><input id="mpFrom" type="date" value="${esc((mp.period || {}).from || '')}"></div>
+      <div class="form-row" style="flex:1;min-width:150px"><label>Период по</label><input id="mpTo" type="date" value="${esc((mp.period || {}).to || '')}"></div>
+      <div class="form-row" style="flex:1;min-width:150px"><label>Статус</label>
+        <select id="mpStatus">${Object.entries(MP_STATUS).map(([k, v]) => `<option value="${k}" ${k === mp.status ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="mp-lbl">Строки плана <span class="muted">· канал · гео · связка · бюджет/лиды план → CPL, и факт (вручную) → CPL факт · Δ</span></div>
+    <div class="mp-tbl-wrap"><table class="mp-tbl"><thead><tr>
+      <th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
+    </tr></thead>
+    <tbody id="mpRows">${(mp.lines || []).map(lineRow).join('') || lineRow()}</tbody>
+    <tfoot><tr class="mp-tot">
+      <td colspan="3">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
+      <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTcP">—</td>
+      <td class="num fct" id="mpTbF">—</td><td class="num fct" id="mpTlF">—</td><td class="num" id="mpTcF">—</td><td></td>
+    </tr></tfoot></table></div>
+    <div class="form-row" style="margin-top:14px"><label>Заметка к плану (видна подрядчику в документе)</label><textarea id="mpNote" style="min-height:60px" placeholder="Условия, комментарии, что нужно согласовать…">${esc(mp.note || '')}</textarea></div>
+  `;
+  const bd = modal({ title: isNew ? 'Новый медиаплан' : 'Медиаплан', sub: isNew ? 'Заполните план по каналам и связкам' : esc(mp.title), body, wide: 'card', actions: [
+    { label: isNew ? 'Создать' : 'Сохранить', cls: 'btn-accent', onClick: async (bd2) => {
+      const payload = collect(bd2);
+      if (!payload) return false;
+      let saved;
+      if (isNew) saved = await api.post('/mediaplans', payload);
+      else saved = await api.patch('/mediaplans/' + mp.id, payload);
+      toast(isNew ? 'Медиаплан создан' : 'Медиаплан сохранён', saved && saved.totals ? `План: ${mpMoney(saved.totals.budgetPlan, payload.currency)} · ${saved.totals.leadsPlan} лидов · CPL ${saved.totals.cplPlan ? mpMoney(saved.totals.cplPlan, payload.currency) : '—'}` : null, true);
+      if (CUR === 'mediaplan') render();
+    } },
+    { label: 'Закрыть' },
+  ] });
+
+  const collect = (root2) => {
+    const title = $('#mpTitle', root2).value.trim();
+    if (!title) { toast('Укажите название плана'); return null; }
+    const ctVal = $('#mpCt', root2).value;
+    const lines = $$('[data-lrow]', root2).map(tr => {
+      const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); return el2 ? el2.value : ''; };
+      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), bundle: g('bundle').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    }).filter(l => l.channel || l.geo || l.bundle || l.budgetPlan || l.leadsPlan || l.budgetFact || l.leadsFact);
+    return { title, contractorId: ctVal === '__new' ? null : ctVal, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
+  };
+
+  const recalc = () => {
+    const cur = $('#mpCur', bd).value;
+    let bp = 0, lp = 0, bf = 0, lf = 0;
+    $$('[data-lrow]', bd).forEach(tr => {
+      const g = (k) => +(tr.querySelector(`[data-k="${k}"]`) || {}).value || 0;
+      const bpv = g('budgetPlan'), lpv = g('leadsPlan'), bfv = g('budgetFact'), lfv = g('leadsFact');
+      bp += bpv; lp += lpv; bf += bfv; lf += lfv;
+      const cplp = lpv ? Math.round(bpv / lpv) : 0, cplf = lfv ? Math.round(bfv / lfv) : 0;
+      tr.querySelector('[data-cpl]').textContent = cplp ? mpMoney(cplp, cur) : '—';
+      const cf = tr.querySelector('[data-cplf]');
+      cf.textContent = cplf ? mpMoney(cplf, cur) : '—';
+      cf.className = 'mp-cpl ' + (cplf && cplp ? (cplf <= cplp ? 'mp-good' : 'mp-bad') : '');
+    });
+    $('#mpTbP', bd).textContent = mpMoney(bp, cur);
+    $('#mpTlP', bd).textContent = lp;
+    $('#mpTcP', bd).textContent = lp ? mpMoney(Math.round(bp / lp), cur) : '—';
+    $('#mpTbF', bd).textContent = bf ? mpMoney(bf, cur) : '—';
+    $('#mpTlF', bd).textContent = lf || '—';
+    $('#mpTcF', bd).textContent = lf ? mpMoney(Math.round(bf / lf), cur) : '—';
+  };
+
+  bd.addEventListener('input', (e) => { if (e.target.closest('[data-lrow]') || e.target.id === 'mpCur') recalc(); });
+  bd.addEventListener('change', (e) => {
+    if (e.target.id === 'mpCur') recalc();
+    if (e.target.id === 'mpCt' && e.target.value === '__new') { openContractorEdit(null, (nc) => { closeModal(); reopenBuilder(mp, isNew, nc); }); }
+  });
+  $('#mpAddRow', bd).addEventListener('click', () => { $('#mpRows', bd).insertAdjacentHTML('beforeend', lineRow()); recalc(); });
+  bd.addEventListener('click', (e) => { const d = e.target.closest('[data-delrow]'); if (d) { const tr = d.closest('[data-lrow]'); if ($$('[data-lrow]', bd).length > 1) tr.remove(); else tr.querySelectorAll('input').forEach(i => i.value = ''); recalc(); } });
+  recalc();
+}
+/* пере-открыть билдер с обновлённым списком подрядчиков (после создания нового) */
+async function reopenBuilder(mp, isNew, newCt) {
+  const contractors = await api.get('/contractors');
+  const draft = mp ? { ...mp } : null;
+  if (newCt) { if (draft) draft.contractorId = newCt.id; }
+  const target = draft || { contractorId: newCt ? newCt.id : (contractors[0] || {}).id, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
+  openMpBuilder(isNew ? { ...target, id: null } : target, contractors);
+}
+
+/* ---- менеджер подрядчиков ---- */
+async function openContractorsModal() {
+  const contractors = await api.get('/contractors');
+  const body = `<div class="mp-ct-list">${contractors.length ? contractors.map(c => `<div class="mp-ct-row" data-ctrow="${c.id}">
+      <div class="mp-ct-main">
+        <div class="mp-ct-nm">${esc(c.name)}</div>
+        <div class="mp-ct-meta">${(c.channels || []).length ? esc(c.channels.join(', ')) : '<span class="muted">каналы не указаны</span>'}${(c.geos || []).length ? ' · ' + c.geos.map(mpGeoName).map(esc).join(', ') : ''}${c.contact ? ' · ' + esc(c.contact) : ''}</div>
+      </div>
+      <button class="btn btn-sm" data-ctedit="${c.id}">${ic(I.gear)}</button>
+      <button class="btn btn-sm btn-danger" data-ctdel="${c.id}">${ic(I.x)}</button>
+    </div>`).join('') : '<div class="muted" style="padding:14px 0">Подрядчиков пока нет — добавьте первого.</div>'}</div>
+    <button class="btn btn-accent" id="ctAdd" style="margin-top:14px">${ic(I.plus)}Добавить подрядчика</button>`;
+  const bd = modal({ title: 'Подрядчики трафика', sub: 'Поставщики трафика: каналы, гео, контакт', body, wide: true, actions: [{ label: 'Готово' }] });
+  $('#ctAdd', bd).addEventListener('click', () => openContractorEdit(null, () => openContractorsModal()));
+  $$('[data-ctedit]', bd).forEach(b => b.addEventListener('click', () => openContractorEdit(contractors.find(c => c.id === b.dataset.ctedit), () => openContractorsModal())));
+  $$('[data-ctdel]', bd).forEach(b => b.addEventListener('click', () => {
+    const c = contractors.find(x => x.id === b.dataset.ctdel);
+    modal({ title: 'Удалить подрядчика?', sub: esc(c.name), body: '<div class="muted">Медиапланы этого подрядчика останутся, но без привязки.</div>', actions: [
+      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/contractors/' + c.id, { method: 'DELETE' }); toast('Подрядчик удалён', null, true); openContractorsModal(); if (CUR === 'mediaplan') render(); } },
+      { label: 'Отмена' },
+    ] });
+  }));
+}
+/* создать/редактировать одного подрядчика; onDone(savedCt) */
+function openContractorEdit(ct, onDone) {
+  const isNew = !ct;
+  ct = ct || { name: '', channels: [], geos: [], contact: '', note: '' };
+  const body = `
+    <div class="form-row"><label>Название</label><input id="ceName" value="${esc(ct.name)}" placeholder="DXB Traffic Lab"></div>
+    <div class="mp-b-top">
+      <div class="form-row" style="flex:1"><label>Каналы (через запятую)</label><input id="ceCh" value="${esc((ct.channels || []).join(', '))}" placeholder="Meta, Google, TikTok"></div>
+      <div class="form-row" style="flex:1"><label>Гео (через запятую)</label><input id="ceGeo" value="${esc((ct.geos || []).join(', '))}" placeholder="dubai, bali"></div>
+    </div>
+    <div class="form-row"><label>Контакт</label><input id="ceContact" value="${esc(ct.contact || '')}" placeholder="@telegram · почта · телефон"></div>
+    <div class="form-row"><label>Заметка</label><textarea id="ceNote" style="min-height:54px" placeholder="Условия, ставки, специализация…">${esc(ct.note || '')}</textarea></div>`;
+  modal({ title: isNew ? 'Новый подрядчик' : 'Подрядчик', body, wide: true, actions: [
+    { label: isNew ? 'Создать' : 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+      const name = $('#ceName', bd).value.trim(); if (!name) { toast('Укажите название'); return false; }
+      const payload = { name, channels: $('#ceCh', bd).value.split(',').map(s => s.trim()).filter(Boolean), geos: $('#ceGeo', bd).value.split(',').map(s => s.trim()).filter(Boolean), contact: $('#ceContact', bd).value.trim(), note: $('#ceNote', bd).value.trim() };
+      const saved = isNew ? await api.post('/contractors', payload) : await api.patch('/contractors/' + ct.id, payload);
+      toast(isNew ? 'Подрядчик добавлен' : 'Сохранено', null, true);
+      if (onDone) onDone(saved);
+      if (CUR === 'mediaplan') render();
+    } },
+    { label: 'Отмена' },
+  ] });
+}
+
 /* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */
 const CMT_INTENT = { price: ['спрашивает цену', 'hot'], payment: ['рассрочка/ипотека', 'hot'], interest: ['проявил интерес', 'hot'], location: ['про локацию', 'hot'], question: ['вопрос', 'hot'], negative: ['негатив', 'neg'], spam: ['спам', 'neg'], other: ['комментарий', ''] };
 PAGES.comments = async (root) => {
@@ -6313,11 +6630,14 @@ const MB_TEXTMODES = { auto: 'Авто', none: 'Без текста', handwritte
    3 семейства: Наклейка (adhesive — крепежа не видно, объект «приклеен»), Скотч (tape), Эмодзи (3D-стикер).
    Скрепка/булавка убраны из дефолтов (гигантские канц-предметы запрещены). Крепёж ≤15% веса объекта.
    AUTO распределяет по интенсивности с анти-повтором; детерминировано по item.id (стабильно). */
-const MB_ATT_MODES = { auto: 'Авто', adhesive: 'Наклейка', tape: 'Скотч', emoji: 'Эмодзи', none: 'Без' };
+const MB_ATT_MODES = { auto: 'Авто', clip: 'Скрепка', tape: 'Скотч', emoji: 'Эмодзи', adhesive: 'Наклейка', none: 'Без' };
 const MB_ATT_INTS = { minimal: 'Минимал', balanced: 'Баланс', expressive: 'Ярко' };
-/* распределение семейств [adhesive, tape, emoji, none] в % */
-/* [adhesive, tape, emoji, none] — эмодзи РЕДКИ в AUTO (не мессенджер-пузыри); дефолт = чисто */
-const MB_ATT_DIST = { minimal: [20, 8, 2, 70], balanced: [25, 18, 4, 53], expressive: [32, 30, 8, 30] };
+/* распределение семейств [clip, tape, emoji, adhesive, none] в % — по умолчанию (auto) скрепка на БОЛЬШИНСТВЕ
+   стикеров (юзер хочет «каждый прикреплён скрепкой»), немного скотча/эмодзи для ритма. */
+const MB_ATT_DIST = { minimal: [62, 8, 2, 8, 20], balanced: [68, 16, 5, 6, 5], expressive: [60, 28, 10, 2, 0] };
+/* размер скрепки (px, эмодзи) по интенсивности [min,max] */
+const MB_CLIP_SIZE = { minimal: [22, 27], balanced: [28, 35], expressive: [34, 44] };
+const MB_CLIP_PLACE = [['tl', 30], ['tr', 30], ['tc', 22], ['trl', 9], ['tll', 9]]; /* верхние углы/центр (скрепка цепляет верхний край) */
 const MB_TAPE_VARIANTS = ['clear', 'white', 'beige', 'cream', 'frosted', 'washi', 'black', 'pastel', 'torn'];
 const MB_TAPE_PLACE = [['tc', 25], ['tl', 15], ['tr', 15], ['dl', 10], ['dr', 10], ['le', 5], ['re', 5], ['bl', 4], ['br', 4], ['cw', 4]];
 const MB_ADH_VARIANTS = ['cutout', 'lift', 'float']; /* card/polaroid бликуют на прозрачном die-cut — только чистые тени */
@@ -6340,15 +6660,22 @@ function mbEmojiFor(cat, meaning, rng) {
 /* назначить крепёж всем объектам (порядок важен для анти-повтора) */
 function mbAssignAtt(items, mode, intensity) {
   const dist = MB_ATT_DIST[intensity] || MB_ATT_DIST.balanced;
-  const famPairs = [['adhesive', dist[0]], ['tape', dist[1]], ['emoji', dist[2]], ['none', dist[3]]];
-  let prevFam = null, prevPlace = null, sameRun = 0;
+  const famPairs = [['clip', dist[0]], ['tape', dist[1]], ['emoji', dist[2]], ['adhesive', dist[3]], ['none', dist[4]]];
+  const clipSz = MB_CLIP_SIZE[intensity] || MB_CLIP_SIZE.balanced;
+  let prevFam = null, prevPlace = null, prevClip = null, sameRun = 0;
   return items.map((it) => {
     const rng = mbSeed(it.id + '|' + mode + '|' + intensity);
     let fam = (mode && mode !== 'auto') ? mode : mbPickW(rng, famPairs);
-    if (mode === 'auto' || !mode) { let g = 0; while (fam === prevFam && sameRun >= 1 && g < 5) { fam = mbPickW(rng, famPairs); g++; } }
+    /* в auto не даём одному семейству идти длинной серией (кроме скрепки — она и должна доминировать) */
+    if ((mode === 'auto' || !mode) && fam !== 'clip') { let g = 0; while (fam === prevFam && sameRun >= 1 && g < 5) { fam = mbPickW(rng, famPairs); g++; } }
     sameRun = fam === prevFam ? sameRun + 1 : 0; prevFam = fam;
-    const d = { fam, rot: +((rng() * 2 - 1) * (fam === 'adhesive' ? 2.4 : fam === 'tape' ? 3 : 1.5)).toFixed(1) };
-    if (fam === 'tape') {
+    const d = { fam, rot: +((rng() * 2 - 1) * (fam === 'adhesive' ? 2.4 : fam === 'tape' ? 3 : fam === 'clip' ? 4 : 1.5)).toFixed(1) };
+    if (fam === 'clip') {
+      let pl = mbPickW(rng, MB_CLIP_PLACE); let g = 0; while (pl === prevClip && g < 4) { pl = mbPickW(rng, MB_CLIP_PLACE); g++; } prevClip = pl;
+      d.place = pl; d.size = clipSz[0] + Math.floor(rng() * (clipSz[1] - clipSz[0] + 1));
+      d.rot = pl === 'tl' || pl === 'tll' ? -(10 + rng() * 12) : pl === 'tr' || pl === 'trl' ? (10 + rng() * 12) : +((rng() * 2 - 1) * 8).toFixed(1);
+      d.rot = +d.rot.toFixed(1);
+    } else if (fam === 'tape') {
       d.variant = MB_TAPE_VARIANTS[Math.floor(rng() * MB_TAPE_VARIANTS.length)];
       let pl = mbPickW(rng, MB_TAPE_PLACE); let g = 0; while (pl === prevPlace && g < 4) { pl = mbPickW(rng, MB_TAPE_PLACE); g++; } prevPlace = pl;
       d.place = pl; d.w = 18 + Math.floor(rng() * 14); d.trot = +((rng() * 2 - 1) * 8).toFixed(1);
@@ -6582,6 +6909,7 @@ async function renderMoodboard(root, opts) {
   /* крепёж-слой: наклейка (класс+тень) / скотч (оверлей) / эмодзи (3D-чип) — арт-директор, ≤15% */
   const mbAttHtml = (it, d) => {
     if (!d || d.fam === 'none') return '';
+    if (d.fam === 'clip') return `<span class="mb-clip mb-clip-${d.place}" style="font-size:${d.size}px;transform:rotate(${d.rot}deg)">📎</span>`;
     if (d.fam === 'tape') return `<span class="mb-tape mb-tape-${d.variant} mb-tp-${d.place}" style="width:${d.w}%"></span>`;
     if (d.fam === 'emoji') return `<span class="mb-emoji mb-emj-${d.anchor}" style="font-size:${Math.round(d.size / 100 * (it.w || 220))}px">${d.emoji}</span>`;
     return '';

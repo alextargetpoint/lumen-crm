@@ -265,6 +265,21 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
   if (!db.brokerTasks) db.brokerTasks = [];     // личный таск-менеджер брокера (Today + встречи + приоритеты + стрики)
+  /* Медиапланы (Ads-сюит, Фаза 1): подрядчики трафика + пер-подрядчик медиапланы (план/факт, CPL — производный).
+     Сидим один пример (Дубай · Meta+Google), помеченный «пример», чтобы страница не была пустой. */
+  if (!db.mpContractors) db.mpContractors = [
+    { id: 'ct_example', name: 'DXB Traffic Lab · пример', channels: ['Meta', 'Google'], geos: ['dubai'], contact: '@dxbtraffic · t.me/dxbtraffic', note: 'Пример подрядчика — можно удалить или переименовать под своего.', createdAt: Date.now() },
+  ];
+  if (!db.mediaplans) db.mediaplans = [
+    { id: 'mp_example', contractorId: 'ct_example', title: 'Дубай · Сентябрь · пример', period: { from: '2026-09-01', to: '2026-09-30' }, currency: 'USD', status: 'draft',
+      lines: [
+        { id: 'mpl_ex1', channel: 'Meta', geo: 'dubai', bundle: 'Видео-тур JVC → лид-форма', budgetPlan: 3000, leadsPlan: 120, budgetFact: 1500, leadsFact: 54, note: 'Факт за первые 2 недели' },
+        { id: 'mpl_ex2', channel: 'Meta', geo: 'dubai', bundle: 'Marina карусель → CTWA', budgetPlan: 2000, leadsPlan: 70, budgetFact: 0, leadsFact: 0, note: '' },
+        { id: 'mpl_ex3', channel: 'Google', geo: 'dubai', bundle: 'Search «купить квартиру Дубай»', budgetPlan: 1500, leadsPlan: 40, budgetFact: 0, leadsFact: 0, note: '' },
+      ],
+      note: 'Пример медиаплана. Факт вносится вручную (позже — авто-синк из рекламного кабинета). Поделитесь ссылкой /mp/:id?key= — подрядчик утвердит план.',
+      createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null },
+  ];
   if (!db.folders) db.folders = [];
   for (const pr of db.properties) { if (!pr.images) pr.images = []; if (!pr.layouts) pr.layouts = []; if (!pr.description) pr.description = ''; if (!pr.amenities) pr.amenities = []; if (!pr.units) pr.units = []; }
   if (!db.settings.agency.manager) db.settings.agency.manager = { name: 'Ваш менеджер', phone: '', email: '' };
@@ -2146,7 +2161,9 @@ const server = http.createServer(async (req, res) => {
     /* Ф3: edit-bar подборки (Перекомпоновать / Lock / Regen) авторизуется тем же edit-ключом,
        что и конструктор /p/:id/blocks — держатель editKey и так может редактировать блоки */
     const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk) return json(res, 401, { error: 'auth required' });
+    /* Медиапланы: публичное утверждение/отклонение подрядчиком авторизуется тем же edit-ключом (?key=hooks.secret), что и /mp/:id */
+    const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -2989,12 +3006,13 @@ const server = http.createServer(async (req, res) => {
           const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);
           try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — падаём на порядок/размер */ }
           console.error('[launch] photo roles:', roles.join(',') || '(none)');
-          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));   /* планировщик владеет назначением ассетов (spec #71/#87) */
+          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));
+          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: db.settings.geoNames[b.geo] || b.geo || '' });   /* ⟲ откат к «умной» раскладке фото (2-дн-давности), без tier-jump планировщика */
         }
       }
       const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
       if (NN) slides = trimToCount(slides, NN);
-      slides = planCarousel(slides, { pool: carPool, dna: carDNA(b, photoBias), theme: PAGE_THEMES[b.theme] || {}, angle: b.angle });   /* spec-first: purposes→plan→validate→critic→apply */
+      slides = stylePass(slides, PAGE_THEMES[b.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо мастер-вижн planCarousel/artDirect (тир-джамп «постеры») */
       if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
@@ -3319,10 +3337,11 @@ const server = http.createServer(async (req, res) => {
           const absP = good.map(u => u[0] === '/' ? `http://${req.headers.host}${u}` : u);   /* локальные /assets → абсолютные для vision */
           try { roles = await llm.classifyPhotos(absP); } catch (e) { /* нет vision — по порядку */ }
           console.error('[ai-compose] photo roles:', roles.join(',') || '(none)');
-          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));   /* планировщик владеет назначением ассетов (spec #71/#87) */
+          carPool = good.map((u, k) => ({ url: u, role: roles[k] || 'other' }));
+          slides = placeProjectPhotos(slides, good, roles, { photoBias, geoName: geoQ });   /* ⟲ откат к умной раскладке фото */
         }
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
-        slides = planCarousel(slides, { pool: carPool, dna: carDNA(b, photoBias), theme: PAGE_THEMES[c.theme] || {}, angle: b.angle });   /* spec-first: purposes→plan→validate→critic→apply */
+        slides = stylePass(slides, PAGE_THEMES[c.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо tier-jump planCarousel */
         if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });   /* уместный стикер по смыслу слайда */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
@@ -3389,8 +3408,8 @@ const server = http.createServer(async (req, res) => {
           let pi = 0;
           if (pics.length) { c.slides.forEach(s => { if (s.bg) { s.bg = pics[pi % pics.length]; pi++; } (s.layers || []).forEach(l => { if (l.t === 'img' && !l.sticker && (l.w || 0) >= 40) { l.url = pics[pi % pics.length]; pi++; } }); }); changed.push('фото'); }
         }
-        /* раскладка: переназначаем семейства с новым seed (для direction/layout, и после смены текста) */
-        if (/layout|direction/.test(change) || change === 'copy') { if (!locks.layout) { c.slides = artDirect(c.slides.map(s => sanSlide(s)), { dna, seed }); if (!changed.includes('раскладка')) changed.push('раскладка'); } }
+        /* раскладка: классический стиль-пасс (⟲ откат от tier-jump artDirect) */
+        if (/layout|direction/.test(change) || change === 'copy') { if (!locks.layout) { c.slides = stylePass(c.slides.map(s => sanSlide(s)), PAGE_THEMES[c.theme] || {}); if (!changed.includes('раскладка')) changed.push('раскладка'); } }
         c.slides = c.slides.slice(0, 12).map(s => sanSlide(s));
         store.save();
         return json(res, 200, { ok: true, changed, theme: c.theme, font: c.font });
@@ -3793,6 +3812,295 @@ const server = http.createServer(async (req, res) => {
         t.attachments = (t.attachments || []).filter(a => a.id !== m[2]); store.save();
         return json(res, 200, { ok: true });
       }
+    }
+
+    /* ================= МЕДИАПЛАНЫ (Ads-сюит · Фаза 1) — подрядчики трафика + план/факт + публичное утверждение =================
+       Весь блок держится вместе: CRUD подрядчиков, CRUD медиапланов, approve/reject (edit-ключ), публичный /mp/:id.
+       CPL нигде не хранится — только считается из бюджет/лиды. Факт вносится вручную (Фаза 2 — авто-синк из кабинета). */
+    /* производные тоталы медиаплана */
+    function mpTotals(mp) {
+      let bp = 0, lp = 0, bf = 0, lf = 0, hasFact = false;
+      for (const ln of (mp.lines || [])) {
+        bp += +ln.budgetPlan || 0; lp += +ln.leadsPlan || 0;
+        bf += +ln.budgetFact || 0; lf += +ln.leadsFact || 0;
+        if ((+ln.budgetFact || 0) || (+ln.leadsFact || 0)) hasFact = true;
+      }
+      return { budgetPlan: bp, leadsPlan: lp, cplPlan: lp ? Math.round(bp / lp) : 0, budgetFact: bf, leadsFact: lf, cplFact: lf ? Math.round(bf / lf) : 0, hasFact, budgetPct: bp ? Math.round(bf / bp * 100) : 0, leadsPct: lp ? Math.round(lf / lp * 100) : 0 };
+    }
+    const mpSanitizeLines = (arr) => (Array.isArray(arr) ? arr : []).slice(0, 60).map(ln => ({
+      id: (ln && ln.id) || store.nextId('mpl'),
+      channel: String((ln && ln.channel) || '').slice(0, 40),
+      geo: String((ln && ln.geo) || '').slice(0, 40),
+      bundle: String((ln && ln.bundle) || '').slice(0, 160),
+      budgetPlan: Math.max(0, +(ln && ln.budgetPlan) || 0),
+      leadsPlan: Math.max(0, Math.round(+(ln && ln.leadsPlan) || 0)),
+      budgetFact: Math.max(0, +(ln && ln.budgetFact) || 0),
+      leadsFact: Math.max(0, Math.round(+(ln && ln.leadsFact) || 0)),
+      note: String((ln && ln.note) || '').slice(0, 300),
+    }));
+
+    /* — подрядчики трафика — */
+    if (p === '/api/contractors' && req.method === 'GET') return json(res, 200, db.mpContractors);
+    if (p === '/api/contractors' && req.method === 'POST') {
+      const b = await readBody(req);
+      const ct = { id: store.nextId('ct'), name: String(b.name || 'Подрядчик').slice(0, 80), channels: (Array.isArray(b.channels) ? b.channels : []).map(x => String(x).slice(0, 30)).slice(0, 12), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => String(x).slice(0, 30)).slice(0, 12), contact: String(b.contact || '').slice(0, 200), note: String(b.note || '').slice(0, 500), createdAt: Date.now() };
+      db.mpContractors.unshift(ct); store.save();
+      return json(res, 200, ct);
+    }
+    if ((m = p.match(/^\/api\/contractors\/([^/]+)$/)) && req.method === 'PATCH') {
+      const ct = db.mpContractors.find(x => x.id === m[1]); if (!ct) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.name != null) ct.name = String(b.name).slice(0, 80);
+      if (Array.isArray(b.channels)) ct.channels = b.channels.map(x => String(x).slice(0, 30)).slice(0, 12);
+      if (Array.isArray(b.geos)) ct.geos = b.geos.map(x => String(x).slice(0, 30)).slice(0, 12);
+      if (b.contact != null) ct.contact = String(b.contact).slice(0, 200);
+      if (b.note != null) ct.note = String(b.note).slice(0, 500);
+      store.save();
+      return json(res, 200, ct);
+    }
+    if ((m = p.match(/^\/api\/contractors\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.mpContractors = db.mpContractors.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+
+    /* — медиапланы — */
+    if (p === '/api/mediaplans' && req.method === 'GET') {
+      return json(res, 200, db.mediaplans.map(mp => Object.assign({}, mp, {
+        contractorName: (db.mpContractors.find(c => c.id === mp.contractorId) || {}).name || null,
+        totals: mpTotals(mp), editKey: db.settings.hooks.secret,
+      })));
+    }
+    if (p === '/api/mediaplans' && req.method === 'POST') {
+      const b = await readBody(req);
+      const mp = { id: store.nextId('mp'), contractorId: b.contractorId || null, title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
+      db.mediaplans.unshift(mp); store.save();
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: db.settings.hooks.secret }));
+    }
+    if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'PATCH') {
+      const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.title != null) mp.title = String(b.title).slice(0, 120);
+      if (b.contractorId !== undefined) mp.contractorId = b.contractorId || null;
+      if (b.period) mp.period = { from: String(b.period.from || '').slice(0, 10), to: String(b.period.to || '').slice(0, 10) };
+      if (['USD', 'EUR', 'AED', 'RUB'].includes(b.currency)) mp.currency = b.currency;
+      if (Array.isArray(b.lines)) mp.lines = mpSanitizeLines(b.lines);
+      if (b.note != null) mp.note = String(b.note).slice(0, 1000);
+      if (b.status && ['draft', 'sent', 'approved', 'rejected'].includes(b.status)) {
+        mp.status = b.status;
+        if (b.status === 'sent' && !mp.sentAt) mp.sentAt = Date.now();
+        if (b.status === 'draft') { mp.approvedAt = null; mp.approvedBy = null; }
+      }
+      store.save();
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: db.settings.hooks.secret }));
+    }
+    if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.mediaplans = db.mediaplans.filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* публичное утверждение / отклонение — edit-ключ ИЛИ сессия (allow-list выше: mpApproveKeyOk) */
+    if ((m = p.match(/^\/api\/mediaplans\/([^/]+)\/(approve|reject)$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      mp.status = m[2] === 'approve' ? 'approved' : 'rejected';
+      mp.approvedAt = Date.now();
+      mp.approvedBy = String(b.name || 'Подрядчик').slice(0, 80);
+      mp.approvalComment = b.comment ? String(b.comment).slice(0, 500) : '';
+      store.save();
+      return json(res, 200, { ok: true, status: mp.status, approvedBy: mp.approvedBy, approvedAt: mp.approvedAt });
+    }
+
+    /* рендер публичного премиум-документа медиаплана (клиентский вид; ?key= добавляет кнопки утверждения) */
+    function renderMpDoc(db, mp, opts) {
+      const AG = db.settings.agency.name || 'Агентство';
+      const logo = db.settings.agency.logo;
+      const ct = db.mpContractors.find(c => c.id === mp.contractorId) || {};
+      const geoNames = db.settings.geoNames || {};
+      const T = mpTotals(mp);
+      const cur = mp.currency || 'USD';
+      const money = (n) => { const v = Number(Math.round(n || 0)).toLocaleString('ru-RU'); return cur === 'EUR' ? '€' + v : cur === 'USD' ? '$' + v : v + ' ' + cur; };
+      const M = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+      const fmtD = (s) => { if (!s) return '—'; const a = String(s).split('-'); return a[2] ? (+a[2]) + ' ' + M[(+a[1]) - 1] + ' ' + a[0] : s; };
+      const period = (mp.period && (mp.period.from || mp.period.to)) ? (fmtD(mp.period && mp.period.from) + ' — ' + fmtD(mp.period && mp.period.to)) : 'период не указан';
+      const STL = { draft: ['На согласовании', '#9A6700', '#FBF0DA', '#EBD9B0'], sent: ['Отправлен подрядчику', '#2563EB', '#DCE8FF', '#C3D6FA'], approved: ['Утверждён', '#12855F', '#E4F5EE', '#C4E6D6'], rejected: ['Отклонён', '#C0392B', '#FBE9E7', '#EDC5C0'] }[mp.status] || ['—', '#667085', '#eee', '#ddd'];
+      const brand = logo ? `<img src="${esc(logo)}" style="max-height:46px;max-width:190px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:25px;font-weight:600;letter-spacing:-.01em">${esc(AG)}</span>`;
+      const hasFact = T.hasFact;
+      const geoRu = (g) => geoNames[g] || (g ? g.charAt(0).toUpperCase() + g.slice(1) : '—');
+      const deltaCell = (ln) => {
+        const cp = ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0;
+        const cf = ln.leadsFact ? Math.round(ln.budgetFact / ln.leadsFact) : 0;
+        if (!cf || !cp) return '<td class="num mut">—</td>';
+        const d = cf - cp; const cls = d <= 0 ? 'good' : 'bad'; const sign = d > 0 ? '+' : '';
+        return `<td class="num ${cls}">${sign}${money(d)}</td>`;
+      };
+      const rows = (mp.lines || []).map(ln => {
+        const cp = ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0;
+        const cf = ln.leadsFact ? Math.round(ln.budgetFact / ln.leadsFact) : 0;
+        return `<tr>
+          <td><b>${esc(ln.channel || '—')}</b></td>
+          <td>${esc(geoRu(ln.geo))}</td>
+          <td class="bundle">${esc(ln.bundle || '')}${ln.note ? `<span class="ln-note">${esc(ln.note)}</span>` : ''}</td>
+          <td class="num">${money(ln.budgetPlan)}</td>
+          <td class="num">${ln.leadsPlan || 0}</td>
+          <td class="num accent">${cp ? money(cp) : '—'}</td>
+          ${hasFact ? `<td class="num fact">${ln.budgetFact ? money(ln.budgetFact) : '—'}</td><td class="num fact">${ln.leadsFact || '—'}</td><td class="num fact accent">${cf ? money(cf) : '—'}</td>${deltaCell(ln)}` : ''}
+        </tr>`;
+      }).join('');
+      const totalRow = `<tr class="tot">
+        <td colspan="3">Итого</td>
+        <td class="num">${money(T.budgetPlan)}</td>
+        <td class="num">${T.leadsPlan}</td>
+        <td class="num accent">${T.cplPlan ? money(T.cplPlan) : '—'}</td>
+        ${hasFact ? `<td class="num fact">${money(T.budgetFact)}</td><td class="num fact">${T.leadsFact}</td><td class="num fact accent">${T.cplFact ? money(T.cplFact) : '—'}</td><td class="num">${T.cplFact && T.cplPlan ? ((T.cplFact - T.cplPlan) <= 0 ? '<span class="good">' : '<span class="bad">') + ((T.cplFact - T.cplPlan) > 0 ? '+' : '') + money(T.cplFact - T.cplPlan) + '</span>' : '—'}</td>` : ''}
+      </tr>`;
+      const factStrip = hasFact ? `<div class="strip">
+        <div class="s-cell"><span class="s-lbl">Освоено бюджета</span><span class="s-val">${money(T.budgetFact)} <span class="s-of">из ${money(T.budgetPlan)}</span></span><div class="s-bar"><i style="width:${Math.min(100, T.budgetPct)}%"></i></div><span class="s-pct">${T.budgetPct}%</span></div>
+        <div class="s-cell"><span class="s-lbl">Лидов получено</span><span class="s-val">${T.leadsFact} <span class="s-of">из ${T.leadsPlan}</span></span><div class="s-bar"><i style="width:${Math.min(100, T.leadsPct)}%"></i></div><span class="s-pct">${T.leadsPct}%</span></div>
+        <div class="s-cell"><span class="s-lbl">CPL план / факт</span><span class="s-val">${T.cplPlan ? money(T.cplPlan) : '—'} <span class="s-arrow">→</span> ${T.cplFact ? money(T.cplFact) : '—'}</span><span class="s-note ${T.cplFact && T.cplFact <= T.cplPlan ? 'good' : (T.cplFact ? 'bad' : '')}">${T.cplFact && T.cplPlan ? (T.cplFact <= T.cplPlan ? 'дешевле плана' : 'дороже плана') : 'факт частичный'}</span></div>
+      </div>` : `<div class="nofact">Факт ещё не внесён — вносится вручную (позже: авто-синк из рекламного кабинета).</div>`;
+      const decided = mp.status === 'approved' || mp.status === 'rejected';
+      const stamp = decided ? `<div class="stamp ${mp.status}">
+        <div class="st-ic">${mp.status === 'approved' ? '✓' : '✕'}</div>
+        <div><b>${mp.status === 'approved' ? 'Медиаплан утверждён' : 'Медиаплан отклонён'}</b><span>${esc(mp.approvedBy || '')}${mp.approvedAt ? ' · ' + new Date(mp.approvedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}</span>${mp.approvalComment ? `<div class="st-cm">«${esc(mp.approvalComment)}»</div>` : ''}</div>
+      </div>` : '';
+      const actions = opts.canEdit ? `<div class="acts" id="acts">
+        <div class="a-lbl">Ваше решение по медиаплану</div>
+        <textarea id="mpCm" placeholder="Комментарий (необязательно) — что скорректировать, вопросы…"></textarea>
+        <div class="a-btns"><button class="ab approve" data-act="approve">✓ Утвердить план</button><button class="ab reject" data-act="reject">✕ Отклонить</button></div>
+      </div>` : `<div class="ro-note">Документ только для просмотра. Решение по плану вносит подрядчик по своей ссылке.</div>`;
+      const SCR = opts.canEdit ? `<script>
+(function(){
+  var acts=document.getElementById('acts');
+  acts.addEventListener('click',async function(e){
+    var b=e.target.closest('[data-act]'); if(!b) return;
+    var act=b.dataset.act; var cm=document.getElementById('mpCm').value.trim();
+    var name=prompt(act==='approve'?'Ваше имя (кто утверждает план):':'Ваше имя (кто отклоняет план):','');
+    if(name===null) return;
+    b.disabled=true; b.textContent='…';
+    try{
+      var r=await fetch('/api/mediaplans/${mp.id}/'+act+'?key=${esc(opts.key)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name||'Подрядчик',comment:cm})});
+      var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка');
+      location.reload();
+    }catch(err){ alert('Не удалось: '+err.message); b.disabled=false; b.textContent=act==='approve'?'✓ Утвердить план':'✕ Отклонить'; }
+  });
+})();
+</${'script'}>` : '';
+      return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Медиаплан · ${esc(mp.title)} · ${esc(AG)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--ink:#0F1B33;--ink2:#3D4A63;--mut:#7A8AA6;--line:#E3E9F2;--soft:#EEF2F8;--accent:#2563EB;--good:#12855F;--bad:#C0392B;--bg:#F4F7FB}
+body{font-family:Manrope,-apple-system,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;padding:32px 18px;line-height:1.5}
+.doc{max-width:940px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px -40px rgba(16,43,92,.4);overflow:hidden}
+.hd{padding:34px 40px 26px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.hd .brand{display:flex;align-items:center;min-height:46px}
+.hd .sp{flex:1}
+.badge{padding:7px 15px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px}
+.h1{font-family:Fraunces,serif;font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+.meta{padding:22px 40px;display:flex;gap:34px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#FBFCFE,#fff)}
+.meta .m{display:flex;flex-direction:column;gap:3px}
+.meta .m .l{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.meta .m .v{font-size:15px;font-weight:650;color:var(--ink)}
+.body{padding:14px 40px 34px}
+.sec-l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);font-weight:700;margin:26px 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#54648A;padding:9px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:12px;border-bottom:1px solid var(--soft);vertical-align:top}
+td.accent{color:var(--accent);font-weight:700}
+td.fact{background:#FAFBFE}
+td.mut{color:var(--mut)}
+td.good{color:var(--good);font-weight:700}
+td.bad{color:var(--bad);font-weight:700}
+.bundle{color:var(--ink2);max-width:280px}
+.ln-note{display:block;font-size:11px;color:var(--mut);margin-top:3px}
+tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;font-size:14px;padding-top:14px;background:#FBFCFE}
+.good{color:var(--good)}.bad{color:var(--bad)}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.s-cell{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff}
+.s-lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.s-val{display:block;font-size:19px;font-weight:750;margin-top:6px;font-variant-numeric:tabular-nums}
+.s-of{font-size:12.5px;color:var(--mut);font-weight:600}
+.s-bar{height:6px;border-radius:99px;background:var(--soft);margin-top:12px;overflow:hidden}
+.s-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#2563EB,#5B8DEF)}
+.s-pct{font-size:11.5px;color:var(--mut);font-weight:700;margin-top:6px;display:inline-block}
+.s-arrow{color:var(--mut);margin:0 4px}
+.s-note{font-size:12px;font-weight:700;margin-top:8px;display:inline-block}
+.nofact{margin-top:14px;padding:15px 18px;border:1px dashed #C7D3E6;border-radius:12px;color:var(--mut);font-size:13px;background:#FBFCFE}
+.note{margin-top:22px;padding:16px 18px;background:var(--soft);border-radius:12px;font-size:13px;color:var(--ink2);line-height:1.6}
+.stamp{margin-top:26px;display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border-radius:14px}
+.stamp.approved{background:#E4F5EE;border:1px solid #C4E6D6}
+.stamp.rejected{background:#FBE9E7;border:1px solid #EDC5C0}
+.st-ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:800;flex:0 0 42px}
+.stamp.approved .st-ic{background:#12855F;color:#fff}
+.stamp.rejected .st-ic{background:#C0392B;color:#fff}
+.stamp b{font-size:15px;display:block}
+.stamp span{font-size:12.5px;color:var(--ink2)}
+.st-cm{margin-top:7px;font-style:italic;color:var(--ink2);font-size:13px}
+.acts{margin-top:28px;padding:22px 24px;border:1.5px solid #C3D6FA;border-radius:16px;background:linear-gradient(180deg,#F5F9FF,#fff)}
+.a-lbl{font-size:13px;font-weight:750;margin-bottom:12px}
+.acts textarea{width:100%;min-height:76px;border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-family:inherit;font-size:13.5px;resize:vertical;outline:none;color:var(--ink)}
+.acts textarea:focus{border-color:var(--accent)}
+.a-btns{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+.ab{border:none;border-radius:12px;padding:14px 24px;font-size:14.5px;font-weight:750;cursor:pointer;font-family:inherit;flex:1;min-width:180px}
+.ab.approve{background:linear-gradient(120deg,#12855F,#1BA574);color:#fff}
+.ab.reject{background:#fff;border:1.5px solid #EDC5C0;color:var(--bad)}
+.ab:disabled{opacity:.6}
+.ro-note{margin-top:26px;font-size:12.5px;color:var(--mut);text-align:center}
+.foot{padding:22px 40px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.tbl-wrap{overflow-x:auto}
+@media(max-width:640px){.hd,.meta,.body,.foot{padding-left:20px;padding-right:20px}.strip{grid-template-columns:1fr}.h1{font-size:24px}table{min-width:560px}}
+@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border:none;border-radius:0;max-width:100%}.acts,.ro-note{display:none}@page{size:A4;margin:14mm}}
+</style></head><body>
+<div class="doc">
+  <div class="hd">
+    <div class="brand">${brand}</div>
+    <div class="sp"></div>
+    <div class="badge" style="color:${STL[1]};background:${STL[2]};border:1px solid ${STL[3]}">${STL[0]}</div>
+  </div>
+  <div style="padding:26px 40px 6px">
+    <div class="kicker">Медиаплан</div>
+    <div class="h1">${esc(mp.title)}</div>
+  </div>
+  <div class="meta">
+    <div class="m"><span class="l">Подрядчик</span><span class="v">${esc(ct.name || '—')}</span></div>
+    <div class="m"><span class="l">Период</span><span class="v">${esc(period)}</span></div>
+    <div class="m"><span class="l">Валюта</span><span class="v">${esc(cur)}</span></div>
+    <div class="m"><span class="l">План бюджета</span><span class="v">${money(T.budgetPlan)}</span></div>
+    <div class="m"><span class="l">План лидов</span><span class="v">${T.leadsPlan} · CPL ${T.cplPlan ? money(T.cplPlan) : '—'}</span></div>
+  </div>
+  <div class="body">
+    <div class="sec-l">Разбивка по каналам и связкам</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">CPL</th>
+        ${hasFact ? '<th class="num">Факт&nbsp;бюджет</th><th class="num">Факт&nbsp;лиды</th><th class="num">Факт&nbsp;CPL</th><th class="num">Δ&nbsp;CPL</th>' : ''}
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="' + (hasFact ? 10 : 6) + '" style="color:#7A8AA6;padding:24px;text-align:center">В плане пока нет строк</td></tr>'}${mp.lines && mp.lines.length ? totalRow : ''}</tbody>
+    </table></div>
+    <div class="sec-l">План vs факт</div>
+    ${factStrip}
+    ${mp.note ? `<div class="note">${esc(mp.note)}</div>` : ''}
+    ${stamp}
+    ${actions}
+  </div>
+  <div class="foot"><span>${esc(AG)} · медиаплан</span><span>Сформировано ${new Date(mp.createdAt || Date.now()).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+</div>
+${SCR}
+</body></html>`;
+    }
+
+    /* публичный документ медиаплана: /mp/:id (read-only) · ?key= показывает Утвердить/Отклонить */
+    if ((m = p.match(/^\/mp\/(mp_[\w]+)$/)) && req.method === 'GET') {
+      const mp = db.mediaplans.find(x => x.id === m[1]);
+      if (!mp) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h1>Медиаплан не найден</h1>'); return; }
+      const canEdit = u.searchParams.get('key') === db.settings.hooks.secret;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(renderMpDoc(db, mp, { canEdit, key: canEdit ? db.settings.hooks.secret : '', print: u.searchParams.get('print') === '1' }));
+      return;
     }
 
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
@@ -5415,8 +5723,8 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:500;line-height:1.08;letter-spacing:-.015em;overflow-wrap:break-word;text-wrap:balance}
 .slide.sz-s .s-h{font-size:clamp(22px,5vw,32px)}
-.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,44px)}
-.slide.sz-l .s-h{font-size:clamp(32px,7.6vw,58px);line-height:1.02;letter-spacing:-.02em}
+.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
+.slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
 .slide.hasbg .s-h{color:#fff;text-shadow:0 1px 14px rgba(0,0,0,.32)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
 .s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
