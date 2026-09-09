@@ -903,6 +903,7 @@ const sanSlide = (s) => ({
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
   pmark: (typeof s.pmark === 'string' && /^img:[a-z0-9_-]+\/[0-9a-z_-]+$/i.test(s.pmark)) ? s.pmark.slice(0, 60) : (['index', 'check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus', 'chip', 'line'].includes(s.pmark) ? s.pmark : 'index'),   /* маркер буллетов: стиль ИЛИ img:pack/key (иконка-буллет) */
+  pmarks: Array.isArray(s.pmarks) ? s.pmarks.slice(0, 12).map(t => (typeof t === 'string' && (/^img:[a-z0-9_-]+\/[0-9a-z_-]+$/i.test(t) || ['index', 'check', 'dot', 'ring', 'dash', 'arrow', 'num', 'diamond', 'star', 'plus', 'chip'].includes(t))) ? t.slice(0, 60) : 'dot') : undefined,   /* ⭐ ПО-СТРОЧНЫЕ маркеры (разные буллеты на каждую строку); undefined = единый s.pmark */
   /* арт-дирекшн: семейство раскладки слайда (композиция), назначается artDirect с учётом ритма колоды */
   layout: ['cinematic', 'immersive', 'editorial', 'typo', 'data', 'split', 'panel', 'mosaic'].includes(s.layout) ? s.layout : '',
   hero: s.hero && (s.hero.v || s.hero.k) ? { v: String(s.hero.v || '').slice(0, 16), k: String(s.hero.k || '').slice(0, 40) } : null,   /* крупное число для data-hero слайда */
@@ -1276,13 +1277,14 @@ function stickerIndex() {
   _stkIdx = [];
   try {
     const j = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'assets', 'stickers', 'index.json'), 'utf8'));
-    (j.packs || []).forEach(p => (p.items || []).forEach(it => _stkIdx.push({ key: it.key, label: it.label, cat: it.cat || 'generic', kw: it.kw || [], pack: p.slug })));
+    (j.packs || []).forEach(p => (p.items || []).forEach(it => _stkIdx.push({ key: it.key, label: it.label, cat: it.cat || 'generic', kw: it.kw || [], pack: p.dir || p.slug, big: !!it.big, geo: it.geo || '', auto: it.auto !== 0 })));
   } catch (e) { _stkIdx = []; }
   return _stkIdx;
 }
 function attachSemanticStickers(slides, opts = {}) {
   const idx = stickerIndex(); if (!idx.length || !Array.isArray(slides)) return slides;
   const angle = opts.angle || 'auto';
+  const geo = String(opts.geo || '').toLowerCase();   /* гео проекта → гейт гео-специфичных элементов (Дубай/AED не на Пхукет) */
   const angleCat = { luxury: 'luxury', lifestyle: 'lifestyle', investment: 'invest', discount: 'invest', urgency: 'urgency' }[angle] || '';
   const norm = s => String(s == null ? '' : s).toLowerCase().replace(/ё/g, 'е');
   const used = new Set();
@@ -1303,12 +1305,16 @@ function attachSemanticStickers(slides, opts = {}) {
     const cands = [];
     for (const st of idx) {
       if (used.has(st.key)) continue;
+      if (st.auto === false) continue;                              /* элементы, не годные для авто-подстановки (ряды/навигация/оверлей фото) */
+      if (st.geo && geo && st.geo !== geo) continue;                /* гео-специфичный элемент на чужом гео — пропуск */
+      if (st.geo && !geo) continue;                                 /* гео-специфичный, а гео проекта неизвестно — не рискуем */
       let sc = 0;
       if (st.cat === cat) sc += 4;
       else if (cat === 'cover' && ['urgency', 'deal', 'luxury'].includes(st.cat)) sc += 2;
       else if (cat === 'cta' && ['contact', 'deal'].includes(st.cat)) sc += 3;
       for (const k of st.kw) { const w = norm(k).split(/\s+/)[0]; if (w.length >= 4 && txt.includes(w.slice(0, 5))) sc += 2; }
-      if (st.pack === 'realty' || st.pack === 'broker') sc += 1;   /* на-тему паки предпочтительнее iOS-иконок */
+      if (st.pack === 're-elements') sc += 3;                       /* ⭐ премиум-элементы недвижимости — приоритетнее иконок/бейджей */
+      else if (st.pack === 'realty' || st.pack === 'broker') sc += 1;
       if (sc >= 5) cands.push({ st, sc });
     }
     /* берём НЕ всегда лучший, а случайно из топа (в пределах 2 очков) — иначе один и тот же бейдж на каждой карусели раздражает */
@@ -1317,10 +1323,20 @@ function attachSemanticStickers(slides, opts = {}) {
     if (best) {
       used.add(best.key); placed++;
       const url = '/assets/stickers/' + best.key + '.png';
-      const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);   /* текст-бейджи выше/уже, чтобы не залезать на текст */
-      const L = i === 0
-        ? { t: 'img', url, x: badge ? 62 : 68, y: 9, w: badge ? 30 : 20, round: 0, z: 6, rot: -4, sticker: 1 }
-        : { t: 'img', url, x: badge ? 78 : 80, y: 5, w: badge ? 17 : 13, round: 0, z: 6, rot: 4, sticker: 1 };
+      let L;
+      if (best.big) {
+        /* ⭐ премиум-композит (карточка/график/бейдж-стек) — крупнее и БЕЗ наклона, в свободной от текста зоне.
+           текст сверху → элемент снизу-справа; иначе → сверху-справа. */
+        const topText = (s.pos || (i === 0 ? 'bottom' : 'center')) === 'top';
+        L = topText
+          ? { t: 'img', url, x: 55, y: 55, w: 40, round: 0, z: 6, rot: 0, sticker: 1 }
+          : { t: 'img', url, x: 56, y: 7, w: 40, round: 0, z: 6, rot: 0, sticker: 1 };
+      } else {
+        const badge = ['urgency', 'deal', 'cover', 'invest', 'cta'].includes(best.cat);   /* текст-бейджи выше/уже, чтобы не залезать на текст */
+        L = i === 0
+          ? { t: 'img', url, x: badge ? 62 : 68, y: 9, w: badge ? 30 : 20, round: 0, z: 6, rot: -4, sticker: 1 }
+          : { t: 'img', url, x: badge ? 78 : 80, y: 5, w: badge ? 17 : 13, round: 0, z: 6, rot: 4, sticker: 1 };
+      }
       const sl = sanLayer(L); if (sl) { s.layers = Array.isArray(s.layers) ? s.layers : []; s.layers.push(sl); }
     }
   });
@@ -3024,7 +3040,7 @@ const server = http.createServer(async (req, res) => {
       const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
       if (NN) slides = trimToCount(slides, NN);
       slides = stylePass(slides, PAGE_THEMES[b.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо мастер-вижн planCarousel/artDirect (тир-джамп «постеры») */
-      if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle });   /* ⟲ авто-стикеры теперь ОПТ-ИН (были кривые: SOLD/Dubai/Notes), 2-дн-давности их не было */
+      if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle, geo: b.geo });   /* ⟲ авто-стикеры теперь ОПТ-ИН (были кривые: SOLD/Dubai/Notes), 2-дн-давности их не было */
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -3355,7 +3371,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
         slides = stylePass(slides, PAGE_THEMES[c.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо tier-jump planCarousel */
-        if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle });   /* ⟲ авто-стикеры опт-ин */
+        if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle, geo: b.geo });   /* ⟲ авто-стикеры опт-ин */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
@@ -5595,7 +5611,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const sInStyle = s.free ? `left:${Math.max(-5, Math.min(95, +s.tx || 10)).toFixed(1)}%;top:${Math.max(-5, Math.min(95, +s.ty || 16)).toFixed(1)}%;--tsc:${Math.max(0.5, Math.min(1.9, +s.tscale || 1))}` : '';
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';   /* чистое фото; контраст даёт per-family скрим (не мутный тёмный бокс на всём)*/
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${s.noNum ? ' data-nonum="1"' : ''}${s.noBrand ? ' data-nobrand="1"' : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${s.free ? ` data-free="1" data-tx="${(+s.tx || 10)}" data-ty="${(+s.ty || 16)}" data-tscale="${(+s.tscale || 1)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} data-bscale="${(+s.bodyScale || 1)}" style="${style};--bscale:${(+s.bodyScale || 1)}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${s.noNum ? ' data-nonum="1"' : ''}${s.noBrand ? ' data-nobrand="1"' : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${s.free ? ` data-free="1" data-tx="${(+s.tx || 10)}" data-ty="${(+s.ty || 16)}" data-tscale="${(+s.tscale || 1)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', pmarks: s.pmarks || null, layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} data-bscale="${(+s.bodyScale || 1)}" style="${style};--bscale:${(+s.bodyScale || 1)}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in"${sInStyle ? ` style="${sInStyle}"` : ''}>
             ${(counter !== 'off' && !s.noNum) ? `<span class="s-num num-${counter}">${numHtml(i)}</span>` : ''}
@@ -5609,7 +5625,19 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'payplan' && (s.items || []).length ? `<div class="s-payplan">${s.items.map(it => `<div class="s-pp-row"><span class="s-pp-dot"></span><span class="s-pp-pct">${esc(it.v || it.pct + '%')}</span><span class="s-pp-txt"><b>${esc(it.k)}</b>${it.text ? `<i>${esc(it.text)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
-            ${!s.mode && (s.points || []).length ? (() => { const pm = s.pmark || 'index'; const isImg = /^img:/.test(pm); const iu = isImg ? '/assets/stickers/' + pm.slice(4) + '.png' : ''; return `<ul class="s-points pm-${isImg ? 'img' : pm}">${s.points.map((pt, pi) => `<li><span class="s-pt-m"${isImg ? ` style="background-image:url('${esc(iu)}')"` : ''} data-n="${String(pi + 1).padStart(2, '0')}"></span><span${isEdit ? ` data-pt="${pi}"` : ''}>${sanInline(pt)}</span></li>`).join('')}</ul>`; })() : ''}
+            ${!s.mode && (s.points || []).length ? (() => {
+              const def = s.pmark || 'index';
+              const marks = (Array.isArray(s.pmarks) && s.pmarks.length) ? s.pmarks : null;   /* ⭐ по-строчные маркеры */
+              const defImg = /^img:/.test(def);
+              const ulCls = marks ? 'pm-mixed' : ('pm-' + (defImg ? 'img' : def));
+              const li = (tok, pi) => {
+                const img = /^img:/.test(tok);
+                const iu = img ? '/assets/stickers/' + tok.slice(4) + '.png' : '';
+                const liCls = marks ? (img ? 'pm-img' : 'pm-' + tok) : '';   /* в mixed-режиме класс маркера на li */
+                return `<li${liCls ? ` class="${liCls}"` : ''}><span class="s-pt-m"${img ? ` style="background-image:url('${esc(iu)}')"` : ''} data-n="${String(pi + 1).padStart(2, '0')}"></span><span${isEdit ? ` data-pt="${pi}"` : ''}>${sanInline(s.points[pi])}</span></li>`;
+              };
+              return `<ul class="s-points ${ulCls}">${s.points.map((pt, pi) => li(marks ? (marks[pi] || def) : def, pi)).join('')}</ul>`;
+            })() : ''}
             ${(footerHide || s.noBrand || s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand fb-${footerStyle}">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -5755,7 +5783,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide:not(.hasbg) .s-h.ts-glass{background:rgba(12,22,48,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(12,22,48,.08),0 14px 40px -14px rgba(6,10,24,.22)}
 .s-h.ts-spaced{letter-spacing:.16em;text-transform:uppercase;font-size:clamp(20px,5cqw,34px)}
 /* ⭐ Подложка всего текстового блока (eyebrow+заголовок+подпись+тезисы): стекло / плашка */
-.slide.card-glass .s-in,.slide.card-solid .s-in{margin:auto 7%;width:auto;border-radius:20px;padding:6.5% 7%;gap:10px}
+.slide.card-glass .s-in,.slide.card-solid .s-in{margin:auto 6%;width:auto;border-radius:22px;padding:9% 8.5%;gap:13px}
 .slide.card-glass.pos-top .s-in,.slide.card-solid.pos-top .s-in{margin-top:12%}
 .slide.card-glass.pos-bottom .s-in,.slide.card-solid.pos-bottom .s-in{margin-bottom:12%}
 .slide.card-glass .s-in{background:rgba(255,255,255,.12);backdrop-filter:blur(16px) saturate(1.25);-webkit-backdrop-filter:blur(16px) saturate(1.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 0 0 1px rgba(255,255,255,.16),0 22px 60px -20px rgba(6,10,24,.6)}
@@ -5898,7 +5926,13 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
    background-COLOR (longhand) transparent на высокой специфичности (.slide.hasbg .pm-img .s-pt-m = 0,4,0)
    бьёт белый фон .slide.hasbg .s-pt-m (0,3,0) — иначе «белые квадраты» на фото. НЕ трогаем
    background-image (он инлайном url), поэтому НЕ shorthand и НЕ !important. */
-.slide .pm-img li{align-items:center}
+/* ⭐ иконка-буллет: воздух между строками (маркеры не касаются), маркер аккуратно по центру строки, отступ до текста */
+.slide .pm-img{gap:11px}
+.slide .pm-img li{align-items:center;gap:16px}
+/* ⭐ mixed-режим: РАЗНЫЕ маркеры на каждую строку (авто по смыслу / нумерация) */
+.slide .pm-mixed{gap:11px}
+.slide .pm-mixed li{align-items:center;gap:15px}
+.slide .pm-mixed li .s-pt-m{margin-top:0}
 .slide .pm-img .s-pt-m,.slide.hasbg .pm-img .s-pt-m{background-color:transparent;background-size:contain;background-repeat:no-repeat;background-position:center;box-shadow:none;border:0;border-radius:0;width:26px;height:26px;flex:0 0 26px;color:transparent;filter:drop-shadow(0 3px 7px rgba(6,12,28,.30)) drop-shadow(0 1px 2px rgba(6,12,28,.22))}
 .slide .pm-img .s-pt-m::after,.slide.hasbg .pm-img .s-pt-m::after{content:"";display:none}
 .slide.hasbg .pm-img .s-pt-m{filter:drop-shadow(0 2px 8px rgba(0,0,0,.45))}
@@ -5966,7 +6000,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=53"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=55"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

@@ -8,16 +8,45 @@
   let STK_PACKS = null; const STK_LABEL = {}, STK_KW = {};
   fetch('/assets/stickers/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; STK_KW[it.key] = it.kw || []; })); }).catch(() => { STK_PACKS = []; });
   const BULLET_DIRS = ['bullets-modern', 'bullets-lux', 'bullets-ios', 'bullets-flat', 'bullets'];
-  /* авто-подбор иконки-буллета по тексту тезисов слайда (совпадение ключевых слов kw) */
+  /* авто-подбор иконки-буллета по тексту ВСЕХ тезисов (единый маркер) */
   function autoBulletKey(points) {
-    const txt = (points || []).join(' ').toLowerCase();
+    const txt = (points || []).join(' ').toLowerCase().replace(/ё/g, 'е');
     if (!txt || !STK_PACKS) return '';
     let best = '', bestScore = 0;
     (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir)).forEach(p => p.items.forEach(it => {
-      let sc = 0; (it.kw || []).forEach(k => { if (k && txt.includes(String(k).toLowerCase())) sc++; });
+      let sc = 0; (it.kw || []).forEach(k => { if (k && txt.includes(String(k).toLowerCase().replace(/ё/g, 'е'))) sc++; });
       if (sc > bestScore) { bestScore = sc; best = it.key; }
     }));
-    return best;   /* '' если ничего не совпало */
+    return best;
+  }
+  /* ⭐ ПО-СТРОЧНЫЙ авто-подбор: на КАЖДУЮ строку — свой уместный маркер по её смыслу (без повторов, где можно) */
+  function autoBulletMarks(points) {
+    if (!STK_PACKS || !(points || []).length) return null;
+    const pool = [];
+    (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir)).forEach(p => p.items.forEach(it => { if (String(it.label || '').match(/^\d+$/)) return; pool.push(it); }));   /* без чисто-числовых */
+    const used = new Set();
+    const NEUTRAL = ['check', 'dot', 'diamond', 'ring', 'star', 'arrow'];
+    return points.map((pt, i) => {
+      const t = String(pt || '').toLowerCase().replace(/ё/g, 'е').replace(/<[^>]*>/g, '');
+      let best = null, bestSc = 0;
+      for (const it of pool) {
+        if (used.has(it.key)) continue;
+        let sc = 0; (it.kw || []).forEach(k => { const w = String(k).toLowerCase().replace(/ё/g, 'е'); if (w.length >= 3 && t.includes(w)) sc += 2; });
+        if (sc > bestSc) { bestSc = sc; best = it; }
+      }
+      if (best && bestSc >= 2) { used.add(best.key); return 'img:' + best.key; }
+      return NEUTRAL[i % NEUTRAL.length];   /* ничего по смыслу — аккуратный нейтральный маркер (варьируется) */
+    });
+  }
+  /* ⭐ нумерация 1·2·3: серия число-иконок из пака (label = «1».«2»…) или встроенный 'num' */
+  function numberMarks(points) {
+    if (!(points || []).length) return null;
+    let series = null;
+    for (const p of (STK_PACKS || []).filter(x => BULLET_DIRS.includes(x.dir))) {
+      const nums = {}; p.items.forEach(it => { const m = String(it.label || '').match(/^(\d+)$/); if (m) nums[+m[1]] = it.key; });
+      if (nums[1] && nums[2] && nums[3]) { series = nums; break; }   /* пак с последовательными числами */
+    }
+    return points.map((_, i) => (series && series[i + 1]) ? 'img:' + series[i + 1] : 'num');
   }
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -348,7 +377,7 @@ body.cpanel-on{padding-right:308px!important}
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', card: sl.dataset.card || '', layers,
-        mode: rich.mode || '', items: rich.items || [], points: points, pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
+        mode: rich.mode || '', items: rich.items || [], points: points, pmark: rich.pmark || 'index', pmarks: (Array.isArray(rich.pmarks) && rich.pmarks.length) ? rich.pmarks.slice(0, points.length) : null, layout: rich.layout || '', hero: rich.hero || null,
         noNum: !!sl.dataset.nonum, noBrand: !!sl.dataset.nobrand,
         free: sl.dataset.free === '1', tx: +sl.dataset.tx || 0, ty: +sl.dataset.ty || 0, tscale: +sl.dataset.tscale || 1,
         bodyScale: +sl.dataset.bscale || 1,
@@ -997,7 +1026,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; const isImg = /^img:/.test(pm); return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cbtn-row" style="margin-top:8px"><button class="cwbtn ${isImg ? 'on' : ''}" id="cPmImg">${isImg ? `<img src="/assets/stickers/${pm.slice(4)}.png" style="width:18px;height:18px;object-fit:contain">` : '🖼'} Иконка-буллет</button><button class="cwbtn" id="cPmAuto">✦ Авто по тексту</button></div><div class="cnote">Стиль маркера или иконка-буллет. «Авто» подберёт иконку под смысл тезисов.</div></div>`; })()}
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const marksOn = Array.isArray(r.pmarks) && r.pmarks.length; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; const isImg = /^img:/.test(pm); return `<div class="cgrp"><label>Маркер буллетов ${marksOn ? '<span style="color:var(--cb);font-weight:700">· по-строчно</span>' : ''}</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${!marksOn && pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cbtn-row" style="margin-top:8px"><button class="cwbtn ${isImg && !marksOn ? 'on' : ''}" id="cPmImg">${isImg && !marksOn ? `<img src="/assets/stickers/${pm.slice(4)}.png" style="width:18px;height:18px;object-fit:contain">` : '🖼'} Иконка-буллет</button><button class="cwbtn ${marksOn ? 'on' : ''}" id="cPmAuto">✦ Авто по смыслу</button><button class="cwbtn" id="cPmNum">① 1·2·3</button></div><div class="cnote">Кнопки/иконка — ОДИН маркер на все строки. «Авто по смыслу» и «1·2·3» ставят <b>разные</b> маркеры на каждую строку.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Подложка текста</label><div class="cseg" id="cCard">${[['', 'Нет'], ['glass', 'Стекло'], ['solid', 'Плашка']].map(([v, n]) => `<button data-card="${v}" class="${(sl.dataset.card || '') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Матовое стекло или плотная плашка под всем текстом — читается на любом фото.</div></div>
     <div class="cgrp"><label>Служебное на этом слайде</label>
@@ -1033,7 +1062,10 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    const setPmark = (val) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = val; sl.dataset.rich = JSON.stringify(r); dirty = true; save(true, { slides: serialize() }); };
+    /* ОДИН маркер на все строки → чистим по-строчные pmarks */
+    const setPmark = (val) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = val; delete r.pmarks; sl.dataset.rich = JSON.stringify(r); dirty = true; save(true, { slides: serialize() }); };
+    /* РАЗНЫЕ маркеры по строкам */
+    const setPmarks = (arr) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmarks = arr; sl.dataset.rich = JSON.stringify(r); dirty = true; save(true, { slides: serialize() }); };
     { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); setPmark(b.dataset.pm); }); }
     /* иконка-буллет: попап с паками «Буллеты» */
     { const im = $('#cPmImg', body); if (im) im.addEventListener('click', (e) => {
@@ -1046,7 +1078,8 @@ body.cpanel-on{padding-right:308px!important}
       $('#cBkCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cBkCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cBkGrid', pp).innerHTML = grid(+b.dataset.c); });
       pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-bk]'); if (!b) return; closePop(); setPmark('img:' + b.dataset.bk); flash('Маркер-иконка применён ✓'); });
     }); }
-    { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const key = autoBulletKey(r.points || []); if (!key) { flash('Не подобралось — выберите вручную'); return; } setPmark('img:' + key); flash('Авто-иконка: ' + (STK_LABEL[key] || key)); }); }
+    { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const pts = r.points || []; const marks = autoBulletMarks(pts); if (!marks) { flash('Нет тезисов'); return; } setPmarks(marks); flash('Разные маркеры по смыслу ✓', 1300); }); }
+    { const nb = $('#cPmNum', body); if (nb) nb.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const pts = r.points || []; if (!pts.length) { flash('Нет тезисов'); return; } setPmarks(numberMarks(pts)); flash('Нумерация 1·2·3 ✓', 1300); }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;
