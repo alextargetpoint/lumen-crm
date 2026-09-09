@@ -4991,3 +4991,20 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .plo-dl-rows .plo-btn { justify-content: center; }
 .plo-dl-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 14px; }
 @media (max-width: 900px) { .plo-hero { grid-template-columns: 1fr; } .plo-hero-r { order: -1; } .plo-feats, .plo-steps { grid-template-columns: 1fr; } }
+
+/* ⭐ Обзор: лёгкое появление виджетов (стаггер) + мягкий ховер-подъём карточки */
+@keyframes ovwIn { from { opacity: 0; transform: translateY(12px) scale(.99); } to { opacity: 1; transform: none; } }
+.ov2-grid:not(.editing) .ov-w { animation: ovwIn .5s cubic-bezier(.22,.61,.36,1) both; }
+.ov2-grid:not(.editing) .ov-w:nth-child(1) { animation-delay: 0s }
+.ov2-grid:not(.editing) .ov-w:nth-child(2) { animation-delay: .045s }
+.ov2-grid:not(.editing) .ov-w:nth-child(3) { animation-delay: .09s }
+.ov2-grid:not(.editing) .ov-w:nth-child(4) { animation-delay: .135s }
+.ov2-grid:not(.editing) .ov-w:nth-child(5) { animation-delay: .18s }
+.ov2-grid:not(.editing) .ov-w:nth-child(6) { animation-delay: .225s }
+.ov2-grid:not(.editing) .ov-w:nth-child(7) { animation-delay: .27s }
+.ov2-grid:not(.editing) .ov-w:nth-child(8) { animation-delay: .315s }
+.ov2-grid:not(.editing) .ov-w:nth-child(9) { animation-delay: .36s }
+.ov2-grid:not(.editing) .ov-w:nth-child(n+10) { animation-delay: .4s }
+.ov-w-body { transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1); }
+.ov2-grid:not(.editing) .ov-w:hover .ov-w-body { transform: translateY(-3px); box-shadow: 0 18px 44px -20px rgba(16,43,92,.42); }
+@media (prefers-reduced-motion: reduce) { .ov2-grid .ov-w { animation: none !important; } .ov-w-body { transition: none; } }
