@@ -2401,12 +2401,18 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-bal-hd { display: flex; align-items: baseline; gap: 8px; font-weight: 600; color: var(--navy-900); font-size: 14px; margin-bottom: 13px; }
 .tk-bal-hd svg { width: 16px; height: 16px; color: var(--accent); align-self: center; }
 .tk-bal-hd .sub { font-weight: 400; color: var(--sub); font-size: 12px; }
-.tk-bal-bars { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; }
-.tk-bal-col { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; min-width: 0; }
-.tk-bal-track { height: 60px; display: flex; align-items: flex-end; }
-.tk-bal-bar { width: 26px; border-radius: 8px 8px 3px 3px; background: var(--sc); box-shadow: 0 4px 13px -4px color-mix(in srgb, var(--sc) 60%, transparent); transition: height .55s cubic-bezier(.2, .8, .25, 1); }
-.tk-bal-lbl { font-size: 10.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.tk-bal-v { font-size: 11px; font-weight: 700; color: var(--navy-900); line-height: 1; }
+/* ⭐ колесо жизни + легенда */
+.tk-bal-main { display: flex; align-items: center; gap: 22px; }
+.tk-wheel { flex: 0 0 auto; width: 168px; }
+.tk-wheel-svg { width: 168px; height: 168px; display: block; }
+.tk-wheel-svg path { transition: fill-opacity .5s ease; }
+.tk-leg { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; align-content: center; }
+.tk-leg-i { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.tk-leg-i.z { opacity: .5; }
+.tk-leg-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--sc); flex: 0 0 auto; }
+.tk-leg-n { color: var(--ink); flex: 1; min-width: 0; }
+.tk-leg-v { font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) { .tk-bal-main { flex-direction: column; } .tk-leg { width: 100%; } }
 .tk-bal-nudge { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--sc) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--sc) 22%, transparent); font-size: 13px; line-height: 1.46; color: var(--ink); }
 .tk-bal-ndot { width: 9px; height: 9px; border-radius: 50%; background: var(--sc); flex: 0 0 auto; margin-top: 5px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--sc) 16%, transparent); }
 /* ⭐ подсветка задачи по сфере + бейдж повтора */
@@ -2422,6 +2428,19 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-dow.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .tk-rep-time { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink); }
 .tk-rep-time input { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); font-size: 14px; }
+/* ⭐ ИНЛАЙН-панель повтора: выезжает снизу капчи (без попапа) */
+.tk-rep-panel { display: none; }
+.tk-cap.rep-open .tk-rep-panel { display: block; margin-top: 8px; animation: tkRepSlide .3s cubic-bezier(.2, .8, .25, 1) both; }
+@keyframes tkRepSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.tk-rep-inner { border-top: 1px solid var(--stroke); padding-top: 12px; }
+.tk-rep-lbl { font-size: 12px; font-weight: 600; color: var(--sub); margin-bottom: 9px; }
+.tk-rep-panel .tk-rep-presets { display: flex; gap: 7px; margin-bottom: 11px; }
+.tk-rep-panel .tk-rep-presets button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--stroke); background: var(--card); font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; transition: all .14s; }
+.tk-rep-panel .tk-rep-presets button:hover { border-color: var(--accent); color: var(--accent); }
+.tk-rep-panel .tk-dow-row { margin-bottom: 11px; }
+.tk-rep-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tk-rep-clear { font-size: 12px; font-weight: 600; color: var(--ink-3); background: none; border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 12px; cursor: pointer; transition: all .14s; }
+.tk-rep-clear:hover { border-color: var(--bad); color: var(--bad); }
 /* ⭐ палитра рутины брокера */
 .tk-rt { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .tk-rt-hd { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: var(--navy-900); margin-bottom: 8px; }
@@ -2853,8 +2872,10 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-lib-add svg { width: 13px; height: 13px; }
 .ov2-lib-i:hover .ov2-lib-add { opacity: 1; }
 .ov2-lib-prev { position: relative; height: 176px; overflow: hidden; background: var(--bg-2); pointer-events: none; padding: 12px; }
-/* виджет верстается на фикс.ширине «десктопа» и масштабируется вниз → контент (напр. цепочка касаний ●—●—●) НЕ обрезается по ширине */
-.ov2-lib-prev-in { width: 340px; transform: scale(.8); transform-origin: top left; padding: 14px; box-shadow: none; -webkit-mask-image: linear-gradient(#000 76%, transparent); mask-image: linear-gradient(#000 76%, transparent); }
+.ov2-lib-prev-in { zoom: .82; padding: 13px; box-shadow: none; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+/* цепочка касаний в превью: перенос вместо обрезки по ширине (единственный не-переносящийся виджет) */
+.ov2-lib-prev .ov-chain-seq { flex-wrap: wrap; row-gap: 5px; }
+.ov2-lib-prev .ov-chain-nm { white-space: normal; }
 .ov2-lib-reset { display: block; margin: 14px auto 0; font-size: 12px; font-weight: 600; color: var(--ink-3); background: none; padding: 8px 14px; border: 1px solid var(--stroke); border-radius: 8px; }
 .ov2-lib-reset:hover { border-color: var(--bad); color: var(--bad); }
 @media (max-width: 640px) { .ov2-lib { grid-template-columns: 1fr; } }

@@ -6386,15 +6386,16 @@ let TASK_NEWSPHERE = '';      /* выбранная сфера при созда
 let TASK_NEWREPEAT = null;    /* {days:[0-6], time:'HH:MM'} при создании */
 let TASK_WEEK = 0; /* смещение недели в календаре */
 /* ⭐ Колесо баланса брокера — 8 сфер жизни. Премиум-палитра 2026 (насыщенные, но не банальные тона), тонкий glow */
+/* приземлённая, спокойная палитра (desaturated earthy/jewel — не кислотная, гармоничная) */
 const SPHERES = {
-  deals:   { n: 'Сделки',    c: '#5468FF', order: 0 },
-  finance: { n: 'Финансы',   c: '#E0A73E', order: 1 },
-  health:  { n: 'Здоровье',  c: '#22C39B', order: 2 },
-  family:  { n: 'Семья',     c: '#EE6A87', order: 3 },
-  growth:  { n: 'Развитие',  c: '#9D6FF0', order: 4 },
-  energy:  { n: 'Энергия',   c: '#38B6F0', order: 5 },
-  network: { n: 'Окружение', c: '#E38856', order: 6 },
-  meaning: { n: 'Смысл',     c: '#2E9E6B', order: 7 },
+  deals:   { n: 'Сделки',    c: '#6B76A8', order: 0 },
+  finance: { n: 'Финансы',   c: '#C2A468', order: 1 },
+  health:  { n: 'Здоровье',  c: '#6FA091', order: 2 },
+  family:  { n: 'Семья',     c: '#C08D93', order: 3 },
+  growth:  { n: 'Развитие',  c: '#8E86AE', order: 4 },
+  energy:  { n: 'Энергия',   c: '#7C9DB4', order: 5 },
+  network: { n: 'Окружение', c: '#BE8E70', order: 6 },
+  meaning: { n: 'Смысл',     c: '#6E8E77', order: 7 },
 };
 const SPHERE_KEYS = Object.keys(SPHERES).sort((a, b) => SPHERES[a].order - SPHERES[b].order);
 /* Рутина брокера — шаблоны по сферам (из исследования: защищённые блоки прозвона/фоллоу-апа, показы,
@@ -6518,13 +6519,49 @@ function tkMeta(t, leadMap) {
 }
 const DOW_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 function tkRepLabel(r) { if (!r) return ''; const d = r.days || []; const days = (!d.length || d.length === 7) ? 'каждый день' : (d.length === 5 && [1, 2, 3, 4, 5].every(x => d.includes(x))) ? 'будни' : (d.length === 2 && d.includes(0) && d.includes(6)) ? 'выходные' : d.slice().sort().map(x => DOW_RU[x]).join('·'); return days + (r.time ? ' ' + r.time : ''); }
+/* инлайн-панель повтора (без попапа): пресеты + дни недели + время, выезжает снизу капчи */
+function tkRepPanelHtml() {
+  const days = (TASK_NEWREPEAT && TASK_NEWREPEAT.days) || [];
+  const time = (TASK_NEWREPEAT && TASK_NEWREPEAT.time) || '09:00';
+  const chips = [1, 2, 3, 4, 5, 6, 0].map(dd => `<button class="tk-dow ${days.includes(dd) ? 'on' : ''}" data-dow="${dd}">${DOW_RU[dd]}</button>`).join('');
+  return `<div class="tk-rep-inner">
+    <div class="tk-rep-lbl">Повторять по дням</div>
+    <div class="tk-rep-presets"><button data-preset="daily">Каждый день</button><button data-preset="work">Будни</button><button data-preset="we">Выходные</button></div>
+    <div class="tk-dow-row" id="tkDow">${chips}</div>
+    <div class="tk-rep-foot"><label class="tk-rep-time">Напоминать в<input type="time" id="tkRepTime" value="${time}"></label>${TASK_NEWREPEAT ? '<button class="tk-rep-clear" id="tkRepClear">Убрать повтор</button>' : ''}</div>
+  </div>`;
+}
 /* колесо баланса недели: 8 сфер-баров + мягкая подсказка по недобранной сфере */
-function tkBalanceHtml(sw) {
+/* ⭐ Колесо жизни (Wheel of Life): 8 лепестков-секторов, радиус = активность сферы за неделю.
+   Приземлённая палитра, мягкие заливки. Не банальные столбики — радиальная метафора «баланса». */
+function tkWheelSVG(sw) {
   const max = Math.max(1, ...SPHERE_KEYS.map(k => sw[k] || 0));
-  const bars = SPHERE_KEYS.map(k => { const v = sw[k] || 0; const h = Math.round(16 + (v / max) * 44); const sp = SPHERES[k]; return `<div class="tk-bal-col" title="${sp.n}: ${v} за неделю"><div class="tk-bal-track"><div class="tk-bal-bar" style="--sc:${sp.c};height:${h}px;opacity:${v ? 1 : .3}"></div></div><span class="tk-bal-lbl">${sp.n}</span><span class="tk-bal-v">${v || ''}</span></div>`; }).join('');
-  const zeros = SPHERE_KEYS.filter(k => !(sw[k])); const pick = zeros.length ? zeros[0] : SPHERE_KEYS.slice().sort((a, b) => (sw[a] || 0) - (sw[b] || 0))[0];
-  const nudge = (SPHERE_NUDGES[pick] || [''])[0];
-  return `<div class="tk-bal-hd">${ic(I.grid || I.spark, 2)}<b>Баланс недели</b><span class="sub">сколько внимания получила каждая сфера</span></div><div class="tk-bal-bars">${bars}</div>${nudge ? `<div class="tk-bal-nudge" style="--sc:${SPHERES[pick].c}"><span class="tk-bal-ndot" style="--sc:${SPHERES[pick].c}"></span><span>${esc(nudge)}</span></div>` : ''}`;
+  const cx = 96, cy = 96, minR = 26, maxR = 84, N = 8, step = 2 * Math.PI / N, gap = 0.06;
+  const pt = (r, a) => [cx + r * Math.cos(a - Math.PI / 2), cy + r * Math.sin(a - Math.PI / 2)];
+  // фоновые направляющие кольца
+  let rings = [42, 62, 84].map(r => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--stroke)" stroke-width="1" opacity=".5"/>`).join('');
+  const wedges = SPHERE_KEYS.map((k, i) => {
+    const v = sw[k] || 0; const sp = SPHERES[k];
+    const r = minR + (v / max) * (maxR - minR);
+    const a0 = i * step + gap, a1 = (i + 1) * step - gap;
+    const [x0, y0] = pt(r, a0), [x1, y1] = pt(r, a1);
+    const large = (a1 - a0) > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r.toFixed(1)},${r.toFixed(1)} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`;
+    return `<path d="${path}" fill="${sp.c}" fill-opacity="${v ? .62 : .12}" stroke="${sp.c}" stroke-opacity="${v ? .9 : .3}" stroke-width="1" stroke-linejoin="round"><title>${sp.n}: ${v} за 7 дней</title></path>`;
+  }).join('');
+  return `<svg viewBox="0 0 192 192" class="tk-wheel-svg">${rings}${wedges}<circle cx="${cx}" cy="${cy}" r="3" fill="var(--sub)"/></svg>`;
+}
+function tkBalanceHtml(sw) {
+  const total = SPHERE_KEYS.reduce((s, k) => s + (sw[k] || 0), 0);
+  const legend = SPHERE_KEYS.map(k => { const v = sw[k] || 0; const sp = SPHERES[k]; return `<div class="tk-leg-i ${v ? '' : 'z'}"><span class="tk-leg-dot" style="--sc:${sp.c}"></span><span class="tk-leg-n">${sp.n}</span><span class="tk-leg-v">${v}</span></div>`; }).join('');
+  const zeros = SPHERE_KEYS.filter(k => !(sw[k])); const low = zeros.length ? zeros[0] : SPHERE_KEYS.slice().sort((a, b) => (sw[a] || 0) - (sw[b] || 0))[0];
+  const top = SPHERE_KEYS.slice().sort((a, b) => (sw[b] || 0) - (sw[a] || 0))[0];
+  const nudge = total ? (SPHERE_NUDGES[low] || [''])[0] : 'Отмечай сферу у задач — колесо покажет, на что уходит неделя и где перекос. Начни с одной задачи в важной для тебя сфере.';
+  const imbalance = (total && top !== low && (sw[top] || 0) > 0) ? `Фокус недели — <b style="color:${SPHERES[top].c}">${SPHERES[top].n}</b>, тоньше всего — <b style="color:${SPHERES[low].c}">${SPHERES[low].n}</b>. ` : '';
+  const sub = total ? `выполнено ${total} ${plural(total, 'задача', 'задачи', 'задач')} по 8 сферам за 7 дней` : 'колесо баланса твоих 8 сфер жизни';
+  return `<div class="tk-bal-hd">${ic(I.grid || I.spark, 2)}<b>Колесо баланса</b><span class="sub">${sub}</span></div>
+    <div class="tk-bal-main"><div class="tk-wheel">${tkWheelSVG(sw)}</div><div class="tk-leg">${legend}</div></div>
+    ${nudge ? `<div class="tk-bal-nudge" style="--sc:${SPHERES[low].c}"><span class="tk-bal-ndot" style="--sc:${SPHERES[low].c}"></span><span>${imbalance}${esc(nudge)}</span></div>` : ''}`;
 }
 /* попап выбора повтора: пресеты + дни недели + время */
 function openRepeatPop(anchor, cb) {
@@ -6789,9 +6826,10 @@ PAGES.tasks = async (root) => {
         </div>
         <div class="tk-cap-row tk-cap-meta">
           <div class="tk-sphere-pick" id="tkSpherePick">${SPHERE_KEYS.map(k => `<button class="tk-sphere-chip ${TASK_NEWSPHERE === k ? 'on' : ''}" data-sp="${k}" style="--sc:${SPHERES[k].c}"><span class="tk-sphere-dot" style="--sc:${SPHERES[k].c}"></span>${SPHERES[k].n}</button>`).join('')}</div>
-          <button class="tk-rep-btn ${TASK_NEWREPEAT ? 'on' : ''}" id="tkRepBtn" title="Повторять по дням">${ic(I.refresh || I.clock, 2)}<span>${TASK_NEWREPEAT ? tkRepLabel(TASK_NEWREPEAT) : 'Повтор'}</span></button>
+          <button class="tk-rep-btn ${TASK_NEWREPEAT ? 'on' : ''}" id="tkRepBtn" title="Повторять по дням">${ic(I.refresh || I.clock, 2)}<span id="tkRepLbl">${TASK_NEWREPEAT ? tkRepLabel(TASK_NEWREPEAT) : 'Повтор'}</span></button>
           <button class="tk-routine-btn" id="tkRoutine" title="Готовые задачи рутины брокера">${ic(I.spark, 2)}<span>Рутина брокера</span></button>
         </div>
+        <div class="tk-rep-panel" id="tkRepPanel">${tkRepPanelHtml()}</div>
       </div>
     </div>
     <div class="tk-balance glass" id="tkBalance"></div>
@@ -6820,8 +6858,20 @@ PAGES.tasks = async (root) => {
   $('#tkAdd', root).addEventListener('click', addTask);
   /* ⭐ сфера жизни */
   $$('#tkSpherePick .tk-sphere-chip', root).forEach(b => b.addEventListener('click', () => { TASK_NEWSPHERE = (TASK_NEWSPHERE === b.dataset.sp) ? '' : b.dataset.sp; $$('#tkSpherePick .tk-sphere-chip', root).forEach(x => x.classList.toggle('on', x.dataset.sp === TASK_NEWSPHERE)); }));
-  /* ⭐ повтор: попап с днями недели + время */
-  $('#tkRepBtn', root) && $('#tkRepBtn', root).addEventListener('click', (e) => { e.stopPropagation(); openRepeatPop(e.currentTarget, () => render()); });
+  /* ⭐ повтор: ИНЛАЙН-панель (без попапа) — выезжает снизу капчи, живое обновление */
+  { const cap = root.querySelector('.tk-cap'), repBtn = $('#tkRepBtn', root), repPanel = $('#tkRepPanel', root);
+    const syncRepLbl = () => { const l = $('#tkRepLbl', root); if (l) l.textContent = TASK_NEWREPEAT ? tkRepLabel(TASK_NEWREPEAT) : 'Повтор'; if (repBtn) repBtn.classList.toggle('on', !!TASK_NEWREPEAT); };
+    const rebuild = () => { if (repPanel) repPanel.innerHTML = tkRepPanelHtml(); };
+    const curTime = () => (($('#tkRepTime', root) || {}).value) || (TASK_NEWREPEAT && TASK_NEWREPEAT.time) || '09:00';
+    if (repBtn) repBtn.addEventListener('click', (e) => { e.stopPropagation(); cap && cap.classList.toggle('rep-open'); });
+    if (repPanel) repPanel.addEventListener('click', (e) => {
+      const dow = e.target.closest('[data-dow]'), pre = e.target.closest('[data-preset]'), clr = e.target.closest('#tkRepClear');
+      if (clr) { TASK_NEWREPEAT = null; rebuild(); syncRepLbl(); return; }
+      if (dow) { const dnum = +dow.dataset.dow; if (!TASK_NEWREPEAT) TASK_NEWREPEAT = { days: [], time: curTime() }; const a = TASK_NEWREPEAT.days; TASK_NEWREPEAT.days = a.includes(dnum) ? a.filter(x => x !== dnum) : [...a, dnum].sort(); rebuild(); syncRepLbl(); return; }
+      if (pre) { const p = pre.dataset.preset; TASK_NEWREPEAT = { days: p === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : p === 'work' ? [1, 2, 3, 4, 5] : [0, 6], time: curTime() }; rebuild(); syncRepLbl(); return; }
+    });
+    if (repPanel) repPanel.addEventListener('change', (e) => { if (e.target.id === 'tkRepTime') { if (!TASK_NEWREPEAT) TASK_NEWREPEAT = { days: [], time: e.target.value }; else TASK_NEWREPEAT.time = e.target.value; syncRepLbl(); } });
+  }
   /* ⭐ рутина брокера: попап-палитра шаблонов по сферам */
   $('#tkRoutine', root) && $('#tkRoutine', root).addEventListener('click', (e) => { e.stopPropagation(); openRoutinePop(e.currentTarget, today, () => render()); });
   /* ⭐ колесо баланса */
@@ -7309,7 +7359,7 @@ async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
 /* ⭐ готовые die-cut стикеры-визион (28 шт, /assets/vision-board) — заменили кривую нарезку */
-const MB_VISION = ['01_better_version_note', '02_rolex_gmt_master', '03_private_jet_global_7500', '04_more_freedom_note', '05_dream_home_dubai', '06_location_independent_income', '07_dubai_burj_khalifa_photo', '08_healthy_strong_man', '09_self_development_books', '10_invest_highest_dividends_note', '11_disciplined_focused_wealthy_free', '12_mercedes_g63', '13_givenchy_bag', '14_good_taste_note', '15_big_goals_bigger_actions', '16_macbook_pro', '17_iphone_16_pro', '18_boarding_pass_travel', '19_see_more_world_note', '20_tropical_destination_photo', '21_destinations_experiences_note', '22_dubai_dinner_photo', '23_fashion_outfit', '24_multiple_income_streams_cash', '25_build_something_bigger_office', '26_french_bulldog', '27_happy_life_for_us_note', '28_freedom_anytime_anywhere_pool'];
+const MB_VISION = ['01_big_goals', '02_g63', '03_dream_villa', '04_real_estate_freedom', '05_private_jet', '06_travel_more', '07_dubai', '08_cash_stack', '09_macbook', '10_passport', '11_tropical_destination', '12_coffee_discipline', '13_work_smart', '14_dream_apartment', '15_financial_freedom', '16_chihuahua_good_boy', '17_healthy_energy_dumbbell', '18_healthy_mind_leaf', '19_business_books', '20_luxury_watch', '21_italy', '22_consistent_progress', '23_inspiring_people_quote', '24_ceo_mindset_workspace', '25_bigger_deals', '26_invest_real_assets_tree', '27_collect_moments_suitcase', '28_porsche_freedom', '29_grateful_sunset', '30_same_vision_bigger_results'];
 /* РАНДОМНО берём 7–9 стикеров, раскидываем по слабой сетке (без жёсткого перекрытия), поворот+стаггер+плавание */
 function mbDemoStickers() {
   const pool = MB_VISION.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[pool[i], pool[j]] = [pool[j], pool[i]]; }
