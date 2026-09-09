@@ -32,7 +32,7 @@ labels = [
  'Прогресс','Рост график','Лист природа','Огонь энергия','Сердце забота','Бриллиант ценность','Корона статус',
  'Локация','Время','Документ','Щит надёжность','Команда люди','Образование','Ракета старт']
 
-T = 44      # порог «это фон» по евклид. расстоянию к bg
+T = 22      # порог «это фон» по евклид. расстоянию к bg
 FEATHER = 16
 saved = []
 for r in range(4):
@@ -58,21 +58,18 @@ for r in range(4):
         border_ids.discard(0)
         outer_bg = np.isin(lbl, list(border_ids))   # только внешний фон; ВНУТРЕННИЙ near_bg сохраняем
         # мягкая альфа: 0 на внешнем фоне, ramp по расстоянию у кромки, 255 внутри объекта
-        # ⭐ ЖЁСТКИЙ die-cut: только уверенно-не-фон (dist>T и не тень), морфология чистит,
-        # 0.6px гаусс — только сглаживание кромки. Никаких полупрозрачных плашек/теней/ореолов
-        # (иначе на цветном слайде вылезают «квадраты»).
-        solid = (dist > T) & (~shadow)
-        solid = ndimage.binary_closing(solid, np.ones((3, 3)))
-        solid = ndimage.binary_opening(solid, np.ones((2, 2)))
-        a = ndimage.gaussian_filter(solid.astype(np.float32), 0.6)
-        a8 = (np.clip(a, 0, 1) * 255).astype(np.uint8)
+        # ⭐ border flood-fill + ЖЁСТКАЯ кромка: икона (всё, что НЕ внешний фон) = непрозрачна,
+        # нутро/плашка ЦЕЛЫЕ (не трогаем), тень/внешний фон = 0, без feather-ореола. 0.6px — только AA.
+        alpha = (~outer_bg).astype(np.float32)
+        alpha = ndimage.gaussian_filter(alpha, 0.6)
+        a8 = (np.clip(alpha, 0, 1) * 255).astype(np.uint8)
         # выкидываем мелкие ошмётки (остатки цифры/подписи, блик-искры), оставляем крупные компоненты
         sol = a8 > 40
         cl, cn = ndimage.label(sol, structure=np.ones((3, 3)))
         if cn:
             sizes = ndimage.sum(np.ones_like(cl), cl, range(1, cn + 1))
             big = max(sizes)
-            keep = {i + 1 for i, s in enumerate(sizes) if s >= max(120, big * 0.06)}
+            keep = {i + 1 for i, s in enumerate(sizes) if s >= max(400, big * 0.14)}
             a8[~np.isin(cl, list(keep))] = 0
         ys_, xs_ = np.where(a8 > 18)
         if len(xs_) == 0:
