@@ -8595,7 +8595,13 @@ setInterval(async () => {
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
-    else if (['overview', 'funnel'].includes(CUR) && Date.now() - (window._lastRenderAt || 0) > 5000) await render(); // не мигать поверх свежего рендера
+    else if (['overview', 'funnel'].includes(CUR)) {
+      /* ⭐ фикс мигания: перерисовываем обзор/воронку ТОЛЬКО если данные реально изменились
+         (fingerprint), а не каждые 7с вслепую — раньше был безусловный re-render = флеш экрана */
+      let fp; try { fp = JSON.stringify(STATE); } catch (_) { fp = null; }
+      if (fp == null) { if (Date.now() - (window._lastRenderAt || 0) > 30000) await render(); }
+      else if (fp !== window._stateFp) { window._stateFp = fp; await render(); }
+    }
   } catch (e) {
     if (e.message !== 'auth') setConn(false); // сервер лёг/рестартует — баннер, не молчание
   }

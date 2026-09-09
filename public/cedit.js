@@ -1306,7 +1306,23 @@ body.cpanel-on{padding-right:308px!important}
     }));
     /* добавление элементов-слоёв */
     const accent = ((P.themes[P.theme] || {}).blue) || '#1D34D8';
-    const addLayerAt = (layer, slideIdx) => { const ti = (slideIdx == null ? i : slideIdx); const arr = serialize(); if (!arr[ti]) return; arr[ti].layers = arr[ti].layers || []; layer.z = Math.max(0, ...arr[ti].layers.map(l => l.z || 0)) + 1; arr[ti].layers.push(layer); save(true, { slides: arr }); };
+    const addLayerAt = (layer, slideIdx) => {
+      /* ⭐ цель = слайд, который пользователь СЕЙЧАС видит по центру экрана (а не «выбранный» ранее) —
+         фикс: стикер/элемент прилетал на 1-2 слайд, когда листаешь на 5-й */
+      let ti = slideIdx;
+      if (ti == null) {
+        const cy = innerHeight / 2; let best = sel, bd = Infinity;
+        $$('.slide').forEach(s => { const r = s.getBoundingClientRect(); const c = r.top + r.height / 2; const d = Math.abs(c - cy); if (d < bd) { bd = d; best = +s.dataset.idx; } });
+        ti = best;
+      }
+      const arr = serialize(); if (!arr[ti]) return;
+      arr[ti].layers = arr[ti].layers || [];
+      layer.z = Math.max(0, ...arr[ti].layers.map(l => l.z || 0)) + 1;
+      arr[ti].layers.push(layer);
+      if (ti !== sel) { sel = ti; try { persistUI(); } catch (_) {} }
+      save(true, { slides: arr });
+      flash('Добавлено на слайд ' + (ti + 1) + ' ✓', 1300);
+    };
     const addLayer = (layer) => addLayerAt(layer, null);
     const shapeMini = (s) => ({ rect: '<rect x="3" y="3" width="18" height="18" rx="3"/>', circle: '<circle cx="12" cy="12" r="9"/>', ring: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3"/>', line: '<rect x="2" y="10" width="20" height="4" rx="2"/>', triangle: '<polygon points="12,3 21,21 3,21"/>', blob: '<circle cx="12" cy="12" r="9"/>', arrow: '<path d="M4 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>', badge: '<rect x="3" y="3" width="18" height="18" rx="6"/>', diamond: '<polygon points="12,3 21,12 12,21 3,12"/>' }[s] || '<rect x="3" y="3" width="18" height="18"/>');
     /* Пикер с подкатегориями + перетаскивание на слайд.
