@@ -614,29 +614,50 @@ function inbound(db, lead, text, opts = {}) {
 
 /* ---------- отчёты владельцу в мессенджер ---------- */
 function buildReport(db, period) {
+  /* ⭐ формат агентства: лиды/расход/CPL/целевые/стоимость целевого/%квал/топ связок/динамика н-н/all-time */
   const now = Date.now();
   const span = period === 'monthly' ? 30 : period === 'weekly' ? 7 : 1;
-  const from = now - span * 24 * 3600e3;
-  const L = db.leads;
-  const inPeriod = (t) => t && t >= from;
-  const newLeads = L.filter(l => inPeriod(l.createdAt));
-  const quals = L.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage) && inPeriod(l.lastMsgAt));
-  const deals = L.filter(l => l.stage === 'deal');
-  const meets = (db.meetings || []).filter(mt => inPeriod(mt.at) || (mt.at > now && mt.at < now + 2 * 24 * 3600e3));
-  const views = (db.collections || []).filter(c => inPeriod(c.lastViewAt));
-  const waiting = L.filter(l => (l.tags || []).includes('нужен человек'));
-  const overdue = L.filter(l => l.nextAction && l.nextAction.at && l.nextAction.at < now && !['deal', 'lost'].includes(l.stage));
-  const pName = { daily: 'за сутки', weekly: 'за неделю', monthly: 'за месяц' }[period];
+  const dayMs = 24 * 3600e3;
+  const from = now - span * dayMs, prevFrom = now - 2 * span * dayMs;
+  const L = db.leads || [], ADS = db.ads || [];
+  const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+  const inR = (t, a, b) => t && t >= a && t < b;
+  const leadsIn = (a, b) => L.filter(l => inR(l.createdAt, a, b));
+  const qualsIn = (a, b) => L.filter(l => QUAL.includes(l.stage) && inR(l.createdAt, a, b));
+  const nl = leadsIn(from, now), pl = leadsIn(prevFrom, from);
+  const nq = qualsIn(from, now), pq = qualsIn(prevFrom, from);
+  const inWork = nl.filter(l => l.stage !== 'new').length;
+  const spendTotal = ADS.reduce((s, a) => s + (+a.spend || 0), 0);
+  const cpl = nl.length ? Math.round(spendTotal / nl.length) : 0;
+  const cpTarget = nq.length ? Math.round(spendTotal / nq.length) : 0;
+  const qualRate = inWork ? Math.round(nq.length / inWork * 100) : 0;
+  const cur = (db.settings.reports && db.settings.reports.currency) || db.settings.currency || '';
+  const M = (n) => Math.round(n).toLocaleString('ru-RU') + (cur ? ' ' + cur : '');
+  const dyn = (a, b) => { if (!b) return a ? '+∞%' : '0%'; const d = Math.round((a - b) / b * 100); return (d >= 0 ? '+' : '') + d + '%'; };
+  const plu = (n) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? 'лид' : (a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 'лида' : 'лидов'; };
+  /* связки: кампания / адсет */
+  const bundles = {};
+  ADS.forEach(a => { const k = (a.campaignName || '—') + ' / ' + (a.adsetName || '—'); if (!bundles[k]) bundles[k] = { leads: 0, spend: 0 }; bundles[k].spend += (+a.spend || 0); });
+  nl.forEach(l => { const ad = l.ads && ADS.find(a => String(a.adId) === String(l.ads.adId)); if (ad) { const k = (ad.campaignName || '—') + ' / ' + (ad.adsetName || '—'); if (bundles[k]) bundles[k].leads++; } });
+  const topB = Object.entries(bundles).filter(([, v]) => v.leads > 0).sort((a, b) => b[1].leads - a[1].leads).slice(0, 5);
+  const atLeads = L.length, atCpl = atLeads ? Math.round(spendTotal / atLeads) : 0;
+  const pName = { daily: 'ежедневная сводка', weekly: 'еженедельный отчёт', monthly: 'месячный отчёт' }[period];
   const lines = [
-    `📊 ${db.settings.agency.name} — сводка ${pName}`,
+    `📊 ${db.settings.agency.name} — ${pName} по лидогенерации`, ``,
+    `Лидов всего: ${nl.length}`,
+    spendTotal ? `Расход: ${M(spendTotal)}  |  CPL: ${M(cpl)}` : null,
+    `Целевые: ${nq.length}${nl.length ? ` (${Math.round(nq.length / nl.length * 100)}%)` : ''}`,
+    spendTotal && nq.length ? `Стоимость целевого: ${M(cpTarget)}` : null,
+    inWork ? `% квалификации (от взятых в работу): ${qualRate}% (${nq.length} из ${inWork})` : null,
+    topB.length ? `` : null,
+    topB.length ? `Топ связок (кампания / адсет):` : null,
+    ...topB.map(([k, v]) => `• ${k} — ${v.leads} ${plu(v.leads)}${v.spend ? `, ${M(v.spend)}, CPL ${M(Math.round(v.spend / v.leads))}` : ''}`),
     ``,
-    `Новые лиды: ${newLeads.length}`,
-    `Квалифицировано: ${quals.length}`,
-    `Сделки (всего в работе): ${deals.length}`,
-    `Встречи (прошедшие/ближайшие): ${meets.length}`,
-    views.length ? `🔥 Смотрели подборки: ${views.map(c => (db.leads.find(l => l.id === c.leadId) || {}).name).filter(Boolean).join(', ')}` : null,
-    waiting.length ? `⚠️ Ждут живого менеджера: ${waiting.map(l => l.name).join(', ')}` : null,
-    overdue.length ? `⏰ Просроченные шаги: ${overdue.slice(0, 5).map(l => l.name + ' — ' + l.nextAction.text).join('; ')}` : null,
+    `Динамика к прошлому периоду:`,
+    `• Лиды: ${pl.length} → ${nl.length} (${dyn(nl.length, pl.length)})`,
+    `• Целевые: ${pq.length} → ${nq.length} (${dyn(nq.length, pq.length)})`,
+    ``,
+    spendTotal ? `За всё время: лиды ${atLeads} | расход ${M(spendTotal)} | CPL ${M(atCpl)}` : `За всё время: лиды ${atLeads}`,
     ``,
     `Открыть CRM: ${tunnelBase() || 'http://localhost:' + (process.env.PORT || 5077)}`,
   ].filter(x => x !== null);
