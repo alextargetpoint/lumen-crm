@@ -5891,7 +5891,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
    бьёт белый фон .slide.hasbg .s-pt-m (0,3,0) — иначе «белые квадраты» на фото. НЕ трогаем
    background-image (он инлайном url), поэтому НЕ shorthand и НЕ !important. */
 .slide .pm-img li{align-items:center}
-.slide .pm-img .s-pt-m,.slide.hasbg .pm-img .s-pt-m{background-color:transparent;background-size:contain;background-repeat:no-repeat;background-position:center;box-shadow:none;border:0;border-radius:0;width:26px;height:26px;flex:0 0 26px;color:transparent;filter:drop-shadow(0 2px 5px rgba(6,12,28,.18))}
+.slide .pm-img .s-pt-m,.slide.hasbg .pm-img .s-pt-m{background-color:transparent;background-size:contain;background-repeat:no-repeat;background-position:center;box-shadow:none;border:0;border-radius:0;width:26px;height:26px;flex:0 0 26px;color:transparent;filter:drop-shadow(0 3px 7px rgba(6,12,28,.30)) drop-shadow(0 1px 2px rgba(6,12,28,.22))}
 .slide .pm-img .s-pt-m::after,.slide.hasbg .pm-img .s-pt-m::after{content:"";display:none}
 .slide.hasbg .pm-img .s-pt-m{filter:drop-shadow(0 2px 8px rgba(0,0,0,.45))}
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}

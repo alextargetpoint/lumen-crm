@@ -1189,6 +1189,152 @@
 ]
 },
 {
+"title": "Буллеты · Плоские",
+"dir": "bullets-flat",
+"items": [
+{
+"slug": "bullets-flat-01",
+"label": "Буллет 1",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/01"
+},
+{
+"slug": "bullets-flat-02",
+"label": "Буллет 2",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/02"
+},
+{
+"slug": "bullets-flat-03",
+"label": "Буллет 3",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/03"
+},
+{
+"slug": "bullets-flat-04",
+"label": "Буллет 4",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/04"
+},
+{
+"slug": "bullets-flat-05",
+"label": "Буллет 5",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/05"
+},
+{
+"slug": "bullets-flat-06",
+"label": "Буллет 6",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/06"
+},
+{
+"slug": "bullets-flat-07",
+"label": "Буллет 7",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/07"
+},
+{
+"slug": "bullets-flat-08",
+"label": "Буллет 8",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/08"
+},
+{
+"slug": "bullets-flat-09",
+"label": "Буллет 9",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/09"
+},
+{
+"slug": "bullets-flat-10",
+"label": "Буллет 10",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/10"
+},
+{
+"slug": "bullets-flat-11",
+"label": "Буллет 11",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/11"
+},
+{
+"slug": "bullets-flat-12",
+"label": "Буллет 12",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/12"
+},
+{
+"slug": "bullets-flat-13",
+"label": "Буллет 13",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/13"
+},
+{
+"slug": "bullets-flat-14",
+"label": "Буллет 14",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/14"
+},
+{
+"slug": "bullets-flat-15",
+"label": "Буллет 15",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/15"
+},
+{
+"slug": "bullets-flat-16",
+"label": "Буллет 16",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/16"
+},
+{
+"slug": "bullets-flat-17",
+"label": "Буллет 17",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/17"
+},
+{
+"slug": "bullets-flat-18",
+"label": "Буллет 18",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/18"
+},
+{
+"slug": "bullets-flat-19",
+"label": "Буллет 19",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/19"
+},
+{
+"slug": "bullets-flat-20",
+"label": "Буллет 20",
+"cat": "flat",
+"kw": [],
+"key": "bullets-flat/20"
+}
+]
+},
+{
 "slug": "ios-icons",
 "title": "iOS · иконки",
 "items": [
