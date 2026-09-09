@@ -68,7 +68,7 @@
 .cpanel-tabs{display:flex;padding:10px 12px 0;gap:4px;border-bottom:1px solid #EEF1F6}
 .cpanel-tab{flex:1;border:none;background:none;padding:9px;font-weight:700;font-size:13px;color:#8a90a0;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit}
 .cpanel-tab.on{color:var(--cb);border-bottom-color:var(--cb)}
-.cpanel-body{flex:1;overflow-y:auto;padding:14px 14px 40px}
+.cpanel-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 14px 40px}
 .cgrp{margin-bottom:16px}
 .cgrp>label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a90a0;font-weight:700;margin-bottom:8px}
 .cthemes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
@@ -90,7 +90,7 @@
 .cfontbtn{width:100%;border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:11px 12px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;color:#2A3346;display:flex;align-items:center;gap:10px;text-align:left}
 .cfontbtn .aa{font-size:20px}
 .cfontbtn:hover{border-color:var(--cb)}
-.cfontcombos{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cfontcombos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .cfcombo{display:flex;align-items:center;gap:9px;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:11px;padding:9px 10px;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .14s,transform .14s,box-shadow .14s}
 .cfcombo:hover{border-color:var(--cb);transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(37,99,235,.4)}
 .cfcombo.on{border-color:var(--cb);box-shadow:inset 0 0 0 1px var(--cb);background:linear-gradient(180deg,#EAF1FF,#DBE7FF)}
@@ -252,10 +252,10 @@ body.cpanel-on{padding-right:308px!important}
   const persistUI = () => { try { sessionStorage.setItem(UIKEY, JSON.stringify({ tab, sel })); } catch (_) {} };
   try { const st = JSON.parse(sessionStorage.getItem(UIKEY) || '{}'); if (st.tab === 'slide' || st.tab === 'design') tab = st.tab; if (Number.isInteger(st.sel) && st.sel >= 0) sel = st.sel; } catch (_) {}
 
-  $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
+  [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
 
   /* очистка вставки — только текст */
-  document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
+  document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce],[data-pt]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
 
   const cleanHtml = (h) => String(h || '').replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '')
     .replace(/<mark\b[^>]*>/gi, (mm) => { const cm = mm.match(/hl-[a-z0-9]+/i); return cm ? `<mark class="${cm[0].toLowerCase()}">` : '<mark>'; })
@@ -268,12 +268,15 @@ body.cpanel-on{padding-right:308px!important}
       const i = sl.dataset.idx;
       const h = sl.querySelector(`[data-ce="${i}:heading"]`); const s = sl.querySelector(`[data-ce="${i}:sub"]`); const ey = sl.querySelector(`[data-ce="${i}:eyebrow"]`);
       const layers = $$('[data-l]', sl).map(le => { try { return JSON.parse(le.getAttribute('data-l')); } catch (e) { return null; } }).filter(Boolean);
-      let rich = {}; if (sl.dataset.rich) { try { rich = JSON.parse(sl.dataset.rich); } catch (e) {} }   /* сохраняем rich-режим (цифры/план) — он не редактируется в DOM */
+      let rich = {}; if (sl.dataset.rich) { try { rich = JSON.parse(sl.dataset.rich); } catch (e) {} }   /* rich-режим (цифры/план) — items не редактируются в DOM */
+      /* ⭐ тезисы-буллеты РЕДАКТИРУЕМЫ: читаем текст из DOM ([data-pt]), иначе — из rich */
+      const ptEls = $$('[data-pt]', sl);
+      const points = ptEls.length ? ptEls.map(e => cleanHtml(e.innerHTML).slice(0, 72)).filter(Boolean) : (rich.points || []);
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', card: sl.dataset.card || '', layers,
-        mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
+        mode: rich.mode || '', items: rich.items || [], points: points, pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
         noNum: !!sl.dataset.nonum, noBrand: !!sl.dataset.nobrand,
         free: sl.dataset.free === '1', tx: +sl.dataset.tx || 0, ty: +sl.dataset.ty || 0, tscale: +sl.dataset.tscale || 1,
       };
@@ -298,7 +301,7 @@ body.cpanel-on{padding-right:308px!important}
     } catch (e) { location.reload(); }
   }
   function rewireLive() {
-    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
+    [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
     const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
     renderBody();
@@ -514,8 +517,8 @@ body.cpanel-on{padding-right:308px!important}
   function selRect(field) { const s = document.getSelection(); if (s && s.rangeCount && !s.isCollapsed) { const rs = s.getRangeAt(0).getClientRects(); if (rs && rs[0] && (rs[0].width + rs[0].height) > 0) return rs[0]; } return field.getBoundingClientRect(); }
   function posQbar(rect) { const q = qbar; q.classList.add('on'); const qw = q.offsetWidth, qh = q.offsetHeight; let x = rect.left + rect.width / 2; x = Math.max(qw / 2 + 8, Math.min(x, innerWidth - qw / 2 - 8)); let top = rect.top - qh - 10; if (top < 62) { top = rect.bottom + 10; } q.style.left = x + 'px'; q.style.top = top + 'px'; q.style.transform = 'translateX(-50%)'; }
   function showTextQbar(field) {
-    if (!field || !field.dataset || !field.dataset.ce) return;
-    const isHead = /:heading$/.test(field.dataset.ce);
+    if (!field || !field.dataset || (!field.dataset.ce && field.dataset.pt == null)) return;
+    const isHead = /:heading$/.test(field.dataset.ce || '');
     const q = ensureQbar(); q._mode = 'text'; q._t = field;
     q.innerHTML = `<button data-q="bold" title="Жирный"><b>Ж</b></button><button data-q="italic" title="Курсив"><i style="font-family:Georgia,serif">К</i></button><button data-q="mark" title="Выделить цветом / маркер"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5-9.5 9.5H5v-5.5z"/><path d="M12.5 6.5l5 5"/><path d="M4 21h16"/></svg></button><span class="cqt-sep"></span>` +
       (isHead ? `<button data-q="sdown" title="Меньше заголовок">A<small>−</small></button><button data-q="sup" title="Больше заголовок">A<small>+</small></button><button data-q="style" title="Стиль заголовка">Стиль&nbsp;▾</button><button data-q="color" title="Цвет заголовка"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button><span class="cqt-sep"></span>` : '') +

@@ -5599,7 +5599,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
-            ${!s.mode && (s.points || []).length ? (() => { const pm = s.pmark || 'index'; const isImg = /^img:/.test(pm); const iu = isImg ? '/assets/stickers/' + pm.slice(4) + '.png' : ''; return `<ul class="s-points pm-${isImg ? 'img' : pm}">${s.points.map((pt, pi) => `<li><span class="s-pt-m"${isImg ? ` style="background-image:url('${esc(iu)}')"` : ''} data-n="${String(pi + 1).padStart(2, '0')}"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>`; })() : ''}
+            ${!s.mode && (s.points || []).length ? (() => { const pm = s.pmark || 'index'; const isImg = /^img:/.test(pm); const iu = isImg ? '/assets/stickers/' + pm.slice(4) + '.png' : ''; return `<ul class="s-points pm-${isImg ? 'img' : pm}">${s.points.map((pt, pi) => `<li><span class="s-pt-m"${isImg ? ` style="background-image:url('${esc(iu)}')"` : ''} data-n="${String(pi + 1).padStart(2, '0')}"></span><span${isEdit ? ` data-pt="${pi}"` : ''}>${sanInline(pt)}</span></li>`).join('')}</ul>`; })() : ''}
             ${(footerHide || s.noBrand || s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand fb-${footerStyle}">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
@@ -5866,10 +5866,13 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .pm-line .s-pt-m{flex:0 0 3px;width:3px;height:1.05em;border-radius:2px;background:var(--blue);box-shadow:none;margin-top:.15em}
 .pm-line .s-pt-m::after{content:""}
 .slide.hasbg .pm-line .s-pt-m{background:#fff}
-/* ⭐ картиночный маркер буллета (иконка из пака «Буллеты») */
-.pm-img li{align-items:center}
-.pm-img .s-pt-m{background:transparent center/contain no-repeat;box-shadow:none;border:0;border-radius:0;width:26px;height:26px;flex:0 0 26px;filter:drop-shadow(0 2px 5px rgba(6,12,28,.18))}
-.pm-img .s-pt-m::after{content:""}
+/* ⭐ картиночный маркер буллета (иконка из пака «Буллеты»).
+   background-COLOR (longhand) transparent на высокой специфичности (.slide.hasbg .pm-img .s-pt-m = 0,4,0)
+   бьёт белый фон .slide.hasbg .s-pt-m (0,3,0) — иначе «белые квадраты» на фото. НЕ трогаем
+   background-image (он инлайном url), поэтому НЕ shorthand и НЕ !important. */
+.slide .pm-img li{align-items:center}
+.slide .pm-img .s-pt-m,.slide.hasbg .pm-img .s-pt-m{background-color:transparent;background-size:contain;background-repeat:no-repeat;background-position:center;box-shadow:none;border:0;border-radius:0;width:26px;height:26px;flex:0 0 26px;color:transparent;filter:drop-shadow(0 2px 5px rgba(6,12,28,.18))}
+.slide .pm-img .s-pt-m::after,.slide.hasbg .pm-img .s-pt-m::after{content:"";display:none}
 .slide.hasbg .pm-img .s-pt-m{filter:drop-shadow(0 2px 8px rgba(0,0,0,.45))}
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
 .s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
@@ -5935,7 +5938,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=42"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=43"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
