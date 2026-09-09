@@ -7204,18 +7204,18 @@ async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
 /* демо-стикеры для пустого состояния (нарезаны из реального референса-визиона) — {файл, x%, y%, ширина%, поворот, задержка} */
 const MB_DEMO_STICKERS = [
-  { f: 'st00', x: 40, y: 1, w: 23, r: 2, d: 0.0 },   // вилла Дубай
-  { f: 'st08', x: 20, y: 5, w: 20, r: 4, d: 0.35 },  // джет
-  { f: 'st02', x: 74, y: 3, w: 23, r: -2, d: 0.6 },  // скайлайн
-  { f: 'st10', x: 20, y: 40, w: 16, r: -3, d: 0.8 }, // книги
-  { f: 'st14', x: 4, y: 30, w: 13, r: -8, d: 1.0 },  // Rolex
-  { f: 'st11', x: 5, y: 62, w: 21, r: 2, d: 0.5 },   // MacBook
-  { f: 'st03', x: 62, y: 32, w: 25, r: 2, d: 1.2 },  // G63
-  { f: 'st07', x: 85, y: 40, w: 14, r: 6, d: 1.5 },  // Givenchy
-  { f: 'st13', x: 33, y: 63, w: 15, r: -5, d: 1.1 }, // деньги
-  { f: 'st09', x: 51, y: 55, w: 14, r: 3, d: 1.85 }, // бульдог
-  { f: 'st01', x: 79, y: 64, w: 18, r: -3, d: 1.4 }, // острова
-  { f: 'st17', x: 68, y: 64, w: 9, r: 7, d: 2.15 },  // iPhone
+  { f: 'jet', x: 5, y: 7, w: 17, r: -3, d: 0.0 },      // частный джет
+  { f: 'villa', x: 37, y: 3, w: 20, r: 1, d: 0.5 },    // вилла Дубай
+  { f: 'skyline', x: 74, y: 5, w: 21, r: -2, d: 0.8 }, // скайлайн Дубай
+  { f: 'watch', x: 2, y: 38, w: 11, r: -7, d: 1.0 },   // Rolex
+  { f: 'books', x: 20, y: 40, w: 15, r: 3, d: 0.7 },   // книги
+  { f: 'car', x: 57, y: 28, w: 24, r: 1, d: 1.1 },     // G63
+  { f: 'bag', x: 86, y: 42, w: 12, r: 5, d: 1.4 },     // Givenchy
+  { f: 'macbook', x: 5, y: 64, w: 20, r: -2, d: 0.55 },// MacBook
+  { f: 'money', x: 32, y: 66, w: 14, r: -4, d: 1.2 },  // деньги
+  { f: 'bulldog', x: 49, y: 57, w: 13, r: 2, d: 1.8 }, // бульдог
+  { f: 'islands', x: 76, y: 66, w: 18, r: -2, d: 1.5 },// острова
+  { f: 'note', x: 65, y: 30, w: 9, r: 6, d: 2.0 },     // рукописная заметка
 ];
 async function renderMoodboard(root, opts) {
   opts = opts || {};
