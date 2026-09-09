@@ -2556,15 +2556,23 @@ const server = http.createServer(async (req, res) => {
       db.campaigns.unshift(cmp); store.save();
       return json(res, 200, cmp);
     }
-    if ((m = p.match(/^\/api\/campaigns\/([^/]+)\/(start|pause|resume|stop)$/)) && req.method === 'POST') {
+    if ((m = p.match(/^\/api\/campaigns\/([^/]+)\/(start|pause|resume|stop|cancel)$/)) && req.method === 'POST') {
       const cmp = db.campaigns.find(c => c.id === m[1]);
       if (!cmp) return json(res, 404, { error: 'not found' });
       if (m[2] === 'start') engine.startCampaign(db, cmp);
       if (m[2] === 'pause') { cmp.state = 'paused'; cmp.log.unshift({ at: Date.now(), text: 'Пауза' }); }
       if (m[2] === 'resume') { cmp.state = 'running'; cmp.nextBatchAt = Date.now() + 2000; cmp.log.unshift({ at: Date.now(), text: 'Продолжение' }); }
       if (m[2] === 'stop') { cmp.state = 'done'; cmp.log.unshift({ at: Date.now(), text: 'Остановлена вручную' }); }
+      if (m[2] === 'cancel') { cmp.state = 'canceled'; cmp.nextBatchAt = null; cmp.log.unshift({ at: Date.now(), text: 'Отменена (не запускалась)' }); }
       store.save();
       return json(res, 200, cmp);
+    }
+    if ((m = p.match(/^\/api\/campaigns\/([^/]+)$/)) && req.method === 'DELETE') {
+      const before = db.campaigns.length;
+      db.campaigns = db.campaigns.filter(c => c.id !== m[1]);
+      if (db.campaigns.length === before) return json(res, 404, { error: 'not found' });
+      store.save();
+      return json(res, 200, { ok: true });
     }
 
     if (p === '/api/brokers' && req.method === 'POST') {

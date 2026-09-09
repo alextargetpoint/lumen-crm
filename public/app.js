@@ -4412,7 +4412,7 @@ PAGES.wake.refresh = async () => {
 };
 
 function cmpCard(c) {
-  const stateBadge = { draft: '<span class="badge">черновик</span>', scheduled: '<span class="badge acc"><i></i>запланирована</span>', running: '<span class="badge ok"><i></i>идёт</span>', paused: '<span class="badge warn">пауза</span>', done: '<span class="badge">завершена</span>' }[c.state] || '';
+  const stateBadge = { draft: '<span class="badge">черновик</span>', scheduled: '<span class="badge acc"><i></i>запланирована</span>', running: '<span class="badge ok"><i></i>идёт</span>', paused: '<span class="badge warn">пауза</span>', done: '<span class="badge">завершена</span>', canceled: '<span class="badge">отменена</span>' }[c.state] || '';
   const total = c.recipients.length || 0;
   const done = Math.min(c.cursor, total);
   const startStr = c.startAt ? new Date(c.startAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
@@ -4429,10 +4429,11 @@ function cmpCard(c) {
     ${total ? `<div class="progress"><i style="width:${total ? done / total * 100 : 0}%"></i></div><div class="muted" style="font-size:11px;margin-top:5px">${done} из ${total}</div>` : ''}
     <div style="display:flex;gap:8px;margin-top:12px">
       ${c.state === 'draft' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить</button>` : ''}
-      ${c.state === 'scheduled' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить сейчас</button><button class="btn btn-danger btn-sm" data-act="stop">Отменить</button>` : ''}
+      ${c.state === 'scheduled' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить сейчас</button><button class="btn btn-danger btn-sm" data-act="cancel">Отменить</button>` : ''}
       ${c.state === 'running' ? `<button class="btn btn-sm" data-act="pause">${ic(I.pause)}Пауза</button>` : ''}
       ${c.state === 'paused' ? `<button class="btn btn-accent btn-sm" data-act="resume">${ic(I.play)}Продолжить</button>` : ''}
       ${['running', 'paused'].includes(c.state) ? `<button class="btn btn-danger btn-sm" data-act="stop">Остановить</button>` : ''}
+      ${['done', 'canceled'].includes(c.state) ? `<button class="btn btn-sm" data-del title="Убрать из списка">${ic(I.x)}Убрать</button>` : ''}
     </div>
     ${c.log.length ? `<div style="margin-top:12px">${coll('Журнал кампании', `<div class="cmp-log" style="border-top:none;padding-top:4px">${c.log.slice(0, 30).map(x => `${tmm(x.at)} — ${esc(x.text)}`).join('<br>')}</div>`, { open: false, count: c.log.length, icon: I.doc })}</div>` : ''}
   </div>`;
@@ -4441,6 +4442,12 @@ function wireCampaigns(root) {
   $$('[data-cmp] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-cmp]').dataset.cmp;
     await api.post(`/campaigns/${id}/${b.dataset.act}`);
+    PAGES.wake.refresh();
+  }));
+  $$('[data-cmp] [data-del]', root).forEach(b => b.addEventListener('click', async () => {
+    const id = b.closest('[data-cmp]').dataset.cmp;
+    await fetch('/api/campaigns/' + id, { method: 'DELETE' });
+    toast('Кампания убрана', null, true);
     PAGES.wake.refresh();
   }));
 }
