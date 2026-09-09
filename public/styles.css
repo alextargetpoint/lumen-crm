@@ -4055,11 +4055,11 @@ html[data-night] .mb-emoji { background: radial-gradient(circle at 34% 28%, #334
 .mb-embed .mb-board { min-height: 46vh; }
 
 /* сворачиваемая карта желаний в «Мои задачи» — тонкая, дорогая шапка */
-.mb-collcard { padding: 0; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--stroke); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, var(--card)), var(--card)); }
-.mb-coll-hd { width: 100%; display: flex; align-items: center; gap: 12px; padding: 15px 18px; background: none; border: none; cursor: pointer; text-align: left; }
-.mb-coll-hd .mb-ch-em { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 10px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.mb-coll-hd .mb-ch-em svg { width: 17px; height: 17px; }
-.mb-coll-hd .mb-ch-t { display: flex; flex-direction: column; gap: 1px; }
+.mb-collcard { padding: 0; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--stroke); border-radius: 18px; position: relative; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, var(--card)), var(--card)); }
+.mb-coll-hd { width: 100%; display: flex; align-items: center; gap: 12px; padding: 16px 18px; background: none; border: none; cursor: pointer; text-align: left; position: relative; z-index: 2; transition: transform .16s var(--ease-soft); }
+.mb-coll-hd .mb-ch-em { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 10px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); transition: background .18s, color .18s; }
+.mb-coll-hd .mb-ch-em svg { width: 18px; height: 18px; }
+.mb-coll-hd .mb-ch-t { display: flex; flex-direction: column; gap: 2px; }
 .mb-coll-hd b { font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px; color: var(--navy-900); letter-spacing: .01em; }
 .mb-coll-hd .sub { font-weight: 400; font-size: 11.5px; color: var(--ink-3); }
 .mb-coll-ar { margin-left: auto; color: var(--ink-3); display: grid; place-items: center; transition: transform .25s; }
@@ -4067,6 +4067,19 @@ html[data-night] .mb-emoji { background: radial-gradient(circle at 34% 28%, #334
 .mb-coll-ar svg { width: 16px; height: 16px; }
 .mb-coll-body { padding: 4px 16px 16px; }
 .mb-coll-hd:hover .mb-ch-em { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+/* ⭐ СВЁРНУТО = живая премиум-кнопка на Higgsfield-текстуре (шёлк). Анимация идёт пока свёрнуто, гаснет при открытии */
+.mb-collcard:not(.op) { border-color: transparent; box-shadow: 0 14px 34px -18px rgba(16,43,92,.55); }
+.mb-collcard:not(.op)::before { content: ''; position: absolute; inset: 0; z-index: 0; background: url('/assets/ui/balance-weave.jpg') center/cover; transform: scale(1.05); animation: tkBalBreathe 20s ease-in-out infinite; }
+.mb-collcard:not(.op)::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(112deg, rgba(14,18,32,.82), rgba(14,18,32,.5) 55%, rgba(14,18,32,.74)); pointer-events: none; }
+.mb-collcard:not(.op) .mb-coll-hd b { color: #fff; }
+.mb-collcard:not(.op) .mb-coll-hd .sub { color: rgba(255,255,255,.8); }
+.mb-collcard:not(.op) .mb-ch-em { color: #fff; background: rgba(255,255,255,.18); }
+.mb-collcard:not(.op) .mb-coll-ar { color: rgba(255,255,255,.82); }
+.mb-collcard:not(.op) .mb-coll-hd:hover { transform: translateY(-1px); }
+.mb-collcard:not(.op) .mb-coll-hd:hover .mb-ch-em { background: rgba(255,255,255,.26); }
+.mb-collcard:not(.op) .mb-coll-hd::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 34%, rgba(255,255,255,.16) 50%, transparent 64%); transform: translateX(-130%); animation: mbSheen 6.5s ease-in-out infinite; pointer-events: none; }
+@keyframes mbSheen { 0% { transform: translateX(-130%); } 48%, 100% { transform: translateX(130%); } }
+@media (prefers-reduced-motion: reduce) { .mb-collcard:not(.op)::before, .mb-collcard:not(.op) .mb-coll-hd::after { animation: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════════
    ОБЗОР — премиум-дашборд 2026. Единая токен-библиотека компонентов.
