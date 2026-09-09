@@ -1339,6 +1339,41 @@ p{font-size:var(--s-body);line-height:1.6}
   /* атомарные блоки не рвём между границами A4 */
   .mrail,.pt-track,.pt-svg,.pay,.pay-one,.fplan,.fp-cell,.cmpc,.units tr,.th,.cc-item,.cc-lr,.dt-r,.pf-t,.pf-pil,.ns-step,.ns-sr,.ns-cta,.ag-facts,.ag-min-head,.rc-sign,.rec-inline,.why li{break-inside:avoid;page-break-inside:avoid}
   .h2,.po-h,.cv-h,.op-h,.ag-h,.pf-intro{break-after:avoid;page-break-after:avoid}
+  /* Ф4 · плотность проектных страниц ТОЛЬКО для печати: «1.4-страничный» проект укладываем в один полный A4,
+     чтобы не оставлять полупустой хвост следующего листа. Экран (?design=1 без print) не меняется. */
+  .po{padding-top:36px;padding-bottom:28px}
+  /* при плотной укладке абсолютный футер наезжал на контент — переводим футер проектных страниц В ПОТОК
+     (как у текстовых .pg-страниц): он сам резервирует место, наезд физически невозможен */
+  .po .pg-foot{position:static;left:auto;right:auto;bottom:auto;margin-top:14px;padding-top:9px}
+  .page.po-single .pg-foot{margin-left:var(--pad-x);margin-right:var(--pad-x)}
+  .po-single .po-hero{height:276px}
+  .po-single.domhi .po-hero{height:330px}
+  .po-single .po-head{margin-top:20px}
+  .po-head{margin-bottom:14px}.po-h{margin-top:6px}
+  .me-split{gap:24px;margin-bottom:4px}
+  .me-r .me-img{height:150px;margin-bottom:12px}
+  /* metricEditorial: правый столбец (фото+рельса метрик) — доминанта высоты; ужимаем ровно чтобы влезть в один A4 */
+  .po-me .me-r .me-img{height:106px;margin-bottom:10px}
+  .po-me .mrail.stack .mr{padding:6px 14px}
+  .lede{margin-bottom:12px;line-height:1.5}
+  /* планы/генплан: ниже для печати; у gallery-страницы (её план уезжает на 2-й полный лист) оставляем крупнее */
+  .fp-img{height:200px}
+  .fp-grid.fp-2 .fp-img,.fp-grid.fp-3 .fp-img{height:160px}
+  .po-gal .fp-img{height:270px}
+  .po-gal .fp-grid.fp-2 .fp-img,.po-gal .fp-grid.fp-3 .fp-img{height:210px}
+  /* трим крупных вертикальных отступов и рядов блоков (печать) */
+  .mrail{margin:6px 0 14px}
+  .mrail.row .mr{padding:14px 20px 14px 0}
+  .mrail.stack .mr{padding:10px 15px}
+  .pay{margin:8px 0 12px}
+  .pt-track{padding-top:4px}.pt-pct{font-size:22px;margin-top:8px}.pt-bar{margin:12px 0 8px}
+  .pay-one .po-one{padding:12px 0}
+  .fplan{margin:10px 0 14px}
+  .loc{margin:4px 0 12px}.loc-b{margin-bottom:10px}.dt-r{padding:7px 0}
+  .units{margin:8px 0 12px}.units td{padding:9px 12px}
+  .rec-inline{margin:8px 0 12px;padding-left:18px}
+  .why li{padding:6px 0 6px 32px}
+  .amen{margin:4px 0 10px}.amen-c{padding:5px 12px}
   @page{size:A4;margin:0}
 }
 .recompose-bar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:8px;background:rgba(12,14,22,.9);backdrop-filter:blur(14px);padding:8px 10px 8px 16px;border-radius:100px;box-shadow:0 18px 50px -18px rgba(0,0,0,.6);z-index:50;align-items:center}
