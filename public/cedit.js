@@ -101,6 +101,8 @@
 .cthemes.clamped .cth.xtra{display:none}
 .clink{background:none;border:none;color:var(--cb);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;float:right;text-transform:none;letter-spacing:0;padding:0}
 .clink:hover{text-decoration:underline}
+.cgrp-hl{animation:cgrpHl 1.5s ease}
+@keyframes cgrpHl{0%,100%{box-shadow:none;background:transparent}18%,55%{box-shadow:0 0 0 2px color-mix(in srgb,var(--cb) 35%,transparent);background:color-mix(in srgb,var(--cb) 8%,transparent);border-radius:12px}}
 .cth{position:relative;aspect-ratio:1;border-radius:11px;border:1.5px solid #E7ECF3;cursor:pointer;overflow:hidden;background:linear-gradient(150deg,color-mix(in srgb,var(--d) 30%,var(--b)),var(--b));transition:transform .14s,box-shadow .14s,border-color .14s;padding:0}
 .cth:before{content:'';position:absolute;left:8px;bottom:8px;width:15px;height:15px;border-radius:50%;background:var(--d);box-shadow:0 1px 4px rgba(0,0,0,.35),inset 0 0 0 1.5px rgba(255,255,255,.3)}
 .cth:hover{transform:translateY(-2px);box-shadow:0 8px 18px -8px rgba(6,17,38,.4);border-color:#CBD6EA}
@@ -301,7 +303,7 @@ body.cpanel-on{padding-right:308px!important}
   const persistUI = () => { try { sessionStorage.setItem(UIKEY, JSON.stringify({ tab, sel })); } catch (_) {} };
   try { const st = JSON.parse(sessionStorage.getItem(UIKEY) || '{}'); if (st.tab === 'slide' || st.tab === 'design') tab = st.tab; if (Number.isInteger(st.sel) && st.sel >= 0) sel = st.sel; } catch (_) {}
 
-  [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
+  [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); jumpToPart(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
 
   /* очистка вставки — только текст */
   document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce],[data-pt]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
@@ -351,7 +353,7 @@ body.cpanel-on{padding-right:308px!important}
     } catch (e) { location.reload(); }
   }
   function rewireLive() {
-    [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
+    [...$$('[data-ce]'), ...$$('[data-pt]')].forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); jumpToPart(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
     const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
     renderBody();
@@ -656,6 +658,18 @@ body.cpanel-on{padding-right:308px!important}
   document.addEventListener('mousedown', (e) => { if (!qbar || !qbar.classList.contains('on')) return; if (e.target.closest('.cqt,.cpop,[data-ce],.s-lyr,.s-frame,.slide')) return; hideQbar(); });
 
   /* ---------- рендер тела панели ---------- */
+  /* ⭐ клик по части слайда → правая панель прыгает к её настройке (буллеты→маркер, заголовок→стиль…) */
+  function jumpToPart(field) {
+    if (!field || !field.dataset) return;
+    let target = null;
+    if (field.dataset.pt != null) target = '#cPmark';                 /* тезис → маркер буллетов */
+    else if (/:heading$/.test(field.dataset.ce || '')) target = '#cTStyleBtn';  /* заголовок → стиль */
+    else if (/:sub$/.test(field.dataset.ce || '')) target = '#cCard';           /* подпись → подложка */
+    else if (/:eyebrow$/.test(field.dataset.ce || '')) target = '#cPos';
+    if (!target) return;
+    if (tab !== 'slide') { tab = 'slide'; $$('.cpanel-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === 'slide')); renderBody(); persistUI(); }
+    requestAnimationFrame(() => { const body = $('#cBody'); const el2 = target && $(target, body); if (el2) { const grp = el2.closest('.cgrp') || el2; grp.scrollIntoView({ behavior: 'smooth', block: 'center' }); grp.classList.remove('cgrp-hl'); void grp.offsetWidth; grp.classList.add('cgrp-hl'); setTimeout(() => grp.classList.remove('cgrp-hl'), 1500); } });
+  }
   function renderBody() {
     const body = $('#cBody');
     if (tab === 'design') { body.innerHTML = designHtml(); wireDesign(body); return; }
