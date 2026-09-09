@@ -98,6 +98,9 @@
 .cgrp{margin-bottom:16px}
 .cgrp>label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#8a90a0;font-weight:700;margin-bottom:8px}
 .cthemes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.cthemes.clamped .cth.xtra{display:none}
+.clink{background:none;border:none;color:var(--cb);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;float:right;text-transform:none;letter-spacing:0;padding:0}
+.clink:hover{text-decoration:underline}
 .cth{position:relative;aspect-ratio:1;border-radius:11px;border:1.5px solid #E7ECF3;cursor:pointer;overflow:hidden;background:linear-gradient(150deg,color-mix(in srgb,var(--d) 30%,var(--b)),var(--b));transition:transform .14s,box-shadow .14s,border-color .14s;padding:0}
 .cth:before{content:'';position:absolute;left:8px;bottom:8px;width:15px;height:15px;border-radius:50%;background:var(--d);box-shadow:0 1px 4px rgba(0,0,0,.35),inset 0 0 0 1.5px rgba(255,255,255,.3)}
 .cth:hover{transform:translateY(-2px);box-shadow:0 8px 18px -8px rgba(6,17,38,.4);border-color:#CBD6EA}
@@ -736,12 +739,7 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cpreset-grid" id="cPresetGrid">${CAR_PRESETS.filter(p => p.g === PRESET_GROUPS[0]).map(presetTile).join('')}</div>
       <div class="cnote">Тема + пара шрифтов + стиль заголовка + подложка + маркер + счётчик + футер — сразу на всю карусель.</div>
     </div>
-    <div class="cgrp"><label>Готовые шаблоны слайдов</label>
-      <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
-      <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
-      <div class="cnote">Один клик — тема, шрифт, узор и стиль текста применятся ко всем слайдам.</div>
-    </div>
-    <div class="cgrp"><label>Цветовая тема</label><div class="cthemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
+    <div class="cgrp"><label>Цветовая тема <button class="clink" id="cThemesMore" type="button">все ▾</button></label><div class="cthemes clamped" id="cThemes">${Object.entries(P.themes || {}).map(([k, t], ti) => `<button class="cth ${k === P.theme ? 'on' : ''}${ti >= 8 ? ' xtra' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
     <div class="cgrp"><label>Пары шрифтов (заголовок + текст)</label><div class="cfontcombos" id="cCombos">${FONT_COMBOS.map(([hf2, bf2, nm]) => { const H = (P.fonts[hf2] || {}), B = (P.fonts[bf2] || {}); const on = P.font === hf2 && (P.bodyFont || '') === (bf2 || ''); return `<button class="cfcombo ${on ? 'on' : ''}" data-hf="${hf2}" data-bf="${bf2}"><span class="cfc-aa" style="font-family:${H.fam || 'serif'}">Ag</span><span class="cfc-t"><b style="font-family:${H.fam || 'serif'}">${esc(nm)}</b><i style="font-family:${B.fam || 'sans-serif'}">${esc((H.name || '') + ' + ' + (B.name || 'Manrope'))}</i></span></button>`; }).join('')}</div></div>
     <div class="cgrp"><label>Шрифт заголовков</label><button class="cfontbtn" id="cFontBtn"><span class="aa" style="font-family:${curFont.fam}">Aa</span> <span style="flex:1">${curFont.name}</span> ▾</button></div>
     <div class="cgrp"><label>Шрифт основного текста</label><button class="cfontbtn" id="cBodyFontBtn"><span class="aa" style="font-family:${(P.fonts[P.bodyFont] || {}).fam || "'Manrope',sans-serif"}">Aa</span> <span style="flex:1">${(P.fonts[P.bodyFont] || {}).name || 'Manrope (по умолч.)'}</span> ▾</button></div>
@@ -800,9 +798,8 @@ body.cpanel-on{padding-right:308px!important}
         pc.addEventListener('click', (e) => { const b = e.target.closest('[data-pg]'); if (!b) return; $$('#cPresetCats button', body).forEach(x => x.classList.toggle('on', x === b)); pg.innerHTML = CAR_PRESETS.filter(p => p.g === PRESET_GROUPS[+b.dataset.pg]).map(presetTile).join(''); });
         pg.addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (!b) return; const p = CAR_PRESETS.find(x => x.k === b.dataset.preset); if (!p) return; flash('Применяю пресет «' + p.name + '»…', 0); const arr = serialize().map(s => Object.assign({}, s, { tstyle: p.tstyle || '', card: p.card || '', pmark: (s.points && s.points.length) ? p.pmark : (s.pmark || 'index'), bgpat: '' })); save('hard', { theme: p.theme, font: p.font, bodyFont: p.body || '', counter: p.counter, footer: Object.assign({}, P.footer || {}, { style: p.footer }), slides: arr }); });
       } }
-    const grid = $('#cTplGrid', body);
-    $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
-    grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save('hard', { theme: tpl.theme, font: tpl.font, slides: arr }); });
+    /* тема: сворачиваемый грид (показываем 8, «все» разворачивает) */
+    { const tm = $('#cThemesMore', body), tg = $('#cThemes', body); if (tm && tg) tm.addEventListener('click', () => { const cl = tg.classList.toggle('clamped'); tm.textContent = cl ? 'все ▾' : 'свернуть ▴'; }); }
     $$('.cth', body).forEach(d => d.addEventListener('click', () => save('hard', { theme: d.dataset.theme })));
     $('#cFmt', body).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) save('hard', { format: b.dataset.f }); });
     $('#cAddSlide', body).addEventListener('click', (e) => {
