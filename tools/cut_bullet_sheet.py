@@ -32,7 +32,7 @@ labels = [
  'Прогресс','Рост график','Лист природа','Огонь энергия','Сердце забота','Бриллиант ценность','Корона статус',
  'Локация','Время','Документ','Щит надёжность','Команда люди','Образование','Ракета старт']
 
-T = 30      # порог «это фон» по евклид. расстоянию к bg
+T = 44      # порог «это фон» по евклид. расстоянию к bg
 FEATHER = 16
 saved = []
 for r in range(4):
@@ -58,10 +58,14 @@ for r in range(4):
         border_ids.discard(0)
         outer_bg = np.isin(lbl, list(border_ids))   # только внешний фон; ВНУТРЕННИЙ near_bg сохраняем
         # мягкая альфа: 0 на внешнем фоне, ramp по расстоянию у кромки, 255 внутри объекта
-        alpha = np.clip((dist - T) / FEATHER, 0, 1)
-        alpha[~outer_bg] = np.maximum(alpha[~outer_bg], 1.0)   # всё, что НЕ внешний фон — непрозрачно
-        alpha[outer_bg] = np.clip((dist[outer_bg] - T) / FEATHER, 0, 1)
-        a8 = (alpha * 255).astype(np.uint8)
+        # ⭐ ЖЁСТКИЙ die-cut: только уверенно-не-фон (dist>T и не тень), морфология чистит,
+        # 0.6px гаусс — только сглаживание кромки. Никаких полупрозрачных плашек/теней/ореолов
+        # (иначе на цветном слайде вылезают «квадраты»).
+        solid = (dist > T) & (~shadow)
+        solid = ndimage.binary_closing(solid, np.ones((3, 3)))
+        solid = ndimage.binary_opening(solid, np.ones((2, 2)))
+        a = ndimage.gaussian_filter(solid.astype(np.float32), 0.6)
+        a8 = (np.clip(a, 0, 1) * 255).astype(np.uint8)
         # выкидываем мелкие ошмётки (остатки цифры/подписи, блик-искры), оставляем крупные компоненты
         sol = a8 > 40
         cl, cn = ndimage.label(sol, structure=np.ones((3, 3)))

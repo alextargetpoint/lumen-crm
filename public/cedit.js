@@ -517,9 +517,9 @@ body.cpanel-on{padding-right:308px!important}
     if (!field || !field.dataset || !field.dataset.ce) return;
     const isHead = /:heading$/.test(field.dataset.ce);
     const q = ensureQbar(); q._mode = 'text'; q._t = field;
-    q.innerHTML = `<button data-q="bold" title="Жирный"><b>Ж</b></button><button data-q="italic" title="Курсив"><i style="font-family:Georgia,serif">К</i></button><button data-q="mark" title="Выделить цветом"><span class="cqt-sw" style="background:linear-gradient(102deg,#2563EBcc,#7C3AEDcc)"></span></button><span class="cqt-sep"></span>` +
-      (isHead ? `<button data-q="sdown" title="Меньше заголовок">A<small>−</small></button><button data-q="sup" title="Больше заголовок">A<small>+</small></button><button data-q="style" title="Стиль текста">Стиль&nbsp;▾</button><span class="cqt-sep"></span>` : '') +
-      `<button data-q="color" title="Цвет текста"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button>`;
+    q.innerHTML = `<button data-q="bold" title="Жирный"><b>Ж</b></button><button data-q="italic" title="Курсив"><i style="font-family:Georgia,serif">К</i></button><button data-q="mark" title="Выделить цветом / маркер"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5-9.5 9.5H5v-5.5z"/><path d="M12.5 6.5l5 5"/><path d="M4 21h16"/></svg></button><span class="cqt-sep"></span>` +
+      (isHead ? `<button data-q="sdown" title="Меньше заголовок">A<small>−</small></button><button data-q="sup" title="Больше заголовок">A<small>+</small></button><button data-q="style" title="Стиль заголовка">Стиль&nbsp;▾</button><button data-q="color" title="Цвет заголовка"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button><span class="cqt-sep"></span>` : '') +
+      `<button data-q="clear" title="Убрать формат и выделение">✕</button>`;
     requestAnimationFrame(() => posQbar(selRect(field)));
   }
   function showLayerQbar(lyr) {
@@ -543,14 +543,17 @@ body.cpanel-on{padding-right:308px!important}
     const q = qbar, t = q._t, a = b.dataset.q;
     if (q._mode === 'text') {
       const field = t; const host = field;
-      const needSel = () => { const s = document.getSelection(); if (!s || s.isCollapsed || !s.toString()) { flash('Сначала выделите текст'); return false; } return true; };
-      if (a === 'bold') { if (!needSel()) return; document.execCommand('bold'); dirty = true; }
-      else if (a === 'italic') { if (!needSel()) return; document.execCommand('italic'); dirty = true; }
+      /* нет выделения → выделяем весь текст поля (кнопки работают с одного клика) */
+      const ensureSel = () => { const s = document.getSelection(); field.focus(); if (!s) return false; if (s.isCollapsed || !s.toString()) { const r = document.createRange(); r.selectNodeContents(field); s.removeAllRanges(); s.addRange(r); } return !!document.getSelection().toString(); };
+      if (a === 'bold') { if (!ensureSel()) return; document.execCommand('bold'); dirty = true; save(false); }
+      else if (a === 'italic') { if (!ensureSel()) return; document.execCommand('italic'); dirty = true; save(false); }
+      else if (a === 'clear') { ensureSel(); const s2 = document.getSelection(); if (s2 && s2.rangeCount) { marksIn(s2.getRangeAt(0), host).forEach(unwrap); host.normalize(); } document.execCommand('removeFormat'); dirty = true; save(false); }
       else if (a === 'mark') {
-        if (!needSel()) return; const rc = b.getBoundingClientRect();
+        if (!ensureSel()) return; const rc = b.getBoundingClientRect();
         const sw = HL.map(([k, c, ex]) => `<span class="hlsw" data-hl="${k}" style="background:${c};${ex || ''}"></span>`).join('');
         const pp = openPop(`<div class="hlpop"><div class="hlrow">${sw}</div><button class="hloff" data-hl="off">Снять выделение</button></div>`, rc.left - 96, rc.bottom + 8);
         pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-hl]'); if (!x) return; ev.preventDefault(); markSel(x.dataset.hl, host); closePop(); save(false); });
+        return;   /* иначе падение в closePop() ниже мгновенно закрывало палитру (3-я кнопка «не работала») */
       }
       else if (a === 'sdown' || a === 'sup') {
         const i = +field.closest('.slide').dataset.idx; const order = ['s', 'm', 'l']; const cur = slideEl(i).dataset.size || 'm';
