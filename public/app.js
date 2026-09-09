@@ -4197,7 +4197,7 @@ function openShareModal(id, leadId, title) {
 }
 /* Ф1: оси дизайн-движка подборок (1-й уровень — 6 осей, всё по умолчанию Авто) */
 const DESIGN_AXES = {
-  style:     { label: 'Стиль',          opts: [['auto', 'Авто'], ['editorial', 'Editorial Luxury'], ['premiumweb', 'Premium Web'], ['architectural', 'Architectural Minimal'], ['investment', 'Investment Intelligence'], ['cinematic', 'Cinematic']] },
+  style:     { label: 'Стиль',          opts: [['auto', 'Авто'], ['editorial', 'Editorial Luxury'], ['premiumweb', 'Premium Web'], ['architectural', 'Architectural Minimal'], ['investment', 'Investment Intelligence'], ['cinematic', 'Cinematic'], ['darkluxury', 'Dark Luxury']] },
   artDir:    { label: 'Арт-дирекшн',    opts: [['auto', 'Авто'], ['minimal', 'Минимал'], ['balanced', 'Баланс'], ['expressive', 'Выразительно'], ['artdirected', 'Арт-дирекшн']] },
   density:   { label: 'Плотность',      opts: [['auto', 'Авто'], ['light', 'Лёгкая'], ['standard', 'Стандарт'], ['detailed', 'Детальная']] },
   imageDom:  { label: 'Доминанта фото', opts: [['auto', 'Авто'], ['low', 'Низкая'], ['medium', 'Средняя'], ['high', 'Высокая']] },
