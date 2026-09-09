@@ -3718,6 +3718,7 @@ const server = http.createServer(async (req, res) => {
        матрица Эйзенхауэра, тайм-блокинг вокруг встреч, стрики/импульс (Habitica), умные подсказки. */
     {
       const TASK_PRI = new Set(['p1', 'p2', 'p3', 'p4']);
+      const TASK_SPHERES = new Set(['deals', 'finance', 'health', 'family', 'growth', 'energy', 'network', 'meaning']);   /* колесо баланса брокера */
       const dstr = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
       const todayStr = dstr(Date.now());
       const sanTask = (b, t) => {
@@ -3731,6 +3732,17 @@ const server = http.createServer(async (req, res) => {
         if (b.leadId !== undefined) t.leadId = b.leadId ? String(b.leadId).slice(0, 40) : null;
         if (b.meetingId !== undefined) t.meetingId = b.meetingId ? String(b.meetingId).slice(0, 60) : null;
         if (Array.isArray(b.subtasks)) t.subtasks = b.subtasks.slice(0, 30).map(st => ({ id: String(st.id || crypto.randomBytes(3).toString('hex')).slice(0, 12), text: String(st.text || '').replace(/<[^>]*>/g, '').slice(0, 200), done: !!st.done })).filter(st => st.text);
+        /* ⭐ сфера жизни (колесо баланса брокера) */
+        if (b.sphere !== undefined) t.sphere = TASK_SPHERES.has(b.sphere) ? b.sphere : null;
+        /* ⭐ повторяющаяся задача: {days:[0..6], time:'HH:MM'} (пусто days = каждый день) */
+        if (b.repeat !== undefined) {
+          if (b.repeat && (Array.isArray(b.repeat.days))) {
+            const days = [...new Set(b.repeat.days.map(Number).filter(d => d >= 0 && d <= 6))].sort();
+            const tm = /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(b.repeat.time || '')) ? String(b.repeat.time) : '09:00';
+            t.repeat = { days, time: tm };
+          } else t.repeat = null;
+        }
+        if (b.repeatDone && typeof b.repeatDone === 'object') { t.repeatDone = t.repeatDone || {}; Object.keys(b.repeatDone).slice(0, 400).forEach(k => { if (/^\d{4}-\d\d-\d\d$/.test(k)) t.repeatDone[k] = !!b.repeatDone[k]; }); }
         return t;
       };
       const TASK_OWNER = IS_BROKER ? ROLE.brokerId : null; /* чьи задачи: брокер видит свои, владелец — свои (null) */
@@ -3740,18 +3752,30 @@ const server = http.createServer(async (req, res) => {
       const leadBrief = (lid) => { const l = db.leads.find(x => x.id === lid); if (!l) return null; const q = l.quals || {}; return { id: l.id, name: l.name || '—', geoName: (db.settings.geoNames || {})[l.geo] || l.geo || '', stage: l.stage, stageName: STAGE_RU[l.stage] || l.stage, phone: l.phone || '', purpose: (q.purpose || {}).value || '', budget: (q.budget || {}).value || '' }; };
       if (p === '/api/tasks' && req.method === 'GET') {
         const tasks = db.brokerTasks.filter(t => (t.brokerId || null) === TASK_OWNER).map(t => t.leadId ? Object.assign({}, t, { lead: leadBrief(t.leadId) }) : t);
-        /* стрик: подряд идущие дни с ≥1 выполненной задачей, заканчивая сегодня/вчера */
+        /* ⭐ повторяющиеся задачи: due-today по дню недели + выполнено-сегодня */
+        const _dow = new Date().getDay();
+        tasks.forEach(t => { if (t.repeat) { const dd = t.repeat.days || []; t.repToday = (dd.length === 0 || dd.includes(_dow)); t.repDoneToday = !!(t.repeatDone && t.repeatDone[todayStr]); } });
+        /* стрик: подряд идущие дни с ≥1 выполненной задачей, заканчивая сегодня/вчера (учитываем и повторяющиеся) */
         const doneDays = new Set(tasks.filter(t => t.status === 'done' && t.doneAt).map(t => dstr(t.doneAt)));
+        tasks.forEach(t => { if (t.repeatDone) Object.keys(t.repeatDone).forEach(d => { if (t.repeatDone[d]) doneDays.add(d); }); });
         let streak = 0; const cur = new Date();
         if (!doneDays.has(dstr(cur.getTime()))) cur.setDate(cur.getDate() - 1); /* сегодня ещё нет — считаем от вчера */
         for (;;) { if (doneDays.has(dstr(cur.getTime()))) { streak++; cur.setDate(cur.getDate() - 1); } else break; }
-        const weekAgo = Date.now() - 7 * 864e5;
+        const weekAgo = Date.now() - 7 * 864e5, weekAgoStr = dstr(weekAgo);
+        /* ⭐ активность по сферам за 7 дней (для колеса баланса) — обычные done + отметки повторяющихся */
+        const sphereWeek = {};
+        tasks.forEach(t => {
+          if (!t.sphere) return; let n = 0;
+          if (t.status === 'done' && t.doneAt && t.doneAt >= weekAgo) n++;
+          if (t.repeatDone) Object.keys(t.repeatDone).forEach(d => { if (t.repeatDone[d] && d >= weekAgoStr) n++; });
+          if (n) sphereWeek[t.sphere] = (sphereWeek[t.sphere] || 0) + n;
+        });
         const stats = {
-          todayTotal: tasks.filter(t => t.status !== 'done' && (t.scheduled === todayStr || (t.due && dstr(t.due) <= todayStr))).length,
-          todayDone: tasks.filter(t => t.status === 'done' && t.doneAt && dstr(t.doneAt) === todayStr).length,
-          overdue: tasks.filter(t => t.status !== 'done' && t.due && dstr(t.due) < todayStr).length,
+          todayTotal: tasks.filter(t => (t.status !== 'done' && (t.scheduled === todayStr || (t.due && dstr(t.due) <= todayStr))) || (t.repToday && !t.repDoneToday)).length,
+          todayDone: tasks.filter(t => (t.status === 'done' && t.doneAt && dstr(t.doneAt) === todayStr) || t.repDoneToday).length,
+          overdue: tasks.filter(t => t.status !== 'done' && !t.repeat && t.due && dstr(t.due) < todayStr).length,
           weekDone: tasks.filter(t => t.status === 'done' && t.doneAt && t.doneAt >= weekAgo).length,
-          streak, open: tasks.filter(t => t.status !== 'done').length,
+          streak, open: tasks.filter(t => t.status !== 'done').length, sphereWeek,
         };
         /* встречи на сегодня+ (тайм-блоки) */
         const now = Date.now();

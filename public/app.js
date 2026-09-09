@@ -6382,7 +6382,56 @@ const TPRI = { p1: { c: '#E5484D', n: 'Срочно' }, p2: { c: '#E8912B', n: '
 const TASK_VIEWS = [['today', 'Сегодня'], ['week', 'Неделя'], ['calendar', 'Календарь'], ['kanban', 'Канбан'], ['all', 'Все'], ['inbox', 'Инбокс']];
 let TASK_VIEW = 'today';
 let TASK_NEWPRI = 'p3';
+let TASK_NEWSPHERE = '';      /* выбранная сфера при создании */
+let TASK_NEWREPEAT = null;    /* {days:[0-6], time:'HH:MM'} при создании */
 let TASK_WEEK = 0; /* смещение недели в календаре */
+/* ⭐ Колесо баланса брокера — 8 сфер жизни. Премиум-палитра 2026 (насыщенные, но не банальные тона), тонкий glow */
+const SPHERES = {
+  deals:   { n: 'Сделки',    c: '#5468FF', order: 0 },
+  finance: { n: 'Финансы',   c: '#E0A73E', order: 1 },
+  health:  { n: 'Здоровье',  c: '#22C39B', order: 2 },
+  family:  { n: 'Семья',     c: '#EE6A87', order: 3 },
+  growth:  { n: 'Развитие',  c: '#9D6FF0', order: 4 },
+  energy:  { n: 'Энергия',   c: '#38B6F0', order: 5 },
+  network: { n: 'Окружение', c: '#E38856', order: 6 },
+  meaning: { n: 'Смысл',     c: '#2E9E6B', order: 7 },
+};
+const SPHERE_KEYS = Object.keys(SPHERES).sort((a, b) => SPHERES[a].order - SPHERES[b].order);
+/* Рутина брокера — шаблоны по сферам (из исследования: защищённые блоки прозвона/фоллоу-апа, показы,
+   + баланс здоровья/семьи/развития). r = повтор {days:[0..6],time} ; days пусто = каждый день. */
+const BROKER_TPL = [
+  { sphere: 'deals', title: 'Прозвон новых лидов', pri: 'p1', r: { days: [1, 2, 3, 4, 5], time: '09:30' } },
+  { sphere: 'deals', title: 'Follow-up тёплых лидов', pri: 'p1', r: { days: [1, 2, 3, 4, 5], time: '11:00' } },
+  { sphere: 'deals', title: 'Обновить статусы сделок в CRM', pri: 'p3', r: { days: [1, 2, 3, 4, 5], time: '18:00' } },
+  { sphere: 'deals', title: 'Собрать подборку объектов клиенту', pri: 'p2', r: null },
+  { sphere: 'deals', title: 'Показ объекта', pri: 'p1', r: null },
+  { sphere: 'finance', title: 'Свести доходы и pipeline недели', pri: 'p2', r: { days: [5], time: '17:00' } },
+  { sphere: 'finance', title: 'План по комиссии на месяц', pri: 'p2', r: null },
+  { sphere: 'health', title: 'Тренировка 40 мин', pri: 'p2', r: { days: [1, 3, 5], time: '07:00' } },
+  { sphere: 'health', title: '10 000 шагов', pri: 'p3', r: { days: [], time: '13:00' } },
+  { sphere: 'health', title: 'Лечь спать до 23:30', pri: 'p3', r: { days: [], time: '23:00' } },
+  { sphere: 'family', title: 'Ужин с семьёй без телефона', pri: 'p2', r: { days: [], time: '19:30' } },
+  { sphere: 'family', title: 'Выходной день с близкими', pri: 'p2', r: { days: [6], time: '11:00' } },
+  { sphere: 'growth', title: '30 минут обучения профессии', pri: 'p2', r: { days: [1, 2, 3, 4, 5], time: '08:00' } },
+  { sphere: 'growth', title: 'Разобрать одну сделку как кейс', pri: 'p3', r: { days: [5], time: '16:00' } },
+  { sphere: 'energy', title: 'Прогулка-перезагрузка', pri: 'p3', r: { days: [], time: '14:30' } },
+  { sphere: 'energy', title: 'Время на хобби', pri: 'p3', r: { days: [0], time: '12:00' } },
+  { sphere: 'network', title: 'Кофе с коллегой/партнёром', pri: 'p3', r: null },
+  { sphere: 'network', title: 'Поблагодарить клиента за рекомендацию', pri: 'p2', r: null },
+  { sphere: 'meaning', title: 'Ретро дня: 3 победы', pri: 'p3', r: { days: [], time: '21:00' } },
+  { sphere: 'meaning', title: 'Пересмотреть карту желаний', pri: 'p3', r: { days: [0], time: '10:00' } },
+];
+/* Мягкие, НЕ-клишейные подсказки по недобранной сфере (конкретный маленький шаг, без «вставай раньше») */
+const SPHERE_NUDGES = {
+  deals: ['Сделки на этой неделе почти не двигались. Поставь один блок прозвона на 30 минут — этого достаточно, чтобы воронка снова задышала.'],
+  finance: ['Финансы давно не в фокусе. Не считай весь год — просто сведи доход за эту неделю, чтобы видеть картину.'],
+  health: ['Тело неделю простояло в стороне. Одна тренировка на 20 минут вернёт тонус — не марафон, просто движение.'],
+  family: ['Работа съела эту неделю у семьи. Забронируй один ужин без телефона — короткий, но целиком их.'],
+  growth: ['Ты не рос профессионально уже несколько дней. 20 минут на разбор одной сделки — и мастерство снова прибавляет.'],
+  energy: ['Ты давно не перезаряжался. Поставь одну прогулку без задач — не роскошь, а топливо для остального.'],
+  network: ['Связи стоят на месте. Один кофе или одно «спасибо» клиенту за неделю держат сеть живой.'],
+  meaning: ['Ты давно не сверялся с тем, куда идёшь. 5 минут с картой желаний вернут ощущение направления.'],
+};
 const dstrLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const KIND_RU = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
 /* минималистичный пикер срока: быстрые варианты + сетка месяца. onPick(ms|null) */
@@ -6467,18 +6516,55 @@ function tkMeta(t, leadMap) {
   if (t.meetingId) chips.push(`<span class="tk-chip">${ic(I.cal)}встреча</span>`);
   return chips.join('');
 }
+const DOW_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+function tkRepLabel(r) { if (!r) return ''; const d = r.days || []; const days = (!d.length || d.length === 7) ? 'каждый день' : (d.length === 5 && [1, 2, 3, 4, 5].every(x => d.includes(x))) ? 'будни' : (d.length === 2 && d.includes(0) && d.includes(6)) ? 'выходные' : d.slice().sort().map(x => DOW_RU[x]).join('·'); return days + (r.time ? ' ' + r.time : ''); }
+/* колесо баланса недели: 8 сфер-баров + мягкая подсказка по недобранной сфере */
+function tkBalanceHtml(sw) {
+  const max = Math.max(1, ...SPHERE_KEYS.map(k => sw[k] || 0));
+  const bars = SPHERE_KEYS.map(k => { const v = sw[k] || 0; const h = Math.round(16 + (v / max) * 44); const sp = SPHERES[k]; return `<div class="tk-bal-col" title="${sp.n}: ${v} за неделю"><div class="tk-bal-track"><div class="tk-bal-bar" style="--sc:${sp.c};height:${h}px;opacity:${v ? 1 : .3}"></div></div><span class="tk-bal-lbl">${sp.n}</span><span class="tk-bal-v">${v || ''}</span></div>`; }).join('');
+  const zeros = SPHERE_KEYS.filter(k => !(sw[k])); const pick = zeros.length ? zeros[0] : SPHERE_KEYS.slice().sort((a, b) => (sw[a] || 0) - (sw[b] || 0))[0];
+  const nudge = (SPHERE_NUDGES[pick] || [''])[0];
+  return `<div class="tk-bal-hd">${ic(I.grid || I.spark, 2)}<b>Баланс недели</b><span class="sub">сколько внимания получила каждая сфера</span></div><div class="tk-bal-bars">${bars}</div>${nudge ? `<div class="tk-bal-nudge" style="--sc:${SPHERES[pick].c}"><span class="tk-bal-ndot" style="--sc:${SPHERES[pick].c}"></span><span>${esc(nudge)}</span></div>` : ''}`;
+}
+/* попап выбора повтора: пресеты + дни недели + время */
+function openRepeatPop(anchor, cb) {
+  let days = (TASK_NEWREPEAT && TASK_NEWREPEAT.days) ? TASK_NEWREPEAT.days.slice() : [];
+  const time = (TASK_NEWREPEAT && TASK_NEWREPEAT.time) || '09:00';
+  const chips = [1, 2, 3, 4, 5, 6, 0].map(d => `<button class="tk-dow ${days.includes(d) ? 'on' : ''}" data-dow="${d}">${DOW_RU[d]}</button>`).join('');
+  const bd = modal({
+    title: 'Повторять задачу', sub: 'Выбери дни и время — задача будет появляться на «сегодня» и напоминать',
+    body: `<div class="tk-rep-presets"><button class="btn btn-sm" data-preset="daily">Каждый день</button><button class="btn btn-sm" data-preset="work">Будни</button><button class="btn btn-sm" data-preset="we">Выходные</button></div>
+      <div class="tk-dow-row" id="tkDow">${chips}</div>
+      <label class="tk-rep-time">Время напоминания<input type="time" id="tkRepTime" value="${time}"></label>`,
+    actions: [
+      { label: 'Убрать повтор', onClick: () => { TASK_NEWREPEAT = null; cb && cb(); } },
+      { label: 'Готово', cls: 'btn-accent', onClick: (b) => { const tm = ($('#tkRepTime', b) || {}).value || '09:00'; TASK_NEWREPEAT = { days: days.slice().sort(), time: tm }; cb && cb(); } },
+    ],
+  });
+  const paint = () => $$('#tkDow .tk-dow', bd).forEach(x => x.classList.toggle('on', days.includes(+x.dataset.dow)));
+  $$('#tkDow .tk-dow', bd).forEach(b => b.addEventListener('click', () => { const d = +b.dataset.dow; days.includes(d) ? days = days.filter(x => x !== d) : days.push(d); paint(); }));
+  $$('.tk-rep-presets [data-preset]', bd).forEach(b => b.addEventListener('click', () => { const p = b.dataset.preset; days = p === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : p === 'work' ? [1, 2, 3, 4, 5] : [0, 6]; paint(); }));
+}
+/* палитра рутины брокера: шаблоны по сферам, клик = добавить (можно несколько), «Готово» закрыть */
+function openRoutinePop(anchor, today, cb) {
+  const bySphere = SPHERE_KEYS.map(k => { const items = BROKER_TPL.filter(t => t.sphere === k); if (!items.length) return ''; const sp = SPHERES[k]; return `<div class="tk-rt-grp"><div class="tk-rt-hd"><span class="tk-sphere-dot" style="--sc:${sp.c}"></span>${sp.n}</div><div class="tk-rt-items">${items.map((t, i) => `<button class="tk-rt-i" data-rt="${BROKER_TPL.indexOf(t)}" style="--sc:${sp.c}"><span class="tk-rt-x">${esc(t.title)}</span>${t.r ? `<span class="tk-rt-rep">${ic(I.refresh || I.clock, 2)}${tkRepLabel(t.r)}</span>` : ''}</button>`).join('')}</div></div>`; }).join('');
+  const bd = modal({ title: 'Рутина брокера', sub: 'Готовые задачи по сферам жизни. Клик — добавить (можно несколько). Повторяющиеся будут напоминать сами.', wide: true, body: `<div class="tk-rt">${bySphere}</div>`, actions: [{ label: 'Готово', cls: 'btn-accent' }] });
+  $$('.tk-rt-i', bd).forEach(b => b.addEventListener('click', async () => { const t = BROKER_TPL[+b.dataset.rt]; if (!t) return; b.classList.add('added'); try { await api.post('/tasks', { title: t.title, priority: t.pri || 'p3', sphere: t.sphere, repeat: t.r || null, scheduled: t.r ? null : today }); toast('Добавлено: ' + t.title, null, true); } catch (e) { toast('Не вышло', e.message); b.classList.remove('added'); } cb && cb({ keepOpen: true }); }));
+}
 function taskRow(t, leadMap) {
-  const done = t.status === 'done';
+  const rep = !!t.repeat;
+  const done = rep ? !!t.repDoneToday : t.status === 'done';
   const pri = TPRI[t.priority] || TPRI.p3;
   const meta = tkMeta(t, leadMap);
+  const sp = t.sphere && SPHERES[t.sphere] ? SPHERES[t.sphere] : null;
   const subs = t.subtasks || [];
   /* инлайн-разворот подзадач прямо в списке (без попапа) */
   const subsHtml = subs.length ? `<div class="tk-subs" data-tksubs="${t.id}" hidden>${subs.map(s => `<button class="tk-sub ${s.done ? 'done' : ''}" data-subdone="${s.id}"><span class="tk-check sm ${s.done ? 'on' : ''}">${ic(I.check, 2.4)}</span><span class="tk-sub-x">${esc(s.text)}</span></button>`).join('')}</div>` : '';
-  return `<div class="tk-rowwrap">${`<div class="tk-row ${done ? 'done' : ''}" data-tk="${t.id}" data-pri="${t.priority}">
-    <button class="tk-check ${done ? 'on' : ''}" data-act="done" title="Готово">${ic(I.check, 2.4)}</button>
+  return `<div class="tk-rowwrap">${`<div class="tk-row ${done ? 'done' : ''}${sp ? ' has-sphere' : ''}" data-tk="${t.id}" data-pri="${t.priority}"${rep ? ' data-rep="1"' : ''}${sp ? ` style="--sc:${sp.c}"` : ''}>
+    <button class="tk-check ${done ? 'on' : ''}" data-act="done" title="${rep ? 'Отметить на сегодня' : 'Готово'}">${ic(I.check, 2.4)}</button>
     <button class="tk-flag" data-act="pri" style="--pc:${pri.c}" title="Приоритет: ${pri.n}">${ic(I.flag)}</button>
     <div class="tk-main" data-act="open">
-      <div class="tk-title">${esc(t.title)}</div>
+      <div class="tk-title">${sp ? `<span class="tk-sphere-dot" style="--sc:${sp.c}" title="${sp.n}"></span>` : ''}${esc(t.title)}${rep ? `<span class="tk-rep-badge" title="Повтор: ${tkRepLabel(t.repeat)}">${ic(I.refresh || I.spark, 2)}</span>` : ''}</div>
       ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
     </div>
     <div class="tk-acts">
@@ -6632,13 +6718,13 @@ PAGES.tasks = async (root) => {
   const plannedToday = s.todayDone + s.todayTotal;
   const pct = plannedToday ? Math.round(s.todayDone / plannedToday * 100) : (s.todayDone ? 100 : 0);
   const open = d.tasks.filter(t => t.status !== 'done');
-  const doneToday = d.tasks.filter(t => t.status === 'done' && t.doneAt && dstrLocal(new Date(t.doneAt)) === today);
+  const doneToday = d.tasks.filter(t => (t.status === 'done' && t.doneAt && dstrLocal(new Date(t.doneAt)) === today) || (t.repeat && t.repDoneToday));
   const byPri = (a, b) => (a.priority > b.priority ? 1 : a.priority < b.priority ? -1 : (a.due || 9e15) - (b.due || 9e15));
 
   let listHtml = '', isBoard = false;
   if (TASK_VIEW === 'today') {
-    const overdue = open.filter(t => t.due && dstrLocal(new Date(t.due)) < today).sort(byPri);
-    const todays = open.filter(t => !overdue.includes(t) && (t.scheduled === today || (t.due && dstrLocal(new Date(t.due)) === today))).sort(byPri);
+    const overdue = open.filter(t => !t.repeat && t.due && dstrLocal(new Date(t.due)) < today).sort(byPri);
+    const todays = open.filter(t => !overdue.includes(t) && !doneToday.includes(t) && ((t.repeat && t.repToday) || t.scheduled === today || (t.due && dstrLocal(new Date(t.due)) === today))).sort(byPri);
     const timeline = d.meetings.filter(mt => dstrLocal(new Date(mt.at)) === today).sort((a, b) => a.at - b.at).map(mt => `<div class="tk-block" data-mtid="${mt.id}" data-mtlead="${mt.leadId || ''}"><div class="tk-block-t">${new Date(mt.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div><div class="tk-block-b"><b>${esc(KIND_RU[mt.kind] || 'Встреча')} · ${esc(mt.leadName)}</b>${mt.link ? `<a href="${esc(mt.link)}" target="_blank" class="tk-block-link">${ic(I.link)}ссылка</a>` : ''}</div><button class="tk-mini" data-mtprep title="Задача-подготовка">${ic(I.plus)}</button></div>`).join('');
     listHtml = `
       ${timeline ? `<div class="tk-sec-lbl">${ic(I.cal)}Встречи сегодня</div>${timeline}` : ''}
@@ -6695,12 +6781,20 @@ PAGES.tasks = async (root) => {
         </div>
       </div>
       <div class="tk-cap glass">
-        <button class="tk-mic" id="tkMic" title="Надиктовать — ИИ поймёт срок">${ic(I.mic)}</button>
-        <input id="tkNew" class="tk-cap-in" placeholder="Задача текстом или голосом — «завтра позвонить в 15:00»…  ⏎">
-        <div class="tk-cap-pri" id="tkNewPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === TASK_NEWPRI ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
-        <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
+        <div class="tk-cap-row">
+          <button class="tk-mic" id="tkMic" title="Надиктовать — ИИ поймёт срок">${ic(I.mic)}</button>
+          <input id="tkNew" class="tk-cap-in" placeholder="Задача текстом или голосом — «завтра позвонить в 15:00»…  ⏎">
+          <div class="tk-cap-pri" id="tkNewPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === TASK_NEWPRI ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
+          <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
+        </div>
+        <div class="tk-cap-row tk-cap-meta">
+          <div class="tk-sphere-pick" id="tkSpherePick">${SPHERE_KEYS.map(k => `<button class="tk-sphere-chip ${TASK_NEWSPHERE === k ? 'on' : ''}" data-sp="${k}" style="--sc:${SPHERES[k].c}"><span class="tk-sphere-dot" style="--sc:${SPHERES[k].c}"></span>${SPHERES[k].n}</button>`).join('')}</div>
+          <button class="tk-rep-btn ${TASK_NEWREPEAT ? 'on' : ''}" id="tkRepBtn" title="Повторять по дням">${ic(I.refresh || I.clock, 2)}<span>${TASK_NEWREPEAT ? tkRepLabel(TASK_NEWREPEAT) : 'Повтор'}</span></button>
+          <button class="tk-routine-btn" id="tkRoutine" title="Готовые задачи рутины брокера">${ic(I.spark, 2)}<span>Рутина брокера</span></button>
+        </div>
       </div>
     </div>
+    <div class="tk-balance glass" id="tkBalance"></div>
     <div class="seg-toggle tk-seg">${TASK_VIEWS.map(([k, n]) => `<button class="seg-btn ${k === TASK_VIEW ? 'on' : ''}" data-tv="${k}">${n}${k === 'all' && s.open ? ` · ${s.open}` : ''}</button>`).join('')}</div>
     ${d.suggestions.length && !isBoard ? `<div class="glass card tk-suggest"><div class="tk-sug-hd">${ic(I.spark)}Умные подсказки<span class="sub">на основе встреч и горячих лидов</span></div>${d.suggestions.map((sg, i) => `<div class="tk-sug" data-sug="${i}"><span class="tk-sug-t">${esc(sg.title)}</span><button class="btn btn-sm btn-accent" data-sugadd="${i}">${ic(I.plus)}В задачи</button></div>`).join('')}</div>` : ''}
     <div id="tkList" class="tk-list ${isBoard ? 'board' : ''}">${listHtml}</div>`;
@@ -6722,8 +6816,16 @@ PAGES.tasks = async (root) => {
       else { mbBody.style.display = ''; localStorage.setItem('lumen_mood_open', '1'); if (!mbMounted) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; } }
     });
   }
-  const addTask = async () => { const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title) { toast('Пустая задача'); return; } try { await api.post('/tasks', { title, priority: TASK_NEWPRI, scheduled: (TASK_VIEW === 'inbox' ? null : today) }); inp.value = ''; render(); } catch (e) { toast('Не вышло', e.message); } };
+  const addTask = async () => { const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title) { toast('Пустая задача'); return; } try { await api.post('/tasks', { title, priority: TASK_NEWPRI, sphere: TASK_NEWSPHERE || null, repeat: TASK_NEWREPEAT, scheduled: (TASK_NEWREPEAT || TASK_VIEW === 'inbox') ? null : today }); inp.value = ''; TASK_NEWREPEAT = null; render(); } catch (e) { toast('Не вышло', e.message); } };
   $('#tkAdd', root).addEventListener('click', addTask);
+  /* ⭐ сфера жизни */
+  $$('#tkSpherePick .tk-sphere-chip', root).forEach(b => b.addEventListener('click', () => { TASK_NEWSPHERE = (TASK_NEWSPHERE === b.dataset.sp) ? '' : b.dataset.sp; $$('#tkSpherePick .tk-sphere-chip', root).forEach(x => x.classList.toggle('on', x.dataset.sp === TASK_NEWSPHERE)); }));
+  /* ⭐ повтор: попап с днями недели + время */
+  $('#tkRepBtn', root) && $('#tkRepBtn', root).addEventListener('click', (e) => { e.stopPropagation(); openRepeatPop(e.currentTarget, () => render()); });
+  /* ⭐ рутина брокера: попап-палитра шаблонов по сферам */
+  $('#tkRoutine', root) && $('#tkRoutine', root).addEventListener('click', (e) => { e.stopPropagation(); openRoutinePop(e.currentTarget, today, () => render()); });
+  /* ⭐ колесо баланса */
+  { const bal = $('#tkBalance', root); if (bal) bal.innerHTML = tkBalanceHtml(s.sphereWeek || {}); }
   $('#tkNew', root).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
   $('#tkMic', root).addEventListener('click', () => tkVoiceAdd($('#tkMic', root), () => render()));
   $$('#tkNewPri .tk-pdot', root).forEach(b => b.addEventListener('click', () => { TASK_NEWPRI = b.dataset.np; $$('#tkNewPri .tk-pdot', root).forEach(x => x.classList.toggle('on', x === b)); }));
@@ -6737,7 +6839,10 @@ PAGES.tasks = async (root) => {
   $$('.tk-row[data-tk]', root).forEach(rowEl => rowEl.addEventListener('click', async (e) => {
     const act = e.target.closest('[data-act]'); if (!act) return;
     const id = rowEl.dataset.tk; const a = act.dataset.act; const t = byId[id];
-    if (a === 'done') { const turnOn = !rowEl.classList.contains('done'); if (turnOn) celebrateCheck(act); await api.patch('/tasks/' + id, { status: turnOn ? 'done' : 'todo' }); render(); return; }
+    if (a === 'done') { const turnOn = !rowEl.classList.contains('done'); if (turnOn) celebrateCheck(act);
+      if (rowEl.dataset.rep === '1') { await api.patch('/tasks/' + id, { repeatDone: { [today]: turnOn } }); }   /* повтор: отметка на сегодня, не закрытие задачи */
+      else { await api.patch('/tasks/' + id, { status: turnOn ? 'done' : 'todo' }); }
+      render(); return; }
     if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
     if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; await api.patch('/tasks/' + id, { priority: order[(order.indexOf(rowEl.dataset.pri) + 1) % 4] }); render(); return; }
     if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
