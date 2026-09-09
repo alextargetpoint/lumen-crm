@@ -381,7 +381,7 @@ body.cpanel-on{padding-right:308px!important}
       let rich = {}; if (sl.dataset.rich) { try { rich = JSON.parse(sl.dataset.rich); } catch (e) {} }   /* rich-режим (цифры/план) — items не редактируются в DOM */
       /* ⭐ тезисы-буллеты РЕДАКТИРУЕМЫ: читаем текст из DOM ([data-pt]), иначе — из rich */
       const ptEls = $$('[data-pt]', sl);
-      const points = ptEls.length ? ptEls.map(e => cleanHtml(e.innerHTML).slice(0, 72)).filter(Boolean) : (rich.points || []);
+      const points = ptEls.length ? ptEls.map(e => cleanHtml(e.innerHTML).slice(0, 200).replace(/<[^>]*$/, '')).filter(Boolean) : (rich.points || []);   /* режем по HTML (не по видимому тексту) → 200 запас + отсечь незакрытый хвост тега, чтобы не рвать <mark>/<b> */
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
@@ -465,8 +465,8 @@ body.cpanel-on{padding-right:308px!important}
     if (act === 'edit') { selectSlide(i, true); return; }
     if (act === 'del') { if (arr.length <= 1) { flash('Оставьте хотя бы 1 слайд'); return; } arr.splice(i, 1); return save(true, { slides: arr }); }
     if (act === 'dup') { arr.splice(i + 1, 0, JSON.parse(JSON.stringify(arr[i]))); return save(true, { slides: arr }); }
-    if (act === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; return save(true, { slides: arr }); }
-    if (act === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; return save(true, { slides: arr }); }
+    if (act === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; sel = i - 1; persistUI(); return save(true, { slides: arr }); }   /* выбор едет вместе со слайдом */
+    if (act === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; sel = i + 1; persistUI(); return save(true, { slides: arr }); }
     if (act === 'insert') { arr.splice(i + 1, 0, { heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); return save(true, { slides: arr }); }
     if (act === 'photo') { selectSlide(i, true); setTimeout(() => { const b = $('#cBody [data-bg="photo"]'); if (b) b.click(); }, 60); return; }
     if (act === 'recompose') {   /* Студия: другая композиция слайда (цикл грамматик на сцен-графе) */
@@ -523,7 +523,7 @@ body.cpanel-on{padding-right:308px!important}
     e.preventDefault(); e.stopPropagation();
     const sin = (mv || rs).closest('.s-in'), slide = sin.closest('.slide'), sr = slide.getBoundingClientRect();
     if (mv) {
-      const sx = e.clientX, sy = e.clientY, ox = +slide.dataset.tx || 10, oy = +slide.dataset.ty || 16;
+      const sx = e.clientX, sy = e.clientY, _tx = parseFloat(slide.dataset.tx), _ty = parseFloat(slide.dataset.ty), ox = isNaN(_tx) ? 10 : _tx, oy = isNaN(_ty) ? 16 : _ty;
       const move = (ev) => { const nx = Math.max(-5, Math.min(90, ox + (ev.clientX - sx) / sr.width * 100)); const ny = Math.max(-5, Math.min(92, oy + (ev.clientY - sy) / sr.height * 100)); slide.dataset.tx = nx.toFixed(1); slide.dataset.ty = ny.toFixed(1); sin.style.left = nx + '%'; sin.style.top = ny + '%'; };
       const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); dirty = true; save(false); };
       document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
@@ -610,6 +610,7 @@ body.cpanel-on{padding-right:308px!important}
     if (kind === 'photo') { sl.dataset.bg = val; sl.style.backgroundImage = `linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62)),url('${val}')`; sl.classList.add('hasbg'); }
     else if (kind === 'video') { sl.dataset.bgv = val; sl.insertBefore(el('<div class="s-shade"></div>'), sl.firstChild); sl.insertBefore(el(`<video class="s-bgv" autoplay muted loop playsinline src="${esc(val)}"></video>`), sl.firstChild); sl.classList.add('hasbg'); }
     else if (kind === 'color') { sl.dataset.bgc = val; sl.style.background = val; if (isDark(val)) sl.classList.add('hasbg'); }
+    if (sl.querySelector('.s-lyr.lyr-img.is-plbg')) sl.classList.add('hasbg');   /* фото-подложка тоже требует скрим+белый текст (иначе заголовок нечитаем) */
     dirty = true; save(false); renderBody();
   }
   async function uploadAsset(file) {
@@ -977,7 +978,7 @@ body.cpanel-on{padding-right:308px!important}
       $('#cStBlank', pp).addEventListener('click', () => { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); closePop(); save(true, { slides: arr }); });
     });
     let ftOn = (P.footer || {}).on, ftHide = !!(P.footer || {}).hide, ftStyle = (P.footer || {}).style || 'plain';
-    const persistFooter = () => save(true, { footer: { on: ftOn, text: $('#cFtTxt', body).value.trim(), style: ftStyle, hide: ftHide } });
+    const persistFooter = () => { const f = { on: ftOn, text: $('#cFtTxt', body).value.trim(), style: ftStyle, hide: ftHide }; P.footer = f; save(true, { footer: f }); };   /* ⭐ обновляем локальный P.footer — иначе liveRefresh откатит панель к старому */
     $('#cFtSw', body).addEventListener('click', () => { ftOn = !ftOn; $('#cFtSw', body).classList.toggle('on', ftOn); persistFooter(); });
     $('#cFtShow', body).addEventListener('click', () => { ftHide = !ftHide; $('#cFtShow', body).classList.toggle('on', !ftHide); persistFooter(); });
     $('#cFtStyle', body).addEventListener('click', (e) => { const b = e.target.closest('[data-fs]'); if (!b) return; ftStyle = b.dataset.fs; $$('#cFtStyle button', body).forEach(x => x.classList.toggle('on', x === b)); persistFooter(); });
@@ -1068,9 +1069,9 @@ body.cpanel-on{padding-right:308px!important}
     </div></div>`;
   }
   function wireSlide(body, i) {
-    $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
+    $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); save(false); });
+    $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); save(false); });
+    $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); save(false); });
     /* ОДИН маркер на все строки → чистим по-строчные pmarks */
     const setPmark = (val) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = val; delete r.pmarks; sl.dataset.rich = JSON.stringify(r); dirty = true; save(true, { slides: serialize() }); };
     /* РАЗНЫЕ маркеры по строкам */
@@ -1162,11 +1163,11 @@ body.cpanel-on{padding-right:308px!important}
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
       const anc = s2.anchorNode && (s2.anchorNode.nodeType === 1 ? s2.anchorNode : s2.anchorNode.parentElement);
-      const host = anc && anc.closest('[data-ce]');
+      const host = anc && anc.closest('[data-ce],[data-pt]');
       if (!host) { flash('Выделите текст внутри слайда'); return; }
-      if (cmd === 'bold') { document.execCommand('bold'); dirty = true; }
-      else if (cmd === 'italic') { document.execCommand('italic'); dirty = true; }
-      else if (cmd === 'clear') { const r = s2.getRangeAt(0); marksIn(r, host).forEach(unwrap); host.normalize(); document.execCommand('removeFormat'); dirty = true; }
+      if (cmd === 'bold') { document.execCommand('bold'); dirty = true; save(false); }
+      else if (cmd === 'italic') { document.execCommand('italic'); dirty = true; save(false); }
+      else if (cmd === 'clear') { const r = s2.getRangeAt(0); marksIn(r, host).forEach(unwrap); host.normalize(); document.execCommand('removeFormat'); dirty = true; save(false); }
       else if (cmd === 'mark') {
         const rc = b.getBoundingClientRect();
         const sw = HL.map(([k, c, ex]) => `<span class="hlsw" data-hl="${k}" title="Выделение" style="background:${c};${ex || ''}"></span>`).join('');
@@ -1176,9 +1177,9 @@ body.cpanel-on{padding-right:308px!important}
     });
     $$('[data-mv]', body).forEach(b => b.addEventListener('click', () => {
       const arr = serialize(); const kind = b.dataset.mv;
-      if (kind === 'del') { if (arr.length <= 1) { flash('Оставьте хотя бы 1 слайд'); return; } arr.splice(i, 1); return save(true, { slides: arr }); }
-      if (kind === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; return save(true, { slides: arr }); }
-      if (kind === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; return save(true, { slides: arr }); }
+      if (kind === 'del') { if (arr.length <= 1) { flash('Оставьте хотя бы 1 слайд'); return; } arr.splice(i, 1); sel = Math.max(0, i - 1); persistUI(); return save(true, { slides: arr }); }
+      if (kind === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; sel = i - 1; persistUI(); return save(true, { slides: arr }); }
+      if (kind === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; sel = i + 1; persistUI(); return save(true, { slides: arr }); }
     }));
     /* добавление элементов-слоёв */
     const accent = ((P.themes[P.theme] || {}).blue) || '#1D34D8';
