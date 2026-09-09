@@ -801,8 +801,23 @@ body.cpanel-on{padding-right:308px!important}
     sl.bg = ''; sl.bgv = '';
     sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker && !l.avatar));   /* стикеры И аватары оставляем */
     let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
-    /* pl:1 → фото ложится ПОДЛОЖКОЙ (ниже текста), не перекрывая заголовок/тезисы; текст получает скрим */
-    L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', pl: 1, z }); });
+    /* ⭐ АДАПТИВНО: фото кладём в СВОБОДНУЮ от текста зону (текст сверху → фото снизу, и наоборот),
+       фото остаются ПЕРЕДНИМ слоем (их видно, можно двигать/тянуть). Полноэкранная раскладка
+       (f1-full / верхняя лента) — единственная, что ложится ПОДЛОЖКОЙ под текст (pl:1). */
+    const fullBleed = (L.k === 'f1-full' || L.k === 'f1-band');
+    const pos = sl.pos || (i === 0 ? 'bottom' : 'center');
+    const zone = fullBleed ? { x: 0, y: 0, w: 100, h: 100 }
+      : pos === 'top' ? { x: 4, y: 48, w: 92, h: 50 }
+        : pos === 'bottom' ? { x: 4, y: 2, w: 92, h: 48 }
+          : { x: 4, y: 2, w: 92, h: 43 };   /* center → верхняя часть, центр-текст ниже */
+    L.boxes.forEach((bx, bi) => {
+      const url = urls[bi % urls.length]; z++;
+      const layer = { t: 'img', url, fit: 'cover', rot: bx[5] || 0, round: fullBleed ? (bx[4] || 0) : Math.max(bx[4] || 0, 12), z,
+        x: +(zone.x + bx[0] * zone.w / 100).toFixed(1), y: +(zone.y + bx[1] * zone.h / 100).toFixed(1),
+        w: +(bx[2] * zone.w / 100).toFixed(1), h: +(bx[3] * zone.h / 100).toFixed(1) };
+      if (fullBleed) layer.pl = 1;   /* только полноэкранный — подложка под текст */
+      sl.layers.push(layer);
+    });
     save(true, { slides: arr }); flash(urls.length < L.n ? `Разложено ${urls.length} из ${L.n} — добавь фото для остальных` : 'Раскладка применена ✓', 1600);
   }
   /* ⭐ открыть слайд на вкладке «Слайд» и подсветить/прокрутить к разделу «Фото-раскладка» */
@@ -1030,7 +1045,7 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cnote" id="cPlDet">${nPhotos ? `Обнаружено <b>${nPhotos}</b> фото на слайде — показаны раскладки для ${detN}. «Авто» разложит их сразу, не перекрывая текст.` : 'На слайде нет фото. Выбери раскладку — попросит подгрузить.'}</div>
       <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n) => `<button data-pln="${n}" class="${n === detN ? 'on' : ''}">${n} фото</button>`).join('')}</div>
       <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === detN).map(plTile).join('')}</div>
-      <div class="cnote">Фото ложатся <b>подложкой под текст</b> (заголовок читается поверх). Размер тянется за угол — <b>пропорция сохраняется</b>. «Авто» сам поймёт число фото и применит подходящую композицию.</div>
+      <div class="cnote">Фото раскладываются <b>рядом с текстом</b> (в свободной зоне — не перекрывают заголовок) и остаются <b>подвижными</b>: тяни за центр, размер — за угол (пропорция сохраняется). «Во весь слайд» — единственная кладёт фон под текст. «Авто» сам поймёт число фото.</div>
     </div>
     <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
