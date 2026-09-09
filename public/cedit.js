@@ -25,6 +25,8 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const FMT = { square: '1:1', portrait: '4:5', story: '9:16' };
   const CAT = { serif: 'С засечками', sans: 'Гротеск', display: 'Акцидентные', hand: 'Рукописные' };
+  /* комбо-пары заголовок+тело (bodyKey '' = Manrope). Ключи существуют в FONT_LIB. */
+  const FONT_COMBOS = [['fraunces', '', 'Мягкий люкс'], ['playfair', 'inter', 'Глянец'], ['bricolage', '', 'Дизайн-студия'], ['instrument', '', 'Минимал'], ['spacegro', 'inter', 'Модерн'], ['cormorant', 'montser', 'Высокая мода'], ['unbounded', '', 'Смелый'], ['oswald', 'robotocond', 'Спорт'], ['ptserif', '', 'Редакция'], ['manrope', '', 'Чистый гротеск']];
   /* палитра выделения текста (несколько цветов) — ключ hl-*, цвет свотча */
   const HL = [['cobalt', '#2563EB'], ['gold', '#E8B84B'], ['mint', '#34C79A'], ['rose', '#F2748F'], ['lav', '#9B8CFF'], ['sky', '#4FB6F2'], ['ink', '#0B0B0F'], ['under', 'linear-gradient(180deg,transparent 62%,#2563EB55 62%)'], ['mark', 'linear-gradient(102deg,#2563EB55,#2563EB88)', 'border-radius:5px 10px 6px 9px'], ['markg', 'linear-gradient(102deg,#E8B84B66,#E8B84Baa)', 'border-radius:6px 9px 5px 10px'], ['ring', 'transparent', 'box-shadow:inset 0 0 0 2px #2563EB;border-radius:50%']];
   /* узоры-фоны (превью для свотчей — нейтральный акцент) */
@@ -88,6 +90,14 @@
 .cfontbtn{width:100%;border:1.5px solid #E1E8F4;background:#fff;border-radius:10px;padding:11px 12px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;color:#2A3346;display:flex;align-items:center;gap:10px;text-align:left}
 .cfontbtn .aa{font-size:20px}
 .cfontbtn:hover{border-color:var(--cb)}
+.cfontcombos{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cfcombo{display:flex;align-items:center;gap:9px;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:11px;padding:9px 10px;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .14s,transform .14s,box-shadow .14s}
+.cfcombo:hover{border-color:var(--cb);transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(37,99,235,.4)}
+.cfcombo.on{border-color:var(--cb);box-shadow:inset 0 0 0 1px var(--cb);background:linear-gradient(180deg,#EAF1FF,#DBE7FF)}
+.cfcombo .cfc-aa{font-size:24px;line-height:1;flex:0 0 auto;color:#1B2740}
+.cfcombo .cfc-t{display:flex;flex-direction:column;min-width:0}
+.cfcombo .cfc-t b{font-size:12.5px;font-weight:700;color:#2A3346;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfcombo .cfc-t i{font-style:normal;font-size:10px;color:#9aa1b2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cfmtbar{display:flex;gap:6px}
 .cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
 .cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
@@ -587,7 +597,9 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cnote">Один клик — тема, шрифт, узор и стиль текста применятся ко всем слайдам.</div>
     </div>
     <div class="cgrp"><label>Цветовая тема</label><div class="cthemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
+    <div class="cgrp"><label>Пары шрифтов (заголовок + текст)</label><div class="cfontcombos" id="cCombos">${FONT_COMBOS.map(([hf2, bf2, nm]) => { const H = (P.fonts[hf2] || {}), B = (P.fonts[bf2] || {}); const on = P.font === hf2 && (P.bodyFont || '') === (bf2 || ''); return `<button class="cfcombo ${on ? 'on' : ''}" data-hf="${hf2}" data-bf="${bf2}"><span class="cfc-aa" style="font-family:${H.fam || 'serif'}">Ag</span><span class="cfc-t"><b style="font-family:${H.fam || 'serif'}">${esc(nm)}</b><i style="font-family:${B.fam || 'sans-serif'}">${esc((H.name || '') + ' + ' + (B.name || 'Manrope'))}</i></span></button>`; }).join('')}</div></div>
     <div class="cgrp"><label>Шрифт заголовков</label><button class="cfontbtn" id="cFontBtn"><span class="aa" style="font-family:${curFont.fam}">Aa</span> <span style="flex:1">${curFont.name}</span> ▾</button></div>
+    <div class="cgrp"><label>Шрифт основного текста</label><button class="cfontbtn" id="cBodyFontBtn"><span class="aa" style="font-family:${(P.fonts[P.bodyFont] || {}).fam || "'Manrope',sans-serif"}">Aa</span> <span style="flex:1">${(P.fonts[P.bodyFont] || {}).name || 'Manrope (по умолч.)'}</span> ▾</button></div>
     <div class="cgrp"><label>Формат</label><div class="cseg" id="cFmt">${['square', 'portrait', 'story'].map(f => `<button data-f="${f}" class="${P.format === f ? 'on' : ''}">${FMT[f]}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Счётчик слайдов</label><div class="cseg" id="cCounter">${[['frac', '1/6'], ['num', '01'], ['dot', '•••'], ['roman', 'I'], ['off', 'Выкл']].map(([v, n]) => `<button data-cn="${v}" class="${(P.counter || 'frac') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Как нумеруются слайды. «Выкл» — убрать счётчик со всех.</div></div>
     <div class="cgrp"><label>Футер слайдов</label>
@@ -672,6 +684,19 @@ body.cpanel-on{padding-right:308px!important}
       pp.addEventListener('click', (e2) => { const t = e2.target.closest('[data-fp]'); if (t) { closePop(); save('hard', { font: t.dataset.fp }); } });
       setTimeout(() => q.focus(), 30);
     });
+    /* комбо-пары заголовок+тело — один клик применяет оба */
+    { const cb = $('#cCombos', body); if (cb) cb.addEventListener('click', (e) => { const b = e.target.closest('[data-hf]'); if (!b) return; save('hard', { font: b.dataset.hf, bodyFont: b.dataset.bf || '' }); }); }
+    /* шрифт основного текста (тела) — отдельный пикер с опцией «по умолчанию» */
+    { const bfb = $('#cBodyFontBtn', body); if (bfb) bfb.addEventListener('click', (e) => {
+      const rows = (filter, cat) => `<div class="fprow ${!P.bodyFont ? 'on' : ''}" data-bfp=""><span class="aa" style="font-family:'Manrope',sans-serif">Aa</span><span class="nm">Manrope (по умолчанию)</span></div>` + Object.entries(P.fonts).filter(([k, f]) => (!cat || f.cat === cat) && (!filter || f.name.toLowerCase().includes(filter))).map(([k, f]) => `<div class="fprow ${k === P.bodyFont ? 'on' : ''}" data-bfp="${k}"><span class="aa" style="font-family:${f.fam}">Aa</span><span class="nm" style="font-family:${f.fam}">${f.name}</span></div>`).join('');
+      const cats = ['', 'serif', 'sans', 'display', 'hand'];
+      const pp = openPop(`<input class="srch" id="cBq" placeholder="Поиск шрифта тела…"><div class="cseg" id="cBcat">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c ? CAT[c] : 'Все'}</button>`).join('')}</div><div id="cBlist">${rows('', '')}</div>`, e.clientX - 250, e.clientY);
+      let curCat = ''; const q = $('#cBq', pp), list = $('#cBlist', pp);
+      q.addEventListener('input', () => list.innerHTML = rows(q.value.trim().toLowerCase(), curCat));
+      $('#cBcat', pp).addEventListener('click', (ev) => { const b2 = ev.target.closest('[data-cat]'); if (!b2) return; curCat = b2.dataset.cat; $$('#cBcat button', pp).forEach(x => x.classList.toggle('on', x === b2)); list.innerHTML = rows(q.value.trim().toLowerCase(), curCat); });
+      pp.addEventListener('click', (e2) => { const t = e2.target.closest('[data-bfp]'); if (t) { closePop(); save('hard', { bodyFont: t.dataset.bfp }); } });
+      setTimeout(() => q.focus(), 30);
+    }); }
   }
   function slideHtml(sl) {
     const pos = sl.dataset.pos || 'center', al = sl.dataset.align || 'left', sz = sl.dataset.size || 'm';

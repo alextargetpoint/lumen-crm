@@ -3256,6 +3256,7 @@ const server = http.createServer(async (req, res) => {
       if (b.title != null) c.title = String(b.title).slice(0, 120);
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
       if (b.font && FONT_LIB[b.font]) c.font = b.font;
+      if (b.bodyFont !== undefined) c.bodyFont = FONT_LIB[b.bodyFont] ? b.bodyFont : '';
       if (b.format && CAR_FORMATS.has(b.format)) c.format = b.format;
       if (b.footer && typeof b.footer === 'object') c.footer = { on: !!b.footer.on, text: String(b.footer.text || '').slice(0, 80), style: ['plain', 'pill', 'line', 'serif'].includes(b.footer.style) ? b.footer.style : 'plain', hide: !!b.footer.hide };
       if (b.counter !== undefined) c.counter = ['frac', 'num', 'dot', 'roman', 'off'].includes(b.counter) ? b.counter : 'frac';
@@ -5542,6 +5543,10 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       if (isCyr && !FONT_CYR.has(c.font)) { const cat = (hf.cat === 'sans') ? 'manrope' : 'playfair'; hf = FONT_LIB[cat]; }   /* editorial serif с кириллицей = Playfair */
       /* стек с кириллическим сериф-фолбэком, чтобы латинский дисплей-шрифт не ронял кириллицу в Times */
       const dispStack = hf.cat === 'sans' ? hf.fam.replace(/,sans-serif$/, ",'Manrope',sans-serif") : hf.fam.replace(/,(serif|cursive)$/, ",'PT Serif',serif");
+      /* ⭐ шрифт ТЕЛА (комбо-пары заголовок+тело): по умолчанию Manrope; кириллический фолбэк */
+      let bf = FONT_LIB[c.bodyFont];
+      if (bf && isCyr && !FONT_CYR.has(c.bodyFont)) bf = null;   /* латинский без кириллицы — откат на Manrope */
+      const bodyStack = bf ? (bf.cat === 'sans' ? bf.fam.replace(/,sans-serif$/, ",'Manrope',sans-serif") : bf.fam.replace(/,(serif|cursive)$/, ",'Manrope',sans-serif")) : "'Manrope',sans-serif";
       const AG = db.settings.agency.name;
       const logo = db.settings.agency.logo;
       const footer = c.footer || {};
@@ -5608,11 +5613,11 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.title)} — ${esc(AG)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&${hf.gf}${isCyr ? '&family=PT+Serif:wght@400;700' : ''}&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&${hf.gf}${bf && bf.gf ? '&' + bf.gf : ''}${isCyr ? '&family=PT+Serif:wght@400;700' : ''}&display=swap" rel="stylesheet">
 <style>
-:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${dispStack}}
+:root{--blue:${theme.blue};--ink:${theme.ink};--mut:${theme.mut};--bg:${theme.bg};--paper:${theme.paper};--line:${theme.line};--disp:${dispStack};--body:${bodyStack}}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Manrope',sans-serif;background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
+body{font-family:var(--body);background:${theme.dark ? '#0B0D14' : '#EEF1F5'};color:var(--ink);-webkit-font-smoothing:antialiased;padding:${isEdit ? '64px 16px 60px' : '30px 16px'}}
 .wrap{max-width:${dims.w}px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
 .cslot{position:relative}
 .cslot:hover,.cslot:focus-within{z-index:20}
@@ -5920,7 +5925,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=38"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=39"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
