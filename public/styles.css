@@ -3727,8 +3727,14 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 .sh-gen-foot .sh-sel { max-width: 220px; }
 
 /* ============ Карта желаний (мудборд брокера) ============ */
-.mb-wrap { display: flex; flex-direction: column; gap: 16px; }
-.mb-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.mb-wrap { display: flex; flex-direction: column; gap: 9px; }   /* ближе к холсту (было 16) */
+.mb-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+/* минимализм: заголовок + кнопки приглушены, загораются при наведении на шапку */
+.mb-top .mb-title, .mb-top .mb-tools { opacity: .42; transition: opacity .24s var(--ease-soft); }
+.mb-top:hover .mb-title, .mb-top:hover .mb-tools, .mb-top:focus-within .mb-title, .mb-top:focus-within .mb-tools { opacity: 1; }
+/* тот же приём для встроенной шапки Карты желаний в «Мои задачи» (раскрытый блок) */
+.mb-collcard.op .mb-coll-hd { opacity: .5; transition: opacity .24s var(--ease-soft); }
+.mb-collcard.op .mb-coll-hd:hover { opacity: 1; }
 .mb-title { display: flex; align-items: center; gap: 11px; }
 .mb-emblem { width: 26px; height: 26px; color: var(--accent); opacity: .85; flex: 0 0 auto; }
 .mb-t-k { font-family: 'Fraunces', serif; font-size: 25px; font-weight: 500; color: var(--navy-900); letter-spacing: .01em; line-height: 1; }
@@ -3778,6 +3784,7 @@ html[data-night] .mb-board { background: radial-gradient(circle at 20px 20px, rg
 .mb-editing .mb-item { cursor: grab; }
 .mb-editing .mb-item:hover { outline: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 6px; border-radius: 6px; }
 .mb-editing .mb-item .mb-grip, .mb-editing .mb-item .mb-del { display: grid; }
+.mb-editing .mb-item:hover .mb-rs, .mb-item.resizing .mb-rs { display: block; }
 /* подсказка «разложить» поверх доски (view-mode, при пересечении) */
 .mb-hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 20; display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border: none; border-radius: 999px; background: rgba(16,43,92,.82); color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 22px -8px rgba(16,43,92,.5); backdrop-filter: blur(6px); animation: mbHintIn .4s ease both; }
 .mb-hint svg { width: 15px; height: 15px; }
@@ -3823,7 +3830,11 @@ html[data-night] .mb-cap { background: rgba(20,30,50,.7); color: var(--ink); }
 .mb-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--bad); color: #fff; display: none; place-items: center; cursor: pointer; z-index: 4; box-shadow: 0 3px 8px -2px rgba(0,0,0,.4); }
 .mb-del svg { width: 12px; height: 12px; }
 .mb-item:hover .mb-del { display: grid; }
-.mb-grip { position: absolute; bottom: 4px; right: 4px; width: 22px; height: 22px; border-radius: 7px; background: rgba(255,255,255,.85); color: var(--ink-3); display: none; place-items: center; cursor: grab; z-index: 3; }
+.mb-grip { position: absolute; bottom: 4px; left: 4px; width: 22px; height: 22px; border-radius: 7px; background: rgba(255,255,255,.85); color: var(--ink-3); display: none; place-items: center; cursor: grab; z-index: 3; }
+/* угловой хэндл ресайза стикера (индивидуальный размер) */
+.mb-rs { position: absolute; right: -7px; bottom: -7px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; cursor: nwse-resize; display: none; z-index: 6; box-shadow: 0 2px 7px -1px rgba(16,43,92,.5); touch-action: none; }
+.mb-item.resizing { cursor: nwse-resize; }
+.mb-item.resizing img { box-shadow: 0 20px 40px -14px rgba(16,43,92,.45); }
 .mb-grip svg { width: 13px; height: 13px; }
 .mb-item:hover .mb-grip { display: grid; }
 /* глубина: фоновые (крупные, низкий z) — чуть мягче, чтобы передний план читался ярче */

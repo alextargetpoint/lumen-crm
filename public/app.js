@@ -6587,13 +6587,14 @@ PAGES.tasks = async (root) => {
   if (moodWrap) {
     const openMood = localStorage.getItem('lumen_mood_open') === '1';
     const mbEm = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2.1 4.3-4.3 2.1 2.1-4.3z"/><circle cx="12" cy="12" r="1"/></svg>`;
-    moodWrap.innerHTML = `<div class="glass card mb-collcard"><button class="mb-coll-hd" id="mbCollHd"><span class="mb-ch-em">${mbEm}</span><span class="mb-ch-t"><b>Карта желаний</b><span class="sub">твоя мотивация — цели перед глазами каждый день</span></span><i class="mb-coll-ar ${openMood ? 'op' : ''}">${ic(I.chev || I.arrow, 2)}</i></button><div class="mb-coll-body" id="mbCollBody" style="${openMood ? '' : 'display:none'}"></div></div>`;
+    moodWrap.innerHTML = `<div class="glass card mb-collcard ${openMood ? 'op' : ''}"><button class="mb-coll-hd" id="mbCollHd"><span class="mb-ch-em">${mbEm}</span><span class="mb-ch-t"><b>Карта желаний</b><span class="sub">твоя мотивация — цели перед глазами каждый день</span></span><i class="mb-coll-ar ${openMood ? 'op' : ''}">${ic(I.chev || I.arrow, 2)}</i></button><div class="mb-coll-body" id="mbCollBody" style="${openMood ? '' : 'display:none'}"></div></div>`;
     const mbBody = $('#mbCollBody', moodWrap), mbHd = $('#mbCollHd', moodWrap);
     let mbMounted = false;
     if (openMood) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; }
     mbHd.addEventListener('click', () => {
       const isOpen = mbBody.style.display !== 'none';
       $('.mb-coll-ar', mbHd).classList.toggle('op', !isOpen);
+      mbHd.closest('.mb-collcard').classList.toggle('op', !isOpen);   /* приглушаем шапку когда доска раскрыта */
       if (isOpen) { mbBody.style.display = 'none'; localStorage.setItem('lumen_mood_open', '0'); }
       else { mbBody.style.display = ''; localStorage.setItem('lumen_mood_open', '1'); if (!mbMounted) { renderMoodboard(mbBody, { embedded: true }); mbMounted = true; } }
     });
@@ -7116,7 +7117,7 @@ async function renderMoodboard(root, opts) {
     ${mbAttHtml(it, d)}
     <img src="${esc(it.url)}" alt="" draggable="false">
     ${mbTxt(it)}
-    ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span>
+    ${ed ? `<button class="mb-del" data-mbdel="${it.id}" title="Убрать">${ic(I.x)}</button><span class="mb-grip" title="Тяни">${ic(I.grip || I.plus, 2)}</span><span class="mb-rs" data-mbrs title="Размер — тяни"></span>
       <div class="mb-iacts"><button data-mbhero="${it.id}" title="Сделать героем">${ic(I.star)}</button><button data-mbfwd="${it.id}" title="На передний план">${ic(I.arrow)}</button><button data-mbback="${it.id}" title="На задний план">${ic(I.arrow)}</button></div>` : ''}
   </div>`; };
   /* тонкая гравюрная эмблема-компас вместо клипартной иконки */
@@ -7206,7 +7207,7 @@ async function renderMoodboard(root, opts) {
     /* drag только в режиме правки */
     $$('.mb-item', root).forEach(el2 => {
       const startDrag = (e) => {
-        if (e.target.closest('[data-mbdel]') || e.target.closest('.mb-iacts')) return;
+        if (e.target.closest('[data-mbdel]') || e.target.closest('.mb-iacts') || e.target.closest('[data-mbrs]')) return;
         e.preventDefault(); const r0 = board.getBoundingClientRect();
         const ox = e.clientX - el2.offsetLeft, oy = e.clientY - el2.offsetTop;
         el2.classList.add('drag'); el2.style.zIndex = 50;
@@ -7215,6 +7216,16 @@ async function renderMoodboard(root, opts) {
         document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
       };
       el2.addEventListener('pointerdown', startDrag);
+      /* ресайз стикера за угловой хэндл — индивидуальный размер (кастомизация) */
+      const rs = el2.querySelector('[data-mbrs]');
+      if (rs) rs.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const startX = e.clientX, startW = el2.offsetWidth;
+        el2.classList.add('resizing'); el2.style.zIndex = 50;
+        const move = (ev) => { const w = Math.max(56, Math.min(560, Math.round(startW + (ev.clientX - startX)))); el2.style.width = w + 'px'; };
+        const up = async () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); el2.classList.remove('resizing'); el2.style.zIndex = ''; await api.patch('/moodboard/' + el2.dataset.mb, { w: parseInt(el2.style.width) }).catch(() => {}); };
+        document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+      });
     });
   }
 }

@@ -3560,7 +3560,7 @@ const server = http.createServer(async (req, res) => {
         const uid = mbUid(); if (!uid) return json(res, 401, { error: 'auth' });
         const b = await readBody(req); const it = ((db.moodboard || {})[uid] || []).find(x => x.id === m[1]); if (!it) return json(res, 404, { error: 'nf' });
         if (b.x != null) it.x = Math.round(+b.x); if (b.y != null) it.y = Math.round(+b.y);
-        if (b.w != null) it.w = Math.max(80, Math.min(440, +b.w)); if (b.rot != null) it.rot = Math.max(-20, Math.min(20, +b.rot));
+        if (b.w != null) it.w = Math.max(56, Math.min(560, +b.w)); if (b.rot != null) it.rot = Math.max(-20, Math.min(20, +b.rot));   /* шире диапазон — ручной ресайз стикера (меньше/больше) */
         if (b.caption != null) it.caption = String(b.caption).slice(0, 80);
         store.save(); return json(res, 200, it);
       }
