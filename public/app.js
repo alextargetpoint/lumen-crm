@@ -4982,8 +4982,168 @@ const mpMonthShort = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн'
 const mpFmtD = (s) => { if (!s) return '—'; const a = String(s).split('-'); return a[2] ? (+a[2]) + ' ' + mpMonthShort[(+a[1]) - 1] + ' ' + a[0] : s; };
 const mpPeriod = (mp) => (mp.period && (mp.period.from || mp.period.to)) ? (mpFmtD(mp.period.from) + ' — ' + mpFmtD(mp.period.to)) : 'без периода';
 
+/* ── Аналитика медиапланов (Фаза 2): сегмент Планы|Аналитика + план-факт по слоям ── */
+let MP_VIEW = 'plans';
+const MP_AN_FILTER = { contractorId: '', from: '', to: '' };
+/* дельта CPL: факт дешевле плана — хорошо (зелёный ↓), дороже — плохо (красный ↑) */
+const mpDeltaChip = (row, cur) => {
+  if (!row.hasFact || row.cplFact <= 0 || row.cplDelta == null) return '<span class="muted" style="font-size:11px">факт не внесён</span>';
+  const cheaper = row.cplDelta <= 0;
+  const arrow = cheaper ? '↓' : '↑';
+  const abs = Math.abs(row.cplDelta);
+  return `<span class="mpa-delta ${cheaper ? 'good' : 'bad'}">${arrow} ${mpMoney(abs, cur)}${row.cplDeltaPct != null ? ` · ${cheaper ? '' : '+'}${row.cplDeltaPct}%` : ''}</span>`;
+};
+/* компактная строка-бар для разбивок (канал/гео/связка) */
+const mpaBarRow = (label, row, cur, opts = {}) => {
+  const wPlan = opts.maxBudget ? Math.round(row.budgetPlan / opts.maxBudget * 100) : 0;
+  const cplTxt = row.hasFact && row.cplFact
+    ? `<b class="${row.cplFact <= row.cplPlan ? 'mp-good' : 'mp-bad'}">${mpMoney(row.cplFact, cur)}</b>`
+    : (row.cplPlan ? `<b class="accent">${mpMoney(row.cplPlan, cur)}</b>` : '<span class="muted">—</span>');
+  return `<div class="mpa-row ${opts.lead ? 'lead' : ''}">
+    <div class="mpa-row-nm">${opts.badge || ''}<span>${esc(label)}</span>${row.mixedCurrency ? '<i class="mpa-mix" title="Смешанные валюты">≈</i>' : ''}</div>
+    <div class="mpa-row-bar"><span style="width:${Math.max(3, wPlan)}%"></span></div>
+    <div class="mpa-row-val">
+      <span class="mpa-cell"><i>план</i>${mpMoney(row.budgetPlan, cur)}</span>
+      <span class="mpa-cell"><i>факт</i>${row.hasFact ? mpMoney(row.budgetFact, cur) : '<span class="muted">—</span>'}</span>
+      <span class="mpa-cell"><i>лиды п/ф</i>${row.leadsPlan}${row.hasFact ? ' / ' + row.leadsFact : ' / —'}</span>
+      <span class="mpa-cell mpa-cplc"><i>CPL${row.hasFact && row.cplFact ? ' факт' : ' план'}</i>${cplTxt}</span>
+    </div>
+  </div>`;
+};
+const mpSigChip = (sig) => sig === 'ahead' ? '<span class="mpa-sig ahead">опережает</span>' : sig === 'behind' ? '<span class="mpa-sig behind">отстаёт</span>' : '<span class="mpa-sig ontrack">в графике</span>';
+
+/* сборка HTML вкладки «Аналитика» из ответа /api/mediaplans/analytics */
+function mpAnalyticsHtml(an, contractors, plans) {
+  if (!an || !an.meta || !an.meta.plansAnalyzed) {
+    return `<div class="glass card"><div class="empty" style="padding:36px;text-align:center">
+      <div style="font-size:15px;font-weight:650;margin-bottom:6px">Нет данных для аналитики</div>
+      <div class="muted" style="margin-bottom:16px">Создайте хотя бы один медиаплан на вкладке «Планы» — и здесь появится план-факт по подрядчикам, каналам, гео и связкам.</div>
+    </div></div>`;
+  }
+  const O = an.overall, cur = O.cur;
+  const anyFact = O.hasFact;
+  /* фильтр по подрядчику */
+  const filterBar = `<div class="mpa-filter">
+    <div class="mpa-fl"><span class="mpa-fl-lbl">Подрядчик</span>
+      <select id="mpaFCt"><option value="">Все подрядчики</option>${contractors.map(c => `<option value="${c.id}" ${MP_AN_FILTER.contractorId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="mpa-fl"><span class="mpa-fl-lbl">Период с</span><input type="date" id="mpaFFrom" value="${esc(MP_AN_FILTER.from)}"></div>
+    <div class="mpa-fl"><span class="mpa-fl-lbl">по</span><input type="date" id="mpaFTo" value="${esc(MP_AN_FILTER.to)}"></div>
+    ${(MP_AN_FILTER.contractorId || MP_AN_FILTER.from || MP_AN_FILTER.to) ? '<button class="btn btn-sm" id="mpaFReset">Сбросить</button>' : ''}
+    <div class="muted mpa-scope">${ic(I.bars)}${an.meta.plansAnalyzed} ${plural(an.meta.plansAnalyzed, 'план', 'плана', 'планов')} · ${an.meta.contractorsAnalyzed} ${plural(an.meta.contractorsAnalyzed, 'подрядчик', 'подрядчика', 'подрядчиков')}${O.mixedCurrency ? ' · <b>смешанные валюты</b> (агрегаты приблизительны)' : ''}</div>
+  </div>`;
+
+  /* headline: бюджет освоено · лиды получено · CPL план→факт */
+  const cplBlock = anyFact && O.cplFact
+    ? `<div class="mpa-h-cpl ${O.cplFact <= O.cplPlan ? 'good' : 'bad'}">
+        <span class="mpa-h-k">CPL план → факт</span>
+        <b>${O.cplPlan ? mpMoney(O.cplPlan, cur) : '—'} <i>→</i> ${mpMoney(O.cplFact, cur)}</b>
+        <span class="mpa-h-d">${mpDeltaChip(O, cur)}</span>
+      </div>`
+    : `<div class="mpa-h-cpl"><span class="mpa-h-k">CPL план</span><b>${O.cplPlan ? mpMoney(O.cplPlan, cur) : '—'}</b><span class="mpa-h-d muted" style="font-size:11px">внесите факт, чтобы увидеть факт-CPL</span></div>`;
+  const headline = `<div class="glass card mpa-hero">
+    <div class="mpa-stat">
+      <span class="mpa-stat-k">Бюджет освоено</span>
+      <b>${anyFact ? mpMoney(O.budgetFact, cur) : '—'} <i>из ${mpMoney(O.budgetPlan, cur)}</i></b>
+      <div class="mp-bar"><span style="width:${Math.min(100, O.budgetPct)}%"></span></div>
+      <span class="mpa-stat-s">${anyFact ? O.budgetPct + '% плана' : 'факт не внесён'}</span>
+    </div>
+    <div class="mpa-stat">
+      <span class="mpa-stat-k">Лиды получено</span>
+      <b>${anyFact ? O.leadsFact : '—'} <i>из ${O.leadsPlan}</i></b>
+      <div class="mp-bar"><span style="width:${Math.min(100, O.leadsPct)}%"></span></div>
+      <span class="mpa-stat-s">${anyFact ? O.leadsPct + '% плана' : 'факт не внесён'}</span>
+    </div>
+    ${cplBlock}
+  </div>`;
+
+  /* pacing / скорость */
+  const pacing = (an.pacing && an.pacing.length) ? `<div class="glass card mb">
+    <div class="card-title">${ic(I.spark)}Скорость освоения<span class="sub">идущие периоды · темп vs плановый</span></div>
+    <div class="mpa-pace-grid">${an.pacing.map(p => `<div class="mpa-pace">
+      <div class="mpa-pace-hd"><b>${esc(p.title)}</b>${p.contractorName ? `<span class="muted">${esc(p.contractorName)}</span>` : ''}<span class="mpa-pace-days">${p.daysLeft} дн. до конца</span></div>
+      <div class="mpa-pace-bars">
+        <div class="mpa-pace-b"><span class="mpa-pace-l">Прошло периода</span><div class="mp-bar ghost"><span style="width:${p.elapsedPct}%"></span></div><i>${p.elapsedPct}%</i></div>
+        <div class="mpa-pace-b"><span class="mpa-pace-l">Бюджет ${mpSigChip(p.budgetSignal)}</span><div class="mp-bar"><span style="width:${Math.min(100, p.budgetPct)}%"></span></div><i>${p.budgetPct}%</i></div>
+        <div class="mpa-pace-b"><span class="mpa-pace-l">Лиды ${mpSigChip(p.leadsSignal)}</span><div class="mp-bar"><span style="width:${Math.min(100, p.leadsPct)}%"></span></div><i>${p.leadsPct}%</i></div>
+      </div>
+      <div class="mpa-pace-ft muted">${p.leadsFact} из ${p.leadsPlan} лидов · CPL факт ${p.cplFact ? mpMoney(p.cplFact, p.cur) : '—'}${p.cplPlan ? ' · план ' + mpMoney(p.cplPlan, p.cur) : ''}</div>
+    </div>`).join('')}</div>
+  </div>` : '';
+
+  /* сравнение подрядчиков */
+  const ctCards = an.byContractor.length ? `<div class="glass card mb">
+    <div class="card-title">${ic(I.users)}Сравнение подрядчиков<span class="sub">план vs факт · CPL · темп</span></div>
+    <div class="mpa-ct-grid">${an.byContractor.map(r => `<div class="mpa-ct ${r.bestCpl ? 'best' : ''}">
+      <div class="mpa-ct-hd">
+        <div class="mpa-ct-nm">${esc(r.name)}${r.bestCpl ? `<span class="mpa-badge-best">${ic(I.spark)}лучший CPL · факт</span>` : ''}</div>
+        <span class="muted" style="font-size:11px">${r.plans} ${plural(r.plans, 'план', 'плана', 'планов')}${r.channels.length ? ' · ' + r.channels.slice(0, 3).map(esc).join(', ') : ''}</span>
+      </div>
+      <div class="mpa-ct-grid2">
+        <div class="mpa-ct-m"><span>Бюджет</span><b>${mpMoney(r.budgetPlan, r.cur)}</b><i>${r.hasFact ? 'факт ' + mpMoney(r.budgetFact, r.cur) : 'факт —'}</i></div>
+        <div class="mpa-ct-m"><span>Лиды</span><b>${r.leadsPlan}</b><i>${r.hasFact ? 'факт ' + r.leadsFact : 'факт —'}</i></div>
+        <div class="mpa-ct-m"><span>CPL план</span><b class="accent">${r.cplPlan ? mpMoney(r.cplPlan, r.cur) : '—'}</b><i>&nbsp;</i></div>
+        <div class="mpa-ct-m"><span>CPL факт</span>${r.hasFact && r.cplFact ? `<b class="${r.cplFact <= r.cplPlan ? 'mp-good' : 'mp-bad'}">${mpMoney(r.cplFact, r.cur)}</b>` : '<b class="muted">—</b>'}<i>${mpDeltaChip(r, r.cur)}</i></div>
+      </div>
+      <div class="mpa-ct-pace">
+        <div class="mpa-ct-pb"><span>Бюджет освоен</span><div class="mp-bar"><span style="width:${Math.min(100, r.budgetPct)}%"></span></div><i>${r.hasFact ? r.budgetPct + '%' : '—'}</i></div>
+        <div class="mpa-ct-pb"><span>Лиды выполнены</span><div class="mp-bar"><span style="width:${Math.min(100, r.leadsPct)}%"></span></div><i>${r.hasFact ? r.leadsPct + '%' : '—'}</i></div>
+      </div>
+    </div>`).join('')}</div>
+  </div>` : '';
+
+  /* блок разбивки (канал/гео/связка) */
+  const bd = (title, sub, rows, icon, extra) => {
+    if (!rows.length) return '';
+    const maxBudget = Math.max(...rows.map(r => r.budgetPlan), 1);
+    return `<div class="glass card mb">
+      <div class="card-title">${ic(icon)}${title}<span class="sub">${sub}</span></div>
+      <div class="mpa-list">${rows.map(r => extra ? extra(r, maxBudget) : mpaBarRow(r.key, r, r.cur, { maxBudget })).join('')}</div>
+    </div>`;
+  };
+  const chBlock = bd('По каналам', 'Meta · Google · TikTok…', an.byChannel, I.bars);
+  const geoRows = an.byGeo.map(r => `${mpaBarRow(r.geoName, r, r.cur, { maxBudget: Math.max(...an.byGeo.map(x => x.budgetPlan), 1) })}${r.crmLeads != null ? `<div class="mpa-crm">${ic(I.users)}В CRM за период: <b>${r.crmLeads}</b> ${plural(r.crmLeads, 'лид', 'лида', 'лидов')} по гео «${esc(r.geoName)}» <span class="muted">· из базы Lumen, не факт подрядчика</span></div>` : ''}`).join('');
+  const geoBlock = an.byGeo.length ? `<div class="glass card mb">
+    <div class="card-title">${ic(I.target)}По гео / направлениям<span class="sub">план vs факт · сверка с CRM</span></div>
+    <div class="mpa-list">${geoRows}</div>
+  </div>` : '';
+  /* связки — ключевой вид «лидирующие связки» */
+  const bundleBlock = an.byBundle.length ? `<div class="glass card mb">
+    <div class="card-title">${ic(I.spark)}Связки<span class="sub">${an.byBundle.some(r => r.leading) ? 'лидеры и аутсайдеры — <b>по факту · не прогноз</b>' : 'по плановому бюджету'}</span></div>
+    <div class="mpa-list">${an.byBundle.map(r => {
+      const badge = r.leading ? '<span class="mpa-bdg lead">лидер</span>' : (r.worst ? '<span class="mpa-bdg worst">дорого</span>' : '');
+      const label = r.key + (r.channel ? '' : '');
+      return `<div class="mpa-row mpa-row-b ${r.leading ? 'lead' : ''} ${r.worst ? 'worst' : ''}">
+        <div class="mpa-row-nm">${badge}<span>${esc(r.key)}</span><small class="mpa-ctx">${esc(r.channel || '')}${r.geo ? ' · ' + esc(mpGeoName(r.geo)) : ''}</small></div>
+        <div class="mpa-row-val">
+          <span class="mpa-cell"><i>бюджет п/ф</i>${mpMoney(r.budgetPlan, r.cur)}${r.hasFact ? ' / ' + mpMoney(r.budgetFact, r.cur) : ' / —'}</span>
+          <span class="mpa-cell"><i>лиды п/ф</i>${r.leadsPlan}${r.hasFact ? ' / ' + r.leadsFact : ' / —'}</span>
+          <span class="mpa-cell mpa-cplc"><i>CPL план</i><b class="accent">${r.cplPlan ? mpMoney(r.cplPlan, r.cur) : '—'}</b></span>
+          <span class="mpa-cell mpa-cplc"><i>CPL факт</i>${r.hasFact && r.cplFact ? `<b class="${r.cplFact <= r.cplPlan ? 'mp-good' : 'mp-bad'}">${mpMoney(r.cplFact, r.cur)}</b>` : '<span class="muted">—</span>'}</span>
+        </div>
+      </div>`;
+    }).join('')}</div>
+    ${!anyFact ? '<div class="mpa-hint-fact">Внесите факт в строках плана — и связки отранжируются по реальному CPL.</div>' : ''}
+  </div>` : '';
+
+  return filterBar + headline + pacing + ctCards + chBlock + geoBlock + bundleBlock;
+}
+
 PAGES.mediaplan = async (root) => {
   const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
+
+  /* Фаза 2: если активна вкладка «Аналитика» — тянем агрегаты план-факт */
+  let anData = null;
+  if (MP_VIEW === 'analytics') {
+    const qs = new URLSearchParams();
+    if (MP_AN_FILTER.contractorId) qs.set('contractorId', MP_AN_FILTER.contractorId);
+    if (MP_AN_FILTER.from) qs.set('from', MP_AN_FILTER.from);
+    if (MP_AN_FILTER.to) qs.set('to', MP_AN_FILTER.to);
+    try { anData = await api.get('/mediaplans/analytics' + (qs.toString() ? '?' + qs.toString() : '')); } catch (_) { anData = null; }
+  }
+  const seg = `<div class="mpa-seg" role="tablist">
+    <button class="mpa-seg-b ${MP_VIEW === 'plans' ? 'on' : ''}" data-mpview="plans">${ic(I.doc)}Планы</button>
+    <button class="mpa-seg-b ${MP_VIEW === 'analytics' ? 'on' : ''}" data-mpview="analytics">${ic(I.bars)}Аналитика</button>
+  </div>`;
 
   /* сводка для hero */
   const sumBudget = plans.reduce((s, mp) => s + (mp.totals ? mp.totals.budgetPlan : 0), 0);
@@ -5062,6 +5222,8 @@ PAGES.mediaplan = async (root) => {
         ['Плановый бюджет', mpMoney(sumBudget, 'USD'), `${sumLeads} лидов · CPL ${avgCpl ? mpMoney(avgCpl, 'USD') : '—'}`],
       ].map(([k, v, sub]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
     `, { v: 'right', hue: '#3E7BE0' })}
+    ${seg}
+    ${MP_VIEW === 'analytics' ? mpAnalyticsHtml(anData, contractors, plans) : `
     <div class="mp-toolbar">
       <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
       <button class="btn" id="mpContractors">${ic(I.users)}Подрядчики <span class="muted">· ${contractors.length}</span></button>
@@ -5092,7 +5254,28 @@ PAGES.mediaplan = async (root) => {
         <div class="muted" style="margin-bottom:16px">Создайте первый медиаплан под подрядчика трафика — с планом по каналам, гео и связкам.</div>
         <button class="btn btn-accent" id="mpNew2">${ic(I.plus)}Новый медиаплан</button>
       </div></div>`}
+  `}
   `;
+
+  /* сегмент Планы | Аналитика */
+  $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.mpview; if (v === MP_VIEW) return;
+    MP_VIEW = v; render();
+  }));
+
+  if (MP_VIEW === 'analytics') {
+    const applyFilter = () => {
+      const s = $('#mpaFCt', root); if (s) MP_AN_FILTER.contractorId = s.value;
+      const f = $('#mpaFFrom', root); if (f) MP_AN_FILTER.from = f.value;
+      const t = $('#mpaFTo', root); if (t) MP_AN_FILTER.to = t.value;
+      render();
+    };
+    const fc = $('#mpaFCt', root); if (fc) fc.addEventListener('change', applyFilter);
+    const ff = $('#mpaFFrom', root); if (ff) ff.addEventListener('change', applyFilter);
+    const ft = $('#mpaFTo', root); if (ft) ft.addEventListener('change', applyFilter);
+    const fr = $('#mpaFReset', root); if (fr) fr.addEventListener('click', () => { MP_AN_FILTER.contractorId = ''; MP_AN_FILTER.from = ''; MP_AN_FILTER.to = ''; render(); });
+    return;
+  }
 
   const openNew = () => openMpBuilder(null, contractors);
   $('#mpNew', root) && $('#mpNew', root).addEventListener('click', openNew);
@@ -6154,7 +6337,7 @@ function tkMeta(t, leadMap) {
   const overdue = !done && t.due && dstrLocal(new Date(t.due)) < dstrLocal(new Date());
   const chips = [];
   if (t.due) chips.push(`<span class="tk-chip ${overdue ? 'od' : ''}" data-act="due">${ic(I.clock)}${new Date(t.due).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}${tkTime(t.due) ? ' ' + tkTime(t.due) : ''}</span>`);
-  const subs = t.subtasks || []; if (subs.length) chips.push(`<span class="tk-chip" data-act="open">${ic(I.task)}${subs.filter(s => s.done).length}/${subs.length}</span>`);
+  const subs = t.subtasks || []; if (subs.length) chips.push(`<span class="tk-chip" data-act="subs" title="Подзадачи">${ic(I.task)}${subs.filter(s => s.done).length}/${subs.length}</span>`);
   const atts = t.attachments || []; if (atts.length) chips.push(`<span class="tk-chip" data-act="open">${ic(atts.some(a => a.kind === 'audio') ? I.mic : I.doc)}${atts.length}</span>`);
   const lead = t.lead || (t.leadId && leadMap[t.leadId] ? { name: leadMap[t.leadId] } : null);
   if (lead) chips.push(`<span class="tk-chip lead" data-act="open">${ic(I.user)}${esc(lead.name)}${lead.stageName ? ' · ' + esc(lead.stageName) : ''}</span>`);
@@ -6165,7 +6348,10 @@ function taskRow(t, leadMap) {
   const done = t.status === 'done';
   const pri = TPRI[t.priority] || TPRI.p3;
   const meta = tkMeta(t, leadMap);
-  return `<div class="tk-row ${done ? 'done' : ''}" data-tk="${t.id}" data-pri="${t.priority}">
+  const subs = t.subtasks || [];
+  /* инлайн-разворот подзадач прямо в списке (без попапа) */
+  const subsHtml = subs.length ? `<div class="tk-subs" data-tksubs="${t.id}" hidden>${subs.map(s => `<button class="tk-sub ${s.done ? 'done' : ''}" data-subdone="${s.id}"><span class="tk-check sm ${s.done ? 'on' : ''}">${ic(I.check, 2.4)}</span><span class="tk-sub-x">${esc(s.text)}</span></button>`).join('')}</div>` : '';
+  return `<div class="tk-rowwrap">${`<div class="tk-row ${done ? 'done' : ''}" data-tk="${t.id}" data-pri="${t.priority}">
     <button class="tk-check ${done ? 'on' : ''}" data-act="done" title="Готово">${ic(I.check, 2.4)}</button>
     <button class="tk-flag" data-act="pri" style="--pc:${pri.c}" title="Приоритет: ${pri.n}">${ic(I.flag)}</button>
     <div class="tk-main" data-act="open">
@@ -6173,10 +6359,11 @@ function taskRow(t, leadMap) {
       ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
     </div>
     <div class="tk-acts">
+      ${subs.length ? `<button class="tk-mini tk-disc" data-act="subs" title="Показать подзадачи">${ic(I.chev)}</button>` : ''}
       <button class="tk-mini" data-act="due" title="Срок">${ic(I.cal)}</button>
       <button class="tk-mini del" data-act="del" title="Удалить">${ic(I.x)}</button>
     </div>
-  </div>`;
+  </div>`}${subsHtml}</div>`;
 }
 function tkChip(t) {
   const pri = TPRI[t.priority] || TPRI.p3; const done = t.status === 'done';
@@ -6430,7 +6617,18 @@ PAGES.tasks = async (root) => {
     if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
     if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; await api.patch('/tasks/' + id, { priority: order[(order.indexOf(rowEl.dataset.pri) + 1) % 4] }); render(); return; }
     if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
+    if (a === 'subs') { e.stopPropagation(); const wrap = rowEl.closest('.tk-rowwrap'); const sb = wrap && wrap.querySelector('.tk-subs'); if (sb) { const opening = sb.hidden; sb.hidden = !opening; rowEl.classList.toggle('subs-open', opening); const disc = rowEl.querySelector('.tk-disc'); if (disc) disc.classList.toggle('open', opening); } return; }
     if (a === 'open') { openTaskDetail(t, leadMap); return; }
+  }));
+  /* инлайн-переключение подзадачи (готово/нет) прямо в списке */
+  $$('.tk-subs[data-tksubs]', root).forEach(sb => sb.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-subdone]'); if (!btn) return;
+    const tid = sb.dataset.tksubs, sid = btn.dataset.subdone; const t = byId[tid]; if (!t) return;
+    const s = (t.subtasks || []).find(x => x.id === sid); if (!s) return;
+    s.done = !s.done; btn.classList.toggle('done', s.done); const ck = btn.querySelector('.tk-check'); if (ck) ck.classList.toggle('on', s.done);
+    /* обновим счётчик в чипе строки */
+    const chip = sb.closest('.tk-rowwrap').querySelector('.tk-chip[data-act="subs"]'); if (chip) { const dn = t.subtasks.filter(x => x.done).length; chip.lastChild.textContent = dn + '/' + t.subtasks.length; }
+    try { await api.patch('/tasks/' + tid, { subtasks: t.subtasks }); } catch (err) { toast('Не сохранилось', err.message); }
   }));
 
   /* доски: календарь / канбан — перетаскивание */
