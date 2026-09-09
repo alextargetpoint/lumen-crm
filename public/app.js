@@ -354,6 +354,7 @@ const NAV = {
   mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
   adsAnalytics: { name: 'Аналитика', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка' },
   comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
+  parlo:     { name: 'Переводчик звонков', icon: I.phone, sub: 'живой перевод вашим голосом + копилот продаж' },
   social:    { name: 'Контент-цех', icon: I.layers, sub: '' },
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
@@ -370,7 +371,7 @@ const NAV = {
    меняется только группировка в меню. Минус ~9 пунктов из бокового меню. */
 const WORKSPACES = {
   pipeline: { label: 'Воронка',       icon: I.funnel,   pages: ['funnel', 'wake'] },
-  dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments'] },
+  dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments', 'parlo'] },
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
   ads:    { label: 'Реклама',         icon: I.target,   pages: ['mediaplan', 'adsAnalytics', 'ads'] },
   engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
@@ -5243,6 +5244,7 @@ PAGES.mediaplan = async (root) => {
       ${breakdown}
       <div class="mp-acts">
         <button class="btn btn-sm btn-accent" data-mpopen="${mp.id}">${ic(I.doc)}Открыть</button>
+        ${mp.status === 'draft' ? `<button class="btn btn-sm" data-mpsend="${mp.id}">${ic(I.send)}Отправить</button>` : ''}
         <button class="btn btn-sm" data-mpshare="${mp.id}">${ic(I.link)}Поделиться</button>
         <button class="btn btn-sm" data-mpdup="${mp.id}">${ic(I.copy)}Дублировать</button>
         <button class="btn btn-sm btn-danger" data-mpdel="${mp.id}">${ic(I.x)}</button>
@@ -5327,6 +5329,13 @@ PAGES.mediaplan = async (root) => {
     const url = `${location.origin}/mp/${mp.id}?key=${mp.editKey}`;
     navigator.clipboard.writeText(url);
     toast('Ссылка на медиаплан скопирована', 'Подрядчик откроет и утвердит план по этой ссылке', true);
+  }));
+  $$('[data-mpsend]', root).forEach(b => b.addEventListener('click', async () => {
+    const mp = plans.find(x => x.id === b.dataset.mpsend);
+    await api.patch('/mediaplans/' + mp.id, { status: 'sent' });
+    try { await navigator.clipboard.writeText(`${location.origin}/mp/${mp.id}?key=${mp.editKey}`); } catch (_) {}
+    toast('Отправлено подрядчику', 'Ссылка скопирована · статус «Отправлен» · ждём согласования', true);
+    render();
   }));
   $$('[data-mpdup]', root).forEach(b => b.addEventListener('click', async () => {
     const mp = plans.find(x => x.id === b.dataset.mpdup);
