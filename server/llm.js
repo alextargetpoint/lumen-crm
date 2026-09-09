@@ -903,6 +903,62 @@ async function parseTask(text, todayStr, dow) {
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+/* ═══ ОЦЕНКА ЗВОНКА по методологии Ольги Синенко ═══
+   Разбирает транскрипт звонка/Zoom брокера, ставит балл по рубрике (открытие, квалификация,
+   возражения, ценность/срочность, следующий шаг, тон/ошибки), даёт конкретный фидбэк
+   и эталонные скрипты «как надо». Опирается на academy.methodologyRef() (дистиллят методологии). */
+const academy = require('./academy');
+async function reviewCall(transcript, ctx = {}) {
+  const ref = academy.methodologyRef();
+  const t = String(transcript || '').slice(0, 14000);
+  const rubricKeys = academy.RUBRIC.map(r => `"${r.key}"`).join(', ');
+  const prompt = `Ты — старший тренер по продажам недвижимости (в стиле разборов звонков Ольги Синенко). Разбери РЕАЛЬНЫЙ звонок/Zoom брокера с клиентом и оцени его СТРОГО по методологии ниже. Будь конкретным и честным, как коуч на разборе: хвали за дело, а ошибки называй прямо и показывай, как надо.
+
+=== МЕТОДОЛОГИЯ (эталон) ===
+${ref}
+
+=== ТРАНСКРИПТ ЗВОНКА ===
+${t || '(пусто)'}
+
+${ctx.geo ? 'Направление: ' + ctx.geo + '\n' : ''}${ctx.lead ? 'Клиент: ' + ctx.lead + '\n' : ''}
+Оцени по 6 измерениям (0-100 каждое): ${rubricKeys}. overall — взвешенный итог (0-100).
+Для КАЖДОГО измерения дай короткий комментарий: что сделал хорошо/плохо в ЭТОМ звонке (со ссылкой на реплики).
+mistakes — 2-5 конкретных ошибок с полем better (как надо было сказать, по возможности с точной фразой-скриптом на английском).
+missedQuestions — важные вопросы квалификации, которые брокер НЕ задал (из эталонных, дословно).
+nextScripts — 2-4 готовых фразы/скрипта (на языке звонка), которые исправят ключевые ошибки.
+strengths — 1-3 сильные стороны звонка.
+Если транскрипт пустой/не про продажу — верни overall:0 и объясни в verdict.
+
+Верни СТРОГО JSON:
+{"overall":0-100,"verdict":"1-2 предложения общего вердикта",
+ "scores":{${academy.RUBRIC.map(r => `"${r.key}":0-100`).join(',')}},
+ "dims":[{"key":"opening","label":"${academy.RUBRIC[0].label}","score":0-100,"comment":"что в этом звонке"}],
+ "strengths":["..."],
+ "mistakes":[{"what":"ошибка","better":"как надо (со скриптом)"}],
+ "missedQuestions":["вопрос дословно"],
+ "nextScripts":["готовая фраза"]}`;
+  const out = await callGemini(prompt, 45000, 3000);
+  if (!out || typeof out.overall === 'undefined') throw new Error('bad review');
+  const clampN = (v) => Math.max(0, Math.min(100, parseInt(v) || 0));
+  const arr = (a, n) => Array.isArray(a) ? a.slice(0, n).map(x => String(x).slice(0, 400)).filter(Boolean) : [];
+  const scores = {};
+  academy.RUBRIC.forEach(r => { scores[r.key] = clampN((out.scores || {})[r.key]); });
+  const dims = academy.RUBRIC.map(r => {
+    const d = (Array.isArray(out.dims) ? out.dims : []).find(x => x && x.key === r.key) || {};
+    return { key: r.key, label: r.label, score: (typeof d.score !== 'undefined') ? clampN(d.score) : scores[r.key], comment: String(d.comment || '').slice(0, 500) };
+  });
+  return {
+    overall: clampN(out.overall),
+    verdict: String(out.verdict || '').slice(0, 600),
+    scores, dims,
+    strengths: arr(out.strengths, 3),
+    mistakes: (Array.isArray(out.mistakes) ? out.mistakes.slice(0, 6) : []).map(m => ({ what: String((m || {}).what || '').slice(0, 300), better: String((m || {}).better || '').slice(0, 500) })).filter(m => m.what),
+    missedQuestions: arr(out.missedQuestions, 8),
+    nextScripts: arr(out.nextScripts, 5),
+    at: Date.now(),
+  };
+}
+
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

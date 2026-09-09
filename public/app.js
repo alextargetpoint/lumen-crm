@@ -350,6 +350,8 @@ const NAV = {
   moodboard: { name: 'Карта желаний', icon: I.spark, sub: 'личная доска мотивации' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
+  academy:  { name: 'Академия продаж', icon: I.doc, sub: 'методология Ольги Синенко · 53 ролика' },
+  callReview: { name: 'Оценка звонка', icon: I.phone, sub: 'ИИ-разбор звонка по методологии' },
   ads:       { name: 'Атрибуция · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление' },
   mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
   adsAnalytics: { name: 'Аналитика', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка' },
@@ -374,7 +376,7 @@ const WORKSPACES = {
   dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments', 'parlo'] },
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
   ads:    { label: 'Реклама',         icon: I.target,   pages: ['mediaplan', 'adsAnalytics', 'ads'] },
-  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'automations', 'templates'] },
+  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates'] },
   config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
 const PARENT_OF = {};
@@ -4865,6 +4867,112 @@ PAGES.playbook = async (root) => {
   $$('.pb-cat', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.cat; render(); }));
   $$('[data-pbgo]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.pbCat = b.dataset.pbgo; render(); }));
   $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+};
+
+/* ---------------- АКАДЕМИЯ ПРОДАЖ (методология Ольги Синенко) ---------------- */
+function acMd(s) {
+  s = esc(String(s || ''));
+  return s.split(/\n{2,}/).map(block => {
+    block = block.trim(); if (!block) return '';
+    const warn = /^⚠️?/.test(block), tip = /^💡/.test(block);
+    const inner = block.replace(/\n/g, '<br>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    if (warn) return `<div class="ac-cal warn">${inner}</div>`;
+    if (tip) return `<div class="ac-cal tip">${inner}</div>`;
+    return `<p>${inner}</p>`;
+  }).join('');
+}
+PAGES.academy = async (root) => {
+  const d = await api.get('/academy');
+  const mods = d.modules || [];
+  if (typeof PAGE_STATE.acMod !== 'number' || !mods[PAGE_STATE.acMod]) { PAGE_STATE.acMod = 0; PAGE_STATE.acLes = 0; }
+  const mi = PAGE_STATE.acMod, m = mods[mi] || { lessons: [] };
+  const li = (typeof PAGE_STATE.acLes === 'number' && (m.lessons || [])[PAGE_STATE.acLes]) ? PAGE_STATE.acLes : 0;
+  const les = (m.lessons || [])[li] || { sections: [] };
+  const s = d.stats || {};
+  root.innerHTML = `
+    ${heroArt('assets/art/book.png', `
+      <div class="ha-title">${ic(I.doc)}Академия продаж<span class="sub">${s.cards || 0} приёмов · ${s.videos || 0} роликов Ольги Синенко · вшито в ИИ</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Методология закрытия сделок: скрипты, вопросы, цепочки разговора, возражения, ошибки. На этой базе работают «Оценка звонка» и подсказки ИИ в карточке лида.</span></div>
+    `, { v: 'right', hue: '#B87E4B' })}
+    <div class="pb-layout">
+      <div class="pb-nav glass">
+        <div class="pb-nav-hd">Модули</div>
+        ${mods.map((mm, ix) => `<button class="pb-cat ${ix === mi ? 'active' : ''}" data-acmod="${ix}">
+          <span class="pb-cat-t"><b>${esc(mm.module || '')}</b><i>${(mm.lessons || []).length} уроков</i></span>
+          <span class="pb-cat-n">${(mm.lessons || []).reduce((a, l) => a + (l.sections || []).length, 0)}</span>
+        </button>`).join('')}
+      </div>
+      <div class="pb-main">
+        <div class="pb-main-hd">${ic(I.doc)}<b>${esc(m.module || '')}</b><span>${(m.lessons || []).length} уроков</span></div>
+        <div class="ac-lessons">${(m.lessons || []).map((l, ix) => `<button class="ac-lchip ${ix === li ? 'on' : ''}" data-acles="${ix}">${esc(l.title || 'Урок')}</button>`).join('')}</div>
+        <h2 class="ac-lt">${esc(les.title || '')}</h2>
+        ${les.intro ? `<div class="ac-intro">${acMd(les.intro)}</div>` : ''}
+        ${(les.sections || []).map((sec, ix) => `<div class="pb-acc ${ix === 0 ? 'open' : ''}" data-acc>
+          <button class="pb-acc-hd"><span class="pb-num">${String(ix + 1).padStart(2, '0')}</span><span class="pb-acc-t">${esc(sec.heading || '')}</span><span class="chev">${ic(I.chev, 2)}</span></button>
+          <div class="pb-acc-body"><div class="pb-acc-inner"><div class="pb-b">${acMd(sec.body)}</div></div></div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  $$('[data-acmod]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.acMod = +b.dataset.acmod; PAGE_STATE.acLes = 0; render(); }));
+  $$('[data-acles]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.acLes = +b.dataset.acles; render(); }));
+  $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+};
+
+/* ---------------- ОЦЕНКА ЗВОНКА (ИИ-разбор по методологии) ---------------- */
+function crBarColor(n) { return n >= 70 ? '#4ADE80' : (n >= 45 ? '#F5B77E' : '#F87171'); }
+function crRenderReview(r) {
+  if (!r) return '';
+  const dims = (r.dims || []).map(d => `<div class="cr-dim">
+    <div class="cr-dim-top"><span>${esc(d.label)}</span><span style="color:${crBarColor(d.score)}">${d.score}</span></div>
+    <div class="cr-bar"><i style="width:${d.score}%;background:${crBarColor(d.score)}"></i></div>
+    ${d.comment ? `<div class="cr-dim-c">${esc(d.comment)}</div>` : ''}
+  </div>`).join('');
+  const mist = (r.mistakes || []).map(m => `<div class="cr-mist"><b>✕ ${esc(m.what)}</b>${m.better ? `<div class="better">→ ${esc(m.better)}</div>` : ''}</div>`).join('');
+  const scr = (r.nextScripts || []).map(s => `<div class="cr-scr">“${esc(s)}”</div>`).join('');
+  const mq = (r.missedQuestions || []).map(q => `<div class="cr-q">${esc(q)}</div>`).join('');
+  const str = (r.strengths || []).map(s => `<li>${esc(s)}</li>`).join('');
+  return `
+    <div class="cr-overall">
+      <div class="cr-score" style="color:${crBarColor(r.overall)}">${r.overall}<small>/100</small></div>
+      <div class="cr-verdict">${esc(r.verdict || '')}</div>
+    </div>
+    <div class="cr-dims">${dims}</div>
+    ${str ? `<div class="cr-block"><h4>${ic(I.spark)}Сильные стороны</h4><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${str}</ul></div>` : ''}
+    ${mist ? `<div class="cr-block"><h4>${ic(I.shield)}Ошибки и как надо</h4>${mist}</div>` : ''}
+    ${mq ? `<div class="cr-block"><h4>${ic(I.spark)}Не задал важные вопросы</h4>${mq}</div>` : ''}
+    ${scr ? `<div class="cr-block"><h4>${ic(I.flame)}Готовые фразы на следующий раз</h4>${scr}</div>` : ''}`;
+}
+PAGES.callReview = async (root) => {
+  const hist = await api.get('/call-reviews').catch(() => []);
+  root.innerHTML = `
+    ${heroArt('assets/art/book.png', `
+      <div class="ha-title">${ic(I.phone)}Оценка звонка<span class="sub">ИИ-разбор по методологии Ольги Синенко</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вставьте транскрипт звонка или Zoom брокера с клиентом — ИИ оценит по 6 измерениям (открытие, квалификация, возражения, ценность/срочность, следующий шаг, тон), укажет ошибки и даст готовые скрипты.</span></div>
+    `, { v: 'right', hue: '#B87E4B' })}
+    <div class="cr-wrap">
+      <div class="cr-input glass">
+        <div class="cr-hd">Транскрипт звонка</div>
+        <textarea id="crText" class="cr-ta" placeholder="Брокер: ...&#10;Клиент: ...&#10;&#10;Вставьте расшифровку разговора (реплики брокера и клиента)."></textarea>
+        <div class="cr-actions"><button id="crRun" class="btn btn-accent">Оценить звонок</button><span id="crStatus" class="cr-status"></span></div>
+      </div>
+      <div id="crResult" class="cr-result"></div>
+      ${hist.length ? `<div class="cr-hist"><div class="cr-hist-hd">Последние разборы</div>${hist.map(h => `<button class="cr-hchip" data-crh="${h.id}"><b>${h.overall}</b> ${esc(h.leadName || 'звонок')} <i>${new Date(h.at).toLocaleDateString('ru-RU')}</i></button>`).join('')}</div>` : ''}
+    </div>`;
+  const resEl = $('#crResult', root), stEl = $('#crStatus', root);
+  $('#crRun', root).addEventListener('click', async () => {
+    const transcript = $('#crText', root).value.trim();
+    if (transcript.length < 40) { stEl.textContent = 'Вставьте транскрипт (хотя бы пару реплик)'; return; }
+    stEl.textContent = 'ИИ разбирает звонок…'; resEl.innerHTML = '';
+    try {
+      const d = await api.post('/call-review', { transcript });
+      stEl.textContent = ''; resEl.innerHTML = crRenderReview(d.review);
+      resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { stEl.textContent = 'Ошибка: ' + (e.message || 'не удалось'); }
+  });
+  $$('[data-crh]', root).forEach(b => b.addEventListener('click', () => {
+    const rec = hist.find(h => h.id === b.dataset.crh);
+    if (rec && rec.review) { resEl.innerHTML = crRenderReview(rec.review); resEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }));
 };
 
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */

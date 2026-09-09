@@ -35,6 +35,7 @@ const design = require('./design'); /* Ф1: движок арт-дирекшна
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
 const shot = require('./shot'); /* серверный скриншот (chrome-headless-shell) для автономного QA-цикла */
 const playbook = require('./playbook');
+const academy = require('./academy'); /* Академия продаж (методология Ольги Синенко): курс + оценка звонка + советы */
 const billing = require('./billing');
 const { MARKET } = require('./marketdata');
 
@@ -486,8 +487,8 @@ const ROLE_CAPS = {
 /* дефолтное скрытие разделов под роль (владелец может переопределить hidePages у сотрудника) */
 const ROLE_DEFAULT_HIDE = {
   broker: [],
-  assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
-  marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
+  marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
 /* заблокирован ли путь для НЕ-владельца с данным набором грантов.
@@ -900,7 +901,7 @@ const sanSlide = (s) => ({
   free: !!s.free, tx: s.free ? Math.max(-5, Math.min(95, +s.tx || 10)) : 0, ty: s.free ? Math.max(-5, Math.min(95, +s.ty || 16)) : 0, tscale: s.free ? Math.max(0.5, Math.min(1.9, +s.tscale || 1)) : 1,   /* свободное размещение текст-блока */
   bodyScale: Math.max(0.7, Math.min(1.5, +s.bodyScale || 1)),   /* размер основного текста (подпись+тезисы) */
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
-  mode: ['stats', 'steps', 'gauges', 'amenities', 'bars', 'payplan'].includes(s.mode) ? s.mode : '',
+  mode: ['stats', 'steps', 'gauges', 'amenities', 'bars', 'payplan', 'growth', 'timeline'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
   /* тезисы-буллеты: добавляют плотность нарративным слайдам (не только заголовок+подпись) */
   points: Array.isArray(s.points) ? s.points.map(p => sanCarInline(String(p)).slice(0, 72)).filter(Boolean).slice(0, 4) : [],
@@ -4912,6 +4913,32 @@ ${SCR}
     }
     if (p === '/api/marketdata' && req.method === 'GET') return json(res, 200, MARKET);
     if (p === '/api/playbook' && req.method === 'GET') return json(res, 200, playbook.PLAYBOOK);
+
+    /* ===== Академия продаж (методология Ольги Синенко) ===== */
+    if (p === '/api/academy' && req.method === 'GET')
+      return json(res, 200, { modules: academy.MODULES, catLabels: academy.CAT_LABELS, rubric: academy.RUBRIC, stats: academy.stats(), vtitles: academy.VTITLES });
+    if (p === '/api/academy/cards' && req.method === 'GET') {
+      const cat = u.searchParams.get('cat');
+      return json(res, 200, cat ? academy.byCategory(cat) : academy.CARDS);
+    }
+    /* Оценка звонка: транскрипт → скоринг по рубрике + фидбэк + скрипты. Можно привязать к лиду. */
+    if (p === '/api/call-review' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const b = await readBody(req);
+      let transcript = String(b.transcript || '').trim();
+      const lead = b.leadId ? (db.leads || []).find(l => l.id === b.leadId) : null;
+      if (!transcript && lead) transcript = (lead.transcripts || []).map(t => t.text).join('\n\n').trim();
+      if (!transcript || transcript.length < 40) return json(res, 400, { error: 'нужен транскрипт звонка (минимум пара реплик)' });
+      try {
+        const review = await llm.reviewCall(transcript, { geo: lead ? (db.settings.geoNames[lead.geo] || lead.geo) : '', lead: lead ? lead.name : '' });
+        if (!Array.isArray(db.callReviews)) db.callReviews = [];
+        const rec = { id: store.nextId('cr'), at: review.at, by: (getSession(req) || {}).uid || null, leadId: lead ? lead.id : null, leadName: lead ? lead.name : (b.label ? String(b.label).slice(0, 80) : ''), overall: review.overall, review, excerpt: transcript.slice(0, 240) };
+        db.callReviews.unshift(rec); db.callReviews = db.callReviews.slice(0, 200); store.save();
+        return json(res, 200, { review, id: rec.id });
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился с разбором: ' + e.message }); }
+    }
+    if (p === '/api/call-reviews' && req.method === 'GET')
+      return json(res, 200, (db.callReviews || []).slice(0, 60));
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
@@ -5650,6 +5677,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'amenities' && (s.items || []).length ? `<div class="s-amen">${s.items.map(it => `<div class="s-amen-i"><span class="s-amen-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${AMEN_ICONS[it.icon] || AMEN_ICONS.award}</svg></span><span>${esc(it.text || it.k)}</span></div>`).join('')}</div>` : ''}
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${s.mode === 'payplan' && (s.items || []).length ? `<div class="s-payplan">${s.items.map(it => `<div class="s-pp-row"><span class="s-pp-dot"></span><span class="s-pp-pct">${esc(it.v || it.pct + '%')}</span><span class="s-pp-txt"><b>${esc(it.k)}</b>${it.text ? `<i>${esc(it.text)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
+            ${s.mode === 'growth' && (s.items || []).length ? (() => { const its = s.items; const nums = its.map(it => parseFloat(String(it.v || '').replace(/[^\d.]/g, '')) || 0); const mx = Math.max(...nums, 1); const f = nums[0] || 0, l = nums[nums.length - 1] || 0; const d = f > 0 ? Math.round((l - f) / f * 100) : 0; return `<div class="s-growth"><div class="s-gr-chart">${its.map((it, n) => `<div class="s-gr-col"><span class="s-gr-v">${esc(it.v)}</span><span class="s-gr-track"><span class="s-gr-bar" style="height:${Math.max(14, (nums[n] / mx) * 100).toFixed(0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>${d > 0 ? `<div class="s-gr-badge">▲ +${d}% к сдаче</div>` : ''}</div>`; })() : ''}
+            ${s.mode === 'timeline' && (s.items || []).length ? `<div class="s-timeline">${s.items.map((it, n) => `<div class="s-tl-row ${n === s.items.length - 1 ? 'done' : ''}"><span class="s-tl-dot"></span><span class="s-tl-c"><b>${esc(it.k || it.text)}</b>${(it.text && it.k) || it.v ? `<i>${esc(it.v || it.text)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
             ${!s.mode && (s.points || []).length ? (() => {
               const def = s.pmark || 'index';
@@ -5920,6 +5949,32 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.hasbg .s-pp-txt b{color:#fff}.slide.hasbg .s-pp-txt i{color:rgba(255,255,255,.82)}
 .slide.hasbg .s-pp-row:not(:last-child){border-bottom-color:rgba(255,255,255,.2)}
 .slide.hasbg .s-pp-dot{box-shadow:0 0 0 4px rgba(255,255,255,.18)}
+/* ⭐ РОСТ ОБЪЕКТА: восходящие столбцы стоимости + дельта */
+.s-growth{margin-top:14px}
+.s-gr-chart{display:flex;align-items:stretch;gap:12px;height:clamp(120px,30cqw,180px)}
+.s-gr-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.s-gr-v{font-family:var(--disp);font-optical-sizing:auto;font-size:clamp(13px,3.4cqw,18px);font-weight:600;color:var(--blue);letter-spacing:-.01em}
+.slide.hasbg .s-gr-v{color:#fff}
+.s-gr-track{flex:1;width:100%;max-width:56px;display:flex;align-items:flex-end}
+.s-gr-bar{width:100%;border-radius:9px 9px 0 0;background:linear-gradient(180deg,var(--blue),color-mix(in srgb,var(--blue) 48%,transparent));box-shadow:inset 0 1px 0 rgba(255,255,255,.32)}
+.slide.hasbg .s-gr-bar{background:linear-gradient(180deg,#fff,rgba(255,255,255,.45))}
+.s-gr-col i{font-style:normal;font-size:clamp(11px,2.8cqw,13px);font-weight:600;color:var(--mut)}
+.slide.hasbg .s-gr-col i{color:rgba(255,255,255,.8)}
+.s-gr-badge{display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:6px 14px;border-radius:100px;font-size:clamp(12px,3cqw,14px);font-weight:700;color:#0E7A5F;background:color-mix(in srgb,#0E7A5F 12%,transparent)}
+.slide.hasbg .s-gr-badge{color:#8DF0C4;background:rgba(141,240,196,.16)}
+/* ⭐ СРОКИ СДАЧИ: таймлайн-майлстоны, последний = сдача (акцент) */
+.s-timeline{display:flex;flex-direction:column;margin-top:16px;position:relative}
+.s-timeline::before{content:"";position:absolute;left:7px;top:15px;bottom:15px;width:2px;background:linear-gradient(180deg,color-mix(in srgb,var(--blue) 42%,transparent),color-mix(in srgb,var(--blue) 16%,transparent))}
+.s-tl-row{display:flex;align-items:baseline;gap:15px;padding:10px 0;position:relative}
+.s-tl-dot{flex:0 0 16px;width:16px;height:16px;border-radius:50%;background:var(--paper);border:3px solid color-mix(in srgb,var(--blue) 45%,var(--mut));margin-top:3px;z-index:1}
+.s-tl-row.done .s-tl-dot{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 20%,transparent)}
+.slide.hasbg .s-tl-dot{background:transparent;border-color:rgba(255,255,255,.55)}
+.slide.hasbg .s-tl-row.done .s-tl-dot{background:#fff;border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.2)}
+.s-tl-c{display:flex;flex-direction:column;gap:2px;min-width:0}
+.s-tl-c b{font-size:clamp(14px,3.7cqw,17px);font-weight:650;color:var(--ink);line-height:1.2}
+.slide.hasbg .s-tl-c b{color:#fff}
+.s-tl-c i{font-style:normal;font-size:clamp(12px,2.9cqw,14px);font-weight:600;color:var(--blue)}
+.slide.hasbg .s-tl-c i{color:rgba(255,255,255,.82)}
 .s-step{display:flex;align-items:center;gap:13px;font-size:clamp(14px,3.6cqw,17px);line-height:1.35;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-step{color:rgba(255,255,255,.92)}
 .s-step-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;font-family:'Manrope',sans-serif}
@@ -6057,7 +6112,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=68"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=69"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
