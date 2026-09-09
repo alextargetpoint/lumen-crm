@@ -5973,7 +5973,7 @@ PAGES.parlo = async (root) => {
   const win = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zM11.6 4.2 21 3v8.5h-9.4zM3 12.5h7.5v7.1L3 18.5zM11.6 12.5H21V21l-9.4-1.2z"/></svg>';
   const feats = [
     { ic: I.mic, t: 'Ваш голос — на их языке', d: 'Клонируем ваш голос: вы говорите по-русски, клиент слышит именно вас — на английском, итальянском, немецком или французском.' },
-    { ic: I.phone, t: 'Поверх любого звонка', d: 'Zoom, Google Meet, Teams, WhatsApp, Telegram — работает через виртуальное аудио, ничего не переключая во время созвона.' },
+    { ic: I.phone, t: 'Поверх ваших звонков', d: 'Zoom и Google Meet — работает через виртуальный микрофон, выбрали Parlo один раз и ничего не переключаете во время созвона.' },
     { ic: I.spark, t: 'Копилот продаж', d: 'Пока клиент говорит — 2–3 варианта ответа в вашем стиле. Нажали ▶ — и реплика уходит в звонок вашим голосом.' },
     { ic: I.chat, t: 'Субтитры речи клиента', d: 'Речь собеседника бежит русскими субтитрами в боковой шторке — не упустите ни одной детали сделки.' },
     { ic: I.doc, t: 'Авто-сводка звонка', d: 'После звонка — транскрипт, ИИ-итоги и следующие шаги. Копия в Telegram и PDF, привязка к карточке лида.' },
@@ -6001,23 +6001,55 @@ PAGES.parlo = async (root) => {
           <button class="plo-btn lg" data-plo-dl>${win}Windows</button>
           <button class="plo-btn ghost lg" data-plo-how>Как это работает</button>
         </div>
-        <div class="plo-langs"><span class="plo-dot"></span>Переводит на <b>EN · IT · DE · FR</b> · работает в Zoom, Meet, Teams, WhatsApp</div>
+        <div class="plo-langs"><span class="plo-dot"></span>Переводит на <b>EN · IT · DE · FR</b> · работает в Zoom и Google Meet</div>
       </div>
       <div class="plo-hero-r">
         <div class="plo-halo"></div>
-        <div class="plo-icon-wrap">${parloAppIcon(150)}</div>
-        <div class="plo-name">Parlo</div>
-        <div class="plo-tag">живой переводчик звонков</div>
+        <div class="plo-mock">
+          <div class="plo-mock-top"><span class="plo-mdots"><i></i><i></i><i></i></span><span class="plo-mtitle">Zoom · звонок с клиентом</span><span class="plo-mrec"><i></i>REC</span></div>
+          <div class="plo-mock-stage">
+            <div class="plo-mock-pill">${parloAppIcon(22)}<b>Parlo</b><span class="pm-st"><i></i>переводит</span><span class="pm-lng">RU→EN</span></div>
+            <div class="plo-mock-cap"><span class="pm-lbl"><span class="pm-wv"><i></i><i></i><i></i></span>Клиент слышит · EN · вашим голосом</span><span class="pm-txt">We train our campaign combos for months and reach rare segments.</span></div>
+            <div class="plo-mock-cop">${ic(I.spark)}Копилот: «Первые лиды — за 7–10 дней»</div>
+          </div>
+        </div>
       </div>
+    </div>
+    <div class="plo-stats glass card">
+      <div class="plo-stat"><b>~1,5 с</b><span>от вашей фразы до звука у клиента</span></div>
+      <div class="plo-stat"><b>4</b><span>языка перевода на выбор</span></div>
+      <div class="plo-stat"><b>100%</b><span>вашим голосом, а не роботом</span></div>
+      <div class="plo-stat"><b>0 ₽</b><span>для команды Lumen — уже в тарифе</span></div>
     </div>
     <div class="plo-feats">${feats.map(f => `<div class="plo-feat glass card"><span class="plo-feat-ic">${ic(f.ic)}</span><b>${esc(f.t)}</b><span>${esc(f.d)}</span></div>`).join('')}</div>
     <div class="plo-how glass card" id="ploHow">
       <div class="plo-how-hd">${ic(I.bolt, 2)}<span>Как это работает — за 3 шага</span></div>
       <div class="plo-steps">
         <div class="plo-step"><span class="plo-step-n">1</span><b>Скачали и открыли</b><span>Один клик. Приложение само настроит виртуальное аудио и подтянет ключи из Lumen.</span></div>
-        <div class="plo-step"><span class="plo-step-n">2</span><b>Позвонили клиенту</b><span>В любом мессенджере или Zoom. Говорите по-русски — клиент слышит вас на своём языке, вашим голосом.</span></div>
+        <div class="plo-step"><span class="plo-step-n">2</span><b>Позвонили клиенту</b><span>В Zoom или Google Meet выбрали Parlo микрофоном. Говорите по-русски — клиент слышит вас на своём языке, вашим голосом.</span></div>
         <div class="plo-step"><span class="plo-step-n">3</span><b>Закрыли — получили сводку</b><span>Итоги, следующие шаги и транскрипт сами лягут в карточку лида и Telegram.</span></div>
       </div>
+    </div>
+    <div class="plo-cschema glass card">
+      <div class="plo-cs-hd">${ic(I.phone, 2)}<span>Как подключить — за 20 секунд</span></div>
+      <div class="plo-cs-grid">
+        <div class="plo-cs-card">
+          <div class="plo-cs-plat">${ic(I.video || I.phone)}<b>Zoom</b></div>
+          <ol><li><span>1</span>Settings → <b>Audio</b></li><li><span>2</span>Microphone → выбрать <b>Parlo</b></li><li><span>3</span>Звоните — клиент слышит перевод</li></ol>
+        </div>
+        <div class="plo-cs-flow">
+          <span class="plo-cs-node">Ваш голос<small>RU</small></span>
+          <span class="plo-cs-arr">${ic(I.chev)}</span>
+          <span class="plo-cs-node mid">Parlo<small>вирт. микрофон</small></span>
+          <span class="plo-cs-arr">${ic(I.chev)}</span>
+          <span class="plo-cs-node">Клиент<small>EN · вашим голосом</small></span>
+        </div>
+        <div class="plo-cs-card">
+          <div class="plo-cs-plat">${ic(I.video || I.phone)}<b>Google Meet</b></div>
+          <ol><li><span>1</span>⋮ → <b>Настройки</b> → Аудио</li><li><span>2</span>Микрофон → выбрать <b>Parlo</b></li><li><span>3</span>Звоните — клиент слышит перевод</li></ol>
+        </div>
+      </div>
+      <div class="plo-cs-note">Обычные телефонные звонки и мессенджеры пока не поддерживаются — только видео-встречи Zoom и Google Meet на компьютере (Mac и Windows).</div>
     </div>
     <div class="plo-band glass card">
       <div><div class="plo-band-t">Звучите увереннее на любом языке</div><div class="plo-band-s">Бесплатно для команды Lumen · macOS и Windows</div></div>

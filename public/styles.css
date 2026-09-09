@@ -5082,7 +5082,7 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 }
 
 /* ═══════════════ Parlo — промо-страница переводчика звонков ═══════════════ */
-.plo-wrap { display: flex; flex-direction: column; gap: 16px; max-width: 1180px; margin: 0 auto; }
+.plo-wrap { display: flex; flex-direction: column; gap: 16px; max-width: 1280px; margin: 0 auto; }
 .plo-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1.35fr .9fr; gap: 24px; align-items: center; padding: 40px 44px; border-radius: 28px;
   background: radial-gradient(120% 130% at 92% -10%, color-mix(in srgb, #6B4BE6 22%, transparent), transparent 55%), linear-gradient(160deg, color-mix(in srgb, #3E74FF 8%, var(--card)), var(--card)); }
 .plo-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px; border-radius: 100px; font-size: 12px; font-weight: 650; color: #5C49E6; background: color-mix(in srgb, #5C49E6 11%, transparent); margin-bottom: 18px; }
@@ -5135,6 +5135,54 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .plo-dl-rows .plo-btn { justify-content: center; }
 .plo-dl-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 14px; }
 @media (max-width: 900px) { .plo-hero { grid-template-columns: 1fr; } .plo-hero-r { order: -1; } .plo-feats, .plo-steps { grid-template-columns: 1fr; } }
+/* ⭐ живой мок звонка в герое */
+.plo-mock { position: relative; width: 100%; max-width: 380px; border-radius: 20px; overflow: hidden; background: #0c1120; box-shadow: 0 26px 60px -24px rgba(20,20,60,.55), 0 0 0 1px rgba(255,255,255,.06) inset; }
+.plo-mock-top { display: flex; align-items: center; gap: 8px; padding: 9px 13px; background: #12172a; color: rgba(255,255,255,.7); font-size: 11.5px; font-weight: 600; }
+.plo-mdots { display: flex; gap: 5px; } .plo-mdots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.22); }
+.plo-mdots i:first-child { background: #FF5F57; } .plo-mdots i:nth-child(2) { background: #FEBC2E; } .plo-mdots i:nth-child(3) { background: #28C840; }
+.plo-mtitle { flex: 1; } .plo-mrec { display: inline-flex; align-items: center; gap: 5px; color: #ff9a9a; font-size: 10.5px; }
+.plo-mrec i { width: 7px; height: 7px; border-radius: 50%; background: #ff5b5b; animation: ploPulse 1.6s infinite; }
+.plo-mock-stage { position: relative; min-height: 300px; padding: 13px; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
+  background: radial-gradient(120% 80% at 72% 8%, rgba(94,73,230,.42), transparent 55%), radial-gradient(100% 80% at 18% 92%, rgba(62,116,255,.36), transparent 55%), linear-gradient(160deg, #1a2140, #0c1120); }
+.plo-mock-pill { position: absolute; top: 13px; left: 13px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 6px; border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 26px -10px rgba(8,14,38,.6); font-size: 12px; color: #14151a; }
+.plo-mock-pill .plo-appicon { border-radius: 7px; }
+.plo-mock-pill b { font-weight: 700; } .plo-mock-pill .pm-st { display: inline-flex; align-items: center; gap: 5px; color: #5C49E6; font-weight: 600; }
+.plo-mock-pill .pm-st i { width: 6px; height: 6px; border-radius: 50%; background: #5C49E6; animation: ploPulse 1.4s infinite; }
+.plo-mock-pill .pm-lng { background: #EEF0FF; color: #3E44C7; border-radius: 7px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
+.plo-mock-cap { background: rgba(10,14,26,.72); backdrop-filter: blur(8px); border-radius: 13px; padding: 11px 13px; }
+.plo-mock-cap .pm-lbl { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: .02em; color: #bfe0ff; margin-bottom: 5px; }
+.plo-mock-cap .pm-wv { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+.plo-mock-cap .pm-wv i { width: 2.5px; background: #7fd0ff; border-radius: 2px; }
+.plo-mock-cap .pm-wv i:nth-child(1) { height: 6px; animation: ploWv 1s infinite; } .plo-mock-cap .pm-wv i:nth-child(2) { height: 12px; animation: ploWv 1s infinite .15s; } .plo-mock-cap .pm-wv i:nth-child(3) { height: 8px; animation: ploWv 1s infinite .3s; }
+@keyframes ploWv { 50% { transform: scaleY(.4); } }
+.plo-mock-cap .pm-txt { font-size: 13px; line-height: 1.4; color: #fff; }
+.plo-mock-cop { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: linear-gradient(120deg, #3E74FF, #6B4BE6); color: #fff; border-radius: 11px; padding: 8px 12px; font-size: 12px; font-weight: 600; box-shadow: 0 12px 26px -12px rgba(94,73,230,.7); }
+.plo-mock-cop svg { width: 15px; height: 15px; }
+/* ⭐ статы */
+.plo-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 24px 26px; border-radius: 22px;
+  background: radial-gradient(120% 170% at 90% -20%, rgba(107,75,230,.85), transparent 55%), linear-gradient(120deg, #141a35, #0e1224); color: #fff; border: none; }
+.plo-stat { text-align: center; }
+.plo-stat b { display: block; font-family: 'Fraunces', serif; font-weight: 500; font-size: clamp(26px, 3vw, 38px); line-height: 1; background: linear-gradient(120deg, #a9c0ff, #d7b8ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.plo-stat span { display: block; font-size: 11.5px; color: rgba(255,255,255,.66); margin-top: 7px; line-height: 1.4; }
+/* ⭐ схема подключения */
+.plo-cschema { padding: 26px 28px; border-radius: 22px; }
+.plo-cs-hd { display: flex; align-items: center; gap: 9px; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 550; color: var(--navy-900); margin-bottom: 18px; }
+.plo-cs-hd svg { width: 20px; height: 20px; color: #5C49E6; }
+.plo-cs-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch; }
+.plo-cs-card { border: 1px solid var(--stroke); border-radius: 16px; padding: 16px 18px; background: var(--bg-2); }
+.plo-cs-plat { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; font-size: 15px; font-weight: 700; color: var(--navy-900); }
+.plo-cs-plat svg { width: 20px; height: 20px; color: #5C49E6; }
+.plo-cs-card ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.plo-cs-card li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.plo-cs-card li b { color: var(--navy-900); }
+.plo-cs-card li > span { flex: none; width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #5C49E6; background: color-mix(in srgb, #5C49E6 12%, transparent); }
+.plo-cs-flow { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.plo-cs-node { display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 12px; font-weight: 650; color: var(--navy-900); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 12px; padding: 8px 12px; min-width: 96px; }
+.plo-cs-node small { font-weight: 500; color: var(--ink-3); font-size: 10.5px; margin-top: 2px; }
+.plo-cs-node.mid { color: #5C49E6; border-color: color-mix(in srgb, #5C49E6 32%, var(--stroke)); }
+.plo-cs-arr { color: var(--ink-3); display: grid; place-items: center; transform: rotate(90deg); } .plo-cs-arr svg { width: 16px; height: 16px; }
+.plo-cs-note { margin-top: 16px; text-align: center; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+@media (max-width: 900px) { .plo-stats { grid-template-columns: repeat(2, 1fr); } .plo-cs-grid { grid-template-columns: 1fr; } .plo-cs-flow { flex-direction: row; flex-wrap: wrap; } .plo-cs-arr { transform: none; } .plo-mock { max-width: none; } }
 
 /* ⭐ Обзор: лёгкое появление виджетов (стаггер) + мягкий ховер-подъём карточки */
 @keyframes ovwIn { from { opacity: 0; transform: translateY(12px) scale(.99); } to { opacity: 1; transform: none; } }
