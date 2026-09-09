@@ -396,6 +396,799 @@
 ]
 },
 {
+"title": "Буллеты · 3D",
+"dir": "bullets-3d",
+"items": [
+{
+"slug": "bullets-3d-01",
+"label": "Круг",
+"cat": "checks",
+"kw": [
+"точка",
+"пункт",
+"круг",
+"список"
+],
+"key": "bullets-3d/01"
+},
+{
+"slug": "bullets-3d-02",
+"label": "Круг · акцент",
+"cat": "checks",
+"kw": [
+"акцент",
+"важно",
+"ключевое"
+],
+"key": "bullets-3d/02"
+},
+{
+"slug": "bullets-3d-03",
+"label": "Точка",
+"cat": "checks",
+"kw": [
+"точка",
+"пункт",
+"список",
+"буллет"
+],
+"key": "bullets-3d/03"
+},
+{
+"slug": "bullets-3d-04",
+"label": "Квадрат",
+"cat": "checks",
+"kw": [
+"пункт",
+"блок",
+"квадрат"
+],
+"key": "bullets-3d/04"
+},
+{
+"slug": "bullets-3d-05",
+"label": "Квадрат · акцент",
+"cat": "checks",
+"kw": [
+"акцент",
+"важно",
+"ключевое"
+],
+"key": "bullets-3d/05"
+},
+{
+"slug": "bullets-3d-06",
+"label": "Галочка",
+"cat": "checks",
+"kw": [
+"галка",
+"да",
+"готово",
+"преимущество"
+],
+"key": "bullets-3d/06"
+},
+{
+"slug": "bullets-3d-07",
+"label": "Галочка в круге",
+"cat": "checks",
+"kw": [
+"точка",
+"пункт",
+"круг",
+"список"
+],
+"key": "bullets-3d/07"
+},
+{
+"slug": "bullets-3d-08",
+"label": "Плюс",
+"cat": "checks",
+"kw": [
+"плюс",
+"добавить",
+"ещё",
+"бонус"
+],
+"key": "bullets-3d/08"
+},
+{
+"slug": "bullets-3d-09",
+"label": "Стрелка вправо",
+"cat": "accent",
+"kw": [
+"стрелка",
+"далее",
+"переход",
+"результат"
+],
+"key": "bullets-3d/09"
+},
+{
+"slug": "bullets-3d-10",
+"label": "Стрелка в круге",
+"cat": "accent",
+"kw": [
+"точка",
+"пункт",
+"круг",
+"список"
+],
+"key": "bullets-3d/10"
+},
+{
+"slug": "bullets-3d-11",
+"label": "Двойная стрелка",
+"cat": "accent",
+"kw": [
+"стрелка",
+"далее",
+"переход",
+"результат"
+],
+"key": "bullets-3d/11"
+},
+{
+"slug": "bullets-3d-12",
+"label": "Треугольник",
+"cat": "accent",
+"kw": [
+"старт",
+"play",
+"запуск",
+"процесс"
+],
+"key": "bullets-3d/12"
+},
+{
+"slug": "bullets-3d-13",
+"label": "Ромб",
+"cat": "accent",
+"kw": [
+"ценность",
+"акцент",
+"грань"
+],
+"key": "bullets-3d/13"
+},
+{
+"slug": "bullets-3d-14",
+"label": "Звезда",
+"cat": "accent",
+"kw": [
+"звезда",
+"топ",
+"лучшее",
+"рейтинг",
+"премиум"
+],
+"key": "bullets-3d/14"
+},
+{
+"slug": "bullets-3d-15",
+"label": "Сердце",
+"cat": "accent",
+"kw": [
+"забота",
+"комфорт",
+"любовь",
+"сервис"
+],
+"key": "bullets-3d/15"
+},
+{
+"slug": "bullets-3d-16",
+"label": "Огонь",
+"cat": "accent",
+"kw": [
+"тренд",
+"хит",
+"спрос",
+"горячо",
+"популярно"
+],
+"key": "bullets-3d/16"
+},
+{
+"slug": "bullets-3d-17",
+"label": "Лист",
+"cat": "accent",
+"kw": [
+"эко",
+"природа",
+"зелень",
+"парк",
+"воздух"
+],
+"key": "bullets-3d/17"
+},
+{
+"slug": "bullets-3d-18",
+"label": "Локация",
+"cat": "accent",
+"kw": [
+"локация",
+"адрес",
+"район",
+"где",
+"карта",
+"пляж",
+"центр"
+],
+"key": "bullets-3d/18"
+},
+{
+"slug": "bullets-3d-19",
+"label": "Часы",
+"cat": "accent",
+"kw": [
+"время",
+"срок",
+"сдача",
+"график",
+"этап"
+],
+"key": "bullets-3d/19"
+},
+{
+"slug": "bullets-3d-20",
+"label": "График",
+"cat": "accent",
+"kw": [
+"рост",
+"график",
+"доход",
+"инвестиции",
+"динамика"
+],
+"key": "bullets-3d/20"
+},
+{
+"slug": "bullets-3d-21",
+"label": "Пользователи",
+"cat": "accent",
+"kw": [
+"команда",
+"люди",
+"жильцы",
+"соседи"
+],
+"key": "bullets-3d/21"
+},
+{
+"slug": "bullets-3d-22",
+"label": "Корона",
+"cat": "accent",
+"kw": [
+"статус",
+"престиж",
+"элита",
+"vip",
+"люкс"
+],
+"key": "bullets-3d/22"
+},
+{
+"slug": "bullets-3d-23",
+"label": "Бриллиант",
+"cat": "accent",
+"kw": [
+"ценность",
+"инвестиции",
+"люкс",
+"капитал",
+"стоимость"
+],
+"key": "bullets-3d/23"
+},
+{
+"slug": "bullets-3d-24",
+"label": "Ракета",
+"cat": "accent",
+"kw": [
+"старт",
+"запуск",
+"начало",
+"рост",
+"продажи"
+],
+"key": "bullets-3d/24"
+},
+{
+"slug": "bullets-3d-25",
+"label": "Документ",
+"cat": "meta",
+"kw": [
+"документ",
+"договор",
+"условия",
+"детали",
+"план"
+],
+"key": "bullets-3d/25"
+},
+{
+"slug": "bullets-3d-26",
+"label": "Сообщение",
+"cat": "meta",
+"kw": [
+"связь",
+"чат",
+"контакт",
+"общение"
+],
+"key": "bullets-3d/26"
+},
+{
+"slug": "bullets-3d-27",
+"label": "Настройки",
+"cat": "meta",
+"kw": [
+"настройка",
+"сервис",
+"процесс",
+"управление"
+],
+"key": "bullets-3d/27"
+},
+{
+"slug": "bullets-3d-28",
+"label": "Солнце",
+"cat": "meta",
+"kw": [
+"климат",
+"тепло",
+"лето",
+"энергия",
+"день"
+],
+"key": "bullets-3d/28"
+},
+{
+"slug": "bullets-3d-29",
+"label": "Луна",
+"cat": "meta",
+"kw": [
+"ночь",
+"спокойствие",
+"отдых"
+],
+"key": "bullets-3d/29"
+},
+{
+"slug": "bullets-3d-30",
+"label": "Щит",
+"cat": "meta",
+"kw": [
+"защита",
+"гарантия",
+"безопасность",
+"надёжность",
+"застройщик"
+],
+"key": "bullets-3d/30"
+},
+{
+"slug": "bullets-3d-31",
+"label": "Молния",
+"cat": "meta",
+"kw": [
+"энергия",
+"скорость",
+"мощь"
+],
+"key": "bullets-3d/31"
+},
+{
+"slug": "bullets-3d-32",
+"label": "Бесконечность",
+"cat": "meta",
+"kw": [
+"навсегда",
+"безлимит",
+"вечность"
+],
+"key": "bullets-3d/32"
+}
+]
+},
+{
+"title": "Буллеты · Неон",
+"dir": "bullets-neon",
+"items": [
+{
+"slug": "bullets-neon-01",
+"label": "Чек",
+"cat": "checks",
+"kw": [
+"галка",
+"чек",
+"да",
+"готово",
+"преимущество",
+"плюс"
+],
+"key": "bullets-neon/01"
+},
+{
+"slug": "bullets-neon-02",
+"label": "Успех",
+"cat": "checks",
+"kw": [
+"успех",
+"готово",
+"выполнено",
+"да",
+"одобрено"
+],
+"key": "bullets-neon/02"
+},
+{
+"slug": "bullets-neon-03",
+"label": "Контур",
+"cat": "checks",
+"kw": [
+"галка",
+"контур",
+"да",
+"минимал"
+],
+"key": "bullets-neon/03"
+},
+{
+"slug": "bullets-neon-04",
+"label": "Премиум",
+"cat": "checks",
+"kw": [
+"премиум",
+"люкс",
+"галка",
+"важное"
+],
+"key": "bullets-neon/04"
+},
+{
+"slug": "bullets-neon-05",
+"label": "Стрелка",
+"cat": "checks",
+"kw": [
+"стрелка",
+"далее",
+"переход",
+"результат"
+],
+"key": "bullets-neon/05"
+},
+{
+"slug": "bullets-neon-06",
+"label": "Стрелка · акцент",
+"cat": "checks",
+"kw": [
+"акцент",
+"важно",
+"ключевое"
+],
+"key": "bullets-neon/06"
+},
+{
+"slug": "bullets-neon-07",
+"label": "Далее",
+"cat": "checks",
+"kw": [
+"далее",
+"шаг",
+"продолжение",
+"вперёд"
+],
+"key": "bullets-neon/07"
+},
+{
+"slug": "bullets-neon-08",
+"label": "Плюс",
+"cat": "checks",
+"kw": [
+"плюс",
+"добавить",
+"ещё",
+"бонус"
+],
+"key": "bullets-neon/08"
+},
+{
+"slug": "bullets-neon-09",
+"label": "Точка",
+"cat": "accent",
+"kw": [
+"точка",
+"пункт",
+"список",
+"буллет"
+],
+"key": "bullets-neon/09"
+},
+{
+"slug": "bullets-neon-10",
+"label": "Точка · контур",
+"cat": "accent",
+"kw": [
+"галка",
+"контур",
+"да",
+"минимал"
+],
+"key": "bullets-neon/10"
+},
+{
+"slug": "bullets-neon-11",
+"label": "Активный",
+"cat": "accent",
+"kw": [
+"активно",
+"включено",
+"да",
+"онлайн"
+],
+"key": "bullets-neon/11"
+},
+{
+"slug": "bullets-neon-12",
+"label": "Неактивный",
+"cat": "accent",
+"kw": [
+"активно",
+"включено",
+"да",
+"онлайн"
+],
+"key": "bullets-neon/12"
+},
+{
+"slug": "bullets-neon-13",
+"label": "Искра",
+"cat": "accent",
+"kw": [
+"новинка",
+"особенное",
+"вау",
+"акцент"
+],
+"key": "bullets-neon/13"
+},
+{
+"slug": "bullets-neon-14",
+"label": "Звезда",
+"cat": "accent",
+"kw": [
+"звезда",
+"топ",
+"лучшее",
+"рейтинг",
+"премиум"
+],
+"key": "bullets-neon/14"
+},
+{
+"slug": "bullets-neon-15",
+"label": "Сердце",
+"cat": "accent",
+"kw": [
+"забота",
+"комфорт",
+"любовь",
+"сервис"
+],
+"key": "bullets-neon/15"
+},
+{
+"slug": "bullets-neon-16",
+"label": "Огонь",
+"cat": "accent",
+"kw": [
+"тренд",
+"хит",
+"спрос",
+"горячо",
+"популярно"
+],
+"key": "bullets-neon/16"
+},
+{
+"slug": "bullets-neon-17",
+"label": "Лист",
+"cat": "accent",
+"kw": [
+"эко",
+"природа",
+"зелень",
+"парк",
+"воздух"
+],
+"key": "bullets-neon/17"
+},
+{
+"slug": "bullets-neon-18",
+"label": "Локация",
+"cat": "accent",
+"kw": [
+"локация",
+"адрес",
+"район",
+"где",
+"карта",
+"пляж",
+"центр"
+],
+"key": "bullets-neon/18"
+},
+{
+"slug": "bullets-neon-19",
+"label": "Время",
+"cat": "accent",
+"kw": [
+"время",
+"срок",
+"сдача",
+"этап"
+],
+"key": "bullets-neon/19"
+},
+{
+"slug": "bullets-neon-20",
+"label": "График",
+"cat": "accent",
+"kw": [
+"рост",
+"график",
+"доход",
+"инвестиции",
+"динамика"
+],
+"key": "bullets-neon/20"
+},
+{
+"slug": "bullets-neon-21",
+"label": "Люди",
+"cat": "accent",
+"kw": [
+"команда",
+"люди",
+"жильцы",
+"соседи"
+],
+"key": "bullets-neon/21"
+},
+{
+"slug": "bullets-neon-22",
+"label": "Образование",
+"cat": "accent",
+"kw": [
+"образование",
+"знания",
+"экспертиза",
+"обучение"
+],
+"key": "bullets-neon/22"
+},
+{
+"slug": "bullets-neon-23",
+"label": "Ценность",
+"cat": "accent",
+"kw": [
+"ценность",
+"инвестиции",
+"люкс",
+"капитал"
+],
+"key": "bullets-neon/23"
+},
+{
+"slug": "bullets-neon-24",
+"label": "Статус",
+"cat": "accent",
+"kw": [
+"статус"
+],
+"key": "bullets-neon/24"
+},
+{
+"slug": "bullets-neon-25",
+"label": "Документ",
+"cat": "meta",
+"kw": [
+"документ",
+"договор",
+"условия",
+"детали",
+"план"
+],
+"key": "bullets-neon/25"
+},
+{
+"slug": "bullets-neon-26",
+"label": "Сообщение",
+"cat": "meta",
+"kw": [
+"связь",
+"чат",
+"контакт",
+"общение"
+],
+"key": "bullets-neon/26"
+},
+{
+"slug": "bullets-neon-27",
+"label": "Настройки",
+"cat": "meta",
+"kw": [
+"настройка",
+"сервис",
+"процесс",
+"управление"
+],
+"key": "bullets-neon/27"
+},
+{
+"slug": "bullets-neon-28",
+"label": "Солнце",
+"cat": "meta",
+"kw": [
+"климат",
+"тепло",
+"лето",
+"энергия",
+"день"
+],
+"key": "bullets-neon/28"
+},
+{
+"slug": "bullets-neon-29",
+"label": "Луна",
+"cat": "meta",
+"kw": [
+"ночь",
+"спокойствие",
+"отдых"
+],
+"key": "bullets-neon/29"
+},
+{
+"slug": "bullets-neon-30",
+"label": "Защита",
+"cat": "meta",
+"kw": [
+"защита",
+"гарантия",
+"безопасность",
+"надёжность",
+"застройщик"
+],
+"key": "bullets-neon/30"
+},
+{
+"slug": "bullets-neon-31",
+"label": "Энергия",
+"cat": "meta",
+"kw": [
+"энергия",
+"скорость",
+"мощь"
+],
+"key": "bullets-neon/31"
+},
+{
+"slug": "bullets-neon-32",
+"label": "Бесконечность",
+"cat": "meta",
+"kw": [
+"навсегда",
+"безлимит",
+"вечность"
+],
+"key": "bullets-neon/32"
+}
+]
+},
+{
 "slug": "ios-icons",
 "title": "iOS · иконки",
 "items": [
