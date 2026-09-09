@@ -104,7 +104,7 @@
 /* поповер выделения (цвета) + узоры */
 .hlpop{display:flex;flex-direction:column;gap:9px}
 .hlrow{display:flex;gap:8px;flex-wrap:wrap;max-width:214px}
-.hlsw{width:30px;height:30px;border-radius:9px;border:2px solid #fff;box-shadow:0 0 0 1px #E1E8F4,0 3px 8px -3px rgba(6,17,38,.3);cursor:pointer;transition:transform .12s,box-shadow .12s}
+.hlsw{width:32px;height:32px;border-radius:10px;border:2px solid #fff;box-shadow:0 0 0 1px #E7ECF3,0 4px 10px -3px rgba(6,17,38,.28);cursor:pointer;transition:transform .13s cubic-bezier(.34,1.4,.5,1),box-shadow .13s}
 .hlsw:hover{transform:scale(1.13);box-shadow:0 0 0 1px var(--cb),0 6px 13px -3px rgba(6,17,38,.4)}
 .hloff{border:1.5px solid #E1E8F4;background:#fff;border-radius:9px;padding:9px;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit;color:#5E6470;transition:all .14s}
 .hloff:hover{border-color:#E0483D;color:#E0483D;background:#FDEEEC}
@@ -131,7 +131,9 @@
 .cnote{font-size:11.5px;color:#9aa1b2;margin-top:6px;line-height:1.5}
 .cslide-empty{color:#9aa1b2;font-size:13px;text-align:center;padding:30px 10px;line-height:1.6}
 /* поповер (шрифты) */
-.cpop{position:fixed;z-index:950;background:#fff;color:#0B1220;border-radius:14px;box-shadow:0 22px 60px rgba(6,17,38,.32);border:1px solid #E7ECF3;padding:9px;width:290px;max-width:calc(100vw - 24px);max-height:70vh;overflow:auto;font-family:Manrope,sans-serif;font-size:13.5px}
+.cpop{position:fixed;z-index:950;background:linear-gradient(180deg,#fff,#FAFBFE);color:#0B1220;border-radius:18px;box-shadow:0 28px 72px -22px rgba(6,17,38,.44),0 4px 14px -6px rgba(6,17,38,.12),inset 0 1px 0 rgba(255,255,255,.9);border:1px solid rgba(220,228,240,.9);padding:12px;width:296px;max-width:calc(100vw - 24px);max-height:72vh;overflow:auto;font-family:Manrope,sans-serif;font-size:13.5px;transform-origin:top center;animation:cpopIn .18s cubic-bezier(.34,1.4,.5,1) both}
+@keyframes cpopIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.cpop{animation:none}}
 .cpop .srch{width:100%;border:1.5px solid #E1E8F4;border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px}
 .cpop .srch:focus{border-color:var(--cb)}
 .cpop .cseg{margin-bottom:6px}
@@ -179,11 +181,12 @@ body.cpanel-on{padding-right:308px!important}
 .ctpl-cv .cv-h{font-size:15px;font-weight:600;line-height:1.05;color:#fff;letter-spacing:-.01em}
 .ctpl-cv .cv-brand{position:absolute;left:12px;top:11px;font-size:7.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;opacity:.55;color:#fff}
 .ctpl i{font-style:normal;font-size:11px;color:#2A3346;font-weight:600;padding:7px 10px;border-top:1px solid #EEF1F6;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cpop.cpop-ctx{background:rgba(11,20,38,.94);border:1px solid rgba(134,175,255,.18);box-shadow:0 24px 64px rgba(6,17,38,.6);padding:6px;width:auto;min-width:206px;backdrop-filter:blur(18px)}
-.cctx{display:flex;flex-direction:column;gap:1px}
-.cctx button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:none;background:none;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;color:#DCE6FF;cursor:pointer;font-family:'Manrope',sans-serif;transition:background .12s,color .12s}
+.cpop.cpop-ctx{background:linear-gradient(180deg,rgba(19,28,50,.96),rgba(11,18,34,.97));border:1px solid rgba(134,175,255,.22);box-shadow:0 28px 70px -18px rgba(4,9,22,.7),inset 0 1px 0 rgba(255,255,255,.08);padding:7px;width:auto;min-width:214px;backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);border-radius:16px}
+.cctx{display:flex;flex-direction:column;gap:2px}
+.cctx button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;background:none;padding:10px 13px;border-radius:11px;font-size:13px;font-weight:600;color:#E4ECFF;cursor:pointer;font-family:'Manrope',sans-serif;transition:background .14s,color .14s,transform .1s}
+.cctx button:active{transform:scale(.98)}
 .cctx button svg{width:16px;height:16px;flex:0 0 16px;opacity:.92}
-.cctx button:hover{background:rgba(37,99,235,.92);color:#fff}
+.cctx button:hover{background:linear-gradient(180deg,rgba(59,120,255,.95),rgba(37,99,235,.95));color:#fff;box-shadow:0 6px 16px -8px rgba(37,99,235,.7)}
 .cctx button.dng{color:#FF9E93}
 .cctx button.dng:hover{background:#E0483D;color:#fff}
 .cctx-sep{height:1px;background:rgba(134,175,255,.16);margin:4px 6px}
@@ -555,7 +558,7 @@ body.cpanel-on{padding-right:308px!important}
         if (!ensureSel()) return; const rc = b.getBoundingClientRect();
         const sw = HL.map(([k, c, ex]) => `<span class="hlsw" data-hl="${k}" style="background:${c};${ex || ''}"></span>`).join('');
         const pp = openPop(`<div class="hlpop"><div class="hlrow">${sw}</div><button class="hloff" data-hl="off">Снять выделение</button></div>`, rc.left - 96, rc.bottom + 8);
-        pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-hl]'); if (!x) return; ev.preventDefault(); markSel(x.dataset.hl, host); closePop(); save(false); });
+        pp.addEventListener('mousedown', (ev) => { const x = ev.target.closest('[data-hl]'); if (!x) return; ev.preventDefault(); markSel(x.dataset.hl, host); save(false); /* НЕ закрываем — можно применять к разным выделениям без переоткрытия */ });
         return;   /* иначе падение в closePop() ниже мгновенно закрывало палитру (3-я кнопка «не работала») */
       }
       else if (a === 'sdown' || a === 'sup') {
