@@ -784,12 +784,12 @@ body.cpanel-on{padding-right:308px!important}
     return `<button class="cpl" data-pl="${l.k}"><div class="cpl-cv">${cells}</div><i>${esc(l.name)}</i></button>`;
   }
   /* фото уже на слайде: фон + img-слои (не стикеры) */
-  function slidePhotos(i) { const arr = serialize(); const s = arr[i]; if (!s) return []; const u = []; if (s.bg) u.push(s.bg); (s.layers || []).forEach(l => { if (l.t === 'img' && !l.sticker && l.url) u.push(l.url); }); return u; }
+  function slidePhotos(i) { const arr = serialize(); const s = arr[i]; if (!s) return []; const u = []; if (s.bg) u.push(s.bg); (s.layers || []).forEach(l => { if (l.t === 'img' && !l.sticker && !l.avatar && l.url) u.push(l.url); }); return u; }   /* аватар НЕ фото раскладки */
   /* разложить данные url'ы по боксам раскладки (цикл, если url меньше боксов) */
   function applyPhotoLayoutTo(i, L, urls) {
     const arr = serialize(); const sl = arr[i]; if (!sl || !urls.length) return;
     sl.bg = ''; sl.bgv = '';
-    sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker));   /* стикеры оставляем */
+    sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker && !l.avatar));   /* стикеры И аватары оставляем */
     let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
     /* pl:1 → фото ложится ПОДЛОЖКОЙ (ниже текста), не перекрывая заголовок/тезисы; текст получает скрим */
     L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', pl: 1, z }); });
@@ -1078,8 +1078,8 @@ body.cpanel-on{padding-right:308px!important}
       $('#cBkCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cBkCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cBkGrid', pp).innerHTML = grid(+b.dataset.c); });
       pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-bk]'); if (!b) return; closePop(); setPmark('img:' + b.dataset.bk); flash('Маркер-иконка применён ✓'); });
     }); }
-    { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const pts = r.points || []; const marks = autoBulletMarks(pts); if (!marks) { flash('Нет тезисов'); return; } setPmarks(marks); flash('Разные маркеры по смыслу ✓', 1300); }); }
-    { const nb = $('#cPmNum', body); if (nb) nb.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const pts = r.points || []; if (!pts.length) { flash('Нет тезисов'); return; } setPmarks(numberMarks(pts)); flash('Нумерация 1·2·3 ✓', 1300); }); }
+    { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { const pts = (serialize()[i] || {}).points || []; const marks = autoBulletMarks(pts); if (!marks) { flash('Нет тезисов'); return; } setPmarks(marks); flash('Разные маркеры по смыслу ✓', 1300); }); }   /* берём ЖИВЫЕ тезисы (не устаревший rich) */
+    { const nb = $('#cPmNum', body); if (nb) nb.addEventListener('click', () => { const pts = (serialize()[i] || {}).points || []; if (!pts.length) { flash('Нет тезисов'); return; } setPmarks(numberMarks(pts)); flash('Нумерация 1·2·3 ✓', 1300); }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;

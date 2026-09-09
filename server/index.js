@@ -846,8 +846,8 @@ function renderCarLayers(layers, isEdit) {
   /* светлый текст на фото → мягкая тень для читаемости поверх «занятых» кадров (пальмы, блики) */
   const isLightHex = (h) => { const x = String(h || '').replace('#', ''); if (x.length < 3) return false; const s2 = x.length <= 4 ? x.split('').slice(0, 3).map(ch => ch + ch).join('') : x.slice(0, 6); const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 155; };
   return layers.map((l, i) => {
-    const isPl = l.t === 'img' && l.pl && !l.sticker;               /* фото-подложка раскладки → НИЖЕ текста */
-    const z = isPl ? (-20 + (l.z || 0)) : (10 + (l.z || 0));         /* отрицательный z: над фоном слайда, под скримом(0)/текстом(1) */
+    const isPl = l.t === 'img' && l.pl && !l.sticker;               /* фото-подложка раскладки → НИЖЕ текста, но НАД фоном слайда */
+    const z = isPl ? (2 + Math.min(l.z || 0, 5)) : (10 + (l.z || 0)); /* pl: малый ПОЛОЖИТЕЛЬНЫЙ z (2-7) над фоном, под скримом(8)/текстом(9); клампится, не всплывёт к тексту */
     const de = isEdit ? ` data-lyr="${i}"${lj(l)}` : '';
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
     const hasH = l.h != null && l.h > 0;
@@ -5665,7 +5665,7 @@ body{font-family:var(--body);background:${theme.dark ? '#0B0D14' : '#EEF1F5'};co
 .slide{position:relative;aspect-ratio:${dims.ar};border-radius:20px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper));background-size:cover;background-position:center;box-shadow:0 20px 50px -18px rgba(0,0,0,.4);display:flex;container-type:inline-size}
 .slide.hasbg{color:#fff}
 /* ⭐ авто-читабельность: позиционно-зависимый скрим под текстом на фото (белый шрифт не растворяется) */
-.slide.hasbg::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,20,.14),rgba(6,10,20,.02) 36%,rgba(6,10,20,.10) 60%,rgba(6,10,20,.66))}
+.slide.hasbg::before{content:'';position:absolute;inset:0;z-index:8;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,20,.14),rgba(6,10,20,.02) 36%,rgba(6,10,20,.10) 60%,rgba(6,10,20,.66))}
 .slide.hasbg.pos-top::before{background:linear-gradient(180deg,rgba(6,10,20,.66),rgba(6,10,20,.14) 44%,rgba(6,10,20,0) 74%)}
 .slide.hasbg.pos-center::before{background:radial-gradient(130% 92% at 50% 50%,rgba(6,10,20,.54),rgba(6,10,20,.16) 64%,rgba(6,10,20,.04))}
 .slide.hasbg.lay-panel::before,.slide.hasbg.lay-split::before,.slide.hasbg.lay-immersive::before,.slide.hasbg.lay-cinematic::before,.slide.hasbg.sc-heavy::before,.slide.hasbg:has(.s-bgv)::before{display:none}
@@ -5683,7 +5683,7 @@ body{font-family:var(--body);background:${theme.dark ? '#0B0D14' : '#EEF1F5'};co
 ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;width:1080px;gap:0;margin:0}.slide{width:1080px!important;height:${c.format === 'story' ? 1920 : c.format === 'square' ? 1080 : 1350}px!important;aspect-ratio:auto!important;border-radius:0!important;box-shadow:none!important}` : ''}
 .s-bgv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .s-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.62));z-index:0}
-.slide .s-in{position:relative;z-index:1}
+.slide .s-in{position:relative;z-index:9}
 .slide.sc-heavy::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,22,.52),rgba(8,12,22,.74));z-index:0}
 /* ═══ СЕМЕЙСТВА РАСКЛАДКИ (арт-дирекшн) ═══ */
 /* data-hero: одно крупное число доминирует */
@@ -6000,7 +6000,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=55"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=56"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
