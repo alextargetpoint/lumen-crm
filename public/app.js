@@ -5969,7 +5969,7 @@ async function shLaunch(main) {
       <div class="sh-launch-opts">
         <select id="lcDensity" title="Сколько текста на слайде"><option value="medium">Текст: средне</option><option value="rich">Текст: подробно</option><option value="brief">Текст: кратко</option></select>
         <select id="lcPhotos" title="Плотность фото"><option value="">Фото: по углу</option><option value="high">Фото: больше</option><option value="low">Фото: меньше</option></select>
-        <select id="lcStk" title="Смысловые стикеры на слайдах"><option value="1">Стикеры: вкл</option><option value="0">Стикеры: выкл</option></select>
+        <select id="lcStk" title="Смысловые стикеры на слайдах"><option value="0">Стикеры: выкл</option><option value="1">Стикеры: вкл</option></select>
         <select id="lcTone" title="Тон подачи"><option value="">Тон: авто</option><option value="expert">Тон: экспертный</option><option value="warm">Тон: тёплый</option><option value="bold">Тон: дерзкий</option></select>
         <select id="lcGenPhotos" title="Догенерировать качественные фото ИИ, если со страницы мало (~$0.05/кадр)"><option value="1">ИИ-фото: вкл</option><option value="0">ИИ-фото: выкл</option></select>
       </div>

@@ -3013,7 +3013,7 @@ const server = http.createServer(async (req, res) => {
       const NN = Math.max(4, Math.min(10, +b.count || 0)) || 0;
       if (NN) slides = trimToCount(slides, NN);
       slides = stylePass(slides, PAGE_THEMES[b.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо мастер-вижн planCarousel/artDirect (тир-джамп «постеры») */
-      if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });
+      if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle });   /* ⟲ авто-стикеры теперь ОПТ-ИН (были кривые: SOLD/Dubai/Notes), 2-дн-давности их не было */
       const c = {
         id: crypto.randomBytes(5).toString('hex'), title, template: b.template || 'project',
         format: CAR_FORMATS.has(b.format) ? b.format : 'square', theme: b.theme || 'klein',
@@ -3342,7 +3342,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (N) slides = trimToCount(slides, N);                    /* ужать до заданного числа слайдов */
         slides = stylePass(slides, PAGE_THEMES[c.theme] || {});   /* ⟲ откат: классический стиль-пасс вместо tier-jump planCarousel */
-        if (b.stickers !== false) slides = attachSemanticStickers(slides, { angle: b.angle });   /* уместный стикер по смыслу слайда */
+        if (b.stickers === true) slides = attachSemanticStickers(slides, { angle: b.angle });   /* ⟲ авто-стикеры опт-ин */
         c.slides = slides.slice(0, 12).map(s => sanSlide(s));
         if (out.title) c.title = String(out.title).slice(0, 120);
         store.save();
