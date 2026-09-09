@@ -103,6 +103,7 @@ const DEFAULT_PASS = 'lumen2026';
     instant: { hotView: true, qualified: true, aiOff: true, deal: true },
     lastDaily: 0, lastWeekly: 0, lastMonthly: 0,
   };
+  if (!db.settings.reports.shareKey) db.settings.reports.shareKey = crypto.randomBytes(10).toString('hex');   /* read-only ключ публичной страницы отчёта */
   if (!db.settings.channels) db.settings.channels = {
     priority: ['wa', 'tg', 'viber', 'email'],
     enabled: { wa: true, tg: false, viber: false, email: false },
@@ -622,6 +623,52 @@ function analytics(db) {
    c.blocks = [{id, t, v, hidden, data}] — источник правды композиции страницы.
    Старые подборки (без blocks) синтезируются из legacy c.custom на лету. */
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+/* ⭐ A4-страница отчёта (клиентская ссылка + печать→PDF): рендерит текст engine.buildReport красивыми блоками */
+function renderReportDoc(db, period, opts = {}) {
+  const text = engine.buildReport(db, period);
+  const pName = { daily: 'Ежедневная сводка', weekly: 'Еженедельный отчёт', monthly: 'Месячный отчёт' }[period] || 'Отчёт';
+  const now = new Date();
+  const body = text.split('\n').map(ln => {
+    const s = ln.trim();
+    if (!s) return '<div class="sp"></div>';
+    if (s.startsWith('📊')) return '';
+    if (s.startsWith('•')) return `<div class="li">${esc(s.slice(1).trim())}</div>`;
+    if (/^(Топ связок|Динамика)/.test(s)) return `<div class="sec">${esc(s)}</div>`;
+    if (s.startsWith('Открыть CRM')) return '';
+    const mm = s.match(/^([^:]+):\s*(.+)$/);
+    if (mm && !/→/.test(s)) return `<div class="mrow"><span class="mk">${esc(mm[1])}</span><span class="mv">${esc(mm[2])}</span></div>`;
+    return `<div class="pln">${esc(s)}</div>`;
+  }).join('');
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(db.settings.agency.name)} — ${pName}</title>
+<style>
+:root{--ink:#16130E;--mut:#5C554A;--accent:#2F6BFF;--line:#E7ECF3}
+*{box-sizing:border-box;margin:0}body{background:#EEF1F6;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--ink);padding:28px 16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep{max-width:720px;margin:0 auto;background:#fff;border-radius:20px;box-shadow:0 24px 60px -28px rgba(16,30,60,.35);overflow:hidden}
+.rhd{padding:30px 40px 24px;background:linear-gradient(135deg,#0e1630,#1b2a52);color:#fff}
+.rag{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+.rti{font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-.01em}
+.rdt{font-size:13px;opacity:.72;margin-top:6px}
+.rbody{padding:26px 40px 30px}
+.mrow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mk{font-size:14px;color:var(--mut)}.mv{font-size:17px;font-weight:700;text-align:right}
+.sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:20px 0 6px}
+.li{font-size:14px;padding:7px 0 7px 16px;position:relative;color:var(--ink);border-bottom:1px dashed var(--line)}
+.li:before{content:'';position:absolute;left:2px;top:13px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.pln{font-size:14px;color:var(--mut);padding:6px 0}
+.sp{height:10px}
+.rfoot{padding:16px 40px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);text-align:center}
+.prbtn{position:fixed;right:20px;bottom:20px;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 12px 28px -10px rgba(47,107,255,.6)}
+@media print{body{background:#fff;padding:0}.rep{box-shadow:none;border-radius:0;max-width:none}.prbtn{display:none}}
+</style></head><body>
+<div class="rep">
+  <div class="rhd"><div class="rag">${esc(db.settings.agency.name)}</div><div class="rti">${pName} по лидогенерации</div><div class="rdt">${now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+  <div class="rbody">${body}</div>
+  <div class="rfoot">Сформировано в Lumen CRM</div>
+</div>
+${opts.print ? '<script>window.onload=()=>window.print()<\/script>' : '<button class="prbtn" onclick="window.print()">Скачать PDF</button>'}
+</body></html>`;
+}
 
 const PB_TYPES = {
   cover: { name: 'Обложка', variants: ['blue', 'photo', 'light', 'split'], std: true },
@@ -4252,6 +4299,17 @@ ${SCR}
       const canEdit = u.searchParams.get('key') === db.settings.hooks.secret;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(renderMpDoc(db, mp, { canEdit, key: canEdit ? db.settings.hooks.secret : '', print: u.searchParams.get('print') === '1' }));
+      return;
+    }
+
+    /* публичная страница отчёта (read-only): /report?period=weekly&key= · &print=1 → авто-печать (PDF) */
+    if (p === '/report' && req.method === 'GET') {
+      const period = ['daily', 'weekly', 'monthly'].includes(u.searchParams.get('period')) ? u.searchParams.get('period') : 'weekly';
+      const rk = db.settings.reports && db.settings.reports.shareKey;
+      const ok = getSession(req) || (rk && u.searchParams.get('key') === rk);
+      if (!ok) { res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h1>Нет доступа к отчёту</h1>'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(renderReportDoc(db, period, { print: u.searchParams.get('print') === '1' }));
       return;
     }
 

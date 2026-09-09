@@ -4634,6 +4634,16 @@ PAGES.automations = async (root) => {
               <input id="repChat" value="${esc((s.reports || {}).tgChatId || '')}" placeholder="например 123456789"></div>
             <button class="btn btn-sm" id="repSave">Сохранить</button>
             <button class="btn btn-sm" id="repTest">${ic(I.send)}Тест-сводка</button>
+            <div class="rep-share" style="width:100%;margin-top:12px;border-top:1px solid var(--stroke);padding-top:12px">
+              <label style="font-size:12px;color:var(--ink-3);font-weight:600;display:block;margin-bottom:6px">Ссылка на отчёт для клиента (read-only) + PDF</label>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+                <select id="repPeriod" class="sh-sel" style="min-width:150px"><option value="weekly">Неделя</option><option value="daily">День</option><option value="monthly">Месяц</option></select>
+                <button class="btn btn-sm" id="repLink">${ic(I.link || I.copy)}Скопировать ссылку</button>
+                <button class="btn btn-sm" id="repOpen">${ic(I.doc)}Открыть</button>
+                <button class="btn btn-sm btn-accent" id="repPdf">${ic(I.doc)}Скачать PDF</button>
+              </div>
+              <div class="muted" style="font-size:11px;margin-top:7px">Живой отчёт по текущему периоду в формате агентства (лиды/расход/CPL/связки/динамика). PDF — через печать браузера.</div>
+            </div>
           </div>
         </div>
         <div class="glass card mb" data-ag="reports">
@@ -4734,6 +4744,11 @@ PAGES.automations = async (root) => {
     const r = await api.post('/reports/test');
     modal({ title: 'Тестовая сводка', sub: r.sent === 'tg' ? 'Отправлена в Telegram' : 'Telegram не подключён — вот как она выглядит:', body: `<pre style="white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:var(--bg);border-radius:10px;padding:14px">${esc(r.text)}</pre>`, wide: true });
   });
+  /* ⭐ ссылка на отчёт + PDF */
+  { const repUrl = () => { const k = (STATE.settings.reports || {}).shareKey || ''; const per = ($('#repPeriod') || {}).value || 'weekly'; return `${location.origin}/report?period=${per}&key=${k}`; };
+    $('#repLink') && $('#repLink').addEventListener('click', () => { navigator.clipboard.writeText(repUrl()); toast('Ссылка на отчёт скопирована', 'Клиент откроет read-only отчёт', true); });
+    $('#repOpen') && $('#repOpen').addEventListener('click', () => window.open(repUrl(), '_blank'));
+    $('#repPdf') && $('#repPdf').addEventListener('click', () => window.open(repUrl() + '&print=1', '_blank')); }
   $$('[data-chmv]', root).forEach(b => b.addEventListener('click', () => {
     const row = b.closest('.ch-prio');
     const sib = +b.dataset.chmv < 0 ? row.previousElementSibling : row.nextElementSibling;
