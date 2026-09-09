@@ -230,7 +230,7 @@ body.cpanel-on{padding-right:308px!important}
   const persistUI = () => { try { sessionStorage.setItem(UIKEY, JSON.stringify({ tab, sel })); } catch (_) {} };
   try { const st = JSON.parse(sessionStorage.getItem(UIKEY) || '{}'); if (st.tab === 'slide' || st.tab === 'design') tab = st.tab; if (Number.isInteger(st.sel) && st.sel >= 0) sel = st.sel; } catch (_) {}
 
-  $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); e.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== e && qbar && qbar._mode === 'text' && !(pop && pop.contains(document.activeElement))) hideQbar(); }, 140); }); });
+  $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
 
   /* очистка вставки — только текст */
   document.addEventListener('paste', (e) => { const t = e.target.closest && e.target.closest('[data-ce]'); if (!t) return; e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt); });
@@ -275,7 +275,7 @@ body.cpanel-on{padding-right:308px!important}
     } catch (e) { location.reload(); }
   }
   function rewireLive() {
-    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); e.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== e && qbar && qbar._mode === 'text' && !(pop && pop.contains(document.activeElement))) hideQbar(); }, 140); }); });
+    $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); showTextQbar(e); }); e.addEventListener('mouseup', () => { if (qbar && qbar._mode === 'text' && qbar._t === e) posQbar(selRect(e)); }); });
     const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
     renderBody();
@@ -531,9 +531,14 @@ body.cpanel-on{padding-right:308px!important}
       else if (a === 'lrepl') { pickFile('image/*', async (f) => { flash('Загружаю…', 0); try { const url = await uploadAsset(f); updL(lyr, { url }); const im = lyr.querySelector('img'); if (im) im.src = url; dirty = true; save(false); flash('Фото заменено ✓'); } catch (er) { flash('Ошибка: ' + er.message); } }); }
     }
   }
-  addEventListener('scroll', hideQbar, true);
-  addEventListener('resize', hideQbar);
+  /* НЕ прячем тулбар при скролле (фокус на поле сам скроллит страницу → тулбар мигал и пропадал
+     навсегда). Вместо этого переанкориваемся к цели. Прячем только по Esc или клику мимо. */
+  function repositionQbar() { if (!qbar || !qbar.classList.contains('on') || !qbar._t) return; const t = qbar._t; if (!document.body.contains(t)) { hideQbar(); return; } posQbar(qbar._mode === 'text' ? selRect(t) : t.getBoundingClientRect()); }
+  let _rqT = null;
+  addEventListener('scroll', () => { if (_rqT) return; _rqT = requestAnimationFrame(() => { _rqT = null; repositionQbar(); }); }, true);
+  addEventListener('resize', repositionQbar);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideQbar(); });
+  document.addEventListener('mousedown', (e) => { if (!qbar || !qbar.classList.contains('on')) return; if (e.target.closest('.cqt,.cpop,[data-ce],.s-lyr,.s-frame,.slide')) return; hideQbar(); });
 
   /* ---------- рендер тела панели ---------- */
   function renderBody() {
@@ -564,14 +569,6 @@ body.cpanel-on{padding-right:308px!important}
     return `
     ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>
     <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><select class="cinp" id="cHlStyle" style="margin-top:6px"><option value="marker">Стиль: маркер (графика)</option><option value="solid">Стиль: заливка</option><option value="ring">Стиль: обводка</option></select><div class="cnote">ИИ подсветит ключевые слова во всех заголовках. Маркер — как подсветка хайлайтером.</div></div>` : ''}
-    <div class="cgrp"><label>Пересобрать — меняем только незалоченное</label>
-      <div class="cbtn-row"><button class="cwbtn" data-regen="direction">✦ Новое направление</button></div>
-      <div class="cbtn-row"><button class="cwbtn" data-regen="colors">Другие цвета</button><button class="cwbtn" data-regen="typography">Другой шрифт</button></div>
-      <div class="cbtn-row"><button class="cwbtn" data-regen="layout">Другая раскладка</button>${P.llm ? '<button class="cwbtn" data-regen="copy">Другой текст</button>' : ''}</div>
-      <div class="cbtn-row"><button class="cwbtn" data-regen="photos">Другие фото</button></div>
-      <div style="display:flex;flex-wrap:wrap;gap:9px;margin-top:8px;font-size:11.5px;opacity:.9">${[['copy', 'Текст'], ['images', 'Фото'], ['typography', 'Шрифт'], ['palette', 'Цвет'], ['layout', 'Раскладка']].map(([k, n]) => `<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none"><input type="checkbox" data-lock="${k}" style="accent-color:#2563EB;width:14px;height:14px">🔒 ${n}</label>`).join('')}</div>
-      <div class="cnote">Доволен фото — залочь «Фото» и меняй дизайн. «Новое направление» меняет цвет+шрифт+раскладку разом.</div>
-    </div>
     <div class="cgrp"><label>Готовые шаблоны</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
