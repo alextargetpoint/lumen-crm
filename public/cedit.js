@@ -198,29 +198,39 @@
 .cpl-cv b{position:absolute;background:linear-gradient(135deg,#A9BEE0,#CBD9EF);box-shadow:inset 0 0 0 1px rgba(255,255,255,.7)}
 .cpl i{font-style:normal;font-size:10px;font-weight:600;color:#5E6470;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* библиотека раскладок слайда (Gamma-стиль) */
-.clay-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
-.clay{border:1.5px solid #E1E8F4;border-radius:11px;cursor:pointer;padding:6px;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s;display:flex;flex-direction:column;gap:5px;min-width:0;font-family:inherit}
+.clay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:8px}
+.clay{border:1.5px solid #E1E8F4;border-radius:12px;cursor:pointer;padding:7px;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s;display:flex;flex-direction:column;gap:6px;min-width:0;font-family:inherit}
 .clay:hover{border-color:var(--cb);transform:translateY(-2px);box-shadow:0 10px 20px -10px rgba(37,99,235,.45)}
 .clay.on{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
-.clay-cv{position:relative;aspect-ratio:4/5;border-radius:7px;overflow:hidden;background:linear-gradient(160deg,#EEF2FA,#E1E8F4);padding:9px;display:flex}
-.clay i{font-style:normal;font-size:10px;font-weight:600;color:#5E6470;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.clm{position:relative;width:100%;height:100%;display:flex;flex-direction:column;gap:4px;justify-content:flex-end}
+.clay-cv{position:relative;aspect-ratio:1.5/1;border-radius:8px;overflow:hidden;background:#F3F6FC;border:1px solid #E7ECF5;display:flex}
+.clay i{font-style:normal;font-size:11px;font-weight:650;color:#3A4353;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* мини-макеты раскладок: заголовок=акцент, текст=серые строки, фото=градиент с иконкой */
+.clm{position:relative;width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+.clm.pad{padding:9px 10px;gap:5px}
 .clm.ctr{justify-content:center;align-items:center;text-align:center}
-.clm.dark{margin:-9px;padding:9px;border-radius:7px;background:linear-gradient(160deg,#2A3346,#141a26)}
-.clm b{display:block;background:#93A6CC;border-radius:2px;height:3px}
-.clm .h{height:5px;background:#6E86B8}
-.clm.dark b{background:rgba(255,255,255,.62)}.clm.dark .h{background:rgba(255,255,255,.82)}
-.clm .big{height:auto;font-size:27px;font-weight:800;color:var(--cb);line-height:.85;background:none;border-radius:0;letter-spacing:-.03em}
-.clm.dark .big{color:#fff}
-.clm.grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:4px;justify-content:stretch}
-.clm.grid u{background:rgba(147,166,204,.45);border-radius:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.65)}
-.clm .cd{display:block;height:11px;background:rgba(147,166,204,.32);border:1px solid rgba(147,166,204,.6);border-radius:5px;flex:none}
-.clm.split{gap:0;margin:-9px;padding:0;border-radius:7px;overflow:hidden}
-.clm.split .ph{flex:1;background:linear-gradient(135deg,#A9BEE0,#CBD9EF)}
-.clm.split .pn{background:#fff;padding:6px 7px 7px;display:flex;flex-direction:column;gap:3px;border-top:2px solid var(--cb)}
-.clm.panel{margin:-9px;padding:0;border-radius:7px;overflow:hidden;background:linear-gradient(135deg,#A9BEE0,#CBD9EF);justify-content:flex-end}
-.clm.panel .pb{background:#141a26;padding:8px 8px 9px;display:flex;flex-direction:column;gap:3px}
-.clm.panel .pb .h{background:rgba(255,255,255,.85)}.clm.panel .pb b{background:rgba(255,255,255,.5)}
+.lm-hd{display:block;height:5px;border-radius:2px;background:var(--cb)}
+.lm-l{display:block;height:3px;border-radius:2px;background:#AEB9CC}
+.lm-gap{height:2px}
+.lm-b{display:flex;align-items:center;gap:5px}
+.lm-b em{width:5px;height:5px;border-radius:50%;background:var(--cb);flex:none}
+.lm-card{display:block;height:12px;border-radius:5px;background:#fff;border:1px solid #D4DEEC;box-shadow:0 1px 2px rgba(20,40,80,.05)}
+.lm-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:5px;width:100%;height:100%}
+.lm-grid u{background:#fff;border:1px solid #D4DEEC;border-radius:5px}
+.lm-bh{display:block;height:9px;border-radius:3px;background:var(--cb);margin:0 auto}
+.lm-num{font-size:30px;font-weight:800;color:var(--cb);line-height:.8;letter-spacing:-.03em}
+/* фото-раскладки */
+.lm-ph{position:absolute;inset:0;background:linear-gradient(135deg,#8FA9D6,#B9CCEA);display:grid;place-items:center;color:rgba(255,255,255,.72)}
+.lm-ph svg{width:22px;height:22px}
+.lm-scrim{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(10,16,30,.68))}
+.clm.phfill{padding:0}
+.lm-cap{position:relative;z-index:2;margin-top:auto;padding:9px 10px;display:flex;flex-direction:column;gap:4px;width:100%}
+.lm-cap.ctr{margin:auto;align-items:center}
+.lm-cap .lm-hd{background:#fff}.lm-cap .lm-l{background:rgba(255,255,255,.8)}
+.clm.split{padding:0;gap:0}
+.clm.split .lm-ph{position:relative;flex:1;inset:auto}
+.lm-panel{background:#fff;padding:7px 9px 8px;display:flex;flex-direction:column;gap:4px;border-top:2px solid var(--cb)}
+.lm-block{position:relative;z-index:2;margin-top:auto;background:#141a26;padding:8px 10px 9px;display:flex;flex-direction:column;gap:4px}
+.lm-block .lm-hd{background:#fff}.lm-block .lm-l{background:rgba(255,255,255,.55)}
 .clay-hero{margin-top:10px;border-top:1px dashed #E1E8F4;padding-top:9px}
 .clay-hero>label{font-size:11px;font-weight:700;color:#5E6470}
 .clay-hero-row{display:flex;gap:7px}
@@ -856,17 +866,20 @@ body.cpanel-on{padding-right:308px!important}
     { k: 'panel',     name: 'Постер-блок',   hint: 'Фото + резкий тёмный блок с контентом', mini: 'panel' },
   ];
   function layMini(m) {
-    const L = (w, o) => `<b style="width:${w}%${o != null ? ';opacity:' + o : ''}"></b>`;
+    const tx = (w, o) => `<b class="lm-l" style="width:${w}%${o != null ? ';opacity:' + o : ''}"></b>`;
+    const hd = (w) => `<b class="lm-hd" style="width:${w}%"></b>`;
+    const bul = (w) => `<span class="lm-b"><em></em><b class="lm-l" style="width:${w}%"></b></span>`;
+    const ph = `<span class="lm-ph"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="7.5" cy="8" r="2"/><path d="M2.5 19l6-6.5 3.5 3 4.5-5.5L21.5 19z"/></svg></span>`;
     switch (m) {
-      case 't3':    return `<div class="clm tl"><b class="h" style="width:70%"></b>${L(54, .65)}${L(46, .5)}${L(38, .42)}</div>`;
-      case 'cards': return `<div class="clm tl"><b class="h" style="width:58%;margin-bottom:2px"></b><span class="cd"></span><span class="cd"></span></div>`;
-      case 'grid':  return `<div class="clm grid"><u></u><u></u><u></u><u></u></div>`;
-      case 'big':   return `<div class="clm ctr"><b class="h" style="width:90%;height:9px"></b><b class="h" style="width:70%;height:9px"></b><b class="h" style="width:48%;height:9px"></b></div>`;
-      case 'num':   return `<div class="clm ctr"><b class="big">%</b>${L(42, .6)}</div>`;
-      case 'imm':   return `<div class="clm ctr dark"><b class="h" style="width:66%;margin:0 auto"></b>${L(40, .55)}</div>`;
-      case 'cine':  return `<div class="clm bl dark"><b class="h" style="width:64%"></b>${L(40, .55)}</div>`;
-      case 'split': return `<div class="clm split"><span class="ph"></span><span class="pn"><b class="h" style="width:62%"></b>${L(40, .6)}</span></div>`;
-      case 'panel': return `<div class="clm panel"><span class="pb"><b class="h" style="width:56%"></b>${L(42, .55)}</span></div>`;
+      case 't3':    return `<div class="clm pad">${hd(66)}<span class="lm-gap"></span>${bul(58)}${bul(48)}${bul(38)}</div>`;
+      case 'cards': return `<div class="clm pad">${hd(56)}<span class="lm-card"></span><span class="lm-card"></span></div>`;
+      case 'grid':  return `<div class="clm pad"><span class="lm-grid"><u></u><u></u><u></u><u></u></span></div>`;
+      case 'big':   return `<div class="clm pad ctr"><b class="lm-bh" style="width:92%"></b><b class="lm-bh" style="width:64%"></b>${tx(46, .55)}</div>`;
+      case 'num':   return `<div class="clm pad ctr"><b class="lm-num">%</b>${tx(46, .55)}</div>`;
+      case 'imm':   return `<div class="clm phfill">${ph}<span class="lm-scrim"></span><span class="lm-cap ctr">${hd(64)}</span></div>`;
+      case 'cine':  return `<div class="clm phfill">${ph}<span class="lm-scrim"></span><span class="lm-cap">${hd(58)}${tx(40, .8)}</span></div>`;
+      case 'split': return `<div class="clm split">${ph}<span class="lm-panel">${hd(60)}${tx(42, .6)}</span></div>`;
+      case 'panel': return `<div class="clm phfill">${ph}<span class="lm-block">${hd(52)}${tx(40, .6)}</span></div>`;
       default: return '';
     }
   }
