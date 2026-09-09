@@ -4004,6 +4004,14 @@ html[data-night] {
   box-shadow:0 16px 38px -16px rgba(11,30,69,.55); transition:transform .16s var(--ease-soft), box-shadow .16s var(--ease-soft); }
 .ovx-hero::after { content:''; position:absolute; inset:0; background:radial-gradient(120% 90% at 88% -10%, rgba(110,155,255,.28), transparent 55%); pointer-events:none; }
 .ovx-hero:hover { transform:translateY(-1px); box-shadow:0 22px 48px -18px rgba(11,30,69,.62); }
+/* ⟲ спокойный навюшный фон вместо видео-«вихря»: прячем небулу (у карточки уже ровный навюшный градиент),
+   добавляем ОДИН мягкий медленно-дрейфующий блик — атмосфера без суматохи. */
+.ovx-hero .ovm-poster, .ovx-hero .ovm-vid { display:none !important; }
+.ovx-hero::before { content:''; position:absolute; inset:-28%; z-index:0; pointer-events:none;
+  background:radial-gradient(44% 56% at 26% 36%, rgba(104,150,238,.18), transparent 72%);
+  filter:blur(30px); animation:ovxDrift 34s ease-in-out infinite alternate; }
+@keyframes ovxDrift { from { transform:translate3d(-6%,-4%,0) scale(1.05); } to { transform:translate3d(8%,6%,0) scale(1.16); } }
+@media (prefers-reduced-motion:reduce){ .ovx-hero::before { animation:none; } }
 .ovx-hero-top { display:flex; align-items:center; gap:10px; position:relative; z-index:1; }
 .ovx-hero-lbl { font-size:12.5px; font-weight:500; color:rgba(224,235,255,.82); }
 .ovx-hero-num { font-size:44px; font-weight:700; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums; position:relative; z-index:1; }
