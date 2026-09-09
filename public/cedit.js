@@ -27,6 +27,32 @@
   const CAT = { serif: 'С засечками', sans: 'Гротеск', display: 'Акцидентные', hand: 'Рукописные' };
   /* комбо-пары заголовок+тело (bodyKey '' = Manrope). Ключи существуют в FONT_LIB. */
   const FONT_COMBOS = [['fraunces', '', 'Мягкий люкс'], ['playfair', 'inter', 'Глянец'], ['bricolage', '', 'Дизайн-студия'], ['instrument', '', 'Минимал'], ['spacegro', 'inter', 'Модерн'], ['cormorant', 'montser', 'Высокая мода'], ['unbounded', '', 'Смелый'], ['oswald', 'robotocond', 'Спорт'], ['ptserif', '', 'Редакция'], ['manrope', '', 'Чистый гротеск']];
+  /* ⭐ КАТАЛОГ ПРЕСЕТОВ СТИЛЯ (один клик = тема+пара шрифтов+стиль заголовка+подложка+маркер+счётчик+футер).
+     Единый источник — применяется ко ВСЕЙ карусели через существующий PATCH. group для вкладок. */
+  const CAR_PRESETS = [
+    // Люкс
+    { k: 'soft', g: 'Люкс', name: 'Мягкий люкс', theme: 'champagne', font: 'fraunces', body: '', tstyle: 'plain', card: '', pmark: 'index', counter: 'frac', footer: 'plain' },
+    { k: 'gloss', g: 'Люкс', name: 'Глянец', theme: 'klein', font: 'playfair', body: 'inter', tstyle: 'plain', card: '', pmark: 'line', counter: 'num', footer: 'serif' },
+    { k: 'couture', g: 'Люкс', name: 'Высокая мода', theme: 'bordeaux', font: 'cormorant', body: 'montser', tstyle: 'italic', card: '', pmark: 'line', counter: 'roman', footer: 'serif' },
+    { k: 'gold', g: 'Люкс', name: 'Золото', theme: 'goldlux', font: 'cormorant', body: 'montser', tstyle: 'gold', card: 'glass', pmark: 'diamond', counter: 'roman', footer: 'serif' },
+    { k: 'pearl', g: 'Люкс', name: 'Жемчуг', theme: 'mocha', font: 'fraunces', body: '', tstyle: 'plain', card: 'glass', pmark: 'dot', counter: 'frac', footer: 'line' },
+    // Тёмные
+    { k: 'noir', g: 'Тёмные', name: 'Нуар', theme: 'noir', font: 'playfair', body: 'inter', tstyle: 'plain', card: '', pmark: 'line', counter: 'roman', footer: 'serif' },
+    { k: 'netflix', g: 'Тёмные', name: 'Кино', theme: 'netflix', font: 'oswald', body: 'robotocond', tstyle: 'block', card: 'solid', pmark: 'arrow', counter: 'num', footer: 'pill' },
+    { k: 'matrix', g: 'Тёмные', name: 'Матрица', theme: 'matrix', font: 'spacegro', body: 'firacode', tstyle: 'glow', card: '', pmark: 'chip', counter: 'num', footer: 'line' },
+    { k: 'batman', g: 'Тёмные', name: 'Тёмный рыцарь', theme: 'batman', font: 'oswald', body: 'robotocond', tstyle: 'caps', card: 'solid', pmark: 'arrow', counter: 'num', footer: 'pill' },
+    { k: 'midnight', g: 'Тёмные', name: 'Полночь', theme: 'midnight', font: 'instrument', body: 'inter', tstyle: 'glass', card: 'glass', pmark: 'line', counter: 'roman', footer: 'line' },
+    // Модерн
+    { k: 'glass', g: 'Модерн', name: 'Стекло', theme: 'slate', font: 'bricolage', body: '', tstyle: 'glass', card: 'glass', pmark: 'chip', counter: 'dot', footer: 'pill' },
+    { k: 'modern', g: 'Модерн', name: 'Модерн', theme: 'slate', font: 'spacegro', body: 'inter', tstyle: 'plain', card: '', pmark: 'line', counter: 'num', footer: 'plain' },
+    { k: 'studio', g: 'Модерн', name: 'Дизайн-студия', theme: 'royal', font: 'bricolage', body: 'manrope', tstyle: 'pill', card: 'glass', pmark: 'dot', counter: 'dot', footer: 'pill' },
+    { k: 'minimal', g: 'Модерн', name: 'Минимал', theme: 'klein', font: 'instrument', body: 'manrope', tstyle: 'plain', card: '', pmark: 'dash', counter: 'off', footer: 'plain' },
+    // Живые
+    { k: 'eco', g: 'Живые', name: 'Природа', theme: 'sage', font: 'fraunces', body: 'manrope', tstyle: 'plain', card: 'glass', pmark: 'check', counter: 'frac', footer: 'line' },
+    { k: 'terra', g: 'Живые', name: 'Терракота', theme: 'terracotta', font: 'playfair', body: 'manrope', tstyle: 'plain', card: '', pmark: 'index', counter: 'num', footer: 'plain' },
+    { k: 'bold', g: 'Живые', name: 'Смелый', theme: 'klein', font: 'unbounded', body: 'manrope', tstyle: 'huge', card: '', pmark: 'chip', counter: 'num', footer: 'pill' },
+    { k: 'emerald', g: 'Живые', name: 'Изумруд', theme: 'emerald', font: 'playfair', body: 'inter', tstyle: 'plain', card: 'glass', pmark: 'diamond', counter: 'frac', footer: 'serif' },
+  ];
   /* палитра выделения текста (несколько цветов) — ключ hl-*, цвет свотча */
   const HL = [['cobalt', '#2563EB'], ['gold', '#E8B84B'], ['mint', '#34C79A'], ['rose', '#F2748F'], ['lav', '#9B8CFF'], ['sky', '#4FB6F2'], ['ink', '#0B0B0F'], ['under', 'linear-gradient(180deg,transparent 62%,#2563EB55 62%)'], ['mark', 'linear-gradient(102deg,#2563EB55,#2563EB88)', 'border-radius:5px 10px 6px 9px'], ['markg', 'linear-gradient(102deg,#E8B84B66,#E8B84Baa)', 'border-radius:6px 9px 5px 10px'], ['ring', 'transparent', 'box-shadow:inset 0 0 0 2px #2563EB;border-radius:50%']];
   /* узоры-фоны (превью для свотчей — нейтральный акцент) */
@@ -98,6 +124,16 @@
 .cfcombo .cfc-t{display:flex;flex-direction:column;min-width:0}
 .cfcombo .cfc-t b{font-size:12.5px;font-weight:700;color:#2A3346;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cfcombo .cfc-t i{font-style:normal;font-size:10px;color:#9aa1b2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* каталог пресетов стиля */
+.cpreset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:8px}
+.cpreset{border:1.5px solid #E7ECF3;border-radius:13px;cursor:pointer;overflow:hidden;padding:0;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s;display:flex;flex-direction:column;min-width:0}
+.cpreset:hover{border-color:var(--cb);transform:translateY(-2px);box-shadow:0 12px 24px -12px rgba(37,99,235,.5)}
+.cpreset.on{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
+.cpreset-cv{position:relative;aspect-ratio:4/5;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;padding:11px 11px 12px;overflow:hidden}
+.cpreset-cv .pv-eye{font-size:7.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.92}
+.cpreset-cv .pv-h{font-size:15px;font-weight:600;line-height:1.06;letter-spacing:-.01em}
+.cpreset-cv .pv-badge{position:absolute;top:9px;right:9px;font-size:7px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.22);color:#fff;backdrop-filter:blur(4px)}
+.cpreset i{font-style:normal;font-size:11px;font-weight:600;color:#2A3346;padding:7px 9px;border-top:1px solid #EEF1F6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fff}
 .cfmtbar{display:flex;gap:6px}
 .cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
 .cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
@@ -607,6 +643,17 @@ body.cpanel-on{padding-right:308px!important}
     if (!sl) { body.innerHTML = `<div class="cslide-empty">Кликните по слайду в макете,<br>чтобы редактировать его</div>`; return; }
     body.innerHTML = slideHtml(sl); wireSlide(body, sel);
   }
+  const PRESET_GROUPS = [...new Set(CAR_PRESETS.map(p => p.g))];
+  const TS_BADGE = { glass: 'Стекло', pill: 'Пилюля', block: 'Плашка', gold: 'Золото', glow: 'Свечение', huge: 'Крупно', caps: 'Капс', italic: 'Курсив' };
+  function presetTile(p) {
+    const th = (P.themes || {})[p.theme] || { blue: '#2563EB', body: '#0A1833' };
+    const ff = ((P.fonts || {})[p.font] || {}).fam || 'serif';
+    const dark = isDark(th.body); const txt = dark ? '#fff' : '#132446';
+    const bg = `linear-gradient(155deg,color-mix(in srgb,${th.blue} 26%,${th.body}),${th.body})`;
+    const on = (P.theme === p.theme && P.font === p.font && (P.bodyFont || '') === (p.body || '')) ? ' on' : '';
+    const badge = TS_BADGE[p.tstyle] || (p.card === 'glass' ? 'Стекло' : '');
+    return `<button class="cpreset${on}" data-preset="${p.k}"><div class="cpreset-cv" style="background:${bg}">${badge ? `<span class="pv-badge">${badge}</span>` : ''}<span class="pv-eye" style="color:${dark ? th.blue : th.blue}">Старт продаж</span><span class="pv-h" style="font-family:${ff};color:${txt}">Новый проект у моря</span></div><i>${esc(p.name)}</i></button>`;
+  }
   function tplTile(tpl) {
     const th = (P.themes || {})[tpl.theme] || { blue: '#2563EB', body: '#0A1833' };
     const ff = ((P.fonts || {})[tpl.font] || {}).fam || 'serif';
@@ -628,7 +675,12 @@ body.cpanel-on{padding-right:308px!important}
     return `
     ${P.llm ? `<div class="cgrp"><button class="cwbtn wide caibtn" id="cAiCompose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/></svg> Оформить с ИИ по ссылке</button><div class="cnote">Вставьте ссылку на объект — ИИ вытянет инфо и фото, разложит по слайдам и соберёт слайд-галерею.</div></div>
     <div class="cgrp"><label>ИИ-выделение главного</label><div class="cbtn-row"><button class="cwbtn" id="cHl1">Один цвет</button><button class="cwbtn" id="cHl2">Два цвета</button></div><select class="cinp" id="cHlStyle" style="margin-top:6px"><option value="marker">Стиль: маркер (графика)</option><option value="solid">Стиль: заливка</option><option value="ring">Стиль: обводка</option></select><div class="cnote">ИИ подсветит ключевые слова во всех заголовках. Маркер — как подсветка хайлайтером.</div></div>` : ''}
-    <div class="cgrp"><label>Готовые шаблоны</label>
+    <div class="cgrp"><label>Пресеты стиля — один клик</label>
+      <div class="cseg ctpl-cats" id="cPresetCats">${PRESET_GROUPS.map((g, i) => `<button data-pg="${i}" class="${i === 0 ? 'on' : ''}">${g}</button>`).join('')}</div>
+      <div class="cpreset-grid" id="cPresetGrid">${CAR_PRESETS.filter(p => p.g === PRESET_GROUPS[0]).map(presetTile).join('')}</div>
+      <div class="cnote">Тема + пара шрифтов + стиль заголовка + подложка + маркер + счётчик + футер — сразу на всю карусель.</div>
+    </div>
+    <div class="cgrp"><label>Готовые шаблоны слайдов</label>
       <div class="cseg ctpl-cats" id="cTplCats">${cats.map((c, i) => `<button data-cat="${c}" class="${i === 0 ? 'on' : ''}">${c}</button>`).join('')}</div>
       <div class="ctpl-grid" id="cTplGrid">${(P.templates[cats[0]] || []).map(tplTile).join('')}</div>
       <div class="cnote">Один клик — тема, шрифт, узор и стиль текста применятся ко всем слайдам.</div>
@@ -686,6 +738,12 @@ body.cpanel-on{padding-right:308px!important}
       });
     });
     /* готовые шаблоны: категории + применение ко всем слайдам */
+    /* ⭐ каталог пресетов стиля: категории + применение ко всей карусели одним кликом */
+    { const pc = $('#cPresetCats', body), pg = $('#cPresetGrid', body);
+      if (pc && pg) {
+        pc.addEventListener('click', (e) => { const b = e.target.closest('[data-pg]'); if (!b) return; $$('#cPresetCats button', body).forEach(x => x.classList.toggle('on', x === b)); pg.innerHTML = CAR_PRESETS.filter(p => p.g === PRESET_GROUPS[+b.dataset.pg]).map(presetTile).join(''); });
+        pg.addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (!b) return; const p = CAR_PRESETS.find(x => x.k === b.dataset.preset); if (!p) return; flash('Применяю пресет «' + p.name + '»…', 0); const arr = serialize().map(s => Object.assign({}, s, { tstyle: p.tstyle || '', card: p.card || '', pmark: (s.points && s.points.length) ? p.pmark : (s.pmark || 'index'), bgpat: '' })); save('hard', { theme: p.theme, font: p.font, bodyFont: p.body || '', counter: p.counter, footer: Object.assign({}, P.footer || {}, { style: p.footer }), slides: arr }); });
+      } }
     const grid = $('#cTplGrid', body);
     $('#cTplCats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cTplCats button', body).forEach(x => x.classList.toggle('on', x === b)); grid.innerHTML = ((P.templates || {})[b.dataset.cat] || []).map(tplTile).join(''); });
     grid.addEventListener('click', (e) => { const t = e.target.closest('[data-tpl]'); if (!t) return; let tpl = {}; try { tpl = JSON.parse(t.dataset.tpl); } catch (_) { return; } const arr = serialize().map(s => Object.assign({}, s, { bgpat: tpl.bgpat || '', tstyle: tpl.tstyle || '' })); flash('Применяю шаблон…', 0); save('hard', { theme: tpl.theme, font: tpl.font, slides: arr }); });
