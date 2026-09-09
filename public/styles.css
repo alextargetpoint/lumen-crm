@@ -2853,7 +2853,8 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 .ov2-lib-add svg { width: 13px; height: 13px; }
 .ov2-lib-i:hover .ov2-lib-add { opacity: 1; }
 .ov2-lib-prev { position: relative; height: 176px; overflow: hidden; background: var(--bg-2); pointer-events: none; padding: 12px; }
-.ov2-lib-prev-in { zoom: .82; padding: 13px; box-shadow: none; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+/* виджет верстается на фикс.ширине «десктопа» и масштабируется вниз → контент (напр. цепочка касаний ●—●—●) НЕ обрезается по ширине */
+.ov2-lib-prev-in { width: 340px; transform: scale(.8); transform-origin: top left; padding: 14px; box-shadow: none; -webkit-mask-image: linear-gradient(#000 76%, transparent); mask-image: linear-gradient(#000 76%, transparent); }
 .ov2-lib-reset { display: block; margin: 14px auto 0; font-size: 12px; font-weight: 600; color: var(--ink-3); background: none; padding: 8px 14px; border: 1px solid var(--stroke); border-radius: 8px; }
 .ov2-lib-reset:hover { border-color: var(--bad); color: var(--bad); }
 @media (max-width: 640px) { .ov2-lib { grid-template-columns: 1fr; } }
