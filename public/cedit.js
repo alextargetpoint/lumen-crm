@@ -275,6 +275,7 @@ body.cpanel-on{padding-right:308px!important}
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', card: sl.dataset.card || '', layers,
         mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
         noNum: !!sl.dataset.nonum, noBrand: !!sl.dataset.nobrand,
+        free: sl.dataset.free === '1', tx: +sl.dataset.tx || 0, ty: +sl.dataset.ty || 0, tscale: +sl.dataset.tscale || 1,
       };
     });
   }
@@ -301,6 +302,7 @@ body.cpanel-on{padding-right:308px!important}
     const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1);
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === sel));
     renderBody();
+    mountFree();
   }
   async function save(reload, extra) {
     flash('Сохраняю…', 0);
@@ -337,6 +339,7 @@ body.cpanel-on{padding-right:308px!important}
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === i));
     if (switchTab) { tab = 'slide'; $$('.cpanel-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === 'slide')); }
     if (tab === 'slide') renderBody();
+    mountFree();
     persistUI();
   }
   /* быстрые действия слайда (ховер-панель + правый клик): edit/photo/dup/up/down/del/insert */
@@ -389,6 +392,31 @@ body.cpanel-on{padding-right:308px!important}
 
   /* ---------- слои: выбор / перетаскивание / размер / порядок / удаление ---------- */
   function selLayer(lyr) { $$('.s-lyr.lsel,.s-frame.lsel').forEach(x => x.classList.remove('lsel')); if (lyr) { lyr.classList.add('lsel'); showLayerQbar(lyr); } else hideQbar(); }
+  /* монтируем ручки перетаскивания/масштаба на текст-блок выбранного «свободного» слайда */
+  function mountFree() {
+    $$('.s-in.s-inedit').forEach(x => { x.classList.remove('s-inedit'); x.querySelectorAll('.s-inmv,.s-inrs').forEach(h => h.remove()); });
+    const sl = slideEl(sel); if (!sl || sl.dataset.free !== '1') return;
+    const sin = sl.querySelector('.s-in'); if (!sin) return;
+    sin.classList.add('s-inedit');
+    if (!sin.querySelector('.s-inmv')) sin.insertAdjacentHTML('beforeend', '<div class="s-inmv" title="Двигать"></div><div class="s-inrs" title="Размер"></div>');
+  }
+  document.addEventListener('pointerdown', (e) => {
+    const mv = e.target.closest('.s-inmv'), rs = e.target.closest('.s-inrs');
+    if (!mv && !rs) return;
+    e.preventDefault(); e.stopPropagation();
+    const sin = (mv || rs).closest('.s-in'), slide = sin.closest('.slide'), sr = slide.getBoundingClientRect();
+    if (mv) {
+      const sx = e.clientX, sy = e.clientY, ox = +slide.dataset.tx || 10, oy = +slide.dataset.ty || 16;
+      const move = (ev) => { const nx = Math.max(-5, Math.min(90, ox + (ev.clientX - sx) / sr.width * 100)); const ny = Math.max(-5, Math.min(92, oy + (ev.clientY - sy) / sr.height * 100)); slide.dataset.tx = nx.toFixed(1); slide.dataset.ty = ny.toFixed(1); sin.style.left = nx + '%'; sin.style.top = ny + '%'; };
+      const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); dirty = true; save(false); };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    } else {
+      const sx = e.clientX, os = +slide.dataset.tscale || 1, w0 = sin.offsetWidth || 220;
+      const move = (ev) => { const ns = Math.max(0.5, Math.min(1.9, os + (ev.clientX - sx) / w0)); slide.dataset.tscale = ns.toFixed(2); sin.style.setProperty('--tsc', ns.toFixed(2)); };
+      const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); dirty = true; save(false); };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    }
+  });
   function updL(lyr, patch) { let o = {}; try { o = JSON.parse(lyr.getAttribute('data-l')) || {}; } catch (e) {} Object.assign(o, patch); lyr.setAttribute('data-l', JSON.stringify(o)); return o; }
   document.addEventListener('pointerdown', (e) => {
     const tb = e.target.closest('.lyr-tools button');
@@ -712,6 +740,7 @@ body.cpanel-on{padding-right:308px!important}
       </div>
       <div id="cBgExtra"></div>
     </div>
+    <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -798,6 +827,8 @@ body.cpanel-on{padding-right:308px!important}
     /* послайдный тоггл счётчика/футера */
     const toggleSvc = (btnId, dataKey) => { const bt = $('#' + btnId, body); if (!bt) return; bt.addEventListener('click', () => { const sl = slideEl(i); const hidden = !!sl.dataset[dataKey]; if (hidden) delete sl.dataset[dataKey]; else sl.dataset[dataKey] = '1'; bt.classList.toggle('on', hidden); dirty = true; save(true, { slides: serialize() }); }); };
     toggleSvc('cNoNum', 'nonum'); toggleSvc('cNoBrand', 'nobrand');
+    /* свободное размещение текст-блока (двигать/масштабировать) */
+    { const fr = $('#cFree', body); if (fr) fr.addEventListener('click', () => { const sl = slideEl(i); const on = sl.dataset.free !== '1'; if (on) { sl.dataset.free = '1'; if (!sl.dataset.tx) sl.dataset.tx = '10'; if (!sl.dataset.ty) sl.dataset.ty = '16'; if (!sl.dataset.tscale) sl.dataset.tscale = '1'; } else { delete sl.dataset.free; } fr.classList.toggle('on', on); dirty = true; save(true, { slides: serialize() }); }); }
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
