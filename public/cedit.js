@@ -234,6 +234,15 @@ body.cpanel-on{padding-right:308px!important}
 .cpi{display:flex;gap:8px;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;cursor:pointer;font-weight:600;font-size:13px;background:#EEF3FF;color:#2563EB;margin-top:4px}
 .cpi:hover{background:#e0eaff}
 .cpop.cpop-el{width:340px;max-width:calc(100vw - 20px)}
+/* ⭐ по-строчные маркеры */
+.cpop.cpop-pml{width:390px;max-width:calc(100vw - 20px)}
+.cpml-list{display:flex;flex-direction:column;gap:7px;margin-top:8px;max-height:360px;overflow:auto}
+.cpml-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border:1.5px solid #E7ECF3;border-radius:11px;background:#fff}
+.cpml-cur{flex:0 0 22px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--cb);font-weight:800}
+.cpml-tx{flex:1;font-size:12px;color:#2A3346;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpml-opts{display:flex;gap:3px;flex:0 0 auto}
+.cpml-opts button{width:26px;height:26px;border:1px solid #E1E8F4;background:#F7F9FE;border-radius:7px;cursor:pointer;font-size:13px;color:#2A3346;display:flex;align-items:center;justify-content:center;padding:0}
+.cpml-opts button:hover{border-color:var(--cb);background:#EEF3FF}
 .celem-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:8px;max-height:320px;overflow:auto}
 .celem{aspect-ratio:1;border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#2A3346;padding:8px}
 .celem:hover{border-color:#2563EB;background:#EEF3FF;color:#2563EB}
@@ -1026,7 +1035,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const marksOn = Array.isArray(r.pmarks) && r.pmarks.length; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; const isImg = /^img:/.test(pm); return `<div class="cgrp"><label>Маркер буллетов ${marksOn ? '<span style="color:var(--cb);font-weight:700">· по-строчно</span>' : ''}</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${!marksOn && pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cbtn-row" style="margin-top:8px"><button class="cwbtn ${isImg && !marksOn ? 'on' : ''}" id="cPmImg">${isImg && !marksOn ? `<img src="/assets/stickers/${pm.slice(4)}.png" style="width:18px;height:18px;object-fit:contain">` : '🖼'} Иконка-буллет</button><button class="cwbtn ${marksOn ? 'on' : ''}" id="cPmAuto">✦ Авто по смыслу</button><button class="cwbtn" id="cPmNum">① 1·2·3</button></div><div class="cnote">Кнопки/иконка — ОДИН маркер на все строки. «Авто по смыслу» и «1·2·3» ставят <b>разные</b> маркеры на каждую строку.</div></div>`; })()}
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const marksOn = Array.isArray(r.pmarks) && r.pmarks.length; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; const isImg = /^img:/.test(pm); return `<div class="cgrp"><label>Маркер буллетов ${marksOn ? '<span style="color:var(--cb);font-weight:700">· по-строчно</span>' : ''}</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${!marksOn && pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cbtn-row" style="margin-top:8px"><button class="cwbtn ${isImg && !marksOn ? 'on' : ''}" id="cPmImg">${isImg && !marksOn ? `<img src="/assets/stickers/${pm.slice(4)}.png" style="width:18px;height:18px;object-fit:contain">` : '🖼'} Иконка-буллет</button><button class="cwbtn ${marksOn ? 'on' : ''}" id="cPmAuto">✦ Авто по смыслу</button><button class="cwbtn" id="cPmNum">① 1·2·3</button><button class="cwbtn" id="cPmLines">✎ По строкам</button></div><div class="cnote">Кнопки/иконка — ОДИН маркер на все строки. «Авто по смыслу» и «1·2·3» — <b>разные</b> маркеры автоматически. «По строкам» — выбрать маркер каждой строке вручную.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Подложка текста</label><div class="cseg" id="cCard">${[['', 'Нет'], ['glass', 'Стекло'], ['solid', 'Плашка']].map(([v, n]) => `<button data-card="${v}" class="${(sl.dataset.card || '') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Матовое стекло или плотная плашка под всем текстом — читается на любом фото.</div></div>
     <div class="cgrp"><label>Служебное на этом слайде</label>
@@ -1080,6 +1089,33 @@ body.cpanel-on{padding-right:308px!important}
     }); }
     { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { const pts = (serialize()[i] || {}).points || []; const marks = autoBulletMarks(pts); if (!marks) { flash('Нет тезисов'); return; } setPmarks(marks); flash('Разные маркеры по смыслу ✓', 1300); }); }   /* берём ЖИВЫЕ тезисы (не устаревший rich) */
     { const nb = $('#cPmNum', body); if (nb) nb.addEventListener('click', () => { const pts = (serialize()[i] || {}).points || []; if (!pts.length) { flash('Нет тезисов'); return; } setPmarks(numberMarks(pts)); flash('Нумерация 1·2·3 ✓', 1300); }); }
+    /* ⭐ ручные ПО-СТРОЧНЫЕ маркеры: попап со списком тезисов, у каждого свой пикер (глифы + иконка-буллет) */
+    { const lb = $('#cPmLines', body); if (lb) lb.addEventListener('click', (e) => {
+      let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {}
+      const pts = (serialize()[i] || {}).points || []; if (!pts.length) { flash('Нет тезисов'); return; }
+      const GL = [['dot', '•'], ['check', '✓'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['diamond', '◆'], ['star', '★'], ['plus', '+'], ['num', '№']];
+      let cur = (Array.isArray(r.pmarks) && r.pmarks.length) ? r.pmarks.slice(0, pts.length) : pts.map(() => r.pmark || 'dot');
+      while (cur.length < pts.length) cur.push('dot');
+      const imgThumb = (m) => /^img:/.test(m) ? `<img src="/assets/stickers/${m.slice(4)}.png" style="width:16px;height:16px;object-fit:contain">` : (GL.find(g => g[0] === m) || ['', m])[1];
+      const rowHtml = (pt, k) => `<div class="cpml-row" data-row="${k}"><span class="cpml-cur">${imgThumb(cur[k])}</span><span class="cpml-tx">${esc(String(pt).replace(/<[^>]*>/g, '').slice(0, 40))}</span><span class="cpml-opts">${GL.map(([v, g]) => `<button data-lm="${v}" title="${v}">${g}</button>`).join('')}<button data-lmimg="1" title="Иконка">🖼</button></span></div>`;
+      const pp = openPop(`<div class="csec" style="padding-top:2px">Маркер каждой строки</div><div class="cpml-list">${pts.map((pt, k) => rowHtml(pt, k)).join('')}</div>`, e.clientX - 300, e.clientY);
+      pp.classList.add('cpop-pml');
+      const commit = () => setPmarks(cur.slice(0, pts.length));
+      pp.addEventListener('click', (ev) => {
+        const row = ev.target.closest('.cpml-row'); if (!row) return; const k = +row.dataset.row;
+        const g = ev.target.closest('[data-lm]'); const im = ev.target.closest('[data-lmimg]');
+        if (g) { cur[k] = g.dataset.lm; row.querySelector('.cpml-cur').innerHTML = imgThumb(cur[k]); commit(); return; }
+        if (im) {
+          const packs = (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir));
+          const keys = packs.map(p => p.title);
+          const grid = (ci) => (packs[ci].items || []).map(it => `<button class="celem" data-lbk="${esc(it.key)}" title="${esc(it.label || '')}"><img src="/assets/stickers/${it.key}.png" style="width:100%;height:100%;object-fit:contain"></button>`).join('');
+          const pp2 = openPop(`<div class="csec" style="padding-top:2px">Иконка для строки ${k + 1}</div><div class="cseg ctpl-cats" id="cLbkCats">${keys.map((c, ci) => `<button data-c="${ci}" class="${ci === 0 ? 'on' : ''}">${esc(c)}</button>`).join('')}</div><div class="celem-grid" id="cLbkGrid">${grid(0)}</div>`, ev.clientX - 260, ev.clientY);
+          pp2.classList.add('cpop-el');
+          $('#cLbkCats', pp2).addEventListener('click', (e2) => { const b = e2.target.closest('[data-c]'); if (!b) return; $$('#cLbkCats button', pp2).forEach(x => x.classList.toggle('on', x === b)); $('#cLbkGrid', pp2).innerHTML = grid(+b.dataset.c); });
+          pp2.addEventListener('click', (e2) => { const b = e2.target.closest('[data-lbk]'); if (!b) return; cur[k] = 'img:' + b.dataset.lbk; closePop(pp2); row.querySelector('.cpml-cur').innerHTML = imgThumb(cur[k]); commit(); });
+        }
+      });
+    }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;
