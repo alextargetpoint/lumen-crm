@@ -225,6 +225,18 @@
 .clay-hero>label{font-size:11px;font-weight:700;color:#5E6470}
 .clay-hero-row{display:flex;gap:7px}
 .cnote-inline{font-size:9.5px;font-weight:700;color:var(--cb);background:#EEF3FF;padding:1px 7px;border-radius:99px;margin-left:6px;text-transform:none;letter-spacing:0}
+/* панель объектов/слоёв слайда */
+.clayers{display:flex;flex-direction:column;gap:5px;margin-top:8px;max-height:240px;overflow:auto}
+.clayer{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1.5px solid #E1E8F4;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .12s,background .12s}
+.clayer:hover{border-color:var(--cb);background:#F5F8FF}
+.clayer.lsel-row{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
+.clayer-ic{width:26px;height:26px;flex:none;border-radius:7px;display:grid;place-items:center;color:var(--cb);background:#EEF3FF}
+.clayer-ic svg{width:15px;height:15px}
+.clayer-t{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#2A3346;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clayer-acts{display:flex;gap:2px;flex:none;opacity:.45;transition:opacity .12s}
+.clayer:hover .clayer-acts{opacity:1}
+.clayer-acts button{width:22px;height:22px;border:none;background:#EEF1F6;border-radius:6px;cursor:pointer;font-size:12px;color:#5E6470;line-height:1;font-family:inherit;transition:background .12s,color .12s}
+.clayer-acts button:hover{background:var(--cb);color:#fff}
 .cfmtbar{display:flex;gap:6px}
 .cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
 .cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
@@ -1179,6 +1191,28 @@ body.cpanel-on{padding-right:308px!important}
       </div>
       <div class="cnote">Добавь элемент → тяни его на макете, угол — размер, стрелки над ним — слои вперёд/назад.</div>
     </div>
+    ${(() => {
+      const arr = serialize(); const ls = ((arr[sel] || {}).layers) || [];
+      if (!ls.length) return '';
+      const meta = (l) => {
+        if (l.t === 'img' && l.avatar) return ['Аватар', 'M12 8.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM5 20a7 7 0 0114 0'];
+        if (l.t === 'img' && (l.sticker || /stickers/.test(l.url || ''))) return ['Стикер', 'M12 2l1.7 5.9L20 9.6l-6.3 1.7L12 17l-1.7-5.7L4 9.6l6.3-1.7z'];
+        if (l.t === 'img') return ['Фото', 'M3 4.5h18v15H3zM8.5 9.5a1 1 0 100 .01M21 15l-5-5-9 9'];
+        if (l.t === 'sticker') return ['Стикер', 'M12 2l1.7 5.9L20 9.6l-6.3 1.7L12 17l-1.7-5.7L4 9.6l6.3-1.7z'];
+        if (l.t === 'frame') return ['Рамка', 'M3.5 3.5h17v17h-17zM7.5 7.5h9v9h-9z'];
+        if (l.t === 'text') return [((l.text || 'Текст').replace(/<[^>]+>/g, '').slice(0, 22)) || 'Текст', 'M5 6h14M12 6v13M9 19h6'];
+        if (l.t === 'shape') return ['Фигура', 'M8 8a4.5 4.5 0 100 .01M12 12h8v8h-8z'];
+        if (l.t === 'btn') return [((l.text || 'Кнопка').slice(0, 18)) || 'Кнопка', 'M4 9h16v6H4z'];
+        if (l.t === 'icon') return ['Иконка', 'M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z'];
+        if (l.t === 'line') return ['Линия', 'M4 12h16'];
+        if (l.t === 'grad') return ['Градиент', 'M3 4.5h18v15H3z'];
+        return [l.t || 'Объект', 'M4 4h16v16H4z'];
+      };
+      const rows = ls.map((l, k) => ({ l, k })).sort((a, b) => (b.l.z || 0) - (a.l.z || 0));
+      return `<div class="cgrp"><label>Объекты на слайде <span class="cnote-inline">${ls.length}</span></label>
+        <div class="clayers" id="cLayers">${rows.map(({ l, k }) => { const [name, d] = meta(l); return `<div class="clayer" data-lk="${k}"><span class="clayer-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg></span><span class="clayer-t">${esc(name)}</span><span class="clayer-acts"><button data-lact="up" title="Выше">↑</button><button data-lact="down" title="Ниже">↓</button><button data-lact="del" title="Удалить">✕</button></span></div>`; }).join('')}</div>
+        <div class="cnote">Клик по объекту — выделить его на макете (даже если он под другими слоями). Стрелки — слой выше/ниже, ✕ — удалить.</div></div>`;
+    })()}
     <div class="cgrp"><label>Порядок и удаление слайда</label><div class="cbtn-row">
       <button class="cwbtn" data-mv="up">↑ Выше</button>
       <button class="cwbtn" data-mv="down">↓ Ниже</button>
@@ -1198,6 +1232,22 @@ body.cpanel-on{padding-right:308px!important}
     { const bf = $('#cBlockFmt', body); if (bf) bf.addEventListener('click', (e) => { const b = e.target.closest('[data-bf]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.mode = b.dataset.bf; if (['bars', 'gauges'].includes(r.mode)) r.items = (r.items || []).map(it => Object.assign({}, it, { pct: it.pct != null ? it.pct : Math.max(0, Math.min(100, parseFloat(String(it.v || '').replace(/[^\d.]/g, '')) || 0)) })); sl.dataset.rich = JSON.stringify(r); $$('#cBlockFmt button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(true, { slides: serialize() }); }); }
     /* ⭐ библиотека раскладок слайда (Gamma-стиль): смена грамматики подачи */
     { const lg = $('#cLayGrid', body); if (lg) lg.addEventListener('click', (e) => { const b = e.target.closest('[data-lay]'); if (!b) return; setLayout(i, b.dataset.lay); }); }
+    /* ⭐ панель объектов/слоёв: выделить любой слой (даже под другими), z-порядок, удаление */
+    { const lw = $('#cLayers', body); if (lw) lw.addEventListener('click', (e) => {
+      const row = e.target.closest('.clayer'); if (!row) return; const k = +row.dataset.lk;
+      const act = e.target.closest('[data-lact]');
+      if (act) {
+        e.stopPropagation();
+        const arr = serialize(); const s = arr[i]; if (!s || !s.layers || !s.layers[k]) return;
+        const zs = s.layers.map(l => l.z || 0);
+        if (act.dataset.lact === 'up') s.layers[k].z = Math.max(...zs) + 1;
+        else if (act.dataset.lact === 'down') s.layers[k].z = Math.min(...zs) - 1;
+        else if (act.dataset.lact === 'del') s.layers.splice(k, 1);
+        save(true, { slides: arr }); return;
+      }
+      const slide = slideEl(i); const le = slide && slide.querySelector('[data-lyr="' + k + '"]');
+      if (le) { le.scrollIntoView({ block: 'nearest' }); selLayer(le); flash('Объект выделен ✓', 900); }
+    }); }
     /* инлайн-редактор числа-героя для раскладки data */
     { const hv = $('#cHeroV', body), hk = $('#cHeroK', body); if (hv || hk) { const upd = (persist) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.hero = { v: (hv ? hv.value : '').trim(), k: (hk ? hk.value : '').trim() }; sl.dataset.rich = JSON.stringify(r); dirty = true; if (persist) save(true, { slides: serialize() }); }; [hv, hk].forEach(inp => { if (!inp) return; inp.addEventListener('input', () => upd(false)); inp.addEventListener('change', () => upd(true)); }); } }
     /* иконка-буллет: попап с паками «Буллеты» */
