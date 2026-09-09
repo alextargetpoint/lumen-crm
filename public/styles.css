@@ -2397,8 +2397,18 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-rep-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
 .tk-routine-btn { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 32%, var(--stroke)); }
 /* ⭐ колесо баланса недели */
-.tk-balance { padding: 15px 18px; margin-bottom: 14px; }
-.tk-bal-hd { display: flex; align-items: baseline; gap: 8px; font-weight: 600; color: var(--navy-900); font-size: 14px; margin-bottom: 13px; }
+/* ⭐ премиум-подложка колеса баланса (Higgsfield-текстура шёлка) + мягкий пульс */
+.tk-balance { position: relative; padding: 17px 20px; margin-bottom: 14px; overflow: hidden; border: none; color: #fff; isolation: isolate; }
+.tk-balance::before { content: ''; position: absolute; inset: 0; z-index: -2; background: url('/assets/ui/balance-weave.jpg') center/cover no-repeat; transform: scale(1.06); animation: tkBalBreathe 16s ease-in-out infinite; }
+.tk-balance::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(120deg, rgba(14,18,32,.82), rgba(14,18,32,.5) 60%, rgba(14,18,32,.74)); }
+@keyframes tkBalBreathe { 0%, 100% { transform: scale(1.06); opacity: .92; } 50% { transform: scale(1.11); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tk-balance::before { animation: none; } }
+.tk-bal-hd { display: flex; align-items: baseline; gap: 8px; font-weight: 600; color: #fff; font-size: 14px; margin-bottom: 13px; }
+.tk-balance .tk-bal-hd svg { color: #fff; }
+.tk-balance .tk-bal-hd .sub { color: rgba(255,255,255,.72); }
+.tk-balance .tk-leg-n { color: rgba(255,255,255,.9); }
+.tk-balance .tk-leg-v { color: #fff; }
+.tk-balance .tk-leg-i.z { opacity: .55; }
 .tk-bal-hd svg { width: 16px; height: 16px; color: var(--accent); align-self: center; }
 .tk-bal-hd .sub { font-weight: 400; color: var(--sub); font-size: 12px; }
 /* ⭐ колесо жизни + легенда */
@@ -2414,6 +2424,8 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-leg-v { font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
 @media (max-width: 620px) { .tk-bal-main { flex-direction: column; } .tk-leg { width: 100%; } }
 .tk-bal-nudge { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--sc) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--sc) 22%, transparent); font-size: 13px; line-height: 1.46; color: var(--ink); }
+.tk-balance .tk-bal-nudge { background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.2); color: rgba(255,255,255,.94); backdrop-filter: blur(6px); }
+.tk-balance .tk-bal-nudge b { color: #fff; }
 .tk-bal-ndot { width: 9px; height: 9px; border-radius: 50%; background: var(--sc); flex: 0 0 auto; margin-top: 5px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--sc) 16%, transparent); }
 /* ⭐ подсветка задачи по сфере + бейдж повтора */
 .tk-row.has-sphere { border-left: 3px solid var(--sc); box-shadow: -7px 0 18px -13px var(--sc), var(--shadow); }

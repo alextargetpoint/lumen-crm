@@ -6539,7 +6539,7 @@ function tkWheelSVG(sw) {
   const cx = 96, cy = 96, minR = 26, maxR = 84, N = 8, step = 2 * Math.PI / N, gap = 0.06;
   const pt = (r, a) => [cx + r * Math.cos(a - Math.PI / 2), cy + r * Math.sin(a - Math.PI / 2)];
   // фоновые направляющие кольца
-  let rings = [42, 62, 84].map(r => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--stroke)" stroke-width="1" opacity=".5"/>`).join('');
+  let rings = [42, 62, 84].map(r => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1"/>`).join('');
   const wedges = SPHERE_KEYS.map((k, i) => {
     const v = sw[k] || 0; const sp = SPHERES[k];
     const r = minR + (v / max) * (maxR - minR);
@@ -6549,7 +6549,7 @@ function tkWheelSVG(sw) {
     const path = `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r.toFixed(1)},${r.toFixed(1)} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`;
     return `<path d="${path}" fill="${sp.c}" fill-opacity="${v ? .62 : .12}" stroke="${sp.c}" stroke-opacity="${v ? .9 : .3}" stroke-width="1" stroke-linejoin="round"><title>${sp.n}: ${v} за 7 дней</title></path>`;
   }).join('');
-  return `<svg viewBox="0 0 192 192" class="tk-wheel-svg">${rings}${wedges}<circle cx="${cx}" cy="${cy}" r="3" fill="var(--sub)"/></svg>`;
+  return `<svg viewBox="0 0 192 192" class="tk-wheel-svg">${rings}${wedges}<circle cx="${cx}" cy="${cy}" r="3" fill="rgba(255,255,255,.6)"/></svg>`;
 }
 function tkBalanceHtml(sw) {
   const total = SPHERE_KEYS.reduce((s, k) => s + (sw[k] || 0), 0);
