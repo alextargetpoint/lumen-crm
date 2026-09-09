@@ -5650,21 +5650,21 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 /* ═══ СЕМЕЙСТВА РАСКЛАДКИ (арт-дирекшн) ═══ */
 /* data-hero: одно крупное число доминирует */
 .s-hero{display:flex;flex-direction:column;gap:0;margin:0 0 6px}
-.s-hero b{font-family:var(--disp);font-weight:600;line-height:.84;letter-spacing:-.045em;font-size:clamp(72px,22vw,168px)}
-.s-hero i{font-style:normal;font-size:clamp(12px,3.2vw,17px);letter-spacing:.16em;text-transform:uppercase;opacity:.75;font-weight:700;margin-top:6px}
+.s-hero b{font-family:var(--disp);font-weight:600;line-height:.84;letter-spacing:-.045em;font-size:clamp(72px,22cqw,168px)}
+.s-hero i{font-style:normal;font-size:clamp(12px,3.2cqw,17px);letter-spacing:.16em;text-transform:uppercase;opacity:.75;font-weight:700;margin-top:6px}
 .slide.lay-data{justify-content:center}
-.slide.lay-data .s-h{font-size:clamp(20px,5vw,30px);opacity:.9;letter-spacing:-.01em}
+.slide.lay-data .s-h{font-size:clamp(20px,5cqw,30px);opacity:.9;letter-spacing:-.01em}
 .slide.lay-data .s-hero b{color:var(--blue)}
 .slide.lay-data.hasbg .s-hero b{color:#fff}
 /* immersive: тёмное фото + центр, максимум эмоции, минимум текста */
 .slide.lay-immersive::after{content:'';position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 45%,rgba(6,10,20,.35),rgba(6,10,20,.72));z-index:0}
 .slide.lay-immersive .s-in{max-width:82%;margin:auto;text-align:center}
-.slide.lay-immersive .s-h{font-size:clamp(34px,8vw,62px);line-height:1.04;letter-spacing:-.02em;font-weight:500;text-wrap:balance}
+.slide.lay-immersive .s-h{font-size:clamp(34px,8cqw,62px);line-height:1.04;letter-spacing:-.02em;font-weight:500;text-wrap:balance}
 .slide.lay-immersive .s-points{display:none}
 .slide.lay-immersive .s-eye{margin-left:auto;margin-right:auto}
 /* typo: типографика-first, без фото — заголовок во весь слайд */
-.slide.lay-typo .s-h{font-size:clamp(44px,11vw,104px);line-height:.96;letter-spacing:-.03em;font-weight:500}
-.slide.lay-typo .s-s{font-size:clamp(14px,3.4vw,18px);max-width:66%;margin-top:20px}
+.slide.lay-typo .s-h{font-size:clamp(44px,11cqw,104px);line-height:.96;letter-spacing:-.03em;font-weight:500}
+.slide.lay-typo .s-s{font-size:clamp(14px,3.4cqw,18px);max-width:66%;margin-top:20px}
 .slide.lay-typo .s-points{display:none}   /* типографика-first: только заголовок+микрокопия */
 /* split: фото сверху + сплошная плашка с контентом снизу */
 .slide.lay-split.hasbg{color:var(--ink)}
@@ -5718,7 +5718,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-h.ts-outline{-webkit-text-stroke:1.6px currentColor;color:transparent}
 .s-h.ts-block{background:var(--blue);color:#fff;display:inline;padding:.04em .22em;box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:.08em}
 .s-h.ts-underline{box-shadow:inset 0 -.16em color-mix(in srgb,var(--blue) 60%,transparent)}
-.s-h.ts-huge{font-size:clamp(40px,11vw,84px);line-height:.98;letter-spacing:-.03em}
+.s-h.ts-huge{font-size:clamp(40px,11cqw,84px);line-height:.98;letter-spacing:-.03em}
 .s-h.ts-caps{text-transform:uppercase;letter-spacing:.08em}
 .s-h.ts-gradient{background:linear-gradient(120deg,var(--blue),#7C3AED);-webkit-background-clip:text;background-clip:text;color:transparent}
 .s-h.ts-shadow{text-shadow:3px 4px 0 rgba(0,0,0,.28)}
@@ -5739,9 +5739,9 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 /* ⭐ Стекло — матовая стеклянная подложка под заголовком (frosted glass) */
 .s-h.ts-glass{background:rgba(255,255,255,.12);padding:.2em .56em;border-radius:.52em;display:inline-block;backdrop-filter:blur(13px) saturate(1.25);-webkit-backdrop-filter:blur(13px) saturate(1.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 0 0 1px rgba(255,255,255,.16),0 14px 40px -12px rgba(6,10,24,.5)}
 .slide:not(.hasbg) .s-h.ts-glass{background:rgba(12,22,48,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(12,22,48,.08),0 14px 40px -14px rgba(6,10,24,.22)}
-.s-h.ts-spaced{letter-spacing:.16em;text-transform:uppercase;font-size:clamp(20px,5vw,34px)}
+.s-h.ts-spaced{letter-spacing:.16em;text-transform:uppercase;font-size:clamp(20px,5cqw,34px)}
 /* ⭐ Подложка всего текстового блока (eyebrow+заголовок+подпись+тезисы): стекло / плашка */
-.slide.card-glass .s-in,.slide.card-solid .s-in{margin:auto 8% ;width:auto;border-radius:20px;padding:8% 8%}
+.slide.card-glass .s-in,.slide.card-solid .s-in{margin:auto 7%;width:auto;border-radius:20px;padding:6.5% 7%;gap:10px}
 .slide.card-glass.pos-top .s-in,.slide.card-solid.pos-top .s-in{margin-top:12%}
 .slide.card-glass.pos-bottom .s-in,.slide.card-solid.pos-bottom .s-in{margin-bottom:12%}
 .slide.card-glass .s-in{background:rgba(255,255,255,.12);backdrop-filter:blur(16px) saturate(1.25);-webkit-backdrop-filter:blur(16px) saturate(1.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 0 0 1px rgba(255,255,255,.16),0 22px 60px -20px rgba(6,10,24,.6)}
@@ -5805,18 +5805,18 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.al-center .s-eye{justify-content:center}
 .slide.hasbg .s-eye{color:#fff;opacity:.92}
 .s-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;margin-top:8px}
-.s-stat b{display:block;font-family:var(--disp);font-optical-sizing:auto;font-size:clamp(22px,5.6vw,36px);font-weight:600;line-height:1.02;letter-spacing:-.02em;color:var(--blue);overflow-wrap:anywhere}
+.s-stat b{display:block;font-family:var(--disp);font-optical-sizing:auto;font-size:clamp(22px,5.6cqw,36px);font-weight:600;line-height:1.02;letter-spacing:-.02em;color:var(--blue);overflow-wrap:anywhere}
 .slide.hasbg .s-stat b{color:#fff}
 .s-stat i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.02em;margin-top:5px;display:block}
 .slide.hasbg .s-stat i{color:rgba(255,255,255,.82)}
 .s-steps{display:flex;flex-direction:column;gap:12px;margin-top:8px}
-.s-step{display:flex;align-items:center;gap:13px;font-size:clamp(14px,3.6vw,17px);line-height:1.35;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
+.s-step{display:flex;align-items:center;gap:13px;font-size:clamp(14px,3.6cqw,17px);line-height:1.35;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-step{color:rgba(255,255,255,.92)}
 .s-step-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;font-family:'Manrope',sans-serif}
 .slide.hasbg .s-step-n{background:#fff;color:var(--blue)}
 .s-gauges{display:flex;gap:26px;margin-top:12px;flex-wrap:wrap}
 .s-gauge{display:flex;flex-direction:column;align-items:center;gap:9px}
-.s-gauge svg{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px)}
+.s-gauge svg{width:clamp(84px,24cqw,104px);height:clamp(84px,24cqw,104px)}
 .gg-bg,.gg-fg{fill:none;stroke-width:7;transform:rotate(-90deg);transform-origin:40px 40px}
 .gg-bg{stroke:color-mix(in srgb,var(--ink) 13%,transparent)}
 .gg-fg{stroke:var(--blue);stroke-linecap:round;transition:stroke-dashoffset .7s ease}
@@ -5826,7 +5826,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
 .s-points{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:0}
-.s-points li{display:flex;gap:14px;align-items:baseline;font-size:clamp(14px,3.6vw,17px);line-height:1.3;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
+.s-points li{display:flex;gap:14px;align-items:baseline;font-size:clamp(14px,3.6cqw,17px);line-height:1.3;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
 .slide.hasbg .s-points li{color:rgba(255,255,255,.95);text-shadow:0 1px 8px rgba(6,10,20,.4)}
 /* ⭐ РЕДАКТОРСКИЙ ИНДЕКС (по умолчанию вместо чек-листа): тонкая линейка + трекнутый номер, как в журнале */
 .s-points.pm-index li{border-top:1px solid color-mix(in srgb,var(--ink) 16%,transparent);padding:11px 0}
@@ -5875,7 +5875,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide .pm-img .s-pt-m::after,.slide.hasbg .pm-img .s-pt-m::after{content:"";display:none}
 .slide.hasbg .pm-img .s-pt-m{filter:drop-shadow(0 2px 8px rgba(0,0,0,.45))}
 .s-amen{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px;margin-top:10px}
-.s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4vw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
+.s-amen-i{display:flex;align-items:center;gap:11px;font-size:clamp(13px,3.4cqw,15.5px);font-weight:600;line-height:1.25;color:color-mix(in srgb,var(--ink) 88%,var(--mut))}
 .slide.hasbg .s-amen-i{color:rgba(255,255,255,.92)}
 .s-amen-ic{flex:0 0 38px;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue);box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 26%,transparent)}
 .slide.hasbg .s-amen-ic{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
@@ -5891,12 +5891,12 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-barcol i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-barcol i{color:rgba(255,255,255,.82)}
 .s-h{font-family:var(--disp);font-optical-sizing:auto;font-weight:500;line-height:1.08;letter-spacing:-.015em;overflow-wrap:break-word;text-wrap:balance}
-.slide.sz-s .s-h{font-size:clamp(22px,5vw,32px)}
-.slide.sz-m .s-h{font-size:clamp(26px,6.2vw,40px)}
-.slide.sz-l .s-h{font-size:clamp(30px,7vw,46px);line-height:1.04}
+.slide.sz-s .s-h{font-size:clamp(22px,5cqw,32px)}
+.slide.sz-m .s-h{font-size:clamp(26px,6.2cqw,40px)}
+.slide.sz-l .s-h{font-size:clamp(30px,7cqw,46px);line-height:1.04}
 .slide.hasbg .s-h{color:#fff;text-shadow:0 1px 14px rgba(0,0,0,.32)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
-.s-s{font-size:clamp(15px,3.6vw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
+.s-s{font-size:clamp(15px,3.6cqw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
 .slide.al-center .s-s{max-width:100%}
 .slide.hasbg .s-s{color:rgba(255,255,255,.92);text-shadow:0 1px 10px rgba(0,0,0,.35)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
