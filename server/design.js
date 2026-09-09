@@ -232,7 +232,7 @@ function projProfile(db, c, pr, dna) {
   };
 }
 
-const ALL_GRAMMARS = ['singleHero', 'galleryCurated', 'bento', 'metricEditorial'];
+const ALL_GRAMMARS = ['singleHero', 'galleryCurated', 'bento', 'metricEditorial', 'sidebarRail', 'figureGround', 'dataLed'];
 
 /* грамматики, проходящие жёсткие гейты (хватает ли фото/данных) */
 function validGrammars(prof, dna) {
@@ -240,6 +240,10 @@ function validGrammars(prof, dna) {
   if (prof.heroOk) { out.push('singleHero'); out.push('bento'); }
   if (prof.nGallery >= 3 && dna.imageDom !== 'low') out.push('galleryCurated');
   if (prof.heroOk && (prof.rich || prof.metrics >= 2 || prof.payRows >= 2) && dna.dataDepth !== 'minimal') out.push('metricEditorial');
+  /* новые композиции (Ф1+) — каждая со своим гейтом доступности контента */
+  if (prof.heroOk && (prof.metrics >= 2 || prof.payRows >= 2 || prof.rich || prof.hasBlurb)) out.push('sidebarRail');
+  if (prof.heroOk) out.push('figureGround');
+  if ((prof.rich || prof.metrics >= 2 || prof.payRows >= 2) && dna.dataDepth !== 'minimal') out.push('dataLed');
   return out.length ? out : ['singleHero'];
 }
 
@@ -258,6 +262,24 @@ function grammarFit(g, prof, dna) {
     imageFit = prof.nPhotos >= 2 ? 1 : prof.nPhotos === 1 ? 0.6 : 0.2;
     dataFit = prof.metrics >= 2 ? 1 : 0.6; hierarchy = (prof.heroOk || prof.metrics >= 2) ? 1 : 0.5;
     balance = (prof.hasLoc || prof.hasBlurb) ? 1 : 0.55;
+  } else if (g === 'sidebarRail') {
+    /* фото-доминанта справа + вертикальная рельса метрик/цены слева */
+    imageFit = prof.heroOk ? 1 : 0.3;
+    dataFit = (prof.metrics >= 2 || prof.payRows >= 2 || prof.rich) ? 1 : 0.55;
+    hierarchy = prof.heroOk ? 1 : 0.5;
+    balance = ((prof.hasBlurb || prof.hasLoc) && (prof.metrics || prof.payRows)) ? 1 : 0.65;
+  } else if (g === 'figureGround') {
+    /* одна доминантная фотография + плавающая карточка-идентити в углу */
+    imageFit = prof.heroOk ? 1 : 0.2;
+    dataFit = (prof.metrics >= 1 || prof.hasBlurb) ? 0.75 : 0.5;
+    hierarchy = prof.heroOk ? 1 : 0.4;
+    balance = (prof.hasBlurb || prof.metrics || prof.hasLoc) ? 1 : 0.55;
+  } else if (g === 'dataLed') {
+    /* цифры/оплата/доходность главенствуют, фото — поддержка (для data-rich, image-poor) */
+    imageFit = prof.heroOk ? 0.8 : 0.6;
+    dataFit = (prof.rich || prof.metrics >= 2 || prof.payRows >= 2) ? 1 : 0.3;
+    hierarchy = (prof.metrics >= 2 || prof.payRows >= 2) ? 1 : 0.55;
+    balance = (prof.hasBlurb || prof.hasLoc || prof.nUnits) ? 1 : 0.5;
   } else { /* metricEditorial */
     imageFit = prof.heroOk ? 0.9 : 0.4;
     dataFit = (prof.rich || prof.metrics >= 2 || prof.payRows >= 2) ? 1 : 0.25;
@@ -272,7 +294,7 @@ function grammarDensity(g, prof, dna) {
   const R = Math.min(prof.nGallery, 5) + prof.metrics + (prof.payRows >= 2 ? 2 : prof.payRows)
     + (dna.dataDepth === 'dashboard' ? Math.min(prof.nUnits, 4) : 0) + prof.nTimes
     + (prof.nAmen > 0 ? 1 : 0) + (prof.hasBlurb ? 1 : 0) + Math.min(prof.nWhy, 3);
-  const cap = g === 'galleryCurated' ? 11 : g === 'metricEditorial' ? 8 : 7;
+  const cap = g === 'galleryCurated' ? 11 : g === 'dataLed' ? 9 : g === 'metricEditorial' ? 8 : g === 'sidebarRail' ? 8 : g === 'figureGround' ? 6 : 7;
   let density = 1;
   if (R < cap * 0.40) density = Math.max(0.2, R / (cap * 0.40));            /* слишком пусто */
   else if (R > cap * 1.75) density = Math.max(0.35, 1 - (R - cap * 1.75) / cap); /* переполнено */
@@ -385,9 +407,12 @@ function artDirect(db, c, props, dna, lead, seed) {
 
   /* COVER — если нет ни одного hero-фото, обложка с фото невозможна → 'type' */
   const heroExists = props.some(p => curateImages(p).hero);
-  let coverV = pick(r, dna.intensity === 'minimal' ? ['type', 'plate'] : ['plate', 'editorial', 'band']);
-  if (!heroExists && ['band', 'plate', 'editorial'].includes(coverV)) coverV = 'type';
-  plan.push({ role: 'COVER', v: coverV, qc: qcFlat({ imageFit: heroExists ? 1 : (coverV === 'type' ? 1 : 0.4), density: 0.9, balance: 0.95 }) });
+  /* пул обложек: indexCard (содержание) не требует фото; splitVertical/band/plate/editorial требуют hero */
+  let coverPool = dna.intensity === 'minimal' ? ['type', 'plate', 'indexCard'] : ['plate', 'editorial', 'band', 'splitVertical', 'indexCard'];
+  if (props.length < 2) coverPool = coverPool.filter(v => v !== 'indexCard');   /* «содержание» осмысленно от 2 проектов */
+  let coverV = pick(r, coverPool);
+  if (!heroExists && ['band', 'plate', 'editorial', 'splitVertical'].includes(coverV)) coverV = 'type';
+  plan.push({ role: 'COVER', v: coverV, qc: qcFlat({ imageFit: (heroExists || coverV === 'type' || coverV === 'indexCard') ? 1 : 0.4, density: 0.9, balance: 0.95 }) });
 
   const q = (lead && lead.quals) || {};
   const hasCriteria = lead && (q.budget || q.purpose || q.timeline || q.type || lead.geo);
@@ -403,9 +428,9 @@ function artDirect(db, c, props, dna, lead, seed) {
     const oseed = (seed ^ hashStr('op|' + pr.id) ^ Math.imul(idx + 1, 0x27D4EB2F)) >>> 0;
     const rr = rng(oseed);
     let pool;
-    if (dna.ax.style === 'cinematic' || dna.imageDom === 'high') pool = ['fullbleed', 'fullbleed', 'split'];
-    else if (dna.ax.style === 'investment' || dna.imageDom === 'low') pool = ['split', 'type'];
-    else pool = ['fullbleed', 'split', 'type'];
+    if (dna.ax.style === 'cinematic' || dna.imageDom === 'high') pool = ['fullbleed', 'fullbleed', 'split', 'plate'];
+    else if (dna.ax.style === 'investment' || dna.imageDom === 'low') pool = ['split', 'type', 'plate'];
+    else pool = ['fullbleed', 'split', 'type', 'plate'];
     if (!heroUrl) pool = ['type'];
     if (idx === 0 && heroUrl && heroUrl === coverHero) pool = ['type', 'split']; /* не повторять кадр обложки */
     let v = pick(rr, pool);
@@ -430,10 +455,21 @@ function artDirect(db, c, props, dna, lead, seed) {
 
   if (props.length >= 2) {
     const shareMetrics = props.filter(p => p.roi || p.priceFrom).length >= 2;
-    const cmpV = dna.dataDepth === 'editorial' ? 'cards' : shareMetrics ? pick(r, ['matrix', 'scoreboard']) : 'cards';
+    const priceable = props.filter(p => p.priceFrom > 0).length >= 2;
+    let cmpPool;
+    if (dna.dataDepth === 'editorial') cmpPool = ['cards', 'ranked'];
+    else if (shareMetrics) cmpPool = ['matrix', 'scoreboard', 'ranked'];
+    else cmpPool = ['cards', 'ranked'];
+    if (priceable && props.length <= 4) cmpPool.push('barsRow');   /* горизонтальные мини-полосы — не слишком широко */
+    const cmpV = pick(r, cmpPool);
     plan.push({ role: 'COMPARISON', v: cmpV, qc: qcFlat({ dataFit: shareMetrics ? 1 : 0.7, density: 0.9 }) });
   }
-  const recV = dna.ax.style === 'investment' ? 'thesis' : dna.ax.style === 'editorial' || dna.ax.style === 'cinematic' || dna.ax.style === 'darkluxury' ? 'editorNote' : pick(r, ['editorNote', 'marginNote', 'thesis']);
+  let recPool;
+  if (dna.ax.style === 'investment') recPool = ['thesis', 'pickCard', 'sidebarNote'];
+  else if (dna.ax.style === 'editorial' || dna.ax.style === 'cinematic' || dna.ax.style === 'darkluxury') recPool = ['editorNote', 'sidebarNote', 'pickCard'];
+  else recPool = ['editorNote', 'marginNote', 'thesis', 'sidebarNote', 'pickCard'];
+  if (props.length < 2) recPool = recPool.filter(v => v !== 'pickCard');   /* «мой выбор» осмысленен от 2 проектов */
+  const recV = pick(r, recPool);
   plan.push({ role: 'RECOMMENDATION', v: recV, qc: qcFlat({ density: 0.85 }) });
 
   /* Ф4 · завершающая дуга: процесс → агент → агентство → тихая задняя обложка.
@@ -670,6 +706,27 @@ function renderDesignDoc(db, c, opts) {
           <div class="cv-r">${imgCell(hero, 'cover-img', geo)}</div></div>
           <footer class="cv-bot"></footer></section>`;
       }
+      if (pg.v === 'splitVertical') {
+        const dt = new Date(c.createdAt || Date.now()).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+        return `<section class="page cover cv-sv"><div class="sv-photo">${imgCell(hero, 'cover-img', geo)}</div>
+          <div class="sv-panel"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+          <div class="sv-mid"><div class="cv-kick">${esc(geo || 'Недвижимость')} · подборка</div><h1 class="cv-h">${esc(title)}</h1>${forWho}${meta}</div>
+          <footer class="sv-bot"><span>${esc(mgr.name || AG)}</span><span>${dt}</span></footer></div></section>`;
+      }
+      if (pg.v === 'indexCard') {
+        /* редакторская обложка-«содержание»: перечень проектов подборки */
+        const dt = new Date(c.createdAt || Date.now()).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+        const items = props.map((p, i) => {
+          const g = geoNames[p.geo] || '';
+          const mt = [g, p.area].filter(Boolean).map(esc).join(' · ');
+          const pr2 = p.priceFrom ? 'от ' + money(p.priceFrom, p) : '';
+          return `<li class="ix-r"><span class="ix-no">${num2(i + 1)}</span><div class="ix-tx"><b class="ix-nm">${esc(p.name)}</b>${mt ? `<span class="ix-mt">${mt}</span>` : ''}</div>${pr2 ? `<span class="ix-pr">${esc(pr2)}</span>` : ''}</li>`;
+        }).join('');
+        return `<section class="page cover cv-index"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
+          <div class="ix-head"><div class="cv-kick">${esc(geo || 'Недвижимость')} · содержание</div><h1 class="cv-h">${esc(title)}</h1>${forWho}</div>
+          <ol class="ix-list">${items}</ol>
+          <footer class="cv-bot line"><span>${esc(mgr.name || AG)}</span><span>${dt}</span></footer></section>`;
+      }
       /* plate — фото + плавающая идентити-плашка */
       return `<section class="page cover cv-plate"><div class="cv-photo">${imgCell(hero, 'cover-img', geo)}</div>
         <div class="cv-plate-in"><header class="cv-top">${wordmark()}<span class="cv-tag">${esc(dna.styleName)}</span></header>
@@ -741,6 +798,43 @@ function renderDesignDoc(db, c, opts) {
           ${payTrack(pr)}${fp}${why}${unitsTable(pr)}
           ${foot(esc(pr.name))}</section>`;
       }
+      if (pg.v === 'sidebarRail') {
+        /* Ф1+ · вертикальная рельса метрик/цены слева + доминантное фото и редакторский текст справа */
+        return `<section class="page po po-rail">${ctl}
+          ${head}
+          <div class="rail-split">
+            <aside class="rail-side">${metricRail(pr, 'stack')}${amenList(pr)}</aside>
+            <div class="rail-main">${imgEl(hero, 'rail-img', pr.area || pr.name)}${co.blurb ? `<p class="lede">${esc(co.blurb)}</p>` : ''}${driveTimes(pr, true)}</div>
+          </div>
+          ${payTrack(pr)}${fp}${why}${unitsTable(pr)}
+          ${foot(esc(pr.name))}</section>`;
+      }
+      if (pg.v === 'figureGround') {
+        /* Ф1+ · одна доминантная фотография + плавающая карточка-идентити в углу + полоса фактов */
+        const sub = pr.name !== co.hook ? `<div class="fg-sub">${esc(pr.name)}${pr.area ? ' · ' + esc(pr.area) : ''}</div>` : (pr.area ? `<div class="fg-sub">${esc(pr.area)}</div>` : '');
+        return `<section class="page po po-fg">${ctl}
+          <div class="fg-stage">
+            ${imgEl(hero, 'fg-img', pr.area || pr.name)}
+            <div class="fg-card">${kicker('Проект №' + num2(pg.idx + 1) + (pr.developer ? ' · ' + esc(pr.developer) : ''))}<h2 class="fg-h">${esc(co.hook)}</h2>${sub}${co.blurb ? `<p class="fg-blurb">${esc(co.blurb)}</p>` : ''}</div>
+          </div>
+          ${metricRail(pr, 'row')}
+          ${driveTimes(pr, true)}${payTrack(pr)}${fp}${why}${unitsTable(pr)}
+          ${foot(esc(pr.name))}</section>`;
+      }
+      if (pg.v === 'dataLed') {
+        /* Ф1+ · цифры/оплата главенствуют, фото — небольшая поддержка (data-rich, image-poor) */
+        return `<section class="page po po-data">${ctl}
+          ${head}
+          <div class="dl-top">
+            <div class="dl-metrics">${metricRail(pr, 'big')}</div>
+            ${hero ? `<figure class="dl-thumb">${imgEl(hero, 'dl-img', pr.area || pr.name)}</figure>` : ''}
+          </div>
+          ${co.blurb ? `<p class="lede">${esc(co.blurb)}</p>` : ''}
+          ${payTrack(pr)}${unitsTable(pr)}
+          <div class="dl-cols"><div class="dl-c">${driveTimes(pr, true)}</div><div class="dl-c">${amenList(pr)}${why}</div></div>
+          ${fp}
+          ${foot(esc(pr.name))}</section>`;
+      }
       /* metricEditorial — редакторский сплит: текст + рельса метрик, план оплаты трек */
       return `<section class="page po po-me">${ctl}
         ${head}
@@ -766,6 +860,40 @@ function renderDesignDoc(db, c, opts) {
         props.forEach((p, i) => { const n = row.num ? row.num(p) : null; if (n == null || isNaN(n)) return; if (bv == null || (row.best === 'min' ? n < bv : n > bv)) { bv = n; bi = i; } });
         return bi;
       };
+      if (pg.v === 'ranked') {
+        /* Ф1+ · редакторский ранжир: кто лидирует по каждому фактическому критерию (не рейтинг) */
+        const dims = rows.filter(r => r.best && bestIdx(r) >= 0);
+        if (dims.length) {
+          return `<section class="page pg cmp cmp-ranked">${kicker('Сравнение')}<h2 class="h2">Кто лидирует по каждому критерию</h2>
+            <div class="rk-list">${dims.map((r, i) => { const bi = bestIdx(r); const p = props[bi]; return `<div class="rk-row"><span class="rk-no">${num2(i + 1)}</span><div class="rk-dim"><span class="rk-k">${esc(r.k)}</span><b class="rk-nm">${esc(p.name)}</b></div><b class="rk-v num">${r.fmt(p)}</b></div>`; }).join('')}</div>
+            <p class="cc-note">«Лидирует» — по фактическим цифрам объектов (мин. цена, ранняя сдача, макс. доходность/прирост), не наша оценка.</p>
+            ${foot('сравнение')}</section>`;
+        }
+      }
+      if (pg.v === 'barsRow') {
+        /* Ф1+ · горизонтальные мини-полосы по каждой числовой метрике; длина = факт. величина */
+        const dims = [
+          { k: 'Цена входа', get: p => p.priceFrom, fmt: p => 'от ' + money(p.priceFrom, p), better: 'low' },
+          { k: 'Доходность', get: p => numOf(p.roi), fmt: p => p.roi ? esc(p.roi) : '—', better: 'high' },
+          { k: 'Прирост к сдаче', get: p => numOf(p.appreciation), fmt: p => p.appreciation ? esc(p.appreciation) : '—', better: 'high' },
+        ].filter(d => props.filter(p => { const n = d.get(p); return n != null && !isNaN(n) && n > 0; }).length >= 2);
+        if (dims.length) {
+          const groups = dims.map(d => {
+            const nums = props.map(p => d.get(p)).filter(n => n != null && !isNaN(n) && n > 0);
+            const mx = Math.max(...nums), mn = Math.min(...nums);
+            return `<div class="br-group"><div class="br-k">${esc(d.k)}</div>${props.map(p => {
+              const n = d.get(p); const has = n != null && !isNaN(n) && n > 0;
+              const w = has && mx > 0 ? Math.max(7, Math.round((n / mx) * 100)) : 0;
+              const best = has && (d.better === 'low' ? n === mn : n === mx);
+              return `<div class="br-row${best ? ' best' : ''}"><span class="br-nm">${esc(p.name)}</span><span class="br-track"><i style="width:${w}%"></i></span><b class="br-v num">${d.fmt(p)}</b><i class="br-bi">${best ? 'лучшее' : ''}</i></div>`;
+            }).join('')}</div>`;
+          }).join('');
+          return `<section class="page pg cmp cmp-bars">${kicker('Сравнение')}<h2 class="h2">Соотношение по цифрам</h2>
+            ${groups}
+            <p class="cc-note">Длина полос — относительно максимума в строке по фактическим цифрам объектов; подсветка — лучшее значение (мин. цена / макс. доходность), не рейтинг.</p>
+            ${foot('сравнение')}</section>`;
+        }
+      }
       if (pg.v === 'cards' || props.length > 3) {
         return `<section class="page pg cmp">${kicker('Сравнение')}<h2 class="h2">${esc(dna.ctx.nProj)} ${plural(dna.ctx.nProj)} рядом</h2>
           <div class="cmp-cards">${props.map((p, i) => `<div class="cmpc"><div class="cmpc-h"><b>${esc(p.name)}</b><span>${esc(p.area || '')}</span></div>
@@ -799,6 +927,7 @@ function renderDesignDoc(db, c, opts) {
       const sAva = signer.photo ? `<div class="rc-ava rc-ava-ph" style="background-image:url('${esc(abs(signer.photo))}')"></div>` : `<div class="rc-ava">${esc(initials(signer.name))}</div>`;
       const sign = `<div class="rc-sign">${sAva}<div><b>${esc(signer.name || AG)}</b><span>${esc(signer.title || 'ваш менеджер')}</span></div></div>`;
       const geo = geoNames[(props[0] || {}).geo] || '';
+      const opener = lead ? `${(lead.name || '').split(' ')[0] || ''}, вот что важно из этой подборки${geo ? ' по ' + esc(geo) : ''}.` : `Коротко — что важно из этой подборки.`;
 
       if (pg.v === 'thesis') {
         return `<section class="page pg rec rec-thesis">${kicker('Инвест-резюме')}<h2 class="h2">Как я вижу выбор</h2>
@@ -810,8 +939,37 @@ function renderDesignDoc(db, c, opts) {
           <div class="mn-r">${pts.map(([k, v]) => `<p class="mn-p"><b>${esc(k)}.</b> ${v}</p>`).join('')}${lead ? `<p class="mn-cta">Скажите, что откликается — посчитаю доходность и условия точечно.</p>` : ''}</div>
           ${foot('рекомендация')}</section>`;
       }
+      if (pg.v === 'sidebarNote') {
+        /* Ф1+ · заметка на полях: закреплённый сайдбар с подписью + аннотированные пункты */
+        return `<section class="page pg rec rec-sidenote">
+          <aside class="sn-side">${kicker('Заметка менеджера')}${sign}${lead ? `<p class="sn-cta">Скажите, что откликается — посчитаю доходность и условия точечно.</p>` : ''}</aside>
+          <div class="sn-main"><p class="sn-open">${esc(opener)}</p>
+            <div class="sn-pts">${pts.map(([k, v]) => `<div class="sn-p"><span class="sn-k">${esc(k)}</span><p>${v}</p></div>`).join('')}</div></div>
+          ${foot('рекомендация')}</section>`;
+      }
+      if (pg.v === 'pickCard') {
+        /* Ф1+ · «с чего начать» — объект, лидирующий по нескольким ФАКТИЧЕСКИМ критериям (с оговоркой) */
+        const wins = {};
+        const bump = (p, reason) => { if (!p) return; (wins[p.id] = wins[p.id] || { p, reasons: [] }).reasons.push(reason); };
+        if (cheapest) bump(cheapest, `самый доступный вход — ${money(cheapest.priceFrom, cheapest)}`);
+        if (topRoi) bump(topRoi, `высшая заявленная доходность — ${esc(topRoi.roi)}`);
+        if (topAppr) bump(topAppr, `наибольший заявленный прирост — ${esc(topAppr.appreciation)}`);
+        if (early && /готов|ready/i.test(String(early.handover))) bump(early, `уже готов к заселению`);
+        else if (early && /Q[1-4]/i.test(String(early.handover))) bump(early, `ближайшая сдача — ${esc(early.handover)}`);
+        const ranked = Object.values(wins).sort((a, b) => b.reasons.length - a.reasons.length);
+        const top = ranked[0];
+        if (top && top.reasons.length) {
+          const rest = ranked.slice(1).filter(x => x.reasons.length);
+          return `<section class="page pg rec rec-pick">${kicker('С чего бы я начал')}<h2 class="h2">Если брать по цифрам</h2>
+            <p class="lede">Один объект лидирует сразу по нескольким фактическим параметрам подборки. Это не «единственно верный» выбор — финал зависит от ваших приоритетов, но начать разговор я бы предложил с него.</p>
+            <div class="pk-card"><div class="pk-h"><b class="pk-nm">${esc(top.p.name)}</b>${top.p.area ? `<span class="pk-mt">${esc(top.p.area)}</span>` : ''}${top.p.priceFrom ? `<span class="pk-pr">от ${money(top.p.priceFrom, top.p)}</span>` : ''}</div>
+              <ul class="pk-why">${top.reasons.map(rr => `<li>${rr}</li>`).join('')}</ul></div>
+            ${rest.length ? `<p class="pk-rest">Также стоит посмотреть: ${rest.map(x => `<b>${esc(x.p.name)}</b> (${x.reasons[0]})`).join('; ')}.</p>` : ''}
+            ${sign}${foot('рекомендация')}</section>`;
+        }
+        /* нет честного лидера — падаем в editorNote */
+      }
       /* editorNote — подписанная заметка редактора/менеджера */
-      const opener = lead ? `${(lead.name || '').split(' ')[0] || ''}, вот что важно из этой подборки${geo ? ' по ' + esc(geo) : ''}.` : `Коротко — что важно из этой подборки.`;
       return `<section class="page pg rec rec-note">
         <div class="rn-mark">“</div>
         <div class="rn-body">${kicker('Заметка менеджера')}
@@ -856,6 +1014,13 @@ function renderDesignDoc(db, c, opts) {
         return `<section class="page opener op-split">
           <div class="op-l"><span class="op-tag dark">${esc(kick)}</span><div class="op-no big">${no}</div><h2 class="op-h">${esc(pr.name)}</h2>${meta ? `<div class="op-meta">${meta}</div>` : ''}${pr.priceFrom ? `<div class="op-price">от ${money(pr.priceFrom, pr)}</div>` : ''}</div>
           <div class="op-r">${imgEl(hero, 'op-img', pr.area)}</div>
+        </section>`;
+      }
+      if (pg.v === 'plate' && hero) {
+        /* Ф1+ · открывашка-плашка: кадр на всю страницу + плотная карточка-идентити снизу */
+        return `<section class="page opener op-plate" style="background-image:linear-gradient(180deg,rgba(0,0,0,.30),rgba(0,0,0,.14) 46%,rgba(0,0,0,.34)),url('${esc(abs(hero.url))}');background-position:${esc(hero.focal || 'center')}">
+          <div class="op-top">${wordmark()}<span class="op-tag">${esc(kick)}</span></div>
+          <div class="op-plate-card"><div class="op-no">${no}</div><h2 class="op-h">${esc(pr.name)}</h2>${meta ? `<div class="op-meta">${meta}</div>` : ''}${co.hook && co.hook !== pr.name ? `<p class="op-plate-lede">${esc(co.hook)}</p>` : ''}${pr.priceFrom ? `<div class="op-price">от ${money(pr.priceFrom, pr)}</div>` : ''}</div>
         </section>`;
       }
       return `<section class="page opener op-type">
@@ -1327,6 +1492,109 @@ p{font-size:var(--s-body);line-height:1.6}
 .style-cinematic .op-full .op-h{font-size:calc(var(--s-disp)*1.08)}
 .style-darkluxury .kick,.style-darkluxury .op-tag.dark{letter-spacing:.24em}
 .style-darkluxury .cv-h,.style-darkluxury .po-h,.style-darkluxury .h2,.style-darkluxury .bk-line{font-weight:500}
+/* ==== Ф1+ · новые грамматики ==== */
+/* PROJECT_OVERVIEW · sidebarRail — вертикальная рельса метрик/цены слева + фото и текст справа */
+.po-rail .rail-split{display:grid;grid-template-columns:.34fr .66fr;gap:34px;align-items:start;margin-bottom:6px}
+.po-rail .rail-side{border-left:2px solid var(--accent);padding-left:24px}
+.po-rail .rail-side .mrail{margin:0 0 18px}
+/* вертикальная рельса: метка над крупным значением — числа не переносятся в узкой колонке */
+.po-rail .rail-side .mrail.stack .mr{flex-direction:column;align-items:flex-start;gap:5px}
+.po-rail .rail-side .mrail.stack .mr-k{flex:0 0 auto}
+.po-rail .rail-side .mrail.stack .mr-v{margin-left:0;font-size:calc(var(--s-metric)*.86);line-height:1.02}
+.po-rail .rail-side .mrail.stack .mr-s{order:3}
+.po-rail .rail-side .amen{margin:0}
+.po-rail .rail-img{height:360px;border-radius:var(--radius);margin-bottom:22px}
+.po-rail .rail-main .lede{margin-bottom:20px}
+@media(max-width:640px){.po-rail .rail-split{grid-template-columns:1fr;gap:22px}.po-rail .rail-side{border-left:0;padding-left:0}.po-rail .rail-img{height:240px}}
+/* PROJECT_OVERVIEW · figureGround — доминантное фото + плавающая карточка-идентити в углу */
+.po-fg .fg-stage{position:relative;height:560px;border-radius:var(--radius);overflow:hidden;margin-bottom:26px}
+.po-fg .fg-img{position:absolute;inset:0}
+.po-fg .fg-card{position:absolute;left:0;bottom:0;background:var(--paper);color:var(--ink);padding:30px 36px 32px;max-width:66%;border-top-right-radius:calc(var(--radius) + 8px);box-shadow:0 -8px 60px -18px rgba(0,0,0,.55)}
+.po-fg .fg-h{font-family:var(--disp);font-size:var(--s-h1);line-height:1.04;font-weight:600;letter-spacing:-.015em;margin-top:4px;max-width:16ch}
+.po-fg .fg-sub{font-size:13px;letter-spacing:.06em;color:var(--mut);margin-top:10px;text-transform:uppercase}
+.po-fg .fg-blurb{font-size:14px;line-height:1.55;color:var(--mut);margin-top:14px;max-width:46ch}
+@media(max-width:640px){.po-fg .fg-stage{height:auto;overflow:visible}.po-fg .fg-img{position:relative;height:260px;border-radius:var(--radius)}.po-fg .fg-card{position:relative;max-width:none;box-shadow:none;padding:22px 4px 4px}}
+/* PROJECT_OVERVIEW · dataLed — цифры/оплата главенствуют, фото — небольшая поддержка */
+.po-data .dl-top{display:grid;grid-template-columns:1.5fr .5fr;gap:34px;align-items:center;margin-bottom:8px}
+.po-data .dl-metrics .mrail.big{margin:0;gap:30px 46px}
+.po-data .dl-metrics .mr-v{font-size:calc(var(--s-metric)*1.2)}
+.po-data .dl-metrics .mr.lead .mr-v{font-size:calc(var(--s-metric)*1.5)}
+.po-data .dl-thumb{margin:0}
+.po-data .dl-img{height:210px;border-radius:var(--radius)}
+.po-data .dl-cols{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start;margin-top:6px}
+.po-data .dl-cols .dl-c > *:first-child{margin-top:0}
+@media(max-width:640px){.po-data .dl-top{grid-template-columns:1fr}.po-data .dl-cols{grid-template-columns:1fr;gap:20px}}
+/* COVER · splitVertical — половина фото / половина типографической панели */
+.cv-sv{display:grid;grid-template-columns:1fr 1fr;min-height:1180px;padding:0}
+.cv-sv .sv-photo{position:relative}.cv-sv .sv-photo .cover-img{position:absolute;inset:0}
+.cv-sv .sv-panel{background:var(--tint);display:flex;flex-direction:column;padding:var(--pad-y) var(--pad-x)}
+.cv-sv .sv-panel .cv-top{padding:0}
+.cv-sv .sv-mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+.cv-sv .cv-h{font-size:calc(var(--s-disp)*.78);max-width:12ch}   /* панель уже половины листа — крупный дисплей меньше переносится */
+.cv-sv .sv-bot{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;border-top:1px solid var(--line);padding-top:18px}
+@media(max-width:640px){.cv-sv{grid-template-columns:1fr;min-height:auto}.cv-sv .sv-photo{min-height:320px}}
+/* COVER · indexCard — редакторская обложка-«содержание» с перечнем проектов */
+.cv-index{padding:var(--pad-y) var(--pad-x)}
+.cv-index .cv-top{padding:0}
+.cv-index .ix-head{margin-top:42px}.cv-index .cv-h{margin-top:0}
+.cv-index .ix-list{list-style:none;margin:36px 0 auto;border-top:1px solid var(--line)}
+.cv-index .ix-r{display:flex;align-items:baseline;gap:20px;padding:20px 0;border-bottom:1px solid var(--line)}
+.cv-index .ix-no{font-family:var(--disp);font-size:16px;color:var(--accent);font-weight:600;flex:0 0 34px;font-variant-numeric:tabular-nums}
+.cv-index .ix-tx{flex:1}
+.cv-index .ix-nm{font-family:var(--disp);font-size:22px;font-weight:600;letter-spacing:-.01em;display:block}
+.cv-index .ix-mt{font-size:12px;color:var(--mut);letter-spacing:.06em;margin-top:5px;display:block;text-transform:uppercase}
+.cv-index .ix-pr{font-family:var(--disp);font-size:17px;font-weight:600;color:var(--accent);flex:0 0 auto}
+@media(max-width:640px){.cv-index .ix-nm{font-size:19px}}
+/* PROJECT_OPENER · plate — кадр на всю страницу + плотная карточка-идентити снизу */
+.op-plate{color:#fff;background:var(--band) center/cover no-repeat;padding:var(--pad-y) var(--pad-x);justify-content:flex-start}
+.op-plate .op-top{display:flex;justify-content:space-between;align-items:center;text-shadow:0 2px 20px rgba(0,0,0,.4)}
+.op-plate .wm-tx{color:#fff}.op-plate .op-top .op-tag{color:rgba(255,255,255,.85)}
+.op-plate .op-plate-card{margin-top:auto;background:var(--paper);color:var(--ink);border-radius:var(--radius);padding:34px 40px;max-width:66%;box-shadow:0 30px 90px -30px rgba(0,0,0,.65)}
+.op-plate .op-plate-card .op-no{color:var(--accent)}
+.op-plate .op-plate-card .op-h{font-family:var(--disp);font-size:var(--s-h1);line-height:1.04;font-weight:600;letter-spacing:-.015em;margin-top:8px;max-width:15ch}
+.op-plate .op-plate-lede{font-size:15px;color:var(--mut);margin-top:14px;line-height:1.5;max-width:44ch}
+.op-plate .op-price{font-family:var(--disp);font-size:23px;font-weight:600;color:var(--accent);margin-top:18px}
+@media(max-width:640px){.op-plate .op-plate-card{max-width:none;padding:26px 24px}}
+/* COMPARISON · ranked — редакторский ранжир лидеров по критериям */
+.cmp-ranked .rk-list{border-top:1px solid var(--ink);margin:8px 0 16px}
+.rk-row{display:flex;align-items:baseline;gap:22px;padding:20px 0;border-bottom:1px solid var(--line)}
+.rk-no{font-family:var(--disp);font-size:15px;color:var(--accent);font-weight:600;flex:0 0 30px}
+.rk-dim{flex:1;display:flex;flex-direction:column;gap:6px}
+.rk-k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.rk-nm{font-family:var(--disp);font-size:21px;font-weight:600;letter-spacing:-.01em}
+.rk-v{font-family:var(--disp);font-size:20px;font-weight:600;color:var(--accent);flex:0 0 auto}
+/* COMPARISON · barsRow — горизонтальные мини-полосы по метрикам (факт. величины) */
+.cmp-bars .br-group{margin:10px 0 22px}
+.br-k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.br-row{display:flex;align-items:center;gap:14px;padding:7px 0}
+.br-nm{flex:0 0 26%;font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.br-track{flex:1;height:10px;background:var(--tint);border-radius:100px;overflow:hidden}
+.br-track i{display:block;height:100%;background:color-mix(in srgb,var(--accent) 38%,var(--tint));border-radius:100px}
+.br-row.best .br-track i{background:var(--accent)}
+.br-v{flex:0 0 auto;font-family:var(--disp);font-size:14px;font-weight:600;min-width:96px;text-align:right}
+.br-row.best .br-v{color:var(--accent)}
+.br-bi{flex:0 0 52px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-style:normal;text-align:right}
+/* RECOMMENDATION · sidebarNote — заметка на полях: сайдбар с подписью + аннотированные пункты */
+.rec-sidenote{display:grid;grid-template-columns:.42fr .58fr;gap:44px;align-items:start}
+.rec-sidenote .sn-side{border-right:1px solid var(--line);padding-right:34px}
+.rec-sidenote .sn-side .rc-sign{margin-top:22px}
+.rec-sidenote .sn-cta{font-size:14px;color:var(--mut);line-height:1.6;margin-top:24px}
+.rec-sidenote .sn-open{font-family:var(--disp);font-size:25px;line-height:1.3;font-weight:500;letter-spacing:-.01em;margin-bottom:24px}
+.rec-sidenote .sn-pts{border-top:1px solid var(--line)}
+.rec-sidenote .sn-p{padding:18px 0;border-bottom:1px solid var(--line)}
+.rec-sidenote .sn-k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700;display:block;margin-bottom:7px}
+.rec-sidenote .sn-p p{font-size:15px;line-height:1.6}
+@media(max-width:640px){.rec-sidenote{grid-template-columns:1fr;gap:24px}.rec-sidenote .sn-side{border-right:0;border-bottom:1px solid var(--line);padding:0 0 22px}}
+/* RECOMMENDATION · pickCard — «с чего начать»: карточка-лидер по фактам (не зелёный бокс) */
+.rec-pick .pk-card{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:26px 32px;margin:6px 0 18px;background:var(--tint)}
+.rec-pick .pk-h{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.rec-pick .pk-nm{font-family:var(--disp);font-size:26px;font-weight:600;letter-spacing:-.01em}
+.rec-pick .pk-mt{font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
+.rec-pick .pk-pr{font-family:var(--disp);font-size:19px;font-weight:600;color:var(--accent);margin-left:auto}
+.rec-pick .pk-why{list-style:none;margin:0}
+.rec-pick .pk-why li{padding:9px 0 9px 24px;font-size:15px;line-height:1.5;position:relative}
+.rec-pick .pk-why li::before{content:"";position:absolute;left:0;top:14px;width:12px;height:1px;background:var(--accent)}
+.rec-pick .pk-rest{font-size:14px;color:var(--mut);line-height:1.6;margin-top:8px}.rec-pick .pk-rest b{color:var(--ink);font-weight:600}
 /* ---- print ---- */
 @media print{
   body{background:#fff}
@@ -1334,10 +1602,10 @@ p{font-size:var(--s-body);line-height:1.6}
   .page{box-shadow:none;margin:0;min-height:auto;page-break-after:always;break-after:page}
   .page:last-child{page-break-after:auto}
   /* полностраничные (full-bleed) роли заполняют A4 целиком; текстовые — по контенту */
-  .cover,.opener,.op-split,.bk-band,.bk-plate{min-height:0;height:100vh}
+  .cover,.opener,.op-split,.cv-sv,.bk-band,.bk-plate{min-height:0;height:100vh}
   .bk-plate{display:flex}
   /* атомарные блоки не рвём между границами A4 */
-  .mrail,.pt-track,.pt-svg,.pay,.pay-one,.fplan,.fp-cell,.cmpc,.units tr,.th,.cc-item,.cc-lr,.dt-r,.pf-t,.pf-pil,.ns-step,.ns-sr,.ns-cta,.ag-facts,.ag-min-head,.rc-sign,.rec-inline,.why li{break-inside:avoid;page-break-inside:avoid}
+  .mrail,.pt-track,.pt-svg,.pay,.pay-one,.fplan,.fp-cell,.cmpc,.units tr,.th,.cc-item,.cc-lr,.dt-r,.pf-t,.pf-pil,.ns-step,.ns-sr,.ns-cta,.ag-facts,.ag-min-head,.rc-sign,.rec-inline,.why li,.rk-row,.br-group,.sn-p,.pk-card,.fg-stage,.rail-side,.dl-thumb,.ix-r{break-inside:avoid;page-break-inside:avoid}
   .h2,.po-h,.cv-h,.op-h,.ag-h,.pf-intro{break-after:avoid;page-break-after:avoid}
   /* Ф4 · плотность проектных страниц ТОЛЬКО для печати: «1.4-страничный» проект укладываем в один полный A4,
      чтобы не оставлять полупустой хвост следующего листа. Экран (?design=1 без print) не меняется. */
@@ -1355,6 +1623,14 @@ p{font-size:var(--s-body);line-height:1.6}
   /* metricEditorial: правый столбец (фото+рельса метрик) — доминанта высоты; ужимаем ровно чтобы влезть в один A4 */
   .po-me .me-r .me-img{height:106px;margin-bottom:10px}
   .po-me .mrail.stack .mr{padding:6px 14px}
+  /* Ф1+ · новые проектные грамматики: ужимаем крупные фото под один A4 */
+  .po-fg .fg-stage{height:300px;margin-bottom:16px}
+  .po-fg .fg-card{padding:20px 26px}
+  .po-rail .rail-img{height:210px;margin-bottom:14px}
+  .po-rail .rail-split{gap:26px}
+  .po-data .dl-img{height:150px}
+  .po-data .dl-top{gap:26px;margin-bottom:4px}
+  .po-data .dl-cols{gap:26px}
   .lede{margin-bottom:12px;line-height:1.5}
   /* планы/генплан: ниже для печати; у gallery-страницы (её план уезжает на 2-й полный лист) оставляем крупнее */
   .fp-img{height:200px}
