@@ -3758,7 +3758,8 @@ html[data-night] .lc-fp-body { background: #0e1626; }
    второй уходил в неявный auto-ряд → фантомные 55px с кликабельным input/select. Схлопываем и неявные ряды
    + pointer-events:none в закрытом состоянии (никаких «невидимых кнопок» и выпадающих меню). */
 .mb-addpanel { display: grid; grid-template-rows: 0fr; grid-auto-rows: 0fr; opacity: 0; pointer-events: none; transition: grid-template-rows .28s cubic-bezier(.4,0,.2,1), grid-auto-rows .28s cubic-bezier(.4,0,.2,1), opacity .22s, margin .28s; margin: 0; }
-.mb-addpanel.open { grid-template-rows: 1fr; grid-auto-rows: auto; opacity: 1; pointer-events: auto; margin: -4px 0 2px; }
+.mb-addpanel:not(.open) { display: none; }   /* закрытая — 0 высоты (холст сразу под шапкой, без остаточного зазора) */
+.mb-addpanel.open { display: grid; grid-template-rows: 1fr; grid-auto-rows: auto; opacity: 1; pointer-events: auto; margin: -4px 0 2px; }
 .mb-addpanel > * { min-height: 0; overflow: hidden; }
 .mb-addpanel .mb-inp { display: flex; gap: 8px; padding-top: 4px; }
 .mb-inp input { flex: 1; min-width: 0; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 15px; font-size: 13.5px; outline: none; background: var(--card); }
@@ -4551,6 +4552,9 @@ html[data-night] {
 
 /* ── асимметр. сетка: dense-упаковка + пер-виджет спаны (стаггер, но выровнено) ── */
 .ov2-grid { grid-auto-flow: row dense; }
+/* ⭐ МОЗАИКА: мелкая строчная сетка + JS-спаны строк (ovMasonry) → виджеты заклиниваются без пустот */
+.ov2-grid.ov-masonry { grid-auto-rows: 8px; row-gap: 8px; }
+.ov2-grid.ov-masonry .ov-w { align-self: start; }
 .ov-w.ov-span-4 { grid-column: span 4; }
 .ov-w.ov-span-5 { grid-column: span 5; }
 .ov-w.ov-span-6 { grid-column: span 6; }

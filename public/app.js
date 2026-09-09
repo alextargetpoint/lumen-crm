@@ -1751,6 +1751,34 @@ async function loadSeats() {
     ${active ? `<div class="seat-sub-t">Кто в системе сейчас</div><div class="seat-list">${active}</div>` : ''}
     <div class="seat-note">Сигнал не блокирует вход автоматически — это подсказка владельцу. Массовый вход разных сотрудников с одного IP/устройства обычно означает передачу одного доступа на несколько человек в обход подписки.</div>`;
 }
+/* ⭐ Мозаичная упаковка виджетов Обзора (masonry): измеряем натуральную высоту каждого виджета
+   и задаём grid-row span на мелкой сетке строк → виджеты «заклиниваются» без пустот, сохраняя ширины (spans).
+   Аддитивно поверх 12-колоночной сетки; выключается в режиме правки и на 1 колонке. */
+const OV_MROW = 8, OV_MGAP = 8;
+function ovMasonry(grid) {
+  if (!grid) return;
+  /* сброс — измеряем в обычной сетке (авто-высота) */
+  grid.classList.remove('ov-masonry');
+  const items = [...grid.querySelectorAll('.ov-w')];
+  items.forEach(w => { w.style.gridRowEnd = ''; });
+  if (typeof OV_EDIT !== 'undefined' && OV_EDIT) return;   /* в конструкторе — обычная сетка (drag) */
+  const cs = getComputedStyle(grid);
+  if (cs.display !== 'grid') return;
+  const ncols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
+  if (ncols <= 1) return;                                   /* мобайл/1 колонка — не мозаичим */
+  const heights = items.map(w => w.getBoundingClientRect().height);
+  grid.classList.add('ov-masonry');
+  items.forEach((w, i) => { w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((heights[i] + OV_MGAP) / (OV_MROW + OV_MGAP))); });
+}
+let _ovMasonryHook = false, _ovMasonryTmr = null;
+function ovMasonryWatch(root) {
+  const run = () => { const g = root.querySelector('#ovGrid'); if (g && document.body.contains(g)) ovMasonry(g); };
+  requestAnimationFrame(() => { run(); setTimeout(run, 260); });   /* после раскладки + после мото-постеров/шрифтов */
+  if (!_ovMasonryHook) {
+    _ovMasonryHook = true;
+    window.addEventListener('resize', () => { clearTimeout(_ovMasonryTmr); _ovMasonryTmr = setTimeout(run, 140); });
+  }
+}
 PAGES.overview = async (root) => {
   const [an, events, leads, tsk, feedD, casesD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] })), api.get('/cases/list').catch(() => [])]);
   const ovBoard = (feedD.board || []).filter(b => b.deals > 0 || b.dealsMonth > 0);
@@ -1805,6 +1833,7 @@ PAGES.overview = async (root) => {
     }
     ovAnimateCounts(root);
     wireMotion(root);
+    ovMasonryWatch(root);   /* мозаичная упаковка виджетов */
   };
   paint();
 };
