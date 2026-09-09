@@ -783,6 +783,7 @@ const sanLayer = (l) => {
     if (!/^(assets\/|\/assets\/|https?:\/\/)/.test(String(l.url || ''))) return null;
     o.url = String(l.url).slice(0, 500); o.round = num(l.round, 0, 0, 50); o.h = num(l.h, 0, 0, 160);
     if (l.avatar) o.avatar = 1; if (l.sticker || /\/stickers\//.test(o.url)) o.sticker = 1;
+    if (l.pl) o.pl = 1;   /* фото-подложка (раскладка): рендерится НИЖЕ текста */
     if (l.fit && CAR_IMGFIT.has(l.fit)) o.fit = l.fit;
     if (l.ox != null) o.ox = num(l.ox, 50, 0, 100); if (l.oy != null) o.oy = num(l.oy, 50, 0, 100);   /* object-position % (кроп-фокус) */
     if (l.filter && CAR_IMGFILT.has(l.filter)) o.filter = l.filter;
@@ -845,7 +846,8 @@ function renderCarLayers(layers, isEdit) {
   /* светлый текст на фото → мягкая тень для читаемости поверх «занятых» кадров (пальмы, блики) */
   const isLightHex = (h) => { const x = String(h || '').replace('#', ''); if (x.length < 3) return false; const s2 = x.length <= 4 ? x.split('').slice(0, 3).map(ch => ch + ch).join('') : x.slice(0, 6); const r = parseInt(s2.slice(0, 2), 16), g = parseInt(s2.slice(2, 4), 16), b = parseInt(s2.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 155; };
   return layers.map((l, i) => {
-    const z = 10 + (l.z || 0);
+    const isPl = l.t === 'img' && l.pl && !l.sticker;               /* фото-подложка раскладки → НИЖЕ текста */
+    const z = isPl ? (-20 + (l.z || 0)) : (10 + (l.z || 0));         /* отрицательный z: над фоном слайда, под скримом(0)/текстом(1) */
     const de = isEdit ? ` data-lyr="${i}"${lj(l)}` : '';
     if (l.t === 'frame') return `<div class="s-frame frame-${l.frame}" style="--fc:${esc(l.color)};z-index:${z}"${de}>${handles}</div>`;
     const hasH = l.h != null && l.h > 0;
@@ -854,7 +856,7 @@ function renderCarLayers(layers, isEdit) {
     const geo = `left:${l.x}%;top:${l.y}%;${autoW ? '' : `width:${l.w}%;`}${hasH ? `height:${l.h}%;` : ''}z-index:${z};transform:rotate(${l.rot || 0}deg)${opv}`;
     let inner = '';
     const isStk = l.t === 'img' && (l.sticker || /\/stickers\//.test(String(l.url || '')));   /* стикер = прозрачный PNG, без рамочной тени */
-    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '') + (l.t === 'icon' && !hasH ? ' lyr-sq' : '');
+    const clsL = 's-lyr lyr-' + l.t + (isStk ? ' is-sticker' : '') + (isPl ? ' is-plbg' : '') + (l.t === 'icon' && !hasH ? ' lyr-sq' : '');
     if (l.t === 'img' && l.avatar) inner = `<div style="width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid #fff;box-shadow:0 8px 26px -8px rgba(6,17,38,.55)"><img src="${esc(abs(l.url))}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
     else if (l.t === 'img') { const filt = l.filter && IMG_FILT[l.filter] ? `filter:${IMG_FILT[l.filter]};` : ''; const sh = l.shadow ? '' : (isStk ? '' : ''); inner = `<img src="${esc(abs(l.url))}" style="width:100%;height:${hasH ? '100%' : 'auto'};object-fit:${isStk ? 'contain' : (l.fit || 'cover')};object-position:${l.ox != null ? l.ox : 50}% ${l.oy != null ? l.oy : 50}%;border-radius:${isStk ? 0 : (l.round || 0)}px;display:block;${filt}">`; }
     else if (l.t === 'grad') inner = `<div style="width:100%;height:${hasH ? '100%' : '40%'};background:${GRAD_CSS(l.gd, esc(l.from), esc(l.to))}"></div>`;
@@ -5577,7 +5579,8 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const slides = (c.slides || []).map((s, i) => {
         if (onlyIdx >= 0 && i !== onlyIdx) return '';
         const hasVid = !!s.bgv, hasBg = !!s.bg, hasColor = !!s.bgc;
-        const light = (hasVid || hasBg || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон → белый текст */
+        const hasPl = Array.isArray(s.layers) && s.layers.some(l => l.t === 'img' && l.pl && !l.sticker);   /* фото-подложка раскладки */
+        const light = (hasVid || hasBg || hasPl || (hasColor && isDarkHex(s.bgc)));   /* тёмный фон/фото → белый текст */
         const hasPat = !hasVid && !hasBg && !hasColor && !!s.bgpat;
         const hasGrad = !hasVid && !hasBg && !hasColor && !hasPat && !!s.grad;
         const scHeavy = (hasBg || hasVid) && !!s.mode;   /* контент (иконки/цифры) поверх фото — усиленный скрим для читаемости */
@@ -5697,6 +5700,10 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-lyr.lyr-img img{box-shadow:0 10px 28px -10px rgba(6,17,38,.5)}
 /* стикеры (прозрачный PNG) — БЕЗ рамочной тени, тень по контуру вырезки, чтобы сливались с фоном как в референсах */
 .s-lyr.lyr-img.is-sticker img{box-shadow:none;border-radius:0;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(6,17,38,.32))}
+/* ⭐ фото-подложка раскладки: живёт НИЖЕ текста (отрицательный z в inline-style), без рамочной тени. */
+.s-lyr.lyr-img.is-plbg img{box-shadow:none}
+/* при выделении в редакторе поднимаем над текстом/скримом, чтобы схватить ручки размера/перемещения */
+.s-lyr.lyr-img.is-plbg.lsel{z-index:35!important}
 .s-lyr.lyr-sticker{aspect-ratio:1}.s-lyr .lyr-ic{height:100%}
 .s-lyr .lyr-shape svg{filter:drop-shadow(0 6px 16px rgba(0,0,0,.18))}
 /* рамки (оверлей на весь слайд) */
@@ -5818,15 +5825,16 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.hasbg .s-stat i{color:rgba(255,255,255,.82)}
 .s-steps{display:flex;flex-direction:column;gap:12px;margin-top:8px}
 /* ⭐ План оплаты — премиум-таймлайн вех (этап · % · заметка), спайн по левому краю */
-.s-payplan{display:flex;flex-direction:column;margin-top:14px;position:relative}
-.s-payplan::before{content:"";position:absolute;left:5px;top:22px;bottom:22px;width:2px;background:color-mix(in srgb,var(--blue) 28%,transparent)}
-.s-pp-row{display:grid;grid-template-columns:12px minmax(58px,auto) 1fr;align-items:center;gap:16px;padding:13px 0;position:relative;z-index:1}
-.s-pp-row:not(:last-child){border-bottom:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
-.s-pp-dot{width:11px;height:11px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 16%,var(--paper))}
-.s-pp-pct{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:clamp(24px,6cqw,38px);color:var(--blue);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.s-pp-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
-.s-pp-txt b{font-size:clamp(14px,3.6cqw,17px);font-weight:700;color:var(--ink);line-height:1.2}
-.s-pp-txt i{font-style:normal;font-size:clamp(12px,3cqw,14px);color:var(--mut);line-height:1.3}
+/* спайн-таймлайн (референс «Vertical Steps»): вертикальная линия сквозь точки, крупный % и подпись.
+   БЕЗ разделительных линий строк — спайн+точки уже дают ритм (две метафоры сразу = визуальный шум). */
+.s-payplan{display:flex;flex-direction:column;margin-top:16px;position:relative}
+.s-payplan::before{content:"";position:absolute;left:6px;top:18px;bottom:18px;width:2px;background:linear-gradient(180deg,color-mix(in srgb,var(--blue) 42%,transparent),color-mix(in srgb,var(--blue) 18%,transparent))}
+.s-pp-row{display:grid;grid-template-columns:14px minmax(62px,auto) 1fr;align-items:center;gap:18px;padding:16px 0;position:relative;z-index:1}
+.s-pp-dot{width:13px;height:13px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 5px color-mix(in srgb,var(--blue) 14%,var(--paper)),0 2px 6px -1px color-mix(in srgb,var(--blue) 55%,transparent)}
+.s-pp-pct{font-family:var(--disp);font-optical-sizing:auto;font-weight:600;font-size:clamp(27px,6.6cqw,42px);color:var(--blue);line-height:1;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.s-pp-txt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.s-pp-txt b{font-size:clamp(15px,3.8cqw,18px);font-weight:700;color:var(--ink);line-height:1.18;letter-spacing:-.005em}
+.s-pp-txt i{font-style:normal;font-size:clamp(12.5px,3cqw,14.5px);color:var(--mut);line-height:1.32}
 .slide.hasbg .s-pp-txt b{color:#fff}.slide.hasbg .s-pp-txt i{color:rgba(255,255,255,.82)}
 .slide.hasbg .s-pp-row:not(:last-child){border-bottom-color:rgba(255,255,255,.2)}
 .slide.hasbg .s-pp-dot{box-shadow:0 0 0 4px rgba(255,255,255,.18)}
@@ -5958,7 +5966,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=50"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=51"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

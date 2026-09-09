@@ -491,7 +491,16 @@ body.cpanel-on{padding-right:308px!important}
     }
     const rs = e.target.closest('.lyr-rs');
     if (rs) { e.preventDefault(); e.stopPropagation(); const lyr = rs.closest('.s-lyr'); const slide = lyr.closest('.slide'); const sr = slide.getBoundingClientRect(); const startW = lyr.offsetWidth, startX = e.clientX; selLayer(lyr);
-      const mv = (ev) => { const w = Math.max(3, Math.min(130, (startW + (ev.clientX - startX)) / sr.width * 100)); lyr.style.width = w + '%'; updL(lyr, { w: +w.toFixed(1) }); };
+      const o0 = updL(lyr, {}); const w0 = +o0.w || (startW / sr.width * 100); const h0 = +o0.h || 0;
+      /* ⭐ фото/картинки с заданной высотой тянутся ПРОПОРЦИОНАЛЬНО (w и h одним коэффициентом) — не искажаются.
+         Shift — свободно (только ширина). Остальные слои — как раньше, по ширине. */
+      const propLock = (lyr.classList.contains('lyr-img') && h0 > 0);
+      const mv = (ev) => {
+        const w = Math.max(3, Math.min(160, (startW + (ev.clientX - startX)) / sr.width * 100));
+        lyr.style.width = w + '%'; const patch = { w: +w.toFixed(1) };
+        if (propLock && !ev.shiftKey) { const nh = Math.max(3, Math.min(160, h0 * (w / w0))); lyr.style.height = nh + '%'; patch.h = +nh.toFixed(1); }
+        updL(lyr, patch);
+      };
       const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); dirty = true; save(false); };
       document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); return;
     }
@@ -514,7 +523,8 @@ body.cpanel-on{padding-right:308px!important}
     const sl = slideEl(i); if (!sl) return;
     sl.dataset[key] = val;
     const pos = sl.dataset.pos || 'center', al = sl.dataset.align || 'left', sz = sl.dataset.size || 'm';
-    const bgcls = (sl.dataset.bg || sl.dataset.bgv || (sl.dataset.bgc && isDark(sl.dataset.bgc))) ? ' hasbg' : '';
+    const hasPlBg = !!sl.querySelector('.s-lyr.lyr-img.is-plbg');   /* фото-подложка тоже даёт скрим+белый текст */
+    const bgcls = (sl.dataset.bg || sl.dataset.bgv || (sl.dataset.bgc && isDark(sl.dataset.bgc)) || hasPlBg) ? ' hasbg' : '';
     const pat = (!sl.dataset.bg && !sl.dataset.bgv && !sl.dataset.bgc && sl.dataset.bgpat) ? ` pat-${sl.dataset.bgpat}` : '';
     /* сохраняем раскладку/градиент/подложку при смене позиции/размера (иначе live-превью их терял) */
     let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {}
@@ -725,8 +735,9 @@ body.cpanel-on{padding-right:308px!important}
     sl.bg = ''; sl.bgv = '';
     sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker));   /* стикеры оставляем */
     let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
-    L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', z }); });
-    save(true, { slides: arr }); flash('Раскладка применена ✓', 1400);
+    /* pl:1 → фото ложится ПОДЛОЖКОЙ (ниже текста), не перекрывая заголовок/тезисы; текст получает скрим */
+    L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', pl: 1, z }); });
+    save(true, { slides: arr }); flash(urls.length < L.n ? `Разложено ${urls.length} из ${L.n} — добавь фото для остальных` : 'Раскладка применена ✓', 1600);
   }
   /* применить раскладку: на ДЕЙСТВУЮЩИЕ фото если есть, иначе — подгрузить */
   function applyPhotoLayout(i, L) {
@@ -886,6 +897,9 @@ body.cpanel-on{padding-right:308px!important}
   function slideHtml(sl) {
     const pos = sl.dataset.pos || 'center', al = sl.dataset.align || 'left', sz = sl.dataset.size || 'm';
     const bgKind = sl.dataset.bgv ? 'Видео' : sl.dataset.bg ? 'Фото' : sl.dataset.bgc ? 'Цвет' : 'Тема';
+    /* ⭐ авто-детект числа фото на слайде (фон + img-слои, без стикеров) → раскладки/тоггл сразу под реальность */
+    const nPhotos = slidePhotos(sel).length;
+    const detN = Math.max(1, Math.min(4, nPhotos || 1));
     return `
     <div class="cgrp"><label>Слайд ${sel + 1} · фон: ${bgKind}</label>
       <div class="cbtn-row">
@@ -898,9 +912,10 @@ body.cpanel-on{padding-right:308px!important}
       <div id="cBgExtra"></div>
     </div>
     <div class="cgrp"><label>Фото-раскладка <button class="clink" id="cPlAuto" type="button">✨ Авто по фото</button></label>
-      <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n, i2) => `<button data-pln="${n}" class="${i2 === 0 ? 'on' : ''}">${n} фото</button>`).join('')}</div>
-      <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === 1).map(plTile).join('')}</div>
-      <div class="cnote">Раскладка ложится на УЖЕ загруженные фото слайда; если их нет — попросит подгрузить. «Авто» сам поймёт число фото и применит подходящую композицию.</div>
+      <div class="cnote" id="cPlDet">${nPhotos ? `Обнаружено <b>${nPhotos}</b> фото на слайде — показаны раскладки для ${detN}. «Авто» разложит их сразу, не перекрывая текст.` : 'На слайде нет фото. Выбери раскладку — попросит подгрузить.'}</div>
+      <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n) => `<button data-pln="${n}" class="${n === detN ? 'on' : ''}">${n} фото</button>`).join('')}</div>
+      <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === detN).map(plTile).join('')}</div>
+      <div class="cnote">Фото ложатся <b>подложкой под текст</b> (заголовок читается поверх). Размер тянется за угол — <b>пропорция сохраняется</b>. «Авто» сам поймёт число фото и применит подходящую композицию.</div>
     </div>
     <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>

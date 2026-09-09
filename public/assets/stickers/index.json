@@ -1,2982 +1,3537 @@
 {
-"packs": [
-{
-"title": "Буллеты",
-"dir": "bullets",
-"items": [
-{
-"slug": "bullet-01",
-"label": "Чек · стандартный",
-"cat": "checks",
-"kw": [
-"галка",
-"чек",
-"да",
-"готово",
-"включено",
-"преимущество",
-"плюс"
-],
-"key": "bullets/01"
-},
-{
-"slug": "bullet-02",
-"label": "Чек · успех",
-"cat": "checks",
-"kw": [
-"успех",
-"готово",
-"выполнено",
-"да",
-"одобрено",
-"преимущество"
-],
-"key": "bullets/02"
-},
-{
-"slug": "bullet-03",
-"label": "Чек · акцент",
-"cat": "checks",
-"kw": [
-"галка",
-"акцент",
-"важно",
-"да",
-"ключевое"
-],
-"key": "bullets/03"
-},
-{
-"slug": "bullet-04",
-"label": "Чек · контур",
-"cat": "checks",
-"kw": [
-"галка",
-"контур",
-"лёгкий",
-"да",
-"минимал"
-],
-"key": "bullets/04"
-},
-{
-"slug": "bullet-05",
-"label": "Чек · премиум",
-"cat": "checks",
-"kw": [
-"галка",
-"премиум",
-"люкс",
-"да",
-"важное"
-],
-"key": "bullets/05"
-},
-{
-"slug": "bullet-06",
-"label": "Искра",
-"cat": "nav",
-"kw": [
-"искра",
-"новинка",
-"особенное",
-"вау",
-"изюминка",
-"акцент"
-],
-"key": "bullets/06"
-},
-{
-"slug": "bullet-07",
-"label": "Далее",
-"cat": "nav",
-"kw": [
-"далее",
-"шаг",
-"продолжение",
-"вперёд",
-"переход"
-],
-"key": "bullets/07"
-},
-{
-"slug": "bullet-08",
-"label": "Точка",
-"cat": "dots",
-"kw": [
-"точка",
-"пункт",
-"список",
-"буллет"
-],
-"key": "bullets/08"
-},
-{
-"slug": "bullet-09",
-"label": "Минимал",
-"cat": "dots",
-"kw": [
-"точка",
-"минимал",
-"список",
-"пункт"
-],
-"key": "bullets/09"
-},
-{
-"slug": "bullet-10",
-"label": "Фокус",
-"cat": "dots",
-"kw": [
-"фокус",
-"цель",
-"центр",
-"внимание",
-"главное"
-],
-"key": "bullets/10"
-},
-{
-"slug": "bullet-11",
-"label": "Активный",
-"cat": "dots",
-"kw": [
-"активно",
-"включено",
-"да",
-"статус",
-"онлайн"
-],
-"key": "bullets/11"
-},
-{
-"slug": "bullet-12",
-"label": "Неактивный",
-"cat": "dots",
-"kw": [
-"неактивно",
-"выключено",
-"пусто",
-"нет"
-],
-"key": "bullets/12"
-},
-{
-"slug": "bullet-13",
-"label": "Добавить",
-"cat": "nav",
-"kw": [
-"плюс",
-"добавить",
-"ещё",
-"бонус",
-"дополнительно"
-],
-"key": "bullets/13"
-},
-{
-"slug": "bullet-14",
-"label": "Стрелка",
-"cat": "nav",
-"kw": [
-"стрелка",
-"далее",
-"переход",
-"результат",
-"ведёт"
-],
-"key": "bullets/14"
-},
-{
-"slug": "bullet-15",
-"label": "Прогресс",
-"cat": "accent",
-"kw": [
-"прогресс",
-"старт",
-"запуск",
-"play",
-"движение",
-"процесс"
-],
-"key": "bullets/15"
-},
-{
-"slug": "bullet-16",
-"label": "Рост",
-"cat": "accent",
-"kw": [
-"рост",
-"график",
-"динамика",
-"доход",
-"инвестиции",
-"увеличение",
-"+%"
-],
-"key": "bullets/16"
-},
-{
-"slug": "bullet-17",
-"label": "Природа",
-"cat": "accent",
-"kw": [
-"природа",
-"эко",
-"зелень",
-"парк",
-"сад",
-"воздух",
-"экология"
-],
-"key": "bullets/17"
-},
-{
-"slug": "bullet-18",
-"label": "Энергия",
-"cat": "accent",
-"kw": [
-"энергия",
-"тренд",
-"огонь",
-"горячо",
-"спрос",
-"популярно",
-"хит"
-],
-"key": "bullets/18"
-},
-{
-"slug": "bullet-19",
-"label": "Забота",
-"cat": "accent",
-"kw": [
-"забота",
-"комфорт",
-"сервис",
-"любовь",
-"семья",
-"уют"
-],
-"key": "bullets/19"
-},
-{
-"slug": "bullet-20",
-"label": "Ценность",
-"cat": "accent",
-"kw": [
-"ценность",
-"инвестиции",
-"люкс",
-"премиум",
-"капитал",
-"бриллиант",
-"стоимость"
-],
-"key": "bullets/20"
-},
-{
-"slug": "bullet-21",
-"label": "Статус",
-"cat": "accent",
-"kw": [
-"статус",
-"престиж",
-"элита",
-"корона",
-"vip",
-"люкс"
-],
-"key": "bullets/21"
-},
-{
-"slug": "bullet-22",
-"label": "Локация",
-"cat": "meta",
-"kw": [
-"локация",
-"адрес",
-"район",
-"где",
-"карта",
-"рядом",
-"пляж",
-"центр",
-"метро",
-"расположение"
-],
-"key": "bullets/22"
-},
-{
-"slug": "bullet-23",
-"label": "Время",
-"cat": "meta",
-"kw": [
-"время",
-"срок",
-"сдача",
-"график",
-"дедлайн",
-"часы",
-"этап"
-],
-"key": "bullets/23"
-},
-{
-"slug": "bullet-24",
-"label": "Документ",
-"cat": "meta",
-"kw": [
-"документ",
-"договор",
-"условия",
-"детали",
-"план",
-"бумаги"
-],
-"key": "bullets/24"
-},
-{
-"slug": "bullet-25",
-"label": "Надёжность",
-"cat": "meta",
-"kw": [
-"надёжность",
-"защита",
-"гарантия",
-"безопасность",
-"щит",
-"застройщик"
-],
-"key": "bullets/25"
-},
-{
-"slug": "bullet-26",
-"label": "Команда",
-"cat": "meta",
-"kw": [
-"команда",
-"люди",
-"партнёры",
-"сообщество",
-"жильцы",
-"соседи"
-],
-"key": "bullets/26"
-},
-{
-"slug": "bullet-27",
-"label": "Образование",
-"cat": "meta",
-"kw": [
-"образование",
-"школа",
-"знания",
-"экспертиза",
-"обучение",
-"университет"
-],
-"key": "bullets/27"
-},
-{
-"slug": "bullet-28",
-"label": "Старт",
-"cat": "meta",
-"kw": [
-"старт",
-"запуск",
-"ракета",
-"начало",
-"рост",
-"вперёд",
-"продажи"
-],
-"key": "bullets/28"
-}
-]
-},
-{
-"title": "Буллеты · 3D",
-"dir": "bullets-3d",
-"items": [
-{
-"slug": "bullets-3d-01",
-"label": "Круг",
-"cat": "checks",
-"kw": [
-"точка",
-"пункт",
-"круг",
-"список"
-],
-"key": "bullets-3d/01"
-},
-{
-"slug": "bullets-3d-02",
-"label": "Круг · акцент",
-"cat": "checks",
-"kw": [
-"акцент",
-"важно",
-"ключевое"
-],
-"key": "bullets-3d/02"
-},
-{
-"slug": "bullets-3d-03",
-"label": "Точка",
-"cat": "checks",
-"kw": [
-"точка",
-"пункт",
-"список",
-"буллет"
-],
-"key": "bullets-3d/03"
-},
-{
-"slug": "bullets-3d-04",
-"label": "Квадрат",
-"cat": "checks",
-"kw": [
-"пункт",
-"блок",
-"квадрат"
-],
-"key": "bullets-3d/04"
-},
-{
-"slug": "bullets-3d-05",
-"label": "Квадрат · акцент",
-"cat": "checks",
-"kw": [
-"акцент",
-"важно",
-"ключевое"
-],
-"key": "bullets-3d/05"
-},
-{
-"slug": "bullets-3d-06",
-"label": "Галочка",
-"cat": "checks",
-"kw": [
-"галка",
-"да",
-"готово",
-"преимущество"
-],
-"key": "bullets-3d/06"
-},
-{
-"slug": "bullets-3d-07",
-"label": "Галочка в круге",
-"cat": "checks",
-"kw": [
-"точка",
-"пункт",
-"круг",
-"список"
-],
-"key": "bullets-3d/07"
-},
-{
-"slug": "bullets-3d-08",
-"label": "Плюс",
-"cat": "checks",
-"kw": [
-"плюс",
-"добавить",
-"ещё",
-"бонус"
-],
-"key": "bullets-3d/08"
-},
-{
-"slug": "bullets-3d-09",
-"label": "Стрелка вправо",
-"cat": "accent",
-"kw": [
-"стрелка",
-"далее",
-"переход",
-"результат"
-],
-"key": "bullets-3d/09"
-},
-{
-"slug": "bullets-3d-10",
-"label": "Стрелка в круге",
-"cat": "accent",
-"kw": [
-"точка",
-"пункт",
-"круг",
-"список"
-],
-"key": "bullets-3d/10"
-},
-{
-"slug": "bullets-3d-11",
-"label": "Двойная стрелка",
-"cat": "accent",
-"kw": [
-"стрелка",
-"далее",
-"переход",
-"результат"
-],
-"key": "bullets-3d/11"
-},
-{
-"slug": "bullets-3d-12",
-"label": "Треугольник",
-"cat": "accent",
-"kw": [
-"старт",
-"play",
-"запуск",
-"процесс"
-],
-"key": "bullets-3d/12"
-},
-{
-"slug": "bullets-3d-13",
-"label": "Ромб",
-"cat": "accent",
-"kw": [
-"ценность",
-"акцент",
-"грань"
-],
-"key": "bullets-3d/13"
-},
-{
-"slug": "bullets-3d-14",
-"label": "Звезда",
-"cat": "accent",
-"kw": [
-"звезда",
-"топ",
-"лучшее",
-"рейтинг",
-"премиум"
-],
-"key": "bullets-3d/14"
-},
-{
-"slug": "bullets-3d-15",
-"label": "Сердце",
-"cat": "accent",
-"kw": [
-"забота",
-"комфорт",
-"любовь",
-"сервис"
-],
-"key": "bullets-3d/15"
-},
-{
-"slug": "bullets-3d-16",
-"label": "Огонь",
-"cat": "accent",
-"kw": [
-"тренд",
-"хит",
-"спрос",
-"горячо",
-"популярно"
-],
-"key": "bullets-3d/16"
-},
-{
-"slug": "bullets-3d-17",
-"label": "Лист",
-"cat": "accent",
-"kw": [
-"эко",
-"природа",
-"зелень",
-"парк",
-"воздух"
-],
-"key": "bullets-3d/17"
-},
-{
-"slug": "bullets-3d-18",
-"label": "Локация",
-"cat": "accent",
-"kw": [
-"локация",
-"адрес",
-"район",
-"где",
-"карта",
-"пляж",
-"центр"
-],
-"key": "bullets-3d/18"
-},
-{
-"slug": "bullets-3d-19",
-"label": "Часы",
-"cat": "accent",
-"kw": [
-"время",
-"срок",
-"сдача",
-"график",
-"этап"
-],
-"key": "bullets-3d/19"
-},
-{
-"slug": "bullets-3d-20",
-"label": "График",
-"cat": "accent",
-"kw": [
-"рост",
-"график",
-"доход",
-"инвестиции",
-"динамика"
-],
-"key": "bullets-3d/20"
-},
-{
-"slug": "bullets-3d-21",
-"label": "Пользователи",
-"cat": "accent",
-"kw": [
-"команда",
-"люди",
-"жильцы",
-"соседи"
-],
-"key": "bullets-3d/21"
-},
-{
-"slug": "bullets-3d-22",
-"label": "Корона",
-"cat": "accent",
-"kw": [
-"статус",
-"престиж",
-"элита",
-"vip",
-"люкс"
-],
-"key": "bullets-3d/22"
-},
-{
-"slug": "bullets-3d-23",
-"label": "Бриллиант",
-"cat": "accent",
-"kw": [
-"ценность",
-"инвестиции",
-"люкс",
-"капитал",
-"стоимость"
-],
-"key": "bullets-3d/23"
-},
-{
-"slug": "bullets-3d-24",
-"label": "Ракета",
-"cat": "accent",
-"kw": [
-"старт",
-"запуск",
-"начало",
-"рост",
-"продажи"
-],
-"key": "bullets-3d/24"
-},
-{
-"slug": "bullets-3d-25",
-"label": "Документ",
-"cat": "meta",
-"kw": [
-"документ",
-"договор",
-"условия",
-"детали",
-"план"
-],
-"key": "bullets-3d/25"
-},
-{
-"slug": "bullets-3d-26",
-"label": "Сообщение",
-"cat": "meta",
-"kw": [
-"связь",
-"чат",
-"контакт",
-"общение"
-],
-"key": "bullets-3d/26"
-},
-{
-"slug": "bullets-3d-27",
-"label": "Настройки",
-"cat": "meta",
-"kw": [
-"настройка",
-"сервис",
-"процесс",
-"управление"
-],
-"key": "bullets-3d/27"
-},
-{
-"slug": "bullets-3d-28",
-"label": "Солнце",
-"cat": "meta",
-"kw": [
-"климат",
-"тепло",
-"лето",
-"энергия",
-"день"
-],
-"key": "bullets-3d/28"
-},
-{
-"slug": "bullets-3d-29",
-"label": "Луна",
-"cat": "meta",
-"kw": [
-"ночь",
-"спокойствие",
-"отдых"
-],
-"key": "bullets-3d/29"
-},
-{
-"slug": "bullets-3d-30",
-"label": "Щит",
-"cat": "meta",
-"kw": [
-"защита",
-"гарантия",
-"безопасность",
-"надёжность",
-"застройщик"
-],
-"key": "bullets-3d/30"
-},
-{
-"slug": "bullets-3d-31",
-"label": "Молния",
-"cat": "meta",
-"kw": [
-"энергия",
-"скорость",
-"мощь"
-],
-"key": "bullets-3d/31"
-},
-{
-"slug": "bullets-3d-32",
-"label": "Бесконечность",
-"cat": "meta",
-"kw": [
-"навсегда",
-"безлимит",
-"вечность"
-],
-"key": "bullets-3d/32"
-}
-]
-},
-{
-"title": "Буллеты · Неон",
-"dir": "bullets-neon",
-"items": [
-{
-"slug": "bullets-neon-01",
-"label": "Чек",
-"cat": "checks",
-"kw": [
-"галка",
-"чек",
-"да",
-"готово",
-"преимущество",
-"плюс"
-],
-"key": "bullets-neon/01"
-},
-{
-"slug": "bullets-neon-02",
-"label": "Успех",
-"cat": "checks",
-"kw": [
-"успех",
-"готово",
-"выполнено",
-"да",
-"одобрено"
-],
-"key": "bullets-neon/02"
-},
-{
-"slug": "bullets-neon-03",
-"label": "Контур",
-"cat": "checks",
-"kw": [
-"галка",
-"контур",
-"да",
-"минимал"
-],
-"key": "bullets-neon/03"
-},
-{
-"slug": "bullets-neon-04",
-"label": "Премиум",
-"cat": "checks",
-"kw": [
-"премиум",
-"люкс",
-"галка",
-"важное"
-],
-"key": "bullets-neon/04"
-},
-{
-"slug": "bullets-neon-05",
-"label": "Стрелка",
-"cat": "checks",
-"kw": [
-"стрелка",
-"далее",
-"переход",
-"результат"
-],
-"key": "bullets-neon/05"
-},
-{
-"slug": "bullets-neon-06",
-"label": "Стрелка · акцент",
-"cat": "checks",
-"kw": [
-"акцент",
-"важно",
-"ключевое"
-],
-"key": "bullets-neon/06"
-},
-{
-"slug": "bullets-neon-07",
-"label": "Далее",
-"cat": "checks",
-"kw": [
-"далее",
-"шаг",
-"продолжение",
-"вперёд"
-],
-"key": "bullets-neon/07"
-},
-{
-"slug": "bullets-neon-08",
-"label": "Плюс",
-"cat": "checks",
-"kw": [
-"плюс",
-"добавить",
-"ещё",
-"бонус"
-],
-"key": "bullets-neon/08"
-},
-{
-"slug": "bullets-neon-09",
-"label": "Точка",
-"cat": "accent",
-"kw": [
-"точка",
-"пункт",
-"список",
-"буллет"
-],
-"key": "bullets-neon/09"
-},
-{
-"slug": "bullets-neon-10",
-"label": "Точка · контур",
-"cat": "accent",
-"kw": [
-"галка",
-"контур",
-"да",
-"минимал"
-],
-"key": "bullets-neon/10"
-},
-{
-"slug": "bullets-neon-11",
-"label": "Активный",
-"cat": "accent",
-"kw": [
-"активно",
-"включено",
-"да",
-"онлайн"
-],
-"key": "bullets-neon/11"
-},
-{
-"slug": "bullets-neon-12",
-"label": "Неактивный",
-"cat": "accent",
-"kw": [
-"активно",
-"включено",
-"да",
-"онлайн"
-],
-"key": "bullets-neon/12"
-},
-{
-"slug": "bullets-neon-13",
-"label": "Искра",
-"cat": "accent",
-"kw": [
-"новинка",
-"особенное",
-"вау",
-"акцент"
-],
-"key": "bullets-neon/13"
-},
-{
-"slug": "bullets-neon-14",
-"label": "Звезда",
-"cat": "accent",
-"kw": [
-"звезда",
-"топ",
-"лучшее",
-"рейтинг",
-"премиум"
-],
-"key": "bullets-neon/14"
-},
-{
-"slug": "bullets-neon-15",
-"label": "Сердце",
-"cat": "accent",
-"kw": [
-"забота",
-"комфорт",
-"любовь",
-"сервис"
-],
-"key": "bullets-neon/15"
-},
-{
-"slug": "bullets-neon-16",
-"label": "Огонь",
-"cat": "accent",
-"kw": [
-"тренд",
-"хит",
-"спрос",
-"горячо",
-"популярно"
-],
-"key": "bullets-neon/16"
-},
-{
-"slug": "bullets-neon-17",
-"label": "Лист",
-"cat": "accent",
-"kw": [
-"эко",
-"природа",
-"зелень",
-"парк",
-"воздух"
-],
-"key": "bullets-neon/17"
-},
-{
-"slug": "bullets-neon-18",
-"label": "Локация",
-"cat": "accent",
-"kw": [
-"локация",
-"адрес",
-"район",
-"где",
-"карта",
-"пляж",
-"центр"
-],
-"key": "bullets-neon/18"
-},
-{
-"slug": "bullets-neon-19",
-"label": "Время",
-"cat": "accent",
-"kw": [
-"время",
-"срок",
-"сдача",
-"этап"
-],
-"key": "bullets-neon/19"
-},
-{
-"slug": "bullets-neon-20",
-"label": "График",
-"cat": "accent",
-"kw": [
-"рост",
-"график",
-"доход",
-"инвестиции",
-"динамика"
-],
-"key": "bullets-neon/20"
-},
-{
-"slug": "bullets-neon-21",
-"label": "Люди",
-"cat": "accent",
-"kw": [
-"команда",
-"люди",
-"жильцы",
-"соседи"
-],
-"key": "bullets-neon/21"
-},
-{
-"slug": "bullets-neon-22",
-"label": "Образование",
-"cat": "accent",
-"kw": [
-"образование",
-"знания",
-"экспертиза",
-"обучение"
-],
-"key": "bullets-neon/22"
-},
-{
-"slug": "bullets-neon-23",
-"label": "Ценность",
-"cat": "accent",
-"kw": [
-"ценность",
-"инвестиции",
-"люкс",
-"капитал"
-],
-"key": "bullets-neon/23"
-},
-{
-"slug": "bullets-neon-24",
-"label": "Статус",
-"cat": "accent",
-"kw": [
-"статус"
-],
-"key": "bullets-neon/24"
-},
-{
-"slug": "bullets-neon-25",
-"label": "Документ",
-"cat": "meta",
-"kw": [
-"документ",
-"договор",
-"условия",
-"детали",
-"план"
-],
-"key": "bullets-neon/25"
-},
-{
-"slug": "bullets-neon-26",
-"label": "Сообщение",
-"cat": "meta",
-"kw": [
-"связь",
-"чат",
-"контакт",
-"общение"
-],
-"key": "bullets-neon/26"
-},
-{
-"slug": "bullets-neon-27",
-"label": "Настройки",
-"cat": "meta",
-"kw": [
-"настройка",
-"сервис",
-"процесс",
-"управление"
-],
-"key": "bullets-neon/27"
-},
-{
-"slug": "bullets-neon-28",
-"label": "Солнце",
-"cat": "meta",
-"kw": [
-"климат",
-"тепло",
-"лето",
-"энергия",
-"день"
-],
-"key": "bullets-neon/28"
-},
-{
-"slug": "bullets-neon-29",
-"label": "Луна",
-"cat": "meta",
-"kw": [
-"ночь",
-"спокойствие",
-"отдых"
-],
-"key": "bullets-neon/29"
-},
-{
-"slug": "bullets-neon-30",
-"label": "Защита",
-"cat": "meta",
-"kw": [
-"защита",
-"гарантия",
-"безопасность",
-"надёжность",
-"застройщик"
-],
-"key": "bullets-neon/30"
-},
-{
-"slug": "bullets-neon-31",
-"label": "Энергия",
-"cat": "meta",
-"kw": [
-"энергия",
-"скорость",
-"мощь"
-],
-"key": "bullets-neon/31"
-},
-{
-"slug": "bullets-neon-32",
-"label": "Бесконечность",
-"cat": "meta",
-"kw": [
-"навсегда",
-"безлимит",
-"вечность"
-],
-"key": "bullets-neon/32"
-}
-]
-},
-{
-"title": "Буллеты · Плоские",
-"dir": "bullets-flat",
-"items": [
-{
-"slug": "bullets-flat-01",
-"label": "Буллет 1",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/01"
-},
-{
-"slug": "bullets-flat-02",
-"label": "Буллет 2",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/02"
-},
-{
-"slug": "bullets-flat-03",
-"label": "Буллет 3",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/03"
-},
-{
-"slug": "bullets-flat-04",
-"label": "Буллет 4",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/04"
-},
-{
-"slug": "bullets-flat-05",
-"label": "Буллет 5",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/05"
-},
-{
-"slug": "bullets-flat-06",
-"label": "Буллет 6",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/06"
-},
-{
-"slug": "bullets-flat-07",
-"label": "Буллет 7",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/07"
-},
-{
-"slug": "bullets-flat-08",
-"label": "Буллет 8",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/08"
-},
-{
-"slug": "bullets-flat-09",
-"label": "Буллет 9",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/09"
-},
-{
-"slug": "bullets-flat-10",
-"label": "Буллет 10",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/10"
-},
-{
-"slug": "bullets-flat-11",
-"label": "Буллет 11",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/11"
-},
-{
-"slug": "bullets-flat-12",
-"label": "Буллет 12",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/12"
-},
-{
-"slug": "bullets-flat-13",
-"label": "Буллет 13",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/13"
-},
-{
-"slug": "bullets-flat-14",
-"label": "Буллет 14",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/14"
-},
-{
-"slug": "bullets-flat-15",
-"label": "Буллет 15",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/15"
-},
-{
-"slug": "bullets-flat-16",
-"label": "Буллет 16",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/16"
-},
-{
-"slug": "bullets-flat-17",
-"label": "Буллет 17",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/17"
-},
-{
-"slug": "bullets-flat-18",
-"label": "Буллет 18",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/18"
-},
-{
-"slug": "bullets-flat-19",
-"label": "Буллет 19",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/19"
-},
-{
-"slug": "bullets-flat-20",
-"label": "Буллет 20",
-"cat": "flat",
-"kw": [],
-"key": "bullets-flat/20"
-}
-]
-},
-{
-"slug": "ios-icons",
-"title": "iOS · иконки",
-"items": [
-{
-"slug": "apple",
-"label": "Эппл",
-"cat": "generic",
-"kw": [
-"смартфон",
-"техника",
-"экосистема",
-"гаджет",
-"бренд"
-],
-"key": "ios-icons/apple"
-},
-{
-"slug": "heart",
-"label": "Избранное",
-"cat": "generic",
-"kw": [
-"лайк",
-"любовь",
-"избранное",
-"хит",
-"нравится"
-],
-"key": "ios-icons/heart"
-},
-{
-"slug": "star",
-"label": "Премиум",
-"cat": "luxury",
-"kw": [
-"рейтинг",
-"отзывы",
-"лучшее",
-"звезда",
-"премиум"
-],
-"key": "ios-icons/star"
-},
-{
-"slug": "chat",
-"label": "Чат",
-"cat": "contact",
-"kw": [
-"сообщение",
-"связь",
-"диалог",
-"вопрос",
-"консультация"
-],
-"key": "ios-icons/chat"
-},
-{
-"slug": "toggle",
-"label": "Переключатель",
-"cat": "generic",
-"kw": [
-"настройки",
-"активация",
-"опция",
-"режим",
-"включить"
-],
-"key": "ios-icons/toggle"
-},
-{
-"slug": "calendar",
-"label": "Календарь",
-"cat": "urgency",
-"kw": [
-"дата",
-"бронь",
-"срок",
-"график",
-"встреча"
-],
-"key": "ios-icons/calendar"
-},
-{
-"slug": "camera",
-"label": "Фото",
-"cat": "generic",
-"kw": [
-"камера",
-"снимок",
-"галерея",
-"тур",
-"обзор"
-],
-"key": "ios-icons/camera"
-},
-{
-"slug": "music",
-"label": "Музыка",
-"cat": "lifestyle",
-"kw": [
-"аудио",
-"мелодия",
-"звук",
-"атмосфера",
-"трек"
-],
-"key": "ios-icons/music"
-},
-{
-"slug": "photos",
-"label": "Альбом",
-"cat": "generic",
-"kw": [
-"галерея",
-"фото",
-"изображения",
-"портфолио",
-"архив"
-],
-"key": "ios-icons/photos"
-},
-{
-"slug": "email",
-"label": "Почта",
-"cat": "contact",
-"kw": [
-"письмо",
-"email",
-"сообщение",
-"рассылка",
-"контакт"
-],
-"key": "ios-icons/email"
-},
-{
-"slug": "cursor",
-"label": "Курсор",
-"cat": "cta",
-"kw": [
-"клик",
-"ссылка",
-"переход",
-"выбор",
-"указатель"
-],
-"key": "ios-icons/cursor"
-},
-{
-"slug": "folder",
-"label": "Папка",
-"cat": "generic",
-"kw": [
-"документы",
-"файл",
-"каталог",
-"архив",
-"проект"
-],
-"key": "ios-icons/folder"
-},
-{
-"slug": "cloud",
-"label": "Облако",
-"cat": "generic",
-"kw": [
-"облако",
-"хранилище",
-"синхронизация",
-"онлайн",
-"данные"
-],
-"key": "ios-icons/cloud"
-},
-{
-"slug": "battery",
-"label": "Батарея",
-"cat": "generic",
-"kw": [
-"заряд",
-"энергия",
-"аккумулятор",
-"питание",
-"уровень"
-],
-"key": "ios-icons/battery"
-},
-{
-"slug": "wifi",
-"label": "Wi-Fi",
-"cat": "amenity",
-"kw": [
-"интернет",
-"связь",
-"сеть",
-"удобства",
-"онлайн"
-],
-"key": "ios-icons/wifi"
-},
-{
-"slug": "location-pin",
-"label": "Локация",
-"cat": "location",
-"kw": [
-"адрес",
-"карта",
-"район",
-"место",
-"где"
-],
-"key": "ios-icons/location-pin"
-},
-{
-"slug": "notes",
-"label": "Заметки",
-"cat": "generic",
-"kw": [
-"список",
-"чеклист",
-"план",
-"запись",
-"тезисы"
-],
-"key": "ios-icons/notes"
-},
-{
-"slug": "moon",
-"label": "Луна",
-"cat": "lifestyle",
-"kw": [
-"ночь",
-"вечер",
-"режим",
-"атмосфера",
-"покой"
-],
-"key": "ios-icons/moon"
-},
-{
-"slug": "app-store",
-"label": "Приложение",
-"cat": "generic",
-"kw": [
-"магазин",
-"софт",
-"скачать",
-"сервис",
-"платформа"
-],
-"key": "ios-icons/app-store"
-},
-{
-"slug": "search",
-"label": "Поиск",
-"cat": "generic",
-"kw": [
-"найти",
-"лупа",
-"выбор",
-"поиск",
-"изучить"
-],
-"key": "ios-icons/search"
-}
-]
-},
-{
-"slug": "ios-ui",
-"title": "iOS · элементы",
-"items": [
-{
-"slug": "finder",
-"label": "Поиск",
-"cat": "generic",
-"kw": [
-"поиск",
-"файлы",
-"навигация",
-"система",
-"обзор"
-],
-"key": "ios-ui/finder"
-},
-{
-"slug": "notes",
-"label": "Заметки",
-"cat": "generic",
-"kw": [
-"план",
-"идеи",
-"заметки",
-"список",
-"чеклист"
-],
-"key": "ios-ui/notes"
-},
-{
-"slug": "calendar",
-"label": "Календарь",
-"cat": "urgency",
-"kw": [
-"дата",
-"календарь",
-"старт",
-"срок",
-"расписание"
-],
-"key": "ios-ui/calendar"
-},
-{
-"slug": "tasks",
-"label": "Задачи",
-"cat": "generic",
-"kw": [
-"список",
-"задачи",
-"план",
-"этапы",
-"работа"
-],
-"key": "ios-ui/tasks"
-},
-{
-"slug": "weather",
-"label": "Погода",
-"cat": "lifestyle",
-"kw": [
-"климат",
-"погода",
-"солнце",
-"регион",
-"природа"
-],
-"key": "ios-ui/weather"
-},
-{
-"slug": "chat",
-"label": "Чат",
-"cat": "contact",
-"kw": [
-"связь",
-"сообщение",
-"диалог",
-"чат",
-"клиент"
-],
-"key": "ios-ui/chat"
-},
-{
-"slug": "mail",
-"label": "Почта",
-"cat": "contact",
-"kw": [
-"письмо",
-"почта",
-"запрос",
-"рассылка",
-"контакт"
-],
-"key": "ios-ui/mail"
-},
-{
-"slug": "safari",
-"label": "Браузер",
-"cat": "generic",
-"kw": [
-"сайт",
-"ссылка",
-"интернет",
-"портал",
-"онлайн"
-],
-"key": "ios-ui/safari"
-},
-{
-"slug": "photos",
-"label": "Галерея",
-"cat": "generic",
-"kw": [
-"фото",
-"галерея",
-"объект",
-"визуализация",
-"рендер"
-],
-"key": "ios-ui/photos"
-},
-{
-"slug": "camera",
-"label": "Камера",
-"cat": "generic",
-"kw": [
-"съемка",
-"обзор",
-"фото",
-"камера",
-"тур"
-],
-"key": "ios-ui/camera"
-},
-{
-"slug": "menu",
-"label": "Меню",
-"cat": "generic",
-"kw": [
-"опции",
-"действие",
-"меню",
-"функции",
-"настройки"
-],
-"key": "ios-ui/menu"
-},
-{
-"slug": "folder",
-"label": "Папка",
-"cat": "generic",
-"kw": [
-"папка",
-"документы",
-"архив",
-"каталог",
-"проект"
-],
-"key": "ios-ui/folder"
-},
-{
-"slug": "sound",
-"label": "Звук",
-"cat": "generic",
-"kw": [
-"звук",
-"громкость",
-"аудио",
-"шум",
-"атмосфера"
-],
-"key": "ios-ui/sound"
-},
-{
-"slug": "brightness",
-"label": "Яркость",
-"cat": "generic",
-"kw": [
-"свет",
-"яркость",
-"солнце",
-"экран",
-"дизайн"
-],
-"key": "ios-ui/brightness"
-},
-{
-"slug": "battery",
-"label": "Заряд",
-"cat": "invest",
-"kw": [
-"заряд",
-"батарея",
-"энергия",
-"успех",
-"готовность"
-],
-"key": "ios-ui/battery"
-},
-{
-"slug": "share",
-"label": "Поделиться",
-"cat": "contact",
-"kw": [
-"поделиться",
-"ссылка",
-"отправить",
-"сеть",
-"контакт"
-],
-"key": "ios-ui/share"
-},
-{
-"slug": "windows",
-"label": "Окна",
-"cat": "generic",
-"kw": [
-"окна",
-"несколько",
-"сравнение",
-"варианты",
-"обзор"
-],
-"key": "ios-ui/windows"
-},
-{
-"slug": "alert",
-"label": "Внимание",
-"cat": "urgency",
-"kw": [
-"внимание",
-"важно",
-"предупреждение",
-"удаление",
-"риск"
-],
-"key": "ios-ui/alert"
-},
-{
-"slug": "search-bar",
-"label": "Поиск",
-"cat": "generic",
-"kw": [
-"поиск",
-"строка",
-"найти",
-"фильтр",
-"запрос"
-],
-"key": "ios-ui/search-bar"
-}
-]
-},
-{
-"slug": "aesthetic",
-"title": "Эстетика · мотивация",
-"items": [
-{
-"slug": "david-glasses",
-"label": "Стильный Давид",
-"cat": "luxury",
-"kw": [
-"мода",
-"тренды",
-"дизайн",
-"стиль",
-"эстетика"
-],
-"key": "aesthetic/david-glasses"
-},
-{
-"slug": "coffee",
-"label": "Кофе с собой",
-"cat": "lifestyle",
-"kw": [
-"кофе",
-"утро",
-"пауза",
-"напиток",
-"бодрость"
-],
-"key": "aesthetic/coffee"
-},
-{
-"slug": "focus-note",
-"label": "Заметка фокус",
-"cat": "generic",
-"kw": [
-"заметка",
-"фокус",
-"главное",
-"важно",
-"акцент"
-],
-"key": "aesthetic/focus-note"
-},
-{
-"slug": "mountains",
-"label": "Горы",
-"cat": "lifestyle",
-"kw": [
-"горы",
-"природа",
-"пейзаж",
-"виды",
-"высота"
-],
-"key": "aesthetic/mountains"
-},
-{
-"slug": "earth-progress",
-"label": "Глобус и загрузка",
-"cat": "generic",
-"kw": [
-"мир",
-"глобус",
-"планета",
-"международный",
-"масштаб"
-],
-"key": "aesthetic/earth-progress"
-},
-{
-"slug": "earth",
-"label": "Планета Земля",
-"cat": "generic",
-"kw": [
-"земля",
-"планета",
-"мир",
-"глобально",
-"глобус"
-],
-"key": "aesthetic/earth"
-},
-{
-"slug": "progress-bar",
-"label": "Индикатор прогресса",
-"cat": "urgency",
-"kw": [
-"прогресс",
-"загрузка",
-"этапы",
-"строительство",
-"статус"
-],
-"key": "aesthetic/progress-bar"
-},
-{
-"slug": "pointing-hand",
-"label": "Указывающая рука",
-"cat": "cta",
-"kw": [
-"указатель",
-"сюда",
-"внимание",
-"клик",
-"стрелка"
-],
-"key": "aesthetic/pointing-hand"
-},
-{
-"slug": "doberman",
-"label": "Доберман",
-"cat": "luxury",
-"kw": [
-"собака",
-"охрана",
-"безопасность",
-"премиум",
-"статус"
-],
-"key": "aesthetic/doberman"
-},
-{
-"slug": "money-stacks",
-"label": "Пачки денег",
-"cat": "invest",
-"kw": [
-"деньги",
-"доход",
-"богатство",
-"наличные",
-"финансы"
-],
-"key": "aesthetic/money-stacks"
-},
-{
-"slug": "headphones",
-"label": "Наушники",
-"cat": "lifestyle",
-"kw": [
-"наушники",
-"музыка",
-"звук",
-"комфорт",
-"технологии"
-],
-"key": "aesthetic/headphones"
-},
-{
-"slug": "monstera-plant",
-"label": "Монстера в горшке",
-"cat": "lifestyle",
-"kw": [
-"растение",
-"комнатныецветы",
-"интерьер",
-"уют",
-"зелень"
-],
-"key": "aesthetic/monstera-plant"
-},
-{
-"slug": "red-sports-car",
-"label": "Красный спорткар",
-"cat": "luxury",
-"kw": [
-"спорткар",
-"машина",
-"авто",
-"скорость",
-"роскошь"
-],
-"key": "aesthetic/red-sports-car"
-},
-{
-"slug": "airplane",
-"label": "Самолет в полете",
-"cat": "lifestyle",
-"kw": [
-"самолет",
-"полет",
-"путешествия",
-"отпуск",
-"перелет"
-],
-"key": "aesthetic/airplane"
-},
-{
-"slug": "ideas-execute-repeat",
-"label": "Идеи и действия",
-"cat": "generic",
-"kw": [
-"идеи",
-"бизнес",
-"мотивация",
-"план",
-"стратегия"
-],
-"key": "aesthetic/ideas-execute-repeat"
-},
-{
-"slug": "david-bubble",
-"label": "Давид с жвачкой",
-"cat": "luxury",
-"kw": [
-"арт",
-"креатив",
-"эстетика",
-"молодежный",
-"стиль"
-],
-"key": "aesthetic/david-bubble"
-},
-{
-"slug": "shark",
-"label": "Акула",
-"cat": "invest",
-"kw": [
-"акула",
-"бизнес",
-"хищник",
-"рынок",
-"лидерство"
-],
-"key": "aesthetic/shark"
-},
-{
-"slug": "palm-tree",
-"label": "Пальма",
-"cat": "lifestyle",
-"kw": [
-"пальма",
-"курорт",
-"море",
-"отдых",
-"пляж"
-],
-"key": "aesthetic/palm-tree"
-},
-{
-"slug": "billiard-ball",
-"label": "Шар восьмерка",
-"cat": "generic",
-"kw": [
-"шар",
-"бильярд",
-"удача",
-"игра",
-"стиль"
-],
-"key": "aesthetic/billiard-ball"
-},
-{
-"slug": "retro-camera",
-"label": "Ретро камера",
-"cat": "generic",
-"kw": [
-"камера",
-"видео",
-"съемка",
-"обзор",
-"контент"
-],
-"key": "aesthetic/retro-camera"
-},
-{
-"slug": "on-air-sign",
-"label": "Вывеска On Air",
-"cat": "contact",
-"kw": [
-"эфир",
-"онлайн",
-"трансляция",
-"внимание",
-"прямойэфир"
-],
-"key": "aesthetic/on-air-sign"
-},
-{
-"slug": "do-it-anyway",
-"label": "Делай несмотря ни на что",
-"cat": "generic",
-"kw": [
-"мотивация",
-"успех",
-"действие",
-"цель",
-"преодоление"
-],
-"key": "aesthetic/do-it-anyway"
-},
-{
-"slug": "checkered-flag",
-"label": "Гоночный флаг",
-"cat": "urgency",
-"kw": [
-"финиш",
-"победа",
-"старт",
-"результат",
-"гонка"
-],
-"key": "aesthetic/checkered-flag"
-},
-{
-"slug": "melting-smiley",
-"label": "Тающий смайлик",
-"cat": "lifestyle",
-"kw": [
-"смайлик",
-"эмодзи",
-"тренд",
-"жара",
-"необычный"
-],
-"key": "aesthetic/melting-smiley"
-},
-{
-"slug": "better-version",
-"label": "Лучшая версия себя",
-"cat": "generic",
-"kw": [
-"развитие",
-"мотивация",
-"успех",
-"цели",
-"рост"
-],
-"key": "aesthetic/better-version"
-}
-]
-},
-{
-"slug": "realty",
-"title": "Недвижимость · бейджи",
-"items": [
-{
-"slug": "real-estate",
-"label": "Недвижимость",
-"cat": "cover",
-"kw": [
-"недвижимость",
-"агентство",
-"обложка",
-"заголовок",
-"компания"
-],
-"key": "realty/real-estate"
-},
-{
-"slug": "real-estate-alt",
-"label": "Недвижимость надпись",
-"cat": "cover",
-"kw": [
-"недвижимость",
-"агентство",
-"бренд",
-"название",
-"стиль"
-],
-"key": "realty/real-estate-alt"
-},
-{
-"slug": "invest-live-grow",
-"label": "Инвестируй Живи Расти",
-"cat": "invest",
-"kw": [
-"инвестиции",
-"жизнь",
-"рост",
-"возможности",
-"стратегия"
-],
-"key": "realty/invest-live-grow"
-},
-{
-"slug": "keys",
-"label": "Ключи и дом",
-"cat": "deal",
-"kw": [
-"ключи",
-"сделка",
-"покупка",
-"новоселье",
-"квартира"
-],
-"key": "realty/keys"
-},
-{
-"slug": "smart-investment",
-"label": "Умные инвестиции",
-"cat": "invest",
-"kw": [
-"инвестиции",
-"доход",
-"график",
-"стратегия",
-"деньги"
-],
-"key": "realty/smart-investment"
-},
-{
-"slug": "new-launch",
-"label": "Старт продаж",
-"cat": "urgency",
-"kw": [
-"старт",
-"новый",
-"продажи",
-"запуск",
-"срочно"
-],
-"key": "realty/new-launch"
-},
-{
-"slug": "dubai",
-"label": "Дубай локация",
-"cat": "location",
-"kw": [
-"дубай",
-"город",
-"локация",
-"оаэ",
-"район"
-],
-"key": "realty/dubai"
-},
-{
-"slug": "underline",
-"label": "Линия подчеркивания",
-"cat": "generic",
-"kw": [
-"линия",
-"подчеркивание",
-"акцент",
-"декор",
-"дизайн"
-],
-"key": "realty/underline"
-},
-{
-"slug": "burj-khalifa",
-"label": "Небоскреб Бурдж-Халифа",
-"cat": "luxury",
-"kw": [
-"небоскреб",
-"дубай",
-"высотка",
-"архитектура",
-"премиум"
-],
-"key": "realty/burj-khalifa"
-},
-{
-"slug": "prime-location",
-"label": "Лучшая локация",
-"cat": "location",
-"kw": [
-"локация",
-"район",
-"центр",
-"адрес",
-"премиум"
-],
-"key": "realty/prime-location"
-},
-{
-"slug": "more-than-property",
-"label": "Больше чем недвижимость",
-"cat": "lifestyle",
-"kw": [
-"стиль",
-"жизнь",
-"ценности",
-"философия",
-"бренд"
-],
-"key": "realty/more-than-property"
-},
-{
-"slug": "property-types",
-"label": "Типы недвижимости",
-"cat": "plan",
-"kw": [
-"квартиры",
-"виллы",
-"пентхаусы",
-"коммерция",
-"типы"
-],
-"key": "realty/property-types"
-},
-{
-"slug": "luxury-living",
-"label": "Роскошная жизнь",
-"cat": "luxury",
-"kw": [
-"люкс",
-"премиум",
-"бассейн",
-"вилла",
-"комфорт"
-],
-"key": "realty/luxury-living"
-},
-{
-"slug": "luxury-living-alt",
-"label": "Люкс проживание",
-"cat": "luxury",
-"kw": [
-"люкс",
-"бассейн",
-"элитный",
-"жилье",
-"комфорт"
-],
-"key": "realty/luxury-living-alt"
-},
-{
-"slug": "arrow-curve",
-"label": "Изогнутая стрелка",
-"cat": "cta",
-"kw": [
-"стрелка",
-"переход",
-"дальше",
-"указатель",
-"слайд"
-],
-"key": "realty/arrow-curve"
-},
-{
-"slug": "beach-view",
-"label": "Вид на пляж",
-"cat": "lifestyle",
-"kw": [
-"пляж",
-"море",
-"вид",
-"пальма",
-"курорт"
-],
-"key": "realty/beach-view"
-},
-{
-"slug": "crown",
-"label": "Корона премиум",
-"cat": "luxury",
-"kw": [
-"корона",
-"премиум",
-"люкс",
-"элитный",
-"vip"
-],
-"key": "realty/crown"
-},
-{
-"slug": "skyline",
-"label": "Городской пейзаж",
-"cat": "location",
-"kw": [
-"город",
-"небоскребы",
-"панорама",
-"центр",
-"мегаполис"
-],
-"key": "realty/skyline"
-},
-{
-"slug": "global-opportunities",
-"label": "Глобальные возможности",
-"cat": "invest",
-"kw": [
-"мир",
-"глобально",
-"возможности",
-"планета",
-"международный"
-],
-"key": "realty/global-opportunities"
-},
-{
-"slug": "turn-goals",
-"label": "Цели в адрес",
-"cat": "cta",
-"kw": [
-"цель",
-"адрес",
-"мечта",
-"покупка",
-"результат"
-],
-"key": "realty/turn-goals"
-},
-{
-"slug": "good-people",
-"label": "Хорошие люди",
-"cat": "generic",
-"kw": [
-"цитата",
-"люди",
-"отзыв",
-"команда",
-"доверие"
-],
-"key": "realty/good-people"
-},
-{
-"slug": "home-feels",
-"label": "Уютный дом",
-"cat": "lifestyle",
-"kw": [
-"дом",
-"уют",
-"интерьер",
-"гостиная",
-"атмосфера"
-],
-"key": "realty/home-feels"
-},
-{
-"slug": "value-growth",
-"label": "Рост стоимости",
-"cat": "invest",
-"kw": [
-"рост",
-"цена",
-"доходность",
-"инвестиции",
-"плюс"
-],
-"key": "realty/value-growth"
-},
-{
-"slug": "book-viewing",
-"label": "Записаться на просмотр",
-"cat": "cta",
-"kw": [
-"просмотр",
-"запись",
-"кнопка",
-"показ",
-"контакт"
-],
-"key": "realty/book-viewing"
-},
-{
-"slug": "photo-gallery",
-"label": "Галерея фото",
-"cat": "generic",
-"kw": [
-"фото",
-"галерея",
-"плюс",
-"добавить",
-"слайдер"
-],
-"key": "realty/photo-gallery"
-},
-{
-"slug": "palm-leaves",
-"label": "Листья пальмы",
-"cat": "lifestyle",
-"kw": [
-"пальма",
-"тропики",
-"отдых",
-"зелень",
-"курорт"
-],
-"key": "realty/palm-leaves"
-},
-{
-"slug": "lifestyle-word",
-"label": "Слово лайфстайл",
-"cat": "lifestyle",
-"kw": [
-"стиль",
-"жизнь",
-"курорт",
-"атмосфера",
-"комфорт"
-],
-"key": "realty/lifestyle-word"
-},
-{
-"slug": "location-freedom",
-"label": "Локация дает свободу",
-"cat": "location",
-"kw": [
-"локация",
-"свобода",
-"выбор",
-"расположение",
-"комфорт"
-],
-"key": "realty/location-freedom"
-},
-{
-"slug": "checklist",
-"label": "Чек-лист преимуществ",
-"cat": "generic",
-"kw": [
-"чек-лист",
-"список",
-"преимущества",
-"галочки",
-"услуги"
-],
-"key": "realty/checklist"
-},
-{
-"slug": "life-looks-better",
-"label": "Жизнь выглядит лучше",
-"cat": "lifestyle",
-"kw": [
-"жизнь",
-"бассейн",
-"закат",
-"красота",
-"вилла"
-],
-"key": "realty/life-looks-better"
-},
-{
-"slug": "arrow-up-right",
-"label": "Стрелка вверх вправо",
-"cat": "cta",
-"kw": [
-"стрелка",
-"вверх",
-"переход",
-"дальше",
-"рост"
-],
-"key": "realty/arrow-up-right"
-}
-]
-},
-{
-"slug": "broker",
-"title": "Брокер · Дубай",
-"items": [
-{
-"slug": "coffee",
-"label": "Кофе",
-"cat": "lifestyle",
-"kw": [
-"кофе",
-"утро",
-"перерыв",
-"напиток",
-"встреча"
-],
-"key": "broker/coffee"
-},
-{
-"slug": "new-lead",
-"label": "Новый лид",
-"cat": "deal",
-"kw": [
-"лид",
-"заявка",
-"клиент",
-"уведомление",
-"whatsapp",
-"сделка"
-],
-"key": "broker/new-lead"
-},
-{
-"slug": "skyline",
-"label": "Небоскрёбы",
-"cat": "location",
-"kw": [
-"небоскрёбы",
-"город",
-"дубай",
-"вид",
-"панорама"
-],
-"key": "broker/skyline"
-},
-{
-"slug": "laptop",
-"label": "Ноутбук",
-"cat": "generic",
-"kw": [
-"ноутбук",
-"работа",
-"онлайн",
-"удаленно",
-"компьютер"
-],
-"key": "broker/laptop"
-},
-{
-"slug": "plan-prospect",
-"label": "План действий",
-"cat": "generic",
-"kw": [
-"план",
-"заметки",
-"стратегия",
-"бизнес",
-"цели"
-],
-"key": "broker/plan-prospect"
-},
-{
-"slug": "car-key",
-"label": "Ключи от авто",
-"cat": "luxury",
-"kw": [
-"ключи",
-"машина",
-"покупка",
-"премиум",
-"сделка"
-],
-"key": "broker/car-key"
-},
-{
-"slug": "checkbox",
-"label": "Чекбокс",
-"cat": "generic",
-"kw": [
-"чекбокс",
-"галочка",
-"выполнено",
-"список",
-"проверка"
-],
-"key": "broker/checkbox"
-},
-{
-"slug": "new-leads-list",
-"label": "Список лидов",
-"cat": "deal",
-"kw": [
-"лиды",
-"список",
-"задачи",
-"клиенты",
-"просмотр"
-],
-"key": "broker/new-leads-list"
-},
-{
-"slug": "luxury-balcony",
-"label": "Вид с террасы",
-"cat": "luxury",
-"kw": [
-"терраса",
-"вид",
-"люкс",
-"элитный",
-"отдых",
-"бассейн"
-],
-"key": "broker/luxury-balcony"
-},
-{
-"slug": "client-message",
-"label": "Сообщение клиента",
-"cat": "contact",
-"kw": [
-"сообщение",
-"чат",
-"клиент",
-"запрос",
-"показ"
-],
-"key": "broker/client-message"
-},
-{
-"slug": "sold",
-"label": "Продано",
-"cat": "deal",
-"kw": [
-"продано",
-"сделка",
-"куплено",
-"успех",
-"продажа"
-],
-"key": "broker/sold"
-},
-{
-"slug": "crown",
-"label": "Корона",
-"cat": "luxury",
-"kw": [
-"корона",
-"премиум",
-"люкс",
-"элитный",
-"лучший"
-],
-"key": "broker/crown"
-},
-{
-"slug": "gelendwagen",
-"label": "Гелендваген",
-"cat": "luxury",
-"kw": [
-"автомобиль",
-"машина",
-"премиум",
-"люкс",
-"статус"
-],
-"key": "broker/gelendwagen"
-},
-{
-"slug": "good-clients",
-"label": "Цели агентства",
-"cat": "generic",
-"kw": [
-"клиенты",
-"инвестиции",
-"стиль",
-"успех",
-"мотивация"
-],
-"key": "broker/good-clients"
-},
-{
-"slug": "arrange-everything",
-"label": "Организация",
-"cat": "contact",
-"kw": [
-"чат",
-"организация",
-"согласие",
-"помощь",
-"сервис"
-],
-"key": "broker/arrange-everything"
-},
-{
-"slug": "airplane-window",
-"label": "Вид из самолета",
-"cat": "lifestyle",
-"kw": [
-"самолет",
-"полет",
-"путешествие",
-"вид",
-"город"
-],
-"key": "broker/airplane-window"
-},
-{
-"slug": "dumbbell",
-"label": "Гантель",
-"cat": "lifestyle",
-"kw": [
-"спорт",
-"фитнес",
-"зал",
-"здоровье",
-"активность"
-],
-"key": "broker/dumbbell"
-},
-{
-"slug": "luxury-watch",
-"label": "Часы премиум",
-"cat": "luxury",
-"kw": [
-"часы",
-"премиум",
-"люкс",
-"статус",
-"аксессуар"
-],
-"key": "broker/luxury-watch"
-},
-{
-"slug": "shopping-bag",
-"label": "Пакет с покупками",
-"cat": "generic",
-"kw": [
-"пакет",
-"покупки",
-"шопинг",
-"агентство",
-"брендовый"
-],
-"key": "broker/shopping-bag"
-},
-{
-"slug": "brochures",
-"label": "Каталог объектов",
-"cat": "invest",
-"kw": [
-"каталог",
-"буклеты",
-"инвестиции",
-"недвижимость",
-"офплан"
-],
-"key": "broker/brochures"
-},
-{
-"slug": "content-today",
-"label": "Контент и клиенты",
-"cat": "generic",
-"kw": [
-"контент",
-"телефон",
-"видео",
-"клиенты",
-"съемка"
-],
-"key": "broker/content-today"
-},
-{
-"slug": "rfp-presentation",
-"label": "Этапы сделки",
-"cat": "deal",
-"kw": [
-"презентация",
-"переговоры",
-"закрытие",
-"этапы",
-"бизнес"
-],
-"key": "broker/rfp-presentation"
-},
-{
-"slug": "interior-view",
-"label": "Вид из окна",
-"cat": "luxury",
-"kw": [
-"интерьер",
-"гостиная",
-"вид",
-"панорама",
-"квартира"
-],
-"key": "broker/interior-view"
-},
-{
-"slug": "steering-wheel",
-"label": "Руль автомобиля",
-"cat": "luxury",
-"kw": [
-"руль",
-"авто",
-"поездка",
-"премиум",
-"путь"
-],
-"key": "broker/steering-wheel"
-},
-{
-"slug": "organizer-files",
-"label": "Органайзер файлов",
-"cat": "generic",
-"kw": [
-"файлы",
-"клиенты",
-"договоры",
-"папки",
-"архив"
-],
-"key": "broker/organizer-files"
-},
-{
-"slug": "same-city",
-"label": "Цитата о городе",
-"cat": "lifestyle",
-"kw": [
-"город",
-"истории",
-"цитата",
-"атмосфера",
-"дубай"
-],
-"key": "broker/same-city"
-},
-{
-"slug": "palm-tree",
-"label": "Пальма",
-"cat": "lifestyle",
-"kw": [
-"пальма",
-"тропики",
-"отдых",
-"курорт",
-"лето"
-],
-"key": "broker/palm-tree"
-},
-{
-"slug": "passport",
-"label": "Паспорт ОАЭ",
-"cat": "lifestyle",
-"kw": [
-"паспорт",
-"оаэ",
-"гражданство",
-"резидентство",
-"эмираты"
-],
-"key": "broker/passport"
-},
-{
-"slug": "street-signs",
-"label": "Указатели районов",
-"cat": "location",
-"kw": [
-"указатели",
-"районы",
-"дубай",
-"локация",
-"марина"
-],
-"key": "broker/street-signs"
-}
-]
-}
-]
+  "packs": [
+    {
+      "title": "Буллеты",
+      "dir": "bullets",
+      "items": [
+        {
+          "slug": "bullet-01",
+          "label": "Чек · стандартный",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "чек",
+            "да",
+            "готово",
+            "включено",
+            "преимущество",
+            "плюс"
+          ],
+          "key": "bullets/01"
+        },
+        {
+          "slug": "bullet-02",
+          "label": "Чек · успех",
+          "cat": "checks",
+          "kw": [
+            "успех",
+            "готово",
+            "выполнено",
+            "да",
+            "одобрено",
+            "преимущество"
+          ],
+          "key": "bullets/02"
+        },
+        {
+          "slug": "bullet-03",
+          "label": "Чек · акцент",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "акцент",
+            "важно",
+            "да",
+            "ключевое"
+          ],
+          "key": "bullets/03"
+        },
+        {
+          "slug": "bullet-04",
+          "label": "Чек · контур",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "контур",
+            "лёгкий",
+            "да",
+            "минимал"
+          ],
+          "key": "bullets/04"
+        },
+        {
+          "slug": "bullet-05",
+          "label": "Чек · премиум",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "премиум",
+            "люкс",
+            "да",
+            "важное"
+          ],
+          "key": "bullets/05"
+        },
+        {
+          "slug": "bullet-06",
+          "label": "Искра",
+          "cat": "nav",
+          "kw": [
+            "искра",
+            "новинка",
+            "особенное",
+            "вау",
+            "изюминка",
+            "акцент"
+          ],
+          "key": "bullets/06"
+        },
+        {
+          "slug": "bullet-07",
+          "label": "Далее",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "шаг",
+            "продолжение",
+            "вперёд",
+            "переход"
+          ],
+          "key": "bullets/07"
+        },
+        {
+          "slug": "bullet-08",
+          "label": "Точка",
+          "cat": "dots",
+          "kw": [
+            "точка",
+            "пункт",
+            "список",
+            "буллет"
+          ],
+          "key": "bullets/08"
+        },
+        {
+          "slug": "bullet-09",
+          "label": "Минимал",
+          "cat": "dots",
+          "kw": [
+            "точка",
+            "минимал",
+            "список",
+            "пункт"
+          ],
+          "key": "bullets/09"
+        },
+        {
+          "slug": "bullet-10",
+          "label": "Фокус",
+          "cat": "dots",
+          "kw": [
+            "фокус",
+            "цель",
+            "центр",
+            "внимание",
+            "главное"
+          ],
+          "key": "bullets/10"
+        },
+        {
+          "slug": "bullet-11",
+          "label": "Активный",
+          "cat": "dots",
+          "kw": [
+            "активно",
+            "включено",
+            "да",
+            "статус",
+            "онлайн"
+          ],
+          "key": "bullets/11"
+        },
+        {
+          "slug": "bullet-12",
+          "label": "Неактивный",
+          "cat": "dots",
+          "kw": [
+            "неактивно",
+            "выключено",
+            "пусто",
+            "нет"
+          ],
+          "key": "bullets/12"
+        },
+        {
+          "slug": "bullet-13",
+          "label": "Добавить",
+          "cat": "nav",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "бонус",
+            "дополнительно"
+          ],
+          "key": "bullets/13"
+        },
+        {
+          "slug": "bullet-14",
+          "label": "Стрелка",
+          "cat": "nav",
+          "kw": [
+            "стрелка",
+            "далее",
+            "переход",
+            "результат",
+            "ведёт"
+          ],
+          "key": "bullets/14"
+        },
+        {
+          "slug": "bullet-15",
+          "label": "Прогресс",
+          "cat": "accent",
+          "kw": [
+            "прогресс",
+            "старт",
+            "запуск",
+            "play",
+            "движение",
+            "процесс"
+          ],
+          "key": "bullets/15"
+        },
+        {
+          "slug": "bullet-16",
+          "label": "Рост",
+          "cat": "accent",
+          "kw": [
+            "рост",
+            "график",
+            "динамика",
+            "доход",
+            "инвестиции",
+            "увеличение",
+            "+%"
+          ],
+          "key": "bullets/16"
+        },
+        {
+          "slug": "bullet-17",
+          "label": "Природа",
+          "cat": "accent",
+          "kw": [
+            "природа",
+            "эко",
+            "зелень",
+            "парк",
+            "сад",
+            "воздух",
+            "экология"
+          ],
+          "key": "bullets/17"
+        },
+        {
+          "slug": "bullet-18",
+          "label": "Энергия",
+          "cat": "accent",
+          "kw": [
+            "энергия",
+            "тренд",
+            "огонь",
+            "горячо",
+            "спрос",
+            "популярно",
+            "хит"
+          ],
+          "key": "bullets/18"
+        },
+        {
+          "slug": "bullet-19",
+          "label": "Забота",
+          "cat": "accent",
+          "kw": [
+            "забота",
+            "комфорт",
+            "сервис",
+            "любовь",
+            "семья",
+            "уют"
+          ],
+          "key": "bullets/19"
+        },
+        {
+          "slug": "bullet-20",
+          "label": "Ценность",
+          "cat": "accent",
+          "kw": [
+            "ценность",
+            "инвестиции",
+            "люкс",
+            "премиум",
+            "капитал",
+            "бриллиант",
+            "стоимость"
+          ],
+          "key": "bullets/20"
+        },
+        {
+          "slug": "bullet-21",
+          "label": "Статус",
+          "cat": "accent",
+          "kw": [
+            "статус",
+            "престиж",
+            "элита",
+            "корона",
+            "vip",
+            "люкс"
+          ],
+          "key": "bullets/21"
+        },
+        {
+          "slug": "bullet-22",
+          "label": "Локация",
+          "cat": "meta",
+          "kw": [
+            "локация",
+            "адрес",
+            "район",
+            "где",
+            "карта",
+            "рядом",
+            "пляж",
+            "центр",
+            "метро",
+            "расположение"
+          ],
+          "key": "bullets/22"
+        },
+        {
+          "slug": "bullet-23",
+          "label": "Время",
+          "cat": "meta",
+          "kw": [
+            "время",
+            "срок",
+            "сдача",
+            "график",
+            "дедлайн",
+            "часы",
+            "этап"
+          ],
+          "key": "bullets/23"
+        },
+        {
+          "slug": "bullet-24",
+          "label": "Документ",
+          "cat": "meta",
+          "kw": [
+            "документ",
+            "договор",
+            "условия",
+            "детали",
+            "план",
+            "бумаги"
+          ],
+          "key": "bullets/24"
+        },
+        {
+          "slug": "bullet-25",
+          "label": "Надёжность",
+          "cat": "meta",
+          "kw": [
+            "надёжность",
+            "защита",
+            "гарантия",
+            "безопасность",
+            "щит",
+            "застройщик"
+          ],
+          "key": "bullets/25"
+        },
+        {
+          "slug": "bullet-26",
+          "label": "Команда",
+          "cat": "meta",
+          "kw": [
+            "команда",
+            "люди",
+            "партнёры",
+            "сообщество",
+            "жильцы",
+            "соседи"
+          ],
+          "key": "bullets/26"
+        },
+        {
+          "slug": "bullet-27",
+          "label": "Образование",
+          "cat": "meta",
+          "kw": [
+            "образование",
+            "школа",
+            "знания",
+            "экспертиза",
+            "обучение",
+            "университет"
+          ],
+          "key": "bullets/27"
+        },
+        {
+          "slug": "bullet-28",
+          "label": "Старт",
+          "cat": "meta",
+          "kw": [
+            "старт",
+            "запуск",
+            "ракета",
+            "начало",
+            "рост",
+            "вперёд",
+            "продажи"
+          ],
+          "key": "bullets/28"
+        }
+      ]
+    },
+    {
+      "title": "Буллеты · 3D",
+      "dir": "bullets-3d",
+      "items": [
+        {
+          "slug": "bullets-3d-01",
+          "label": "Круг",
+          "cat": "checks",
+          "kw": [
+            "точка",
+            "пункт",
+            "круг",
+            "список"
+          ],
+          "key": "bullets-3d/01"
+        },
+        {
+          "slug": "bullets-3d-02",
+          "label": "Круг · акцент",
+          "cat": "checks",
+          "kw": [
+            "акцент",
+            "важно",
+            "ключевое"
+          ],
+          "key": "bullets-3d/02"
+        },
+        {
+          "slug": "bullets-3d-03",
+          "label": "Точка",
+          "cat": "checks",
+          "kw": [
+            "точка",
+            "пункт",
+            "список",
+            "буллет"
+          ],
+          "key": "bullets-3d/03"
+        },
+        {
+          "slug": "bullets-3d-04",
+          "label": "Квадрат",
+          "cat": "checks",
+          "kw": [
+            "пункт",
+            "блок",
+            "квадрат"
+          ],
+          "key": "bullets-3d/04"
+        },
+        {
+          "slug": "bullets-3d-05",
+          "label": "Квадрат · акцент",
+          "cat": "checks",
+          "kw": [
+            "акцент",
+            "важно",
+            "ключевое"
+          ],
+          "key": "bullets-3d/05"
+        },
+        {
+          "slug": "bullets-3d-06",
+          "label": "Галочка",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "да",
+            "готово",
+            "преимущество"
+          ],
+          "key": "bullets-3d/06"
+        },
+        {
+          "slug": "bullets-3d-07",
+          "label": "Галочка в круге",
+          "cat": "checks",
+          "kw": [
+            "точка",
+            "пункт",
+            "круг",
+            "список"
+          ],
+          "key": "bullets-3d/07"
+        },
+        {
+          "slug": "bullets-3d-08",
+          "label": "Плюс",
+          "cat": "checks",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "бонус"
+          ],
+          "key": "bullets-3d/08"
+        },
+        {
+          "slug": "bullets-3d-09",
+          "label": "Стрелка вправо",
+          "cat": "accent",
+          "kw": [
+            "стрелка",
+            "далее",
+            "переход",
+            "результат"
+          ],
+          "key": "bullets-3d/09"
+        },
+        {
+          "slug": "bullets-3d-10",
+          "label": "Стрелка в круге",
+          "cat": "accent",
+          "kw": [
+            "точка",
+            "пункт",
+            "круг",
+            "список"
+          ],
+          "key": "bullets-3d/10"
+        },
+        {
+          "slug": "bullets-3d-11",
+          "label": "Двойная стрелка",
+          "cat": "accent",
+          "kw": [
+            "стрелка",
+            "далее",
+            "переход",
+            "результат"
+          ],
+          "key": "bullets-3d/11"
+        },
+        {
+          "slug": "bullets-3d-12",
+          "label": "Треугольник",
+          "cat": "accent",
+          "kw": [
+            "старт",
+            "play",
+            "запуск",
+            "процесс"
+          ],
+          "key": "bullets-3d/12"
+        },
+        {
+          "slug": "bullets-3d-13",
+          "label": "Ромб",
+          "cat": "accent",
+          "kw": [
+            "ценность",
+            "акцент",
+            "грань"
+          ],
+          "key": "bullets-3d/13"
+        },
+        {
+          "slug": "bullets-3d-14",
+          "label": "Звезда",
+          "cat": "accent",
+          "kw": [
+            "звезда",
+            "топ",
+            "лучшее",
+            "рейтинг",
+            "премиум"
+          ],
+          "key": "bullets-3d/14"
+        },
+        {
+          "slug": "bullets-3d-15",
+          "label": "Сердце",
+          "cat": "accent",
+          "kw": [
+            "забота",
+            "комфорт",
+            "любовь",
+            "сервис"
+          ],
+          "key": "bullets-3d/15"
+        },
+        {
+          "slug": "bullets-3d-16",
+          "label": "Огонь",
+          "cat": "accent",
+          "kw": [
+            "тренд",
+            "хит",
+            "спрос",
+            "горячо",
+            "популярно"
+          ],
+          "key": "bullets-3d/16"
+        },
+        {
+          "slug": "bullets-3d-17",
+          "label": "Лист",
+          "cat": "accent",
+          "kw": [
+            "эко",
+            "природа",
+            "зелень",
+            "парк",
+            "воздух"
+          ],
+          "key": "bullets-3d/17"
+        },
+        {
+          "slug": "bullets-3d-18",
+          "label": "Локация",
+          "cat": "accent",
+          "kw": [
+            "локация",
+            "адрес",
+            "район",
+            "где",
+            "карта",
+            "пляж",
+            "центр"
+          ],
+          "key": "bullets-3d/18"
+        },
+        {
+          "slug": "bullets-3d-19",
+          "label": "Часы",
+          "cat": "accent",
+          "kw": [
+            "время",
+            "срок",
+            "сдача",
+            "график",
+            "этап"
+          ],
+          "key": "bullets-3d/19"
+        },
+        {
+          "slug": "bullets-3d-20",
+          "label": "График",
+          "cat": "accent",
+          "kw": [
+            "рост",
+            "график",
+            "доход",
+            "инвестиции",
+            "динамика"
+          ],
+          "key": "bullets-3d/20"
+        },
+        {
+          "slug": "bullets-3d-21",
+          "label": "Пользователи",
+          "cat": "accent",
+          "kw": [
+            "команда",
+            "люди",
+            "жильцы",
+            "соседи"
+          ],
+          "key": "bullets-3d/21"
+        },
+        {
+          "slug": "bullets-3d-22",
+          "label": "Корона",
+          "cat": "accent",
+          "kw": [
+            "статус",
+            "престиж",
+            "элита",
+            "vip",
+            "люкс"
+          ],
+          "key": "bullets-3d/22"
+        },
+        {
+          "slug": "bullets-3d-23",
+          "label": "Бриллиант",
+          "cat": "accent",
+          "kw": [
+            "ценность",
+            "инвестиции",
+            "люкс",
+            "капитал",
+            "стоимость"
+          ],
+          "key": "bullets-3d/23"
+        },
+        {
+          "slug": "bullets-3d-24",
+          "label": "Ракета",
+          "cat": "accent",
+          "kw": [
+            "старт",
+            "запуск",
+            "начало",
+            "рост",
+            "продажи"
+          ],
+          "key": "bullets-3d/24"
+        },
+        {
+          "slug": "bullets-3d-25",
+          "label": "Документ",
+          "cat": "meta",
+          "kw": [
+            "документ",
+            "договор",
+            "условия",
+            "детали",
+            "план"
+          ],
+          "key": "bullets-3d/25"
+        },
+        {
+          "slug": "bullets-3d-26",
+          "label": "Сообщение",
+          "cat": "meta",
+          "kw": [
+            "связь",
+            "чат",
+            "контакт",
+            "общение"
+          ],
+          "key": "bullets-3d/26"
+        },
+        {
+          "slug": "bullets-3d-27",
+          "label": "Настройки",
+          "cat": "meta",
+          "kw": [
+            "настройка",
+            "сервис",
+            "процесс",
+            "управление"
+          ],
+          "key": "bullets-3d/27"
+        },
+        {
+          "slug": "bullets-3d-28",
+          "label": "Солнце",
+          "cat": "meta",
+          "kw": [
+            "климат",
+            "тепло",
+            "лето",
+            "энергия",
+            "день"
+          ],
+          "key": "bullets-3d/28"
+        },
+        {
+          "slug": "bullets-3d-29",
+          "label": "Луна",
+          "cat": "meta",
+          "kw": [
+            "ночь",
+            "спокойствие",
+            "отдых"
+          ],
+          "key": "bullets-3d/29"
+        },
+        {
+          "slug": "bullets-3d-30",
+          "label": "Щит",
+          "cat": "meta",
+          "kw": [
+            "защита",
+            "гарантия",
+            "безопасность",
+            "надёжность",
+            "застройщик"
+          ],
+          "key": "bullets-3d/30"
+        },
+        {
+          "slug": "bullets-3d-31",
+          "label": "Молния",
+          "cat": "meta",
+          "kw": [
+            "энергия",
+            "скорость",
+            "мощь"
+          ],
+          "key": "bullets-3d/31"
+        },
+        {
+          "slug": "bullets-3d-32",
+          "label": "Бесконечность",
+          "cat": "meta",
+          "kw": [
+            "навсегда",
+            "безлимит",
+            "вечность"
+          ],
+          "key": "bullets-3d/32"
+        }
+      ]
+    },
+    {
+      "title": "Буллеты · Неон",
+      "dir": "bullets-neon",
+      "items": [
+        {
+          "slug": "bullets-neon-01",
+          "label": "Чек",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "чек",
+            "да",
+            "готово",
+            "преимущество",
+            "плюс"
+          ],
+          "key": "bullets-neon/01"
+        },
+        {
+          "slug": "bullets-neon-02",
+          "label": "Успех",
+          "cat": "checks",
+          "kw": [
+            "успех",
+            "готово",
+            "выполнено",
+            "да",
+            "одобрено"
+          ],
+          "key": "bullets-neon/02"
+        },
+        {
+          "slug": "bullets-neon-03",
+          "label": "Контур",
+          "cat": "checks",
+          "kw": [
+            "галка",
+            "контур",
+            "да",
+            "минимал"
+          ],
+          "key": "bullets-neon/03"
+        },
+        {
+          "slug": "bullets-neon-04",
+          "label": "Премиум",
+          "cat": "checks",
+          "kw": [
+            "премиум",
+            "люкс",
+            "галка",
+            "важное"
+          ],
+          "key": "bullets-neon/04"
+        },
+        {
+          "slug": "bullets-neon-05",
+          "label": "Стрелка",
+          "cat": "checks",
+          "kw": [
+            "стрелка",
+            "далее",
+            "переход",
+            "результат"
+          ],
+          "key": "bullets-neon/05"
+        },
+        {
+          "slug": "bullets-neon-06",
+          "label": "Стрелка · акцент",
+          "cat": "checks",
+          "kw": [
+            "акцент",
+            "важно",
+            "ключевое"
+          ],
+          "key": "bullets-neon/06"
+        },
+        {
+          "slug": "bullets-neon-07",
+          "label": "Далее",
+          "cat": "checks",
+          "kw": [
+            "далее",
+            "шаг",
+            "продолжение",
+            "вперёд"
+          ],
+          "key": "bullets-neon/07"
+        },
+        {
+          "slug": "bullets-neon-08",
+          "label": "Плюс",
+          "cat": "checks",
+          "kw": [
+            "плюс",
+            "добавить",
+            "ещё",
+            "бонус"
+          ],
+          "key": "bullets-neon/08"
+        },
+        {
+          "slug": "bullets-neon-09",
+          "label": "Точка",
+          "cat": "accent",
+          "kw": [
+            "точка",
+            "пункт",
+            "список",
+            "буллет"
+          ],
+          "key": "bullets-neon/09"
+        },
+        {
+          "slug": "bullets-neon-10",
+          "label": "Точка · контур",
+          "cat": "accent",
+          "kw": [
+            "галка",
+            "контур",
+            "да",
+            "минимал"
+          ],
+          "key": "bullets-neon/10"
+        },
+        {
+          "slug": "bullets-neon-11",
+          "label": "Активный",
+          "cat": "accent",
+          "kw": [
+            "активно",
+            "включено",
+            "да",
+            "онлайн"
+          ],
+          "key": "bullets-neon/11"
+        },
+        {
+          "slug": "bullets-neon-12",
+          "label": "Неактивный",
+          "cat": "accent",
+          "kw": [
+            "активно",
+            "включено",
+            "да",
+            "онлайн"
+          ],
+          "key": "bullets-neon/12"
+        },
+        {
+          "slug": "bullets-neon-13",
+          "label": "Искра",
+          "cat": "accent",
+          "kw": [
+            "новинка",
+            "особенное",
+            "вау",
+            "акцент"
+          ],
+          "key": "bullets-neon/13"
+        },
+        {
+          "slug": "bullets-neon-14",
+          "label": "Звезда",
+          "cat": "accent",
+          "kw": [
+            "звезда",
+            "топ",
+            "лучшее",
+            "рейтинг",
+            "премиум"
+          ],
+          "key": "bullets-neon/14"
+        },
+        {
+          "slug": "bullets-neon-15",
+          "label": "Сердце",
+          "cat": "accent",
+          "kw": [
+            "забота",
+            "комфорт",
+            "любовь",
+            "сервис"
+          ],
+          "key": "bullets-neon/15"
+        },
+        {
+          "slug": "bullets-neon-16",
+          "label": "Огонь",
+          "cat": "accent",
+          "kw": [
+            "тренд",
+            "хит",
+            "спрос",
+            "горячо",
+            "популярно"
+          ],
+          "key": "bullets-neon/16"
+        },
+        {
+          "slug": "bullets-neon-17",
+          "label": "Лист",
+          "cat": "accent",
+          "kw": [
+            "эко",
+            "природа",
+            "зелень",
+            "парк",
+            "воздух"
+          ],
+          "key": "bullets-neon/17"
+        },
+        {
+          "slug": "bullets-neon-18",
+          "label": "Локация",
+          "cat": "accent",
+          "kw": [
+            "локация",
+            "адрес",
+            "район",
+            "где",
+            "карта",
+            "пляж",
+            "центр"
+          ],
+          "key": "bullets-neon/18"
+        },
+        {
+          "slug": "bullets-neon-19",
+          "label": "Время",
+          "cat": "accent",
+          "kw": [
+            "время",
+            "срок",
+            "сдача",
+            "этап"
+          ],
+          "key": "bullets-neon/19"
+        },
+        {
+          "slug": "bullets-neon-20",
+          "label": "График",
+          "cat": "accent",
+          "kw": [
+            "рост",
+            "график",
+            "доход",
+            "инвестиции",
+            "динамика"
+          ],
+          "key": "bullets-neon/20"
+        },
+        {
+          "slug": "bullets-neon-21",
+          "label": "Люди",
+          "cat": "accent",
+          "kw": [
+            "команда",
+            "люди",
+            "жильцы",
+            "соседи"
+          ],
+          "key": "bullets-neon/21"
+        },
+        {
+          "slug": "bullets-neon-22",
+          "label": "Образование",
+          "cat": "accent",
+          "kw": [
+            "образование",
+            "знания",
+            "экспертиза",
+            "обучение"
+          ],
+          "key": "bullets-neon/22"
+        },
+        {
+          "slug": "bullets-neon-23",
+          "label": "Ценность",
+          "cat": "accent",
+          "kw": [
+            "ценность",
+            "инвестиции",
+            "люкс",
+            "капитал"
+          ],
+          "key": "bullets-neon/23"
+        },
+        {
+          "slug": "bullets-neon-24",
+          "label": "Статус",
+          "cat": "accent",
+          "kw": [
+            "статус"
+          ],
+          "key": "bullets-neon/24"
+        },
+        {
+          "slug": "bullets-neon-25",
+          "label": "Документ",
+          "cat": "meta",
+          "kw": [
+            "документ",
+            "договор",
+            "условия",
+            "детали",
+            "план"
+          ],
+          "key": "bullets-neon/25"
+        },
+        {
+          "slug": "bullets-neon-26",
+          "label": "Сообщение",
+          "cat": "meta",
+          "kw": [
+            "связь",
+            "чат",
+            "контакт",
+            "общение"
+          ],
+          "key": "bullets-neon/26"
+        },
+        {
+          "slug": "bullets-neon-27",
+          "label": "Настройки",
+          "cat": "meta",
+          "kw": [
+            "настройка",
+            "сервис",
+            "процесс",
+            "управление"
+          ],
+          "key": "bullets-neon/27"
+        },
+        {
+          "slug": "bullets-neon-28",
+          "label": "Солнце",
+          "cat": "meta",
+          "kw": [
+            "климат",
+            "тепло",
+            "лето",
+            "энергия",
+            "день"
+          ],
+          "key": "bullets-neon/28"
+        },
+        {
+          "slug": "bullets-neon-29",
+          "label": "Луна",
+          "cat": "meta",
+          "kw": [
+            "ночь",
+            "спокойствие",
+            "отдых"
+          ],
+          "key": "bullets-neon/29"
+        },
+        {
+          "slug": "bullets-neon-30",
+          "label": "Защита",
+          "cat": "meta",
+          "kw": [
+            "защита",
+            "гарантия",
+            "безопасность",
+            "надёжность",
+            "застройщик"
+          ],
+          "key": "bullets-neon/30"
+        },
+        {
+          "slug": "bullets-neon-31",
+          "label": "Энергия",
+          "cat": "meta",
+          "kw": [
+            "энергия",
+            "скорость",
+            "мощь"
+          ],
+          "key": "bullets-neon/31"
+        },
+        {
+          "slug": "bullets-neon-32",
+          "label": "Бесконечность",
+          "cat": "meta",
+          "kw": [
+            "навсегда",
+            "безлимит",
+            "вечность"
+          ],
+          "key": "bullets-neon/32"
+        }
+      ]
+    },
+    {
+      "title": "Буллеты · Плоские",
+      "dir": "bullets-flat",
+      "items": [
+        {
+          "slug": "bullets-flat-01",
+          "label": "Стрелка вправо",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "переход",
+            "продолжение",
+            "стрелка"
+          ],
+          "key": "bullets-flat/01"
+        },
+        {
+          "slug": "bullets-flat-02",
+          "label": "Стрелка · светлая",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "переход",
+            "стрелка"
+          ],
+          "key": "bullets-flat/02"
+        },
+        {
+          "slug": "bullets-flat-03",
+          "label": "Стрелка · акцент",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "вперёд",
+            "переход",
+            "главное",
+            "стрелка"
+          ],
+          "key": "bullets-flat/03"
+        },
+        {
+          "slug": "bullets-flat-04",
+          "label": "Вперёд",
+          "cat": "nav",
+          "kw": [
+            "далее",
+            "следующий",
+            "шаг",
+            "продолжение"
+          ],
+          "key": "bullets-flat/04"
+        },
+        {
+          "slug": "bullets-flat-05",
+          "label": "Поиск",
+          "cat": "nav",
+          "kw": [
+            "поиск",
+            "найти",
+            "подбор",
+            "фильтр",
+            "искать"
+          ],
+          "key": "bullets-flat/05"
+        },
+        {
+          "slug": "bullets-flat-06",
+          "label": "Закрыть",
+          "cat": "nav",
+          "kw": [
+            "закрыть",
+            "отмена",
+            "нет",
+            "убрать",
+            "минус"
+          ],
+          "key": "bullets-flat/06"
+        },
+        {
+          "slug": "bullets-flat-07",
+          "label": "Готово",
+          "cat": "checks",
+          "kw": [
+            "готово",
+            "да",
+            "включено",
+            "есть",
+            "преимущество",
+            "выполнено",
+            "галка"
+          ],
+          "key": "bullets-flat/07"
+        },
+        {
+          "slug": "bullets-flat-08",
+          "label": "Добавить",
+          "cat": "nav",
+          "kw": [
+            "добавить",
+            "плюс",
+            "ещё",
+            "больше",
+            "новое"
+          ],
+          "key": "bullets-flat/08"
+        },
+        {
+          "slug": "bullets-flat-09",
+          "label": "Ещё",
+          "cat": "nav",
+          "kw": [
+            "меню",
+            "ещё",
+            "опции",
+            "подробнее",
+            "детали"
+          ],
+          "key": "bullets-flat/09"
+        },
+        {
+          "slug": "bullets-flat-10",
+          "label": "Дом",
+          "cat": "amenity",
+          "kw": [
+            "дом",
+            "жильё",
+            "квартира",
+            "недвижимость",
+            "резиденция",
+            "апартаменты"
+          ],
+          "key": "bullets-flat/10"
+        },
+        {
+          "slug": "bullets-flat-11",
+          "label": "Здание",
+          "cat": "amenity",
+          "kw": [
+            "здание",
+            "новостройка",
+            "комплекс",
+            "застройщик",
+            "башня",
+            "офис",
+            "дом"
+          ],
+          "key": "bullets-flat/11"
+        },
+        {
+          "slug": "bullets-flat-12",
+          "label": "Локация",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "место",
+            "район",
+            "адрес",
+            "на карте",
+            "гео",
+            "расположение"
+          ],
+          "key": "bullets-flat/12"
+        },
+        {
+          "slug": "bullets-flat-13",
+          "label": "Календарь",
+          "cat": "plan",
+          "kw": [
+            "срок",
+            "дата",
+            "график",
+            "календарь",
+            "сдача",
+            "год",
+            "этап"
+          ],
+          "key": "bullets-flat/13"
+        },
+        {
+          "slug": "bullets-flat-14",
+          "label": "Документ",
+          "cat": "contact",
+          "kw": [
+            "документ",
+            "договор",
+            "бумаги",
+            "файл",
+            "условия",
+            "заявка"
+          ],
+          "key": "bullets-flat/14"
+        },
+        {
+          "slug": "bullets-flat-15",
+          "label": "Клиент",
+          "cat": "contact",
+          "kw": [
+            "клиент",
+            "профиль",
+            "менеджер",
+            "персона",
+            "вы",
+            "аккаунт"
+          ],
+          "key": "bullets-flat/15"
+        },
+        {
+          "slug": "bullets-flat-16",
+          "label": "Команда",
+          "cat": "contact",
+          "kw": [
+            "команда",
+            "люди",
+            "семья",
+            "аудитория",
+            "партнёры",
+            "эксперты"
+          ],
+          "key": "bullets-flat/16"
+        },
+        {
+          "slug": "bullets-flat-17",
+          "label": "Настройки",
+          "cat": "amenity",
+          "kw": [
+            "настройки",
+            "сервис",
+            "управление",
+            "под ключ",
+            "обслуживание",
+            "опции"
+          ],
+          "key": "bullets-flat/17"
+        },
+        {
+          "slug": "bullets-flat-18",
+          "label": "Параметры",
+          "cat": "amenity",
+          "kw": [
+            "параметры",
+            "фильтр",
+            "настройка",
+            "критерии",
+            "подбор",
+            "опции"
+          ],
+          "key": "bullets-flat/18"
+        },
+        {
+          "slug": "bullets-flat-19",
+          "label": "Избранное",
+          "cat": "lifestyle",
+          "kw": [
+            "избранное",
+            "нравится",
+            "сохранить",
+            "желание",
+            "мечта",
+            "сердце"
+          ],
+          "key": "bullets-flat/19"
+        },
+        {
+          "slug": "bullets-flat-20",
+          "label": "Любимое",
+          "cat": "lifestyle",
+          "kw": [
+            "любовь",
+            "избранное",
+            "топ",
+            "желанное",
+            "нравится",
+            "сердце"
+          ],
+          "key": "bullets-flat/20"
+        },
+        {
+          "slug": "bullets-flat-21",
+          "label": "Закладка",
+          "cat": "lifestyle",
+          "kw": [
+            "закладка",
+            "сохранить",
+            "отметить",
+            "избранное",
+            "заметка"
+          ],
+          "key": "bullets-flat/21"
+        },
+        {
+          "slug": "bullets-flat-22",
+          "label": "Поделиться",
+          "cat": "cta",
+          "kw": [
+            "поделиться",
+            "отправить",
+            "репост",
+            "рассказать",
+            "share"
+          ],
+          "key": "bullets-flat/22"
+        },
+        {
+          "slug": "bullets-flat-23",
+          "label": "Ссылка",
+          "cat": "cta",
+          "kw": [
+            "ссылка",
+            "перейти",
+            "подробнее",
+            "сайт",
+            "линк",
+            "открыть"
+          ],
+          "key": "bullets-flat/23"
+        },
+        {
+          "slug": "bullets-flat-24",
+          "label": "Отправить",
+          "cat": "cta",
+          "kw": [
+            "отправить",
+            "заявка",
+            "сообщение",
+            "написать",
+            "связаться",
+            "самолётик"
+          ],
+          "key": "bullets-flat/24"
+        },
+        {
+          "slug": "bullets-flat-25",
+          "label": "Позвонить",
+          "cat": "contact",
+          "kw": [
+            "звонок",
+            "телефон",
+            "позвонить",
+            "связаться",
+            "созвон",
+            "консультация"
+          ],
+          "key": "bullets-flat/25"
+        },
+        {
+          "slug": "bullets-flat-26",
+          "label": "WhatsApp",
+          "cat": "contact",
+          "kw": [
+            "whatsapp",
+            "ватсап",
+            "написать",
+            "чат",
+            "мессенджер",
+            "связь"
+          ],
+          "key": "bullets-flat/26"
+        },
+        {
+          "slug": "bullets-flat-27",
+          "label": "Почта",
+          "cat": "contact",
+          "kw": [
+            "почта",
+            "email",
+            "письмо",
+            "написать",
+            "связаться",
+            "имейл"
+          ],
+          "key": "bullets-flat/27"
+        },
+        {
+          "slug": "bullets-flat-28",
+          "label": "Смотреть",
+          "cat": "cta",
+          "kw": [
+            "play",
+            "смотреть",
+            "видео",
+            "запуск",
+            "тур",
+            "обзор"
+          ],
+          "key": "bullets-flat/28"
+        },
+        {
+          "slug": "bullets-flat-29",
+          "label": "Пауза",
+          "cat": "nav",
+          "kw": [
+            "пауза",
+            "стоп",
+            "остановить"
+          ],
+          "key": "bullets-flat/29"
+        },
+        {
+          "slug": "bullets-flat-30",
+          "label": "Назад",
+          "cat": "nav",
+          "kw": [
+            "назад",
+            "предыдущий",
+            "влево"
+          ],
+          "key": "bullets-flat/30"
+        },
+        {
+          "slug": "bullets-flat-31",
+          "label": "Далее ›",
+          "cat": "nav",
+          "kw": [
+            "вперёд",
+            "далее",
+            "следующий",
+            "вправо"
+          ],
+          "key": "bullets-flat/31"
+        },
+        {
+          "slug": "bullets-flat-32",
+          "label": "Развернуть",
+          "cat": "amenity",
+          "kw": [
+            "развернуть",
+            "площадь",
+            "масштаб",
+            "простор",
+            "полный экран",
+            "планировка"
+          ],
+          "key": "bullets-flat/32"
+        },
+        {
+          "slug": "bullets-flat-33",
+          "label": "Скачать",
+          "cat": "cta",
+          "kw": [
+            "скачать",
+            "загрузить",
+            "презентация",
+            "каталог",
+            "pdf",
+            "подборка"
+          ],
+          "key": "bullets-flat/33"
+        },
+        {
+          "slug": "bullets-flat-34",
+          "label": "Загрузить",
+          "cat": "cta",
+          "kw": [
+            "загрузить",
+            "отправить",
+            "выгрузка",
+            "upload"
+          ],
+          "key": "bullets-flat/34"
+        },
+        {
+          "slug": "bullets-flat-35",
+          "label": "Обновить",
+          "cat": "nav",
+          "kw": [
+            "обновить",
+            "синхронизация",
+            "цикл",
+            "повтор",
+            "обмен",
+            "актуально"
+          ],
+          "key": "bullets-flat/35"
+        },
+        {
+          "slug": "bullets-flat-36",
+          "label": "Топ",
+          "cat": "luxury",
+          "kw": [
+            "звезда",
+            "топ",
+            "премиум",
+            "избранное",
+            "оценка",
+            "рейтинг",
+            "лучшее"
+          ],
+          "key": "bullets-flat/36"
+        },
+        {
+          "slug": "bullets-flat-37",
+          "label": "Рост в цифрах",
+          "cat": "invest",
+          "kw": [
+            "график",
+            "рост",
+            "статистика",
+            "показатели",
+            "динамика",
+            "столбцы",
+            "аналитика"
+          ],
+          "key": "bullets-flat/37"
+        },
+        {
+          "slug": "bullets-flat-38",
+          "label": "Рост",
+          "cat": "invest",
+          "kw": [
+            "рост",
+            "доходность",
+            "тренд",
+            "вверх",
+            "прибыль",
+            "увеличение",
+            "перспектива"
+          ],
+          "key": "bullets-flat/38"
+        },
+        {
+          "slug": "bullets-flat-39",
+          "label": "Доля",
+          "cat": "invest",
+          "kw": [
+            "диаграмма",
+            "доля",
+            "распределение",
+            "процент",
+            "структура",
+            "портфель"
+          ],
+          "key": "bullets-flat/39"
+        },
+        {
+          "slug": "bullets-flat-40",
+          "label": "Каталог",
+          "cat": "amenity",
+          "kw": [
+            "каталог",
+            "блоки",
+            "сетка",
+            "варианты",
+            "объекты",
+            "категории"
+          ],
+          "key": "bullets-flat/40"
+        },
+        {
+          "slug": "bullets-flat-41",
+          "label": "Слои",
+          "cat": "amenity",
+          "kw": [
+            "слои",
+            "этапы",
+            "пакеты",
+            "варианты",
+            "комплекс",
+            "стек",
+            "очереди"
+          ],
+          "key": "bullets-flat/41"
+        },
+        {
+          "slug": "bullets-flat-42",
+          "label": "Тег",
+          "cat": "deal",
+          "kw": [
+            "тег",
+            "цена",
+            "метка",
+            "ярлык",
+            "предложение"
+          ],
+          "key": "bullets-flat/42"
+        },
+        {
+          "slug": "bullets-flat-43",
+          "label": "Цена",
+          "cat": "deal",
+          "kw": [
+            "цена",
+            "скидка",
+            "предложение",
+            "спецпредложение",
+            "ярлык",
+            "выгода"
+          ],
+          "key": "bullets-flat/43"
+        },
+        {
+          "slug": "bullets-flat-44",
+          "label": "Процент",
+          "cat": "deal",
+          "kw": [
+            "процент",
+            "скидка",
+            "ставка",
+            "рассрочка",
+            "доходность",
+            "годовых"
+          ],
+          "key": "bullets-flat/44"
+        },
+        {
+          "slug": "bullets-flat-45",
+          "label": "Люкс",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "премиум",
+            "бриллиант",
+            "эксклюзив",
+            "ценность",
+            "качество",
+            "статус"
+          ],
+          "key": "bullets-flat/45"
+        },
+        {
+          "slug": "bullets-flat-46",
+          "label": "Кнопка · Подробнее",
+          "cat": "cta",
+          "kw": [
+            "подробнее",
+            "детали",
+            "узнать",
+            "смотреть",
+            "кнопка"
+          ],
+          "key": "bullets-flat/46"
+        },
+        {
+          "slug": "bullets-flat-47",
+          "label": "Кнопка · Узнать больше",
+          "cat": "cta",
+          "kw": [
+            "узнать",
+            "подробнее",
+            "больше",
+            "инфо",
+            "кнопка"
+          ],
+          "key": "bullets-flat/47"
+        },
+        {
+          "slug": "bullets-flat-48",
+          "label": "Кнопка · Связаться",
+          "cat": "cta",
+          "kw": [
+            "связаться",
+            "контакт",
+            "написать",
+            "заявка",
+            "кнопка"
+          ],
+          "key": "bullets-flat/48"
+        },
+        {
+          "slug": "bullets-flat-49",
+          "label": "Кнопка · Забронировать",
+          "cat": "cta",
+          "kw": [
+            "забронировать",
+            "бронь",
+            "запись",
+            "сейчас",
+            "кнопка"
+          ],
+          "key": "bullets-flat/49"
+        },
+        {
+          "slug": "bullets-flat-50",
+          "label": "Переключатель · вкл",
+          "cat": "amenity",
+          "kw": [
+            "включено",
+            "да",
+            "опция",
+            "вкл",
+            "активно",
+            "переключатель"
+          ],
+          "key": "bullets-flat/50"
+        },
+        {
+          "slug": "bullets-flat-51",
+          "label": "Переключатель · выкл",
+          "cat": "amenity",
+          "kw": [
+            "выключено",
+            "нет",
+            "опция",
+            "выкл",
+            "переключатель"
+          ],
+          "key": "bullets-flat/51"
+        }
+      ]
+    },
+    {
+      "slug": "ios-icons",
+      "title": "iOS · иконки",
+      "items": [
+        {
+          "slug": "apple",
+          "label": "Эппл",
+          "cat": "generic",
+          "kw": [
+            "смартфон",
+            "техника",
+            "экосистема",
+            "гаджет",
+            "бренд"
+          ],
+          "key": "ios-icons/apple"
+        },
+        {
+          "slug": "heart",
+          "label": "Избранное",
+          "cat": "generic",
+          "kw": [
+            "лайк",
+            "любовь",
+            "избранное",
+            "хит",
+            "нравится"
+          ],
+          "key": "ios-icons/heart"
+        },
+        {
+          "slug": "star",
+          "label": "Премиум",
+          "cat": "luxury",
+          "kw": [
+            "рейтинг",
+            "отзывы",
+            "лучшее",
+            "звезда",
+            "премиум"
+          ],
+          "key": "ios-icons/star"
+        },
+        {
+          "slug": "chat",
+          "label": "Чат",
+          "cat": "contact",
+          "kw": [
+            "сообщение",
+            "связь",
+            "диалог",
+            "вопрос",
+            "консультация"
+          ],
+          "key": "ios-icons/chat"
+        },
+        {
+          "slug": "toggle",
+          "label": "Переключатель",
+          "cat": "generic",
+          "kw": [
+            "настройки",
+            "активация",
+            "опция",
+            "режим",
+            "включить"
+          ],
+          "key": "ios-icons/toggle"
+        },
+        {
+          "slug": "calendar",
+          "label": "Календарь",
+          "cat": "urgency",
+          "kw": [
+            "дата",
+            "бронь",
+            "срок",
+            "график",
+            "встреча"
+          ],
+          "key": "ios-icons/calendar"
+        },
+        {
+          "slug": "camera",
+          "label": "Фото",
+          "cat": "generic",
+          "kw": [
+            "камера",
+            "снимок",
+            "галерея",
+            "тур",
+            "обзор"
+          ],
+          "key": "ios-icons/camera"
+        },
+        {
+          "slug": "music",
+          "label": "Музыка",
+          "cat": "lifestyle",
+          "kw": [
+            "аудио",
+            "мелодия",
+            "звук",
+            "атмосфера",
+            "трек"
+          ],
+          "key": "ios-icons/music"
+        },
+        {
+          "slug": "photos",
+          "label": "Альбом",
+          "cat": "generic",
+          "kw": [
+            "галерея",
+            "фото",
+            "изображения",
+            "портфолио",
+            "архив"
+          ],
+          "key": "ios-icons/photos"
+        },
+        {
+          "slug": "email",
+          "label": "Почта",
+          "cat": "contact",
+          "kw": [
+            "письмо",
+            "email",
+            "сообщение",
+            "рассылка",
+            "контакт"
+          ],
+          "key": "ios-icons/email"
+        },
+        {
+          "slug": "cursor",
+          "label": "Курсор",
+          "cat": "cta",
+          "kw": [
+            "клик",
+            "ссылка",
+            "переход",
+            "выбор",
+            "указатель"
+          ],
+          "key": "ios-icons/cursor"
+        },
+        {
+          "slug": "folder",
+          "label": "Папка",
+          "cat": "generic",
+          "kw": [
+            "документы",
+            "файл",
+            "каталог",
+            "архив",
+            "проект"
+          ],
+          "key": "ios-icons/folder"
+        },
+        {
+          "slug": "cloud",
+          "label": "Облако",
+          "cat": "generic",
+          "kw": [
+            "облако",
+            "хранилище",
+            "синхронизация",
+            "онлайн",
+            "данные"
+          ],
+          "key": "ios-icons/cloud"
+        },
+        {
+          "slug": "battery",
+          "label": "Батарея",
+          "cat": "generic",
+          "kw": [
+            "заряд",
+            "энергия",
+            "аккумулятор",
+            "питание",
+            "уровень"
+          ],
+          "key": "ios-icons/battery"
+        },
+        {
+          "slug": "wifi",
+          "label": "Wi-Fi",
+          "cat": "amenity",
+          "kw": [
+            "интернет",
+            "связь",
+            "сеть",
+            "удобства",
+            "онлайн"
+          ],
+          "key": "ios-icons/wifi"
+        },
+        {
+          "slug": "location-pin",
+          "label": "Локация",
+          "cat": "location",
+          "kw": [
+            "адрес",
+            "карта",
+            "район",
+            "место",
+            "где"
+          ],
+          "key": "ios-icons/location-pin"
+        },
+        {
+          "slug": "notes",
+          "label": "Заметки",
+          "cat": "generic",
+          "kw": [
+            "список",
+            "чеклист",
+            "план",
+            "запись",
+            "тезисы"
+          ],
+          "key": "ios-icons/notes"
+        },
+        {
+          "slug": "moon",
+          "label": "Луна",
+          "cat": "lifestyle",
+          "kw": [
+            "ночь",
+            "вечер",
+            "режим",
+            "атмосфера",
+            "покой"
+          ],
+          "key": "ios-icons/moon"
+        },
+        {
+          "slug": "app-store",
+          "label": "Приложение",
+          "cat": "generic",
+          "kw": [
+            "магазин",
+            "софт",
+            "скачать",
+            "сервис",
+            "платформа"
+          ],
+          "key": "ios-icons/app-store"
+        },
+        {
+          "slug": "search",
+          "label": "Поиск",
+          "cat": "generic",
+          "kw": [
+            "найти",
+            "лупа",
+            "выбор",
+            "поиск",
+            "изучить"
+          ],
+          "key": "ios-icons/search"
+        }
+      ]
+    },
+    {
+      "slug": "ios-ui",
+      "title": "iOS · элементы",
+      "items": [
+        {
+          "slug": "finder",
+          "label": "Поиск",
+          "cat": "generic",
+          "kw": [
+            "поиск",
+            "файлы",
+            "навигация",
+            "система",
+            "обзор"
+          ],
+          "key": "ios-ui/finder"
+        },
+        {
+          "slug": "notes",
+          "label": "Заметки",
+          "cat": "generic",
+          "kw": [
+            "план",
+            "идеи",
+            "заметки",
+            "список",
+            "чеклист"
+          ],
+          "key": "ios-ui/notes"
+        },
+        {
+          "slug": "calendar",
+          "label": "Календарь",
+          "cat": "urgency",
+          "kw": [
+            "дата",
+            "календарь",
+            "старт",
+            "срок",
+            "расписание"
+          ],
+          "key": "ios-ui/calendar"
+        },
+        {
+          "slug": "tasks",
+          "label": "Задачи",
+          "cat": "generic",
+          "kw": [
+            "список",
+            "задачи",
+            "план",
+            "этапы",
+            "работа"
+          ],
+          "key": "ios-ui/tasks"
+        },
+        {
+          "slug": "weather",
+          "label": "Погода",
+          "cat": "lifestyle",
+          "kw": [
+            "климат",
+            "погода",
+            "солнце",
+            "регион",
+            "природа"
+          ],
+          "key": "ios-ui/weather"
+        },
+        {
+          "slug": "chat",
+          "label": "Чат",
+          "cat": "contact",
+          "kw": [
+            "связь",
+            "сообщение",
+            "диалог",
+            "чат",
+            "клиент"
+          ],
+          "key": "ios-ui/chat"
+        },
+        {
+          "slug": "mail",
+          "label": "Почта",
+          "cat": "contact",
+          "kw": [
+            "письмо",
+            "почта",
+            "запрос",
+            "рассылка",
+            "контакт"
+          ],
+          "key": "ios-ui/mail"
+        },
+        {
+          "slug": "safari",
+          "label": "Браузер",
+          "cat": "generic",
+          "kw": [
+            "сайт",
+            "ссылка",
+            "интернет",
+            "портал",
+            "онлайн"
+          ],
+          "key": "ios-ui/safari"
+        },
+        {
+          "slug": "photos",
+          "label": "Галерея",
+          "cat": "generic",
+          "kw": [
+            "фото",
+            "галерея",
+            "объект",
+            "визуализация",
+            "рендер"
+          ],
+          "key": "ios-ui/photos"
+        },
+        {
+          "slug": "camera",
+          "label": "Камера",
+          "cat": "generic",
+          "kw": [
+            "съемка",
+            "обзор",
+            "фото",
+            "камера",
+            "тур"
+          ],
+          "key": "ios-ui/camera"
+        },
+        {
+          "slug": "menu",
+          "label": "Меню",
+          "cat": "generic",
+          "kw": [
+            "опции",
+            "действие",
+            "меню",
+            "функции",
+            "настройки"
+          ],
+          "key": "ios-ui/menu"
+        },
+        {
+          "slug": "folder",
+          "label": "Папка",
+          "cat": "generic",
+          "kw": [
+            "папка",
+            "документы",
+            "архив",
+            "каталог",
+            "проект"
+          ],
+          "key": "ios-ui/folder"
+        },
+        {
+          "slug": "sound",
+          "label": "Звук",
+          "cat": "generic",
+          "kw": [
+            "звук",
+            "громкость",
+            "аудио",
+            "шум",
+            "атмосфера"
+          ],
+          "key": "ios-ui/sound"
+        },
+        {
+          "slug": "brightness",
+          "label": "Яркость",
+          "cat": "generic",
+          "kw": [
+            "свет",
+            "яркость",
+            "солнце",
+            "экран",
+            "дизайн"
+          ],
+          "key": "ios-ui/brightness"
+        },
+        {
+          "slug": "battery",
+          "label": "Заряд",
+          "cat": "invest",
+          "kw": [
+            "заряд",
+            "батарея",
+            "энергия",
+            "успех",
+            "готовность"
+          ],
+          "key": "ios-ui/battery"
+        },
+        {
+          "slug": "share",
+          "label": "Поделиться",
+          "cat": "contact",
+          "kw": [
+            "поделиться",
+            "ссылка",
+            "отправить",
+            "сеть",
+            "контакт"
+          ],
+          "key": "ios-ui/share"
+        },
+        {
+          "slug": "windows",
+          "label": "Окна",
+          "cat": "generic",
+          "kw": [
+            "окна",
+            "несколько",
+            "сравнение",
+            "варианты",
+            "обзор"
+          ],
+          "key": "ios-ui/windows"
+        },
+        {
+          "slug": "alert",
+          "label": "Внимание",
+          "cat": "urgency",
+          "kw": [
+            "внимание",
+            "важно",
+            "предупреждение",
+            "удаление",
+            "риск"
+          ],
+          "key": "ios-ui/alert"
+        },
+        {
+          "slug": "search-bar",
+          "label": "Поиск",
+          "cat": "generic",
+          "kw": [
+            "поиск",
+            "строка",
+            "найти",
+            "фильтр",
+            "запрос"
+          ],
+          "key": "ios-ui/search-bar"
+        }
+      ]
+    },
+    {
+      "slug": "aesthetic",
+      "title": "Эстетика · мотивация",
+      "items": [
+        {
+          "slug": "david-glasses",
+          "label": "Стильный Давид",
+          "cat": "luxury",
+          "kw": [
+            "мода",
+            "тренды",
+            "дизайн",
+            "стиль",
+            "эстетика"
+          ],
+          "key": "aesthetic/david-glasses"
+        },
+        {
+          "slug": "coffee",
+          "label": "Кофе с собой",
+          "cat": "lifestyle",
+          "kw": [
+            "кофе",
+            "утро",
+            "пауза",
+            "напиток",
+            "бодрость"
+          ],
+          "key": "aesthetic/coffee"
+        },
+        {
+          "slug": "focus-note",
+          "label": "Заметка фокус",
+          "cat": "generic",
+          "kw": [
+            "заметка",
+            "фокус",
+            "главное",
+            "важно",
+            "акцент"
+          ],
+          "key": "aesthetic/focus-note"
+        },
+        {
+          "slug": "mountains",
+          "label": "Горы",
+          "cat": "lifestyle",
+          "kw": [
+            "горы",
+            "природа",
+            "пейзаж",
+            "виды",
+            "высота"
+          ],
+          "key": "aesthetic/mountains"
+        },
+        {
+          "slug": "earth-progress",
+          "label": "Глобус и загрузка",
+          "cat": "generic",
+          "kw": [
+            "мир",
+            "глобус",
+            "планета",
+            "международный",
+            "масштаб"
+          ],
+          "key": "aesthetic/earth-progress"
+        },
+        {
+          "slug": "earth",
+          "label": "Планета Земля",
+          "cat": "generic",
+          "kw": [
+            "земля",
+            "планета",
+            "мир",
+            "глобально",
+            "глобус"
+          ],
+          "key": "aesthetic/earth"
+        },
+        {
+          "slug": "progress-bar",
+          "label": "Индикатор прогресса",
+          "cat": "urgency",
+          "kw": [
+            "прогресс",
+            "загрузка",
+            "этапы",
+            "строительство",
+            "статус"
+          ],
+          "key": "aesthetic/progress-bar"
+        },
+        {
+          "slug": "pointing-hand",
+          "label": "Указывающая рука",
+          "cat": "cta",
+          "kw": [
+            "указатель",
+            "сюда",
+            "внимание",
+            "клик",
+            "стрелка"
+          ],
+          "key": "aesthetic/pointing-hand"
+        },
+        {
+          "slug": "doberman",
+          "label": "Доберман",
+          "cat": "luxury",
+          "kw": [
+            "собака",
+            "охрана",
+            "безопасность",
+            "премиум",
+            "статус"
+          ],
+          "key": "aesthetic/doberman"
+        },
+        {
+          "slug": "money-stacks",
+          "label": "Пачки денег",
+          "cat": "invest",
+          "kw": [
+            "деньги",
+            "доход",
+            "богатство",
+            "наличные",
+            "финансы"
+          ],
+          "key": "aesthetic/money-stacks"
+        },
+        {
+          "slug": "headphones",
+          "label": "Наушники",
+          "cat": "lifestyle",
+          "kw": [
+            "наушники",
+            "музыка",
+            "звук",
+            "комфорт",
+            "технологии"
+          ],
+          "key": "aesthetic/headphones"
+        },
+        {
+          "slug": "monstera-plant",
+          "label": "Монстера в горшке",
+          "cat": "lifestyle",
+          "kw": [
+            "растение",
+            "комнатныецветы",
+            "интерьер",
+            "уют",
+            "зелень"
+          ],
+          "key": "aesthetic/monstera-plant"
+        },
+        {
+          "slug": "red-sports-car",
+          "label": "Красный спорткар",
+          "cat": "luxury",
+          "kw": [
+            "спорткар",
+            "машина",
+            "авто",
+            "скорость",
+            "роскошь"
+          ],
+          "key": "aesthetic/red-sports-car"
+        },
+        {
+          "slug": "airplane",
+          "label": "Самолет в полете",
+          "cat": "lifestyle",
+          "kw": [
+            "самолет",
+            "полет",
+            "путешествия",
+            "отпуск",
+            "перелет"
+          ],
+          "key": "aesthetic/airplane"
+        },
+        {
+          "slug": "ideas-execute-repeat",
+          "label": "Идеи и действия",
+          "cat": "generic",
+          "kw": [
+            "идеи",
+            "бизнес",
+            "мотивация",
+            "план",
+            "стратегия"
+          ],
+          "key": "aesthetic/ideas-execute-repeat"
+        },
+        {
+          "slug": "david-bubble",
+          "label": "Давид с жвачкой",
+          "cat": "luxury",
+          "kw": [
+            "арт",
+            "креатив",
+            "эстетика",
+            "молодежный",
+            "стиль"
+          ],
+          "key": "aesthetic/david-bubble"
+        },
+        {
+          "slug": "shark",
+          "label": "Акула",
+          "cat": "invest",
+          "kw": [
+            "акула",
+            "бизнес",
+            "хищник",
+            "рынок",
+            "лидерство"
+          ],
+          "key": "aesthetic/shark"
+        },
+        {
+          "slug": "palm-tree",
+          "label": "Пальма",
+          "cat": "lifestyle",
+          "kw": [
+            "пальма",
+            "курорт",
+            "море",
+            "отдых",
+            "пляж"
+          ],
+          "key": "aesthetic/palm-tree"
+        },
+        {
+          "slug": "billiard-ball",
+          "label": "Шар восьмерка",
+          "cat": "generic",
+          "kw": [
+            "шар",
+            "бильярд",
+            "удача",
+            "игра",
+            "стиль"
+          ],
+          "key": "aesthetic/billiard-ball"
+        },
+        {
+          "slug": "retro-camera",
+          "label": "Ретро камера",
+          "cat": "generic",
+          "kw": [
+            "камера",
+            "видео",
+            "съемка",
+            "обзор",
+            "контент"
+          ],
+          "key": "aesthetic/retro-camera"
+        },
+        {
+          "slug": "on-air-sign",
+          "label": "Вывеска On Air",
+          "cat": "contact",
+          "kw": [
+            "эфир",
+            "онлайн",
+            "трансляция",
+            "внимание",
+            "прямойэфир"
+          ],
+          "key": "aesthetic/on-air-sign"
+        },
+        {
+          "slug": "do-it-anyway",
+          "label": "Делай несмотря ни на что",
+          "cat": "generic",
+          "kw": [
+            "мотивация",
+            "успех",
+            "действие",
+            "цель",
+            "преодоление"
+          ],
+          "key": "aesthetic/do-it-anyway"
+        },
+        {
+          "slug": "checkered-flag",
+          "label": "Гоночный флаг",
+          "cat": "urgency",
+          "kw": [
+            "финиш",
+            "победа",
+            "старт",
+            "результат",
+            "гонка"
+          ],
+          "key": "aesthetic/checkered-flag"
+        },
+        {
+          "slug": "melting-smiley",
+          "label": "Тающий смайлик",
+          "cat": "lifestyle",
+          "kw": [
+            "смайлик",
+            "эмодзи",
+            "тренд",
+            "жара",
+            "необычный"
+          ],
+          "key": "aesthetic/melting-smiley"
+        },
+        {
+          "slug": "better-version",
+          "label": "Лучшая версия себя",
+          "cat": "generic",
+          "kw": [
+            "развитие",
+            "мотивация",
+            "успех",
+            "цели",
+            "рост"
+          ],
+          "key": "aesthetic/better-version"
+        }
+      ]
+    },
+    {
+      "slug": "realty",
+      "title": "Недвижимость · бейджи",
+      "items": [
+        {
+          "slug": "real-estate",
+          "label": "Недвижимость",
+          "cat": "cover",
+          "kw": [
+            "недвижимость",
+            "агентство",
+            "обложка",
+            "заголовок",
+            "компания"
+          ],
+          "key": "realty/real-estate"
+        },
+        {
+          "slug": "real-estate-alt",
+          "label": "Недвижимость надпись",
+          "cat": "cover",
+          "kw": [
+            "недвижимость",
+            "агентство",
+            "бренд",
+            "название",
+            "стиль"
+          ],
+          "key": "realty/real-estate-alt"
+        },
+        {
+          "slug": "invest-live-grow",
+          "label": "Инвестируй Живи Расти",
+          "cat": "invest",
+          "kw": [
+            "инвестиции",
+            "жизнь",
+            "рост",
+            "возможности",
+            "стратегия"
+          ],
+          "key": "realty/invest-live-grow"
+        },
+        {
+          "slug": "keys",
+          "label": "Ключи и дом",
+          "cat": "deal",
+          "kw": [
+            "ключи",
+            "сделка",
+            "покупка",
+            "новоселье",
+            "квартира"
+          ],
+          "key": "realty/keys"
+        },
+        {
+          "slug": "smart-investment",
+          "label": "Умные инвестиции",
+          "cat": "invest",
+          "kw": [
+            "инвестиции",
+            "доход",
+            "график",
+            "стратегия",
+            "деньги"
+          ],
+          "key": "realty/smart-investment"
+        },
+        {
+          "slug": "new-launch",
+          "label": "Старт продаж",
+          "cat": "urgency",
+          "kw": [
+            "старт",
+            "новый",
+            "продажи",
+            "запуск",
+            "срочно"
+          ],
+          "key": "realty/new-launch"
+        },
+        {
+          "slug": "dubai",
+          "label": "Дубай локация",
+          "cat": "location",
+          "kw": [
+            "дубай",
+            "город",
+            "локация",
+            "оаэ",
+            "район"
+          ],
+          "key": "realty/dubai"
+        },
+        {
+          "slug": "underline",
+          "label": "Линия подчеркивания",
+          "cat": "generic",
+          "kw": [
+            "линия",
+            "подчеркивание",
+            "акцент",
+            "декор",
+            "дизайн"
+          ],
+          "key": "realty/underline"
+        },
+        {
+          "slug": "burj-khalifa",
+          "label": "Небоскреб Бурдж-Халифа",
+          "cat": "luxury",
+          "kw": [
+            "небоскреб",
+            "дубай",
+            "высотка",
+            "архитектура",
+            "премиум"
+          ],
+          "key": "realty/burj-khalifa"
+        },
+        {
+          "slug": "prime-location",
+          "label": "Лучшая локация",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "район",
+            "центр",
+            "адрес",
+            "премиум"
+          ],
+          "key": "realty/prime-location"
+        },
+        {
+          "slug": "more-than-property",
+          "label": "Больше чем недвижимость",
+          "cat": "lifestyle",
+          "kw": [
+            "стиль",
+            "жизнь",
+            "ценности",
+            "философия",
+            "бренд"
+          ],
+          "key": "realty/more-than-property"
+        },
+        {
+          "slug": "property-types",
+          "label": "Типы недвижимости",
+          "cat": "plan",
+          "kw": [
+            "квартиры",
+            "виллы",
+            "пентхаусы",
+            "коммерция",
+            "типы"
+          ],
+          "key": "realty/property-types"
+        },
+        {
+          "slug": "luxury-living",
+          "label": "Роскошная жизнь",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "премиум",
+            "бассейн",
+            "вилла",
+            "комфорт"
+          ],
+          "key": "realty/luxury-living"
+        },
+        {
+          "slug": "luxury-living-alt",
+          "label": "Люкс проживание",
+          "cat": "luxury",
+          "kw": [
+            "люкс",
+            "бассейн",
+            "элитный",
+            "жилье",
+            "комфорт"
+          ],
+          "key": "realty/luxury-living-alt"
+        },
+        {
+          "slug": "arrow-curve",
+          "label": "Изогнутая стрелка",
+          "cat": "cta",
+          "kw": [
+            "стрелка",
+            "переход",
+            "дальше",
+            "указатель",
+            "слайд"
+          ],
+          "key": "realty/arrow-curve"
+        },
+        {
+          "slug": "beach-view",
+          "label": "Вид на пляж",
+          "cat": "lifestyle",
+          "kw": [
+            "пляж",
+            "море",
+            "вид",
+            "пальма",
+            "курорт"
+          ],
+          "key": "realty/beach-view"
+        },
+        {
+          "slug": "crown",
+          "label": "Корона премиум",
+          "cat": "luxury",
+          "kw": [
+            "корона",
+            "премиум",
+            "люкс",
+            "элитный",
+            "vip"
+          ],
+          "key": "realty/crown"
+        },
+        {
+          "slug": "skyline",
+          "label": "Городской пейзаж",
+          "cat": "location",
+          "kw": [
+            "город",
+            "небоскребы",
+            "панорама",
+            "центр",
+            "мегаполис"
+          ],
+          "key": "realty/skyline"
+        },
+        {
+          "slug": "global-opportunities",
+          "label": "Глобальные возможности",
+          "cat": "invest",
+          "kw": [
+            "мир",
+            "глобально",
+            "возможности",
+            "планета",
+            "международный"
+          ],
+          "key": "realty/global-opportunities"
+        },
+        {
+          "slug": "turn-goals",
+          "label": "Цели в адрес",
+          "cat": "cta",
+          "kw": [
+            "цель",
+            "адрес",
+            "мечта",
+            "покупка",
+            "результат"
+          ],
+          "key": "realty/turn-goals"
+        },
+        {
+          "slug": "good-people",
+          "label": "Хорошие люди",
+          "cat": "generic",
+          "kw": [
+            "цитата",
+            "люди",
+            "отзыв",
+            "команда",
+            "доверие"
+          ],
+          "key": "realty/good-people"
+        },
+        {
+          "slug": "home-feels",
+          "label": "Уютный дом",
+          "cat": "lifestyle",
+          "kw": [
+            "дом",
+            "уют",
+            "интерьер",
+            "гостиная",
+            "атмосфера"
+          ],
+          "key": "realty/home-feels"
+        },
+        {
+          "slug": "value-growth",
+          "label": "Рост стоимости",
+          "cat": "invest",
+          "kw": [
+            "рост",
+            "цена",
+            "доходность",
+            "инвестиции",
+            "плюс"
+          ],
+          "key": "realty/value-growth"
+        },
+        {
+          "slug": "book-viewing",
+          "label": "Записаться на просмотр",
+          "cat": "cta",
+          "kw": [
+            "просмотр",
+            "запись",
+            "кнопка",
+            "показ",
+            "контакт"
+          ],
+          "key": "realty/book-viewing"
+        },
+        {
+          "slug": "photo-gallery",
+          "label": "Галерея фото",
+          "cat": "generic",
+          "kw": [
+            "фото",
+            "галерея",
+            "плюс",
+            "добавить",
+            "слайдер"
+          ],
+          "key": "realty/photo-gallery"
+        },
+        {
+          "slug": "palm-leaves",
+          "label": "Листья пальмы",
+          "cat": "lifestyle",
+          "kw": [
+            "пальма",
+            "тропики",
+            "отдых",
+            "зелень",
+            "курорт"
+          ],
+          "key": "realty/palm-leaves"
+        },
+        {
+          "slug": "lifestyle-word",
+          "label": "Слово лайфстайл",
+          "cat": "lifestyle",
+          "kw": [
+            "стиль",
+            "жизнь",
+            "курорт",
+            "атмосфера",
+            "комфорт"
+          ],
+          "key": "realty/lifestyle-word"
+        },
+        {
+          "slug": "location-freedom",
+          "label": "Локация дает свободу",
+          "cat": "location",
+          "kw": [
+            "локация",
+            "свобода",
+            "выбор",
+            "расположение",
+            "комфорт"
+          ],
+          "key": "realty/location-freedom"
+        },
+        {
+          "slug": "checklist",
+          "label": "Чек-лист преимуществ",
+          "cat": "generic",
+          "kw": [
+            "чек-лист",
+            "список",
+            "преимущества",
+            "галочки",
+            "услуги"
+          ],
+          "key": "realty/checklist"
+        },
+        {
+          "slug": "life-looks-better",
+          "label": "Жизнь выглядит лучше",
+          "cat": "lifestyle",
+          "kw": [
+            "жизнь",
+            "бассейн",
+            "закат",
+            "красота",
+            "вилла"
+          ],
+          "key": "realty/life-looks-better"
+        },
+        {
+          "slug": "arrow-up-right",
+          "label": "Стрелка вверх вправо",
+          "cat": "cta",
+          "kw": [
+            "стрелка",
+            "вверх",
+            "переход",
+            "дальше",
+            "рост"
+          ],
+          "key": "realty/arrow-up-right"
+        }
+      ]
+    },
+    {
+      "slug": "broker",
+      "title": "Брокер · Дубай",
+      "items": [
+        {
+          "slug": "coffee",
+          "label": "Кофе",
+          "cat": "lifestyle",
+          "kw": [
+            "кофе",
+            "утро",
+            "перерыв",
+            "напиток",
+            "встреча"
+          ],
+          "key": "broker/coffee"
+        },
+        {
+          "slug": "new-lead",
+          "label": "Новый лид",
+          "cat": "deal",
+          "kw": [
+            "лид",
+            "заявка",
+            "клиент",
+            "уведомление",
+            "whatsapp",
+            "сделка"
+          ],
+          "key": "broker/new-lead"
+        },
+        {
+          "slug": "skyline",
+          "label": "Небоскрёбы",
+          "cat": "location",
+          "kw": [
+            "небоскрёбы",
+            "город",
+            "дубай",
+            "вид",
+            "панорама"
+          ],
+          "key": "broker/skyline"
+        },
+        {
+          "slug": "laptop",
+          "label": "Ноутбук",
+          "cat": "generic",
+          "kw": [
+            "ноутбук",
+            "работа",
+            "онлайн",
+            "удаленно",
+            "компьютер"
+          ],
+          "key": "broker/laptop"
+        },
+        {
+          "slug": "plan-prospect",
+          "label": "План действий",
+          "cat": "generic",
+          "kw": [
+            "план",
+            "заметки",
+            "стратегия",
+            "бизнес",
+            "цели"
+          ],
+          "key": "broker/plan-prospect"
+        },
+        {
+          "slug": "car-key",
+          "label": "Ключи от авто",
+          "cat": "luxury",
+          "kw": [
+            "ключи",
+            "машина",
+            "покупка",
+            "премиум",
+            "сделка"
+          ],
+          "key": "broker/car-key"
+        },
+        {
+          "slug": "checkbox",
+          "label": "Чекбокс",
+          "cat": "generic",
+          "kw": [
+            "чекбокс",
+            "галочка",
+            "выполнено",
+            "список",
+            "проверка"
+          ],
+          "key": "broker/checkbox"
+        },
+        {
+          "slug": "new-leads-list",
+          "label": "Список лидов",
+          "cat": "deal",
+          "kw": [
+            "лиды",
+            "список",
+            "задачи",
+            "клиенты",
+            "просмотр"
+          ],
+          "key": "broker/new-leads-list"
+        },
+        {
+          "slug": "luxury-balcony",
+          "label": "Вид с террасы",
+          "cat": "luxury",
+          "kw": [
+            "терраса",
+            "вид",
+            "люкс",
+            "элитный",
+            "отдых",
+            "бассейн"
+          ],
+          "key": "broker/luxury-balcony"
+        },
+        {
+          "slug": "client-message",
+          "label": "Сообщение клиента",
+          "cat": "contact",
+          "kw": [
+            "сообщение",
+            "чат",
+            "клиент",
+            "запрос",
+            "показ"
+          ],
+          "key": "broker/client-message"
+        },
+        {
+          "slug": "sold",
+          "label": "Продано",
+          "cat": "deal",
+          "kw": [
+            "продано",
+            "сделка",
+            "куплено",
+            "успех",
+            "продажа"
+          ],
+          "key": "broker/sold"
+        },
+        {
+          "slug": "crown",
+          "label": "Корона",
+          "cat": "luxury",
+          "kw": [
+            "корона",
+            "премиум",
+            "люкс",
+            "элитный",
+            "лучший"
+          ],
+          "key": "broker/crown"
+        },
+        {
+          "slug": "gelendwagen",
+          "label": "Гелендваген",
+          "cat": "luxury",
+          "kw": [
+            "автомобиль",
+            "машина",
+            "премиум",
+            "люкс",
+            "статус"
+          ],
+          "key": "broker/gelendwagen"
+        },
+        {
+          "slug": "good-clients",
+          "label": "Цели агентства",
+          "cat": "generic",
+          "kw": [
+            "клиенты",
+            "инвестиции",
+            "стиль",
+            "успех",
+            "мотивация"
+          ],
+          "key": "broker/good-clients"
+        },
+        {
+          "slug": "arrange-everything",
+          "label": "Организация",
+          "cat": "contact",
+          "kw": [
+            "чат",
+            "организация",
+            "согласие",
+            "помощь",
+            "сервис"
+          ],
+          "key": "broker/arrange-everything"
+        },
+        {
+          "slug": "airplane-window",
+          "label": "Вид из самолета",
+          "cat": "lifestyle",
+          "kw": [
+            "самолет",
+            "полет",
+            "путешествие",
+            "вид",
+            "город"
+          ],
+          "key": "broker/airplane-window"
+        },
+        {
+          "slug": "dumbbell",
+          "label": "Гантель",
+          "cat": "lifestyle",
+          "kw": [
+            "спорт",
+            "фитнес",
+            "зал",
+            "здоровье",
+            "активность"
+          ],
+          "key": "broker/dumbbell"
+        },
+        {
+          "slug": "luxury-watch",
+          "label": "Часы премиум",
+          "cat": "luxury",
+          "kw": [
+            "часы",
+            "премиум",
+            "люкс",
+            "статус",
+            "аксессуар"
+          ],
+          "key": "broker/luxury-watch"
+        },
+        {
+          "slug": "shopping-bag",
+          "label": "Пакет с покупками",
+          "cat": "generic",
+          "kw": [
+            "пакет",
+            "покупки",
+            "шопинг",
+            "агентство",
+            "брендовый"
+          ],
+          "key": "broker/shopping-bag"
+        },
+        {
+          "slug": "brochures",
+          "label": "Каталог объектов",
+          "cat": "invest",
+          "kw": [
+            "каталог",
+            "буклеты",
+            "инвестиции",
+            "недвижимость",
+            "офплан"
+          ],
+          "key": "broker/brochures"
+        },
+        {
+          "slug": "content-today",
+          "label": "Контент и клиенты",
+          "cat": "generic",
+          "kw": [
+            "контент",
+            "телефон",
+            "видео",
+            "клиенты",
+            "съемка"
+          ],
+          "key": "broker/content-today"
+        },
+        {
+          "slug": "rfp-presentation",
+          "label": "Этапы сделки",
+          "cat": "deal",
+          "kw": [
+            "презентация",
+            "переговоры",
+            "закрытие",
+            "этапы",
+            "бизнес"
+          ],
+          "key": "broker/rfp-presentation"
+        },
+        {
+          "slug": "interior-view",
+          "label": "Вид из окна",
+          "cat": "luxury",
+          "kw": [
+            "интерьер",
+            "гостиная",
+            "вид",
+            "панорама",
+            "квартира"
+          ],
+          "key": "broker/interior-view"
+        },
+        {
+          "slug": "steering-wheel",
+          "label": "Руль автомобиля",
+          "cat": "luxury",
+          "kw": [
+            "руль",
+            "авто",
+            "поездка",
+            "премиум",
+            "путь"
+          ],
+          "key": "broker/steering-wheel"
+        },
+        {
+          "slug": "organizer-files",
+          "label": "Органайзер файлов",
+          "cat": "generic",
+          "kw": [
+            "файлы",
+            "клиенты",
+            "договоры",
+            "папки",
+            "архив"
+          ],
+          "key": "broker/organizer-files"
+        },
+        {
+          "slug": "same-city",
+          "label": "Цитата о городе",
+          "cat": "lifestyle",
+          "kw": [
+            "город",
+            "истории",
+            "цитата",
+            "атмосфера",
+            "дубай"
+          ],
+          "key": "broker/same-city"
+        },
+        {
+          "slug": "palm-tree",
+          "label": "Пальма",
+          "cat": "lifestyle",
+          "kw": [
+            "пальма",
+            "тропики",
+            "отдых",
+            "курорт",
+            "лето"
+          ],
+          "key": "broker/palm-tree"
+        },
+        {
+          "slug": "passport",
+          "label": "Паспорт ОАЭ",
+          "cat": "lifestyle",
+          "kw": [
+            "паспорт",
+            "оаэ",
+            "гражданство",
+            "резидентство",
+            "эмираты"
+          ],
+          "key": "broker/passport"
+        },
+        {
+          "slug": "street-signs",
+          "label": "Указатели районов",
+          "cat": "location",
+          "kw": [
+            "указатели",
+            "районы",
+            "дубай",
+            "локация",
+            "марина"
+          ],
+          "key": "broker/street-signs"
+        }
+      ]
+    }
+  ]
 }
