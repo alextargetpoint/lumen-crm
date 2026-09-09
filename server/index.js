@@ -6009,6 +6009,9 @@ ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparen
 .cslot:hover .s-ins{opacity:1}
 .s-ins:hover{transform:translateX(-50%) scale(1.05);box-shadow:0 8px 22px -5px rgba(37,99,235,.85)}
 ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.slide.sel{box-shadow:0 0 0 3px var(--blue),0 20px 50px -18px rgba(0,0,0,.4)}
+/* ⭐ в РЕДАКТОРЕ текст всегда кликабелен/редактируем поверх фото (фикс «не могу выделить подзаголовок») */
+.slide .s-in{z-index:22}
+.slide .s-in [data-ce],.slide .s-in [data-pt]{position:relative;z-index:1}
 .s-lyr{cursor:grab}.s-lyr:active{cursor:grabbing}
 .s-lyr.lsel,.s-frame.lsel{outline:2px solid #2563EB;outline-offset:2px}
 .lyr-h{position:absolute;z-index:30}
