@@ -215,6 +215,11 @@ body.cpanel-on{padding-right:308px!important}
   document.body.appendChild(panel);
   document.body.classList.add('cpanel-on');
   let tab = 'design';
+  /* ⭐ сохраняем активную вкладку и выбранный слайд между перерисовками/reload —
+     чинит «клик по настройке сбрасывает на Дизайн и на 1-й слайд». */
+  const UIKEY = 'cedit-ui:' + (P.cid || '');
+  const persistUI = () => { try { sessionStorage.setItem(UIKEY, JSON.stringify({ tab, sel })); } catch (_) {} };
+  try { const st = JSON.parse(sessionStorage.getItem(UIKEY) || '{}'); if (st.tab === 'slide' || st.tab === 'design') tab = st.tab; if (Number.isInteger(st.sel) && st.sel >= 0) sel = st.sel; } catch (_) {}
 
   $$('[data-ce]').forEach(e => { e.setAttribute('contenteditable', 'true'); e.addEventListener('input', () => dirty = true); e.addEventListener('focus', () => { const sl = e.closest('.slide'); if (sl) selectSlide(+sl.dataset.idx, false); }); });
 
@@ -236,7 +241,7 @@ body.cpanel-on{padding-right:308px!important}
       return {
         heading: cleanHtml(h ? h.innerHTML : ''), sub: cleanHtml(s ? s.innerHTML : ''), eyebrow: (ey ? ey.innerText : '').trim(),
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
-        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', layers,
+        pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', card: sl.dataset.card || '', layers,
         mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
       };
     });
@@ -272,7 +277,7 @@ body.cpanel-on{padding-right:308px!important}
     if (!r.ok) { flash('Ошибка сохранения'); return false; }
     dirty = false;
     if (body.slides) recordHist(body.slides);   /* точка истории для undo/redo */
-    if (reload === 'hard') location.reload();
+    if (reload === 'hard') { persistUI(); location.reload(); }
     else if (reload) { await liveRefresh(); flash('Сохранено ✓'); }
     else flash('Сохранено ✓');
     return true;
@@ -300,6 +305,7 @@ body.cpanel-on{padding-right:308px!important}
     $$('.slide').forEach(s => s.classList.toggle('sel', +s.dataset.idx === i));
     if (switchTab) { tab = 'slide'; $$('.cpanel-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === 'slide')); }
     if (tab === 'slide') renderBody();
+    persistUI();
   }
   /* быстрые действия слайда (ховер-панель + правый клик): edit/photo/dup/up/down/del/insert */
   function slideAction(act, i) {
@@ -386,7 +392,7 @@ body.cpanel-on{padding-right:308px!important}
   document.addEventListener('dblclick', (e) => { const lyr = e.target.closest('.s-lyr.lyr-text'); if (!lyr) return; e.preventDefault(); const o = updL(lyr, {}); const t = prompt('Текст элемента:', o.text || ''); if (t != null) { const sp = lyr.querySelector('.lyr-tx'); if (sp) sp.textContent = t; updL(lyr, { text: t.slice(0, 140) }); dirty = true; save(false); } });
 
   /* ---------- панель: вкладки ---------- */
-  $$('.cpanel-tab', panel).forEach(t => t.addEventListener('click', () => { tab = t.dataset.tab; $$('.cpanel-tab').forEach(x => x.classList.toggle('on', x === t)); renderBody(); }));
+  $$('.cpanel-tab', panel).forEach(t => t.addEventListener('click', () => { tab = t.dataset.tab; $$('.cpanel-tab').forEach(x => x.classList.toggle('on', x === t)); renderBody(); persistUI(); }));
 
   /* live-применение метаданных текста */
   function applyMeta(i, key, val) {
@@ -395,7 +401,12 @@ body.cpanel-on{padding-right:308px!important}
     const pos = sl.dataset.pos || 'center', al = sl.dataset.align || 'left', sz = sl.dataset.size || 'm';
     const bgcls = (sl.dataset.bg || sl.dataset.bgv || (sl.dataset.bgc && isDark(sl.dataset.bgc))) ? ' hasbg' : '';
     const pat = (!sl.dataset.bg && !sl.dataset.bgv && !sl.dataset.bgc && sl.dataset.bgpat) ? ` pat-${sl.dataset.bgpat}` : '';
-    sl.className = 'slide' + bgcls + ` pos-${pos} al-${al} sz-${sz}` + pat + ' sel';
+    /* сохраняем раскладку/градиент/подложку при смене позиции/размера (иначе live-превью их терял) */
+    let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {}
+    const lay = r.layout ? ` lay-${r.layout}` : '';
+    const grad = (!sl.dataset.bg && !sl.dataset.bgv && !sl.dataset.bgc && !sl.dataset.bgpat && sl.dataset.grad) ? ` grad-${sl.dataset.grad}` : '';
+    const card = (sl.dataset.card === 'glass' || sl.dataset.card === 'solid') ? ` card-${sl.dataset.card}` : '';
+    sl.className = 'slide' + bgcls + ` pos-${pos} al-${al} sz-${sz}` + pat + grad + lay + card + ' sel';
     dirty = true;
   }
   /* live-применение фона */
@@ -577,8 +588,9 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}">${g}</button>`).join('')}</div><div class="cnote">Стиль маркера у тезисов слайда.</div></div>`; })()}
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cnote">Стиль маркера у тезисов слайда.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
+    <div class="cgrp"><label>Подложка текста</label><div class="cseg" id="cCard">${[['', 'Нет'], ['glass', 'Стекло'], ['solid', 'Плашка']].map(([v, n]) => `<button data-card="${v}" class="${(sl.dataset.card || '') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Матовое стекло или плотная плашка под всем текстом — читается на любом фото.</div></div>
     <div class="cgrp"><label>Цвет текста</label><div class="ctcolors" id="cTColor"><button class="ctc ${!sl.dataset.tcolor ? 'on' : ''}" data-tc="" title="Авто">A</button>${Object.entries(P.tcolors || {}).map(([k, v]) => `<button class="ctc ${sl.dataset.tcolor === k ? 'on' : ''}" data-tc="${k}" title="${k}" style="--tc:${v}"></button>`).join('')}</div><div class="cnote">«A» — авто (по фону). Пресет перекрывает цвет заголовка и подписи.</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
@@ -608,7 +620,7 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = b.dataset.pm; sl.dataset.rich = JSON.stringify(r); $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save('hard', { slides: serialize() }); }); }
+    { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = b.dataset.pm; sl.dataset.rich = JSON.stringify(r); $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(true, { slides: serialize() }); }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;
@@ -626,6 +638,18 @@ body.cpanel-on{padding-right:308px!important}
       const grid = Object.entries(P.tstyles || { plain: 'Обычный' }).map(([k, n]) => `<button class="ctst ${cur === k ? 'on' : ''}" data-ts="${k}" title="${n}"><span class="s-h ts-${k}" style="font-size:18px;font-family:var(--disp)">Aa</span><i>${n}</i></button>`).join('');
       const pp = openPop(`<div class="ctstyles">${grid}</div>`, e.clientX - 250, e.clientY);
       pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-ts]'); if (!b) return; const k = b.dataset.ts; sl.dataset.tstyle = k; const h = sl.querySelector('.s-h'); if (h) h.className = 's-h' + (k !== 'plain' ? ' ts-' + k : ''); dirty = true; closePop(); save(false); renderBody(); });
+    });
+    /* подложка текст-блока: стекло / плашка / нет */
+    const cardBox = $('#cCard', body);
+    if (cardBox) cardBox.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-card]'); if (!b) return;
+      const sl = slideEl(i); if (!sl) return;
+      const v = b.dataset.card;
+      if (v) sl.dataset.card = v; else delete sl.dataset.card;
+      sl.classList.remove('card-glass', 'card-solid');
+      if (v) sl.classList.add('card-' + v);
+      $$('#cCard button', body).forEach(x => x.classList.toggle('on', x === b));
+      dirty = true; save(false);
     });
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
@@ -817,7 +841,9 @@ body.cpanel-on{padding-right:308px!important}
   /* цвет вживую без сохранения (сохраняем на change) */
   function setBgLive(i, kind, val) { const sl = slideEl(i); if (!sl) return; if (kind === 'color') { sl.dataset.bgc = val; delete sl.dataset.bg; delete sl.dataset.bgv; const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove(); sl.style.backgroundImage = ''; sl.style.background = val; sl.classList.toggle('hasbg', isDark(val)); } }
 
-  /* старт: выбрать первый слайд, показать вкладку Дизайн */
+  /* старт: восстановить вкладку+выбранный слайд (или Дизайн/первый по умолчанию) */
+  { const n = $$('.slide').length; if (sel >= n) sel = Math.max(0, n - 1); }
+  $$('.cpanel-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  selectSlide(sel, false);
   renderBody();
-  selectSlide(0, false);
 })();
