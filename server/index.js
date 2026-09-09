@@ -3870,6 +3870,102 @@ const server = http.createServer(async (req, res) => {
         totals: mpTotals(mp), editKey: db.settings.hooks.secret,
       })));
     }
+    /* ── Аналитика медиапланов (Фаза 2): многослойный план-факт по подрядчикам / каналам / гео / связкам ──
+       Считаем ТОЛЬКО из внесённого факта (budgetFact/leadsFact). CPL всюду производный. Ничего не выдумываем:
+       если у измерения факта нет — hasFact=false, UI покажет «факт не внесён». Опц. фильтры ?contractorId=&from=&to=. */
+    if (p === '/api/mediaplans/analytics' && req.method === 'GET') {
+      const ctFilter = u.searchParams.get('contractorId') || '';
+      const fromF = u.searchParams.get('from') || '';
+      const toF = u.searchParams.get('to') || '';
+      let plans = db.mediaplans.slice();
+      if (ctFilter) plans = plans.filter(mp => mp.contractorId === ctFilter);
+      if (fromF) plans = plans.filter(mp => !(mp.period && mp.period.to) || mp.period.to >= fromF);
+      if (toF) plans = plans.filter(mp => !(mp.period && mp.period.from) || mp.period.from <= toF);
+
+      const acc = () => ({ bp: 0, lp: 0, bf: 0, lf: 0, hasFact: false, lines: 0, plans: 0 });
+      const add = (a, ln) => { a.bp += +ln.budgetPlan || 0; a.lp += +ln.leadsPlan || 0; a.bf += +ln.budgetFact || 0; a.lf += +ln.leadsFact || 0; if ((+ln.budgetFact || 0) || (+ln.leadsFact || 0)) a.hasFact = true; a.lines++; return a; };
+      const fin = (a, cur) => {
+        const cplPlan = a.lp ? Math.round(a.bp / a.lp) : 0, cplFact = a.lf ? Math.round(a.bf / a.lf) : 0;
+        return { budgetPlan: a.bp, leadsPlan: a.lp, budgetFact: a.bf, leadsFact: a.lf, cplPlan, cplFact, hasFact: a.hasFact, lines: a.lines, plans: a.plans, cur,
+          budgetPct: a.bp ? Math.round(a.bf / a.bp * 100) : 0, leadsPct: a.lp ? Math.round(a.lf / a.lp * 100) : 0,
+          cplDelta: (a.lf && a.lp) ? (cplFact - cplPlan) : null,
+          cplDeltaPct: (a.lf && a.lp && cplPlan) ? Math.round((cplFact - cplPlan) / cplPlan * 100) : null };
+      };
+      const curOf = (mps) => { const c = {}; mps.forEach(m => { c[m.currency] = (c[m.currency] || 0) + 1; }); const keys = Object.keys(c); return { cur: keys.sort((x, y) => c[y] - c[x])[0] || 'USD', mixed: keys.length > 1 }; };
+
+      /* общий период анализа (для CRM-сверки лидов по гео) */
+      const froms = plans.map(m => m.period && m.period.from).filter(Boolean).sort();
+      const tos = plans.map(m => m.period && m.period.to).filter(Boolean).sort();
+      const gFrom = froms[0] || '', gTo = tos[tos.length - 1] || '';
+      const dayOf = (ts) => { try { return new Date(ts).toISOString().slice(0, 10); } catch { return ''; } };
+      const crmLeadsGeo = (g) => (db.leads || []).filter(l => l.geo === g && (() => { const s = dayOf(l.createdAt); return s && (!gFrom || s >= gFrom) && (!gTo || s <= gTo); })()).length;
+
+      /* rollup */
+      const overallCur = curOf(plans);
+      const overallA = acc(); overallA.plans = plans.length;
+      plans.forEach(mp => (mp.lines || []).forEach(ln => add(overallA, ln)));
+      const overall = fin(overallA, overallCur.cur);
+      overall.mixedCurrency = overallCur.mixed;
+      overall.byStatus = plans.reduce((o, mp) => { const s = mp.status || 'draft'; o[s] = (o[s] || 0) + 1; return o; }, {});
+
+      /* по подрядчикам */
+      const ctIds = [...new Set(plans.map(mp => mp.contractorId || '__none'))];
+      let byContractor = ctIds.map(cid => {
+        const mps = plans.filter(mp => (mp.contractorId || '__none') === cid);
+        const cur = curOf(mps);
+        const a = acc(); a.plans = mps.length; mps.forEach(mp => (mp.lines || []).forEach(ln => add(a, ln)));
+        const r = fin(a, cur.cur); r.mixedCurrency = cur.mixed;
+        const ct = db.mpContractors.find(c => c.id === cid);
+        r.id = cid === '__none' ? null : cid;
+        r.name = ct ? ct.name : (cid === '__none' ? 'Без подрядчика' : (mps[0] && mps[0].contractorName) || '—');
+        r.channels = ct ? (ct.channels || []) : [];
+        r.geos = ct ? (ct.geos || []) : [];
+        return r;
+      }).sort((x, y) => y.budgetPlan - x.budgetPlan);
+      /* ранг эффективности: только среди тех, у кого есть реальный CPL факт */
+      const ranked = byContractor.filter(r => r.hasFact && r.cplFact > 0).sort((x, y) => x.cplFact - y.cplFact);
+      ranked.forEach((r, i) => { r.rank = i + 1; r.bestCpl = i === 0; });
+
+      /* обобщённая агрегация по измерению строки */
+      const dimAgg = (keyFn) => {
+        const map = new Map();
+        for (const mp of plans) for (const ln of (mp.lines || [])) {
+          const key = keyFn(ln, mp); if (key == null || key === '') continue;
+          let e = map.get(key); if (!e) { e = { key, a: acc(), curs: new Set(), channel: ln.channel || '', geo: ln.geo || '' }; map.set(key, e); }
+          add(e.a, ln); e.curs.add(mp.currency);
+        }
+        return [...map.values()].map(e => { const cur = [...e.curs][0] || 'USD'; const r = fin(e.a, cur); r.key = e.key; r.mixedCurrency = e.curs.size > 1; r.channel = e.channel; r.geo = e.geo; return r; });
+      };
+      const byChannel = dimAgg(ln => ln.channel || '—').sort((x, y) => y.budgetPlan - x.budgetPlan);
+      const byGeo = dimAgg(ln => ln.geo || '—').map(r => { r.geoName = db.settings.geoNames[r.key] || r.key; r.crmLeads = crmLeadsGeo(r.key); return r; }).sort((x, y) => y.budgetPlan - x.budgetPlan);
+      const byBundle = dimAgg(ln => ln.bundle || '—').sort((x, y) => y.budgetPlan - x.budgetPlan);
+      /* лидеры/аутсайдеры связок — только по реальному факту */
+      const bundleFact = byBundle.filter(r => r.hasFact && r.cplFact > 0).sort((x, y) => x.cplFact - y.cplFact);
+      bundleFact.forEach((r, i) => { r.rank = i + 1; if (i === 0) r.leading = true; if (i === bundleFact.length - 1 && bundleFact.length > 1) r.worst = true; });
+
+      /* скорость / pacing — только для планов, чей период идёт СЕЙЧАС и есть факт */
+      const now = Date.now(), todayStr = dayOf(now);
+      const pacing = plans.filter(mp => mp.period && mp.period.from && mp.period.to && mp.period.from <= todayStr && mp.period.to >= todayStr).map(mp => {
+        const a = acc(); (mp.lines || []).forEach(ln => add(a, ln)); const T = fin(a, mp.currency);
+        if (!T.hasFact) return null;
+        const from = new Date(mp.period.from + 'T00:00:00Z').getTime();
+        const to = new Date(mp.period.to + 'T23:59:59Z').getTime();
+        const elapsedPct = to > from ? Math.max(0, Math.min(100, Math.round((now - from) / (to - from) * 100))) : 0;
+        const margin = 8;
+        const sig = (pct) => pct >= elapsedPct + margin ? 'ahead' : (pct <= elapsedPct - margin ? 'behind' : 'ontrack');
+        return { id: mp.id, title: mp.title, cur: mp.currency, contractorName: (db.mpContractors.find(c => c.id === mp.contractorId) || {}).name || null,
+          elapsedPct, budgetPct: T.budgetPct, leadsPct: T.leadsPct, budgetSignal: sig(T.budgetPct), leadsSignal: sig(T.leadsPct),
+          leadsFact: T.leadsFact, leadsPlan: T.leadsPlan, cplFact: T.cplFact, cplPlan: T.cplPlan,
+          daysLeft: Math.max(0, Math.ceil((to - now) / 864e5)), daysTotal: Math.max(1, Math.round((to - from) / 864e5)) };
+      }).filter(Boolean);
+
+      return json(res, 200, {
+        overall, byContractor, byChannel, byGeo, byBundle, pacing,
+        meta: { plansAnalyzed: plans.length, contractorsAnalyzed: byContractor.length, generatedAt: now,
+          period: { from: gFrom, to: gTo }, filters: { contractorId: ctFilter || null, from: fromF || null, to: toF || null },
+          crmPeriodNote: (gFrom && gTo) ? `Сверка с CRM: лиды по гео за ${gFrom} — ${gTo}` : null },
+      });
+    }
     if (p === '/api/mediaplans' && req.method === 'POST') {
       const b = await readBody(req);
       const mp = { id: store.nextId('mp'), contractorId: b.contractorId || null, title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
