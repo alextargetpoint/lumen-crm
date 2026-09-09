@@ -6,7 +6,7 @@
   const KEY = P.key || '';
   /* растровые паки стикеров (нарезанные из шитов) + смысловой индекс для авто-подстановки */
   let STK_PACKS = null; const STK_LABEL = {};
-  fetch('/assets/stickers/index.json').then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; })); }).catch(() => { STK_PACKS = []; });
+  fetch('/assets/stickers/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; })); }).catch(() => { STK_PACKS = []; });
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const el = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
