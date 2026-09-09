@@ -761,7 +761,7 @@ function renderDesignDoc(db, c, opts) {
       const hero = cur.hero;
       const second = photos.find(x => x !== hero) || null;
       const fp = floorPlan(cur.plans);
-      const head = `<div class="po-head">${kicker('Проект №' + num2(pg.idx + 1) + (pr.developer ? ' · ' + esc(pr.developer) : ''))}<h2 class="po-h">${esc(co.hook)}</h2>${pr.name !== co.hook ? `<div class="po-sub">${esc(pr.name)}${pr.area ? ' · ' + esc(pr.area) : ''}</div>` : (pr.area ? `<div class="po-sub">${esc(pr.area)}</div>` : '')}</div>`;
+      const head = `<div class="po-head">${kicker('Проект №' + num2(pg.idx + 1) + ((pr.developer && !/^[—–\-\s]+$/.test(pr.developer)) ? ' · ' + esc(pr.developer) : ''))}<h2 class="po-h">${esc(co.hook)}</h2>${pr.name !== co.hook ? `<div class="po-sub">${esc(pr.name)}${pr.area ? ' · ' + esc(pr.area) : ''}</div>` : (pr.area ? `<div class="po-sub">${esc(pr.area)}</div>` : '')}</div>`;
       const why = co.why.length ? `<div class="rec-inline">${kicker(pr.market === 'offplan' ? 'Почему стоит рассмотреть' : 'Почему этот объект')}<ol class="why">${co.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}</ol></div>` : '';
 
       const ctl = projCtl(pg);
@@ -815,7 +815,7 @@ function renderDesignDoc(db, c, opts) {
         return `<section class="page po po-fg">${ctl}
           <div class="fg-stage">
             ${imgEl(hero, 'fg-img', pr.area || pr.name)}
-            <div class="fg-card">${kicker('Проект №' + num2(pg.idx + 1) + (pr.developer ? ' · ' + esc(pr.developer) : ''))}<h2 class="fg-h">${esc(co.hook)}</h2>${sub}${co.blurb ? `<p class="fg-blurb">${esc(co.blurb)}</p>` : ''}</div>
+            <div class="fg-card">${kicker('Проект №' + num2(pg.idx + 1) + ((pr.developer && !/^[—–\-\s]+$/.test(pr.developer)) ? ' · ' + esc(pr.developer) : ''))}<h2 class="fg-h">${esc(co.hook)}</h2>${sub}${co.blurb ? `<p class="fg-blurb">${esc(co.blurb)}</p>` : ''}</div>
           </div>
           ${metricRail(pr, 'row')}
           ${driveTimes(pr, true)}${payTrack(pr)}${fp}${why}${unitsTable(pr)}
