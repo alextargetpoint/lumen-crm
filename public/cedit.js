@@ -183,6 +183,34 @@
 .cpl-cv{position:relative;aspect-ratio:4/5;border-radius:7px;overflow:hidden;background:#EDF1F8}
 .cpl-cv b{position:absolute;background:linear-gradient(135deg,#A9BEE0,#CBD9EF);box-shadow:inset 0 0 0 1px rgba(255,255,255,.7)}
 .cpl i{font-style:normal;font-size:10px;font-weight:600;color:#5E6470;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* библиотека раскладок слайда (Gamma-стиль) */
+.clay-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.clay{border:1.5px solid #E1E8F4;border-radius:11px;cursor:pointer;padding:6px;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s;display:flex;flex-direction:column;gap:5px;min-width:0;font-family:inherit}
+.clay:hover{border-color:var(--cb);transform:translateY(-2px);box-shadow:0 10px 20px -10px rgba(37,99,235,.45)}
+.clay.on{border-color:var(--cb);box-shadow:inset 0 0 0 1.5px var(--cb)}
+.clay-cv{position:relative;aspect-ratio:4/5;border-radius:7px;overflow:hidden;background:linear-gradient(160deg,#EEF2FA,#E1E8F4);padding:9px;display:flex}
+.clay i{font-style:normal;font-size:10px;font-weight:600;color:#5E6470;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clm{position:relative;width:100%;height:100%;display:flex;flex-direction:column;gap:4px;justify-content:flex-end}
+.clm.ctr{justify-content:center;align-items:center;text-align:center}
+.clm.dark{margin:-9px;padding:9px;border-radius:7px;background:linear-gradient(160deg,#2A3346,#141a26)}
+.clm b{display:block;background:#93A6CC;border-radius:2px;height:3px}
+.clm .h{height:5px;background:#6E86B8}
+.clm.dark b{background:rgba(255,255,255,.62)}.clm.dark .h{background:rgba(255,255,255,.82)}
+.clm .big{height:auto;font-size:27px;font-weight:800;color:var(--cb);line-height:.85;background:none;border-radius:0;letter-spacing:-.03em}
+.clm.dark .big{color:#fff}
+.clm.grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:4px;justify-content:stretch}
+.clm.grid u{background:rgba(147,166,204,.45);border-radius:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.65)}
+.clm .cd{display:block;height:11px;background:rgba(147,166,204,.32);border:1px solid rgba(147,166,204,.6);border-radius:5px;flex:none}
+.clm.split{gap:0;margin:-9px;padding:0;border-radius:7px;overflow:hidden}
+.clm.split .ph{flex:1;background:linear-gradient(135deg,#A9BEE0,#CBD9EF)}
+.clm.split .pn{background:#fff;padding:6px 7px 7px;display:flex;flex-direction:column;gap:3px;border-top:2px solid var(--cb)}
+.clm.panel{margin:-9px;padding:0;border-radius:7px;overflow:hidden;background:linear-gradient(135deg,#A9BEE0,#CBD9EF);justify-content:flex-end}
+.clm.panel .pb{background:#141a26;padding:8px 8px 9px;display:flex;flex-direction:column;gap:3px}
+.clm.panel .pb .h{background:rgba(255,255,255,.85)}.clm.panel .pb b{background:rgba(255,255,255,.5)}
+.clay-hero{margin-top:10px;border-top:1px dashed #E1E8F4;padding-top:9px}
+.clay-hero>label{font-size:11px;font-weight:700;color:#5E6470}
+.clay-hero-row{display:flex;gap:7px}
+.cnote-inline{font-size:9.5px;font-weight:700;color:var(--cb);background:#EEF3FF;padding:1px 7px;border-radius:99px;margin-left:6px;text-transform:none;letter-spacing:0}
 .cfmtbar{display:flex;gap:6px}
 .cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
 .cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
@@ -788,6 +816,59 @@ body.cpanel-on{padding-right:308px!important}
     { k: 'f4-gap', n: 4, name: 'Сетка с отступом', boxes: [[3, 3, 45.5, 45.5, 10, 0], [51.5, 3, 45.5, 45.5, 10, 0], [3, 51.5, 45.5, 45.5, 10, 0], [51.5, 51.5, 45.5, 45.5, 10, 0]] },
     { k: 'f4-hero3', n: 4, name: 'Герой + 3 ленты', boxes: [[0, 0, 100, 55, 0, 0], [0, 55, 33.4, 45, 0, 0], [33.3, 55, 33.4, 45, 0, 0], [66.6, 55, 33.4, 45, 0, 0]] },
   ];
+  /* ═══ Библиотека раскладок слайда (Gamma-стиль): одна структура контента → разные способы подачи.
+     Меняет ТОЛЬКО s.layout (грамматику рендера lay-*) — применяется ВРУЧНУЮ по кнопке, НЕ при генерации. ═══ */
+  const LAYOUTS = [
+    { k: '',          name: 'Классика',      hint: 'Заголовок сверху + тезисы списком', mini: 't3' },
+    { k: 'editorial', name: 'Редакторская',  hint: 'Тезисы — светлые карточки с акцентной линией', mini: 'cards' },
+    { k: 'mosaic',    name: 'Мозаика',       hint: 'Тезисы плиткой 2×2 — плотная структура', mini: 'grid' },
+    { k: 'typo',      name: 'Типографика',   hint: 'Крупный заголовок во весь слайд, без списка', mini: 'big' },
+    { k: 'data',      name: 'Крупное число', hint: 'Цифра-герой доминирует + подпись', mini: 'num' },
+    { k: 'immersive', name: 'Погружение',    hint: 'Фото затемнено, короткая фраза по центру', mini: 'imm' },
+    { k: 'cinematic', name: 'Кинематограф',  hint: 'Фото на весь слайд, текст внизу', mini: 'cine' },
+    { k: 'split',     name: 'Сплит',         hint: 'Фото сверху, светлая панель с текстом снизу', mini: 'split' },
+    { k: 'panel',     name: 'Постер-блок',   hint: 'Фото + резкий тёмный блок с контентом', mini: 'panel' },
+  ];
+  function layMini(m) {
+    const L = (w, o) => `<b style="width:${w}%${o != null ? ';opacity:' + o : ''}"></b>`;
+    switch (m) {
+      case 't3':    return `<div class="clm tl"><b class="h" style="width:70%"></b>${L(54, .65)}${L(46, .5)}${L(38, .42)}</div>`;
+      case 'cards': return `<div class="clm tl"><b class="h" style="width:58%;margin-bottom:2px"></b><span class="cd"></span><span class="cd"></span></div>`;
+      case 'grid':  return `<div class="clm grid"><u></u><u></u><u></u><u></u></div>`;
+      case 'big':   return `<div class="clm ctr"><b class="h" style="width:90%;height:9px"></b><b class="h" style="width:70%;height:9px"></b><b class="h" style="width:48%;height:9px"></b></div>`;
+      case 'num':   return `<div class="clm ctr"><b class="big">%</b>${L(42, .6)}</div>`;
+      case 'imm':   return `<div class="clm ctr dark"><b class="h" style="width:66%;margin:0 auto"></b>${L(40, .55)}</div>`;
+      case 'cine':  return `<div class="clm bl dark"><b class="h" style="width:64%"></b>${L(40, .55)}</div>`;
+      case 'split': return `<div class="clm split"><span class="ph"></span><span class="pn"><b class="h" style="width:62%"></b>${L(40, .6)}</span></div>`;
+      case 'panel': return `<div class="clm panel"><span class="pb"><b class="h" style="width:56%"></b>${L(42, .55)}</span></div>`;
+      default: return '';
+    }
+  }
+  function layTile(l, cur) {
+    return `<button class="clay ${l.k === cur ? 'on' : ''}" data-lay="${l.k}" title="${esc(l.hint)}"><div class="clay-cv">${layMini(l.mini)}</div><i>${esc(l.name)}</i></button>`;
+  }
+  /* вытащить осмысленное «крупное число» из контента слайда для раскладки data */
+  function deriveHero(s) {
+    const strip = (x) => String(x || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+    const parts = [s.heading, ...(s.points || []), ...((s.items || []).map(it => (it.v || '') + ' ' + (it.k || it.label || '')))].map(strip);
+    for (const p of parts) {
+      const m = p.match(/(\$\s?\d[\d.,]*\s?(?:млн|M|k|K|млрд|B)?|\d[\d.,]*\s?(?:%|м²|m²|лет|года?|год)|20\d\d|[×x]\s?\d+)/);
+      if (m) { const v = m[1].replace(/\s+/g, ''); if (v.length <= 12) { const k = p.replace(m[1], ' ').replace(/[·—–-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 3).join(' ').slice(0, 28); return { v, k }; } }
+    }
+    return null;
+  }
+  function setLayout(i, k) {
+    const sl = slideEl(i); if (!sl) return;
+    let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {}
+    r.layout = k;
+    if (k === 'data' && !(r.hero && (r.hero.v || r.hero.k))) { const arr = serialize(); const h = deriveHero(arr[i] || {}); if (h) r.hero = h; }
+    sl.dataset.rich = JSON.stringify(r);
+    sl.className = sl.className.replace(/\blay-\w+/g, '').replace(/\s+/g, ' ').trim();
+    if (k) sl.classList.add('lay-' + k);
+    dirty = true;
+    save(true, { slides: serialize() });
+    flash(k ? 'Раскладка: ' + (LAYOUTS.find(l => l.k === k) || {}).name + ' ✓' : 'Классическая раскладка ✓', 1400);
+  }
   function pickFiles(accept, cb) { const inp = el(`<input type="file" accept="${accept}" multiple style="display:none">`); document.body.appendChild(inp); inp.addEventListener('change', () => { if (inp.files && inp.files.length) cb([...inp.files]); inp.remove(); }); inp.click(); }
   function plTile(l) {
     const cells = l.boxes.map(b => `<b style="left:${b[0]}%;top:${b[1]}%;width:${b[2]}%;height:${b[3]}%;border-radius:${Math.min(b[4] || 0, 6)}px;transform:rotate(${b[5] || 0}deg)"></b>`).join('');
@@ -1047,6 +1128,11 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === detN).map(plTile).join('')}</div>
       <div class="cnote">Фото раскладываются <b>рядом с текстом</b> (в свободной зоне — не перекрывают заголовок) и остаются <b>подвижными</b>: тяни за центр, размер — за угол (пропорция сохраняется). «Во весь слайд» — единственная кладёт фон под текст. «Авто» сам поймёт число фото.</div>
     </div>
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} const cur = r.layout || ''; const h = r.hero || {}; return `<div class="cgrp"><label>Раскладка слайда <span class="cnote-inline">библиотека структур</span></label>
+      <div class="clay-grid" id="cLayGrid">${LAYOUTS.map(l => layTile(l, cur)).join('')}</div>
+      <div class="cnote">Один и тот же контент — <b>разные способы подачи</b>. «Крупное число», «Типографика», «Погружение» убирают лишнее и делают акцент; «Мозаика»/«Редакторская» структурируют тезисы; «Сплит»/«Постер»/«Кинематограф» — под фото. Ничего не теряется — переключай свободно.</div>
+      ${cur === 'data' ? `<div class="clay-hero"><label>Число-герой</label><div class="clay-hero-row"><input id="cHeroV" class="cinp" placeholder="45%" value="${esc(h.v || '')}" maxlength="12"><input id="cHeroK" class="cinp" placeholder="подпись — напр. доходность" value="${esc(h.k || '')}" maxlength="40"></div><div class="cnote">Крупная цифра + короткая подпись. Тяни из смысла слайда.</div></div>` : ''}
+    </div>`; })()}
     <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -1095,6 +1181,10 @@ body.cpanel-on{padding-right:308px!important}
     { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); setPmark(b.dataset.pm); }); }
     /* ⭐ конфигуратор формата блока данных: одни items — разные виды (payplan/stats/steps/bars/gauges) */
     { const bf = $('#cBlockFmt', body); if (bf) bf.addEventListener('click', (e) => { const b = e.target.closest('[data-bf]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.mode = b.dataset.bf; if (['bars', 'gauges'].includes(r.mode)) r.items = (r.items || []).map(it => Object.assign({}, it, { pct: it.pct != null ? it.pct : Math.max(0, Math.min(100, parseFloat(String(it.v || '').replace(/[^\d.]/g, '')) || 0)) })); sl.dataset.rich = JSON.stringify(r); $$('#cBlockFmt button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(true, { slides: serialize() }); }); }
+    /* ⭐ библиотека раскладок слайда (Gamma-стиль): смена грамматики подачи */
+    { const lg = $('#cLayGrid', body); if (lg) lg.addEventListener('click', (e) => { const b = e.target.closest('[data-lay]'); if (!b) return; setLayout(i, b.dataset.lay); }); }
+    /* инлайн-редактор числа-героя для раскладки data */
+    { const hv = $('#cHeroV', body), hk = $('#cHeroK', body); if (hv || hk) { const upd = (persist) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.hero = { v: (hv ? hv.value : '').trim(), k: (hk ? hk.value : '').trim() }; sl.dataset.rich = JSON.stringify(r); dirty = true; if (persist) save(true, { slides: serialize() }); }; [hv, hk].forEach(inp => { if (!inp) return; inp.addEventListener('input', () => upd(false)); inp.addEventListener('change', () => upd(true)); }); } }
     /* иконка-буллет: попап с паками «Буллеты» */
     { const im = $('#cPmImg', body); if (im) im.addEventListener('click', (e) => {
       const packs = (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir));

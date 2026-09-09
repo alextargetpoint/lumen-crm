@@ -5743,6 +5743,15 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.lay-panel .s-points li{color:rgba(255,255,255,.9)}
 .slide.lay-panel .s-points.pm-index li{border-top-color:rgba(255,255,255,.22)}
 .slide.lay-panel .pm-index .s-pt-m{color:#fff}
+/* mosaic: тезисы плиткой 2×2 — плотная структура «карточки» */
+.slide.lay-mosaic .s-points{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.slide.lay-mosaic .s-points li{flex-direction:column;align-items:flex-start;gap:6px;border-top:none!important;padding:14px 15px;border-radius:15px;background:color-mix(in srgb,var(--ink) 5%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.slide.lay-mosaic.hasbg .s-points li{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.18);backdrop-filter:blur(7px)}
+.slide.lay-mosaic .s-points .s-pt-m{margin:0}
+/* editorial: тезисы — светлые карточки-полоски с акцентной линией слева */
+.slide.lay-editorial .s-points{gap:9px}
+.slide.lay-editorial .s-points li{border-top:none!important;padding:12px 15px;border-radius:13px;background:color-mix(in srgb,var(--ink) 4%,transparent);border-left:3px solid var(--blue)}
+.slide.lay-editorial.hasbg .s-points li{background:rgba(255,255,255,.11);backdrop-filter:blur(7px)}
 /* cinematic: двусторонний скрим — тёмный верх (метаданные) + низ (заголовок), центр чистый */
 .slide.lay-cinematic::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,20,.5) 0%,transparent 24%,transparent 46%,rgba(6,10,20,.84));z-index:0}
 .slide.lay-split{background-color:#0b0f18}
@@ -6027,7 +6036,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=60"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=62"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }
