@@ -751,7 +751,7 @@ const CAR_POS = new Set(['top', 'center', 'bottom']);
 const CAR_SIZE = new Set(['s', 'm', 'l']);
 /* узоры-фоны слайда (как в реф-боте): CSS-паттерны, тонированные акцентом темы. Без ассетов. */
 const CAR_PATTERNS = new Set(['dots', 'grid', 'diag', 'cross', 'waves', 'rings', 'carbon', 'topo']);
-const CAR_GRADS = new Set(['glow', 'dusk', 'sheen', 'aurora']);   /* эстетичные градиент-фоны (тон темы), не только узоры */
+const CAR_GRADS = new Set(['glow', 'dusk', 'sheen', 'aurora', 'spot', 'halo', 'mesh', 'veil', 'depth', 'ember']);   /* эстетичные градиент-фоны (тон темы), не только узоры */
 const CAR_TCOLORS = { light: '#FFFFFF', dark: '#0A1833', gold: '#E8B84B', accent: 'var(--blue)', mint: '#2FA98C', rose: '#E06A8A', sky: '#4FB6F2', cream: '#F3ECDD' };   /* пресеты цвета текста */
 /* нормализация инлайн-HTML заголовка/подписи: B/I/U + <mark> с классом-цветом hl-* (несколько цветов выделения) */
 const sanCarInline = (h) => String(h == null ? '' : h).slice(0, 900)
@@ -5844,7 +5844,13 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.grad-dusk{background:linear-gradient(180deg,var(--paper),color-mix(in srgb,var(--blue) 30%,var(--body)))}
 .slide.grad-sheen{background:linear-gradient(125deg,color-mix(in srgb,var(--blue) 22%,var(--paper)),var(--paper) 55%,color-mix(in srgb,var(--blue) 10%,var(--paper)))}
 .slide.grad-aurora{background:radial-gradient(90% 70% at 85% 8%,color-mix(in srgb,var(--blue) 30%,var(--paper)),transparent 60%),linear-gradient(160deg,color-mix(in srgb,var(--blue) 12%,var(--paper)),var(--paper))}
-.slide.grad-dusk{color:var(--ink)}
+.slide.grad-spot{background:radial-gradient(80% 55% at 50% 0%,color-mix(in srgb,var(--blue) 28%,var(--paper)),var(--paper) 62%)}
+.slide.grad-halo{background:radial-gradient(70% 60% at 100% 0%,color-mix(in srgb,var(--blue) 34%,var(--paper)),transparent 55%),radial-gradient(62% 55% at 0% 100%,color-mix(in srgb,var(--blue) 18%,var(--paper)),transparent 60%),var(--paper)}
+.slide.grad-mesh{background:radial-gradient(52% 46% at 14% 18%,color-mix(in srgb,var(--blue) 32%,var(--paper)),transparent 60%),radial-gradient(46% 46% at 86% 24%,color-mix(in srgb,var(--blue) 20%,var(--paper)),transparent 62%),radial-gradient(64% 58% at 60% 104%,color-mix(in srgb,var(--blue) 26%,var(--body)),transparent 60%),var(--paper)}
+.slide.grad-veil{background:linear-gradient(135deg,color-mix(in srgb,var(--blue) 20%,var(--paper)),var(--paper) 44%,color-mix(in srgb,var(--blue) 26%,var(--body)))}
+.slide.grad-depth{background:linear-gradient(180deg,color-mix(in srgb,var(--blue) 9%,var(--paper)),color-mix(in srgb,var(--blue) 36%,var(--body)))}
+.slide.grad-ember{background:radial-gradient(92% 62% at 50% 122%,color-mix(in srgb,var(--blue) 36%,var(--body)),var(--paper) 72%)}
+.slide.grad-dusk,.slide.grad-veil,.slide.grad-depth{color:var(--ink)}
 .slide[class*=pat-]{background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 16%,var(--paper)),var(--paper))}
 .slide.pat-dots{background-image:radial-gradient(color-mix(in srgb,var(--blue) 26%,transparent) 1.5px,transparent 1.6px);background-size:20px 20px}
 .slide.pat-grid{background-image:linear-gradient(color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px);background-size:28px 28px}
@@ -6036,7 +6042,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=62"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=63"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

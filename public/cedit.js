@@ -96,6 +96,20 @@
     carbon: 'linear-gradient(27deg,#2563EB33 3px,transparent 3px),linear-gradient(207deg,#2563EB33 3px,transparent 3px);background-size:8px 8px',
     topo: 'repeating-radial-gradient(ellipse 60% 40% at 30% 20%,transparent 0 10px,#2563EB33 10px 12px)',
   };
+  /* градиент-фоны (мягкая альтернатива узорам, тонируются акцентом темы на рендере) */
+  const GRADS = [['none', 'нет'], ['glow', 'сияние'], ['sheen', 'отблеск'], ['aurora', 'аврора'], ['dusk', 'сумерки'], ['spot', 'софит'], ['halo', 'ореол'], ['mesh', 'меш'], ['veil', 'вуаль'], ['depth', 'глубина'], ['ember', 'жар']];
+  const GRADV = {
+    glow: 'radial-gradient(120% 85% at 18% 12%,#2563EB44,#fff 68%)',
+    sheen: 'linear-gradient(125deg,#2563EB3a,#fff 55%,#2563EB1a)',
+    aurora: 'radial-gradient(90% 70% at 85% 8%,#2563EB4d,transparent 60%),linear-gradient(160deg,#2563EB22,#fff)',
+    dusk: 'linear-gradient(180deg,#fff,#2563EB4d)',
+    spot: 'radial-gradient(80% 55% at 50% 0%,#2563EB47,#fff 62%)',
+    halo: 'radial-gradient(70% 60% at 100% 0%,#2563EB55,transparent 55%),radial-gradient(62% 55% at 0% 100%,#2563EB2e,transparent 60%),#fff',
+    mesh: 'radial-gradient(52% 46% at 14% 18%,#2563EB52,transparent 60%),radial-gradient(46% 46% at 86% 24%,#2563EB33,transparent 62%),radial-gradient(64% 58% at 60% 104%,#2563EB42,transparent 60%),#fff',
+    veil: 'linear-gradient(135deg,#2563EB33,#fff 44%,#2563EB42)',
+    depth: 'linear-gradient(180deg,#2563EB17,#2563EB5c)',
+    ember: 'radial-gradient(92% 62% at 50% 122%,#2563EB5c,#fff 72%)',
+  };
   const isDark = (h) => { const x = String(h || '').replace('#', ''); const s = x.length <= 4 ? x.split('').map(c => c + c).join('') : x; const r = parseInt(s.slice(0, 2), 16), g = parseInt(s.slice(2, 4), 16), b = parseInt(s.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) < 145; };
   let dirty = false, pop = null, popOutside = null, sel = 0, panelOpen = true;
   /* углы подачи карусели (ключи совпадают с CAROUSEL_ANGLES на сервере) */
@@ -1147,6 +1161,7 @@ body.cpanel-on{padding-right:308px!important}
       <div class="cnote">Выключи, чтобы убрать номер/футер именно с этого слайда (напр. обложка).</div></div>
     <div class="cgrp"><label>Цвет текста</label><div class="ctcolors" id="cTColor"><button class="ctc ${!sl.dataset.tcolor ? 'on' : ''}" data-tc="" title="Авто">A</button>${Object.entries(P.tcolors || {}).map(([k, v]) => `<button class="ctc ${sl.dataset.tcolor === k ? 'on' : ''}" data-tc="${k}" title="${k}" style="--tc:${v}"></button>`).join('')}</div><div class="cnote">«A» — авто (по фону). Пресет перекрывает цвет заголовка и подписи.</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
+    <div class="cgrp"><label>Градиент-фон</label><div class="cpats cgrads" id="cGrads">${GRADS.map(([k, n]) => { const on = (sl.dataset.grad || '') === k || (!sl.dataset.grad && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-grad="${k}" title="${n}"${k !== 'none' ? ` style="background:${GRADV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Мягкий градиент в тон темы — премиальнее узора. Взаимоисключается с узором/фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
       <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
       <button data-cmd="italic" title="Курсив"><i>К</i></button>
@@ -1443,13 +1458,30 @@ body.cpanel-on{padding-right:308px!important}
       const t = e.target.closest('[data-pat]'); if (!t) return;
       const kk = t.dataset.pat; const sl = slideEl(i); if (!sl) return;
       $$('.cpat', pats).forEach(x => x.classList.toggle('on', x === t));
-      sl.className = sl.className.replace(/\bpat-\w+/g, '').replace(/\s+/g, ' ').trim();
+      sl.className = sl.className.replace(/\b(pat|grad)-\w+/g, '').replace(/\s+/g, ' ').trim();
+      delete sl.dataset.grad;   /* узор и градиент взаимоисключаются */
       if (kk === 'none') { delete sl.dataset.bgpat; }
       else {
         delete sl.dataset.bg; delete sl.dataset.bgv; delete sl.dataset.bgc;
         const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove();
         sl.style.background = ''; sl.style.backgroundImage = ''; sl.classList.remove('hasbg');
         sl.dataset.bgpat = kk; sl.classList.add('pat-' + kk);
+      }
+      dirty = true; save(false); renderBody();
+    });
+    const grads = $('#cGrads', body);
+    if (grads) grads.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-grad]'); if (!t) return;
+      const kk = t.dataset.grad; const sl = slideEl(i); if (!sl) return;
+      $$('.cpat', grads).forEach(x => x.classList.toggle('on', x === t));
+      sl.className = sl.className.replace(/\b(pat|grad)-\w+/g, '').replace(/\s+/g, ' ').trim();
+      delete sl.dataset.bgpat;   /* градиент и узор взаимоисключаются */
+      if (kk === 'none') { delete sl.dataset.grad; }
+      else {
+        delete sl.dataset.bg; delete sl.dataset.bgv; delete sl.dataset.bgc;
+        const ov = sl.querySelector('.s-bgv'), os = sl.querySelector('.s-shade'); if (ov) ov.remove(); if (os) os.remove();
+        sl.style.background = ''; sl.style.backgroundImage = ''; sl.classList.remove('hasbg');
+        sl.dataset.grad = kk; sl.classList.add('grad-' + kk);
       }
       dirty = true; save(false); renderBody();
     });
