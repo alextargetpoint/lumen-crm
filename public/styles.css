@@ -3819,6 +3819,18 @@ html[data-night] .mb-pending-box { background: linear-gradient(135deg, rgba(30,4
 .mb-empty-cta { margin-top: 8px; box-shadow: 0 10px 26px -8px rgba(37,99,235,.6); }
 /* плюс на синей CTA должен быть БЕЛЫМ + мелким (перебиваем .mb-empty svg{color:accent;width:34px} — та же (0,1,1), но объявлена позже; поэтому даём (0,2,1)) */
 .mb-empty-anim .mb-empty-cta svg { color: #fff; width: 16px; height: 16px; opacity: 1; }
+/* ⭐ анимированная демо-доска: реальные стикеры «влетают» на доску (мотивация собрать свою) */
+.mb-demo { position: absolute; inset: 0; overflow: hidden; }
+.mb-demo-board { position: absolute; inset: 0; }
+.mb-demo-st { position: absolute; transform-origin: 50% 50%; opacity: 0; filter: drop-shadow(0 11px 18px rgba(16,43,92,.30)) drop-shadow(0 2px 4px rgba(16,43,92,.22)); animation: mbDemoPop .72s cubic-bezier(.34,1.5,.5,1) var(--d, 0s) both; }
+@keyframes mbDemoPop { 0% { opacity: 0; transform: translateY(-22px) scale(.72) rotate(calc(var(--r) - 10deg)); } 62% { opacity: 1; } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(var(--r)); } }
+.mb-demo-fade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 44%, color-mix(in srgb, var(--navy-900) 10%, transparent) 78%, color-mix(in srgb, var(--navy-900) 26%, transparent)); }
+.mb-demo .mb-empty-c { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 3; max-width: 540px; padding: 19px 26px; border-radius: 20px; background: color-mix(in srgb, var(--card) 80%, transparent); backdrop-filter: blur(16px) saturate(1.25); -webkit-backdrop-filter: blur(16px) saturate(1.25); border: 1px solid color-mix(in srgb, #fff 28%, var(--stroke)); box-shadow: 0 18px 44px -16px rgba(16,43,92,.42); }
+.mb-demo .mb-empty-c b { font-family: 'Fraunces', serif; font-weight: 550; font-size: 22px; color: var(--navy-900); letter-spacing: .01em; }
+.mb-demo .mb-empty-c span { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.mb-demo .mb-empty-cta svg { color: #fff; width: 16px; height: 16px; opacity: 1; }
+html[data-night] .mb-demo .mb-empty-c b { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .mb-demo-st { animation-duration: .01s; } }
 /* крепёж — реалистичные вырезанные PNG (Apple-стиль), поверх стикера */
 .mb-fast { position: absolute; z-index: 4; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(16,43,92,.28)); }
 .mb-pin { top: -20px; left: 50%; width: 40px; transform: translateX(-50%) rotate(-4deg); }

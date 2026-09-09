@@ -1762,6 +1762,9 @@ function ovMasonry(grid) {
   grid.classList.remove('ov-masonry');
   const items = [...grid.querySelectorAll('.ov-w')];
   items.forEach(w => { w.style.gridRowEnd = ''; });
+  return;   /* ⚠️ row-span masonry на этой 12-кол сетке не даёт выигрыша (16→17% пусто, структурные дыры) —
+               отключено. Настоящая упаковка = CSS-columns, но это конфликтует с активной перестройкой сетки
+               параллельной сессией (обзор v3). Вернуть, когда сетка Обзора устаканится. */
   if (typeof OV_EDIT !== 'undefined' && OV_EDIT) return;   /* в конструкторе — обычная сетка (drag) */
   const cs = getComputedStyle(grid);
   if (cs.display !== 'grid') return;
@@ -7199,6 +7202,21 @@ async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
   toast('Композиция собрана', null, true);
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
+/* демо-стикеры для пустого состояния (нарезаны из реального референса-визиона) — {файл, x%, y%, ширина%, поворот, задержка} */
+const MB_DEMO_STICKERS = [
+  { f: 'st00', x: 40, y: 1, w: 23, r: 2, d: 0.0 },   // вилла Дубай
+  { f: 'st08', x: 20, y: 5, w: 20, r: 4, d: 0.35 },  // джет
+  { f: 'st02', x: 74, y: 3, w: 23, r: -2, d: 0.6 },  // скайлайн
+  { f: 'st10', x: 20, y: 40, w: 16, r: -3, d: 0.8 }, // книги
+  { f: 'st14', x: 4, y: 30, w: 13, r: -8, d: 1.0 },  // Rolex
+  { f: 'st11', x: 5, y: 62, w: 21, r: 2, d: 0.5 },   // MacBook
+  { f: 'st03', x: 62, y: 32, w: 25, r: 2, d: 1.2 },  // G63
+  { f: 'st07', x: 85, y: 40, w: 14, r: 6, d: 1.5 },  // Givenchy
+  { f: 'st13', x: 33, y: 63, w: 15, r: -5, d: 1.1 }, // деньги
+  { f: 'st09', x: 51, y: 55, w: 14, r: 3, d: 1.85 }, // бульдог
+  { f: 'st01', x: 79, y: 64, w: 18, r: -3, d: 1.4 }, // острова
+  { f: 'st17', x: 68, y: 64, w: 9, r: 7, d: 2.15 },  // iPhone
+];
 async function renderMoodboard(root, opts) {
   opts = opts || {};
   const data = await api.get('/moodboard').catch(() => ({ items: [], cfg: {} }));
@@ -7271,10 +7289,10 @@ async function renderMoodboard(root, opts) {
             <div class="mb-pending-box"><span class="mb-pending-orb"></span><span class="mb-pending-t">${esc(p.prompt)}</span><span class="mb-pending-s">генерирую…</span></div>
           </div>`).join('') +
           (!ed && items.length >= 2 && mbOverlap(items) ? `<button class="mb-hint" data-mbcomposehint>${ic(I.layers, 2)}Разложить красиво</button>` : '')
-        ) : `<div class="mb-empty mb-empty-anim">
-          <video class="mb-empty-vid" autoplay muted loop playsinline poster="/assets/widgets/amb-gold.jpg"><source src="/assets/widgets/amb-gold.mp4" type="video/mp4"></video>
-          <div class="mb-empty-ov"></div>
-          <div class="mb-empty-c"><b>Собери свою карту желаний</b><span>Напиши, чего ты хочешь — ИИ создаст стикер и прикрепит на доску. Пусть цели будут перед глазами каждый день.</span><button class="btn btn-accent mb-empty-cta" data-mbaddempty>${ic(I.plus)}Добавить желание</button></div>
+        ) : `<div class="mb-empty mb-demo">
+          <div class="mb-demo-board">${MB_DEMO_STICKERS.map(s => `<img class="mb-demo-st" src="/assets/moodboard-demo/${s.f}.png" style="left:${s.x}%;top:${s.y}%;width:${s.w}%;--r:${s.r}deg;--d:${s.d}s" alt="" draggable="false" loading="lazy">`).join('')}</div>
+          <div class="mb-demo-fade"></div>
+          <div class="mb-empty-c"><b>Твоя карта желаний — перед глазами каждый день</b><span>Напиши, чего ты хочешь: Rolex, вилла на Бали, частный джет, €1M капитала — ИИ вырежет стикер и приколет на доску.</span><button class="btn btn-accent mb-empty-cta" data-mbaddempty>${ic(I.plus)}Собрать свою доску</button></div>
         </div>`}
       </div>
     </div>`;
