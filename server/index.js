@@ -894,6 +894,7 @@ const sanSlide = (s) => ({
   card: (s.card === 'glass' || s.card === 'solid') ? s.card : '',   /* подложка всего текст-блока: стекло/плашка */
   noNum: !!s.noNum, noBrand: !!s.noBrand,   /* послайдный тоггл счётчика/футера */
   free: !!s.free, tx: s.free ? Math.max(-5, Math.min(95, +s.tx || 10)) : 0, ty: s.free ? Math.max(-5, Math.min(95, +s.ty || 16)) : 0, tscale: s.free ? Math.max(0.5, Math.min(1.9, +s.tscale || 1)) : 1,   /* свободное размещение текст-блока */
+  bodyScale: Math.max(0.7, Math.min(1.5, +s.bodyScale || 1)),   /* размер основного текста (подпись+тезисы) */
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
   mode: ['stats', 'steps', 'gauges', 'amenities', 'bars'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
@@ -5586,7 +5587,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const sInStyle = s.free ? `left:${Math.max(-5, Math.min(95, +s.tx || 10)).toFixed(1)}%;top:${Math.max(-5, Math.min(95, +s.ty || 16)).toFixed(1)}%;--tsc:${Math.max(0.5, Math.min(1.9, +s.tscale || 1))}` : '';
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';   /* чистое фото; контраст даёт per-family скрим (не мутный тёмный бокс на всём)*/
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${s.noNum ? ' data-nonum="1"' : ''}${s.noBrand ? ' data-nobrand="1"' : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${s.free ? ` data-free="1" data-tx="${(+s.tx || 10)}" data-ty="${(+s.ty || 16)}" data-tscale="${(+s.tscale || 1)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${s.noNum ? ' data-nonum="1"' : ''}${s.noBrand ? ' data-nobrand="1"' : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${s.free ? ` data-free="1" data-tx="${(+s.tx || 10)}" data-ty="${(+s.ty || 16)}" data-tscale="${(+s.tscale || 1)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} data-bscale="${(+s.bodyScale || 1)}" style="${style};--bscale:${(+s.bodyScale || 1)}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in"${sInStyle ? ` style="${sInStyle}"` : ''}>
             ${(counter !== 'off' && !s.noNum) ? `<span class="s-num num-${counter}">${numHtml(i)}</span>` : ''}
@@ -5826,7 +5827,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .s-gauge i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--mut)}
 .slide.hasbg .s-gauge i{color:rgba(255,255,255,.82)}
 .s-points{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:0}
-.s-points li{display:flex;gap:14px;align-items:baseline;font-size:clamp(14px,3.6cqw,17px);line-height:1.3;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
+.s-points li{display:flex;gap:14px;align-items:baseline;font-size:calc(clamp(14px,3.6cqw,17px)*var(--bscale,1));line-height:1.3;font-weight:600;color:color-mix(in srgb,var(--ink) 90%,var(--mut))}
 .slide.hasbg .s-points li{color:rgba(255,255,255,.95);text-shadow:0 1px 8px rgba(6,10,20,.4)}
 /* ⭐ РЕДАКТОРСКИЙ ИНДЕКС (по умолчанию вместо чек-листа): тонкая линейка + трекнутый номер, как в журнале */
 .s-points.pm-index li{border-top:1px solid color-mix(in srgb,var(--ink) 16%,transparent);padding:11px 0}
@@ -5896,7 +5897,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.sz-l .s-h{font-size:clamp(30px,7cqw,46px);line-height:1.04}
 .slide.hasbg .s-h{color:#fff;text-shadow:0 1px 14px rgba(0,0,0,.32)}
 .slide.hasbg .s-eye,.slide.hasbg .s-num{text-shadow:0 1px 8px rgba(0,0,0,.5)}
-.s-s{font-size:clamp(15px,3.6cqw,19px);line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
+.s-s{font-size:calc(clamp(15px,3.6cqw,19px)*var(--bscale,1));line-height:1.5;color:color-mix(in srgb,var(--ink) 82%,var(--mut));max-width:94%;overflow-wrap:break-word;text-wrap:pretty}
 .slide.al-center .s-s{max-width:100%}
 .slide.hasbg .s-s{color:rgba(255,255,255,.92);text-shadow:0 1px 10px rgba(0,0,0,.35)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
@@ -5938,7 +5939,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=48"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', bodyFont: c.bodyFont || '', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=49"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

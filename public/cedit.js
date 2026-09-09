@@ -328,6 +328,7 @@ body.cpanel-on{padding-right:308px!important}
         mode: rich.mode || '', items: rich.items || [], points: points, pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
         noNum: !!sl.dataset.nonum, noBrand: !!sl.dataset.nobrand,
         free: sl.dataset.free === '1', tx: +sl.dataset.tx || 0, ty: +sl.dataset.ty || 0, tscale: +sl.dataset.tscale || 1,
+        bodyScale: +sl.dataset.bscale || 1,
       };
     });
   }
@@ -570,8 +571,9 @@ body.cpanel-on{padding-right:308px!important}
     const isHead = /:heading$/.test(field.dataset.ce || '');
     const q = ensureQbar(); q._mode = 'text'; q._t = field;
     q.innerHTML = `<button data-q="bold" title="Жирный"><b>Ж</b></button><button data-q="italic" title="Курсив"><i style="font-family:Georgia,serif">К</i></button><button data-q="mark" title="Выделить цветом / маркер"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5-9.5 9.5H5v-5.5z"/><path d="M12.5 6.5l5 5"/><path d="M4 21h16"/></svg></button><span class="cqt-sep"></span>` +
-      (isHead ? `<button data-q="sdown" title="Меньше заголовок">A<small>−</small></button><button data-q="sup" title="Больше заголовок">A<small>+</small></button><button data-q="style" title="Стиль заголовка">Стиль&nbsp;▾</button><button data-q="color" title="Цвет заголовка"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button><span class="cqt-sep"></span>` : '') +
-      `<button data-q="clear" title="Убрать формат и выделение">✕</button>`;
+      `<button data-q="sdown" title="${isHead ? 'Меньше заголовок' : 'Меньше текст'}">A<small>−</small></button><button data-q="sup" title="${isHead ? 'Больше заголовок' : 'Больше текст'}">A<small>+</small></button>` +
+      (isHead ? `<button data-q="style" title="Стиль заголовка">Стиль&nbsp;▾</button><button data-q="color" title="Цвет заголовка"><span class="cqt-sw" style="background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#3b82f6,#8b5cf6,#ef4444)"></span></button>` : '') +
+      `<span class="cqt-sep"></span><button data-q="clear" title="Убрать формат и выделение">✕</button>`;
     requestAnimationFrame(() => posQbar(selRect(field)));
   }
   function showLayerQbar(lyr) {
@@ -608,9 +610,14 @@ body.cpanel-on{padding-right:308px!important}
         return;   /* иначе падение в closePop() ниже мгновенно закрывало палитру (3-я кнопка «не работала») */
       }
       else if (a === 'sdown' || a === 'sup') {
-        const i = +field.closest('.slide').dataset.idx; const order = ['s', 'm', 'l']; const cur = slideEl(i).dataset.size || 'm';
-        let ni = order.indexOf(cur) + (a === 'sup' ? 1 : -1); ni = Math.max(0, Math.min(2, ni));
-        applyMeta(i, 'size', order[ni]); save(false); if (tab === 'slide') renderBody(); requestAnimationFrame(() => { field.focus(); posQbar(field.getBoundingClientRect()); });
+        const i = +field.closest('.slide').dataset.idx; const sl = slideEl(i);
+        if (/:heading$/.test(field.dataset.ce || '')) {   /* заголовок → размер слайда S/M/L */
+          const order = ['s', 'm', 'l']; const cur = sl.dataset.size || 'm'; let ni = order.indexOf(cur) + (a === 'sup' ? 1 : -1); ni = Math.max(0, Math.min(2, ni));
+          applyMeta(i, 'size', order[ni]); save(false); if (tab === 'slide') renderBody();
+        } else {   /* подпись/тезис → масштаб основного текста (bodyScale) */
+          let bs = +sl.dataset.bscale || 1; bs = Math.max(0.7, Math.min(1.5, Math.round((bs + (a === 'sup' ? 0.1 : -0.1)) * 100) / 100)); sl.dataset.bscale = bs; sl.style.setProperty('--bscale', bs); dirty = true; save(false); flash('Текст ×' + bs, 800);
+        }
+        requestAnimationFrame(() => { field.focus(); posQbar(field.getBoundingClientRect()); });
       }
       else if (a === 'style') {
         const i = +field.closest('.slide').dataset.idx; const sl = slideEl(i); const rc = b.getBoundingClientRect();
@@ -696,22 +703,38 @@ body.cpanel-on{padding-right:308px!important}
     const cells = l.boxes.map(b => `<b style="left:${b[0]}%;top:${b[1]}%;width:${b[2]}%;height:${b[3]}%;border-radius:${Math.min(b[4] || 0, 6)}px;transform:rotate(${b[5] || 0}deg)"></b>`).join('');
     return `<button class="cpl" data-pl="${l.k}"><div class="cpl-cv">${cells}</div><i>${esc(l.name)}</i></button>`;
   }
-  /* применить фото-раскладку к слайду i: подгрузить фото → разложить img-слоями по боксам */
+  /* фото уже на слайде: фон + img-слои (не стикеры) */
+  function slidePhotos(i) { const arr = serialize(); const s = arr[i]; if (!s) return []; const u = []; if (s.bg) u.push(s.bg); (s.layers || []).forEach(l => { if (l.t === 'img' && !l.sticker && l.url) u.push(l.url); }); return u; }
+  /* разложить данные url'ы по боксам раскладки (цикл, если url меньше боксов) */
+  function applyPhotoLayoutTo(i, L, urls) {
+    const arr = serialize(); const sl = arr[i]; if (!sl || !urls.length) return;
+    sl.bg = ''; sl.bgv = '';
+    sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker));   /* стикеры оставляем */
+    let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
+    L.boxes.forEach((bx, bi) => { const url = urls[bi % urls.length]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', z }); });
+    save(true, { slides: arr }); flash('Раскладка применена ✓', 1400);
+  }
+  /* применить раскладку: на ДЕЙСТВУЮЩИЕ фото если есть, иначе — подгрузить */
   function applyPhotoLayout(i, L) {
+    const have = slidePhotos(i);
+    if (have.length) { applyPhotoLayoutTo(i, L, have); return; }
     pickFiles('image/*', async (files) => {
-      if (!files.length) return;
-      flash('Загружаю фото…', 0);
-      try {
-        const urls = [];
-        for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f));
-        const arr = serialize(); const sl = arr[i]; if (!sl) return;
-        sl.bg = ''; sl.bgv = '';   /* коллаж = контент слайда */
-        sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker));   /* убрать старые фото-слои, стикеры оставить */
-        let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
-        L.boxes.forEach((bx, bi) => { const url = urls[Math.min(bi, urls.length - 1)]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', z }); });
-        save(true, { slides: arr }); flash('Раскладка применена ✓', 1400);
-      } catch (er) { flash('Ошибка: ' + er.message); }
+      if (!files.length) return; flash('Загружаю фото…', 0);
+      try { const urls = []; for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f)); applyPhotoLayoutTo(i, L, urls); } catch (er) { flash('Ошибка: ' + er.message); }
     });
+  }
+  /* ✨ авто: понять число фото на слайде и применить подходящую композицию */
+  function autoPhotoLayout(i) {
+    const have = slidePhotos(i);
+    if (!have.length) { flash('На слайде нет фото — подгрузи или выбери раскладку'); return; }
+    const n = Math.min(have.length, 4);
+    const cands = PHOTO_LAYOUTS.filter(l => l.n === n);
+    if (!cands.length) { flash('Нет раскладки для ' + n + ' фото'); return; }
+    /* курируем «лучшую» по числу: 1→в рамке, 2→большое+узкое, 3→герой+пара, 4→сетка с отступом */
+    const best = { 1: 'f1-frame', 2: 'f2-bigsmall', 3: 'f3-hero2', 4: 'f4-gap' }[n];
+    const L = cands.find(l => l.k === best) || cands[0];
+    applyPhotoLayoutTo(i, L, have);
+    flash('Авто-раскладка на ' + n + ' фото ✓', 1400);
   }
   function tplTile(tpl) {
     const th = (P.themes || {})[tpl.theme] || { blue: '#2563EB', body: '#0A1833' };
@@ -860,10 +883,10 @@ body.cpanel-on{padding-right:308px!important}
       </div>
       <div id="cBgExtra"></div>
     </div>
-    <div class="cgrp"><label>Фото-раскладка</label>
+    <div class="cgrp"><label>Фото-раскладка <button class="clink" id="cPlAuto" type="button">✨ Авто по фото</button></label>
       <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n, i2) => `<button data-pln="${n}" class="${i2 === 0 ? 'on' : ''}">${n} фото</button>`).join('')}</div>
       <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === 1).map(plTile).join('')}</div>
-      <div class="cnote">Выбери композицию → подгрузи фото, они лягут в раскладку. Каждое фото двигается/меняется как слой.</div>
+      <div class="cnote">Раскладка ложится на УЖЕ загруженные фото слайда; если их нет — попросит подгрузить. «Авто» сам поймёт число фото и применит подходящую композицию.</div>
     </div>
     <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -957,7 +980,8 @@ body.cpanel-on{padding-right:308px!important}
       if (pn && pgr) {
         pn.addEventListener('click', (e) => { const b = e.target.closest('[data-pln]'); if (!b) return; $$('#cPlN button', body).forEach(x => x.classList.toggle('on', x === b)); pgr.innerHTML = PHOTO_LAYOUTS.filter(l => l.n === +b.dataset.pln).map(plTile).join(''); });
         pgr.addEventListener('click', (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; const L = PHOTO_LAYOUTS.find(x => x.k === b.dataset.pl); if (L) applyPhotoLayout(i, L); });
-      } }
+      }
+      const pa = $('#cPlAuto', body); if (pa) pa.addEventListener('click', () => autoPhotoLayout(i)); }
     /* свободное размещение текст-блока (двигать/масштабировать) */
     { const fr = $('#cFree', body); if (fr) fr.addEventListener('click', () => { const sl = slideEl(i); const on = sl.dataset.free !== '1'; if (on) { sl.dataset.free = '1'; if (!sl.dataset.tx) sl.dataset.tx = '10'; if (!sl.dataset.ty) sl.dataset.ty = '16'; if (!sl.dataset.tscale) sl.dataset.tscale = '1'; } else { delete sl.dataset.free; } fr.classList.toggle('on', on); dirty = true; save(true, { slides: serialize() }); }); }
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
