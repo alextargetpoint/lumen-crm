@@ -6037,6 +6037,25 @@ function refSearchUrl(plat, q) {
 }
 /* Блок «живых примеров»: главная кнопка — платформа идеи (открывает залетевшие ролики по запросу),
    рядом альтернативные площадки. Клик → брокер смотрит реальные примеры конкурентов. */
+/* ссылка на ролик (Reels/TikTok/Shorts/прямое видео) → встраиваемый плеер ПРЯМО в дашборде (бесплатно, без скрапера) */
+function embedFromUrl(url) {
+  url = String(url || '').trim(); if (!url) return null; let m;
+  if ((m = url.match(/instagram\.com\/(reels?|p|tv)\/([\w-]+)/i))) { const t = /^reel/i.test(m[1]) ? 'reel' : m[1]; return `<iframe class="sh-embed ig" src="https://www.instagram.com/${t}/${m[2]}/embed/" loading="lazy" frameborder="0" scrolling="no" allowtransparency="true"></iframe>`; }
+  if ((m = url.match(/tiktok\.com\/.*?\/video\/(\d+)/i)) || (m = url.match(/tiktok\.com\/.*?(\d{15,})/i))) return `<iframe class="sh-embed tt" src="https://www.tiktok.com/embed/v2/${m[1]}" loading="lazy" frameborder="0" scrolling="no" allow="encrypted-media"></iframe>`;
+  if ((m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/i))) return `<iframe class="sh-embed yt" src="https://www.youtube.com/embed/${m[1]}" loading="lazy" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`;
+  if (/\.(mp4|webm|mov)(\?|$)/i.test(url)) return `<video class="sh-embed vid" src="${esc(url)}" controls playsinline></video>`;
+  return null;
+}
+if (!window.__shEmbed) {
+  window.__shEmbed = 1;
+  document.addEventListener('click', (e) => {
+    const tg = e.target.closest('[data-embedtoggle]');
+    if (tg) { const w = tg.parentElement.querySelector('.sh-embed-wrap'); if (w) { w.hidden = !w.hidden; tg.classList.toggle('on', !w.hidden); if (!w.hidden) { const i = w.querySelector('.sh-embed-url'); if (i) setTimeout(() => i.focus(), 0); } } return; }
+    const go = e.target.closest('.sh-embed-go');
+    if (go) { const wrap = go.closest('.sh-embed-wrap'); const url = wrap.querySelector('.sh-embed-url').value; const box = wrap.querySelector('.sh-embed-box'); const emb = embedFromUrl(url); box.innerHTML = emb || `<div class="sh-embed-err">Не распознал ссылку. Подойдёт Reels, TikTok, YouTube Shorts или прямая ссылка на видео (.mp4).</div>`; return; }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('sh-embed-url')) { const go = e.target.closest('.sh-embed-wrap').querySelector('.sh-embed-go'); if (go) go.click(); } });
+}
 function refLinksHtml(query, plat) {
   if (!query) return '';
   const primary = plat || 'reels';
@@ -6045,8 +6064,16 @@ function refLinksHtml(query, plat) {
   const short = { reels: 'Reels', tiktok: 'TikTok', shorts: 'Shorts' };
   const tagLink = (primary === 'reels') ? `<a class="sh-reflink" href="${refSearchUrl('tag', query)}" target="_blank" rel="noopener" title="Топ по хэштегу">#хэштег</a>` : '';
   return `<div class="sh-treflinks">
-    <a class="sh-refcta" href="${refSearchUrl(primary, query)}" target="_blank" rel="noopener" title="Открыть залетевшие ролики по запросу «${esc(query)}»">${ic(I.play)}Смотреть залетевшие примеры<span class="sh-refcta-p">${names[primary]}</span></a>
+    <a class="sh-refcta" href="${refSearchUrl(primary, query)}" target="_blank" rel="noopener" title="Открыть залетевшие ролики по запросу «${esc(query)}»">${ic(I.play)}Найти залетевшие примеры<span class="sh-refcta-p">${names[primary]}</span></a>
     <div class="sh-reflinks-alt"><span class="sh-tref-lbl">ещё площадки</span>${rest.map(pl => `<a class="sh-reflink" href="${refSearchUrl(pl, query)}" target="_blank" rel="noopener">${short[pl]}</a>`).join('')}${tagLink}</div>
+    <div class="sh-refembed">
+      <button type="button" class="sh-embed-toggle" data-embedtoggle>${ic(I.play)}Смотреть <b>внутри дашборда</b></button>
+      <div class="sh-embed-wrap" hidden>
+        <div class="sh-embed-in"><input class="sh-embed-url" placeholder="Вставь ссылку на Reels / TikTok / Shorts…"><button type="button" class="sh-embed-go btn btn-sm btn-accent">Показать</button></div>
+        <div class="sh-embed-box"></div>
+        <div class="sh-embed-hint">Нашёл залётный ролик по ссылкам выше — вставь его сюда и смотри, не выходя из дашборда.</div>
+      </div>
+    </div>
   </div>`;
 }
 function renderIdeaCard(i) {
