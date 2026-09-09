@@ -983,7 +983,7 @@ async function ideaSwipe(kind, ctx, repaint) {
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 /* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
-const OV_DEFAULT = ['kpi', 'attention', 'funnel', 'tasks', 'hotleads', 'goal', 'aivs', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders'];
+const OV_DEFAULT = ['kpi', 'attention', 'funnel', 'tasks', 'hotleads', 'goal', 'aivs', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders', 'parlo'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -998,7 +998,7 @@ const OV_VARIANT = {
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, parlo: 6 };
 
 /* ─── motion-слой: тонкая видео-атмосфера на hero/AI-зонах (ПРЕМИУМ-АКЦЕНТ, не дефолт) ───
    cost-safe: переиспользуем уже сгенерённые лупы, НЕ генерим новое видео */
@@ -1483,6 +1483,14 @@ const OV_W = {
     if (!cs.length) return hd + `<div class="ov-ghost"><div class="ov-ghost-stack">${ic(I.doc, 2)}<span class="ov-ghost-p"></span><span class="ov-ghost-p"></span></div><div class="ov-ghost-t">База кейсов пуста</div><div class="ov-ghost-s">Разберите лиды на планёрке и сохраните вывод — команда будет учиться на реальных сделках</div></div>`;
     const body = cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('');
     return hd + body;
+  } },
+  parlo: { name: 'Переводчик звонков', icon: () => I.phone, render: () => {
+    return `<div class="ov2-card-hd">${ic(I.phone)}Переводчик звонков<span>звоните на языке клиента</span><button class="btn btn-sm" data-ovgo="parlo">Открыть</button></div>
+    <button class="ov-plo" data-ovgo="parlo">
+      <span class="ov-plo-ic">${ic(I.spark)}</span>
+      <span class="ov-plo-t"><b>Parlo — ваш голос на их языке</b><span>Перевод звонка в реальном времени вашим голосом + подсказки ответа. EN · IT · DE · FR</span></span>
+      <span class="ov-plo-go">${ic(I.arrow)}</span>
+    </button>`;
   } },
 };
 
