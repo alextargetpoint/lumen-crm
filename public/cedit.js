@@ -134,6 +134,13 @@
 .cpreset-cv .pv-h{font-size:15px;font-weight:600;line-height:1.06;letter-spacing:-.01em}
 .cpreset-cv .pv-badge{position:absolute;top:9px;right:9px;font-size:7px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.22);color:#fff;backdrop-filter:blur(4px)}
 .cpreset i{font-style:normal;font-size:11px;font-weight:600;color:#2A3346;padding:7px 9px;border-top:1px solid #EEF1F6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fff}
+/* фото-раскладки */
+.cpl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.cpl{border:1.5px solid #E1E8F4;border-radius:11px;cursor:pointer;padding:6px;background:#fff;transition:border-color .14s,transform .14s,box-shadow .14s;display:flex;flex-direction:column;gap:5px;min-width:0}
+.cpl:hover{border-color:var(--cb);transform:translateY(-2px);box-shadow:0 10px 20px -10px rgba(37,99,235,.45)}
+.cpl-cv{position:relative;aspect-ratio:4/5;border-radius:7px;overflow:hidden;background:#EDF1F8}
+.cpl-cv b{position:absolute;background:linear-gradient(135deg,#A9BEE0,#CBD9EF);box-shadow:inset 0 0 0 1px rgba(255,255,255,.7)}
+.cpl i{font-style:normal;font-size:10px;font-weight:600;color:#5E6470;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cfmtbar{display:flex;gap:6px}
 .cfmtbar button{flex:1;border:1.5px solid #E1E8F4;background:linear-gradient(180deg,#fff,#F7F9FE);border-radius:10px;padding:9px;font-size:15px;cursor:pointer;font-weight:700;color:#2A3346;transition:transform .14s,border-color .14s,background .14s}
 .cfmtbar button:hover{border-color:var(--cb);background:#EEF3FF;transform:translateY(-1px)}
@@ -654,6 +661,52 @@ body.cpanel-on{padding-right:308px!important}
     const badge = TS_BADGE[p.tstyle] || (p.card === 'glass' ? 'Стекло' : '');
     return `<button class="cpreset${on}" data-preset="${p.k}"><div class="cpreset-cv" style="background:${bg}">${badge ? `<span class="pv-badge">${badge}</span>` : ''}<span class="pv-eye" style="color:${dark ? th.blue : th.blue}">Старт продаж</span><span class="pv-h" style="font-family:${ff};color:${txt}">Новый проект у моря</span></div><i>${esc(p.name)}</i></button>`;
   }
+  /* ⭐ ФОТО-РАСКЛАДКИ (Real Estate): композиции для 1–4 фото. box=[x,y,w,h,round,rot] в % слайда.
+     Применяются как img-слои (object-fit:cover) — движок слоёв уже это рендерит. */
+  const PHOTO_LAYOUTS = [
+    // 1 фото
+    { k: 'f1-full', n: 1, name: 'Во весь слайд', boxes: [[0, 0, 100, 100, 0, 0]] },
+    { k: 'f1-frame', n: 1, name: 'В рамке', boxes: [[7, 7, 86, 86, 10, 0]] },
+    { k: 'f1-card', n: 1, name: 'Открытка', boxes: [[11, 13, 78, 74, 14, -3]] },
+    { k: 'f1-band', n: 1, name: 'Верхняя лента', boxes: [[0, 0, 100, 58, 0, 0]] },
+    // 2 фото
+    { k: 'f2-vsplit', n: 2, name: 'Пополам ↔', boxes: [[0, 0, 50, 100, 0, 0], [50, 0, 50, 100, 0, 0]] },
+    { k: 'f2-hsplit', n: 2, name: 'Пополам ↕', boxes: [[0, 0, 100, 50, 0, 0], [0, 50, 100, 50, 0, 0]] },
+    { k: 'f2-bigsmall', n: 2, name: 'Большое + узкое', boxes: [[0, 0, 64, 100, 0, 0], [64, 0, 36, 100, 0, 0]] },
+    { k: 'f2-overlap', n: 2, name: 'Внахлёст', boxes: [[3, 9, 60, 72, 14, -4], [42, 26, 54, 66, 14, 4]] },
+    { k: 'f2-gap', n: 2, name: 'С отступом', boxes: [[3, 3, 46, 94, 12, 0], [51, 3, 46, 94, 12, 0]] },
+    // 3 фото
+    { k: 'f3-cols', n: 3, name: '3 колонки', boxes: [[0, 0, 33.4, 100, 0, 0], [33.3, 0, 33.4, 100, 0, 0], [66.6, 0, 33.4, 100, 0, 0]] },
+    { k: 'f3-hero2', n: 3, name: 'Герой + пара', boxes: [[0, 0, 100, 60, 0, 0], [0, 60, 50, 40, 0, 0], [50, 60, 50, 40, 0, 0]] },
+    { k: 'f3-1big2', n: 3, name: 'Большое + 2', boxes: [[0, 0, 62, 100, 0, 0], [62, 0, 38, 50, 0, 0], [62, 50, 38, 50, 0, 0]] },
+    { k: 'f3-tilt', n: 3, name: 'Коллаж-веер', boxes: [[2, 6, 46, 60, 12, -5], [30, 30, 44, 58, 12, 3], [56, 8, 42, 56, 12, 6]] },
+    // 4 фото
+    { k: 'f4-grid', n: 4, name: 'Сетка 2×2', boxes: [[0, 0, 50, 50, 0, 0], [50, 0, 50, 50, 0, 0], [0, 50, 50, 50, 0, 0], [50, 50, 50, 50, 0, 0]] },
+    { k: 'f4-gap', n: 4, name: 'Сетка с отступом', boxes: [[3, 3, 45.5, 45.5, 10, 0], [51.5, 3, 45.5, 45.5, 10, 0], [3, 51.5, 45.5, 45.5, 10, 0], [51.5, 51.5, 45.5, 45.5, 10, 0]] },
+    { k: 'f4-hero3', n: 4, name: 'Герой + 3 ленты', boxes: [[0, 0, 100, 55, 0, 0], [0, 55, 33.4, 45, 0, 0], [33.3, 55, 33.4, 45, 0, 0], [66.6, 55, 33.4, 45, 0, 0]] },
+  ];
+  function pickFiles(accept, cb) { const inp = el(`<input type="file" accept="${accept}" multiple style="display:none">`); document.body.appendChild(inp); inp.addEventListener('change', () => { if (inp.files && inp.files.length) cb([...inp.files]); inp.remove(); }); inp.click(); }
+  function plTile(l) {
+    const cells = l.boxes.map(b => `<b style="left:${b[0]}%;top:${b[1]}%;width:${b[2]}%;height:${b[3]}%;border-radius:${Math.min(b[4] || 0, 6)}px;transform:rotate(${b[5] || 0}deg)"></b>`).join('');
+    return `<button class="cpl" data-pl="${l.k}"><div class="cpl-cv">${cells}</div><i>${esc(l.name)}</i></button>`;
+  }
+  /* применить фото-раскладку к слайду i: подгрузить фото → разложить img-слоями по боксам */
+  function applyPhotoLayout(i, L) {
+    pickFiles('image/*', async (files) => {
+      if (!files.length) return;
+      flash('Загружаю фото…', 0);
+      try {
+        const urls = [];
+        for (const f of files.slice(0, Math.max(L.n, 1))) urls.push(await uploadAsset(f));
+        const arr = serialize(); const sl = arr[i]; if (!sl) return;
+        sl.bg = ''; sl.bgv = '';   /* коллаж = контент слайда */
+        sl.layers = (sl.layers || []).filter(l => !(l.t === 'img' && !l.sticker));   /* убрать старые фото-слои, стикеры оставить */
+        let z = Math.max(0, ...sl.layers.map(l => l.z || 0));
+        L.boxes.forEach((bx, bi) => { const url = urls[Math.min(bi, urls.length - 1)]; z++; sl.layers.push({ t: 'img', url, x: bx[0], y: bx[1], w: bx[2], h: bx[3], round: bx[4] || 0, rot: bx[5] || 0, fit: 'cover', z }); });
+        save(true, { slides: arr }); flash('Раскладка применена ✓', 1400);
+      } catch (er) { flash('Ошибка: ' + er.message); }
+    });
+  }
   function tplTile(tpl) {
     const th = (P.themes || {})[tpl.theme] || { blue: '#2563EB', body: '#0A1833' };
     const ff = ((P.fonts || {})[tpl.font] || {}).fam || 'serif';
@@ -807,6 +860,11 @@ body.cpanel-on{padding-right:308px!important}
       </div>
       <div id="cBgExtra"></div>
     </div>
+    <div class="cgrp"><label>Фото-раскладка</label>
+      <div class="cseg" id="cPlN">${[1, 2, 3, 4].map((n, i2) => `<button data-pln="${n}" class="${i2 === 0 ? 'on' : ''}">${n} фото</button>`).join('')}</div>
+      <div class="cpl-grid" id="cPlGrid">${PHOTO_LAYOUTS.filter(l => l.n === 1).map(plTile).join('')}</div>
+      <div class="cnote">Выбери композицию → подгрузи фото, они лягут в раскладку. Каждое фото двигается/меняется как слой.</div>
+    </div>
     <div class="cgrp"><label>Размещение текста</label><div class="swrow"><span class="sw ${sl.dataset.free === '1' ? 'on' : ''}" id="cFree"></span> Свободно двигать и масштабировать</div><div class="cnote">Вкл → тяни блок за уголок ✥, размер — за нижний угол. Выкл — вернётся в сетку (Позиция/Выравнивание).</div></div>
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -894,6 +952,12 @@ body.cpanel-on{padding-right:308px!important}
     /* послайдный тоггл счётчика/футера */
     const toggleSvc = (btnId, dataKey) => { const bt = $('#' + btnId, body); if (!bt) return; bt.addEventListener('click', () => { const sl = slideEl(i); const hidden = !!sl.dataset[dataKey]; if (hidden) delete sl.dataset[dataKey]; else sl.dataset[dataKey] = '1'; bt.classList.toggle('on', hidden); dirty = true; save(true, { slides: serialize() }); }); };
     toggleSvc('cNoNum', 'nonum'); toggleSvc('cNoBrand', 'nobrand');
+    /* фото-раскладка: вкладки по числу фото + применение */
+    { const pn = $('#cPlN', body), pgr = $('#cPlGrid', body);
+      if (pn && pgr) {
+        pn.addEventListener('click', (e) => { const b = e.target.closest('[data-pln]'); if (!b) return; $$('#cPlN button', body).forEach(x => x.classList.toggle('on', x === b)); pgr.innerHTML = PHOTO_LAYOUTS.filter(l => l.n === +b.dataset.pln).map(plTile).join(''); });
+        pgr.addEventListener('click', (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; const L = PHOTO_LAYOUTS.find(x => x.k === b.dataset.pl); if (L) applyPhotoLayout(i, L); });
+      } }
     /* свободное размещение текст-блока (двигать/масштабировать) */
     { const fr = $('#cFree', body); if (fr) fr.addEventListener('click', () => { const sl = slideEl(i); const on = sl.dataset.free !== '1'; if (on) { sl.dataset.free = '1'; if (!sl.dataset.tx) sl.dataset.tx = '10'; if (!sl.dataset.ty) sl.dataset.ty = '16'; if (!sl.dataset.tscale) sl.dataset.tscale = '1'; } else { delete sl.dataset.free; } fr.classList.toggle('on', on); dirty = true; save(true, { slides: serialize() }); }); }
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
