@@ -6050,28 +6050,6 @@ PAGES.social = async (root) => {
   else if (tool === 'post') await shPost(main);
 };
 
-/* ── Кастомный селект (взамен нативного <select> — правило: никаких нативных контролов) ──
-   Скрытый input несёт тот же id → все читатели `$('#id').value` продолжают работать. */
-function cSelect(id, opts, sel, cls) {
-  sel = sel == null ? '' : String(sel);
-  const cur = opts.find(o => String(o[0]) === sel);
-  const lbl = cur ? cur[1] : (opts[0] ? opts[0][1] : '');
-  return `<div class="csel ${cls || ''}" data-csel><input type="hidden" id="${id}" value="${esc(sel)}">
-    <button type="button" class="csel-btn"><span class="csel-lbl">${esc(lbl)}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="csel-pop">${opts.map(([v, n]) => `<button type="button" class="csel-opt ${String(v) === sel ? 'on' : ''}" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div>
-  </div>`;
-}
-if (!window.__csel) {
-  window.__csel = 1;
-  document.addEventListener('click', (e) => {
-    const opt = e.target.closest('.csel-opt');
-    if (opt) { const cs = opt.closest('.csel'); const inp = cs.querySelector('input'); inp.value = opt.dataset.v; cs.querySelectorAll('.csel-opt').forEach(x => x.classList.toggle('on', x === opt)); const lb = cs.querySelector('.csel-lbl'); if (lb) lb.textContent = opt.textContent; cs.classList.remove('open'); inp.dispatchEvent(new Event('change', { bubbles: true })); e.stopPropagation(); return; }
-    const btn = e.target.closest('.csel-btn');
-    if (btn) { const cs = btn.closest('.csel'); const wasOpen = cs.classList.contains('open'); document.querySelectorAll('.csel.open').forEach(x => x.classList.remove('open')); if (!wasOpen) cs.classList.add('open'); e.stopPropagation(); return; }
-    document.querySelectorAll('.csel.open').forEach(x => x.classList.remove('open'));
-  });
-}
-
 /* ── Сценарии Reels ── */
 async function shScripts(main) {
   const hist = await api.get('/social/content?kind=script');
@@ -6089,8 +6067,8 @@ async function shScripts(main) {
       <div class="form-row"><label id="shTopicLbl">${SOCIAL_SCRIPT_MODE === 'rewrite' ? 'Свой угол / что добавить (необязательно)' : 'Идея / тема / вводные'}</label><textarea id="shTopic" placeholder="Расскажи мысль голосом 🎤 или текстом. Напр.: почему дешёвые лиды сливают бюджет; рассрочка 0% в Дубае; ошибка при выборе района">${esc(prefill)}</textarea></div>
       <div class="sh-fmts"><span class="sh-lbl">Формат съёмки</span>${Object.entries(SHOOT_FMT).map(([k, n]) => `<button type="button" class="chip-t ${SOCIAL_SCRIPT_FMTS.has(k) ? 'on' : ''}" data-fmt="${k}">${n}</button>`).join('')}<span class="muted sh-fmts-note">на каждый формат — свой вариант сценария</span></div>
       <div class="sh-gen-foot">
-        ${cSelect('shGeo', [['', 'Направление —'], ...geos.map(g => [g, STATE.settings.geoNames[g] || g])], '', 'sh-sel')}
-        ${cSelect('shFormula', [['', 'Формула — авто (ИИ подберёт)'], ...Object.entries(REEL_FORMULAS_UI)], '', 'sh-sel')}
+        <select id="shGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
+        <select id="shFormula" class="sh-sel" title="Психо-формула сценария"><option value="">Формула — авто (ИИ подберёт)</option>${Object.entries(REEL_FORMULAS_UI).map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('')}</select>
         <span class="tb-spacer"></span>
         <button class="btn btn-accent" id="shGo">${ic(I.spark)}Собрать сценарии</button>
       </div>
@@ -6148,8 +6126,8 @@ async function shHunt(main) {
       <div class="sh-gen-hd">${ic(I.spark)}Хантинг идей<span class="sub">листай карточки как в Tinder — что нравится, летит в копилку (← мимо · → в копилку)</span></div>
       <div class="form-row"><label>Контекст (необязательно) — ИИ разберёт на ключевые слова и будет хантить точнее</label><textarea id="shHCtx" placeholder="напр. запускаем виллы на Бали под инвесторов из РФ, упор на доходность и управление; хочу идеи под Reels и сторис"></textarea></div>
       <div class="sh-gen-foot">
-        ${cSelect('shAngle', ANGLES, 'all', 'sh-sel')}
-        ${cSelect('shHGeo', [['', 'Направление —'], ...geos.map(g => [g, STATE.settings.geoNames[g] || g])], '', 'sh-sel')}
+        <select id="shAngle" class="sh-sel">${ANGLES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
+        <select id="shHGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
         <span class="tb-spacer"></span>
         <button class="btn btn-accent" id="shHunt">${ic(I.spark)}Нахантить идеи</button>
       </div>
@@ -6372,8 +6350,8 @@ async function shPost(main) {
       <div class="form-row"><label>Тема / вводные</label><textarea id="shPTopic" placeholder="о чём пост — голосом 🎤 или текстом"></textarea></div>
       <div class="sh-fmts"><span class="sh-lbl">Что пишем</span>${KINDS.map(([k, n], i) => `<button type="button" class="chip-t ${i === 0 ? 'on' : ''}" data-pkind="${k}">${n}</button>`).join('')}</div>
       <div class="sh-gen-foot">
-        ${cSelect('shPStyle', STYLES.map(([k, n]) => [k, 'Тон: ' + n]), (STYLES[0] || [''])[0], 'sh-sel')}
-        ${cSelect('shPGeo', [['', 'Направление —'], ...geos.map(g => [g, STATE.settings.geoNames[g] || g])], '', 'sh-sel')}
+        <select id="shPStyle" class="sh-sel">${STYLES.map(([k, n]) => `<option value="${k}">Тон: ${n}</option>`).join('')}</select>
+        <select id="shPGeo" class="sh-sel"><option value="">Направление —</option>${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select>
         <span class="tb-spacer"></span>
         <button class="btn btn-accent" id="shPGo">${ic(I.spark)}Написать</button>
       </div>
