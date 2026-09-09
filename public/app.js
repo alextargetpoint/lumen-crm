@@ -6605,6 +6605,7 @@ function taskRow(t, leadMap) {
       ${meta ? `<div class="tk-meta">${meta}</div>` : ''}
     </div>
     <div class="tk-acts">
+      ${(() => { const atts = t.attachments || []; const au = atts.find(a => a.kind === 'audio'); const fl = atts.find(a => a.kind !== 'audio'); return (au ? `<button class="tk-mini tk-att" data-act="playaud" data-url="${esc(au.url)}" title="Прослушать голосовое">${ic(I.play || I.mic)}</button>` : '') + (fl ? `<a class="tk-mini tk-att" href="${esc(fl.url)}" target="_blank" rel="noopener" title="Открыть вложение">${ic(fl.kind === 'image' ? (I.image || I.doc) : I.doc)}${atts.length > 1 ? `<span class="tk-att-n">${atts.length}</span>` : ''}</a>` : ''); })()}
       ${subs.length ? `<button class="tk-mini tk-disc" data-act="subs" title="Показать подзадачи">${ic(I.chev)}</button>` : ''}
       <button class="tk-mini" data-act="due" title="Срок">${ic(I.cal)}</button>
       <button class="tk-mini del" data-act="del" title="Удалить">${ic(I.x)}</button>
@@ -6896,6 +6897,7 @@ PAGES.tasks = async (root) => {
     if (a === 'del') { await fetch('/api/tasks/' + id, { method: 'DELETE' }); render(); return; }
     if (a === 'pri') { const order = ['p1', 'p2', 'p3', 'p4']; await api.patch('/tasks/' + id, { priority: order[(order.indexOf(rowEl.dataset.pri) + 1) % 4] }); render(); return; }
     if (a === 'due') { const ms = await tkDatePop(act, (t || {}).due || null); if (ms !== undefined) { await api.patch('/tasks/' + id, { due: ms, scheduled: ms ? dstrLocal(new Date(ms)) : (t.scheduled || null) }); render(); } return; }
+    if (a === 'playaud') { e.stopPropagation(); const url = act.dataset.url; if (window._tkAud && window._tkAud._u === url && !window._tkAud.paused) { window._tkAud.pause(); act.classList.remove('playing'); return; } if (window._tkAud) { try { window._tkAud.pause(); } catch (_) {} } document.querySelectorAll('.tk-att.playing').forEach(x => x.classList.remove('playing')); const au = new Audio(url); au._u = url; window._tkAud = au; act.classList.add('playing'); au.onended = () => act.classList.remove('playing'); au.play().catch(() => { toast('Не удалось воспроизвести'); act.classList.remove('playing'); }); return; }
     if (a === 'subs') { e.stopPropagation(); const wrap = rowEl.closest('.tk-rowwrap'); const sb = wrap && wrap.querySelector('.tk-subs'); if (sb) { const opening = sb.hidden; sb.hidden = !opening; rowEl.classList.toggle('subs-open', opening); const disc = rowEl.querySelector('.tk-disc'); if (disc) disc.classList.toggle('open', opening); } return; }
     if (a === 'open') { openTaskDetail(t, leadMap); return; }
   }));
@@ -7368,9 +7370,8 @@ function mbDemoStickers() {
   for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[cells[i], cells[j]] = [cells[j], cells[i]]; }
   const cw = 100 / cols, ch = 100 / rows;
   return pool.slice(0, n).map((f, i) => { const [c, r] = cells[i % cells.length]; return {
-    f, x: +(c * cw + cw * 0.10 + Math.random() * cw * 0.34).toFixed(1), y: +(r * ch + ch * 0.08 + Math.random() * ch * 0.30).toFixed(1),
-    w: +(13 + Math.random() * 7).toFixed(1), r: +(Math.random() * 16 - 8).toFixed(1), d: +(i * 0.10 + Math.random() * 0.18).toFixed(2),
-    fdur: +(5.5 + Math.random() * 3.5).toFixed(1), amp: Math.round(6 + Math.random() * 9) }; });
+    f, x: +(c * cw + cw * 0.18 + Math.random() * cw * 0.5).toFixed(1), y: +(r * ch + ch * 0.14 + Math.random() * ch * 0.5).toFixed(1),
+    w: +(6 + Math.random() * 3.5).toFixed(1), r: +(Math.random() * 14 - 7).toFixed(1), d: +(i * 0.09 + Math.random() * 0.16).toFixed(2) }; });
 }
 async function renderMoodboard(root, opts) {
   opts = opts || {};
@@ -7427,7 +7428,7 @@ async function renderMoodboard(root, opts) {
         <div class="mb-inp"><input id="mbQuery" placeholder="Чего ты хочешь? Patek Philippe Nautilus, вилла на Бали, частный джет, €1M капитала…" autocomplete="off"><button class="btn btn-accent" id="mbGo">${ic(I.spark)}Создать</button></div>
         <div class="mb-addopts">
           <div class="mb-seg mb-style"><button class="mb-st ${MB_STYLE === 'sticker' ? 'on' : ''}" data-mbst="sticker">Стикер</button><button class="mb-st ${MB_STYLE === 'photo' ? 'on' : ''}" data-mbst="photo">Фото</button></div>
-          <label class="mb-tm ${MB_STYLE === 'sticker' ? '' : 'off'}" id="mbTmWrap"><span>Текст</span><select id="mbTextMode" class="mb-select">${Object.entries(MB_TEXTMODES).map(([k, n]) => `<option value="${k}" ${k === MB_TEXTMODE ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <div class="mb-tm ${MB_STYLE === 'sticker' ? '' : 'off'}" id="mbTmWrap"><span>Текст</span><div class="mb-tm-seg" id="mbTextMode">${Object.entries(MB_TEXTMODES).map(([k, n]) => `<button type="button" class="mb-tm-b ${k === MB_TEXTMODE ? 'on' : ''}" data-tm="${k}">${n}</button>`).join('')}</div></div>
         </div>
       </div>
       ${ed ? `<div class="mb-cfg">
@@ -7460,7 +7461,7 @@ async function renderMoodboard(root, opts) {
   $('#mbShuffle', root)?.addEventListener('click', () => { let s; do { s = 's' + Math.floor(Math.random() * 1e9); } while (s === MB_SEED); MB_SEED = s; mbApplyCompose(root, opts, items, board, s); });
   const addToggle = $('#mbAddToggle', root), addPanel = $('#mbAddPanel', root);
   addToggle.addEventListener('click', () => { MB_ADD_OPEN = !MB_ADD_OPEN; addToggle.classList.toggle('on', MB_ADD_OPEN); addPanel.classList.toggle('open', MB_ADD_OPEN); if (MB_ADD_OPEN) setTimeout(() => { const qq = $('#mbQuery', root); if (qq) qq.focus(); }, 60); });
-  const tmSel = $('#mbTextMode', root); if (tmSel) tmSel.addEventListener('change', () => { MB_TEXTMODE = tmSel.value; });
+  const tmSel = $('#mbTextMode', root); if (tmSel) tmSel.addEventListener('click', (e) => { const b = e.target.closest('[data-tm]'); if (!b) return; MB_TEXTMODE = b.dataset.tm; $$('#mbTextMode .mb-tm-b', root).forEach(x => x.classList.toggle('on', x === b)); });
   const genBtn = $('#mbGo', root), q = $('#mbQuery', root);
   /* очередь генераций: не блокируем — сразу плейсхолдер-стикер на доске + можно запускать следующий */
   const gen = async () => {
