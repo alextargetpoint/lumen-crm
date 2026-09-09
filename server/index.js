@@ -5930,7 +5930,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.hasbg .pm-index .s-pt-m{color:#fff}
 .pm-index .s-pt-m::after{content:attr(data-n)}
 /* маркер-чип: контраст на любом фоне (акцент+белый глиф), не сливается. Стиль задаёт .pm-* на списке */
-.s-pt-m{flex:0 0 20px;width:20px;height:20px;border-radius:7px;margin-top:1px;background:var(--blue);position:relative;box-shadow:0 2px 8px -2px color-mix(in srgb,var(--blue) 60%,transparent),inset 0 0 0 1px rgba(255,255,255,.16);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;line-height:1}
+.s-pt-m{flex:0 0 21px;width:21px;height:21px;border-radius:8px;margin-top:1px;background:linear-gradient(145deg,color-mix(in srgb,var(--blue) 82%,#fff),var(--blue));position:relative;box-shadow:0 4px 11px -3px color-mix(in srgb,var(--blue) 55%,transparent),inset 0 1px 0 rgba(255,255,255,.34),inset 0 0 0 1px rgba(255,255,255,.12);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;line-height:1}
 .slide.hasbg .s-pt-m{background:rgba(255,255,255,.92);color:var(--blue)}
 /* галка (по умолчанию) */
 .pm-check .s-pt-m::after{content:"";position:absolute;left:6px;top:4px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
