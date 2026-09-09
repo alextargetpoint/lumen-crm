@@ -5,8 +5,20 @@
   const P = window.CEDIT || {};
   const KEY = P.key || '';
   /* растровые паки стикеров (нарезанные из шитов) + смысловой индекс для авто-подстановки */
-  let STK_PACKS = null; const STK_LABEL = {};
-  fetch('/assets/stickers/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; })); }).catch(() => { STK_PACKS = []; });
+  let STK_PACKS = null; const STK_LABEL = {}, STK_KW = {};
+  fetch('/assets/stickers/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { STK_PACKS = j.packs || []; STK_PACKS.forEach(p => p.items.forEach(it => { STK_LABEL[it.key] = it.label; STK_KW[it.key] = it.kw || []; })); }).catch(() => { STK_PACKS = []; });
+  const BULLET_DIRS = ['bullets', 'bullets-3d', 'bullets-neon'];
+  /* авто-подбор иконки-буллета по тексту тезисов слайда (совпадение ключевых слов kw) */
+  function autoBulletKey(points) {
+    const txt = (points || []).join(' ').toLowerCase();
+    if (!txt || !STK_PACKS) return '';
+    let best = '', bestScore = 0;
+    (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir)).forEach(p => p.items.forEach(it => {
+      let sc = 0; (it.kw || []).forEach(k => { if (k && txt.includes(String(k).toLowerCase())) sc++; });
+      if (sc > bestScore) { bestScore = sc; best = it.key; }
+    }));
+    return best;   /* '' если ничего не совпало */
+  }
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const el = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
@@ -678,7 +690,7 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Позиция текста</label><div class="cseg" id="cPos">${[['top', 'Верх'], ['center', 'Центр'], ['bottom', 'Низ']].map(([v, n]) => `<button data-v="${v}" class="${pos === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Выравнивание</label><div class="cseg" id="cAlign">${[['left', 'Слева'], ['center', 'По центру']].map(([v, n]) => `<button data-v="${v}" class="${al === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="cgrp"><label>Размер заголовка</label><div class="cseg" id="cSize">${[['s', 'S'], ['m', 'M'], ['l', 'L']].map(([v, n]) => `<button data-v="${v}" class="${sz === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cnote">Стиль маркера у тезисов слайда.</div></div>`; })()}
+    ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; const isImg = /^img:/.test(pm); return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cbtn-row" style="margin-top:8px"><button class="cwbtn ${isImg ? 'on' : ''}" id="cPmImg">${isImg ? `<img src="/assets/stickers/${pm.slice(4)}.png" style="width:18px;height:18px;object-fit:contain">` : '🖼'} Иконка-буллет</button><button class="cwbtn" id="cPmAuto">✦ Авто по тексту</button></div><div class="cnote">Стиль маркера или иконка-буллет. «Авто» подберёт иконку под смысл тезисов.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Подложка текста</label><div class="cseg" id="cCard">${[['', 'Нет'], ['glass', 'Стекло'], ['solid', 'Плашка']].map(([v, n]) => `<button data-card="${v}" class="${(sl.dataset.card || '') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Матовое стекло или плотная плашка под всем текстом — читается на любом фото.</div></div>
     <div class="cgrp"><label>Служебное на этом слайде</label>
@@ -714,7 +726,20 @@ body.cpanel-on{padding-right:308px!important}
     $('#cPos', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'pos', b.dataset.v); $$('#cPos button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cAlign', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'align', b.dataset.v); $$('#cAlign button', body).forEach(x => x.classList.toggle('on', x === b)); });
     $('#cSize', body).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; applyMeta(i, 'size', b.dataset.v); $$('#cSize button', body).forEach(x => x.classList.toggle('on', x === b)); });
-    { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = b.dataset.pm; sl.dataset.rich = JSON.stringify(r); $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); dirty = true; save(true, { slides: serialize() }); }); }
+    const setPmark = (val) => { const sl = slideEl(i); let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (_) {} r.pmark = val; sl.dataset.rich = JSON.stringify(r); dirty = true; save(true, { slides: serialize() }); };
+    { const pmEl = $('#cPmark', body); if (pmEl) pmEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; $$('#cPmark button', body).forEach(x => x.classList.toggle('on', x === b)); setPmark(b.dataset.pm); }); }
+    /* иконка-буллет: попап с паками «Буллеты» */
+    { const im = $('#cPmImg', body); if (im) im.addEventListener('click', (e) => {
+      const packs = (STK_PACKS || []).filter(p => BULLET_DIRS.includes(p.dir));
+      if (!packs.length) { flash('Иконки-буллеты ещё грузятся…'); return; }
+      const keys = packs.map(p => p.title);
+      const grid = (ci) => (packs[ci].items || []).map(it => `<button class="celem" data-bk="${esc(it.key)}" title="${esc(it.label || '')}"><img src="/assets/stickers/${it.key}.png" style="width:100%;height:100%;object-fit:contain"></button>`).join('');
+      const pp = openPop(`<div class="csec" style="padding-top:2px">Иконка-буллет</div><div class="cseg ctpl-cats" id="cBkCats">${keys.map((c, ci) => `<button data-c="${ci}" class="${ci === 0 ? 'on' : ''}">${esc(c)}</button>`).join('')}</div><div class="celem-grid" id="cBkGrid">${grid(0)}</div>`, e.clientX - 260, e.clientY);
+      pp.classList.add('cpop-el');
+      $('#cBkCats', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; $$('#cBkCats button', pp).forEach(x => x.classList.toggle('on', x === b)); $('#cBkGrid', pp).innerHTML = grid(+b.dataset.c); });
+      pp.addEventListener('click', (ev) => { const b = ev.target.closest('[data-bk]'); if (!b) return; closePop(); setPmark('img:' + b.dataset.bk); flash('Маркер-иконка применён ✓'); });
+    }); }
+    { const au = $('#cPmAuto', body); if (au) au.addEventListener('click', () => { let r = {}; try { r = JSON.parse(slideEl(i).dataset.rich || '{}'); } catch (_) {} const key = autoBulletKey(r.points || []); if (!key) { flash('Не подобралось — выберите вручную'); return; } setPmark('img:' + key); flash('Авто-иконка: ' + (STK_LABEL[key] || key)); }); }
     const tcBox = $('#cTColor', body);
     if (tcBox) tcBox.addEventListener('click', (e) => {
       const b = e.target.closest('[data-tc]'); if (!b) return;
