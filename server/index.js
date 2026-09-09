@@ -892,6 +892,7 @@ const sanSlide = (s) => ({
   size: CAR_SIZE.has(s.size) ? s.size : 'm',
   tstyle: CAR_TSTYLES_SET.has(s.tstyle) ? s.tstyle : '',
   card: (s.card === 'glass' || s.card === 'solid') ? s.card : '',   /* подложка всего текст-блока: стекло/плашка */
+  noNum: !!s.noNum, noBrand: !!s.noBrand,   /* послайдный тоггл счётчика/футера */
   /* rich-режимы контента: 'stats' (сетка цифр) / 'steps' (нумерованный разбор, напр. план оплаты) */
   mode: ['stats', 'steps', 'gauges', 'amenities', 'bars'].includes(s.mode) ? s.mode : '',
   items: Array.isArray(s.items) ? s.items.slice(0, 6).map(x => ({ k: String((x && x.k) || '').slice(0, 48), v: String((x && x.v) || '').slice(0, 40), text: String((x && x.text) || '').slice(0, 160), pct: Math.max(0, Math.min(100, Math.round(+(x && x.pct) || 0))), icon: String((x && x.icon) || '').slice(0, 20) })).filter(x => x.k || x.v || x.text) : [],
@@ -3256,7 +3257,8 @@ const server = http.createServer(async (req, res) => {
       if (b.theme && PAGE_THEMES[b.theme]) c.theme = b.theme;
       if (b.font && FONT_LIB[b.font]) c.font = b.font;
       if (b.format && CAR_FORMATS.has(b.format)) c.format = b.format;
-      if (b.footer && typeof b.footer === 'object') c.footer = { on: !!b.footer.on, text: String(b.footer.text || '').slice(0, 80) };
+      if (b.footer && typeof b.footer === 'object') c.footer = { on: !!b.footer.on, text: String(b.footer.text || '').slice(0, 80), style: ['plain', 'pill', 'line', 'serif'].includes(b.footer.style) ? b.footer.style : 'plain', hide: !!b.footer.hide };
+      if (b.counter !== undefined) c.counter = ['frac', 'num', 'dot', 'roman', 'off'].includes(b.counter) ? b.counter : 'frac';
       if (Array.isArray(b.slides)) c.slides = b.slides.slice(0, 12).map(s => sanSlide(s));
       store.save();
       return json(res, 200, { ok: true, count: c.slides.length });
@@ -5544,6 +5546,12 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       const logo = db.settings.agency.logo;
       const footer = c.footer || {};
       const brandTxt = footer.on ? (footer.text || AG) : AG;
+      /* ⭐ гибкость служебных элементов: счётчик слайдов + футер бренда — стили + глобальный/послайдный тоггл */
+      const counter = ['frac', 'num', 'dot', 'roman', 'off'].includes(c.counter) ? c.counter : 'frac';
+      const footerStyle = ['plain', 'pill', 'line', 'serif'].includes(footer.style) ? footer.style : 'plain';
+      const footerHide = !!footer.hide;
+      const roman = (n) => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'][n - 1] || String(n);
+      const numHtml = (i) => counter === 'dot' ? c.slides.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('') : counter === 'num' ? String(i + 1).padStart(2, '0') : counter === 'roman' ? roman(i + 1) : (i + 1) + ' / ' + c.slides.length;
       const ce = (f, i) => isEdit ? ` data-ce="${i}:${f}"` : '';
       const abs = (v) => v && /^assets\//.test(v) ? '/' + v : v;
       /* инлайн-форматирование (B/I/выделение цветом) — храним ограниченный HTML + класс цвета выделения */
@@ -5570,10 +5578,10 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
         const cls = [`pos-${s.pos || (i === 0 ? 'bottom' : 'center')}`, `al-${s.align || 'left'}`, `sz-${s.size || 'm'}`, hasPat ? `pat-${s.bgpat}` : '', hasGrad ? `grad-${s.grad}` : '', scHeavy ? 'sc-heavy' : '', s.layout ? `lay-${s.layout}` : '', (s.card === 'glass' || s.card === 'solid') ? `card-${s.card}` : ''].filter(Boolean).join(' ');
         const eye = s.eyebrow || '';
         const style = hasVid ? '' : hasBg ? `background-image:url('${esc(abs(s.bg))}')` : hasColor ? `background:${esc(s.bgc)}` : '';   /* чистое фото; контраст даёт per-family скрим (не мутный тёмный бокс на всём)*/
-        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
+        return `${isEdit ? `<div class="cslot" data-idx="${i}">` : ''}<div class="slide${light ? ' hasbg' : ''} ${cls}" data-idx="${i}" data-pos="${s.pos || (i === 0 ? 'bottom' : 'center')}" data-align="${s.align || 'left'}" data-size="${s.size || 'm'}" data-tstyle="${s.tstyle || 'plain'}"${s.card ? ` data-card="${esc(s.card)}"` : ''}${s.noNum ? ' data-nonum="1"' : ''}${s.noBrand ? ' data-nobrand="1"' : ''}${hasBg ? ` data-bg="${esc(abs(s.bg))}"` : ''}${hasVid ? ` data-bgv="${esc(abs(s.bgv))}"` : ''}${hasColor ? ` data-bgc="${esc(s.bgc)}"` : ''}${s.bgpat ? ` data-bgpat="${esc(s.bgpat)}"` : ''}${s.grad ? ` data-grad="${esc(s.grad)}"` : ''}${s.tcolor ? ` data-tcolor="${esc(s.tcolor)}"` : ''}${isEdit && (s.mode || (s.points || []).length || s.layout || s.hero) ? ` data-rich='${JSON.stringify({ mode: s.mode, items: s.items || [], points: s.points || [], pmark: s.pmark || 'index', layout: s.layout || '', hero: s.hero || null }).replace(/'/g, '&#39;').replace(/</g, '\\u003c')}'` : ''} style="${style}">
           ${hasVid ? `<video class="s-bgv" autoplay muted loop playsinline preload="metadata" src="${esc(abs(s.bgv))}"></video><div class="s-shade"></div>` : ''}
           <div class="s-in">
-            <span class="s-num">${i + 1} / ${c.slides.length}</span>
+            ${(counter !== 'off' && !s.noNum) ? `<span class="s-num num-${counter}">${numHtml(i)}</span>` : ''}
             ${(eye || isEdit) ? `<span class="s-eye"${ce('eyebrow', i)}>${esc(eye)}</span>` : ''}
             ${s.hero ? `<div class="s-hero"><b>${esc(s.hero.v)}</b><i>${esc(s.hero.k)}</i></div>` : ''}
             <h2 class="s-h${s.tstyle ? ' ts-' + s.tstyle : ''}"${ce('heading', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]}"` : ''}>${sanInline(s.heading)}</h2>
@@ -5584,7 +5592,7 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
             ${s.mode === 'bars' && (s.items || []).length ? `<div class="s-bars">${s.items.map((it, n) => `<div class="s-barcol"><span class="s-barv">${esc(it.v)}</span><span class="s-bartrack"><span class="s-bar ${n === s.items.length - 1 ? 'hi' : ''}" style="height:${Math.max(8, it.pct || 0)}%"></span></span><i>${esc(it.k)}</i></div>`).join('')}</div>` : ''}
             ${!s.mode ? `<p class="s-s"${ce('sub', i)}${s.tcolor ? ` style="color:${CAR_TCOLORS[s.tcolor]};opacity:.9"` : ''}>${sanInline(s.sub)}</p>` : ''}
             ${!s.mode && (s.points || []).length ? `<ul class="s-points pm-${s.pmark || 'index'}">${s.points.map((pt, pi) => `<li><span class="s-pt-m" data-n="${String(pi + 1).padStart(2, '0')}"></span><span>${sanInline(pt)}</span></li>`).join('')}</ul>` : ''}
-            ${(s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
+            ${(footerHide || s.noBrand || s.mode || (s.points || []).length || (Array.isArray(s.layers) && s.layers.some(l => l.t === 'img'))) ? '' : `<div class="s-brand fb-${footerStyle}">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<span>${esc(brandTxt)}</span></div>`}
           </div>
           ${renderCarLayers(s.layers, isEdit)}
         </div>${isEdit ? `<div class="s-tbar">
@@ -5769,6 +5777,13 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.al-center .s-in{text-align:center;align-items:center}
 .s-num{position:absolute;top:7.5%;left:10%;font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.16em;font-variant-numeric:tabular-nums}
 .slide.al-center .s-num{left:50%;transform:translateX(-50%)}
+/* ⭐ стили счётчика слайдов */
+.s-num.num-num{font-size:13px;font-weight:800;letter-spacing:.1em}
+.s-num.num-roman{font-style:italic;font-family:var(--disp);letter-spacing:.06em;font-size:13px}
+.s-num.num-dot{display:flex;gap:5px;align-items:center;letter-spacing:0}
+.s-num.num-dot i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.3;transition:.2s}
+.s-num.num-dot i.on{opacity:1;width:16px;border-radius:3px}
+.slide.al-center .s-num.num-dot{transform:translateX(-50%)}
 /* eyebrow — редакторская микро-рубрика с короткой линейкой-акцентом */
 .s-eye{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--blue)}
 .s-eye::before{content:"";width:22px;height:1.5px;background:currentColor;opacity:.9;flex:0 0 auto}
@@ -5863,6 +5878,13 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.hasbg .s-s{color:rgba(255,255,255,.92);text-shadow:0 1px 10px rgba(0,0,0,.35)}
 .s-brand{position:absolute;bottom:8%;left:10%;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--mut);font-family:var(--disp)}
 .slide.al-center .s-brand{left:50%;transform:translateX(-50%)}
+/* ⭐ стили футера бренда */
+.s-brand.fb-pill{background:color-mix(in srgb,var(--ink) 7%,transparent);padding:6px 13px;border-radius:999px;font-size:12.5px}
+.slide.hasbg .s-brand.fb-pill{background:rgba(255,255,255,.16);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.s-brand.fb-line{padding-top:9px;border-top:1.5px solid color-mix(in srgb,var(--ink) 20%,transparent)}
+.slide.hasbg .s-brand.fb-line{border-top-color:rgba(255,255,255,.34)}
+.s-brand.fb-serif{font-family:var(--disp);font-weight:600;letter-spacing:.01em;font-size:15px}
+.s-brand.fb-serif img{height:22px}
 .s-brand img{height:26px;max-width:130px;object-fit:contain}
 [data-ce]{outline:1.5px dashed transparent;border-radius:4px;transition:outline .12s}
 ${isEdit ? `[data-ce]{outline-color:color-mix(in srgb,var(--blue) 45%,transparent);cursor:text}[data-ce]:focus{outline:2px solid var(--blue);background:rgba(0,0,0,.04)}.s-eye:empty:before{content:'ЭЙБРОУ';opacity:.4}` : ''}
@@ -5893,7 +5915,7 @@ ${isEdit ? `.slide{cursor:pointer;transition:box-shadow .18s,transform .18s}.sli
 @media print{body{background:#fff;padding:0}.wrap{max-width:none;gap:0}.slide{border-radius:0;box-shadow:none;page-break-after:always;width:100vw;height:100vh;aspect-ratio:auto}.s-tbar,.s-ins,.cqt{display:none!important}.slide.sel{box-shadow:none}}
 </style></head><body>
 <div class="wrap">${slides}</div>
-${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=35"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
+${isEdit ? `<script>window.CEDIT=${JSON.stringify({ cid: c.id, key: u.searchParams.get('key'), theme: c.theme, font: c.font || 'fraunces', format: c.format || 'square', footer: c.footer || { on: false, text: '' }, counter: counter, title: c.title, llm: llm.available(), img: llm.hasImage(), themes: Object.fromEntries(Object.entries(PAGE_THEMES).map(([k, v]) => [k, { name: v.name, blue: v.blue, body: v.body }])), fonts: Object.fromEntries(Object.entries(FONT_LIB).map(([k, v]) => [k, { name: v.name, cat: v.cat, fam: v.fam, gf: v.gf }])), shapes: [...CAR_SHAPES], frames: [...CAR_FRAMES], stickers: CAR_STICKERS, tstyles: CAR_TSTYLES, tcolors: CAR_TCOLORS, templates: CAR_TEMPLATES, slideTpls: CAR_SLIDE_TPLS }).replace(/</g, '\\u003c')}<\/script><script src="/cedit.js?v=36"><\/script>` : isPrint ? '<script>window.print()<\/script>' : ''}
 </body></html>`);
       return;
     }

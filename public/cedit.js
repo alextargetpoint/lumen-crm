@@ -252,6 +252,7 @@ body.cpanel-on{padding-right:308px!important}
         bg: sl.dataset.bg || '', bgv: sl.dataset.bgv || '', bgc: sl.dataset.bgc || '', bgpat: sl.dataset.bgpat || '', grad: sl.dataset.grad || '', tcolor: sl.dataset.tcolor || '',
         pos: sl.dataset.pos || '', align: sl.dataset.align || 'left', size: sl.dataset.size || 'm', tstyle: (sl.dataset.tstyle && sl.dataset.tstyle !== 'plain') ? sl.dataset.tstyle : '', card: sl.dataset.card || '', layers,
         mode: rich.mode || '', items: rich.items || [], points: rich.points || [], pmark: rich.pmark || 'index', layout: rich.layout || '', hero: rich.hero || null,
+        noNum: !!sl.dataset.nonum, noBrand: !!sl.dataset.nobrand,
       };
     });
   }
@@ -579,8 +580,11 @@ body.cpanel-on{padding-right:308px!important}
     <div class="cgrp"><label>Цветовая тема</label><div class="cthemes">${Object.entries(P.themes || {}).map(([k, t]) => `<button class="cth ${k === P.theme ? 'on' : ''}" data-theme="${k}" title="${t.name}" style="--d:${t.blue};--b:${t.body}"></button>`).join('')}</div></div>
     <div class="cgrp"><label>Шрифт заголовков</label><button class="cfontbtn" id="cFontBtn"><span class="aa" style="font-family:${curFont.fam}">Aa</span> <span style="flex:1">${curFont.name}</span> ▾</button></div>
     <div class="cgrp"><label>Формат</label><div class="cseg" id="cFmt">${['square', 'portrait', 'story'].map(f => `<button data-f="${f}" class="${P.format === f ? 'on' : ''}">${FMT[f]}</button>`).join('')}</div></div>
+    <div class="cgrp"><label>Счётчик слайдов</label><div class="cseg" id="cCounter">${[['frac', '1/6'], ['num', '01'], ['dot', '•••'], ['roman', 'I'], ['off', 'Выкл']].map(([v, n]) => `<button data-cn="${v}" class="${(P.counter || 'frac') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Как нумеруются слайды. «Выкл» — убрать счётчик со всех.</div></div>
     <div class="cgrp"><label>Футер слайдов</label>
-      <div class="swrow"><span class="sw ${(P.footer || {}).on ? 'on' : ''}" id="cFtSw"></span> Свой футер вместо агентства</div>
+      <div class="swrow"><span class="sw ${(P.footer || {}).hide ? '' : 'on'}" id="cFtShow"></span> Показывать футер на слайдах</div>
+      <div class="cseg" id="cFtStyle" style="margin-top:8px">${[['plain', 'Обычный'], ['pill', 'Пилюля'], ['line', 'Линия'], ['serif', 'Сериф']].map(([v, n]) => `<button data-fs="${v}" class="${((P.footer || {}).style || 'plain') === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="swrow" style="margin-top:8px"><span class="sw ${(P.footer || {}).on ? 'on' : ''}" id="cFtSw"></span> Свой текст вместо агентства</div>
       <input class="cinp" id="cFtTxt" placeholder="@ваш_аккаунт · сайт.ru" value="${esc((P.footer || {}).text || '')}">
     </div>
     <div class="cgrp"><button class="cwbtn wide" id="cAddSlide">+ Добавить слайд</button></div>
@@ -641,11 +645,13 @@ body.cpanel-on{padding-right:308px!important}
       $('#cStGrid', pp).addEventListener('click', (ev) => { const b = ev.target.closest('[data-sti]'); if (!b) return; const [ci, ti] = b.dataset.sti.split(':').map(Number); const t = (P.slideTpls[cats[ci]] || [])[ti]; if (!t) return; const arr = serialize(); arr.push(Object.assign({}, t.s)); closePop(); save(true, { slides: arr }); });
       $('#cStBlank', pp).addEventListener('click', () => { const arr = serialize(); arr.push({ heading: 'Новый слайд', sub: 'Текст слайда', size: 'm', align: 'left' }); closePop(); save(true, { slides: arr }); });
     });
-    let ftOn = (P.footer || {}).on;
-    $('#cFtSw', body).addEventListener('click', () => { ftOn = !ftOn; $('#cFtSw', body).classList.toggle('on', ftOn); dirty = true; });
-    const persistFooter = () => save(true, { footer: { on: ftOn, text: $('#cFtTxt', body).value.trim() } });
+    let ftOn = (P.footer || {}).on, ftHide = !!(P.footer || {}).hide, ftStyle = (P.footer || {}).style || 'plain';
+    const persistFooter = () => save(true, { footer: { on: ftOn, text: $('#cFtTxt', body).value.trim(), style: ftStyle, hide: ftHide } });
+    $('#cFtSw', body).addEventListener('click', () => { ftOn = !ftOn; $('#cFtSw', body).classList.toggle('on', ftOn); persistFooter(); });
+    $('#cFtShow', body).addEventListener('click', () => { ftHide = !ftHide; $('#cFtShow', body).classList.toggle('on', !ftHide); persistFooter(); });
+    $('#cFtStyle', body).addEventListener('click', (e) => { const b = e.target.closest('[data-fs]'); if (!b) return; ftStyle = b.dataset.fs; $$('#cFtStyle button', body).forEach(x => x.classList.toggle('on', x === b)); persistFooter(); });
     $('#cFtTxt', body).addEventListener('change', persistFooter);
-    $('#cFtSw', body).addEventListener('dblclick', persistFooter);
+    $('#cCounter', body).addEventListener('click', (e) => { const b = e.target.closest('[data-cn]'); if (!b) return; $$('#cCounter button', body).forEach(x => x.classList.toggle('on', x === b)); P.counter = b.dataset.cn; save(true, { counter: b.dataset.cn }); });
     /* шрифт-поповер */
     $('#cFontBtn', body).addEventListener('click', (e) => {
       const rows = (filter, cat) => Object.entries(P.fonts).filter(([k, f]) => (!cat || f.cat === cat) && (!filter || f.name.toLowerCase().includes(filter))).map(([k, f]) => `<div class="fprow ${k === P.font ? 'on' : ''}" data-fp="${k}"><span class="aa" style="font-family:${f.fam}">Aa</span><span class="nm" style="font-family:${f.fam}">${f.name}</span></div>`).join('') || '<div style="padding:10px;color:#9aa1b2">Ничего не найдено</div>';
@@ -678,6 +684,10 @@ body.cpanel-on{padding-right:308px!important}
     ${(() => { let r = {}; try { r = JSON.parse(sl.dataset.rich || '{}'); } catch (e) {} if (!(r.points && r.points.length)) return ''; const pm = r.pmark || 'index'; const OPT = [['index', '01'], ['chip', '❶'], ['line', '▏'], ['check', '✓'], ['dot', '•'], ['ring', '◦'], ['dash', '—'], ['arrow', '→'], ['num', '1.'], ['diamond', '◆'], ['star', '★'], ['plus', '+']]; return `<div class="cgrp"><label>Маркер буллетов</label><div class="cseg cpmark" id="cPmark" style="flex-wrap:wrap">${OPT.map(([v, g]) => `<button data-pm="${v}" class="${pm === v ? 'on' : ''}" style="flex:0 0 auto;min-width:34px">${g}</button>`).join('')}</div><div class="cnote">Стиль маркера у тезисов слайда.</div></div>`; })()}
     <div class="cgrp"><label>Стиль заголовка</label><button class="cfontbtn" id="cTStyleBtn"><span class="s-h ts-${sl.dataset.tstyle || 'plain'}" style="font-size:18px;font-family:var(--disp)">Aa</span><span style="flex:1">${(P.tstyles || {})[sl.dataset.tstyle || 'plain'] || 'Обычный'}</span> ▾</button></div>
     <div class="cgrp"><label>Подложка текста</label><div class="cseg" id="cCard">${[['', 'Нет'], ['glass', 'Стекло'], ['solid', 'Плашка']].map(([v, n]) => `<button data-card="${v}" class="${(sl.dataset.card || '') === v ? 'on' : ''}">${n}</button>`).join('')}</div><div class="cnote">Матовое стекло или плотная плашка под всем текстом — читается на любом фото.</div></div>
+    <div class="cgrp"><label>Служебное на этом слайде</label>
+      <div class="swrow"><span class="sw ${sl.dataset.nonum ? '' : 'on'}" id="cNoNum"></span> Показывать счётчик</div>
+      <div class="swrow" style="margin-top:7px"><span class="sw ${sl.dataset.nobrand ? '' : 'on'}" id="cNoBrand"></span> Показывать футер</div>
+      <div class="cnote">Выключи, чтобы убрать номер/футер именно с этого слайда (напр. обложка).</div></div>
     <div class="cgrp"><label>Цвет текста</label><div class="ctcolors" id="cTColor"><button class="ctc ${!sl.dataset.tcolor ? 'on' : ''}" data-tc="" title="Авто">A</button>${Object.entries(P.tcolors || {}).map(([k, v]) => `<button class="ctc ${sl.dataset.tcolor === k ? 'on' : ''}" data-tc="${k}" title="${k}" style="--tc:${v}"></button>`).join('')}</div><div class="cnote">«A» — авто (по фону). Пресет перекрывает цвет заголовка и подписи.</div></div>
     <div class="cgrp"><label>Узор фона</label><div class="cpats" id="cPats">${PATS.map(([k, n]) => { const on = (sl.dataset.bgpat || '') === k || (!sl.dataset.bgpat && k === 'none'); return `<div class="cpat ${k === 'none' ? 'none' : ''} ${on ? 'on' : ''}" data-pat="${k}" title="${n}"${k !== 'none' ? ` style="background-image:${PATV[k]}"` : ''}>${k === 'none' ? 'нет' : ''}</div>`; }).join('')}</div><div class="cnote">Тонкий узор поверх темы. Не работает вместе с фото/видео/цветом.</div></div>
     <div class="cgrp"><label>Формат выделенного текста</label><div class="cfmtbar" id="cFmtBar">
@@ -738,6 +748,9 @@ body.cpanel-on{padding-right:308px!important}
       $$('#cCard button', body).forEach(x => x.classList.toggle('on', x === b));
       dirty = true; save(false);
     });
+    /* послайдный тоггл счётчика/футера */
+    const toggleSvc = (btnId, dataKey) => { const bt = $('#' + btnId, body); if (!bt) return; bt.addEventListener('click', () => { const sl = slideEl(i); const hidden = !!sl.dataset[dataKey]; if (hidden) delete sl.dataset[dataKey]; else sl.dataset[dataKey] = '1'; bt.classList.toggle('on', hidden); dirty = true; save(true, { slides: serialize() }); }); };
+    toggleSvc('cNoNum', 'nonum'); toggleSvc('cNoBrand', 'nobrand');
     $('#cFmtBar', body).addEventListener('mousedown', (e) => {
       const b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault(); const cmd = b.dataset.cmd;
       const s2 = document.getSelection(); if (!s2 || !s2.rangeCount || !s2.toString()) { flash('Сначала выделите текст в слайде'); return; }
