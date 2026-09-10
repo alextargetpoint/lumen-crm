@@ -351,6 +351,7 @@ const DEFAULT_PASS = 'lumen2026';
     }
   }
   for (const b of db.brokers) if (!b.schedule) b.schedule = { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' };
+  for (const b of db.brokers) if (!b.calKey) b.calKey = crypto.randomBytes(8).toString('hex');   /* ключ ICS-подписки календаря брокера (Apple/Google) */
   for (const l of db.leads) { if (!l.custom) l.custom = {}; if (!l.transcripts) l.transcripts = []; }
   store.save();
 }
@@ -672,6 +673,25 @@ ${opts.print ? '<script>window.onload=()=>window.print()<\/script>' : '<button c
 </body></html>`;
 }
 
+/* ⭐ ICS-фид календаря брокера: встречи + задачи-с-дедлайном → подписка в Apple/Google Calendar (read-only, live) */
+function brokerIcs(db, b) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const dt = (ms) => { const d = new Date(ms); return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z'; };
+  const e2 = (s) => String(s == null ? '' : s).replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  const KM = { zoom: 'Zoom', call: 'Звонок', meet: 'Встреча', viewing: 'Показ', office: 'Встреча в офисе' };
+  const now = dt(Date.now()); const ev = [];
+  (db.meetings || []).filter(m => m.brokerId === b.id && m.at).forEach(m => {
+    const lead = (db.leads || []).find(l => l.id === m.leadId); const dur = (m.durationMin || 30) * 60000;
+    ev.push({ uid: 'mt-' + m.id + '@lumen', s: m.at, e: m.at + dur, sum: (KM[m.kind] || 'Встреча') + (lead ? ' · ' + lead.name : ''), d: 'Встреча в Lumen CRM' + (lead && lead.phone ? ' · ' + lead.phone : '') });
+  });
+  (db.brokerTasks || []).filter(t => t.brokerId === b.id && t.due && t.status !== 'done').forEach(t => {
+    ev.push({ uid: 'tk-' + t.id + '@lumen', s: t.due, e: t.due + 30 * 60000, sum: '☑ ' + (t.title || 'Задача'), d: 'Задача из Lumen CRM' });
+  });
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Lumen CRM//RU', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Lumen · ' + e2(b.name || 'Календарь'), 'X-WR-TIMEZONE:UTC'];
+  ev.forEach(x => L.push('BEGIN:VEVENT', 'UID:' + x.uid, 'DTSTAMP:' + now, 'DTSTART:' + dt(x.s), 'DTEND:' + dt(x.e), 'SUMMARY:' + e2(x.sum), 'DESCRIPTION:' + e2(x.d), 'END:VEVENT'));
+  L.push('END:VCALENDAR');
+  return L.join('\r\n');
+}
 const PB_TYPES = {
   cover: { name: 'Обложка', variants: ['blue', 'photo', 'light', 'split'], std: true },
   hello: { name: 'Привет + об агентстве', variants: ['std'], std: true },
@@ -4313,6 +4333,15 @@ ${SCR}
       if (!ok) { res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h1>Нет доступа к отчёту</h1>'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(renderReportDoc(db, period, { print: u.searchParams.get('print') === '1' }));
+      return;
+    }
+
+    /* ICS-календарь брокера (read-only подписка Apple/Google): /cal/:brokerId.ics?key= */
+    if ((m = p.match(/^\/cal\/([\w]+)\.ics$/)) && req.method === 'GET') {
+      const b = db.brokers.find(x => x.id === m[1]);
+      if (!b || u.searchParams.get('key') !== b.calKey) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Disposition': 'inline; filename="lumen.ics"' });
+      res.end(brokerIcs(db, b));
       return;
     }
 

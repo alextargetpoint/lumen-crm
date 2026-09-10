@@ -7899,6 +7899,9 @@ PAGES.brokers = async (root) => {
                 <div style="display:flex;gap:9px;align-items:center;padding-top:6px"><label class="switch"><input type="checkbox" data-be="active" ${b.active !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
                 <span class="muted" style="font-size:11.5px">${b.active !== false ? 'активен · видит только своих лидов' : 'отключён · лиды переданы команде'}</span></div>
               </div>
+              ${b.calKey ? `<div class="pd-fact"><label class="lc-lbl">Личный календарь (Apple / Google)</label>
+                <div class="muted" style="font-size:11.5px;padding:4px 0 6px">Встречи и задачи брокера — живой подпиской в его календарь. В Apple Calendar: «Файл → Новая подписка на календарь» → вставить ссылку.</div>
+                <button type="button" class="btn btn-sm br-calcopy" data-calurl="${location.origin}/cal/${b.id}.ics?key=${b.calKey}">${ic(I.cal)}Скопировать ссылку подписки</button></div>` : ''}
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
@@ -8073,6 +8076,8 @@ PAGES.brokers = async (root) => {
     });
     const pinC = eb.querySelector('.br-pincopy');
     if (pinC) pinC.addEventListener('click', () => { navigator.clipboard.writeText(pinC.closest('[data-brpincode]').dataset.brpincode); toast('Код скопирован', null, true); });
+    const calC = eb.querySelector('.br-calcopy');
+    if (calC) calC.addEventListener('click', () => { navigator.clipboard.writeText(calC.dataset.calurl); toast('Ссылка календаря скопирована', 'Подписка в Apple/Google Calendar — обновляется сама', true); });
     const pv = eb.querySelector('[data-brpreview]');
     if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
     const pr = eb.querySelector('[data-brprovision]');
