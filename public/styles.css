@@ -4873,6 +4873,36 @@ html[data-night] {
 @media (max-width: 760px) { .ov2-grid.ov-masonry { grid-template-columns: 1fr; grid-auto-rows: auto; } .ov2-grid.ov-masonry .ov-w, .ov2-grid.ov-masonry .ov-w[class*="ov-cw-"] { grid-column: 1 / -1 !important; grid-row: auto !important; } }
 /* пользовательская мин-высота тела (ресайз по вертикали) */
 .ov-w-body { min-height: var(--ovh, auto); }
+/* ── ШТАБ РУКОВОДИТЕЛЯ ── */
+.ov-tp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ov-tp th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); padding: 4px 6px; border-bottom: 1px solid var(--stroke); }
+.ov-tp th:not(:first-child), .ov-tp td:not(:first-child) { text-align: center; }
+.ov-tp td { padding: 7px 6px; border-bottom: 1px solid var(--bg-2); color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.ov-tp tr:last-child td { border-bottom: 0; }
+.ov-tp-nm { font-weight: 600; text-align: left !important; display: flex; align-items: center; gap: 6px; }
+.ov-tp-hot { font-style: normal; font-size: 10px; color: #E5484D; font-weight: 700; }
+.ov-tp-v { display: inline-block; font-size: 10.5px; font-weight: 650; padding: 2px 8px; border-radius: 20px; }
+.ov-tp-v.ok { background: color-mix(in srgb, #2FA98C 14%, transparent); color: #1E7A64; }
+.ov-tp-v.warn { background: color-mix(in srgb, #E5844B 16%, transparent); color: #B45309; }
+.ov-tp-v.mut { background: var(--bg-2); color: var(--ink-3); }
+.ov-sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.ov-sig { display: flex; align-items: center; gap: 11px; text-align: left; border: 1px solid var(--stroke); border-left: 3px solid var(--ink-3); border-radius: 12px; padding: 11px 13px; background: var(--card); cursor: pointer; font-family: inherit; transition: transform .14s, box-shadow .14s, border-color .14s; }
+.ov-sig:hover { transform: translateY(-2px); box-shadow: var(--shadow-elevated); }
+.ov-sig.crit { border-left-color: #E5484D; background: linear-gradient(180deg, color-mix(in srgb, #E5484D 6%, var(--card)), var(--card) 60%); }
+.ov-sig.warn { border-left-color: #E5844B; }
+.ov-sig.ok { border-left-color: #2FA98C; }
+.ov-sig.info { border-left-color: var(--accent); }
+.ov-sig-ic { flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--bg-2); color: var(--ink-2); }
+.ov-sig.crit .ov-sig-ic { background: color-mix(in srgb, #E5484D 12%, transparent); color: #E5484D; }
+.ov-sig.warn .ov-sig-ic { background: color-mix(in srgb, #E5844B 14%, transparent); color: #B45309; }
+.ov-sig.ok .ov-sig-ic { background: color-mix(in srgb, #2FA98C 14%, transparent); color: #1E7A64; }
+.ov-sig.info .ov-sig-ic { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.ov-sig-ic svg { width: 17px; height: 17px; }
+.ov-sig-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ov-sig-b b { font-size: 13px; color: var(--navy-900); font-weight: 650; }
+.ov-sig-b i { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.ov-sig-go { flex: none; color: var(--ink-3); opacity: .5; }
+.ov-sig-go svg { width: 15px; height: 15px; }
 /* ручка ресайза — ТОЛЬКО в режиме «Настроить», крупная и явно видимая */
 .ov-w { position: relative; }
 .ov-w-rz { display: none; }

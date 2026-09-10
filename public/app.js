@@ -1003,9 +1003,10 @@ const OV_VARIANT = {
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, execsignals: 12 };
 /* категории для библиотеки виджетов */
 const OV_CAT = [
+  ['Руководителю · штаб', ['execsignals', 'teamperf', 'trafficperf']],
   ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
   ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'numbers']],
   ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
@@ -1016,7 +1017,7 @@ const OV_CAT = [
 const ovCatOf = (k) => { for (const [c, ks] of OV_CAT) if (ks.includes(k)) return c; return 'Прочее'; };
 /* ⭐ готовые наборы виджетов под цель — один клик собирает обзор под роль/задачу */
 const OV_PRESETS = [
-  { k: 'chief', name: 'Руководитель', d: 'сводка по агентству', ic: () => I.grid, w: ['kpi', 'clientreport', 'funnel', 'leadsources', 'brokers', 'leaders', 'goal', 'activity'] },
+  { k: 'chief', name: 'Руководитель', d: 'штаб · срезы · решения', ic: () => I.grid, w: ['execsignals', 'kpi', 'teamperf', 'trafficperf', 'clientreport', 'funnel', 'leaders', 'goal'] },
   { k: 'sales', name: 'Отдел продаж', d: 'лиды, задачи, сделки', ic: () => I.funnel, w: ['kpi', 'funnel', 'hotleads', 'tasks', 'meetings', 'attention', 'chains', 'leaders'] },
   { k: 'marketing', name: 'Маркетинг · реклама', d: 'трафик, связки, CPL', ic: () => I.target, w: ['kpi', 'clientreport', 'adbundles', 'leadsources', 'funnel', 'aivs', 'numbers'] },
   { k: 'content', name: 'Контент', d: 'идеи, сценарии, карусели', ic: () => I.layers, w: ['contenthub', 'ideas', 'casebase', 'kpi'] },
@@ -1408,6 +1409,62 @@ const OV_W = {
       </div>`;
     }).join('');
     return hd + `<div class="ov-chains">${body}</div>`;
+  } },
+  /* ═══ ШТАБ РУКОВОДИТЕЛЯ — умные срезы для решений (owner/admin) ═══ */
+  teamperf: { name: 'Срез по команде', icon: () => I.users, full: false, render: (c) => {
+    const L = c.leads || [], QUAL = ['qualified', 'handover', 'viewing', 'deal'], now = Date.now();
+    const rows = (STATE.brokers || []).filter(b => b.active !== false).map(b => {
+      const mine = L.filter(l => l.broker === b.id);
+      const q = mine.filter(l => QUAL.includes(l.stage)).length;
+      const deals = mine.filter(l => l.stage === 'deal').length;
+      const hotWait = mine.filter(l => ['handover', 'viewing'].includes(l.stage) && l.lastDir === 'in' && (now - (l.lastMsgAt || 0)) > 2 * 3600e3).length;
+      return { b, n: mine.length, q, deals, conv: mine.length ? Math.round(q / mine.length * 100) : 0, hotWait };
+    }).filter(r => r.n || r.deals);
+    const hd = `<div class="ov2-card-hd">${ic(I.users)}Срез по команде<span>лиды · квалы · сделки · сигнал</span><button class="btn btn-sm" data-ovgo="brokers">Команда</button></div>`;
+    if (!rows.length) return hd + ovEmpty(I.users, 'Нет данных по команде', 'Появится, когда лиды распределятся по брокерам');
+    const avg = rows.reduce((s, r) => s + r.n, 0) / rows.length;
+    const topDeals = Math.max(0, ...rows.map(r => r.deals));
+    const verdict = (r) => r.hotWait ? { t: 'внимание', c: 'warn' } : (r.deals && r.deals === topDeals) ? { t: 'топ', c: 'ok' } : (r.n > avg * 1.6) ? { t: 'перегружен', c: 'warn' } : (r.n < Math.max(1, avg * 0.4)) ? { t: 'простой', c: 'mut' } : { t: 'ок', c: 'ok' };
+    rows.sort((a, b) => b.deals - a.deals || b.q - a.q);
+    return hd + `<table class="ov-tp"><thead><tr><th>Сотрудник</th><th>Лиды</th><th>Квал</th><th>Сделки</th><th>Конв</th><th></th></tr></thead><tbody>${rows.map(r => { const v = verdict(r); return `<tr><td class="ov-tp-nm">${esc(r.b.name.split(' ')[0])}${r.hotWait ? `<i class="ov-tp-hot" title="${r.hotWait} горячих без ответа >2ч">${r.hotWait}🔥</i>` : ''}</td><td>${r.n}</td><td>${r.q}</td><td><b>${r.deals}</b></td><td>${r.conv}%</td><td><span class="ov-tp-v ${v.c}">${v.t}</span></td></tr>`; }).join('')}</tbody></table>`;
+  } },
+  trafficperf: { name: 'Трафик и маркетинг', icon: () => I.target, full: false, render: (c) => {
+    const L = c.leads || [], QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+    const srcName = (l) => l.source === 'ad_comment' ? 'Комментарии рекламы' : (l.ads && l.ads.campaignName) ? l.ads.campaignName : (l.ads && l.ads.adId) ? 'Реклама · лид-формы' : l.source === 'import' ? 'Импорт' : l.source === 'broker_card' ? 'От брокера' : 'Прямые / другое';
+    const S = {}; L.forEach(l => { const k = srcName(l); (S[k] = S[k] || { leads: 0, q: 0 }); S[k].leads++; if (QUAL.includes(l.stage)) S[k].q++; });
+    const rows = Object.entries(S).map(([k, v]) => ({ k, leads: v.leads, q: v.q, qr: v.leads ? Math.round(v.q / v.leads * 100) : 0 })).sort((a, b) => b.leads - a.leads).slice(0, 6);
+    const hd = `<div class="ov2-card-hd">${ic(I.target)}Трафик и маркетинг<span>источники · качество лида</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>`;
+    if (!rows.length) return hd + ovEmpty(I.target, 'Нет данных по трафику', 'Появится с первыми лидами из источников');
+    const avgQr = Math.round(rows.reduce((s, r) => s + r.qr, 0) / rows.length) || 1;
+    const mx = Math.max(...rows.map(r => r.leads), 1);
+    const sig = (r) => (r.qr >= avgQr * 1.3 && r.leads >= 3) ? '💎' : (r.qr < avgQr * 0.5 && r.leads >= 3) ? '🗑' : '';
+    return hd + `<div class="ov-bnd">${rows.map(r => `<div class="ov-bnd-row"><div class="ov-bnd-t">${esc(r.k)} ${sig(r)}<i>${r.leads} лид · ${r.q} целевых · квал ${r.qr}%</i></div><div class="ov-bnd-bar"><span style="width:${Math.round(r.leads / mx * 100)}%"></span></div></div>`).join('')}</div>`;
+  } },
+  execsignals: { name: 'Штаб · сигналы руководителю', icon: () => I.bolt, full: true, render: (c) => {
+    const L = c.leads || [], QUAL = ['qualified', 'handover', 'viewing', 'deal'], now = Date.now();
+    const sigs = [];
+    /* 1. горячие лиды без ответа >2ч (по брокерам) */
+    const hot = L.filter(l => ['handover', 'viewing'].includes(l.stage) && l.lastDir === 'in' && (now - (l.lastMsgAt || 0)) > 2 * 3600e3);
+    if (hot.length) { const byB = {}; hot.forEach(l => { const b = (STATE.brokers || []).find(x => x.id === l.broker); const n = b ? b.name.split(' ')[0] : 'без брокера'; byB[n] = (byB[n] || 0) + 1; }); sigs.push({ sev: 'crit', icon: I.flame, t: `${hot.length} горячих лидов без ответа >2ч`, d: Object.entries(byB).map(([n, k]) => `${n}: ${k}`).join(' · '), go: 'funnel' }); }
+    /* 2. застряли на квалификации */
+    const stuckQ = L.filter(l => l.stage === 'qualified' && (now - (l.lastMsgAt || l.createdAt || 0)) > 3 * 864e5);
+    if (stuckQ.length >= 3) sigs.push({ sev: 'warn', icon: I.handover, t: `${stuckQ.length} квал-лидов не переданы >3 дней`, d: 'Раздать брокерам или проверить загрузку', go: 'funnel' });
+    /* 3. простаивающие брокеры */
+    const idle = (STATE.brokers || []).filter(b => b.active !== false).filter(b => { const mine = L.filter(l => l.broker === b.id && ['handover', 'viewing', 'qualified'].includes(l.stage)); return mine.length === 0; });
+    if (idle.length) sigs.push({ sev: 'info', icon: I.moon, t: `${idle.length} брокеров без активных лидов`, d: idle.slice(0, 4).map(b => b.name.split(' ')[0]).join(', '), go: 'brokers' });
+    /* 4. лучший / худший источник по качеству */
+    const S = {}; L.forEach(l => { const k = l.source === 'ad_comment' ? 'Комментарии' : (l.ads && l.ads.campaignName) ? l.ads.campaignName : l.source || 'Прямые'; (S[k] = S[k] || { n: 0, q: 0 }); S[k].n++; if (QUAL.includes(l.stage)) S[k].q++; });
+    const srcRows = Object.entries(S).filter(([, v]) => v.n >= 5).map(([k, v]) => ({ k, qr: Math.round(v.q / v.n * 100), n: v.n }));
+    if (srcRows.length) { const best = srcRows.slice().sort((a, b) => b.qr - a.qr)[0], worst = srcRows.slice().sort((a, b) => a.qr - b.qr)[0]; if (best && best.qr >= 25) sigs.push({ sev: 'ok', icon: I.spark, t: `Лучший источник: ${best.k}`, d: `квал ${best.qr}% на ${best.n} лидах — масштабировать`, go: 'analytics' }); if (worst && worst.k !== best.k && worst.qr < 10) sigs.push({ sev: 'warn', icon: I.target, t: `Слабый источник: ${worst.k}`, d: `квал всего ${worst.qr}% на ${worst.n} лидах — пересмотреть`, go: 'analytics' }); }
+    /* 5. приток за сегодня vs вчера */
+    const dayStart = (d) => { const x = new Date(now - d * 864e5); x.setHours(0, 0, 0, 0); return x.getTime(); };
+    const today = L.filter(l => (l.createdAt || 0) >= dayStart(0)).length, yest = L.filter(l => (l.createdAt || 0) >= dayStart(1) && (l.createdAt || 0) < dayStart(0)).length;
+    if (today || yest) sigs.push({ sev: today >= yest ? 'ok' : 'warn', icon: I.plus, t: `Лидов сегодня: ${today}`, d: `вчера было ${yest}${yest ? ` (${today >= yest ? '+' : ''}${Math.round((today - yest) / Math.max(1, yest) * 100)}%)` : ''}`, go: 'funnel' });
+    const hd = `<div class="ov2-card-hd">${ic(I.bolt)}Штаб · сигналы руководителю<span>на что смотреть сейчас</span></div>`;
+    if (!sigs.length) return hd + ovEmpty(I.check, 'Всё под контролем', 'Критичных сигналов нет — команда работает ровно');
+    const order = { crit: 0, warn: 1, info: 2, ok: 3 };
+    sigs.sort((a, b) => order[a.sev] - order[b.sev]);
+    return hd + `<div class="ov-sig-grid">${sigs.map(s => `<button class="ov-sig ${s.sev}" data-ovgo="${s.go}"><span class="ov-sig-ic">${ic(s.icon, 2)}</span><span class="ov-sig-b"><b>${esc(s.t)}</b><i>${esc(s.d)}</i></span><span class="ov-sig-go">${ic(I.arrow, 2)}</span></button>`).join('')}</div>`;
   } },
   leaders: { name: 'Доска лидеров', icon: () => I.flame, full: false, render: (c) => {
     const now = Date.now(), mAgo = now - 30 * 864e5;
