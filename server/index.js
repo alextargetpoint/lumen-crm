@@ -620,13 +620,51 @@ function analytics(db) {
   const contacted = leads.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'out'));
   const replied = contacted.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'in'));
   const qualifiedPlus = replied.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage));
+  const QP = ['qualified', 'handover', 'viewing', 'deal'];   /* «дошёл до квала и дальше» */
+  const isQ = (l) => QP.includes(l.stage);
   const geoStats = {};
   for (const g of db.settings.agency.geos) {
     const gl = leads.filter(l => l.geo === g);
-    const gq = gl.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage));
-    geoStats[g] = { name: db.settings.geoNames[g], total: gl.length, qualified: gq.length, conv: gl.length ? Math.round(gq.length / gl.length * 100) : 0 };
+    const gq = gl.filter(isQ);
+    const gd = gl.filter(l => l.stage === 'deal');
+    geoStats[g] = { name: db.settings.geoNames[g], total: gl.length, qualified: gq.length, deals: gd.length, conv: gl.length ? Math.round(gq.length / gl.length * 100) : 0 };
   }
+
+  /* ── по брокерам: нагрузка → квалы → сделки ── */
+  const byBroker = (db.brokers || []).filter(b => b.active !== false).map(b => {
+    const bl = leads.filter(l => l.broker === b.id);
+    const inWork = bl.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
+    const q = bl.filter(isQ).length;
+    const deals = bl.filter(l => l.stage === 'deal').length;
+    return { id: b.id, name: b.name, total: bl.length, inWork, qualified: q, deals, conv: bl.length ? Math.round(q / bl.length * 100) : 0 };
+  }).sort((a, b) => b.deals - a.deals || b.qualified - a.qualified);
+
+  /* ── по источникам заявок ── */
+  const SRC_LABEL = { wa_inbound: 'WhatsApp (входящие)', meta_form: 'Meta лид-форма', landing: 'Лендинг', import: 'Импорт/выгрузка', bitrix24: 'Bitrix24', manual: 'Вручную', ad_comment: 'Комментарии рекламы' };
+  const srcMap = {};
+  for (const l of leads) { const s = l.source || 'other'; (srcMap[s] = srcMap[s] || { key: s, name: SRC_LABEL[s] || s, total: 0, qualified: 0 }); srcMap[s].total++; if (isQ(l)) srcMap[s].qualified++; }
+  const bySource = Object.values(srcMap).map(s => ({ ...s, conv: s.total ? Math.round(s.qualified / s.total * 100) : 0 })).sort((a, b) => b.total - a.total);
+
+  /* ── эффективность цепочек касаний: вошло → ответили → квал ── */
+  const byChain = (db.sequences || []).filter(s => s.active).map(seq => {
+    const scope = leads.filter(l => (seq.geo === 'all' || !seq.geo) ? true : l.geo === seq.geo);
+    const entered = scope.filter(l => (l.ai && l.ai.chainStep > 0) || db.messages.some(m => m.leadId === l.id && m.dir === 'out'));
+    const replied = entered.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'in'));
+    const q = entered.filter(isQ);
+    return { id: seq.id, name: seq.name, geo: seq.geo && seq.geo !== 'all' ? (db.settings.geoNames[seq.geo] || seq.geo) : 'Все', steps: (seq.steps || []).filter(s => s.active !== false).length, entered: entered.length, replied: replied.length, qualified: q.length, replyRate: entered.length ? Math.round(replied.length / entered.length * 100) : 0, qualRate: entered.length ? Math.round(q.length / entered.length * 100) : 0 };
+  }).sort((a, b) => b.entered - a.entered);
+
+  /* ── динамика 14 дней: новые vs квалы по дню создания ── */
+  const DAY = 864e5; const now = Date.now(); const trend = [];
+  for (let i = 13; i >= 0; i--) {
+    const d0 = new Date(now - i * DAY); d0.setHours(0, 0, 0, 0); const s = d0.getTime(), e = s + DAY;
+    const dl = leads.filter(l => l.createdAt >= s && l.createdAt < e);
+    trend.push({ d: d0.getDate(), month: d0.getMonth() + 1, total: dl.length, qualified: dl.filter(isQ).length });
+  }
+
   return {
+    byBroker, bySource, byChain, trend,
+    solo: (db.settings.agency.edition === 'solo'),
     unread: leads.filter(l => l.lastDir === 'in' && l.stage !== 'lost').length,
     totalActive: leads.filter(l => !['lost'].includes(l.stage)).length,
     funnel: { new: by('new'), touch: by('touch'), dialog: by('dialog'), qualified: by('qualified'), handover: by('handover'), viewing: by('viewing'), deal: by('deal'), sleeping: by('sleeping'), lost: by('lost') },
@@ -2553,10 +2591,21 @@ const server = http.createServer(async (req, res) => {
         else if (action === 'tag' && b.value) { l.tags = [...new Set([...(l.tags || []), String(b.value).slice(0, 40)])]; done++; }
         else if (action === 'untag' && b.value) { l.tags = (l.tags || []).filter(t => t !== b.value); done++; }
         else if (action === 'ai') { l.ai.enabled = !!b.value; if (b.value) l.tags = (l.tags || []).filter(t => t !== 'нужен человек'); done++; }
+        else if (action === 'chain') {
+          /* ручной запуск цепочки касаний на карточку: сбрасываем прогресс, форсируем выбранную последовательность,
+             первое касание — почти сразу (движок сам учтёт тихие часы) */
+          const seqId = b.value ? String(b.value) : null;
+          if (seqId && !db.sequences.some(s => s.id === seqId && s.active)) continue;
+          l.ai.enabled = true; l.ai.forced = true; l.ai.forceSeq = seqId || null;
+          l.ai.chainStep = 0; l.ai.secondRound = false; l.ai.nextTouchAt = Date.now() + 15e3;
+          if (l.stage === 'sleeping' || l.stage === 'lost') l.stage = 'touch';
+          l.tags = (l.tags || []).filter(t => t !== 'нужен человек');
+          done++;
+        }
         else if (action === 'delete') { db.messages = db.messages.filter(mm2 => mm2.leadId !== l.id); db.leads = db.leads.filter(x => x.id !== l.id); done++; }
       }
       if (IS_BROKER) audit(db, req, `массовое действие «${action}» над ${done} лид(ами)`);
-      const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', delete: 'удалено' };
+      const labels = { stage: 'перемещено', archive: 'в архив', broker: 'передано', tag: 'помечено', untag: 'снят тег', ai: b.value ? 'ИИ включён' : 'ИИ выключен', chain: 'запущена цепочка', delete: 'удалено' };
       ai.pushEvent(db, { type: 'stage', text: `Массовое действие: ${labels[action] || action} — ${done} лид(ов)` });
       store.save();
       return json(res, 200, { ok: true, done });

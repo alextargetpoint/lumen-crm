@@ -239,10 +239,19 @@ function tickChains(db) {
   const nowT = Date.now();
   const actives = db.sequences.filter(s => s.active);
   if (!actives.length) return;
+  /* глобальный выключатель авто-цепочек на новые лиды (Воронка → контрол цепочек).
+     Выключен → авто-касания не идут; но лиды, запущенные ВРУЧНУЮ (ai.forced), работают всегда. */
+  const autoOn = !db.settings.ai || db.settings.ai.autoChains !== false;
+  const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
   for (const lead of db.leads) {
-    const seq = actives.find(s => s.geo === lead.geo) || actives.find(s => !s.geo || s.geo === 'all');
-    if (!seq) continue;
     if (!lead.ai.enabled) continue;
+    if (!autoOn && !lead.ai.forced) continue;                       // авто off → только ручные
+    /* какую цепочку крутить: приоритет — принудительная (ручной запуск), затем дефолтная из настроек, затем по гео */
+    const seq = (lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq))
+      || (defaultSeqId && actives.find(s => s.id === defaultSeqId))
+      || actives.find(s => s.geo === lead.geo)
+      || actives.find(s => !s.geo || s.geo === 'all');
+    if (!seq) continue;
     /* цепочка — только до первого ответа клиента; ответил → живой диалог,
        и обратно в «Спящие» из диалога цепочка лида не роняет */
     if (!['new', 'touch'].includes(lead.stage)) continue;

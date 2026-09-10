@@ -366,6 +366,7 @@ const NAV = {
   hr:        { name: 'HR · подбор', icon: I.users, sub: 'хантинг брокеров и сотрудников' },
   analytics: { name: 'Лиды и продажи', icon: I.bars, sub: 'воронка · квалы · динамика' },
   settings:  { name: 'Подключения', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим' },
+  roles:     { name: 'Роли и доступы', icon: I.users, sub: 'Кто из команды что видит · права на сервере' },
   agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
   billing:   { name: 'Подписка и оплата', icon: I.card, sub: 'Тариф, места, счета, расходники по себестоимости' },
 };
@@ -794,11 +795,12 @@ function initNavSearch() {
   const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: v.name, sub: v.sub || '', parent: parentOf(k), icon: v.icon }));
   const norm = (s) => String(s || '').toLowerCase();
   const goTo = (pk) => { go(pk); inp.value = ''; res.hidden = true; inp.blur(); };
+  const place = () => { const r = inp.getBoundingClientRect(); res.style.left = r.left + 'px'; res.style.top = (r.bottom + 6) + 'px'; res.style.width = r.width + 'px'; };
   const render = (q) => {
     q = norm(q).trim(); if (!q) { res.hidden = true; res.innerHTML = ''; return; }
     const hits = index.filter(it => norm(it.name).includes(q) || norm(it.sub).includes(q) || norm(it.parent).includes(q)).slice(0, 8);
     res.innerHTML = hits.length ? hits.map((it, i) => `<button class="ns-item ${i === 0 ? 'sel' : ''}" data-nsgo="${it.page}">${ic(it.icon)}<span class="ns-nm">${esc(it.name)}${it.parent ? `<i>${esc(it.parent)}</i>` : ''}</span></button>`).join('') : '<div class="ns-empty">Ничего не найдено</div>';
-    res.hidden = false;
+    place(); res.hidden = false;
     res.querySelectorAll('[data-nsgo]').forEach(b => b.addEventListener('mousedown', (e) => { e.preventDefault(); goTo(b.dataset.nsgo); }));
   };
   inp.addEventListener('input', () => render(inp.value));
@@ -1540,16 +1542,29 @@ const OV_W = {
       </div></div>`;
   } },
   worldclock: { name: 'Часовые пояса', icon: () => I.clock || I.cal, full: false, render: () => {
-    const geos = (STATE.settings.agency.geos || []).slice(0, 6);
+    const geos = (STATE.settings.agency.geos || []).slice(0, 8);
     const now = Date.now();
+    const myOff = -new Date().getTimezoneOffset() / 60;          // локальный пояс менеджера, в часах
+    const fmt = (t) => pad2h(t.getHours()) + ':' + pad2h(t.getMinutes());
+    // строка «Вы» — точка отсчёта, чтобы было видно, на сколько клиент впереди/позади
+    const meT = new Date(now);
+    const meRow = `<div class="ov2-wc-row me"><span class="ov2-wc-nm">Вы <i>GMT${myOff >= 0 ? '+' : ''}${myOff}</i></span><span class="ov2-wc-t">${fmt(meT)}</span></div>`;
     const rows = geos.map(g => {
       const tz = GEO_TZ[g]; const nm = STATE.settings.geoNames[g] || g;
-      const t = tz == null ? null : new Date(now + (tz * 60 - (-new Date().getTimezoneOffset())) * 60e3);
-      const hh = t ? pad2h(t.getHours()) + ':' + pad2h(t.getMinutes()) : '—';
-      const bad = t && (t.getHours() < 8 || t.getHours() >= 22);
-      return `<div class="ov2-wc-row"><span class="ov2-wc-nm">${esc(nm)}${tz != null ? ` <i>GMT${tz >= 0 ? '+' : ''}${tz}</i>` : ''}</span><span class="ov2-wc-t ${bad ? 'off' : ''}">${hh}${bad ? ` ${ic(I.moon, 2)}` : ''}</span></div>`;
+      if (tz == null) return `<div class="ov2-wc-row"><span class="ov2-wc-nm">${esc(nm)}</span><span class="ov2-wc-t off">пояс не задан</span></div>`;
+      const t = new Date(now + (tz - myOff) * 3600e3);
+      const h = t.getHours();
+      const good = h >= 9 && h < 21;                              // приемлемое окно для звонка/сообщения
+      const diff = Math.round(tz - myOff);
+      const rel = diff === 0 ? 'как у вас' : (diff > 0 ? `+${diff} ч` : `${diff} ч`);
+      return `<div class="ov2-wc-row" title="${good ? 'Удобное время связаться' : 'Клиент, скорее всего, спит — лучше позже'}">
+        <span class="ov2-wc-dot ${good ? 'good' : 'off'}"></span>
+        <span class="ov2-wc-nm">${esc(nm)} <i>GMT${tz >= 0 ? '+' : ''}${tz} · ${rel}</i></span>
+        <span class="ov2-wc-t ${good ? '' : 'off'}">${fmt(t)}${good ? '' : ` ${ic(I.moon, 2)}`}</span></div>`;
     }).join('');
-    return `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${rows || '<div class="ov2-empty">Добавьте направления в профиле агентства</div>'}`;
+    return `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>удобно ли сейчас писать клиенту</span><button class="btn btn-sm" data-ovgo="settings">Направления</button></div>
+      <div class="ov2-wc-note">Зелёная точка — у клиента сейчас 9:00–21:00, можно связаться. Направления берутся из профиля агентства.</div>
+      ${meRow}${rows || '<div class="ov2-empty">Добавьте направления в профиле агентства (Настройки)</div>'}`;
   } },
   goal: { name: 'Цель месяца', icon: () => I.target, full: false, render: (c) => {
     const now = new Date();
@@ -1678,7 +1693,10 @@ const OV_PREV = {
   onboarding: () => `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>3 из 5</span></div><div class="ov2-ob">${[['Логотип агентства', 1], ['Боевой WhatsApp', 1], ['Цепочка касаний', 0]].map(([t, ok]) => `<div class="ov2-ob-row ${ok ? 'ok' : ''}"><span class="ov2-ob-dot">${ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${t}</span></div>`).join('')}</div>`,
   leaders: () => `<div class="ov2-card-hd">${ic(I.flame)}Доска лидеров<span>сделки за месяц</span></div><div class="ov2-lead-hero"><div class="ov2-lead-podium">${[['Дарья', 5, 1], ['Амир', 3, 2], ['Кетут', 2, 3]].map(([n, d, r]) => `<div class="ov2-lp p${r}"><div class="ov2-lp-ava">${n[0]}<span class="ov2-lp-rank">${r}</span></div><b>${n}</b><i>${d} сделок</i></div>`).join('')}</div></div>`,
   ideas: () => `<div class="ov2-card-hd">${ic(I.spark)}Идея дня<span>свайп-колода</span></div><div class="idea-deck"><div class="idea-count">6 идей в колоде</div><div class="idea-card" style="--acol:#2FA98C"><span class="idea-angle">кейс</span><div class="idea-title">Как клиент отбил виллу за 3 года аренды</div><div class="idea-hook">«Купил за $180k — сдаёт за $2k/мес. Считаем на пальцах»</div><div class="idea-why">${ic(I.spark, 2)}<span>Закрывает страх «а окупится ли»</span></div><div class="idea-meta"><span class="idea-fmt">${ic(I.play, 2)}говорящая голова + графика</span><span class="idea-eff e-low">съёмка: низкий</span></div></div><div class="idea-acts"><button class="idea-act skip">${ic(I.x, 2.2)}</button><button class="idea-act keep">${ic(I.moon, 2)}<span>В копилку</span></button><button class="idea-act take">${ic(I.check, 2.4)}<span>В работу</span></button></div></div>`,
-  worldclock: () => `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>время у клиентов</span></div>${[['Дубай', 'GMT+4', '14:20', false], ['Бали', 'GMT+8', '18:20', false], ['Пхукет', 'GMT+7', '17:20', false], ['Испания', 'GMT+1', '11:20', false]].map(([n, z, t, bad]) => `<div class="ov2-wc-row"><span class="ov2-wc-nm">${n} <i>${z}</i></span><span class="ov2-wc-t ${bad ? 'off' : ''}">${t}</span></div>`).join('')}`,
+  worldclock: () => `<div class="ov2-card-hd">${ic(I.clock || I.cal)}Часовые пояса<span>удобно ли сейчас писать клиенту</span></div>
+    <div class="ov2-wc-note">Зелёная точка — у клиента сейчас 9:00–21:00, можно связаться.</div>
+    <div class="ov2-wc-row me"><span class="ov2-wc-nm">Вы <i>GMT+3</i></span><span class="ov2-wc-t">10:20</span></div>
+    ${[['Дубай', 'GMT+4 · +1 ч', '11:20', true], ['Бали', 'GMT+8 · +5 ч', '15:20', true], ['Пхукет', 'GMT+7 · +4 ч', '14:20', true], ['Испания', 'GMT+1 · −2 ч', '08:20', true]].map(([n, z, t, good]) => `<div class="ov2-wc-row"><span class="ov2-wc-dot ${good ? 'good' : 'off'}"></span><span class="ov2-wc-nm">${n} <i>${z}</i></span><span class="ov2-wc-t ${good ? '' : 'off'}">${t}</span></div>`).join('')}`,
   goal: () => `<div class="ov2-card-hd">${ic(I.target)}Цель месяца<span>сделки за 30 дней</span></div><div class="ov2-goal"><svg viewBox="0 0 120 120" class="ov2-goal-ring"><circle cx="60" cy="60" r="52" class="gr-bg"/><circle cx="60" cy="60" r="52" class="gr-fg" stroke-dasharray="326.7" stroke-dashoffset="98"/></svg><div class="ov2-goal-c"><b>7</b><i>из 10</i></div></div><div class="ov2-goal-note">Ещё 3 сделки до цели</div>`,
   hotleads: () => `<div class="ov2-card-hd">${ic(I.flame)}Горячие лиды<span>по скорингу</span></div>${[['Ислам Керимов', 'Дубай · квалифицирован', 86, 'hi'], ['Мария Власова', 'Бали · в диалоге', 64, 'mid'], ['Настя Рой', 'Дубай · новый', 38, '']].map(([n, s, sc, cl]) => `<div class="ov2-lrow"><div class="ov2-lrow-b"><div class="ov2-lrow-n">${n}</div><div class="ov2-lrow-s">${s}</div></div><span class="ov2-hot-score ${cl}">${sc}</span></div>`).join('')}`,
   casebase: () => `<div class="ov2-card-hd">${ic(I.doc)}База кейсов<span>3 разбора</span></div>${[['Ислам Керимов', 'Дубай · дожали через рассрочку застройщика', 'Выиграли', 'win'], ['Мария Власова', 'Бали · ушла думать, потеряли темп', 'Урок', 'lesson'], ['Настя Рой', 'Дубай · в работе, ждём документы', 'В работе', 'wip']].map(([n, s, o, cl]) => `<div class="ov2-case"><div class="ov2-case-b"><div class="ov2-case-n">${n}<span class="ov2-oc ${cl}">${o}</span></div><div class="ov2-case-s">${s}</div></div></div>`).join('')}`,
@@ -2257,6 +2275,7 @@ const SELCFG_LEADS = {
     { id: 'stage', label: 'Стадия', ic: I.arrow, run: (cfg, c) => ctxPopup(c.x, c.y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => selBulk(cfg, 'stage', s.id) }))) },
     { id: 'broker', label: 'Брокеру', ic: I.handover, run: (cfg, c) => ctxPopup(c.x, c.y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => selBulk(cfg, 'broker', b.id) }))) },
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
+    { id: 'chain', label: 'Запустить цепочку', ic: I.chain, run: (cfg, c) => { const seqs = (STATE.sequences || []).filter(s => s.active); ctxPopup(c.x, c.y, [{ ic: I.bolt, label: 'По направлению (авто)', onClick: () => selBulk(cfg, 'chain', '', { title: `Запустить цепочку на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания по WhatsApp (по гео-цепочке). Первое — в ближайшую минуту.', ok: 'Запустить' }) }, ...seqs.map(s => ({ ic: I.chain, label: s.name, onClick: () => selBulk(cfg, 'chain', s.id, { title: `Запустить «${s.name}» на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания этой цепочки по WhatsApp. Первое — в ближайшую минуту.', ok: 'Запустить' }) }))]); } },
     { id: 'aion', label: 'ИИ вкл', ic: I.spark, run: (cfg) => selBulk(cfg, 'ai', true) },
     { id: 'aioff', label: 'ИИ выкл', run: (cfg) => selBulk(cfg, 'ai', false) },
     { id: 'cases', label: 'Разбор кейсов', ic: I.doc, run: (cfg) => { const ids = [...selSet(cfg.kind)]; if (!ids.length) return; window.open('/cases?ids=' + ids.join(','), '_blank'); } },
@@ -2369,6 +2388,11 @@ PAGES.funnel = async (root) => {
   const srcs = [...new Set(all.map(l => l.source))];
   const view = F.funnelView || 'kanban';
   const srcName = { meta_form: 'Lead Form', ctwa: 'CTWA', site: 'Сайт', manual: 'Вручную', wa_inbound: 'Входящий WA' };
+  /* контрол цепочек касаний: авто-запуск на новые + ручной запуск на отфильтрованные */
+  const aiSet = (STATE.settings.ai) || {};
+  const autoChains = aiSet.autoChains !== false;
+  const activeSeqs = (STATE.sequences || []).filter(s => s.active);
+  const launchable = leads.filter(l => ['new', 'touch', 'sleeping'].includes(l.stage));
 
   root.innerHTML = `
     <div class="filters">
@@ -2387,6 +2411,18 @@ PAGES.funnel = async (root) => {
         <button class="seg-btn ${view === 'kanban' ? 'on' : ''}" data-view="kanban" title="Канбан">${ic(I.grid)}</button>
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
       </div>
+    </div>
+    <div class="chain-ctl glass">
+      <span class="cc-ic">${ic(I.chain)}</span>
+      <div class="cc-txt"><b>Авто-цепочка касаний</b><i>${autoChains ? 'на каждый новый лид запускается автоматически' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
+      <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+      <div class="cc-seqpick ${autoChains ? '' : 'off'}">
+        <span>Запускать</span>
+        <select id="ccSeq"><option value="">по направлению (авто)</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+      </div>
+      <span class="tb-spacer"></span>
+      <span class="cc-hint">Ручной запуск: выдели карточки${launchable.length ? ' или' : ''}</span>
+      ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : ''}
     </div>
     ${view === 'kanban' ? `
     <div class="kanban">
@@ -2487,6 +2523,25 @@ PAGES.funnel = async (root) => {
   const db = $('#dupesBtn');
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
+  /* --- контрол цепочек касаний --- */
+  $('#ccAuto')?.addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    try { await api.patch('/settings', { ai: { autoChains: on } }); await loadState();
+      toast(on ? 'Авто-цепочка включена' : 'Авто-цепочка выключена', on ? 'Новые лиды пойдут в касания сами' : 'Новые лиды ждут ручного запуска', true); render();
+    } catch (er) { toast('Не вышло', er.message); e.target.checked = !on; }
+  });
+  $('#ccSeq')?.addEventListener('change', async (e) => {
+    try { await api.patch('/settings', { ai: { defaultSeq: e.target.value || null } }); if (STATE.settings.ai) STATE.settings.ai.defaultSeq = e.target.value || null;
+      toast('Цепочка по умолчанию сохранена', e.target.value ? 'Ей запускаются новые лиды' : 'Запуск по направлению лида', true);
+    } catch (er) { toast('Не вышло', er.message); }
+  });
+  $('#ccLaunchFiltered')?.addEventListener('click', () => {
+    const ids = launchable.map(l => l.id); if (!ids.length) return;
+    const seqId = $('#ccSeq')?.value || '';
+    const seqName = seqId ? (activeSeqs.find(s => s.id === seqId) || {}).name : 'по направлению';
+    modal({ title: `Запустить цепочку на ${ids.length} лид(ов)?`, sub: `Отфильтрованным карточкам (новые / первое касание / спящие) уйдут касания по WhatsApp${seqId ? ` — цепочка «${seqName}»` : ' по гео-цепочке'}. Первое касание — в ближайшую минуту.`,
+      actions: [{ label: 'Запустить', cls: 'btn-accent', onClick: async () => { const r = await api.post('/leads/bulk', { ids, action: 'chain', value: seqId }); toast('Цепочка запущена', `${r.done} лид(ов) — касания пошли`, true); render(); } }, { label: 'Отмена' }] });
+  });
 };
 
 /* ---------- drag предметов на папки (объекты/подборки) ---------- */
@@ -5561,30 +5616,29 @@ PAGES.ads = async (root) => {
       const PL = { meta: ['Meta', '#2F6BFF'], google: ['Google', '#E0603B'], tiktok: ['TikTok', '#111'], other: ['Другое', '#888'] };
       const plBadge = (p) => { const x = PL[p] || PL.other; return `<span class="ct-pl" style="--c:${x[1]}">${x[0]}</span>`; };
       const geoName = (g) => g ? (((STATE && STATE.settings && STATE.settings.geoNames) || {})[g] || g) : '';
-      const thumb = (media) => media && media.url ? (media.type === 'video' ? `<span class="ct-th vid">${ic(I.play, 2)}</span>` : `<span class="ct-th" style="background-image:url('${esc(media.url)}')"></span>`) : `<span class="ct-th empty">${ic(I.doc, 2)}</span>`;
-      const preview = (media) => media && media.url ? (media.type === 'video' ? `<video src="${esc(media.url)}" controls playsinline></video>` : `<img src="${esc(media.url)}" alt="креатив">`) : '<div class="ct-crea-empty">Креатив не привязан</div>';
+      const thumb = (media) => media && media.url ? (media.type === 'video' ? `<span class="ct-th vid" ${media.url ? `style="background-image:url('${esc(media.poster || '')}')"` : ''}>${ic(I.play, 2)}</span>` : `<span class="ct-th" style="background-image:url('${esc(media.url)}')"></span>`) : `<span class="ct-th empty">${ic(I.doc, 2)}</span>`;
+      const preview = (media) => media && media.url ? (media.type === 'video' ? `<video src="${esc(media.url)}" controls playsinline></video>` : `<img src="${esc(media.url)}" alt="креатив">`) : '';
       const adRow = (a) => { const done = a.hasCreative || a.hasPoints; return `<div class="ct-ad" data-ctad="${a.adId}">
         <div class="ct-ad-hd" data-ctedit="${a.adId}">
           ${thumb(a.media)}
           <div class="ct-ad-nm"><b>${esc(a.name || a.adId)}</b><span>${a.leads} лид${a.leads === 1 ? '' : 'ов'}${a.geo ? ' · ' + esc(geoName(a.geo)) : ''}</span></div>
-          <span class="ct-flags">${a.hasCreative ? '<span class="ct-ok" title="Креатив привязан">креатив</span>' : ''}${a.hasPoints ? '<span class="ct-ok" title="Тезисы заданы">тезисы</span>' : ''}</span>
+          <span class="ct-flags">${a.hasCreative ? `<span class="ct-dot ok" title="Креатив привязан"></span>` : ''}${a.hasPoints ? `<span class="ct-dot ok2" title="Тезисы заданы"></span>` : ''}</span>
           <button class="btn btn-sm ${done ? '' : 'btn-accent'} ct-edit">${done ? 'Править' : 'Настроить'}</button>
         </div>
         <div class="ct-ed" id="cted-${a.adId}" hidden>
-          <div class="ct-ed-cols">
+          <div class="ct-ed-grid">
             <div class="ct-ed-crea">
               <div class="ct-ed-lbl">Креатив — уходит первым сообщением</div>
-              <div class="ct-crea" data-ctprev="${a.adId}">${preview(a.media)}</div>
+              <div class="ct-prev${(a.media && a.media.url) ? ' has' : ''}" data-ctprev="${a.adId}">${preview(a.media)}</div>
               <div class="ct-crea-acts">
-                <button class="btn btn-sm btn-accent ct-upload" data-ctup="${a.adId}">${ic(I.plus)}Загрузить с ПК</button>
+                <button class="btn btn-sm ct-upload" data-ctup="${a.adId}">${ic(I.plus)}Файл с ПК</button>
                 <input type="file" class="ct-file" data-ctfile="${a.adId}" accept="video/*,image/*" hidden>
               </div>
-              <div class="ct-or">или вставь ссылку (Reels / YouTube / .mp4 / .jpg):</div>
-              <input class="ct-media" value="${esc((a.media && a.media.url) || '')}" placeholder="https://…">
+              <input class="ct-media" value="${esc((a.media && a.media.url) || '')}" placeholder="или ссылка: Reels / .mp4 / .jpg">
             </div>
             <div class="ct-ed-pts">
-              <div class="ct-ed-lbl">Сильные стороны проекта — ИИ вплетёт 2-3 в первое касание</div>
-              <textarea class="ct-points" rows="6" placeholder="Рассрочка 0% на 3 года\nЛокация: метро и школы в 5 минут\nПрогноз доходности аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea>
+              <div class="ct-ed-lbl">Сильные стороны — ИИ вплетёт 2-3 в касание</div>
+              <textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года&#10;Метро и школы в 5 минут&#10;Доходность аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea>
             </div>
           </div>
           <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a.adId}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
@@ -5652,11 +5706,19 @@ PAGES.ads = async (root) => {
           </div>
         </div>
         <div class="glass card">
-          <div class="card-title">${ic(I.doc)}Загрузка объявлений таблицей</div>
-          <div class="muted" style="font-size:11.8px;margin-bottom:8px">Вставь строки из таблицы (CSV / из Excel). Колонки: <code class="pill">ad_id</code> <code class="pill">name</code> <code class="pill">adset</code> <code class="pill">campaign</code> <code class="pill">geo</code> — порядок любой, определяется по заголовку.</div>
-          <textarea id="adsCsv" data-nodic style="min-height:110px;font-family:Menlo,monospace;font-size:11.5px" placeholder="ad_id,name,adset,campaign,geo
+          <div class="card-title">${ic(I.doc)}Каталог объявлений</div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Объявления появляются здесь <b>сами</b>, когда с них приходит заявка (по <code class="pill">ad_id</code> из моста приёма). Добавлять руками нужно, только если хочешь <b>заранее</b> завести объявление и привязать креатив/тезисы до первого лида.</div>
+          <div class="adadd-row">
+            <input class="adadd" data-k="ad_id" placeholder="ad_id (обязательно)">
+            <input class="adadd" data-k="name" placeholder="Название">
+            <select class="adadd" data-k="geo"><option value="">гео —</option>${Object.entries((STATE.settings && STATE.settings.geoNames) || {}).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select>
+            <button class="btn btn-accent btn-sm" id="adAddOne">${ic(I.plus)}Добавить</button>
+          </div>
+          ${coll('Загрузить пачкой из таблицы (CSV / Excel)', `
+            <div class="muted" style="font-size:11.5px;margin-bottom:7px">Колонки: <code class="pill">ad_id</code> <code class="pill">name</code> <code class="pill">adset</code> <code class="pill">campaign</code> <code class="pill">geo</code> — порядок любой, читается по заголовку.</div>
+            <textarea id="adsCsv" data-nodic style="min-height:90px;font-family:Menlo,monospace;font-size:11.5px;width:100%;border:1px solid var(--stroke);border-radius:9px;padding:8px 10px" placeholder="ad_id,name,adset,campaign,geo
 120211478921230508,Дубай · видео-тур JVC,RU 30-55,DXB Sept,dubai"></textarea>
-          <button class="btn btn-accent" id="importAds" style="margin-top:10px">Импортировать и смэтчить</button>
+            <button class="btn btn-accent btn-sm" id="importAds" style="margin-top:8px">Импортировать и смэтчить</button>`, { open: false, count: 0, icon: I.doc })}
         </div>
       </div>
       <div>
@@ -5695,13 +5757,14 @@ PAGES.ads = async (root) => {
   $$('[data-ctup]', root).forEach(b => b.addEventListener('click', () => { const f = root.querySelector('.ct-file[data-ctfile="' + b.dataset.ctup + '"]'); if (f) f.click(); }));
   $$('.ct-file', root).forEach(f => f.addEventListener('change', async () => {
     const ad = f.dataset.ctfile; const file = f.files && f.files[0]; if (!file) return;
-    const box = f.closest('.ct-ad'); const st = box.querySelector('.ct-up-status'); const prev = box.querySelector('.ct-crea');
+    const box = f.closest('.ct-ad'); const st = box.querySelector('.ct-up-status'); const prev = box.querySelector('.ct-prev');
     if (file.size > 100e6) { toast('Файл больше 100 МБ', 'Сожми видео или загрузи ссылкой'); return; }
     st.textContent = 'Загружаю ' + Math.round(file.size / 1e6 * 10) / 10 + ' МБ…';
     try {
       const r = await fetch('/api/ads/' + ad + '/creative-upload?filename=' + encodeURIComponent(file.name), { method: 'POST', body: file });
       const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка');
       box.querySelector('.ct-media').value = j.url;
+      prev.classList.add('has');
       prev.innerHTML = j.type === 'video' ? `<video src="${j.url}" controls playsinline></video>` : `<img src="${j.url}" alt="креатив">`;
       st.textContent = '✓ загружено'; setTimeout(() => st.textContent = '', 2500);
       toast('Креатив загружен', 'Нажми «Сохранить», чтобы привязать', true);
@@ -5710,9 +5773,17 @@ PAGES.ads = async (root) => {
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
   $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });
-  $('#importAds').addEventListener('click', async () => {
+  $('#importAds')?.addEventListener('click', async () => {
     const r = await api.post('/ads/import', { csv: $('#adsCsv').value });
     toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
+    render();
+  });
+  $('#adAddOne')?.addEventListener('click', async () => {
+    const g = {}; $$('.adadd', root).forEach(i => g[i.dataset.k] = i.value.trim());
+    if (!g.ad_id) { toast('Нужен ad_id', 'Скопируй ID объявления из Meta Ads', false); return; }
+    const csv = 'ad_id,name,geo\n' + [g.ad_id, (g.name || '').replace(/,/g, ' '), g.geo || ''].join(',');
+    const r = await api.post('/ads/import', { csv });
+    toast(r.added ? 'Объявление добавлено' : 'Объявление обновлено', 'Раскрой его в дереве и привяжи креатив', true);
     render();
   });
   $$('.ad-spend', root).forEach(inp => inp.addEventListener('change', async () => {
@@ -8446,15 +8517,24 @@ function rbacRowHtml(b) {
       <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn-ghost rbac-del" title="Убрать сотрудника">${ic(I.x)}</button></div>
       <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
       <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать. Серые закрыты ролью.</div>
-      <div class="rbac-lf">
-        <div class="rbac-lf-h">Видимость карточек лидов${(b.leadFilter && (((b.leadFilter.tags || []).length) || ((b.leadFilter.sources || []).length))) ? '<span class="rbac-lf-on">фильтр включён</span>' : ''}</div>
-        <div class="rbac-lf-sub">Ничего не выбрано — по роли (свои / все лиды). Выбери критерии — сотрудник увидит <b>только</b> карточки с этими источниками или тегами.</div>
-        <div class="rbac-lf-lbl">Источники</div>
-        <div class="rbac-lf-srcs">${RBAC_SOURCES.map(([v, n]) => `<button type="button" class="rbac-lf-src ${((b.leadFilter && b.leadFilter.sources) || []).includes(v) ? 'on' : ''}" data-lfsrc="${v}">${n}</button>`).join('')}</div>
-        <div class="rbac-lf-lbl">Теги (через запятую)</div>
-        <input class="lc-inp rbac-lf-tags" value="${esc(((b.leadFilter && b.leadFilter.tags) || []).join(', '))}" placeholder="напр. VIP, инвестор, Дубай">
-        <button type="button" class="btn btn-sm btn-accent rbac-lf-save" style="margin-top:8px">Сохранить фильтр карточек</button>
-      </div>
+      ${(() => {
+        const lf = b.leadFilter || {}; const restrict = ((lf.tags || []).length || (lf.sources || []).length) > 0;
+        const roleHint = rt === 'broker' ? 'видит только свои лиды' : 'видит все лиды агентства';
+        return `<div class="rbac-lf">
+        <div class="rbac-lf-h">Какие карточки лидов видит сотрудник</div>
+        <div class="rbac-lf-modes">
+          <button type="button" class="rbac-lfm ${restrict ? '' : 'on'}" data-lfm="role">По роли<i>${roleHint}</i></button>
+          <button type="button" class="rbac-lfm ${restrict ? 'on' : ''}" data-lfm="restrict">Только выбранные<i>по источнику или тегу</i></button>
+        </div>
+        <div class="rbac-lf-crit" ${restrict ? '' : 'hidden'}>
+          <div class="rbac-lf-lbl">Показывать карточки с источником</div>
+          <div class="rbac-lf-srcs">${RBAC_SOURCES.map(([v, n]) => `<button type="button" class="rbac-lf-src ${(lf.sources || []).includes(v) ? 'on' : ''}" data-lfsrc="${v}">${n}</button>`).join('')}</div>
+          <div class="rbac-lf-lbl">…и/или с тегами (через запятую)</div>
+          <input class="lc-inp rbac-lf-tags" value="${esc((lf.tags || []).join(', '))}" placeholder="напр. VIP, инвестор, Дубай">
+        </div>
+        <button type="button" class="btn btn-sm btn-accent rbac-lf-save" style="margin-top:10px">Сохранить видимость</button>
+      </div>`;
+      })()}
     </div>
   </div>`;
 }
@@ -8486,11 +8566,19 @@ function wireRbac(root) {
     const del = rowEl.querySelector('.rbac-del');
     if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
     rowEl.querySelectorAll('.rbac-lf-src').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+    const crit = rowEl.querySelector('.rbac-lf-crit');
+    let lfMode = rowEl.querySelector('.rbac-lfm.on')?.dataset.lfm || 'role';
+    rowEl.querySelectorAll('.rbac-lfm').forEach(m => m.addEventListener('click', () => {
+      lfMode = m.dataset.lfm; rowEl.querySelectorAll('.rbac-lfm').forEach(x => x.classList.toggle('on', x === m));
+      if (crit) crit.hidden = (lfMode !== 'restrict');
+    }));
     const lfSave = rowEl.querySelector('.rbac-lf-save');
     if (lfSave) lfSave.addEventListener('click', async () => {
-      const sources = [...rowEl.querySelectorAll('.rbac-lf-src.on')].map(x => x.dataset.lfsrc);
-      const tags = (rowEl.querySelector('.rbac-lf-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
-      try { await api.patch('/brokers/' + id, { leadFilter: { tags, sources } }); const b = (STATE.brokers || []).find(x => x.id === id); if (b) b.leadFilter = { tags, sources }; toast(tags.length || sources.length ? 'Фильтр карточек сохранён' : 'Фильтр снят', tags.length || sources.length ? 'Сотрудник видит только выбранные карточки' : 'Видимость по роли', true); } catch (e) { toast('Не вышло', e.message); }
+      const restrict = lfMode === 'restrict';
+      const sources = restrict ? [...rowEl.querySelectorAll('.rbac-lf-src.on')].map(x => x.dataset.lfsrc) : [];
+      const tags = restrict ? (rowEl.querySelector('.rbac-lf-tags').value || '').split(',').map(t => t.trim()).filter(Boolean) : [];
+      if (restrict && !sources.length && !tags.length) { toast('Выберите источник или тег', 'Иначе сотрудник не увидит ни одной карточки', false); return; }
+      try { await api.patch('/brokers/' + id, { leadFilter: { tags, sources } }); const b = (STATE.brokers || []).find(x => x.id === id); if (b) b.leadFilter = { tags, sources }; toast(restrict ? 'Видимость ограничена' : 'Видимость по роли', restrict ? 'Сотрудник видит только выбранные карточки' : 'Свои / все лиды по роли', true); } catch (e) { toast('Не вышло', e.message); }
     });
   });
   { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }
@@ -8959,24 +9047,65 @@ PAGES.analytics = async (root) => {
         </div>
       </div>
     </div>
+    ${(() => {
+      const maxT = Math.max(1, ...an.trend.map(d => d.total));
+      const bars = an.trend.map(d => `<div class="an-tbar" title="${d.d}.${d.month}: ${d.total} лид · ${d.qualified} квал">
+        <div class="an-tstk"><i class="tot" style="height:${Math.round(d.total / maxT * 100)}%"></i><i class="qual" style="height:${Math.round(d.qualified / maxT * 100)}%"></i></div>
+        <span>${d.d}</span></div>`).join('');
+      return `<div class="glass card mb">
+        <div class="card-title">${ic(I.bars)}Динамика заявок · 14 дней<span class="sub">новые лиды и из них дошли до квалификации</span>
+          <span class="an-legend"><i class="l-tot"></i>новые <i class="l-qual"></i>квалы</span></div>
+        <div class="an-trend">${bars}</div>
+      </div>`;
+    })()}
     <div class="two-col">
       <div class="glass card">
-        <div class="card-title">${ic(I.funnel)}Конверсия в квалификацию по направлениям</div>
+        <div class="card-title">${ic(I.funnel)}По направлениям<span class="sub">конверсия в квал + сделки</span></div>
         <div class="geo-bars">
-          ${Object.values(an.geoStats).map(g => `<div class="geo-bar">
-            <div class="g-top"><b>${g.name}</b><span>${g.qualified} из ${g.total} · <b>${g.conv}%</b></span></div>
+          ${Object.values(an.geoStats).length ? Object.values(an.geoStats).sort((a, b) => b.total - a.total).map(g => `<div class="geo-bar">
+            <div class="g-top"><b>${esc(g.name || '—')}</b><span>${g.qualified} квал из ${g.total} · <b>${g.conv}%</b>${g.deals ? ` · ${g.deals} сдел.` : ''}</span></div>
             <div class="g-track"><div class="g-fill" style="width:${g.conv}%"></div></div>
-          </div>`).join('')}
+          </div>`).join('') : '<div class="empty">Пока нет данных по направлениям</div>'}
         </div>
       </div>
       <div class="glass card">
-        <div class="card-title">${ic(I.sim)}Канал WhatsApp</div>
-        <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:0">
-          <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div></div>
-          <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Средн. качество номеров</div><div class="val">${an.wa.avgQuality}%</div></div>
-        </div>
-        <div class="muted" style="font-size:12px;line-height:1.6;margin-top:12px">Воронка: ${Object.entries(an.funnel).filter(([k]) => !['lost'].includes(k)).map(([k, v]) => `${stageName(k)} — <b>${v}</b>`).join(' · ')}</div>
+        <div class="card-title">${ic(I.funnel2 || I.funnel)}Источники заявок<span class="sub">откуда приходят и как конвертят</span></div>
+        <table class="tbl an-tbl"><thead><tr><th>Источник</th><th>Лиды</th><th>Квалы</th><th>Конв.</th></tr></thead><tbody>
+          ${an.bySource.length ? an.bySource.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${s.total}</td><td>${s.qualified}</td><td><b>${s.conv}%</b></td></tr>`).join('') : '<tr><td colspan="4" class="empty">Нет данных</td></tr>'}
+        </tbody></table>
       </div>
+    </div>
+    ${!an.solo ? `<div class="glass card mb">
+      <div class="card-title">${ic(I.team || I.user)}По брокерам<span class="sub">нагрузка → квалы → сделки</span><button class="btn btn-sm" data-ovgo="brokers" style="margin-left:auto">Команда</button></div>
+      <table class="tbl an-tbl an-brokers"><thead><tr><th>Брокер</th><th>Лидов</th><th>В работе</th><th>Квалы</th><th>Сделки</th><th>Конв.</th></tr></thead><tbody>
+        ${an.byBroker.length ? an.byBroker.map(b => `<tr>
+          <td><b>${esc(b.name)}</b></td><td>${b.total}</td><td>${b.inWork}</td><td>${b.qualified}</td>
+          <td>${b.deals ? `<span class="an-deal">${b.deals}</span>` : '0'}</td>
+          <td><div class="an-cvbar"><i style="width:${b.conv}%"></i></div><span>${b.conv}%</span></td>
+        </tr>`).join('') : '<tr><td colspan="6" class="empty">Лиды ещё не распределены по брокерам</td></tr>'}
+      </tbody></table>
+    </div>` : ''}
+    <div class="glass card mb">
+      <div class="card-title">${ic(I.bolt)}Эффективность цепочек касаний<span class="sub">вошло в цепочку → ответили → дошли до квала</span><button class="btn btn-sm" data-ovgo="qualifier" style="margin-left:auto">Настроить цепочки</button></div>
+      ${an.byChain.length ? `<div class="an-chains">${an.byChain.map(c => `<div class="an-chain">
+        <div class="an-chain-hd"><b>${esc(c.name)}</b><span>${esc(c.geo)} · ${c.steps} ${plural(c.steps, 'касание', 'касания', 'касаний')}</span></div>
+        <div class="an-chain-funnel">
+          <div class="acf-step"><b>${c.entered}</b><span>вошло</span></div>
+          <div class="acf-arrow">${ic(I.chev)}<em>${c.replyRate}%</em></div>
+          <div class="acf-step"><b>${c.replied}</b><span>ответили</span></div>
+          <div class="acf-arrow">${ic(I.chev)}<em>${c.qualRate}%</em></div>
+          <div class="acf-step acc"><b>${c.qualified}</b><span>квал</span></div>
+        </div>
+        <div class="an-chain-track"><i class="a" style="width:100%"></i><i class="b" style="width:${c.entered ? Math.round(c.replied / c.entered * 100) : 0}%"></i><i class="c" style="width:${c.entered ? Math.round(c.qualified / c.entered * 100) : 0}%"></i></div>
+      </div>`).join('')}</div>` : '<div class="empty">Нет активных цепочек. Включите их в разделе «Движок».</div>'}
+    </div>
+    <div class="glass card">
+      <div class="card-title">${ic(I.sim)}Канал WhatsApp<span class="sub">и текущая воронка</span></div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+        <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div></div>
+        <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Средн. качество номеров</div><div class="val">${an.wa.avgQuality}%</div></div>
+      </div>
+      <div class="an-funnel-chips">${Object.entries(an.funnel).filter(([k]) => !['lost'].includes(k)).map(([k, v]) => `<span class="afc"><b>${v}</b>${stageName(k)}</span>`).join('')}</div>
     </div>`;
 };
 
@@ -9387,10 +9516,33 @@ function tplListHtml(list) {
   const badge = st => st === 'APPROVED' ? '<span class="badge ok">одобрен</span>' : st === 'REJECTED' ? '<span class="badge bad">отклонён</span>' : `<span class="badge warn">${esc((st || 'модерация').toLowerCase())}</span>`;
   return list.map(t => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>${esc(t.name)}</b> <span class="muted">· ${esc(t.language)} · ${esc((t.category || '').toLowerCase())}</span></span>${badge(t.status)}</div>`).join('');
 }
+/* ---------------- РОЛИ И ДОСТУПЫ (отдельная подстраница Настроек) ---------------- */
+PAGES.roles = async (root) => {
+  root.innerHTML = `
+    <button class="btn btn-sm set-back" data-ovgo="settings">${ic(I.chev)}Назад в Подключения</button>
+    <div class="glass card mb roles-intro">
+      <div class="card-title">${ic(I.users)}Как это работает<span class="sub">права применяются на сервере, не только прячутся в интерфейсе</span></div>
+      <div class="roles-steps">
+        <div class="roles-step"><span>1</span><div><b>Роль</b> задаёт базовый набор разделов (Брокер, Ассистент, Маркетолог, Аналитик, Менеджер).</div></div>
+        <div class="roles-step"><span>2</span><div><b>Разделы</b> — точечно доскрыть или дооткрыть поверх роли. Серые закрыты ролью.</div></div>
+        <div class="roles-step"><span>3</span><div><b>Видимость карточек</b> — по роли (свои / все) или ограничить конкретными источниками и тегами.</div></div>
+      </div>
+    </div>
+    ${rbacCardHtml()}`;
+  wireRbac(root);
+  $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+};
+
 PAGES.settings = async (root) => {
   const s = STATE.settings;
+  const teamN = (STATE.brokers || []).length;
   root.innerHTML = `
-    ${rbacCardHtml()}
+    <button class="glass card set-link" data-ovgo="roles">
+      <span class="set-link-ic">${ic(I.users)}</span>
+      <span class="set-link-main"><b>Роли и доступы</b><i>Кто из команды что видит и какие карточки лидов — права на сервере</i></span>
+      <span class="set-link-meta">${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}</span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
@@ -9496,6 +9648,7 @@ PAGES.settings = async (root) => {
         <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('') || '<div class="muted" style="font-size:12px">Порталы не заданы</div>'}
       <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>
     </div>`;
+  $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   $('#portalSave')?.addEventListener('click', async () => {
     const body = {};
     $$('[data-portal]', root).forEach(inp => { if (inp.value.trim()) body[inp.dataset.portal] = { key: inp.value.trim() }; });
@@ -9503,7 +9656,6 @@ PAGES.settings = async (root) => {
     toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
     await loadState(); PAGES.settings(root);
   });
-  wireRbac(root);   /* матрица «Роли и доступы» (переехала из «Брокеров» в «Настройки») */
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
   const whc = $('#whCopy');
