@@ -159,6 +159,36 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .leak .fig{font-family:var(--disp);font-size:44px;font-weight:600;line-height:1;color:var(--rose);flex:0 0 auto;min-width:96px}
 .leak h4{font-size:16px;font-weight:700;margin-bottom:5px;font-family:var(--text)}
 .leak p{font-size:14.5px;color:var(--ink2)}
+/* FAILS — situational cases */
+.fails{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.fail{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform var(--dur),box-shadow var(--dur)}
+.fail:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.fail::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--rose),transparent)}
+.fail .tag{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--rose);margin-bottom:14px;display:inline-flex;align-items:center;gap:7px}
+.fail .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--rose)}
+.fail .quote{font-family:var(--disp);font-style:italic;font-size:21px;line-height:1.26;color:var(--ink);font-weight:500}
+.fail .fix{margin-top:18px;font-size:13.5px;color:var(--mint);display:flex;gap:9px;align-items:flex-start;border-top:1px solid var(--line2);padding-top:15px;font-weight:600}
+.fail .fix svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px}
+/* NATIVE — всё из коробки */
+.native-grid{display:grid;gap:16px}
+.nrow3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ncard{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:32px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform var(--dur),border-color var(--dur)}
+.ncard:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--blue) 32%,var(--line))}
+.ncard .ic{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--blue) 12%,transparent);color:var(--blue);margin-bottom:20px}
+.ncard .ic svg{width:24px;height:24px}
+.ncard h3{font-size:22px;font-weight:600;margin-bottom:9px}
+.ncard p{color:var(--ink2);font-size:14.5px}
+.ncard .usual{margin-top:18px;padding-top:15px;border-top:1px solid var(--line2);font-size:12.5px;color:var(--ink3);display:flex;gap:9px;align-items:flex-start;line-height:1.4}
+.ncard .usual svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px;color:var(--ink3);opacity:.7}
+.ncard.wide{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.25fr;gap:clamp(28px,4vw,48px);align-items:center}
+.ncard.wide::after{content:"";position:absolute;right:-10%;top:-30%;width:340px;height:340px;background:radial-gradient(closest-side,color-mix(in srgb,var(--blue) 16%,transparent),transparent);pointer-events:none}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;position:relative;z-index:2}
+.mode{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--card-soft)}
+.mode .mh{font-family:var(--disp);font-size:19px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+.mode .mh .n{width:24px;height:24px;border-radius:7px;background:linear-gradient(180deg,var(--blue2),var(--blue));color:#fff;font-family:var(--text);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.mode p{font-size:13.5px;color:var(--ink2);line-height:1.5}
+@media(max-width:1000px){.nrow3{grid-template-columns:1fr}.ncard.wide{grid-template-columns:1fr}}
+@media(max-width:640px){.modes{grid-template-columns:1fr}}
 
 /* ============ STEPS ============ */
 .steps{position:relative}
@@ -233,20 +263,31 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .flow .con{align-self:flex-start;margin-top:33px;color:var(--blue);opacity:.6}
 .flow .con svg{width:34px;height:20px}
 
-/* ============ COMPARE ============ */
-.cmp{border:1px solid var(--line);border-radius:22px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
-.cmp table{width:100%;border-collapse:collapse;font-size:15px}
-.cmp th,.cmp td{padding:17px 20px;text-align:left;border-bottom:1px solid var(--line2);vertical-align:top}
-.cmp thead th{font-family:var(--disp);font-weight:600;font-size:18px;background:var(--card-soft)}
-.cmp thead th.us{color:#fff;background:linear-gradient(180deg,var(--blue2),var(--blue));position:relative}
-.cmp thead th.us .rib{font-family:var(--text);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:.85;display:block;margin-top:2px}
-.cmp td.feat-c{color:var(--ink);font-weight:600;font-family:var(--text)}
-.cmp td.us{background:color-mix(in srgb,var(--blue) 7%,transparent)}
-.cmp .yes{color:var(--mint);font-weight:700;display:flex;gap:8px;align-items:flex-start}
-.cmp .yes svg{width:17px;height:17px;flex:0 0 17px;margin-top:2px}
-.cmp .no{color:var(--ink3)}
-.cmp tbody tr:hover td{background:color-mix(in srgb,var(--blue) 4%,transparent)}
-.cmp tbody tr:hover td.us{background:color-mix(in srgb,var(--blue) 11%,transparent)}
+/* ============ COMPARE (versus cards) ============ */
+.vs{display:grid;grid-template-columns:1.32fr .88fr;gap:20px;align-items:stretch}
+.vs-card{border-radius:26px;padding:clamp(26px,3.5vw,40px);position:relative;overflow:hidden}
+.vs-lumen{background:linear-gradient(158deg,var(--navy3),var(--navy) 78%);color:#fff;border:1px solid rgba(143,180,255,.22);box-shadow:0 54px 110px -44px rgba(37,99,235,.6)}
+.vs-lumen::before{content:"";position:absolute;inset:0;background:radial-gradient(72% 54% at 82% -6%,rgba(79,125,255,.4),transparent 60%);pointer-events:none}
+.vs-lumen .glimmer{position:absolute;top:-40%;left:-30%;width:70%;height:180%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);transform:rotate(12deg);animation:sheen 6s ease-in-out infinite;pointer-events:none}
+@keyframes sheen{0%,100%{left:-40%}50%{left:110%}}
+.vs-old{background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.vs-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px;position:relative;z-index:2}
+.vs-head .lbl{font-family:var(--disp);font-size:clamp(24px,3vw,32px);font-weight:600}
+.vs-lumen .vs-head .lbl{color:#fff}
+.vs-old .vs-head .lbl{color:var(--ink)}
+.vs-ribbon{font-family:var(--text);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#061126;background:linear-gradient(180deg,#fff,#cfe0ff);padding:7px 13px;border-radius:999px}
+.vs-sub{font-size:13.5px;margin:4px 0 24px;position:relative;z-index:2}
+.vs-lumen .vs-sub{color:#9DB4E6}.vs-old .vs-sub{color:var(--ink3)}
+.vs-list{display:grid;gap:15px;position:relative;z-index:2}
+.vs-item{display:flex;gap:14px;align-items:flex-start;font-size:15.5px;line-height:1.42;opacity:0;transform:translateY(10px);transition:opacity .55s var(--ease-spring),transform .55s var(--ease-spring)}
+.vs.in .vs-item{opacity:1;transform:none}
+.vs-list .vs-item:nth-child(1){transition-delay:.04s}.vs-list .vs-item:nth-child(2){transition-delay:.1s}.vs-list .vs-item:nth-child(3){transition-delay:.16s}.vs-list .vs-item:nth-child(4){transition-delay:.22s}.vs-list .vs-item:nth-child(5){transition-delay:.28s}.vs-list .vs-item:nth-child(6){transition-delay:.34s}.vs-list .vs-item:nth-child(7){transition-delay:.4s}.vs-list .vs-item:nth-child(8){transition-delay:.46s}
+.vs-item .mk{flex:0 0 26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-top:0}
+.vs-item .mk svg{width:15px;height:15px}
+.vs-lumen .vs-item .mk{background:rgba(124,224,176,.16);color:#7CE0B0;box-shadow:0 0 18px -4px rgba(124,224,176,.5)}
+.vs-old .vs-item .mk{background:color-mix(in srgb,var(--rose) 12%,transparent);color:var(--rose)}
+.vs-lumen .vs-item{color:#D6E2FB}.vs-lumen .vs-item b{color:#fff;font-weight:700}
+.vs-old .vs-item{color:var(--ink3)}
 
 /* ============ NICHES (photo cards) ============ */
 .niche-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
@@ -335,12 +376,29 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}.d4{transition-delay:.32s}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}[data-r]{opacity:1;transform:none}}
 
+/* ============ AMPLIFY: grain, progress, glow, manifesto, tilt ============ */
+body::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+html[data-theme="dark"] body::after{opacity:.06}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:70;background:linear-gradient(90deg,var(--klein),var(--blue2),var(--sky));box-shadow:0 0 14px rgba(79,125,255,.8)}
+.plan.pop::before{content:"";position:absolute;inset:0;border-radius:24px;padding:1.5px;background:linear-gradient(130deg,var(--blue2),var(--sky),var(--klein),var(--blue2));background-size:300% 300%;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:borderflow 6s linear infinite;pointer-events:none;z-index:1}
+@keyframes borderflow{to{background-position:300% 0}}
+.tilt{transform-style:preserve-3d;transition:transform .3s var(--ease-soft)}
+.tilt img{transition:transform .3s var(--ease-soft)}
+/* manifesto band */
+.manifesto{position:relative;overflow:hidden;padding:clamp(90px,13vw,170px) 0;text-align:center}
+.manifesto video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.34}
+.manifesto::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 50%,transparent,#060B16 78%)}
+.manifesto .wrap{position:relative;z-index:2;max-width:960px}
+.manifesto .q{font-family:var(--disp);font-size:clamp(32px,4.6vw,60px);font-weight:500;line-height:1.12;letter-spacing:-.01em}
+.manifesto .q em{font-style:italic;color:var(--sky)}
+.manifesto .by{margin-top:26px;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+
 /* ============ RESPONSIVE ============ */
 .mobnav{display:none}
 @media (max-width:1000px){
   .hero .grid{grid-template-columns:1fr;gap:40px}
   .stage{max-width:440px;margin:0 auto}
-  .prob,.scene,.calc,.showcase .sc-grid{grid-template-columns:1fr}
+  .prob,.scene,.calc,.showcase .sc-grid,.vs{grid-template-columns:1fr}
   .feat{grid-template-columns:1fr;gap:30px}.feat.rev .fx{order:0}
   .steps .row{grid-template-columns:repeat(2,1fr);gap:34px}.steps .line{display:none}
   .niche-grid{grid-template-columns:repeat(2,1fr)}
@@ -370,6 +428,7 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
 </style>
 </head>
 <body>
+<div id="prog"></div>
 
 <!-- NAV -->
 <nav class="nav" id="nav">
@@ -404,7 +463,7 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
     <div>
       <span class="hero-badge" data-r><b>AI-CRM</b> для агентств недвижимости</span>
       <h1 data-r class="d1">Отдел продаж,<br>который <span class="it">не спит</span><br>и не теряет заявки</h1>
-      <p class="lead" data-r class="d2">Lumen отвечает клиенту за секунды в WhatsApp, в комментариях под рекламой и в Telegram, квалифицирует как живой менеджер и отдаёт брокеру тёплого покупателя — с психо-портретом и готовым сценарием сделки.</p>
+      <p class="lead" data-r class="d2">Lumen отвечает клиенту первым — в WhatsApp, в комментариях под рекламой и в Telegram — ведёт диалог в живом темпе, квалифицирует как менеджер и отдаёт брокеру тёплого покупателя с психо-портретом и готовым сценарием сделки.</p>
       <div class="cta-row" data-r class="d3">
         <a class="btn btn-p" href="/" target="_blank">Открыть живое демо
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -450,7 +509,7 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
 
 <!-- BIG NUMBER BAND -->
 <section class="band invert">
-  <video autoplay muted loop playsinline poster="/assets/site/silk-poster.jpg"><source src="/assets/site/silk-bg.mp4?v=2" type="video/mp4"></video>
+  <video autoplay muted loop playsinline poster="/assets/site/ink-poster.jpg"><source src="/assets/site/ink-bg.mp4?v=1" type="video/mp4"></video>
   <div class="wrap">
     <div class="head" data-r>
       <span class="kicker"><span class="dot"></span>Цифры, а не обещания</span>
@@ -479,6 +538,23 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
   </div>
 </section>
 
+<!-- ЗНАКОМО? situational fails -->
+<section class="sec wrap" id="familiar">
+  <div class="sec-head" data-r>
+    <span class="kicker" style="color:var(--rose)"><span class="dot" style="background:var(--rose);box-shadow:0 0 12px var(--rose)"></span>Знакомо?</span>
+    <h2>Каждая такая ситуация — <em style="color:var(--rose);font-style:italic">потерянная комиссия</em></h2>
+    <p class="lead">Реальные сцены из отделов продаж недвижимости. Узнаёте хоть одну — значит, деньги уже утекают.</p>
+  </div>
+  <div class="fails">
+    <div class="fail" data-r><span class="tag">Скорость</span><div class="quote">«Заявка пришла ночью. Менеджер увидел её утром — клиент уже купил у других.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen отвечает первым, круглосуточно</div></div>
+    <div class="fail" data-r class="d1"><span class="tag">Квалификация</span><div class="quote">«Проплавал 15 минут разговора и не узнал ни бюджета, ни сроков, ни кто принимает решение.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>ИИ квалифицирует по цели, сроку, бюджету и ЛПР — с цитатами</div></div>
+    <div class="fail" data-r class="d2"><span class="tag">Слив</span><div class="quote">«Отправил клиенту 10 объектов до того, как выяснил бюджет — и клиент пропал.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen квалифицирует до показа, не сливает варианты</div></div>
+    <div class="fail" data-r><span class="tag">Follow-up</span><div class="quote">«"Давайте спишемся в WhatsApp" — и клиент не ответил. Заявка потеряна.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Цепочка касаний сама возвращает клиента по всем каналам</div></div>
+    <div class="fail" data-r class="d1"><span class="tag">Комментарии</span><div class="quote">«Клиент спросил цену в комментариях под рекламой — ему никто не ответил.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>ИИ ловит комментарии и уводит в директ</div></div>
+    <div class="fail" data-r class="d2"><span class="tag">Язык</span><div class="quote">«Ответили на ломаном английском — и клиент начал молча игнорировать.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen отвечает грамотно на языке клиента</div></div>
+  </div>
+</section>
+
 <!-- HOW / STEPS -->
 <section class="sec wrap" id="how">
   <div class="sec-head center" data-r>
@@ -490,7 +566,7 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
     <div class="line"></div>
     <div class="row">
       <div class="stp on" data-r><div class="num">1</div><h3>Заявка влетает</h3><p>Из рекламы, формы, комментария под постом или CTWA — лид сразу в системе, с привязкой к объявлению.</p></div>
-      <div class="stp on" data-r class="d1"><div class="num">2</div><h3>ИИ ведёт диалог</h3><p>Отвечает за секунды на языке клиента и квалифицирует по цели, сроку, бюджету и типу.</p></div>
+      <div class="stp on" data-r class="d1"><div class="num">2</div><h3>ИИ ведёт диалог</h3><p>Отвечает в живом темпе на языке клиента и квалифицирует по цели, сроку, бюджету и типу.</p></div>
       <div class="stp on" data-r class="d2"><div class="num">3</div><h3>Психо-портрет</h3><p>Определяет тип клиента, на что давить и чего избегать, готовит подборку и ответы на возражения.</p></div>
       <div class="stp on" data-r class="d3"><div class="num">4</div><h3>Брокеру — тёплого</h3><p>В тот же чат, без смены номера. С историей, сценарием и задачей «позвонить за 30 минут».</p></div>
     </div>
@@ -543,10 +619,10 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
     <div class="fx">
       <span class="ftag" style="color:var(--klein);background:color-mix(in srgb,var(--klein) 12%,transparent)">ИИ-квалификатор</span>
       <h3>Первая линия, которая не устаёт</h3>
-      <p>Отвечает, квалифицирует, не галлюцинирует цифры и передаёт человека, когда нужно. Вшитый плейбук из 22 приёмов продаж Дубая и США — ИИ ведёт диалог по методике, а не «как получится».</p>
+      <p>Отвечает в живом темпе — с паузами и «печатает», не галлюцинирует цифры и передаёт человека, когда нужно. Вшитый плейбук из 22 приёмов продаж Дубая и США — ИИ ведёт диалог по методике, а не «как получится».</p>
       <ul class="fl">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--klein)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Живой темп: задержки и индикатор «печатает»</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--klein)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Защита от клише и выдуманных цифр</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--klein)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Тихие часы по поясу клиента</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--klein)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Автопередача человеку по триггерам</li>
       </ul>
     </div>
@@ -598,11 +674,60 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
         <h2 style="margin-top:14px">Клиент не понимает, <em>что говорит с ИИ</em></h2>
       </div>
       <div class="pts">
-        <div class="pt" data-r><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div><div><h4>Отвечает за секунды</h4><p>Пока конкуренты спят — Lumen уже ведёт диалог, на языке клиента и в вашем тоне.</p></div></div>
+        <div class="pt" data-r><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div><div><h4>Пишет в живом темпе</h4><p>Не мгновенно-роботом, а с естественной задержкой и индикатором «печатает». Клиент видит живой темп переписки — и не догадывается, что это ИИ.</p></div></div>
         <div class="pt" data-r class="d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><h4>Квалифицирует как человек</h4><p>Цель, срок, бюджет, тип — с цитатами из переписки и вшитым плейбуком продаж.</p></div></div>
         <div class="pt" data-r class="d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0M23 21v-2a4 4 0 00-3-3.87"/></svg></div><div><h4>Бесшовно передаёт брокеру</h4><p>Тот же номер, тот же чат. Клиент не чувствует переключения — конверсия не рвётся.</p></div></div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- NATIVE / из коробки -->
+<section class="sec wrap" id="native">
+  <div class="sec-head center" data-r>
+    <span class="kicker"><span class="dot"></span>Всё из коробки</span>
+    <h2>Всё напрямую. <em>Без зоопарка интеграций.</em></h2>
+    <p class="lead">То, для чего в обычной CRM нужны Zapier, подрядчики и месяцы настройки — в Lumen встроено и заточено под недвижимость.</p>
+  </div>
+  <div class="native-grid">
+    <div class="ncard wide" data-r>
+      <div style="position:relative;z-index:2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></div>
+        <h3>WhatsApp в двух режимах</h3>
+        <p>Официальный WhatsApp Cloud API напрямую — без ферм, серых шлюзов и BSP-наценок. Выбираете, как брокер подхватывает диалог у ИИ:</p>
+        <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg><span>Обычно: ферма номеров или сторонний шлюз с риском бана</span></div>
+      </div>
+      <div class="modes">
+        <div class="mode"><div class="mh"><span class="n">A</span>Один номер</div><p>ИИ и брокер работают с одного центрального номера. Клиент не замечает передачи — переписка не прерывается, конверсия не рвётся.</p></div>
+        <div class="mode"><div class="mh"><span class="n">B</span>Личный номер</div><p>Брокер продолжает с личного номера — с тёплым преданонсом от ИИ, чтобы клиент ждал именно его звонка.</p></div>
+      </div>
+    </div>
+    <div class="nrow3">
+      <div class="ncard" data-r>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.1-8.7A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.4-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/></svg></div>
+        <h3>Прямая телефония</h3><p>Звонки и авто-транскрипция прямо в карточке лида — договорённости из разговора сами попадают в сводку.</p>
+        <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: отдельный сервис + ручная расшифровка</span></div>
+      </div>
+      <div class="ncard" data-r class="d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+        <h3>Комментарии напрямую</h3><p>ИИ отвечает на комментарии под рекламой в Instagram и уводит в директ — без Zapier и ручного мониторинга.</p>
+        <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: никто не разбирает или костыли</span></div>
+      </div>
+      <div class="ncard" data-r class="d2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5zM2 2l7.6 7.6"/></svg></div>
+        <h3>Живой ИИ-конструктор</h3><p>Собирает сильный дизайн подборок и PDF под запрос клиента — не шаблон, а продуманная презентация.</p>
+        <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: отдельный дизайнер и часы работы</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MANIFESTO -->
+<section class="manifesto invert">
+  <video autoplay muted loop playsinline poster="/assets/site/city-poster.jpg"><source src="/assets/site/city-bg.mp4?v=1" type="video/mp4"></video>
+  <div class="wrap">
+    <p class="q" data-r>Клиент выбирает того, кто <em>ответил вовремя</em> и <em>понял его.</em> Lumen делает и то, и другое — пока ваши брокеры закрывают сделки.</p>
+    <div class="by" data-r class="d1">заточено под недвижимость · работает из коробки</div>
   </div>
 </section>
 
@@ -650,22 +775,39 @@ footer .cp{font-size:13px;color:var(--ink3);width:100%;margin-top:18px}
 <section class="sec wrap" id="compare">
   <div class="sec-head center" data-r>
     <span class="kicker"><span class="dot"></span>Честное сравнение</span>
-    <h2>Почему Lumen, <em>а не «оплата за лида»</em></h2>
+    <h2>Почему агентства <em>выбирают Lumen</em></h2>
+    <p class="lead">Не арендуете чужой поток заявок — получаете свою систему, которая работает на вас.</p>
   </div>
-  <div class="cmp" data-r>
-    <table>
-      <thead><tr><th>Что важно агентству</th><th class="us">Lumen<span class="rib">рекомендуем</span></th><th>Оплата за лида</th><th>Отдел вручную</th></tr></thead>
-      <tbody>
-        <tr><td class="feat-c">Скорость первого ответа</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Секунды, 24/7</span></td><td class="no">Зависит от их очереди</td><td class="no">Минуты–часы</td></tr>
-        <tr><td class="feat-c">Чья это система</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Ваша, с вашими данными</span></td><td class="no">Чужой «кран» заявок</td><td class="no">Ваша, но ручная</td></tr>
-        <tr><td class="feat-c">Модель оплаты</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Фиксированная подписка</span></td><td class="no">Плата за каждого лида</td><td class="no">Зарплаты + текучка</td></tr>
-        <tr><td class="feat-c">Каналы</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>WA, IG-комменты, TG, e-mail, звонки</span></td><td class="no">Обычно только звонки</td><td class="no">Сколько успеет менеджер</td></tr>
-        <tr><td class="feat-c">Лиды из комментариев рекламы</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Да, автоматически</span></td><td class="no">Нет</td><td class="no">Почти никогда</td></tr>
-        <tr><td class="feat-c">Психо-портрет для брокера</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>В каждой карточке</span></td><td class="no">Нет</td><td class="no">В голове у менеджера</td></tr>
-        <tr><td class="feat-c">Брендированные подборки и PDF</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Встроенный конструктор</span></td><td class="no">Нет</td><td class="no">Отдельный дизайнер</td></tr>
-        <tr><td class="feat-c">Реанимация спящей базы</td><td class="us"><span class="yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Цепочки по всем каналам</span></td><td class="no">Только звонки</td><td class="no">Руки не доходят</td></tr>
-      </tbody>
-    </table>
+  <div class="vs" data-r>
+    <div class="vs-card vs-lumen">
+      <div class="glimmer"></div>
+      <div class="vs-head"><span class="lbl">С Lumen</span><span class="vs-ribbon">★ рекомендуем</span></div>
+      <div class="vs-sub">Ваш AI-отдел продаж под ключ</div>
+      <div class="vs-list">
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span>Отвечает <b>первым</b>, круглосуточно — заявка не остывает ночью и в выходные</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span>Пишет <b>в живом темпе</b> — с паузами и «печатает», клиент не чувствует бота</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span>Система <b>ваша</b> — свой номер, свои данные, своя база</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Фиксированная подписка</b> — платите за инструмент, а не за каждого лида</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Все каналы</b>: WhatsApp, комментарии Instagram, Telegram, e-mail, звонки</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Лиды из комментариев</b> под рекламой — автоматически</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Психо-портрет</b> и сценарий сделки в каждой карточке</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Реанимация базы</b> цепочками по всем каналам</span></div>
+      </div>
+    </div>
+    <div class="vs-card vs-old">
+      <div class="vs-head"><span class="lbl">Обычный путь</span></div>
+      <div class="vs-sub">Оплата за лида · отдел продаж вручную</div>
+      <div class="vs-list">
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Первый ответ через минуты и часы — лид уже у конкурента</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Либо робот-автоответ, либо менеджер, который не успевает</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Чужой «кран» заявок — данные не ваши</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Платите за каждого лида или зарплаты + текучку</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Обычно только звонки — остальные каналы теряются</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Комментарии под рекламой никто не разбирает</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Подход «в голове у менеджера»</span></div>
+        <div class="vs-item"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg></span><span>Спящая база лежит мёртвым грузом</span></div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -848,7 +990,23 @@ function fmt(n){return '$'+Math.round(n).toLocaleString('ru-RU').replace(/,/g,' 
 function calc(){const L=+leads.value,C=+comm.value,P=+conv.value/100;vLeads.textContent=L;vComm.textContent=fmt(C);vConv.textContent=(P*100)+'%';const extra=L*P,gain=extra*C;lost.textContent=fmt(gain);roi.textContent='Это ≈ '+Math.max(1,Math.round(extra))+' доп. сделок в месяц. Подписка окупается с первой же.';}
 [leads,comm,conv].forEach(i=>i.addEventListener('input',calc));calc();
 
-if(matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('video').forEach(v=>{v.removeAttribute('autoplay');v.pause&&v.pause()})}
+// scroll progress bar
+const prog=document.getElementById('prog');
+addEventListener('scroll',()=>{const h=document.documentElement;const sc=h.scrollHeight-h.clientHeight;prog.style.width=(sc>0?(h.scrollTop/sc*100):0)+'%';},{passive:true});
+
+// smart pointer-tilt (fine pointer, motion allowed)
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(!reduced && matchMedia('(pointer:fine)').matches){
+  const tilt=(el,max)=>{
+    el.addEventListener('mouseenter',()=>el.style.transition='transform .06s linear');
+    el.addEventListener('mousemove',e=>{const r=el.getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;el.style.transform=`perspective(1100px) rotateY(${x*max}deg) rotateX(${-y*max}deg)`;});
+    el.addEventListener('mouseleave',()=>{el.style.transition='transform .6s cubic-bezier(.16,1,.3,1)';el.style.transform='perspective(1100px)';});
+  };
+  document.querySelectorAll('.frame').forEach(el=>tilt(el,3.5));
+  const st=document.querySelector('.stage');if(st)tilt(st,4.5);
+}
+
+if(reduced){document.querySelectorAll('video').forEach(v=>{v.removeAttribute('autoplay');v.pause&&v.pause()})}
 </script>
 </body>
 </html>
