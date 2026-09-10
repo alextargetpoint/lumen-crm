@@ -1,5 +1,5 @@
 /* Lumen CRM — Академия продаж: методология Ольги Синенко (Dubai RE).
-   135 роликов → 688 приёмов. Единый источник знаний для:
+   205 роликов → 953 приёмов. Единый источник знаний для:
    (1) раздела «Академия» (браузинг), (2) «Оценки звонка» (скоринг по методологии),
    (3) подсказок-советов в карточке лида / копилоте продаж.
    Данные — в academy_data.json (курируются из роликов); методология статична, как playbook.js. */
@@ -9,7 +9,7 @@ const CARDS = _d.CARDS;
 const MODULES = _d.MODULES;
 const VTITLES = _d.VTITLES;
 
-const CAT_LABELS = {"cold_call": "Холодные звонки", "discovery": "Квалификация", "conversation_flow": "Схема разговора", "objections": "Возражения", "meetings": "Встречи и Zoom", "closing": "Закрытие и срочность", "followup": "Дожим и пропавшие", "psychology": "Психология и доверие", "mistakes": "Ошибки", "agent_ops": "Организация работы", "dubai_market": "Рынок Дубая"};
+const CAT_LABELS = {"cold_call": "Холодные звонки", "discovery": "Квалификация", "conversation_flow": "Схема разговора", "objections": "Возражения", "meetings": "Встречи и Zoom", "closing": "Закрытие и срочность", "followup": "Дожим и пропавшие", "psychology": "Психология и доверие", "mistakes": "Ошибки", "agent_ops": "Организация работы", "dubai_market": "Рынок Дубая", "phuket_market": "Рынок Пхукета", "bali_market": "Рынок Бали"};
 
 function ytUrl(vid){ return 'https://www.youtube.com/watch?v=' + vid; }
 function byCategory(cat){ return CARDS.filter(c => c.cat === cat); }
