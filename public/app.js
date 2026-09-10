@@ -783,6 +783,33 @@ function initNav() {
     }
   });
   syncNavSub();
+  initNavSearch();
+}
+/* ⭐ умный поиск по разделам в сайдбаре: находит страницу по имени/подписи/группе → прыгает туда (⌘K) */
+function initNavSearch() {
+  const inp = document.getElementById('navSearch'), res = document.getElementById('navSearchRes'); if (!inp || !res) return;
+  const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return def.label; return ''; };
+  const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
+  const hidden = new Set(isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || []));
+  const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: v.name, sub: v.sub || '', parent: parentOf(k), icon: v.icon }));
+  const norm = (s) => String(s || '').toLowerCase();
+  const goTo = (pk) => { go(pk); inp.value = ''; res.hidden = true; inp.blur(); };
+  const render = (q) => {
+    q = norm(q).trim(); if (!q) { res.hidden = true; res.innerHTML = ''; return; }
+    const hits = index.filter(it => norm(it.name).includes(q) || norm(it.sub).includes(q) || norm(it.parent).includes(q)).slice(0, 8);
+    res.innerHTML = hits.length ? hits.map((it, i) => `<button class="ns-item ${i === 0 ? 'sel' : ''}" data-nsgo="${it.page}">${ic(it.icon)}<span class="ns-nm">${esc(it.name)}${it.parent ? `<i>${esc(it.parent)}</i>` : ''}</span></button>`).join('') : '<div class="ns-empty">Ничего не найдено</div>';
+    res.hidden = false;
+    res.querySelectorAll('[data-nsgo]').forEach(b => b.addEventListener('mousedown', (e) => { e.preventDefault(); goTo(b.dataset.nsgo); }));
+  };
+  inp.addEventListener('input', () => render(inp.value));
+  inp.addEventListener('focus', () => { if (inp.value) render(inp.value); });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { inp.value = ''; res.hidden = true; inp.blur(); }
+    else if (e.key === 'Enter') { const s = res.querySelector('.ns-item.sel') || res.querySelector('.ns-item'); if (s) goTo(s.dataset.nsgo); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const items = [...res.querySelectorAll('.ns-item')]; if (!items.length) return; let i = items.findIndex(x => x.classList.contains('sel')); items.forEach(x => x.classList.remove('sel')); i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1); items[i].classList.add('sel'); }
+  });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.navsearch')) res.hidden = true; });
+  if (!window.__navK) { window.__navK = 1; document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); const i = document.getElementById('navSearch'); if (i) { i.focus(); i.select(); } } }); }
 }
 /* синхронизация раскрытия/активности сайдбар-подстраниц с текущей страницей */
 function syncNavSub() {

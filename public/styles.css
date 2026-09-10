@@ -5746,3 +5746,17 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 .lc-e-foot { margin-top: 12px; }
 .lc-del { color: #C0392B; }
 @media (max-width: 680px) { .lc-e-grid, .lc-share-grid { grid-template-columns: 1fr; } }
+
+/* ── умный поиск в сайдбаре ── */
+.navsearch { position: relative; padding: 0 14px 10px; }
+.navsearch input { width: 100%; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #fff; border-radius: 11px; padding: 9px 12px; font: inherit; font-size: 13px; outline: none; transition: border-color .15s, background .15s; }
+.navsearch input::placeholder { color: rgba(255,255,255,.45); }
+.navsearch input:focus { border-color: rgba(157,184,255,.6); background: rgba(255,255,255,.10); }
+.navsearch-res { position: absolute; left: 14px; right: 14px; top: calc(100% - 4px); z-index: 40; background: var(--card); border: 1px solid var(--stroke); border-radius: 12px; box-shadow: var(--shadow-lift); overflow: hidden; padding: 5px; max-height: 340px; overflow-y: auto; }
+.ns-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px; cursor: pointer; font: inherit; color: var(--navy-900); }
+.ns-item svg { width: 16px; height: 16px; color: var(--ink-3); flex: none; }
+.ns-item.sel, .ns-item:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ns-item.sel svg, .ns-item:hover svg { color: var(--accent); }
+.ns-nm { display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; font-weight: 600; }
+.ns-nm i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.ns-empty { padding: 14px; text-align: center; color: var(--ink-3); font-size: 12.5px; }
