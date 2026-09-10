@@ -8077,6 +8077,37 @@ function rbacCardHtml() {
     <div class="rbac-list" id="rbacList">${groups || '<div class="muted" style="padding:8px">Нет сотрудников. Нажми «+ Сотрудник».</div>'}</div>
   </div>`;
 }
+/* Вся логика матрицы «Роли и доступы» (раскрытие/смена роли/скрытие разделов/фильтр карточек/поиск/добавление).
+   Вынесена из «Брокеров» в «Настройки» — вызывается из PAGES.settings. */
+function wireRbac(root) {
+  $$('.rbac-row', root).forEach(rowEl => {
+    const id = rowEl.dataset.rbacid;
+    rowEl.querySelector('[data-rbactoggle]').addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
+    const sel = rowEl.querySelector('.rbac-roleSel');
+    if (sel) sel.addEventListener('change', async () => { try { await api.patch('/brokers/' + id, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } });
+    rowEl.querySelectorAll('.rbac-sec:not(.locked)').forEach(chip => chip.addEventListener('click', async () => {
+      const b = (STATE.brokers || []).find(x => x.id === id); if (!b) return;
+      const ind = new Set(b.hidePages || []); const s = chip.dataset.sec;
+      if (ind.has(s)) ind.delete(s); else ind.add(s);
+      const arr = [...ind]; chip.classList.toggle('off'); chip.classList.toggle('on');
+      try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
+    }));
+    const del = rowEl.querySelector('.rbac-del');
+    if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
+    rowEl.querySelectorAll('.rbac-lf-src').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+    const lfSave = rowEl.querySelector('.rbac-lf-save');
+    if (lfSave) lfSave.addEventListener('click', async () => {
+      const sources = [...rowEl.querySelectorAll('.rbac-lf-src.on')].map(x => x.dataset.lfsrc);
+      const tags = (rowEl.querySelector('.rbac-lf-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+      try { await api.patch('/brokers/' + id, { leadFilter: { tags, sources } }); const b = (STATE.brokers || []).find(x => x.id === id); if (b) b.leadFilter = { tags, sources }; toast(tags.length || sources.length ? 'Фильтр карточек сохранён' : 'Фильтр снят', tags.length || sources.length ? 'Сотрудник видит только выбранные карточки' : 'Видимость по роли', true); } catch (e) { toast('Не вышло', e.message); }
+    });
+  });
+  { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }
+  { const ad = $('#rbacAdd', root); if (ad) ad.addEventListener('click', () => {
+    const bd = modal({ title: 'Новый сотрудник', sub: 'Имя + роль — доступы применятся сразу', body: `<div class="form-row"><label>Имя</label><input id="rbNm" placeholder="Имя Фамилия"></div><div class="form-row"><label>Роль</label><select id="rbRl" class="sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>`, actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async () => { const nm = $('#rbNm', bd).value.trim(); if (!nm) { toast('Впиши имя'); return false; } try { await api.post('/brokers', { name: nm, roleType: $('#rbRl', bd).value }); toast('Сотрудник добавлен', nm, true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
+    setTimeout(() => { const i = $('#rbNm', bd); if (i) i.focus(); }, 30);
+  }); }
+}
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
   let auditLog = [];
@@ -8104,7 +8135,6 @@ PAGES.brokers = async (root) => {
       ['Режим распределения', 'По загрузке, по очереди или по сменам — в «Автоматизациях»'],
       ['Саммари вместе с лидом', '4 оси с цитатами, источник, история диалога'],
       ['Авто-задача', '«Позвонить в течение 30 минут» при передаче']])}</div>
-  ${rbacCardHtml()}
   <div class="broker-grid">
     ${STATE.brokers.map(b => {
       const mine = leads.filter(l => l.broker === b.id);
@@ -8189,37 +8219,6 @@ PAGES.brokers = async (root) => {
   ${auditLog.length ? `<div style="margin-top:16px">${coll('Журнал доступа · безопасность базы', `<div style="font-size:12px;line-height:1.9;padding:6px 2px">${auditLog.slice(0, 40).map(a => `<div><span class="muted">${new Date(a.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <b>${esc(a.who || '—')}</b> — ${esc(a.action)}${a.lead ? ' · ' + esc(a.lead) : ''}</div>`).join('')}</div>`, { open: false, count: auditLog.length, icon: I.shield })}</div>` : ''}
   `;
   $('#brAutoLink').addEventListener('click', () => go('automations'));
-  /* ⭐ RBAC-матрица: раскрытие + смена роли + пер-секционное скрытие (пишет roleType/hidePages, enforcement на сервере) */
-  $$('.rbac-row', root).forEach(rowEl => {
-    const id = rowEl.dataset.rbacid;
-    rowEl.querySelector('[data-rbactoggle]').addEventListener('click', () => { const bd = rowEl.querySelector('.rbac-body'); bd.hidden = !bd.hidden; rowEl.classList.toggle('open', !bd.hidden); });
-    const sel = rowEl.querySelector('.rbac-roleSel');
-    if (sel) sel.addEventListener('change', async () => { try { await api.patch('/brokers/' + id, { roleType: sel.value }); toast('Роль обновлена', RBAC_ROLES[sel.value] || '', true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); } });
-    rowEl.querySelectorAll('.rbac-sec:not(.locked)').forEach(chip => chip.addEventListener('click', async () => {
-      const b = (STATE.brokers || []).find(x => x.id === id); if (!b) return;
-      const ind = new Set(b.hidePages || []); const s = chip.dataset.sec;
-      if (ind.has(s)) ind.delete(s); else ind.add(s);
-      const arr = [...ind]; chip.classList.toggle('off'); chip.classList.toggle('on');
-      try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
-    }));
-    const del = rowEl.querySelector('.rbac-del');
-    if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
-    /* фильтр видимости карточек лидов по тегам/источникам */
-    rowEl.querySelectorAll('.rbac-lf-src').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
-    const lfSave = rowEl.querySelector('.rbac-lf-save');
-    if (lfSave) lfSave.addEventListener('click', async () => {
-      const sources = [...rowEl.querySelectorAll('.rbac-lf-src.on')].map(x => x.dataset.lfsrc);
-      const tags = (rowEl.querySelector('.rbac-lf-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
-      try { await api.patch('/brokers/' + id, { leadFilter: { tags, sources } }); const b = (STATE.brokers || []).find(x => x.id === id); if (b) b.leadFilter = { tags, sources }; toast(tags.length || sources.length ? 'Фильтр карточек сохранён' : 'Фильтр снят', tags.length || sources.length ? 'Сотрудник видит только выбранные карточки' : 'Видимость по роли', true); } catch (e) { toast('Не вышло', e.message); }
-    });
-  });
-  /* поиск по имени (для команды 30-50) */
-  { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }
-  /* + добавить сотрудника сразу с ролью */
-  { const ad = $('#rbacAdd', root); if (ad) ad.addEventListener('click', () => {
-    const bd = modal({ title: 'Новый сотрудник', sub: 'Имя + роль — доступы применятся сразу', body: `<div class="form-row"><label>Имя</label><input id="rbNm" placeholder="Имя Фамилия"></div><div class="form-row"><label>Роль</label><select id="rbRl" class="sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>`, actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async () => { const nm = $('#rbNm', bd).value.trim(); if (!nm) { toast('Впиши имя'); return false; } try { await api.post('/brokers', { name: nm, roleType: $('#rbRl', bd).value }); toast('Сотрудник добавлен', nm, true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
-    setTimeout(() => { const i = $('#rbNm', bd); if (i) i.focus(); }, 30);
-  }); }
   $('#brAdd').addEventListener('click', async () => {
     const nb = await api.post('/brokers', { name: 'Новый брокер' });
     await loadState();
@@ -8873,6 +8872,7 @@ function tplListHtml(list) {
 PAGES.settings = async (root) => {
   const s = STATE.settings;
   root.innerHTML = `
+    ${rbacCardHtml()}
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
@@ -8985,6 +8985,7 @@ PAGES.settings = async (root) => {
     toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
     await loadState(); PAGES.settings(root);
   });
+  wireRbac(root);   /* матрица «Роли и доступы» (переехала из «Брокеров» в «Настройки») */
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
   const whc = $('#whCopy');
