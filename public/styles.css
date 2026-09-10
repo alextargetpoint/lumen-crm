@@ -2898,7 +2898,7 @@ body.has-preview { padding-top: 38px; }
 .ov-rep-sub { font-size: 12px; color: var(--ink-3); line-height: 1.45; margin: -2px 0 12px; }
 .ov-rep-nums { display: flex; gap: 24px; margin: 4px 0 13px; flex-wrap: wrap; }
 .ov-rep-n { display: flex; flex-direction: column; gap: 3px; }
-.ov-rep-n b { font-family: var(--font-display); font-size: 27px; font-weight: 600; color: var(--navy-900); line-height: 1; letter-spacing: -.01em; }
+.ov-rep-n b { font-size: 26px; font-weight: 700; color: var(--navy-900); line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .ov-rep-n span { font-size: 12px; color: var(--ink-3); }
 .ov-rep-acts { display: flex; gap: 7px; flex-wrap: wrap; }
 .ov-bnd { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
@@ -4861,28 +4861,27 @@ html[data-night] {
 
 /* ── асимметр. сетка: dense-упаковка + пер-виджет спаны (стаггер, но выровнено) ── */
 .ov2-grid { grid-auto-flow: row dense; }
-/* ⭐ МОЗАИКА: настоящие CSS-колонки в ПРОСМОТРЕ — браузер сам балансирует высоту колонок И сохраняет порядок
-   (grid dense упаковывал дыры, но НЕ выравнивал высоты → одна колонка на 1700px длиннее). Колонки решают оба. */
-.ov2-grid.ov-masonry:not(.ov-editcols) { display: block; column-width: 340px; column-gap: 16px; grid-template-columns: none; grid-auto-flow: initial; }
-.ov2-grid.ov-masonry:not(.ov-editcols) .ov-w, .ov2-grid.ov-masonry:not(.ov-editcols) .ov-w[class*="ov-span-"] {
-  break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; margin: 0 0 14px; display: block; width: 100%; grid-row: auto; grid-column: auto; }
-.ov2-grid.ov-masonry:not(.ov-editcols) .ov-w.full, .ov2-grid.ov-masonry:not(.ov-editcols) .ov-w.ov-cw-full { column-span: all; -webkit-column-span: all; }
-/* режим правки: равные колонки грид (стабильно для drag), та же ширина колонок → WYSIWYG с просмотром */
-.ov2-grid.ov-masonry.ov-editcols { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: auto; gap: 14px; grid-auto-flow: row; }
-.ov2-grid.ov-masonry.ov-editcols .ov-w, .ov2-grid.ov-masonry.ov-editcols .ov-w[class*="ov-span-"] { grid-row: auto !important; grid-column: auto; align-self: start; }
-.ov2-grid.ov-masonry.ov-editcols .ov-w.full, .ov2-grid.ov-masonry.ov-editcols .ov-w.ov-cw-full { grid-column: 1 / -1; }
-/* пользовательская мин-высота (ресайз по вертикали) — тело растягивается */
+/* ⭐ МОЗАИКА: ЕДИНАЯ grid-раскладка в правке И просмотре (WYSIWYG). Мелкая строчная сетка (10px) → высоту
+   виджета задаём grid-row span (JS ovMasonry по контенту ИЛИ явная при ресайзе). Интервалы (gap) сохраняются
+   всегда — виджеты не налезают друг на друга; ширина = span колонок. */
+.ov2-grid.ov-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: 10px; gap: 14px; grid-auto-flow: row; }
+.ov2-grid.ov-masonry .ov-w, .ov2-grid.ov-masonry .ov-w[class*="ov-span-"] { grid-column: span 1; align-self: start; }
+.ov2-grid.ov-masonry .ov-w.ov-cw-2 { grid-column: span 2; }
+.ov2-grid.ov-masonry .ov-w.ov-cw-3 { grid-column: span 3; }
+.ov2-grid.ov-masonry .ov-w.full, .ov2-grid.ov-masonry .ov-w.ov-cw-full { grid-column: 1 / -1; }
+@media (max-width: 1180px) { .ov2-grid.ov-masonry .ov-w.ov-cw-3 { grid-column: span 2; } }
+@media (max-width: 760px) { .ov2-grid.ov-masonry { grid-template-columns: 1fr; grid-auto-rows: auto; } .ov2-grid.ov-masonry .ov-w, .ov2-grid.ov-masonry .ov-w[class*="ov-cw-"] { grid-column: 1 / -1 !important; grid-row: auto !important; } }
+/* пользовательская мин-высота тела (ресайз по вертикали) */
 .ov-w-body { min-height: var(--ovh, auto); }
-/* ручка ресайза в углу (view-режим) */
+/* ручка ресайза — ТОЛЬКО в режиме «Настроить», крупная и явно видимая */
 .ov-w { position: relative; }
-.ov-w-rz { position: absolute; right: 4px; bottom: 4px; width: 16px; height: 16px; cursor: nwse-resize; opacity: 0; z-index: 4; border-radius: 0 0 8px 0;
-  background: radial-gradient(circle at 70% 70%, var(--accent) 0 2px, transparent 2.5px) 0 0/6px 6px; transition: opacity .14s; touch-action: none; }
-.ov-w:hover .ov-w-rz { opacity: .5; }
-.ov-w-rz:hover { opacity: 1 !important; }
-.ov-w.ov-rzing { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: calc(var(--r-card) + 2px); z-index: 6; }
+.ov-w-rz { display: none; }
+.ov2-grid.editing .ov-w-rz { display: flex; align-items: center; justify-content: center; position: absolute; right: 6px; bottom: 6px; width: 26px; height: 26px; cursor: nwse-resize; z-index: 6; border-radius: 8px; background: var(--accent); box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--accent) 60%, transparent); transition: transform var(--dur-fast); touch-action: none; }
+.ov2-grid.editing .ov-w-rz::before { content: ''; width: 9px; height: 9px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; margin: -2px -2px 0 0; }
+.ov2-grid.editing .ov-w-rz:hover { transform: scale(1.1); }
+.ov-w.ov-rzing { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: calc(var(--r-card) + 2px); z-index: 7; }
 .ov-w.ov-rzing .ov-w-body { box-shadow: var(--shadow-elevated); }
 body.ov-rz-cursor, body.ov-rz-cursor * { cursor: nwse-resize !important; user-select: none; }
-@media (max-width: 700px) { .ov2-grid.ov-masonry { grid-template-columns: 1fr; } .ov2-grid.ov-masonry .ov-w { grid-row: auto !important; } }
 .ov-w.ov-span-4 { grid-column: span 4; }
 .ov-w.ov-span-5 { grid-column: span 5; }
 .ov-w.ov-span-6 { grid-column: span 6; }
