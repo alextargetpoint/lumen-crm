@@ -484,7 +484,9 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .stage{max-width:440px;margin:0 auto}
   .prob,.scene,.calc,.showcase .sc-grid,.vs,.pbig,.pbig.rev,.prow2{grid-template-columns:1fr}
   .pbig.rev .pstack{order:2}
-  .pstack{height:300px;max-width:440px;margin:0 auto}
+  .pstack{height:auto;max-width:460px;margin:0 auto;display:grid;gap:12px}
+  .pstack .sc{position:static}
+  .pstack .s1,.pstack .s2{width:100%;inset:auto}
   .pwide{flex-direction:column;align-items:flex-start}
   .feat{grid-template-columns:1fr;gap:30px}.feat.rev .fx{order:0}
   .steps .row{grid-template-columns:repeat(2,1fr);gap:34px}.steps .line{display:none}
@@ -823,13 +825,13 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     </div>
     <div class="pbig rev" data-r>
       <div class="pstack">
-        <div class="sc s1"><img src="/assets/site/cap-academy.png" alt="Академия продаж" onerror="this.src='/assets/site/cap-ai.png'"></div>
-        <div class="sc s2"><img src="/assets/site/cap-callreview.png" alt="ИИ-оценка звонка" onerror="this.src='/assets/site/cap-analytics.png'"></div>
+        <div class="sc s1"><img src="/assets/site/cap-callreview.png" alt="ИИ-оценка звонка" onerror="this.src='/assets/site/cap-analytics.png'"></div>
+        <div class="sc s2"><img src="/assets/site/cap-ai.png" alt="ИИ-квалификатор" onerror="this.src='/assets/site/cap-dialogs.png'"></div>
       </div>
       <div>
         <span class="ptag">Развитие команды · HR</span>
         <h3>Растите сильных брокеров системно</h3>
-        <p>Внутри — академия из 688 приёмов продаж (135 роликов Ольги Синенко, вшиты в ИИ) и ИИ-оценка звонков по методике. Брокеры учатся на реальных кейсах, а не «как получится».</p>
+        <p>Внутри — академия из 688 приёмов продаж по проверенным методикам, вшитым в ИИ, и ИИ-оценка звонков. Брокеры учатся на реальных кейсах, а не «как получится».</p>
         <ul class="fl">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Академия: 688 приёмов + разбор кейсов на планёрке</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>ИИ слушает звонок и ставит оценку по 6 критериям</li>
