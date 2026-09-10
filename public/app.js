@@ -1854,14 +1854,14 @@ function ovMasonry(grid) {
   const items = [...grid.querySelectorAll('.ov-w')];
   if (cs.display !== 'grid' || cols <= 1) { items.forEach(w => { w.style.gridRowEnd = ''; }); return; }  /* мобилка (1 колонка) — обычный поток */
   const row = parseFloat(cs.gridAutoRows) || 10, gap = parseFloat(cs.rowGap) || 14;
-  const sizes = ovGetSizes();
-  /* сброс спанов у виджетов БЕЗ явной высоты — чтобы замерить натуральную высоту контента */
-  items.forEach(w => { const sz = sizes[w.dataset.w]; if (!(sz && sz.h)) w.style.gridRowEnd = ''; });
+  /* сбрасываем ВСЕ спаны и меряем РЕАЛЬНУЮ высоту виджета: она уже включает и заданную ресайзом мин-высоту
+     (--ovh на теле), и хром режима правки (шапка-ручка, пунктирный паддинг/бордер). Поэтому резерв места точный,
+     и виджеты не налезают ни в просмотре, ни при настройке. */
+  items.forEach(w => { w.style.gridRowEnd = ''; });
   void grid.offsetHeight;
   items.forEach(w => {
-    const sz = sizes[w.dataset.w] || {};
-    const h = sz.h ? sz.h : w.getBoundingClientRect().height;               /* явная высота при ресайзе, иначе по контенту */
-    w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + gap + 8) / (row + gap)));   /* +8px запас → виджеты не касаются */
+    const h = w.getBoundingClientRect().height;
+    w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + gap + 8) / (row + gap)));   /* +8px запас → гарантированный зазор */
   });
 }
 let _ovMasonryHook = false, _ovMasonryTmr = null;
