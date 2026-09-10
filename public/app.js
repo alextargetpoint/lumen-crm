@@ -8383,7 +8383,29 @@ PAGES.hr = async (root) => {
       </div>
     </div>
     <div class="hr-board">${HR_STAGES.map(([st, nm]) => col(st, nm)).join('')}</div>
-    ${cands.some(c => c.stage === 'rejected') ? `<div style="margin-top:12px">${coll('Отклонённые', `<div class="hr-board" style="grid-template-columns:1fr">${col('rejected', 'Отклонены')}</div>`, { open: false, count: cands.filter(c => c.stage === 'rejected').length })}</div>` : ''}`;
+    ${cands.some(c => c.stage === 'rejected') ? `<div style="margin-top:12px">${coll('Отклонённые', `<div class="hr-board" style="grid-template-columns:1fr">${col('rejected', 'Отклонены')}</div>`, { open: false, count: cands.filter(c => c.stage === 'rejected').length })}</div>` : ''}
+    ${owner ? `<div class="glass card hr-hunt" style="margin-top:16px">
+      <div class="card-title">${ic(I.spark)}Хантинг в Threads / Instagram<span class="sub">авто-постинг вакансии + приём откликов</span></div>
+      <div class="hr-hunt-grid">
+        <div class="hr-hunt-compose">
+          <div class="hr-hunt-lbl">Пост-вакансия <button class="btn btn-sm" id="huGen">${ic(I.spark)}Сгенерировать ИИ</button></div>
+          <textarea id="huText" rows="7" placeholder="Нажми «Сгенерировать ИИ» — соберу пост под Threads/Instagram из твоей вакансии. Или впиши свой."></textarea>
+          <div class="hr-hunt-acts">
+            <button class="btn btn-sm" id="huCopy">${ic(I.copy)}Копировать</button>
+            <button class="btn btn-sm ${d.social && d.social.threadsTokenSet ? 'btn-accent' : ''}" id="huPubT">${ic(I.send)}${d.social && d.social.threadsTokenSet ? 'Опубликовать в Threads' : 'Threads (нужен токен)'}</button>
+          </div>
+        </div>
+        <div class="hr-hunt-cfg">
+          <div class="hr-hunt-lbl">Подключение</div>
+          <label class="fl"><span>Токен Threads (Graph API)</span><input id="huThreads" type="password" placeholder="${d.social && d.social.threadsTokenSet ? '•••••• подключён' : 'access_token'}"></label>
+          <label class="fl"><span>Токен Instagram (бизнес)</span><input id="huIg" type="password" placeholder="${d.social && d.social.igTokenSet ? '•••••• подключён' : 'access_token'}"></label>
+          <label class="hr-hunt-auto"><input type="checkbox" id="huAuto" ${d.social && d.social.autoReply ? 'checked' : ''}> Авто-ответ в директ на комментарии/DM</label>
+          <label class="fl"><span>Шаблон авто-ответа</span><textarea id="huTpl" rows="2">${esc((d.social && d.social.replyTpl) || '')}</textarea></label>
+          <button class="btn btn-sm btn-accent" id="huSaveCfg">Сохранить подключение</button>
+          <div class="muted" style="font-size:11px;margin-top:6px">Без токена пост можно скопировать и запостить руками — отклики всё равно придут в воронку по ссылке. С токеном — авто-публикация и авто-ответ в директ → перевод на онбординг.</div>
+        </div>
+      </div>
+    </div>` : ''}`;
   const reload = () => PAGES.hr(root);
   /* карточка кандидата */
   $$('[data-hrcand]', root).forEach(b => b.addEventListener('click', () => {
@@ -8439,6 +8461,23 @@ PAGES.hr = async (root) => {
       <div class="muted" style="font-size:11.5px">Кидай в Threads/Instagram/Telegram. Публикуй где угодно — отклики придут сюда.</div>`,
       actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async () => { try { await api.post('/hr/form/share', { on: $('#hrOn', bd).checked }); toast('Готово', $('#hrOn', bd).checked ? 'Приём откликов включён' : 'Форма закрыта', true); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Закрыть' }] });
     $('#hrCopy', bd).addEventListener('click', () => { navigator.clipboard.writeText($('#hrUrl', bd).value); toast('Ссылка скопирована', null, true); });
+  });
+  /* хантинг Threads/IG — всё inline, без попапов */
+  const hg = $('#huGen', root); if (hg) hg.addEventListener('click', async () => {
+    hg.disabled = true; const old = hg.innerHTML; hg.innerHTML = ic(I.spark) + 'Генерю…';
+    try { const r = await api.post('/hr/social/compose', {}); if (r.text) $('#huText', root).value = r.text; toast('Пост готов', 'Проверь и опубликуй', true); }
+    catch (e) { toast('Не вышло', e.message); } hg.disabled = false; hg.innerHTML = old;
+  });
+  const hc = $('#huCopy', root); if (hc) hc.addEventListener('click', () => { const t = $('#huText', root).value.trim(); if (!t) { toast('Пусто'); return; } navigator.clipboard.writeText(t); toast('Скопировано', 'Вставь в Threads/Instagram', true); });
+  const hpt = $('#huPubT', root); if (hpt) hpt.addEventListener('click', async () => {
+    const text = $('#huText', root).value.trim(); if (!text) { toast('Пусто', 'Сначала сгенерируй пост'); return; }
+    hpt.disabled = true; try { const r = await api.post('/hr/social/publish', { platform: 'threads', text }); if (r.published) toast('Опубликовано в Threads', null, true); else toast('Черновик сохранён', r.note || 'Подключи токен для авто-публикации'); } catch (e) { toast('Не вышло', e.message); } hpt.disabled = false;
+  });
+  const hsc = $('#huSaveCfg', root); if (hsc) hsc.addEventListener('click', async () => {
+    const payload = { autoReply: $('#huAuto', root).checked, replyTpl: $('#huTpl', root).value };
+    const tt = $('#huThreads', root).value.trim(); if (tt) payload.threadsToken = tt;
+    const ig = $('#huIg', root).value.trim(); if (ig) payload.igToken = ig;
+    try { await api.post('/hr/social/config', payload); toast('Подключение сохранено', null, true); reload(); } catch (e) { toast('Не вышло', e.message); }
   });
 };
 function hrScreenHtml(s) {

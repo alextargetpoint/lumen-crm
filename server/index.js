@@ -276,7 +276,9 @@ const DEFAULT_PASS = 'lumen2026';
       { key: 'geo', label: 'Город проживания', type: 'text', req: false },
       { key: 'why', label: 'Почему хотите к нам?', type: 'textarea', req: false },
     ],
+    social: { threadsTokenSet: false, igTokenSet: false, autoReply: false, replyTpl: 'Спасибо за интерес! Оставьте отклик по ссылке — и мы свяжемся: {applyUrl}', posts: [] },
   };
+  if (db.settings.hr && !db.settings.hr.social) db.settings.hr.social = { threadsTokenSet: false, igTokenSet: false, autoReply: false, replyTpl: 'Спасибо за интерес! Оставьте отклик по ссылке: {applyUrl}', posts: [] };
   if (!db.feed) db.feed = [];                    // лента агентства (корпоративная стена: новости/материалы/референсы/поздравления)
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
@@ -5315,8 +5317,8 @@ ${SCR}
     }
     /* ═══ HR · ПОДБОР: конструктор формы + воронка кандидатов + ИИ-скрининг ═══ */
     if (p === '/api/hr' && req.method === 'GET') {
-      const H = db.settings.hr || {};
-      return json(res, 200, { form: { fields: H.fields || [], vacancy: H.vacancy || {} }, candidates: db.hrCandidates || [], share: { on: !!H.formOn, token: H.formToken || '', url: `${global.LUMEN_BASE || ''}/apply/${H.formToken || ''}` } });
+      const H = db.settings.hr || {}; const S = H.social || {};
+      return json(res, 200, { form: { fields: H.fields || [], vacancy: H.vacancy || {} }, candidates: db.hrCandidates || [], share: { on: !!H.formOn, token: H.formToken || '', url: `${global.LUMEN_BASE || ''}/apply/${H.formToken || ''}` }, social: { threadsTokenSet: !!S.threadsTokenSet, igTokenSet: !!S.igTokenSet, autoReply: !!S.autoReply, replyTpl: S.replyTpl || '', posts: (S.posts || []).slice(0, 8) } });
     }
     if (p === '/api/hr/form' && req.method === 'POST') {
       { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
@@ -5351,6 +5353,51 @@ ${SCR}
       const c = (db.hrCandidates || []).find(x => x.id === m[1]); if (!c) return json(res, 404, { error: 'not found' });
       try { c.screen = await llm.screenCandidate(c, db.settings.hr || {}); if (c.stage === 'new') c.stage = 'screen'; store.save(); return json(res, 200, { screen: c.screen }); }
       catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* ── Хантинг в Threads/Instagram: конфиг + ИИ-composer поста вакансии + публикация ── */
+    if (p === '/api/hr/social/config' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const H = db.settings.hr = db.settings.hr || {}; const S = H.social = H.social || {};
+      if (b.threadsToken != null) { if (String(b.threadsToken)) { S.threadsToken = String(b.threadsToken).slice(0, 400); S.threadsTokenSet = true; } else if (b.threadsToken === '') { S.threadsToken = ''; S.threadsTokenSet = false; } }
+      if (b.igToken != null) { if (String(b.igToken)) { S.igToken = String(b.igToken).slice(0, 400); S.igTokenSet = true; } else if (b.igToken === '') { S.igToken = ''; S.igTokenSet = false; } }
+      if (typeof b.autoReply === 'boolean') S.autoReply = b.autoReply;
+      if (typeof b.replyTpl === 'string') S.replyTpl = b.replyTpl.slice(0, 600);
+      store.save();
+      return json(res, 200, { threadsTokenSet: !!S.threadsTokenSet, igTokenSet: !!S.igTokenSet, autoReply: !!S.autoReply, replyTpl: S.replyTpl || '' });
+    }
+    if (p === '/api/hr/social/compose' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+      const H = db.settings.hr || {}; const v = H.vacancy || {};
+      const applyUrl = `${global.LUMEN_BASE || ''}/apply/${H.formToken || ''}`;
+      try {
+        const out = await llm.composePost({ topic: `Вакансия: ${v.title || 'брокер по недвижимости'}. ${v.pitch || ''} Плюсы: ${(v.perks || []).join(', ')}. Призыв: оставить отклик по ссылке ${H.formOn ? applyUrl : '(ссылка появится после включения приёма)'}`, geo: '', agencyName: db.settings.agency.name, kind: 'vacancy', style: 'Threads/Instagram: живо, по-человечески, без канцелярита, с крючком в первой строке. Без длинных тире.' });
+        let text = llm.humanize(out.body || '');
+        if (H.formOn && applyUrl && !text.includes(applyUrl)) text += '\n\n👉 Откликнуться: ' + applyUrl;
+        if (out.hashtags && out.hashtags.length) text += '\n\n' + out.hashtags.slice(0, 6).map(h => '#' + h).join(' ');
+        return json(res, 200, { text: text.trim(), applyUrl: H.formOn ? applyUrl : '' });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    if (p === '/api/hr/social/publish' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const H = db.settings.hr || {}; const S = H.social || {};
+      const text = String(b.text || '').slice(0, 500); const platform = b.platform === 'ig' ? 'ig' : 'threads';
+      if (!text) return json(res, 400, { error: 'пустой текст' });
+      const token = platform === 'ig' ? S.igToken : S.threadsToken;
+      if (!token) { (S.posts = S.posts || []).unshift({ at: Date.now(), platform, text, status: 'draft' }); store.save(); return json(res, 200, { published: false, reason: 'no-token', note: 'Токен не подключён — сохранил черновик. Скопируй и опубликуй вручную, либо подключи токен для авто-публикации.' }); }
+      /* Threads Graph API: 2 шага (контейнер → публикация). Best-effort; при ошибке — черновик. */
+      try {
+        if (platform === 'threads') {
+          const uid = S.threadsUserId || 'me';
+          const c1 = await fetch(`https://graph.threads.net/v1.0/${uid}/threads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ media_type: 'TEXT', text, access_token: token }) });
+          const j1 = await c1.json(); if (!c1.ok || !j1.id) throw new Error((j1.error && j1.error.message) || 'container failed');
+          const c2 = await fetch(`https://graph.threads.net/v1.0/${uid}/threads_publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creation_id: j1.id, access_token: token }) });
+          const j2 = await c2.json(); if (!c2.ok) throw new Error((j2.error && j2.error.message) || 'publish failed');
+          (S.posts = S.posts || []).unshift({ at: Date.now(), platform, text, status: 'published', id: j2.id });
+          store.save(); return json(res, 200, { published: true, id: j2.id });
+        }
+        return json(res, 400, { error: 'публикация в Instagram требует бизнес-аккаунт + отдельный флоу; пока сохрани черновик' });
+      } catch (e) { (S.posts = S.posts || []).unshift({ at: Date.now(), platform, text, status: 'draft', err: e.message }); store.save(); return json(res, 200, { published: false, reason: 'error', note: 'Публикация не прошла (' + e.message + ') — сохранил черновик.' }); }
     }
     /* публичный приём отклика — ВНЕ /api (без сессии), rate-limited, авто-ИИ-скрининг */
     if ((m = p.match(/^\/apply\/([a-z0-9]+)\/submit$/)) && req.method === 'POST') {
