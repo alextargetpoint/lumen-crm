@@ -36,7 +36,9 @@
   --shadow: 0 1px 2px rgba(16, 43, 92, .045), 0 3px 8px -3px rgba(16, 43, 92, .07), 0 14px 32px -16px rgba(16, 43, 92, .16);
   --shadow-lift: 0 2px 6px -2px rgba(16, 43, 92, .10), 0 20px 48px -18px rgba(16, 43, 92, .30);
   --font: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: 'Fraunces', 'Manrope', Georgia, serif;
+  /* ⚠ БЫЛО Fraunces (без кириллицы) → RU-заголовки рендерились уродливым миксом сериф+санс.
+     Дисплей-шрифт = тот же Manrope (жирные веса + плотный трекинг дают «дисплейность»), единый чистый вид без серифа. */
+  --font-display: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* motion: critically-damped spring, ноль отскока */
   --ease-spring: cubic-bezier(.16, 1, .3, 1);
   --ease-soft: cubic-bezier(.4, 0, .2, 1);
@@ -96,9 +98,11 @@ body {
   letter-spacing: -0.006em;
   overflow: hidden;
 }
-/* ---------- дисплейная типографика (люкс-сериф Fraunces — только заголовки, НЕ цифры) ---------- */
-.font-display, .page-title, .hero-nm, .modal-title, .hero-title { font-family: var(--font-display); font-optical-sizing: auto; }
-.page-title { font-weight: 600; letter-spacing: -0.02em; }
+/* ---------- дисплейная типографика: единый Manrope, плотный трекинг = «дисплейность» без серифа ---------- */
+.font-display, .page-title, .hero-nm, .modal-title, .hero-title { font-family: var(--font-display); letter-spacing: -0.022em; }
+/* заголовки карточек/секций/героев — чуть жирнее и плотнее, чтобы читались как дисплей */
+.ov2-card-hd, .ha-title, .hr-hero-t, .lrn-t, .card-title, .plo-h1, h1, h2, h3, .modal h3 { letter-spacing: -0.02em; }
+.page-title { font-weight: 600; letter-spacing: -0.024em; }
 /* цифры остаются на гротеске Manrope — чистые табличные, без серифа */
 .kpi .val, .stat-big, .big-num { font-family: var(--font); font-variant-numeric: tabular-nums; }
 
@@ -5609,3 +5613,15 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .lrn-b { padding: 0 16px; font-size: 13px; color: var(--ink-2); max-height: 200px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent); }
 .lrn-acts { display: flex; gap: 8px; align-items: center; padding: 4px 16px 16px; margin-top: auto; }
 .lrn-acts .btn { flex: 1; justify-content: center; }
+
+/* ═══ ВИДЖЕТЫ ×3 — эстетика (по запросу «ещё круче»): иконка-чип, крупнее заголовок, богаче поверхность ═══ */
+.ov2-card-hd { font-size: 15px; font-weight: 700; gap: 10px; align-items: center; margin-bottom: 14px; }
+.ov2-card-hd > svg:first-child { width: 30px; height: 30px; padding: 7px; box-sizing: border-box; border-radius: 10px; background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent); }
+.ov2-card-hd span { margin-left: 1px; font-weight: 450; }
+.ov2-card-hd .btn, .ov2-card-hd > button:last-child { margin-left: auto; }
+.ov2-grid .ov-w-body { border-radius: var(--r-card, 18px); padding: 18px 19px; position: relative; overflow: hidden; }
+/* тончайшая световая линия по верхней кромке (свет сверху = премиум-стекло) */
+.ov2-grid .ov-w-body::after { content: ''; position: absolute; left: 14px; right: 14px; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); pointer-events: none; z-index: 1; }
+:root[data-theme="dark"] .ov2-grid .ov-w-body::after, .dark .ov2-grid .ov-w-body::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); }
+/* крупные числа в виджетах — плотнее и выразительнее */
+.ov-rep-n b, .ov2-kpi-v { letter-spacing: -.02em; }
