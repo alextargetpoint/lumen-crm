@@ -7864,6 +7864,7 @@ const RBAC_DEFHIDE = {
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
 const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
+const RBAC_SOURCES = [['ad_comment', 'Комментарии рекламы'], ['wa_inbound', 'Прямые (WhatsApp)'], ['import', 'Импорт / выгрузка'], ['broker_card', 'От брокера']];
 function rbacRowHtml(b) {
   const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = RBAC_DEFHIDE[rt] || [];
@@ -7874,6 +7875,15 @@ function rbacRowHtml(b) {
       <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn-ghost rbac-del" title="Убрать сотрудника">${ic(I.x)}</button></div>
       <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
       <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать. Серые закрыты ролью.</div>
+      <div class="rbac-lf">
+        <div class="rbac-lf-h">Видимость карточек лидов${(b.leadFilter && (((b.leadFilter.tags || []).length) || ((b.leadFilter.sources || []).length))) ? '<span class="rbac-lf-on">фильтр включён</span>' : ''}</div>
+        <div class="rbac-lf-sub">Ничего не выбрано — по роли (свои / все лиды). Выбери критерии — сотрудник увидит <b>только</b> карточки с этими источниками или тегами.</div>
+        <div class="rbac-lf-lbl">Источники</div>
+        <div class="rbac-lf-srcs">${RBAC_SOURCES.map(([v, n]) => `<button type="button" class="rbac-lf-src ${((b.leadFilter && b.leadFilter.sources) || []).includes(v) ? 'on' : ''}" data-lfsrc="${v}">${n}</button>`).join('')}</div>
+        <div class="rbac-lf-lbl">Теги (через запятую)</div>
+        <input class="lc-inp rbac-lf-tags" value="${esc(((b.leadFilter && b.leadFilter.tags) || []).join(', '))}" placeholder="напр. VIP, инвестор, Дубай">
+        <button type="button" class="btn btn-sm btn-accent rbac-lf-save" style="margin-top:8px">Сохранить фильтр карточек</button>
+      </div>
     </div>
   </div>`;
 }
@@ -8014,6 +8024,14 @@ PAGES.brokers = async (root) => {
     }));
     const del = rowEl.querySelector('.rbac-del');
     if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
+    /* фильтр видимости карточек лидов по тегам/источникам */
+    rowEl.querySelectorAll('.rbac-lf-src').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+    const lfSave = rowEl.querySelector('.rbac-lf-save');
+    if (lfSave) lfSave.addEventListener('click', async () => {
+      const sources = [...rowEl.querySelectorAll('.rbac-lf-src.on')].map(x => x.dataset.lfsrc);
+      const tags = (rowEl.querySelector('.rbac-lf-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+      try { await api.patch('/brokers/' + id, { leadFilter: { tags, sources } }); const b = (STATE.brokers || []).find(x => x.id === id); if (b) b.leadFilter = { tags, sources }; toast(tags.length || sources.length ? 'Фильтр карточек сохранён' : 'Фильтр снят', tags.length || sources.length ? 'Сотрудник видит только выбранные карточки' : 'Видимость по роли', true); } catch (e) { toast('Не вышло', e.message); }
+    });
   });
   /* поиск по имени (для команды 30-50) */
   { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }

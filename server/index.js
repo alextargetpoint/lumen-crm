@@ -2298,8 +2298,10 @@ const server = http.createServer(async (req, res) => {
     const CAP = IS_BROKER ? (ROLE_CAPS[MEMBER.roleType] || ROLE_CAPS.broker) : null;
     const GRANTED = CAP ? new Set(CAP.allow) : new Set();
     if (IS_BROKER && p.startsWith('/api/') && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
-    /* видимость лида: own — только свои, all — все (ассистент/менеджер) */
-    const canSeeLead = (l) => !IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId;
+    /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
+    const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
+    const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); return !!(byTag || bySrc); };
+    const canSeeLead = (l) => (!IS_BROKER || (CAP && CAP.leads === 'all') || l.broker === ROLE.brokerId) && matchesLeadFilter(l);
     /* код доступа (pinPlain) виден ТОЛЬКО реальному владельцу (не брокеру, не в режиме preview) */
     const RR_STATE = realRole(req);
     const showSecret = RR_STATE && RR_STATE.role === 'owner' && !RR_STATE.previewAs;
@@ -2836,6 +2838,7 @@ const server = http.createServer(async (req, res) => {
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
       if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
+      if (b.leadFilter && typeof b.leadFilter === 'object') { br.leadFilter = { tags: (Array.isArray(b.leadFilter.tags) ? b.leadFilter.tags : []).filter(x => typeof x === 'string').slice(0, 30), sources: (Array.isArray(b.leadFilter.sources) ? b.leadFilter.sources : []).filter(x => typeof x === 'string').slice(0, 20) }; }   /* фильтр видимости карточек лидов по тегам/источникам */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту агентства */
       /* поля публичной визитки брокера (/b/:id) */
       if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
