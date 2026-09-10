@@ -2155,6 +2155,41 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, leadId: lead.id, result: entry.result, adMatched: !!(lead.ads && lead.ads.matched) });
     }
 
+    /* ---------------- ПУБЛИЧНАЯ форма захвата с лендинга (site.html) — без секрета, ИИ выключен ---------------- */
+    if (p === '/site/lead' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (b && String(b.company || '').trim()) return json(res, 200, { ok: true }); // honeypot: молча глотаем ботов
+      const g = (k) => (b[k] != null ? String(b[k]).trim() : '');
+      const name = g('name').slice(0, 80) || 'Заявка с сайта';
+      const phone = (g('phone') || g('contact')).slice(0, 40);
+      const message = g('message').slice(0, 800);
+      const topic = g('topic').slice(0, 40);
+      if (!phone || phone.replace(/\D/g, '').length < 6) return json(res, 400, { error: 'нужен телефон/контакт' });
+      const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      let lead = db.leads.find(l => l.phone && norm(l.phone) === norm(phone));
+      if (lead) {
+        lead.tags = [...new Set([...(lead.tags || []), 'повторная заявка', 'с сайта'])];
+        if (message) (lead.notes = lead.notes || []).push({ at: Date.now(), text: 'Заявка с сайта: ' + message });
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка с лендинга: ${lead.name}` });
+      } else {
+        lead = {
+          id: store.nextId('ld'), name, phone,
+          geo: db.settings.agency.geos[0], lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0,
+          source: 'landing', createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+          quals: { purpose: null, timeline: null, budget: null, type: null },
+          ai: { enabled: false, chainStep: 0, nextTouchAt: null, silentSince: null },
+          broker: null, summary: null, tags: ['с сайта'].concat(topic ? ['тема: ' + topic] : []),
+          numberId: null, meta: {}, avatarUrl: null, activeChannel: 'wa',
+          channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: 'unknown' },
+          contacts: [], notes: message ? [{ at: Date.now(), text: 'Заявка с сайта: ' + message }] : [], custom: {}, transcripts: [], ads: null,
+        };
+        db.leads.push(lead);
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Заявка с лендинга: ${name}${topic ? ' · ' + topic : ''} (ИИ выкл — нужен менеджер)` });
+      }
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+
     /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
     if (p === '/hooks/comment' && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
