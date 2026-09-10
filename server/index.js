@@ -3839,20 +3839,47 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/social/refvideos' && req.method === 'GET') {
       const q = String(u.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 200, { videos: [] });
+      const want = (u.searchParams.get('platform') || 'all').toLowerCase();   /* all | youtube | tiktok | instagram */
+      const tag = q.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase().slice(0, 40);
       global.__refVidCache = global.__refVidCache || {};
-      const cacheKey = q.toLowerCase();
+      const cacheKey = want + '|' + q.toLowerCase();
       const hit = global.__refVidCache[cacheKey];
-      if (hit && (Date.now() - hit.t) < 6 * 3600 * 1000) return json(res, 200, { videos: hit.v, cached: true });
-      try {
-        // sp=CAMSAhAB — сортировка по релевантности + фильтр «видео»; +shorts тянет вертикаль
+      if (hit && (Date.now() - hit.t) < 6 * 3600 * 1000) return json(res, 200, { videos: hit.v, sources: hit.s, cached: true });
+      /* YouTube: search HTML → videoId (стабильно) */
+      const scrapeYouTube = async () => {
         const { text } = await safeFetch('https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' shorts'));
-        const ids = []; const seen = new Set();
-        const re = /"videoId":"([A-Za-z0-9_-]{11})"/g; let mm;
-        while ((mm = re.exec(text)) && ids.length < 8) { if (!seen.has(mm[1])) { seen.add(mm[1]); ids.push(mm[1]); } }
-        const videos = ids.map(id => ({ id, embed: 'https://www.youtube.com/embed/' + id + '?rel=0&modestbranding=1', watch: 'https://www.youtube.com/shorts/' + id, thumb: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg' }));
-        global.__refVidCache[cacheKey] = { t: Date.now(), v: videos };
-        return json(res, 200, { videos });
-      } catch (e) { return json(res, 200, { videos: [], error: e.message }); }
+        const ids = []; const seen = new Set(); const re = /"videoId":"([A-Za-z0-9_-]{11})"/g; let mm;
+        while ((mm = re.exec(text)) && ids.length < 6) { if (!seen.has(mm[1])) { seen.add(mm[1]); ids.push(mm[1]); } }
+        return ids.map(id => ({ platform: 'youtube', id, embed: 'https://www.youtube.com/embed/' + id + '?rel=0&modestbranding=1', watch: 'https://www.youtube.com/shorts/' + id, thumb: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg' }));
+      };
+      /* TikTok: search HTML → video id (best-effort, бывает бот-защита) */
+      const scrapeTikTok = async () => {
+        const { text } = await safeFetch('https://www.tiktok.com/search?q=' + encodeURIComponent(q));
+        const ids = []; const seen = new Set(); const re = /(?:"id":"|\/video\/)(\d{15,21})/g; let mm;
+        while ((mm = re.exec(text)) && ids.length < 5) { if (!seen.has(mm[1])) { seen.add(mm[1]); ids.push(mm[1]); } }
+        return ids.map(id => ({ platform: 'tiktok', id, embed: 'https://www.tiktok.com/embed/v2/' + id, watch: 'https://www.tiktok.com/@x/video/' + id, thumb: '' }));
+      };
+      /* Instagram: страница хэштега (логаут-стена частая) → shortcode; embed reel (best-effort) */
+      const scrapeInstagram = async () => {
+        if (!tag) return [];
+        const { text } = await safeFetch('https://www.instagram.com/explore/tags/' + encodeURIComponent(tag) + '/');
+        const codes = []; const seen = new Set(); const re = /(?:"shortcode":"|\/(?:reel|p)\/)([\w-]{6,15})/g; let mm;
+        while ((mm = re.exec(text)) && codes.length < 5) { if (!seen.has(mm[1]) && !/^(embed|explore|accounts)$/.test(mm[1])) { seen.add(mm[1]); codes.push(mm[1]); } }
+        return codes.map(c => ({ platform: 'instagram', id: c, embed: 'https://www.instagram.com/reel/' + c + '/embed/', watch: 'https://www.instagram.com/reel/' + c + '/', thumb: '' }));
+      };
+      const tasks = [];
+      if (want === 'all' || want === 'youtube') tasks.push(scrapeYouTube());
+      if (want === 'all' || want === 'tiktok') tasks.push(scrapeTikTok());
+      if (want === 'all' || want === 'instagram') tasks.push(scrapeInstagram());
+      const settled = await Promise.allSettled(tasks);
+      const videos = []; const sources = {};
+      for (const r of settled) { if (r.status === 'fulfilled' && Array.isArray(r.value)) { r.value.forEach(v => { sources[v.platform] = (sources[v.platform] || 0) + 1; }); videos.push(...r.value); } }
+      /* чередуем платформы, чтобы сверху был микс, а не только один источник */
+      const byPl = {}; videos.forEach(v => (byPl[v.platform] = byPl[v.platform] || []).push(v));
+      const mixed = []; const order = ['youtube', 'tiktok', 'instagram']; let added = true;
+      while (added && mixed.length < 12) { added = false; for (const pl of order) { if (byPl[pl] && byPl[pl].length) { mixed.push(byPl[pl].shift()); added = true; } } }
+      global.__refVidCache[cacheKey] = { t: Date.now(), v: mixed, s: sources };
+      return json(res, 200, { videos: mixed, sources });
     }
     /* быстрый пост / сторис / тред */
     if (p === '/api/social/post' && req.method === 'POST') {
