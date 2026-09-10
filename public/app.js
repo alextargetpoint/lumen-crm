@@ -860,11 +860,9 @@ function go(page) {
   $('#pageSub').textContent = NAV[page].sub;
   $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
   syncTopAction();
-  /* волна входа: анимации только при смене раздела, фоновые обновления без replay */
-  const c = $('#content');
-  c.classList.add('anim');
-  clearTimeout(go._t);
-  go._t = setTimeout(() => c.classList.remove('anim'), 1400);
+  /* волна входа проигрывается ТОЛЬКО на НОВОМ содержимом (после fn), а не на старом во время фетча —
+     иначе старый раздел мигал (fade-out) пока грузился новый. Флаг снимается в render(). */
+  go._wave = true;
   render();
 }
 
@@ -900,16 +898,26 @@ async function render() {
       if (!fn) break;
       try {
         const c0 = $('#content');
-        const isWave = c0.classList.contains('anim');
+        const isWave = !!go._wave; go._wave = false;      /* смена раздела → волна входа */
+        const silent = !!render._silent; render._silent = false;  /* фоновый poll → без анимации и без скачка скролла */
+        const prevScroll = c0.scrollTop;
+        c0.classList.remove('anim', 'soft');              /* снимаем прошлые классы ДО замены DOM — старый контент не мигает */
         await fn(c0);
         injectWorkspaceTabs(c0, page);
         enhanceControls(c0);
         wireAiWand(c0);
         wireDictate(c0);
         wireHeroArt(c0);
-        if (isWave) countUp(c0);
-        else { /* мягкое перестроение при фильтрах/обновлениях — без грубого скачка */
-          c0.classList.remove('soft');
+        if (silent) {
+          /* тихое обновление данных: DOM меняется мгновенно, скролл на месте, без fade — глазу незаметно */
+          c0.scrollTop = prevScroll;
+        } else if (isWave) {
+          void c0.offsetWidth;
+          c0.classList.add('anim');                        /* анимируем ТОЛЬКО новый контент, один раз */
+          clearTimeout(go._t);
+          go._t = setTimeout(() => c0.classList.remove('anim'), 1400);
+          countUp(c0);
+        } else { /* мягкое перестроение при фильтрах — лёгкий fade, без грубого скачка */
           void c0.offsetWidth;
           c0.classList.add('soft');
           clearTimeout(render._soft);
@@ -8597,6 +8605,7 @@ const HR_STAGES = [['new', 'Отклики'], ['screen', 'Скрининг'], ['
 const HR_STNAME = Object.fromEntries(HR_STAGES);
 PAGES.hr = async (root) => {
   const d = await api.get('/hr');
+  const me = STATE && STATE.me; const owner = !me || me.role === 'owner' || me.role === 'master';
   const cands = d.candidates || [], sh = d.share || {}, form = d.form || { fields: [], vacancy: {} };
   const scoreChip = (c) => c.screen ? `<span class="hr-sc ${c.screen.score >= 65 ? 'hi' : c.screen.score >= 40 ? 'mid' : 'lo'}">${c.screen.score}</span>` : '<span class="hr-sc pend">•••</span>';
   const col = (st, nm) => { const list = cands.filter(c => (c.stage || 'new') === st); return `<div class="hr-col" data-hrcol="${st}"><div class="hr-col-h">${esc(nm)}<span>${list.length}</span></div><div class="hr-col-b">${list.map(c => `<button class="hr-cand" data-hrcand="${c.id}">
@@ -9858,10 +9867,11 @@ setInterval(async () => {
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
     else if (['overview', 'funnel'].includes(CUR)) {
       /* ⭐ фикс мигания: перерисовываем обзор/воронку ТОЛЬКО если данные реально изменились
-         (fingerprint), а не каждые 7с вслепую — раньше был безусловный re-render = флеш экрана */
+         (fingerprint), и ТИХО (render._silent) — мгновенная подмена DOM, скролл на месте, без fade.
+         Раньше poll каждые 7с гонял softIn на всём → экран дёргался. */
       let fp; try { fp = JSON.stringify(STATE); } catch (_) { fp = null; }
-      if (fp == null) { if (Date.now() - (window._lastRenderAt || 0) > 30000) await render(); }
-      else if (fp !== window._stateFp) { window._stateFp = fp; await render(); }
+      if (fp == null) { if (Date.now() - (window._lastRenderAt || 0) > 30000) { render._silent = true; await render(); } }
+      else if (fp !== window._stateFp) { window._stateFp = fp; render._silent = true; await render(); }
     }
   } catch (e) {
     if (e.message !== 'auth') setConn(false); // сервер лёг/рестартует — баннер, не молчание
