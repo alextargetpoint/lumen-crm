@@ -61,7 +61,7 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.settings.auth) {
     db.settings.auth = { passHash: sha(DEFAULT_PASS), sessions: {} };
     store.save();
-    console.log(`[auth] пароль по умолчанию: ${DEFAULT_PASS} — смените в «Подключениях»`);
+    console.log('[auth] задан пароль по умолчанию — смените его в «Подключениях» (значение не логируем)');
   }
   if (db.settings.ai.provider === 'mock') { db.settings.ai.provider = 'auto'; store.save(); }
   /* миграция: мост лидов + база рекламных объявлений */
@@ -1811,25 +1811,47 @@ function tzFromPhone(phone) {
 }
 
 /* безопасная загрузка страницы (SSRF-гард) — для скрейпинга инфы и фото лонча */
+/* SSRF-гард: блокируем приватные/loopback/link-local хосты, включая decimal/hex/octal-запись IPv4 и IPv6-маппинг */
+function ssrfBlocked(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return true;
+  if (/^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|::1$|::$|fe80:|fc00:|fd00:)/i.test(h)) return true;
+  if (/(^|:)(:ffff:)?(127\.\d|10\.\d|192\.168\.|169\.254\.)/i.test(h)) return true;                 /* IPv4-mapped IPv6 */
+  const dec = Number(h); if (Number.isInteger(dec) && dec >= 0 && dec <= 0xffffffff) return true;      /* десятичный IPv4 (напр. 2130706433=127.0.0.1) */
+  if (/^0x[0-9a-f]+$/i.test(h) || /^0[0-7]+$/.test(h)) return true;                                    /* hex/octal */
+  if (h === '0.0.0.0' || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  return false;
+}
+/* fetch с ручной перепроверкой КАЖДОГО редиректа тем же гардом (иначе внешний сервер редиректит на 127.0.0.1) */
+async function guardedFetch(url, opts, hops = 4) {
+  let u = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
+  for (let i = 0; i <= hops; i++) {
+    if (!/^https?:$/.test(u.protocol) || ssrfBlocked(u.hostname)) throw new Error('ссылка недоступна');
+    const rr = await fetch(u.href, { ...opts, redirect: 'manual' });
+    if (rr.status >= 300 && rr.status < 400 && rr.headers.get('location')) {
+      if (i === hops) throw new Error('слишком много редиректов');
+      u = new URL(rr.headers.get('location'), u.href);                                                /* следующий прыжок — снова через гард */
+      continue;
+    }
+    return { rr, finalUrl: u.href };
+  }
+  throw new Error('слишком много редиректов');
+}
 async function safeFetchPage(url) {
-  const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
-  if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(uu.hostname)) throw new Error('ссылка недоступна');
   const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 12000);
-  let rr;
-  try { rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)' } }); }
-  finally { clearTimeout(to); }
-  const html = (await rr.text()).slice(0, 900000);
-  return { html, finalUrl: rr.url || uu.href };
+  try {
+    const { rr, finalUrl } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)' } });
+    const html = (await rr.text()).slice(0, 900000);
+    return { html, finalUrl };
+  } finally { clearTimeout(to); }
 }
 /* безопасный GET с произвольным UA (для oEmbed JSON / соцсетей, которые блокируют ботов) */
 async function safeFetch(url, ua) {
-  const uu = new URL(/^https?:\/\//.test(url) ? url : 'https://' + url);
-  if (!/^https?:$/.test(uu.protocol) || /^(localhost|127\.|10\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(uu.hostname)) throw new Error('ссылка недоступна');
   const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 10000);
   try {
-    const rr = await fetch(uu.href, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': ua || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'ru,en;q=0.8' } });
+    const { rr, finalUrl } = await guardedFetch(url, { signal: ctrl.signal, headers: { 'User-Agent': ua || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'ru,en;q=0.8' } });
     const text = (await rr.text()).slice(0, 900000);
-    return { text, finalUrl: rr.url || uu.href, ok: rr.ok };
+    return { text, finalUrl, ok: rr.ok };
   } finally { clearTimeout(to); }
 }
 /* богатое превью ссылки: YouTube/TikTok через oEmbed + детерминированные обложки, Instagram/прочее через og:image.
@@ -2014,8 +2036,19 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
   const db = store.get();
-  /* базовый URL для ссылок в сообщениях (страницы встреч/подборок) — engine берёт из global */
-  if (req.headers.host && !p.startsWith('/wa/')) global.LUMEN_BASE = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+  /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  /* базовый URL для ссылок в сообщениях И для серверных скриншотов (shot.capture) — engine берёт из global.
+     SSRF-фикс: в проде пиним через env PUBLIC_BASE_URL; иначе доверяем Host, только если он НЕ приватный/внутренний
+     (иначе Host: 169.254.169.254 заставил бы сервер сам сходить во внутреннюю сеть Railway). */
+  const _envBase = process.env.PUBLIC_BASE_URL || process.env.LUMEN_BASE;
+  if (_envBase) global.LUMEN_BASE = _envBase.replace(/\/$/, '');
+  else if (req.headers.host && !p.startsWith('/wa/')) {
+    const hh = req.headers.host.split(':')[0];
+    if (hh === 'localhost' || hh === '127.0.0.1' || !ssrfBlocked(hh)) global.LUMEN_BASE = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+  }
 
   try {
     /* ---------------- WhatsApp Cloud API webhook ---------------- */
@@ -2026,7 +2059,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(403); res.end(); return;
     }
     if (p === '/wa/webhook' && req.method === 'POST') {
-      const body = await readBody(req);
+      /* Подпись Meta: HMAC-SHA256 сырого тела с App Secret. Без валидной подписи любой в интернете
+         мог инжектить «входящие сообщения»/лидов прямо в ИИ-продавца. Нужен WA_APP_SECRET (env) или wa.appSecret. */
+      const raw = await new Promise((resolve) => { const ch = []; req.on('data', c => ch.push(c)); req.on('end', () => resolve(Buffer.concat(ch))); req.on('close', () => resolve(Buffer.concat(ch))); });
+      const waSecret = process.env.WA_APP_SECRET || (db.settings.wa && db.settings.wa.appSecret) || '';
+      if (!waSecret) { console.warn('[wa/webhook] отклонён: не задан WA_APP_SECRET — подпись Meta проверить нельзя'); return json(res, 401, { error: 'webhook not configured' }); }
+      const sig = String(req.headers['x-hub-signature-256'] || '');
+      const expected = 'sha256=' + crypto.createHmac('sha256', waSecret).update(raw).digest('hex');
+      const okSig = sig.length === expected.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch (_) { return false; } })();
+      if (!okSig) { return json(res, 403, { error: 'bad signature' }); }
+      let body; try { body = JSON.parse(raw.toString('utf8') || '{}'); } catch (_) { body = {}; }
       try {
         const field = body.entry?.[0]?.changes?.[0]?.field;
         const changes = body.entry?.[0]?.changes?.[0]?.value;
@@ -2205,6 +2247,13 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- auth ---------------- */
     if (p === '/auth/login' && req.method === 'POST') {
       const b = await readBody(req);
+      /* защита от перебора пароля/PIN: персистентный счётчик неудач по IP + экспоненциальный лок-аут */
+      const lip = clientIp(req) || 'unknown';
+      db.settings.auth.throttle = db.settings.auth.throttle || {};
+      const TH = db.settings.auth.throttle; const nowT = Date.now();
+      for (const k in TH) { if (TH[k].until && TH[k].until < nowT - 3600e3) delete TH[k]; }   /* уборка старых */
+      const rec = TH[lip];
+      if (rec && rec.until && rec.until > nowT) { await new Promise(r => setTimeout(r, 600)); return json(res, 429, { error: 'слишком много попыток входа, подождите пару минут' }); }
       let sess = null;
       if (sha(String(b.password || '')) === db.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
       else {
@@ -2213,9 +2262,13 @@ const server = http.createServer(async (req, res) => {
         if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id };
       }
       if (!sess) {
+        const r2 = TH[lip] = TH[lip] || { fails: 0 }; r2.fails++; r2.last = nowT;
+        if (r2.fails >= 5) r2.until = nowT + Math.min(15 * 60000, 15000 * Math.pow(2, r2.fails - 5));   /* 15с→…→15мин */
+        store.save();
         await new Promise(r => setTimeout(r, 600)); // тормоз перебору
         return json(res, 401, { error: 'wrong password' });
       }
+      delete TH[lip];                                                                     /* успех → сброс счётчика */
       const sid = crypto.randomBytes(16).toString('hex');
       sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
       db.settings.auth.sessions[sid] = sess;
@@ -2224,9 +2277,10 @@ const server = http.createServer(async (req, res) => {
       const keys = Object.keys(db.settings.auth.sessions);
       if (keys.length > 20) delete db.settings.auth.sessions[keys[0]];
       store.save();
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';   /* Secure только на HTTPS (Railway), не на локалхосте */
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax`,
+        'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}`,
       });
       res.end(JSON.stringify({ ok: true })); return;
     }
@@ -4153,7 +4207,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/mediaplans' && req.method === 'POST') {
       const b = await readBody(req);
-      const mp = { id: store.nextId('mp'), contractorId: b.contractorId || null, title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
+      const mp = { id: 'mp_' + crypto.randomBytes(6).toString('hex'), contractorId: b.contractorId || null,   /* непредсказуемый id (был последовательный store.nextId → перебор соседних медиапланов) */ title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
       db.mediaplans.unshift(mp); store.save();
       return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: db.settings.hooks.secret }));
     }
