@@ -5689,3 +5689,17 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 .modal-bd { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); background: rgba(6,17,38,.28); }
 /* активный пункт нав-рейла — чётче «дорогая» подсветка */
 .nav-item.active { position: relative; }
+
+/* ── Видео-студия ── */
+.stu-card { padding: 18px; }
+.stu-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.stu-mode .seg-btn { font-size: 12.5px; }
+.stu-mic { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.stu-mic svg { width: 14px; height: 14px; }
+.stu-time { font-variant-numeric: tabular-nums; font-weight: 700; color: #E5484D; font-size: 15px; }
+#stuRec.rec { background: #E5484D; }
+.stu-stage { position: relative; width: 100%; aspect-ratio: 16/9; background: #0b1220; border-radius: 14px; overflow: hidden; display: grid; place-items: center; }
+.stu-stage video, .stu-stage canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stu-hint { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; color: rgba(255,255,255,.66); font-size: 13.5px; line-height: 1.5; padding: 24px; }
+.stu-hint svg { width: 34px; height: 34px; opacity: .7; }
+.stu-after { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }

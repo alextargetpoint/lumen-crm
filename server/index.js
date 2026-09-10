@@ -2766,6 +2766,19 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { url: lead.creativeUrl });
     }
+    /* Видео-студия: загрузка записанной презентации (webm/mp4) → ассет для урока академии/подборки */
+    if (p === '/api/studio/upload' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const extM = String(u.searchParams.get('filename') || 'rec.webm').match(/\.(webm|mp4|mov)$/i) || [null, 'webm'];
+      const chunks = []; let size = 0, over = false;
+      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 120e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
+      if (over) return json(res, 400, { error: 'запись до 120 МБ — сократите или снизьте качество' });
+      if (!size) return json(res, 400, { error: 'пустая запись' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'studio'), { recursive: true });
+      const fname = `studio/${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}.${extM[1].toLowerCase()}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      return json(res, 200, { url: '/assets/' + fname, size });
+    }
 
     /* диктовка: голос → Whisper → (опц.) ИИ-причёсывание. Универсально для любого текстового поля */
     if (p === '/api/voice/dictate' && req.method === 'POST') {
