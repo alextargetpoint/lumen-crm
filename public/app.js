@@ -987,6 +987,10 @@ const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbu
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
+/* размеры виджетов: { widgetKey: {w:1..3 колонок, h:px мин-высоты} } — пользователь тянет угол, масонри переупаковывается */
+const ovSizeKey = () => ovKey() + '_sizes';
+function ovGetSizes() { try { return JSON.parse(localStorage.getItem(ovSizeKey())) || {}; } catch (_) { return {}; } }
+function ovSaveSizes(s) { try { localStorage.setItem(ovSizeKey(), JSON.stringify(s || {})); } catch (_) {} }
 
 /* ─── v3: карт-варианты (surface/иерархия/контраст/плотность) + асимметр. спаны 12-кол ─── */
 const OV_VARIANT = {
@@ -1002,11 +1006,11 @@ const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leader
 /* категории для библиотеки виджетов */
 const OV_CAT = [
   ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
-  ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'conv', 'numbers']],
+  ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'numbers']],
   ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
-  ['Команда', ['brokers', 'leaders', 'wahealth']],
+  ['Команда', ['brokers', 'leaders']],
   ['Контент и идеи', ['contenthub', 'ideas', 'casebase']],
-  ['Прочее', ['activity', 'geo', 'worldclock', 'onboarding', 'spark', 'timezones']],
+  ['Прочее', ['activity', 'geo', 'worldclock', 'onboarding', 'spark']],
 ];
 const ovCatOf = (k) => { for (const [c, ks] of OV_CAT) if (ks.includes(k)) return c; return 'Прочее'; };
 /* ⭐ готовые наборы виджетов под цель — один клик собирает обзор под роль/задачу */
@@ -1844,23 +1848,25 @@ const OV_MROW = 8, OV_MGAP = 8;
 function ovMasonry(grid) {
   if (!grid) return;
   const items = [...grid.querySelectorAll('.ov-w')];
-  /* в конструкторе (drag) — обычная сетка, мозаику не трогаем */
-  if (typeof OV_EDIT !== 'undefined' && OV_EDIT) { grid.classList.remove('ov-masonry'); items.forEach(w => { w.style.gridRowEnd = ''; }); return; }
-  /* сброс: меряем натуральную высоту в равноколоночной сетке (класс ov-masonry задаёт равные колонки + auto-rows:8) */
   grid.classList.add('ov-masonry');
-  items.forEach(w => { w.style.gridRowEnd = ''; });
-  const cs = getComputedStyle(grid);
-  const ncols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
-  if (cs.display !== 'grid' || ncols <= 1) { items.forEach(w => { w.style.gridRowEnd = ''; }); return; }  /* мобайл/1 колонка — обычный поток */
-  void grid.offsetHeight;                                   /* форс-reflow перед замером */
-  const row = parseFloat(cs.gridAutoRows) || OV_MROW, gap = parseFloat(cs.rowGap) || OV_MGAP;
-  const heights = items.map(w => w.getBoundingClientRect().height);
-  items.forEach((w, i) => { w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((heights[i] + gap) / (row + gap))); });
+  items.forEach(w => { w.style.gridRowEnd = ''; });         /* колонки высоту балансируют сами, строчные спаны не нужны */
+  /* правка → равноколоночный грид (стабильно для drag); просмотр → CSS-колонки (браузер балансирует + порядок) */
+  if (typeof OV_EDIT !== 'undefined' && OV_EDIT) grid.classList.add('ov-editcols');
+  else grid.classList.remove('ov-editcols');
 }
 let _ovMasonryHook = false, _ovMasonryTmr = null;
 function ovMasonryWatch(root) {
   const run = () => { const g = root.querySelector('#ovGrid'); if (g && document.body.contains(g)) ovMasonry(g); };
-  requestAnimationFrame(() => { run(); setTimeout(run, 260); });   /* после раскладки + после мото-постеров/шрифтов */
+  run();                                                            /* синхронно сразу (rAF тормозится в фоновой вкладке) */
+  requestAnimationFrame(run);
+  [120, 400, 900].forEach(ms => setTimeout(run, ms));              /* пере-замеры после шрифтов/картинок/мото-постеров (setTimeout не тормозится как rAF) */
+  /* пере-упаковка, когда меняется высота любого виджета (догрузились картинки/контент) */
+  const g = root.querySelector('#ovGrid');
+  if (g && window.ResizeObserver) {
+    if (window.__ovRO) window.__ovRO.disconnect();
+    window.__ovRO = new ResizeObserver(() => { clearTimeout(window.__ovROt); window.__ovROt = setTimeout(run, 60); });
+    g.querySelectorAll('.ov-w-body').forEach(b => window.__ovRO.observe(b));
+  }
   if (!_ovMasonryHook) {
     _ovMasonryHook = true;
     window.addEventListener('resize', () => { clearTimeout(_ovMasonryTmr); _ovMasonryTmr = setTimeout(run, 140); });
@@ -1876,6 +1882,7 @@ PAGES.overview = async (root) => {
   let layout = ovGetLayout();
 
   const paint = () => {
+    const ovSizes = ovGetSizes();
     root.innerHTML = `
       <div class="ov2-bar">
         ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×</span>' : ''}
@@ -1884,9 +1891,12 @@ PAGES.overview = async (root) => {
         <button class="ov2-edit ${OV_EDIT ? 'on' : ''}" id="ovEdit" title="${OV_EDIT ? 'Готово' : 'Настроить обзор'}">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}<span>${OV_EDIT ? 'Готово' : 'Настроить'}</span></button>
       </div>
       <div class="ov2-grid ${OV_EDIT ? 'editing' : ''}" id="ovGrid">
-        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; const span = (!w.full && OV_SPAN[k]) ? ` ov-span-${OV_SPAN[k]}` : ''; return `<div class="ov-w ${w.full ? 'full' : ''}${span}" data-w="${k}">
+        ${layout.map(k => { const w = OV_W[k]; if (!w) return ''; const span = (!w.full && OV_SPAN[k]) ? ` ov-span-${OV_SPAN[k]}` : '';
+          const sz = ovSizes[k] || {}; const cw = (!w.full && (sz.w === 'full' || sz.w >= 2)) ? ' ov-cw-full' : ''; const hStyle = sz.h ? ` style="--ovh:${sz.h}px"` : '';
+          return `<div class="ov-w ${w.full ? 'full' : ''}${span}${cw}" data-w="${k}"${hStyle}>
           ${OV_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Убрать виджет">${ic(I.x)}</button></div>` : ''}
           <div class="ov-w-body glass card ${OV_SURF[k] || ''} ${OV_VARIANT[k] || 'cv-standard'}">${w.render(ctx)}</div>
+          ${(!OV_EDIT && !w.full) ? `<div class="ov-w-rz" data-ovrz title="Потяни, чтобы изменить размер"></div>` : ''}
         </div>`; }).join('')}
         ${OV_EDIT ? `<button class="ov2-add-tile" id="ovAdd">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
       </div>`;
@@ -1924,9 +1934,45 @@ PAGES.overview = async (root) => {
     ovAnimateCounts(root);
     wireMotion(root);
     ovMasonryWatch(root);   /* мозаичная упаковка виджетов */
+    ovWireResize(root, () => paint());   /* ресайз виджетов углом (ширина колонок + высота) */
   };
   paint();
 };
+/* ресайз виджета за нижний-правый угол: X → число колонок (1..max), Y → мин-высота тела.
+   Живо переупаковывает масонри; на отпускании сохраняет в OV_SIZES и перерисовывает. */
+function ovWireResize(root, repaint) {
+  const grid = root.querySelector('#ovGrid'); if (!grid) return;
+  root.querySelectorAll('[data-ovrz]').forEach(h => {
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const wEl = h.closest('.ov-w'); const key = wEl && wEl.dataset.w; if (!key) return;
+      const cs = getComputedStyle(grid);
+      const cols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
+      const colGap = parseFloat(cs.columnGap) || 16;
+      const gridRect = grid.getBoundingClientRect();
+      const stride = (gridRect.width + colGap) / cols;              /* ширина одной колонки+гэп */
+      const startRect = wEl.getBoundingClientRect();
+      wEl.classList.add('ov-rzing'); document.body.classList.add('ov-rz-cursor');
+      let curFull = wEl.classList.contains('ov-cw-full'), curH = 0, tmr = null;
+      const apply = (ev) => {
+        const wCols = Math.min(cols, Math.max(1, Math.round((ev.clientX - startRect.left + colGap) / stride)));
+        const wantFull = wCols >= 2;                              /* в колоночной раскладке ширина = 1 колонка или на всю ширину */
+        if (wantFull !== curFull) { curFull = wantFull; wEl.classList.toggle('ov-cw-full', wantFull); }
+        curH = Math.max(90, Math.round(ev.clientY - startRect.top));
+        wEl.style.setProperty('--ovh', curH + 'px');
+        clearTimeout(tmr); tmr = setTimeout(() => ovMasonry(grid), 30);
+      };
+      const up = () => {
+        document.removeEventListener('pointermove', apply); document.removeEventListener('pointerup', up);
+        wEl.classList.remove('ov-rzing'); document.body.classList.remove('ov-rz-cursor');
+        const sizes = ovGetSizes(); const rec = {}; if (curFull) rec.w = 'full'; if (curH) rec.h = curH;
+        if (Object.keys(rec).length) sizes[key] = rec; else delete sizes[key];
+        ovSaveSizes(sizes); ovMasonry(grid);
+      };
+      document.addEventListener('pointermove', apply); document.addEventListener('pointerup', up);
+    });
+  });
+}
 /* библиотека виджетов с живыми превью */
 function ovLibrary(ctx, layout, onChange) {
   const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
