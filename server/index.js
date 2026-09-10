@@ -2678,6 +2678,15 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { text });
       } catch (e) { return json(res, 500, { error: 'не распозналось: ' + e.message }); }
     }
+    /* Причесать заметку: сырой/надиктованный текст → аккуратная структура (заголовок, буллеты, чек-боксы) */
+    if (p === '/api/tidy-note' && req.method === 'POST') {
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+      const b = await readBody(req);
+      const text = String(b.text || '').trim();
+      if (!text) return json(res, 200, { text: '' });
+      try { return json(res, 200, { text: await llm.tidyNote(text, b.ctx) }); }
+      catch (e) { return json(res, 500, { error: e.message }); }
+    }
 
     if (p === '/api/wake/preview' && req.method === 'GET') {
       const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0), segment: u.searchParams.get('segment') || null };

@@ -6987,6 +6987,28 @@ function tkWireDnD(root, onDrop, onOpen) {
     });
   });
 }
+/* лёгкий markdown → красивая заметка (стиль iPhone Notes): ## / ### заголовки, - буллеты,
+   - [ ] / - [x] чек-боксы, **жирный**, *курсив*. Безопасно: сначала esc, потом разметка. */
+function mdNote(src) {
+  const s = String(src || '').trim();
+  if (!s) return '';
+  const inl = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)([^*]+?)\*(?!\*)/g, '$1<i>$2</i>');
+  const lines = s.split(/\r?\n/);
+  let html = '', ul = false;
+  const close = () => { if (ul) { html += '</ul>'; ul = false; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, ''); let m;
+    if (!line.trim()) { close(); continue; }
+    if ((m = line.match(/^\s*###\s+(.*)/))) { close(); html += `<div class="mdn-h3">${inl(m[1])}</div>`; continue; }
+    if ((m = line.match(/^\s*##\s+(.*)/))) { close(); html += `<div class="mdn-h2">${inl(m[1])}</div>`; continue; }
+    if ((m = line.match(/^\s*#\s+(.*)/))) { close(); html += `<div class="mdn-h2">${inl(m[1])}</div>`; continue; }
+    if ((m = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)/))) { close(); const done = m[1].toLowerCase() === 'x'; html += `<div class="mdn-chk${done ? ' done' : ''}"><span class="mdn-box"></span><span>${inl(m[2])}</span></div>`; continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)/))) { if (!ul) { html += '<ul class="mdn-ul">'; ul = true; } html += `<li>${inl(m[1])}</li>`; continue; }
+    close(); html += `<p class="mdn-p">${inl(line)}</p>`;
+  }
+  close();
+  return html;
+}
 /* детальная карточка задачи: правка, дедлайн (день+время), подзадачи, вложения (голос/файл), заметки */
 function tdBody(t) {
   const dueD = t.due ? new Date(t.due) : null;
@@ -6999,7 +7021,17 @@ function tdBody(t) {
       <div class="td-row"><span class="td-lbl">Подзадачи</span><div class="td-subs" id="tdSubs"></div></div>
       <div class="td-row"><span class="td-lbl">Вложения</span><div class="td-atts" id="tdAtts"></div></div>
       <div class="td-row"><span class="td-lbl">Лид</span><div class="td-lead" id="tdLead"></div></div>
-      <div class="td-row"><span class="td-lbl">Заметки</span><textarea class="td-notes" id="tdNotes" data-nodic placeholder="Детали, контекст…">${esc(t.notes || '')}</textarea></div>
+      <div class="td-row td-notes-row"><span class="td-lbl">Заметки</span>
+        <div class="td-notes-wrap" id="tdNotesWrap">
+          <div class="td-notes-tools">
+            <button type="button" class="dic-btn td-note-mic" id="tdNoteMic" title="Надиктовать — ИИ причешет">${ic(I.mic)}</button>
+            <button type="button" class="btn btn-sm td-note-tidy" id="tdNoteTidy" title="ИИ причешет: заголовок, буллеты, выделения — как в iPhone Notes">${ic(I.spark)}Причесать</button>
+            <button type="button" class="btn-ghost td-note-edit" id="tdNoteEdit" title="Редактировать текст">${ic(I.edit || I.pencil || I.doc)}</button>
+          </div>
+          <div class="td-notes-view md-note" id="tdNotesView"></div>
+          <textarea class="td-notes" id="tdNotes" data-nodic placeholder="Детали, контекст… или надиктуйте 🎤 и нажмите «Причесать»">${esc(t.notes || '')}</textarea>
+        </div>
+      </div>
     </div>`;
 }
 function openTaskDetail(t, leadMap, inlineEl) {
@@ -7018,7 +7050,28 @@ function openTaskDetail(t, leadMap, inlineEl) {
   const applyDue = () => { const ds = $('#tdDate', bd).value; if (!ds) { patch({ due: null }); $('#tdDclear', bd).style.display = 'none'; return; } const tm = $('#tdTime', bd).value || '12:00'; patch({ due: new Date(`${ds}T${tm}:00`).getTime(), scheduled: ds }); $('#tdDclear', bd).style.display = ''; };
   $('#tdDate', bd).addEventListener('change', applyDue); $('#tdTime', bd).addEventListener('change', applyDue);
   $('#tdDclear', bd).addEventListener('click', () => { $('#tdDate', bd).value = ''; $('#tdTime', bd).value = ''; applyDue(); });
-  $('#tdNotes', bd).addEventListener('change', e => patch({ notes: e.target.value }));
+  /* заметки: диктовка + ИИ-причёсывание + красивый рендер (стиль iPhone Notes) */
+  const noteWrap = $('#tdNotesWrap', bd), noteTa = $('#tdNotes', bd), noteView = $('#tdNotesView', bd);
+  const renderNote = () => { noteView.innerHTML = mdNote(t.notes || ''); };
+  const setEditMode = (on) => { noteWrap.classList.toggle('editing', on); if (on) { noteTa.style.display = ''; noteView.style.display = 'none'; noteTa.focus(); } else { renderNote(); const has = !!(t.notes || '').trim(); noteTa.style.display = has ? 'none' : ''; noteView.style.display = has ? '' : 'none'; } };
+  renderNote();
+  setEditMode(!(t.notes || '').trim());                                  /* пусто → сразу редактирование; есть текст → красивый вид */
+  noteTa.addEventListener('change', e => { patch({ notes: e.target.value }); });
+  noteTa.addEventListener('blur', () => { if ((t.notes || '') !== noteTa.value) patch({ notes: noteTa.value }); setEditMode(false); });
+  $('#tdNoteEdit', bd).addEventListener('click', () => setEditMode(true));
+  noteView.addEventListener('click', () => setEditMode(true));           /* клик по заметке → правка (как в iPhone Notes) */
+  dicBind(noteTa, $('#tdNoteMic', bd));                                  /* голос → Whisper → дописать в поле */
+  noteTa.addEventListener('input', () => { t.notes = noteTa.value; });
+  $('#tdNoteTidy', bd).addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const src = noteTa.value.trim();
+    if (!src) { setEditMode(true); toast('Пусто', 'Сначала надиктуйте или впишите заметку'); return; }
+    btn.disabled = true; btn.classList.add('busy'); const old = btn.innerHTML; btn.innerHTML = ic(I.spark) + 'Причёсываю…';
+    try {
+      const r = await api.post('/tidy-note', { text: src, ctx: 'заметка к задаче' + (t.title ? ': ' + t.title : '') });
+      if (r && r.text) { noteTa.value = r.text; t.notes = r.text; await patch({ notes: r.text }); setEditMode(false); toast('Готово', 'ИИ причесал заметку', true); }
+    } catch (err) { toast('Не вышло', err.message); }
+    btn.disabled = false; btn.classList.remove('busy'); btn.innerHTML = old;
+  });
   /* лид: сводка + ссылка на карточку + привязка/отвязка */
   const leadEl = $('#tdLead', bd);
   const paintLead = () => {

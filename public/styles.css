@@ -2786,6 +2786,31 @@ body.has-preview { padding-top: 38px; }
 #tdMic.rec { background: var(--bad); color: #fff; border-color: var(--bad); animation: tkpulse 1.1s ease-in-out infinite; }
 .td-notes { width: 100%; min-height: 70px; border: 1px solid var(--stroke); border-radius: 10px; padding: 9px 11px; font-family: inherit; font-size: 13px; color: var(--ink); background: var(--card); outline: none; resize: vertical; }
 .td-notes:focus { border-color: var(--accent); }
+/* заметки задачи: панелька инструментов + красивый рендер (стиль iPhone Notes) */
+.td-notes-wrap { display: flex; flex-direction: column; gap: 8px; }
+.td-notes-tools { display: flex; align-items: center; gap: 6px; }
+.td-note-mic.dic-btn { position: static; width: 30px; height: 30px; flex: none; }
+.td-note-tidy { gap: 5px; }
+.td-note-edit { margin-left: auto; width: 30px; height: 30px; display: grid; place-items: center; color: var(--ink-3); }
+.td-note-edit svg { width: 15px; height: 15px; }
+.td-notes-wrap.editing .td-note-edit { color: var(--accent); }
+.td-notes-view { border: 1px solid transparent; border-radius: 10px; padding: 4px 2px; cursor: text; min-height: 24px; }
+.td-notes-view:hover { border-color: var(--stroke); background: var(--bg-2); }
+/* markdown-заметка */
+.md-note { font-size: 13.5px; line-height: 1.5; color: var(--navy-900); }
+.md-note .mdn-h2 { font-family: var(--font-display); font-size: 15px; font-weight: 650; color: var(--navy-900); margin: 10px 0 5px; }
+.md-note .mdn-h2:first-child { margin-top: 2px; }
+.md-note .mdn-h3 { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 10px 0 4px; }
+.md-note .mdn-p { margin: 5px 0; }
+.md-note .mdn-ul { list-style: none; margin: 5px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.md-note .mdn-ul li { position: relative; padding-left: 17px; }
+.md-note .mdn-ul li::before { content: ''; position: absolute; left: 3px; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.md-note .mdn-chk { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+.md-note .mdn-box { flex: none; width: 16px; height: 16px; margin-top: 1px; border: 1.6px solid var(--stroke); border-radius: 5px; position: relative; }
+.md-note .mdn-chk.done .mdn-box { background: var(--accent); border-color: var(--accent); }
+.md-note .mdn-chk.done .mdn-box::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.md-note .mdn-chk.done span:last-child { color: var(--ink-3); text-decoration: line-through; }
+.md-note b { font-weight: 680; color: var(--navy-900); }
 @media (max-width: 640px) { .td-row { grid-template-columns: 1fr; } .td-lbl { padding-top: 0; } }
 
 /* задача ↔ лид: панель сводки в деталях + чип */

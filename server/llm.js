@@ -256,6 +256,32 @@ ${String(text).slice(0, 3000)}
   return res;
 }
 
+/* Причёсывание заметки в аккуратную структуру (стиль заметок iPhone): заголовок, буллеты,
+   жирные ключевые слова, чек-боксы для действий. Возвращает лёгкий markdown, который фронт рендерит красиво. */
+async function tidyNote(text, ctx) {
+  const src = String(text || '').trim();
+  if (!src) return '';
+  const prompt = `Ты приводишь рабочую заметку в аккуратный, структурированный вид — как красивая заметка в iPhone Notes. Сохрани ВЕСЬ смысл и факты, ничего не выдумывай и не выкидывай важное. Пиши на языке исходной заметки.
+
+Оформи в лёгком markdown:
+- Если есть явная тема — первой строкой короткий заголовок «## Заголовок» (без точки). Заголовок бери СТРОГО из содержания заметки, НЕ придумывай город/имя/факты, которых в тексте нет.
+- Разбей на пункты списком «- ».
+- Логические группы разделяй подзаголовком «### Подзаголовок» (только если групп реально несколько).
+- Ключевые слова, имена, суммы, даты, дедлайны выделяй **жирным**.
+- Конкретные действия/поручения оформляй чек-боксом «- [ ] действие».
+- Не добавляй воды, вступлений «вот ваша заметка», комментариев о себе. Только сам структурированный текст.
+${ctx ? 'Контекст (для понимания, в ответ не включать): ' + String(ctx).slice(0, 300) + '\n' : ''}
+ИСХОДНАЯ ЗАМЕТКА:
+${src.slice(0, 4000)}
+
+Ответь строго JSON: {"text":"структурированный markdown"}`;
+  const out = await callGemini(prompt, 18000, 1600);
+  if (!out || typeof out.text !== 'string' || !out.text.trim()) throw new Error('bad tidy');
+  const r = out.text.trim().slice(0, 6000);
+  if (/как (ИИ|нейросеть|модель)|вот (ваша|структ)/i.test(r)) throw new Error('брак tidy');
+  return r;
+}
+
 /* ИИ-сборка текстов подборки: интро + крючки/аргументы по каждому объекту из контекста лида */
 async function composeCollection(db, c, props, lead) {
   const q = lead ? lead.quals : null;
@@ -959,6 +985,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
