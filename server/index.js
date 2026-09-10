@@ -2368,6 +2368,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/billing' && req.method === 'GET') return json(res, 200, billing.view(db));
       if (p === '/api/billing/plan' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setPlan(db, b)); }
       if (p === '/api/billing/method' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setMethod(db, b)); }
+      if (p === '/api/billing/rates' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setRates(db, b)); }
       if (p === '/api/billing/invoice' && req.method === 'POST') { const b = await readBody(req); const r = billing.issueInvoice(db, b); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/billing/checkout' && req.method === 'POST') {
         try { const r = await billing.stripeCheckout(db, global.LUMEN_BASE || ''); return json(res, 200, r); }

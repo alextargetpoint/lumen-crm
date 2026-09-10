@@ -52,18 +52,45 @@ function quote(plan, cycle, seats) {
   };
 }
 
-/* ---- оценка расходников за текущий период (проброс, по себестоимости) ---- */
+/* ---- ставки расходников (проброс по себестоимости; редактируются в кабинете, дефолты ниже) ---- */
+const RATE_DEFAULTS = {
+  wa: 0.04,          // WhatsApp-сообщение/шаблон (усреднённо utility+marketing), $
+  aiMsg: 0.002,      // проход ИИ на входящее сообщение (flash-lite), $
+  telephonyMin: 0.02,// минута телефонии (DIDWW + запись), $
+  sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
+};
+function rates(db) { return { ...RATE_DEFAULTS, ...((db.settings.billing && db.settings.billing.rates) || {}) }; }
+
+/* ---- итемизированная оценка расходников за текущий период + прогноз на месяц ---- */
 function usageEstimate(db) {
   const b = db.settings.billing;
   const from = (b.usage && b.usage.periodStart) || 0;
+  const now = Date.now();
+  const R = rates(db);
   const msgs = db.messages || [];
-  const outbound = msgs.filter(m => m.dir === 'out' && (m.at || 0) >= from).length;
+  const outbound = msgs.filter(m => m.dir === 'out' && (m.at || 0) >= from && m.channel !== 'email').length;
   const inbound = msgs.filter(m => m.dir === 'in' && (m.at || 0) >= from).length;
-  /* WhatsApp: utility-шаблон ≈ $0.03, marketing/реанимация ≈ $0.05 (усредняем $0.04);
-     ИИ: один проход квалификатора ≈ $0.002 на входящее сообщение (flash-lite). */
-  const waCost = +(outbound * 0.04).toFixed(2);
-  const aiCost = +(inbound * 0.002).toFixed(2);
-  return { outbound, inbound, waCost, aiCost, total: +(waCost + aiCost).toFixed(2) };
+  /* минуты телефонии — из счётчика (наполняет пайплайн DIDWW) или из журнала звонков, если есть */
+  const telephonyMin = Math.round((b.usage && b.usage.telephonyMin) || 0);
+  /* минуты транскрибации — из разборов звонков/транскриптов за период */
+  const sttMin = Math.round((b.usage && b.usage.sttMin) || (db.callReviews || []).filter(r => (r.at || 0) >= from).length * 6);
+  const line = (key, label, unit, qty, rate) => ({ key, label, unit, qty, rate, cost: +(qty * rate).toFixed(2) });
+  const items = [
+    line('wa', 'WhatsApp-сообщения', 'сообщений', outbound, R.wa),
+    line('ai', 'ИИ-обработка переписки', 'входящих', inbound, R.aiMsg),
+    line('telephony', 'Телефония (звонки+запись)', 'минут', telephonyMin, R.telephonyMin),
+    line('stt', 'Транскрибация звонков', 'минут', sttMin, R.sttMin),
+  ];
+  const total = +(items.reduce((s, i) => s + i.cost, 0)).toFixed(2);
+  /* прогноз на 30 дней: линейная экстраполяция от того, что накопилось за прошедшую часть периода */
+  const elapsedDays = Math.max(0.5, (now - from) / 86400e3);
+  const forecast = +(total / elapsedDays * 30).toFixed(2);
+  return {
+    items, total, forecast, rates: R,
+    periodStart: from, elapsedDays: Math.round(elapsedDays * 10) / 10,
+    outbound, inbound, telephonyMin, sttMin,
+    waCost: items[0].cost, aiCost: items[1].cost,   // обратная совместимость
+  };
 }
 
 /* ---- полный вид кабинета для фронта ---- */
@@ -190,4 +217,20 @@ async function stripeCheckout(db, baseUrl) {
   return { url: sess.url };
 }
 
-module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, setMethod, stripeCheckout, usageEstimate };
+/* ---- редактировать ставки расходников (кабинет) ---- */
+function setRates(db, patch) {
+  const b = db.settings.billing;
+  b.rates = { ...RATE_DEFAULTS, ...(b.rates || {}) };
+  for (const k of Object.keys(RATE_DEFAULTS)) { if (patch && patch[k] != null && !isNaN(+patch[k])) b.rates[k] = Math.max(0, +patch[k]); }
+  store.save();
+  return view(db);
+}
+/* ---- инкремент фактического потребления (телефония/STT) — зовёт пайплайн звонков ---- */
+function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
+  const b = db.settings.billing;
+  b.usage = b.usage || { periodStart: Date.now() };
+  b.usage.telephonyMin = (b.usage.telephonyMin || 0) + Math.max(0, +telephonyMin || 0);
+  b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
+  store.save();
+}
+module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, setMethod, stripeCheckout, usageEstimate, setRates, addUsage };

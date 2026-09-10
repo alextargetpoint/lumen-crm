@@ -8672,6 +8672,7 @@ PAGES.agency = async (root) => {
 PAGES.billing = async (root) => {
   const B = await api.get('/billing');
   const money = (n) => '$' + Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+  const moneyC = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   /* расходники: доллары.центы */
   const date = (t) => t ? new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const STATUS = {
     trial:     { t: 'Пробный период', c: '#7C9BFF' },
@@ -8764,15 +8765,30 @@ PAGES.billing = async (root) => {
       </div>
 
       <div>
-        <!-- расходники -->
+        <!-- расходники: калькулятор по факту -->
         <div class="glass card mb">
-          <div class="card-title">${ic(I.bolt)}Расходники периода<span class="sub">напрямую провайдеру, по себестоимости</span></div>
-          <div class="bill-usage">
-            <div class="bu-cell"><div class="bu-n">${u.outbound}</div><div class="bu-l">WhatsApp-сообщений</div><div class="bu-c">${money(u.waCost)}</div></div>
-            <div class="bu-cell"><div class="bu-n">${u.inbound}</div><div class="bu-l">проходов ИИ</div><div class="bu-c">${money(u.aiCost)}</div></div>
-            <div class="bu-cell bu-total"><div class="bu-n">${money(u.total)}</div><div class="bu-l">итого расходников</div><div class="bu-c">за период</div></div>
+          <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">подписка отдельно · расходники — по факту месяца</span>
+            <button class="btn btn-sm" id="bcRates" style="margin-left:auto">${ic(I.edit || I.doc)}Ставки</button></div>
+          <div class="bc-lines">
+            ${(u.items || []).map(it => `<div class="bc-line">
+              <div class="bc-line-l"><b>${it.label}</b><span>${it.qty.toLocaleString('ru-RU')} ${it.unit} × $${it.rate}</span></div>
+              <div class="bc-line-c">${moneyC(it.cost)}</div>
+            </div>`).join('')}
           </div>
-          <div class="muted" style="font-size:11px;margin-top:10px">Не входит в подписку и не несёт нашей наценки. Шаблоны WhatsApp тарифицирует Meta, токены ИИ — провайдер модели. Оценка по факту переписки за текущий период.</div>
+          <div class="bc-sum">
+            <div class="bc-sum-row"><span>Накоплено за период (${u.elapsedDays} дн)</span><b>${moneyC(u.total)}</b></div>
+            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце месяца</span><b>${moneyC(u.forecast)}</b></div>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:10px">Расходники не входят в подписку и идут по себестоимости провайдеров: WhatsApp тарифицирует Meta, токены ИИ — провайдер модели, телефония — DIDWW. Списываются по факту в конце расчётного месяца, отдельно от подписки.</div>
+          <div id="bcRatesBox" hidden class="bc-rates">
+            <div class="bc-rates-grid">
+              <label>WhatsApp, $/сообщение<input class="bc-rate" data-rk="wa" type="number" step="0.001" value="${(u.rates || {}).wa}"></label>
+              <label>ИИ, $/входящее<input class="bc-rate" data-rk="aiMsg" type="number" step="0.001" value="${(u.rates || {}).aiMsg}"></label>
+              <label>Телефония, $/мин<input class="bc-rate" data-rk="telephonyMin" type="number" step="0.001" value="${(u.rates || {}).telephonyMin}"></label>
+              <label>Транскрибация, $/мин<input class="bc-rate" data-rk="sttMin" type="number" step="0.001" value="${(u.rates || {}).sttMin}"></label>
+            </div>
+            <div style="display:flex;margin-top:8px"><span class="tb-spacer"></span><button class="btn btn-sm btn-accent" id="bcRatesSave">Сохранить ставки</button></div>
+          </div>
         </div>
 
         <!-- реквизиты -->
@@ -8803,6 +8819,12 @@ PAGES.billing = async (root) => {
 
   /* --- взаимодействие --- */
   const reload = async () => { await PAGES.billing(root); };
+  /* калькулятор расходников: показать/скрыть ставки + сохранить */
+  const bcR = $('#bcRates', root); if (bcR) bcR.addEventListener('click', () => { const box = $('#bcRatesBox', root); if (box) box.hidden = !box.hidden; });
+  const bcS = $('#bcRatesSave', root); if (bcS) bcS.addEventListener('click', async () => {
+    const patch = {}; $$('.bc-rate', root).forEach(i => { patch[i.dataset.rk] = +i.value || 0; });
+    await api.post('/billing/rates', patch); toast('Ставки сохранены', 'Пересчитал расходники', true); await reload();
+  });
   $$('[data-cycle]', root).forEach(b => b.addEventListener('click', async () => { await api.post('/billing/plan', { cycle: b.dataset.cycle }); await reload(); }));
   $$('[data-plan]', root).forEach(b => b.addEventListener('click', async () => { await api.post('/billing/plan', { plan: b.dataset.plan }); await reload(); }));
   const seat = $('#seatVal');

@@ -443,6 +443,24 @@ textarea { resize: vertical; min-height: 70px; }
 .ct-ad-hd .ct-edit { flex: none; }
 .ct-ed { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--stroke); }
 .ct-ed-foot { display: flex; margin-top: 4px; }
+/* калькулятор расходников */
+.bc-lines { display: flex; flex-direction: column; gap: 2px; }
+.bc-line { display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--stroke); }
+.bc-line:last-child { border-bottom: 0; }
+.bc-line-l { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.bc-line-l b { font-size: 13px; color: var(--navy-900); font-weight: 600; }
+.bc-line-l span { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bc-line-c { font-size: 15px; font-weight: 650; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.bc-sum { margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--stroke); display: flex; flex-direction: column; gap: 7px; }
+.bc-sum-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); }
+.bc-sum-row b { font-size: 16px; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.bc-forecast { padding: 9px 12px; margin: 2px -2px 0; background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 10px; }
+.bc-forecast b { color: var(--accent); font-size: 18px; }
+.bc-rates { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--stroke); }
+.bc-rates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bc-rates-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--ink-3); }
+.bc-rates-grid input { padding: 7px 10px; border: 1px solid var(--stroke); border-radius: 9px; font-size: 13px; font-family: inherit; }
+@media (max-width: 560px) { .bc-rates-grid { grid-template-columns: 1fr; } }
 .bubble.in { align-self: flex-start; background: var(--card); border: 1px solid var(--stroke); border-bottom-left-radius: 6px; color: var(--ink); box-shadow: 0 1px 2px rgba(16, 43, 92, .04); }
 .bubble.out {
   align-self: flex-end; border-bottom-right-radius: 6px; color: #fff;
