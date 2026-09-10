@@ -5175,66 +5175,111 @@ PAGES.academy = async (root) => {
 /* ═══ Академия агентства: свои уроки (видео+текст) + доступ по паролю ═══ */
 PAGES.learn = async (root) => {
   const d = await api.get('/learn');
-  const lessons = d.lessons || [], sh = d.share || {};
+  let lessons = d.lessons || []; const sh = d.share || {};
   const isOwner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
+  /* ── ПРОСМОТР (брокеры): красивые карточки, только чтение ── */
+  if (!isOwner) {
+    root.innerHTML = `${heroArt('assets/art/book.png', `<div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')}</span></div>`, { v: 'right', hue: '#B87E4B' })}
+      <div class="lrn-grid">${lessons.length ? lessons.map(l => `<div class="glass card lrn-card">${l.video ? `<div class="lrn-vid" data-emb="${esc(l.video)}"></div>` : ''}${l.cat ? `<div class="lrn-cat">${esc(l.cat)}</div>` : ''}<div class="lrn-t">${esc(l.title)}</div><div class="lrn-b md-note">${mdNote(l.body || '')}</div></div>`).join('') : '<div class="glass card empty">Уроки скоро появятся.</div>'}</div>`;
+    $$('[data-emb]', root).forEach(el => { const e = embedFromUrl(el.dataset.emb); if (e) el.innerHTML = e; else el.remove(); });
+    return;
+  }
+  /* ── КОНСТРУКТОР (владелец): inline drag-and-drop, без попапов ── */
+  const row = (l) => `<div class="lc-item glass" data-lid="${l.id}">
+    <div class="lc-head">
+      <span class="lc-grip" data-grip title="Перетащить">${ic(I.grip)}</span>
+      <span class="lc-vico">${l.video ? ic(I.play, 2) : ic(I.doc, 2)}</span>
+      <div class="lc-h-main"><b class="lc-h-title">${esc(l.title || 'Без названия')}</b><span class="lc-h-cat">${esc(l.cat || 'без категории')}</span></div>
+      <span class="lc-saved" data-saved>сохранено</span>
+      <span class="lc-caret" data-toggle>${ic(I.chev)}</span>
+    </div>
+    <div class="lc-edit" hidden>
+      <div class="lc-e-grid">
+        <label class="fl"><span>Заголовок</span><input class="lc-f" data-k="title" value="${esc(l.title || '')}" placeholder="Как вести первый звонок"></label>
+        <label class="fl"><span>Категория</span><input class="lc-f" data-k="cat" value="${esc(l.cat || '')}" placeholder="Скрипты / Возражения / Онбординг"></label>
+      </div>
+      <label class="fl"><span>Ссылка на видео (YouTube / Reels / TikTok / .mp4)</span><input class="lc-f lc-vurl" data-k="video" value="${esc(l.video || '')}" placeholder="https://…"></label>
+      <div class="lc-vprev" data-vprev>${l.video ? '' : ''}</div>
+      <label class="fl"><span style="display:flex;align-items:center;justify-content:space-between">Текст урока <button type="button" class="btn btn-sm lc-tidy">${ic(I.spark)}Причесать ИИ</button></span><textarea class="lc-f" data-k="body" rows="7" placeholder="Впиши или надиктуй 🎤 — «Причесать» приведёт в аккуратную структуру">${esc(l.body || '')}</textarea></label>
+      <div class="lc-e-foot"><button class="btn-ghost lc-del" data-del="${l.id}">${ic(I.x)}Удалить урок</button></div>
+    </div>
+  </div>`;
+  const paintList = () => {
+    root.querySelector('#lcList').innerHTML = lessons.map(row).join('') || '<div class="glass card empty">Пусто. Нажми «Добавить урок» — впиши видео и текст, сохранится само.</div>';
+    wireItems();
+  };
   root.innerHTML = `
     ${heroArt('assets/art/book.png', `
-      <div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')} · свои материалы для команды</span></div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Записывай уроки (видео + текст), ИИ причешет текст в аккуратную структуру, а новым брокерам открывай доступ по защищённой ссылке с паролем.</span></div>
+      <div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')} · конструктор уроков команды</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Собери уроки как конструктор: перетаскивай, редактируй прямо в карточке, ИИ причешет текст. Открой брокерам доступ по ссылке с паролем.</span></div>
     `, { v: 'right', hue: '#B87E4B' })}
-    ${isOwner ? `<div class="lrn-bar">
-      <button class="btn btn-accent" id="lrnNew">${ic(I.plus)}Новый урок</button>
-      <button class="btn" id="lrnShare">${ic(I.link || I.copy)}Доступ для брокеров${sh.on ? ' · вкл' : ''}</button>
-    </div>` : ''}
-    <div class="lrn-grid">${lessons.length ? lessons.map(l => `<div class="glass card lrn-card" data-lrn="${l.id}">
-      ${l.video ? `<div class="lrn-vid" data-emb="${esc(l.video)}"></div>` : ''}
-      ${l.cat ? `<div class="lrn-cat">${esc(l.cat)}</div>` : ''}
-      <div class="lrn-t">${esc(l.title)}</div>
-      <div class="lrn-b md-note">${mdNote((l.body || '').slice(0, 600))}</div>
-      ${isOwner ? `<div class="lrn-acts"><button class="btn btn-sm" data-lrnedit="${l.id}">${ic(I.edit || I.doc)}Править</button><button class="btn-ghost" data-lrndel="${l.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}
-    </div>`).join('') : `<div class="glass card empty">${isOwner ? 'Уроков пока нет. Нажми «Новый урок» — добавь видео и текст, ИИ причешет.' : 'Уроки скоро появятся.'}</div>`}</div>`;
-  /* встроить видео-превью */
-  $$('[data-emb]', root).forEach(el => { const e = embedFromUrl(el.dataset.emb); if (e) el.innerHTML = e; else el.remove(); });
-  if (!isOwner) return;
-  const openEditor = (les) => {
-    const bd = modal({ wide: true, title: les ? 'Правка урока' : 'Новый урок', body: `
-      <div class="form-row"><label>Заголовок</label><input id="leT" value="${esc((les && les.title) || '')}" placeholder="Напр. Как вести первый звонок"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-row"><label>Категория</label><input id="leC" value="${esc((les && les.cat) || '')}" placeholder="Продажи / Онбординг / Скрипты"></div>
-        <div class="form-row"><label>Ссылка на видео (YouTube/Reels/TikTok/.mp4)</label><input id="leV" value="${esc((les && les.video) || '')}" placeholder="https://…"></div>
+    <div class="lrn-bar">
+      <button class="btn btn-accent" id="lrnNew">${ic(I.plus)}Добавить урок</button>
+      <button class="btn" id="lrnShareT">${ic(I.link || I.copy)}Доступ для брокеров${sh.on ? ' · вкл' : ''}</button>
+    </div>
+    <div class="lc-share glass card" id="lcShare" hidden>
+      <div class="set-row"><div class="sp"><div class="sl">Доступ по ссылке</div><div class="sd">Брокеры смотрят уроки по паролю (только чтение)</div></div><label class="switch"><input type="checkbox" id="shOn" ${sh.on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="lc-share-grid">
+        <label class="fl"><span>Пароль ${sh.hasPass ? '(задан — впиши, чтобы сменить)' : ''}</span><input id="shPw" type="text" placeholder="${sh.hasPass ? '•••••• задан' : 'придумай пароль'}"></label>
+        <label class="fl"><span>Ссылка</span><div style="display:flex;gap:8px"><input id="shUrl" readonly value="${esc(sh.url || (location.origin + '/learn/' + (sh.token || '')))}"><button class="btn btn-sm" id="shCopy">${ic(I.copy)}</button></div></label>
       </div>
-      <div class="form-row"><label style="display:flex;align-items:center;justify-content:space-between">Текст урока <button type="button" class="btn btn-sm" id="leTidy">${ic(I.spark)}Причесать ИИ</button></label>
-        <textarea id="leB" rows="9" placeholder="Впиши или надиктуй 🎤 — потом «Причесать» приведёт в аккуратную структуру (заголовки, буллеты, выделения)">${esc((les && les.body) || '')}</textarea></div>`,
-      actions: [{ label: les ? 'Сохранить' : 'Создать урок', cls: 'btn-accent', onClick: async (bd) => {
-        const body = { title: $('#leT', bd).value.trim() || 'Урок', cat: $('#leC', bd).value.trim(), video: $('#leV', bd).value.trim(), body: $('#leB', bd).value };
-        if (les) body.id = les.id;
-        try { await api.post('/learn', body); toast(les ? 'Урок сохранён' : 'Урок создан', null, true); PAGES.learn(root); } catch (e) { toast('Не вышло', e.message); return false; }
-      } }, { label: 'Отмена' }],
-    });
-    wireDictate(bd);
-    const tidy = $('#leTidy', bd); if (tidy) tidy.addEventListener('click', async () => {
-      const ta = $('#leB', bd), src = ta.value.trim(); if (!src) { toast('Пусто', 'Сначала впиши или надиктуй текст'); return; }
-      tidy.disabled = true; const old = tidy.innerHTML; tidy.innerHTML = ic(I.spark) + 'Причёсываю…';
-      try { const r = await api.post('/tidy-note', { text: src, ctx: 'урок внутренней академии агентства недвижимости' }); if (r && r.text) { ta.value = r.text; toast('Готово', 'ИИ структурировал текст', true); } } catch (e) { toast('Не вышло', e.message); }
-      tidy.disabled = false; tidy.innerHTML = old;
-    });
-    setTimeout(() => { const i = $('#leT', bd); if (i) i.focus(); }, 30);
+      <div class="lc-share-foot"><button class="btn btn-sm btn-accent" id="shSave">Сохранить доступ</button></div>
+    </div>
+    <div class="lc-list" id="lcList"></div>`;
+  /* автосейв поля урока (debounce) с индикатором «сохранено» */
+  const saveTimers = {};
+  const autosave = (item) => {
+    const id = item.dataset.lid; clearTimeout(saveTimers[id]);
+    saveTimers[id] = setTimeout(async () => {
+      const body = { id }; item.querySelectorAll('.lc-f').forEach(f => body[f.dataset.k] = f.value);
+      try { await api.post('/learn', body); const l = lessons.find(x => x.id === id); if (l) Object.assign(l, body);
+        item.querySelector('.lc-h-title').textContent = body.title || 'Без названия'; item.querySelector('.lc-h-cat').textContent = body.cat || 'без категории';
+        const sv = item.querySelector('[data-saved]'); sv.classList.add('show'); setTimeout(() => sv.classList.remove('show'), 1400);
+      } catch (e) { toast('Не сохранилось', e.message); }
+    }, 650);
   };
-  const nb = $('#lrnNew', root); if (nb) nb.addEventListener('click', () => openEditor(null));
-  $$('[data-lrnedit]', root).forEach(b => b.addEventListener('click', () => openEditor(lessons.find(l => l.id === b.dataset.lrnedit))));
-  $$('[data-lrndel]', root).forEach(b => b.addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + b.dataset.lrndel, { method: 'DELETE' }); toast('Удалён', null, true); PAGES.learn(root); } catch (e) { toast('Не вышло', e.message); } }));
-  const shB = $('#lrnShare', root); if (shB) shB.addEventListener('click', () => {
-    const bd = modal({ title: 'Доступ для брокеров', sub: 'Защищённая ссылка + пароль. Только просмотр уроков, ничего лишнего.', body: `
-      <div class="set-row"><div class="sp"><div class="sl">Открыть доступ по ссылке</div><div class="sd">Новые брокеры смогут смотреть уроки по паролю</div></div><label class="switch"><input type="checkbox" id="shOn" ${sh.on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-      <div class="form-row"><label>Пароль ${sh.hasPass ? '(задан — впиши, чтобы сменить)' : ''}</label><input id="shPw" type="text" placeholder="${sh.hasPass ? '•••••• задан' : 'придумай пароль'}"></div>
-      <div class="form-row"><label>Ссылка</label><div style="display:flex;gap:8px"><input id="shUrl" readonly value="${esc(sh.url || (location.origin + '/learn/' + (sh.token || '')))}"><button class="btn btn-sm" id="shCopy">${ic(I.copy)}</button></div></div>`,
-      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
-        const payload = { on: $('#shOn', bd).checked }; const pw = $('#shPw', bd).value.trim(); if (pw) payload.password = pw;
-        try { await api.post('/learn/share', payload); toast('Доступ обновлён', payload.on ? 'Ссылка активна' : 'Ссылка закрыта', true); } catch (e) { toast('Не вышло', e.message); return false; }
-      } }, { label: 'Закрыть' }],
+  function wireItems() {
+    $$('.lc-item', root).forEach(item => {
+      const id = item.dataset.lid;
+      item.querySelector('[data-toggle]').addEventListener('click', () => { const ed = item.querySelector('.lc-edit'); ed.hidden = !ed.hidden; item.classList.toggle('open', !ed.hidden); if (!ed.hidden) renderVPrev(item); });
+      item.querySelector('.lc-head').addEventListener('click', e => { if (e.target.closest('[data-grip],[data-toggle],[data-saved]')) return; item.querySelector('[data-toggle]').click(); });
+      item.querySelectorAll('.lc-f').forEach(f => f.addEventListener('input', () => { autosave(item); if (f.classList.contains('lc-vurl')) renderVPrev(item); }));
+      wireDictate(item.querySelector('.lc-edit'));
+      const tidy = item.querySelector('.lc-tidy'); tidy.addEventListener('click', async () => {
+        const ta = item.querySelector('[data-k="body"]'), src = ta.value.trim(); if (!src) { toast('Пусто', 'Впиши или надиктуй текст'); return; }
+        tidy.disabled = true; const old = tidy.innerHTML; tidy.innerHTML = ic(I.spark) + 'Причёсываю…';
+        try { const r = await api.post('/tidy-note', { text: src, ctx: 'урок внутренней академии' }); if (r && r.text) { ta.value = r.text; autosave(item); toast('Готово', 'ИИ структурировал', true); } } catch (e) { toast('Не вышло', e.message); }
+        tidy.disabled = false; tidy.innerHTML = old;
+      });
+      item.querySelector('.lc-del').addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + id, { method: 'DELETE' }); lessons = lessons.filter(x => x.id !== id); item.remove(); toast('Удалён', null, true); } catch (e) { toast('Не вышло', e.message); } });
+      wireDrag(item);
     });
-    const cp = $('#shCopy', bd); if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText($('#shUrl', bd).value); toast('Ссылка скопирована', null, true); });
+  }
+  const renderVPrev = (item) => { const url = item.querySelector('.lc-vurl').value.trim(); const box = item.querySelector('[data-vprev]'); const e = url ? embedFromUrl(url) : null; box.innerHTML = e || ''; box.style.display = e ? '' : 'none'; };
+  /* drag-reorder на pointer-событиях (HTML5 DnD конфликтует — см. память) */
+  function wireDrag(item) {
+    const grip = item.querySelector('[data-grip]');
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); const list = root.querySelector('#lcList'); const items = () => [...list.querySelectorAll('.lc-item')];
+      item.classList.add('lc-dragging'); document.body.style.userSelect = 'none';
+      const move = (ev) => { const y = ev.clientY; for (const other of items()) { if (other === item) continue; const r = other.getBoundingClientRect(); if (y > r.top && y < r.bottom) { const mid = r.top + r.height / 2; if (y < mid) list.insertBefore(item, other); else list.insertBefore(item, other.nextSibling); break; } } };
+      const up = async () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); item.classList.remove('lc-dragging'); document.body.style.userSelect = '';
+        const ids = items().map(x => x.dataset.lid); lessons = ids.map(id => lessons.find(l => l.id === id)).filter(Boolean);
+        try { await api.post('/learn/reorder', { ids }); } catch (_) {} };
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    });
+  }
+  paintList();
+  /* добавить урок → создаём пустой, вставляем сверху, открываем */
+  $('#lrnNew', root).addEventListener('click', async () => {
+    try { const r = await api.post('/learn', { title: 'Новый урок', cat: '', video: '', body: '' }); lessons.unshift(r.lesson); paintList();
+      const first = root.querySelector('.lc-item'); if (first) { first.querySelector('[data-toggle]').click(); const t = first.querySelector('[data-k="title"]'); if (t) { t.focus(); t.select(); } }
+    } catch (e) { toast('Не вышло', e.message); }
   });
+  /* доступ — inline-панель (без попапа) */
+  $('#lrnShareT', root).addEventListener('click', () => { const p = $('#lcShare', root); p.hidden = !p.hidden; });
+  $('#shCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#shUrl', root).value); toast('Ссылка скопирована', null, true); });
+  $('#shSave', root).addEventListener('click', async () => { const payload = { on: $('#shOn', root).checked }; const pw = $('#shPw', root).value.trim(); if (pw) payload.password = pw; try { await api.post('/learn/share', payload); toast('Доступ обновлён', payload.on ? 'Ссылка активна' : 'Закрыт', true); } catch (e) { toast('Не вышло', e.message); } });
 };
 /* ═══ ВИДЕО-СТУДИЯ: запись презентаций в браузере (экран + камера PiP + микрофон) ═══ */
 const STU = { mode: 'screencam', mic: true, rec: null, chunks: [], streams: [], raf: 0, startAt: 0, timer: 0, blob: null, blobUrl: '' };

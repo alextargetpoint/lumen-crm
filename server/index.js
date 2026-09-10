@@ -265,6 +265,16 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.carousels) db.carousels = [];
   if (!db.learnLessons) db.learnLessons = [];    // внутренняя академия агентства: свои уроки (видео+текст)
   if (!db.settings.learn) db.settings.learn = { shareToken: crypto.randomBytes(6).toString('hex'), sharePassHash: '', shareOn: false };
+  /* демо-уроки один раз (чтобы конструктор был наглядным) — удалятся, если владелец их снесёт (флаг не даст пере-сидить) */
+  if (!db.learnLessons.length && !db.settings._learnSeeded) {
+    const t = Date.now();
+    db.learnLessons = [
+      { id: 'demo1' + crypto.randomBytes(3).toString('hex'), title: 'Первый звонок: как захватить внимание', cat: 'Скрипты', video: '', body: '## Цель первого звонка\nНе продать, а **завязать диалог** и договориться о следующем шаге.\n\n### Первые 10 секунд\n- Представься и сразу назови **причину звонка** (заявка на проект X)\n- Не спрашивай «удобно ли говорить» — это даёт лёгкий выход\n- Тон: уверенный эксперт, не проситель\n\n### Что делать\n- [ ] Захватить внимание в первые секунды\n- [ ] Задать открытый вопрос про **цель покупки**\n- [ ] Закрыть на конкретный следующий шаг (Zoom/подборка)', createdAt: t, updatedAt: t },
+      { id: 'demo2' + crypto.randomBytes(3).toString('hex'), title: 'Возражение «дорого»: как отвечать', cat: 'Возражения', video: '', body: '## Принцип\nНе спорь и не оправдывайся. Сначала **согласись**, потом переведи критерий с цены на **ценность/доходность**.\n\n### Скрипт\n- «Понимаю, цена важна. Давайте посмотрим, что вы за эти деньги получаете...»\n- Переведи на **ROI, рассрочку, рост цены** к сдаче\n- Дай конкретную цифру, а не воду', createdAt: t - 1, updatedAt: t - 1 },
+      { id: 'demo3' + crypto.randomBytes(3).toString('hex'), title: 'Онбординг: первая неделя брокера', cat: 'Онбординг', video: '', body: '## Первая неделя\n### День 1-2\n- Изучить проекты в базе и медиапланы\n- Пройти уроки по скриптам и возражениям\n\n### День 3-5\n- Первые звонки под наблюдением наставника\n- Разбор записи звонка в разделе «Оценка звонка»\n\n### Что важно\n- [ ] Знать топ-5 проектов наизусть\n- [ ] Отработать первый звонок на 5+ по рубрике', createdAt: t - 2, updatedAt: t - 2 },
+    ];
+    db.settings._learnSeeded = true;
+  }
   if (!db.hrCandidates) db.hrCandidates = [];    // HR: отклики кандидатов (воронка подбора)
   if (!db.settings.hr) db.settings.hr = {
     formToken: crypto.randomBytes(6).toString('hex'), formOn: false,
@@ -5282,9 +5292,18 @@ ${SCR}
       store.save();
       return json(res, 200, { lesson: les });
     }
-    if ((m = p.match(/^\/api\/learn\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+    if ((m = p.match(/^\/api\/learn\/([a-z0-9]+)$/)) && req.method === 'DELETE') {
       { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
       db.learnLessons = (db.learnLessons || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (p === '/api/learn/reorder' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const ids = Array.isArray(b.ids) ? b.ids : [];
+      const map = Object.fromEntries((db.learnLessons || []).map(l => [l.id, l]));
+      const next = ids.map(id => map[id]).filter(Boolean);
+      (db.learnLessons || []).forEach(l => { if (!ids.includes(l.id)) next.push(l); });   /* хвост для не попавших */
+      db.learnLessons = next; store.save();
       return json(res, 200, { ok: true });
     }
     if (p === '/api/learn/share' && req.method === 'POST') {
