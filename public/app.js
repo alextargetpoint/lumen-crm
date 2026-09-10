@@ -7803,30 +7803,36 @@ async function renderMoodboard(root, opts) {
 
 /* ---------------- БРОКЕРЫ ---------------- */
 /* RBAC (зеркало серверных ROLE_CAPS/ROLE_DEFAULT_HIDE — сервер остаётся источником enforcement) */
-const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', manager: 'Менеджер' };
+const RBAC_ROLES = { broker: 'Брокер', assistant: 'Ассистент', marketer: 'Маркетолог', analyst: 'Аналитик', manager: 'Менеджер' };
 const RBAC_DEFHIDE = {
   broker: [],
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
   marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
 const RBAC_SECTIONS = ['funnel', 'inbox', 'properties', 'collections', 'qualifier', 'sequences', 'wake', 'meetings', 'tasks', 'automations', 'playbook', 'academy', 'callReview', 'ads', 'mediaplan', 'comments', 'social', 'parlo', 'analytics'];
-function rbacCardHtml() {
+function rbacRowHtml(b) {
   const inits = (n) => (n || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = RBAC_DEFHIDE[rt] || [];
+  const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
+  return `<div class="rbac-row" data-rbacid="${b.id}" data-name="${esc((b.name || '').toLowerCase())}">
+    <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b><i>${RBAC_ROLES[rt]} · ${shown}/${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
+    <div class="rbac-body" hidden>
+      <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select><button class="btn-ghost rbac-del" title="Убрать сотрудника">${ic(I.x)}</button></div>
+      <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
+      <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать. Серые закрыты ролью.</div>
+    </div>
+  </div>`;
+}
+function rbacCardHtml() {
+  const members = STATE.brokers || [];
+  const order = ['manager', 'analyst', 'marketer', 'assistant', 'broker'];
+  const groups = order.map(role => { const ms = members.filter(b => (b.roleType || 'broker') === role); if (!ms.length) return ''; return `<div class="rbac-grp"><div class="rbac-grp-h">${RBAC_ROLES[role]}<span>${ms.length}</span></div>${ms.map(rbacRowHtml).join('')}</div>`; }).join('');
   return `<div class="glass card rbac-card">
-    <div class="rbac-hd">${ic(I.users)}Роли и доступы<span>кто какие разделы видит · права применяются на сервере</span></div>
-    <div class="rbac-list">${(STATE.brokers || []).map(b => {
-      const rt = b.roleType || 'broker'; const ind = b.hidePages || []; const defHide = RBAC_DEFHIDE[rt] || [];
-      const shown = RBAC_SECTIONS.filter(s => !defHide.includes(s) && !ind.includes(s)).length;
-      return `<div class="rbac-row" data-rbacid="${b.id}">
-        <button class="rbac-main" data-rbactoggle><span class="rbac-ava">${b.photo ? `<img src="${esc(b.photo)}">` : esc(inits(b.name))}</span><span class="rbac-nm"><b>${esc(b.name || 'Сотрудник')}</b><i>${RBAC_ROLES[rt]} · доступ к ${shown} из ${RBAC_SECTIONS.length} разделов</i></span><span class="rbac-chev">${ic(I.chev)}</span></button>
-        <div class="rbac-body" hidden>
-          <div class="rbac-role"><span>Роль</span><select class="sh-sel rbac-roleSel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}" ${k === rt ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-          <div class="rbac-secs">${RBAC_SECTIONS.map(s => { const byRole = defHide.includes(s); const byInd = ind.includes(s); const hidden = byRole || byInd; return `<button class="rbac-sec ${hidden ? 'off' : 'on'} ${byRole ? 'locked' : ''}" data-sec="${s}"${byRole ? ' disabled title="Закрыто ролью — смени роль, чтобы открыть"' : ''}>${esc((NAV[s] || {}).name || s)}</button>`; }).join('')}</div>
-          <div class="rbac-note">Роль задаёт базовый набор. Клик по разделу — дополнительно скрыть/показать сотруднику. Серые закрыты ролью.</div>
-        </div>
-      </div>`;
-    }).join('') || '<div class="muted" style="padding:8px">Нет сотрудников. Добавьте команду ниже.</div>'}</div>
+    <div class="rbac-hd">${ic(I.users)}Роли и доступы<span>${members.length} чел · кто что видит · права на сервере</span></div>
+    <div class="rbac-bar"><input id="rbacSearch" class="rbac-search" placeholder="Поиск по имени…"><button class="btn btn-sm btn-accent" id="rbacAdd">${ic(I.plus)}Сотрудник</button></div>
+    <div class="rbac-list" id="rbacList">${groups || '<div class="muted" style="padding:8px">Нет сотрудников. Нажми «+ Сотрудник».</div>'}</div>
   </div>`;
 }
 PAGES.brokers = async (root) => {
@@ -7949,7 +7955,16 @@ PAGES.brokers = async (root) => {
       const arr = [...ind]; chip.classList.toggle('off'); chip.classList.toggle('on');
       try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
     }));
+    const del = rowEl.querySelector('.rbac-del');
+    if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
   });
+  /* поиск по имени (для команды 30-50) */
+  { const sr = $('#rbacSearch', root); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.rbac-row', root).forEach(r => { r.style.display = (!q || (r.dataset.name || '').includes(q)) ? '' : 'none'; }); $$('.rbac-grp', root).forEach(g => { const any = [...g.querySelectorAll('.rbac-row')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; }); }); }
+  /* + добавить сотрудника сразу с ролью */
+  { const ad = $('#rbacAdd', root); if (ad) ad.addEventListener('click', () => {
+    const bd = modal({ title: 'Новый сотрудник', sub: 'Имя + роль — доступы применятся сразу', body: `<div class="form-row"><label>Имя</label><input id="rbNm" placeholder="Имя Фамилия"></div><div class="form-row"><label>Роль</label><select id="rbRl" class="sh-sel">${Object.entries(RBAC_ROLES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>`, actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async () => { const nm = $('#rbNm', bd).value.trim(); if (!nm) { toast('Впиши имя'); return false; } try { await api.post('/brokers', { name: nm, roleType: $('#rbRl', bd).value }); toast('Сотрудник добавлен', nm, true); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
+    setTimeout(() => { const i = $('#rbNm', bd); if (i) i.focus(); }, 30);
+  }); }
   $('#brAdd').addEventListener('click', async () => {
     const nb = await api.post('/brokers', { name: 'Новый брокер' });
     await loadState();

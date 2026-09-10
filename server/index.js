@@ -483,6 +483,7 @@ const ROLE_CAPS = {
   broker: { name: 'Брокер', leads: 'own', allow: [] },
   assistant: { name: 'Ассистент', leads: 'all', allow: ['reports', 'voice'] },
   marketer: { name: 'Маркетолог', leads: 'own', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports'] },
+  analyst: { name: 'Аналитик', leads: 'all', allow: ['ads', 'campaigns', 'reports'] },
   manager: { name: 'Менеджер', leads: 'all', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports', 'sequences', 'voice', 'templates', 'numbers'] },
 };
 /* дефолтное скрытие разделов под роль (владелец может переопределить hidePages у сотрудника) */
@@ -490,6 +491,7 @@ const ROLE_DEFAULT_HIDE = {
   broker: [],
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
   marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
+  analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],
   manager: ['settings', 'brokers', 'agency', 'billing', 'numbers'],
 };
 /* заблокирован ли путь для НЕ-владельца с данным набором грантов.
@@ -2678,6 +2680,7 @@ const server = http.createServer(async (req, res) => {
         avatar: name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase(),
         schedule: { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' },
       };
+      if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: создать сотрудника сразу с ролью */
       db.brokers.push(br); store.save();
       return json(res, 200, br);
     }

@@ -5333,3 +5333,14 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .rbac-sec.locked { opacity: .5; cursor: not-allowed; text-decoration: none; }
 .rbac-sec:not(.locked):hover { transform: translateY(-1px); }
 .rbac-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 12px; }
+
+/* RBAC — панель для команды 30-50: поиск + группы по ролям */
+.rbac-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.rbac-search { flex: 1; border: 1px solid var(--stroke); border-radius: 10px; padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none; }
+.rbac-search:focus { border-color: var(--accent); }
+.rbac-grp { margin-bottom: 12px; }
+.rbac-grp-h { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 4px 2px 8px; }
+.rbac-grp-h span { background: var(--bg-2); border-radius: 99px; padding: 1px 8px; font-size: 11px; letter-spacing: 0; }
+.rbac-grp .rbac-row { margin-bottom: 6px; }
+.rbac-del { margin-left: auto; color: var(--ink-3); }
+.rbac-del:hover { color: #E0483D; }
