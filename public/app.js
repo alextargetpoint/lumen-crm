@@ -2436,18 +2436,25 @@ PAGES.funnel = async (root) => {
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
       </div>
     </div>
-    <div class="chain-ctl glass">
-      <span class="cc-ic">${ic(I.chain)}</span>
-      <div class="cc-txt"><b>Авто-цепочка касаний</b><i>${autoChains ? 'на каждый новый лид запускается автоматически' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
-      <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-      <div class="cc-seqpick ${autoChains ? '' : 'off'}">
-        <span>Запускать</span>
-        <select id="ccSeq"><option value="">по направлению (авто)</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+    ${(() => { const open = !!PAGE_STATE.funnelChainOpen; return `<div class="chain-ctl glass ${open ? 'open' : ''}">
+      <button class="cc-head" data-cctoggle>
+        <span class="cc-ic">${ic(I.chain)}</span>
+        <div class="cc-htxt"><b>Цепочки касаний</b><span>Авто ${autoChains ? 'вкл' : 'выкл'} · ручной запуск на карточки</span></div>
+        <span class="cc-status ${autoChains ? 'on' : ''}">${autoChains ? 'АВТО' : 'РУЧНОЙ'}</span>
+        <span class="cc-chev">${ic(I.chev)}</span>
+      </button>
+      <div class="cc-body" ${open ? '' : 'hidden'}>
+        <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+        <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'на каждый новый лид запускается автоматически' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
+        <div class="cc-seqpick ${autoChains ? '' : 'off'}">
+          <span>Запускать</span>
+          <select id="ccSeq"><option value="">по направлению (авто)</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        </div>
+        <span class="tb-spacer"></span>
+        <span class="cc-hint">Ручной запуск: выдели карточки${launchable.length ? ' или' : ''}</span>
+        ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : ''}
       </div>
-      <span class="tb-spacer"></span>
-      <span class="cc-hint">Ручной запуск: выдели карточки${launchable.length ? ' или' : ''}</span>
-      ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : ''}
-    </div>
+    </div>`; })()}
     ${view === 'kanban' ? `
     <div class="kanban">
       ${STAGES.map(st => {
@@ -2548,6 +2555,11 @@ PAGES.funnel = async (root) => {
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
   /* --- контрол цепочек касаний --- */
+  root.querySelector('[data-cctoggle]')?.addEventListener('click', () => {
+    PAGE_STATE.funnelChainOpen = !PAGE_STATE.funnelChainOpen;
+    const w = root.querySelector('.chain-ctl'); const b = root.querySelector('.cc-body');
+    if (w && b) { w.classList.toggle('open', PAGE_STATE.funnelChainOpen); b.hidden = !PAGE_STATE.funnelChainOpen; }
+  });
   $('#ccAuto')?.addEventListener('change', async (e) => {
     const on = e.target.checked;
     try { await api.patch('/settings', { ai: { autoChains: on } }); await loadState();
@@ -4675,9 +4687,7 @@ PAGES.collections = async (root) => {
             <div class="cl2-meta">${c.propertyIds.length} ${plural(c.propertyIds.length, 'объект', 'объекта', 'объектов')}${c.leadName ? ' · для ' + esc(c.leadName) : ''} · ${ago(c.createdAt)}</div>
             ${c.analytics ? `<div class="cl2-analytics ${c.analytics.maxDepth >= 75 ? 'hot' : ''}"><div class="cl2-bar"><i style="width:${c.analytics.maxDepth}%"></i></div><span>изучил ${c.analytics.maxDepth}%${c.analytics.deepSessions ? ' · глубоких ' + c.analytics.deepSessions : ''}</span></div>` : ''}
             <div class="cl2-acts">
-              <a class="btn btn-sm btn-accent" href="/p/${c.id}?design=1&key=${c.editKey}" target="_blank" title="Премиум арт-документ (движок арт-дирекшна)">${ic(I.layers)}Арт-документ</a>
-              <a class="btn btn-sm" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
-              <button class="btn btn-sm" data-act="design" title="Настроить дизайн (6 осей)">${ic(I.gear)}Дизайн</button>
+              <a class="btn btn-sm btn-accent" href="/p/${c.id}?edit=1&key=${c.editKey}" target="_blank">${ic(I.edit || I.doc)}Конструктор</a>
               <button class="btn btn-sm" data-act="share" title="Поделиться">${ic(I.send)}Поделиться</button>
               <a class="btn btn-sm" href="/p/${c.id}" target="_blank" title="Открыть классический вид">${ic(I.eye)}</a>
               <span class="tb-spacer"></span>
@@ -9409,7 +9419,7 @@ PAGES.analytics = async (root) => {
         <div class="an-trend">${bars}</div>
       </div>`;
     })()}
-    <div class="two-col">
+    <div class="two-col mb">
       <div class="glass card">
         <div class="card-title">${ic(I.funnel)}По направлениям<span class="sub">конверсия в квал + сделки</span></div>
         <div class="geo-bars">

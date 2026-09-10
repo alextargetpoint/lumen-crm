@@ -639,8 +639,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .afc { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 20px; padding: 5px 11px; }
 .afc b { color: var(--navy-900); font-weight: 700; font-variant-numeric: tabular-nums; }
 
-/* ---------- воронка: контрол цепочек касаний ---------- */
-.chain-ctl { display: flex; align-items: center; gap: 12px; padding: 11px 15px; margin-bottom: 14px; border-radius: 14px; }
+/* ---------- воронка: контрол цепочек касаний (сворачиваемый) ---------- */
+.chain-ctl { margin-bottom: 14px; border-radius: 14px; overflow: hidden; }
+.chain-ctl .cc-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: none; font-family: inherit; cursor: pointer; text-align: left; }
+.chain-ctl .cc-head:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.chain-ctl .cc-htxt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.chain-ctl .cc-htxt b { font-size: 13px; font-weight: 700; color: var(--navy-900); }
+.chain-ctl .cc-htxt span { font-size: 11px; color: var(--ink-3); }
+.chain-ctl .cc-status { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 3px 9px; border-radius: 20px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-3); }
+.chain-ctl .cc-status.on { background: color-mix(in srgb, #2FA98C 16%, transparent); color: #1E7A64; }
+.chain-ctl .cc-chev { color: var(--ink-3); transition: transform .2s; } .chain-ctl .cc-chev svg { width: 16px; height: 16px; }
+.chain-ctl.open .cc-chev { transform: rotate(90deg); }
+.chain-ctl .cc-body { display: flex; align-items: center; gap: 12px; padding: 12px 14px 13px; flex-wrap: wrap; border-top: 1px solid var(--stroke-soft); }
+.chain-ctl .cc-body[hidden] { display: none; }   /* .hidden vs display:flex — класс перебивал атрибут, поле не сворачивалось */
 .chain-ctl .cc-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .chain-ctl .cc-ic svg { width: 17px; height: 17px; }
 .chain-ctl .cc-txt { display: flex; flex-direction: column; gap: 1px; }
@@ -1048,7 +1059,10 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .cal-task { position: absolute; left: 3px; right: 3px; z-index: 3; height: 20px; overflow: hidden; display: flex; align-items: center; gap: 5px;
   background: var(--card); color: var(--navy-900); border: 1px solid var(--stroke); border-left: 3px solid var(--pc, var(--accent));
   border-radius: 7px; padding: 2px 7px; font-size: 10px; line-height: 1.2; cursor: pointer; box-shadow: 0 2px 6px -3px rgba(16,43,92,.25); white-space: nowrap; }
-.cal-task:hover { background: var(--bg-2); border-color: var(--pc, var(--accent)); z-index: 5; overflow: visible; }
+/* при наведении задача раскрывается ВНИЗ внутри своей колонки (не залезает на соседний день):
+   высота auto, текст переносится, поверх остального — не обрезается и не бьёт в соседнюю клетку */
+.cal-task:hover { z-index: 20; height: auto; min-height: 20px; overflow: visible; white-space: normal; flex-wrap: wrap; align-items: flex-start; background: var(--card); border-color: var(--pc, var(--accent)); box-shadow: var(--shadow-lift); }
+.cal-task:hover b { align-self: center; }
 .cal-task b { font-size: 10px; font-variant-numeric: tabular-nums; }
 .cal-task-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--pc, var(--accent)); flex: none; }
 .cal-legend { display: flex; gap: 14px; align-items: center; margin: -2px 0 10px; font-size: 11.5px; color: var(--ink-3); }
