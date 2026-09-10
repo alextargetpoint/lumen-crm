@@ -5527,21 +5527,38 @@ PAGES.ads = async (root) => {
     ${(() => {
       const PL = { meta: ['Meta', '#2F6BFF'], google: ['Google', '#E0603B'], tiktok: ['TikTok', '#111'], other: ['Другое', '#888'] };
       const plBadge = (p) => { const x = PL[p] || PL.other; return `<span class="ct-pl" style="--c:${x[1]}">${x[0]}</span>`; };
-      const adRow = (a) => `<div class="ct-ad" data-ctad="${a.adId}">
-        <div class="ct-ad-hd">
-          ${plBadge(a.platform)}
-          <div class="ct-ad-nm"><b>${esc(a.name || a.adId)}</b><span>${a.leads} лид${a.leads === 1 ? '' : 'ов'}${a.geo ? ' · ' + esc(((STATE && STATE.settings && STATE.settings.geoNames) || {})[a.geo] || a.geo) : ''}</span></div>
-          <span class="ct-flags">${a.hasCreative ? `<span class="ct-ok" title="Креатив привязан">${ic(I.play, 2)}</span>` : ''}${a.hasPoints ? `<span class="ct-ok" title="Тезисы заданы">${ic(I.spark, 2)}</span>` : ''}</span>
-          <button class="btn btn-sm ct-edit" data-ctedit="${a.adId}">${a.hasCreative || a.hasPoints ? 'Править' : 'Настроить'}</button>
+      const geoName = (g) => g ? (((STATE && STATE.settings && STATE.settings.geoNames) || {})[g] || g) : '';
+      const thumb = (media) => media && media.url ? (media.type === 'video' ? `<span class="ct-th vid">${ic(I.play, 2)}</span>` : `<span class="ct-th" style="background-image:url('${esc(media.url)}')"></span>`) : `<span class="ct-th empty">${ic(I.doc, 2)}</span>`;
+      const preview = (media) => media && media.url ? (media.type === 'video' ? `<video src="${esc(media.url)}" controls playsinline></video>` : `<img src="${esc(media.url)}" alt="креатив">`) : '<div class="ct-crea-empty">Креатив не привязан</div>';
+      const adRow = (a) => { const done = a.hasCreative || a.hasPoints; return `<div class="ct-ad" data-ctad="${a.adId}">
+        <div class="ct-ad-hd" data-ctedit="${a.adId}">
+          ${thumb(a.media)}
+          <div class="ct-ad-nm"><b>${esc(a.name || a.adId)}</b><span>${a.leads} лид${a.leads === 1 ? '' : 'ов'}${a.geo ? ' · ' + esc(geoName(a.geo)) : ''}</span></div>
+          <span class="ct-flags">${a.hasCreative ? '<span class="ct-ok" title="Креатив привязан">креатив</span>' : ''}${a.hasPoints ? '<span class="ct-ok" title="Тезисы заданы">тезисы</span>' : ''}</span>
+          <button class="btn btn-sm ${done ? '' : 'btn-accent'} ct-edit">${done ? 'Править' : 'Настроить'}</button>
         </div>
         <div class="ct-ed" id="cted-${a.adId}" hidden>
-          <div class="form-row"><label>Ссылка на креатив (видео/картинка) — уходит первым сообщением</label><input class="ct-media" value="${esc((a.media && a.media.url) || '')}" placeholder="https://…/reels.mp4 или .jpg"></div>
-          <div class="form-row"><label>Сильные стороны проекта (по одной в строке) — ИИ вплетёт 2-3 в первое касание</label><textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года\nЛокация: метро и школы в 5 минут\nПрогноз доходности аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea></div>
-          <div class="ct-ed-foot"><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
+          <div class="ct-ed-cols">
+            <div class="ct-ed-crea">
+              <div class="ct-ed-lbl">Креатив — уходит первым сообщением</div>
+              <div class="ct-crea" data-ctprev="${a.adId}">${preview(a.media)}</div>
+              <div class="ct-crea-acts">
+                <button class="btn btn-sm btn-accent ct-upload" data-ctup="${a.adId}">${ic(I.plus)}Загрузить с ПК</button>
+                <input type="file" class="ct-file" data-ctfile="${a.adId}" accept="video/*,image/*" hidden>
+              </div>
+              <div class="ct-or">или вставь ссылку (Reels / YouTube / .mp4 / .jpg):</div>
+              <input class="ct-media" value="${esc((a.media && a.media.url) || '')}" placeholder="https://…">
+            </div>
+            <div class="ct-ed-pts">
+              <div class="ct-ed-lbl">Сильные стороны проекта — ИИ вплетёт 2-3 в первое касание</div>
+              <textarea class="ct-points" rows="6" placeholder="Рассрочка 0% на 3 года\nЛокация: метро и школы в 5 минут\nПрогноз доходности аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea>
+            </div>
+          </div>
+          <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a.adId}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
         </div>
-      </div>`;
-      const adsetBlock = (as) => `<div class="ct-adset"><div class="ct-adset-hd">${ic(I.chev, 2)}${esc(as.name)}<span>${as.leads} лид · ${as.ads.length} объявл</span></div><div class="ct-ads">${as.ads.map(adRow).join('')}</div></div>`;
-      const campBlock = (c) => `<div class="ct-camp"><div class="ct-camp-hd">${plBadge(c.platform)}<b>${esc(c.name)}</b><span>${c.leads} лид</span></div>${c.adsets.map(adsetBlock).join('')}</div>`;
+      </div>`; };
+      const adsetBlock = (as) => `<div class="ct-adset"><div class="ct-adset-hd">${esc(as.name)}<span>${as.leads} лид · ${as.ads.length} объявл</span></div><div class="ct-ads">${as.ads.map(adRow).join('')}</div></div>`;
+      const campBlock = (c) => `<div class="ct-camp"><div class="ct-camp-hd">${plBadge(c.platform)}<b>${esc(c.name)}</b><span class="ct-camp-n">${c.leads} лид</span></div>${c.adsets.map(adsetBlock).join('')}</div>`;
       return `<div class="glass card mb ct-wrap">
         <div class="card-title">${ic(I.target)}Дерево креативов<span class="sub">Meta · Google · любой источник — креатив + тезисы на каждое объявление</span>
           <span class="ct-stat">${treeD.withCreative}/${treeD.totalAds} с креативом · ${treeD.withPoints} с тезисами</span></div>
@@ -5639,6 +5656,22 @@ PAGES.ads = async (root) => {
     b.disabled = true; b.textContent = 'Сохраняю…';
     try { await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); toast('Сохранено', 'Креатив и тезисы привязаны к объявлению', true); render(); }
     catch (e) { toast('Не сохранилось', e.message); b.disabled = false; b.textContent = 'Сохранить'; }
+  }));
+  /* загрузка исходника креатива с ПК */
+  $$('[data-ctup]', root).forEach(b => b.addEventListener('click', () => { const f = root.querySelector('.ct-file[data-ctfile="' + b.dataset.ctup + '"]'); if (f) f.click(); }));
+  $$('.ct-file', root).forEach(f => f.addEventListener('change', async () => {
+    const ad = f.dataset.ctfile; const file = f.files && f.files[0]; if (!file) return;
+    const box = f.closest('.ct-ad'); const st = box.querySelector('.ct-up-status'); const prev = box.querySelector('.ct-crea');
+    if (file.size > 100e6) { toast('Файл больше 100 МБ', 'Сожми видео или загрузи ссылкой'); return; }
+    st.textContent = 'Загружаю ' + Math.round(file.size / 1e6 * 10) / 10 + ' МБ…';
+    try {
+      const r = await fetch('/api/ads/' + ad + '/creative-upload?filename=' + encodeURIComponent(file.name), { method: 'POST', body: file });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка');
+      box.querySelector('.ct-media').value = j.url;
+      prev.innerHTML = j.type === 'video' ? `<video src="${j.url}" controls playsinline></video>` : `<img src="${j.url}" alt="креатив">`;
+      st.textContent = '✓ загружено'; setTimeout(() => st.textContent = '', 2500);
+      toast('Креатив загружен', 'Нажми «Сохранить», чтобы привязать', true);
+    } catch (e) { st.textContent = ''; toast('Не загрузилось', e.message); }
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });

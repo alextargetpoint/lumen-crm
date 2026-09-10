@@ -4625,6 +4625,23 @@ ${SCR}
       store.save();
       return json(res, 200, { ok: true, ad: { adId: ad.adId, media: ad.media || null, points: ad.points || [], platform: ad.platform || null } });
     }
+    /* загрузка исходника креатива с ПК на объявление (видео/картинка) — как в TargetPoint */
+    if ((m = p.match(/^\/api\/ads\/([^/]+)\/creative-upload$/)) && req.method === 'POST') {
+      const ad = db.ads.find(a => String(a.adId) === String(m[1]));
+      if (!ad) return json(res, 404, { error: 'not found' });
+      const extM = String(u.searchParams.get('filename') || '').match(/\.(mp4|webm|mov|jpe?g|png|webp|gif)$/i);
+      if (!extM) return json(res, 400, { error: 'формат: mp4/webm/mov/jpg/png/webp/gif' });
+      const chunks = []; let size = 0, over = false;
+      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 100e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
+      if (over) return json(res, 400, { error: 'файл до 100 МБ' });
+      if (!size) return json(res, 400, { error: 'пустой файл' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      const ext = extM[1].toLowerCase(); const fname = `creatives/ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      ad.media = { type: /^(mp4|webm|mov)$/.test(ext) ? 'video' : 'image', url: '/assets/' + fname };
+      store.save();
+      return json(res, 200, { url: ad.media.url, type: ad.media.type });
+    }
     /* дерево: кампании → адсеты → объявления, с креативом и статой лидов (источник-агностик) */
     if (p === '/api/ads/tree' && req.method === 'GET') {
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
