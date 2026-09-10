@@ -5924,7 +5924,9 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 
 /* ═══ АКАДЕМИЯ АГЕНТСТВА — премиум-модули с кастомными обложками ═══ */
 /* hero-баннер (Higgsfield-арт) */
-.lm-hero { position: relative; border-radius: 18px; overflow: hidden; background-size: cover; background-position: center; padding: 30px 32px; margin-bottom: 18px; min-height: 148px; display: flex; align-items: center; box-shadow: 0 18px 44px rgba(6,17,38,.28); }
+.lm-hero { position: relative; border-radius: 18px; overflow: hidden; background: #0A1833; padding: 32px 34px; margin-bottom: 18px; min-height: 172px; display: flex; align-items: center; box-shadow: 0 18px 44px rgba(6,17,38,.28); }
+.lm-hero-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lm-hero-veil { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,17,38,.94) 22%, rgba(6,17,38,.5) 62%, rgba(6,17,38,.2)); }
 .lm-hero-in { position: relative; z-index: 1; }
 .lm-hero-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: #EAD9B0; background: rgba(200,155,90,.16); border: 1px solid rgba(200,155,90,.3); padding: 5px 12px; border-radius: 30px; }
 .lm-hero-badge svg { width: 14px; height: 14px; }
@@ -5932,8 +5934,13 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 .lm-hero-s { font-size: 13px; color: rgba(230,238,255,.78); max-width: 560px; line-height: 1.5; }
 /* папка-обложка модуля */
 .lm-fold { position: relative; flex: none; border-radius: 13px; overflow: hidden; display: grid; place-items: center; background: #0A1833; box-shadow: 0 8px 20px -8px rgba(6,17,38,.5); }
-.lm-fold img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.lm-fold .lm-fold-g { position: absolute; inset: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue,#2F6BFF) 45%, transparent), inset 0 -18px 30px -14px color-mix(in srgb, var(--hue,#2F6BFF) 60%, transparent); border-radius: inherit; pointer-events: none; }
+.lm-fold img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s var(--ease-spring, ease); }
+.lm-folder:hover .lm-fold img, .lm-card:hover .lm-fold img { transform: scale(1.06); }
+/* живой блик по обложке — модуль не выглядит статичным */
+.lm-fold .lm-fold-g { position: absolute; inset: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue,#2F6BFF) 45%, transparent), inset 0 -18px 30px -14px color-mix(in srgb, var(--hue,#2F6BFF) 60%, transparent); border-radius: inherit; pointer-events: none; overflow: hidden; }
+.lm-fold .lm-fold-g::after { content: ''; position: absolute; top: -60%; left: -30%; width: 40%; height: 220%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.28), transparent); transform: rotate(8deg); animation: lmSheen 5.5s ease-in-out infinite; }
+@keyframes lmSheen { 0%, 100% { left: -40%; } 55%, 100% { left: 120%; } }
+@media (prefers-reduced-motion: reduce) { .lm-fold .lm-fold-g::after { animation: none; } }
 .lm-fold.noimg { color: color-mix(in srgb, var(--hue,#2F6BFF) 70%, #fff); border: 1px solid color-mix(in srgb, var(--hue,#2F6BFF) 35%, transparent); }
 .lm-fold.noimg svg { width: 44%; height: 44%; }
 /* полка модулей (владелец) — папки-фильтры */

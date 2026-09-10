@@ -5325,11 +5325,13 @@ function learnRenderRead(root, lessons, meta) {
   });
 }
 function learnHeroHTML(n, meta) {
-  return `<div class="lm-hero" style="background-image:linear-gradient(90deg, rgba(6,17,38,.92) 30%, rgba(6,17,38,.35)), url('assets/learn/hero-academy.png')">
+  return `<div class="lm-hero">
+    <video class="lm-hero-v" autoplay muted loop playsinline poster="assets/learn/hero-academy.png" src="assets/widgets/amb-gold.mp4"></video>
+    <div class="lm-hero-veil"></div>
     <div class="lm-hero-in">
       <div class="lm-hero-badge">${ic(I.doc)}Академия агентства</div>
       <div class="lm-hero-h">${esc((meta && meta.title) || 'База знаний вашей команды')}</div>
-      <div class="lm-hero-s">${n} ${plural(n, 'урок', 'урока', 'уроков')} · ${learnModules ? '' : ''}видео, скрипты и разборы — единый стандарт продаж агентства</div>
+      <div class="lm-hero-s">${n} ${plural(n, 'урок', 'урока', 'уроков')} · видео, скрипты и разборы — единый стандарт продаж агентства</div>
     </div>
   </div>`;
 }
