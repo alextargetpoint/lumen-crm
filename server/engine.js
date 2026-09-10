@@ -289,6 +289,8 @@ function tickChains(db) {
       if (sendOpts.channel === 'email') {
         /* официальный тон для e-mail */
         text = 'Здравствуйте' + (lead.name && !/^[+\d]/.test(lead.name) ? ', ' + lead.name.split(' ')[0] : '') + '!\n\n' + text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '') + '\n\nС уважением,\n' + (db.settings.agency.manager?.name || db.settings.agency.name) + '\n' + db.settings.agency.name;
+      } else if (llm.humanize) {
+        text = llm.humanize(text);   /* чистим AI-почерк (длинные тире и т.п.) в WhatsApp/мессенджер-касаниях */
       }
       send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';
@@ -296,7 +298,11 @@ function tickChains(db) {
     }
     lead.ai.chainStep += 1;
     const next = seq.steps.filter(s => s.active)[lead.ai.chainStep];
-    lead.ai.nextTouchAt = next ? nowT + Math.max(0.1, next.day - step.day) * dayMs(db) : nowT + dayMs(db);
+    /* авто-delay: базовый интервал шага + человеческий джиттер (±25%, минимум пара минут),
+       чтобы касания не уходили роботизированно в одну и ту же секунду */
+    const baseGap = next ? Math.max(0.1, next.day - step.day) * dayMs(db) : dayMs(db);
+    const jitter = baseGap * (0.75 + (lead.id.charCodeAt(lead.id.length - 1) % 50) / 100);   /* детерминированный по лиду разброс 0.75–1.25× */
+    lead.ai.nextTouchAt = nowT + Math.max(120e3, jitter);
   }
 }
 

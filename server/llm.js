@@ -92,6 +92,65 @@ function pickPersona(db, lead) {
   return null;
 }
 
+/* ── ЖИВОЙ ПОЧЕРК + МЕНТАЛИТЕТ ─────────────────────────────────────────────
+   Чистим типичные «следы ИИ» (длинное тире), даём модели правила живой речи и
+   адаптируем тон под менталитет страны клиента (по коду телефона / языку). */
+function humanize(s) {
+  if (!s) return s;
+  let t = String(s);
+  t = t.replace(/^[ \t]*[—–][ \t]+/gm, '- ');                          /* СНАЧАЛА маркер списка в начале строки → «- » */
+  t = t.replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2');                       /* числовой диапазон «2—3» → «2-3» (дефис) */
+  t = t.replace(/[ \t]+[—–][ \t]+/g, ', ');                            /* инлайн «цена — $400k» → «цена, $400k» (тире = AI-tell) */
+  t = t.replace(/([A-Za-zА-Яа-яЁё])[—–]([A-Za-zА-Яа-яЁё])/g, '$1, $2');
+  t = t.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([,.!?;:])/g, '$1');  /* лишние пробелы */
+  t = t.replace(/\n{3,}/g, '\n\n');                                     /* не больше пустой строки между абзацами */
+  return t.trim();
+}
+const LIVE_STYLE = `ЖИВОЙ ПОЧЕРК (обязательно, иначе видно что писал бот):
+- НЕ используй длинное тире «—»/«–». Ставь запятую, точку или начни новое предложение.
+- Не строй симметричные конструкции («не только…, но и…», «это не X, это Y») — живая речь неровная.
+- Абзацы делай ПО СМЫСЛУ: если мыслей несколько, раздели их пустой строкой; но не дроби каждую фразу.
+- Пиши как человек в мессенджере: просто, тепло, по-разному по длине, без канцелярита и рекламных клише.`;
+const MENTALITY = {
+  ru: 'прямота и конкретика, но с теплом; ценят экспертизу и цифры, не терпят «впаривание» и воду; уместен лёгкий юмор',
+  uk: 'тепло и по-человечески, конкретика, без официоза',
+  en: 'дружелюбно, вежливо, без давления; ценят прозрачность, факты и «no pressure»',
+  de: 'точность и факты, без пафоса и преувеличений; ценят структуру, гарантии, юридическую чистоту, пунктуальность',
+  fr: 'вежливо и с достоинством, не спеша; сначала контакт и вкус, потом цифры; важен статус объекта',
+  it: 'тепло, по-семейному, эмоционально; на старте отношения важнее цифр',
+  es: 'дружелюбно и неформально, с эмоцией; доверие вперёд, без сухости',
+  pt: 'тепло и неформально, отношения важны, без спешки',
+  ar: 'уважительно и статусно, с почтением; важны доверие, репутация, конфиденциальность; не торопить с деньгами',
+  tr: 'тепло и уважительно, ценят личный контакт и возможность поторговаться; уверенно, но без давления',
+  hi: 'вежливо и подробно, ценят выгоду и торг; отношения и доверие важны',
+  zh: 'по делу, с уважением к статусу и выгоде; конкретика, ROI, надёжность, без лишних эмоций',
+  id: 'мягко, вежливо, дружелюбно, без давления и резкости',
+  pl: 'вежливо и по делу, ценят честность и конкретику',
+};
+const DIAL = [['+385', 'Хорватия', 'hr'], ['+386', 'Словения', 'sl'], ['+381', 'Сербия', 'sr'], ['+380', 'Украина', 'uk'], ['+375', 'Беларусь', 'ru'], ['+7', 'Россия/Казахстан', 'ru'], ['+49', 'Германия', 'de'], ['+43', 'Австрия', 'de'], ['+41', 'Швейцария', 'de'], ['+33', 'Франция', 'fr'], ['+39', 'Италия', 'it'], ['+34', 'Испания', 'es'], ['+351', 'Португалия', 'pt'], ['+44', 'Великобритания', 'en'], ['+353', 'Ирландия', 'en'], ['+1', 'США/Канада', 'en'], ['+971', 'ОАЭ', 'ar'], ['+966', 'Саудовская Аравия', 'ar'], ['+974', 'Катар', 'ar'], ['+965', 'Кувейт', 'ar'], ['+973', 'Бахрейн', 'ar'], ['+968', 'Оман', 'ar'], ['+972', 'Израиль', 'he'], ['+90', 'Турция', 'tr'], ['+91', 'Индия', 'hi'], ['+86', 'Китай', 'zh'], ['+62', 'Индонезия', 'id'], ['+48', 'Польша', 'pl'], ['+420', 'Чехия', 'cs'], ['+994', 'Азербайджан', 'az'], ['+998', 'Узбекистан', 'uz'], ['+995', 'Грузия', 'ka']];
+function dialCountry(phone) {
+  const p = String(phone || '').replace(/[^\d+]/g, ''); if (!p) return null;
+  let best = null; for (const d of DIAL) { if (p.startsWith(d[0]) && (!best || d[0].length > best[0].length)) best = d; }
+  return best ? { country: best[1], lang: best[2] } : null;
+}
+function mentalityBlock(lead) {
+  const dc = dialCountry(lead && lead.phone) || {};
+  const key = MENTALITY[dc.lang] ? dc.lang : (MENTALITY[lead && lead.lang] ? lead.lang : 'ru');
+  const anchor = MENTALITY[key] || MENTALITY.ru;
+  return `МЕНТАЛИТЕТ КЛИЕНТА${dc.country ? ` (${dc.country})` : ''}: ${anchor}. Подстрой тон, темп и дистанцию под культурный код этой страны — естественно, без стереотипов и без упоминания национальности.`;
+}
+/* банк возражений из академии Синенко: если последнее сообщение клиента похоже на возражение — подсказать эталонный ответ */
+function objectionHint(db, lead) {
+  try {
+    const academy = require('./academy');
+    if (!academy.forObjection) return '';
+    const lastIn = [...((db && db.messages) || [])].reverse().find(m => m.leadId === lead.id && m.dir === 'in');
+    if (!lastIn) return '';
+    const hits = academy.forObjection(lastIn.text);
+    if (!hits || !hits.length) return '';
+    return 'ВОЗРАЖЕНИЕ КЛИЕНТА — как отвечают лучшие (методология Синенко; адаптируй под живой тон, НЕ цитируй дословно):\n' + hits.slice(0, 2).map(c => '- «' + (c.objection || c.title) + '» → ' + (c.response || c.tip || '')).join('\n');
+  } catch (_) { return ''; }
+}
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
@@ -110,6 +169,9 @@ function buildPrompt(db, lead, history) {
 - Минимальный бюджет направления: ${crit.budgetMin} ${crit.currency}. Если клиент назвал бюджет ниже — НЕ отказывай, предложи down-sell: ${crit.downsell}
 - Заметки: ${crit.notes || '—'}
 - Тон: живой человеческий, коротко (1-3 предложения), без канцелярита, без эмодзи, один вопрос за раз.
+${mentalityBlock(lead)}
+${LIVE_STYLE}
+${objectionHint(db, lead)}
 ЖЁСТКИЕ ЗАПРЕТЫ (нарушение = брак):
 - НЕ называй конкретные цены, доходности, скидки и сроки сдачи, которых НЕТ в этом промпте или в словах клиента. Нет данных — скажи «уточню у эксперта и вернусь с точной цифрой».
 - НЕ обещай («гарантирую», «точно вырастет»), не давай юридических/налоговых советов — только «этот вопрос разберёт эксперт на созвоне».
@@ -185,7 +247,7 @@ async function reply(db, lead) {
   const prompt = buildPrompt(db, lead, history);
   const out = await callGemini(prompt);
   if (!out || typeof out.reply !== 'string' || !out.reply.trim()) throw new Error('llm bad shape');
-  const text = out.reply.trim().slice(0, 650);
+  const text = humanize(out.reply.trim()).slice(0, 650);
   const bad = validateReply(db, lead, text, prompt);
   if (bad) throw new Error('брак LLM: ' + bad);
   return { text, axes: clampAxes(db, lead, out.axes) };
@@ -344,6 +406,9 @@ async function composeFirstTouch(db, lead, draft, agencyName) {
 4. Лёгкий крючок-ценность: намекни, что есть что показать по его запросу (варианты/условия/рассрочка), но без «уникальных предложений» и клише.
 5. Тон — живой человек на ${LANG} языке: коротко (2-4 предложения), тепло, уверенно, без канцелярита, без воды, без длинных простыней. Эмодзи — максимум один, уместный.
 
+${mentalityBlock(lead)}
+${LIVE_STYLE}
+
 ДАННЫЕ ЛИДА:
 ${ctx}
 
@@ -356,7 +421,7 @@ ${draft ? 'ЧЕРНОВИК МЕНЕДЖЕРА (улучши, сохрани с�
  "analysis":"1-2 предложения менеджеру: что за лид и на что давить"}`;
   const out = await callGemini(prompt, 20000, 1100);
   if (!out || typeof out.message !== 'string' || !out.message.trim()) throw new Error('bad first-touch');
-  const clean = (s) => { s = String(s || '').trim().slice(0, 900); return /\{[a-z_]+\}/i.test(s) ? '' : s; };
+  const clean = (s) => { s = humanize(String(s || '').trim()).slice(0, 900); return /\{[a-z_]+\}/i.test(s) ? '' : s; };
   const msg = clean(out.message);
   if (!msg) throw new Error('брак: плейсхолдер в тексте');
   return { message: msg, variantB: clean(out.variantB), hook: String(out.hook || '').slice(0, 80), analysis: String(out.analysis || '').slice(0, 400) };
@@ -985,6 +1050,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, humanize, mentalityBlock, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };
