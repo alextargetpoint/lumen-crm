@@ -80,6 +80,7 @@ const DEFAULT_PASS = 'lumen2026';
   /* источники инвентаря объектов (новостройки): Reelly — основной для брокеров ОАЭ */
   if (!db.settings.inventorySources) db.settings.inventorySources = { reelly: { enabled: false, key: '', baseUrl: '' } };
   if (!db.intakeLog) db.intakeLog = [];
+  if (!db.decks) db.decks = [];   /* студия презентаций: колоды слайдов */
   { const a1 = (db.ads || []).find(x => x.adId === '120211478921230508'); if (a1 && !a1.priceFrom) a1.priceFrom = 190000;
     const a2 = (db.ads || []).find(x => x.adId === '120211478921230742'); if (a2 && !a2.priceFrom) a2.priceFrom = 180000; }
   for (const l of db.leads) { if (!l.notes) l.notes = []; if (!l.contacts) l.contacts = []; }
@@ -690,6 +691,25 @@ function analytics(db) {
    c.blocks = [{id, t, v, hidden, data}] — источник правды композиции страницы.
    Старые подборки (без blocks) синтезируются из legacy c.custom на лету. */
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+/* студия презентаций: id слайда + санитайзер слайда */
+function sid() { return 's' + crypto.randomBytes(4).toString('hex'); }
+function cleanSlide(s) {
+  const LAY = ['cover', 'bullets', 'stat', 'text', 'quote', 'cta', 'media'];
+  s = s || {};
+  return {
+    id: s.id || sid(),
+    layout: LAY.includes(s.layout) ? s.layout : 'text',
+    eyebrow: String(s.eyebrow || '').slice(0, 24),
+    title: String(s.title || '').slice(0, 140),
+    body: String(s.body || '').slice(0, 600),
+    bullets: Array.isArray(s.bullets) ? s.bullets.map(x => String(x).slice(0, 120)).filter(Boolean).slice(0, 8) : [],
+    stat: String(s.stat || '').slice(0, 24),
+    statLabel: String(s.statLabel || '').slice(0, 120),
+    media: (s.media && s.media.url) ? { url: String(s.media.url).slice(0, 500), type: (s.media.type === 'video' ? 'video' : 'image') } : null,
+    note: String(s.note || '').slice(0, 1000),
+  };
+}
 
 /* ⭐ A4-страница отчёта (клиентская ссылка + печать→PDF): рендерит текст engine.buildReport красивыми блоками */
 function renderReportDoc(db, period, opts = {}) {
@@ -5344,6 +5364,49 @@ ${SCR}
       } catch (e) { return json(res, 500, { error: 'нет файла расшифровок' }); }
     }
     /* ═══ ВНУТРЕННЯЯ АКАДЕМИЯ АГЕНТСТВА: свои уроки (видео+текст) + защищённый шэринг новым брокерам ═══ */
+    /* ── СТУДИЯ ПРЕЗЕНТАЦИЙ: колоды слайдов (db.decks) ── */
+    if (p === '/api/decks' && req.method === 'GET') {
+      return json(res, 200, { decks: (db.decks || []).map(d => ({ id: d.id, title: d.title, theme: d.theme, accent: d.accent, slides: (d.slides || []).length, updatedAt: d.updatedAt, cover: (d.slides || [])[0] || null })) });
+    }
+    if (p === '/api/decks' && req.method === 'POST') {
+      const b = await readBody(req);
+      const title = String(b.title || 'Новая презентация').slice(0, 120);
+      const d = { id: 'dk' + crypto.randomBytes(5).toString('hex'), title, theme: 'cobalt', accent: '#2F6BFF', slides: [cleanSlide({ layout: 'cover', title, body: '' })], createdAt: Date.now(), updatedAt: Date.now() };
+      db.decks.unshift(d); store.save();
+      return json(res, 200, { deck: d });
+    }
+    if ((m = p.match(/^\/api\/decks\/([a-z0-9]+)$/)) && req.method === 'GET') {
+      const d = (db.decks || []).find(x => x.id === m[1]); if (!d) return json(res, 404, { error: 'not found' });
+      return json(res, 200, { deck: d });
+    }
+    if ((m = p.match(/^\/api\/decks\/([a-z0-9]+)$/)) && req.method === 'PATCH') {
+      const d = (db.decks || []).find(x => x.id === m[1]); if (!d) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.title != null) d.title = String(b.title).slice(0, 120);
+      if (b.theme) d.theme = String(b.theme).slice(0, 24);
+      if (b.accent) d.accent = String(b.accent).slice(0, 16);
+      if (Array.isArray(b.slides)) d.slides = b.slides.slice(0, 60).map(cleanSlide);
+      d.updatedAt = Date.now(); store.save();
+      return json(res, 200, { deck: d });
+    }
+    if ((m = p.match(/^\/api\/decks\/([a-z0-9]+)$/)) && req.method === 'DELETE') {
+      db.decks = (db.decks || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    if ((m = p.match(/^\/api\/decks\/([a-z0-9]+)\/ai$/)) && req.method === 'POST') {
+      const d = (db.decks || []).find(x => x.id === m[1]); if (!d) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM (GEMINI_API_KEY)' });
+      const b = await readBody(req);
+      try {
+        const out = await llm.composeDeck(b.topic, b.count, db.settings.agency.name, b.geo || db.settings.agency.geos[0]);
+        const slides = out.slides.map(s => cleanSlide(s));
+        if (b.mode === 'append') d.slides = d.slides.concat(slides);
+        else { d.slides = slides; if (out.title && b.useTitle !== false) d.title = out.title; }
+        d.updatedAt = Date.now(); store.save();
+        return json(res, 200, { deck: d });
+      } catch (e) { return json(res, 500, { error: e.message }); }
+    }
+
     if (p === '/api/learn' && req.method === 'GET') {
       const L = db.settings.learn || {};
       return json(res, 200, { lessons: db.learnLessons || [], share: { on: !!L.shareOn, hasPass: !!L.sharePassHash, url: `${global.LUMEN_BASE || ''}/learn/${L.shareToken || ''}`, token: L.shareToken || '' } });

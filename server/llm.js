@@ -344,6 +344,38 @@ ${src.slice(0, 4000)}
   return r;
 }
 
+/* Студия презентаций: собрать колоду слайдов из темы/текста (речь клиента, оффер, разбор объекта). */
+async function composeDeck(topic, count, agencyName, geo) {
+  const n = Math.max(4, Math.min(14, +count || 8));
+  const src = String(topic || '').slice(0, 3000).trim();
+  const prompt = `Ты — сценарист презентаций агентства недвижимости «${String(agencyName || 'агентство').slice(0, 80)}». Собери структуру слайд-презентации на ${n} слайдов${geo ? ' (направление: ' + geo + ')' : ''}.
+${src ? 'ТЕМА / ВВОДНЫЕ (можно расшифровка речи, оффер, описание объекта):\n' + src : 'Тема не задана — сделай универсальную презентацию объекта/услуги агентства.'}
+
+Драматургия: обложка (крючок) → проблема/желание клиента → решение/объект → доказательства (цифры, локация, факты) → условия/выгода → следующий шаг. Каждый слайд двигает к решению.
+Правила: живой человеческий язык, конкретика вместо клише. НЕ пиши воду («место силы», «искусство жить», «дом мечты»). Цифры не выдумывай — если их нет во вводных, говори обтекаемо.
+Для каждого слайда выбери layout из: "cover" (обложка: крупный заголовок), "bullets" (заголовок + 3-5 тезисов), "stat" (одна крупная цифра + подпись), "text" (заголовок + абзац), "quote" (короткая цитата/тезис), "cta" (финал: призыв + следующий шаг). Первый слайд — cover, последний — cta.
+
+Верни строго JSON:
+{"title":"название презентации",
+ "slides":[{"layout":"cover|bullets|stat|text|quote|cta","eyebrow":"РУБРИКА КАПСОМ 1-2 слова","title":"заголовок 2-6 слов","body":"подпись/абзац 1-2 предложения (для text/quote/cta/cover)","bullets":["тезис 4-8 слов"],"stat":"крупное число напр. $185K или 8%","statLabel":"подпись к числу"}]}
+Ровно ${n} слайдов. bullets только у layout=bullets (3-5 шт). stat/statLabel только у layout=stat.`;
+  const out = await callGemini(prompt, 22000, 2600);
+  if (!out || !Array.isArray(out.slides) || !out.slides.length) throw new Error('bad deck');
+  const LAY = ['cover', 'bullets', 'stat', 'text', 'quote', 'cta'];
+  return {
+    title: String(out.title || 'Презентация').slice(0, 120),
+    slides: out.slides.slice(0, 14).map(s => ({
+      layout: LAY.includes(s.layout) ? s.layout : 'text',
+      eyebrow: String(s.eyebrow || '').replace(/<[^>]*>/g, '').slice(0, 24),
+      title: String(s.title || '').replace(/<[^>]*>/g, '').slice(0, 120),
+      body: String(s.body || '').replace(/<[^>]*>/g, '').slice(0, 320),
+      bullets: Array.isArray(s.bullets) ? s.bullets.map(b => String(b).replace(/<[^>]*>/g, '').slice(0, 90)).filter(Boolean).slice(0, 6) : [],
+      stat: String(s.stat || '').slice(0, 24),
+      statLabel: String(s.statLabel || '').slice(0, 90),
+    })),
+  };
+}
+
 /* HR-скрининг кандидата: по ответам формы оценивает пригодность на роль брокера, даёт саммари + вердикт + флаги */
 async function screenCandidate(cand, hr) {
   const ans = Object.entries(cand.answers || {}).map(([k, v]) => `${k}: ${String(v).slice(0, 400)}`).join('\n');
@@ -1084,6 +1116,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

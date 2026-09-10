@@ -5456,14 +5456,183 @@ PAGES.learn = async (root) => {
   $('#shSave', root).addEventListener('click', async () => { const payload = { on: $('#shOn', root).checked }; const pw = $('#shPw', root).value.trim(); if (pw) payload.password = pw; try { await api.post('/learn/share', payload); toast('Доступ обновлён', payload.on ? 'Ссылка активна' : 'Закрыт', true); } catch (e) { toast('Не вышло', e.message); } });
 };
 /* ═══ ВИДЕО-СТУДИЯ: запись презентаций в браузере (экран + камера PiP + микрофон) ═══ */
-const STU = { mode: 'screencam', mic: true, rec: null, chunks: [], streams: [], raf: 0, startAt: 0, timer: 0, blob: null, blobUrl: '' };
+/* ═══════════ СТУДИЯ ПРЕЗЕНТАЦИЙ (нативная: колоды + ИИ-слайды из речи/темы + кастомизация + показ) ═══════════ */
+const STUDIO = { tab: 'decks', deckId: null, cur: 0, deck: null, _save: null };
+const DECK_THEMES = {
+  cobalt: { name: 'Кобальт',    bg: 'linear-gradient(150deg,#0A1833 0%,#102B5C 100%)', fg: '#ffffff', sub: 'rgba(230,238,255,.78)', line: 'rgba(255,255,255,.14)' },
+  night:  { name: 'Ночь-люкс',  bg: 'radial-gradient(120% 130% at 18% 8%, #16233d 0%, #070d1c 70%)', fg: '#ffffff', sub: 'rgba(222,232,252,.72)', line: 'rgba(255,255,255,.12)' },
+  paper:  { name: 'Бумага',     bg: 'linear-gradient(160deg,#FBF9F5,#F1ECE3)', fg: '#16233D', sub: '#5A6472', line: 'rgba(16,43,92,.12)' },
+  gold:   { name: 'Тёмн. золото', bg: 'radial-gradient(120% 130% at 80% 10%, #241c0c 0%, #0b0904 72%)', fg: '#F5E9CF', sub: 'rgba(234,217,176,.72)', line: 'rgba(200,155,90,.22)' },
+};
+const DECK_ACCENTS = ['#2F6BFF', '#C89B5A', '#2FA98C', '#E4813D', '#7C4DFF', '#E0483D'];
+const DECK_LAYOUTS = [['cover', 'Обложка'], ['bullets', 'Тезисы'], ['stat', 'Цифра'], ['text', 'Текст'], ['quote', 'Цитата'], ['cta', 'Призыв'], ['media', 'Медиа']];
+/* один слайд → HTML (используется и в редакторе-превью, и в показе) */
+function deckSlideHTML(s, deck) {
+  const th = DECK_THEMES[deck.theme] || DECK_THEMES.cobalt; const ac = deck.accent || '#2F6BFF';
+  const eyebrow = s.eyebrow ? `<div class="ds-eyebrow" style="color:${ac}">${esc(s.eyebrow)}</div>` : '';
+  const media = s.media && s.media.url;
+  const mediaEl = media ? (s.media.type === 'video' ? `<video class="ds-media" src="${esc(s.media.url)}" muted loop autoplay playsinline></video>` : `<img class="ds-media" src="${esc(s.media.url)}" alt="">`) : '';
+  let inner;
+  if (s.layout === 'cover') {
+    inner = `<div class="ds-c ds-cover">${eyebrow}<div class="ds-title ds-xl">${esc(s.title || 'Заголовок')}</div>${s.body ? `<div class="ds-body">${esc(s.body)}</div>` : ''}</div>`;
+  } else if (s.layout === 'bullets') {
+    inner = `<div class="ds-c">${eyebrow}<div class="ds-title">${esc(s.title || '')}</div><ul class="ds-bullets">${(s.bullets || []).map(b => `<li style="--ac:${ac}">${esc(b)}</li>`).join('')}</ul></div>`;
+  } else if (s.layout === 'stat') {
+    inner = `<div class="ds-c ds-statc"><div class="ds-stat" style="color:${ac}">${esc(s.stat || '—')}</div><div class="ds-statlbl">${esc(s.statLabel || s.title || '')}</div>${s.body ? `<div class="ds-body">${esc(s.body)}</div>` : ''}</div>`;
+  } else if (s.layout === 'quote') {
+    inner = `<div class="ds-c ds-quotec"><div class="ds-quote-m" style="color:${ac}">“</div><div class="ds-quote">${esc(s.title || s.body || '')}</div>${s.body && s.title ? `<div class="ds-body">${esc(s.body)}</div>` : ''}</div>`;
+  } else if (s.layout === 'cta') {
+    inner = `<div class="ds-c ds-ctac">${eyebrow}<div class="ds-title ds-lg">${esc(s.title || '')}</div>${s.body ? `<div class="ds-body">${esc(s.body)}</div>` : ''}${(s.bullets || []).length ? `<ul class="ds-bullets">${s.bullets.map(b => `<li style="--ac:${ac}">${esc(b)}</li>`).join('')}</ul>` : ''}</div>`;
+  } else if (s.layout === 'media') {
+    inner = `<div class="ds-c ds-mediac">${mediaEl || '<div class="ds-media ph">медиа не задано</div>'}${(s.title || s.body) ? `<div class="ds-mediacap">${s.title ? `<b>${esc(s.title)}</b>` : ''}${s.body ? `<span>${esc(s.body)}</span>` : ''}</div>` : ''}</div>`;
+  } else {
+    inner = `<div class="ds-c">${eyebrow}<div class="ds-title">${esc(s.title || '')}</div>${s.body ? `<div class="ds-body ds-body-lg">${esc(s.body)}</div>` : ''}</div>`;
+  }
+  const bgMedia = (media && s.layout !== 'media') ? `<div class="ds-bg" style="background-image:url('${esc(s.media.url)}')"></div><div class="ds-bg-veil"></div>` : '';
+  return `<div class="dslide" style="--fg:${th.fg};--sub:${th.sub};--line:${th.line};background:${th.bg}">${bgMedia}${inner}</div>`;
+}
 PAGES.studio = async (root) => {
+  const seg = `<div class="seg-toggle stu-topseg">
+    <button class="seg-btn ${STUDIO.tab !== 'record' ? 'on' : ''}" data-stutab="decks">${ic(I.layers)}Презентации</button>
+    <button class="seg-btn ${STUDIO.tab === 'record' ? 'on' : ''}" data-stutab="record">${ic(I.play)}Запись экрана</button>
+  </div>`;
+  root.innerHTML = `${heroArt('assets/art/mega.png', `
+      <div class="ha-title">${ic(I.play)}Видео-студия<span class="sub">презентации с ИИ + запись экрана — для клиентов и обучения</span></div>
+    `, { v: 'right', hue: '#7C4DFF' })}${seg}<div id="stuBody"></div>`;
+  const body = root.querySelector('#stuBody');
+  root.querySelectorAll('[data-stutab]').forEach(b => b.addEventListener('click', () => { STUDIO.tab = b.dataset.stutab; if (b.dataset.stutab !== 'record') STUDIO.deckId = null; render(); }));
+  if (STUDIO.tab === 'record') return studioRecorder(body);
+  if (STUDIO.deckId) return studioEditor(body, STUDIO.deckId);
+  return studioCatalog(body);
+};
+async function studioCatalog(root) {
+  const d = await api.get('/decks').catch(() => ({ decks: [] }));
+  const decks = d.decks || [];
+  root.innerHTML = `
+    <div class="lrn-bar">
+      <button class="btn btn-accent" id="dkNew">${ic(I.plus)}Новая презентация</button>
+      <span class="muted" style="font-size:12px;align-self:center">${decks.length} ${plural(decks.length, 'презентация', 'презентации', 'презентаций')}</span>
+    </div>
+    <div class="dk-grid">${decks.length ? decks.map(dk => {
+      const th = DECK_THEMES[dk.theme] || DECK_THEMES.cobalt;
+      return `<div class="dk-card glass" data-dkopen="${dk.id}">
+        <div class="dk-cover" style="background:${th.bg}"><div class="dk-cover-t" style="color:${th.fg}">${esc((dk.cover && dk.cover.title) || dk.title)}</div><span class="dk-cover-badge" style="--ac:${dk.accent || '#2F6BFF'}"></span></div>
+        <div class="dk-meta"><b>${esc(dk.title)}</b><span>${dk.slides} ${plural(dk.slides, 'слайд', 'слайда', 'слайдов')} · ${ago(dk.updatedAt)}</span></div>
+        <button class="dk-del" data-dkdel="${dk.id}" title="Удалить">${ic(I.x)}</button>
+      </div>`;
+    }).join('') : '<div class="glass card empty">Пока нет презентаций. Нажми «Новая презентация» — собери руками или сгенерируй из текста/речи ИИ.</div>'}</div>`;
+  root.querySelector('#dkNew').addEventListener('click', async () => { const r = await api.post('/decks', { title: 'Новая презентация' }); STUDIO.deckId = r.deck.id; STUDIO.cur = 0; render(); });
+  root.querySelectorAll('[data-dkopen]').forEach(c => c.addEventListener('click', (e) => { if (e.target.closest('[data-dkdel]')) return; STUDIO.deckId = c.dataset.dkopen; STUDIO.cur = 0; render(); }));
+  root.querySelectorAll('[data-dkdel]').forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Удалить презентацию?')) return; await fetch('/api/decks/' + b.dataset.dkdel, { method: 'DELETE' }); render(); }));
+}
+async function studioEditor(root, id) {
+  const r = await api.get('/decks/' + id).catch(() => null);
+  if (!r || !r.deck) { STUDIO.deckId = null; toast('Презентация не найдена', null, false); return render(); }
+  const deck = STUDIO.deck = r.deck;
+  if (STUDIO.cur >= deck.slides.length) STUDIO.cur = Math.max(0, deck.slides.length - 1);
+  const saveDeck = () => { clearTimeout(STUDIO._save); STUDIO._save = setTimeout(async () => { try { await api.patch('/decks/' + deck.id, { title: deck.title, theme: deck.theme, accent: deck.accent, slides: deck.slides }); } catch (e) { toast('Не сохранилось', e.message); } }, 500); };
+  const rerender = () => studioEditor(root, id);   /* дешёвый ре-рендер редактора из текущего deck без сети — используем прямую перерисовку */
+  const paint = () => {
+    const s = deck.slides[STUDIO.cur] || null;
+    root.innerHTML = `
+      <div class="dk-topbar">
+        <button class="btn btn-sm dk-back" id="dkBack">${ic(I.chev)}К презентациям</button>
+        <input class="dk-title-in" id="dkTitle" value="${esc(deck.title)}">
+        <span class="tb-spacer"></span>
+        <div class="dk-themes">${Object.entries(DECK_THEMES).map(([k, t]) => `<button class="dk-theme ${deck.theme === k ? 'on' : ''}" data-dktheme="${k}" title="${t.name}" style="background:${t.bg}"></button>`).join('')}</div>
+        <div class="dk-accents">${DECK_ACCENTS.map(c => `<button class="dk-accent ${deck.accent === c ? 'on' : ''}" data-dkaccent="${c}" style="background:${c}"></button>`).join('')}</div>
+        <button class="btn btn-sm" id="dkAi">${ic(I.spark)}Собрать ИИ</button>
+        <button class="btn btn-sm btn-accent" id="dkPresent">${ic(I.play)}Показ</button>
+      </div>
+      <div class="dk-ai" id="dkAiPanel" hidden>
+        <div class="dk-ai-lbl">Опиши тему, вставь оффер или расшифровку речи — ИИ соберёт слайды:</div>
+        <textarea id="dkAiText" class="dk-ai-text" rows="3" placeholder="Напр.: ЖК Marina View, Дубай. Студии от $185K, сдача Q4 2027, рассрочка 0% на 3 года, 300м до пляжа, доходность аренды ~8%. Нужна презентация для инвестора."></textarea>
+        <div class="dk-ai-foot">
+          <label class="dk-ai-cnt">Слайдов <select id="dkAiCount">${[6, 8, 10, 12].map(n => `<option ${n === 8 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label class="dk-ai-mode"><input type="checkbox" id="dkAiAppend"> добавить к текущим</label>
+          <span class="tb-spacer"></span>
+          <button class="btn btn-sm" id="dkAiCancel">Отмена</button>
+          <button class="btn btn-sm btn-accent" id="dkAiGo">${ic(I.spark)}Сгенерировать</button>
+        </div>
+      </div>
+      <div class="dk-editor">
+        <aside class="dk-rail" id="dkRail">
+          ${deck.slides.map((sl, i) => `<div class="dk-thumb ${i === STUDIO.cur ? 'on' : ''}" data-dkslide="${i}"><span class="dk-thumb-n">${i + 1}</span><div class="dk-thumb-prev">${deckSlideHTML(sl, deck)}</div><button class="dk-thumb-del" data-dkslidedel="${i}" title="Удалить слайд">${ic(I.x)}</button></div>`).join('')}
+          <button class="dk-addslide" id="dkAddSlide">${ic(I.plus)}Слайд</button>
+        </aside>
+        <main class="dk-canvas">${s ? deckSlideHTML(s, deck) : '<div class="empty">Нет слайдов — добавь первый</div>'}</main>
+        <aside class="dk-inspect">${s ? deckInspectorHTML(s) : ''}</aside>
+      </div>`;
+    /* topbar */
+    root.querySelector('#dkBack').addEventListener('click', () => { STUDIO.deckId = null; render(); });
+    const ti = root.querySelector('#dkTitle'); ti.addEventListener('input', () => { deck.title = ti.value; saveDeck(); });
+    root.querySelectorAll('[data-dktheme]').forEach(b => b.addEventListener('click', () => { deck.theme = b.dataset.dktheme; saveDeck(); paint(); }));
+    root.querySelectorAll('[data-dkaccent]').forEach(b => b.addEventListener('click', () => { deck.accent = b.dataset.dkaccent; saveDeck(); paint(); }));
+    root.querySelector('#dkPresent').addEventListener('click', () => deckPresent(deck, STUDIO.cur));
+    /* AI panel */
+    const ap = root.querySelector('#dkAiPanel');
+    root.querySelector('#dkAi').addEventListener('click', () => { ap.hidden = !ap.hidden; if (!ap.hidden) root.querySelector('#dkAiText').focus(); });
+    root.querySelector('#dkAiCancel').addEventListener('click', () => { ap.hidden = true; });
+    root.querySelector('#dkAiGo').addEventListener('click', async () => {
+      const topic = root.querySelector('#dkAiText').value.trim(); const count = +root.querySelector('#dkAiCount').value || 8; const append = root.querySelector('#dkAiAppend').checked;
+      const btn = root.querySelector('#dkAiGo'); btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Собираю…';
+      try { const rr = await api.post('/decks/' + deck.id + '/ai', { topic, count, mode: append ? 'append' : 'replace' }); STUDIO.deck = rr.deck; STUDIO.cur = 0; toast('Презентация собрана', `${rr.deck.slides.length} слайдов`, true); studioEditor(root, id); }
+      catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Сгенерировать'; }
+    });
+    /* rail */
+    root.querySelectorAll('[data-dkslide]').forEach(t => t.addEventListener('click', (e) => { if (e.target.closest('[data-dkslidedel]')) return; STUDIO.cur = +t.dataset.dkslide; paint(); }));
+    root.querySelectorAll('[data-dkslidedel]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); const i = +b.dataset.dkslidedel; if (deck.slides.length <= 1) { toast('Нужен хотя бы один слайд'); return; } deck.slides.splice(i, 1); if (STUDIO.cur >= deck.slides.length) STUDIO.cur = deck.slides.length - 1; saveDeck(); paint(); }));
+    root.querySelector('#dkAddSlide').addEventListener('click', () => { deck.slides.splice(STUDIO.cur + 1, 0, { id: 's' + Math.random().toString(16).slice(2, 10), layout: 'text', eyebrow: '', title: 'Новый слайд', body: '', bullets: [], stat: '', statLabel: '', media: null }); STUDIO.cur++; saveDeck(); paint(); });
+    /* inspector */
+    wireDeckInspector(root, deck, () => { saveDeck(); root.querySelector('.dk-canvas').innerHTML = deckSlideHTML(deck.slides[STUDIO.cur], deck); const th = root.querySelector(`[data-dkslide="${STUDIO.cur}"] .dk-thumb-prev`); if (th) th.innerHTML = deckSlideHTML(deck.slides[STUDIO.cur], deck); });
+  };
+  paint();
+}
+function deckInspectorHTML(s) {
+  const field = (k, lbl, val, ph) => `<label class="fl"><span>${lbl}</span><input class="dk-f" data-dk="${k}" value="${esc(val || '')}" placeholder="${ph || ''}"></label>`;
+  return `
+    <div class="dk-insp-lbl">Тип слайда</div>
+    <div class="dk-layouts">${DECK_LAYOUTS.map(([k, n]) => `<button class="dk-lay ${s.layout === k ? 'on' : ''}" data-dklay="${k}">${esc(n)}</button>`).join('')}</div>
+    ${['bullets', 'text', 'cover', 'cta'].includes(s.layout) ? field('eyebrow', 'Рубрика (капсом)', s.eyebrow, 'ЗАПУСК') : ''}
+    ${s.layout === 'stat' ? field('stat', 'Крупная цифра', s.stat, '$185K') + field('statLabel', 'Подпись к цифре', s.statLabel, 'старт цены студии') : field('title', s.layout === 'quote' ? 'Цитата / тезис' : 'Заголовок', s.title, 'Заголовок слайда')}
+    ${['text', 'cover', 'quote', 'cta', 'stat', 'media'].includes(s.layout) ? `<label class="fl"><span>${s.layout === 'quote' ? 'Автор / контекст' : 'Текст / подпись'}</span><textarea class="dk-f" data-dk="body" rows="3" placeholder="1-2 предложения по делу">${esc(s.body || '')}</textarea></label>` : ''}
+    ${['bullets', 'cta'].includes(s.layout) ? `<label class="fl"><span>Тезисы (каждый с новой строки)</span><textarea class="dk-f" data-dk="bullets" rows="5" placeholder="Рассрочка 0% на 3 года&#10;300 м до пляжа&#10;Доходность ~8%">${esc((s.bullets || []).join('\n'))}</textarea></label>` : ''}
+    <label class="fl"><span>Медиа (ссылка на картинку / видео — фон или полный слайд)</span><input class="dk-f" data-dk="media" value="${esc(s.media && s.media.url || '')}" placeholder="https://…jpg / .mp4"></label>`;
+}
+function wireDeckInspector(root, deck, onChange) {
+  const s = deck.slides[STUDIO.cur];
+  root.querySelectorAll('[data-dklay]').forEach(b => b.addEventListener('click', () => { s.layout = b.dataset.dklay; onChange(); root.querySelector('.dk-inspect').innerHTML = deckInspectorHTML(s); wireDeckInspector(root, deck, onChange); }));
+  root.querySelectorAll('.dk-f').forEach(f => f.addEventListener('input', () => {
+    const k = f.dataset.dk;
+    if (k === 'bullets') s.bullets = f.value.split('\n').map(x => x.trim()).filter(Boolean);
+    else if (k === 'media') s.media = f.value.trim() ? { url: f.value.trim(), type: /\.(mp4|webm|mov)(\?|$)|reels|youtu/i.test(f.value) ? 'video' : 'image' } : null;
+    else s[k] = f.value;
+    onChange();
+  }));
+}
+/* показ: полноэкранный оверлей со стрелками/кликом */
+function deckPresent(deck, start) {
+  let i = start || 0; const n = deck.slides.length; if (!n) return;
+  const ov = el(`<div class="dk-present"><div class="dk-present-stage" id="dpStage"></div><div class="dk-present-bar"><button class="dp-x" id="dpX">${ic(I.x)}</button><span class="dp-n" id="dpN"></span></div></div>`);
+  document.body.appendChild(ov);
+  const stage = ov.querySelector('#dpStage'); const nEl = ov.querySelector('#dpN');
+  const paint = () => { stage.innerHTML = deckSlideHTML(deck.slides[i], deck); nEl.textContent = (i + 1) + ' / ' + n; };
+  const go = (d) => { i = Math.max(0, Math.min(n - 1, i + d)); paint(); };
+  const key = (e) => { if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(1); } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); } else if (e.key === 'Escape') close(); };
+  const clickNav = (e) => { if (e.target.closest('.dk-present-bar')) return; const r = stage.getBoundingClientRect(); (e.clientX < r.left + r.width / 2) ? go(-1) : go(1); };
+  function close() { document.removeEventListener('keydown', key); ov.remove(); try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} }
+  ov.querySelector('#dpX').addEventListener('click', close);
+  stage.addEventListener('click', clickNav);
+  document.addEventListener('keydown', key);
+  try { ov.requestFullscreen && ov.requestFullscreen(); } catch (_) {}
+  paint();
+}
+
+const STU = { mode: 'screencam', mic: true, rec: null, chunks: [], streams: [], raf: 0, startAt: 0, timer: 0, blob: null, blobUrl: '' };
+async function studioRecorder(root) {
   const owner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
   root.innerHTML = `
-    ${heroArt('assets/art/mega.png', `
-      <div class="ha-title">${ic(I.play)}Видео-студия<span class="sub">запиши презентацию: экран + камера + голос — прямо в браузере</span></div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Запиши обучающее видео, разбор объекта или презентацию для клиента. Сохрани уроком в Академию агентства или скачай.</span></div>
-    `, { v: 'right', hue: '#7C4DFF' })}
+    <div class="muted" style="font-size:12.5px;line-height:1.6;margin:2px 0 14px">Запиши обучающее видео, разбор объекта или презентацию для клиента: экран + камера + голос, прямо в браузере. Сохрани уроком в Академию или скачай.</div>
     <div class="glass card stu-card">
       <div class="stu-toolbar">
         <div class="seg-toggle stu-mode">
@@ -5560,7 +5729,7 @@ PAGES.studio = async (root) => {
       toast('Сохранено в Академию', 'Урок с видео создан', true); go('learn');
     } catch (e) { toast('Не вышло', e.message); saveBtn.disabled = false; saveBtn.innerHTML = ic(I.plus) + 'Сохранить уроком в Академию'; }
   });
-};
+}
 // «Второй формат»: глубокое чтение — полная расшифровка ролика-источника + ссылка на видео.
 async function acadDetail(vid, heading) {
   const ov = el(`<div class="ac-modal-ov"><div class="ac-modal glass">
