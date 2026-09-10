@@ -8254,25 +8254,93 @@ function wireRbac(root) {
   }); }
 }
 /* HR · подбор — бета-скаффолд (раздел в разработке, помечен явно) */
+const HR_STAGES = [['new', 'Отклики'], ['screen', 'Скрининг'], ['interview', 'Интервью'], ['offer', 'Оффер'], ['hired', 'Вышел']];
+const HR_STNAME = Object.fromEntries(HR_STAGES);
 PAGES.hr = async (root) => {
-  const STAGES = [['Отклики', 0], ['Скрининг', 0], ['Интервью', 0], ['Оффер', 0], ['Вышел', 0]];
+  const d = await api.get('/hr');
+  const cands = d.candidates || [], sh = d.share || {}, form = d.form || { fields: [], vacancy: {} };
+  const scoreChip = (c) => c.screen ? `<span class="hr-sc ${c.screen.score >= 65 ? 'hi' : c.screen.score >= 40 ? 'mid' : 'lo'}">${c.screen.score}</span>` : '<span class="hr-sc pend">•••</span>';
+  const col = (st, nm) => { const list = cands.filter(c => (c.stage || 'new') === st); return `<div class="hr-col" data-hrcol="${st}"><div class="hr-col-h">${esc(nm)}<span>${list.length}</span></div><div class="hr-col-b">${list.map(c => `<button class="hr-cand" data-hrcand="${c.id}">
+    <div class="hr-cand-top">${scoreChip(c)}<b>${esc(c.name)}</b></div>
+    ${c.screen ? `<div class="hr-cand-v">${esc(c.screen.verdict || '')}</div>` : '<div class="hr-cand-v muted">ждёт скрининга…</div>'}
+    <div class="hr-cand-t">${ago(c.createdAt)}</div>
+  </button>`).join('') || '<div class="hr-col-empty">пусто</div>'}</div></div>`; };
   root.innerHTML = `
     <div class="glass card hr-hero">
-      <div class="hr-hero-t">${ic(I.users)}HR · подбор команды <span class="beta-badge">бета · в разработке</span></div>
-      <div class="hr-hero-s">Хантинг брокеров и сотрудников: воронка кандидатов, ИИ-скрининг откликов и резюме, база кандидатов, авто-задачи на интервью, онбординг новичка со связкой с Академией. Раздел собирается — функции подключаются в ближайших обновлениях.</div>
+      <div class="hr-hero-t">${ic(I.users)}HR · подбор команды</div>
+      <div class="hr-hero-s">Своя брендированная форма отклика (без Google-форм), ИИ-скрининг кандидатов и воронка подбора. Хантинг через Threads/Instagram — на подходе.</div>
+      <div class="hr-bar">
+        <button class="btn btn-accent" id="hrShare">${ic(I.link || I.copy)}Ссылка на вакансию${sh.on ? ' · вкл' : ''}</button>
+        <button class="btn" id="hrForm">${ic(I.edit || I.doc)}Конструктор формы</button>
+        <button class="btn" id="hrVac">${ic(I.spark)}Вакансия</button>
+      </div>
     </div>
-    <div class="hr-board">${STAGES.map(([n, cnt]) => `<div class="hr-col"><div class="hr-col-h">${esc(n)}<span>${cnt}</span></div><div class="hr-col-b">${cnt ? '' : '<div class="hr-col-empty">пусто</div>'}</div></div>`).join('')}</div>
-    <div class="glass card hr-plan"><div class="card-title">${ic(I.spark)}Что появится в разделе<span class="sub">дорожная карта</span></div>
-      <ul class="hr-plan-list">
-        <li>${ic(I.check, 2)}Умный конструктор формы отклика — персональной, в стилистике агентства (больше не нужны Google-формы)</li>
-        <li>${ic(I.check, 2)}ИИ-скрининг входящих откликов: первичная квалификация кандидата прямо в переписке</li>
-        <li>${ic(I.check, 2)}Хантинг через Threads: авто-постинг вакансий, авто-ответ и авто-реплай в директ → перевод на онбординг</li>
-        <li>${ic(I.check, 2)}Приём заявок через директ в Instagram</li>
-        <li>${ic(I.check, 2)}Конструктор вакансии + одностраничник-презентация «что предлагаем»</li>
-        <li>${ic(I.check, 2)}Воронка кандидатов: отклики → скрининг → интервью → оффер → вышел</li>
-        <li>${ic(I.check, 2)}Онбординг нового брокера + связка с внутренней Академией</li>
-      </ul></div>`;
+    <div class="hr-board">${HR_STAGES.map(([st, nm]) => col(st, nm)).join('')}</div>
+    ${cands.some(c => c.stage === 'rejected') ? `<div style="margin-top:12px">${coll('Отклонённые', `<div class="hr-board" style="grid-template-columns:1fr">${col('rejected', 'Отклонены')}</div>`, { open: false, count: cands.filter(c => c.stage === 'rejected').length })}</div>` : ''}`;
+  const reload = () => PAGES.hr(root);
+  /* карточка кандидата */
+  $$('[data-hrcand]', root).forEach(b => b.addEventListener('click', () => {
+    const c = cands.find(x => x.id === b.dataset.hrcand); if (!c) return;
+    const sc = c.screen;
+    const bd = modal({ wide: true, title: c.name, sub: HR_STNAME[c.stage || 'new'] + ' · ' + ago(c.createdAt), body: `
+      <div class="hr-det">
+        <div class="hr-det-ans">${Object.entries(c.answers || {}).map(([k, v]) => `<div class="hr-ans"><span>${esc(k)}</span><div>${esc(v).replace(/\n/g, '<br>')}</div></div>`).join('')}</div>
+        <div class="hr-det-ai" id="hrAi">${sc ? hrScreenHtml(sc) : `<div class="hr-ai-empty">${ic(I.spark, 2)}<div>ИИ ещё не оценил кандидата</div><button class="btn btn-sm btn-accent" id="hrScreen">${ic(I.spark)}Скрининг ИИ</button></div>`}</div>
+      </div>
+      <div class="hr-stagebar">${HR_STAGES.concat([['rejected', 'Отклонить']]).map(([st, nm]) => `<button class="hr-stbtn ${st === (c.stage || 'new') ? 'on' : ''} ${st === 'rejected' ? 'rej' : ''}" data-hrst="${st}">${esc(nm)}</button>`).join('')}<span class="tb-spacer"></span><button class="btn-ghost" id="hrDel" title="Удалить">${ic(I.x)}</button></div>`,
+      actions: [{ label: 'Закрыть' }] });
+    const doScreen = async (btn) => { if (btn) { btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Оцениваю…'; } try { const r = await api.post('/hr/candidates/' + c.id + '/screen', {}); c.screen = r.screen; c.stage = c.stage === 'new' ? 'screen' : c.stage; $('#hrAi', bd).innerHTML = hrScreenHtml(r.screen); toast('Скрининг готов', 'Балл ' + r.screen.score, true); } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Скрининг ИИ'; } } };
+    const sb = $('#hrScreen', bd); if (sb) sb.addEventListener('click', () => doScreen(sb));
+    $$('[data-hrst]', bd).forEach(x => x.addEventListener('click', async () => { try { await api.patch('/hr/candidates/' + c.id, { stage: x.dataset.hrst }); toast('Стадия обновлена', HR_STNAME[x.dataset.hrst] || 'Отклонён', true); closeModal(); reload(); } catch (e) { toast('Не вышло', e.message); } }));
+    $('#hrDel', bd).addEventListener('click', async () => { if (!confirm('Удалить кандидата?')) return; try { await fetch('/api/hr/candidates/' + c.id, { method: 'DELETE' }); toast('Удалён', null, true); closeModal(); reload(); } catch (e) { toast('Не вышло', e.message); } });
+  }));
+  /* конструктор формы */
+  $('#hrForm', root).addEventListener('click', () => {
+    let fields = JSON.parse(JSON.stringify(form.fields || []));
+    const TYPES = [['text', 'Строка'], ['textarea', 'Абзац'], ['tel', 'Телефон'], ['email', 'E-mail'], ['select', 'Выбор']];
+    const bd = modal({ wide: true, title: 'Конструктор формы отклика', sub: 'Поля, которые увидит кандидат на публичной странице', body: `<div id="hrFlds"></div><button class="btn btn-sm" id="hrAddF" style="margin-top:8px">${ic(I.plus)}Добавить поле</button>`,
+      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async () => { try { await api.post('/hr/form', { fields }); toast('Форма сохранена', null, true); reload(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
+    const paint = () => { $('#hrFlds', bd).innerHTML = fields.map((f, i) => `<div class="hr-fld" data-fi="${i}">
+      <input class="hr-fl-l" value="${esc(f.label || '')}" placeholder="Название поля">
+      <select class="hr-fl-t">${TYPES.map(([v, n]) => `<option value="${v}" ${f.type === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <label class="hr-fl-r"><input type="checkbox" class="hr-fl-req" ${f.req ? 'checked' : ''}>обяз.</label>
+      <button class="btn-ghost hr-fl-x" title="Убрать">${ic(I.x)}</button></div>`).join('') || '<div class="muted" style="padding:8px">Нет полей. Добавь первое.</div>';
+      $$('.hr-fld', bd).forEach(row => { const i = +row.dataset.fi;
+        row.querySelector('.hr-fl-l').addEventListener('input', e => fields[i].label = e.target.value);
+        row.querySelector('.hr-fl-t').addEventListener('change', e => fields[i].type = e.target.value);
+        row.querySelector('.hr-fl-req').addEventListener('change', e => fields[i].req = e.target.checked);
+        row.querySelector('.hr-fl-x').addEventListener('click', () => { fields.splice(i, 1); paint(); });
+      }); };
+    $('#hrAddF', bd).addEventListener('click', () => { fields.push({ key: 'f' + Math.random().toString(36).slice(2, 6), label: '', type: 'text', req: false }); paint(); });
+    paint();
+  });
+  /* вакансия (текст + плюшки для публичной страницы) */
+  $('#hrVac', root).addEventListener('click', () => {
+    const v = form.vacancy || {};
+    const bd = modal({ wide: true, title: 'Вакансия', sub: 'Что видит кандидат на странице отклика', body: `
+      <div class="form-row"><label>Заголовок вакансии</label><input id="vT" value="${esc(v.title || '')}"></div>
+      <div class="form-row"><label>Описание (питч)</label><textarea id="vP" rows="3">${esc(v.pitch || '')}</textarea></div>
+      <div class="form-row"><label>Плюшки (по одной в строке)</label><textarea id="vK" rows="5">${esc((v.perks || []).join('\n'))}</textarea></div>`,
+      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async () => { try { await api.post('/hr/form', { vacancy: { title: $('#vT', bd).value, pitch: $('#vP', bd).value, perks: $('#vK', bd).value.split('\n').map(x => x.trim()).filter(Boolean) } }); toast('Вакансия сохранена', null, true); reload(); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Отмена' }] });
+  });
+  /* поделиться ссылкой */
+  $('#hrShare', root).addEventListener('click', () => {
+    const url = sh.url || (location.origin + '/apply/' + (sh.token || ''));
+    const bd = modal({ title: 'Ссылка на вакансию', sub: 'Публичная брендированная форма. Отклики падают в воронку + авто-скрининг ИИ.', body: `
+      <div class="set-row"><div class="sp"><div class="sl">Приём откликов</div><div class="sd">Форма доступна по ссылке</div></div><label class="switch"><input type="checkbox" id="hrOn" ${sh.on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="form-row"><label>Ссылка</label><div style="display:flex;gap:8px"><input id="hrUrl" readonly value="${esc(url)}"><button class="btn btn-sm" id="hrCopy">${ic(I.copy)}</button></div></div>
+      <div class="muted" style="font-size:11.5px">Кидай в Threads/Instagram/Telegram. Публикуй где угодно — отклики придут сюда.</div>`,
+      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async () => { try { await api.post('/hr/form/share', { on: $('#hrOn', bd).checked }); toast('Готово', $('#hrOn', bd).checked ? 'Приём откликов включён' : 'Форма закрыта', true); } catch (e) { toast('Не вышло', e.message); return false; } } }, { label: 'Закрыть' }] });
+    $('#hrCopy', bd).addEventListener('click', () => { navigator.clipboard.writeText($('#hrUrl', bd).value); toast('Ссылка скопирована', null, true); });
+  });
 };
+function hrScreenHtml(s) {
+  return `<div class="hr-ai"><div class="hr-ai-hd"><span class="hr-sc ${s.score >= 65 ? 'hi' : s.score >= 40 ? 'mid' : 'lo'}">${s.score}</span><b>${esc(s.verdict || '')}</b><span class="hr-ai-re">ИИ-оценка</span></div>
+    <div class="hr-ai-sum">${esc(s.summary || '')}</div>
+    ${(s.green || []).length ? `<div class="hr-ai-l"><span class="hr-ai-tag g">Плюсы</span>${(s.green || []).map(x => `<div>+ ${esc(x)}</div>`).join('')}</div>` : ''}
+    ${(s.red || []).length ? `<div class="hr-ai-l"><span class="hr-ai-tag r">Риски</span>${(s.red || []).map(x => `<div>− ${esc(x)}</div>`).join('')}</div>` : ''}
+    ${(s.nextq || []).length ? `<div class="hr-ai-l"><span class="hr-ai-tag q">Спросить на интервью</span>${(s.nextq || []).map(x => `<div>• ${esc(x)}</div>`).join('')}</div>` : ''}</div>`;
+}
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
   let auditLog = [];

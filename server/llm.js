@@ -344,6 +344,35 @@ ${src.slice(0, 4000)}
   return r;
 }
 
+/* HR-скрининг кандидата: по ответам формы оценивает пригодность на роль брокера, даёт саммари + вердикт + флаги */
+async function screenCandidate(cand, hr) {
+  const ans = Object.entries(cand.answers || {}).map(([k, v]) => `${k}: ${String(v).slice(0, 400)}`).join('\n');
+  const vac = (hr && hr.vacancy) || {};
+  const prompt = `Ты — HR агентства зарубежной недвижимости. Оцени кандидата на роль «${String(vac.title || 'брокер').slice(0, 80)}» по его анкете. Роль: работа с тёплыми лидами из рекламы, переписка и звонки, продажи недвижимости за рубежом.
+Оцени пригодность 0-100 (опыт продаж/недвижимости, коммуникабельность по тексту, мотивация, адекватность), дай короткое саммари для рекрутёра, вердикт-ярлык и флаги-на-что-обратить-внимание (красные и зелёные).
+
+АНКЕТА КАНДИДАТА:
+${ans || '(пусто)'}
+
+Ответь строго JSON:
+{"score":0-100,
+ "verdict":"1 короткая фраза: перспективный / средний / слабый / нужен звонок",
+ "summary":"2-3 предложения рекрутёру: кто это и стоит ли звать на интервью",
+ "green":["сильные стороны 1-3"],
+ "red":["риски/пробелы 0-3"],
+ "nextq":["2-3 вопроса, которые задать на интервью"]}`;
+  const out = await callGemini(prompt, 16000, 1000);
+  if (!out || typeof out.score === 'undefined') throw new Error('bad screen');
+  const arr = (a, n) => Array.isArray(a) ? a.slice(0, n).map(x => String(x).slice(0, 200)).filter(Boolean) : [];
+  return {
+    score: Math.max(0, Math.min(100, parseInt(out.score) || 0)),
+    verdict: String(out.verdict || '').slice(0, 60),
+    summary: humanize(String(out.summary || '')).slice(0, 500),
+    green: arr(out.green, 3), red: arr(out.red, 3), nextq: arr(out.nextq, 3),
+    at: Date.now(),
+  };
+}
+
 /* ИИ-сборка текстов подборки: интро + крючки/аргументы по каждому объекту из контекста лида */
 async function composeCollection(db, c, props, lead) {
   const q = lead ? lead.quals : null;
@@ -1055,6 +1084,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, humanize, mentalityBlock, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

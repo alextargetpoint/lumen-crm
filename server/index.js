@@ -265,6 +265,18 @@ const DEFAULT_PASS = 'lumen2026';
   if (!db.carousels) db.carousels = [];
   if (!db.learnLessons) db.learnLessons = [];    // внутренняя академия агентства: свои уроки (видео+текст)
   if (!db.settings.learn) db.settings.learn = { shareToken: crypto.randomBytes(6).toString('hex'), sharePassHash: '', shareOn: false };
+  if (!db.hrCandidates) db.hrCandidates = [];    // HR: отклики кандидатов (воронка подбора)
+  if (!db.settings.hr) db.settings.hr = {
+    formToken: crypto.randomBytes(6).toString('hex'), formOn: false,
+    vacancy: { title: 'Брокер по зарубежной недвижимости', pitch: 'Работа с тёплыми лидами из рекламы, обучение, высокий процент. Дубай · Бали · Пхукет.', perks: ['Тёплые лиды, без холодного обзвона', 'Обучение в нашей академии', 'Высокий процент со сделок', 'Удалённо, гибкий график'] },
+    fields: [
+      { key: 'name', label: 'Имя и фамилия', type: 'text', req: true },
+      { key: 'phone', label: 'Телефон / WhatsApp', type: 'tel', req: true },
+      { key: 'exp', label: 'Опыт в продажах/недвижимости', type: 'textarea', req: false },
+      { key: 'geo', label: 'Город проживания', type: 'text', req: false },
+      { key: 'why', label: 'Почему хотите к нам?', type: 'textarea', req: false },
+    ],
+  };
   if (!db.feed) db.feed = [];                    // лента агентства (корпоративная стена: новости/материалы/референсы/поздравления)
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
@@ -5288,6 +5300,64 @@ ${SCR}
       const lessons = (db.learnLessons || []).map(l => ({ id: l.id, title: l.title, cat: l.cat, video: l.video, body: l.body }));
       return json(res, 200, { lessons, agency: db.settings.agency.name });
     }
+    /* ═══ HR · ПОДБОР: конструктор формы + воронка кандидатов + ИИ-скрининг ═══ */
+    if (p === '/api/hr' && req.method === 'GET') {
+      const H = db.settings.hr || {};
+      return json(res, 200, { form: { fields: H.fields || [], vacancy: H.vacancy || {} }, candidates: db.hrCandidates || [], share: { on: !!H.formOn, token: H.formToken || '', url: `${global.LUMEN_BASE || ''}/apply/${H.formToken || ''}` } });
+    }
+    if (p === '/api/hr/form' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const H = db.settings.hr = db.settings.hr || {};
+      if (Array.isArray(b.fields)) H.fields = b.fields.slice(0, 20).map(f => ({ key: String(f.key || 'f' + Math.random().toString(36).slice(2, 6)).slice(0, 24), label: String(f.label || 'Поле').slice(0, 80), type: ['text', 'textarea', 'tel', 'email', 'select'].includes(f.type) ? f.type : 'text', req: !!f.req, opts: Array.isArray(f.opts) ? f.opts.map(o => String(o).slice(0, 60)).slice(0, 12) : undefined }));
+      if (b.vacancy) H.vacancy = { title: String(b.vacancy.title || '').slice(0, 120), pitch: String(b.vacancy.pitch || '').slice(0, 600), perks: Array.isArray(b.vacancy.perks) ? b.vacancy.perks.map(x => String(x).slice(0, 120)).slice(0, 8) : [] };
+      store.save();
+      return json(res, 200, { ok: true, form: { fields: H.fields, vacancy: H.vacancy } });
+    }
+    if (p === '/api/hr/form/share' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const H = db.settings.hr = db.settings.hr || {};
+      if (typeof b.on === 'boolean') H.formOn = b.on;
+      if (b.rotate || !H.formToken) H.formToken = crypto.randomBytes(6).toString('hex');
+      store.save();
+      return json(res, 200, { on: !!H.formOn, token: H.formToken, url: `${global.LUMEN_BASE || ''}/apply/${H.formToken}` });
+    }
+    if ((m = p.match(/^\/api\/hr\/candidates\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const c = (db.hrCandidates || []).find(x => x.id === m[1]); if (!c) return json(res, 404, { error: 'not found' });
+      if (b.stage && ['new', 'screen', 'interview', 'offer', 'hired', 'rejected'].includes(b.stage)) c.stage = b.stage;
+      if (typeof b.note === 'string') c.note = b.note.slice(0, 2000);
+      store.save(); return json(res, 200, { ok: true, candidate: c });
+    }
+    if ((m = p.match(/^\/api\/hr\/candidates\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      db.hrCandidates = (db.hrCandidates || []).filter(x => x.id !== m[1]); store.save(); return json(res, 200, { ok: true });
+    }
+    if ((m = p.match(/^\/api\/hr\/candidates\/([a-f0-9]+)\/screen$/)) && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+      const c = (db.hrCandidates || []).find(x => x.id === m[1]); if (!c) return json(res, 404, { error: 'not found' });
+      try { c.screen = await llm.screenCandidate(c, db.settings.hr || {}); if (c.stage === 'new') c.stage = 'screen'; store.save(); return json(res, 200, { screen: c.screen }); }
+      catch (e) { return json(res, 500, { error: e.message }); }
+    }
+    /* публичный приём отклика — ВНЕ /api (без сессии), rate-limited, авто-ИИ-скрининг */
+    if ((m = p.match(/^\/apply\/([a-z0-9]+)\/submit$/)) && req.method === 'POST') {
+      const H = db.settings.hr || {};
+      const lip = clientIp(req) || 'x'; db.settings.auth.throttle = db.settings.auth.throttle || {}; const TH = db.settings.auth.throttle; const nowT = Date.now();
+      const rk = 'apply:' + lip; const rec = TH[rk];
+      if (rec && rec.n && rec.t > nowT - 3600e3 && rec.n >= 8) return json(res, 429, { error: 'слишком много заявок' });   /* максимум 8 откликов/час с IP */
+      if (!H.formOn || m[1] !== H.formToken) return json(res, 404, { error: 'форма недоступна' });
+      const b = await readBody(req);
+      const answers = {}; (H.fields || []).forEach(f => { const v = (b.answers || {})[f.key]; if (v != null) answers[f.label] = String(v).slice(0, 1000); });
+      if (!Object.keys(answers).length) return json(res, 400, { error: 'пустая заявка' });
+      const nameField = (H.fields || []).find(f => f.key === 'name');
+      const c = { id: crypto.randomBytes(5).toString('hex'), name: (nameField && answers[nameField.label]) || 'Кандидат', answers, stage: 'new', createdAt: nowT, screen: null, note: '' };
+      db.hrCandidates.unshift(c);
+      TH[rk] = { n: (rec && rec.t > nowT - 3600e3 ? rec.n : 0) + 1, t: nowT };
+      store.save();
+      /* авто-скрининг ИИ в фоне (не блокируем ответ кандидату) */
+      if (llm.available()) { (async () => { try { c.screen = await llm.screenCandidate(c, H); c.stage = 'screen'; store.save(); } catch (e) { /* */ } })(); }
+      return json(res, 200, { ok: true });
+    }
     /* Оценка звонка: транскрипт → скоринг по рубрике + фидбэк + скрипты. Можно привязать к лиду. */
     if (p === '/api/call-review' && req.method === 'POST') {
       if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
@@ -6020,6 +6090,65 @@ var L=o.j.lessons||[],h='';for(var i=0;i<L.length;i++){var l=L[i];h+='<div class
 document.getElementById('list').innerHTML=h||'<div class=gate><p>Уроки скоро появятся.</p></div>'})}
 document.getElementById('go').addEventListener('click',open);
 document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')open()});
+</script>` : ''}
+</body></html>`);
+      return;
+    }
+    /* ================= публичная форма отклика: /apply/:token (брендированная) ================= */
+    if ((m = p.match(/^\/apply\/([a-z0-9]+)$/)) && req.method === 'GET') {
+      const H = db.settings.hr || {};
+      const ok = H.formOn && m[1] === H.formToken;
+      const AG = esc(db.settings.agency.name || 'Агентство');
+      const vac = H.vacancy || {};
+      const fields = ok ? (H.fields || []) : [];
+      const fieldHtml = fields.map(f => {
+        const req = f.req ? ' required' : ''; const id = 'f_' + esc(f.key);
+        const ctrl = f.type === 'textarea' ? `<textarea id="${id}" data-k="${esc(f.key)}"${req} rows="3"></textarea>`
+          : f.type === 'select' ? `<select id="${id}" data-k="${esc(f.key)}"${req}><option value="">—</option>${(f.opts || []).map(o => `<option>${esc(o)}</option>`).join('')}</select>`
+            : `<input id="${id}" data-k="${esc(f.key)}" type="${f.type === 'tel' ? 'tel' : f.type === 'email' ? 'email' : 'text'}"${req}>`;
+        return `<label class="fl"><span>${esc(f.label)}${f.req ? ' *' : ''}</span>${ctrl}</label>`;
+      }).join('');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Frame-Options': 'SAMEORIGIN' });
+      res.end(`<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Вакансия · ${AG}</title><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel=stylesheet>
+<style>:root{--nv:#0A1833;--ac:#2563EB;--bg:#F4F7FB;--ink:#111827;--mut:#667085;--st:#DCE3ED}
+*{box-sizing:border-box}body{margin:0;font-family:Manrope,sans-serif;background:linear-gradient(180deg,#0A1833,#132649);color:#fff;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+.wrap{max-width:560px;margin:0 auto;padding:44px 20px 80px}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9DB8FF;background:rgba(157,184,255,.14);padding:5px 12px;border-radius:20px;margin-bottom:16px}
+h1{font-size:30px;font-weight:800;line-height:1.12;margin:0 0 12px;letter-spacing:-.03em}
+.pitch{color:#B9C7E8;font-size:15px;line-height:1.55;margin-bottom:20px}
+.perks{list-style:none;padding:0;margin:0 0 28px;display:flex;flex-direction:column;gap:9px}
+.perks li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#DCE6FA}.perks li:before{content:'✓';color:#5EE0A8;font-weight:800;flex:none}
+.card{background:#fff;color:var(--ink);border-radius:20px;padding:26px 24px;box-shadow:0 30px 80px -30px rgba(0,0,0,.6)}
+.card h2{font-size:19px;margin:0 0 4px;color:var(--nv);letter-spacing:-.02em}.card .cs{color:var(--mut);font-size:13px;margin:0 0 18px}
+.fl{display:block;margin-bottom:14px}.fl>span{display:block;font-size:12.5px;font-weight:600;color:var(--nv);margin-bottom:6px}
+input,textarea,select{width:100%;padding:12px 14px;border:1px solid var(--st);border-radius:11px;font:inherit;font-size:15px;background:#fff;color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:2px solid color-mix(in srgb,var(--ac) 60%,transparent);outline-offset:1px;border-color:var(--ac)}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:var(--ac);color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer;margin-top:6px}
+.done{text-align:center;padding:40px 10px}.done h2{color:var(--nv);font-size:24px}.done p{color:var(--mut)}
+.err{color:#C0392B;font-size:13px;margin-bottom:10px;display:none}
+@media(max-width:520px){h1{font-size:25px}}
+</style></head><body><div class=wrap>
+<div class=badge>Вакансия · ${AG}</div>
+${ok ? `<h1>${esc(vac.title || 'Брокер по недвижимости')}</h1>
+<div class=pitch>${esc(vac.pitch || '')}</div>
+${(vac.perks || []).length ? `<ul class=perks>${(vac.perks || []).map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
+<div class=card id=card><h2>Оставить отклик</h2><div class=cs>Заполните — мы свяжемся в течение дня.</div>
+<div class=err id=err>Заполните обязательные поля</div>
+<form id=form>${fieldHtml}<button type=submit>Откликнуться</button></form></div>`
+        : `<h1>Вакансия недоступна</h1><div class=pitch>Приём откликов закрыт или ссылка устарела.</div>`}
+</div>
+${ok ? `<script>
+var TOKEN=${JSON.stringify(m[1])};
+document.getElementById('form').addEventListener('submit',function(e){e.preventDefault();
+var ans={},ok=true;var els=document.querySelectorAll('[data-k]');
+for(var i=0;i<els.length;i++){var el=els[i];if(el.required&&!el.value.trim()){ok=false;el.style.borderColor='#C0392B'}ans[el.getAttribute('data-k')]=el.value}
+if(!ok){document.getElementById('err').style.display='block';return}
+var btn=e.target.querySelector('button');btn.disabled=true;btn.textContent='Отправляем…';
+fetch('/apply/'+TOKEN+'/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:ans})}).then(function(r){return r.json().then(function(j){return{s:r.status,j:j}})}).then(function(o){
+if(o.s===200){document.getElementById('card').innerHTML='<div class=done><h2>Спасибо!</h2><p>Отклик получен. Мы свяжемся с вами в ближайшее время.</p></div>'}
+else{btn.disabled=false;btn.textContent='Откликнуться';document.getElementById('err').textContent=(o.j&&o.j.error)||'Не отправилось';document.getElementById('err').style.display='block'}
+})});
 </script>` : ''}
 </body></html>`);
       return;
