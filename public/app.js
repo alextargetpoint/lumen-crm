@@ -350,7 +350,8 @@ const NAV = {
   moodboard: { name: 'Карта желаний', icon: I.spark, sub: 'личная доска мотивации' },
   automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
-  academy:  { name: 'Академия продаж', icon: I.doc, sub: 'методология Ольги Синенко · 53 ролика' },
+  academy:  { name: 'Академия продаж', icon: I.doc, sub: 'продажи + рынки Дубай/Пхукет/Бали' },
+  learn:    { name: 'Академия агентства', icon: I.doc, sub: 'свои уроки: видео + текст, доступ по паролю' },
   callReview: { name: 'Оценка звонка', icon: I.phone, sub: 'ИИ-разбор звонка по методологии' },
   ads:       { name: 'Атрибуция · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление' },
   mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
@@ -378,7 +379,7 @@ const WORKSPACES = {
   base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
   ads:    { label: 'Реклама',         icon: I.target,   pages: ['mediaplan', 'ads'] },
   analytics: { label: 'Аналитика',   icon: I.bars,     pages: ['analytics', 'adsAnalytics'] },
-  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates'] },
+  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'learn', 'callReview', 'automations', 'templates'] },
   config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
 const PARENT_OF = {};
@@ -5140,8 +5141,8 @@ PAGES.academy = async (root) => {
   const s = d.stats || {};
   root.innerHTML = `
     ${heroArt('assets/art/book.png', `
-      <div class="ha-title">${ic(I.doc)}Академия продаж<span class="sub">${s.cards || 0} приёмов · ${s.videos || 0} роликов Ольги Синенко · вшито в ИИ</span></div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Методология закрытия сделок: скрипты, вопросы, цепочки разговора, возражения, ошибки. На этой базе работают «Оценка звонка» и подсказки ИИ в карточке лида.</span></div>
+      <div class="ha-title">${ic(I.doc)}Академия продаж<span class="sub">${s.cards || 0} приёмов · ${s.videos || 0} роликов · продажи + рынки · вшито в ИИ</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Продажи (скрипты, вопросы, возражения, закрытие) + рынки Дубая, Пхукета и Бали (районы, доходность, застройщики, риски). На базе продаж работают «Оценка звонка» и подсказки ИИ.</span></div>
     `, { v: 'right', hue: '#B87E4B' })}
     <div class="pb-layout">
       <div class="pb-nav glass">
@@ -5169,6 +5170,70 @@ PAGES.academy = async (root) => {
   $$('[data-acles]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.acLes = +b.dataset.acles; render(); }));
   $$('.pb-acc-hd', root).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
   $$('[data-acsrc]', root).forEach(b => b.addEventListener('click', () => acadDetail(b.dataset.acsrc, b.dataset.achd)));
+};
+/* ═══ Академия агентства: свои уроки (видео+текст) + доступ по паролю ═══ */
+PAGES.learn = async (root) => {
+  const d = await api.get('/learn');
+  const lessons = d.lessons || [], sh = d.share || {};
+  const isOwner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
+  root.innerHTML = `
+    ${heroArt('assets/art/book.png', `
+      <div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')} · свои материалы для команды</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Записывай уроки (видео + текст), ИИ причешет текст в аккуратную структуру, а новым брокерам открывай доступ по защищённой ссылке с паролем.</span></div>
+    `, { v: 'right', hue: '#B87E4B' })}
+    ${isOwner ? `<div class="lrn-bar">
+      <button class="btn btn-accent" id="lrnNew">${ic(I.plus)}Новый урок</button>
+      <button class="btn" id="lrnShare">${ic(I.link || I.copy)}Доступ для брокеров${sh.on ? ' · вкл' : ''}</button>
+    </div>` : ''}
+    <div class="lrn-grid">${lessons.length ? lessons.map(l => `<div class="glass card lrn-card" data-lrn="${l.id}">
+      ${l.video ? `<div class="lrn-vid" data-emb="${esc(l.video)}"></div>` : ''}
+      ${l.cat ? `<div class="lrn-cat">${esc(l.cat)}</div>` : ''}
+      <div class="lrn-t">${esc(l.title)}</div>
+      <div class="lrn-b md-note">${mdNote((l.body || '').slice(0, 600))}</div>
+      ${isOwner ? `<div class="lrn-acts"><button class="btn btn-sm" data-lrnedit="${l.id}">${ic(I.edit || I.doc)}Править</button><button class="btn-ghost" data-lrndel="${l.id}" title="Удалить">${ic(I.x)}</button></div>` : ''}
+    </div>`).join('') : `<div class="glass card empty">${isOwner ? 'Уроков пока нет. Нажми «Новый урок» — добавь видео и текст, ИИ причешет.' : 'Уроки скоро появятся.'}</div>`}</div>`;
+  /* встроить видео-превью */
+  $$('[data-emb]', root).forEach(el => { const e = embedFromUrl(el.dataset.emb); if (e) el.innerHTML = e; else el.remove(); });
+  if (!isOwner) return;
+  const openEditor = (les) => {
+    const bd = modal({ wide: true, title: les ? 'Правка урока' : 'Новый урок', body: `
+      <div class="form-row"><label>Заголовок</label><input id="leT" value="${esc((les && les.title) || '')}" placeholder="Напр. Как вести первый звонок"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Категория</label><input id="leC" value="${esc((les && les.cat) || '')}" placeholder="Продажи / Онбординг / Скрипты"></div>
+        <div class="form-row"><label>Ссылка на видео (YouTube/Reels/TikTok/.mp4)</label><input id="leV" value="${esc((les && les.video) || '')}" placeholder="https://…"></div>
+      </div>
+      <div class="form-row"><label style="display:flex;align-items:center;justify-content:space-between">Текст урока <button type="button" class="btn btn-sm" id="leTidy">${ic(I.spark)}Причесать ИИ</button></label>
+        <textarea id="leB" rows="9" placeholder="Впиши или надиктуй 🎤 — потом «Причесать» приведёт в аккуратную структуру (заголовки, буллеты, выделения)">${esc((les && les.body) || '')}</textarea></div>`,
+      actions: [{ label: les ? 'Сохранить' : 'Создать урок', cls: 'btn-accent', onClick: async (bd) => {
+        const body = { title: $('#leT', bd).value.trim() || 'Урок', cat: $('#leC', bd).value.trim(), video: $('#leV', bd).value.trim(), body: $('#leB', bd).value };
+        if (les) body.id = les.id;
+        try { await api.post('/learn', body); toast(les ? 'Урок сохранён' : 'Урок создан', null, true); PAGES.learn(root); } catch (e) { toast('Не вышло', e.message); return false; }
+      } }, { label: 'Отмена' }],
+    });
+    wireDictate(bd);
+    const tidy = $('#leTidy', bd); if (tidy) tidy.addEventListener('click', async () => {
+      const ta = $('#leB', bd), src = ta.value.trim(); if (!src) { toast('Пусто', 'Сначала впиши или надиктуй текст'); return; }
+      tidy.disabled = true; const old = tidy.innerHTML; tidy.innerHTML = ic(I.spark) + 'Причёсываю…';
+      try { const r = await api.post('/tidy-note', { text: src, ctx: 'урок внутренней академии агентства недвижимости' }); if (r && r.text) { ta.value = r.text; toast('Готово', 'ИИ структурировал текст', true); } } catch (e) { toast('Не вышло', e.message); }
+      tidy.disabled = false; tidy.innerHTML = old;
+    });
+    setTimeout(() => { const i = $('#leT', bd); if (i) i.focus(); }, 30);
+  };
+  const nb = $('#lrnNew', root); if (nb) nb.addEventListener('click', () => openEditor(null));
+  $$('[data-lrnedit]', root).forEach(b => b.addEventListener('click', () => openEditor(lessons.find(l => l.id === b.dataset.lrnedit))));
+  $$('[data-lrndel]', root).forEach(b => b.addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + b.dataset.lrndel, { method: 'DELETE' }); toast('Удалён', null, true); PAGES.learn(root); } catch (e) { toast('Не вышло', e.message); } }));
+  const shB = $('#lrnShare', root); if (shB) shB.addEventListener('click', () => {
+    const bd = modal({ title: 'Доступ для брокеров', sub: 'Защищённая ссылка + пароль. Только просмотр уроков, ничего лишнего.', body: `
+      <div class="set-row"><div class="sp"><div class="sl">Открыть доступ по ссылке</div><div class="sd">Новые брокеры смогут смотреть уроки по паролю</div></div><label class="switch"><input type="checkbox" id="shOn" ${sh.on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="form-row"><label>Пароль ${sh.hasPass ? '(задан — впиши, чтобы сменить)' : ''}</label><input id="shPw" type="text" placeholder="${sh.hasPass ? '•••••• задан' : 'придумай пароль'}"></div>
+      <div class="form-row"><label>Ссылка</label><div style="display:flex;gap:8px"><input id="shUrl" readonly value="${esc(sh.url || (location.origin + '/learn/' + (sh.token || '')))}"><button class="btn btn-sm" id="shCopy">${ic(I.copy)}</button></div></div>`,
+      actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+        const payload = { on: $('#shOn', bd).checked }; const pw = $('#shPw', bd).value.trim(); if (pw) payload.password = pw;
+        try { await api.post('/learn/share', payload); toast('Доступ обновлён', payload.on ? 'Ссылка активна' : 'Ссылка закрыта', true); } catch (e) { toast('Не вышло', e.message); return false; }
+      } }, { label: 'Закрыть' }],
+    });
+    const cp = $('#shCopy', bd); if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText($('#shUrl', bd).value); toast('Ссылка скопирована', null, true); });
+  });
 };
 // «Второй формат»: глубокое чтение — полная расшифровка ролика-источника + ссылка на видео.
 async function acadDetail(vid, heading) {

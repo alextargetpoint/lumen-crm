@@ -263,6 +263,8 @@ const DEFAULT_PASS = 'lumen2026';
   ];
   if (!db.collections) db.collections = [];
   if (!db.carousels) db.carousels = [];
+  if (!db.learnLessons) db.learnLessons = [];    // внутренняя академия агентства: свои уроки (видео+текст)
+  if (!db.settings.learn) db.settings.learn = { shareToken: crypto.randomBytes(6).toString('hex'), sharePassHash: '', shareOn: false };
   if (!db.feed) db.feed = [];                    // лента агентства (корпоративная стена: новости/материалы/референсы/поздравления)
   if (!db.socialContent) db.socialContent = []; // сценарии/посты/хантинг — история генераций соц-помощника
   if (!db.ideaBank) db.ideaBank = [];           // копилка идей брокера (Tinder + диктофон)
@@ -5238,6 +5240,54 @@ ${SCR}
         return json(res, 200, { vid, title: academy.VTITLES[vid] || vid, url: academy.ytUrl(vid), text: t });
       } catch (e) { return json(res, 500, { error: 'нет файла расшифровок' }); }
     }
+    /* ═══ ВНУТРЕННЯЯ АКАДЕМИЯ АГЕНТСТВА: свои уроки (видео+текст) + защищённый шэринг новым брокерам ═══ */
+    if (p === '/api/learn' && req.method === 'GET') {
+      const L = db.settings.learn || {};
+      return json(res, 200, { lessons: db.learnLessons || [], share: { on: !!L.shareOn, hasPass: !!L.sharePassHash, url: `${global.LUMEN_BASE || ''}/learn/${L.shareToken || ''}`, token: L.shareToken || '' } });
+    }
+    if (p === '/api/learn' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req);
+      const clean = { title: String(b.title || 'Урок').slice(0, 160), cat: String(b.cat || '').slice(0, 60), video: String(b.video || '').slice(0, 500), body: String(b.body || '').slice(0, 20000) };
+      let les;
+      if (b.id) { les = (db.learnLessons || []).find(x => x.id === b.id); if (!les) return json(res, 404, { error: 'not found' }); Object.assign(les, clean, { updatedAt: Date.now() }); }
+      else { les = { id: crypto.randomBytes(5).toString('hex'), ...clean, createdAt: Date.now(), updatedAt: Date.now() }; db.learnLessons.unshift(les); }
+      store.save();
+      return json(res, 200, { lesson: les });
+    }
+    if ((m = p.match(/^\/api\/learn\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      db.learnLessons = (db.learnLessons || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (p === '/api/learn/share' && req.method === 'POST') {
+      { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
+      const b = await readBody(req); const L = db.settings.learn = db.settings.learn || {};
+      if (typeof b.on === 'boolean') L.shareOn = b.on;
+      if (b.password != null && String(b.password)) L.sharePassHash = sha(String(b.password));
+      if (b.clearPass) L.sharePassHash = '';
+      if (b.rotate) L.shareToken = crypto.randomBytes(6).toString('hex');
+      if (!L.shareToken) L.shareToken = crypto.randomBytes(6).toString('hex');
+      store.save();
+      return json(res, 200, { on: !!L.shareOn, hasPass: !!L.sharePassHash, url: `${global.LUMEN_BASE || ''}/learn/${L.shareToken}`, token: L.shareToken });
+    }
+    /* публичный доступ по паролю (read-only, rate-limited, отдаём только безопасные поля).
+       ВНЕ /api/ — иначе перехватит гейт сессии (публичная ссылка без логина). */
+    if ((m = p.match(/^\/learn\/([a-z0-9]+)\/data$/)) && req.method === 'POST') {
+      const L = db.settings.learn || {};
+      const lip = clientIp(req) || 'x'; db.settings.auth.throttle = db.settings.auth.throttle || {}; const TH = db.settings.auth.throttle; const nowT = Date.now();
+      const rec = TH['learn:' + lip];
+      if (rec && rec.until && rec.until > nowT) { await new Promise(r => setTimeout(r, 500)); return json(res, 429, { error: 'слишком много попыток' }); }
+      if (!L.shareOn || m[1] !== L.shareToken) return json(res, 404, { error: 'ссылка недоступна' });
+      const b = await readBody(req);
+      if (L.sharePassHash && sha(String(b.password || '')) !== L.sharePassHash) {
+        const r2 = TH['learn:' + lip] = TH['learn:' + lip] || { fails: 0 }; r2.fails++; if (r2.fails >= 5) r2.until = nowT + Math.min(15 * 60000, 15000 * Math.pow(2, r2.fails - 5)); store.save();
+        await new Promise(r => setTimeout(r, 500)); return json(res, 401, { error: 'неверный пароль' });
+      }
+      delete TH['learn:' + lip];
+      const lessons = (db.learnLessons || []).map(l => ({ id: l.id, title: l.title, cat: l.cat, video: l.video, body: l.body }));
+      return json(res, 200, { lessons, agency: db.settings.agency.name });
+    }
     /* Оценка звонка: транскрипт → скоринг по рубрике + фидбэк + скрипты. Можно привязать к лиду. */
     if (p === '/api/call-review' && req.method === 'POST') {
       if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
@@ -5918,6 +5968,62 @@ document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fet
       return;
     }
 
+    /* ================= публичная страница внутренней академии: /learn/:token (пароль) ================= */
+    if ((m = p.match(/^\/learn\/([a-z0-9]+)$/)) && req.method === 'GET') {
+      const L = db.settings.learn || {};
+      const ok = L.shareOn && m[1] === L.shareToken;
+      const AG = esc(db.settings.agency.name || 'Академия');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Frame-Options': 'SAMEORIGIN' });
+      res.end(`<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Академия · ${AG}</title><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel=stylesheet>
+<style>:root{--nv:#0A1833;--ac:#2563EB;--bg:#F4F7FB;--ink:#111827;--mut:#667085;--st:#DCE3ED}
+*{box-sizing:border-box}body{margin:0;font-family:Manrope,sans-serif;background:linear-gradient(180deg,#F6F9FD,var(--bg) 40%);color:var(--ink);-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:40px 20px 80px}
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:8px}.hd b{font-family:Fraunces,serif;font-size:26px;color:var(--nv);font-weight:600}
+.sub{color:var(--mut);font-size:14px;margin-bottom:28px}
+.gate{max-width:400px;margin:60px auto;background:#fff;border:1px solid var(--st);border-radius:18px;padding:28px;box-shadow:0 14px 40px -18px rgba(16,43,92,.2)}
+.gate h1{font-family:Fraunces,serif;font-size:22px;margin:0 0 6px;color:var(--nv)}.gate p{color:var(--mut);font-size:13px;margin:0 0 18px}
+input{width:100%;padding:12px 14px;border:1px solid var(--st);border-radius:11px;font:inherit;font-size:15px;margin-bottom:12px}
+button{width:100%;padding:12px;border:0;border-radius:11px;background:var(--ac);color:#fff;font:inherit;font-weight:650;font-size:15px;cursor:pointer}
+.err{color:#C0392B;font-size:13px;margin-bottom:10px;display:none}
+.les{background:#fff;border:1px solid var(--st);border-radius:18px;padding:22px 24px;margin-bottom:18px;box-shadow:0 8px 24px -14px rgba(16,43,92,.16)}
+.les .cat{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ac);margin-bottom:6px}
+.les h2{font-family:Fraunces,serif;font-size:21px;color:var(--nv);margin:0 0 12px;font-weight:600}
+.les .md{font-size:14.5px;line-height:1.6;color:#243049}.les .md h4{font-family:Fraunces,serif;font-size:16px;color:var(--nv);margin:14px 0 6px}.les .md b{color:var(--nv)}
+.les .md ul{padding-left:2px;list-style:none}.les .md li{position:relative;padding-left:18px;margin:5px 0}.les .md li:before{content:'';position:absolute;left:4px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--ac)}
+.emb{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;margin-bottom:14px;background:#0b1220}
+.emb.vert{aspect-ratio:9/16;max-width:340px}
+@media(prefers-color-scheme:dark){body{background:#0b1220;color:#e6ebf5}.les,.gate{background:#141d30;border-color:#22314c}.les h2,.gate h1,.hd b,.les .md h4,.les .md b{color:#fff}}
+</style></head><body><div class=wrap>
+<div class=hd><b>Академия ${AG}</b></div><div class=sub>Внутренние уроки для команды</div>
+${ok ? `<div id=gate class=gate><h1>Доступ по паролю</h1><p>Введите пароль, который дал руководитель.</p><div class=err id=err>Неверный пароль</div><input id=pw type=password placeholder="Пароль" autofocus><button id=go>Открыть</button></div><div id=list></div>` : `<div class=gate><h1>Ссылка недоступна</h1><p>Доступ к академии закрыт или ссылка устарела. Запросите актуальную у руководителя.</p></div>`}
+</div>
+${ok ? `<script>
+var TOKEN=${JSON.stringify(m[1])};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function md(s){var t=esc(s).split(/\\r?\\n/),h='',ul=false;function cl(){if(ul){h+='</ul>';ul=false}}
+for(var i=0;i<t.length;i++){var ln=t[i],mm;if(!ln.trim()){cl();continue}
+if(mm=ln.match(/^\\s*#{2,3}\\s+(.*)/)){cl();h+='<h4>'+inl(mm[1])+'</h4>';continue}
+if(mm=ln.match(/^\\s*[-*]\\s+(.*)/)){if(!ul){h+='<ul>';ul=true}h+='<li>'+inl(mm[1])+'</li>';continue}
+cl();h+='<p>'+inl(ln)+'</p>'}cl();return h}
+function inl(x){return x.replace(/\\*\\*(.+?)\\*\\*/g,'<b>$1</b>')}
+function emb(u){u=String(u||'').trim();var m;if(!u)return '';
+if(m=u.match(/instagram\\.com\\/(reels?|p|tv)\\/([\\w-]+)/i))return '<iframe class="emb vert" src="https://www.instagram.com/'+(/^reel/i.test(m[1])?'reel':m[1])+'/'+m[2]+'/embed/" frameborder=0 scrolling=no allowtransparency=true loading=lazy></iframe>';
+if(m=u.match(/tiktok\\.com\\/.*?(\\d{15,})/i))return '<iframe class="emb vert" src="https://www.tiktok.com/embed/v2/'+m[1]+'" frameborder=0 loading=lazy></iframe>';
+if(m=u.match(/(?:youtube\\.com\\/(?:watch\\?v=|shorts\\/)|youtu\\.be\\/)([\\w-]{6,})/i))return '<iframe class=emb src="https://www.youtube.com/embed/'+m[1]+'" frameborder=0 allowfullscreen loading=lazy></iframe>';
+if(/\\.(mp4|webm|mov)(\\?|$)/i.test(u))return '<video class=emb src="'+esc(u)+'" controls playsinline></video>';return ''}
+function open(){var pw=document.getElementById('pw').value;
+fetch('/learn/'+TOKEN+'/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})}).then(function(r){return r.json().then(function(j){return{s:r.status,j:j}})}).then(function(o){
+if(o.s!==200){document.getElementById('err').style.display='block';return}
+document.getElementById('gate').style.display='none';
+var L=o.j.lessons||[],h='';for(var i=0;i<L.length;i++){var l=L[i];h+='<div class=les>'+(l.cat?'<div class=cat>'+esc(l.cat)+'</div>':'')+'<h2>'+esc(l.title)+'</h2>'+emb(l.video)+'<div class=md>'+md(l.body)+'</div></div>'}
+document.getElementById('list').innerHTML=h||'<div class=gate><p>Уроки скоро появятся.</p></div>'})}
+document.getElementById('go').addEventListener('click',open);
+document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')open()});
+</script>` : ''}
+</body></html>`);
+      return;
+    }
     /* ================= карусель для соцсетей: /car/:id ================= */
     if ((m = p.match(/^\/car\/([a-f0-9]+)$/)) && req.method === 'GET') {
       const c = db.carousels.find(x => x.id === m[1]);
