@@ -983,7 +983,7 @@ async function ideaSwipe(kind, ctx, repaint) {
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 /* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
-const OV_DEFAULT = ['kpi', 'attention', 'funnel', 'tasks', 'hotleads', 'goal', 'aivs', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders', 'parlo'];
+const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'leadsources', 'hotleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -998,7 +998,7 @@ const OV_VARIANT = {
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, parlo: 6 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6 };
 
 /* ─── motion-слой: тонкая видео-атмосфера на hero/AI-зонах (ПРЕМИУМ-АКЦЕНТ, не дефолт) ───
    cost-safe: переиспользуем уже сгенерённые лупы, НЕ генерим новое видео */
@@ -1484,13 +1484,50 @@ const OV_W = {
     const body = cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('');
     return hd + body;
   } },
-  parlo: { name: 'Переводчик звонков', icon: () => I.phone, render: () => {
-    return `<div class="ov2-card-hd">${ic(I.phone)}Переводчик звонков<span>звоните на языке клиента</span><button class="btn btn-sm" data-ovgo="parlo">Открыть</button></div>
-    <button class="ov-plo" data-ovgo="parlo">
-      <span class="ov-plo-ic">${ic(I.spark)}</span>
-      <span class="ov-plo-t"><b>Parlo — ваш голос на их языке</b><span>Перевод звонка в реальном времени вашим голосом + подсказки ответа. EN · IT · DE · FR</span></span>
-      <span class="ov-plo-go">${ic(I.arrow)}</span>
-    </button>`;
+  /* ⭐ Отчёт клиенту — сводка лидогенерации в формате агентства + отправка/PDF/ссылка */
+  clientreport: { name: 'Отчёт клиенту', icon: () => I.doc, render: (c) => {
+    const L = c.leads || [], now = Date.now(), wk = now - 7 * 864e5, pw = now - 14 * 864e5;
+    const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+    const nl = L.filter(l => l.createdAt && l.createdAt >= wk);
+    const pl = L.filter(l => l.createdAt && l.createdAt >= pw && l.createdAt < wk);
+    const nq = nl.filter(l => QUAL.includes(l.stage));
+    const conv = nl.length ? Math.round(nq.length / nl.length * 100) : 0;
+    return `<div class="ov2-card-hd">${ic(I.doc)}Отчёт клиенту<span>лидогенерация · формат агентства</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
+      <div class="ov-rep-nums">
+        <div class="ov-rep-n"><b>${nl.length}</b><span>лидов за неделю</span>${deltaChip(nl.length, pl.length)}</div>
+        <div class="ov-rep-n"><b>${nq.length}</b><span>целевых (${conv}%)</span></div>
+      </div>
+      <div class="ov-rep-acts"><button class="btn btn-sm btn-accent" data-ovrep="tg">${ic(I.send)}В Telegram</button><button class="btn btn-sm" data-ovrep="pdf">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-ovrep="link">${ic(I.link || I.copy)}Ссылка клиенту</button></div>`;
+  } },
+  /* ⭐ Реклама · связки — топ кампаний/адсетов по лидам (атрибуция из лидов) */
+  adbundles: { name: 'Реклама · связки', icon: () => I.target, render: (c) => {
+    const L = c.leads || [], QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+    const B = {};
+    L.forEach(l => { if (l.ads && (l.ads.campaignName || l.ads.adName)) { const k = (l.ads.campaignName || '—') + (l.ads.adsetName ? ' · ' + l.ads.adsetName : ''); (B[k] = B[k] || { leads: 0, q: 0 }); B[k].leads++; if (QUAL.includes(l.stage)) B[k].q++; } });
+    const top = Object.entries(B).sort((a, b) => b[1].leads - a[1].leads).slice(0, 4);
+    const hd = `<div class="ov2-card-hd">${ic(I.target)}Реклама · связки<span>кампания · адсет</span><button class="btn btn-sm" data-ovgo="ads">Атрибуция</button></div>`;
+    if (!top.length) return hd + ovEmpty(I.target, 'Пока нет привязки к рекламе', 'Загрузите базу объявлений и сопоставьте лиды в разделе «Атрибуция · CAPI»', { label: 'К рекламе', go: 'ads', icon: I.arrow });
+    const mx = Math.max(...top.map(([, v]) => v.leads), 1);
+    return hd + `<div class="ov-bnd">${top.map(([k, v]) => `<div class="ov-bnd-row"><div class="ov-bnd-t">${esc(k)}<i>${v.leads} лид${v.leads === 1 ? '' : 'ов'} · ${v.q} целевых</i></div><div class="ov-bnd-bar"><span style="width:${Math.round(v.leads / mx * 100)}%"></span></div></div>`).join('')}</div>`;
+  } },
+  /* ⭐ Источники лидов — реклама / комментарии / импорт / другое */
+  leadsources: { name: 'Источники лидов', icon: () => I.funnel, render: (c) => {
+    const L = c.leads || [];
+    const cat = (l) => l.source === 'ad_comment' ? 'Комментарии рекламы' : (l.ads && l.ads.adId) ? 'Реклама · лид-формы' : l.source === 'import' ? 'Импорт / выгрузка' : l.source === 'broker_card' ? 'От брокера' : 'Прямые / другое';
+    const S = {}; L.forEach(l => S[cat(l)] = (S[cat(l)] || 0) + 1);
+    const rows = Object.entries(S).sort((a, b) => b[1] - a[1]);
+    const tot = L.length || 1;
+    const COL = { 'Реклама · лид-формы': '#2F6BFF', 'Комментарии рекламы': '#E08A6B', 'Импорт / выгрузка': '#7C5BD8', 'От брокера': '#2FA98C', 'Прямые / другое': '#9AA3B2' };
+    const hd = `<div class="ov2-card-hd">${ic(I.funnel)}Источники лидов<span>${L.length} всего</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
+    if (!rows.length) return hd + ovEmpty(I.funnel, 'Пока нет лидов', 'Источники появятся по мере поступления заявок');
+    return hd + `<div class="ov-src-bar">${rows.map(([k, v]) => `<span style="width:${v / tot * 100}%;background:${COL[k] || '#9AA3B2'}" title="${esc(k)}: ${v}"></span>`).join('')}</div>
+      <div class="ov-src-list">${rows.map(([k, v]) => `<div class="ov-src-row"><span class="ov-src-dot" style="background:${COL[k] || '#9AA3B2'}"></span><span class="ov-src-k">${esc(k)}</span><span class="ov-src-v">${v} · ${Math.round(v / tot * 100)}%</span></div>`).join('')}</div>`;
+  } },
+  /* ⭐ Контент-цех — запуск контент-инструментов */
+  contenthub: { name: 'Контент-цех', icon: () => I.layers, render: () => {
+    const tiles = [['Сценарии Reels', I.play], ['Хантинг идей', I.spark], ['Карусели', I.layers], ['Посты и сторис', I.doc]];
+    return `<div class="ov2-card-hd">${ic(I.layers)}Контент-цех<span>собери пост за 2 минуты</span><button class="btn btn-sm" data-ovgo="social">Открыть</button></div>
+      <div class="ov-launch">${tiles.map(([n, icn]) => `<button class="ov-launch-i" data-ovgo="social"><span class="ov-launch-ic">${ic(icn)}</span>${n}</button>`).join('')}</div>`;
   } },
 };
 
@@ -8266,6 +8303,14 @@ PAGES.agency = async (root) => {
     render();
   }));
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+  /* ⭐ виджет «Отчёт клиенту»: отправка в Telegram / PDF / ссылка */
+  $$('[data-ovrep]', root).forEach(b => b.addEventListener('click', async () => {
+    const k = (STATE.settings.reports || {}).shareKey || ''; const url = `${location.origin}/report?period=weekly&key=${k}`;
+    const a = b.dataset.ovrep;
+    if (a === 'tg') { try { const r = await api.post('/reports/test'); toast(r.sent === 'tg' ? 'Отчёт отправлен в Telegram' : 'Telegram не подключён — настрой в «Подключения»', null, r.sent === 'tg'); } catch (e) { toast('Не вышло', e.message); } }
+    else if (a === 'pdf') window.open(url + '&print=1', '_blank');
+    else if (a === 'link') { navigator.clipboard.writeText(url); toast('Ссылка на отчёт скопирована', 'read-only для клиента', true); }
+  }));
   /* живой бренд-превью: как агентство видит клиент на обложке подборки */
   const agPreview = () => {
     const name = ($('#agName') ? $('#agName').value : s.agency.name) || 'Агентство';

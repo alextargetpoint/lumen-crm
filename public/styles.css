@@ -2792,16 +2792,29 @@ body.has-preview { padding-top: 38px; }
 .ov-w-body { height: 100%; }
 @media (min-width: 1560px) { .ov2-grid { column-count: 3; } }
 .ov-w-body { padding: 16px; }
-/* виджет «Переводчик звонков» */
-.ov-plo { width: 100%; display: flex; align-items: center; gap: 13px; text-align: left; border: 1px solid var(--stroke); background: linear-gradient(135deg, color-mix(in srgb, #5C49E6 8%, var(--card)), var(--card)); border-radius: 14px; padding: 14px 15px; cursor: pointer; transition: transform .14s var(--ease-soft), box-shadow .16s, border-color .16s; margin-top: 4px; }
-.ov-plo:hover { transform: translateY(-2px); border-color: color-mix(in srgb, #5C49E6 40%, var(--stroke)); box-shadow: 0 12px 28px -14px rgba(94,73,230,.5); }
-.ov-plo-ic { width: 38px; height: 38px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #3E74FF, #6B4BE6); }
-.ov-plo-ic svg { width: 19px; height: 19px; }
-.ov-plo-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ov-plo-t b { font-size: 14px; font-weight: 650; color: var(--navy-900); }
-.ov-plo-t > span { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
-.ov-plo-go { flex: none; color: var(--ink-3); }
-.ov-plo-go svg { width: 16px; height: 16px; }
+/* виджеты обзора: отчёт клиенту / связки рекламы / источники / контент-launcher */
+.ov-rep-nums { display: flex; gap: 24px; margin: 4px 0 13px; flex-wrap: wrap; }
+.ov-rep-n { display: flex; flex-direction: column; gap: 3px; }
+.ov-rep-n b { font-family: var(--font-display); font-size: 27px; font-weight: 600; color: var(--navy-900); line-height: 1; letter-spacing: -.01em; }
+.ov-rep-n span { font-size: 12px; color: var(--ink-3); }
+.ov-rep-acts { display: flex; gap: 7px; flex-wrap: wrap; }
+.ov-bnd { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.ov-bnd-t { font-size: 13px; font-weight: 600; color: var(--navy-900); display: flex; flex-direction: column; gap: 2px; margin-bottom: 5px; }
+.ov-bnd-t i { font-style: normal; font-size: 11.5px; color: var(--ink-3); font-weight: 400; }
+.ov-bnd-bar { height: 7px; border-radius: 5px; background: var(--bg-2); overflow: hidden; }
+.ov-bnd-bar span { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7C4DFF)); }
+.ov-src-bar { display: flex; height: 12px; border-radius: 7px; overflow: hidden; margin: 4px 0 12px; gap: 2px; }
+.ov-src-bar span { display: block; min-width: 3px; }
+.ov-src-list { display: flex; flex-direction: column; gap: 8px; }
+.ov-src-row { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.ov-src-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ov-src-k { flex: 1; color: var(--navy-900); }
+.ov-src-v { color: var(--ink-3); font-weight: 600; font-size: 12px; }
+.ov-launch { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 4px; }
+.ov-launch-i { display: flex; align-items: center; gap: 9px; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 13px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--navy-900); cursor: pointer; font-family: inherit; transition: border-color .14s, transform .14s, box-shadow .14s; }
+.ov-launch-i:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--accent) 50%, transparent); }
+.ov-launch-ic { width: 32px; height: 32px; flex: none; border-radius: 9px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ov-launch-ic svg { width: 16px; height: 16px; }
 .ov2-grid.editing .ov-w { border: 1px dashed var(--stroke); border-radius: calc(var(--r-md) + 4px); padding: 4px; background: var(--bg-2); }
 .ov2-grid.editing .ov-w.drag { opacity: .45; }
 .ov2-grid.editing .ov-w.ov-over { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
