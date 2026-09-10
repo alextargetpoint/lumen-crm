@@ -4672,7 +4672,15 @@ function newCampaignModal() {
         <div class="form-row"><label>Направление</label><select id="cGeo"><option value="">Все</option>${s.agency.geos.map(g => `<option value="${g}">${s.geoNames[g]}</option>`).join('')}</select></div>
         <div class="form-row"><label>Молчат дольше</label><select id="cOlder">${olderOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
       </div>
-      <div class="form-row"><label>Сегмент</label><select id="cSeg">${segOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Сегмент</label><select id="cSeg">${segOpts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Но не дольше</label><select id="cMax"><option value="">без ограничения</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Источник</label><select id="cSrc"><option value="">Любой</option><option value="ad_comment">Комментарии рекламы</option><option value="ctwa">Клик в WhatsApp (реклама)</option><option value="import">Импорт / выгрузка</option><option value="broker_card">От брокера</option><option value="wa_inbound">Входящий WhatsApp</option></select></div>
+        <div class="form-row"><label>Брокер</label><select id="cBrk"><option value="">Любой</option><option value="none">Без брокера</option>${(STATE.brokers || []).map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row"><label>Теги (через запятую) — по желанию</label><input id="cTags" placeholder="напр. инвестор, VIP, горячий"></div>
       <div class="cmp-count" id="cCountBox"><span class="cmp-count-dot"></span><b id="cCount">…</b> получателей под эти условия</div>
       <div class="form-row" style="margin-top:2px"><label style="display:flex;align-items:center;justify-content:space-between">Шаблон первого касания <button class="btn-ghost" id="cTplNew" type="button" style="font-size:11px">${ic(I.plus)}Создать шаблон реанимации</button></label>
         <select id="cTpl">${marketingTpls.length ? marketingTpls.map(t => `<option value="${t.id}" ${t.status !== 'approved' ? 'disabled' : ''}>${esc(t.name)}${t.status !== 'approved' ? ' · на модерации' : ''}</option>`).join('') : '<option value="" disabled>Нет marketing-шаблонов — создайте</option>'}</select></div>
@@ -4698,7 +4706,7 @@ function newCampaignModal() {
         const startAt = dv ? new Date(dv + 'T' + tv).getTime() : null;
         const body = {
           name: $('#cName', bd).value, templateId: $('#cTpl', bd).value,
-          filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null, olderDays: +$('#cOlder', bd).value || 0, segment: $('#cSeg', bd).value || null },
+          filters: { stages: ['sleeping'], geo: $('#cGeo', bd).value || null, olderDays: +$('#cOlder', bd).value || 0, maxDays: +$('#cMax', bd).value || null, segment: $('#cSeg', bd).value || null, sources: $('#cSrc', bd).value ? [$('#cSrc', bd).value] : [], broker: $('#cBrk', bd).value || null, tags: ($('#cTags', bd).value || '').split(',').map(t => t.trim()).filter(Boolean) },
           batchSize: +$('#cBatch', bd).value, pauseMin: [+$('#cP1', bd).value, +$('#cP2', bd).value],
           window: [+$('#cW1', bd).value, +$('#cW2', bd).value],
         };
@@ -4722,15 +4730,16 @@ function newCampaignModal() {
     clearTimeout(cntT);
     cntT = setTimeout(async () => {
       const geo = $('#cGeo', bd).value, older = $('#cOlder', bd).value, seg = $('#cSeg', bd).value;
+      const mx = $('#cMax', bd)?.value || '', src = $('#cSrc', bd)?.value || '', brk = $('#cBrk', bd)?.value || '', tags = ($('#cTags', bd)?.value || '').split(',').map(t => t.trim()).filter(Boolean).join(',');
       const cnt = $('#cCount', bd); if (cnt) cnt.textContent = '…';
       try {
-        const qs = `?stages=sleeping&geo=${encodeURIComponent(geo)}&olderDays=${encodeURIComponent(older || 0)}&segment=${encodeURIComponent(seg)}`;
+        const qs = `?stages=sleeping&geo=${encodeURIComponent(geo)}&olderDays=${encodeURIComponent(older || 0)}&maxDays=${encodeURIComponent(mx)}&segment=${encodeURIComponent(seg)}&sources=${encodeURIComponent(src)}&broker=${encodeURIComponent(brk)}&tags=${encodeURIComponent(tags)}`;
         const list = await api.get('/wake/preview' + qs);
         const c2 = $('#cCount', bd); if (c2) c2.textContent = Array.isArray(list) ? list.length : 0;
       } catch (e) { const c2 = $('#cCount', bd); if (c2) c2.textContent = '—'; }
     }, 240);
   };
-  ['#cGeo', '#cOlder', '#cSeg'].forEach(sel => { const e = $(sel, bd); if (e) e.addEventListener('change', () => { paintCount(); if (sel === '#cGeo') paintPrev(); }); });
+  ['#cGeo', '#cOlder', '#cSeg', '#cMax', '#cSrc', '#cBrk', '#cTags'].forEach(sel => { const e = $(sel, bd); if (e) e.addEventListener(sel === '#cTags' ? 'input' : 'change', () => { paintCount(); if (sel === '#cGeo') paintPrev(); }); });
   $('#cTpl', bd)?.addEventListener('change', paintPrev);
   $('#cTplNew', bd)?.addEventListener('click', () => { closeModal(); go('templates'); setTimeout(() => { const b = $('#newTpl'); if (b) b.click(); }, 520); });
   paintPrev(); paintCount();

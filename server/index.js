@@ -2744,7 +2744,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/wake/preview' && req.method === 'GET') {
-      const filters = { geo: u.searchParams.get('geo') || null, stages: (u.searchParams.get('stages') || 'sleeping').split(','), olderDays: +(u.searchParams.get('olderDays') || 0), segment: u.searchParams.get('segment') || null };
+      const csv = (k) => { const v = u.searchParams.get(k); return v ? v.split(',').map(x => x.trim()).filter(Boolean) : []; };
+      const filters = {
+        geo: u.searchParams.get('geo') || null,
+        stages: (u.searchParams.get('stages') || 'sleeping').split(','),
+        olderDays: +(u.searchParams.get('olderDays') || 0),
+        maxDays: +(u.searchParams.get('maxDays') || 0) || null,
+        segment: u.searchParams.get('segment') || null,
+        tags: csv('tags'), sources: csv('sources'),
+        broker: u.searchParams.get('broker') || null,
+        qual: u.searchParams.get('qual') || null,
+      };
       return json(res, 200, engine.wakePreview(db, filters));
     }
 

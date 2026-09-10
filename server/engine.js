@@ -373,11 +373,19 @@ function wakeScore(db, lead) {
 function segmentOf(score) { return score >= 55 ? 'A' : score >= 30 ? 'B' : 'C'; }
 
 function wakePreview(db, filters = {}) {
+  const accel = db.settings.demo.accelerate ? 0 : 1;
+  const dorm = (l) => Date.now() - (l.lastMsgAt || l.createdAt);
+  const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
   const list = db.leads
     .filter(l => (filters.stages || ['sleeping']).includes(l.stage))
     .filter(l => !filters.geo || l.geo === filters.geo)
-    .filter(l => !filters.olderDays || (Date.now() - (l.lastMsgAt || l.createdAt)) >= filters.olderDays * DAY * (db.settings.demo.accelerate ? 0 : 1))
-    .map(l => ({ id: l.id, name: l.name, geo: l.geo, phone: l.phone, lastMsgAt: l.lastMsgAt, note: l.summary, wakeScore: wakeScore(db, l) }))
+    .filter(l => !filters.olderDays || dorm(l) >= filters.olderDays * DAY * accel)
+    .filter(l => !filters.maxDays || dorm(l) <= filters.maxDays * DAY)                                 /* верхняя граница окна «спячки» → точечное окно */
+    .filter(l => !filters.tags || !filters.tags.length || (l.tags || []).some(t => filters.tags.includes(t)))
+    .filter(l => !filters.sources || !filters.sources.length || filters.sources.includes(l.source))
+    .filter(l => !filters.broker || (filters.broker === 'none' ? !l.broker : l.broker === filters.broker))
+    .filter(l => filters.qual == null || filters.qual === '' || (filters.qual === 'yes' ? QUAL.includes(l.stage) || (l.quals && Object.values(l.quals).some(Boolean)) : true))
+    .map(l => ({ id: l.id, name: l.name, geo: l.geo, phone: l.phone, lastMsgAt: l.lastMsgAt, note: l.summary, source: l.source, tags: l.tags || [], broker: l.broker || null, wakeScore: wakeScore(db, l) }))
     .sort((a, b) => b.wakeScore - a.wakeScore);
   list.forEach(x => x.segment = segmentOf(x.wakeScore));
   return filters.segment ? list.filter(x => x.segment === filters.segment) : list;
