@@ -5668,3 +5668,24 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .hr-fld input.hr-fl-l, .hr-fld select { padding: 8px 10px; border: 1px solid var(--stroke); border-radius: 9px; font: inherit; font-size: 13px; }
 .hr-fl-r { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
 @media (max-width: 760px) { .hr-det { grid-template-columns: 1fr; } .hr-fld { grid-template-columns: 1fr 1fr; } }
+
+/* ═══ ВИЗУАЛ v4 · СЛОЙ 3 — полировка примитивов (таблицы/пустые/чипы/инпуты/модалки) ═══ */
+/* таблицы: мягче хедер, строки с accent-подсветкой при наведении, ровнее ритм */
+.tbl th { border-bottom: 1px solid var(--stroke); padding: 9px 11px; color: var(--ink-3); }
+.tbl td { padding: 11px; border-bottom: 1px solid var(--stroke-soft); transition: background .14s; }
+.tbl tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.tbl tr:last-child td { border-bottom: 0; }
+/* пустые состояния — премиальнее (иконка/мягкий фон) */
+.empty { padding: 44px 24px; border-radius: var(--r-md); background: linear-gradient(180deg, var(--bg-2), transparent); border: 1px dashed var(--stroke); }
+/* бейджи/чипы — единый плотный pill */
+.badge, .mini-badge { border-radius: 20px; letter-spacing: .01em; }
+.mini-badge { padding: 3px 9px; }
+/* инпуты/textarea/select — мягкая глубина + плавный фокус */
+input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, select { transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast); }
+input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+/* модалка — матовое стекло + глубже тень + мягче вход */
+@supports (backdrop-filter: blur(1px)) { .modal { -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); background: color-mix(in srgb, var(--card) 90%, transparent); } }
+.modal { box-shadow: 0 30px 80px -30px rgba(6,17,38,.55), inset 0 1px 0 rgba(255,255,255,.6); }
+.modal-bd { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); background: rgba(6,17,38,.28); }
+/* активный пункт нав-рейла — чётче «дорогая» подсветка */
+.nav-item.active { position: relative; }
