@@ -5495,6 +5495,39 @@ PAGES.callReview = async (root) => {
   }));
 };
 
+/* Упаковка страницы «Реклама» в вкладки: аналитика по рекламе / дерево креативов / приём лидов / Meta CAPI.
+   Пост-рендер реорганизация DOM (шаблон и вся его обвязка не трогаются, узлы просто переносятся в панели). */
+function restructureAdsTabs(root) {
+  if (!root || root.querySelector('.adtabs')) return;
+  const cardOf = (sel) => { const e = root.querySelector(sel); return e ? (e.closest('.glass.card') || e.closest('.glass') || e) : null; };
+  const kpis = root.querySelector('.ad-kpis');
+  const tree = root.querySelector('.ct-wrap');
+  const capi = cardOf('#capiOn');
+  const most = cardOf('#copyHook');
+  const imp = cardOf('#adsCsv');
+  const eff = cardOf('.ad-tbl');
+  const twocol = root.querySelector('.two-col');
+  const rightCol = twocol ? twocol.children[1] : null;
+  const intakeLog = rightCol ? [...rightCol.children].find(c => c !== eff && (c.classList.contains('ds-fold') || /Журнал приёма/.test(c.textContent || ''))) : null;
+  const TABS = [['analytics', 'Аналитика по рекламе', I.bars], ['creatives', 'Дерево креативов', I.target], ['intake', 'Приём лидов', I.link || I.bolt], ['capi', 'Meta CAPI', I.spark]];
+  const active = ['analytics', 'creatives', 'intake', 'capi'].includes(PAGE_STATE.adsTab) ? PAGE_STATE.adsTab : 'analytics';
+  const bar = el(`<div class="adtabs">${TABS.map(([k, n, icn]) => `<button class="adtab ${k === active ? 'on' : ''}" data-adtab-btn="${k}">${ic(icn)}${n}</button>`).join('')}</div>`);
+  const panels = {};
+  ['analytics', 'creatives', 'intake', 'capi'].forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
+  const put = (node, k) => { if (node) panels[k].appendChild(node); };
+  put(kpis, 'analytics'); put(eff, 'analytics');
+  put(tree, 'creatives');
+  put(most, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
+  put(capi, 'capi');
+  const hero = root.firstElementChild;   /* heroArt-блок */
+  hero.after(bar); bar.after(panels.analytics); panels.analytics.after(panels.creatives); panels.creatives.after(panels.intake); panels.intake.after(panels.capi);
+  if (twocol) twocol.remove();
+  bar.querySelectorAll('[data-adtab-btn]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.adtabBtn; PAGE_STATE.adsTab = k;
+    bar.querySelectorAll('[data-adtab-btn]').forEach(x => x.classList.toggle('on', x === b));
+    Object.entries(panels).forEach(([pk, p]) => p.hidden = pk !== k);
+  }));
+}
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   const d = await api.get('/ads');
@@ -5647,6 +5680,7 @@ PAGES.ads = async (root) => {
         ${coll('Журнал приёма', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: true, count: d.intakeLog.length, icon: I.bolt })}
       </div>
     </div>`;
+  restructureAdsTabs(root);   /* упаковать хаос страницы в аккуратные вкладки (Аналитика/Креативы/Приём/CAPI) */
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   $$('[data-ctsave]', root).forEach(b => b.addEventListener('click', async () => {
