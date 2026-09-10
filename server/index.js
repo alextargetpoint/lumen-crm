@@ -6180,6 +6180,7 @@ ${isRaw ? `body{padding:0;background:#000;overflow:hidden}.wrap{max-width:none;w
 .slide.grad-ember{background:radial-gradient(92% 62% at 50% 122%,color-mix(in srgb,var(--blue) 36%,var(--body)),var(--paper) 72%)}
 .slide.grad-dusk,.slide.grad-veil,.slide.grad-depth{color:var(--ink)}
 .slide[class*=pat-]{background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 16%,var(--paper)),var(--paper))}
+.slide[class*="pat-"]{background-color:var(--paper)}   /* ⚠ фикс: узор задаёт только background-image и перекрывал базовую заливку → слайд проваливался в чёрный на экспорте/скриншоте. Даём светлую бумагу под узор. */
 .slide.pat-dots{background-image:radial-gradient(color-mix(in srgb,var(--blue) 26%,transparent) 1.5px,transparent 1.6px);background-size:20px 20px}
 .slide.pat-grid{background-image:linear-gradient(color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--blue) 15%,transparent) 1px,transparent 1px);background-size:28px 28px}
 .slide.pat-diag{background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--blue) 12%,transparent) 0 2px,transparent 2px 14px)}
