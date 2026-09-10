@@ -692,6 +692,32 @@ function brokerIcs(db, b) {
   L.push('END:VCALENDAR');
   return L.join('\r\n');
 }
+/* ⭐ Занятость брокера для ИИ-планирования: встречи + задачи-с-дедлайном + личный календарь (внешний ICS) */
+const ICS_CACHE = {};   /* brokerId → { intervals:[{s,e}], at } */
+function parseIcsBusy(text) {
+  const out = []; const blocks = String(text).split(/BEGIN:VEVENT/i).slice(1);
+  const toMs = (v) => { const md = String(v).trim().match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?/); if (!md) return null; const [, Y, Mo, D, H, Mi, S] = md; return H == null ? Date.UTC(+Y, +Mo - 1, +D) : Date.UTC(+Y, +Mo - 1, +D, +H, +Mi, +S || 0); };
+  blocks.forEach(bl => {
+    const ds = (bl.match(/DTSTART[^:\n]*:([0-9TZ]+)/i) || [])[1]; const de = (bl.match(/DTEND[^:\n]*:([0-9TZ]+)/i) || [])[1];
+    const allday = /DTSTART;[^:\n]*VALUE=DATE(?![-T])/i.test(bl);
+    let s = ds ? toMs(ds) : null; if (s == null) return; let e = de ? toMs(de) : null;
+    if (allday) e = s + 24 * 3600e3; else if (e == null) e = s + 30 * 60000;
+    out.push({ s, e });
+  });
+  return out;
+}
+async function refreshIcsBusy(b) {
+  if (!b || !b.busyIcsUrl) { if (b) delete ICS_CACHE[b.id]; return; }
+  try { const { text } = await safeFetch(b.busyIcsUrl); if (/BEGIN:VCALENDAR/i.test(text)) ICS_CACHE[b.id] = { intervals: parseIcsBusy(text).slice(0, 500), at: Date.now() }; } catch (_) {}
+}
+function brokerBusyIntervals(db, b) {
+  const iv = [];
+  (db.meetings || []).filter(m => m.brokerId === b.id && m.at).forEach(m => iv.push({ s: m.at, e: m.at + (m.durationMin || 30) * 60000 }));
+  (db.brokerTasks || []).filter(t => t.brokerId === b.id && t.due && t.status !== 'done').forEach(t => iv.push({ s: t.due, e: t.due + 30 * 60000 }));
+  const c = ICS_CACHE[b.id]; if (c) iv.push(...c.intervals);
+  if (b.busyIcsUrl && (!c || Date.now() - c.at > 30 * 60000)) refreshIcsBusy(b);   /* фоновое обновление кэша */
+  return iv;
+}
 const PB_TYPES = {
   cover: { name: 'Обложка', variants: ['blue', 'photo', 'light', 'split'], std: true },
   hello: { name: 'Привет + об агентстве', variants: ['std'], std: true },
@@ -2809,6 +2835,7 @@ const server = http.createServer(async (req, res) => {
       if (b.capacity != null) br.capacity = +b.capacity;
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
+      if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту агентства */
       /* поля публичной визитки брокера (/b/:id) */
       if (b.phone != null) br.phone = String(b.phone).slice(0, 40);
@@ -5504,7 +5531,9 @@ body::before{z-index:1}.card{z-index:2}
       const wdays = (br.schedule && br.schedule.days && br.schedule.days.length) ? br.schedule.days : [1, 2, 3, 4, 5];
       const times = ['11:00', '14:00', '17:00'];
       const nowT = Date.now();
-      const booked = new Set((db.meetings || []).filter(mt => mt.brokerId === br.id).map(mt => mt.at));
+      /* ⭐ занятость: встречи + задачи-с-дедлайном + личный календарь (ICS) — ИИ/бронь не предлагают занятое */
+      const busy = brokerBusyIntervals(db, br);
+      const slotFree = (at) => !busy.some(iv => at < iv.e && (at + 60 * 60000) > iv.s);
       const dowN = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
       const monN = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
       const base = new Date(); base.setHours(0, 0, 0, 0);
@@ -5513,7 +5542,7 @@ body::before{z-index:1}.card{z-index:2}
         const day = new Date(base); day.setDate(base.getDate() + dOff);
         const wd = day.getDay() === 0 ? 7 : day.getDay();
         if (!wdays.includes(wd)) continue;
-        const slots = times.map(t => { const [hh, mm] = t.split(':'); const dt = new Date(day); dt.setHours(+hh, +mm, 0, 0); return { t, at: dt.getTime() }; }).filter(s => s.at > nowT + 3600e3 && !booked.has(s.at));
+        const slots = times.map(t => { const [hh, mm] = t.split(':'); const dt = new Date(day); dt.setHours(+hh, +mm, 0, 0); return { t, at: dt.getTime() }; }).filter(s => s.at > nowT + 3600e3 && slotFree(s.at));
         if (slots.length) byDay.push({ label: `${dowN[day.getDay()]}, ${day.getDate()} ${monN[day.getMonth()]}`, slots });
       }
       const geoName = db.settings.geoNames[br.geo] || br.geo || '';

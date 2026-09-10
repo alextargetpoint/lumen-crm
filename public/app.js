@@ -7900,8 +7900,10 @@ PAGES.brokers = async (root) => {
                 <span class="muted" style="font-size:11.5px">${b.active !== false ? 'активен · видит только своих лидов' : 'отключён · лиды переданы команде'}</span></div>
               </div>
               ${b.calKey ? `<div class="pd-fact"><label class="lc-lbl">Личный календарь (Apple / Google)</label>
-                <div class="muted" style="font-size:11.5px;padding:4px 0 6px">Встречи и задачи брокера — живой подпиской в его календарь. В Apple Calendar: «Файл → Новая подписка на календарь» → вставить ссылку.</div>
-                <button type="button" class="btn btn-sm br-calcopy" data-calurl="${location.origin}/cal/${b.id}.ics?key=${b.calKey}">${ic(I.cal)}Скопировать ссылку подписки</button></div>` : ''}
+                <div class="muted" style="font-size:11.5px;padding:4px 0 6px">① Подписка «Lumen → календарь брокера»: встречи+задачи живьём. В Apple Calendar: «Файл → Новая подписка» → вставить.</div>
+                <button type="button" class="btn btn-sm br-calcopy" data-calurl="${location.origin}/cal/${b.id}.ics?key=${b.calKey}">${ic(I.cal)}Скопировать ссылку подписки</button>
+                <div class="muted" style="font-size:11.5px;padding:10px 0 4px">② Учитывать занятость в ИИ-планировании: вставь <b>публичную ICS-ссылку личного календаря</b> брокера (Apple: «Сделать общим» → публичная ссылка). ИИ не будет предлагать лидам занятое время.</div>
+                <div style="display:flex;gap:6px"><input class="lc-inp br-busyics" data-brbusyid="${b.id}" value="${esc(b.busyIcsUrl || '')}" placeholder="https://…/basic.ics" style="flex:1"><button type="button" class="btn btn-sm br-busysave">Сохранить</button></div></div>` : ''}
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
@@ -8078,6 +8080,8 @@ PAGES.brokers = async (root) => {
     if (pinC) pinC.addEventListener('click', () => { navigator.clipboard.writeText(pinC.closest('[data-brpincode]').dataset.brpincode); toast('Код скопирован', null, true); });
     const calC = eb.querySelector('.br-calcopy');
     if (calC) calC.addEventListener('click', () => { navigator.clipboard.writeText(calC.dataset.calurl); toast('Ссылка календаря скопирована', 'Подписка в Apple/Google Calendar — обновляется сама', true); });
+    const busySave = eb.querySelector('.br-busysave');
+    if (busySave) busySave.addEventListener('click', async () => { const inp = eb.querySelector('.br-busyics'); const id = inp.dataset.brbusyid; try { await api.patch('/brokers/' + id, { busyIcsUrl: inp.value.trim() }); toast('Личный календарь подключён', 'ИИ будет учитывать занятость при планировании', true); } catch (e) { toast('Не вышло', e.message); } });
     const pv = eb.querySelector('[data-brpreview]');
     if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
     const pr = eb.querySelector('[data-brprovision]');
