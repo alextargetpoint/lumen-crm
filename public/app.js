@@ -1511,7 +1511,8 @@ const OV_W = {
     const pl = L.filter(l => l.createdAt && l.createdAt >= pw && l.createdAt < wk);
     const nq = nl.filter(l => QUAL.includes(l.stage));
     const conv = nl.length ? Math.round(nq.length / nl.length * 100) : 0;
-    return `<div class="ov2-card-hd">${ic(I.doc)}Отчёт клиенту<span>лидогенерация · формат агентства</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
+    return `<div class="ov2-card-hd">${ic(I.doc)}Отчёт клиенту<span>сводка недели · отправить клиенту</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
+      <div class="ov-rep-sub">Готовая сводка по лидам и рекламе за неделю — как её ждёт клиент. Одной кнопкой в Telegram, PDF или ссылкой.</div>
       <div class="ov-rep-nums">
         <div class="ov-rep-n"><b>${nl.length}</b><span>лидов за неделю</span>${deltaChip(nl.length, pl.length)}</div>
         <div class="ov-rep-n"><b>${nq.length}</b><span>целевых (${conv}%)</span></div>
@@ -1842,21 +1843,19 @@ async function loadSeats() {
 const OV_MROW = 8, OV_MGAP = 8;
 function ovMasonry(grid) {
   if (!grid) return;
-  /* сброс — измеряем в обычной сетке (авто-высота) */
-  grid.classList.remove('ov-masonry');
   const items = [...grid.querySelectorAll('.ov-w')];
-  items.forEach(w => { w.style.gridRowEnd = ''; });
-  return;   /* ⚠️ row-span masonry на этой 12-кол сетке не даёт выигрыша (16→17% пусто, структурные дыры) —
-               отключено. Настоящая упаковка = CSS-columns, но это конфликтует с активной перестройкой сетки
-               параллельной сессией (обзор v3). Вернуть, когда сетка Обзора устаканится. */
-  if (typeof OV_EDIT !== 'undefined' && OV_EDIT) return;   /* в конструкторе — обычная сетка (drag) */
-  const cs = getComputedStyle(grid);
-  if (cs.display !== 'grid') return;
-  const ncols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
-  if (ncols <= 1) return;                                   /* мобайл/1 колонка — не мозаичим */
-  const heights = items.map(w => w.getBoundingClientRect().height);
+  /* в конструкторе (drag) — обычная сетка, мозаику не трогаем */
+  if (typeof OV_EDIT !== 'undefined' && OV_EDIT) { grid.classList.remove('ov-masonry'); items.forEach(w => { w.style.gridRowEnd = ''; }); return; }
+  /* сброс: меряем натуральную высоту в равноколоночной сетке (класс ov-masonry задаёт равные колонки + auto-rows:8) */
   grid.classList.add('ov-masonry');
-  items.forEach((w, i) => { w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((heights[i] + OV_MGAP) / (OV_MROW + OV_MGAP))); });
+  items.forEach(w => { w.style.gridRowEnd = ''; });
+  const cs = getComputedStyle(grid);
+  const ncols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
+  if (cs.display !== 'grid' || ncols <= 1) { items.forEach(w => { w.style.gridRowEnd = ''; }); return; }  /* мобайл/1 колонка — обычный поток */
+  void grid.offsetHeight;                                   /* форс-reflow перед замером */
+  const row = parseFloat(cs.gridAutoRows) || OV_MROW, gap = parseFloat(cs.rowGap) || OV_MGAP;
+  const heights = items.map(w => w.getBoundingClientRect().height);
+  items.forEach((w, i) => { w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((heights[i] + gap) / (row + gap))); });
 }
 let _ovMasonryHook = false, _ovMasonryTmr = null;
 function ovMasonryWatch(root) {

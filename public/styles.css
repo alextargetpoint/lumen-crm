@@ -2816,6 +2816,7 @@ body.has-preview { padding-top: 38px; }
 @media (min-width: 1560px) { .ov2-grid { column-count: 3; } }
 .ov-w-body { padding: 16px; }
 /* виджеты обзора: отчёт клиенту / связки рекламы / источники / контент-launcher */
+.ov-rep-sub { font-size: 12px; color: var(--ink-3); line-height: 1.45; margin: -2px 0 12px; }
 .ov-rep-nums { display: flex; gap: 24px; margin: 4px 0 13px; flex-wrap: wrap; }
 .ov-rep-n { display: flex; flex-direction: column; gap: 3px; }
 .ov-rep-n b { font-family: var(--font-display); font-size: 27px; font-weight: 600; color: var(--navy-900); line-height: 1; letter-spacing: -.01em; }
@@ -4781,9 +4782,12 @@ html[data-night] {
 
 /* ── асимметр. сетка: dense-упаковка + пер-виджет спаны (стаггер, но выровнено) ── */
 .ov2-grid { grid-auto-flow: row dense; }
-/* ⭐ МОЗАИКА: мелкая строчная сетка + JS-спаны строк (ovMasonry) → виджеты заклиниваются без пустот */
-.ov2-grid.ov-masonry { grid-auto-rows: 8px; row-gap: 8px; }
-.ov2-grid.ov-masonry .ov-w { align-self: start; }
+/* ⭐ МОЗАИКА (Pinterest): равные колонки + JS-спаны строк (ovMasonry) → карточки обтекают без пустот.
+   Равная ширина колонок (а не ov-span-N) — ключ: при разной ширине dense-упаковка оставляла структурные дыры. */
+.ov2-grid.ov-masonry { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); grid-auto-rows: 8px; row-gap: 8px; column-gap: 16px; grid-auto-flow: row dense; }
+.ov2-grid.ov-masonry .ov-w, .ov2-grid.ov-masonry .ov-w[class*="ov-span-"] { grid-column: span 1; align-self: start; }
+.ov2-grid.ov-masonry .ov-w.full { grid-column: 1 / -1; }
+@media (max-width: 700px) { .ov2-grid.ov-masonry { grid-template-columns: 1fr; } .ov2-grid.ov-masonry .ov-w { grid-row: auto !important; } }
 .ov-w.ov-span-4 { grid-column: span 4; }
 .ov-w.ov-span-5 { grid-column: span 5; }
 .ov-w.ov-span-6 { grid-column: span 6; }
