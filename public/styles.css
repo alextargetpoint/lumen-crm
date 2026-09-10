@@ -2326,6 +2326,29 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .sh-thook { font-size: 14px; font-style: italic; color: var(--ink-2); line-height: 1.45; }
 .sh-twhy { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
 .sh-tmeta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+/* ── Хантинг: грид карточек с живым видео ── */
+.sh-hgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 6px; }
+.sh-hcard { display: flex; flex-direction: column; border-radius: var(--r-lg); overflow: hidden; padding: 0; }
+.sh-hvid { position: relative; width: 100%; aspect-ratio: 9 / 12; background: #0b1220; display: grid; place-items: center; overflow: hidden; }
+.sh-hvid-load, .sh-hvid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 18px; color: rgba(255,255,255,.72); font-size: 12px; line-height: 1.4; }
+.sh-hvid-load svg, .sh-hvid-empty svg { width: 26px; height: 26px; opacity: .8; }
+.sh-hframe, .sh-hembed iframe, .sh-hembed video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.sh-hembed { position: absolute; inset: 0; }
+.sh-hthumbs { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 5px; padding: 7px; background: linear-gradient(180deg, transparent, rgba(6,12,24,.72)); overflow-x: auto; z-index: 2; }
+.sh-hthumbs::-webkit-scrollbar { height: 0; }
+.sh-hthumb { flex: 0 0 auto; width: 34px; height: 46px; border-radius: 6px; background-size: cover; background-position: center; border: 2px solid transparent; opacity: .6; transition: opacity var(--dur-fast), border-color var(--dur-fast); cursor: pointer; }
+.sh-hthumb.on, .sh-hthumb:hover { opacity: 1; border-color: rgba(255,255,255,.9); }
+.sh-embed-in.mini { display: flex; gap: 6px; margin-top: 8px; width: 100%; }
+.sh-embed-in.mini input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #fff; font-size: 12px; }
+.sh-embed-in.mini input::placeholder { color: rgba(255,255,255,.5); }
+.sh-hbody { display: flex; flex-direction: column; gap: 9px; padding: 16px 16px 15px; }
+.sh-htitle { font-family: var(--font-display); font-size: 17px; font-weight: 600; line-height: 1.24; color: var(--navy-900); }
+.sh-hlinks { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 2px; padding-top: 9px; border-top: 1px solid var(--stroke); }
+.sh-hacts { display: flex; gap: 8px; margin-top: 4px; }
+.sh-hacts .btn { flex: 1; justify-content: center; }
+.sh-hlike.done { color: var(--accent); border-color: var(--accent); }
+.sh-hmore { display: flex; justify-content: center; margin-top: 18px; }
+@media (max-width: 560px) { .sh-hgrid { grid-template-columns: 1fr; } }
 .sh-tbtns { display: flex; justify-content: center; gap: 26px; margin-top: 18px; }
 .sh-tbtn { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--stroke); background: var(--card); box-shadow: var(--shadow); transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast); }
 .sh-tbtn:hover { transform: scale(1.09); box-shadow: 0 8px 22px -8px rgba(16, 43, 92, .3); }

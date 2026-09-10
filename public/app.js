@@ -6163,8 +6163,10 @@ function refSearchUrl(plat, q) {
   const tag = String(q || '').replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
   if (plat === 'tiktok') return 'https://www.tiktok.com/search?q=' + e;                         /* поиск TikTok сортирует по «Top» */
   if (plat === 'shorts') return 'https://www.youtube.com/results?search_query=' + e + '%20shorts';
-  if (plat === 'tag' && tag) return 'https://www.instagram.com/explore/tags/' + encodeURIComponent(tag) + '/';  /* топ по хэштегу */
-  return 'https://www.instagram.com/explore/search/keyword/?q=' + e;
+  if (plat === 'tag' && tag) return 'https://www.instagram.com/explore/tags/' + encodeURIComponent(tag) + '/';  /* топ по хэштегу (одно слово) */
+  /* Instagram/Reels: страница поиска /explore/search/keyword/ отдаёт ошибку без входа, а склеенный мега-хэштег
+     из фразы обычно пустой → ведём на Google-выдачу reels по запросу: всегда открывается, релевантно, без ошибки. */
+  return 'https://www.google.com/search?q=' + encodeURIComponent((q || '') + ' reels instagram');
 }
 /* Блок «живых примеров»: главная кнопка — платформа идеи (открывает залетевшие ролики по запросу),
    рядом альтернативные площадки. Клик → брокер смотрит реальные примеры конкурентов. */
@@ -6429,7 +6431,7 @@ async function shHunt(main) {
   const ANGLES = [['all', 'Всё подряд'], ['myths', 'Мифы'], ['cases', 'Кейсы'], ['mistakes', 'Ошибки'], ['behind', 'Закулисье'], ['trends', 'Тренды'], ['guide', 'Гайды'], ['shoot', 'Под съёмку']];
   main.innerHTML = `
     <div class="glass card sh-gen">
-      <div class="sh-gen-hd">${ic(I.spark)}Хантинг идей<span class="sub">листай карточки как в Tinder — что нравится, летит в копилку (← мимо · → в копилку)</span></div>
+      <div class="sh-gen-hd">${ic(I.spark)}Хантинг идей<span class="sub">ИИ накидывает 8 идей сразу — с реальными «залетевшими» роликами, которые играют прямо здесь. Понравилось — в копилку.</span></div>
       <div class="form-row"><label>Контекст (необязательно) — ИИ разберёт на ключевые слова и будет хантить точнее</label><textarea id="shHCtx" placeholder="напр. запускаем виллы на Бали под инвесторов из РФ, упор на доходность и управление; хочу идеи под Reels и сторис"></textarea></div>
       <div class="sh-gen-foot">
         <select id="shAngle" class="sh-sel">${ANGLES.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>
@@ -6440,39 +6442,70 @@ async function shHunt(main) {
     </div>
     <div id="shDeck"></div>`;
   const deck = $('#shDeck', main);
-  const paintDeck = () => {
-    if (!HUNT_DECK.length) { deck.innerHTML = '<div class="glass card empty">Нажми «Нахантить идеи» — ИИ накидает свежих идей под нишу. Понравившиеся свайпни вправо ❤ — они лягут в «Копилку идей».</div>'; return; }
-    if (HUNT_I >= HUNT_DECK.length) {
-      deck.innerHTML = `<div class="glass card sh-deck-done">${ic(I.check)}<div><b>Колода пройдена</b><div class="muted">В копилку добавлено идей: ${HUNT_LIKES}. Загляни в «Копилку идей» — там любую превратишь в сценарий одним тапом.</div></div><button class="btn btn-accent" id="shReHunt">${ic(I.spark)}Ещё колоду</button></div>`;
-      const rb = $('#shReHunt', deck); if (rb) rb.addEventListener('click', () => $('#shHunt', main).click());
-      return;
-    }
-    const idea = HUNT_DECK[HUNT_I];
-    deck.innerHTML = `<div class="sh-tinder">
-      <div class="sh-tcard glass">
-        <div class="sh-tcount">${HUNT_I + 1} / ${HUNT_DECK.length}</div>
+  const refPlatLinks = (q, plat) => {
+    const items = [['reels', 'Instagram'], ['tiktok', 'TikTok'], ['shorts', 'YouTube']];
+    return `<span class="sh-tref-lbl">ещё примеры:</span>` + items.map(([k, n]) => `<a class="sh-reflink" href="${refSearchUrl(k, q)}" target="_blank" rel="noopener" title="Открыть залетевшие ${n} по запросу «${esc(q)}»">${n}</a>`).join('');
+  };
+  const huntCardHtml = (idea, i) => {
+    const q = idea.refQuery || idea.title;
+    return `<div class="sh-hcard glass" data-i="${i}">
+      <div class="sh-hvid" data-vidq="${esc(q)}"><div class="sh-hvid-load">${ic(I.play)}<span>ищу залетевшие примеры…</span></div></div>
+      <div class="sh-hbody">
         ${idea.angle ? `<span class="sh-tangle">${esc(idea.angle)}</span>` : ''}
-        <div class="sh-ttitle">${esc(idea.title)}</div>
+        <div class="sh-htitle">${esc(idea.title)}</div>
         ${idea.hook ? `<div class="sh-thook">«${esc(idea.hook)}»</div>` : ''}
         ${idea.why ? `<div class="sh-twhy">${esc(idea.why)}</div>` : ''}
         <div class="sh-tmeta">${idea.format ? `<span class="sh-broll-i">${esc(idea.format)}</span>` : ''}${idea.effort ? `<span class="sh-broll-i">съёмка: ${esc(idea.effort)}</span>` : ''}</div>
         ${idea.refWhat ? `<div class="sh-tref"><span class="sh-tref-lbl">Референс-приём</span>${esc(idea.refWhat)}</div>` : ''}
-        ${refLinksHtml(idea.refQuery, idea.platform)}
-        <button type="button" class="sh-tmake" id="shMake">${ic(I.play)}Сразу собрать сценарий</button>
-      </div>
-      <div class="sh-tbtns">
-        <button class="sh-tbtn skip" id="shSkip" title="Мимо (←)">${ic(I.x)}</button>
-        <button class="sh-tbtn like" id="shLike" title="В копилку (→)"><span>❤</span></button>
+        <div class="sh-hlinks">${refPlatLinks(q, idea.platform)}</div>
+        <div class="sh-hacts">
+          <button type="button" class="btn btn-sm sh-hlike">❤ В копилку</button>
+          <button type="button" class="btn btn-sm btn-accent sh-hmake">${ic(I.play)}Собрать сценарий</button>
+        </div>
       </div>
     </div>`;
-    $('#shSkip', deck).addEventListener('click', () => { const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-l'); setTimeout(() => { HUNT_I++; paintDeck(); }, 160); });
-    $('#shLike', deck).addEventListener('click', async () => {
-      const c = $('.sh-tcard', deck); if (c) c.classList.add('gone-r');
-      try { await api.post('/social/ideas', { text: idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : ''), hook: idea.hook, format: idea.format, source: 'хантинг', geo: $('#shHGeo', main).value, refWhat: idea.refWhat, refQuery: idea.refQuery, platform: idea.platform }); HUNT_LIKES++; toast('В копилке', 'Идея сохранена', true); }
-      catch (e) { toast('Не сохранилось', e.message); }
-      setTimeout(() => { HUNT_I++; paintDeck(); }, 160);
+  };
+  const wireHuntCard = async (card, idea) => {
+    if (!card) return;
+    const vwrap = card.querySelector('.sh-hvid');
+    const q = vwrap.getAttribute('data-vidq');
+    // like
+    card.querySelector('.sh-hlike').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget; if (btn.classList.contains('done')) return; btn.disabled = true;
+      try { await api.post('/social/ideas', { text: idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : ''), hook: idea.hook, format: idea.format, source: 'хантинг', geo: $('#shHGeo', main).value, refWhat: idea.refWhat, refQuery: idea.refQuery, platform: idea.platform }); HUNT_LIKES++; btn.innerHTML = '✓ В копилке'; btn.classList.add('done'); btn.disabled = false; toast('В копилке', 'Идея сохранена', true); }
+      catch (e) { btn.disabled = false; toast('Не сохранилось', e.message); }
     });
-    const mk = $('#shMake', deck); if (mk) mk.addEventListener('click', () => { SOCIAL_PREFILL = idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : '') + (idea.format ? ('\nФормат: ' + idea.format) : ''); SOCIAL_TOOL = 'scripts'; render(); toast('Идея в генераторе', 'Выбери формат и собери сценарий', true); });
+    // make
+    card.querySelector('.sh-hmake').addEventListener('click', () => { SOCIAL_PREFILL = idea.title + (idea.hook ? ('\nХук: ' + idea.hook) : '') + (idea.format ? ('\nФормат: ' + idea.format) : ''); SOCIAL_TOOL = 'scripts'; render(); toast('Идея в генераторе', 'Выбери формат и собери сценарий', true); });
+    // real videos (YouTube scrape, no key) — play inside dashboard
+    try {
+      const r = await api.get('/social/refvideos?q=' + encodeURIComponent(q));
+      const vids = (r && r.videos) || [];
+      if (vids.length) {
+        let cur = 0;
+        const paint = () => {
+          vwrap.innerHTML = `<iframe class="sh-hframe" src="${vids[cur].embed}" loading="lazy" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
+            <div class="sh-hthumbs">${vids.map((v, j) => `<button type="button" class="sh-hthumb${j === cur ? ' on' : ''}" data-j="${j}" style="background-image:url('${v.thumb}')" title="Пример ${j + 1}"></button>`).join('')}</div>`;
+          vwrap.querySelectorAll('.sh-hthumb').forEach(b => b.addEventListener('click', () => { cur = +b.getAttribute('data-j'); paint(); }));
+        };
+        paint();
+      } else {
+        vwrap.innerHTML = `<div class="sh-hvid-empty">${ic(I.play)}<span>Авто-примеров не нашлось — открой площадки ниже или вставь свою ссылку</span>
+          <div class="sh-embed-in mini"><input class="sh-embed-u" placeholder="ссылка на Reels / TikTok / Shorts…"><button type="button" class="btn btn-sm btn-accent sh-embed-g">Показать</button></div></div>`;
+        const go = vwrap.querySelector('.sh-embed-g'), inp = vwrap.querySelector('.sh-embed-u');
+        const play = () => { const emb = embedFromUrl(inp.value); if (emb) vwrap.innerHTML = `<div class="sh-hembed">${emb}</div>`; else toast('Не распознал ссылку', 'Reels, TikTok, Shorts или .mp4'); };
+        go.addEventListener('click', play); inp.addEventListener('keydown', e => { if (e.key === 'Enter') play(); });
+      }
+    } catch (e) {
+      vwrap.innerHTML = `<div class="sh-hvid-empty">${ic(I.play)}<span>не получилось подгрузить примеры — открой площадки ниже</span></div>`;
+    }
+  };
+  const paintDeck = () => {
+    if (!HUNT_DECK.length) { deck.innerHTML = '<div class="glass card empty">Нажми «Нахантить идеи» — ИИ накидает 8 свежих идей под нишу, каждая с реальными «залетевшими» роликами. Понравившиеся — ❤ в «Копилку идей».</div>'; return; }
+    deck.innerHTML = `<div class="sh-hgrid">${HUNT_DECK.map((idea, i) => huntCardHtml(idea, i)).join('')}</div>
+      <div class="sh-hmore"><button class="btn" id="shReHunt">${ic(I.spark)}Ещё 8 идей</button></div>`;
+    HUNT_DECK.forEach((idea, i) => wireHuntCard(deck.querySelector('.sh-hcard[data-i="' + i + '"]'), idea));
+    const rb = $('#shReHunt', deck); if (rb) rb.addEventListener('click', () => $('#shHunt', main).click());
   };
   paintDeck();
   $('#shHunt', main).addEventListener('click', async () => {

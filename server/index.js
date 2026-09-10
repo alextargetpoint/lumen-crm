@@ -3760,6 +3760,26 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ideas: out.ideas });
       } catch (e) { return json(res, 500, { error: e.message }); }
     }
+    /* Реальные «залетевшие» видео под запрос — БЕЗ ключа: парсим HTML выдачи YouTube (Shorts).
+       Отдаём id роликов → фронт встраивает плеер прямо в дашборд. Кэш на 6ч (не долбить YouTube). */
+    if (p === '/api/social/refvideos' && req.method === 'GET') {
+      const q = String(u.searchParams.get('q') || '').trim().slice(0, 120);
+      if (!q) return json(res, 200, { videos: [] });
+      global.__refVidCache = global.__refVidCache || {};
+      const cacheKey = q.toLowerCase();
+      const hit = global.__refVidCache[cacheKey];
+      if (hit && (Date.now() - hit.t) < 6 * 3600 * 1000) return json(res, 200, { videos: hit.v, cached: true });
+      try {
+        // sp=CAMSAhAB — сортировка по релевантности + фильтр «видео»; +shorts тянет вертикаль
+        const { text } = await safeFetch('https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' shorts'));
+        const ids = []; const seen = new Set();
+        const re = /"videoId":"([A-Za-z0-9_-]{11})"/g; let mm;
+        while ((mm = re.exec(text)) && ids.length < 8) { if (!seen.has(mm[1])) { seen.add(mm[1]); ids.push(mm[1]); } }
+        const videos = ids.map(id => ({ id, embed: 'https://www.youtube.com/embed/' + id + '?rel=0&modestbranding=1', watch: 'https://www.youtube.com/shorts/' + id, thumb: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg' }));
+        global.__refVidCache[cacheKey] = { t: Date.now(), v: videos };
+        return json(res, 200, { videos });
+      } catch (e) { return json(res, 200, { videos: [], error: e.message }); }
+    }
     /* быстрый пост / сторис / тред */
     if (p === '/api/social/post' && req.method === 'POST') {
       if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключей LLM)' });
