@@ -3465,8 +3465,11 @@ async function renderChat(id, rebuild) {
     const day = new Date(m.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     const sep = day !== lastDay ? `<div class="day-sep">${day}</div>` : '';
     lastDay = day;
+    const media = m.media && m.media.url ? (m.media.type === 'video'
+      ? `<video class="bubble-media" src="${esc(m.media.url)}" controls playsinline preload="metadata"></video>`
+      : `<img class="bubble-media" src="${esc(m.media.url)}" loading="lazy" alt="креатив">`) : '';
     return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
-      ${esc(m.text)}
+      ${media}${m.text ? esc(m.text) : (media ? '' : '')}
       <div class="bmeta">${m.channel && m.channel !== 'wa' ? `<span class="via-tag" style="background:rgba(255,255,255,.3)">${chName[m.channel] || m.channel}</span>` : ''}${m.dir === 'out' && m.via ? `<span class="via-tag">${viaName[m.via] || m.via}</span>` : ''}<span>${tmm(m.at)}</span>${m.dir === 'out' ? `<span>${m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}</span>` : ''}</div>
     </div>`;
   }).join('');
@@ -5172,6 +5175,7 @@ PAGES.callReview = async (root) => {
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   const d = await api.get('/ads');
+  const treeD = await api.get('/ads/tree').catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
@@ -5197,6 +5201,31 @@ PAGES.ads = async (root) => {
         ${tile('CPL', money(t.cpl), 'цена лида', true)}
         ${tile('CPA', money(t.cpa), 'цена сделки', true)}
       </div>`; })()}
+    ${(() => {
+      const PL = { meta: ['Meta', '#2F6BFF'], google: ['Google', '#E0603B'], tiktok: ['TikTok', '#111'], other: ['Другое', '#888'] };
+      const plBadge = (p) => { const x = PL[p] || PL.other; return `<span class="ct-pl" style="--c:${x[1]}">${x[0]}</span>`; };
+      const adRow = (a) => `<div class="ct-ad" data-ctad="${a.adId}">
+        <div class="ct-ad-hd">
+          ${plBadge(a.platform)}
+          <div class="ct-ad-nm"><b>${esc(a.name || a.adId)}</b><span>${a.leads} лид${a.leads === 1 ? '' : 'ов'}${a.geo ? ' · ' + esc(((STATE && STATE.settings && STATE.settings.geoNames) || {})[a.geo] || a.geo) : ''}</span></div>
+          <span class="ct-flags">${a.hasCreative ? `<span class="ct-ok" title="Креатив привязан">${ic(I.play, 2)}</span>` : ''}${a.hasPoints ? `<span class="ct-ok" title="Тезисы заданы">${ic(I.spark, 2)}</span>` : ''}</span>
+          <button class="btn btn-sm ct-edit" data-ctedit="${a.adId}">${a.hasCreative || a.hasPoints ? 'Править' : 'Настроить'}</button>
+        </div>
+        <div class="ct-ed" id="cted-${a.adId}" hidden>
+          <div class="form-row"><label>Ссылка на креатив (видео/картинка) — уходит первым сообщением</label><input class="ct-media" value="${esc((a.media && a.media.url) || '')}" placeholder="https://…/reels.mp4 или .jpg"></div>
+          <div class="form-row"><label>Сильные стороны проекта (по одной в строке) — ИИ вплетёт 2-3 в первое касание</label><textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года\nЛокация: метро и школы в 5 минут\nПрогноз доходности аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea></div>
+          <div class="ct-ed-foot"><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
+        </div>
+      </div>`;
+      const adsetBlock = (as) => `<div class="ct-adset"><div class="ct-adset-hd">${ic(I.chev, 2)}${esc(as.name)}<span>${as.leads} лид · ${as.ads.length} объявл</span></div><div class="ct-ads">${as.ads.map(adRow).join('')}</div></div>`;
+      const campBlock = (c) => `<div class="ct-camp"><div class="ct-camp-hd">${plBadge(c.platform)}<b>${esc(c.name)}</b><span>${c.leads} лид</span></div>${c.adsets.map(adsetBlock).join('')}</div>`;
+      return `<div class="glass card mb ct-wrap">
+        <div class="card-title">${ic(I.target)}Дерево креативов<span class="sub">Meta · Google · любой источник — креатив + тезисы на каждое объявление</span>
+          <span class="ct-stat">${treeD.withCreative}/${treeD.totalAds} с креативом · ${treeD.withPoints} с тезисами</span></div>
+        <div class="muted ct-note">По объявлению, на которое человек оставил заявку, первое касание уходит так: сначала сам креатив (видео/картинка), затем текст «отличный выбор» с 2-3 сильными сторонами проекта и наводящим вопросом. Заполни креатив и тезисы — ИИ соберёт касание сам.</div>
+        ${treeD.tree && treeD.tree.length ? treeD.tree.map(campBlock).join('') : '<div class="empty">Пока нет объявлений в базе. Загрузи их ниже в «Атрибуции», и они появятся деревом здесь.</div>'}
+      </div>`;
+    })()}
     <div class="two-col">
       <div>
         ${(() => {
@@ -5278,6 +5307,16 @@ PAGES.ads = async (root) => {
         ${coll('Журнал приёма', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: true, count: d.intakeLog.length, icon: I.bolt })}
       </div>
     </div>`;
+  /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
+  $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
+  $$('[data-ctsave]', root).forEach(b => b.addEventListener('click', async () => {
+    const ad = b.dataset.ctsave; const box = b.closest('.ct-ad');
+    const url = box.querySelector('.ct-media').value.trim();
+    const points = box.querySelector('.ct-points').value.split('\n').map(x => x.trim()).filter(Boolean);
+    b.disabled = true; b.textContent = 'Сохраняю…';
+    try { await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); toast('Сохранено', 'Креатив и тезисы привязаны к объявлению', true); render(); }
+    catch (e) { toast('Не сохранилось', e.message); b.disabled = false; b.textContent = 'Сохранить'; }
+  }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
   $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });

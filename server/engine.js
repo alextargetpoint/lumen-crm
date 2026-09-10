@@ -69,6 +69,7 @@ function send(db, lead, text, via, opts = {}) {
     /* не-WA каналы: mock-запись в переписку; боевые слоты (TG-бот/Viber/Resend) включаются токенами */
     const m0 = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel, text, at: Date.now(), status: 'sent', templateId: opts.templateId || null };
     if (channel === 'email' && opts.subject) m0.subject = opts.subject;
+    if (opts.media && opts.media.url) m0.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500) };
     db.messages.push(m0);
     lead.lastMsgAt = m0.at;
     lead.lastDir = 'out';
@@ -111,6 +112,7 @@ function send(db, lead, text, via, opts = {}) {
   num.sentToday += 1;
   if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, waId: null };
+  if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500) };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
   lead.lastDir = 'out';
@@ -291,6 +293,14 @@ function tickChains(db) {
         text = 'Здравствуйте' + (lead.name && !/^[+\d]/.test(lead.name) ? ', ' + lead.name.split(' ')[0] : '') + '!\n\n' + text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '') + '\n\nС уважением,\n' + (db.settings.agency.manager?.name || db.settings.agency.name) + '\n' + db.settings.agency.name;
       } else if (llm.humanize) {
         text = llm.humanize(text);   /* чистим AI-почерк (длинные тире и т.п.) в WhatsApp/мессенджер-касаниях */
+      }
+      /* ДЕРЕВО КРЕАТИВОВ: на ПЕРВОМ касании в мессенджере сначала уходит сам креатив (видео/картинка),
+         на который человек среагировал, а затем — текстовое касание. */
+      if (lead.ai.chainStep === 0 && sendOpts.channel !== 'email') {
+        const adRec = lead.ads && lead.ads.adId ? (db.ads || []).find(a => String(a.adId) === String(lead.ads.adId)) : null;
+        const media = (adRec && adRec.media && adRec.media.url) ? adRec.media
+          : (lead.creativeUrl ? { type: /\.(mp4|webm|mov)(\?|$)/i.test(lead.creativeUrl) ? 'video' : 'image', url: lead.creativeUrl } : null);
+        if (media) send(db, lead, '', 'chain', { media });
       }
       send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';

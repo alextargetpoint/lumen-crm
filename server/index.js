@@ -4498,6 +4498,37 @@ ${SCR}
       store.save();
       return json(res, 200, { ok: true, spend: ad.spend });
     }
+    /* ДЕРЕВО КРЕАТИВОВ: креатив (видео/картинка) + сильные стороны проекта на объявление.
+       По ним строится первое касание: сначала уходит сам креатив, потом персональный текст. Работает для Meta/Google/любого источника. */
+    if ((m = p.match(/^\/api\/ads\/([^/]+)\/creative$/)) && req.method === 'PATCH') {
+      const b = await readBody(req);
+      const ad = db.ads.find(a => String(a.adId) === String(m[1]));
+      if (!ad) return json(res, 404, { error: 'not found' });
+      if (b.media && typeof b.media === 'object') {
+        const url = String(b.media.url || '').slice(0, 500);
+        ad.media = url ? { type: (b.media.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(url)) ? 'video' : 'image', url } : null;
+      } else if (b.media === null) ad.media = null;
+      if (Array.isArray(b.points)) ad.points = b.points.map(x => String(x || '').slice(0, 200)).filter(Boolean).slice(0, 6);
+      if (b.platform) ad.platform = ['meta', 'google', 'tiktok', 'other'].includes(b.platform) ? b.platform : ad.platform;
+      store.save();
+      return json(res, 200, { ok: true, ad: { adId: ad.adId, media: ad.media || null, points: ad.points || [], platform: ad.platform || null } });
+    }
+    /* дерево: кампании → адсеты → объявления, с креативом и статой лидов (источник-агностик) */
+    if (p === '/api/ads/tree' && req.method === 'GET') {
+      const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
+      const camps = {};
+      for (const ad of db.ads) {
+        const leads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId)).length;
+        const cn = ad.campaignName || '— без кампании';
+        const an = ad.adsetName || '— без адсета';
+        camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, leads: 0 };
+        camps[cn].adsets[an] = camps[cn].adsets[an] || { name: an, ads: [], leads: 0 };
+        camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
+        camps[cn].adsets[an].leads += leads; camps[cn].leads += leads;
+      }
+      const tree = Object.values(camps).map(c => ({ ...c, adsets: Object.values(c.adsets) }));
+      return json(res, 200, { tree, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
+    }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);
       /* принимаем rows: [{adId,name,adsetName,campaignName,geo}] ИЛИ csv-текст */

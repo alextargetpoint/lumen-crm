@@ -419,6 +419,30 @@ textarea { resize: vertical; min-height: 70px; }
   max-width: 72%; padding: 10px 14px; border-radius: 16px; font-size: 13.2px; line-height: 1.5;
   position: relative; word-wrap: break-word;
 }
+.bubble-media { display: block; width: 100%; max-width: 240px; border-radius: 10px; margin: -2px 0 6px; background: #0b1220; }
+.bubble-media:last-child { margin-bottom: 0; }
+/* дерево креативов */
+.ct-wrap .ct-stat { margin-left: auto; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ct-note { font-size: 12px; line-height: 1.5; margin-bottom: 14px; }
+.ct-pl { flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #fff; background: var(--c, #888); padding: 2px 7px; border-radius: 20px; }
+.ct-camp { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; background: var(--bg-2); }
+.ct-camp-hd { display: flex; align-items: center; gap: 9px; font-family: var(--font-display); font-size: 14px; color: var(--navy-900); }
+.ct-camp-hd span { margin-left: auto; font-size: 11.5px; color: var(--ink-3); font-family: var(--font-sans); }
+.ct-adset { margin: 10px 0 0 6px; padding-left: 12px; border-left: 2px solid var(--stroke); }
+.ct-adset-hd { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--ink-2); margin-bottom: 7px; }
+.ct-adset-hd svg { width: 13px; height: 13px; color: var(--ink-3); }
+.ct-adset-hd span { margin-left: auto; font-weight: 400; color: var(--ink-3); font-size: 11px; }
+.ct-ad { background: var(--card); border: 1px solid var(--stroke); border-radius: 11px; padding: 9px 11px; margin-bottom: 7px; }
+.ct-ad-hd { display: flex; align-items: center; gap: 10px; }
+.ct-ad-nm { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ct-ad-nm b { font-size: 13px; color: var(--navy-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-ad-nm span { font-size: 11px; color: var(--ink-3); }
+.ct-flags { margin-left: auto; display: flex; gap: 5px; }
+.ct-ok { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.ct-ok svg { width: 13px; height: 13px; }
+.ct-ad-hd .ct-edit { flex: none; }
+.ct-ed { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--stroke); }
+.ct-ed-foot { display: flex; margin-top: 4px; }
 .bubble.in { align-self: flex-start; background: var(--card); border: 1px solid var(--stroke); border-bottom-left-radius: 6px; color: var(--ink); box-shadow: 0 1px 2px rgba(16, 43, 92, .04); }
 .bubble.out {
   align-self: flex-end; border-bottom-right-radius: 6px; color: #fff;
