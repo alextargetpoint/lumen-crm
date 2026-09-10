@@ -448,6 +448,11 @@ html[data-theme="dark"] body::after{opacity:.06}
 .pstack .sc img{width:100%;display:block}
 .pstack .s1{width:74%;left:0;top:0;z-index:2}
 .pstack .s2{width:56%;right:0;bottom:0;z-index:3}
+.pbig.rev{grid-template-columns:1.05fr 1fr}
+.pwide{grid-column:1/-1;display:flex;align-items:center;gap:clamp(24px,4vw,48px);flex-wrap:wrap;background:linear-gradient(150deg,color-mix(in srgb,var(--blue) 9%,var(--card)),var(--card));border:1px solid var(--line);border-radius:24px;padding:clamp(28px,4vw,44px);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.pwide .pw-tx{flex:1;min-width:280px}
+.pwide .ptag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,transparent);padding:7px 13px;border-radius:999px;margin-bottom:16px}
+.pwide .trx{flex:0 0 auto}
 .prow2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:32px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .pcard .badge2{position:absolute;top:22px;right:22px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border-radius:999px;background:color-mix(in srgb,var(--gold) 18%,transparent);color:var(--gold)}
@@ -477,7 +482,10 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 @media (max-width:1000px){
   .hero .grid{grid-template-columns:1fr;gap:40px}
   .stage{max-width:440px;margin:0 auto}
-  .prob,.scene,.calc,.showcase .sc-grid,.vs{grid-template-columns:1fr}
+  .prob,.scene,.calc,.showcase .sc-grid,.vs,.pbig,.pbig.rev,.prow2{grid-template-columns:1fr}
+  .pbig.rev .pstack{order:2}
+  .pstack{height:300px;max-width:440px;margin:0 auto}
+  .pwide{flex-direction:column;align-items:flex-start}
   .feat{grid-template-columns:1fr;gap:30px}.feat.rev .fx{order:0}
   .steps .row{grid-template-columns:repeat(2,1fr);gap:34px}.steps .line{display:none}
   .niche-grid{grid-template-columns:repeat(2,1fr)}
@@ -553,7 +561,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <div class="cta-row" data-r class="d3">
         <a class="btn btn-p" href="/" target="_blank">Открыть живое демо
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <a class="btn btn-g" href="#how">Как это работает</a>
+        <button class="btn btn-g js-lead" type="button">Получить консультацию</button>
       </div>
       <div class="microtrust" data-r class="d4">
         <div class="m"><div class="n">≈1<span class="u"> мин</span></div><div class="l">ответ на заявку вместо 47 минут</div></div>
@@ -788,6 +796,63 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   </div>
 </section>
 
+<!-- PLATFORM: команда и брокер -->
+<section class="sec wrap" id="platform">
+  <div class="sec-head center" data-r>
+    <span class="kicker"><span class="dot"></span>Не только про лиды</span>
+    <h2>Операционка для <em>всего агентства</em></h2>
+    <p class="lead">Lumen — не очередной чат-бот. Это система для продаж, команды и даже личной мотивации брокера: чтобы люди не выгорали, а росли.</p>
+  </div>
+  <div class="platform-grid">
+    <div class="pbig" data-r>
+      <div>
+        <span class="ptag">Личный кабинет брокера</span>
+        <h3>Брокер организован и не выгорает</h3>
+        <p>У каждого брокера — личный таск-менеджер по сферам жизни, рутины, колесо баланса и карта желаний. Работа и мотивация в одном месте.</p>
+        <ul class="fl">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Задачи по сферам жизни + повторяющиеся рутины</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Колесо баланса и мягкие наджи — чтобы не выгорал</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Карта желаний: доска целей и личная мотивация</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Личное расписание — учитывается в брони встреч</li>
+        </ul>
+      </div>
+      <div class="pstack">
+        <div class="sc s1"><img src="/assets/site/cap-tasks.png" alt="Личные задачи брокера" onerror="this.src='/assets/site/cap-meetings.png'"></div>
+        <div class="sc s2"><img src="/assets/site/cap-wish.png" alt="Карта желаний" onerror="this.src='/assets/site/cap-moodboard.png'"></div>
+      </div>
+    </div>
+    <div class="pbig rev" data-r>
+      <div class="pstack">
+        <div class="sc s1"><img src="/assets/site/cap-academy.png" alt="Академия продаж" onerror="this.src='/assets/site/cap-ai.png'"></div>
+        <div class="sc s2"><img src="/assets/site/cap-callreview.png" alt="ИИ-оценка звонка" onerror="this.src='/assets/site/cap-analytics.png'"></div>
+      </div>
+      <div>
+        <span class="ptag">Развитие команды · HR</span>
+        <h3>Растите сильных брокеров системно</h3>
+        <p>Внутри — академия из 688 приёмов продаж (135 роликов Ольги Синенко, вшиты в ИИ) и ИИ-оценка звонков по методике. Брокеры учатся на реальных кейсах, а не «как получится».</p>
+        <ul class="fl">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Академия: 688 приёмов + разбор кейсов на планёрке</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>ИИ слушает звонок и ставит оценку по 6 критериям</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Сильные стороны и ошибки с конкретными репликами</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Лидерборд и HR-модуль — в активной разработке</li>
+        </ul>
+      </div>
+    </div>
+    <div class="pwide" data-r>
+      <div class="pw-tx">
+        <span class="ptag">Переводчик звонков · аддон</span>
+        <h3 style="font-size:clamp(24px,2.6vw,32px);margin-bottom:12px">Говорите по-русски — клиент слышит вас на своём языке</h3>
+        <p style="color:var(--ink2);font-size:15px">Реальный синхронный перевод прямо в звонке и Zoom. Международные сделки в Дубае, на Бали и в Европе — без языкового барьера и без переводчика в штате.</p>
+      </div>
+      <div class="trx">
+        <div class="say"><span class="wave"><i></i><i></i><i></i><i></i></span>Брокер · RU</div>
+        <span class="arw"><svg width="26" height="18" viewBox="0 0 34 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10h28M24 4l6 6-6 6"/></svg></span>
+        <div class="langs"><span>EN</span><span>IT</span><span>DE</span><span>FR</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- MANIFESTO -->
 <section class="manifesto invert">
   <video autoplay muted loop playsinline poster="/assets/site/city-poster.jpg"><source src="/assets/site/city-bg.mp4?v=1" type="video/mp4"></video>
@@ -974,7 +1039,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Лидоген-мост (Albato/Make)</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Приоритетная поддержка</li>
       </ul>
-      <a class="btn btn-g" href="/" target="_blank">Обсудить</a>
+      <button class="btn btn-g js-lead" type="button">Обсудить</button>
     </div>
   </div>
   <p class="plan-note">Расходники на агентство при ~500 лидах/мес — от $70 до $180 в зависимости от объёма сообщений. Проводим по себестоимости и показываем прозрачно в кабинете.</p>
@@ -1006,6 +1071,13 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       <a class="btn btn-g" href="#pricing" style="color:#fff;border-color:rgba(143,180,255,.3)">Посмотреть тарифы</a>
     </div>
+    <form class="finalform" id="finalForm" data-r>
+      <input class="hp" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input name="name" placeholder="Ваше имя" required>
+      <input name="phone" placeholder="Телефон или WhatsApp" required inputmode="tel">
+      <button class="btn btn-p" type="submit">Оставить заявку</button>
+    </form>
+    <div class="finalform-ok" id="finalFormOk">✓ Заявка отправлена — свяжемся вживую.</div>
   </div>
 </section>
 
@@ -1019,6 +1091,42 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <div class="cp">© 2026 Lumen CRM — AI-отдел продаж для агентств недвижимости. Дубай · Бали · Пхукет · Испания.</div>
   </div>
 </footer>
+
+<!-- LEAD MODAL -->
+<div class="modal" id="lform" aria-hidden="true">
+  <div class="modal-bg" data-close></div>
+  <div class="modal-card">
+    <button class="modal-x" data-close aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <div class="mform" id="mform">
+      <span class="kicker"><span class="dot"></span>Заявка</span>
+      <h3>Получить консультацию</h3>
+      <p>Оставьте контакт — покажем Lumen на вашем агентстве и посчитаем экономику под ваш поток лидов.</p>
+      <form id="leadForm">
+        <input class="hp" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="field"><label>Имя</label><input name="name" required placeholder="Как к вам обращаться"></div>
+        <div class="field"><label>Телефон или WhatsApp</label><input name="phone" required inputmode="tel" placeholder="+…"></div>
+        <div class="field"><label>Направление</label>
+          <div class="chips" id="topicChips">
+            <button type="button" class="chip-r" data-topic="Дубай">Дубай</button>
+            <button type="button" class="chip-r" data-topic="Бали">Бали</button>
+            <button type="button" class="chip-r" data-topic="Пхукет">Пхукет</button>
+            <button type="button" class="chip-r" data-topic="Испания">Испания</button>
+            <button type="button" class="chip-r" data-topic="Другое">Другое</button>
+          </div>
+          <input type="hidden" name="topic" id="topicInput">
+        </div>
+        <div class="field"><label>Сообщение (необязательно)</label><textarea name="message" rows="3" placeholder="Коротко о задаче"></textarea></div>
+        <button class="btn btn-p" type="submit">Отправить заявку</button>
+        <div class="privacy">Нажимая «Отправить», вы соглашаетесь на обработку данных.</div>
+      </form>
+    </div>
+    <div class="mform-ok" id="mformOk">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h3>Заявка отправлена</h3>
+      <p>Свяжемся с вами вживую и покажем Lumen на вашем агентстве.</p>
+    </div>
+  </div>
+</div>
 
 <script>
 // theme
@@ -1071,6 +1179,29 @@ if(!reduced && matchMedia('(pointer:fine)').matches){
   document.querySelectorAll('.frame').forEach(el=>tilt(el,3.5));
   const st=document.querySelector('.stage');if(st)tilt(st,4.5);
 }
+
+// preloader hide
+const load=document.getElementById('load');
+let loadHidden=false;
+function hideLoad(){if(loadHidden||!load)return;loadHidden=true;load.classList.add('done');setTimeout(()=>load.remove(),800);}
+addEventListener('load',()=>setTimeout(hideLoad,450));
+setTimeout(hideLoad,2600);
+
+// lead modal
+const lform=document.getElementById('lform');
+const openLead=()=>{lform.classList.add('open');document.body.style.overflow='hidden';};
+const closeLead=()=>{lform.classList.remove('open');document.body.style.overflow='';};
+document.querySelectorAll('.js-lead').forEach(b=>b.addEventListener('click',openLead));
+lform.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLead));
+addEventListener('keydown',e=>{if(e.key==='Escape'&&lform.classList.contains('open'))closeLead();});
+const topicInput=document.getElementById('topicInput');
+document.querySelectorAll('#topicChips .chip-r').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('#topicChips .chip-r').forEach(x=>x.classList.remove('on'));c.classList.add('on');topicInput.value=c.dataset.topic;}));
+
+async function sendLead(form){const fd=new FormData(form),b={};fd.forEach((v,k)=>b[k]=v);try{const r=await fetch('/site/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));return r.ok&&j.ok;}catch(e){return false;}}
+const leadForm=document.getElementById('leadForm');
+leadForm&&leadForm.addEventListener('submit',async e=>{e.preventDefault();const btn=leadForm.querySelector('button[type=submit]');btn.disabled=true;const t=btn.textContent;btn.textContent='Отправляем…';const ok=await sendLead(leadForm);if(ok){document.getElementById('mform').classList.add('hide');document.getElementById('mformOk').classList.add('show');}else{btn.disabled=false;btn.textContent='Ошибка — повторить';setTimeout(()=>btn.textContent=t,2500);}});
+const finalForm=document.getElementById('finalForm');
+finalForm&&finalForm.addEventListener('submit',async e=>{e.preventDefault();const btn=finalForm.querySelector('button[type=submit]');btn.disabled=true;const t=btn.textContent;btn.textContent='Отправляем…';const ok=await sendLead(finalForm);if(ok){finalForm.style.display='none';document.getElementById('finalFormOk').classList.add('show');}else{btn.disabled=false;btn.textContent='Ошибка — повторить';setTimeout(()=>btn.textContent=t,2500);}});
 
 if(reduced){document.querySelectorAll('video').forEach(v=>{v.removeAttribute('autoplay');v.pause&&v.pause()})}
 </script>

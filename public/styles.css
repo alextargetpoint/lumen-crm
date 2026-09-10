@@ -5574,3 +5574,25 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .content::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 34%, transparent); border-radius: 20px; border: 3px solid transparent; background-clip: content-box; }
 .content::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink-3) 52%, transparent); background-clip: content-box; }
 @media (prefers-reduced-motion: reduce) { .content::before { display: none; } }
+
+/* ═══ ВИЗУАЛ v4 · СЛОЙ 2 — стекло + motion (по запросу «больше стекла/мошн») ═══ */
+/* настоящее матовое стекло на карточках поверх атмосферного фона (высокая непрозрачность → читаемо) */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass { background: color-mix(in srgb, var(--card) 86%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.35); backdrop-filter: blur(16px) saturate(1.35); }
+  :root[data-theme="dark"] .glass, .dark .glass { background: color-mix(in srgb, var(--card) 74%, transparent); }
+}
+/* живой дрейф атмосферы (медленно, GPU, reduced-motion уже гасит ::before) */
+@keyframes ambientDrift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2.2%, 1.6%, 0) scale(1.05); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+.content::before { animation: ambientDrift 26s var(--ease-soft) infinite; will-change: transform; }
+/* стеклянный «блик» и мягкий подъём карточек по наведению (микровзаимодействие) */
+.glass.card { transition: box-shadow var(--dur) var(--ease-soft), transform var(--dur) var(--ease-spring); }
+.glass.card:hover { box-shadow: var(--shadow-lift), inset 0 1px 0 rgba(255,255,255,.7); }
+/* тонкая живая градиент-кромка на акцентных кнопках (дорого-футуристично) */
+@keyframes sheenSlide { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.btn-accent { background-image: linear-gradient(110deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7C4DFF), var(--accent)); background-size: 200% 100%; transition: background-position var(--dur-slow, .8s) var(--ease-soft), transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast); }
+.btn-accent:hover { background-position: 100% 50%; }
+@media (prefers-reduced-motion: reduce) { .btn-accent { background-image: none; } }
