@@ -128,7 +128,7 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .band video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28}
 .band::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 120% at 50% 0,transparent,#060B16 82%)}
 .band .wrap{position:relative;z-index:2}
-.band .head{text-align:center;max-width:24ch;margin:0 auto clamp(40px,6vw,70px)}
+.band .head{text-align:center;max-width:720px;margin:0 auto clamp(40px,6vw,70px)}
 .bigs{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .big{text-align:center;padding:20px}
 .big .n{font-family:var(--disp);font-size:clamp(60px,9vw,120px);font-weight:600;line-height:.9;letter-spacing:-.02em;background:linear-gradient(180deg,#fff,var(--sky));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -629,8 +629,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   <video autoplay muted loop playsinline poster="/assets/site/ink-poster.jpg"><source src="/assets/site/ink-bg.mp4?v=3" type="video/mp4"></video>
   <div class="wrap">
     <div class="head" data-r>
-      <span class="kicker"><span class="dot"></span>Цифры, а не обещания</span>
-      <h2 style="margin-top:14px">Когда первую линию <em>ведёт Lumen</em></h2>
+      <h2>Когда первую линию ведёт <em>Lumen</em></h2>
     </div>
     <div class="bigs">
       <div class="big" data-r><div class="from">47 мин</div><div class="n">1 мин</div><div class="l">первый ответ — пока конкуренты ещё спят</div></div>
@@ -644,8 +643,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 <section class="sec wrap" id="problem">
   <div class="prob">
     <div data-r>
-      <span class="kicker"><span class="dot"></span>Где утекают деньги</span>
-      <div class="big-say" style="margin-top:18px">Заявка стоит дорого — <span class="hl">а остывает за минуты.</span> Вы платите за трафик, а менеджер отвечает через полчаса, когда клиент уже написал троим конкурентам.</div>
+      <div class="big-say">Заявка стоит дорого — <span class="hl">а остывает за минуты.</span> Вы платите за трафик, а менеджер отвечает через полчаса, когда клиент уже написал троим конкурентам.</div>
     </div>
     <div class="leaks">
       <div class="leak" data-r><div class="fig">78%</div><div><h4>Побеждает тот, кто первый</h4><p>Клиенты выбирают агентство, ответившее первым. Ночная заявка без мгновенного ответа — почти всегда потеряна.</p></div></div>
@@ -842,7 +840,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 <!-- PLATFORM: команда и брокер -->
 <section class="sec wrap" id="platform">
   <div class="sec-head center" data-r>
-    <span class="kicker"><span class="dot"></span>Не только про лиды</span>
+    <span class="kicker"><span class="dot"></span>Платформа</span>
     <h2>Операционка для <em>всего агентства</em></h2>
     <p class="lead">Lumen — не очередная CRM-система. Это система для продаж, команды и даже личной мотивации брокера: чтобы люди не выгорали, а росли.</p>
   </div>
@@ -916,7 +914,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <div class="sc-phone"><img src="/assets/site/cap-coll-mobile.png" alt="Подборка на телефоне" onerror="this.src='/assets/site/cap-mob-collection.png'"></div>
       </div>
       <div class="cap">
-        <span class="kicker"><span class="dot"></span>Подборки, которые продают</span>
+        <span class="kicker"><span class="dot"></span>Подборки и презентации</span>
         <h3 style="margin-top:14px">Презентация уровня агентства — <span class="serif-accent">без дизайнера</span></h3>
         <p class="lead" style="font-size:16px">Запрос клиента превращается в брендированную страницу и PDF: обложка-оффер, проекты с фото и метриками, план оплаты, ROI, прогноз аренды.</p>
         <div class="cbul">
@@ -948,7 +946,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 <!-- COMPARE -->
 <section class="sec wrap" id="compare">
   <div class="sec-head center" data-r>
-    <span class="kicker"><span class="dot"></span>Честное сравнение</span>
+    <span class="kicker"><span class="dot"></span>Сравнение</span>
     <h2>Почему агентства <em>выбирают Lumen</em></h2>
     <p class="lead">Не арендуете чужой поток заявок — получаете свою систему, которая работает на вас.</p>
   </div>
@@ -1003,7 +1001,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 <!-- CALC -->
 <section class="sec wrap" id="calc">
   <div class="sec-head center" data-r>
-    <span class="kicker"><span class="dot"></span>Сколько вы теряете сейчас</span>
+    <span class="kicker"><span class="dot"></span>Калькулятор</span>
     <h2>Посчитайте <em>цену медленных ответов</em></h2>
   </div>
   <div class="calc" data-r>
