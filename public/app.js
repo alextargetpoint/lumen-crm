@@ -5268,22 +5268,87 @@ PAGES.academy = async (root) => {
   $$('[data-acsrc]', root).forEach(b => b.addEventListener('click', () => acadDetail(b.dataset.acsrc, b.dataset.achd)));
 };
 /* ═══ Академия агентства: свои уроки (видео+текст) + доступ по паролю ═══ */
+/* ═══ АКАДЕМИЯ АГЕНТСТВА: модули-папки с кастомными обложками (сгенерированы Higgsfield), премиум-модули ═══ */
+const LEARN_CATS = [
+  { key: 'scripts',    re: /скрипт|звонк|диалог|презентац/i,           name: 'Скрипты',          cover: 'assets/learn/cat-scripts.png',    hue: '#2F6BFF' },
+  { key: 'objections', re: /возраж|отказ|сомнен/i,                     name: 'Возражения',       cover: 'assets/learn/cat-objections.png', hue: '#E4813D' },
+  { key: 'onboarding', re: /онбординг|новичк|старт|адаптац|первая/i,   name: 'Онбординг',        cover: 'assets/learn/cat-onboarding.png', hue: '#2FA98C' },
+  { key: 'closing',    re: /закрыти|сделк|переговор|торг|дожим/i,      name: 'Закрытие сделок',  cover: 'assets/learn/cat-closing.png',    hue: '#C89B5A' },
+  { key: 'marketing',  re: /маркетинг|лид|трафик|реклам|контент/i,     name: 'Маркетинг и лиды', cover: 'assets/learn/cat-marketing.png',  hue: '#7C4DFF' },
+  { key: 'market',     re: /рынок|продукт|объект|локаци|застройщик|инвест/i, name: 'Рынок и продукт', cover: 'assets/learn/cat-market.png', hue: '#3EA0C8' },
+];
+function learnCatOf(cat) { const c = (cat || '').trim(); for (const k of LEARN_CATS) if (k.re.test(c)) return Object.assign({}, k, { label: c || k.name }); return { key: 'other', name: c || 'Разное', label: c || 'Разное', cover: '', hue: '#6B7A99' }; }
+/* сгруппировать уроки в модули по категории, сохранив порядок появления категорий */
+function learnModules(lessons) {
+  const order = [], map = {};
+  for (const l of lessons) { const m = learnCatOf(l.cat); if (!map[m.label]) { map[m.label] = { meta: m, lessons: [] }; order.push(m.label); } map[m.label].lessons.push(l); }
+  return order.map(k => map[k]);
+}
+/* обложка-папка модуля: сгенерённая картинка или стеклянный градиент-фолбэк */
+function learnFold(m, size) {
+  const s = size || 64;
+  const grad = `background:radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, ${m.hue} 55%, #0A1833), #0A1833 75%)`;
+  return m.cover
+    ? `<span class="lm-fold" style="--hue:${m.hue};width:${s}px;height:${s}px"><img src="${m.cover}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"><i class="lm-fold-g"></i></span>`
+    : `<span class="lm-fold noimg" style="--hue:${m.hue};width:${s}px;height:${s}px;${grad}">${ic(I.doc, 2)}</span>`;
+}
+/* премиум-карточка урока для чтения (брокер / предпросмотр) */
+function learnLessonCard(l, m) {
+  const emb = l.video ? embedFromUrl(l.video) : null;
+  const preview = (l.body || '').replace(/[#*_>`\-]/g, '').replace(/\n+/g, ' ').trim().slice(0, 130);
+  return `<article class="lm-card glass" data-lread="${l.id}" style="--hue:${m.hue}">
+    <div class="lm-card-cover">${l.video ? `<span class="lm-play">${ic(I.play, 2)}</span>` : ''}${learnFold(m, 40)}</div>
+    <div class="lm-card-b">
+      <span class="lm-card-cat">${esc(m.label)}</span>
+      <b class="lm-card-t">${esc(l.title || 'Урок')}</b>
+      ${preview ? `<span class="lm-card-p">${esc(preview)}${(l.body || '').length > 130 ? '…' : ''}</span>` : ''}
+    </div>
+    <div class="lm-card-read" hidden>${emb ? `<div class="lm-embed">${emb}</div>` : ''}<div class="lm-body md-note">${mdNote(l.body || '')}</div></div>
+  </article>`;
+}
+/* премиум-рендер чтения (модули + карточки + inline-раскрытие) — для брокеров и для предпросмотра владельца */
+function learnRenderRead(root, lessons, meta) {
+  const mods = learnModules(lessons);
+  root.innerHTML = `
+    ${learnHeroHTML(lessons.length, meta)}
+    ${lessons.length ? mods.map(mod => `
+      <section class="lm-mod">
+        <header class="lm-mod-h">${learnFold(mod.meta, 54)}<div class="lm-mod-tt"><b>${esc(mod.meta.label)}</b><span>${mod.lessons.length} ${plural(mod.lessons.length, 'урок', 'урока', 'уроков')}</span></div></header>
+        <div class="lm-cards">${mod.lessons.map(l => learnLessonCard(l, mod.meta)).join('')}</div>
+      </section>`).join('') : '<div class="glass card empty">Уроки скоро появятся.</div>'}`;
+  $$('[data-lread]', root).forEach(card => {
+    const rd = card.querySelector('.lm-card-read');
+    card.addEventListener('click', () => {
+      const opening = rd.hidden; rd.hidden = !rd.hidden; card.classList.toggle('open', opening);
+      if (opening) { const box = rd.querySelector('.lm-embed'); /* ленивое видео уже в разметке через embedFromUrl */ }
+    });
+  });
+}
+function learnHeroHTML(n, meta) {
+  return `<div class="lm-hero" style="background-image:linear-gradient(90deg, rgba(6,17,38,.92) 30%, rgba(6,17,38,.35)), url('assets/learn/hero-academy.png')">
+    <div class="lm-hero-in">
+      <div class="lm-hero-badge">${ic(I.doc)}Академия агентства</div>
+      <div class="lm-hero-h">${esc((meta && meta.title) || 'База знаний вашей команды')}</div>
+      <div class="lm-hero-s">${n} ${plural(n, 'урок', 'урока', 'уроков')} · ${learnModules ? '' : ''}видео, скрипты и разборы — единый стандарт продаж агентства</div>
+    </div>
+  </div>`;
+}
 PAGES.learn = async (root) => {
   const d = await api.get('/learn');
   let lessons = d.lessons || []; const sh = d.share || {};
   const isOwner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
-  /* ── ПРОСМОТР (брокеры): красивые карточки, только чтение ── */
-  if (!isOwner) {
-    root.innerHTML = `${heroArt('assets/art/book.png', `<div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')}</span></div>`, { v: 'right', hue: '#B87E4B' })}
-      <div class="lrn-grid">${lessons.length ? lessons.map(l => `<div class="glass card lrn-card">${l.video ? `<div class="lrn-vid" data-emb="${esc(l.video)}"></div>` : ''}${l.cat ? `<div class="lrn-cat">${esc(l.cat)}</div>` : ''}<div class="lrn-t">${esc(l.title)}</div><div class="lrn-b md-note">${mdNote(l.body || '')}</div></div>`).join('') : '<div class="glass card empty">Уроки скоро появятся.</div>'}</div>`;
-    $$('[data-emb]', root).forEach(el => { const e = embedFromUrl(el.dataset.emb); if (e) el.innerHTML = e; else el.remove(); });
-    return;
-  }
+  /* ── ПРОСМОТР (брокеры): премиум-модули с кастомными обложками ── */
+  if (!isOwner) { learnRenderRead(root, lessons, d.meta); return; }
+  /* предпросмотр «как видят брокеры» — тот же премиум-рендер */
+  if (PAGE_STATE.learnPreview) { learnRenderRead(root, lessons, d.meta);
+    const back = el('<button class="btn btn-sm lm-preview-exit">' + ic(I.chev) + 'Выйти из предпросмотра</button>');
+    back.addEventListener('click', () => { PAGE_STATE.learnPreview = false; render(); });
+    root.insertBefore(back, root.firstChild); return; }
   /* ── КОНСТРУКТОР (владелец): inline drag-and-drop, без попапов ── */
   const row = (l) => `<div class="lc-item glass" data-lid="${l.id}">
     <div class="lc-head">
       <span class="lc-grip" data-grip title="Перетащить">${ic(I.grip)}</span>
-      <span class="lc-vico">${l.video ? ic(I.play, 2) : ic(I.doc, 2)}</span>
+      <span class="lc-vico">${learnFold(learnCatOf(l.cat), 38)}${l.video ? `<i class="lc-vico-play">${ic(I.play, 2)}</i>` : ''}</span>
       <div class="lc-h-main"><b class="lc-h-title">${esc(l.title || 'Без названия')}</b><span class="lc-h-cat">${esc(l.cat || 'без категории')}</span></div>
       <span class="lc-saved" data-saved>сохранено</span>
       <span class="lc-caret" data-toggle>${ic(I.chev)}</span>
@@ -5299,19 +5364,30 @@ PAGES.learn = async (root) => {
       <div class="lc-e-foot"><button class="btn-ghost lc-del" data-del="${l.id}">${ic(I.x)}Удалить урок</button></div>
     </div>
   </div>`;
+  const paintShelf = () => {
+    const shelf = root.querySelector('#lmShelf'); if (!shelf) return;
+    const mods = learnModules(lessons); const flt = PAGE_STATE.learnFilter || '';
+    shelf.innerHTML = mods.length ? mods.map(mod => `<button class="lm-folder ${flt === mod.meta.label ? 'on' : ''}" data-lmfolder="${esc(mod.meta.label)}" style="--hue:${mod.meta.hue}">
+      ${learnFold(mod.meta, 46)}
+      <span class="lm-folder-tt"><b>${esc(mod.meta.label)}</b><span>${mod.lessons.length} ${plural(mod.lessons.length, 'урок', 'урока', 'уроков')}</span></span>
+    </button>`).join('') : '<div class="muted" style="font-size:12px;padding:2px">Категории появятся по мере добавления уроков — задай урокам категорию (Скрипты, Возражения…), и они соберутся в модули с обложками.</div>';
+    shelf.querySelectorAll('[data-lmfolder]').forEach(b => b.addEventListener('click', () => { PAGE_STATE.learnFilter = (PAGE_STATE.learnFilter === b.dataset.lmfolder) ? '' : b.dataset.lmfolder; paintShelf(); paintList(); }));
+  };
   const paintList = () => {
-    root.querySelector('#lcList').innerHTML = lessons.map(row).join('') || '<div class="glass card empty">Пусто. Нажми «Добавить урок» — впиши видео и текст, сохранится само.</div>';
+    const flt = PAGE_STATE.learnFilter || '';
+    const shown = flt ? lessons.filter(l => learnCatOf(l.cat).label === flt) : lessons;
+    root.querySelector('#lcList').innerHTML = shown.map(row).join('') || `<div class="glass card empty">${flt ? 'В этом модуле пока нет уроков.' : 'Пусто. Нажми «Добавить урок» — впиши видео и текст, сохранится само.'}</div>`;
     wireItems();
   };
   root.innerHTML = `
-    ${heroArt('assets/art/book.png', `
-      <div class="ha-title">${ic(I.doc)}Академия агентства<span class="sub">${lessons.length} ${plural(lessons.length, 'урок', 'урока', 'уроков')} · конструктор уроков команды</span></div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Собери уроки как конструктор: перетаскивай, редактируй прямо в карточке, ИИ причешет текст. Открой брокерам доступ по ссылке с паролем.</span></div>
-    `, { v: 'right', hue: '#B87E4B' })}
+    ${learnHeroHTML(lessons.length, d.meta)}
     <div class="lrn-bar">
       <button class="btn btn-accent" id="lrnNew">${ic(I.plus)}Добавить урок</button>
+      <button class="btn" id="lrnPreview">${ic(I.eye || I.play)}Смотреть как брокер</button>
+      <span class="tb-spacer"></span>
       <button class="btn" id="lrnShareT">${ic(I.link || I.copy)}Доступ для брокеров${sh.on ? ' · вкл' : ''}</button>
     </div>
+    <div class="lm-shelf" id="lmShelf"></div>
     <div class="lc-share glass card" id="lcShare" hidden>
       <div class="set-row"><div class="sp"><div class="sl">Доступ по ссылке</div><div class="sd">Брокеры смотрят уроки по паролю (только чтение)</div></div><label class="switch"><input type="checkbox" id="shOn" ${sh.on ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
       <div class="lc-share-grid">
@@ -5329,6 +5405,8 @@ PAGES.learn = async (root) => {
       const body = { id }; item.querySelectorAll('.lc-f').forEach(f => body[f.dataset.k] = f.value);
       try { await api.post('/learn', body); const l = lessons.find(x => x.id === id); if (l) Object.assign(l, body);
         item.querySelector('.lc-h-title').textContent = body.title || 'Без названия'; item.querySelector('.lc-h-cat').textContent = body.cat || 'без категории';
+        const m = learnCatOf(body.cat); const vico = item.querySelector('.lc-vico'); if (vico) vico.innerHTML = learnFold(m, 38) + (body.video ? `<i class="lc-vico-play">${ic(I.play, 2)}</i>` : '');
+        paintShelf();
         const sv = item.querySelector('[data-saved]'); sv.classList.add('show'); setTimeout(() => sv.classList.remove('show'), 1400);
       } catch (e) { toast('Не сохранилось', e.message); }
     }, 650);
@@ -5346,7 +5424,7 @@ PAGES.learn = async (root) => {
         try { const r = await api.post('/tidy-note', { text: src, ctx: 'урок внутренней академии' }); if (r && r.text) { ta.value = r.text; autosave(item); toast('Готово', 'ИИ структурировал', true); } } catch (e) { toast('Не вышло', e.message); }
         tidy.disabled = false; tidy.innerHTML = old;
       });
-      item.querySelector('.lc-del').addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + id, { method: 'DELETE' }); lessons = lessons.filter(x => x.id !== id); item.remove(); toast('Удалён', null, true); } catch (e) { toast('Не вышло', e.message); } });
+      item.querySelector('.lc-del').addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + id, { method: 'DELETE' }); lessons = lessons.filter(x => x.id !== id); item.remove(); paintShelf(); toast('Удалён', null, true); } catch (e) { toast('Не вышло', e.message); } });
       wireDrag(item);
     });
   }
@@ -5364,10 +5442,11 @@ PAGES.learn = async (root) => {
       document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
     });
   }
-  paintList();
+  paintShelf(); paintList();
+  $('#lrnPreview', root).addEventListener('click', () => { PAGE_STATE.learnPreview = true; render(); });
   /* добавить урок → создаём пустой, вставляем сверху, открываем */
   $('#lrnNew', root).addEventListener('click', async () => {
-    try { const r = await api.post('/learn', { title: 'Новый урок', cat: '', video: '', body: '' }); lessons.unshift(r.lesson); paintList();
+    try { const r = await api.post('/learn', { title: 'Новый урок', cat: '', video: '', body: '' }); lessons.unshift(r.lesson); PAGE_STATE.learnFilter = ''; paintShelf(); paintList();
       const first = root.querySelector('.lc-item'); if (first) { first.querySelector('[data-toggle]').click(); const t = first.querySelector('[data-k="title"]'); if (t) { t.focus(); t.select(); } }
     } catch (e) { toast('Не вышло', e.message); }
   });
