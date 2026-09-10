@@ -2503,7 +2503,9 @@ function openDupesModal(groups) {
 
 /* ---------- встречи ---------- */
 PAGES.meetings = async (root) => {
-  const list = await api.get('/meetings');
+  const [list, tdata] = await Promise.all([api.get('/meetings'), api.get('/tasks').catch(() => ({ tasks: [] }))]);
+  const allTasks = (tdata.tasks || []).filter(t => t.due && t.status !== 'done');   /* личные задачи с дедлайном-временем → блоки в календаре */
+  const TASK_MAP = {}; allTasks.forEach(t => TASK_MAP[t.id] = t);
   /* неделя календаря: смещение хранится в PAGE_STATE.calWeek */
   const wk = PAGE_STATE.calWeek || 0;
   const mon = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day + wk * 7); d.setHours(0, 0, 0, 0); return d; })();
@@ -2516,6 +2518,11 @@ PAGES.meetings = async (root) => {
       const dur = mt.dur || 60; const h = Math.max(19, dur / 60 * HPX - 2);
       const endT = new Date(t.getTime() + dur * 60e3);
       return `<div class="cal-ev st-${mt.status}" style="top:${top}px;height:${h}px" data-mtid="${mt.id}" data-mtdrag="${mt.id}" data-dur="${dur}" title="${esc(mt.leadName)} · ${tmm(mt.at)}–${tmm(+endT)} · тяните для переноса, за низ — длительность"><b>${tmm(mt.at)}</b> ${esc(mt.leadName.split(' ')[0])}<span>${esc(mt.brokerName.split(' ')[0])}</span><div class="cal-ev-rs" data-mtrs="${mt.id}" title="Растянуть длительность"></div></div>`; }).join('');
+  const tasksF = brF ? allTasks.filter(t => t.brokerId === brF) : allTasks;
+  const taskBlocks = (d) => tasksF.filter(t => { const dt = new Date(t.due); return dt.toDateString() === d.toDateString() && dt.getHours() >= H0 && dt.getHours() < H1; })
+    .map(t => { const dt = new Date(t.due); const top = Math.max(0, (dt.getHours() + dt.getMinutes() / 60 - H0) * HPX);
+      const pc = (TPRI[t.priority] || {}).c || 'var(--accent)';
+      return `<div class="cal-task" style="top:${top}px;--pc:${pc}" data-tkid="${t.id}" title="Задача: ${esc(t.title)} · ${tmm(+dt)}"><span class="cal-task-dot"></span><b>${tmm(+dt)}</b> ${esc(t.title)}</div>`; }).join('');
   const calHtml = `
     <div class="glass card mb">
       <div class="card-title">${ic(I.cal)}Календарь недели ${hint('meet', 'Как работают встречи', [
@@ -2531,11 +2538,12 @@ PAGES.meetings = async (root) => {
           <button class="btn btn-sm" id="calNext" style="transform:none">${ic(I.chev)}</button>
           <button class="btn btn-sm" id="mtPrint" title="Печать недели / PDF">${ic(I.doc)}</button>
         </span></div>
+      <div class="cal-legend"><span class="cal-lg-i"><span class="cal-lg-dot ev"></span>встречи</span><span class="cal-lg-i"><span class="cal-lg-dot tk"></span>задачи с дедлайном${tasksF.length ? ' · ' + tasksF.length : ''}</span></div>
       <div class="cal-grid" style="--hpx:${HPX}px">
         <div class="cal-hours">${Array.from({ length: H1 - H0 }, (_, i) => `<div>${H0 + i}:00</div>`).join('')}</div>
         ${dayCols.map(d => `<div class="cal-day ${d.toDateString() === new Date().toDateString() ? 'today' : ''}" data-day="${dstrLocal(d)}">
           <div class="cal-dhead">${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][(d.getDay() + 6) % 7]} <b>${d.getDate()}</b></div>
-          <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${d.toDateString() === new Date().toDateString() && new Date().getHours() >= H0 && new Date().getHours() < H1 ? `<div class="cal-now" style="top:${(new Date().getHours() + new Date().getMinutes() / 60 - H0) * HPX}px"></div>` : ''}${calBlocks(d)}
+          <div class="cal-body" style="height:${(H1 - H0) * HPX}px">${d.toDateString() === new Date().toDateString() && new Date().getHours() >= H0 && new Date().getHours() < H1 ? `<div class="cal-now" style="top:${(new Date().getHours() + new Date().getMinutes() / 60 - H0) * HPX}px"></div>` : ''}${calBlocks(d)}${taskBlocks(d)}
             ${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cal-slot" style="top:${i * HPX}px" data-h="${H0 + i}"></div>`).join('')}</div>
         </div>`).join('')}
       </div>
@@ -2581,6 +2589,8 @@ PAGES.meetings = async (root) => {
   $('#calPrev').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) - 1; render(); });
   $('#calNext').addEventListener('click', () => { PAGE_STATE.calWeek = (PAGE_STATE.calWeek || 0) + 1; render(); });
   $('#calBroker').addEventListener('change', (e) => { PAGE_STATE.calBroker = e.target.value; render(); });
+  /* блоки задач в календаре: клик → детальная карточка задачи (личные дела рядом со встречами, один календарь) */
+  $$('.cal-task', root).forEach(el => el.addEventListener('click', (e) => { e.stopPropagation(); const t = TASK_MAP[el.dataset.tkid]; if (t) openTaskDetail(t, null); }));
   const pad2 = (n) => String(n).padStart(2, '0');
   const SNAP = 15; /* минут */
   /* по Y внутри тела дня → минуты от H0, снап к 15 мин, клампинг в рабочие часы */

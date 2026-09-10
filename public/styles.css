@@ -926,6 +926,18 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 }
 .cal-ev b { font-size: 10px; }
 .cal-ev span { display: block; opacity: .75; font-size: 9px; }
+/* блок задачи в календаре — визуально отличается от встречи: светлый, с цветной кромкой по приоритету */
+.cal-task { position: absolute; left: 3px; right: 3px; z-index: 3; height: 20px; overflow: hidden; display: flex; align-items: center; gap: 5px;
+  background: var(--card); color: var(--navy-900); border: 1px solid var(--stroke); border-left: 3px solid var(--pc, var(--accent));
+  border-radius: 7px; padding: 2px 7px; font-size: 10px; line-height: 1.2; cursor: pointer; box-shadow: 0 2px 6px -3px rgba(16,43,92,.25); white-space: nowrap; }
+.cal-task:hover { background: var(--bg-2); border-color: var(--pc, var(--accent)); z-index: 5; overflow: visible; }
+.cal-task b { font-size: 10px; font-variant-numeric: tabular-nums; }
+.cal-task-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--pc, var(--accent)); flex: none; }
+.cal-legend { display: flex; gap: 14px; align-items: center; margin: -2px 0 10px; font-size: 11.5px; color: var(--ink-3); }
+.cal-lg-i { display: inline-flex; align-items: center; gap: 6px; }
+.cal-lg-dot { width: 11px; height: 11px; border-radius: 3px; }
+.cal-lg-dot.ev { background: linear-gradient(135deg, var(--accent-2), var(--accent)); }
+.cal-lg-dot.tk { background: var(--card); border: 1px solid var(--stroke); border-left: 3px solid var(--accent); border-radius: 3px; }
 .cal-ev.st-done { background: var(--ok-bg); color: var(--ok); box-shadow: none; border: 1px solid #C4E6D6; }
 .cal-ev.st-no_show { background: var(--bad-bg); color: var(--bad); box-shadow: none; border: 1px solid #EDC5C0; }
 .cal-ev.rsizing { box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 8px 18px -6px rgba(37, 99, 235, .6); z-index: 5; }
