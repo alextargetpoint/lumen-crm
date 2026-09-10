@@ -1009,6 +1009,15 @@ const OV_CAT = [
   ['Прочее', ['activity', 'geo', 'worldclock', 'onboarding', 'spark', 'timezones']],
 ];
 const ovCatOf = (k) => { for (const [c, ks] of OV_CAT) if (ks.includes(k)) return c; return 'Прочее'; };
+/* ⭐ готовые наборы виджетов под цель — один клик собирает обзор под роль/задачу */
+const OV_PRESETS = [
+  { k: 'chief', name: 'Руководитель', d: 'сводка по агентству', ic: () => I.grid, w: ['kpi', 'clientreport', 'funnel', 'leadsources', 'brokers', 'leaders', 'goal', 'activity'] },
+  { k: 'sales', name: 'Отдел продаж', d: 'лиды, задачи, сделки', ic: () => I.funnel, w: ['kpi', 'funnel', 'hotleads', 'tasks', 'meetings', 'attention', 'chains', 'leaders'] },
+  { k: 'marketing', name: 'Маркетинг · реклама', d: 'трафик, связки, CPL', ic: () => I.target, w: ['kpi', 'clientreport', 'adbundles', 'leadsources', 'funnel', 'aivs', 'numbers'] },
+  { k: 'content', name: 'Контент', d: 'идеи, сценарии, карусели', ic: () => I.layers, w: ['contenthub', 'ideas', 'casebase', 'kpi'] },
+  { k: 'brokerday', name: 'День брокера', d: 'задачи, встречи, фокус', ic: () => I.task, w: ['tasks', 'meetings', 'goal', 'attention', 'hotleads'] },
+  { k: 'minimal', name: 'Минимал', d: 'только главное', ic: () => I.spark, w: ['kpi', 'funnel', 'tasks'] },
+];
 
 /* ─── motion-слой: тонкая видео-атмосфера на hero/AI-зонах (ПРЕМИУМ-АКЦЕНТ, не дефолт) ───
    cost-safe: переиспользуем уже сгенерённые лупы, НЕ генерим новое видео */
@@ -1926,20 +1935,25 @@ function ovLibrary(ctx, layout, onChange) {
   const lb = modal({
     title: 'Библиотека виджетов', wide: true, sub: `${avail.length} виджетов по категориям — нажми на карточку, чтобы добавить`,
     body: (() => {
-      if (!avail.length) return '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>' + (!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : '');
       const tile = (k) => { let inner; try { inner = OV_W[k].render(ctx, 'default'); } catch (_) { inner = OV_PREV[k] ? OV_PREV[k]() : ''; } return `<div class="ov2-lib-i ${OV_W[k].full ? 'wide' : ''}" data-add="${k}" data-nm="${esc((OV_W[k].name || '').toLowerCase())}">
         <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
         <div class="ov2-lib-prev"><div class="ov-w-body glass card ov2-lib-prev-in">${inner}</div></div>
       </div>`; };
+      /* Пресеты — готовые наборы под цель (собирают весь обзор одним кликом) */
+      const presets = `<div class="ov2-preset-sec"><div class="ov2-lib-cat-h ovp-h">Пресеты — готовый обзор под цель<span>${OV_PRESETS.length}</span></div>
+        <div class="ov2-presets">${OV_PRESETS.map(p => `<button class="ov2-preset" data-preset="${p.k}"><span class="ov2-preset-ic">${ic(p.ic())}</span><span class="ov2-preset-t"><b>${esc(p.name)}</b><i>${esc(p.d)} · ${p.w.filter(k => OV_W[k]).length} виджетов</i></span><span class="ov2-preset-go">${ic(I.arrow)}</span></button>`).join('')}</div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px">Пресет заменит текущую раскладку набором под задачу. Потом можно докинуть виджеты вручную ниже.</div></div>`;
       const grouped = {}; avail.forEach(k => { const c = ovCatOf(k); (grouped[c] = grouped[c] || []).push(k); });
       const cats = OV_CAT.map(([c]) => c).filter(c => grouped[c]);
-      return `<div class="ov2-lib-search"><input id="ovLibSearch" placeholder="Поиск виджета…"></div>
-        ${cats.map(c => `<div class="ov2-lib-cat"><div class="ov2-lib-cat-h">${esc(c)}<span>${grouped[c].length}</span></div><div class="ov2-lib">${grouped[c].map(tile).join('')}</div></div>`).join('')}
-        ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`;
+      const libPart = avail.length
+        ? `<div class="ov2-lib-search"><input id="ovLibSearch" placeholder="Поиск виджета…"></div>${cats.map(c => `<div class="ov2-lib-cat"><div class="ov2-lib-cat-h">${esc(c)}<span>${grouped[c].length}</span></div><div class="ov2-lib">${grouped[c].map(tile).join('')}</div></div>`).join('')}`
+        : '<div class="ov2-empty" style="padding:22px 0 6px">Все отдельные виджеты уже на обзоре 👌</div>';
+      return `${presets}${libPart}${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`;
     })(),
     actions: [{ label: 'Закрыть' }],
   });
   $$('[data-add]', lb).forEach(x => x.addEventListener('click', () => { onChange([...layout, x.dataset.add]); closeModal(); }));
+  $$('[data-preset]', lb).forEach(x => x.addEventListener('click', () => { const p = OV_PRESETS.find(y => y.k === x.dataset.preset); if (p) { onChange(p.w.filter(k => OV_W[k])); closeModal(); toast('Пресет применён', p.name, true); } }));
   const rl = $('#ovResetLib', lb); if (rl) rl.addEventListener('click', () => { onChange(OV_DEFAULT.slice()); closeModal(); });
   const sr = $('#ovLibSearch', lb); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.ov2-lib-i', lb).forEach(t => { t.style.display = (!q || (t.dataset.nm || '').includes(q)) ? '' : 'none'; }); $$('.ov2-lib-cat', lb).forEach(g => { g.style.display = [...g.querySelectorAll('.ov2-lib-i')].some(t => t.style.display !== 'none') ? '' : 'none'; }); });
 }
