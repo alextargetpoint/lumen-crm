@@ -520,6 +520,17 @@ function modal({ title, sub, body, actions, wide }) {
   return bd;
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
+/* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
+function uiConfirm(title, sub, opts = {}) {
+  return new Promise(res => {
+    let done = false; const finish = v => { if (done) return; done = true; res(v); };
+    modal({ title, sub, actions: [
+      { label: opts.ok || 'Подтвердить', cls: opts.danger ? 'btn-danger' : 'btn-accent', onClick: () => { finish(true); } },
+      { label: opts.cancel || 'Отмена', onClick: () => { finish(false); } },
+    ] });
+    const bd = $('.modal-bd'); if (bd) bd.addEventListener('mousedown', e => { if (e.target === bd) finish(false); }, { once: true });
+  });
+}
 /* Escape закрывает по слоям: подсказка → пикер → модалка (пока юзер не в поле ввода) */
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
@@ -5426,7 +5437,7 @@ PAGES.learn = async (root) => {
         try { const r = await api.post('/tidy-note', { text: src, ctx: 'урок внутренней академии' }); if (r && r.text) { ta.value = r.text; autosave(item); toast('Готово', 'ИИ структурировал', true); } } catch (e) { toast('Не вышло', e.message); }
         tidy.disabled = false; tidy.innerHTML = old;
       });
-      item.querySelector('.lc-del').addEventListener('click', async () => { if (!confirm('Удалить урок?')) return; try { await fetch('/api/learn/' + id, { method: 'DELETE' }); lessons = lessons.filter(x => x.id !== id); item.remove(); paintShelf(); toast('Удалён', null, true); } catch (e) { toast('Не вышло', e.message); } });
+      item.querySelector('.lc-del').addEventListener('click', async () => { if (!await uiConfirm('Удалить урок?', 'Урок исчезнет из Академии.', { ok: 'Удалить', danger: true })) return; try { await fetch('/api/learn/' + id, { method: 'DELETE' }); lessons = lessons.filter(x => x.id !== id); item.remove(); paintShelf(); toast('Удалён', null, true); } catch (e) { toast('Не вышло', e.message); } });
       wireDrag(item);
     });
   }
@@ -5525,7 +5536,7 @@ async function studioCatalog(root) {
     }).join('') : '<div class="glass card empty">Пока нет презентаций. Нажми «Новая презентация» — собери руками или сгенерируй из текста/речи ИИ.</div>'}</div>`;
   root.querySelector('#dkNew').addEventListener('click', async () => { const r = await api.post('/decks', { title: 'Новая презентация' }); STUDIO.deckId = r.deck.id; STUDIO.cur = 0; render(); });
   root.querySelectorAll('[data-dkopen]').forEach(c => c.addEventListener('click', (e) => { if (e.target.closest('[data-dkdel]')) return; STUDIO.deckId = c.dataset.dkopen; STUDIO.cur = 0; render(); }));
-  root.querySelectorAll('[data-dkdel]').forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Удалить презентацию?')) return; await fetch('/api/decks/' + b.dataset.dkdel, { method: 'DELETE' }); render(); }));
+  root.querySelectorAll('[data-dkdel]').forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); if (!await uiConfirm('Удалить презентацию?', 'Все слайды исчезнут навсегда.', { ok: 'Удалить', danger: true })) return; await fetch('/api/decks/' + b.dataset.dkdel, { method: 'DELETE' }); render(); }));
 }
 async function studioEditor(root, id) {
   const r = await api.get('/decks/' + id).catch(() => null);
@@ -5806,6 +5817,7 @@ async function studioRecorder(root) {
   });
   /* уборка при уходе со вкладки */
   root._stuCleanup && root._stuCleanup(); root._stuCleanup = () => { document.removeEventListener('keydown', keyNav); if (STU.rec && STU.rec.state === 'recording') { try { STU.rec.stop(); } catch (_) {} } stopAll(); };
+  try { enhanceControls(root); } catch (_) {}   /* внутренние ре-рендеры студии тоже получают Lumen-стилевые селекты */
 }
 // «Второй формат»: глубокое чтение — полная расшифровка ролика-источника + ссылка на видео.
 async function acadDetail(vid, heading) {
@@ -8902,7 +8914,7 @@ function wireRbac(root) {
       try { await api.patch('/brokers/' + id, { hidePages: arr }); b.hidePages = arr; } catch (e) { toast('Не вышло', e.message); chip.classList.toggle('off'); chip.classList.toggle('on'); }
     }));
     const del = rowEl.querySelector('.rbac-del');
-    if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!confirm('Убрать сотрудника из системы?')) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
+    if (del) del.addEventListener('click', async (e) => { e.stopPropagation(); if (!await uiConfirm('Убрать сотрудника из системы?', 'Доступ к CRM для него закроется.', { ok: 'Убрать', danger: true })) return; try { const r = await fetch('/api/brokers/' + id, { method: 'DELETE' }); if (!r.ok) throw new Error((await r.json()).error || 'ошибка'); toast('Сотрудник удалён', null, true); await loadState(); render(); } catch (er) { toast('Нельзя удалить', er.message); } });
     rowEl.querySelectorAll('.rbac-lf-src').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
     const crit = rowEl.querySelector('.rbac-lf-crit');
     let lfMode = rowEl.querySelector('.rbac-lfm.on')?.dataset.lfm || 'role';
@@ -8987,7 +8999,7 @@ PAGES.hr = async (root) => {
     const doScreen = async (btn) => { if (btn) { btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Оцениваю…'; } try { const r = await api.post('/hr/candidates/' + c.id + '/screen', {}); c.screen = r.screen; c.stage = c.stage === 'new' ? 'screen' : c.stage; $('#hrAi', bd).innerHTML = hrScreenHtml(r.screen); toast('Скрининг готов', 'Балл ' + r.screen.score, true); } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.innerHTML = ic(I.spark) + 'Скрининг ИИ'; } } };
     const sb = $('#hrScreen', bd); if (sb) sb.addEventListener('click', () => doScreen(sb));
     $$('[data-hrst]', bd).forEach(x => x.addEventListener('click', async () => { try { await api.patch('/hr/candidates/' + c.id, { stage: x.dataset.hrst }); toast('Стадия обновлена', HR_STNAME[x.dataset.hrst] || 'Отклонён', true); closeModal(); reload(); } catch (e) { toast('Не вышло', e.message); } }));
-    $('#hrDel', bd).addEventListener('click', async () => { if (!confirm('Удалить кандидата?')) return; try { await fetch('/api/hr/candidates/' + c.id, { method: 'DELETE' }); toast('Удалён', null, true); closeModal(); reload(); } catch (e) { toast('Не вышло', e.message); } });
+    $('#hrDel', bd).addEventListener('click', async () => { if (!await uiConfirm('Удалить кандидата?', 'Карточка кандидата будет удалена.', { ok: 'Удалить', danger: true })) return; try { await fetch('/api/hr/candidates/' + c.id, { method: 'DELETE' }); toast('Удалён', null, true); closeModal(); reload(); } catch (e) { toast('Не вышло', e.message); } });
   }));
   /* конструктор формы */
   $('#hrForm', root).addEventListener('click', () => {
