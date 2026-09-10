@@ -789,6 +789,10 @@ function initNav() {
 /* ⭐ умный поиск по разделам в сайдбаре: находит страницу по имени/подписи/группе → прыгает туда (⌘K) */
 function initNavSearch() {
   const inp = document.getElementById('navSearch'), res = document.getElementById('navSearchRes'); if (!inp || !res) return;
+  /* ⚠️ выносим выпадашку в <body>: .navsearch создаёт стек-контекст (z-index:1), внутри него
+     любой z-index выпадашки заперт, и соседний .nav (тоже z:1, ниже в DOM) её перекрывает —
+     клики уходили в меню под ней. В body фиксированная выпадашка с z:300 бьёт всё. */
+  if (res.parentElement !== document.body) document.body.appendChild(res);
   const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return def.label; return ''; };
   const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
   const hidden = new Set(isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || []));
@@ -810,7 +814,8 @@ function initNavSearch() {
     else if (e.key === 'Enter') { const s = res.querySelector('.ns-item.sel') || res.querySelector('.ns-item'); if (s) goTo(s.dataset.nsgo); }
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const items = [...res.querySelectorAll('.ns-item')]; if (!items.length) return; let i = items.findIndex(x => x.classList.contains('sel')); items.forEach(x => x.classList.remove('sel')); i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1); items[i].classList.add('sel'); }
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.navsearch')) res.hidden = true; });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.navsearch') && !e.target.closest('#navSearchRes')) res.hidden = true; });
+  window.addEventListener('resize', () => { if (!res.hidden) place(); });
   if (!window.__navK) { window.__navK = 1; document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); const i = document.getElementById('navSearch'); if (i) { i.focus(); i.select(); } } }); }
 }
 /* синхронизация раскрытия/активности сайдбар-подстраниц с текущей страницей */
