@@ -5630,28 +5630,83 @@ function deckPresent(deck, start) {
   paint();
 }
 
-const STU = { mode: 'screencam', mic: true, rec: null, chunks: [], streams: [], raf: 0, startAt: 0, timer: 0, blob: null, blobUrl: '' };
+const STU = { source: 'deck', mic: true, camOn: true, camPos: 'br', ring: 55, warm: false, live: false, rec: null, chunks: [], streams: [], raf: 0, startAt: 0, timer: 0, blob: null, blobUrl: '', deckId: null, deck: null, cur: 0, _cam: null, _screen: null, _tele: false };
+const STU_THEME_CV = { cobalt: { c1: '#0A1833', c2: '#102B5C', fg: '#ffffff', sub: 'rgba(230,238,255,.82)' }, night: { c1: '#070d1c', c2: '#16233d', fg: '#ffffff', sub: 'rgba(222,232,252,.78)' }, paper: { c1: '#FBF9F5', c2: '#EFEAE1', fg: '#16233D', sub: '#5A6472' }, gold: { c1: '#0b0904', c2: '#241c0c', fg: '#F5E9CF', sub: 'rgba(234,217,176,.82)' } };
+function stuWrap(ctx, text, maxW) { const words = String(text || '').split(/\s+/); const lines = []; let line = ''; for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines; }
+/* нативная отрисовка слайда на canvas (без внешних картинок → холст не «тейнтится», запись всегда работает) */
+function stuDrawSlide(ctx, s, deck, W, H) {
+  const th = STU_THEME_CV[deck.theme] || STU_THEME_CV.cobalt; const ac = deck.accent || '#2F6BFF';
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, th.c1); g.addColorStop(1, th.c2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const pad = Math.round(W * 0.075); const fam = '"Manrope",system-ui,-apple-system,sans-serif';
+  const F = (px, w) => { ctx.font = `${w} ${Math.round(px)}px ${fam}`; };
+  const drawLines = (lines, x, y, lh) => { for (const ln of lines) { ctx.fillText(ln, x, y); y += lh; } return y; };
+  if (s.layout === 'stat') {
+    F(W * 0.16, '800'); ctx.fillStyle = ac; ctx.fillText((s.stat || '—').slice(0, 12), pad, H * 0.52);
+    F(W * 0.045, '700'); ctx.fillStyle = th.fg; ctx.fillText((s.statLabel || s.title || '').slice(0, 42), pad, H * 0.52 + W * 0.07);
+    if (s.body) { F(W * 0.03, '500'); ctx.fillStyle = th.sub; drawLines(stuWrap(ctx, s.body, W - pad * 2), pad, H * 0.52 + W * 0.13, W * 0.042); }
+    return;
+  }
+  if (s.layout === 'quote') {
+    F(W * 0.15, '800'); ctx.fillStyle = ac; ctx.fillText('“', pad, H * 0.36);
+    F(W * 0.055, '650'); ctx.fillStyle = th.fg; const ql = stuWrap(ctx, s.title || s.body || '', W - pad * 2); drawLines(ql, pad, H * 0.5 - (ql.length - 1) * W * 0.033, W * 0.07);
+    return;
+  }
+  if (s.layout === 'cover') {
+    const tl = (F(W * 0.088, '800'), stuWrap(ctx, s.title || '', W - pad * 2));
+    const bl = s.body ? (F(W * 0.032, '500'), stuWrap(ctx, s.body, W * 0.82)) : [];
+    const blockH = tl.length * W * 0.096 + (bl.length ? bl.length * W * 0.044 + W * 0.03 : 0);
+    let ty = H - pad - blockH;
+    if (s.eyebrow) { F(W * 0.028, '800'); ctx.fillStyle = ac; ctx.fillText(String(s.eyebrow).toUpperCase().slice(0, 26), pad, ty - W * 0.025); }
+    F(W * 0.088, '800'); ctx.fillStyle = th.fg; ty = drawLines(tl, pad, ty + W * 0.075, W * 0.096);
+    if (bl.length) { F(W * 0.032, '500'); ctx.fillStyle = th.sub; drawLines(bl, pad, ty + W * 0.02, W * 0.044); }
+    return;
+  }
+  let y = pad + W * 0.03;
+  if (s.eyebrow) { F(W * 0.026, '800'); ctx.fillStyle = ac; ctx.fillText(String(s.eyebrow).toUpperCase().slice(0, 26), pad, y); y += W * 0.05; }
+  F(W * 0.06, '800'); ctx.fillStyle = th.fg; y = drawLines(stuWrap(ctx, s.title || '', W - pad * 2), pad, y + W * 0.05, W * 0.068);
+  if (s.layout === 'bullets' || s.layout === 'cta') {
+    y += W * 0.03; F(W * 0.036, '600');
+    for (const b of (s.bullets || [])) { ctx.fillStyle = ac; ctx.fillRect(pad, y - W * 0.028, W * 0.026, W * 0.026); ctx.fillStyle = th.fg; const bl = stuWrap(ctx, b, W - pad * 2 - W * 0.06); let yy = y; for (const ln of bl) { ctx.fillText(ln, pad + W * 0.05, yy); yy += W * 0.046; } y = yy + W * 0.018; }
+    if (s.body) { F(W * 0.03, '500'); ctx.fillStyle = th.sub; drawLines(stuWrap(ctx, s.body, W - pad * 2), pad, y + W * 0.01, W * 0.042); }
+  } else if (s.body) {
+    y += W * 0.02; F(W * 0.038, '500'); ctx.fillStyle = th.sub; drawLines(stuWrap(ctx, s.body, W - pad * 2), pad, y + W * 0.03, W * 0.052);
+  }
+}
 async function studioRecorder(root) {
   const owner = !STATE.me || STATE.me.role === 'owner' || STATE.me.role === 'master';
+  const dl = await api.get('/decks').catch(() => ({ decks: [] })); const decks = dl.decks || [];
+  if (!STU.deckId && decks.length) STU.deckId = decks[0].id;
+  const src = STU.source;
   root.innerHTML = `
-    <div class="muted" style="font-size:12.5px;line-height:1.6;margin:2px 0 14px">Запиши обучающее видео, разбор объекта или презентацию для клиента: экран + камера + голос, прямо в браузере. Сохрани уроком в Академию или скачай.</div>
+    <div class="muted" style="font-size:12.5px;line-height:1.6;margin:2px 0 14px">Студия записи: показывай презентацию и одновременно снимай себя на камеру с кольцевой подсветкой — как настоящий вебинар. Сохрани уроком в Академию или скачай.</div>
     <div class="glass card stu-card">
       <div class="stu-toolbar">
         <div class="seg-toggle stu-mode">
-          <button class="seg-btn ${STU.mode === 'screencam' ? 'on' : ''}" data-stmode="screencam">Экран + камера</button>
-          <button class="seg-btn ${STU.mode === 'screen' ? 'on' : ''}" data-stmode="screen">Только экран</button>
-          <button class="seg-btn ${STU.mode === 'cam' ? 'on' : ''}" data-stmode="cam">Только камера</button>
+          <button class="seg-btn ${src === 'deck' ? 'on' : ''}" data-stsrc="deck">${ic(I.layers)}Презентация</button>
+          <button class="seg-btn ${src === 'screen' ? 'on' : ''}" data-stsrc="screen">${ic(I.doc)}Экран</button>
+          <button class="seg-btn ${src === 'cam' ? 'on' : ''}" data-stsrc="cam">${ic(I.user)}Только камера</button>
         </div>
-        <label class="stu-mic"><input type="checkbox" id="stuMic" ${STU.mic ? 'checked' : ''}> ${ic(I.mic)} Микрофон</label>
+        ${src === 'deck' ? `<select id="stuDeck" class="stu-deck">${decks.length ? decks.map(d => `<option value="${d.id}" ${d.id === STU.deckId ? 'selected' : ''}>${esc(d.title)} · ${d.slides} сл.</option>`).join('') : '<option value="">нет презентаций</option>'}</select>` : ''}
+        <label class="stu-chip"><input type="checkbox" id="stuCam" ${STU.camOn ? 'checked' : ''}> ${ic(I.user)} Камера</label>
+        <label class="stu-chip"><input type="checkbox" id="stuMic" ${STU.mic ? 'checked' : ''}> ${ic(I.mic)} Микрофон</label>
         <span class="tb-spacer"></span>
         <span class="stu-time" id="stuTime" hidden>00:00</span>
-        <button class="btn btn-accent" id="stuRec">${ic(I.play)}Начать запись</button>
+        <button class="btn" id="stuLive" ${STU.live ? 'style="display:none"' : ''}>${ic(I.play)}Включить студию</button>
+        <button class="btn btn-accent" id="stuRec" ${STU.live ? '' : 'style="display:none"'}>${ic(I.play)}Запись</button>
+      </div>
+      <div class="stu-ringrow" id="stuRingRow">
+        <span class="stu-ring-lbl">${ic(I.spark)}Кольцевая лампа</span>
+        <input type="range" id="stuRing" min="0" max="100" value="${STU.ring}" class="stu-range">
+        <button class="stu-chip ${STU.warm ? 'on' : ''}" id="stuWarm" title="Тёплый свет">${STU.warm ? '🔆 Тёплый' : '❄️ Холодный'}</button>
+        ${src === 'deck' ? `<button class="stu-chip ${STU._tele ? 'on' : ''}" id="stuTele" title="Суфлёр">${ic(I.doc)} Суфлёр</button>` : ''}
       </div>
       <div class="stu-stage" id="stuStage">
-        <canvas id="stuCanvas" hidden></canvas>
-        <video id="stuPreview" autoplay muted playsinline hidden></video>
+        <canvas id="stuCanvas" width="1280" height="720"></canvas>
+        <div class="stu-ringlight" id="stuRingLight"></div>
         <video id="stuPlayback" controls playsinline hidden></video>
-        <div class="stu-hint" id="stuHint">${ic(I.play, 2)}<div>Выбери режим и нажми «Начать запись».<br>Для «Экран+камера» браузер спросит, что расшарить — выбери окно/вкладку.</div></div>
+        <div class="stu-hint" id="stuHint">${ic(I.play, 2)}<div>Нажми «Включить студию» — появится живой кадр с кольцевой подсветкой.<br>${src === 'deck' ? 'Листай слайды стрелками, говори в камеру и жми «Запись».' : src === 'screen' ? 'Браузер спросит, какое окно расшарить.' : 'Снимаем только камеру.'}</div></div>
+        ${src === 'deck' ? `<div class="stu-navbar" id="stuNav" hidden><button class="stu-navb" id="stuPrev">${ic(I.chev)}</button><span id="stuSlideN">1 / 1</span><button class="stu-navb stu-next" id="stuNext">${ic(I.chev)}</button></div>` : ''}
+        <div class="stu-tele" id="stuTelePanel" hidden></div>
       </div>
       <div class="stu-after" id="stuAfter" hidden>
         <button class="btn" id="stuRedo">${ic(I.refresh || I.spark)}Перезаписать</button>
@@ -5660,77 +5715,97 @@ async function studioRecorder(root) {
       </div>
     </div>`;
   const $$s = (id) => document.getElementById(id);
-  const cleanup = () => { STU.streams.forEach(s => { try { s.getTracks().forEach(t => t.stop()); } catch (_) {} }); STU.streams = []; cancelAnimationFrame(STU.raf); clearInterval(STU.timer); };
+  const canvas = $$s('stuCanvas'); const ctx = canvas.getContext('2d');
   const fmt = (ms) => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
-  $$('[data-stmode]', root).forEach(b => b.addEventListener('click', () => { STU.mode = b.dataset.stmode; $$('[data-stmode]', root).forEach(x => x.classList.toggle('on', x === b)); }));
-  $$s('stuMic').addEventListener('change', e => STU.mic = e.target.checked);
-  const startRec = async () => {
-    cleanup(); STU.chunks = []; STU.blob = null;
-    let recordStream, previewStream;
+  const applyRing = () => { const rl = $$s('stuRingLight'); if (!rl) return; const a = STU.ring / 100; rl.style.setProperty('--ri', (a * 0.9).toFixed(2)); rl.style.setProperty('--rc', STU.warm ? '255,214,160' : '255,255,255'); rl.style.opacity = STU.ring > 2 ? '1' : '0'; };
+  const stopAll = () => { STU.streams.forEach(s => { try { s.getTracks().forEach(t => t.stop()); } catch (_) {} }); STU.streams = []; STU._cam = STU._screen = null; cancelAnimationFrame(STU.raf); clearInterval(STU.timer); STU.live = false; };
+  /* единый компоновщик кадра на canvas: слайд/экран/камера + PiP-камера с кольцом */
+  const compose = () => {
+    if (!document.body.contains(canvas)) { stopAll(); return; }   /* ушли со вкладки → гасим камеру и RAF */
+    const W = canvas.width, H = canvas.height;
+    if (STU.source === 'deck') { const d = STU.deck; if (d && d.slides[STU.cur]) stuDrawSlide(ctx, d.slides[STU.cur], d, W, H); else { ctx.fillStyle = '#0A1833'; ctx.fillRect(0, 0, W, H); } }
+    else if (STU.source === 'screen' && STU._screen && STU._screen.videoWidth) { const v = STU._screen; const ar = v.videoWidth / v.videoHeight, cr = W / H; let dw = W, dh = H, dx = 0, dy = 0; if (ar > cr) { dh = W / ar; dy = (H - dh) / 2; } else { dw = H * ar; dx = (W - dw) / 2; } ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.drawImage(v, dx, dy, dw, dh); }
+    else if (STU.source === 'cam' && STU._cam && STU._cam.videoWidth) { drawCamCover(STU._cam, W, H); }
+    else { ctx.fillStyle = '#0A1833'; ctx.fillRect(0, 0, W, H); }
+    /* PiP-камера с кольцевой подсветкой (для deck/screen) */
+    if (STU.camOn && STU.source !== 'cam' && STU._cam && STU._cam.videoWidth) {
+      const d = Math.round(W * 0.22), pad = Math.round(W * 0.025);
+      const cx = (STU.camPos.includes('l') ? pad + d / 2 : W - pad - d / 2), cy = H - pad - d / 2;
+      const ringA = STU.ring / 100;
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, d / 2 + 6, 0, Math.PI * 2);
+      ctx.shadowColor = STU.warm ? `rgba(255,210,150,${0.35 + ringA * 0.5})` : `rgba(255,255,255,${0.3 + ringA * 0.5})`; ctx.shadowBlur = 20 + ringA * 40;
+      ctx.lineWidth = Math.max(4, d * 0.03); ctx.strokeStyle = STU.warm ? `rgba(255,224,180,${0.7 + ringA * 0.3})` : `rgba(255,255,255,${0.65 + ringA * 0.35})`; ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.clip();
+      const v = STU._cam, ar = v.videoWidth / v.videoHeight; let sw = v.videoWidth, sh = v.videoHeight; if (ar > 1) sw = v.videoHeight; else sh = v.videoWidth;
+      ctx.translate(cx + d / 2, 0); ctx.scale(-1, 1); /* зеркалим селфи */
+      ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, cy - d / 2, d, d); ctx.restore();
+    }
+    STU.raf = requestAnimationFrame(compose);
+  };
+  const drawCamCover = (v, W, H) => { const ar = v.videoWidth / v.videoHeight, cr = W / H; let sw = v.videoWidth, sh = v.videoHeight; if (ar > cr) sw = v.videoHeight * cr; else sh = v.videoWidth / cr; ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, 0, W, H); ctx.restore(); };
+  const mkVideo = (stream) => { const v = document.createElement('video'); v.srcObject = stream; v.muted = true; v.playsInline = true; v.play().catch(() => {}); return v; };
+  const goLive = async () => {
+    stopAll(); STU.blob = null; $$s('stuPlayback').hidden = true; $$s('stuAfter').hidden = true; $$s('stuHint').hidden = true;
     try {
-      if (STU.mode === 'cam') {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: STU.mic });
-        STU.streams.push(s); recordStream = s; previewStream = s;
-      } else {
-        const screen = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
-        STU.streams.push(screen);
-        let micStream = null;
-        if (STU.mic) { try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); STU.streams.push(micStream); } catch (_) {} }
-        if (STU.mode === 'screen') {
-          const tracks = [screen.getVideoTracks()[0]]; if (micStream) tracks.push(micStream.getAudioTracks()[0]); else if (screen.getAudioTracks()[0]) tracks.push(screen.getAudioTracks()[0]);
-          recordStream = new MediaStream(tracks); previewStream = screen;
-        } else {
-          /* экран + камера: композитим на canvas (talking head в углу) */
-          let cam = null; try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false }); STU.streams.push(cam); } catch (_) {}
-          const sv = document.createElement('video'); sv.srcObject = screen; sv.muted = true; sv.play();
-          const cv = document.createElement('video'); if (cam) { cv.srcObject = cam; cv.muted = true; cv.play(); }
-          await new Promise(r => { sv.onloadedmetadata = r; setTimeout(r, 600); });
-          const canvas = $$s('stuCanvas'); canvas.width = sv.videoWidth || 1280; canvas.height = sv.videoHeight || 720; const ctx = canvas.getContext('2d');
-          const draw = () => {
-            ctx.drawImage(sv, 0, 0, canvas.width, canvas.height);
-            if (cam && cv.videoWidth) { const d = Math.round(canvas.width * 0.20); const pad = Math.round(canvas.width * 0.02); const x = canvas.width - d - pad, y = canvas.height - d - pad;
-              ctx.save(); ctx.beginPath(); ctx.arc(x + d / 2, y + d / 2, d / 2, 0, Math.PI * 2); ctx.closePath(); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(3, d * 0.02); ctx.stroke(); ctx.clip();
-              const ar = cv.videoWidth / cv.videoHeight; let sw = cv.videoWidth, sh = cv.videoHeight; if (ar > 1) { sw = cv.videoHeight; } else { sh = cv.videoWidth; }
-              ctx.drawImage(cv, (cv.videoWidth - sw) / 2, (cv.videoHeight - sh) / 2, sw, sh, x, y, d, d); ctx.restore(); }
-            STU.raf = requestAnimationFrame(draw);
-          };
-          draw();
-          const canvasStream = canvas.captureStream(30);
-          const tracks = [canvasStream.getVideoTracks()[0]]; if (micStream) tracks.push(micStream.getAudioTracks()[0]);
-          recordStream = new MediaStream(tracks); previewStream = canvasStream;
-        }
-      }
-      /* когда пользователь останавливает шэринг экрана из системной плашки — тоже стопаем */
-      STU.streams.forEach(s => s.getVideoTracks().forEach(t => t.addEventListener('ended', () => { if (STU.rec && STU.rec.state === 'recording') stopRec(); })));
-      const prev = $$s('stuPreview'); prev.srcObject = previewStream; prev.hidden = false; $$s('stuHint').hidden = true; $$s('stuPlayback').hidden = true;
+      if (STU.source === 'deck') { const r = await api.get('/decks/' + STU.deckId).catch(() => null); if (!r || !r.deck || !r.deck.slides.length) { toast('Нет презентации', 'Собери её во вкладке «Презентации»', false); $$s('stuHint').hidden = false; return; } STU.deck = r.deck; STU.cur = Math.min(STU.cur, r.deck.slides.length - 1); }
+      if (STU.source === 'screen') { const scr = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false }); STU.streams.push(scr); STU._screen = mkVideo(scr); scr.getVideoTracks()[0].addEventListener('ended', () => { if (STU.rec && STU.rec.state === 'recording') stopRec(); stopAll(); studioRecorder(root); }); }
+      if (STU.camOn || STU.source === 'cam') { try { const cam = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false }); STU.streams.push(cam); STU._cam = mkVideo(cam); } catch (_) { if (STU.source === 'cam') throw new Error('Камера недоступна'); } }
+      await new Promise(r => setTimeout(r, 400));
+      STU.live = true; cancelAnimationFrame(STU.raf); compose();
+      $$s('stuLive').style.display = 'none'; $$s('stuRec').style.display = ''; applyRing();
+      if (STU.source === 'deck') { const nav = $$s('stuNav'); if (nav) nav.hidden = false; paintSlideN(); paintTele(); }
+    } catch (e) { toast('Не удалось включить студию', e.name === 'NotAllowedError' ? 'Доступ к камере/экрану отклонён' : e.message); stopAll(); $$s('stuHint').hidden = false; }
+  };
+  const paintSlideN = () => { const n = $$s('stuSlideN'); if (n && STU.deck) n.textContent = (STU.cur + 1) + ' / ' + STU.deck.slides.length; paintTele(); };
+  const paintTele = () => { const t = $$s('stuTelePanel'); if (!t) return; t.hidden = !STU._tele; if (STU._tele && STU.deck) { const s = STU.deck.slides[STU.cur] || {}; t.innerHTML = `<div class="stu-tele-in">${s.eyebrow ? `<b>${esc(s.eyebrow)}</b>` : ''}<h4>${esc(s.title || '')}</h4>${s.body ? `<p>${esc(s.body)}</p>` : ''}${(s.bullets || []).length ? `<ul>${s.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}${s.note ? `<div class="stu-tele-note">${esc(s.note)}</div>` : ''}</div>`; } };
+  const goSlide = (d) => { if (!STU.deck) return; STU.cur = Math.max(0, Math.min(STU.deck.slides.length - 1, STU.cur + d)); paintSlideN(); };
+  /* controls */
+  $$('[data-stsrc]', root).forEach(b => b.addEventListener('click', () => { if (STU.source === b.dataset.stsrc) return; STU.source = b.dataset.stsrc; stopAll(); studioRecorder(root); }));
+  $$s('stuDeck') && $$s('stuDeck').addEventListener('change', e => { STU.deckId = e.target.value; if (STU.live) goLive(); });
+  $$s('stuCam').addEventListener('change', e => { STU.camOn = e.target.checked; if (STU.live && STU.source !== 'cam') { if (STU.camOn && !STU._cam) goLive(); } });
+  $$s('stuMic').addEventListener('change', e => STU.mic = e.target.checked);
+  $$s('stuRing').addEventListener('input', e => { STU.ring = +e.target.value; applyRing(); });
+  $$s('stuWarm').addEventListener('click', () => { STU.warm = !STU.warm; const b = $$s('stuWarm'); b.classList.toggle('on', STU.warm); b.textContent = STU.warm ? '🔆 Тёплый' : '❄️ Холодный'; applyRing(); });
+  $$s('stuTele') && $$s('stuTele').addEventListener('click', () => { STU._tele = !STU._tele; $$s('stuTele').classList.toggle('on', STU._tele); paintTele(); });
+  $$s('stuPrev') && $$s('stuPrev').addEventListener('click', () => goSlide(-1));
+  $$s('stuNext') && $$s('stuNext').addEventListener('click', () => goSlide(1));
+  const keyNav = (e) => { if (!STU.live || STU.source !== 'deck') return; if (e.key === 'ArrowRight') goSlide(1); else if (e.key === 'ArrowLeft') goSlide(-1); };
+  document.addEventListener('keydown', keyNav);
+  $$s('stuLive').addEventListener('click', goLive);
+  applyRing();
+  /* запись */
+  const startRec = () => {
+    if (!STU.live) { goLive(); return; }
+    STU.chunks = []; STU.blob = null;
+    const canvasStream = canvas.captureStream(30);
+    const tracks = [canvasStream.getVideoTracks()[0]];
+    let micStream = null;
+    const attachMicThenRec = async () => {
+      if (STU.mic) { try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); STU.streams.push(micStream); tracks.push(micStream.getAudioTracks()[0]); } catch (_) {} }
       const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-      STU.rec = new MediaRecorder(recordStream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+      STU.rec = new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 5_000_000 });
       STU.rec.ondataavailable = e => { if (e.data.size) STU.chunks.push(e.data); };
-      STU.rec.onstop = () => {
-        STU.blob = new Blob(STU.chunks, { type: 'video/webm' }); if (STU.blobUrl) URL.revokeObjectURL(STU.blobUrl); STU.blobUrl = URL.createObjectURL(STU.blob);
-        const pb = $$s('stuPlayback'); pb.src = STU.blobUrl; pb.hidden = false; $$s('stuPreview').hidden = true; $$s('stuAfter').hidden = false;
-        cleanup();
-      };
+      STU.rec.onstop = () => { STU.blob = new Blob(STU.chunks, { type: 'video/webm' }); if (STU.blobUrl) URL.revokeObjectURL(STU.blobUrl); STU.blobUrl = URL.createObjectURL(STU.blob); const pb = $$s('stuPlayback'); pb.src = STU.blobUrl; pb.hidden = false; $$s('stuAfter').hidden = false; };
       STU.rec.start();
       const rb = $$s('stuRec'); rb.innerHTML = ic(I.x) + 'Стоп'; rb.classList.add('rec');
       const tEl = $$s('stuTime'); tEl.hidden = false; STU.startAt = Date.now(); STU.timer = setInterval(() => tEl.textContent = fmt(Date.now() - STU.startAt), 500);
-      $$s('stuAfter').hidden = true;
-    } catch (e) { toast('Не удалось начать запись', e.message.includes('denied') || e.name === 'NotAllowedError' ? 'Доступ к экрану/камере отклонён' : e.message); cleanup(); }
+      $$s('stuAfter').hidden = true; $$s('stuPlayback').hidden = true;
+    };
+    attachMicThenRec();
   };
-  const stopRec = () => { if (STU.rec && STU.rec.state !== 'inactive') STU.rec.stop(); const rb = $$s('stuRec'); rb.innerHTML = ic(I.play) + 'Начать запись'; rb.classList.remove('rec'); clearInterval(STU.timer); };
+  const stopRec = () => { if (STU.rec && STU.rec.state !== 'inactive') STU.rec.stop(); const rb = $$s('stuRec'); if (rb) { rb.innerHTML = ic(I.play) + 'Запись'; rb.classList.remove('rec'); } clearInterval(STU.timer); };
   $$s('stuRec').addEventListener('click', () => { if (STU.rec && STU.rec.state === 'recording') stopRec(); else startRec(); });
-  $$s('stuRedo').addEventListener('click', () => { $$s('stuAfter').hidden = true; $$s('stuPlayback').hidden = true; $$s('stuHint').hidden = false; });
+  $$s('stuRedo').addEventListener('click', () => { $$s('stuAfter').hidden = true; $$s('stuPlayback').hidden = true; });
   $$s('stuDl').addEventListener('click', () => { if (!STU.blob) return; const a = document.createElement('a'); a.href = STU.blobUrl; a.download = 'presentation-' + Date.now() + '.webm'; a.click(); });
-  const saveBtn = $$s('stuSave'); if (saveBtn) saveBtn.addEventListener('click', async () => {
-    if (!STU.blob) return; saveBtn.disabled = true; saveBtn.innerHTML = ic(I.plus) + 'Загружаю…';
-    try {
-      const up = await fetch('/api/studio/upload?filename=rec.webm', { method: 'POST', body: STU.blob });
-      const uj = await up.json(); if (!up.ok) throw new Error(uj.error || 'ошибка загрузки');
-      const title = prompt('Название урока:', 'Видео-презентация ' + new Date().toLocaleDateString('ru-RU')); if (title === null) { saveBtn.disabled = false; saveBtn.innerHTML = ic(I.plus) + 'Сохранить уроком в Академию'; return; }
-      await api.post('/learn', { title: title || 'Видео-урок', cat: 'Видео', video: uj.url, body: '' });
-      toast('Сохранено в Академию', 'Урок с видео создан', true); go('learn');
-    } catch (e) { toast('Не вышло', e.message); saveBtn.disabled = false; saveBtn.innerHTML = ic(I.plus) + 'Сохранить уроком в Академию'; }
+  const saveBtn = $$s('stuSave'); if (saveBtn) saveBtn.addEventListener('click', () => {
+    if (!STU.blob) return;
+    modal({ title: 'Сохранить уроком в Академию', sub: 'Видео появится в разделе «Академия агентства».', body: `<label class="fl"><span>Название урока</span><input id="stuLessonTitle" value="Видео-презентация ${new Date().toLocaleDateString('ru-RU')}"></label>`, actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+      const title = ($('#stuLessonTitle', bd) || {}).value || 'Видео-урок';
+      try { const up = await fetch('/api/studio/upload?filename=rec.webm', { method: 'POST', body: STU.blob }); const uj = await up.json(); if (!up.ok) throw new Error(uj.error || 'ошибка загрузки'); await api.post('/learn', { title, cat: 'Видео', video: uj.url, body: '' }); toast('Сохранено в Академию', 'Урок с видео создан', true); go('learn'); } catch (e) { toast('Не вышло', e.message); return false; }
+    } }, { label: 'Отмена' }] });
   });
+  /* уборка при уходе со вкладки */
+  root._stuCleanup && root._stuCleanup(); root._stuCleanup = () => { document.removeEventListener('keydown', keyNav); if (STU.rec && STU.rec.state === 'recording') { try { STU.rec.stop(); } catch (_) {} } stopAll(); };
 }
 // «Второй формат»: глубокое чтение — полная расшифровка ролика-источника + ссылка на видео.
 async function acadDetail(vid, heading) {
