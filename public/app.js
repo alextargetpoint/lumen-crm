@@ -361,6 +361,7 @@ const NAV = {
   numbers:   { name: 'Номера', icon: I.sim, sub: '' },
   templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
   brokers:   { name: 'Брокеры', icon: I.users, sub: '' },
+  hr:        { name: 'HR · подбор', icon: I.users, sub: 'хантинг брокеров и сотрудников' },
   analytics: { name: 'Лиды и продажи', icon: I.bars, sub: 'воронка · квалы · динамика' },
   settings:  { name: 'Подключения', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим' },
   agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
@@ -684,7 +685,7 @@ const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
-const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'analytics', 'settings', 'agency', 'billing'];
+const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
 function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
@@ -8186,6 +8187,24 @@ function wireRbac(root) {
     setTimeout(() => { const i = $('#rbNm', bd); if (i) i.focus(); }, 30);
   }); }
 }
+/* HR · подбор — бета-скаффолд (раздел в разработке, помечен явно) */
+PAGES.hr = async (root) => {
+  const STAGES = [['Отклики', 0], ['Скрининг', 0], ['Интервью', 0], ['Оффер', 0], ['Вышел', 0]];
+  root.innerHTML = `
+    <div class="glass card hr-hero">
+      <div class="hr-hero-t">${ic(I.users)}HR · подбор команды <span class="beta-badge">бета · в разработке</span></div>
+      <div class="hr-hero-s">Хантинг брокеров и сотрудников: воронка кандидатов, ИИ-скрининг откликов и резюме, база кандидатов, авто-задачи на интервью, онбординг новичка со связкой с Академией. Раздел собирается — функции подключаются в ближайших обновлениях.</div>
+    </div>
+    <div class="hr-board">${STAGES.map(([n, cnt]) => `<div class="hr-col"><div class="hr-col-h">${esc(n)}<span>${cnt}</span></div><div class="hr-col-b">${cnt ? '' : '<div class="hr-col-empty">пусто</div>'}</div></div>`).join('')}</div>
+    <div class="glass card hr-plan"><div class="card-title">${ic(I.spark)}Что появится в разделе<span class="sub">дорожная карта</span></div>
+      <ul class="hr-plan-list">
+        <li>${ic(I.check, 2)}Воронка кандидатов: отклики → скрининг → интервью → оффер → вышел</li>
+        <li>${ic(I.check, 2)}ИИ-скрининг резюме и переписки с кандидатами</li>
+        <li>${ic(I.check, 2)}База кандидатов и источников найма</li>
+        <li>${ic(I.check, 2)}Авто-задачи и напоминания по интервью</li>
+        <li>${ic(I.check, 2)}Онбординг нового брокера + связка с внутренней Академией</li>
+      </ul></div>`;
+};
 PAGES.brokers = async (root) => {
   const leads = await api.get('/leads');
   let auditLog = [];
