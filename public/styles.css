@@ -32,8 +32,9 @@
   --r-lg: 16px;
   --r-md: 13px;
   --r-sm: 10px;
-  --shadow: 0 1px 2px rgba(16, 43, 92, .05), 0 8px 24px -12px rgba(16, 43, 92, .12);
-  --shadow-lift: 0 12px 32px -12px rgba(16, 43, 92, .22);
+  /* ⭐ визуал v4: более глубокая, слоёная тень (мягкий контакт + средний + дальний ореол) — премиум-глубина */
+  --shadow: 0 1px 2px rgba(16, 43, 92, .045), 0 3px 8px -3px rgba(16, 43, 92, .07), 0 14px 32px -16px rgba(16, 43, 92, .16);
+  --shadow-lift: 0 2px 6px -2px rgba(16, 43, 92, .10), 0 20px 48px -18px rgba(16, 43, 92, .30);
   --font: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Fraunces', 'Manrope', Georgia, serif;
   /* motion: critically-damped spring, ноль отскока */
@@ -4849,9 +4850,9 @@ html[data-night] .cmp-prev-b { background: rgba(80, 140, 90, .16); border-color:
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
   --r-xl: 22px; --r-card: 18px; --r-analytics: 16px; --r-nested: 12px; --r-chip: 9px; --r-pill: 999px;
-  --shadow-subtle: 0 1px 2px rgba(20,33,58,.04), 0 4px 14px -8px rgba(20,33,58,.10);
-  --shadow-elevated: 0 10px 30px -14px rgba(20,33,58,.20);
-  --shadow-hero: 0 18px 44px -18px rgba(11,30,69,.55);
+  --shadow-subtle: 0 1px 2px rgba(20,33,58,.045), 0 2px 8px -3px rgba(20,33,58,.07), 0 8px 22px -12px rgba(20,33,58,.13);
+  --shadow-elevated: 0 2px 6px -2px rgba(20,33,58,.10), 0 16px 40px -16px rgba(20,33,58,.26);
+  --shadow-hero: 0 24px 60px -22px rgba(11,30,69,.60);
 }
 html[data-night] {
   --shadow-subtle: 0 1px 2px rgba(0,0,0,.30), 0 6px 18px -10px rgba(0,0,0,.45);
@@ -4875,6 +4876,9 @@ html[data-night] {
 .ov-w-body { min-height: var(--ovh, auto); }
 /* ── HR · подбор (бета) ── */
 .beta-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #B45309; background: color-mix(in srgb, #E5844B 15%, transparent); padding: 3px 9px; border-radius: 20px; vertical-align: middle; margin-left: 8px; }
+.plo-beta { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 4px; padding: 9px 14px; border-radius: 12px; background: color-mix(in srgb, #E5844B 12%, transparent); border: 1px solid color-mix(in srgb, #E5844B 30%, transparent); font-size: 12.5px; line-height: 1.4; color: var(--ink); }
+.plo-beta svg { width: 15px; height: 15px; color: #E5844B; flex: none; }
+.plo-beta b { color: var(--navy-900); }
 .hr-hero { margin-bottom: 16px; }
 .hr-hero-t { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--navy-900); }
 .hr-hero-t svg { width: 22px; height: 22px; color: var(--accent); }
@@ -5535,3 +5539,38 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .ov2-preset-t b { font-size: 14px; font-weight: 650; color: var(--navy-900); }
 .ov2-preset-t i { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
 .ov2-preset-go { flex: none; color: var(--ink-3); } .ov2-preset-go svg { width: 16px; height: 16px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ⭐ ВИЗУАЛ v4 — глобальный премиум-слой (усиление глубины/атмосферы/микровзаимодействий).
+   Аддитивно поверх токенов, без правки разметки страниц. Уважает reduced-motion.
+   ═══════════════════════════════════════════════════════════════════ */
+/* атмосферный фон рабочей зоны: мягкие цветные ореолы + едва заметное зерно → глубина, не плоскость */
+.content { position: relative; }
+.content::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60% 42% at 82% 6%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    radial-gradient(52% 40% at 6% 96%, color-mix(in srgb, var(--violet) 6%, transparent), transparent 72%);
+}
+:root[data-theme="dark"] .content::before, .dark .content::before {
+  background:
+    radial-gradient(60% 42% at 82% 6%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(52% 40% at 6% 96%, color-mix(in srgb, var(--violet) 13%, transparent), transparent 72%);
+}
+/* стеклянные карточки: тонкий верхний хайлайт (свет сверху) + чуть более выразительная кромка → «дорого» */
+.glass { position: relative; box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.6); }
+:root[data-theme="dark"] .glass, .dark .glass { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05); }
+/* единый premium focus-ring на интерактиве (доступность + аккуратность) */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent); outline-offset: 2px; border-radius: 8px;
+}
+/* мягкая spring-физика на всех кнопках .btn (нажатие «дышит») */
+.btn { transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) var(--ease-soft), background var(--dur-fast), border-color var(--dur-fast); }
+.btn:active { transform: translateY(1px) scale(.985); }
+.btn-accent:hover { box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* чуть живее скролл-бар рабочей зоны (тонкий, премиальный) */
+.content::-webkit-scrollbar { width: 10px; }
+.content::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 34%, transparent); border-radius: 20px; border: 3px solid transparent; background-clip: content-box; }
+.content::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink-3) 52%, transparent); background-clip: content-box; }
+@media (prefers-reduced-motion: reduce) { .content::before { display: none; } }

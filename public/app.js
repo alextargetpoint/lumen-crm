@@ -6444,6 +6444,7 @@ PAGES.parlo = async (root) => {
       <div class="plo-hero-l">
         <div class="plo-badge">${ic(I.spark, 2)}Помощник продаж · звонки с иностранцами</div>
         <h1 class="plo-h1">Закрывайте сделки <span>голосом</span>,<br>а не текстом</h1>
+        <div class="plo-beta">${ic(I.spark, 2)}<span><b>Бета-тестирование.</b> В первый период — бонусом бесплатно, пока идёт бета-разработка.</span></div>
         <p class="plo-sub">Parlo переводит ваш звонок в реальном времени <b>вашим же голосом</b> и подсказывает, что ответить. Для брокеров, которые звонят покупателям в Дубае, на Бали и Пхукете.</p>
         <div class="plo-cta">
           <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать для Mac</button>
