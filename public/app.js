@@ -998,7 +998,17 @@ const OV_VARIANT = {
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5 };
+/* категории для библиотеки виджетов */
+const OV_CAT = [
+  ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
+  ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'conv', 'numbers']],
+  ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
+  ['Команда', ['brokers', 'leaders', 'wahealth']],
+  ['Контент и идеи', ['contenthub', 'ideas', 'casebase']],
+  ['Прочее', ['activity', 'geo', 'worldclock', 'onboarding', 'spark', 'timezones']],
+];
+const ovCatOf = (k) => { for (const [c, ks] of OV_CAT) if (ks.includes(k)) return c; return 'Прочее'; };
 
 /* ─── motion-слой: тонкая видео-атмосфера на hero/AI-зонах (ПРЕМИУМ-АКЦЕНТ, не дефолт) ───
    cost-safe: переиспользуем уже сгенерённые лупы, НЕ генерим новое видео */
@@ -1529,6 +1539,23 @@ const OV_W = {
     return `<div class="ov2-card-hd">${ic(I.layers)}Контент-цех<span>собери пост за 2 минуты</span><button class="btn btn-sm" data-ovgo="social">Открыть</button></div>
       <div class="ov-launch">${tiles.map(([n, icn]) => `<button class="ov-launch-i" data-ovgo="social"><span class="ov-launch-ic">${ic(icn)}</span>${n}</button>`).join('')}</div>`;
   } },
+  /* ⭐ Сделки месяца */
+  dealsmonth: { name: 'Сделки месяца', icon: () => I.flame, render: (c) => {
+    const L = c.leads || []; const d = new Date(); const m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    const deals = L.filter(l => l.stage === 'deal'); const dm = deals.filter(l => (l.dealAt || l.lastMsgAt || 0) >= m0);
+    const inWork = L.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
+    return `<div class="ov2-card-hd">${ic(I.flame)}Сделки месяца<span>закрыто + в финале</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>
+      <div class="ov-rep-nums"><div class="ov-rep-n"><b>${dm.length}</b><span>сделок в этом месяце</span></div><div class="ov-rep-n"><b>${inWork}</b><span>на показе / передаче</span></div><div class="ov-rep-n"><b>${deals.length}</b><span>всего сделок</span></div></div>`;
+  } },
+  /* ⭐ Реанимация базы — спящие лиды */
+  reengage: { name: 'Реанимация базы', icon: () => I.wake, render: (c) => {
+    const L = c.leads || [], now = Date.now();
+    const sleeping = L.filter(l => !['deal', 'lost'].includes(l.stage) && l.lastMsgAt && (now - l.lastMsgAt) > 14 * 864e5);
+    const hd = `<div class="ov2-card-hd">${ic(I.wake)}Реанимация базы<span>спящие 14+ дней</span><button class="btn btn-sm" data-ovgo="wake">Разбудить</button></div>`;
+    if (!sleeping.length) return hd + ovEmpty(I.check, 'База живая', 'Нет лидов, «уснувших» дольше 2 недель');
+    return hd + `<div class="ov-rep-nums"><div class="ov-rep-n"><b>${sleeping.length}</b><span>спящих лидов</span></div></div>
+      <button class="ov-launch-i" data-ovgo="wake" style="width:100%;margin-top:2px"><span class="ov-launch-ic">${ic(I.wake)}</span>Запустить массовую реанимацию →</button>`;
+  } },
 };
 
 /* превью виджетов для библиотеки — представительные мокапы (те же компоненты, образцовые данные) */
@@ -1843,7 +1870,8 @@ PAGES.overview = async (root) => {
   const paint = () => {
     root.innerHTML = `
       <div class="ov2-bar">
-        ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×  · добавляй виджеты снизу</span>' : ''}
+        ${OV_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · убирай ×</span>' : ''}
+        ${OV_EDIT ? `<button class="ov2-addtop" id="ovAddTop">${ic(I.plus)}<span>Добавить виджет</span></button>` : ''}
         <button class="ov2-motion ${LESS_MOTION ? 'off' : 'on'}" id="ovMotion" title="${LESS_MOTION ? 'Движение выключено — включить фон-атмосферу' : 'Меньше движения (постеры вместо видео)'}">${ic(LESS_MOTION ? I.moon : I.spark)}<span>${LESS_MOTION ? 'Движение выкл.' : 'Меньше движения'}</span></button>
         <button class="ov2-edit ${OV_EDIT ? 'on' : ''}" id="ovEdit" title="${OV_EDIT ? 'Готово' : 'Настроить обзор'}">${ic(OV_EDIT ? I.check : (I.edit || I.doc))}<span>${OV_EDIT ? 'Готово' : 'Настроить'}</span></button>
       </div>
@@ -1879,7 +1907,9 @@ PAGES.overview = async (root) => {
     /* конструктор */
     $('#ovEdit', root).addEventListener('click', () => { OV_EDIT = !OV_EDIT; paint(); });
     if (OV_EDIT) {
-      const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', () => ovLibrary(ctx, layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); }));
+      const openLib = () => ovLibrary(ctx, layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
+      const ab = $('#ovAdd', root); if (ab) ab.addEventListener('click', openLib);
+      const abt = $('#ovAddTop', root); if (abt) abt.addEventListener('click', openLib);
       $$('[data-wrm]', root).forEach(b => b.addEventListener('click', () => { layout = layout.filter(k => k !== b.closest('[data-w]').dataset.w); ovSetLayout(layout); paint(); }));
       ovWireReorder($('#ovGrid', root), () => layout, (arr) => { layout = arr; ovSetLayout(arr); paint(); });
     }
@@ -1894,16 +1924,24 @@ function ovLibrary(ctx, layout, onChange) {
   const avail = Object.keys(OV_W).filter(k => !layout.includes(k));
   const isDefault = layout.length === OV_DEFAULT.length && layout.join() === OV_DEFAULT.join();
   const lb = modal({
-    title: 'Библиотека виджетов', wide: true, sub: 'Живое превью — нажми на карточку, чтобы добавить на обзор',
-    body: `${avail.length ? `<div class="ov2-lib">${avail.map(k => { let inner; try { inner = OV_W[k].render(ctx, 'default'); } catch (_) { inner = OV_PREV[k] ? OV_PREV[k]() : ''; } return `<div class="ov2-lib-i ${OV_W[k].full ? 'wide' : ''}" data-add="${k}">
+    title: 'Библиотека виджетов', wide: true, sub: `${avail.length} виджетов по категориям — нажми на карточку, чтобы добавить`,
+    body: (() => {
+      if (!avail.length) return '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>' + (!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : '');
+      const tile = (k) => { let inner; try { inner = OV_W[k].render(ctx, 'default'); } catch (_) { inner = OV_PREV[k] ? OV_PREV[k]() : ''; } return `<div class="ov2-lib-i ${OV_W[k].full ? 'wide' : ''}" data-add="${k}" data-nm="${esc((OV_W[k].name || '').toLowerCase())}">
         <div class="ov2-lib-hd">${ic(OV_W[k].icon())}<b>${OV_W[k].name}</b><span class="ov2-lib-add">${ic(I.plus)}Добавить</span></div>
         <div class="ov2-lib-prev"><div class="ov-w-body glass card ov2-lib-prev-in">${inner}</div></div>
-      </div>`; }).join('')}</div>` : '<div class="ov2-empty" style="padding:30px">Все виджеты уже на обзоре 👌</div>'}
-      ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`,
+      </div>`; };
+      const grouped = {}; avail.forEach(k => { const c = ovCatOf(k); (grouped[c] = grouped[c] || []).push(k); });
+      const cats = OV_CAT.map(([c]) => c).filter(c => grouped[c]);
+      return `<div class="ov2-lib-search"><input id="ovLibSearch" placeholder="Поиск виджета…"></div>
+        ${cats.map(c => `<div class="ov2-lib-cat"><div class="ov2-lib-cat-h">${esc(c)}<span>${grouped[c].length}</span></div><div class="ov2-lib">${grouped[c].map(tile).join('')}</div></div>`).join('')}
+        ${!isDefault ? '<button class="ov2-lib-reset" id="ovResetLib">Сбросить раскладку к стандартной</button>' : ''}`;
+    })(),
     actions: [{ label: 'Закрыть' }],
   });
   $$('[data-add]', lb).forEach(x => x.addEventListener('click', () => { onChange([...layout, x.dataset.add]); closeModal(); }));
   const rl = $('#ovResetLib', lb); if (rl) rl.addEventListener('click', () => { onChange(OV_DEFAULT.slice()); closeModal(); });
+  const sr = $('#ovLibSearch', lb); if (sr) sr.addEventListener('input', () => { const q = sr.value.trim().toLowerCase(); $$('.ov2-lib-i', lb).forEach(t => { t.style.display = (!q || (t.dataset.nm || '').includes(q)) ? '' : 'none'; }); $$('.ov2-lib-cat', lb).forEach(g => { g.style.display = [...g.querySelectorAll('.ov2-lib-i')].some(t => t.style.display !== 'none') ? '' : 'none'; }); });
 }
 /* перетаскивание виджетов обзора (за grip) в режиме конструктора */
 function ovWireReorder(grid, getLayout, onChange) {

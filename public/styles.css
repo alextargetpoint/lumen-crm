@@ -5344,3 +5344,14 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .rbac-grp .rbac-row { margin-bottom: 6px; }
 .rbac-del { margin-left: auto; color: var(--ink-3); }
 .rbac-del:hover { color: #E0483D; }
+
+/* обзор: кнопка «Добавить виджет» сверху + категории в библиотеке */
+.ov2-addtop { display: inline-flex; align-items: center; gap: 7px; border: none; background: linear-gradient(120deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #7C4DFF)); color: #fff; border-radius: 11px; padding: 9px 15px; font-size: 13px; font-weight: 650; font-family: inherit; cursor: pointer; box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--accent) 70%, transparent); transition: transform .14s, box-shadow .14s; }
+.ov2-addtop:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -12px color-mix(in srgb, var(--accent) 75%, transparent); }
+.ov2-addtop svg { width: 15px; height: 15px; }
+.ov2-lib-search { margin-bottom: 14px; }
+.ov2-lib-search input { width: 100%; border: 1px solid var(--stroke); border-radius: 11px; padding: 11px 14px; font-size: 14px; font-family: inherit; outline: none; }
+.ov2-lib-search input:focus { border-color: var(--accent); }
+.ov2-lib-cat { margin-bottom: 22px; }
+.ov2-lib-cat-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 0 2px 10px; }
+.ov2-lib-cat-h span { background: var(--bg-2); border-radius: 99px; padding: 1px 9px; font-size: 11px; letter-spacing: 0; }
