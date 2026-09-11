@@ -1044,7 +1044,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 <!-- SCROLL ASSEMBLY (pinned) -->
 <style>
 .asm{position:relative;height:300vh;background:linear-gradient(180deg,var(--bg) 0%,color-mix(in srgb,var(--blue) 6%,var(--bg)) 45%,var(--bg) 100%)}
-.asm-sticky{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.asm-sticky{position:absolute;top:0;left:0;width:100%;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .asm-inner{position:relative;width:100%;max-width:1120px;height:100%;margin:0 auto}
 .asm-head{position:absolute;top:11%;left:0;right:0;text-align:center;z-index:6;padding:0 20px}
 .asm-head .kicker{display:inline-flex}
@@ -1105,10 +1105,15 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   function slotX(i){return (i-(N-1)/2)*gap();}
   function lerp(a,b,t){return a+(b-a)*t;}
   function ease(t){return t<0?0:t>1?1:1-Math.pow(1-t,3);}
+  var sticky=sec.querySelector('.asm-sticky');
   function frame(){
     var r=sec.getBoundingClientRect();
     var total=sec.offsetHeight-innerHeight;
     var p=total>0?Math.max(0,Math.min(1,(-r.top)/total)):0;
+    // JS-пиннинг (position:sticky сломан из-за overflow-x:hidden на html/body)
+    if(r.top>0){ sticky.style.position='absolute'; sticky.style.top='0px'; }
+    else if(r.top < -total){ sticky.style.position='absolute'; sticky.style.top=total+'px'; }
+    else { sticky.style.position='fixed'; sticky.style.top='0px'; }
     pieces.forEach(function(el,i){
       var st=scatter[i];
       var t=ease((p-0.04-i*0.08)/0.5);
