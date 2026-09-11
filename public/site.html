@@ -505,8 +505,25 @@ html[data-theme="dark"] body::after{opacity:.06}
 .manifesto .by{margin-top:26px;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
 
 /* ============ PRELOADER ============ */
-#load{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .7s var(--ease-soft),visibility .7s}
+#load{position:fixed;inset:0;z-index:100;background:radial-gradient(circle at 50% 44%,#0b1428 0%,#040914 58%,#01040b 100%);display:flex;align-items:center;justify-content:center;transition:opacity .8s var(--ease-soft),visibility .8s}
 #load.done{opacity:0;visibility:hidden}
+.ll-atmo{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.45;pointer-events:none}
+.ll-atmo video{width:100%;height:100%;object-fit:cover;mix-blend-mode:screen}
+.ll-stage{position:relative;width:min(66vmin,460px);aspect-ratio:1;display:grid;place-items:center;z-index:2}
+.ll-glow{position:absolute;width:130%;height:130%;left:-15%;top:-13%;z-index:1;background:radial-gradient(circle at 50% 46%,rgba(79,125,255,.45),rgba(37,99,235,.15) 40%,transparent 62%);filter:blur(22px);opacity:0;animation:llGlow 2.8s ease .1s forwards}
+.ll-band{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2;opacity:0;will-change:transform,opacity}
+.ll-band.b1{clip-path:inset(0 0 59.6% 0);animation:llB1 1.05s var(--ease-spring) .15s forwards}
+.ll-band.b2{clip-path:inset(39.8% 0 41.8% 0);animation:llB2 1.05s var(--ease-spring) .32s forwards}
+.ll-band.b3{clip-path:inset(57.8% 0 25.8% 0);animation:llB3 1.05s var(--ease-spring) .5s forwards}
+.ll-band.b4{clip-path:inset(73.8% 0 0 0);animation:llB4 1.05s var(--ease-spring) .66s forwards}
+.ll-shine{position:absolute;inset:0;z-index:4;pointer-events:none;-webkit-mask:radial-gradient(circle at 50% 49%,#000 47.5%,transparent 48.5%);mask:radial-gradient(circle at 50% 49%,#000 47.5%,transparent 48.5%);background:linear-gradient(112deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%);background-size:260% 100%;background-position:160% 0;mix-blend-mode:screen;opacity:0;animation:llShine 1.2s ease 1.4s forwards}
+@keyframes llGlow{0%{opacity:0}45%{opacity:1}100%{opacity:.8}}
+@keyframes llB1{0%{opacity:0;transform:translateY(-42px) scale(1.06)}100%{opacity:1;transform:none}}
+@keyframes llB2{0%{opacity:0;transform:translateY(-17px) scale(1.06)}100%{opacity:1;transform:none}}
+@keyframes llB3{0%{opacity:0;transform:translateY(17px) scale(1.06)}100%{opacity:1;transform:none}}
+@keyframes llB4{0%{opacity:0;transform:translateY(42px) scale(1.06)}100%{opacity:1;transform:none}}
+@keyframes llShine{0%{opacity:0;background-position:160% 0}20%{opacity:1}100%{opacity:0;background-position:-90% 0}}
+@media(prefers-reduced-motion:reduce){.ll-band{animation-duration:.4s!important}.ll-shine{display:none}}
 .load-mark{position:relative;width:76px;height:76px;display:grid;place-items:center}
 .load-mark .ring{position:absolute;inset:-16px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0deg,var(--blue2) 300deg,transparent 340deg);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2.5px));animation:lspin 1s linear infinite;opacity:.85}
 .load-mark svg{width:44px;height:53px;filter:drop-shadow(0 0 14px rgba(79,125,255,.55));animation:lpop .8s var(--ease-spring) both,lfloat 2.6s var(--ease-soft) .8s infinite}
@@ -847,12 +864,16 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 </style>
 </head>
 <body>
-<div id="load">
-  <div class="load-mark">
-    <div class="ring"></div>
-    <svg viewBox="0 0 100 120"><defs><linearGradient id="lgL" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#lgL)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
+<div id="load" class="logo-load">
+  <div class="ll-atmo"><video id="llAtmo" autoplay muted loop playsinline><source src="/assets/site/loader-atmo.mp4?v=1" type="video/mp4"></video></div>
+  <div class="ll-stage">
+    <div class="ll-glow"></div>
+    <img class="ll-band b1" src="/assets/site/lumen-logo.png" alt="Lumen">
+    <img class="ll-band b2" src="/assets/site/lumen-logo.png" alt="">
+    <img class="ll-band b3" src="/assets/site/lumen-logo.png" alt="">
+    <img class="ll-band b4" src="/assets/site/lumen-logo.png" alt="">
+    <div class="ll-shine"></div>
   </div>
-  <div class="load-word">Lumen</div>
 </div>
 <div id="prog"></div>
 
@@ -1965,9 +1986,14 @@ if(!reduced && matchMedia('(pointer:fine)').matches){
 // preloader hide
 const load=document.getElementById('load');
 let loadHidden=false;
-function hideLoad(){if(loadHidden||!load)return;loadHidden=true;load.classList.add('done');setTimeout(()=>load.remove(),800);}
-addEventListener('load',()=>setTimeout(hideLoad,450));
-setTimeout(hideLoad,2600);
+function hideLoad(){if(loadHidden||!load)return;loadHidden=true;load.classList.add('done');setTimeout(()=>{load&&load.remove();},900);}
+// логотип-сборка проигрывается ~2.6с, затем показываем сайт; скип по действию после 1.1с
+if(!location.search.includes('holdload')) setTimeout(hideLoad,2700);
+setTimeout(function(){
+  ['pointerdown','touchstart','wheel','keydown'].forEach(function(ev){
+    addEventListener(ev,function _s(){hideLoad();},{once:true,passive:true});
+  });
+},1100);
 
 // lead modal
 const lform=document.getElementById('lform');
