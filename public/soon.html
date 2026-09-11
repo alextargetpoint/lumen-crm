@@ -38,6 +38,31 @@
   .vign{position:fixed;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 0 200px 40px rgba(0,0,0,.7);}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.9;transform:translate(-50%,-50%) scale(1.12)}}
+  /* ── дрейфующая пыль (люкс-искры, монохром) ── */
+  .dust{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+  .dust i{position:absolute;bottom:-12px;width:2px;height:2px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 7px rgba(255,255,255,.45);opacity:0;animation:floatUp linear infinite}
+  @keyframes floatUp{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.6}88%{opacity:.5}100%{transform:translateY(-106vh) translateX(var(--dx,0));opacity:0}}
+  /* ── тонкий вертикальный луч, дышит ── */
+  .beam{position:fixed;left:50%;top:0;width:1px;height:100%;z-index:0;pointer-events:none;transform:translateX(-50%);
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.13) 42%,rgba(255,255,255,.05) 60%,transparent);
+    animation:beamB 7s ease-in-out infinite}
+  @keyframes beamB{0%,100%{opacity:.22;transform:translateX(-50%) scaleY(.92)}50%{opacity:.55;transform:translateX(-50%) scaleY(1)}}
+  /* ── вспышка успеха (радиальное кольцо) ── */
+  .pulse{position:fixed;left:50%;top:44%;width:10px;height:10px;z-index:1;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%) scale(0);opacity:0;box-shadow:0 0 0 1px rgba(255,255,255,.55)}
+  .pulse.go{animation:pl 1.15s var(--ease) forwards}
+  @keyframes pl{0%{opacity:.7;transform:translate(-50%,-50%) scale(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(60)}}
+  /* ── сияющий свип по вордмарку на ховер ── */
+  .brand .mk{cursor:default;background-image:linear-gradient(90deg,#f4f3f1 0%,#f4f3f1 42%,#ffffff 50%,#f4f3f1 58%,#f4f3f1 100%);background-size:250% 100%;background-position:120% 0;-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand .mk:hover{animation:sweepmk 1.05s var(--ease)}
+  @keyframes sweepmk{from{background-position:130% 0}to{background-position:-130% 0}}
+  /* ── мерцание eyebrow ── */
+  .eyebrow{position:relative;overflow:hidden}
+  .eyebrow::after{content:"";position:absolute;top:0;left:-45%;width:45%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:shimmer 5s ease-in-out infinite;animation-delay:1.5s}
+  @keyframes shimmer{0%{left:-45%}50%,100%{left:135%}}
+  /* ── магнитная кнопка (плавный возврат) + параллакс ── */
+  .field .go{transition:transform .35s var(--ease),background .45s var(--ease),color .45s var(--ease),border-color .45s var(--ease)}
+  .halo,.core h1{will-change:transform}
+  @media(prefers-reduced-motion:reduce){.dust,.beam,.eyebrow::after{animation:none;display:none}}
 
   .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
     padding:clamp(22px,4vw,44px); max-width:1180px;margin:0 auto}
@@ -57,8 +82,8 @@
     border:1px solid var(--line);border-radius:999px;padding:9px 18px;opacity:0;animation:up .9s var(--ease) .28s forwards;
     background:rgba(255,255,255,.02);backdrop-filter:blur(6px)}
 
-  h1{font-family:var(--serif);font-weight:300;font-size:clamp(46px,10vw,124px);line-height:.96;letter-spacing:-.015em}
-  h1 .ln{display:block;overflow:hidden;padding-bottom:.06em}
+  h1{font-family:var(--serif);font-weight:300;font-size:clamp(44px,9vw,108px);line-height:.98;letter-spacing:-.015em}
+  h1 .ln{display:block;overflow:hidden;padding:.06em .18em .16em}
   h1 .ln>span{display:block;transform:translateY(110%);animation:rise 1.15s var(--ease) forwards}
   h1 .ln:nth-child(1)>span{animation-delay:.42s}
   h1 .ln:nth-child(2)>span{animation-delay:.56s}
@@ -125,20 +150,29 @@
 <div class="halo"></div>
 <div class="grain"></div>
 <div class="vign"></div>
+<div class="dust" id="dust"></div>
+<div class="beam"></div>
+<div class="pulse" id="pulse"></div>
 
 <div class="wrap">
   <div class="top">
-    <div class="brand"><span class="mk">LUMEN</span><span class="sub">Real Estate CRM</span></div>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen">
+        <defs><linearGradient id="lx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#cfcecb"/><stop offset="1" stop-color="#8a8885"/></linearGradient></defs>
+        <path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="url(#lx)" stroke-width="2.6" stroke-linejoin="round"/>
+      </svg>
+      <span class="mk">LUMEN</span><span class="sub">Real Estate CRM</span>
+    </div>
     <div class="st"><i></i>Ранний доступ · 2026</div>
   </div>
 
   <div class="core">
     <div class="eyebrow">Скоро · лист ожидания открыт</div>
     <h1>
-      <span class="ln"><span>Отдел продаж,</span></span>
-      <span class="ln"><span>который <em>не спит</em></span></span>
+      <span class="ln"><span>Порядок,</span></span>
+      <span class="ln"><span>которого <em>не было</em></span></span>
     </h1>
-    <p class="lede">Первая линия отвечает за секунды, квалифицирует и передаёт тёплых — пока вы закрываете сделки. Оставьте почту — позовём в бету одними из первых.</p>
+    <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте почту — позовём в бету одними из первых.</p>
 
     <form class="wl" id="wl" novalidate>
       <div class="field" id="field">
@@ -186,6 +220,16 @@
   var SEED=214; // ранняя заинтересованность (реальные заявки прибавляются поверх)
   fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
 
+  // ── дрейфующая пыль (люкс-искры) ──
+  (function(){var d=document.getElementById('dust');if(!d)return;var N=innerWidth<560?7:13;for(var i=0;i<N;i++){var s=document.createElement('i');var dur=9+Math.random()*11,sz=1+Math.random()*2.2,dx=(Math.random()*2-1)*46;s.style.left=(Math.random()*100)+'vw';s.style.width=s.style.height=sz+'px';s.style.animationDuration=dur+'s';s.style.animationDelay=(-Math.random()*dur)+'s';s.style.setProperty('--dx',dx+'px');d.appendChild(s);}})();
+  // ── курсор-параллакс заголовка (тонко) ──
+  var _h1=document.querySelector('.core h1');
+  addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
+  // ── магнитная кнопка-стрелка ──
+  var goB=document.getElementById('go');
+  if(goB){addEventListener('pointermove',function(e){var r=goB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;if(Math.hypot(dx,dy)<130&&!field.classList.contains('busy')){goB.style.transform='translate('+(dx*.3).toFixed(1)+'px,'+(dy*.3).toFixed(1)+'px)';}else if(!field.classList.contains('busy')){goB.style.transform='';}},{passive:true});goB.addEventListener('pointerleave',function(){goB.style.transform='';});}
+  function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
+
   function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;field.classList.remove('busy');field.classList.add('shake');setTimeout(function(){field.classList.remove('shake')},420);}
 
   form.addEventListener('submit',function(e){
@@ -206,7 +250,7 @@
           form.style.display='none';
           if(j&&j.position){pos.textContent='вы №'+(SEED+j.position)+' в очереди';}else{pos.style.display='none';}
           if(j&&typeof j.count==='number'){cnum.textContent=(SEED+j.count).toLocaleString('ru-RU');}
-          done.classList.add('on');
+          done.classList.add('on');successPulse();
         },420);
       })
       .catch(function(){fail('Сеть подвела. Попробуйте ещё раз.');});
