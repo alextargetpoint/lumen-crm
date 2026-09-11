@@ -3754,8 +3754,11 @@ async function renderChat(id, rebuild) {
     const day = new Date(m.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     const sep = day !== lastDay ? `<div class="day-sep">${day}</div>` : '';
     lastDay = day;
-    const media = m.media && m.media.url ? (m.media.type === 'video'
-      ? `<video class="bubble-media" src="${esc(m.media.url)}" controls playsinline preload="metadata"></video>`
+    const _mt = m.media && m.media.type;
+    const media = m.media && m.media.url ? (
+      _mt === 'video' ? `<video class="bubble-media" src="${esc(m.media.url)}" controls playsinline preload="metadata"></video>`
+      : (_mt === 'voice' || _mt === 'audio') ? `<audio class="bubble-audio" src="${esc(m.media.url)}" controls preload="none" style="display:block;max-width:230px;height:38px;margin:3px 0"></audio>`
+      : _mt === 'document' ? `<a class="bubble-doc" href="${esc(m.media.url)}" target="_blank" style="color:inherit;display:inline-flex;gap:7px;align-items:center;text-decoration:none;font-weight:600">${ic(I.doc || I.file || I.paper)}${esc(m.media.name || 'файл')}</a>`
       : `<img class="bubble-media" src="${esc(m.media.url)}" loading="lazy" alt="креатив">`) : '';
     return sep + `<div class="bubble ${m.dir}${isNewMsg && i === arr.length - 1 ? ' new' : ''}">
       ${media}${m.text ? esc(m.text) : (media ? '' : '')}
@@ -3780,9 +3783,6 @@ async function renderChat(id, rebuild) {
       <span class="badge acc">${stageName(l.stage)}</span>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
-    <div class="chat-ai-aura" aria-hidden="true">
-      <div class="chat-ai-pill">${ic(I.spark)}<span>ИИ ведёт диалог</span><i class="chat-ai-dot"></i></div>
-    </div>
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -3790,6 +3790,14 @@ async function renderChat(id, rebuild) {
   $('#composerText').value = draft;
   const body = $('#chatBody');
   body.scrollTop = body.scrollHeight;
+  /* фикс «узкое поле при первом открытии»: textarea меряет ширину до того, как flex устоялся →
+     форс-рефлоу после раскладки + явная ширина/высота */
+  requestAnimationFrame(() => {
+    const ta = $('#composerText'); if (!ta) return;
+    void pane.offsetWidth;
+    ta.style.width = '100%';
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
