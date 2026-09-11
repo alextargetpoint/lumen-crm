@@ -2511,6 +2511,23 @@ const server = http.createServer(async (req, res) => {
         try { const out = await llm.rewrite(t, String(b.mode || 'improve'), 'сообщение клиенту от менеджера агентства недвижимости в WhatsApp — живо, коротко, по-человечески, без канцелярита, тот же смысл и язык'); return json(res, 200, { text: String(out).slice(0, 2000) }); }
         catch (e) { return json(res, 400, { error: e.message }); }
       }
+      /* 🎙️ диктовка: голос брокера → транскрипт → ИИ причёсывает → чистый текст в поле ввода */
+      if (p === '/tgapp/api/dictate' && req.method === 'POST') {
+        if (!llm.hasImage()) return json(res, 400, { error: 'распознавание речи не подключено (нет ключа модели)' });
+        const chunks = []; let size = 0, over = false;
+        await new Promise(r => { req.on('data', c => { size += c.length; if (size > 16e6) { over = true; req.destroy(); r(); } else chunks.push(c); }); req.on('end', r); req.on('close', r); });
+        if (over) return json(res, 400, { error: 'запись слишком длинная' });
+        if (!size) return json(res, 400, { error: 'пустая запись' });
+        try {
+          let text = ((await llm.transcribe(Buffer.concat(chunks), u.searchParams.get('filename') || 'dictate.webm')) || '').trim();
+          const raw = text;
+          if (text && llm.available()) {
+            try { text = await llm.rewrite(text, 'improve', 'надиктованное сообщение клиенту от менеджера агентства недвижимости в WhatsApp — убери слова-паразиты и оговорки, расставь пунктуацию, сделай живой аккуратный текст; тот же смысл и язык, без канцелярита, ничего не выдумывай'); }
+            catch (e) { text = raw; /* модель причёсывания недоступна — отдаём сырой транскрипт */ }
+          }
+          return json(res, 200, { text: (text || '').trim(), raw });
+        } catch (e) { return json(res, 500, { error: 'не распозналось: ' + e.message }); }
+      }
       /* 🔊 текст → голосовое (ElevenLabs) → отправить клиенту как voice */
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/tts$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });

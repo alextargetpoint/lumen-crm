@@ -208,6 +208,9 @@
   .segflt .cnt{background:rgba(255,255,255,.22);color:inherit;font-size:11px;font-weight:800;padding:0 6px;border-radius:8px;min-width:16px;text-align:center}
   .segflt button:not(.on) .cnt{background:var(--acc);color:#fff}
   .dot-me{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
+  #dict.rec{color:#fff;background:#e5484d!important;animation:dictpulse 1.1s ease-in-out infinite}
+  #dict.busy{opacity:.45;pointer-events:none}
+  @keyframes dictpulse{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}50%{box-shadow:0 0 0 7px rgba(229,72,77,0)}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{50%{opacity:.5}}
   @keyframes fade{from{opacity:0}}
@@ -246,6 +249,7 @@
     <div class="composer" id="composer">
       <button class="cbtn ghost ic" id="plus" data-ic="plus"></button>
       <input type="file" id="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
+      <button class="cbtn ghost ic" id="dict" data-ic="wave" title="Диктовка — голос в текст"></button>
       <textarea id="text" rows="1" placeholder="Сообщение"></textarea>
       <button class="cbtn ghost ic hidden" id="enh" data-ic="ai" title="Усилить ИИ"></button>
       <button class="cbtn ic hidden" id="tts" data-ic="speak" title="Озвучить"></button>
@@ -284,6 +288,7 @@ const IC={
   spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
   pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   flame:'<path d="M12 3c3 3.5 5 6 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.2 1 2 2 2 .5-2-.5-4.5 1-6.5z"/>',
+  wave:'<path d="M4 10v4M8 6v12M12 8v8M16 5v14M20 10v4"/>',
 };
 const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
@@ -454,6 +459,32 @@ $('#plus').onclick=()=>{hap();sheet('Отправить',[
 $('#file').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
   const type=/^image\//.test(f.type)?'image':/^video\//.test(f.type)?'video':/^audio\//.test(f.type)?'voice':'document';
   toast('Отправляю…');try{await jpost('/tgapp/api/chat/'+CUR.id+'/media?type='+type+'&filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'application/octet-stream'});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message)}};
+
+/* 🎙️ диктовка: голос → транскрипт → ИИ причёсывает → чистый текст в поле (на правку) */
+let DREC=null,DCH=[];
+$('#dict').onclick=async()=>{
+  if(DREC){DREC.stop();return}
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:true});
+    DREC=new MediaRecorder(st);DCH=[];hap('medium');$('#dict').classList.add('rec');toast('Говорите… нажмите ещё раз, чтобы закончить');
+    DREC.ondataavailable=ev=>DCH.push(ev.data);
+    DREC.onstop=async()=>{
+      st.getTracks().forEach(t=>t.stop());$('#dict').classList.remove('rec');
+      const blob=new Blob(DCH,{type:(DCH[0]&&DCH[0].type)||'audio/webm'});DREC=null;
+      if(!blob.size){return}
+      const ext=((blob.type.split('/')[1]||'webm').split(';')[0]);
+      $('#dict').classList.add('busy');toast('Распознаю и причёсываю…');
+      try{
+        const r=await jpost('/tgapp/api/dictate?filename=dictate.'+ext,null,{body:blob,ct:blob.type||'audio/webm'});
+        const t=(r.text||'').trim();
+        if(t){const cur=txt.value.trim();txt.value=cur?cur+' '+t:t;txt.dispatchEvent(new Event('input'));txt.focus();hap();toast('Готово — проверьте и отправьте')}
+        else toast('Ничего не распозналось');
+      }catch(e){toast(e.message)}
+      $('#dict').classList.remove('busy');
+    };
+    DREC.start();
+  }catch(e){toast('Нет доступа к микрофону')}
+};
 
 let REC=null,CHUNKS=[],recT=null,recCancel=false;
 mic.onclick=async()=>{if(REC){REC.stop();return}
