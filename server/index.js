@@ -2181,6 +2181,8 @@ function imgDims(buf) {
 }
 async function downloadImageToAsset(url) {
   try {
+    let _u; try { _u = new URL(url); } catch (_) { return null; }
+    if (!/^https?:$/.test(_u.protocol) || ssrfBlocked(_u.hostname)) return null;   /* SEC(#6): не лезем на internal/metadata-хосты */
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
     let r; try { r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LumenBot/1.0)', Referer: url } }); } finally { clearTimeout(to); }
     if (!r.ok) return null;
@@ -2583,7 +2585,28 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---------------- мост приёма лидов (Albato / Make / любой интегратор) ---------------- */
+    /* SEC(#3): Stripe-вебхук с проверкой подписи — ЕДИНСТВЕННЫЙ путь пометить подписку оплаченной */
+    if (p === '/hooks/stripe' && req.method === 'POST') {
+      const secret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!secret) return json(res, 503, { error: 'stripe webhook not configured' });
+      let raw = ''; req.on('data', c => { raw += c; if (raw.length > 1e6) req.destroy(); }); await new Promise(r => req.on('end', r));
+      const sig = String(req.headers['stripe-signature'] || '');
+      const m = /t=(\d+),v1=([a-f0-9]+)/.exec(sig);
+      if (!m) return json(res, 400, { error: 'bad signature' });
+      const [, ts, v1] = m;
+      if (Math.abs(Date.now() / 1000 - +ts) > 300) return json(res, 403, { error: 'stale' });
+      const expected = crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');
+      let ok = false; try { ok = crypto.timingSafeEqual(Buffer.from(v1), Buffer.from(expected)); } catch (_) {}
+      if (!ok) return json(res, 403, { error: 'signature mismatch' });
+      let evt; try { evt = JSON.parse(raw); } catch (_) { return json(res, 400, { error: 'bad json' }); }
+      if (/checkout\.session\.completed|invoice\.(paid|payment_succeeded)/.test(evt.type || '')) {
+        const o = (evt.data && evt.data.object) || {};
+        billing.markInvoicePaid(db, (o.metadata && o.metadata.invId) || o.client_reference_id || null);
+      }
+      return json(res, 200, { received: true });
+    }
     if (p === '/hooks/lead' && req.method === 'POST') {
+      if (!rateHit('hooklead:' + clientIp(req), 30, 60000)) return json(res, 429, { error: 'rate limit' });
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       /* гибкий маппинг полей — интеграторы шлют по-разному */
@@ -2674,6 +2697,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
     if (p === '/hooks/comment' && req.method === 'POST') {
+      if (!rateHit('hookcmt:' + clientIp(req), 60, 60000)) return json(res, 429, { error: 'rate limit' });
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       const r0 = comments.ingest(db, b, matchAd);
@@ -2778,6 +2802,7 @@ const server = http.createServer(async (req, res) => {
        ссылкой на запись. Мы находим лида по номеру, скачиваем запись и
        расшифровываем Whisper-ом — транскрипт сам ложится в карточку. */
     if (p === '/hooks/call' && req.method === 'POST') {
+      if (!rateHit('hookcall:' + clientIp(req), 60, 60000)) return json(res, 429, { error: 'rate limit' });
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       const phone = String(b.phone || b.caller_id || b.to || b.destination || '').replace(/\D/g, '');
@@ -2791,6 +2816,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- Telnyx: события звонка (bridge + запись → карточка) ---------------- */
     if (p === '/hooks/telnyx' && req.method === 'POST') {
+      if (!rateHit('hooktlx:' + clientIp(req), 120, 60000)) return json(res, 429, { error: 'rate limit' });
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       const ev = b.data || {}; const et = ev.event_type; const pl = ev.payload || {};
@@ -8209,6 +8235,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
     const full = path.join(PUBLIC, file);
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
+    /* SEC(#7): документы лида и входящие WA-медиа (паспорта/ВНЖ и пр.) — ТОЛЬКО под валидной сессией,
+       иначе любая утечка URL = вечный доступ постороннего к чувствительному файлу */
+    if (/^\/assets\/(leadfiles|wa-media)\//.test(p) && !getSession(req)) { res.writeHead(403); res.end('forbidden'); return; }
     fs.readFile(full, (err, buf) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       const ext = path.extname(full);

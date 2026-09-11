@@ -123,20 +123,41 @@ function issueInvoice(db, { method } = {}) {
   const q = quote(b.plan, b.cycle, b.seats);
   if (q.custom) return { error: 'Тариф «Сеть» — по договору, счёт формирует менеджер' };
   const now = Date.now();
+  const isStripe = method === 'stripe';
+  /* SEC(#3): НИКОГДА не помечаем 'paid' по клиентскому полю. Stripe → 'pending' до
+     верифицированного вебхука (markInvoicePaid). Ручной/банк → 'issued' (владелец подтверждает оффлайн). */
   const inv = {
     id: 'INV-' + String(now).slice(-8),
     at: now,
     plan: q.plan, planName: q.name, cycle: q.cycle, seats: q.seats,
     amount: q.billedNow, currency: 'USD',
     period: q.cycle === 'yearly' ? '12 мес' : '1 мес',
-    status: method === 'stripe' ? 'paid' : 'issued', // stripe-путь помечает оплату вебхук; здесь — упрощённо
+    status: isStripe ? 'pending' : 'issued',
     method: method || b.payMode,
   };
   b.invoices.unshift(inv);
   if (b.invoices.length > 60) b.invoices.length = 60;
-  /* продлеваем период и активируем подписку */
+  /* активируем подписку ТОЛЬКО для ручного/банк-пути (владелец подтверждает своей же оплатой).
+     Для Stripe активация происходит в markInvoicePaid() из верифицированного вебхука. */
+  if (!isStripe) {
+    b.status = 'active';
+    b.currentPeriodEnd = now + (q.cycle === 'yearly' ? 365 : 30) * 86400e3;
+    b.usage = { periodStart: now, waTemplates: 0, aiRequests: 0 };
+  }
+  store.save();
+  return { invoice: inv, view: view(db) };
+}
+
+/* SEC(#3): отметить счёт оплаченным — вызывается ТОЛЬКО из верифицированного Stripe-вебхука */
+function markInvoicePaid(db, invId) {
+  const b = db.settings.billing;
+  const inv = (b.invoices || []).find(i => i.id === invId) || (b.invoices || [])[0];
+  if (!inv) return { error: 'invoice not found' };
+  if (inv.status === 'paid') return { invoice: inv, view: view(db) };
+  inv.status = 'paid';
+  const now = Date.now();
   b.status = 'active';
-  b.currentPeriodEnd = now + (q.cycle === 'yearly' ? 365 : 30) * 86400e3;
+  b.currentPeriodEnd = now + (inv.cycle === 'yearly' ? 365 : 30) * 86400e3;
   b.usage = { periodStart: now, waTemplates: 0, aiRequests: 0 };
   store.save();
   return { invoice: inv, view: view(db) };
@@ -233,4 +254,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, setMethod, stripeCheckout, usageEstimate, setRates, addUsage };
+module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage };
