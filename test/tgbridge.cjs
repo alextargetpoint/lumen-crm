@@ -153,6 +153,17 @@ async function run() {
   ok('optOut: excluded from wake targeting', preBefore.length === 2 && preAfter.length === 1 && preAfter[0].id === 'ld1');
   ok('optOut: idempotent', engine.optOut(db6, db6.leads[1]) === false);
 
+  // 8b) непрочитанные: инкремент на входящем, сброс при ответе человека
+  const dbu = makeDb();
+  const lu = dbu.leads[0]; lu.unread = 0; lu.broker = null; lu.ai = { enabled: false };
+  engine.inbound(dbu, lu, 'первое'); engine.inbound(dbu, lu, 'второе');
+  ok('unread: инкремент на входящих', lu.unread === 2, 'unread=' + lu.unread);
+  engine.send(dbu, lu, 'ответ брокера', 'human', { channel: 'wa' });
+  ok('unread: сброс при ответе человека', lu.unread === 0);
+  engine.inbound(dbu, lu, 'ещё');
+  engine.send(dbu, lu, 'авто-ответ', 'ai', { channel: 'wa' });
+  ok('unread: авто-ответ ИИ НЕ сбрасывает (это не «человек увидел»)', lu.unread === 1, 'unread=' + lu.unread);
+
   // 9) стартовый marketing-шаблон несёт кнопку «Отписаться»
   const idx = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
   const hasBtn = /QUICK_REPLY[^}]*Отписаться/.test(idx.replace(/\n/g, ' ')) && /QUICK_REPLY[^}]*Unsubscribe/.test(idx.replace(/\n/g, ' '));

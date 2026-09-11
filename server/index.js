@@ -684,7 +684,9 @@ function analytics(db) {
   return {
     byBroker, bySource, byChain, trend,
     solo: (db.settings.agency.edition === 'solo'),
-    unread: leads.filter(l => l.lastDir === 'in' && l.stage !== 'lost').length,
+    unread: leads.filter(l => (l.unread || 0) > 0 && l.stage !== 'lost').length,
+    unreadMsgs: leads.reduce((n, l) => n + (l.stage !== 'lost' ? (l.unread || 0) : 0), 0),
+    lastUnread: (() => { const u = leads.filter(l => (l.unread || 0) > 0 && l.stage !== 'lost').sort((a, b) => (b.lastInboundAt || 0) - (a.lastInboundAt || 0))[0]; return u ? { id: u.id, name: u.name, at: u.lastInboundAt || 0, broker: u.broker || null } : null; })(),
     totalActive: leads.filter(l => !['lost'].includes(l.stage)).length,
     funnel: { new: by('new'), touch: by('touch'), dialog: by('dialog'), qualified: by('qualified'), handover: by('handover'), viewing: by('viewing'), deal: by('deal'), sleeping: by('sleeping'), lost: by('lost') },
     compare: {
@@ -2408,8 +2410,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge/setup' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      const base = process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || tunnelUrl();
-      if (!base) return json(res, 400, { error: 'нет публичного адреса (туннель/PUBLIC_BASE_URL) — Telegram не сможет достучаться до вебхука' });
+      /* Telegram нужен ПУБЛИЧНЫЙ адрес: туннель приоритетнее, чем Host запроса
+         (иначе клик из localhost прописал бы webhook на localhost — Telegram туда не достучится) */
+      const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE;
+      if (!base || /localhost|127\.0\.0\.1/.test(base)) return json(res, 400, { error: 'нет публичного адреса (туннель не запущен) — Telegram не сможет достучаться до вебхука' });
       try { const r = await tgbridge.setupWebhook(db, base); return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', result: r }); }
       catch (e) { return json(res, 400, { error: e.message }); }
     }
@@ -2749,6 +2753,7 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       if (req.method === 'GET') {
         if (IS_BROKER) audit(db, req, 'открыл карточку лида', { leadId: lead.id, lead: lead.name });
+        if (lead.unread) { lead.unread = 0; store.save(); }   /* открыл карточку → непрочитанные обнулены */
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
         return json(res, 200, Object.assign(leadView(db, lead), {
           messages: msgs,

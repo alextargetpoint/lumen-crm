@@ -64,6 +64,7 @@ function renderTemplate(db, tpl, lead) {
 }
 
 function send(db, lead, text, via, opts = {}) {
+  if (via === 'human') lead.unread = 0;   /* брокер ответил вручную → он видел переписку, непрочитанных нет */
   const channel = opts.channel || resolveChannel(db, lead);
   if (channel !== 'wa') {
     /* не-WA каналы: mock-запись в переписку; боевые слоты (TG-бот/Viber/Resend) включаются токенами */
@@ -595,6 +596,8 @@ function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   db.messages.push(m);
+  lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
+  lead.lastInboundAt = m.at;
   /* пересылка входящего клиента назначенному брокеру в Telegram (мост) — если подключён */
   if (module.exports.onInboundMessage) { try { const r = module.exports.onInboundMessage(db, lead, m); if (r && r.catch) r.catch(() => {}); } catch (_) {} }
   const wasWake = (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';

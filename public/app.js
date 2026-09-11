@@ -758,6 +758,29 @@ async function loadState() {
   };
   setCnt('inbox', an.unread || 0);
   setCnt('funnel', an.totalActive || 0);
+  /* умное уведомление: новое входящее сообщение → тост + короткий бип (чтобы брокер не пропустил) */
+  const um = an.unreadMsgs || 0;
+  if (window._prevUnreadMsgs !== undefined && um > window._prevUnreadMsgs && an.lastUnread) {
+    const nm = an.lastUnread.name || 'Клиент';
+    toast('💬 Новое сообщение', nm + ' написал — ответьте, пока лид горячий', true);
+    beepNew();
+  }
+  window._prevUnreadMsgs = um;
+}
+/* короткий сигнал через WebAudio (без файла); тихо глохнет, если контекст заблокирован */
+function beepNew() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    window._ac = window._ac || new AC();
+    const ac = window._ac; if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.0001;
+    o.connect(g); g.connect(ac.destination);
+    const t = ac.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    o.start(t); o.stop(t + 0.3);
+  } catch (_) {}
 }
 
 function hidePreloader() {
@@ -2462,7 +2485,7 @@ PAGES.funnel = async (root) => {
           <div class="kb-cards">
             ${items.map(l => `<div class="lead-card glass ${selSet("funnel").has(l.id) ? "sel" : ""} ${l.hint && l.hint.kind === 'act' ? 'hot' : ''}" data-id="${l.id}" data-stage="${l.stage}">
               <span class="lc-check" data-check title="Выделить">${ic(I.check, 2)}</span>
-              <div class="top"><div class="nm">${esc(l.name)}</div>${scoreRing(l.score)}</div>
+              <div class="top"><div class="nm">${esc(l.name)}${(l.unread || 0) > 0 ? ` <span class="lc-unread" title="${l.unread} новых сообщений" style="background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle">${l.unread > 9 ? '9+' : l.unread}</span>` : ''}</div>${scoreRing(l.score)}</div>
               <div class="geo">${l.geoName} · ${esc(l.phone)}</div>
               <div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
               <div class="foot">
@@ -3606,7 +3629,7 @@ async function refreshInbox(first) {
       ${avaHtml(l)}
       <div class="meta"><div class="nm">${esc(l.name)}</div><div class="prev">${esc(l.lastText || 'нет сообщений')}</div></div>
       <div class="tm">${l.lastMsgAt ? tmm(l.lastMsgAt) : ''}</div>
-      ${l.lastDir === 'in' ? '<div class="unread"></div>' : ''}
+      ${(l.unread || 0) > 0 ? `<div class="unread-badge" style="background:var(--accent);color:#fff;border-radius:10px;min-width:18px;height:18px;display:grid;place-items:center;font-size:10.5px;font-weight:700;padding:0 5px;box-shadow:0 1px 4px rgba(37,99,235,.4)">${l.unread > 9 ? '9+' : l.unread}</div>` : (l.lastDir === 'in' ? '<div class="unread"></div>' : '')}
     </div>`).join('') || `<div class="empty" style="padding:24px 14px">Ничего не найдено${PAGE_STATE.inboxSeg !== 'all' || PAGE_STATE.inboxBroker || PAGE_STATE.inboxSearch ? ' — снимите фильтры' : ''}</div>`;
   $$('.conv', list).forEach(c => c.addEventListener('click', () => { PAGE_STATE.inboxLead = c.dataset.id; $$('.conv', list).forEach(x => x.classList.toggle('active', x === c)); renderChat(c.dataset.id, true); }));
   if (PAGE_STATE.inboxLead && leads.length) await renderChat(PAGE_STATE.inboxLead, first);
@@ -3681,7 +3704,6 @@ async function renderChat(id, rebuild) {
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
     <div class="chat-ai-aura" aria-hidden="true">
-      <video class="chat-ai-aura-v" autoplay muted loop playsinline src="assets/widgets/amb-aurora.mp4"></video>
       <div class="chat-ai-pill">${ic(I.spark)}<span>ИИ ведёт диалог</span><i class="chat-ai-dot"></i></div>
     </div>
     <div class="composer">
@@ -7178,11 +7200,11 @@ PAGES.parlo = async (root) => {
   ];
   const dl = () => {
     const bd = modal({
-      title: 'Скачать Parlo',
+      title: 'Скачать Parlo · бета',
       body: `<div class="plo-dl-modal"><div class="plo-dl-ic">${parloAppIcon(64)}</div>
-        <div class="plo-dl-mt">Живой переводчик звонков — бесплатно для команды Lumen.</div>
+        <div class="plo-dl-mt">Живой переводчик звонков — бесплатно для команды Lumen. <span class="plo-beta-tag">бета</span></div>
         <div class="plo-dl-rows"><button class="plo-btn primary" data-plo-os="mac">${apple}macOS (Apple Silicon / Intel)</button><button class="plo-btn" data-plo-os="win">${win}Windows 10/11</button></div>
-        <div class="plo-dl-note">После установки Parlo сам подхватит ваши ключи и глоссарий из Lumen — настраивать ничего не нужно.</div></div>`,
+        <div class="plo-dl-note">Продукт в бете — ещё дорабатываем. Пришлём установщик и настроим его с вами на коротком созвоне-консультации: подхватим ключи и глоссарий из Lumen, проверим звук в Zoom/Meet.</div></div>`,
       actions: [{ label: 'Готово' }],
     });
     if (bd && bd.querySelectorAll) bd.querySelectorAll('[data-plo-os]').forEach(b => b.addEventListener('click', () => toast('Готовим установщик', 'Пришлём ссылку на Parlo для ' + (b.dataset.ploOs === 'mac' ? 'macOS' : 'Windows') + ' вам в Telegram в течение пары минут', true)));
@@ -7195,10 +7217,11 @@ PAGES.parlo = async (root) => {
         <div class="plo-beta">${ic(I.spark, 2)}<span><b>Бета-тестирование.</b> В первый период — бонусом бесплатно, пока идёт бета-разработка.</span></div>
         <p class="plo-sub">Parlo переводит ваш звонок в реальном времени <b>вашим же голосом</b> и подсказывает, что ответить. Для брокеров, которые звонят покупателям в Дубае, на Бали и Пхукете.</p>
         <div class="plo-cta">
-          <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать для Mac</button>
-          <button class="plo-btn lg" data-plo-dl>${win}Windows</button>
+          <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать для Mac<span class="plo-beta-tag">бета</span></button>
+          <button class="plo-btn lg" data-plo-dl>${win}Windows<span class="plo-beta-tag">бета</span></button>
           <button class="plo-btn ghost lg" data-plo-how>Как это работает</button>
         </div>
+        <div class="plo-cta-note">${ic(I.spark, 2)}Пока бета: устанавливаем и настраиваем вместе на коротком созвоне-консультации — чтобы всё сразу заработало.</div>
         <div class="plo-langs"><span class="plo-dot"></span>Переводит на <b>EN · IT · DE · FR</b> · работает в Zoom и Google Meet</div>
       </div>
       <div class="plo-hero-r">
