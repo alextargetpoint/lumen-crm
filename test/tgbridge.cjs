@@ -47,7 +47,7 @@ function makeDb() {
   return {
     settings: {
       tgBridge: { enabled: true, botToken: 'TESTBOT:xyz', secret: 'sec123' },
-      channels: { tg: { botToken: '' } },
+      channels: { priority: ['wa', 'tg', 'viber', 'email'], enabled: { wa: true, tg: false, viber: false, email: false }, tg: { botToken: '' } },
       ai: { provider: 'core', autoOff: { onHumanReply: true }, persona: {} },
       wa: { mode: 'mock', token: '', phoneId: '' },
       geoNames: { dubai: 'Дубай' },
@@ -136,6 +136,27 @@ async function run() {
   await new Promise(r => setTimeout(r, 30));
   global.fetch = prevFetch;
   ok('Cloud API image payload shape', graphBody && graphBody.type === 'image' && graphBody.image && graphBody.image.link === 'https://tunnel.example/assets/wa-media/x.jpg' && graphBody.image.caption === 'подпись', JSON.stringify(graphBody || {}).slice(0, 120));
+
+  // 8) отписка от рассылки (кнопка «Отписаться») — enforcement
+  const db6 = makeDb();
+  db6.leads = [
+    { id: 'ld1', name: 'A', phone: '+971500000001', geo: 'dubai', stage: 'sleeping', lang: 'ru', tags: [], quals: {}, ai: { enabled: true, chainStep: 0 }, lastMsgAt: Date.now() - 40 * 864e5, createdAt: Date.now() - 60 * 864e5 },
+    { id: 'ld2', name: 'B', phone: '+971500000002', geo: 'dubai', stage: 'sleeping', lang: 'ru', tags: [], quals: {}, ai: { enabled: true, chainStep: 0 }, lastMsgAt: Date.now() - 40 * 864e5, createdAt: Date.now() - 60 * 864e5 },
+  ];
+  db6.settings.demo = { accelerate: false, dayMs: 1000 };
+  const preBefore = engine.wakePreview(db6, { stages: ['sleeping'] });
+  const changed = engine.optOut(db6, db6.leads[1]); // B отписался
+  const preAfter = engine.wakePreview(db6, { stages: ['sleeping'] });
+  ok('optOut: flag+tag set', db6.leads[1].marketingOptOut === true && db6.leads[1].tags.includes('отписался') && changed === true);
+  ok('optOut: AI paused', db6.leads[1].ai.enabled === false);
+  ok('optOut: confirmation sent in window', db6.messages.some(m => m.dir === 'out' && m.via === 'system' && /рассылку/.test(m.text)));
+  ok('optOut: excluded from wake targeting', preBefore.length === 2 && preAfter.length === 1 && preAfter[0].id === 'ld1');
+  ok('optOut: idempotent', engine.optOut(db6, db6.leads[1]) === false);
+
+  // 9) стартовый marketing-шаблон несёт кнопку «Отписаться»
+  const idx = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
+  const hasBtn = /QUICK_REPLY[^}]*Отписаться/.test(idx.replace(/\n/g, ' ')) && /QUICK_REPLY[^}]*Unsubscribe/.test(idx.replace(/\n/g, ' '));
+  ok('starter template has opt-out button (ru+en)', hasBtn);
 
   // вывод
   const failed = results.filter(r => !r.pass).length;

@@ -9927,6 +9927,7 @@ PAGES.settings = async (root) => {
         <div class="wa-tpl-card" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="sl">Шаблоны первого касания</div><div style="display:flex;gap:6px"><button class="btn btn-sm" id="waSyncTpl">${ic(I.refresh || I.spark)}Синк</button><button class="btn btn-sm btn-accent" id="waCreateTpl">Создать стартовые</button></div></div>
           <div id="waTpl" class="muted" style="font-size:12px">${s.wa.templates && s.wa.templates.length ? tplListHtml(s.wa.templates) : 'Шаблоны нужны для холодного первого касания (вне 24-часового окна Meta пускает только их). Нажмите «Синк» после подключения токена или «Создать стартовые».'}</div>
+          <div class="muted" style="font-size:11.2px;line-height:1.5;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">${ic(I.x || I.spark)} В стартовые шаблоны вшита кнопка <b>«Отписаться»</b>: недовольный жмёт её вместо «Report spam» — жалоба не уходит (это главный триггер бана номера). Нажатие ловится вебхуком: лид помечается «отписался», рассылки и цепочки ему останавливаются автоматически.</div>
         </div>
       </div>
       <div>

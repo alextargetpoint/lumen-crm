@@ -44,11 +44,21 @@ const { MARKET } = require('./marketdata');
    где {{1}} — полностью собранное Lumen персональное сообщение (совпадает
    с одно-параметровой отправкой в wa.sendTemplate). Категория MARKETING —
    первое исходящее касание вне 24ч-окна по правилам Meta это маркетинг. */
+/* Кнопка отписки (QUICK_REPLY) на marketing-шаблонах: недовольный жмёт «Отписаться»
+   вместо «Report spam» — это снижает жалобы (главный триггер бана белого номера).
+   Нажатие прилетает вебхуком (type:'button') → помечаем лид marketingOptOut. */
+const OPTOUT_BUTTON = { ru: 'Отписаться', en: 'Unsubscribe' };
 const STARTER_TEMPLATES = [
   { name: 'lumen_first_touch', language: 'ru', category: 'MARKETING',
-    components: [{ type: 'BODY', text: 'Здравствуйте! 👋 На связи агентство недвижимости.\n\n{{1}}', example: { body_text: [['Подобрали для вас несколько объектов под ваш запрос — скинуть подборку?']] } }] },
+    components: [
+      { type: 'BODY', text: 'Здравствуйте! 👋 На связи агентство недвижимости.\n\n{{1}}', example: { body_text: [['Подобрали для вас несколько объектов под ваш запрос — скинуть подборку?']] } },
+      { type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: OPTOUT_BUTTON.ru }] },
+    ] },
   { name: 'lumen_first_touch', language: 'en', category: 'MARKETING',
-    components: [{ type: 'BODY', text: 'Hello! 👋 This is a real estate agency reaching out.\n\n{{1}}', example: { body_text: [['We\'ve prepared a few options matching your request — shall we send the selection?']] } }] },
+    components: [
+      { type: 'BODY', text: 'Hello! 👋 This is a real estate agency reaching out.\n\n{{1}}', example: { body_text: [['We\'ve prepared a few options matching your request — shall we send the selection?']] } },
+      { type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: OPTOUT_BUTTON.en }] },
+    ] },
 ];
 
 store.load(seed);
@@ -2187,6 +2197,18 @@ const server = http.createServer(async (req, res) => {
         }
         if (wa.applyStatuses(db, changes)) store.save();
         const wam = changes?.messages?.[0];
+        /* нажатие кнопки шаблона: «Отписаться» → тихий opt-out (вместо жалобы), прочие кнопки → как ответ */
+        if (wam && (wam.type === 'button' || wam.type === 'interactive')) {
+          const btnText = (wam.button && wam.button.text) || (wam.interactive && wam.interactive.button_reply && wam.interactive.button_reply.title) || '';
+          const payload = (wam.button && wam.button.payload) || (wam.interactive && wam.interactive.button_reply && wam.interactive.button_reply.id) || '';
+          const fromDigits = wam.from.replace(/\D/g, '');
+          const lead = db.leads.find(l => l.phone.replace(/\D/g, '') === fromDigits);
+          if (lead) {
+            if (/отпис|unsubscrib|\bstop\b|стоп|opt.?out/i.test(btnText + ' ' + payload)) engine.optOut(db, lead);
+            else engine.inbound(db, lead, btnText || payload);
+          }
+          json(res, 200, { ok: true }); return;
+        }
         const MEDIA_TYPES = ['image', 'video', 'audio', 'voice', 'document', 'sticker'];
         if (wam && (wam.type === 'text' || MEDIA_TYPES.includes(wam.type))) {
           const phone = '+' + wam.from.replace(/\D/g, '');

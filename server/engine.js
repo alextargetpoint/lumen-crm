@@ -255,6 +255,7 @@ function tickChains(db) {
   const defaultSeqId = (db.settings.ai && db.settings.ai.defaultSeq) || null;
   for (const lead of db.leads) {
     if (!lead.ai.enabled) continue;
+    if (lead.marketingOptOut) continue;                             // отписался от рассылки — касания не шлём
     if (!autoOn && !lead.ai.forced) continue;                       // авто off → только ручные
     /* какую цепочку крутить: приоритет — принудительная (ручной запуск), затем дефолтная из настроек, затем по гео */
     const seq = (lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq))
@@ -396,6 +397,7 @@ function wakePreview(db, filters = {}) {
   const dorm = (l) => Date.now() - (l.lastMsgAt || l.createdAt);
   const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
   const list = db.leads
+    .filter(l => !l.marketingOptOut)                                                                    /* отписавшихся в рассылку не берём */
     .filter(l => (filters.stages || ['sleeping']).includes(l.stage))
     .filter(l => !filters.geo || l.geo === filters.geo)
     .filter(l => !filters.olderDays || dorm(l) >= filters.olderDays * DAY * accel)
@@ -506,6 +508,7 @@ function tickCampaigns(db) {
     for (const id of batch) {
       const lead = db.leads.find(l => l.id === id);
       if (!lead || !lead.phone) { cmp.stats.skipped += 1; continue; }
+      if (lead.marketingOptOut) { cmp.stats.skipped += 1; continue; }   /* отписался в процессе кампании — пропускаем */
       const hour = new Date(nowT + (lead.tz || 0) * 3600e3).getUTCHours();
       if (!db.settings.demo.accelerate && (hour < cmp.window[0] || hour >= cmp.window[1])) {
         cmp.recipients.push(id); // вне окна клиента — в конец очереди
@@ -658,6 +661,25 @@ function inbound(db, lead, text, opts = {}) {
   return m;
 }
 
+/* ---------- отписка от рассылки (кнопка «Отписаться» в шаблоне) ----------
+   Тихий opt-out вместо жалобы: снимаем маркетинг, чистим из кампаний, стопаем
+   авто-цепочки, подтверждаем в 24ч-окне (клиент только что нажал → окно открыто). */
+function optOut(db, lead) {
+  if (lead.marketingOptOut) return false;
+  lead.marketingOptOut = true;
+  lead.optOutAt = Date.now();
+  lead.tags = [...new Set([...(lead.tags || []), 'отписался'])];
+  for (const cmp of db.campaigns || []) cmp.recipients = (cmp.recipients || []).filter(id => id !== lead.id);
+  if (lead.ai) lead.ai.enabled = false;
+  ai.pushEvent(db, { type: 'note', leadId: lead.id, text: `${lead.name} отписался от рассылки (кнопка в шаблоне) — маркетинг остановлен` });
+  const txt = (lead.lang === 'en')
+    ? 'Done — you won’t receive promotional messages from us anymore. You can still reach us here anytime.'
+    : 'Готово — рассылку вам больше присылать не будем. Написать нам сюда можно в любой момент.';
+  try { send(db, lead, txt, 'system'); } catch (_) {}
+  store.save();
+  return true;
+}
+
 /* ---------- отчёты владельцу в мессенджер ---------- */
 function buildReport(db, period) {
   /* ⭐ формат агентства: лиды/расход/CPL/целевые/стоимость целевого/%квал/топ связок/динамика н-н/all-time */
@@ -779,4 +801,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment };
+module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut };
