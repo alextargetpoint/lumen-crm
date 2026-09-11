@@ -137,7 +137,7 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .big:not(:last-child){border-right:1px solid var(--line2)}
 
 /* ============ SECTION ============ */
-.sec{padding:clamp(72px,9vw,128px) 0}
+.sec{padding-block:clamp(72px,9vw,128px)}
 .sec-head{display:grid;gap:16px;max-width:60ch;margin-bottom:clamp(38px,5vw,62px)}
 .sec-head.center{margin-inline:auto;text-align:center;justify-items:center}
 
@@ -620,8 +620,9 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 
 /* ============ MOBILE OVERHAUL (≤640) — полная оптимизация ============ */
 @media (max-width:640px){
-  :root{--pad:18px}
-  .sec{padding:52px 0}
+  :root{--pad:22px}
+  body{overflow-wrap:break-word;word-break:break-word}
+  .sec{padding-block:50px}
   .sec-head{margin-bottom:26px}
   h2{font-size:clamp(27px,7.6vw,34px);line-height:1.07}
   .lead{font-size:15.5px}
@@ -635,30 +636,51 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .stage{width:100%!important;max-width:318px;margin:24px auto 0;aspect-ratio:5/5.2}
 
   /* ТЕЛЕФОНЫ-МОКАПЫ — меньше и по центру */
-  .phone{width:208px;padding:7px;border-radius:30px;margin:0 auto}
-  .phone .island{width:66px;height:18px}
-  .phone .screen{border-radius:24px}
-  .wa-body,.tg-body{min-height:240px;gap:7px;padding:12px 10px}
-  .wa-top,.tg-top{padding:38px 12px 10px}
-  .msg{font-size:12px;padding:7px 10px}
-  .tg-ai{font-size:10px}
+  .phone{width:176px;padding:6px;border-radius:26px;margin:0 auto}
+  .phone .island{width:54px;height:15px;top:16px}
+  .phone .screen{border-radius:21px}
+  .wa-body,.tg-body{min-height:210px;gap:6px;padding:10px 8px}
+  .wa-top,.tg-top{padding:32px 10px 9px;gap:7px}
+  .wa-top .av,.tg-top .av{width:26px;height:26px;font-size:11px}
+  .wa-top .nm,.tg-top .nm{font-size:11.5px}.wa-top .st,.tg-top .st{font-size:9.5px}
+  .tg-top .wa-badge{font-size:8px;padding:3px 6px;white-space:nowrap}
+  .wa-top .nm,.tg-top .nm{white-space:nowrap}
+  .msg{font-size:11px;padding:6px 9px;border-radius:9px}
+  .tg-ai{font-size:9.5px;padding:5px 9px}
+  .tg-input{padding:8px 11px;font-size:11px}
+  .scene .pt .ic{flex-basis:38px;height:38px}
   .scene{gap:22px}
   .scene .phone{order:2}
   .scene .pts{gap:15px}
   .tgwrap{gap:20px}
 
   /* SHOWCASE — чистый вертикальный стек вместо desktop-наложения */
-  .showcase .sc-grid{gap:22px}
-  .pages{position:static;height:auto;max-width:300px;margin:0 auto;display:block}
-  .pages .page{position:static;width:100%;inset:auto;margin:0 auto;box-shadow:var(--shadow-lg)}
-  .pages .page.p-back{display:none}
-  .pages .sc-phone{position:static;width:150px;margin:16px auto 0}
+  .showcase .sc-grid{gap:20px}
+  .pages{position:static;height:auto;max-width:250px;margin:0 auto;display:block}
+  .pages .page{position:static;width:100%;inset:auto;margin:0 auto;box-shadow:var(--shadow-lg);border-radius:12px}
+  .pages .page.p-back,.pages .sc-phone{display:none}
 
   /* PLATFORM (pstack) — картинки в стек */
   .pstack{position:static;height:auto;max-width:420px;margin:0 auto;display:grid;gap:12px}
   .pstack .sc{position:static;width:100%;inset:auto}
   .pstack .s1,.pstack .s2{width:100%;inset:auto}
   .pbig.rev .pstack{order:2}
+
+  /* ОМНИКАНАЛ — вертикальные узлы, стрелка вниз по центру */
+  .flow{flex-direction:column;align-items:center;gap:0}
+  .flow .node{width:100%;max-width:300px;min-width:0}
+  .flow .con{align-self:center;margin:6px 0!important;margin-top:6px!important;transform:rotate(90deg);height:auto}
+  .flow .con svg{width:20px;height:20px;opacity:1;color:var(--sky)}
+
+  /* СПИСКИ — больше воздуха, крупнее галка */
+  .fl li,.lwin li,.hrlist li,.tgcol li,.vs-item{font-size:14.5px;gap:12px}
+  .fl svg,.lwin svg,.hrlist svg,.tgcol li svg{width:19px;height:19px;flex-basis:19px}
+  .fl,.lwin,.hrlist,.tgcol ul{gap:13px}
+  .plan li{font-size:14.5px;gap:12px}
+
+  /* фичи-скрины: аккуратная рамка, не «растянуто» */
+  .feat .frame{border-radius:14px}
+  .frame .tb{padding:9px 12px}
 
   /* БОЛЬШИЕ ЦИФРЫ / ЗАГОЛОВКИ */
   .big .n{font-size:clamp(50px,19vw,74px)}
@@ -1470,8 +1492,12 @@ burger&&burger.addEventListener('click',()=>mobnav.classList.toggle('open'));
 mobnav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>mobnav.classList.remove('open')));
 
 // reveal
-const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});
-document.querySelectorAll('[data-r]').forEach(el=>io.observe(el));
+// robust reveal: show anything in/near viewport immediately, rest on scroll, ALL guaranteed within 2s
+function revealVisible(){document.querySelectorAll('[data-r]:not(.in)').forEach(e=>{if(e.getBoundingClientRect().top < innerHeight*0.94) e.classList.add('in');});}
+revealVisible();
+addEventListener('scroll',revealVisible,{passive:true});
+addEventListener('load',()=>{revealVisible();setTimeout(revealVisible,150);});
+setTimeout(()=>document.querySelectorAll('[data-r]:not(.in)').forEach(e=>e.classList.add('in')),2000);
 
 // count-up numbers
 const _cuReduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
