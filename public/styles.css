@@ -6871,8 +6871,9 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   background: #faf9f5; border: 1px solid rgba(20,19,17,.09); box-shadow: var(--shadow); }
 :root[data-theme="atelier"] .topbar { background: transparent; border: none; }
 /* видеофон hero — грейскейл (монохром-люкс) */
-:root[data-theme="atelier"] .hero-vid { filter: grayscale(1) contrast(1.05) brightness(.9); mix-blend-mode: screen; opacity: .45; }
-:root[data-theme="mono"] .hero-vid, :root[data-theme="frame"] .hero-vid { filter: grayscale(1) contrast(1.05) brightness(.95); }
+/* тёмные/монохром hero-панели: screen-блендинг гасил тёмное видео → normal + ярче, чтобы абстракт-текстура была ВИДНА */
+:root[data-theme="atelier"] .hero-vid, :root[data-theme="mono"] .hero-vid, :root[data-theme="frame"] .hero-vid,
+:root[data-theme="dark"] .hero-vid { filter: grayscale(1) contrast(1.18) brightness(1.25); mix-blend-mode: normal; opacity: .6; }
 /* синий onboard-баннер (чужой инлайн) → уголь, чтобы не выбивался */
 :root[data-theme="atelier"] [data-onboard] { background: rgba(20,19,17,.06) !important; border-color: rgba(20,19,17,.18) !important; color: var(--ink) !important; }
 
