@@ -75,7 +75,7 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .nav .links{display:flex;gap:2px}
 .nav a.lnk{padding:9px 15px;border-radius:999px;font-size:14.5px;font-weight:600;color:var(--ink2);transition:color var(--dur-fast),background var(--dur-fast)}
 .nav a.lnk:hover{color:var(--ink);background:color-mix(in srgb,var(--blue) 10%,transparent)}
-.tgl{width:38px;height:38px;border-radius:999px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2);transition:all var(--dur-fast)}
+.tgl{width:42px;height:42px;border-radius:999px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2);transition:all var(--dur-fast);flex:0 0 auto}
 .tgl:hover{color:var(--ink);border-color:var(--blue)}
 .tgl svg{width:17px;height:17px}
 .nav .cta{margin-left:4px;background:var(--blue);color:#fff;border-radius:999px;padding:11px 21px;font-size:14.5px;font-weight:700;box-shadow:0 10px 26px -8px rgba(37,99,235,.7);transition:transform var(--dur-fast),box-shadow var(--dur-fast)}
@@ -321,6 +321,12 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .plan{border:1px solid var(--line);border-radius:24px;padding:32px;background:var(--card);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:7px;position:relative}
 .plan.pop{border-color:var(--blue);box-shadow:0 44px 90px -34px rgba(37,99,235,.5);transform:scale(1.02)}
 .plan .badge{position:absolute;top:-13px;left:32px;z-index:4;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700;letter-spacing:.05em;padding:6px 13px;border-radius:999px;box-shadow:0 6px 16px -4px rgba(37,99,235,.6)}
+.plan .was{font-family:var(--text);font-size:22px;font-weight:600;color:var(--ink3);text-decoration:line-through;margin-right:8px}
+.betabar{max-width:780px;margin:0 auto 30px;background:linear-gradient(120deg,color-mix(in srgb,var(--blue) 13%,var(--card)),var(--card));border:1px solid color-mix(in srgb,var(--blue) 32%,var(--line));border-radius:16px;padding:15px 22px;display:flex;align-items:center;gap:14px;justify-content:center;flex-wrap:wrap;text-align:center;box-shadow:var(--shadow)}
+.betabar .bt-tag{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:linear-gradient(180deg,var(--blue2),var(--blue));padding:7px 13px;border-radius:999px;white-space:nowrap}
+.betabar .bt-txt{font-size:15px;color:var(--ink);font-weight:600}
+.betabar .bt-txt b{color:var(--blue)}
+.betabar s{color:var(--ink3);font-weight:500}
 .plan.pop{overflow:visible}
 .plan .nm{font-family:var(--disp);font-size:26px;font-weight:600}
 .plan .ds{color:var(--ink2);font-size:14px;min-height:42px}
@@ -1192,14 +1198,14 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <div class="bcard lumen" data-r class="d1">
       <h3>С Lumen</h3>
       <div class="bsub">Всё уже построено и заточено под недвижимость</div>
-      <div class="lprice">$300<span>/мес</span></div>
+      <div class="lprice"><span class="was" style="font-size:30px">$300</span>$200<span>/мес</span></div>
       <ul class="lwin">
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Запуск за 7 дней, а не за полгода</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>WhatsApp, комментарии, телефония — уже подключены</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Квалификация, подборки, психо-портрет — из коробки</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Обновления, поддержка и без своей команды</li>
       </ul>
-      <div class="bwin">Экономия <b>≈ $4 700</b> каждый месяц</div>
+      <div class="bwin">Экономия <b>≈ $4 800</b> каждый месяц</div>
     </div>
   </div>
   <p class="plan-note">Оценка по средним рыночным ставкам на поддержку и инфраструктуру. Разработка CRM такого уровня с нуля стоит в разы больше — Lumen вы запускаете за неделю и без своей команды.</p>
@@ -1211,6 +1217,10 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <span class="kicker"><span class="dot"></span>Тарифы</span>
     <h2>Прозрачно. <em>Без оплаты за лида.</em></h2>
     <p class="lead">Фиксированная подписка — система ваша. Расходники (токены обработки сообщений и шаблоны WhatsApp) идут по себестоимости, без наценки.</p>
+  </div>
+  <div class="betabar" data-r>
+    <span class="bt-tag">Бета</span>
+    <span class="bt-txt">Первым <b>10 агентствам</b> — <b>$200/мес</b> и внедрение <b>$200</b> под ключ <s>вместо $300 + $300</s></span>
   </div>
   <div style="text-align:center" data-r>
     <div class="price-toggle"><button id="tMonth" class="on">Помесячно</button><button id="tYear">Год<span class="save">−20%</span></button></div>
@@ -1229,18 +1239,18 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <a class="btn btn-g" href="/" target="_blank">Попробовать</a>
     </div>
     <div class="plan pop" data-r class="d1">
-      <div class="badge">Выбор агентств</div>
-      <div class="nm">Агентство</div><div class="ds">Команда брокеров, RBAC, автораспределение.</div>
-      <div class="pr"><span data-m="300" data-y="240">$300</span><span class="per">/мес</span></div>
-      <div class="setup">+ $25/мес за брокера · 3 места включено · внедрение $300</div>
+      <div class="badge">Бета · первым 10 агентствам</div>
+      <div class="nm">Агентство</div><div class="ds">Команда брокеров, руководитель, RBAC, автораспределение.</div>
+      <div class="pr"><span class="was">$300</span><span data-m="200" data-y="160">$200</span><span class="per">/мес</span></div>
+      <div class="setup">5 брокеров + руководитель включены · внедрение <s>$300</s> $200 — WhatsApp и телефония под ключ</div>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Всё из «Брокер» для всей команды</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>5 мест брокеров + руководитель и доп. роли</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Омниканал + комментарии → лиды</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Роли, права, SLA, автораспределение</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Отчёты в Telegram, реанимация базы</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Запуск за 7 дней под ключ</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Telegram-приложение брокера + отчёты</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Внедрение под ключ за 7 дней</li>
       </ul>
-      <a class="btn btn-p" href="/" target="_blank">Запустить демо</a>
+      <button type="button" class="btn btn-p js-lead">Занять место в бете</button>
     </div>
     <div class="plan" data-r class="d2">
       <div class="nm">Сеть</div><div class="ds">Несколько офисов, много номеров, свои интеграции.</div>
@@ -1255,7 +1265,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <button class="btn btn-g js-lead" type="button">Обсудить</button>
     </div>
   </div>
-  <p class="plan-note">Расходники на агентство при ~500 лидах/мес — от $70 до $180 в зависимости от объёма сообщений. Проводим по себестоимости и показываем прозрачно в кабинете.</p>
+  <p class="plan-note">Расходники на агентство при ~500 лидах/мес — от $70 до $180 в зависимости от объёма сообщений, по себестоимости и прозрачно в кабинете. Бета — <b style="color:var(--ink)">1 агентство = 1 аккаунт</b>: места именные, с журналом входов и защитой от передачи. <a href="/service-agreement.html" target="_blank" style="color:var(--blue)">Договор-оферта</a>.</p>
 </section>
 
 <!-- FAQ -->
@@ -1325,12 +1335,15 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <h4>Связаться</h4>
         <a class="fmail" href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
         <button type="button" class="js-lead">Оставить заявку →</button>
+        <a href="/partner-agreement.html" target="_blank" rel="noopener">Стать партнёром →</a>
         <a href="/" target="_blank">Живое демо →</a>
       </div>
     </div>
     <div class="foot-bot">
       <span>© 2026 Lumen — продукт TargetPoint AY · P.IVA 04986270231</span>
       <span class="flinks">
+        <a href="/service-agreement.html" target="_blank" rel="noopener">Договор-оферта</a>
+        <a href="/partner-agreement.html" target="_blank" rel="noopener">Партнёрам</a>
         <a href="https://targetpoint.agency/privacy.html" target="_blank" rel="noopener">Конфиденциальность</a>
         <a href="https://targetpoint.agency/cookie-policy.html" target="_blank" rel="noopener">Cookies</a>
       </span>
