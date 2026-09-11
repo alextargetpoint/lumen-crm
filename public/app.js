@@ -930,6 +930,7 @@ function go(page) {
   navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
+  document.documentElement.setAttribute('data-page', page);   /* пер-экранная атмосфера (Lumen Glass) */
   if (PARENT_OF[page]) PAGE_STATE['ws_' + PARENT_OF[page]] = page; /* запоминаем вкладку пространства */
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? WORKSPACES[b.dataset.ws].pages.includes(page) : b.dataset.page === page));
   syncNavSub();
