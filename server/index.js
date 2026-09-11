@@ -2435,6 +2435,16 @@ const server = http.createServer(async (req, res) => {
         if (b.on) { lead.ai.pausedBy = null; lead.tags = (lead.tags || []).filter(t => t !== 'ведёт брокер' && t !== 'нужен человек'); } else { lead.ai.pausedBy = 'broker'; }
         store.save(); return json(res, 200, { aiOn: !!lead.ai.enabled });
       }
+      /* персональное оформление брокера (тема + акцент) */
+      if (p === '/tgapp/api/prefs' && req.method === 'GET') { return json(res, 200, abroker.tgPrefs || {}); }
+      if (p === '/tgapp/api/prefs' && req.method === 'POST') {
+        const b = await readBody(req);
+        abroker.tgPrefs = {
+          theme: ['auto', 'light', 'dark'].includes(b.theme) ? b.theme : 'auto',
+          accent: ['blue', 'violet', 'green', 'orange'].includes(b.accent) ? b.accent : 'blue',
+        };
+        store.save(); return json(res, 200, { ok: true });
+      }
       /* переслать сообщение в другой чат брокера */
       if (p === '/tgapp/api/forward' && req.method === 'POST') {
         const b = await readBody(req); const to = db.leads.find(l => l.id === b.toLeadId);

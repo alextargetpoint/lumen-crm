@@ -15,6 +15,23 @@
     --out:linear-gradient(135deg,#2a5bdd,#1d34d8); --in:#18233a; --ok:#38d18a; --danger:#ff5b52;
     --sh:0 10px 34px rgba(0,0,0,.42); --shacc:0 6px 20px rgba(59,116,255,.45);
   }
+  /* ── СВЕТЛАЯ ТЕМА ── */
+  :root[data-theme="light"]{
+    --bg:#eef2f8; --bg2:#e6ecf6; --panel:#ffffff; --panel2:#f1f5fb; --glass:rgba(255,255,255,.8);
+    --ink:#0f1a2e; --mut:#64748b; --line:rgba(15,26,46,.1);
+    --in:#ffffff; --sh:0 8px 26px rgba(16,32,70,.12);
+  }
+  :root[data-theme="light"] #bgart{opacity:.12}
+  :root[data-theme="light"] .b.in{border:1px solid var(--line)}
+  :root[data-theme="light"] .b.in .vp .wave i{background:rgba(15,26,46,.18)}
+  :root[data-theme="light"] .b.in .vp .wave i.on{background:var(--acc)}
+  :root[data-theme="light"] .b.in .doc .ic{background:var(--panel2)}
+  :root[data-theme="light"] .qchip,:root[data-theme="light"] .quoted{background:var(--panel2)}
+  .b.out{color:#fff}   /* исходящие всегда белым текстом на акценте (обе темы) */
+  /* ── АКЦЕНТНЫЕ ЦВЕТА ── */
+  :root[data-accent="violet"]{--acc:#7b5cff;--acc2:#a58bff;--grad:linear-gradient(135deg,#7b5cff,#5b3cff);--out:linear-gradient(135deg,#6a4bf0,#5b3cff);--shacc:0 6px 20px rgba(123,92,255,.45)}
+  :root[data-accent="green"]{--acc:#12b76a;--acc2:#4fd18a;--grad:linear-gradient(135deg,#12b76a,#0e9f5b);--out:linear-gradient(135deg,#0fa863,#0e9f5b);--shacc:0 6px 20px rgba(18,183,106,.4)}
+  :root[data-accent="orange"]{--acc:#ff8a3d;--acc2:#ffb277;--grad:linear-gradient(135deg,#ff8a3d,#f5691a);--out:linear-gradient(135deg,#f57a2a,#f5691a);--shacc:0 6px 20px rgba(255,138,61,.4)}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:'Manrope',-apple-system,SF Pro Text,Roboto,Segoe UI,sans-serif;font-size:15px;line-height:1.42;
@@ -134,6 +151,15 @@
   .sheet-opt small{display:block;color:var(--mut);font-size:12px;margin-top:2px;font-weight:500}
   .toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 82px);left:50%;transform:translateX(-50%) translateY(10px);background:rgba(17,26,43,.97);color:#fff;padding:11px 18px;border-radius:15px;font-size:13.5px;z-index:60;max-width:88%;box-shadow:var(--sh);opacity:0;transition:.25s;border:1px solid var(--line);text-align:center;font-weight:600}
   .toast.on{opacity:1;transform:translateX(-50%)}
+  /* настройки оформления */
+  .set-lbl{font-size:11.5px;color:var(--mut);font-weight:800;margin:14px 2px 9px;text-transform:uppercase;letter-spacing:.06em}
+  .seg{display:flex;gap:6px;background:var(--panel);border-radius:14px;padding:5px}
+  .seg button{flex:1;border:none;background:transparent;color:var(--mut);font-family:inherit;font-weight:700;font-size:13px;padding:10px 6px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:.15s}
+  .seg button .ic{font-size:18px}
+  .seg button.on{background:var(--grad);color:#fff;box-shadow:var(--shacc)}
+  .acc-row{display:flex;gap:13px;padding:2px}
+  .acc-sw{width:40px;height:40px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:.15s;box-shadow:var(--sh)}
+  .acc-sw.on{border-color:var(--ink);transform:scale(1.08)}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{50%{opacity:.5}}
   @keyframes fade{from{opacity:0}}
@@ -147,7 +173,7 @@
 <div id="app">
   <div id="view-list">
     <div class="top">
-      <h1><span class="spark ic" data-ic="chat"></span>Мои чаты</h1>
+      <h1><span class="spark ic" data-ic="chat"></span>Мои чаты<span class="hd-btn ic" id="settingsBtn" data-ic="gear" style="margin-left:auto;color:var(--mut);background:var(--panel)"></span></h1>
       <div class="sub" id="sub">Загрузка…</div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
     </div>
@@ -195,6 +221,10 @@ const IC={
   img:'<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="10" r="2"/><path d="M4 18l5-4.5 4 3 3.5-2.5L20 17"/>',
   video:'<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3z"/>',
   doc:'<path d="M6 3h7l5 5v13H6z"/><path d="M13 3v5h5"/>',
+  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5l1.4 2.3 2.6-.5.5 2.6 2.3 1.4-1 2.4 1 2.4-2.3 1.4-.5 2.6-2.6-.5L12 21.5l-1.4-2.3-2.6.5-.5-2.6-2.3-1.4 1-2.4-1-2.4 2.3-1.4.5-2.6 2.6.5z"/>',
+  sun:'<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M19.4 4.6l-1.8 1.8M6.4 17.6l-1.8 1.8"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
 };
 const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
@@ -202,6 +232,13 @@ function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach
 const TG=window.Telegram&&window.Telegram.WebApp; if(TG){TG.ready();TG.expand();try{TG.setHeaderColor('#080b12');TG.setBackgroundColor('#080b12')}catch(e){}}
 const hap=(t)=>{try{TG&&TG.HapticFeedback&&TG.HapticFeedback.impactOccurred(t||'light')}catch(e){}};
 const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
+/* ── персональное оформление брокера (тема + акцент), сохраняется за ним ── */
+const PREF_KEY='lumen_tgprefs_'+((TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user&&TG.initDataUnsafe.user.id)||'x');
+let PREFS={theme:'auto',accent:'blue'};
+try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
+function applyTheme(){const r=document.documentElement;const th=PREFS.theme==='auto'?((TG&&TG.colorScheme)||'dark'):PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');try{TG&&TG.setHeaderColor&&TG.setHeaderColor(th==='light'?'#eef2f8':'#080b12');TG&&TG.setBackgroundColor&&TG.setBackgroundColor(th==='light'?'#eef2f8':'#080b12')}catch(e){}}
+applyTheme();
+if(TG&&TG.onEvent)TG.onEvent('themeChanged',()=>{if(PREFS.theme==='auto')applyTheme()});
 let CHATS=[],CUR=null,POLL=null;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -388,9 +425,30 @@ function sheet(title,opts){const bd=document.createElement('div');bd.className='
 }
 $('#q').addEventListener('input',renderChats);
 
+/* ── настройки оформления ── */
+function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme();fetch('/tgapp/api/prefs',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(PREFS)}).catch(()=>{})}
+function openSettings(){
+  const themes=[['auto','auto','Авто'],['light','sun','Светлая'],['dark','moon','Тёмная']];
+  const accents=[['blue','#3b74ff'],['violet','#7b5cff'],['green','#12b76a'],['orange','#ff8a3d']];
+  const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Оформление</h3>
+    <div class="set-lbl">Тема</div>
+    <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div>
+    <div class="set-lbl">Акцентный цвет</div>
+    <div class="acc-row">${accents.map(a=>`<span data-acc="${a[0]}" class="acc-sw ${PREFS.accent===a[0]?'on':''}" style="background:${a[1]}"></span>`).join('')}</div></div>`;
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{hap();PREFS.theme=b.dataset.th;bd.querySelectorAll('[data-th]').forEach(x=>x.classList.toggle('on',x===b));savePrefs()});
+  bd.querySelectorAll('[data-acc]').forEach(s=>s.onclick=()=>{hap();PREFS.accent=s.dataset.acc;bd.querySelectorAll('[data-acc]').forEach(x=>x.classList.toggle('on',x===s));savePrefs()});
+}
+$('#settingsBtn').onclick=()=>{hap();openSettings()};
+
 paintIcons();
 if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
-else{loadChats();setInterval(()=>{if(!$('#conv').classList.contains('open'))loadChats()},6000)}
+else{
+  fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
+  loadChats();setInterval(()=>{if(!$('#conv').classList.contains('open'))loadChats()},6000);
+}
 </script>
 </body>
 </html>
