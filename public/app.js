@@ -459,7 +459,7 @@ function renderLogin() {
   let loginBrand = '';
   try {
     const b = JSON.parse(localStorage.getItem('lumen_brand') || 'null');
-    if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(120,160,255,.4))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7C9BFF;opacity:.75;margin-top:12px">работает на Lumen</div></div>`;
+    if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(255,255,255,.28))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6);opacity:.85;margin-top:12px">работает на Lumen</div></div>`;
   } catch (e) {}
   const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
     <video data-skyline autoplay muted loop playsinline src="${typeof skylineSrc==='function'?skylineSrc():'assets/skyline-bg.mp4?v=2'}" poster="assets/skyline-poster.jpg?v=2"
@@ -5124,7 +5124,7 @@ PAGES.wake = async (root) => {
       <div class="ha-title">${ic(I.moon)}Спящая база<span class="sub">${preview.length} лидов ждут пробуждения · скоринг: свежесть + вовлечённость</span></div>
       ${[
         ['A', 'будить первыми', segs.A.length, 'score ≥ 55: свежие, вовлечённые, писали сами', '#FFB86B'],
-        ['B', 'вторая волна', segs.B.length, 'score 30–54: были в диалоге, остыли', '#7C9BFF'],
+        ['B', 'вторая волна', segs.B.length, 'score 30–54: были в диалоге, остыли', 'var(--ov-cat-blue)'],
         ['C', 'фон', segs.C.length, 'score < 30: холодные, редкими волнами', '#5E6C8F'],
       ].map(([k, nm, v, sub, col]) => `<div class="ha-row" data-ha>
         <span class="dot" style="background:${col};box-shadow:0 0 8px ${col}"></span>
@@ -6211,7 +6211,7 @@ async function acadDetail(vid, heading) {
   document.addEventListener('keydown', onK);
   try {
     const d = await api.get('/academy/transcript?vid=' + encodeURIComponent(vid));
-    ov.querySelector('.ac-modal-sub').innerHTML = `${esc(d.title || '')} · <a href="${d.url}" target="_blank" rel="noopener" style="color:#7C9BFF">▶ смотреть на YouTube</a>`;
+    ov.querySelector('.ac-modal-sub').innerHTML = `${esc(d.title || '')} · <a href="${d.url}" target="_blank" rel="noopener" style="color:var(--ov-cat-blue)">▶ смотреть на YouTube</a>`;
     const paras = String(d.text || '').split(/\n{2,}/).map(p => p.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join('');
     ov.querySelector('.ac-modal-body').innerHTML = paras || '<p style="color:var(--muted)">Расшифровка недоступна.</p>';
   } catch (e) {
@@ -6453,7 +6453,7 @@ PAGES.ads = async (root) => {
           <table class="tbl ad-tbl"><thead><tr><th>Объявление</th><th>Лиды</th><th>Диал.</th><th>Квал.</th><th>Сделки</th><th>Расход $</th><th>CPL</th></tr></thead><tbody>
             ${d.ads.slice().sort((a, b) => b.leads - a.leads).map(a => `<tr>
               <td><b>${esc(a.name)}</b><div class="muted" style="font-size:10.5px">${esc(a.campaignName || '')}${a.adsetName ? ' · ' + esc(a.adsetName) : ''}</div>
-                <div class="ad-funnel" title="лиды → диалоги → квалы → сделки">${[['leads', '#2563EB'], ['dialogs', '#7C9BFF'], ['qualified', '#12855F'], ['deals', '#E4813D']].map(([k, c]) => `<span style="flex:${Math.max(a[k], 0.02)};background:${c}" title="${k}: ${a[k]}"></span>`).join('')}</div></td>
+                <div class="ad-funnel" title="лиды → диалоги → квалы → сделки">${[['leads', 'var(--ov-cat-blue)'], ['dialogs', 'var(--ov-cat-purple)'], ['qualified', 'var(--ov-cat-green)'], ['deals', 'var(--ov-cat-amber)']].map(([k, c]) => `<span style="flex:${Math.max(a[k], 0.02)};background:${c}" title="${k}: ${a[k]}"></span>`).join('')}</div></td>
               <td><b>${a.leads}</b></td>
               <td>${a.dialogs}</td>
               <td>${a.qualified}${a.leads ? `<span class="muted" style="font-size:9.5px"> ${a.qualRate}%</span>` : ''}</td>
@@ -10133,7 +10133,7 @@ PAGES.agency = async (root) => {
     if (!box) return;
     box.innerHTML = `
       <div style="background:linear-gradient(150deg,#0A1833,#061126);padding:26px 22px;color:#fff;text-align:center">
-        ${logo ? `<img src="${esc(logo)}" style="max-height:44px;max-width:150px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(120,160,255,.35))">` : `<div style="font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:.02em">${esc(name)}</div>`}
+        ${logo ? `<img src="${esc(logo)}" style="max-height:44px;max-width:150px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(255,255,255,.25))">` : `<div style="font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:.02em">${esc(name)}</div>`}
         ${logo ? `<div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#86AFFF;margin-top:9px">${esc(name)}</div>` : ''}
         <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(134,175,255,.4),transparent);margin:16px 34px"></div>
         <div style="font-size:12.5px;color:#B9C7E8">Персональная подборка недвижимости</div>
@@ -10212,7 +10212,7 @@ PAGES.billing = async (root) => {
   const moneyC = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   /* расходники: доллары.центы */
   const date = (t) => t ? new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const STATUS = {
-    trial:     { t: 'Пробный период', c: '#7C9BFF' },
+    trial:     { t: 'Пробный период', c: 'var(--ov-cat-blue)' },
     active:    { t: 'Активна',        c: '#4ADE80' },
     past_due:  { t: 'Ожидает оплаты', c: '#F0B04A' },
     canceled:  { t: 'Отменена',       c: '#F28B8B' },

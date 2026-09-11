@@ -1308,7 +1308,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
   position: absolute; top: 11px; left: 50%; transform: translateX(-50%); z-index: 20;
   width: 92px; height: 27px; background: #000; border-radius: 999px; display: flex; align-items: center; justify-content: flex-end; padding-right: 11px;
 }
-.iph-cam { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2a3550, #05060a 70%); box-shadow: inset 0 0 2px rgba(120, 150, 255, .5); }
+.iph-cam { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #3a3a3e, #05060a 70%); box-shadow: inset 0 0 2px rgba(200, 200, 210, .4); }
 .iph-status {
   display: flex; align-items: center; justify-content: space-between; padding: 12px 24px 6px; background: #075E54; color: #fff;
   font-variant-numeric: tabular-nums;
@@ -1539,8 +1539,8 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .ha-chip:hover { border-color: rgba(255,255,255,.42); background: rgba(16,30,55,.66); transform: translateY(-2px); color: #fff; }
 .ha-chip b { color: #fff; }
 .ha-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-.ha-step { border-radius: 9px; background: rgba(255, 255, 255, .07); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); padding: 5px 10px; font-size: 11px; font-weight: 650; color: #B9C7E8; animation: hastep 3.6s ease-in-out infinite; animation-delay: calc(var(--i) * .45s); }
-@keyframes hastep { 0%, 100% { background: rgba(255, 255, 255, .07); color: #B9C7E8 } 8% { background: rgba(79, 125, 255, .45); color: #fff; box-shadow: 0 0 14px rgba(79, 125, 255, .5) } 20% { background: rgba(255, 255, 255, .07); color: #B9C7E8 } }
+.ha-step { border-radius: 9px; background: rgba(255, 255, 255, .07); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); padding: 5px 10px; font-size: 11px; font-weight: 650; color: rgba(255,255,255,.72); animation: hastep 3.6s ease-in-out infinite; animation-delay: calc(var(--i) * .45s); }
+@keyframes hastep { 0%, 100% { background: rgba(255, 255, 255, .07); color: rgba(255,255,255,.72) } 8% { background: color-mix(in srgb, var(--accent) 42%, transparent); color: #fff; box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent) } 20% { background: rgba(255, 255, 255, .07); color: rgba(255,255,255,.72) } }
 @media (prefers-reduced-motion: reduce) { .ha-obj, .ha-glow, .ha-p, .ha-step { animation: none; } .ha-p { display: none; } }
 @media (max-width: 760px) { .ha { grid-template-columns: 1fr; padding: 16px; } .ha-stage { min-height: 140px; } .ha-obj { width: 120px; } }
 
@@ -2782,7 +2782,7 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .tk-balance .tk-bal-nudge b { color: #fff; }
 .tk-bal-ndot { width: 9px; height: 9px; border-radius: 50%; background: var(--sc); flex: 0 0 auto; margin-top: 5px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--sc) 16%, transparent); }
 /* ⭐ подсветка задачи по сфере + бейдж повтора */
-.tk-row.has-sphere { border-left: 3px solid var(--sc); box-shadow: -7px 0 18px -13px var(--sc), var(--shadow); }
+.tk-row.has-sphere { border-left: 3px solid var(--sc); box-shadow: var(--shadow); }   /* цветной edge-glow убран (читался чужим синим); идентичность — в бордере */
 .tk-title .tk-sphere-dot { display: inline-block; margin-right: 7px; vertical-align: middle; }
 .tk-rep-badge { display: inline-flex; align-items: center; margin-left: 7px; color: var(--sub); opacity: .7; vertical-align: middle; }
 .tk-rep-badge svg { width: 13px; height: 13px; }
@@ -6812,7 +6812,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="atelier"] {
   --bg: #f3f1ec; --bg-2: #eae7df; --card: #faf9f5;
   --ink: #141311; --ink-2: #57544e; --ink-3: #8b8983;
-  --navy-900: #141311; --navy-950: #f3f1ec; --navy-700: #35322c;
+  --navy-900: #141311; --navy-950: #0c0c0e; --navy-700: #1e1b17;   /* navy-950/700 — ТЁМНЫЕ (акцент-панели: vs-col.ai, bulk-bar); navy-900 — тёмный текст на креме */
   --stroke: rgba(20,19,17,.13); --stroke-soft: rgba(20,19,17,.07); --glass: rgba(255,255,255,.55);
   --accent: #1a1815; --accent-2: #35322c; --accent-3: #57544e;   /* акцент = уголь: чёрные пилюли на креме */
   --accent-soft-bd: rgba(20,19,17,.16); --hover-bd: rgba(20,19,17,.22);
