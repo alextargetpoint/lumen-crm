@@ -639,30 +639,21 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 .afc { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 20px; padding: 5px 11px; }
 .afc b { color: var(--navy-900); font-weight: 700; font-variant-numeric: tabular-nums; }
 
-/* ---------- воронка: контрол цепочек касаний (сворачиваемый) ---------- */
-.chain-ctl { margin-bottom: 14px; border-radius: 14px; overflow: hidden; }
-.chain-ctl .cc-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: none; font-family: inherit; cursor: pointer; text-align: left; }
-.chain-ctl .cc-head:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
-.chain-ctl .cc-htxt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.chain-ctl .cc-htxt b { font-size: 13px; font-weight: 700; color: var(--navy-900); }
-.chain-ctl .cc-htxt span { font-size: 11px; color: var(--ink-3); }
-.chain-ctl .cc-status { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 3px 9px; border-radius: 20px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-3); }
-.chain-ctl .cc-status.on { background: color-mix(in srgb, #2FA98C 16%, transparent); color: #1E7A64; }
-.chain-ctl .cc-chev { color: var(--ink-3); transition: transform .2s; } .chain-ctl .cc-chev svg { width: 16px; height: 16px; }
-.chain-ctl.open .cc-chev { transform: rotate(90deg); }
-.chain-ctl .cc-body { display: flex; align-items: center; gap: 12px; padding: 12px 14px 13px; flex-wrap: wrap; border-top: 1px solid var(--stroke-soft); }
-.chain-ctl .cc-body[hidden] { display: none; }   /* .hidden vs display:flex — класс перебивал атрибут, поле не сворачивалось */
-.chain-ctl .cc-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-.chain-ctl .cc-ic svg { width: 17px; height: 17px; }
-.chain-ctl .cc-txt { display: flex; flex-direction: column; gap: 1px; }
-.chain-ctl .cc-txt b { font-size: 13px; font-weight: 700; color: var(--navy-900); }
-.chain-ctl .cc-txt i { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
-.chain-ctl .cc-sw { margin-left: 4px; }
-.chain-ctl .cc-seqpick { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); transition: opacity .18s; }
-.chain-ctl .cc-seqpick.off { opacity: .4; pointer-events: none; }
-.chain-ctl .cc-seqpick select { border: 1px solid var(--stroke); border-radius: 9px; padding: 6px 10px; font: inherit; font-size: 12.5px; background: var(--card); color: var(--navy-900); }
-.chain-ctl .cc-hint { font-size: 11.5px; color: var(--ink-3); }
-@media (max-width: 720px) { .chain-ctl { flex-wrap: wrap; } .chain-ctl .cc-hint { display: none; } }
+/* ---------- воронка: контрол цепочек касаний — компактный чип + слим-панель ---------- */
+.cc-chip { position: relative; }
+.cc-chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.cc-chip .cc-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); display: inline-block; margin-left: 2px; }
+.cc-chip .cc-chip-dot.on { background: #2FA98C; box-shadow: 0 0 0 3px color-mix(in srgb, #2FA98C 20%, transparent); }
+.cc-panel { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 11px 15px; margin: -4px 0 14px; border-radius: 12px; }
+.cc-panel[hidden] { display: none; }
+.cc-panel .cc-sw { flex: none; }
+.cc-panel .cc-txt { display: flex; flex-direction: column; gap: 1px; }
+.cc-panel .cc-txt b { font-size: 12.5px; font-weight: 700; color: var(--navy-900); }
+.cc-panel .cc-txt i { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.cc-panel .cc-seqpick { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); transition: opacity .18s; }
+.cc-panel .cc-seqpick.off { opacity: .4; pointer-events: none; }
+.cc-panel .cc-seqpick select { border: 1px solid var(--stroke); border-radius: 9px; padding: 6px 10px; font: inherit; font-size: 12.5px; background: var(--card); color: var(--navy-900); }
+.cc-panel .cc-hint { font-size: 11.5px; color: var(--ink-3); }
 
 /* ---------- шаблоны ---------- */
 .tpl-card { padding: 16px 18px; margin-bottom: 12px; }
@@ -4961,7 +4952,7 @@ html[data-night] {
 /* ⭐ МОЗАИКА: ЕДИНАЯ grid-раскладка в правке И просмотре (WYSIWYG). Мелкая строчная сетка (10px) → высоту
    виджета задаём grid-row span (JS ovMasonry по контенту ИЛИ явная при ресайзе). Интервалы (gap) сохраняются
    всегда — виджеты не налезают друг на друга; ширина = span колонок. */
-.ov2-grid.ov-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: 10px; gap: 14px; grid-auto-flow: row; }
+.ov2-grid.ov-masonry { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); grid-auto-rows: 1px; column-gap: 14px; row-gap: 0; grid-auto-flow: row; }
 .ov2-grid.ov-masonry .ov-w, .ov2-grid.ov-masonry .ov-w[class*="ov-span-"] { grid-column: span 1; align-self: start; }
 .ov2-grid.ov-masonry .ov-w.ov-cw-2 { grid-column: span 2; }
 .ov2-grid.ov-masonry .ov-w.ov-cw-3 { grid-column: span 3; }

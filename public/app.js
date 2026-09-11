@@ -1982,15 +1982,21 @@ function ovMasonry(grid) {
   const cols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
   const items = [...grid.querySelectorAll('.ov-w')];
   if (cs.display !== 'grid' || cols <= 1) { items.forEach(w => { w.style.gridRowEnd = ''; }); return; }  /* мобилка (1 колонка) — обычный поток */
-  const row = parseFloat(cs.gridAutoRows) || 10, gap = parseFloat(cs.rowGap) || 14;
-  /* сбрасываем ВСЕ спаны и меряем РЕАЛЬНУЮ высоту виджета: она уже включает и заданную ресайзом мин-высоту
-     (--ovh на теле), и хром режима правки (шапка-ручка, пунктирный паддинг/бордер). Поэтому резерв места точный,
-     и виджеты не налезают ни в просмотре, ни при настройке. */
+  /* ⭐ ТОЧНО-РАВНЫЕ зазоры: сетка строк по 1px, row-gap:0. span = высота контента + GAP (в пикселях).
+     Тогда область виджета = высота + ровно GAP пустоты снизу → вертикальный интервал ВЕЗДЕ = GAP,
+     идентичен горизонтальному column-gap. Никакого «округления до строки» (был разнобой 21–44px). */
   items.forEach(w => { w.style.gridRowEnd = ''; });
   void grid.offsetHeight;
+  /* самокалибровка: берём РЕАЛЬНЫЙ горизонтальный зазор между двумя соседями в одном ряду
+     (auto-fill/1fr может давать не ровно column-gap) и делаем вертикальный интервал ТАКИМ ЖЕ */
+  let GAP = parseFloat(cs.columnGap) || 14;
+  const rects = items.filter(w => !w.classList.contains('full')).map(w => ({ w, r: w.getBoundingClientRect() }));
+  for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+    if (Math.abs(rects[i].r.top - rects[j].r.top) < 4) { const a = rects[i].r, b = rects[j].r; const g = (b.left > a.left ? b.left - a.right : a.left - b.right); if (g > 0 && g < 60) { GAP = g; i = rects.length; break; } }
+  }
   items.forEach(w => {
     const h = w.getBoundingClientRect().height;
-    w.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + gap + 8) / (row + gap)));   /* +8px запас → гарантированный зазор */
+    w.style.gridRowEnd = 'span ' + Math.max(1, Math.round(h + GAP));
   });
 }
 let _ovMasonryHook = false, _ovMasonryTmr = null;
@@ -2428,6 +2434,7 @@ PAGES.funnel = async (root) => {
         ${[['', 'Все'], ['hot', 'Горячие'], ['overdue', 'Просрочка'], ['human', 'Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
       </div>
       <span class="tb-spacer"></span>
+      <button class="btn btn-sm cc-chip ${PAGE_STATE.funnelChainOpen ? 'on' : ''}" data-cctoggle title="Цепочки касаний: авто-запуск и ручной запуск">${ic(I.chain)}Цепочки<i class="cc-chip-dot ${autoChains ? 'on' : ''}"></i></button>
       <button class="btn btn-sm" id="importBtn">${ic(I.doc)}Импорт</button>
       <button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
@@ -2436,25 +2443,13 @@ PAGES.funnel = async (root) => {
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
       </div>
     </div>
-    ${(() => { const open = !!PAGE_STATE.funnelChainOpen; return `<div class="chain-ctl glass ${open ? 'open' : ''}">
-      <button class="cc-head" data-cctoggle>
-        <span class="cc-ic">${ic(I.chain)}</span>
-        <div class="cc-htxt"><b>Цепочки касаний</b><span>Авто ${autoChains ? 'вкл' : 'выкл'} · ручной запуск на карточки</span></div>
-        <span class="cc-status ${autoChains ? 'on' : ''}">${autoChains ? 'АВТО' : 'РУЧНОЙ'}</span>
-        <span class="cc-chev">${ic(I.chev)}</span>
-      </button>
-      <div class="cc-body" ${open ? '' : 'hidden'}>
-        <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-        <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'на каждый новый лид запускается автоматически' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
-        <div class="cc-seqpick ${autoChains ? '' : 'off'}">
-          <span>Запускать</span>
-          <select id="ccSeq"><option value="">по направлению (авто)</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-        </div>
-        <span class="tb-spacer"></span>
-        <span class="cc-hint">Ручной запуск: выдели карточки${launchable.length ? ' или' : ''}</span>
-        ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : ''}
-      </div>
-    </div>`; })()}
+    <div class="cc-panel glass" id="ccPanel" ${PAGE_STATE.funnelChainOpen ? '' : 'hidden'}>
+      <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+      <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'запускается на каждый новый лид сама' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
+      <div class="cc-seqpick ${autoChains ? '' : 'off'}"><span>Запускать</span><select id="ccSeq"><option value="">по направлению</option>${activeSeqs.map(s => `<option value="${s.id}" ${aiSet.defaultSeq === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+      <span class="tb-spacer"></span>
+      ${launchable.length ? `<button class="btn btn-sm btn-accent" id="ccLaunchFiltered">${ic(I.bolt)}Запустить на отфильтрованные · ${launchable.length}</button>` : '<span class="cc-hint">Ручной запуск — выдели карточки лидов</span>'}
+    </div>
     ${view === 'kanban' ? `
     <div class="kanban">
       ${STAGES.map(st => {
@@ -2555,10 +2550,11 @@ PAGES.funnel = async (root) => {
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
   /* --- контрол цепочек касаний --- */
-  root.querySelector('[data-cctoggle]')?.addEventListener('click', () => {
+  root.querySelector('[data-cctoggle]')?.addEventListener('click', (e) => {
     PAGE_STATE.funnelChainOpen = !PAGE_STATE.funnelChainOpen;
-    const w = root.querySelector('.chain-ctl'); const b = root.querySelector('.cc-body');
-    if (w && b) { w.classList.toggle('open', PAGE_STATE.funnelChainOpen); b.hidden = !PAGE_STATE.funnelChainOpen; }
+    const chip = e.currentTarget; const p = root.querySelector('#ccPanel');
+    if (p) p.hidden = !PAGE_STATE.funnelChainOpen;
+    chip.classList.toggle('on', PAGE_STATE.funnelChainOpen);
   });
   $('#ccAuto')?.addEventListener('change', async (e) => {
     const on = e.target.checked;
@@ -10212,10 +10208,10 @@ setInterval(async () => {
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return; // юзер печатает
     if (PAGES[CUR] && PAGES[CUR].refresh) await PAGES[CUR].refresh();
-    else if (['overview', 'funnel'].includes(CUR)) {
-      /* ⭐ фикс мигания: перерисовываем обзор/воронку ТОЛЬКО если данные реально изменились
-         (fingerprint), и ТИХО (render._silent) — мгновенная подмена DOM, скролл на месте, без fade.
-         Раньше poll каждые 7с гонял softIn на всём → экран дёргался. */
+    else if (CUR === 'funnel') {
+      /* ⭐ ТОЛЬКО воронка авто-обновляется по poll — и ТИХО (мгновенная подмена DOM, скролл на месте).
+         Обзор НЕ трогаем: он тяжёлый по медиа (видео-фоны виджетов), любой ре-рендер перезагружает
+         видео = мигание раз в 7с (юзер жаловался). Обзор освежается при заходе на вкладку. */
       let fp; try { fp = JSON.stringify(STATE); } catch (_) { fp = null; }
       if (fp == null) { if (Date.now() - (window._lastRenderAt || 0) > 30000) { render._silent = true; await render(); } }
       else if (fp !== window._stateFp) { window._stateFp = fp; render._silent = true; await render(); }
