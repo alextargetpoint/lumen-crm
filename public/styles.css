@@ -6450,3 +6450,8 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   --ov-cat-blue: #0071E3; --ov-cat-green: #34C759; --ov-cat-red: #FF3B30; --ov-cat-amber: #FF9500; --ov-cat-purple: #AF52DE;
   --ov-chip-gray: rgba(0,0,0,.05); --ov-gold-soft: rgba(0,0,0,.04);
 }
+
+/* Донат «Статусы» (цвета стадий — data-viz): координируем под тему */
+:root[data-theme="mono"] .ov2-donut, :root[data-theme="frame"] .ov2-donut { filter: grayscale(1) contrast(1.03); }
+:root[data-theme="warm"] .ov2-donut { filter: hue-rotate(128deg) saturate(.95); }
+:root[data-theme="emerald"] .ov2-donut { filter: saturate(.9); }
