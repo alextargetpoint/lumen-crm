@@ -1928,6 +1928,27 @@ function mimeToExt(mime) {
   return sub ? sub.replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
 }
 
+/* --- Telegram Mini App: валидация initData (подпись Telegram bot-token'ом) --- */
+function tgValidateInitData(initData, botToken) {
+  if (!initData || !botToken) return null;
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash'); if (!hash) return null;
+  params.delete('hash');
+  const dcs = [...params.entries()].map(([k, v]) => `${k}=${v}`).sort().join('\n');
+  const secret = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const calc = crypto.createHmac('sha256', secret).update(dcs).digest('hex');
+  if (calc.length !== hash.length || !crypto.timingSafeEqual(Buffer.from(calc), Buffer.from(hash))) return null;
+  const authDate = +params.get('auth_date') || 0;
+  if (authDate && Date.now() / 1000 - authDate > 86400) return null;   /* initData старше суток — не принимаем */
+  try { return JSON.parse(params.get('user') || 'null'); } catch { return null; }
+}
+/* брокер, открывший мини-апп (по Telegram user.id ↔ broker.tgChatId) */
+function tgAppBroker(req, db) {
+  const user = tgValidateInitData(req.headers['x-tg-init-data'] || '', tgbridge.token(db));
+  if (!user || !user.id) return null;
+  return db.brokers.find(b => String(b.tgChatId) === String(user.id) && b.active !== false) || null;
+}
+
 /* часовой пояс по коду страны телефона (грубо, для тихих часов достаточно) */
 const PHONE_TZ = [['7', 3], ['971', 4], ['966', 3], ['968', 4], ['974', 3], ['62', 8], ['66', 7], ['34', 2], ['39', 2], ['49', 2], ['33', 2], ['44', 1], ['48', 2], ['380', 3], ['375', 3], ['998', 5], ['996', 6], ['992', 5], ['994', 4], ['995', 4], ['374', 4], ['90', 3], ['972', 3], ['20', 3], ['1', -5], ['86', 8], ['91', 5.5], ['81', 9]];
 function tzFromPhone(phone) {
@@ -2265,6 +2286,54 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true }); // Telegram нужен только 200
     }
 
+    /* ---------------- Telegram Mini App: мессенджер брокера в телефоне ---------------- */
+    if (p === '/tgapp' || p === '/tgapp/') {
+      try { const html = fs.readFileSync(path.join(PUBLIC, 'tgapp.html'), 'utf8'); res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(html); }
+      catch (e) { res.writeHead(500); res.end('tgapp missing'); }
+      return;
+    }
+    if (p.startsWith('/tgapp/api/')) {
+      const abroker = tgAppBroker(req, db);
+      if (!abroker) return json(res, 401, { error: 'нет привязки брокера — откройте через кнопку бота' });
+      const canSee = l => l && l.broker === abroker.id;
+      let tam;
+      if (p === '/tgapp/api/chats' && req.method === 'GET') {
+        const list = db.leads.filter(canSee).map(l => leadView(db, l))
+          .filter(l => l.stage !== 'lost')
+          .sort((a, b) => (b.lastMsgAt || b.createdAt) - (a.lastMsgAt || a.createdAt))
+          .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0 }));
+        return json(res, 200, list);
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        if (lead.unread) { lead.unread = 0; store.save(); }
+        const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at).map(m => ({ dir: m.dir, text: m.text, at: m.at, status: m.status, via: m.via, media: m.media || null }));
+        return json(res, 200, { name: lead.name, phone: lead.phone, stage: lead.stage, messages: msgs });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/text$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const t = String(b.text || '').trim(); if (!t) return json(res, 400, { error: 'пусто' });
+        engine.send(db, lead, t, 'human', { channel: 'wa' });
+        if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
+        store.save(); return json(res, 200, { ok: true });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/media$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const fn = String(u.searchParams.get('filename') || 'file'); const caption = String(u.searchParams.get('caption') || '');
+        let type = String(u.searchParams.get('type') || '');
+        const extM = fn.match(/\.([a-z0-9]+)$/i); const ext = extM ? extM[1].toLowerCase() : 'bin';
+        if (!type) type = /^(jpe?g|png|webp|gif)$/.test(ext) ? 'image' : /^(mp4|mov|webm|3gp)$/.test(ext) ? 'video' : /^(ogg|oga|opus|mp3|m4a|aac|amr|wav)$/.test(ext) ? 'voice' : 'document';
+        const chunks = []; let size = 0;
+        await new Promise(r => { req.on('data', c => { size += c.length; if (size > 25e6) req.destroy(); else chunks.push(c); }); req.on('end', r); req.on('close', r); });
+        if (!size || size > 25e6) return json(res, 400, { error: 'файл до 25 МБ' });
+        const saved = tgbridge.saveMedia(Buffer.concat(chunks), ext);
+        engine.send(db, lead, caption, 'human', { channel: 'wa', media: { type, url: saved.url, name: fn.slice(0, 120) } });
+        if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
+        store.save(); return json(res, 200, { ok: true });
+      }
+      return json(res, 404, { error: 'no route' });
+    }
+
     /* ---------------- мост приёма лидов (Albato / Make / любой интегратор) ---------------- */
     if (p === '/hooks/lead' && req.method === 'POST') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
@@ -2421,7 +2490,7 @@ const server = http.createServer(async (req, res) => {
          (иначе клик из localhost прописал бы webhook на localhost — Telegram туда не достучится) */
       const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE;
       if (!base || /localhost|127\.0\.0\.1/.test(base)) return json(res, 400, { error: 'нет публичного адреса (туннель не запущен) — Telegram не сможет достучаться до вебхука' });
-      try { const r = await tgbridge.setupWebhook(db, base); return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', result: r }); }
+      try { const r = await tgbridge.setupWebhook(db, base); let menu = null; try { menu = await tgbridge.setMenuButton(db, base); } catch (_) {} return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', miniApp: base.replace(/\/$/, '') + '/tgapp', result: r, menu: !!menu }); }
       catch (e) { return json(res, 400, { error: e.message }); }
     }
     let tgm;

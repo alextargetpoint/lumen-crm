@@ -33,8 +33,10 @@ function ready(db) { return !!(cfg(db).enabled && token(db)); }
 function rt(db) {
   if (!db.tgBridge) db.tgBridge = {};
   if (!db.tgBridge.replyMap) db.tgBridge.replyMap = {};
+  if (!db.tgBridge.topicMap) db.tgBridge.topicMap = {};   /* `${groupChatId}:${threadId}` → leadId (режим топиков) */
   return db.tgBridge;
 }
+function hashStr(s) { let h = 0; for (let i = 0; i < String(s).length; i++) { h = (h * 31 + String(s).charCodeAt(i)) | 0; } return h; }
 function pruneMap(db) {
   const map = rt(db).replyMap;
   const keys = Object.keys(map);
@@ -241,7 +243,13 @@ async function setupWebhook(db, baseUrl) {
   });
 }
 
+/* кнопка-меню бота, открывающая мессенджер-мини-апп (Telegram Web App) */
+async function setMenuButton(db, baseUrl) {
+  const url = baseUrl.replace(/\/$/, '') + '/tgapp';
+  return api(db, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url } } });
+}
+
 module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardHandover, bindBroker,
-  setupWebhook, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl,
+  setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl,
 };
