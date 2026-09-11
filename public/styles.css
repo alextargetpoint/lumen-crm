@@ -1525,6 +1525,12 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .ha-row .sp2 { flex: 1; }
 .ha-row .val2 { font-weight: 800; font-size: 16px; color: #fff; }
 .ha-row .sub2 { font-size: 11px; color: #7E93C4; }
+/* видеофон data-hero: абстрактный луп поверх тёмного градиента, контент выше */
+.ovx-hero, .f3card { position: relative; overflow: hidden; }
+.hero-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: .5; pointer-events: none; mix-blend-mode: screen; }
+.ha > *:not(.hero-vid), .ovx-hero > *:not(.hero-vid), .f3card > *:not(.hero-vid) { position: relative; z-index: 1; }
+.ha .ha-obj { z-index: 2; }
+@media (prefers-reduced-motion: reduce) { .hero-vid { display: none; } }
 .ha-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 /* тёмная frosted-пилюля: читаема и на СВЕТЛОЙ, и на ТЁМНОЙ обложке (раньше был захардкоженный светлый #CBD8F5 — на светлой обложке пропадал) */
 .ha-chip { border: 1px solid rgba(255,255,255,.24); border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 650; color: #fff; background: rgba(16,30,55,.52); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); transition: all .18s var(--ease-spring, ease); cursor: default; }

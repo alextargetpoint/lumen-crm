@@ -696,6 +696,32 @@ function applyThemeVideo(theme) {
     const cur = (v.getAttribute('src') || '').split('?')[0];
     if (cur !== src.split('?')[0]) { v.setAttribute('src', src); if (v.load) try { v.load(); } catch (_) {} }
   });
+  mountHeroVideos(document, theme);
+}
+/* видеофоны data-hero панелей (тёмный градиент + абстрактный луп) — только для тем с видео */
+const HERO_VIDEO = { warm: 'assets/hero-burgundy.mp4?v=1', emerald: 'assets/hero-glass.mp4?v=1' };
+const HERO_VIDEO_POSTER = { warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg' };
+function mountHeroVideos(root, theme) {
+  root = root || document;
+  theme = theme || localStorage.getItem('lumen_theme') || 'light';
+  const src = HERO_VIDEO[theme];
+  const page = document.documentElement.getAttribute('data-page');
+  const photoPage = (page === 'feed' || page === 'properties'); /* там у .ha фото-обложка — видео не нужно */
+  root.querySelectorAll('.ovx-hero, .ha, .f3card').forEach(el => {
+    const isPhotoHa = photoPage && el.classList.contains('ha');
+    let vid = el.querySelector(':scope > .hero-vid');
+    if (!src || isPhotoHa) { if (vid) vid.remove(); return; }
+    if (vid) {
+      if (vid.getAttribute('data-src') !== src) { vid.setAttribute('data-src', src); vid.src = src; vid.poster = HERO_VIDEO_POSTER[theme] || ''; try { vid.load(); vid.play && vid.play().catch(() => {}); } catch (_) {} }
+      return;
+    }
+    vid = document.createElement('video');
+    vid.className = 'hero-vid'; vid.muted = true; vid.loop = true; vid.autoplay = true;
+    vid.setAttribute('playsinline', ''); vid.setAttribute('muted', ''); vid.setAttribute('data-src', src);
+    vid.poster = HERO_VIDEO_POSTER[theme] || ''; vid.src = src;
+    el.insertBefore(vid, el.firstChild);
+    try { vid.play && vid.play().catch(() => {}); } catch (_) {}
+  });
 }
 (() => {
   const P = Object.fromEntries(THEME_PRESETS.map(p => [p.k, p]));
@@ -987,6 +1013,7 @@ async function render() {
         wireAiWand(c0);
         wireDictate(c0);
         wireHeroArt(c0);
+        mountHeroVideos(c0);
         if (silent) {
           /* тихое обновление данных: DOM меняется мгновенно, скролл на месте, без fade — глазу незаметно */
           c0.scrollTop = prevScroll;
