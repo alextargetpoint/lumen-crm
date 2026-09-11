@@ -3511,6 +3511,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
       if (b.capacity != null) br.capacity = +b.capacity;
+      /* дежурство/замещение: «в отсутствии» — новых лидов не даём, владелец сохраняется, клиенты уходят заместителю */
+      if (b.away !== undefined) { br.away = !!b.away; audit(db, req, br.away ? 'брокер в отсутствии' : 'брокер вернулся', { broker: br.name }); }
+      if (b.substituteId !== undefined) br.substituteId = b.substituteId && db.brokers.some(x => x.id === b.substituteId && x.id !== br.id) ? b.substituteId : null;
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
       if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
@@ -3594,6 +3597,40 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/control-center' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       return json(res, 200, control.scanRisks(db));
+    }
+
+    /* ── Слияние дублей лида: перенести переписку/встречи/заметки/владение в один тред ── */
+    if (p === '/api/leads/merge' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const ids = (b.ids || []).filter(x => typeof x === 'string');
+      const keepId = b.keepId || ids[0];
+      const keep = db.leads.find(l => l.id === keepId);
+      if (!keep || ids.length < 2) return json(res, 400, { error: 'нужно ≥2 лида и keepId' });
+      const gone = ids.filter(id => id !== keepId);
+      let msgs = 0, mts = 0;
+      for (const id of gone) {
+        const l = db.leads.find(x => x.id === id); if (!l) continue;
+        for (const mm of db.messages) if (mm.leadId === id) { mm.leadId = keepId; msgs++; }
+        for (const mt of db.meetings || []) if (mt.leadId === id) { mt.leadId = keepId; mts++; }
+        keep.notes = (keep.notes || []).concat(l.notes || []);
+        keep.ownerHistory = (keep.ownerHistory || []).concat(l.ownerHistory || []).sort((a, c) => (a.at || 0) - (c.at || 0));
+        for (const k of ['purpose', 'timeline', 'budget', 'type']) if (!(keep.quals && keep.quals[k]) && l.quals && l.quals[k]) { keep.quals = keep.quals || {}; keep.quals[k] = l.quals[k]; }
+        if (!keep.summary && l.summary) keep.summary = l.summary;
+      }
+      keep.lastMsgAt = Math.max(keep.lastMsgAt || 0, ...db.messages.filter(mm => mm.leadId === keepId).map(mm => mm.at));
+      db.leads = db.leads.filter(l => !gone.includes(l.id));
+      audit(db, req, `слияние дублей: ${gone.length} → ${keep.name}`, { kept: keepId, msgs, mts });
+      store.save();
+      return json(res, 200, { ok: true, kept: keepId, removed: gone.length, msgs, meetings: mts });
+    }
+
+    /* ── Атрибуция комиссии по цепочке владения (правило из настроек) ── */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/commission$/)) && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const rule = (db.settings.control && db.settings.control.commissionRule) || 'last';
+      return json(res, 200, { rule, split: control.commissionSplit(lead.ownerHistory || [], rule) });
     }
 
     if (p === '/api/numbers' && req.method === 'POST') {

@@ -6203,3 +6203,15 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 .off-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-2); margin-top: 6px; cursor: pointer; }
 .off-check input { width: 17px; height: 17px; accent-color: var(--accent); }
 .off-warn { margin-top: 12px; font-size: 13px; color: var(--bad); background: var(--bad-bg); border-radius: 10px; padding: 10px 12px; }
+
+/* Фаза 4: дежурство, тон, слияние дублей */
+.btn-xs { padding: 4px 9px; font-size: 11px; border-radius: 7px; }
+.ctrl-away-tag { font-size: 10.5px; font-weight: 700; color: var(--warn); background: var(--warn-bg); border-radius: 6px; padding: 1px 7px; margin-left: 8px; vertical-align: 1px; }
+.ctrl-tone-tag { font-size: 10.5px; font-weight: 700; color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+.ctrl-team-row .btn-xs { flex: none; }
+.ctrl-row .btn-xs { flex: none; margin-left: auto; }
+.mrg-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.mrg-row { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--stroke); border-radius: 12px; cursor: pointer; transition: .12s; }
+.mrg-row:has(input:checked) { border-color: var(--accent); background: var(--bg-2); }
+.mrg-row input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
+.mrg-row b { font-size: 14px; } .mrg-row small { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }

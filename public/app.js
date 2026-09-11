@@ -2509,6 +2509,9 @@ const CTRL_BUCKETS = {
   leak:         { t: 'Антислив',              s: 'crit', ic: I.flame,    d: 'риск увода на личный канал', lead: true },
   silentBroker: { t: 'Брокер молчит',         s: 'warn', ic: I.chat,     d: 'клиент ждёт ответа', lead: true },
   vipStalled:   { t: 'Крупные без движения',  s: 'warn', ic: I.spark,    d: 'большой бюджет застрял', lead: true },
+  dealCheck:    { t: 'Сверить сделки',         s: 'crit', ic: I.flame,    d: '«сделка» без следов работы', lead: true },
+  awayWaiting:  { t: 'Ждут заместителя',       s: 'warn', ic: I.chat,     d: 'брокер в отсутствии, клиент ждёт', lead: true },
+  duplicates:   { t: 'Дубли лидов',            s: 'warn', ic: I.layers,   d: 'один человек из разных каналов', lead: false },
   orphanMeetings:{ t: 'Встречи-сироты',       s: 'warn', ic: I.cal,      d: 'встреча у отключённого брокера', lead: false },
   overloaded:   { t: 'Перегруз брокеров',     s: 'warn', ic: I.users,    d: 'лидов сверх ёмкости', lead: false },
   geoUncovered: { t: 'Гео без покрытия',      s: 'warn', ic: I.building, d: 'лиды из региона без брокера', lead: false },
@@ -2525,6 +2528,8 @@ function ctrlItemRow(key, it) {
   if (key === 'orphanMeetings') meta = `${it.lead} · ${new Date(it.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${it.broker}`;
   if (key === 'overloaded') meta = `нагрузка ${it.load} / ёмкость ${it.capacity}`;
   if (key === 'geoUncovered') meta = `${it.name} · ${it.leads} активных лидов`;
+  if (key === 'dealCheck') meta = `${it.broker || '—'}${it.budget ? ' · $' + (it.budget / 1000 | 0) + 'k' : ''} · нет переписки/встреч`;
+  if (key === 'awayWaiting') meta = `${it.broker} в отсутствии → ${it.substitute || 'нет замены'} · ждёт ${it.waitingH} ч`;
   const nm = it.name || it.lead || it.geo || '—';
   return `<div class="ctrl-row"${attr}><span class="ctrl-row-nm">${esc(nm)}</span><span class="ctrl-row-meta">${esc(meta)}</span>${open ? `<span class="ctrl-row-go">${ic(I.arrow)}</span>` : ''}</div>`;
 }
@@ -2564,8 +2569,9 @@ async function openOffboard(brokerId) {
 PAGES.control = async (root) => {
   let d;
   try { d = await api.get('/control-center'); } catch (e) { root.innerHTML = `<div class="m-empty">Не удалось загрузить: ${esc(e.message)}</div>`; return; }
-  const order = ['unassigned', 'slaBreach', 'leak', 'silentBroker', 'vipStalled', 'orphanMeetings', 'overloaded', 'geoUncovered'];
+  const order = ['unassigned', 'slaBreach', 'leak', 'dealCheck', 'silentBroker', 'vipStalled', 'awayWaiting', 'duplicates', 'orphanMeetings', 'overloaded', 'geoUncovered'];
   const active = order.filter(k => (d.buckets[k] || []).length);
+  window._ctrlDups = d.buckets.duplicates || [];
   const crit = active.filter(k => CTRL_BUCKETS[k].s === 'crit').reduce((s, k) => s + d.buckets[k].length, 0);
   const hero = `<div class="ctrl-hero ${d.total === 0 ? 'calm' : crit ? 'alarm' : 'watch'}">
     <div class="ctrl-hero-l">
@@ -2574,28 +2580,48 @@ PAGES.control = async (root) => {
     </div>
     <button class="btn btn-sm" id="ctrlRefresh">${ic(I.refresh || I.arrow)} Обновить</button>
   </div>`;
+  const dupRows = (items) => items.slice(0, 6).map((c, i) => `<div class="ctrl-row"><span class="ctrl-row-nm">${esc(c.leads.map(l => l.name).join(' · '))}</span><span class="ctrl-row-meta">+${esc(String(c.phone).slice(-4))} · ${c.count} записи</span><button class="btn btn-xs" data-merge="${i}">Объединить</button></div>`).join('');
   const cards = active.length ? `<div class="ctrl-grid">${active.map(k => { const B = CTRL_BUCKETS[k]; const items = d.buckets[k];
     return `<div class="ctrl-card s-${B.s}">
       <div class="ctrl-card-hd"><span class="ctrl-ico">${ic(B.ic)}</span><div><b>${B.t}</b><small>${B.d}</small></div><span class="ctrl-badge">${items.length}</span></div>
-      <div class="ctrl-list">${items.slice(0, 8).map(it => ctrlItemRow(k, it)).join('')}${items.length > 8 ? `<div class="ctrl-more">+ ещё ${items.length - 8}</div>` : ''}</div>
+      <div class="ctrl-list">${k === 'duplicates' ? dupRows(items) : items.slice(0, 8).map(it => ctrlItemRow(k, it)).join('')}${items.length > (k === 'duplicates' ? 6 : 8) ? `<div class="ctrl-more">+ ещё ${items.length - (k === 'duplicates' ? 6 : 8)}</div>` : ''}</div>
     </div>`; }).join('')}</div>`
     : `<div class="ctrl-calm-box">${ic(I.check)}<div><b>Ни одной тревоги</b><span>Ничьих лидов нет, SLA соблюдается, увода не зафиксировано, все гео под покрытием.</span></div></div>`;
   /* панель команды и передачи дел */
   const brs = (STATE.brokers || []).filter(b => b.active !== false);
   const team = `<div class="ctrl-team">
     <div class="ctrl-team-hd">${ic(I.users)} Команда и передача дел<small>отключение брокера мгновенно отзывает доступ и передаёт лидов</small></div>
-    <div class="ctrl-team-list">${brs.map(b => { const cap = b.capacity || 0; const over = cap && (b.load || 0) > cap;
+    <div class="ctrl-team-list">${brs.map(b => { const cap = b.capacity || 0; const over = cap && (b.load || 0) > cap; const flags = b.toneFlags || 0;
       return `<div class="ctrl-team-row">
-        <span class="ctrl-team-nm">${esc(b.name)}${b.geo ? `<i>${esc((STATE.settings.geoNames && STATE.settings.geoNames[b.geo]) || b.geo)}</i>` : ''}</span>
+        <span class="ctrl-team-nm">${esc(b.name)}${b.geo ? `<i>${esc((STATE.settings.geoNames && STATE.settings.geoNames[b.geo]) || b.geo)}</i>` : ''}${b.away ? '<span class="ctrl-away-tag">в отсутствии</span>' : ''}${flags ? `<span class="ctrl-tone-tag" title="жалобы на тон">⚠ тон ${flags}</span>` : ''}</span>
         <span class="ctrl-team-load ${over ? 'over' : ''}">${b.load || 0}${cap ? ' / ' + cap : ''}</span>
-        <button class="btn btn-sm btn-ghost" data-offboard="${b.id}">Передать дела</button>
+        <button class="btn btn-xs btn-ghost" data-away="${b.id}" data-on="${b.away ? 1 : 0}">${b.away ? 'Вернуть' : 'В отсутствии'}</button>
+        <button class="btn btn-xs btn-ghost" data-offboard="${b.id}">Передать дела</button>
       </div>`; }).join('') || '<div class="m-empty">Нет активных брокеров</div>'}</div>
   </div>`;
   root.innerHTML = `<div class="ctrl-wrap">${hero}${cards}${team}</div>`;
   $('#ctrlRefresh', root)?.addEventListener('click', () => { render._silent = false; go('control'); });
   $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', () => openLeadModal(b.dataset.ovlead)));
   $$('[data-offboard]', root).forEach(b => b.addEventListener('click', () => openOffboard(b.dataset.offboard)));
+  $$('[data-merge]', root).forEach(b => b.addEventListener('click', () => openMerge((window._ctrlDups || [])[+b.dataset.merge])));
+  $$('[data-away]', root).forEach(b => b.addEventListener('click', async () => {
+    try { await api.patch('/brokers/' + b.dataset.away, { away: b.dataset.on !== '1' }); await loadState(); go('control'); } catch (e) { toast('Ошибка', e.message); }
+  }));
 };
+function openMerge(cluster) {
+  if (!cluster) return;
+  const ls = cluster.leads;
+  const body = `<div class="off-sum">Один человек (${esc('+' + cluster.phone)}) заведён <b>${ls.length}</b> раза. Выберите основную карточку — переписка, встречи, заметки и владение остальных перельются в неё, дубли удалятся.</div>
+    <div class="mrg-list">${ls.map((l, i) => `<label class="mrg-row"><input type="radio" name="mrgKeep" value="${l.id}" ${i === 0 ? 'checked' : ''}><div><b>${esc(l.name)}</b><small>${esc(stageName(l.stage))}${l.source ? ' · ' + esc(l.source) : ''} · ${ago(l.createdAt)}</small></div></label>`).join('')}</div>`;
+  modal({ title: 'Объединить дубли', sub: 'Слияние в один тред', body, wide: true, actions: [
+    { label: 'Отмена' },
+    { label: 'Объединить', cls: 'btn-accent', onClick: async (bd) => {
+        const keepId = (bd.querySelector('input[name="mrgKeep"]:checked') || {}).value; if (!keepId) return false;
+        try { const r = await api.post('/leads/merge', { ids: ls.map(l => l.id), keepId }); toast('Объединено', `перенесено сообщений: ${r.msgs}`, true); await loadState(); go('control'); }
+        catch (e) { toast('Ошибка', e.message); return false; }
+      } },
+  ] });
+}
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
   LEAD_LOOKUP = Object.fromEntries(all.map(l => [l.id, l]));

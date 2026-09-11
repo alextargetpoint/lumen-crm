@@ -75,5 +75,63 @@ function mkDb() {
   ok(prevEmpty.poolEmpty === true || prevEmpty.poolEmpty === false, 'offboard: poolEmpty вычислен');
 }
 
+/* ── ФАЗА 4 ── */
+/* дедуп */
+{
+  const db = { brokers: [{ id: 'b1', name: 'И' }], leads: [
+    { id: 'l1', name: 'Иван', phone: '+971 50 111 22 33', stage: 'dialog', source: 'ig', quals: {} },
+    { id: 'l2', name: 'Иван К', phone: '971501112233', stage: 'new', source: 'wa', quals: {} },
+    { id: 'l3', name: 'Пётр', phone: '+79990001122', stage: 'dialog', quals: {} },
+    { id: 'l4', name: 'Закрыт', phone: '+971501112233', stage: 'lost', quals: {} },
+  ], messages: [], meetings: [] };
+  const dups = control.findDuplicates(db);
+  ok(dups.length === 1, `dedup: 1 кластер (${dups.length})`);
+  ok(dups[0].leads.length === 2, 'dedup: закрытый лид не считается дублем');
+  ok(dups[0].leads[0].id === 'l1', 'dedup: старейший первым');
+}
+/* сверка сделок */
+{
+  const db = { brokers: [{ id: 'b1', name: 'И' }], leads: [
+    { id: 'd1', name: 'Пустая сделка', stage: 'deal', broker: 'b1', quals: {} },
+    { id: 'd2', name: 'Живая сделка', stage: 'deal', broker: 'b1', quals: {} },
+  ], messages: [{ leadId: 'd2', dir: 'out', via: 'human' }], meetings: [] };
+  const fc = control.dealFactCheck(db);
+  ok(fc.length === 1 && fc[0].id === 'd1', 'dealCheck: ловит сделку без следов работы');
+}
+/* атрибуция комиссии */
+{
+  const oh = [{ brokerId: 'b1', name: 'Игорь' }, { brokerId: 'b2', name: 'Анна' }, { brokerId: 'b1', name: 'Игорь' }];
+  ok(control.commissionSplit(oh, 'first')[0].name === 'Игорь' && control.commissionSplit(oh, 'first')[0].pct === 100, 'commission: first-touch = Игорь 100%');
+  ok(control.commissionSplit(oh, 'last')[0].name === 'Игорь' && control.commissionSplit(oh, 'last').length === 1, 'commission: last-touch = Игорь 100%');
+  const sp = control.commissionSplit(oh, 'split');
+  ok(sp.length === 2 && sp.reduce((s, x) => s + x.pct, 0) === 100, 'commission: split уникальных = 100% в сумме');
+}
+/* надзор тона */
+ok(control.toneScan('ты идиот что ли'), 'tone: оскорбление');
+ok(control.toneScan('отвали уже'), 'tone: грубость');
+ok(control.toneScan('ЭТО ВАШИ ПРОБЛЕМЫ РАЗБИРАЙТЕСЬ САМИ'), 'tone: крик/пренебрежение');
+ok(!control.toneScan('Добрый день! Подобрал для вас три варианта.'), 'tone: нормальное сообщение чисто');
+ok(!control.toneScan('ОК'), 'tone: короткий капс не ложно-срабатывает');
+
+/* новые корзины в scanRisks */
+{
+  const db = mkDb();
+  db.leads.push({ id: 'dup1', name: 'Дубль', geo: 'dubai', stage: 'dialog', broker: 'b1', phone: '+971509999999', quals: {}, ai: {} });
+  db.leads.push({ id: 'dup2', name: 'Дубль2', geo: 'dubai', stage: 'new', broker: 'b1', phone: '971509999999', quals: {}, ai: {} });
+  db.leads.push({ id: 'dl1', name: 'Пустая сделка', geo: 'dubai', stage: 'deal', broker: 'b1', phone: '+971502223344', quals: {}, ai: {} });
+  const r = control.scanRisks(db);
+  ok(r.counts.duplicates >= 1, `scan: duplicates корзина (${r.counts.duplicates})`);
+  ok(r.counts.dealCheck === 2, `scan: dealCheck корзина (${r.counts.dealCheck}) — l6+dl1`);
+}
+/* дежурство: pickBroker учитывает away через scanRisks.awayWaiting */
+{
+  const db = mkDb();
+  db.brokers[0].away = true; db.brokers[0].substituteId = null;
+  db.leads.push({ id: 'aw1', name: 'Ждёт', geo: 'dubai', stage: 'handover', broker: 'b1', quals: {}, ai: { enabled: false } });
+  db.messages.push({ leadId: 'aw1', dir: 'in', at: Date.now() - 3600e3, text: 'Ау?' });
+  const r = control.scanRisks(db);
+  ok(r.counts.awayWaiting === 2, `scan: awayWaiting корзина (${r.counts.awayWaiting}) — l3(Молчун)+aw1`);
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

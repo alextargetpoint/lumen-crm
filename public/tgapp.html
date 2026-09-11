@@ -602,6 +602,7 @@ async function openLeadCard(id){
 
     <div class="lcd-sec"><h4>ИИ-сводка</h4><div class="lcd-sum" id="lcdSum">${d.summary?esc(d.summary):'<span style="color:var(--mut)">Нажмите «ИИ-сводка» выше, чтобы собрать.</span>'}</div></div>
     ${(d.tags||[]).length?`<div class="lcd-sec"><h4>Теги</h4><div style="display:flex;gap:7px;flex-wrap:wrap">${d.tags.map(t=>`<span class="lcd-tag">${esc(t)}</span>`).join('')}</div></div>`:''}
+    ${(d.ownerHistory||[]).length?`<div class="lcd-sec"><h4>Владение</h4>${d.ownerHistory.map(o=>`<div class="lcd-ev"><span class="t">${new Date(o.at).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span><span>${esc(o.name||'снят')}${o.reason?' · '+esc(o.reason):''}</span></div>`).join('')}</div>`:''}
     <div class="lcd-sec"><h4>История</h4>${ev.length?ev.map(e=>`<div class="lcd-ev"><span class="t">${new Date(e.at).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span><span>${esc(e.text)}</span></div>`).join(''):'<div style="color:var(--mut);font-size:13px">Пока пусто</div>'}</div>
   </div>`;
   paintIcons(lc);$('#lcback').onclick=closeLeadCard;

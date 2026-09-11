@@ -65,7 +65,11 @@ function renderTemplate(db, tpl, lead) {
 }
 
 function send(db, lead, text, via, opts = {}) {
-  if (via === 'human') lead.unread = 0;   /* брокер ответил вручную → он видел переписку, непрочитанных нет */
+  if (via === 'human') {
+    lead.unread = 0;   /* брокер ответил вручную → он видел переписку, непрочитанных нет */
+    /* надзор тона: грубость менеджера в исходящем → флаг качества брокеру + тревога руководителю */
+    if (text) { try { const tn = control.toneScan(text); if (tn) { const br = db.brokers.find(b => b.id === lead.broker); if (br) { br.toneFlags = (br.toneFlags || 0) + 1; br.lastToneFlag = { at: Date.now(), reason: tn.reason, leadId: lead.id }; } ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `⚠️ Тон: ${(db.brokers.find(b => b.id === lead.broker) || {}).name || 'брокер'} — ${tn.reason} в сообщении клиенту ${lead.name}` }); } } catch (_) {} }
+  }
   const channel = opts.channel || resolveChannel(db, lead);
   if (channel !== 'wa') {
     /* не-WA каналы: mock-запись в переписку; боевые слоты (TG-бот/Viber/Resend) включаются токенами */
@@ -161,8 +165,10 @@ function brokerOnShift(b) {
 
 function pickBroker(db, lead) {
   const mode = (db.settings.automations || {}).assignMode || 'load';
-  let pool = db.brokers.filter(b => b.geo === lead.geo);
-  if (!pool.length) pool = db.brokers.slice();
+  const avail = b => b.active !== false && !b.away;   /* дежурство: отсутствующим и отключённым новых не даём */
+  let pool = db.brokers.filter(b => b.geo === lead.geo && avail(b));
+  if (!pool.length) pool = db.brokers.filter(avail);
+  if (!pool.length) pool = db.brokers.slice();   /* совсем некому — лид не виснет */
   if (mode === 'shift') {
     const onShift = pool.filter(brokerOnShift);
     if (onShift.length) pool = onShift; // вне смен — fallback на всех, лид не виснет

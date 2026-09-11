@@ -72,6 +72,9 @@ function scanRisks(db) {
     orphanMeetings: [], /* будущая встреча у отключённого/удалённого брокера */
     overloaded: [],     /* брокер сверх ёмкости */
     geoUncovered: [],   /* гео с лидами, но без активного брокера */
+    duplicates: [],     /* один человек через разные каналы */
+    dealCheck: [],      /* «сделка» без следов работы — сверить факт */
+    awayWaiting: [],    /* брокер в отсутствии, а клиент ждёт */
   };
 
   const geoWithLead = new Set();
@@ -138,6 +141,24 @@ function scanRisks(db) {
     }
   }
 
+  /* дубли и сверка сделок */
+  for (const c of findDuplicates(db)) buckets.duplicates.push({ phone: c.phone, count: c.leads.length, leads: c.leads, name: c.leads.map(l => l.name).join(' · ') });
+  for (const d of dealFactCheck(db)) buckets.dealCheck.push(d);
+
+  /* брокер в отсутствии, а его клиент ждёт ответа → передать заместителю */
+  const awayIds = new Set(brokers.filter(b => b.away).map(b => b.id));
+  if (awayIds.size) {
+    for (const l of db.leads) {
+      if (CLOSED_STAGES.includes(l.stage) || !awayIds.has(l.broker)) continue;
+      const { lastIn, lastHumanOut } = lastDirs(db, l.id);
+      if (lastIn && lastIn > lastHumanOut) {
+        const br = brokers.find(b => b.id === l.broker);
+        const sub = br && br.substituteId ? brokerName(br.substituteId) : null;
+        buckets.awayWaiting.push({ id: l.id, name: l.name, broker: brokerName(l.broker), substitute: sub, waitingH: Math.round((now - lastIn) / 3600e3) });
+      }
+    }
+  }
+
   const total = Object.values(buckets).reduce((s, arr) => s + arr.length, 0);
   const counts = Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, v.length]));
   return { total, counts, buckets, at: now };
@@ -172,6 +193,68 @@ function offboardPreview(db, brokerId, successorId) {
   };
 }
 
+/* ═══════════ ФАЗА 4: качество, деньги, дедуп, дежурство ═══════════ */
+
+function normPhone(p) { const d = String(p || '').replace(/\D/g, ''); return d.length > 9 ? d.slice(-11) : d; }
+
+/* ── дедуп: один человек через разные каналы → кластеры дублей по телефону ── */
+function findDuplicates(db) {
+  const by = {};
+  for (const l of db.leads) {
+    if (CLOSED_STAGES.includes(l.stage)) continue;
+    const k = normPhone(l.phone); if (!k || k.length < 7) continue;
+    (by[k] = by[k] || []).push(l);
+  }
+  return Object.entries(by).filter(([, arr]) => arr.length > 1).map(([phone, arr]) => ({
+    phone,
+    leads: arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).map(l => ({ id: l.id, name: l.name, source: l.source || '', stage: l.stage, broker: l.broker, createdAt: l.createdAt || 0 })),
+  }));
+}
+
+/* ── сверка факта сделки: стадия «deal», но нет ни переписки менеджера, ни встречи, ни документа ── */
+function dealFactCheck(db) {
+  const out = [];
+  for (const l of db.leads) {
+    if (l.stage !== 'deal') continue;
+    const humanMsg = db.messages.some(m => m.leadId === l.id && m.dir === 'out' && m.via === 'human');
+    const meeting = (db.meetings || []).some(m => m.leadId === l.id);
+    const docs = (l.attachments || l.files || []).length > 0;
+    if (!humanMsg && !meeting && !docs) out.push({ id: l.id, name: l.name, broker: (db.brokers.find(b => b.id === l.broker) || {}).name || null, budget: budgetOf(l) });
+  }
+  return out;
+}
+
+/* ── атрибуция комиссии из цепочки владения. rule: 'first'|'last'|'split' ── */
+function commissionSplit(ownerHistory, rule) {
+  const owners = (ownerHistory || []).filter(o => o.brokerId).map(o => ({ id: o.brokerId, name: o.name }));
+  if (!owners.length) return [];
+  if (rule === 'first') return [{ id: owners[0].id, name: owners[0].name, pct: 100 }];
+  if (rule === 'split') {
+    const uniq = []; const seen = new Set();
+    for (const o of owners) if (!seen.has(o.id)) { seen.add(o.id); uniq.push(o); }
+    const pct = Math.round(100 / uniq.length);
+    return uniq.map((o, i) => ({ id: o.id, name: o.name, pct: i === uniq.length - 1 ? 100 - pct * (uniq.length - 1) : pct }));
+  }
+  const last = owners[owners.length - 1];   /* по умолчанию last-touch */
+  return [{ id: last.id, name: last.name, pct: 100 }];
+}
+
+/* ── надзор тона: грубость/токсичность/угроза в исходящем менеджера (эвристика, без LLM) ── */
+const TONE_PATTERNS = [
+  { re: new RegExp(`(идиот|дурак|тупой|тупиц|придур|кретин|дебил|болван|уебан|мудак|сволоч|скотин)[${К}]*`, 'i'), reason: 'оскорбление' },
+  { re: new RegExp(`(отвали|отстань|заткни|достал[${К}]*|надоел[${К}]*|не мешай|отвяжись)`, 'i'), reason: 'грубость' },
+  { re: /\b(fuck|shit|idiot|stupid|moron)\b/i, reason: 'brute (en)' },
+  { re: new RegExp(`(сам[${К}]* виноват|это ваши проблем[${К}]*|мне (всё равно|плевать|наплевать))`, 'i'), reason: 'пренебрежение' },
+];
+function toneScan(text) {
+  const t = String(text || ''); if (t.length < 3) return null;
+  for (const p of TONE_PATTERNS) if (p.re.test(t)) return { flag: true, reason: p.reason };
+  /* капслок-крик: длинная фраза заглавными */
+  const letters = t.replace(/[^A-Za-zА-Яа-яЁё]/g, '');
+  if (letters.length > 12 && letters === letters.toUpperCase() && /[А-ЯA-Z]{8,}/.test(t)) return { flag: true, reason: 'крик капслоком' };
+  return null;
+}
+
 /* ── цепочка владения: неизменяемый лог передач лида (для атрибуции комиссий) ── */
 function recordOwner(db, lead, brokerId, by, reason) {
   if (!lead) return;
@@ -183,4 +266,4 @@ function recordOwner(db, lead, brokerId, by, reason) {
   if (lead.ownerHistory.length > 40) lead.ownerHistory.splice(0, lead.ownerHistory.length - 40);
 }
 
-module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, ACTIVE_STAGES, CLOSED_STAGES, cfg };
+module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, normPhone, ACTIVE_STAGES, CLOSED_STAGES, cfg };
