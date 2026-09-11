@@ -989,6 +989,92 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   </div>
 </section>
 
+<!-- SCROLL ASSEMBLY (pinned) -->
+<style>
+.asm{position:relative;height:300vh;background:linear-gradient(180deg,var(--bg) 0%,color-mix(in srgb,var(--blue) 6%,var(--bg)) 45%,var(--bg) 100%)}
+.asm-sticky{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.asm-inner{position:relative;width:100%;max-width:1120px;height:100%;margin:0 auto}
+.asm-head{position:absolute;top:11%;left:0;right:0;text-align:center;z-index:6;padding:0 20px}
+.asm-head .kicker{display:inline-flex}
+.asm-head h2{margin-top:10px}
+.asm-stage{position:absolute;inset:0}
+.asm-line{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);height:2px;width:0;z-index:0;background:repeating-linear-gradient(90deg,var(--blue) 0 7px,transparent 7px 16px);opacity:0}
+.asm-piece{position:absolute;left:50%;top:52%;width:150px;text-align:center;z-index:2;will-change:transform,opacity}
+.asm-piece .fig{width:118px;height:118px;margin:0 auto;filter:drop-shadow(0 26px 42px rgba(37,99,235,.4))}
+.asm-piece .fig img{width:100%;height:100%;object-fit:contain}
+.asm-piece .lb{margin-top:12px;font-weight:800;font-size:14.5px;color:var(--ink);letter-spacing:-.01em}
+.asm-piece .sub{font-size:12px;color:var(--ink3);margin-top:2px}
+.asm-final{position:absolute;left:0;right:0;bottom:10%;text-align:center;z-index:6;opacity:0;transform:translateY(22px);padding:0 20px}
+.asm-final .big{font-family:var(--disp);font-weight:800;font-size:clamp(22px,3.2vw,42px);letter-spacing:-.025em}
+.asm-final .big em{font-style:normal;color:var(--blue)}
+@media(max-width:640px){
+  .asm{height:250vh}
+  .asm-head{top:9%}
+  .asm-piece{width:60px}
+  .asm-piece .fig{width:56px;height:56px}
+  .asm-piece .lb,.asm-piece .sub{display:none}
+  .asm-final{bottom:16%}
+}
+</style>
+<section class="asm" id="assembly" aria-label="Как из хаоса собирается система">
+  <div class="asm-sticky">
+    <div class="asm-inner">
+      <div class="asm-head">
+        <span class="kicker"><span class="dot"></span>Из хаоса — в систему</span>
+        <h2>Пять частей — <em>одна система</em></h2>
+      </div>
+      <div class="asm-stage" id="asmStage">
+        <div class="asm-line" id="asmLine"></div>
+        <div class="asm-piece" data-i="0"><div class="fig"><img src="/assets/site/asm-0.png" alt="" loading="lazy"></div><div class="lb">Ловим лида</div><div class="sub">все каналы разом</div></div>
+        <div class="asm-piece" data-i="1"><div class="fig"><img src="/assets/site/asm-1.png" alt="" loading="lazy"></div><div class="lb">Отвечаем первыми</div><div class="sub">WhatsApp за секунды</div></div>
+        <div class="asm-piece" data-i="2"><div class="fig"><img src="/assets/site/asm-2.png" alt="" loading="lazy"></div><div class="lb">Понимаем клиента</div><div class="sub">психо-портрет</div></div>
+        <div class="asm-piece" data-i="3"><div class="fig"><img src="/assets/site/asm-3.png" alt="" loading="lazy"></div><div class="lb">Показываем объект</div><div class="sub">живые подборки</div></div>
+        <div class="asm-piece" data-i="4"><div class="fig"><img src="/assets/site/asm-4.png" alt="" loading="lazy"></div><div class="lb">Доводим до сделки</div><div class="sub">под контролем</div></div>
+      </div>
+      <div class="asm-final" id="asmFinal"><div class="big">Хаос заявок → <em>управляемая выручка</em></div></div>
+    </div>
+  </div>
+</section>
+<script>
+(function(){
+  var sec=document.getElementById('assembly'); if(!sec) return;
+  var pieces=[].slice.call(sec.querySelectorAll('.asm-piece'));
+  var lineEl=document.getElementById('asmLine'), finalEl=document.getElementById('asmFinal');
+  var N=pieces.length;
+  var scatter=[
+    {x:-470,y:-300,r:-42,s:.32},
+    {x: 440,y:-350,r: 38,s:.32},
+    {x:-380,y: 350,r: 30,s:.32},
+    {x: 500,y: 300,r:-34,s:.32},
+    {x:  10,y:-450,r: 54,s:.32}
+  ];
+  function mob(){return matchMedia('(max-width:640px)').matches;}
+  function gap(){return mob()?66:184;}
+  function slotX(i){return (i-(N-1)/2)*gap();}
+  function lerp(a,b,t){return a+(b-a)*t;}
+  function ease(t){return t<0?0:t>1?1:1-Math.pow(1-t,3);}
+  function frame(){
+    var r=sec.getBoundingClientRect();
+    var total=sec.offsetHeight-innerHeight;
+    var p=total>0?Math.max(0,Math.min(1,(-r.top)/total)):0;
+    pieces.forEach(function(el,i){
+      var st=scatter[i];
+      var t=ease((p-0.04-i*0.08)/0.5);
+      var x=lerp(st.x,slotX(i),t),y=lerp(st.y,0,t),rot=lerp(st.r,0,t),sc=lerp(st.s,1,t);
+      el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) rotate('+rot+'deg) scale('+sc+')';
+      el.style.opacity=Math.max(0,Math.min(1,t*1.5));
+    });
+    var lp=ease((p-0.52)/0.32);
+    lineEl.style.width=(lp*gap()*(N-1))+'px';
+    lineEl.style.opacity=lp*0.85;
+    var fp=ease((p-0.7)/0.3);
+    finalEl.style.opacity=fp; finalEl.style.transform='translateY('+lerp(22,0,fp)+'px)';
+  }
+  addEventListener('scroll',function(){requestAnimationFrame(frame);},{passive:true});
+  addEventListener('resize',frame); frame();
+})();
+</script>
+
 <!-- HOW / STEPS -->
 <section class="sec wrap" id="how">
   <div class="sec-head center" data-r>
