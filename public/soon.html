@@ -138,6 +138,19 @@
   .wback{background:none;border:none;color:var(--ink3);font-family:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;padding:4px;display:inline-flex;align-items:center;gap:6px;transition:color .3s;margin-top:12px}
   .wback:hover{color:var(--ink)}
   .wback[hidden]{display:none}
+  /* choice / multi опции */
+  .qopts{display:grid;gap:10px;margin-top:4px}
+  .qopts.two{grid-template-columns:1fr 1fr}
+  .qopt{display:flex;align-items:center;gap:12px;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:13px;padding:15px 17px;color:var(--ink);font-family:inherit;font-size:15px;font-weight:300;cursor:pointer;transition:.28s var(--ease)}
+  .qopt:hover{border-color:rgba(255,255,255,.34);background:rgba(255,255,255,.05);transform:translateY(-1px)}
+  .qopt .qtick{flex:0 0 18px;width:18px;height:18px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.25s}
+  .qopt.multi .qtick{border-radius:6px}
+  .qopt .qtick svg{width:11px;height:11px;stroke:#0a0a0a;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.5);transition:.25s}
+  .qopt.sel{border-color:transparent;background:rgba(255,255,255,.1)}
+  .qopt.sel .qtick{background:#f4f3f1;border-color:transparent}
+  .qopt.sel .qtick svg{opacity:1;transform:none}
+  .qopt .qem{margin-left:auto;opacity:.5;font-size:16px}
+  @media(max-width:520px){.qopts.two{grid-template-columns:1fr}}
 
   /* ── успех ── */
   .done{width:min(520px,92vw);display:none;flex-direction:column;align-items:center;gap:16px;text-align:center}
@@ -202,41 +215,10 @@
     <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте контакты — позовём в бету одними из первых.</p>
 
     <form class="wl" id="wl" novalidate>
-      <div class="wsteps" id="wsteps">
-        <div class="wstep on" data-step="0">
-          <div class="qlabel"><span class="qn">01 / 04</span> Как к вам обращаться?</div>
-          <div class="field">
-            <input data-k="name" type="text" autocomplete="name" placeholder="Ваше имя" aria-label="Имя">
-            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          </div>
-        </div>
-        <div class="wstep" data-step="1">
-          <div class="qlabel"><span class="qn">02 / 04</span> Ваш WhatsApp</div>
-          <div class="field">
-            <input data-k="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="+971 50 123 4567" aria-label="WhatsApp">
-            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          </div>
-        </div>
-        <div class="wstep" data-step="2">
-          <div class="qlabel"><span class="qn">03 / 04</span> Куда прислать приглашение</div>
-          <div class="field">
-            <input data-k="email" type="email" inputmode="email" autocomplete="email" placeholder="you@agency.com" aria-label="E-mail">
-            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          </div>
-        </div>
-        <div class="wstep" data-step="3">
-          <div class="qlabel"><span class="qn">04 / 04</span> Последний шаг</div>
-          <label class="consent">
-            <input type="checkbox" id="consent">
-            <span class="cbox"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
-            <span class="ctxt">Даю согласие на обработку моих персональных данных для связи по раннему доступу — в соответствии с <a href="/privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a>, и принимаю <a href="/terms.html" target="_blank" rel="noopener">условия</a>.</span>
-          </label>
-          <input type="text" id="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-          <button class="go gowide" id="go" type="submit"><span>Занять место в бете</span></button>
-        </div>
-      </div>
-      <div class="wdots" id="wdots"><i class="on"></i><i></i><i></i><i></i></div>
+      <div class="wsteps" id="wsteps"></div>
+      <div class="wdots" id="wdots"></div>
       <button type="button" class="wback" id="wback" hidden>← назад</button>
+      <input type="text" id="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <div class="hint" id="hint">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 13l4 4L19 7"/></svg>
         Без спама. Только приглашение в бету и дата запуска.
@@ -262,64 +244,105 @@
 <script>
   var form=document.getElementById('wl'), hint=document.getElementById('hint'),
       done=document.getElementById('done'), pos=document.getElementById('pos'),
-      cnum=document.getElementById('cnum'), doneMsg=document.getElementById('doneMsg'),
+      cnum=document.getElementById('cnum'),
       wsteps=document.getElementById('wsteps'),
-      steps=[].slice.call(wsteps.querySelectorAll('.wstep')),
-      dots=[].slice.call(document.getElementById('wdots').children),
-      wback=document.getElementById('wback'),
-      goB=document.getElementById('go'),
-      consent=document.getElementById('consent');
+      dotsWrap=document.getElementById('wdots'),
+      wback=document.getElementById('wback');
   var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-  var data={name:'',whatsapp:'',email:''}, cur=0, busy=false;
   var HINT_DEFAULT=' Без спама. Только приглашение в бету и дата запуска.';
+  var data={}, cur=0, busy=false;
 
+  /* ── конфиг вопросов: квалификация → контакты → согласие ── */
+  var QS=[
+    {k:'role',type:'choice',two:true,q:'Вы — соло-брокер или агентство?',opts:[
+      {v:'solo',t:'Соло-брокер',em:'🧭'},{v:'agency',t:'Агентство недвижимости',em:'🏢'}]},
+    {k:'brokers',type:'choice',two:true,q:'Сколько брокеров в команде?',when:function(d){return d.role==='agency'},opts:[
+      {v:'2-3',t:'2–3'},{v:'4-10',t:'4–10'},{v:'11-30',t:'11–30'},{v:'30+',t:'30+'}]},
+    {k:'pains',type:'multi',q:'Что болит сильнее всего?',opts:[
+      {v:'speed',t:'Медленно отвечаем — лиды уходят'},
+      {v:'leak',t:'Брокеры уводят базу'},
+      {v:'qual',t:'Нет нормальной квалификации'},
+      {v:'chaos',t:'Хаос в переписках и каналах'},
+      {v:'nurture',t:'Не дожимаем — лиды остывают'}]},
+    {k:'name',type:'text',q:'Как к вам обращаться?',ph:'Ваше имя',ac:'name',val:function(v){return v.trim().length>=2?'':'Подскажите, как к вам обращаться.'}},
+    {k:'whatsapp',type:'tel',q:'Ваш WhatsApp',ph:'+971 50 123 4567',ac:'tel',val:function(v){return v.replace(/\D/g,'').length>=7?'':'Проверьте номер WhatsApp.'}},
+    {k:'email',type:'email',q:'Куда прислать приглашение',ph:'you@agency.com',ac:'email',val:function(v){return EMAIL.test(v.trim())?'':'Проверьте адрес — кажется, есть опечатка.'}},
+    {k:'consent',type:'consent',q:'Последний шаг'}
+  ];
+  function activeQs(){return QS.filter(function(s){return !s.when||s.when(data)})}
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
   function clearErr(){if(hint.classList.contains('err')){hint.classList.remove('err');hint.lastChild.textContent=HINT_DEFAULT}}
-  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;var f=steps[cur].querySelector('.field')||steps[cur];f.classList.add('shake');setTimeout(function(){f.classList.remove('shake')},420);}
+  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;var st=wsteps.querySelector('.wstep');if(st){st.classList.add('shake');setTimeout(function(){st.classList.remove('shake')},420)}}
+  function svgArrow(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}
+  function svgTick(){return '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>'}
+  function setHeight(){var st=wsteps.querySelector('.wstep');if(st)wsteps.style.height=st.offsetHeight+'px'}
 
-  // подчёркивание + Enter + очистка ошибки для всех полей шагов
-  [].forEach.call(wsteps.querySelectorAll('input[data-k]'),function(inp){
-    var f=inp.closest('.field');
-    inp.addEventListener('focus',function(){f.classList.add('focus')});
-    inp.addEventListener('blur',function(){if(!inp.value)f.classList.remove('focus')});
-    inp.addEventListener('input',clearErr);
-    inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();nextStep()}});
-  });
-
-  function setHeight(){if(steps[cur])wsteps.style.height=steps[cur].offsetHeight+'px'}
-  function show(i){
-    cur=i;
-    steps.forEach(function(s,idx){s.classList.toggle('on',idx===i)});
-    dots.forEach(function(d,idx){d.classList.toggle('on',idx===i);d.classList.toggle('done',idx<i)});
-    wback.hidden=(i===0);
-    setHeight();
-    var inp=steps[i].querySelector('input[data-k]');
-    setTimeout(function(){inp&&inp.focus()},80);
+  function buildStep(s,idx,total){
+    var el=document.createElement('div');el.className='wstep';
+    var lab='<div class="qlabel"><span class="qn">'+String(idx+1).padStart(2,'0')+' / '+String(total).padStart(2,'0')+'</span> '+esc(s.q)+'</div>';
+    if(s.type==='text'||s.type==='tel'||s.type==='email'){
+      el.innerHTML=lab+'<div class="field"><input data-k="'+s.k+'" type="'+s.type+'"'+(s.type==='tel'?' inputmode="tel"':s.type==='email'?' inputmode="email"':'')+' autocomplete="'+(s.ac||'off')+'" placeholder="'+esc(s.ph||'')+'" aria-label="'+esc(s.q)+'"><button class="go" type="button" data-next aria-label="Далее">'+svgArrow()+'</button></div>';
+    } else if(s.type==='choice'){
+      el.innerHTML=lab+'<div class="qopts'+(s.two?' two':'')+'">'+s.opts.map(function(o){return '<button type="button" class="qopt'+(data[s.k]===o.v?' sel':'')+'" data-v="'+esc(o.v)+'"><span class="qtick">'+svgTick()+'</span>'+esc(o.t)+(o.em?'<span class="qem">'+o.em+'</span>':'')+'</button>'}).join('')+'</div>';
+    } else if(s.type==='multi'){
+      el.innerHTML=lab+'<div class="qopts">'+s.opts.map(function(o){return '<button type="button" class="qopt multi" data-v="'+esc(o.v)+'"><span class="qtick">'+svgTick()+'</span>'+esc(o.t)+'</button>'}).join('')+'</div><button class="go gowide" type="button" data-next style="margin-top:14px"><span>Далее</span></button>';
+    } else if(s.type==='consent'){
+      el.innerHTML=lab+'<label class="consent"><input type="checkbox" id="consent"><span class="cbox">'+svgTick()+'</span><span class="ctxt">Даю согласие на обработку моих персональных данных для связи по раннему доступу — в соответствии с <a href="/privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a>, и принимаю <a href="/terms.html" target="_blank" rel="noopener">условия</a>.</span></label><button class="go gowide" id="go" type="submit"><span>Занять место в бете</span></button>';
+    }
+    return el;
   }
-  function validStep(i){
-    var inp=steps[i].querySelector('input[data-k]'), v=inp?inp.value.trim():'';
-    if(i===0){if(v.length<2){fail('Подскажите, как к вам обращаться.');return false}data.name=v;return true}
-    if(i===1){if(v.replace(/\D/g,'').length<7){fail('Проверьте номер WhatsApp.');return false}data.whatsapp=v;return true}
-    if(i===2){if(!EMAIL.test(v)){fail('Проверьте адрес — кажется, есть опечатка.');return false}data.email=v;return true}
+
+  function render(){
+    var qs=activeQs(), total=qs.length, s=qs[cur];
+    dotsWrap.innerHTML=qs.map(function(_,i){return '<i class="'+(i===cur?'on':i<cur?'done':'')+'"></i>'}).join('');
+    wsteps.innerHTML='';
+    var el=buildStep(s,cur,total); wsteps.appendChild(el);
+    requestAnimationFrame(function(){el.classList.add('on');setHeight();});
+    wback.hidden=(cur===0);
+    var inp=el.querySelector('input[data-k]');
+    if(inp){var f=inp.closest('.field');inp.value=data[s.k]||'';
+      inp.addEventListener('focus',function(){f.classList.add('focus')});
+      inp.addEventListener('blur',function(){if(!inp.value)f.classList.remove('focus')});
+      inp.addEventListener('input',clearErr);
+      inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();next()}});
+      if(inp.value)f.classList.add('focus');
+      setTimeout(function(){inp.focus()},90);
+    }
+    el.querySelectorAll('.qopt:not(.multi)').forEach(function(b){b.addEventListener('click',function(){data[s.k]=b.dataset.v;clearErr();next()})});
+    el.querySelectorAll('.qopt.multi').forEach(function(b){
+      if((data[s.k]||[]).indexOf(b.dataset.v)>=0)b.classList.add('sel');
+      b.addEventListener('click',function(){b.classList.toggle('sel');clearErr();setHeight()});
+    });
+    el.querySelectorAll('[data-next]').forEach(function(b){b.addEventListener('click',next)});
+  }
+
+  function collectCurrent(){
+    var qs=activeQs(), s=qs[cur], el=wsteps.querySelector('.wstep');
+    if(s.type==='text'||s.type==='tel'||s.type==='email'){
+      var v=(el.querySelector('input').value||'').trim(); var err=s.val?s.val(v):''; if(err){fail(err);return false} data[s.k]=v; return true;
+    }
+    if(s.type==='multi'){
+      var sel=[].map.call(el.querySelectorAll('.qopt.sel'),function(x){return x.dataset.v}); if(!sel.length){fail('Выберите хотя бы один вариант.');return false} data[s.k]=sel; return true;
+    }
+    if(s.type==='choice'){ if(!data[s.k]){fail('Выберите вариант.');return false} return true; }
     return true;
   }
-  function nextStep(){if(!validStep(cur))return;if(cur<3){clearErr();show(cur+1)}else submit();}
-
-  [].forEach.call(wsteps.querySelectorAll('[data-next]'),function(b){b.addEventListener('click',nextStep)});
-  wback.addEventListener('click',function(){if(cur>0){clearErr();show(cur-1)}});
-  form.addEventListener('submit',function(e){e.preventDefault();nextStep()});
+  function next(){ if(!collectCurrent())return; var qs=activeQs(); if(cur<qs.length-1){clearErr();cur++;render();} else submit(); }
+  wback.addEventListener('click',function(){if(cur>0){clearErr();cur--;render();}});
+  form.addEventListener('submit',function(e){e.preventDefault();var qs=activeQs();if(qs[cur].type==='consent')submit();else next();});
 
   function submit(){
     if(busy)return;
-    if(!consent.checked){fail('Отметьте согласие на обработку персональных данных.');return;}
+    var cb=document.getElementById('consent'); if(!cb||!cb.checked){fail('Отметьте согласие на обработку персональных данных.');return;}
     if(document.getElementById('company').value)return; // honeypot
-    busy=true;goB.classList.add('busy');
+    busy=true;var goB=document.getElementById('go');if(goB)goB.classList.add('busy');
     fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:data.name,whatsapp:data.whatsapp,email:data.email,consent:true,ref:(location.search||''),ts:Date.now(),company:''})})
+      body:JSON.stringify({name:data.name,whatsapp:data.whatsapp,email:data.email,role:data.role||'',brokers:data.brokers||'',pains:data.pains||[],consent:true,ref:(location.search||''),ts:Date.now(),company:''})})
       .then(function(r){return r.json().catch(function(){return {}})})
       .then(function(j){
-        if(j&&j.error){busy=false;goB.classList.remove('busy');fail(j.error);return;}
-        form.style.transition='opacity .5s, transform .5s';
-        form.style.opacity='0';form.style.transform='translateY(-10px)';
+        if(j&&j.error){busy=false;if(goB)goB.classList.remove('busy');fail(j.error);return;}
+        form.style.transition='opacity .5s, transform .5s';form.style.opacity='0';form.style.transform='translateY(-10px)';
         setTimeout(function(){
           form.style.display='none';
           if(j&&j.position){pos.textContent='вы №'+(SEED+j.position)+' в очереди';}else{pos.style.display='none';}
@@ -327,28 +350,23 @@
           done.classList.add('on');successPulse();
         },420);
       })
-      .catch(function(){busy=false;goB.classList.remove('busy');fail('Сеть подвела. Попробуйте ещё раз.');});
+      .catch(function(){busy=false;if(goB)goB.classList.remove('busy');fail('Сеть подвела. Попробуйте ещё раз.');});
   }
 
-  // живой счётчик (анимация набора к базовому числу; уточняется с сервера)
+  // живой счётчик
   function animCount(to){var from=Math.max(0,to-140),t0=performance.now(),dur=1400;
     (function s(t){var p=Math.min(1,(t-t0)/dur),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));cnum.textContent=v.toLocaleString('ru-RU');if(p<1)requestAnimationFrame(s)})(t0);}
-  var SEED=214; // ранняя заинтересованность (реальные заявки прибавляются поверх)
+  var SEED=214;
   fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
+  addEventListener('resize',setHeight);
 
-  // высота степпера: инициализация + пересчёт (шрифты/ресайз)
-  addEventListener('load',setHeight);setTimeout(setHeight,300);setTimeout(setHeight,1200);addEventListener('resize',setHeight);
-
-  // ── дрейфующая пыль (люкс-искры) ──
+  // дрейфующая пыль
   (function(){var d=document.getElementById('dust');if(!d)return;var N=innerWidth<560?7:13;for(var i=0;i<N;i++){var s=document.createElement('i');var dur=9+Math.random()*11,sz=1+Math.random()*2.2,dx=(Math.random()*2-1)*46;s.style.left=(Math.random()*100)+'vw';s.style.width=s.style.height=sz+'px';s.style.animationDuration=dur+'s';s.style.animationDelay=(-Math.random()*dur)+'s';s.style.setProperty('--dx',dx+'px');d.appendChild(s);}})();
-  // ── курсор-параллакс заголовка (тонко) ──
   var _h1=document.querySelector('.core h1');
   addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
-  // ── магнитная финальная кнопка (только на шаге согласия) ──
-  if(goB){addEventListener('pointermove',function(e){if(busy||cur!==3){return;}var r=goB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;if(Math.hypot(dx,dy)<170){goB.style.transform='translate('+(dx*.14).toFixed(1)+'px,'+(dy*.14).toFixed(1)+'px)';}else{goB.style.transform='';}},{passive:true});goB.addEventListener('pointerleave',function(){goB.style.transform='';});}
   function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
 
-  show(0);
+  render();
 </script>
 </body>
 </html>

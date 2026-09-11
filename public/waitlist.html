@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лист ожидания — Lumen</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@300;400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#080809;--bg2:#0e0e10;--card:#131315;--ink:#f4f3f1;--ink2:#a7a6a3;--ink3:#6b6a68;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.055);--serif:'Cormorant',Georgia,serif;--sans:'Manrope',system-ui,sans-serif;--ease:cubic-bezier(.19,1,.22,1);--ok:#7fb98a;--warn:#d8b26a;--bad:#d78a8a}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;font-weight:300}
+  a{color:inherit}
+  .wrap{max-width:1180px;margin:0 auto;padding:clamp(18px,3vw,34px)}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand svg{width:18px;height:22px}
+  .brand b{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:.34em;padding-left:.34em}
+  .brand span{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);margin-left:6px}
+  .top .r{display:flex;align-items:center;gap:16px;font-size:12.5px;color:var(--ink3)}
+  .top .r a:hover{color:var(--ink)}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .kpi{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px 18px;min-width:120px}
+  .kpi b{display:block;font-family:var(--serif);font-weight:300;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-top:6px;display:block}
+  /* config */
+  .cfg{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:16px 18px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end}
+  .cfg .f label{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px}
+  .cfg input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--ink);font-family:inherit;font-size:14px}
+  .cfg input:focus{outline:none;border-color:rgba(255,255,255,.32)}
+  .cfg .st{font-size:11.5px;color:var(--ink3)}
+  .cfg .st i{font-style:normal}
+  .cfg .st .ok{color:var(--ok)}.cfg .st .bad{color:var(--warn)}
+  .btn{font-family:inherit;font-size:13px;letter-spacing:.02em;border-radius:999px;padding:11px 18px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);transition:.3s var(--ease);white-space:nowrap}
+  .btn:hover{border-color:rgba(255,255,255,.34);transform:translateY(-1px)}
+  .btn.pri{background:var(--ink);color:#0a0a0a;border-color:transparent}
+  .btn.sm{padding:8px 13px;font-size:12px}
+  .btn.ic{padding:8px 11px}
+  /* toolbar */
+  .tb{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .tb input.search{flex:1;min-width:200px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:11px 16px;color:var(--ink);font-family:inherit;font-size:14px}
+  .tb input.search:focus{outline:none;border-color:rgba(255,255,255,.3)}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{font-family:inherit;font-size:12px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer;transition:.25s}
+  .seg button.on{background:var(--ink);color:#0a0a0a;border-color:transparent}
+  /* list */
+  .row{display:grid;grid-template-columns:1.4fr 1.3fr 1.1fr auto;gap:16px;align-items:center;background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:16px 18px;margin-bottom:10px;transition:border-color .3s}
+  .row:hover{border-color:var(--line)}
+  .who b{font-family:var(--serif);font-weight:500;font-size:18px}
+  .who .meta{font-size:12px;color:var(--ink3);margin-top:3px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{font-size:10.5px;letter-spacing:.03em;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+  .chip.role{border-color:rgba(255,255,255,.22);color:var(--ink)}
+  .contact a{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px;cursor:pointer;transition:color .2s;word-break:break-all}
+  .contact a:hover{color:var(--ink)}
+  .contact a svg{width:12px;height:12px;opacity:.5;margin-right:6px;vertical-align:-1px}
+  .stwrap{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .badge{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:5px 11px;border-radius:999px;border:1px solid var(--line)}
+  .badge.new{color:var(--ink2)}
+  .badge.emailed{color:var(--warn);border-color:rgba(216,178,106,.4)}
+  .badge.messaged{color:#8ab8d8;border-color:rgba(138,184,216,.4)}
+  .badge.contacted{color:var(--ok);border-color:rgba(127,185,138,.45)}
+  .badge.rejected{color:var(--bad);border-color:rgba(215,138,138,.4)}
+  select.stsel{background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--ink2);font-family:inherit;font-size:12px;padding:6px 8px;cursor:pointer}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .acts svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .empty{text-align:center;color:var(--ink3);padding:60px 0;font-family:var(--serif);font-size:22px}
+  .gate{max-width:420px;margin:14vh auto;text-align:center}
+  .gate h2{font-family:var(--serif);font-weight:300;font-size:32px;margin-bottom:12px}
+  .gate p{color:var(--ink2);font-size:14px;margin-bottom:22px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#f4f3f1;color:#0a0a0a;font-size:13px;font-weight:500;padding:12px 20px;border-radius:999px;opacity:0;transition:.4s var(--ease);pointer-events:none;z-index:60}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* modal */
+  .ovl{position:fixed;inset:0;z-index:80;background:rgba(4,4,5,.8);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:24px}
+  .ovl.on{display:flex}
+  .modal{width:min(680px,100%);max-height:90vh;overflow:auto;background:#0e0e10;border:1px solid var(--line);border-radius:18px;padding:22px}
+  .modal .mh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .modal .mh b{font-family:var(--serif);font-weight:400;font-size:22px}
+  .modal .x{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer}
+  .modal iframe{width:100%;height:60vh;border:1px solid var(--line2);border-radius:12px;background:#070707}
+  .watext{white-space:pre-wrap;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:16px;font-size:14px;line-height:1.6;color:var(--ink);margin-bottom:14px}
+  @media(max-width:760px){.row{grid-template-columns:1fr;gap:12px}.cfg{grid-template-columns:1fr}.acts{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app" style="display:none">
+  <div class="top">
+    <div class="brand">
+      <svg viewBox="0 0 100 120" aria-hidden="true"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg>
+      <b>LUMEN</b><span>Лист ожидания</span>
+    </div>
+    <div class="r"><a href="/">← В CRM</a><a href="/soon.html" target="_blank">Открыть форму ↗</a></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="cfg">
+    <div class="f"><label>Наш WhatsApp для click-to-chat (E.164)</label><input id="cfgWa" placeholder="+971501234567"></div>
+    <div class="f"><label>Отправитель email (Resend from)</label><input id="cfgFrom" placeholder="Lumen <hello@ваш-домен>"></div>
+    <div>
+      <button class="btn pri" id="cfgSave">Сохранить</button>
+      <div class="st" id="cfgSt" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="tb">
+    <input class="search" id="q" placeholder="Поиск по имени, email, номеру…">
+    <div class="seg" id="segRole"><button data-r="" class="on">Все</button><button data-r="agency">Агентства</button><button data-r="solo">Соло</button></div>
+    <div class="seg" id="segStatus"><button data-s="" class="on">Любой статус</button><button data-s="new">Новые</button><button data-s="emailed">Письмо</button><button data-s="messaged">WhatsApp</button><button data-s="contacted">На связи</button></div>
+    <button class="btn sm" id="csv">Экспорт CSV</button>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="wrap gate" id="gate" style="display:none">
+  <div class="brand" style="justify-content:center;margin-bottom:20px"><svg viewBox="0 0 100 120" style="width:20px;height:24px"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg><b style="font-family:var(--serif);letter-spacing:.34em;padding-left:.34em">LUMEN</b></div>
+  <h2>Только для владельца</h2>
+  <p>Войдите как владелец в основной CRM — и вернитесь на эту страницу.</p>
+  <a class="btn pri" href="/">Войти в CRM</a>
+</div>
+
+<div class="ovl" id="ovl"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var PAINS={speed:'Медленно отвечают',leak:'Уводят базу',qual:'Нет квалификации',chaos:'Хаос в каналах',nurture:'Не дожимают',other:'Другое'};
+  var ROLES={agency:'Агентство',solo:'Соло-брокер'};
+  var ST_RU={new:'Новый',emailed:'Письмо',messaged:'WhatsApp',contacted:'На связи',rejected:'Отклонён'};
+  var DATA=[], WA='', EMAIL_READY=false, fRole='', fStatus='', fQ='';
+  var app=document.getElementById('app'),gate=document.getElementById('gate');
+
+  function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},1900);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function fmtDate(ts){if(!ts)return '';var d=new Date(ts);return d.getDate()+' '+['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+
+  function load(){
+    fetch('/api/waitlist/list',{headers:{'Accept':'application/json'}}).then(function(r){
+      if(r.status===401||r.status===403){app.style.display='none';gate.style.display='block';throw 'gate';}
+      return r.json();
+    }).then(function(j){
+      app.style.display='block';gate.style.display='none';
+      DATA=j.list||[];WA=j.wa||'';EMAIL_READY=!!j.emailReady;
+      document.getElementById('cfgWa').value=WA?('+'+WA):'';
+      var st=document.getElementById('cfgSt');
+      st.innerHTML='Email: <i class="'+(EMAIL_READY?'ok':'bad')+'">'+(EMAIL_READY?'настроен ✓':'не настроен')+'</i> · WhatsApp Cloud: <i class="'+(j.waReady?'ok':'bad')+'">'+(j.waReady?'подключён ✓':'через click-to-chat')+'</i>';
+      renderKpis();render();
+    }).catch(function(e){if(e!=='gate')console.error(e)});
+  }
+
+  function renderKpis(){
+    var n=DATA.length,ag=DATA.filter(function(x){return x.role==='agency'}).length,so=DATA.filter(function(x){return x.role==='solo'}).length,
+        cont=DATA.filter(function(x){return x.status==='contacted'}).length,today=DATA.filter(function(x){return x.at&&(Date.now()-x.at)<864e5}).length;
+    document.getElementById('kpis').innerHTML=
+      kpi(n,'всего в списке')+kpi(today,'за сутки')+kpi(ag,'агентства')+kpi(so,'соло')+kpi(cont,'на связи');
+  }
+  function kpi(v,l){return '<div class="kpi"><b>'+v+'</b><span>'+l+'</span></div>'}
+
+  function match(x){
+    if(fRole&&x.role!==fRole)return false;
+    if(fStatus&&(x.status||'new')!==fStatus)return false;
+    if(fQ){var s=(x.name+' '+x.email+' '+(x.whatsapp||'')).toLowerCase();if(s.indexOf(fQ)<0)return false;}
+    return true;
+  }
+  function render(){
+    var rows=DATA.filter(match);
+    var el=document.getElementById('list');
+    if(!rows.length){el.innerHTML='<div class="empty">Пусто. Заявки появятся здесь.</div>';return;}
+    el.innerHTML=rows.map(function(x){
+      var chips='';
+      if(x.role)chips+='<span class="chip role">'+esc(ROLES[x.role]||x.role)+'</span>';
+      if(x.brokers)chips+='<span class="chip">'+esc(x.brokers)+' брокеров</span>';
+      if(x.market)chips+='<span class="chip">'+esc(x.market)+'</span>';
+      (x.pains||[]).forEach(function(p){chips+='<span class="chip">'+esc(PAINS[p]||p)+'</span>'});
+      var stt=x.status||'new';
+      var waLink=x.whatsapp?('<a onclick="waOpen(\''+esc(x.email)+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+esc(x.whatsapp)+'</a>'):'';
+      return '<div class="row">'+
+        '<div class="who"><b>'+esc(x.name||'—')+'</b><div class="meta">'+fmtDate(x.at)+(x.consent?' · согласие ✓':'')+'</div><div class="chips">'+chips+'</div></div>'+
+        '<div class="contact"><a onclick="copy(\''+esc(x.email)+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="13" height="13" rx="2"/><path d="M9 20h9a2 2 0 0 0 2-2V9"/></svg>'+esc(x.email)+'</a>'+waLink+'</div>'+
+        '<div class="stwrap"><span class="badge '+stt+'">'+esc(ST_RU[stt]||stt)+'</span>'+
+          '<select class="stsel" onchange="setStatus(\''+esc(x.email)+'\',this.value)">'+
+          ['new','emailed','messaged','contacted','rejected'].map(function(s){return '<option value="'+s+'"'+(s===stt?' selected':'')+'>'+ST_RU[s]+'</option>'}).join('')+'</select></div>'+
+        '<div class="acts">'+
+          '<button class="btn sm" onclick="sendEmail(\''+esc(x.email)+'\')" title="Отправить письмо">Email</button>'+
+          (x.whatsapp?'<button class="btn sm" onclick="waOpen(\''+esc(x.email)+'\')" title="Написать в WhatsApp">WhatsApp</button>':'')+
+          '<button class="btn sm ic" onclick="preview(\''+esc(x.email)+'\')" title="Превью письма"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>'+
+          '<button class="btn sm ic" onclick="del(\''+esc(x.email)+'\')" title="Удалить"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg></button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  window.copy=function(t){navigator.clipboard&&navigator.clipboard.writeText(t);toast('Скопировано: '+t)};
+  window.setStatus=function(email,status){api('/api/waitlist/status',{email:email,status:status}).then(function(){var r=DATA.find(function(x){return x.email===email});if(r)r.status=status;render();renderKpis();toast('Статус: '+ST_RU[status])})};
+  window.sendEmail=function(email){
+    if(!EMAIL_READY){toast('Сначала настройте Resend (from + ключ)');return;}
+    toast('Отправляю письмо…');
+    api('/api/waitlist/email',{email:email}).then(function(j){if(j.error){toast('Ошибка: '+j.error);return;}var r=DATA.find(function(x){return x.email===email});if(r){r.emailedAt=Date.now();if((r.status||'new')==='new')r.status='emailed';}render();renderKpis();toast('Письмо отправлено ✓')}).catch(function(){toast('Не удалось отправить')});
+  };
+  window.waOpen=function(email){
+    fetch('/api/waitlist/wa-text?email='+encodeURIComponent(email)).then(function(r){return r.json()}).then(function(j){
+      if(j.error){toast(j.error);return;}
+      if(!j.phone){toast('У записи нет номера WhatsApp');return;}
+      window.open('https://wa.me/'+j.phone+'?text='+encodeURIComponent(j.text),'_blank');
+      // помечаем как "написали"
+      var r=DATA.find(function(x){return x.email===email});if(r&&(r.status||'new')!=='contacted'){setStatus(email,'messaged');}
+    });
+  };
+  window.preview=function(email){
+    var m=document.getElementById('modal');
+    m.innerHTML='<div class="mh"><b>Превью письма первого касания</b><button class="x" onclick="closeM()">✕</button></div>'+
+      '<div class="watext" id="waPrev">Загрузка WhatsApp-текста…</div>'+
+      '<iframe src="/api/waitlist/preview?email='+encodeURIComponent(email)+'"></iframe>';
+    document.getElementById('ovl').classList.add('on');
+    fetch('/api/waitlist/wa-text?email='+encodeURIComponent(email)).then(function(r){return r.json()}).then(function(j){
+      var p=document.getElementById('waPrev');if(!p)return;
+      if(j.error){p.textContent='WhatsApp: нет номера или текста';return;}
+      p.innerHTML='<div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">Первое сообщение в WhatsApp</div>'+esc(j.text)+
+        '<div style="margin-top:12px"><button class="btn sm" onclick="copy('+JSON.stringify(j.text).replace(/"/g,'&quot;')+')">Скопировать</button></div>';
+    });
+  };
+  window.closeM=function(){document.getElementById('ovl').classList.remove('on')};
+  document.getElementById('ovl').addEventListener('click',function(e){if(e.target===this)closeM()});
+  window.del=function(email){if(!confirm('Удалить '+email+' из списка?'))return;api2('/api/waitlist','DELETE',{email:email}).then(function(){DATA=DATA.filter(function(x){return x.email!==email});render();renderKpis();toast('Удалено')})};
+
+  function api(p,body){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return{}})})}
+  function api2(p,method,body){return fetch(p,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return{}})})}
+
+  document.getElementById('q').addEventListener('input',function(){fQ=this.value.trim().toLowerCase();render()});
+  document.getElementById('segRole').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;fRole=b.dataset.r;[].forEach.call(this.children,function(c){c.classList.toggle('on',c===b)});render()});
+  document.getElementById('segStatus').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;fStatus=b.dataset.s;[].forEach.call(this.children,function(c){c.classList.toggle('on',c===b)});render()});
+  document.getElementById('cfgSave').addEventListener('click',function(){
+    api('/api/waitlist/config',{waPublic:document.getElementById('cfgWa').value,emailFrom:document.getElementById('cfgFrom').value}).then(function(j){
+      if(j.wa!==undefined)WA=j.wa;EMAIL_READY=!!j.emailReady;toast('Сохранено');load();
+    });
+  });
+  document.getElementById('csv').addEventListener('click',function(){
+    var rows=DATA.filter(match);
+    var head=['Имя','Email','WhatsApp','Тип','Брокеров','Рынок','Боли','Статус','Согласие','Дата'];
+    var lines=[head.join(',')].concat(rows.map(function(x){
+      return [x.name,x.email,x.whatsapp,ROLES[x.role]||x.role||'',x.brokers||'',x.market||'',(x.pains||[]).map(function(p){return PAINS[p]||p}).join('; '),ST_RU[x.status||'new'],x.consent?'да':'',new Date(x.at||0).toISOString()]
+        .map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(',');
+    }));
+    var blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lumen-waitlist.csv';a.click();
+  });
+
+  load();
+</script>
+</body>
+</html>

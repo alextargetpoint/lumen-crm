@@ -581,6 +581,123 @@ function nonOwnerBlocked(p, method, granted) {
 /* маскировка телефона для чужих лидов у роли broker */
 const maskPhone = (ph) => String(ph || '').replace(/^(\+?\d{2,4})\d+(\d{2})$/, '$1•••••$2');
 
+/* ───────── ЛИСТ ОЖИДАНИЯ: первое касание (персонализация по сегменту/боли) ───────── */
+function waPublicNumber(db) {
+  const a = db.settings.agency || {};
+  return String(a.waPublic || (a.manager && a.manager.phone) || '').replace(/\D/g, '');
+}
+const WL_PAIN_LINE = {
+  speed: 'Ответ за секунды — пока конкуренты только набирают первое сообщение.',
+  leak: 'База остаётся у агентства, даже когда уходит брокер.',
+  qual: 'Каждый лид приходит квалифицированным и с психо-портретом — ещё до звонка.',
+  chaos: 'Все каналы и переписки — в одном месте, без хаоса и заметок «в голове».',
+  nurture: 'Цепочки касаний дожимают молчунов, пока вы заняты сделками.',
+  other: 'Меньше рутины — больше сделок.'
+};
+const WL_ROLE_RU = { agency: 'агентство', solo: 'соло-брокер' };
+function wlSegment(rec) {
+  const role = rec.role === 'agency' ? 'agency' : rec.role === 'solo' ? 'solo' : 'unknown';
+  const pain = (rec.pains && rec.pains[0]) || '';
+  return { role, pain, key: role + (pain ? ':' + pain : '') };
+}
+function wlHook(rec) {
+  const s = wlSegment(rec);
+  if (s.pain && WL_PAIN_LINE[s.pain]) return WL_PAIN_LINE[s.pain];
+  if (s.role === 'agency') return 'Вы держите агентство под контролем: база — ваша, брокеры её не уводят.';
+  if (s.role === 'solo') return 'Вы отвечаете первым и не теряете ни одного лида — даже когда работаете одни.';
+  return 'Не ещё одна CRM — среда, где заявка сама доходит до сделки.';
+}
+function wlSubject(rec) {
+  const s = wlSegment(rec), n = rec.name ? rec.name + ', ' : '';
+  if (s.role === 'agency') return n + 'ваша база — под контролем агентства';
+  if (s.role === 'solo') return n + 'отвечайте первым — даже когда вы одни';
+  return n + 'вы в списке раннего доступа Lumen';
+}
+/* нативное первое сообщение в WhatsApp (менеджер → лид), персонализированное */
+function waitlistWaText(db, rec) {
+  const mgrName = (db.settings.agency.manager && db.settings.agency.manager.name && db.settings.agency.manager.name !== 'Ваш менеджер') ? db.settings.agency.manager.name : '';
+  const sig = mgrName ? `${mgrName} из Lumen` : 'команда Lumen';
+  const n = rec.name || 'Здравствуйте';
+  const forWhom = rec.role === 'agency' ? 'под ваше агентство' : rec.role === 'solo' ? 'под вашу работу' : 'под ваш случай';
+  return `${n}, привет! 👋 Это ${sig}.\n\nСпасибо за заявку на ранний доступ — вы уже в списке. ${wlHook(rec)}\n\nХочу показать систему живьём ${forWhom} — 15 минут, без слайдов, на вашем реальном сценарии. Когда удобно, сегодня или завтра? Можно ответить прямо здесь 🙌`;
+}
+/* префилл для click-to-chat в письме (лид → наш номер) */
+function waitlistClickText(rec) {
+  const s = wlSegment(rec);
+  const who = WL_ROLE_RU[s.role] ? ` (${WL_ROLE_RU[s.role]})` : '';
+  return `Здравствуйте! Я в листе ожидания Lumen${who}. Хочу узнать про ранний доступ и когда старт 🙌`;
+}
+/* красивое HTML-письмо первого касания (dark-lux, inline-стили, bulletproof-кнопка) */
+function waitlistEmailHTML(db, rec) {
+  const name = esc(rec.name || 'Здравствуйте');
+  const mgrRaw = (db.settings.agency.manager && db.settings.agency.manager.name && db.settings.agency.manager.name !== 'Ваш менеджер') ? db.settings.agency.manager.name : 'Команда Lumen';
+  const mgr = esc(mgrRaw);
+  const waNum = waPublicNumber(db);
+  const waHref = waNum ? `https://wa.me/${waNum}?text=${encodeURIComponent(waitlistClickText(rec))}` : '';
+  const hook = esc(wlHook(rec));
+  const s = wlSegment(rec);
+  const bullets = s.role === 'agency'
+    ? ['База принадлежит агентству — брокеры её не уводят', 'Ответ за секунды на всех каналах, круглосуточно', 'Пульт контроля: риски, тишина, «утекающие» лиды']
+    : ['Отвечаете первым — даже когда заняты или спите', 'ИИ квалифицирует и строит психо-портрет клиента', 'Живые подборки и дожим — без ручной рутины'];
+  const bl = bullets.map(t => `<tr><td style="padding:6px 0;color:#cfcdc8;font:400 15px/1.5 Georgia,serif;"><span style="color:#8a8885;">—&nbsp;</span>${esc(t)}</td></tr>`).join('');
+  const site = (process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || tunnelUrl() || '').replace(/\/$/, '');
+  const waBtn = waHref ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px auto 0;"><tr><td align="center" bgcolor="#f4f3f1" style="border-radius:999px;">
+        <a href="${waHref}" style="display:inline-block;padding:15px 30px;font:600 15px/1 Arial,sans-serif;color:#0a0a0a;text-decoration:none;border-radius:999px;letter-spacing:.02em;">Написать нам в WhatsApp&nbsp;→</a>
+      </td></tr></table>` : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"></head>
+<body style="margin:0;padding:0;background:#070707;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Вы в списке раннего доступа Lumen. ${hook}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#070707;padding:32px 16px;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0d0d0e;border:1px solid rgba(255,255,255,.09);border-radius:18px;overflow:hidden;">
+      <tr><td style="padding:34px 40px 0;text-align:center;">
+        <div style="font:500 20px/1 Georgia,serif;letter-spacing:.42em;color:#f4f3f1;padding-left:.42em;">LUMEN</div>
+      </td></tr>
+      <tr><td style="padding:26px 40px 0;">
+        <div style="font:600 11px/1 Arial,sans-serif;letter-spacing:.28em;color:#8a8885;text-transform:uppercase;text-align:center;">Ранний доступ</div>
+        <h1 style="margin:16px 0 0;font:300 34px/1.08 Georgia,serif;color:#f4f3f1;text-align:center;letter-spacing:-.01em;">Вы в списке, ${name}.</h1>
+        <p style="margin:16px 0 0;font:400 15px/1.65 Georgia,serif;color:#a7a6a3;text-align:center;">${hook}</p>
+      </td></tr>
+      <tr><td style="padding:26px 40px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);padding:6px 0;">
+          <tr><td style="padding:14px 0 6px;">${bl}</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:26px 40px 4px;text-align:center;">
+        <p style="margin:0 0 14px;font:400 14px/1.6 Georgia,serif;color:#cfcdc8;">Хотите не ждать очередь? Напишите нам в WhatsApp — покажем систему живьём под ваш случай за 15 минут.</p>
+        ${waBtn}
+      </td></tr>
+      <tr><td style="padding:22px 40px 0;text-align:center;">
+        <p style="margin:0;font:400 14px/1.6 Georgia,serif;color:#8a8885;">— ${mgr}${site ? ` · <a href="${esc(site)}/land.html" style="color:#cfcdc8;">о продукте</a>` : ''}</p>
+      </td></tr>
+      <tr><td style="padding:28px 40px 34px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid rgba(255,255,255,.07);">
+          <tr><td style="padding:18px 0 0;font:400 11px/1.6 Arial,sans-serif;color:#6b6a68;text-align:center;">
+            © 2026 Lumen — продукт TargetPoint · Rue du Trône 100, 1050 Brussels, Belgium<br>
+            Вы получили письмо, потому что оставили заявку на раннний доступ. <a href="mailto:info@targetpoint.agency?subject=unsubscribe" style="color:#8a8885;">Отписаться</a>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+</table></body></html>`;
+}
+async function sendWaitlistEmail(db, rec) {
+  const cfg = (db.settings.channels && db.settings.channels.email) || {};
+  if (!cfg.key || !cfg.from) return { ok: false, error: 'Email не настроен (Resend key/from)' };
+  if (!rec.email) return { ok: false, error: 'нет e-mail' };
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: cfg.from, to: rec.email, subject: wlSubject(rec), html: waitlistEmailHTML(db, rec) }),
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, error: 'Resend ' + r.status + (t ? ': ' + t.slice(0, 120) : '') }; }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
 function tunnelUrl() {
   try {
     const log = fs.readFileSync('/tmp/lumen-tunnel.log', 'utf8');
@@ -2716,15 +2833,73 @@ const server = http.createServer(async (req, res) => {
       if (!consent) return json(res, 400, { error: 'нужно согласие на обработку персональных данных' });
       db.waitlist = db.waitlist || [];
       let idx = db.waitlist.findIndex(w => w.email === email);
+      const PAINS = { speed: 'Медленно отвечаем', leak: 'Брокеры уводят базу', qual: 'Нет квалификации', chaos: 'Хаос в переписках', nurture: 'Не дожимаем лидов', other: 'Другое' };
+      const pains = Array.isArray(b && b.pains) ? b.pains.map(x => String(x).slice(0, 20)).filter(x => PAINS[x]).slice(0, 6) : [];
       const rec = {
         name: String((b && b.name) || '').trim().slice(0, 120),
         whatsapp: String((b && b.whatsapp) || '').trim().slice(0, 40),
+        role: (b && b.role === 'agency') ? 'agency' : (b && b.role === 'solo') ? 'solo' : '',
+        brokers: String((b && b.brokers) || '').trim().slice(0, 20),
+        market: String((b && b.market) || '').trim().slice(0, 40),
+        pains,
         ref: String((b && b.ref) || '').slice(0, 200),
         consent: true, consentAt: Date.now()
       };
-      if (idx < 0) { db.waitlist.push(Object.assign({ email, at: Date.now() }, rec)); idx = db.waitlist.length - 1; store.save(); }
+      if (idx < 0) { db.waitlist.push(Object.assign({ email, at: Date.now(), status: 'new' }, rec)); idx = db.waitlist.length - 1; store.save(); }
       else { Object.assign(db.waitlist[idx], rec); store.save(); } // дозаполняем контакт/согласие
+      /* авто-приветствие на почту (best-effort, если Resend настроен) */
+      try { const rr = db.waitlist[idx]; if (!rr.emailedAt) sendWaitlistEmail(db, rr).then(r => { if (r && r.ok) { rr.emailedAt = Date.now(); if (rr.status === 'new') rr.status = 'emailed'; store.save(); } }).catch(() => {}); } catch (_) {}
       return json(res, 200, { ok: true, count: db.waitlist.length, position: idx + 1 });
+    }
+    /* ---------- АДМИНКА листа ожидания (только владелец) ---------- */
+    if (p === '/api/waitlist/list' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const list = (db.waitlist || []).map((w, i) => Object.assign({ i }, w)).sort((a, b2) => (b2.at || 0) - (a.at || 0));
+      return json(res, 200, { list, wa: waPublicNumber(db), emailReady: !!(db.settings.channels && db.settings.channels.email && db.settings.channels.email.key && db.settings.channels.email.from), waReady: wa.ready(db) });
+    }
+    if (p === '/api/waitlist/status' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const em = String((b && b.email) || '').toLowerCase();
+      const rr = (db.waitlist || []).find(w => w.email === em); if (!rr) return json(res, 404, { error: 'нет записи' });
+      const ST = ['new', 'emailed', 'messaged', 'contacted', 'rejected'];
+      if (b.status !== undefined) rr.status = ST.includes(b.status) ? b.status : rr.status;
+      if (b.note !== undefined) rr.adminNote = String(b.note).slice(0, 800);
+      store.save(); return json(res, 200, { ok: true });
+    }
+    if (p === '/api/waitlist/email' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const em = String((b && b.email) || '').toLowerCase();
+      const rr = (db.waitlist || []).find(w => w.email === em); if (!rr) return json(res, 404, { error: 'нет записи' });
+      const r0 = await sendWaitlistEmail(db, rr);
+      if (!r0.ok) return json(res, 400, { error: r0.error || 'не удалось отправить' });
+      rr.emailedAt = Date.now(); if (rr.status === 'new') rr.status = 'emailed'; store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (p === '/api/waitlist/preview' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') { res.writeHead(403); return res.end('403'); }
+      const em = String(u.searchParams.get('email') || '').toLowerCase();
+      const rr = (db.waitlist || []).find(w => w.email === em) || { name: 'Алексей', email: 'you@agency.com', role: 'agency', brokers: '4-10', pains: ['speed', 'leak'], at: Date.now() };
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(waitlistEmailHTML(db, rr));
+    }
+    if (p === '/api/waitlist/wa-text' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const em = String(u.searchParams.get('email') || '').toLowerCase();
+      const rr = (db.waitlist || []).find(w => w.email === em); if (!rr) return json(res, 404, { error: 'нет записи' });
+      return json(res, 200, { text: waitlistWaText(db, rr), phone: String(rr.whatsapp || '').replace(/\D/g, '') });
+    }
+    if (p === '/api/waitlist/config' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      if (b.waPublic !== undefined) db.settings.agency.waPublic = String(b.waPublic || '').trim().slice(0, 40);
+      if (b.emailFrom !== undefined) { db.settings.channels = db.settings.channels || {}; db.settings.channels.email = db.settings.channels.email || {}; db.settings.channels.email.from = String(b.emailFrom || '').trim().slice(0, 120); }
+      if (b.emailKey) { db.settings.channels = db.settings.channels || {}; db.settings.channels.email = db.settings.channels.email || {}; db.settings.channels.email.key = String(b.emailKey).trim().slice(0, 200); }
+      store.save(); return json(res, 200, { ok: true, wa: waPublicNumber(db), emailReady: !!(db.settings.channels.email.key && db.settings.channels.email.from) });
+    }
+    if (p === '/api/waitlist' && req.method === 'DELETE') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const em = String((b && b.email) || '').toLowerCase();
+      db.waitlist = (db.waitlist || []).filter(w => w.email !== em); store.save();
+      return json(res, 200, { ok: true, count: db.waitlist.length });
     }
     if (p === '/api/consult' && req.method === 'POST') {
       if (!rateHit('cs:' + (clientIp(req) || 'x'), 8, 60000)) return json(res, 429, { error: 'слишком часто' });
