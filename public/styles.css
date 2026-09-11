@@ -6864,6 +6864,15 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="atelier"] .topbar { background: transparent; border: none; }
 :root[data-theme="atelier"] .brand-mark { filter: grayscale(1) brightness(1.5); }
 :root[data-theme="atelier"] .pl-logo { filter: grayscale(1) brightness(1.6); }
+/* выпадашки/поповеры/меню — near-black (в тёмной базе они navy #101B31, тут клешат) */
+:root[data-theme="atelier"] .cs-list, :root[data-theme="atelier"] .dtp-pop, :root[data-theme="atelier"] .pop,
+:root[data-theme="atelier"] .navsearch-res, :root[data-theme="atelier"] .gs-results, :root[data-theme="atelier"] .menu,
+:root[data-theme="atelier"] .ctx, :root[data-theme="atelier"] .hint-pop { background: #16130f !important; border: 1px solid rgba(255,255,255,.1) !important; box-shadow: 0 20px 56px rgba(0,0,0,.7) !important; }
+:root[data-theme="atelier"] .cs-opt:hover, :root[data-theme="atelier"] .pop-item:hover { background: rgba(255,255,255,.06); }
+:root[data-theme="atelier"] .cs-btn { background: #16130f; border-color: rgba(255,255,255,.1); color: var(--ink); }
+:root[data-theme="atelier"] .seg-toggle, :root[data-theme="atelier"] .seg { background: rgba(255,255,255,.04); }
+:root[data-theme="atelier"] .seg-btn.on { background: rgba(255,255,255,.1); color: var(--ink); }
+:root[data-theme="atelier"] input, :root[data-theme="atelier"] textarea, :root[data-theme="atelier"] select { background: #16130f; border-color: rgba(255,255,255,.12); color: var(--ink); }
 
 /* ═══ Пер-темовая персонализация иконок: каждая стилистика — свой характер штриха ═══
    ic()-иконки в рабочей области несут атрибут stroke-width; CSS-свойство его перекрывает.
