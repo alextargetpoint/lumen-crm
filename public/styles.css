@@ -6376,7 +6376,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; }
 /* координация видеофонов под тему: тонируем скайлайн (лоадер/логин/обложка агентства) */
 :root[data-theme="mono"] #preloader video, :root[data-theme="mono"] #loginScreen video, :root[data-theme="mono"] .ag-cover-v,
 :root[data-theme="frame"] #preloader video, :root[data-theme="frame"] #loginScreen video, :root[data-theme="frame"] .ag-cover-v { filter: grayscale(1) contrast(1.05) brightness(.92); }
-:root[data-theme="warm"] #preloader video, :root[data-theme="warm"] #loginScreen video, :root[data-theme="warm"] .ag-cover-v { filter: hue-rotate(52deg) saturate(1.15); }
+/* Аметист использует НАТИВНОЕ фиолетовое видео (skyline-warm.mp4) — тинт не нужен */
 :root[data-theme="emerald"] #preloader video, :root[data-theme="emerald"] #loginScreen video, :root[data-theme="emerald"] .ag-cover-v { filter: hue-rotate(298deg) saturate(1.1) brightness(.98); }
 /* лого лоадера/логина (img src=logo.svg) тонируем под тему, чтобы совпадал с шапкой */
 :root[data-theme="mono"] .pl-logo, :root[data-theme="frame"] .pl-logo { filter: grayscale(1) brightness(1.5) contrast(1.1); }

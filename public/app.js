@@ -461,7 +461,7 @@ function renderLogin() {
     if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(120,160,255,.4))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#7C9BFF;opacity:.75;margin-top:12px">работает на Lumen</div></div>`;
   } catch (e) {}
   const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
-    <video autoplay muted loop playsinline src="assets/skyline-bg.mp4?v=2" poster="assets/skyline-poster.jpg?v=2"
+    <video data-skyline autoplay muted loop playsinline src="${typeof skylineSrc==='function'?skylineSrc():'assets/skyline-bg.mp4?v=2'}" poster="assets/skyline-poster.jpg?v=2"
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
     <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
     <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
@@ -681,6 +681,17 @@ const THEME_PRESETS = [
   { k: 'frame',   name: 'Контур',   desc: 'чёткие рамки, без теней',       sw: ['#111827', '#FFFFFF', '#111827'], dark: false },
   { k: 'emerald', name: 'Изумруд',  desc: 'чистый насыщенный emerald',     sw: ['#059669', '#F4FBF7', '#0C1F17'], dark: false },
 ];
+/* бесповоротные AI-видеофоны под тему (сгенерированы через Higgsfield);
+   у кого своего нет — родной скайлайн + CSS-тинт под палитру */
+const THEME_VIDEO = { warm: 'assets/skyline-warm.mp4?v=1' };
+function skylineSrc(theme) { return THEME_VIDEO[theme || localStorage.getItem('lumen_theme') || 'light'] || 'assets/skyline-bg.mp4?v=2'; }
+function applyThemeVideo(theme) {
+  const src = skylineSrc(theme);
+  document.querySelectorAll('[data-skyline]').forEach(v => {
+    const cur = (v.getAttribute('src') || '').split('?')[0];
+    if (cur !== src.split('?')[0]) { v.setAttribute('src', src); if (v.load) try { v.load(); } catch (_) {} }
+  });
+}
 (() => {
   const P = Object.fromEntries(THEME_PRESETS.map(p => [p.k, p]));
   const applyTheme = (k) => {
@@ -689,6 +700,7 @@ const THEME_PRESETS = [
     if (k !== 'light' && k !== 'dark') root.setAttribute('data-theme', k); else root.removeAttribute('data-theme');
     const b = document.getElementById('nightBtn');
     if (b) { b.textContent = p.dark ? '☀️' : (k === 'light' ? '🌙' : '◐'); b.title = 'Оформление: ' + p.name; }
+    applyThemeVideo(k);
   };
   let cur = localStorage.getItem('lumen_theme');
   if (!P[cur]) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'light';
@@ -9832,7 +9844,7 @@ PAGES.agency = async (root) => {
   const edition = s.agency.edition || 'agency';
   root.innerHTML = `
     <div class="ag-profile">
-      <div class="ag-cover"><video class="ag-cover-v" autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="assets/skyline-bg.mp4?v=2"></video></div>
+      <div class="ag-cover"><video class="ag-cover-v" data-skyline autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="${skylineSrc()}"></video></div>
       <div class="ag-ident">
         <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.55">`}</div>
         <div class="ag-id-main">
