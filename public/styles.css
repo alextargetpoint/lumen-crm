@@ -416,16 +416,16 @@ textarea { resize: vertical; min-height: 70px; }
 .conv .unread { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 
 .chat { display: flex; flex-direction: column; overflow: hidden; position: relative; }
-/* ⭐ ИИ на связи: мягкая живая подсветка снизу чата + дышащий пилл. Появляется, когда ИИ ведёт диалог, плавно гаснет при выключении */
-.chat-ai-aura { position: absolute; left: 0; right: 0; bottom: 62px; height: 116px; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .6s var(--ease-soft, ease); }
-.chat.ai-live .chat-ai-aura { opacity: 1; }
-.chat-ai-aura-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .3; -webkit-mask: linear-gradient(0deg, #000 12%, transparent 92%); mask: linear-gradient(0deg, #000 12%, transparent 92%); }
-.chat-ai-pill { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%) translateY(6px); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; background: rgba(10, 17, 33, .72); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); color: #fff; font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 30px; box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent) 65%, transparent); transition: transform .5s var(--ease-spring, ease); }
-.chat.ai-live .chat-ai-pill { transform: translateX(-50%) translateY(0); }
-.chat-ai-pill svg { width: 14px; height: 14px; color: var(--blue-300, #7C9BFF); }
-.chat-ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue-300, #7C9BFF); box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue-300, #7C9BFF) 60%, transparent); animation: aiBreath 1.9s ease-in-out infinite; }
-@keyframes aiBreath { 0%, 100% { opacity: .4; transform: scale(.8); box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue-300, #7C9BFF) 55%, transparent); } 50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 0 5px color-mix(in srgb, var(--blue-300, #7C9BFF) 0%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .chat-ai-dot { animation: none; } .chat-ai-aura-v { opacity: .18; } }
+/* ⭐ ИИ на связи: тонкая живая полоска МЕЖДУ перепиской и полем ввода (в потоке, НЕ поверх сообщений —
+   не налезает на чат). Плавно раскрывается, когда ИИ ведёт диалог, и схлопывается при выключении. */
+.chat-ai-aura { position: relative; flex: none; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .42s var(--ease-soft, ease), opacity .42s; }
+.chat.ai-live .chat-ai-aura { max-height: 40px; opacity: 1; }
+.chat-ai-aura-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .2; pointer-events: none; }
+.chat-ai-pill { position: relative; z-index: 1; height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; border-top: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke-soft)); background: color-mix(in srgb, var(--accent) 6%, transparent); color: color-mix(in srgb, var(--accent) 82%, var(--navy-900)); font-size: 11.5px; font-weight: 650; letter-spacing: .01em; }
+.chat-ai-pill svg { width: 14px; height: 14px; color: var(--accent); }
+.chat-ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: aiBreath 1.9s ease-in-out infinite; }
+@keyframes aiBreath { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .chat-ai-dot { animation: none; } .chat-ai-aura-v { opacity: .12; } }
 .chat-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--stroke-soft); }
 .chat-head .nm { font-weight: 650; font-size: 14.5px; color: var(--navy-900); }
 .chat-head .ph { font-size: 12px; color: var(--ink-3); }
