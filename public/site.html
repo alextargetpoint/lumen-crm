@@ -301,6 +301,14 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 .node .sub{font-size:12.5px;color:var(--ink3)}
 .flow .con{align-self:flex-start;margin-top:33px;color:var(--blue);opacity:.6}
 .flow .con svg{width:34px;height:20px}
+/* омниканальный каскад: стрелки «текут», каналы загораются по очереди */
+.flow .con svg path{stroke-dasharray:5 5;animation:omniFlow 1s linear infinite}
+@keyframes omniFlow{to{stroke-dashoffset:-20}}
+.flow .node .bubble{animation:omniPulse 4.4s var(--ease-soft) infinite}
+.flow .node:nth-of-type(3) .bubble{animation-delay:1.1s}
+.flow .node:nth-of-type(5) .bubble{animation-delay:2.2s}
+.flow .node:nth-of-type(7) .bubble{animation-delay:3.3s}
+@keyframes omniPulse{0%,58%,100%{box-shadow:var(--shadow);transform:translateY(0)}10%{box-shadow:0 0 0 7px color-mix(in srgb,var(--blue) 15%,transparent),0 18px 34px -12px color-mix(in srgb,var(--blue) 55%,transparent);transform:translateY(-5px)}22%{box-shadow:var(--shadow);transform:translateY(0)}}
 
 /* ============ COMPARE (versus cards) ============ */
 .vs{display:grid;grid-template-columns:1.32fr .88fr;gap:20px;align-items:stretch}
@@ -1046,9 +1054,9 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <div class="big-say">Заявка стоит дорого — <span class="hl">а остывает за минуты.</span> Вы платите за трафик, а менеджер отвечает через полчаса, когда клиент уже написал троим конкурентам.</div>
     </div>
     <div class="leaks">
-      <div class="leak" data-r><div class="fig">78%</div><div><h4>Побеждает тот, кто первый</h4><p>Клиенты выбирают агентство, ответившее первым. Ночная заявка без мгновенного ответа — почти всегда потеряна.</p></div></div>
-      <div class="leak d1" data-r><div class="fig">47′</div><div><h4>Рутина съедает скорость</h4><p>Средняя задержка ответа у живого отдела. Квалификация вручную — долго, неровно, по настроению.</p></div></div>
-      <div class="leak d2" data-r><div class="fig">60%</div><div><h4>База лежит мёртвым грузом</h4><p>Больше половины контактов «спят». Никто не дожимает молчунов системно — а там оплаченные, прогретые лиды.</p></div></div>
+      <div class="leak" data-r><div class="fig countup" data-to="78" data-suffix="%">0%</div><div><h4>Побеждает тот, кто первый</h4><p>Клиенты выбирают агентство, ответившее первым. Ночная заявка без мгновенного ответа — почти всегда потеряна.</p></div></div>
+      <div class="leak d1" data-r><div class="fig countup" data-to="47" data-suffix="′">0′</div><div><h4>Рутина съедает скорость</h4><p>Средняя задержка ответа у живого отдела. Квалификация вручную — долго, неровно, по настроению.</p></div></div>
+      <div class="leak d2" data-r><div class="fig countup" data-to="60" data-suffix="%">0%</div><div><h4>База лежит мёртвым грузом</h4><p>Больше половины контактов «спят». Никто не дожимает молчунов системно — а там оплаченные, прогретые лиды.</p></div></div>
     </div>
   </div>
 </section>
