@@ -615,9 +615,70 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .mobnav.open{display:flex}
   .mobnav a{font-family:var(--disp);font-size:30px;font-weight:600;padding:10px}
   .mobnav .btn{margin-top:22px}
-  .pages{height:440px}.page.p-front{width:250px}.page.p-back{width:220px;left:70px}.sc-phone{width:130px}
   .fcard{display:none}
-  .stage{max-width:360px}
+}
+
+/* ============ MOBILE OVERHAUL (≤640) — полная оптимизация ============ */
+@media (max-width:640px){
+  :root{--pad:18px}
+  .sec{padding:52px 0}
+  .sec-head{margin-bottom:26px}
+  h2{font-size:clamp(27px,7.6vw,34px);line-height:1.07}
+  .lead{font-size:15.5px}
+  .kicker{font-size:11px}
+
+  /* HERO */
+  .hero{padding-top:104px;padding-bottom:44px}
+  .hero h1{font-size:clamp(38px,11vw,52px)}
+  .hero .lead{font-size:16px}
+  .hero .microtrust{gap:16px 24px;margin-top:20px;padding-top:20px}
+  .stage{width:100%!important;max-width:318px;margin:24px auto 0;aspect-ratio:5/5.2}
+
+  /* ТЕЛЕФОНЫ-МОКАПЫ — меньше и по центру */
+  .phone{width:262px;padding:9px;border-radius:36px;margin:0 auto}
+  .phone .island{width:76px;height:20px}
+  .phone .screen{border-radius:28px}
+  .wa-body,.tg-body{min-height:320px}
+  .scene{gap:22px}
+  .scene .phone{order:2}
+  .scene .pts{gap:15px}
+  .tgwrap{gap:20px}
+
+  /* SHOWCASE — чистый вертикальный стек вместо desktop-наложения */
+  .showcase .sc-grid{gap:22px}
+  .pages{position:static;height:auto;max-width:300px;margin:0 auto;display:block}
+  .pages .page{position:static;width:100%;inset:auto;margin:0 auto;box-shadow:var(--shadow-lg)}
+  .pages .page.p-back{display:none}
+  .pages .sc-phone{position:static;width:150px;margin:16px auto 0}
+
+  /* PLATFORM (pstack) — картинки в стек */
+  .pstack{position:static;height:auto;max-width:420px;margin:0 auto;display:grid;gap:12px}
+  .pstack .sc{position:static;width:100%;inset:auto}
+  .pstack .s1,.pstack .s2{width:100%;inset:auto}
+  .pbig.rev .pstack{order:2}
+
+  /* БОЛЬШИЕ ЦИФРЫ / ЗАГОЛОВКИ */
+  .big .n{font-size:clamp(50px,19vw,74px)}
+  .big .from{font-size:19px}
+  .gap .gap-h{font-size:clamp(26px,8vw,34px)}
+  .gap-cta .lb{font-size:19px}
+  .btotal,.lprice{font-size:clamp(40px,12vw,54px)}
+
+  /* ПАДДИНГИ карточек ужать */
+  .vs-card,.bcard,.plan,.ncard,.pcard,.tgcol,.leak,.fail,.gap-item,.gap,.niche,.showcase{padding:22px}
+  .ncard.wide,.pbig{padding:24px}
+  .plan.pop{transform:none}
+  .niche{min-height:264px}
+  .calc{padding:24px}.calc .out{padding:24px}
+
+  /* модалка / футер */
+  .modal{padding:14px}
+  .modal-card{padding:26px 20px;border-radius:20px}
+  footer{padding-top:46px}
+  footer .foot-grid{gap:24px}
+
+  /* тап-таргеты */
+  .tgl,.burger{width:44px;height:44px}
 }
 </style>
 </head>
