@@ -36,9 +36,11 @@
   .vidbg>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(.9)}
   .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(243,241,236,.9),rgba(243,241,236,.8) 50%,rgba(243,241,236,.92))}
   .vidbg>.wrap{position:relative;z-index:1}
-  .tr{height:clamp(170px,22vw,320px);position:relative;z-index:2}
-  .tr.d2l{background:linear-gradient(180deg,var(--d-bg) 0%,#0f0f0f 22%,#3a3936 52%,#c9c6bf 80%,var(--l-bg) 100%)}
-  .tr.l2d{background:linear-gradient(180deg,var(--l-bg) 0%,#c9c6bf 20%,#3a3936 48%,#0f0f0f 78%,var(--d-bg) 100%)}
+  .tr{height:clamp(240px,30vw,440px);position:relative;z-index:2}
+  .tr::after{content:"";position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .tr.d2l{background:linear-gradient(180deg,#080808 0%,#080808 12%,#131211 28%,#35322c 47%,#6f6c64 63%,#a8a49b 77%,#d6d2ca 90%,#f3f1ec 100%)}
+  .tr.l2d{background:linear-gradient(180deg,#f3f1ec 0%,#d6d2ca 10%,#a8a49b 23%,#6f6c64 37%,#35322c 53%,#131211 72%,#080808 88%,#080808 100%)}
 
   .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink3);display:inline-flex;align-items:center;gap:10px}
   .eyebrow::before{content:"";width:22px;height:1px;background:var(--line)}
@@ -149,6 +151,18 @@
   .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
+  /* KILLER FEATURES — «вкусняшки» */
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
+  .feat{background:var(--cell);padding:clamp(24px,2.6vw,36px);position:relative;transition:background .5s var(--ease)}
+  .feat:hover{background:color-mix(in srgb,var(--ink) 4%,var(--cell))}
+  .feat .fi{font-family:var(--serif);font-size:15px;color:var(--ink3);letter-spacing:.02em}
+  .feat .fn{font-family:var(--serif);font-weight:400;font-size:clamp(20px,2vw,25px);line-height:1.1;margin:12px 0 11px}
+  .feat p{font-size:13.5px;color:var(--ink2);font-weight:300;line-height:1.58}
+  .feat .only{margin-top:14px;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);display:inline-flex;align-items:center;gap:7px}
+  .feat .only::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+  @media(max-width:860px){.feats{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.feats{grid-template-columns:1fr}}
+
   /* CONTROL (владелец) */
   .ctrl{display:grid;grid-template-columns:1fr 1fr;gap:clamp(26px,5vw,64px);align-items:center;margin-top:10px}
   .ctrl-list{display:grid;gap:14px}
@@ -258,8 +272,8 @@
 <div class="tr l2d"></div>
 
 <!-- THESIS (тёмная) -->
-<section class="sec dark split" id="thesis">
-  <div class="wrap" style="display:contents">
+<section class="sec dark" id="thesis">
+  <div class="wrap split">
     <div data-r>
       <span class="eyebrow">Что такое Lumen</span>
       <div class="big" style="margin-top:22px">Не инструмент, который надо заставлять открывать. <em>Среда</em>, в которой агентство живёт само — от первого сообщения до подписи.</div>
@@ -303,6 +317,25 @@
       <div class="shot" data-r class="d2"><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
       <div class="shot" data-r class="d1"><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Подборки</b><span>живые презентации объектов</span></div></div>
       <div class="shot" data-r class="d2"><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика</b><span>деньги и эффективность в цифрах</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- KILLER FEATURES (светлая, та же зона) -->
+<section class="sec light" id="feats">
+  <div class="wrap">
+    <div data-r><span class="eyebrow">Детали, которых нет у других</span>
+      <h2 style="margin-top:22px;max-width:20ch">Не «есть CRM». <em>Есть то, чего нет ни у кого</em></h2></div>
+    <div class="feats">
+      <div class="feat" data-r><div class="fi">01</div><div class="fn">Психо-портрет клиента</div><p>ИИ читает переписку и строит профиль покупателя: тип личности, на что давить, чего избегать, с чем заходить. Брокер получает не «лид №47», а инструкцию, как его закрыть.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r class="d1"><div class="fi">02</div><div class="fn">ИИ, которого не отличить</div><p>Отвечает с паузами и статусом «печатает…», в живом человеческом темпе. Клиент уверен, что общается с менеджером — а не с автоответчиком, который выдаёт себя первой же секундой.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r class="d2"><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает клиенту прямо из личного Telegram — удобно и привычно. А вся переписка, медиа и история остаются в системе агентства. Уходит брокер — база остаётся.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r><div class="fi">04</div><div class="fn">Живые подборки за минуту</div><p>ИИ собирает брендированную подборку объектов под конкретного клиента — с вашим лого и подписью. И показывает, что именно он открывал и сколько смотрел.</p></div>
+      <div class="feat" data-r class="d1"><div class="fi">05</div><div class="fn">Лиды из комментариев рекламы</div><p>Ловим тех, кто написал под объявлением в Instagram, и уводим в личный диалог — автоматически, пока конкуренты вообще не читают комментарии.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r class="d2"><div class="fi">06</div><div class="fn">Звонок в вашем голосе</div><p>Говорите по-русски — клиент слышит вас на своём языке и вашим голосом. По ходу разговора ИИ-суфлёр подсказывает, что ответить на возражение.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r><div class="fi">07</div><div class="fn">Разбор каждого звонка</div><p>ИИ слушает записи и оценивает по методологии продаж: что упустили, где не дожали, какой следующий шаг. Тренер для команды, который не спит.</p></div>
+      <div class="feat" data-r class="d1"><div class="fi">08</div><div class="fn">Реанимация спящей базы</div><p>Молчуны — это уже оплаченные лиды. Цепочки касаний будят их по всем каналам, уважая тихие часы по поясу клиента, и останавливаются, как только человек ответил.</p></div>
+      <div class="feat" data-r class="d2"><div class="fi">09</div><div class="fn">Академия рынка внутри</div><p>Встроенные знания по Дубаю, Пхукету, Бали: районы, ROI, планы оплаты, скрипты. Новый брокер выходит на сделки, не изучая рынок полгода.</p></div>
     </div>
   </div>
 </section>
