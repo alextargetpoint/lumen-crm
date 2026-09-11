@@ -6343,28 +6343,56 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 :root[data-theme="frame"] .ov2-card, :root[data-theme="frame"] .modal { border-width: 1.5px; box-shadow: 3px 3px 0 rgba(17,24,39,.12); }
 :root[data-theme="frame"] .brand-mark img { filter: grayscale(1) contrast(1.1); }
 
-/* ── Стекло: Apple-минимализм, максимум стекла (glassmorphism) ── */
+/* ═══ LUMEN GLASS — атмосферное стекло, premium-OS (спека Lumen Glass 2026) ═══ */
 :root[data-theme="emerald"] {
-  --navy-950: #1D1D1F; --navy-900: #2C2C2E; --navy-700: #3A3A3C;
-  --accent: #0071E3; --accent-2: #0A84FF; --accent-3: #5AC8FA;
-  --blue-300: #7AB8FF; --blue-100: #E3F0FF;
-  --bg: #F5F5F7; --bg-2: #ECECEE; --card: rgba(255,255,255,.62);
-  --ink: #1D1D1F; --ink-2: #424245; --ink-3: #86868B;
-  --stroke: rgba(0,0,0,.08); --stroke-soft: rgba(0,0,0,.05); --glass: rgba(255,255,255,.55);
-  --ok: #1D8F4E; --ok-bg: #E4F5EA; --warn: #B25000; --warn-bg: #F7ECD9; --bad: #E0384D; --bad-bg: #FBE9EB;
-  --violet: #5E5CE6; --violet-bg: #EBEBFF;
-  --ov-primary: #0071E3; --ov-primary-hover: #0056B3; --gauge-track: rgba(0,0,0,.08);
-  --ov-hero-a: #1D1D1F; --ov-hero-b: #2C2C2E; --ov-hero-c: #3A3A3C;
-  --logo-a: #7AB8FF; --logo-b: #0A84FF; --logo-c: #0071E3;
-  --shadow: 0 8px 32px rgba(0,0,0,.06); --shadow-lift: 0 12px 40px rgba(0,0,0,.10);
-  --r-lg: 20px; --r-md: 16px; --r-sm: 12px;
+  --navy-950: #071426; --navy-900: #0A1930; --navy-700: #17365F;
+  --accent: #397BFF; --accent-2: #2868FF; --accent-3: #65A0FF;
+  --blue-300: #9AC1FF; --blue-100: #E8F1FF;
+  --bg: #F5F8FD; --bg-2: #EAF1FB; --card: rgba(255,255,255,.68);
+  --ink: #0F1E36; --ink-2: #344054; --ink-3: #667085;
+  --stroke: rgba(15,35,65,.08); --stroke-soft: rgba(255,255,255,.62); --glass: rgba(255,255,255,.55);
+  --ok: #24B47E; --ok-bg: #E4F6EE; --warn: #F4A340; --warn-bg: #FBF1DF; --bad: #EF596F; --bad-bg: #FCE9EC;
+  --violet: #8268FF; --violet-bg: #EEEAFF;
+  --ov-primary: #2868FF; --ov-primary-hover: #1E54DB; --gauge-track: rgba(15,35,65,.08);
+  --ov-hero-a: #071426; --ov-hero-b: #0A1930; --ov-hero-c: #17365F;
+  --logo-a: #9AC1FF; --logo-b: #397BFF; --logo-c: #2868FF;
+  --shadow: 0 8px 28px rgba(14,30,55,.07); --shadow-lift: 0 18px 55px rgba(14,30,55,.11);
+  --r-lg: 22px; --r-md: 16px; --r-sm: 12px;
 }
+/* атмосферная среда: приложение сидит на мягком голубо-белом градиенте с радиальными свечениями */
+:root[data-theme="emerald"] .app, :root[data-theme="emerald"] body {
+  background:
+    radial-gradient(circle at 74% -4%, rgba(116,164,255,.16), transparent 44%),
+    radial-gradient(circle at 22% 26%, rgba(197,218,255,.14), transparent 40%),
+    radial-gradient(circle at 96% 70%, rgba(154,193,255,.10), transparent 46%),
+    linear-gradient(135deg, #F8FBFF 0%, #EEF5FF 38%, #F7F9FC 72%, #FFFFFF 100%);
+  background-attachment: fixed;
+}
+:root[data-theme="emerald"] .main, :root[data-theme="emerald"] .content { background: transparent; }
+/* сайдбар — светлый frosted-слой (spatial), тёмный текст */
+:root[data-theme="emerald"] .sidebar { background: rgba(248,251,255,.60); -webkit-backdrop-filter: blur(28px) saturate(1.4); backdrop-filter: blur(28px) saturate(1.4); border-right: 1px solid rgba(255,255,255,.6); box-shadow: 1px 0 40px rgba(14,30,55,.05); }
+:root[data-theme="emerald"] .sidebar .nav-item, :root[data-theme="emerald"] .brand-name, :root[data-theme="emerald"] .agency .nm { color: var(--ink); }
+:root[data-theme="emerald"] .nav-item { color: var(--ink-2) !important; }
+:root[data-theme="emerald"] .nav-item:hover { background: rgba(57,123,255,.06); }
+:root[data-theme="emerald"] .nav-item.active { background: linear-gradient(90deg, rgba(57,123,255,.16), rgba(57,123,255,.06)); color: var(--accent) !important; box-shadow: inset 0 0 0 1px rgba(90,145,255,.14), 0 4px 18px rgba(42,96,220,.08); }
+:root[data-theme="emerald"] .nav-label, :root[data-theme="emerald"] .agency .rl { color: var(--ink-3); }
+:root[data-theme="emerald"] .navsearch input, :root[data-theme="emerald"] .brand-name span { color: var(--ink-2); }
 /* Стекло: карточки — матовое стекло с blur; много воздуха, тонкие линии, меньше текста */
 :root[data-theme="emerald"] .card, :root[data-theme="emerald"] .glass, :root[data-theme="emerald"] .ov2-card,
 :root[data-theme="emerald"] .kpi, :root[data-theme="emerald"] .ctrl-card, :root[data-theme="emerald"] .ctrl-hero,
 :root[data-theme="emerald"] .ctrl-team, :root[data-theme="emerald"] .modal, :root[data-theme="emerald"] .ovx-kcard,
 :root[data-theme="emerald"] .ovx-hero, :root[data-theme="emerald"] .navsearch, :root[data-theme="emerald"] .gsearch,
-:root[data-theme="emerald"] .topbar { background: rgba(255,255,255,.6); -webkit-backdrop-filter: blur(24px) saturate(1.7); backdrop-filter: blur(24px) saturate(1.7); border: 1px solid rgba(255,255,255,.7); box-shadow: 0 8px 32px rgba(0,0,0,.06); }
+:root[data-theme="emerald"] .navsearch, :root[data-theme="emerald"] .gsearch { background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border: 1px solid var(--stroke-soft); box-shadow: var(--shadow); }
+:root[data-theme="emerald"] .card, :root[data-theme="emerald"] .glass, :root[data-theme="emerald"] .ov2-card,
+:root[data-theme="emerald"] .kpi, :root[data-theme="emerald"] .ctrl-card, :root[data-theme="emerald"] .ctrl-hero,
+:root[data-theme="emerald"] .ctrl-team, :root[data-theme="emerald"] .modal, :root[data-theme="emerald"] .ovx-kcard {
+  background: rgba(255,255,255,.66); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid var(--stroke-soft); border-radius: var(--r-lg);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.6);
+}
+/* тёмный data-hero (Glass 04) — премиальная панель под главный график */
+:root[data-theme="emerald"] .ovx-hero { background: linear-gradient(145deg, rgba(7,20,38,.96), rgba(19,48,87,.92)); border: 1px solid rgba(255,255,255,.10); box-shadow: 0 16px 55px rgba(7,20,38,.20); border-radius: var(--r-lg); }
+:root[data-theme="emerald"] .topbar { background: transparent; -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: none; box-shadow: none; }
 :root[data-theme="emerald"] .card, :root[data-theme="emerald"] .glass, :root[data-theme="emerald"] .ov2-card { padding: 24px 26px; }
 :root[data-theme="emerald"] .ovx-kc-s, :root[data-theme="emerald"] .card-title .sub, :root[data-theme="emerald"] .hint { display: none !important; }
 :root[data-theme="emerald"] .ha-obj { filter: saturate(.35) brightness(1.12) drop-shadow(0 20px 26px rgba(0,0,0,.4)); }
@@ -6455,3 +6483,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="mono"] .ov2-donut, :root[data-theme="frame"] .ov2-donut { filter: grayscale(1) contrast(1.03); }
 :root[data-theme="warm"] .ov2-donut { filter: hue-rotate(128deg) saturate(.95); }
 :root[data-theme="emerald"] .ov2-donut { filter: saturate(.9); }
+
+/* Lumen Glass — environment media: editorial-скайлайн проступает сверху-справа сквозь стекло */
+:root[data-theme="emerald"] .app::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: url('lumen-media/editorial/skyline-dubai.webp') right -2% top -2% / auto 58% no-repeat;
+  opacity: .42; filter: saturate(.55) hue-rotate(185deg) brightness(1.06) contrast(.98);
+  -webkit-mask-image: linear-gradient(102deg, transparent 0 46%, rgba(0,0,0,.35) 68%, rgba(0,0,0,.85) 100%);
+  mask-image: linear-gradient(102deg, transparent 0 46%, rgba(0,0,0,.35) 68%, rgba(0,0,0,.85) 100%);
+}
+:root[data-theme="emerald"] .sidebar, :root[data-theme="emerald"] .main { position: relative; z-index: 1; }

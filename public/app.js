@@ -679,7 +679,7 @@ const THEME_PRESETS = [
   { k: 'mono',    name: 'Моно',     desc: 'чёрно-белый минимализм',        sw: ['#171717', '#F6F6F6', '#0D0D0D'], dark: false },
   { k: 'warm',    name: 'Бургунди',  desc: 'винный градиент, трендовый',   sw: ['#9B1B3F', '#FBF6F7', '#2A1017'], dark: false },
   { k: 'frame',   name: 'Контур',   desc: 'чёткие рамки, без теней',       sw: ['#111827', '#FFFFFF', '#111827'], dark: false },
-  { k: 'emerald', name: 'Стекло',   desc: 'Apple-минимализм, много стекла', sw: ['#0071E3', '#F5F5F7', '#1D1D1F'], dark: false },
+  { k: 'emerald', name: 'Lumen Glass', desc: 'атмосферное стекло, premium-OS', sw: ['#397BFF', '#EEF5FF', '#0A1930'], dark: false },
 ];
 /* бесповоротные AI-видеофоны под тему (сгенерированы через Higgsfield);
    у кого своего нет — родной скайлайн + CSS-тинт под палитру */
