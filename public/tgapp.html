@@ -181,6 +181,25 @@
   .lcd-ev{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
   .lcd-ev:last-child{border-bottom:none}
   .lcd-ev .t{color:var(--mut);font-size:11px;flex:none;width:70px;font-weight:600}
+  .lcd-sec h4 .lcd-edit{float:right;color:var(--acc);cursor:pointer;margin-top:-2px}.lcd-edit svg{width:15px;height:15px}
+  .lcd-chips{display:flex;gap:7px;flex-wrap:wrap}
+  .lcd-chip{border:1.5px solid var(--line);background:var(--panel2);color:var(--mut);font-family:inherit;font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:12px;cursor:pointer;transition:.15s}
+  .lcd-chip.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
+  .lcd-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin-bottom:12px;box-shadow:var(--sh)}
+  .lcd-rl b{font-size:14.5px;font-weight:700;display:block}.lcd-rl small{color:var(--mut);font-size:12px}
+  .lcd-sw{width:48px;height:28px;border-radius:15px;background:var(--panel2);border:1px solid var(--line);position:relative;cursor:pointer;flex:none;transition:.2s}
+  .lcd-sw::after{content:'';position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:.2s}
+  .lcd-sw.on{background:var(--grad);border-color:transparent}.lcd-sw.on::after{transform:translateX(20px)}
+  .lcd-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .lcd-acts button{border:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:inherit;font-weight:700;font-size:11.5px;padding:12px 4px;border-radius:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--sh);transition:.15s}
+  .lcd-acts button:active{transform:scale(.94)}
+  .lcd-acts button .ic svg{width:21px;height:21px;color:var(--acc)}
+  .lcd-next{font-size:14px;line-height:1.5;cursor:pointer;font-weight:600}.lcd-next.empty{color:var(--mut);font-weight:500}
+  .lcd-ax{cursor:pointer}.lcd-ax .v.empty{color:var(--acc);font-weight:600}
+  .ish{width:100%;box-sizing:border-box;border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);font-family:inherit;font-size:15px;padding:12px 14px;border-radius:13px;margin-bottom:12px;resize:none}
+  .ish:focus{outline:none;border-color:var(--acc)}
+  .ish-ok{width:100%;border:none;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:var(--shacc)}
+  .ms-ch{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--mut);font-weight:600;margin:4px 2px 14px}.ms-ch input{width:18px;height:18px;accent-color:var(--acc)}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{50%{opacity:.5}}
   @keyframes fade{from{opacity:0}}
@@ -247,6 +266,11 @@ const IC={
   sun:'<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M19.4 4.6l-1.8 1.8M6.4 17.6l-1.8 1.8"/>',
   moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
+  note:'<path d="M5 4h11l4 4v12H5z"/><path d="M15 4v5h5"/><path d="M9 13h6M9 17h4"/>',
+  cal:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/>',
+  spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+  pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  flame:'<path d="M12 3c3 3.5 5 6 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.2 1 2 2 2 .5-2-.5-4.5 1-6.5z"/>',
 };
 const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
@@ -465,27 +489,93 @@ function openSettings(){
 }
 $('#settingsBtn').onclick=()=>{hap();openSettings()};
 
-/* ── карточка лида (тап по имени/аватару в шапке) ── */
-const AXNM={purpose:'Цель',timeline:'Срок',budget:'Бюджет',type:'Объект'};
-const STAGE_RU={new:'Новый',touch:'Касание',dialog:'Диалог',qualified:'Квалифицирован',handover:'Передан',viewing:'Показ',deal:'Сделка',sleeping:'Спит',lost:'Закрыт'};
+/* ── карточка лида = пульт брокера (тап по имени/аватару в шапке) ── */
+const AXNM={purpose:'Цель покупки',timeline:'Срок',budget:'Бюджет',type:'Тип объекта'};
+const STAGE_RU={new:'Новый',touch:'Касание',dialog:'Диалог',qualified:'Квалифицирован',handover:'У меня',viewing:'Показ',deal:'Сделка',sleeping:'Спит',lost:'Закрыт'};
+const STAGE_ORDER=['new','touch','dialog','qualified','handover','viewing','deal','sleeping','lost'];
+const STAGE_C={new:'#6B7A99',touch:'#7C8FE0',dialog:'#4F7DFF',qualified:'#2FA98C',handover:'#8B7BD8',viewing:'#C9922E',deal:'#129B6E',sleeping:'#97A2B5',lost:'#C77B7B'};
+let LEADID=null;
+
+/* универсальный инпут-шит (текст/дата) */
+function inputSheet(title,o,cb){
+  const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>${esc(title)}</h3>
+    ${o.multiline?`<textarea class="ish" rows="3" placeholder="${esc(o.placeholder||'')}">${esc(o.value||'')}</textarea>`:`<input class="ish" type="${o.type||'text'}" placeholder="${esc(o.placeholder||'')}" value="${esc(o.value||'')}">`}
+    <button class="ish-ok">${esc(o.ok||'Сохранить')}</button></div>`;
+  document.body.appendChild(bd);requestAnimationFrame(()=>{bd.classList.add('on');const f=bd.querySelector('.ish');f.focus();f.setSelectionRange&&f.setSelectionRange(f.value.length,f.value.length)});
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};
+  bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelector('.ish-ok').onclick=()=>{const v=bd.querySelector('.ish').value.trim();hap();close();cb(v)};
+}
+/* шит назначения встречи */
+function meetingSheet(id){
+  const KINDS=[['call','Созвон'],['video','Видео-показ'],['tour','Показ объекта']];
+  const d=new Date(Date.now()+24*3600e3);d.setMinutes(0);const def=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:00`;
+  const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Назначить встречу</h3>
+    <div class="set-lbl">Формат</div><div class="seg" id="mkind">${KINDS.map((k,i)=>`<button data-k="${k[0]}" class="${i===0?'on':''}">${k[1]}</button>`).join('')}</div>
+    <div class="set-lbl">Дата и время</div><input class="ish" id="mat" type="datetime-local" value="${def}">
+    <label class="ms-ch"><input type="checkbox" id="mconfirm" checked> Отправить клиенту подтверждение в WhatsApp</label>
+    <button class="ish-ok" id="mok">Назначить</button></div>`;
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
+  let kind='call';bd.querySelectorAll('#mkind button').forEach(b=>b.onclick=()=>{hap();kind=b.dataset.k;bd.querySelectorAll('#mkind button').forEach(x=>x.classList.toggle('on',x===b))});
+  bd.querySelector('#mok').onclick=async()=>{const at=bd.querySelector('#mat').value;if(!at){toast('Укажите время');return}hap('medium');close();
+    try{await jpost('/tgapp/api/lead/'+id+'/meeting',{kind,at:new Date(at).getTime(),confirm:bd.querySelector('#mconfirm').checked});toast('Встреча назначена'+(bd.querySelector('#mconfirm').checked?' · клиенту отправлено':''));openLeadCard(id)}catch(e){toast(e.message)}};
+}
+
 async function openLeadCard(id){
-  const lc=$('#leadcard');lc.innerHTML='<div class="load"><div class="sp"></div>Загрузка…</div>';lc.classList.add('open');
+  LEADID=id;const lc=$('#leadcard');lc.innerHTML='<div class="load"><div class="sp"></div>Загрузка…</div>';lc.classList.add('open');
   if(TG&&TG.BackButton){TG.BackButton.offClick&&TG.BackButton.offClick(closeChat);TG.BackButton.onClick(closeLeadCard)}
   let d;try{d=await jget('/tgapp/api/lead/'+id)}catch(e){lc.innerHTML='<div class="lcd-hd"><span class="back ic" id="lcback" data-ic="back"></span><b>Карточка</b></div><div class="empty">'+esc(e.message)+'</div>';paintIcons(lc);$('#lcback').onclick=closeLeadCard;return}
-  const ev=[...(d.events||[]).map(e=>({at:e.at,text:e.text})),...(d.notes||[]).map(n=>({at:n.at,text:'💬 '+n.text})),...(d.meetings||[]).map(m=>({at:m.at,text:'📅 Встреча · '+(m.status||'')+(m.broker?' · '+m.broker:'')}))].sort((a,b)=>b.at-a.at).slice(0,20);
+  const ev=[...(d.events||[]).map(e=>({at:e.at,text:e.text})),...(d.notes||[]).map(n=>({at:n.at,text:'📝 '+n.text})),...(d.meetings||[]).map(m=>({at:m.at,text:'📅 Встреча · '+(STAGE_RU[m.status]||m.status||'')+(m.broker?' · '+m.broker:'')}))].sort((a,b)=>b.at-a.at).slice(0,24);
   lc.innerHTML=`<div class="lcd-hd"><span class="back ic" id="lcback" data-ic="back"></span><b style="font-size:16px">Карточка лида</b></div>
   <div class="lcd-body">
     <div class="lcd-top">${d.avatar?`<span class="ava" style="background-image:url('${esc(d.avatar)}');background-size:cover"></span>`:`<span class="ava" style="background:${avg(id)}">${esc(ini(d.name))}</span>`}
       <div class="lcd-nm">${esc(d.name)}</div><div class="lcd-ph">${esc(d.phone||'')}${d.geo?' · '+esc(d.geo):''}</div>
-      <div class="lcd-badges"><span class="lcd-stage">${esc(STAGE_RU[d.stage]||d.stage||'')}</span>${d.aiOn?'<span class="lcd-tag" style="color:var(--acc2)">ИИ ведёт</span>':''}${d.broker?`<span class="lcd-tag">${esc(d.broker)}</span>`:''}${d.source?`<span class="lcd-tag">${esc(d.source)}</span>`:''}</div></div>
-    <div class="lcd-sec"><h4>Квалификация</h4>${Object.keys(AXNM).map(k=>`<div class="lcd-ax"><span class="k">${AXNM[k]}</span><span class="v ${d.quals&&d.quals[k]?'':'empty'}">${d.quals&&d.quals[k]?esc(d.quals[k]):'—'}</span></div>`).join('')}</div>
-    ${d.summary?`<div class="lcd-sec"><h4>ИИ-сводка</h4><div class="lcd-sum">${esc(d.summary)}</div></div>`:''}
+      <div class="lcd-badges">${d.broker?`<span class="lcd-tag">${esc(d.broker)}</span>`:''}${d.source?`<span class="lcd-tag">${esc(d.source)}</span>`:''}</div></div>
+
+    <div class="lcd-sec"><h4>Стадия</h4><div class="lcd-chips" id="lcdStages">${STAGE_ORDER.map(s=>`<button class="lcd-chip ${d.stage===s?'on':''}" data-st="${s}" style="--c:${STAGE_C[s]}">${STAGE_RU[s]}</button>`).join('')}</div></div>
+
+    <div class="lcd-row"><div class="lcd-rl"><b>ИИ ведёт диалог</b><small>автоответы клиенту в WhatsApp</small></div><span class="lcd-sw ${d.aiOn?'on':''}" id="lcdAi"></span></div>
+
+    <div class="lcd-acts">
+      <button data-a="note"><span class="ic">${svg('note')}</span><span>Заметка</span></button>
+      <button data-a="meet"><span class="ic">${svg('cal')}</span><span>Встреча</span></button>
+      <button data-a="call"><span class="ic">${svg('call')}</span><span>Звонок</span></button>
+      <button data-a="sum"><span class="ic">${svg('spark')}</span><span>ИИ-сводка</span></button>
+    </div>
+
+    <div class="lcd-sec"><h4>Следующий шаг <span class="lcd-edit" data-edit="next">${svg('pencil')}</span></h4><div class="lcd-next ${d.nextAction&&d.nextAction.text?'':'empty'}" data-edit="next">${d.nextAction&&d.nextAction.text?esc(d.nextAction.text):'не задан — нажмите, чтобы добавить'}</div></div>
+
+    <div class="lcd-sec"><h4>Квалификация</h4>${Object.keys(AXNM).map(k=>`<div class="lcd-ax" data-qual="${k}"><span class="k">${AXNM[k]}</span><span class="v ${d.quals[k]?'':'empty'}">${d.quals[k]?esc(d.quals[k]):'добавить'}</span></div>`).join('')}</div>
+
+    <div class="lcd-sec"><h4>ИИ-сводка</h4><div class="lcd-sum" id="lcdSum">${d.summary?esc(d.summary):'<span style="color:var(--mut)">Нажмите «ИИ-сводка» выше, чтобы собрать.</span>'}</div></div>
     ${(d.tags||[]).length?`<div class="lcd-sec"><h4>Теги</h4><div style="display:flex;gap:7px;flex-wrap:wrap">${d.tags.map(t=>`<span class="lcd-tag">${esc(t)}</span>`).join('')}</div></div>`:''}
     <div class="lcd-sec"><h4>История</h4>${ev.length?ev.map(e=>`<div class="lcd-ev"><span class="t">${new Date(e.at).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span><span>${esc(e.text)}</span></div>`).join(''):'<div style="color:var(--mut);font-size:13px">Пока пусто</div>'}</div>
   </div>`;
   paintIcons(lc);$('#lcback').onclick=closeLeadCard;
+
+  /* стадия */
+  lc.querySelectorAll('#lcdStages .lcd-chip').forEach(b=>b.onclick=async()=>{const st=b.dataset.st;if(b.classList.contains('on'))return;hap('medium');
+    lc.querySelectorAll('#lcdStages .lcd-chip').forEach(x=>x.classList.toggle('on',x===b));
+    try{await jpost('/tgapp/api/lead/'+id+'/stage',{stage:st});if(CUR&&CUR.id===id)CUR.stage=st;toast('Стадия: '+STAGE_RU[st])}catch(e){toast(e.message);openLeadCard(id)}});
+  /* ИИ тумблер — синк с шапкой чата */
+  $('#lcdAi').onclick=async()=>{const on=!$('#lcdAi').classList.contains('on');hap();$('#lcdAi').classList.toggle('on',on);
+    try{const r=await jpost('/tgapp/api/chat/'+id+'/ai',{on});if(CUR&&CUR.id===id){CUR.aiOn=r.aiOn;const ca=$('#cAi');if(ca)ca.classList.toggle('aon',r.aiOn);const cs=$('#cSt');if(cs)cs.innerHTML=(r.aiOn?'<span class="ai-on">● ИИ ведёт</span>':'вы ведёте')+' · '+esc(CUR.phone||'')}toast(r.aiOn?'ИИ включён':'ИИ выключен — вы ведёте')}catch(e){toast(e.message);$('#lcdAi').classList.toggle('on',!on)}};
+  /* быстрые действия */
+  lc.querySelectorAll('.lcd-acts button').forEach(b=>b.onclick=()=>{const a=b.dataset.a;hap();
+    if(a==='note')inputSheet('Заметка по лиду',{multiline:true,placeholder:'Например: просил перезвонить после 18:00, бюджет вырос'},async v=>{if(!v)return;try{await jpost('/tgapp/api/lead/'+id+'/note',{text:v});toast('Заметка добавлена');openLeadCard(id)}catch(e){toast(e.message)}});
+    else if(a==='meet')meetingSheet(id);
+    else if(a==='call'){toast('Звоню…');jpost('/tgapp/api/chat/'+id+'/call',{}).then(r=>toast('Звонок инициирован → '+(r.from||''))).catch(e=>toast(e.message))}
+    else if(a==='sum'){const s=$('#lcdSum');s.innerHTML='<span style="color:var(--mut)">Собираю сводку…</span>';jpost('/tgapp/api/lead/'+id+'/summary',{}).then(r=>{s.textContent=r.summary||'—';toast('Сводка обновлена')}).catch(e=>{toast(e.message);openLeadCard(id)})}
+  });
+  /* следующий шаг */
+  lc.querySelectorAll('[data-edit="next"]').forEach(el=>el.onclick=()=>{hap();inputSheet('Следующий шаг',{placeholder:'Например: перезвонить завтра в 12:00',value:(d.nextAction&&d.nextAction.text)||''},async v=>{try{await jpost('/tgapp/api/lead/'+id+'/next',{text:v});toast(v?'Сохранено':'Очищено');openLeadCard(id)}catch(e){toast(e.message)}})});
+  /* квалификация — тап по оси → редактировать */
+  lc.querySelectorAll('[data-qual]').forEach(el=>el.onclick=()=>{const k=el.dataset.qual;hap();inputSheet(AXNM[k],{placeholder:k==='budget'?'Например: $300 000':'Введите значение',value:d.quals[k]||''},async v=>{try{await jpost('/tgapp/api/lead/'+id+'/qual',{key:k,value:v});toast('Сохранено');openLeadCard(id)}catch(e){toast(e.message)}})});
 }
-function closeLeadCard(){hap();$('#leadcard').classList.remove('open');if(TG&&TG.BackButton){TG.BackButton.offClick&&TG.BackButton.offClick(closeLeadCard);if($('#conv').classList.contains('open'))TG.BackButton.onClick(closeChat)}}
+function closeLeadCard(){hap();LEADID=null;$('#leadcard').classList.remove('open');if(TG&&TG.BackButton){TG.BackButton.offClick&&TG.BackButton.offClick(closeLeadCard);if($('#conv').classList.contains('open'))TG.BackButton.onClick(closeChat)}}
 $('#cProfile').onclick=()=>{if(CUR)openLeadCard(CUR.id)};
 $('#cAva').onclick=()=>{if(CUR)openLeadCard(CUR.id)};
 

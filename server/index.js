@@ -2401,13 +2401,69 @@ const server = http.createServer(async (req, res) => {
         const events = db.events.filter(e => e.leadId === lead.id).slice(0, 24).map(e => ({ at: e.at, type: e.type, text: e.text }));
         const notes = (lead.notes || []).map(n => ({ at: n.at, text: n.text }));
         const meetings = (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => ({ at: mt.at, status: mt.status, kind: mt.kind, broker: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '' }));
+        const qflat = {}; ['purpose', 'timeline', 'budget', 'type'].forEach(k => { const q = lead.quals && lead.quals[k]; qflat[k] = q ? (q.value || '') : ''; });
         return json(res, 200, {
           name: lead.name, phone: lead.phone, geo: (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '',
           stage: lead.stage, source: lead.source || '', createdAt: lead.createdAt || 0, avatar: lead.avatarUrl || null,
-          quals: lead.quals || {}, summary: lead.summary || '', tags: lead.tags || [],
+          quals: qflat, summary: lead.summary || '', tags: lead.tags || [], nextAction: lead.nextAction || null,
           broker: (db.brokers.find(x => x.id === lead.broker) || {}).name || null, aiOn: !!(lead.ai && lead.ai.enabled),
           events, notes, meetings,
         });
+      }
+      /* ── пульт брокера: действия над лидом прямо из бота ── */
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/stage$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const st = String(b.stage || '');
+        if (!['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal', 'sleeping', 'lost'].includes(st)) return json(res, 400, { error: 'плохая стадия' });
+        if (lead.stage !== st) { lead.stage = st; capi.onStageChange(db, lead, st); ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: стадия изменена брокером из бота → ${st}` }); store.save(); }
+        return json(res, 200, { stage: lead.stage });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/note$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const text = String(b.text || '').trim(); if (!text) return json(res, 400, { error: 'пусто' });
+        lead.notes = lead.notes || []; lead.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: text.slice(0, 2000) });
+        store.save(); return json(res, 200, { ok: true, at: lead.notes[0].at, text: lead.notes[0].text });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/qual$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const k = String(b.key || ''); const v = String(b.value || '').trim();
+        if (!['purpose', 'timeline', 'budget', 'type'].includes(k)) return json(res, 400, { error: 'плохая ось' });
+        lead.quals = lead.quals || {};
+        if (v) { lead.quals[k] = Object.assign({}, lead.quals[k] || {}, { value: v.slice(0, 200) }); if (k === 'budget') { const num = parseInt(v.replace(/[^\d]/g, ''), 10); if (num) lead.quals[k].num = num; } }
+        else lead.quals[k] = null;
+        store.save(); return json(res, 200, { ok: true, value: v });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/next$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const text = String(b.text || '').trim();
+        lead.nextAction = text ? { text: text.slice(0, 200), at: +b.at || null } : null;
+        store.save(); return json(res, 200, { ok: true, nextAction: lead.nextAction });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/meeting$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req);
+        const mt = {
+          id: store.nextId('mt'), leadId: lead.id, brokerId: abroker.id,
+          at: +b.at || Date.now() + 24 * 3600e3, kind: ['call', 'video', 'tour'].includes(b.kind) ? b.kind : 'call',
+          dur: Math.max(15, Math.min(240, +b.dur || 60)), note: String(b.note || '').slice(0, 400), status: 'scheduled', createdAt: Date.now(),
+          link: b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null,
+        };
+        db.meetings = db.meetings || []; db.meetings.push(mt);
+        if (b.confirm !== false) {
+          const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
+          const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+          const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+          engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${abroker.name} — ${when}. Детали и кнопка подключения: ${base}/m/${mt.id} Если время не подойдёт — напишите сюда, перенесём.`, 'human', { channel: 'wa' });
+          if (db.settings.ai.autoOff.onHumanReply && lead.ai && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
+        }
+        ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча назначена из бота: ${lead.name} + ${abroker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
+        store.save(); return json(res, 200, mt);
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/summary$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        let text = null; if (llm.available()) { try { text = await llm.summarize(db, lead); } catch (e) { console.error('[tgapp summary]', e.message); } }
+        lead.summary = text || ai.buildSummary(db, lead); lead.summaryAt = Date.now(); store.save();
+        return json(res, 200, { summary: lead.summary });
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/text$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
