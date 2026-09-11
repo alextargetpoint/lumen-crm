@@ -948,6 +948,27 @@ body > .dtp-pop.dtp-time, .dtp-pop.dtp-time.show { max-height: 250px; overflow-y
 .lc-meet b { color: var(--navy-900); }
 @media (max-width: 1000px) { .lc-grid { grid-template-columns: 1fr; } }
 
+/* ⭐ Усиление разделения блоков в карточке лида (фидбэк: всё сливалось в пастель, нет границ) */
+.modal-card .lc-grid { gap: 26px; position: relative; }
+.modal-card .lc-grid::before { content: ''; position: absolute; left: calc(1.25 / 2.25 * 100% - 1px); top: 0; bottom: 0; width: 1px; background: var(--stroke-soft); }
+@media (max-width: 1000px) { .modal-card .lc-grid::before { display: none; } }
+/* левая колонка: лента — в отдельную панель */
+.modal-card .lc-timeline { border: 1px solid var(--stroke); border-radius: 14px; padding: 4px 13px; background: var(--card); box-shadow: 0 1px 4px rgba(16, 32, 70, .05); }
+.modal-card .lc-filters { position: sticky; top: 0; z-index: 2; background: var(--paper, #fff); padding: 4px 0 10px; margin-top: 12px; }
+.modal-card .lc-note-row { padding: 11px 13px; border: 1px solid var(--stroke); border-radius: 13px; background: var(--card); box-shadow: 0 1px 4px rgba(16, 32, 70, .05); }
+/* правая колонка: каждая секция — чёткая карточка с акцентной полосой при раскрытии */
+.modal-card .lc-right .coll { border: 1px solid var(--stroke); border-radius: 14px; margin: 12px 0; background: var(--card); box-shadow: 0 1px 4px rgba(16, 32, 70, .05); transition: box-shadow var(--dur, .25s) var(--ease-soft, ease), border-color var(--dur, .25s); }
+.modal-card .lc-right .coll-head { padding: 12px 14px; font-weight: 700; color: var(--navy-900); border-left: 3px solid transparent; border-radius: 14px 14px 0 0; }
+.modal-card .lc-right .coll:not(.open) .coll-head { border-radius: 14px; }
+.modal-card .lc-right .coll.open { box-shadow: 0 6px 20px rgba(16, 32, 70, .09); border-color: var(--blue-300, #C3D6FA); }
+.modal-card .lc-right .coll.open .coll-head { border-left-color: var(--accent); background: var(--blue-50, #F4F8FF); }
+.modal-card .lc-right .coll-head .ch-ic svg { width: 15px; height: 15px; }
+/* ИИ-блок — самый заметный */
+.modal-card .lc-ai { border-width: 1.5px; border-radius: 14px; box-shadow: 0 2px 12px rgba(16, 32, 70, .07); }
+.modal-card .lc-ai-head b { font-weight: 800; font-size: 13.5px; }
+/* теги лида — чуть контрастнее, разделены */
+.modal-card .lc-hint { border-radius: 12px; }
+
 /* ---------- карточка v2: мини-воронка, подсказка, ИИ-блок ---------- */
 .lc-funnel { display: flex; gap: 4px; margin-bottom: 14px; }
 .lcf-step { flex: 1; min-width: 0; text-align: center; }
