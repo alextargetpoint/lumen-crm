@@ -6306,23 +6306,32 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 .tm-tx { flex: 1; min-width: 0; } .tm-tx b { font-size: 13.5px; font-weight: 700; display: block; } .tm-tx small { font-size: 11px; color: var(--ink-3); }
 .tm-ok { color: var(--accent); font-weight: 800; }
 
-/* ── Тёплый: кремовая бумага + терракота (editorial) ── */
-/* ── Бургунди: трендовый винный градиент, премиум ── */
+/* ═══ LUMEN BURGUNDY — бордо = БРЕНД-АКЦЕНТ, а НЕ красный фильтр на весь экран ═══
+   Принцип: workspace ЧИСТЫЙ светлый нейтраль; бордо живёт в сайдбаре, primary-кнопках,
+   активной навигации, hero-графике, бренд-иконке. Семантика — нормальные цвета. */
 :root[data-theme="warm"] {
-  --navy-950: #2A1017; --navy-900: #3E1622; --navy-700: #5E1E33;
-  --accent: #9B1B3F; --accent-2: #C42B54; --accent-3: #6D1730;
-  --blue-300: #E7A9B8; --blue-100: #F6E1E7;
-  --bg: #FBF6F7; --bg-2: #F5E9ED; --card: #FFFFFF;
-  --ink: #2A1017; --ink-2: #5A3640; --ink-3: #8A6B72;
-  --stroke: #EEDCE1; --stroke-soft: #F5E9ED; --glass: rgba(255,255,255,.7);
-  --ok: #0E7C5A; --ok-bg: #E1F1EA; --warn: #B45309; --warn-bg: #F7ECD9; --bad: #DC2626; --bad-bg: #FBE9E9;
-  --violet: #9B1B3F; --violet-bg: #F6E1E7;
-  --ov-primary: #9B1B3F; --ov-primary-hover: #7B1330;
-  --ov-chip-gray: #F5E9ED; --gauge-track: #EEDCE1;
-  --ov-hero-a: #2A0A14; --ov-hero-b: #4A0E23; --ov-hero-c: #7B1330;
-  --logo-a: #E9B8C4; --logo-b: #C42B54; --logo-c: #7B1E3B;
+  /* бордо-шкала (бренд) */
+  --burgundy-900: #32101C; --burgundy-700: #6B1830; --burgundy-600: #8D1F42;
+  --burgundy-500: #AC2852; --burgundy-300: #DD7693; --burgundy-100: #F9E4EA;
+  /* тёмная база сайдбара (navy-токены переиспользуются структурой) */
+  --navy-950: #210810; --navy-900: #42121F; --navy-700: #6B1830;
+  --accent: #861C3C; --accent-2: #9E2348; --accent-3: #6B1830; --accent-hover: #741832;
+  --blue-300: #DD7693; --blue-100: #F9E4EA;
+  /* нейтрали — workspace остаётся ЧИСТЫМ светлым, БЕЗ розового тинта */
+  --bg: #F8FAFD; --bg-2: #F2F5F9; --card: #FFFFFF;
+  --ink: #141821; --ink-2: #596273; --ink-3: #8A93A3;
+  --stroke: rgba(30,40,60,.08); --stroke-soft: rgba(30,40,60,.05); --glass: rgba(255,255,255,.7);
+  /* семантика — НОРМАЛЬНЫЕ цвета (НЕ бордо!) */
+  --ok: #1F9D73; --ok-bg: #DFF5EC; --warn: #D99A34; --warn-bg: #FFF2D8; --bad: #D94757; --bad-bg: #FCE5E8;
+  --violet: #7657D9; --violet-bg: #EDE8FB;
+  --ov-primary: #861C3C; --ov-primary-hover: #741832;
+  --ov-chip-gray: #F1F4F8; --gauge-track: rgba(30,40,60,.10);
+  /* hero — тёмный бордо-графит (для data-hero) */
+  --ov-hero-a: #35111F; --ov-hero-b: #2A1220; --ov-hero-c: #1D1520;
+  /* логотип на ТЁМНОМ сайдбаре — светлый бордо */
+  --logo-a: #F4C9D5; --logo-b: #DD7693; --logo-c: #AC2852;
 }
-:root[data-theme="warm"] .ha-obj { filter: hue-rotate(122deg) saturate(1.35) brightness(.95) drop-shadow(0 20px 26px rgba(0,0,0,.5)); }
+:root[data-theme="warm"] .ha-obj { filter: hue-rotate(118deg) saturate(1.1) brightness(.98) drop-shadow(0 20px 26px rgba(0,0,0,.5)); }
 
 /* ── Контур: чёткие рамки, минимум теней (bold outline) ── */
 :root[data-theme="frame"] {
@@ -6402,7 +6411,7 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --accent-3: #8B5CF6; }
 :root[data-theme="mono"] { --accent-3: #3a3a3a; }
 :root[data-theme="frame"] { --accent-3: #374151; }
-:root[data-theme="warm"] { --accent-3: #6D1730; }
+:root[data-theme="warm"] { --accent-3: #6B1830; }
 :root[data-theme="emerald"] { --accent-3: #5AC8FA; }
 
 /* Оформление в профиле агентства (свотчи тем) */
@@ -6466,11 +6475,12 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   --ov-cat-blue: #1F2937; --ov-cat-green: #3F5A4E; --ov-cat-red: #7F3F3A; --ov-cat-amber: #6B5A2E; --ov-cat-purple: #3A3F4A;
   --ov-chip-gray: #F1F3F6; --ov-gold-soft: #F3F1EC;
 }
-/* Бургунди — тёплый винный спред (роза/плам/золото/вино), без синего/зелёного */
+/* Бургунди — категорийные цвета РАЗЛИЧИМЫЕ и семантические (blue/green/amber/purple),
+   НЕ моно-винный спред: графики/донат/воронка должны читаться. Бордо — только бренд-акцент. */
 :root[data-theme="warm"] {
-  --ov-soft-blue: #F6E6EB; --ov-soft-green: #F2EEDF; --ov-soft-red: #F7E4E1; --ov-soft-amber: #F4ECDB; --ov-soft-purple: #F1E3EC;
-  --ov-cat-blue: #A83A5A; --ov-cat-green: #8A7A3E; --ov-cat-red: #C0392B; --ov-cat-amber: #B8823C; --ov-cat-purple: #7B2D5B;
-  --ov-chip-gray: #F5EDEF; --ov-gold-soft: #F5EFE6;
+  --ov-soft-blue: #E8F0FD; --ov-soft-green: #DFF5EC; --ov-soft-red: #FCE5E8; --ov-soft-amber: #FFF2D8; --ov-soft-purple: #EDE8FB;
+  --ov-cat-blue: #3F7CEC; --ov-cat-green: #1F9D73; --ov-cat-red: #D94757; --ov-cat-amber: #D99A34; --ov-cat-purple: #7657D9;
+  --ov-chip-gray: #F1F4F8; --ov-gold-soft: #FBF3E4;
 }
 /* Стекло — Apple-системные цвета (яркие, но на матовом — премиально и когерентно) */
 :root[data-theme="emerald"] {
@@ -6481,7 +6491,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 
 /* Донат «Статусы» (цвета стадий — data-viz): координируем под тему */
 :root[data-theme="mono"] .ov2-donut, :root[data-theme="frame"] .ov2-donut { filter: grayscale(1) contrast(1.03); }
-:root[data-theme="warm"] .ov2-donut { filter: hue-rotate(128deg) saturate(.95); }
+/* Бургунди: донат/воронка — РАСПОЗНАВАЕМЫЕ цвета стадий (без моно-красного тинта) */
 :root[data-theme="emerald"] .ov2-donut { filter: saturate(.9); }
 
 /* Lumen Glass — environment media: editorial-скайлайн проступает сверху-справа сквозь стекло */
@@ -6545,3 +6555,71 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="emerald"] .fd-media img, :root[data-theme="emerald"] .prop-thumb img, :root[data-theme="emerald"] .cl2-thumb img,
 :root[data-theme="emerald"] .ov-cap-ava img, :root[data-theme="emerald"] .ava img, :root[data-theme="emerald"] .lc-media img,
 :root[data-theme="emerald"] .mediaimg, :root[data-theme="emerald"] .card-media img { object-fit: cover; width: 100%; height: 100%; display: block; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   LUMEN BURGUNDY — примитивы (Ф1). Бордо = бренд-поверхности, НЕ фон.
+   ══════════════════════════════════════════════════════════════════════ */
+/* ── Тёмно-бордовый САЙДБАР (главная бренд-поверхность, сигнатура) ── */
+:root[data-theme="warm"] .sidebar { background: linear-gradient(180deg, #42121F 0%, #2B0C16 55%, #210810 100%); color: #F4E8EC; }
+:root[data-theme="warm"] .sidebar::before { opacity: .10; mix-blend-mode: soft-light; }
+:root[data-theme="warm"] .nav-item { color: rgba(255,255,255,.68); }
+:root[data-theme="warm"] .nav-item svg { opacity: .8; }
+:root[data-theme="warm"] .nav-item:hover { background: rgba(255,255,255,.05); color: rgba(255,255,255,.92); }
+:root[data-theme="warm"] .nav-item.active { background: rgba(183,50,86,.20); color: #fff; border: 1px solid rgba(255,255,255,.07); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+:root[data-theme="warm"] .nav-item.active svg { color: var(--burgundy-300); opacity: 1; }
+:root[data-theme="warm"] .nav-item .cnt { color: var(--burgundy-300); background: rgba(183,50,86,.22); }
+:root[data-theme="warm"] .nav-label { color: rgba(255,255,255,.42); }
+:root[data-theme="warm"] .nav-sub .nav-subitem { color: rgba(255,255,255,.60); }
+:root[data-theme="warm"] .nav-sub .nav-subitem:hover, :root[data-theme="warm"] .nav-sub .nav-subitem.on { color: #fff; background: rgba(183,50,86,.16); }
+:root[data-theme="warm"] .nav-sub .nav-subitem::before { background: rgba(255,255,255,.12); }
+:root[data-theme="warm"] .nav-sub .nav-subitem.on::before { background: var(--burgundy-300); }
+:root[data-theme="warm"] .brand-name { color: #fff; }
+:root[data-theme="warm"] .brand-name span { color: var(--burgundy-300); }
+:root[data-theme="warm"] .agency .nm { color: #fff; }
+:root[data-theme="warm"] .agency .rl { color: rgba(255,255,255,.55); }
+:root[data-theme="warm"] .agency .ava { background: linear-gradient(135deg, var(--burgundy-500), var(--burgundy-700)); }
+:root[data-theme="warm"] .side-foot { border-top-color: rgba(255,255,255,.10); }
+:root[data-theme="warm"] .navsearch input { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #fff; }
+:root[data-theme="warm"] .navsearch input::placeholder { color: rgba(255,255,255,.42); }
+:root[data-theme="warm"] .navsearch input:focus { border-color: rgba(221,118,147,.5); background: rgba(255,255,255,.10); }
+
+/* ── Топ-бар светлый; заголовок — тёмный графит (не бордо на всю ширину) ── */
+:root[data-theme="warm"] .topbar { background: transparent; border: none; box-shadow: none; }
+:root[data-theme="warm"] .page-title { color: var(--ink); }
+
+/* ── PRIMARY-кнопка: плотный бордо-градиент, без большого glow ── */
+:root[data-theme="warm"] .btn-accent, :root[data-theme="warm"] .btn-primary {
+  background: linear-gradient(180deg, #9E2348, #781732);
+  background-image: linear-gradient(180deg, #9E2348, #781732);
+  border: 1px solid rgba(120,23,50,.5); color: #fff;
+  box-shadow: 0 8px 22px rgba(96,20,43,.18);
+}
+:root[data-theme="warm"] .btn-accent:hover, :root[data-theme="warm"] .btn-primary:hover {
+  background-image: linear-gradient(180deg, #A82A50, #86183A); box-shadow: 0 10px 26px rgba(96,20,43,.24);
+}
+
+/* ── Формы: фокус-кольцо бордо ── */
+:root[data-theme="warm"] input:focus, :root[data-theme="warm"] textarea:focus, :root[data-theme="warm"] select:focus,
+:root[data-theme="warm"] .field:focus-within { border-color: rgba(134,28,60,.38); box-shadow: 0 0 0 3px rgba(134,28,60,.08); }
+
+/* ── Таблицы: белые, hover — лёгкий бордо-tint, header muted ── */
+:root[data-theme="warm"] .tbl tbody tr:hover, :root[data-theme="warm"] .tbl tr:hover,
+:root[data-theme="warm"] .an-tbl tr:hover, :root[data-theme="warm"] .lead-tbl tr:hover,
+:root[data-theme="warm"] .mp-tbl tbody tr:hover { background: rgba(134,28,60,.055); }
+:root[data-theme="warm"] .tbl th, :root[data-theme="warm"] .an-tbl th, :root[data-theme="warm"] .mp-tbl th { color: var(--ink-3); }
+
+/* ── Модалки: белые, бордо-backdrop полупрозрачный ── */
+:root[data-theme="warm"] .modal-bd { background: rgba(18,12,16,.26); }
+
+/* ── ЧАТ (Диалоги): бабблы НЕ бордовые. Клиент — белый; менеджер — светло-зелёный ── */
+:root[data-theme="warm"] .bubble.out {
+  background: var(--ok-bg); color: #14432F; border: 1px solid rgba(31,157,115,.20);
+  box-shadow: 0 1px 2px rgba(20,67,47,.06);
+}
+:root[data-theme="warm"] .bubble.out .via-tag { background: rgba(31,157,115,.16); color: #1F7D5B; }
+:root[data-theme="warm"] .bubble.out .bmeta { color: #2E6B52; opacity: .9; }
+
+/* ── Картинки — заполнять контейнер (фикс «нерастянутых») ── */
+:root[data-theme="warm"] .fd-media img, :root[data-theme="warm"] .prop-thumb img, :root[data-theme="warm"] .cl2-thumb img,
+:root[data-theme="warm"] .ov-cap-ava img, :root[data-theme="warm"] .ava img, :root[data-theme="warm"] .lc-media img,
+:root[data-theme="warm"] .mediaimg, :root[data-theme="warm"] .card-media img { object-fit: cover; width: 100%; height: 100%; display: block; }
