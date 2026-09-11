@@ -913,6 +913,25 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   </div>
 </header>
 
+<!-- MARQUEE TICKER -->
+<style>
+.marq{overflow:hidden;border-block:1px solid var(--line);background:var(--card);padding:15px 0;white-space:nowrap;-webkit-mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)}
+.marq-track{display:inline-flex;align-items:center;gap:38px;animation:marq 34s linear infinite;will-change:transform}
+.marq:hover .marq-track{animation-play-state:paused}
+.marq-track i{font-style:normal;font-family:var(--disp);font-weight:800;font-size:clamp(17px,2vw,27px);letter-spacing:-.01em;color:var(--ink);display:inline-flex;align-items:center;gap:38px}
+.marq-track i::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue)}
+@keyframes marq{to{transform:translateX(-50%)}}
+</style>
+<div class="marq" aria-hidden="true"><div class="marq-track" id="marqTrack"></div></div>
+<script>
+(function(){
+  var t=document.getElementById('marqTrack'); if(!t) return;
+  var items=['Дубай','Испания','Кипр','Бали','Таиланд','54+ проектов','$15 средний CPL','5+ языков','825 лидов за 4 мес','17 сделок · Baytify','3 380+ лидов · Alegria','недвижимость'];
+  var html=items.map(function(x){return '<i>'+x+'</i>';}).join('');
+  t.innerHTML=html+html; // дубль для бесшовной петли -50%
+})();
+</script>
+
 <!-- INDUSTRY GAP -->
 <section class="sec wrap" id="gap" style="padding-top:clamp(40px,6vw,80px)">
   <div class="gap" data-r>
@@ -1226,6 +1245,62 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     </div>
   </div>
 </section>
+
+<!-- HORIZONTAL PINNED GALLERY -->
+<style>
+.hgal{position:relative;height:360vh;background:linear-gradient(180deg,var(--bg),color-mix(in srgb,var(--blue) 5%,var(--bg)),var(--bg))}
+.hgal-pin{position:absolute;top:0;left:0;width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.hgal-head{text-align:center;padding:0 20px 24px;position:relative;z-index:3}
+.hgal-head h2{margin-top:10px}
+.hgal-track{display:flex;gap:26px;padding:0 max(8vw,24px);will-change:transform}
+.hslide{flex:0 0 auto;width:min(72vw,700px);border-radius:20px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow-lg);background:var(--card);position:relative}
+.hslide img{width:100%;display:block;aspect-ratio:1440/900;object-fit:cover;object-position:top left}
+.hslide .num{position:absolute;top:12px;left:14px;z-index:2;font-family:var(--disp);font-weight:800;font-size:15px;color:#fff;background:rgba(37,99,235,.9);width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -6px rgba(37,99,235,.6)}
+.hslide .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(transparent,rgba(6,11,22,.86));color:#fff}
+.hslide .cap b{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:-.01em;display:block}
+.hslide .cap span{font-size:13px;color:rgba(255,255,255,.82)}
+.hgal-prog{position:absolute;left:max(8vw,24px);right:max(8vw,24px);bottom:6vh;height:3px;border-radius:3px;background:var(--line);z-index:3}
+.hgal-prog i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--sky))}
+@media(max-width:640px){.hgal{height:300vh}.hslide{width:80vw;border-radius:15px}.hgal-prog{bottom:10vh}}
+</style>
+<section class="hgal" id="hgal" aria-label="Тур по дашборду">
+  <div class="hgal-pin">
+    <div class="hgal-head">
+      <span class="kicker"><span class="dot"></span>Один экран — весь отдел</span>
+      <h2>Весь дашборд — <em>листайте вбок</em></h2>
+    </div>
+    <div class="hgal-track" id="hgalTrack">
+      <div class="hslide"><span class="num">1</span><img src="/assets/site/cap-funnel.png" alt="Воронка" loading="lazy"><div class="cap"><b>Воронка и стадии</b><span>каждый лид и сделка — на виду</span></div></div>
+      <div class="hslide"><span class="num">2</span><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
+      <div class="hslide"><span class="num">3</span><img src="/assets/site/cap-ai.png" alt="Первая линия" loading="lazy"><div class="cap"><b>Первая линия отвечает</b><span>WhatsApp за секунды, из коробки</span></div></div>
+      <div class="hslide"><span class="num">4</span><img src="/assets/site/cap-comments.png" alt="Комментарии" loading="lazy"><div class="cap"><b>Комментарии → лиды</b><span>ловим тех, кого не видят конкуренты</span></div></div>
+      <div class="hslide"><span class="num">5</span><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Живые подборки объектов</b><span>конструктор под клиента</span></div></div>
+      <div class="hslide"><span class="num">6</span><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика и план-факт</b><span>деньги и эффективность в цифрах</span></div></div>
+      <div class="hslide"><span class="num">7</span><img src="/assets/site/cap-tasks.png" alt="Задачи" loading="lazy"><div class="cap"><b>Задачи брокера</b><span>ничего не забыто, никто не выгорает</span></div></div>
+    </div>
+    <div class="hgal-prog"><i id="hgalProg"></i></div>
+  </div>
+</section>
+<script>
+(function(){
+  var sec=document.getElementById('hgal'); if(!sec) return;
+  var pin=sec.querySelector('.hgal-pin'), track=document.getElementById('hgalTrack'), prog=document.getElementById('hgalProg');
+  function frame(){
+    var r=sec.getBoundingClientRect();
+    var total=sec.offsetHeight-innerHeight;
+    var p=total>0?Math.max(0,Math.min(1,(-r.top)/total)):0;
+    if(r.top>0){ pin.style.position='absolute'; pin.style.top='0px'; }
+    else if(r.top < -total){ pin.style.position='absolute'; pin.style.top=total+'px'; }
+    else { pin.style.position='fixed'; pin.style.top='0px'; }
+    var max=Math.max(0,track.scrollWidth-innerWidth);
+    // ease-in/out a touch so ends breathe
+    track.style.transform='translateX('+(-p*max)+'px)';
+    if(prog) prog.style.width=(p*100)+'%';
+  }
+  addEventListener('scroll',function(){requestAnimationFrame(frame);},{passive:true});
+  addEventListener('resize',frame); addEventListener('load',frame); frame();
+})();
+</script>
 
 <!-- WHATSAPP SCENE -->
 <section class="sec wrap" id="scene">
@@ -1829,6 +1904,19 @@ if(matchMedia('(max-width:640px)').matches){
   addEventListener('scroll',function(){requestAnimationFrame(drive);},{passive:true});
   addEventListener('resize',drive); drive();
 })();
+
+// 3D-тилт карточек от курсора (только hover-устройства)
+if(matchMedia('(hover:hover)').matches){
+  document.querySelectorAll('.niche,.ccase,.gap-item,.pcard').forEach(function(c){
+    c.style.transformStyle='preserve-3d';
+    c.addEventListener('pointermove',function(e){
+      var r=c.getBoundingClientRect();
+      var x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
+      c.style.transform='perspective(760px) rotateY('+(x*7).toFixed(2)+'deg) rotateX('+(-y*7).toFixed(2)+'deg) translateY(-6px)';
+    });
+    c.addEventListener('pointerleave',function(){c.style.transform='';});
+  });
+}
 
 // count-up numbers
 const _cuReduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
