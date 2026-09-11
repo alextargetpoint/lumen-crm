@@ -23,6 +23,19 @@
   const el = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+  // ---------- чистые SVG-иконки (премиум, консистентно, вместо эмодзи) ----------
+  const _svg = (p, sw) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || 1.7) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+  const IC = {
+    building: _svg('<path d="M3 21h18"/><path d="M6 21V5a1 1 0 011-1h6a1 1 0 011 1v16"/><path d="M14 21V10h4a1 1 0 011 1v10"/><path d="M9 8h2M9 12h2M9 16h2"/>'),
+    user: _svg('<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0115 0"/>'),
+    palette: _svg('<path d="M12 3a9 9 0 000 18c1.4 0 2-1 2-2 0-.6-.3-1-.3-1.6 0-.7.6-1.4 1.4-1.4H17a4 4 0 004-4c0-4.4-4-9-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>'),
+    chat: _svg('<path d="M21 11.5a7.5 7.5 0 01-10.9 6.7L4 20l1.8-5.1A7.5 7.5 0 1121 11.5z"/>'),
+    bolt: _svg('<path d="M13 2L5 13h5l-1 9 8-11h-5l1-9z"/>'),
+    spark: _svg('<path d="M12 3l1.7 5.1a2 2 0 001.2 1.2L20 11l-5.1 1.7a2 2 0 00-1.2 1.2L12 19l-1.7-5.1a2 2 0 00-1.2-1.2L4 11l5.1-1.7a2 2 0 001.2-1.2z"/>'),
+    check: _svg('<path d="M20 6L9 17l-5-5"/>', 2.4),
+    x: _svg('<path d="M18 6L6 18M6 6l12 12"/>', 2),
+  };
+
   // ---------- данные ----------
   const THEMES = [
     { key: 'light',   name: 'Кобальт',        desc: 'Фирменный синий, мягкие тени — базовый вид Lumen.', vid: 'skyline-cobalt',   sw: ['#2563EB', '#F4F7FB', '#111827'] },
@@ -97,10 +110,10 @@
           <h1 class="ob-h1">Добро пожаловать в <span class="ob-grad">Lumen</span></h1>
           <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
           <div class="ob-pills">
-            <span class="ob-pill">🎨 Свой стиль</span>
-            <span class="ob-pill">🏢 Агентство или соло</span>
-            <span class="ob-pill">💬 WhatsApp из коробки</span>
-            <span class="ob-pill">⚡ Запуск за 7 дней</span>
+            <span class="ob-pill">${IC.palette}Свой стиль</span>
+            <span class="ob-pill">${IC.building}Агентство или соло</span>
+            <span class="ob-pill">${IC.chat}WhatsApp из коробки</span>
+            <span class="ob-pill">${IC.bolt}Запуск за 7 дней</span>
           </div>
         </div>`,
       primary: 'Начать настройку →',
@@ -111,7 +124,7 @@
   function stepEdition() {
     const pick = (e) => `
       <button class="ob-choice ${S.edition === e ? 'on' : ''}" data-edition="${e}">
-        <div class="ob-choice-ic">${e === 'agency' ? '🏢' : '🧑‍💼'}</div>
+        <div class="ob-choice-ic">${e === 'agency' ? IC.building : IC.user}</div>
         <div class="ob-choice-t">${e === 'agency' ? 'Агентство недвижимости' : 'Соло-брокер'}</div>
         <div class="ob-choice-d">${e === 'agency'
           ? 'Команда брокеров, распределение лидов, контроль собственника, роли и доступы, антислив.'
@@ -119,7 +132,7 @@
         <ul class="ob-choice-l">${(e === 'agency'
           ? ['Брокеры и роли', 'Пульт контроля', 'Распределение и SLA', 'Общая база и лента']
           : ['Только ваши лиды', 'Ничего лишнего', 'Быстрый запуск', 'Весь ИИ-функционал']).map(x => `<li>${x}</li>`).join('')}</ul>
-        <div class="ob-choice-check">✓</div>
+        <div class="ob-choice-check">${IC.check}</div>
       </button>`;
     return {
       title: 'Кто вы?',
@@ -138,7 +151,7 @@
           <div class="ob-theme-swz">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div>
         </div>
         <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
-        <div class="ob-choice-check">✓</div>
+        <div class="ob-choice-check">${IC.check}</div>
       </button>`;
     return {
       title: 'Выберите стиль пространства',
@@ -191,7 +204,7 @@
       <button class="ob-tone ${S.tone === t.k ? 'on' : ''}" data-tone="${t.k}">
         <div class="ob-tone-name">${t.name}</div>
         <div class="ob-tone-ex">${esc(t.ex)}</div>
-        <div class="ob-choice-check">✓</div>
+        <div class="ob-choice-check">${IC.check}</div>
       </button>`;
     return {
       title: 'Тон первой линии',
@@ -209,7 +222,7 @@
       title: o.title, sub: o.sub, shot: o.shot,
       html: `
         <div class="ob-guide">
-          <ul class="ob-guide-l">${o.points.map(p => `<li><i>✓</i>${p}</li>`).join('')}</ul>
+          <ul class="ob-guide-l">${o.points.map(p => `<li><i>${IC.check}</i>${p}</li>`).join('')}</ul>
           <div class="ob-guide-cta">
             <button class="ob-do" data-do="${o.action}">${o.cta}</button>
             <span class="ob-later">или настройте позже — этот шаг не блокирует запуск</span>
@@ -223,7 +236,7 @@
       bg: 'success', pad: true,
       html: `
         <div class="ob-center">
-          <div class="ob-done-mark">✓</div>
+          <div class="ob-done-mark">${IC.check}</div>
           <h1 class="ob-h1">Пространство собрано</h1>
           <p class="ob-lead">${S.name ? esc(S.name) + ' — ' : ''}всё готово. Lumen берёт первую линию: отвечает за секунды, квалифицирует и передаёт тёплых. Вы видите заявки, квалы и сделки в реальном времени.</p>
           <div class="ob-recap" id="obRecap"></div>
@@ -439,7 +452,7 @@
         <div class="ob-veil"></div>
         <div class="ob-orbs"><i></i><i></i><i></i></div>
         <div class="ob-grain"></div>
-        <button class="ob-close" title="Закрыть">✕</button>
+        <button class="ob-close" title="Закрыть">${IC.x}</button>
         <div class="ob-wrap">
           <div class="ob-stage"></div>
           <div class="ob-foot"></div>
@@ -679,6 +692,14 @@
     .ob-grad{background-size:220% auto;animation:obUp .8s cubic-bezier(.16,1,.3,1) both,obGrad 7s linear infinite .8s}
     @keyframes obGrad{to{background-position:220% center}}
     .ob-badge{animation:obUp .6s cubic-bezier(.16,1,.3,1) both}
+    /* ==== размеры SVG-иконок (вместо эмодзи) ==== */
+    .ob-choice-ic{margin-bottom:14px;color:#8FB4FF;line-height:0}
+    .ob-choice-ic svg{width:40px;height:40px;filter:drop-shadow(0 8px 18px rgba(37,99,235,.45))}
+    .ob-pill svg{width:15px;height:15px;margin-right:7px;vertical-align:-3px;color:#8FB4FF}
+    .ob-guide-l li i svg{width:13px;height:13px}
+    .ob-done-mark svg{width:46px;height:46px}
+    .ob-choice-check svg{width:15px;height:15px}
+    .ob-close svg{width:15px;height:15px}
     @media(prefers-reduced-motion:reduce){.ob-orbs i,.ob-primary:after,.ob-do:after,.ob-bgvid video,.ob-done-mark{animation:none!important}}
     `;
     const s = document.createElement('style'); s.id = 'ob-style'; s.textContent = css; document.head.appendChild(s);
