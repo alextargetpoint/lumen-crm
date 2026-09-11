@@ -702,6 +702,23 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   footer{padding-top:46px}
   footer .foot-grid{gap:24px}
 
+  /* --- ПРЕМИУМ-ПОЛИРОВКА МОБИЛКИ --- */
+  /* CTA на всю ширину — app-like */
+  .hero .cta-row,.final .cta-row{flex-direction:column;align-items:stretch;gap:11px}
+  .hero .cta-row .btn,.final .cta-row .btn{width:100%;justify-content:center}
+  .plan .btn{width:100%}
+  .btn{padding:15px 20px}
+  /* списки: галка в мягком квадрате — не «сухо» */
+  .fl li,.lwin li,.hrlist li,.tgcol li,.plan li{align-items:center;line-height:1.36}
+  .fl li svg,.lwin li svg,.hrlist li svg,.tgcol li svg,.plan li svg{width:23px;height:23px;flex:0 0 23px;padding:4px;border-radius:7px;background:color-mix(in srgb,var(--blue) 13%,transparent);box-sizing:border-box}
+  .tgcol.own li svg{background:color-mix(in srgb,var(--mint) 15%,transparent)}
+  .hrlist li svg{background:color-mix(in srgb,var(--klein) 13%,transparent)}
+  .pbig .fl li svg{background:color-mix(in srgb,var(--blue) 13%,transparent)}
+  /* единый премиум-радиус карточек */
+  .leak,.fail,.gap-item,.niche,.plan,.vs-card,.bcard,.ncard,.pcard,.tgcol,.calc,.showcase,.frame,.q,.pbig,.pwide,.betabar{border-radius:18px}
+  /* заголовки плотнее, кикеры выразительнее */
+  h2,.hook,.gap-h,.big-say{letter-spacing:-.015em}
+  .kicker{letter-spacing:.13em}
   /* тап-таргеты */
   .tgl,.burger{width:44px;height:44px}
 }
