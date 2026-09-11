@@ -129,8 +129,15 @@
   .qchip{white-space:nowrap;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12.5px;padding:7px 13px;border-radius:13px;cursor:pointer;transition:.15s;flex:none;font-weight:600}
   .qchip:active{background:var(--panel2);transform:scale(.95)}
   .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px calc(env(safe-area-inset-bottom) + 10px);background:var(--glass);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
-  .composer textarea{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:21px;padding:10px 16px;font-size:15px;resize:none;max-height:120px;outline:none;font-family:inherit;transition:.2s;line-height:1.35;font-weight:500}
+  .composer textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:21px;padding:10px 16px;font-size:15px;resize:none;max-height:170px;outline:none;font-family:inherit;transition:border-color .2s;line-height:1.38;font-weight:500}
   .composer textarea:focus{border-color:rgba(59,116,255,.5)}
+  .composer.has-text textarea{border-radius:18px;padding:11px 16px}
+  /* многострочный текст (после диктовки) → поле на всю ширину сверху, кнопки строкой снизу */
+  .composer.expanded{flex-wrap:wrap;justify-content:flex-end;gap:8px}
+  .composer.expanded textarea{flex:1 0 100%;order:-1;max-height:200px}
+  /* при наборе второстепенные кнопки плавно сворачиваются — поле остаётся широким */
+  .cbtn.collapsible{transition:width .26s cubic-bezier(.22,1,.36,1),min-width .26s,opacity .18s,margin .26s,transform .2s,padding .26s}
+  .composer.has-text .cbtn.collapsible{width:0;min-width:0;padding:0;opacity:0;margin-left:-8px;pointer-events:none;transform:scale(.4);overflow:hidden}
   .cbtn{width:45px;height:45px;border-radius:50%;border:none;background:var(--grad);color:#fff;font-size:20px;display:grid;place-items:center;cursor:pointer;flex:none;box-shadow:var(--shacc);transition:.15s}
   .cbtn:active{transform:scale(.87)}
   .cbtn.ghost{background:var(--panel);color:var(--mut);box-shadow:none;width:41px;height:41px;font-size:21px}
@@ -247,13 +254,14 @@
     <div id="body"></div>
     <div id="replyBar"></div>
     <div class="composer" id="composer">
-      <button class="cbtn ghost ic" id="plus" data-ic="plus"></button>
+      <button class="cbtn ghost ic collapsible" id="plus" data-ic="plus"></button>
       <input type="file" id="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
-      <button class="cbtn ghost ic" id="dict" data-ic="wave" title="Диктовка — голос в текст"></button>
+      <button class="cbtn ghost ic collapsible" id="dict" data-ic="wave" title="Диктовка — голос в текст"></button>
       <textarea id="text" rows="1" placeholder="Сообщение"></textarea>
       <button class="cbtn ghost ic hidden" id="enh" data-ic="ai" title="Усилить ИИ"></button>
       <button class="cbtn ic hidden" id="tts" data-ic="speak" title="Озвучить"></button>
-      <button class="cbtn ic" id="mic" data-ic="mic" title="Голосовое"></button>
+      <button class="cbtn ghost ic hidden" id="actions" data-ic="dots" title="Действия"></button>
+      <button class="cbtn ic collapsible" id="mic" data-ic="mic" title="Голосовое"></button>
       <button class="cbtn ic fill hidden" id="send" data-ic="send" title="Отправить"></button>
     </div>
   </div>
@@ -289,6 +297,7 @@ const IC={
   pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   flame:'<path d="M12 3c3 3.5 5 6 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.2 1 2 2 2 .5-2-.5-4.5 1-6.5z"/>',
   wave:'<path d="M4 10v4M8 6v12M12 8v8M16 5v14M20 10v4"/>',
+  dots:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 };
 const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
@@ -437,9 +446,20 @@ function sheetChats(title,pick){const bd=document.createElement('div');bd.classN
   bd.querySelectorAll('[data-id]').forEach(el=>el.onclick=()=>{hap();close();pick(el.dataset.id)});
 }
 
-const txt=$('#text'),send=$('#send'),mic=$('#mic'),enh=$('#enh'),tts=$('#tts');
-txt.addEventListener('input',()=>{txt.style.height='auto';txt.style.height=Math.min(txt.scrollHeight,120)+'px';const has=txt.value.trim();
-  send.classList.toggle('hidden',!has);mic.classList.toggle('hidden',!!has);enh.classList.toggle('hidden',!has);tts.classList.toggle('hidden',!has)});
+const txt=$('#text'),send=$('#send'),mic=$('#mic'),enh=$('#enh'),tts=$('#tts'),composer=$('#composer'),actions=$('#actions');
+/* дигитальный композер: при наборе второстепенные кнопки сворачиваются, поле остаётся
+   широким и растёт; доп-действия (усилить/озвучить/диктовка/вложение) — в кнопке-меню «⋯» */
+txt.addEventListener('input',()=>{txt.style.height='auto';txt.style.height=Math.min(txt.scrollHeight,200)+'px';const has=!!txt.value.trim();
+  composer.classList.toggle('has-text',has);
+  composer.classList.toggle('expanded',has&&txt.scrollHeight>58);   /* многострочно → поле на всю ширину сверху, кнопки снизу */
+  send.classList.toggle('hidden',!has);
+  actions.classList.toggle('hidden',!has)});
+actions.onclick=()=>{hap();sheet('Действия с сообщением',[
+  {ic:'ai',t:'Усилить текст ИИ',s:'живее и аккуратнее, тот же смысл',f:()=>enh.click()},
+  {ic:'speak',t:'Озвучить и отправить',s:'голосом брокера',f:()=>tts.click()},
+  {ic:'wave',t:'Продиктовать ещё',s:'добавить голосом к тексту',f:()=>$('#dict').click()},
+  {ic:'plus',t:'Вложение',s:'фото, видео или файл',f:()=>$('#plus').click()},
+])};
 txt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send.click()}});
 send.onclick=async()=>{let t=txt.value.trim();if(!t)return;hap();
   if(REPLYING){t='↪ '+String(REPLYING.text||'').replace(/\n/g,' ').slice(0,80)+'\n'+t;REPLYING=null;renderReplyBar()}
