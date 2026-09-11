@@ -218,6 +218,10 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 /* ============ STEPS ============ */
 .steps{position:relative}
 .steps .line{position:absolute;top:38px;left:8%;right:8%;height:2px;background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 16px);z-index:0}
+.steps .line i{position:absolute;left:0;top:50%;transform:translateY(-50%);height:3px;width:0;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--sky));box-shadow:0 0 14px 1px color-mix(in srgb,var(--blue) 70%,transparent);transition:width .15s linear}
+.steps .line i::after{content:"";position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 0 16px 4px color-mix(in srgb,var(--sky) 80%,transparent)}
+.stp .num{transition:transform .55s var(--ease-spring),box-shadow .55s var(--ease-soft),background .45s,color .45s,border-color .45s}
+.stp .num.lit{transform:scale(1.14);background:linear-gradient(180deg,var(--blue2),var(--blue));color:#fff;border-color:transparent;box-shadow:0 0 0 7px color-mix(in srgb,var(--blue) 15%,transparent),0 18px 36px -12px var(--blue)}
 .steps .row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;position:relative;z-index:2}
 .stp{text-align:center}
 .stp .num{width:74px;height:74px;margin:0 auto 20px;border-radius:50%;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-size:30px;font-weight:600;color:var(--blue)}
@@ -505,25 +509,8 @@ html[data-theme="dark"] body::after{opacity:.06}
 .manifesto .by{margin-top:26px;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
 
 /* ============ PRELOADER ============ */
-#load{position:fixed;inset:0;z-index:100;background:radial-gradient(circle at 50% 44%,#0b1428 0%,#040914 58%,#01040b 100%);display:flex;align-items:center;justify-content:center;transition:opacity .8s var(--ease-soft),visibility .8s}
+#load{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .7s var(--ease-soft),visibility .7s}
 #load.done{opacity:0;visibility:hidden}
-.ll-atmo{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.45;pointer-events:none}
-.ll-atmo video{width:100%;height:100%;object-fit:cover;mix-blend-mode:screen}
-.ll-stage{position:relative;width:min(66vmin,460px);aspect-ratio:1;display:grid;place-items:center;z-index:2}
-.ll-glow{position:absolute;width:130%;height:130%;left:-15%;top:-13%;z-index:1;background:radial-gradient(circle at 50% 46%,rgba(79,125,255,.45),rgba(37,99,235,.15) 40%,transparent 62%);filter:blur(22px);opacity:0;animation:llGlow 2.8s ease .1s forwards}
-.ll-band{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2;opacity:0;will-change:transform,opacity}
-.ll-band.b1{clip-path:inset(0 0 59.6% 0);animation:llB1 1.05s var(--ease-spring) .15s forwards}
-.ll-band.b2{clip-path:inset(39.8% 0 41.8% 0);animation:llB2 1.05s var(--ease-spring) .32s forwards}
-.ll-band.b3{clip-path:inset(57.8% 0 25.8% 0);animation:llB3 1.05s var(--ease-spring) .5s forwards}
-.ll-band.b4{clip-path:inset(73.8% 0 0 0);animation:llB4 1.05s var(--ease-spring) .66s forwards}
-.ll-shine{position:absolute;inset:0;z-index:4;pointer-events:none;-webkit-mask:radial-gradient(circle at 50% 49%,#000 47.5%,transparent 48.5%);mask:radial-gradient(circle at 50% 49%,#000 47.5%,transparent 48.5%);background:linear-gradient(112deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%);background-size:260% 100%;background-position:160% 0;mix-blend-mode:screen;opacity:0;animation:llShine 1.2s ease 1.4s forwards}
-@keyframes llGlow{0%{opacity:0}45%{opacity:1}100%{opacity:.8}}
-@keyframes llB1{0%{opacity:0;transform:translateY(-42px) scale(1.06)}100%{opacity:1;transform:none}}
-@keyframes llB2{0%{opacity:0;transform:translateY(-17px) scale(1.06)}100%{opacity:1;transform:none}}
-@keyframes llB3{0%{opacity:0;transform:translateY(17px) scale(1.06)}100%{opacity:1;transform:none}}
-@keyframes llB4{0%{opacity:0;transform:translateY(42px) scale(1.06)}100%{opacity:1;transform:none}}
-@keyframes llShine{0%{opacity:0;background-position:160% 0}20%{opacity:1}100%{opacity:0;background-position:-90% 0}}
-@media(prefers-reduced-motion:reduce){.ll-band{animation-duration:.4s!important}.ll-shine{display:none}}
 .load-mark{position:relative;width:76px;height:76px;display:grid;place-items:center}
 .load-mark .ring{position:absolute;inset:-16px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0deg,var(--blue2) 300deg,transparent 340deg);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 2.5px),#000 calc(100% - 2.5px));animation:lspin 1s linear infinite;opacity:.85}
 .load-mark svg{width:44px;height:53px;filter:drop-shadow(0 0 14px rgba(79,125,255,.55));animation:lpop .8s var(--ease-spring) both,lfloat 2.6s var(--ease-soft) .8s infinite}
@@ -864,16 +851,12 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
 </style>
 </head>
 <body>
-<div id="load" class="logo-load">
-  <div class="ll-atmo"><video id="llAtmo" autoplay muted loop playsinline><source src="/assets/site/loader-atmo.mp4?v=1" type="video/mp4"></video></div>
-  <div class="ll-stage">
-    <div class="ll-glow"></div>
-    <img class="ll-band b1" src="/assets/site/lumen-logo.png" alt="Lumen">
-    <img class="ll-band b2" src="/assets/site/lumen-logo.png" alt="">
-    <img class="ll-band b3" src="/assets/site/lumen-logo.png" alt="">
-    <img class="ll-band b4" src="/assets/site/lumen-logo.png" alt="">
-    <div class="ll-shine"></div>
+<div id="load">
+  <div class="load-mark">
+    <div class="ring"></div>
+    <svg viewBox="0 0 100 120"><defs><linearGradient id="lgL" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#lgL)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
   </div>
+  <div class="load-word">Lumen</div>
 </div>
 <div id="prog"></div>
 
@@ -1186,7 +1169,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <p class="lead">Четыре шага, которые раньше съедали день менеджера — теперь проходят сами, пока вы спите.</p>
   </div>
   <div class="steps">
-    <div class="line"></div>
+    <div class="line"><i></i></div>
     <div class="row">
       <div class="stp on" data-r><div class="num">1</div><h3>Заявка влетает</h3><p>Из рекламы, формы, комментария под постом или CTWA — лид сразу в системе, с привязкой к объявлению.</p></div>
       <div class="stp on d1" data-r><div class="num">2</div><h3>Ведёт диалог сам</h3><p>Отвечает в живом темпе на языке клиента и квалифицирует по цели, сроку, бюджету и типу.</p></div>
@@ -1967,6 +1950,38 @@ if(matchMedia('(hover:hover)').matches){
   });
 }
 
+// #how: скролл-ведомый поток — линия заполняется, номера зажигаются по очереди
+(function(){
+  var steps=document.querySelector('#how .steps'); if(!steps) return;
+  var fill=steps.querySelector('.line i'), nums=[].slice.call(steps.querySelectorAll('.stp .num'));
+  function frame(){
+    var r=steps.getBoundingClientRect();
+    var p=Math.max(0,Math.min(1,(innerHeight*0.8 - r.top)/(r.height*0.66)));
+    if(fill) fill.style.width=(p*100)+'%';
+    nums.forEach(function(n,i){ n.classList.toggle('lit', p >= (i+0.5)/nums.length - 0.03); });
+  }
+  addEventListener('scroll',function(){requestAnimationFrame(frame);},{passive:true});
+  addEventListener('resize',frame); addEventListener('load',frame); frame();
+})();
+
+// параллакс экранов фич (десктоп): дрейф при скролле для глубины
+if(matchMedia('(min-width:861px)').matches){
+  (function(){
+    var frames=[].slice.call(document.querySelectorAll('#features .frame'));
+    if(!frames.length) return;
+    function frame(){
+      var vc=innerHeight/2;
+      frames.forEach(function(f){
+        var r=f.getBoundingClientRect(), c=r.top+r.height/2;
+        var dy=Math.max(-42,Math.min(42,(vc-c)*0.055));
+        f.style.transform='translateY('+dy.toFixed(1)+'px)';
+      });
+    }
+    addEventListener('scroll',function(){requestAnimationFrame(frame);},{passive:true});
+    addEventListener('resize',frame); frame();
+  })();
+}
+
 // count-up numbers
 const _cuReduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cuIO=new IntersectionObserver((es)=>{es.forEach(e=>{if(!e.isIntersecting)return;const el=e.target,to=+el.dataset.to,suf=el.dataset.suffix||'';cuIO.unobserve(el);if(_cuReduced){el.textContent=to+suf;return;}const dur=1200,t0=performance.now();const step=(t)=>{const p=Math.min(1,(t-t0)/dur),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=v+suf;if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);})},{threshold:.6});
@@ -2008,14 +2023,9 @@ if(!reduced && matchMedia('(pointer:fine)').matches){
 // preloader hide
 const load=document.getElementById('load');
 let loadHidden=false;
-function hideLoad(){if(loadHidden||!load)return;loadHidden=true;load.classList.add('done');setTimeout(()=>{load&&load.remove();},900);}
-// логотип-сборка проигрывается ~2.6с, затем показываем сайт; скип по действию после 1.1с
-if(!location.search.includes('holdload')) setTimeout(hideLoad,2700);
-setTimeout(function(){
-  ['pointerdown','touchstart','wheel','keydown'].forEach(function(ev){
-    addEventListener(ev,function _s(){hideLoad();},{once:true,passive:true});
-  });
-},1100);
+function hideLoad(){if(loadHidden||!load)return;loadHidden=true;load.classList.add('done');setTimeout(()=>load.remove(),800);}
+addEventListener('load',()=>setTimeout(hideLoad,450));
+setTimeout(hideLoad,2600);
 
 // lead modal
 const lform=document.getElementById('lform');
