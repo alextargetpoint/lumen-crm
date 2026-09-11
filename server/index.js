@@ -2395,6 +2395,20 @@ const server = http.createServer(async (req, res) => {
         const typing = aiOn && lead.lastDir === 'in' && !['handover', 'viewing', 'deal', 'lost'].includes(lead.stage);
         return json(res, 200, { name: lead.name, phone: lead.phone, avatar: lead.avatarUrl || null, stage: lead.stage, aiOn, typing, messages: msgs });
       }
+      /* полная карточка лида (по тапу на имя в шапке) */
+      if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)$/)) && req.method === 'GET') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const events = db.events.filter(e => e.leadId === lead.id).slice(0, 24).map(e => ({ at: e.at, type: e.type, text: e.text }));
+        const notes = (lead.notes || []).map(n => ({ at: n.at, text: n.text }));
+        const meetings = (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => ({ at: mt.at, status: mt.status, kind: mt.kind, broker: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '' }));
+        return json(res, 200, {
+          name: lead.name, phone: lead.phone, geo: (db.settings.geoNames && db.settings.geoNames[lead.geo]) || lead.geo || '',
+          stage: lead.stage, source: lead.source || '', createdAt: lead.createdAt || 0, avatar: lead.avatarUrl || null,
+          quals: lead.quals || {}, summary: lead.summary || '', tags: lead.tags || [],
+          broker: (db.brokers.find(x => x.id === lead.broker) || {}).name || null, aiOn: !!(lead.ai && lead.ai.enabled),
+          events, notes, meetings,
+        });
+      }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/text$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         const b = await readBody(req); const t = String(b.text || '').trim(); if (!t) return json(res, 400, { error: 'пусто' });
