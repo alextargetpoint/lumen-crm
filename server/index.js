@@ -2405,6 +2405,24 @@ const server = http.createServer(async (req, res) => {
           store.save(); return json(res, 200, { ok: true });
         } catch (e) { return json(res, 400, { error: e.message }); }
       }
+      /* тумблер ИИ вкл/выкл (синк с CRM) */
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/ai$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); lead.ai = lead.ai || {}; lead.ai.enabled = !!b.on;
+        if (b.on) { lead.ai.pausedBy = null; lead.tags = (lead.tags || []).filter(t => t !== 'ведёт брокер' && t !== 'нужен человек'); } else { lead.ai.pausedBy = 'broker'; }
+        store.save(); return json(res, 200, { aiOn: !!lead.ai.enabled });
+      }
+      /* переслать сообщение в другой чат брокера */
+      if (p === '/tgapp/api/forward' && req.method === 'POST') {
+        const b = await readBody(req); const to = db.leads.find(l => l.id === b.toLeadId);
+        if (!canSee(to)) return json(res, 403, { error: 'чужой лид' });
+        const media = b.media && b.media.url ? { type: b.media.type || 'document', url: String(b.media.url).slice(0, 500), name: (b.media.name || '').slice(0, 120) } : undefined;
+        const text = String(b.text || '').trim();
+        if (!text && !media) return json(res, 400, { error: 'пусто' });
+        engine.send(db, to, text, 'human', { channel: 'wa', media });
+        if (db.settings.ai.autoOff.onHumanReply && to.ai && to.ai.enabled) { to.ai.enabled = false; to.ai.pausedBy = 'broker'; }
+        store.save(); return json(res, 200, { ok: true });
+      }
       return json(res, 404, { error: 'no route' });
     }
 

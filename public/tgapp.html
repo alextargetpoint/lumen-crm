@@ -55,8 +55,20 @@
   .load{padding:44px;text-align:center;color:var(--mut)}
   .load .sp{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:spin .8s linear infinite}
   /* ---------- ДИАЛОГ ---------- */
-  #conv{position:absolute;inset:0;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(8,11,18,.4),var(--bg));z-index:10;transform:translateX(100%);transition:transform .28s cubic-bezier(.22,1,.36,1)}
+  #conv{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:10;transform:translateX(100%);transition:transform .28s cubic-bezier(.22,1,.36,1)}
   #conv.open{transform:none}
+  .hd-btn.aon{background:var(--grad);color:#fff;box-shadow:var(--shacc)}
+  /* reply/forward */
+  .reply-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--panel);border-top:1px solid var(--line);border-left:3px solid var(--acc)}
+  .reply-bar .rq{flex:1;min-width:0}.reply-bar .rq b{font-size:12px;color:var(--acc2)}.reply-bar .rq div{font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reply-bar .x{font-size:20px;color:var(--mut);cursor:pointer;padding:0 4px}
+  .b .quoted{border-left:3px solid rgba(255,255,255,.5);padding:3px 8px;margin-bottom:5px;border-radius:6px;background:rgba(0,0,0,.16);font-size:13px;opacity:.85}
+  .b.in .quoted{border-left-color:var(--acc)}
+  .msgmenu-bd{position:fixed;inset:0;z-index:45}
+  .msgmenu{position:absolute;background:var(--panel2);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);overflow:hidden;min-width:170px}
+  .msgmenu div{padding:12px 16px;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:10px;font-weight:600}
+  .msgmenu div:active{background:var(--panel)}
+  .msgmenu .ic{font-size:17px;color:var(--acc2)}
   .chd{display:flex;align-items:center;gap:11px;padding:calc(env(safe-area-inset-top) + 9px) 12px 9px;background:var(--glass);backdrop-filter:blur(20px);border-bottom:1px solid var(--line);z-index:3}
   .back{font-size:22px;color:var(--acc);cursor:pointer;padding:2px 5px;display:grid;place-items:center}
   .chd .ava{width:43px;height:43px;font-size:15px;border-radius:14px}
@@ -147,10 +159,11 @@
       <span class="back ic" id="back" data-ic="back"></span>
       <span class="ava" id="cAva"></span>
       <div style="flex:1;min-width:0"><div class="nm" id="cNm"></div><div class="st" id="cSt"></div></div>
+      <span class="hd-btn ic" id="cAi" data-ic="ai" title="ИИ вкл/выкл"></span>
       <span class="hd-btn ic" id="cCall" data-ic="call"></span>
     </div>
     <div id="body"></div>
-    <div id="quickBar" class="quick"></div>
+    <div id="replyBar"></div>
     <div class="composer" id="composer">
       <button class="cbtn ghost ic" id="plus" data-ic="plus"></button>
       <input type="file" id="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
@@ -201,7 +214,7 @@ let toastT; function toast(m){let t=$('#tst');if(!t){t=document.createElement('d
 async function jget(u){const r=await fetch(u,{headers:H});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||r.status);return r.json()}
 async function jpost(u,body,raw){const o={method:'POST',headers:{...H}};if(raw){o.body=raw.body;if(raw.ct)o.headers['Content-Type']=raw.ct}else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}const r=await fetch(u,o);const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||r.status);return j}
 
-async function loadChats(){try{CHATS=await jget('/tgapp/api/chats');renderChats()}catch(e){$('#chats').innerHTML='<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку «Чаты» у бота (нужна привязка брокера).</div>'}}
+async function loadChats(){try{CHATS=await jget('/tgapp/api/chats');const fp=JSON.stringify(CHATS.map(c=>[c.id,c.lastMsgAt,c.unread,c.lastText]));if(fp!==window._cfp){window._cfp=fp;renderChats()}}catch(e){$('#chats').innerHTML='<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку «Чаты» у бота (нужна привязка брокера).</div>'}}
 function tot(){return CHATS.reduce((n,c)=>n+(c.unread||0),0)}
 function renderChats(){
   const q=($('#q').value||'').toLowerCase().trim();
@@ -225,7 +238,7 @@ async function openChat(id){
   $('#cNm').textContent=CUR.name||'';$('#cSt').textContent=CUR.phone||'';
   $('#conv').classList.add('open');
   if(TG&&TG.BackButton){TG.BackButton.show();TG.BackButton.offClick&&TG.BackButton.offClick(closeChat);TG.BackButton.onClick(closeChat)}
-  renderQuick();await loadConv(true);
+  REPLYING=null;renderReplyBar();CUR._fp=null;await loadConv(true);
   clearInterval(POLL);POLL=setInterval(()=>loadConv(false),4000);
 }
 function closeChat(){hap();clearInterval(POLL);$('#conv').classList.remove('open');if(TG&&TG.BackButton)TG.BackButton.hide();loadChats()}
@@ -255,38 +268,78 @@ function fmtd(s){s=Math.max(0,s|0);return Math.floor(s/60)+':'+String(s%60).padS
 
 async function loadConv(scroll){
   let d;try{d=await jget('/tgapp/api/chat/'+CUR.id)}catch(e){$('#body').innerHTML='<div class="empty">'+esc(e.message)+'</div>';return}
-  CUR=Object.assign(CUR,{name:d.name,phone:d.phone,stage:d.stage,avatar:d.avatar});
+  CUR=Object.assign(CUR,{name:d.name,phone:d.phone,stage:d.stage,avatar:d.avatar,aiOn:d.aiOn});
   $('#cNm').textContent=d.name;$('#cSt').innerHTML=(d.aiOn?'<span class="ai-on">● ИИ ведёт</span>':'вы ведёте')+' · '+esc(d.phone||'');
+  $('#cAi').classList.toggle('aon',!!d.aiOn);
+  /* анти-мигание: если ничего не изменилось — не перерисовываем DOM */
+  const fp=JSON.stringify((d.messages||[]).map(m=>[m.at,m.status,m.text,m.media&&m.media.url]))+'|'+(d.typing?1:0);
+  if(fp===CUR._fp&&!scroll)return; CUR._fp=fp; CUR._msgs=d.messages||[];
   let lastDay='';
-  $('#body').innerHTML=(d.messages||[]).map(m=>{
+  $('#body').innerHTML=CUR._msgs.map((m,i)=>{
     const day=new Date(m.at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
     const sep=day!==lastDay?`<div class="day">${day}</div>`:'';lastDay=day;
     let inner='';
+    let txt=m.text||'';let quoted='';
+    if(txt.startsWith('↪ ')){const nl=txt.indexOf('\n');if(nl>0){quoted=`<div class="quoted">${esc(txt.slice(2,nl))}</div>`;txt=txt.slice(nl+1)}}
     if(m.media&&m.media.url){const u=esc(m.media.url),t=m.media.type;
       if(t==='image')inner=`<img src="${u}" onclick="window.open('${u}')">`;
       else if(t==='video')inner=`<video src="${u}" controls playsinline preload="metadata"></video>`;
       else if(t==='voice'||t==='audio')inner=voicePlayer(u);
       else inner=`<a class="doc" href="${u}" target="_blank"><span class="ic">${svg('doc')}</span><span>${esc(m.media.name||'файл')}</span></a>`;
     }
-    if(m.text)inner+=(inner?'<div style="margin-top:2px">':'')+esc(m.text)+(inner?'</div>':'');
+    if(txt)inner+=(inner?'<div style="margin-top:2px">':'')+esc(txt)+(inner?'</div>':'');
     const tick=m.dir==='out'?`<span class="ic ${m.status==='read'?'read':''}">${svg(m.status==='read'||m.status==='delivered'?'checks':'check')}</span>`:'';
-    return sep+`<div class="b ${m.dir}">${inner}<div class="bm">${tmm(m.at)} ${tick}</div></div>`;
+    return sep+`<div class="b ${m.dir}" data-i="${i}">${quoted}${inner}<div class="bm">${tmm(m.at)} ${tick}</div></div>`;
   }).join('')||'<div class="empty">Сообщений пока нет</div>';
   if(d.typing)$('#body').insertAdjacentHTML('beforeend','<div class="typing"><i></i><i></i><i></i></div>');
-  wireVoicePlayers($('#body'));
+  wireVoicePlayers($('#body'));wireBubbleMenu($('#body'));
   const b=$('#body');if(scroll||b.scrollHeight-b.scrollTop-b.clientHeight<160)b.scrollTop=b.scrollHeight;
 }
 
-const QUICK=['Здравствуйте! 👋','Спасибо, что откликнулись!','Уже готовлю варианты под ваш запрос','Скину подборку в течение часа','Когда удобно созвониться?','Отправлю детали и цены'];
-function renderQuick(){$('#quickBar').innerHTML=QUICK.map((q,i)=>`<span class="qchip" data-q="${i}">${esc(q)}</span>`).join('');
-  document.querySelectorAll('[data-q]').forEach(c=>c.onclick=()=>{hap();const t=$('#text');t.value=t.value?t.value+' '+QUICK[c.dataset.q]:QUICK[c.dataset.q];t.dispatchEvent(new Event('input'));t.focus()})}
+/* ответ (цитата) */
+let REPLYING=null;
+function renderReplyBar(){const rb=$('#replyBar');if(!REPLYING){rb.innerHTML='';return}rb.innerHTML=`<div class="reply-bar"><div class="rq"><b>Ответ</b><div>${esc(REPLYING.text||'вложение')}</div></div><span class="x" id="rbx">×</span></div>`;$('#rbx').onclick=()=>{REPLYING=null;renderReplyBar()};$('#text').focus()}
+/* контекст-меню сообщения: ответить / переслать / копировать */
+function wireBubbleMenu(root){root.querySelectorAll('.b[data-i]').forEach(b=>{
+  let t;const start=e=>{t=setTimeout(()=>{hap('medium');openMsgMenu(b,+b.dataset.i)},480)};
+  const stop=()=>clearTimeout(t);
+  b.addEventListener('touchstart',start,{passive:true});b.addEventListener('touchend',stop);b.addEventListener('touchmove',stop);
+  b.addEventListener('contextmenu',e=>{e.preventDefault();hap('medium');openMsgMenu(b,+b.dataset.i)});
+})}
+function openMsgMenu(bubble,i){const m=(CUR._msgs||[])[i];if(!m)return;
+  const bd=document.createElement('div');bd.className='msgmenu-bd';
+  bd.innerHTML=`<div class="msgmenu"><div data-a="reply"><span class="ic">${svg('back')}</span>Ответить</div><div data-a="forward"><span class="ic">${svg('send')}</span>Переслать</div><div data-a="copy"><span class="ic">${svg('doc')}</span>Копировать</div></div>`;
+  document.body.appendChild(bd);
+  const menu=bd.querySelector('.msgmenu');const r=bubble.getBoundingClientRect();
+  menu.style.top=Math.min(r.bottom+6,innerHeight-160)+'px';menu.style.left=Math.max(10,Math.min(r.left,innerWidth-190))+'px';
+  const close=()=>bd.remove();bd.onclick=e=>{if(e.target===bd)close()};
+  menu.querySelectorAll('[data-a]').forEach(el=>el.onclick=()=>{const a=el.dataset.a;close();hap();
+    if(a==='reply'){REPLYING={text:(m.text||(m.media?'['+m.media.type+']':''))};renderReplyBar()}
+    else if(a==='copy'){navigator.clipboard.writeText(m.text||'');toast('Скопировано')}
+    else if(a==='forward')openForward(m);
+  });
+}
+/* переслать: выбрать чат → отправить туда */
+function openForward(m){sheetChats('Переслать в чат',async(toId)=>{
+  try{await jpost('/tgapp/api/forward',{toLeadId:toId,text:m.text||'',media:m.media||null});toast('Переслано')}catch(e){toast(e.message)}
+})}
+function sheetChats(title,pick){const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML='<div class="sheet"><div class="grip"></div><h3>'+esc(title)+'</h3>'+CHATS.map(c=>`<div class="sheet-opt" data-id="${c.id}">${c.avatar?`<span class="ic" style="background-image:url('${esc(c.avatar)}');background-size:cover"></span>`:`<span class="ic" style="background:${avg(c.id)}">${esc(ini(c.name))}</span>`}<div><b>${esc(c.name)}</b><small>${esc(c.phone||'')}</small></div></div>`).join('')+'</div>';
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelectorAll('[data-id]').forEach(el=>el.onclick=()=>{hap();close();pick(el.dataset.id)});
+}
 
 const txt=$('#text'),send=$('#send'),mic=$('#mic'),enh=$('#enh'),tts=$('#tts');
 txt.addEventListener('input',()=>{txt.style.height='auto';txt.style.height=Math.min(txt.scrollHeight,120)+'px';const has=txt.value.trim();
   send.classList.toggle('hidden',!has);mic.classList.toggle('hidden',!!has);enh.classList.toggle('hidden',!has);tts.classList.toggle('hidden',!has)});
 txt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send.click()}});
-send.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap();txt.value='';txt.dispatchEvent(new Event('input'));
-  try{await jpost('/tgapp/api/chat/'+CUR.id+'/text',{text:t});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message);txt.value=t}};
+send.onclick=async()=>{let t=txt.value.trim();if(!t)return;hap();
+  if(REPLYING){t='↪ '+String(REPLYING.text||'').replace(/\n/g,' ').slice(0,80)+'\n'+t;REPLYING=null;renderReplyBar()}
+  txt.value='';txt.dispatchEvent(new Event('input'));
+  try{await jpost('/tgapp/api/chat/'+CUR.id+'/text',{text:t});CUR._fp=null;await loadConv(true)}catch(e){toast('Не отправилось: '+e.message)}};
+$('#cAi').onclick=async()=>{hap();const on=!CUR.aiOn;$('#cAi').classList.toggle('aon',on);
+  try{const r=await jpost('/tgapp/api/chat/'+CUR.id+'/ai',{on});CUR.aiOn=r.aiOn;$('#cAi').classList.toggle('aon',r.aiOn);$('#cSt').innerHTML=(r.aiOn?'<span class="ai-on">● ИИ ведёт</span>':'вы ведёте')+' · '+esc(CUR.phone||'');toast(r.aiOn?'ИИ включён — ведёт диалог':'ИИ выключен — вы ведёте')}catch(e){toast(e.message);$('#cAi').classList.toggle('aon',CUR.aiOn)}};
 enh.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');enh.style.pointerEvents='none';enh.style.opacity=.5;
   try{const r=await jpost('/tgapp/api/enhance',{text:t,mode:'improve'});txt.value=r.text;txt.dispatchEvent(new Event('input'));toast('Текст усилен ИИ')}catch(e){toast(e.message)}enh.style.pointerEvents='';enh.style.opacity=''};
 tts.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');toast('Генерирую голосовое…');
