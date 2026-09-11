@@ -381,9 +381,9 @@
     // ветвление пересобирается после выбора edition
     if (step.id === 'edition') STEPS = buildSteps();
     idx = Math.min(idx + 1, STEPS.length - 1);
-    paint();
+    playTrans(); paint();
   }
-  function back() { idx = Math.max(0, idx - 1); paint(); }
+  function back() { if (idx <= 0) return; idx = Math.max(0, idx - 1); playTrans(); paint(); }
 
   async function saveProgress(markDone) {
     const agency = {
@@ -428,9 +428,11 @@
     root = el(`
       <div id="lumenOnboard" class="ob-root" role="dialog" aria-label="Настройка Lumen">
         <div class="ob-bgvid"></div>
+        <canvas class="ob-shader"></canvas>
         <div class="ob-veil"></div>
         <div class="ob-orbs"><i></i><i></i><i></i></div>
         <div class="ob-grain"></div>
+        <div class="ob-trans"><video muted playsinline></video></div>
         <button class="ob-close" title="Закрыть">✕</button>
         <div class="ob-wrap">
           <div class="ob-stage"></div>
@@ -439,12 +441,15 @@
       </div>`);
     document.body.appendChild(root);
     document.documentElement.style.overflow = 'hidden';
+    try { startShader(root.querySelector('.ob-shader')); } catch (e) {}
+    root.addEventListener('pointermove', (e) => { _mouse.tx = e.clientX / innerWidth; _mouse.ty = 1 - e.clientY / innerHeight; }, { passive: true });
     root.querySelector('.ob-close').onclick = () => { saveProgress(false); close(true); };
     requestAnimationFrame(() => root.classList.add('in'));
     paint();
   }
   function close(keepScroll) {
     if (!root) return;
+    stopShader();
     const r = root; root = null;
     r.classList.remove('in');
     document.documentElement.style.overflow = '';
@@ -636,9 +641,104 @@
     .ob-done-mark{box-shadow:0 0 0 12px rgba(52,211,153,.12),0 0 64px -6px rgba(16,185,129,.7),0 24px 60px -18px rgba(16,185,129,.6);animation:obPop .6s cubic-bezier(.16,1,.3,1),obDoneGlow 2.8s ease-in-out .6s infinite}
     @keyframes obDoneGlow{0%,100%{box-shadow:0 0 0 12px rgba(52,211,153,.12),0 0 64px -6px rgba(16,185,129,.72),0 24px 60px -18px rgba(16,185,129,.6)}50%{box-shadow:0 0 0 20px rgba(52,211,153,.05),0 0 96px 2px rgba(16,185,129,.92),0 24px 60px -18px rgba(16,185,129,.6)}}
     .ob-recap{background:linear-gradient(rgba(14,24,46,.4),rgba(14,24,46,.4)) padding-box;border-radius:16px;padding:8px 22px}
+    /* ==== шейдер-слой + генеративные переходы + z-порядок ==== */
+    .ob-shader{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:.92}
+    .ob-orbs{z-index:2;opacity:.4}
+    .ob-grain{z-index:3}
+    .ob-trans{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;transition:opacity .1s}
+    .ob-trans.on{opacity:1}
+    .ob-trans video{width:100%;height:100%;object-fit:cover;mix-blend-mode:screen;filter:saturate(1.35) brightness(1.15)}
+    .ob-wrap{z-index:5}.ob-foot{z-index:5}.ob-close{z-index:7}
+    /* ==== усиленные входы: каскад детей ==== */
+    .ob-panel .ob-body>*{animation:obUp .72s cubic-bezier(.16,1,.3,1) both}
+    .ob-panel .ob-body>*:nth-child(1){animation-delay:.04s}
+    .ob-panel .ob-body>*:nth-child(2){animation-delay:.12s}
+    .ob-panel .ob-body>*:nth-child(3){animation-delay:.2s}
+    .ob-panel .ob-body>*:nth-child(4){animation-delay:.28s}
+    .ob-center>*{animation:obUp .72s cubic-bezier(.16,1,.3,1) both}
+    .ob-center>*:nth-child(2){animation-delay:.1s}.ob-center>*:nth-child(3){animation-delay:.2s}.ob-center>*:nth-child(4){animation-delay:.3s}.ob-center>*:nth-child(5){animation-delay:.4s}
+    .ob-panel .ob-shot{animation:obShotIn .95s cubic-bezier(.16,1,.3,1) both .16s}
+    @keyframes obUp{from{opacity:0;transform:translateY(28px);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+    @keyframes obShotIn{from{opacity:0;transform:translateY(32px) rotateX(9deg) scale(.95);filter:blur(11px)}to{opacity:1;transform:none;filter:none}}
+    .ob-choices .ob-choice,.ob-themes .ob-theme,.ob-tones .ob-tone,.ob-chips .ob-chip{animation:obCard .6s cubic-bezier(.16,1,.3,1) both}
+    .ob-choice:nth-child(2),.ob-tone:nth-child(2){animation-delay:.09s}.ob-tone:nth-child(3){animation-delay:.18s}
+    .ob-theme:nth-child(2){animation-delay:.05s}.ob-theme:nth-child(3){animation-delay:.1s}.ob-theme:nth-child(4){animation-delay:.15s}.ob-theme:nth-child(5){animation-delay:.2s}.ob-theme:nth-child(6){animation-delay:.25s}
+    @keyframes obCard{from{opacity:0;transform:translateY(22px) scale(.95);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+    /* ==== вращающийся конический ореол на выбранной карточке ==== */
+    .ob-choice.on,.ob-tone.on{position:relative}
+    .ob-choice.on:before,.ob-tone.on:before{content:"";position:absolute;inset:-3px;border-radius:inherit;z-index:-1;background:conic-gradient(from 0deg,#5B84FF,#6C4CFF,#12B3A6,#5B84FF);animation:obSpin 4.5s linear infinite;filter:blur(6px);opacity:.85}
+    @keyframes obSpin{to{transform:rotate(360deg)}}
+    /* ==== магнитные кнопки + пульс градиента ==== */
+    .ob-primary:hover{transform:translateY(-3px) scale(1.02)}
+    .ob-btn:active{transform:scale(.97)}
+    .ob-do:hover{transform:translateY(-3px) scale(1.02)}
+    .ob-grad{background-size:220% auto;animation:obUp .8s cubic-bezier(.16,1,.3,1) both,obGrad 7s linear infinite .8s}
+    @keyframes obGrad{to{background-position:220% center}}
+    .ob-badge{animation:obUp .6s cubic-bezier(.16,1,.3,1) both}
     @media(prefers-reduced-motion:reduce){.ob-orbs i,.ob-primary:after,.ob-do:after,.ob-bgvid video,.ob-done-mark{animation:none!important}}
     `;
     const s = document.createElement('style'); s.id = 'ob-style'; s.textContent = css; document.head.appendChild(s);
+  }
+
+  // ============================================================
+  //  WebGL-шейдер: живая кобальт-небула, реагирует на курсор
+  // ============================================================
+  let _raf = 0, _mouse = { x: .5, y: .5, tx: .5, ty: .5 };
+  function startShader(canvas) {
+    if (!canvas) return;
+    let gl; try { gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); } catch (e) {}
+    if (!gl) return;
+    const vs = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+    const fs = [
+      'precision highp float;uniform vec2 r;uniform float t;uniform vec2 m;',
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
+      'float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}',
+      'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.02;a*=.5;}return v;}',
+      'void main(){vec2 uv=gl_FragCoord.xy/r.xy;vec2 q=uv;q.x*=r.x/r.y;float tt=t*.045;',
+      'vec2 fl=vec2(fbm(q*2.2+tt),fbm(q*2.2-tt+5.));',
+      'float f=fbm(q*3.2+fl*1.7+vec2(tt*2.,-tt));',
+      'vec3 c1=vec3(.012,.028,.085),c2=vec3(.08,.20,.60),c3=vec3(.34,.27,.86);',
+      'vec3 col=mix(c1,c2,smoothstep(.22,.78,f));col=mix(col,c3,smoothstep(.62,.96,f)*.6);',
+      'vec2 mp=m;mp.x*=r.x/r.y;float d=distance(q,mp);col+=vec3(.16,.36,.95)*exp(-d*3.2)*.6;',
+      'col+=vec3(.05,.12,.4)*pow(fbm(q*6.+tt*3.),3.)*1.2;',
+      'col*=1.-.55*distance(uv,vec2(.5));gl_FragColor=vec4(col,1.);}'
+    ].join('');
+    function sh(ty, src) { const s = gl.createShader(ty); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const pl = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(pl); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 0, 0);
+    const ur = gl.getUniformLocation(prog, 'r'), ut = gl.getUniformLocation(prog, 't'), um = gl.getUniformLocation(prog, 'm');
+    const start = performance.now();
+    function resize() { const dpr = Math.min(devicePixelRatio || 1, 1.5); canvas.width = Math.floor(innerWidth * dpr); canvas.height = Math.floor(innerHeight * dpr); gl.viewport(0, 0, canvas.width, canvas.height); }
+    resize(); canvas._resize = resize; addEventListener('resize', resize);
+    (function loop() {
+      _mouse.x += (_mouse.tx - _mouse.x) * .06; _mouse.y += (_mouse.ty - _mouse.y) * .06;
+      gl.uniform2f(ur, canvas.width, canvas.height);
+      gl.uniform1f(ut, (performance.now() - start) / 1000);
+      gl.uniform2f(um, _mouse.x, _mouse.y);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      _raf = requestAnimationFrame(loop);
+    })();
+  }
+  function stopShader() { if (_raf) cancelAnimationFrame(_raf); _raf = 0; }
+
+  // ---------- генеративные переходы между шагами (Higgsfield) ----------
+  const TRANS = ['ob-trans-sweep', 'ob-trans-burst', 'ob-trans-ripple'];
+  let _transI = 0;
+  function playTrans() {
+    const box = root && root.querySelector('.ob-trans'); if (!box) return;
+    const v = box.querySelector('video');
+    const name = TRANS[_transI++ % TRANS.length];
+    if ((v.getAttribute('src') || '').indexOf(name) < 0) v.src = '/assets/' + name + '.mp4?v=1';
+    box.classList.add('on');
+    try { v.currentTime = 0; const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    clearTimeout(box._t); box._t = setTimeout(() => box.classList.remove('on'), 640);
   }
 
   // ---------- авто-открытие на первом запуске (владелец + не пройдено) ----------
