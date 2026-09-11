@@ -64,6 +64,7 @@
   let STEPS = [];       // активные шаги (после ветвления)
   let idx = 0;
   let root = null, auto = false;
+  let _billing = null;
 
   function freshState(st) {
     const a = (st && st.settings && st.settings.agency) || {};
@@ -93,6 +94,7 @@
       { id: 'chains' },
       { id: 'listings' },
       !solo && { id: 'team' },
+      { id: 'pricing' },
       { id: 'finish' },
     ].filter(Boolean);
     return all;
@@ -241,6 +243,42 @@
     };
   }
 
+  function stepPricing() {
+    const b = _billing || {};
+    let trialDays = b.trialEndsAt ? Math.ceil((b.trialEndsAt - Date.now()) / 86400000) : 14;
+    if (!(trialDays >= 3)) trialDays = 14; // свежий онбординг = полный триал
+    const solo = S.edition === 'solo';
+    const price = solo ? 99 : 200, was = solo ? 149 : 300;
+    const seats = solo ? '1 рабочее место' : '5 брокеров + руководитель';
+    return {
+      title: 'Запуск и подписка',
+      sub: `Всё настроено. Первые ${trialDays} дней — бесплатно, без карты. Дальше — фиксированная подписка, без оплаты за лида.`,
+      html: `
+        <div class="ob-price">
+          <div class="ob-price-card">
+            <div class="ob-price-beta">Бета · первым 10 агентствам</div>
+            <div class="ob-price-name">${solo ? 'Соло-брокер' : 'Агентство'}</div>
+            <div class="ob-price-val"><s>$${was}</s><b>$${price}</b><span>/мес</span></div>
+            <div class="ob-price-seats">${seats}</div>
+            <ul class="ob-price-list">
+              <li>${IC.check}Запуск за 7 дней, а не за полгода</li>
+              <li>${IC.check}WhatsApp, комментарии, телефония — из коробки</li>
+              <li>${IC.check}Квалификация, подборки, психо-портрет</li>
+              <li>${IC.check}Обновления и поддержка, без своей команды</li>
+            </ul>
+            <button class="ob-do ob-do-pay" data-do="pay">Активировать подписку →</button>
+            <div class="ob-price-rr">${IC.check}Без карты для старта · отмена в один клик</div>
+          </div>
+          <div class="ob-price-side">
+            <div class="ob-price-badge">${trialDays}<span>дней<br>бесплатно</span></div>
+            <div class="ob-price-why"><b>Почему активировать сейчас?</b><span>Вы уже собрали пространство под себя. Одна кнопка — и Lumen берёт первую линию с этой минуты, а заявки перестают остывать по ночам.</span></div>
+          </div>
+        </div>`,
+      primary: `Продолжить бесплатно ${trialDays} дн. →`,
+      hideSkip: true,
+    };
+  }
+
   function stepFinish() {
     return {
       bg: 'success', pad: true,
@@ -269,6 +307,7 @@
       case 'chains': return stepGuide({ title: 'Цепочки касаний', sub: 'Не ответил сразу — Lumen мягко дожимает по расписанию и уважает тихие часы.', shot: 'sequences', action: 'chains', cta: 'Открыть цепочки', points: ['Готовая цепочка на 7 касаний / 18 дней', 'Переключение между каналами', 'Останавливается, как только клиент ответил', 'Реанимация «спящей» базы'] });
       case 'listings': return stepGuide({ title: 'База объектов', sub: 'Загрузите объекты — Lumen соберёт из них живые подборки под клиента.', shot: 'collections', action: 'listings', cta: 'Импортировать объекты', points: ['Импорт Reelly / CSV / Excel / JSON', 'Синк порталов (Property Finder, Bayut, DLD)', 'Подборки с вашим лого и подписью', 'Публичная страница с трекингом просмотров'] });
       case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Пульт контроля и антислив базы', 'Мост Telegram ⇄ WhatsApp для брокеров'] });
+      case 'pricing': return stepPricing();
       case 'finish': return stepFinish();
     }
   }
@@ -332,10 +371,23 @@
       qq('[data-edition]').forEach(b => b.onclick = () => { S.edition = b.dataset.edition; paint(); });
     }
     if (step.id === 'style') {
+      const zoom = root.querySelector('.ob-zoom'), zImg = zoom.querySelector('img'), zLbl = zoom.querySelector('.ob-zoom-lbl');
+      let hideT;
       qq('[data-theme]').forEach(b => {
         const v = b.querySelector('video');
-        b.onmouseenter = () => { if (v) v.play().catch(() => {}); };
-        b.onmouseleave = () => { if (v && S.theme !== b.dataset.theme) { v.pause(); } };
+        const backImg = b.querySelector('.ob-theme-back img');
+        const name = (b.querySelector('.ob-theme-meta b') || {}).textContent || '';
+        b.onmouseenter = () => {
+          if (v) v.play().catch(() => {});
+          clearTimeout(hideT);
+          if (backImg) { zImg.setAttribute('src', backImg.getAttribute('src')); zImg.style.filter = backImg.style.filter || 'none'; }
+          zLbl.textContent = 'Интерфейс · ' + name;
+          zoom.classList.add('on');
+        };
+        b.onmouseleave = () => {
+          if (v && S.theme !== b.dataset.theme) v.pause();
+          hideT = setTimeout(() => { root && zoom.classList.remove('on'); }, 130);
+        };
         b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };
       });
     }
@@ -362,9 +414,7 @@
       qq('[data-tone]').forEach(b => b.onclick = () => { S.tone = b.dataset.tone; qq('[data-tone]').forEach(x => x.classList.toggle('on', x === b)); });
       q('#obAutopilot').onchange = e => S.autopilot = e.target.checked;
     }
-    if (d.action) {
-      const btn = q('[data-do]'); if (btn) btn.onclick = () => runGuide(d.action);
-    }
+    qq('[data-do]').forEach(btn => { btn.onclick = () => runGuide(btn.dataset.do); });
   }
 
   function runGuide(action) {
@@ -453,6 +503,7 @@
     injectCSS();
     const st = (B().state) || (window.STATE) || {};
     S = freshState(st);
+    api('GET', '/billing').then(b => { _billing = b; }).catch(() => {});
     STEPS = buildSteps();
     idx = 0;
     root = el(`
@@ -463,6 +514,7 @@
         <div class="ob-orbs"><i></i><i></i><i></i></div>
         <div class="ob-grain"></div>
         <button class="ob-close" title="Закрыть">${IC.x}</button>
+        <div class="ob-zoom"><div class="ob-zoom-card"><img alt=""><div class="ob-zoom-lbl"></div></div></div>
         <div class="ob-wrap">
           <div class="ob-stage"></div>
           <div class="ob-foot"></div>
@@ -622,8 +674,8 @@
     .ob-orbs{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
     .ob-orbs i{position:absolute;border-radius:50%;filter:blur(72px);opacity:.5;mix-blend-mode:screen;animation:obOrb 20s ease-in-out infinite}
     .ob-orbs i:nth-child(1){width:48vw;height:48vw;left:-14vw;top:-16vw;background:radial-gradient(circle,#2F6BFF,transparent 68%)}
-    .ob-orbs i:nth-child(2){width:42vw;height:42vw;right:-14vw;top:6vw;background:radial-gradient(circle,#6C4CFF,transparent 68%);animation-delay:-7s}
-    .ob-orbs i:nth-child(3){width:40vw;height:40vw;left:28vw;bottom:-20vw;background:radial-gradient(circle,#0FB6A6,transparent 68%);animation-delay:-13s;opacity:.32}
+    .ob-orbs i:nth-child(2){width:42vw;height:42vw;right:-14vw;top:6vw;background:radial-gradient(circle,#2F6BFF,transparent 68%);animation-delay:-7s}
+    .ob-orbs i:nth-child(3){width:40vw;height:40vw;left:28vw;bottom:-20vw;background:radial-gradient(circle,#2563EB,transparent 68%);animation-delay:-13s;opacity:.32}
     @keyframes obOrb{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(6vw,-4vw) scale(1.14)}66%{transform:translate(-5vw,5vw) scale(.94)}}
     .ob-grain{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
     .ob-veil{background:radial-gradient(130% 100% at 50% -12%,rgba(24,44,92,.5),rgba(6,11,26,.84) 58%,#03060f 100%)}
@@ -640,17 +692,17 @@
     .ob-h2{font-size:clamp(30px,4vw,52px);letter-spacing:-.035em}
     .ob-grad{background:linear-gradient(110deg,#EAF1FF,#9CC0FF 42%,#5B84FF);-webkit-background-clip:text;background-clip:text;color:transparent}
     .ob-step-n{background:linear-gradient(90deg,#9CC0FF,#5B84FF);-webkit-background-clip:text;background-clip:text;color:transparent}
-    .ob-badge{background:linear-gradient(90deg,rgba(37,99,235,.28),rgba(108,76,255,.22));border-color:rgba(143,180,255,.42);box-shadow:0 10px 34px -12px rgba(37,99,235,.6);color:#CFE0FF}
+    .ob-badge{background:linear-gradient(90deg,rgba(37,99,235,.28),rgba(37,99,235,.22));border-color:rgba(143,180,255,.42);box-shadow:0 10px 34px -12px rgba(37,99,235,.6);color:#CFE0FF}
     .ob-pill{background:rgba(18,30,60,.5);box-shadow:0 8px 22px -12px rgba(0,0,0,.6)}
     .ob-lead{color:#B9C9EC}
     /* карточки: стеклянный градиент-бордер + свечение */
     .ob-choice,.ob-tone{border:1.5px solid transparent;background:linear-gradient(rgba(13,22,44,.72),rgba(13,22,44,.72)) padding-box,linear-gradient(135deg,rgba(143,180,255,.4),rgba(143,180,255,.05) 42%,transparent) border-box;backdrop-filter:blur(18px) saturate(140%)}
     .ob-choice:hover,.ob-tone:hover{box-shadow:0 34px 74px -26px rgba(37,99,235,.5)}
-    .ob-choice.on,.ob-tone.on{background:linear-gradient(rgba(24,44,92,.8),rgba(17,29,62,.82)) padding-box,linear-gradient(135deg,#5B84FF,#6C4CFF) border-box;box-shadow:0 34px 84px -24px rgba(37,99,235,.72),0 0 70px -22px rgba(80,110,255,.6)}
+    .ob-choice.on,.ob-tone.on{background:linear-gradient(rgba(24,44,92,.8),rgba(17,29,62,.82)) padding-box,linear-gradient(135deg,#5B84FF,#2F6BFF) border-box;box-shadow:0 34px 84px -24px rgba(37,99,235,.72),0 0 70px -22px rgba(37,99,235,.6)}
     .ob-choice-ic{filter:drop-shadow(0 8px 18px rgba(37,99,235,.45))}
-    .ob-choice-check{background:linear-gradient(135deg,#5B84FF,#6C4CFF);box-shadow:0 8px 20px -6px rgba(37,99,235,.7)}
+    .ob-choice-check{background:linear-gradient(135deg,#5B84FF,#2F6BFF);box-shadow:0 8px 20px -6px rgba(37,99,235,.7)}
     .ob-theme{border:1.5px solid transparent;background:linear-gradient(rgba(13,22,44,.6),rgba(13,22,44,.6)) padding-box,linear-gradient(135deg,rgba(143,180,255,.32),transparent 55%) border-box}
-    .ob-theme.on{background:linear-gradient(rgba(24,44,92,.72),rgba(17,29,62,.74)) padding-box,linear-gradient(135deg,#5B84FF,#6C4CFF) border-box;box-shadow:0 34px 76px -24px rgba(37,99,235,.62)}
+    .ob-theme.on{background:linear-gradient(rgba(24,44,92,.72),rgba(17,29,62,.74)) padding-box,linear-gradient(135deg,#5B84FF,#2F6BFF) border-box;box-shadow:0 34px 76px -24px rgba(37,99,235,.62)}
     .ob-theme-prev:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 58%,rgba(6,11,26,.55));pointer-events:none;z-index:1}
     .ob-theme-prev video{transition:transform .7s cubic-bezier(.16,1,.3,1)}
     .ob-theme:hover .ob-theme-prev video{transform:scale(1.07)}
@@ -664,7 +716,7 @@
     .ob-do{position:relative;overflow:hidden;box-shadow:0 20px 40px -14px rgba(37,99,235,.8)}
     .ob-do:after{content:"";position:absolute;top:0;left:-60%;width:42%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-18deg);animation:obShine 3.6s ease-in-out infinite}
     @keyframes obShine{0%{left:-60%}58%,100%{left:135%}}
-    .ob-dots i.on{background:linear-gradient(90deg,#5B84FF,#6C4CFF);box-shadow:0 0 14px rgba(91,132,255,.85)}
+    .ob-dots i.on{background:linear-gradient(90deg,#5B84FF,#2F6BFF);box-shadow:0 0 14px rgba(91,132,255,.85)}
     .ob-toggle{background:linear-gradient(rgba(14,24,46,.5),rgba(14,24,46,.5)) padding-box,linear-gradient(135deg,rgba(143,180,255,.28),transparent) border-box;border:1px solid transparent;backdrop-filter:blur(12px)}
     .ob-shot{border:1px solid transparent;background:linear-gradient(#0a1224,#0a1224) padding-box,linear-gradient(135deg,rgba(143,180,255,.42),transparent 62%) border-box;box-shadow:0 54px 104px -30px rgba(0,0,0,.8),0 0 90px -34px rgba(37,99,235,.45)}
     .ob-done-mark{box-shadow:0 0 0 12px rgba(52,211,153,.12),0 0 64px -6px rgba(16,185,129,.7),0 24px 60px -18px rgba(16,185,129,.6);animation:obPop .6s cubic-bezier(.16,1,.3,1),obDoneGlow 2.8s ease-in-out .6s infinite}
@@ -720,6 +772,38 @@
     .ob-theme-back-lbl{padding:10px 14px;font-size:12px;font-weight:700;color:#CBD9F5;background:rgba(10,18,38,.92);border-top:1px solid rgba(143,180,255,.14);text-align:left}
     .ob-theme.on{box-shadow:0 30px 72px -24px rgba(37,99,235,.62)!important}
     .ob-theme.on .ob-theme-front,.ob-theme.on .ob-theme-back{border-color:#5B84FF;box-shadow:0 0 0 1px #5B84FF inset}
+    /* фикс крестика: центрируем SVG */
+    .ob-close{display:flex;align-items:center;justify-content:center}
+    /* ==== шаг тарифов ==== */
+    .ob-price{display:grid;grid-template-columns:1.12fr .88fr;gap:24px;align-items:stretch;max-width:900px}
+    .ob-price-card{position:relative;padding:26px;border-radius:20px;border:1.5px solid transparent;background:linear-gradient(rgba(17,29,62,.82),rgba(13,22,44,.84)) padding-box,linear-gradient(135deg,#5B84FF,#2F6BFF) border-box;box-shadow:0 34px 84px -24px rgba(37,99,235,.6)}
+    .ob-price-beta{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8FB4FF;border:1px solid rgba(143,180,255,.35);border-radius:999px;padding:5px 12px;margin-bottom:14px}
+    .ob-price-name{font-size:15px;font-weight:700;color:#AEBFE0}
+    .ob-price-val{display:flex;align-items:baseline;gap:9px;margin:6px 0 2px}
+    .ob-price-val s{font-size:22px;color:#7286AB}
+    .ob-price-val b{font-size:52px;font-weight:800;letter-spacing:-.03em;color:#fff;line-height:1}
+    .ob-price-val span{font-size:16px;color:#9DB0D6}
+    .ob-price-seats{font-size:13px;color:#9DB0D6;margin-bottom:16px}
+    .ob-price-list{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:10px}
+    .ob-price-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#CBD9F5}
+    .ob-price-list li svg{width:15px;height:15px;flex:0 0 15px;color:#7CE0B0;margin-top:2px}
+    .ob-do-pay{width:100%;justify-content:center;display:flex;align-items:center}
+    .ob-price-rr{display:flex;align-items:center;gap:7px;font-size:12px;color:#8296BC;margin-top:12px;justify-content:center}
+    .ob-price-rr svg{width:13px;height:13px;flex:0 0 13px;color:#7CE0B0}
+    .ob-price-side{display:flex;flex-direction:column;gap:16px;justify-content:center}
+    .ob-price-badge{text-align:center;padding:22px;border-radius:18px;background:linear-gradient(160deg,rgba(37,99,235,.22),rgba(29,79,216,.12));border:1px solid rgba(143,180,255,.25);font-weight:800;font-size:56px;letter-spacing:-.03em;color:#fff;line-height:.9}
+    .ob-price-badge span{display:block;font-size:14px;font-weight:600;color:#9DB0D6;letter-spacing:0;margin-top:8px;line-height:1.25}
+    .ob-price-why{padding:18px;border-radius:16px;border:1px solid rgba(143,180,255,.16);background:rgba(14,24,46,.5)}
+    .ob-price-why b{display:block;font-size:14.5px;margin-bottom:6px;color:#EAF1FF}
+    .ob-price-why span{font-size:13px;color:#9DB0D6;line-height:1.5}
+    /* ==== зум-превью стиля: ховер → почти на весь экран ==== */
+    .ob-zoom{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .28s ease;background:rgba(4,9,20,.55);backdrop-filter:blur(4px)}
+    .ob-zoom.on{opacity:1}
+    .ob-zoom-card{position:relative;width:min(80vw,1180px);aspect-ratio:16/9.6;max-height:82vh;border-radius:20px;overflow:hidden;border:1.5px solid rgba(143,180,255,.35);box-shadow:0 60px 130px -30px rgba(0,0,0,.85),0 0 100px -30px rgba(37,99,235,.5);transform:scale(.9) translateY(10px);transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .ob-zoom.on .ob-zoom-card{transform:none}
+    .ob-zoom-card img{width:100%;height:100%;object-fit:cover;object-position:top left;display:block}
+    .ob-zoom-lbl{position:absolute;left:0;right:0;bottom:0;padding:16px 22px;font-size:15px;font-weight:700;color:#EAF1FF;background:linear-gradient(transparent,rgba(4,9,20,.85))}
+    @media(max-width:820px){.ob-price{grid-template-columns:1fr}.ob-price-side{flex-direction:row}.ob-price-badge{flex:1}.ob-zoom-card{width:94vw}}
     @media(prefers-reduced-motion:reduce){.ob-orbs i,.ob-primary:after,.ob-do:after,.ob-bgvid video,.ob-done-mark{animation:none!important}}
     `;
     const s = document.createElement('style'); s.id = 'ob-style'; s.textContent = css; document.head.appendChild(s);
