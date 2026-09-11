@@ -113,9 +113,24 @@
   .hint.err{color:#e8a0a0}
 
   /* ── пошаговая форма ── */
-  .wsteps{position:relative;transition:height .5s var(--ease)}
-  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .45s var(--ease),transform .5s var(--ease)}
-  .wstep.on{opacity:1;transform:none;pointer-events:auto}
+  .wsteps{position:relative;transition:height .55s var(--ease)}
+  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(18px) scale(.992);filter:blur(5px);pointer-events:none;transition:opacity .5s var(--ease),transform .6s var(--ease),filter .5s var(--ease)}
+  .wstep.on{opacity:1;transform:none;filter:none;pointer-events:auto}
+  .wstep.leaving{opacity:0;transform:translateY(-16px) scale(.992);filter:blur(5px);pointer-events:none}
+  /* стартовый экран формы */
+  .wlgate{width:min(520px,92vw);text-align:center;opacity:0;animation:up 1s var(--ease) 1.05s forwards}
+  .wlgate.hide{opacity:0;transform:translateY(-12px);pointer-events:none;transition:opacity .5s var(--ease),transform .5s var(--ease)}
+  .wlcta{position:relative;overflow:hidden;font-family:inherit;font-size:15px;letter-spacing:.02em;font-weight:600;color:#0a0a0a;background:#f4f3f1;border:1px solid transparent;border-radius:999px;padding:17px 34px;cursor:pointer;display:inline-flex;align-items:center;gap:12px;transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+  .wlcta:hover{transform:translateY(-3px);box-shadow:0 20px 44px rgba(0,0,0,.45)}
+  .wlcta .ar{transition:transform .4s var(--ease)}
+  .wlcta:hover .ar{transform:translateX(4px)}
+  .wlcta::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-18deg);animation:ctaSheen 3.8s ease-in-out infinite}
+  @keyframes ctaSheen{0%{left:-60%}46%,100%{left:135%}}
+  .wlnote{margin-top:15px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3)}
+  .wl{display:none}
+  .wl.on{display:block;animation:wlIn .7s var(--ease)}
+  @keyframes wlIn{from{opacity:0;transform:translateY(22px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  @media(prefers-reduced-motion:reduce){.wlcta::after{animation:none;display:none}.wstep{filter:none}.wstep.leaving{filter:none}}
   .qlabel{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;display:flex;align-items:center;gap:10px;justify-content:flex-start}
   .qlabel .qn{color:var(--ink2);font-variant-numeric:tabular-nums;letter-spacing:.12em}
   .consent{display:flex;gap:12px;align-items:flex-start;margin-top:10px;cursor:pointer;text-align:left;user-select:none}
@@ -214,6 +229,11 @@
     </h1>
     <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте контакты — позовём в бету одними из первых.</p>
 
+    <div class="wlgate" id="wlGate">
+      <button class="wlcta" id="wlStart" type="button"><span>Получить доступ к бете</span><i class="ar">→</i></button>
+      <div class="wlnote">30 секунд · несколько коротких вопросов</div>
+    </div>
+
     <form class="wl" id="wl" novalidate>
       <div class="wsteps" id="wsteps"></div>
       <div class="wdots" id="wdots"></div>
@@ -293,7 +313,7 @@
     return el;
   }
 
-  function render(){
+  function paint(){
     var qs=activeQs(), total=qs.length, s=qs[cur];
     dotsWrap.innerHTML=qs.map(function(_,i){return '<i class="'+(i===cur?'on':i<cur?'done':'')+'"></i>'}).join('');
     wsteps.innerHTML='';
@@ -328,9 +348,16 @@
     if(s.type==='choice'){ if(!data[s.k]){fail('Выберите вариант.');return false} return true; }
     return true;
   }
-  function next(){ if(!collectCurrent())return; var qs=activeQs(); if(cur<qs.length-1){clearErr();cur++;render();} else submit(); }
-  wback.addEventListener('click',function(){if(cur>0){clearErr();cur--;render();}});
+  /* плавный кросс-фейд: текущий шаг уезжает, затем рисуем новый */
+  function transitionTo(){var old=wsteps.querySelector('.wstep');if(old){old.classList.add('leaving');old.classList.remove('on');setTimeout(paint,250);}else paint();}
+  function next(){ if(!collectCurrent())return; var qs=activeQs(); if(cur<qs.length-1){clearErr();cur++;transitionTo();} else submit(); }
+  wback.addEventListener('click',function(){if(cur>0){clearErr();cur--;transitionTo();}});
   form.addEventListener('submit',function(e){e.preventDefault();var qs=activeQs();if(qs[cur].type==='consent')submit();else next();});
+
+  /* стартовый экран: форма прячется, пока не нажали «Получить доступ к бете» */
+  var wlGate=document.getElementById('wlGate'), wlStart=document.getElementById('wlStart');
+  function startForm(){if(form.classList.contains('on'))return;wlGate.classList.add('hide');setTimeout(function(){wlGate.style.display='none';form.classList.add('on');cur=0;paint();},360);}
+  if(wlStart)wlStart.addEventListener('click',startForm);
 
   function submit(){
     if(busy)return;
@@ -365,8 +392,7 @@
   var _h1=document.querySelector('.core h1');
   addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
   function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
-
-  render();
+  // форма стартует по кнопке (wlStart) — здесь ничего не открываем
 </script>
 </body>
 </html>
