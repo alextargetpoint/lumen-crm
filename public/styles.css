@@ -6292,3 +6292,64 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 :root[data-theme="mono"] .brand-mark { filter: grayscale(1) contrast(1.05) drop-shadow(0 2px 8px rgba(0,0,0,.35)); }
 :root[data-theme="mono"] .aiwand { background: linear-gradient(120deg, #2b2b2b, #0d0d0d); }
 :root[data-theme="mono"] .brand-mark img { filter: grayscale(1) contrast(1.04); }
+
+/* ═══════════ ПИКЕР ОФОРМЛЕНИЯ (меню пресетов) ═══════════ */
+.theme-menu { position: fixed; z-index: 900; width: 268px; background: var(--card); border: 1px solid var(--stroke); border-radius: 14px; box-shadow: var(--shadow-lift); padding: 7px; animation: tmIn .16s var(--ease-spring, ease); }
+@keyframes tmIn { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.tm-h { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); padding: 6px 9px 8px; }
+.tm-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; border: none; background: none; padding: 8px 9px; border-radius: 10px; cursor: pointer; font-family: inherit; color: var(--ink); transition: background .12s; }
+.tm-item:hover { background: var(--bg-2); }
+.tm-item.on { background: var(--bg-2); }
+.tm-sw { display: flex; flex: none; border-radius: 7px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.tm-sw i { width: 13px; height: 30px; display: block; }
+.tm-tx { flex: 1; min-width: 0; } .tm-tx b { font-size: 13.5px; font-weight: 700; display: block; } .tm-tx small { font-size: 11px; color: var(--ink-3); }
+.tm-ok { color: var(--accent); font-weight: 800; }
+
+/* ── Тёплый: кремовая бумага + терракота (editorial) ── */
+:root[data-theme="warm"] {
+  --navy-950: #2B2420; --navy-900: #3A302A; --navy-700: #5A4A3E;
+  --accent: #B5643C; --accent-2: #C2734A;
+  --blue-300: #C9A98E; --blue-100: #EFE3D6;
+  --bg: #F5F1E8; --bg-2: #EDE6D8; --card: #FCFAF4;
+  --ink: #2B2420; --ink-2: #524740; --ink-3: #857567;
+  --stroke: #E2D7C5; --stroke-soft: #EAE1D3; --glass: rgba(252,250,244,.7);
+  --ok: #5B7A4E; --ok-bg: #E9EFE1; --warn: #9A6B1E; --warn-bg: #F4E8D0; --bad: #A6483A; --bad-bg: #F3E2DD;
+  --violet: #8A6D9E; --violet-bg: #EFE7F1;
+  --ov-primary: #B5643C; --ov-primary-hover: #A0522F;
+  --ov-chip-gray: #EFE8DB; --gauge-track: #E6DBC8;
+  --ov-hero-a: #3A2E24; --ov-hero-b: #5A4432; --ov-hero-c: #7A5A3E;
+  --font-display: 'Playfair Display', 'Manrope', serif;
+}
+:root[data-theme="warm"] .brand-mark img { filter: sepia(.5) saturate(1.2) hue-rotate(-12deg); }
+
+/* ── Контур: чёткие рамки, минимум теней (bold outline) ── */
+:root[data-theme="frame"] {
+  --accent: #111827; --accent-2: #1F2937;
+  --blue-300: #6B7280; --blue-100: #E5E7EB;
+  --bg: #FFFFFF; --bg-2: #F3F4F6; --card: #FFFFFF;
+  --ink: #0B0F19; --ink-2: #374151; --ink-3: #6B7280;
+  --stroke: #111827; --stroke-soft: #9CA3AF;   /* рамки — тёмные и заметные */
+  --shadow: none; --shadow-lift: 0 2px 0 #111827;
+  --ok: #14532D; --ok-bg: #E7F0E9; --warn: #713F12; --warn-bg: #F3ECD9; --bad: #7F1D1D; --bad-bg: #F3E4E4;
+  --violet: #3730A3; --violet-bg: #E7E6F5;
+  --ov-primary: #111827; --ov-primary-hover: #000; --gauge-track: #D1D5DB;
+  --r-lg: 8px; --r-md: 6px; --r-sm: 4px;
+}
+:root[data-theme="frame"] .card, :root[data-theme="frame"] .glass, :root[data-theme="frame"] .kpi,
+:root[data-theme="frame"] .ctrl-card, :root[data-theme="frame"] .ctrl-hero, :root[data-theme="frame"] .ctrl-team,
+:root[data-theme="frame"] .ov2-card, :root[data-theme="frame"] .modal { border-width: 1.5px; box-shadow: 3px 3px 0 rgba(17,24,39,.12); }
+:root[data-theme="frame"] .brand-mark img { filter: grayscale(1) contrast(1.1); }
+
+/* ── Изумруд: глубокий зелёный, элегантно ── */
+:root[data-theme="emerald"] {
+  --navy-950: #0A1A12; --navy-900: #132019; --navy-700: #1E3A2C;
+  --accent: #0E7C5A; --accent-2: #12936B;
+  --blue-300: #7FB89F; --blue-100: #DCEDE4;
+  --bg: #F3F7F4; --bg-2: #EAF1EC; --card: #FFFFFF;
+  --ink: #10231A; --ink-2: #33473C; --ink-3: #5E7268;
+  --stroke: #D8E5DD; --stroke-soft: #E5EDE8; --glass: rgba(255,255,255,.7);
+  --ok: #0E7C5A; --ok-bg: #DCEDE4; --warn: #8A6D1E; --warn-bg: #F1EBD6; --bad: #9A4436; --bad-bg: #F1E1DD;
+  --violet: #4A7A66; --violet-bg: #E3EDE7;
+  --ov-primary: #0E7C5A; --ov-primary-hover: #0B664A; --gauge-track: #DCE8E1;
+  --ov-hero-a: #0A1A12; --ov-hero-b: #12362554; --ov-hero-c: #1E5540;
+}

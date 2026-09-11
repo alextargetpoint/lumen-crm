@@ -672,28 +672,42 @@ function wireHeroArt(root) {
   });
 }
 
-/* тема: Светлая / Тёмная / Моно (чёрно-белый минимализм) — переключатель + память */
+/* Оформление: пресеты стилистик (палитра + рамки/тени) — пикер-меню + память */
+const THEME_PRESETS = [
+  { k: 'light',   name: 'Кобальт',  desc: 'фирменный синий, мягкие тени',  sw: ['#2563EB', '#F4F7FB', '#111827'], dark: false },
+  { k: 'dark',    name: 'Ночь',     desc: 'тёмный кобальт',                sw: ['#5B84FF', '#0A1833', '#EAF0FF'], dark: true },
+  { k: 'mono',    name: 'Моно',     desc: 'чёрно-белый минимализм',        sw: ['#171717', '#F6F6F6', '#0D0D0D'], dark: false },
+  { k: 'warm',    name: 'Тёплый',   desc: 'кремовая бумага, терракота',    sw: ['#B5643C', '#F5F1E8', '#2B2420'], dark: false },
+  { k: 'frame',   name: 'Контур',   desc: 'чёткие рамки, без теней',       sw: ['#111827', '#FFFFFF', '#111827'], dark: false },
+  { k: 'emerald', name: 'Изумруд',  desc: 'глубокий зелёный, элегантно',   sw: ['#0E7C5A', '#F3F7F4', '#132019'], dark: false },
+];
 (() => {
-  const THEMES = ['light', 'dark', 'mono'];
-  const LABEL = { light: 'Светлая', dark: 'Тёмная', mono: 'Моно' };
-  const ICON = { light: '🌙', dark: '☀️', mono: '◐' };   /* иконка = текущая тема */
-  const apply = (t) => {
-    const root = document.documentElement;
-    root.toggleAttribute('data-night', t === 'dark');
-    if (t === 'mono') root.setAttribute('data-theme', 'mono'); else root.removeAttribute('data-theme');
+  const P = Object.fromEntries(THEME_PRESETS.map(p => [p.k, p]));
+  const applyTheme = (k) => {
+    const p = P[k] || P.light, root = document.documentElement;
+    root.toggleAttribute('data-night', !!p.dark);
+    if (k !== 'light' && k !== 'dark') root.setAttribute('data-theme', k); else root.removeAttribute('data-theme');
     const b = document.getElementById('nightBtn');
-    if (b) { b.textContent = ICON[t]; b.title = 'Тема: ' + LABEL[t] + ' (клик — следующая)'; }
+    if (b) { b.textContent = p.dark ? '☀️' : (k === 'light' ? '🌙' : '◐'); b.title = 'Оформление: ' + p.name; }
   };
   let cur = localStorage.getItem('lumen_theme');
-  if (!THEMES.includes(cur)) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'light';
-  apply(cur);
+  if (!P[cur]) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'light';
+  applyTheme(cur);
+  window.setTheme = (k) => { cur = P[k] ? k : 'light'; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#nightBtn')) return;
-    cur = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
-    localStorage.setItem('lumen_theme', cur);
-    localStorage.setItem('lumen_night', cur === 'dark' ? '1' : '0');   /* обратная совместимость */
-    apply(cur);
-    if (window.toast) toast('Тема: ' + LABEL[cur]);
+    if (e.target.closest('#nightBtn')) {
+      e.stopPropagation();
+      const open = document.getElementById('themeMenu');
+      if (open) { open.remove(); return; }
+      const btn = document.getElementById('nightBtn'); const r = btn.getBoundingClientRect();
+      const menu = document.createElement('div'); menu.id = 'themeMenu'; menu.className = 'theme-menu';
+      menu.style.top = (r.bottom + 8) + 'px'; menu.style.right = (window.innerWidth - r.right) + 'px';
+      menu.innerHTML = `<div class="tm-h">Оформление</div>` + THEME_PRESETS.map(p => `<button class="tm-item ${p.k === cur ? 'on' : ''}" data-theme-k="${p.k}"><span class="tm-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="tm-tx"><b>${p.name}</b><small>${p.desc}</small></span>${p.k === cur ? '<span class="tm-ok">✓</span>' : ''}</button>`).join('');
+      document.body.appendChild(menu);
+      menu.querySelectorAll('[data-theme-k]').forEach(it => it.addEventListener('click', () => { window.setTheme(it.dataset.themeK); menu.remove(); if (window.toast) toast('Оформление: ' + P[it.dataset.themeK].name); }));
+      return;
+    }
+    const m = document.getElementById('themeMenu'); if (m && !e.target.closest('#themeMenu')) m.remove();
   });
 })();
 
