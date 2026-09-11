@@ -160,6 +160,8 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 .fail .quote{font-family:var(--disp);font-style:italic;font-size:21px;line-height:1.26;color:var(--ink);font-weight:500}
 .fail .fix{margin-top:18px;font-size:13.5px;color:var(--mint);display:flex;gap:9px;align-items:flex-start;border-top:1px solid var(--line2);padding-top:15px;font-weight:600}
 .fail .fix svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px}
+@media(max-width:1000px){.fails{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.fails{grid-template-columns:1fr}}
 /* NATIVE — всё из коробки */
 .native-grid{display:grid;gap:16px}
 .nrow3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -401,7 +403,7 @@ footer .fsoc a{width:42px;height:42px;border-radius:12px;border:1px solid var(--
 footer .fsoc a:hover{color:#fff;background:var(--blue);border-color:var(--blue);transform:translateY(-2px)}
 footer .fsoc svg{width:18px;height:18px}
 footer .fcol h4{font-family:var(--disp);font-size:17px;font-weight:600;margin-bottom:15px}
-footer .fcol a,footer .fcol button{display:block;color:var(--ink2);font-size:14.5px;padding:6px 0;transition:color var(--dur-fast);text-align:left;font-family:inherit}
+footer .fcol a,footer .fcol button{display:block;color:var(--ink2);font-size:14.5px;padding:9px 0;transition:color var(--dur-fast);text-align:left;font-family:inherit}
 footer .fcol a:hover,footer .fcol button:hover{color:var(--blue)}
 footer .fmail{font-weight:700;color:var(--ink)!important}
 footer .foot-bot{border-top:1px solid var(--line2);padding:22px 0 24px;display:flex;justify-content:space-between;gap:14px 26px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--ink3);position:relative;z-index:2}
@@ -1250,7 +1252,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Telegram-приложение брокера + отчёты</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Внедрение под ключ за 7 дней</li>
       </ul>
-      <button type="button" class="btn btn-p js-lead">Занять место в бете</button>
+      <button type="button" class="btn btn-p js-lead" data-title="Занять место в бете" data-sub="Оставьте контакт — забронируем место в бете (первым 10 агентствам: $200/мес и внедрение $200) и покажем Lumen на вашем агентстве.">Занять место в бете</button>
     </div>
     <div class="plan" data-r class="d2">
       <div class="nm">Сеть</div><div class="ds">Несколько офисов, много номеров, свои интеграции.</div>
@@ -1454,7 +1456,9 @@ setTimeout(hideLoad,2600);
 
 // lead modal
 const lform=document.getElementById('lform');
-const openLead=()=>{lform.classList.add('open');document.body.style.overflow='hidden';};
+const mformH3=document.querySelector('#mform h3'), mformSub=document.querySelector('#mform > p');
+const DEF_T=mformH3?mformH3.textContent:'', DEF_S=mformSub?mformSub.textContent:'';
+const openLead=(e)=>{const b=e&&e.currentTarget; if(mformH3)mformH3.textContent=(b&&b.dataset.title)||DEF_T; if(mformSub)mformSub.textContent=(b&&b.dataset.sub)||DEF_S; lform.classList.add('open');document.body.style.overflow='hidden';};
 const closeLead=()=>{lform.classList.remove('open');document.body.style.overflow='';};
 document.querySelectorAll('.js-lead').forEach(b=>b.addEventListener('click',openLead));
 lform.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLead));
