@@ -419,7 +419,12 @@ textarea { resize: vertical; min-height: 70px; }
 /* ⭐ ИИ на связи: живая полоса МЕЖДУ перепиской и полем ввода (в потоке, не поверх сообщений).
    Верх РАСТВОРЯЕТСЯ в переписку (маска + градиент, без жёсткой линии), низ упирается в композер.
    Насыщенная — аврора + акцентное свечение, не блёклая. */
-.chat-ai-aura { position: relative; flex: none; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .5s var(--ease-soft, ease), opacity .5s; }
+.chat-ai-aura { position: relative; flex: none; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .5s var(--ease-soft, ease), opacity .5s; background: #F6F9FD; }
+/* фон полосы = базовый цвет ленты сообщений канала → полоса бесшовна с чатом, никакого «белого ящика» */
+.chat--wa .chat-ai-aura { background: #EAE4DA; }
+.chat--tg .chat-ai-aura { background: #DCE9F6; }
+.chat--viber .chat-ai-aura { background: #EAE2F8; }
+.chat--email .chat-ai-aura { background: #EEF1F5; }
 .chat.ai-live .chat-ai-aura { max-height: 62px; opacity: 1; }
 /* живое свечение БЕЗ фона: два дрейфующих световых пятна (accent + accent-2), тают кверху.
    Никакого видео/прямоугольника — чистый CSS, прозрачная база → бесшовно вписывается в чат. */
