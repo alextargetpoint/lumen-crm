@@ -6,193 +6,320 @@
 <title>Lumen · Чаты</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-  :root{ --bg:#0e1621; --panel:#17212b; --panel2:#1f2c39; --ink:#fff; --mut:#7d8b99; --line:#26333f;
-    --out:#2b5278; --in:#182533; --acc:#3390ec; --ok:#4fae4e; }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,Roboto,Segoe UI,sans-serif;overscroll-behavior:none}
-  #app{height:100%;display:flex;flex-direction:column;max-width:640px;margin:0 auto}
+  :root{
+    --bg:#0b0f17; --bg2:#0e1420; --panel:#131b2a; --panel2:#1a2436; --glass:rgba(26,36,54,.72);
+    --ink:#eef2f8; --mut:#8593a8; --line:rgba(255,255,255,.07);
+    --acc:#4f8cff; --acc2:#6ea8ff; --grad:linear-gradient(135deg,#4f8cff,#7b5cff);
+    --out:linear-gradient(135deg,#2f6bd8,#3d5bd0); --in:#1a2436; --ok:#3fca7a; --danger:#ff5b52;
+    --sh:0 8px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;height:100%;background:
+    radial-gradient(120% 60% at 100% 0,rgba(79,140,255,.10),transparent 60%),
+    radial-gradient(90% 50% at 0 100%,rgba(123,92,255,.10),transparent 55%),var(--bg);
+    color:var(--ink);font:15px/1.42 -apple-system,SF Pro Text,Roboto,Segoe UI,sans-serif;overscroll-behavior:none;
+    -webkit-font-smoothing:antialiased}
+  #app{height:100%;display:flex;flex-direction:column;max-width:680px;margin:0 auto;position:relative;overflow:hidden}
   .hidden{display:none!important}
-  /* --- список чатов --- */
-  .list-hd{padding:12px 14px 8px;font-weight:600;font-size:17px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
-  .list-hd .cnt{margin-left:auto;font-size:12px;color:var(--mut);font-weight:500}
-  .search{padding:8px 12px;border-bottom:1px solid var(--line)}
-  .search input{width:100%;background:var(--panel2);border:none;color:var(--ink);border-radius:10px;padding:9px 12px;font-size:14px;outline:none}
-  #chats{flex:1;overflow-y:auto}
-  .chat-row{display:flex;gap:11px;align-items:center;padding:10px 13px;cursor:pointer;border-bottom:1px solid rgba(38,51,63,.5)}
-  .chat-row:active{background:var(--panel)}
-  .ava{width:46px;height:46px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:600;color:#fff;font-size:16px}
-  .chat-mid{flex:1;min-width:0}
-  .chat-top{display:flex;align-items:center;gap:6px}
-  .chat-nm{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-  .chat-tm{font-size:12px;color:var(--mut);flex:none}
-  .chat-prev{color:var(--mut);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-  .unread{background:var(--acc);color:#fff;border-radius:11px;min-width:20px;height:20px;padding:0 6px;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;margin-left:6px}
-  .empty{padding:40px 20px;text-align:center;color:var(--mut)}
-  /* --- диалог --- */
-  #conv{flex:1;display:flex;flex-direction:column;min-height:0}
-  .conv-hd{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
-  .back{font-size:22px;color:var(--acc);cursor:pointer;padding:2px 6px;margin-left:-4px}
-  .conv-hd .ava{width:38px;height:38px;font-size:14px}
-  .conv-nm{font-weight:600;font-size:15px}
-  .conv-sub{font-size:12px;color:var(--mut)}
-  .conv-call{margin-left:auto;font-size:20px;color:var(--acc);cursor:pointer;padding:6px}
-  #body{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,#0e1621,#0b131c)}
-  .b{max-width:80%;padding:7px 11px;border-radius:14px;font-size:14.5px;word-wrap:break-word;position:relative}
-  .b.in{align-self:flex-start;background:var(--in);border-bottom-left-radius:5px}
-  .b.out{align-self:flex-end;background:var(--out);border-bottom-right-radius:5px}
-  .b img,.b video{max-width:100%;border-radius:10px;display:block;margin-bottom:3px}
-  .b audio{width:210px;height:36px;margin-bottom:2px}
-  .b .doc{display:flex;align-items:center;gap:8px;color:var(--acc);text-decoration:none}
-  .bm{font-size:10.5px;color:var(--mut);text-align:right;margin-top:2px}
-  .b.out .bm{color:rgba(255,255,255,.55)}
-  .day{align-self:center;background:rgba(0,0,0,.3);color:var(--mut);font-size:11.5px;padding:3px 10px;border-radius:10px;margin:6px 0}
-  /* --- composer --- */
-  .composer{display:flex;align-items:flex-end;gap:7px;padding:8px 9px;border-top:1px solid var(--line);background:var(--panel)}
-  .composer textarea{flex:1;background:var(--panel2);border:none;color:var(--ink);border-radius:18px;padding:9px 13px;font-size:15px;resize:none;max-height:110px;outline:none;font-family:inherit}
-  .cbtn{width:42px;height:42px;border-radius:50%;border:none;background:var(--acc);color:#fff;font-size:19px;display:grid;place-items:center;cursor:pointer;flex:none}
-  .cbtn.ghost{background:transparent;color:var(--mut);width:38px}
-  .cbtn.rec{background:#e0483d;animation:pulse 1s infinite}
-  @keyframes pulse{50%{opacity:.55}}
-  .rec-hint{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:#e0483d;color:#fff;font-size:12.5px;padding:6px 14px;border-radius:14px}
-  .toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:9px 16px;border-radius:12px;font-size:13px;z-index:50;max-width:90%}
-  .load{padding:36px;text-align:center;color:var(--mut)}
+  ::-webkit-scrollbar{width:0}
+  /* ---------- ЛИСТ ---------- */
+  #view-list{height:100%;display:flex;flex-direction:column;animation:fade .3s}
+  .top{padding:calc(env(safe-area-inset-top) + 14px) 16px 10px;position:sticky;top:0;z-index:5;
+    background:linear-gradient(180deg,var(--bg) 60%,transparent);backdrop-filter:blur(12px)}
+  .top h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:9px}
+  .top h1 .spark{width:26px;height:26px;border-radius:8px;background:var(--grad);display:grid;place-items:center;font-size:14px;box-shadow:0 4px 14px rgba(79,140,255,.5)}
+  .top .sub{color:var(--mut);font-size:12.5px;margin-top:3px;font-weight:500}
+  .search{margin:10px 0 2px;position:relative}
+  .search input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:13px;padding:11px 14px 11px 38px;font-size:14.5px;outline:none;transition:.2s}
+  .search input:focus{border-color:rgba(79,140,255,.5);background:var(--panel2)}
+  .search svg{position:absolute;left:12px;top:11px;width:17px;height:17px;stroke:var(--mut);fill:none;stroke-width:2}
+  #chats{flex:1;overflow-y:auto;padding:4px 8px 20px}
+  .row{display:flex;gap:12px;align-items:center;padding:11px 10px;border-radius:16px;cursor:pointer;transition:.15s;position:relative}
+  .row:active{background:var(--panel);transform:scale(.985)}
+  .ava{width:52px;height:52px;border-radius:16px;flex:none;display:grid;place-items:center;font-weight:700;color:#fff;font-size:18px;letter-spacing:.5px;box-shadow:var(--sh);position:relative}
+  .ava .dot{position:absolute;right:-1px;bottom:-1px;width:14px;height:14px;border-radius:50%;background:var(--ok);border:3px solid var(--bg)}
+  .mid{flex:1;min-width:0}
+  .rtop{display:flex;align-items:center;gap:6px}
+  .nm{font-weight:650;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;letter-spacing:-.2px}
+  .tm{font-size:11.5px;color:var(--mut);flex:none;font-weight:500}
+  .prev{color:var(--mut);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;display:flex;align-items:center;gap:5px}
+  .prev .me{color:var(--acc2);font-weight:600}
+  .badge-un{background:var(--grad);color:#fff;border-radius:12px;min-width:22px;height:22px;padding:0 7px;display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;box-shadow:0 3px 10px rgba(79,140,255,.5);animation:pop .3s}
+  .geo-chip{font-size:10.5px;color:var(--acc2);background:rgba(79,140,255,.13);padding:1px 7px;border-radius:8px;font-weight:600}
+  .empty{padding:60px 24px;text-align:center;color:var(--mut);font-size:14px;line-height:1.6}
+  .load{padding:44px;text-align:center;color:var(--mut)}
+  .load .sp{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:spin .8s linear infinite}
+  /* ---------- ДИАЛОГ ---------- */
+  #conv{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:10;transform:translateX(100%);transition:transform .28s cubic-bezier(.22,1,.36,1)}
+  #conv.open{transform:none}
+  .chd{display:flex;align-items:center;gap:11px;padding:calc(env(safe-area-inset-top) + 9px) 12px 9px;background:var(--glass);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);z-index:3}
+  .back{font-size:26px;color:var(--acc);cursor:pointer;padding:0 4px;line-height:1;font-weight:300}
+  .chd .ava{width:42px;height:42px;font-size:15px;border-radius:13px}
+  .chd .nm{font-weight:700;font-size:16px}
+  .chd .st{font-size:12px;color:var(--mut);margin-top:1px;display:flex;align-items:center;gap:5px}
+  .chd .st .ai-on{color:var(--acc2)}
+  .hd-btn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:19px;cursor:pointer;color:var(--acc);background:rgba(79,140,255,.1);transition:.15s;flex:none}
+  .hd-btn:active{transform:scale(.9);background:rgba(79,140,255,.2)}
+  #body{flex:1;overflow-y:auto;padding:14px 12px 8px;display:flex;flex-direction:column;gap:3px}
+  .day{align-self:center;background:var(--panel2);color:var(--mut);font-size:11.5px;padding:4px 12px;border-radius:11px;margin:8px 0;font-weight:600;box-shadow:var(--sh)}
+  .b{max-width:82%;padding:8px 12px 6px;border-radius:18px;font-size:14.7px;word-wrap:break-word;position:relative;animation:bubble .25s cubic-bezier(.22,1,.36,1);line-height:1.38}
+  .b.in{align-self:flex-start;background:var(--in);border-bottom-left-radius:6px}
+  .b.out{align-self:flex-end;background:var(--out);border-bottom-right-radius:6px;box-shadow:0 3px 14px rgba(47,107,216,.28)}
+  .b img,.b video{max-width:min(260px,72vw);border-radius:13px;display:block;margin:-2px -4px 4px;cursor:pointer}
+  .b .doc{display:flex;align-items:center;gap:9px;color:#fff;text-decoration:none;padding:4px 2px}
+  .b .doc .ic{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:16px;flex:none}
+  .bm{font-size:10.5px;color:var(--mut);text-align:right;margin-top:2px;display:flex;align-items:center;gap:4px;justify-content:flex-end}
+  .b.out .bm{color:rgba(255,255,255,.6)}
+  .tick{font-size:11px}.tick.read{color:#7fd0ff}
+  .typing{align-self:flex-start;background:var(--in);border-radius:18px;border-bottom-left-radius:6px;padding:12px 15px;display:flex;gap:4px}
+  .typing i{width:7px;height:7px;border-radius:50%;background:var(--mut);animation:td 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+  /* voice player */
+  .vp{display:flex;align-items:center;gap:10px;min-width:190px;padding:2px 0}
+  .vp .pp{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:16px;cursor:pointer;flex:none;transition:.15s}
+  .b.in .vp .pp{background:var(--grad)}
+  .vp .pp:active{transform:scale(.9)}
+  .vp .wave{flex:1;height:26px;display:flex;align-items:center;gap:2px;cursor:pointer}
+  .vp .wave i{flex:1;background:rgba(255,255,255,.28);border-radius:2px;min-height:4px;transition:.1s}
+  .b.in .vp .wave i{background:rgba(255,255,255,.22)}
+  .vp .wave i.on{background:#fff}
+  .vp .meta{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+  .vp .sp{font-size:10.5px;font-weight:800;background:rgba(255,255,255,.22);padding:2px 7px;border-radius:8px;cursor:pointer;color:#fff}
+  .vp .dur{font-size:10.5px;color:rgba(255,255,255,.65)}
+  .b.in .vp .dur{color:var(--mut)}
+  /* ---------- COMPOSER ---------- */
+  .quick{display:flex;gap:7px;overflow-x:auto;padding:8px 12px 2px;scrollbar-width:none}
+  .quick::-webkit-scrollbar{display:none}
+  .qchip{white-space:nowrap;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12.5px;padding:7px 12px;border-radius:12px;cursor:pointer;transition:.15s;flex:none;font-weight:500}
+  .qchip:active{background:var(--panel2);transform:scale(.95)}
+  .qchip.act{background:rgba(79,140,255,.15);border-color:rgba(79,140,255,.5);color:var(--acc2)}
+  .qchip .e{margin-right:5px}
+  .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px calc(env(safe-area-inset-bottom) + 10px);background:var(--glass);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+  .composer textarea{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:20px;padding:10px 15px;font-size:15px;resize:none;max-height:120px;outline:none;font-family:inherit;transition:.2s;line-height:1.35}
+  .composer textarea:focus{border-color:rgba(79,140,255,.5)}
+  .cbtn{width:44px;height:44px;border-radius:50%;border:none;background:var(--grad);color:#fff;font-size:19px;display:grid;place-items:center;cursor:pointer;flex:none;box-shadow:0 4px 14px rgba(79,140,255,.4);transition:.15s}
+  .cbtn:active{transform:scale(.88)}
+  .cbtn.ghost{background:var(--panel);color:var(--mut);box-shadow:none;width:40px;height:40px;font-size:20px}
+  .cbtn.ghost:active{background:var(--panel2)}
+  .cbtn.rec{background:var(--danger);animation:pulse 1.1s infinite}
+  /* recording bar */
+  .recbar{display:flex;align-items:center;gap:12px;flex:1;background:var(--panel);border-radius:20px;padding:9px 15px;border:1px solid rgba(255,91,82,.4)}
+  .recbar .rd{width:10px;height:10px;border-radius:50%;background:var(--danger);animation:pulse 1s infinite}
+  .recbar .rt{font-variant-numeric:tabular-nums;font-weight:600}
+  .recbar .cancel{margin-left:auto;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer}
+  /* sheet (быстрые ответы / меню) */
+  .sheet-bd{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);z-index:40;opacity:0;transition:.2s;display:flex;align-items:flex-end}
+  .sheet-bd.on{opacity:1}
+  .sheet{width:100%;max-width:680px;margin:0 auto;background:var(--panel2);border-radius:22px 22px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);transform:translateY(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);max-height:70vh;overflow-y:auto}
+  .sheet-bd.on .sheet{transform:none}
+  .sheet .grip{width:38px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 12px}
+  .sheet h3{margin:0 0 10px;font-size:16px;font-weight:700}
+  .sheet-opt{padding:13px 14px;border-radius:13px;background:var(--panel);margin-bottom:7px;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:11px;transition:.15s}
+  .sheet-opt:active{background:var(--bg2);transform:scale(.98)}
+  .sheet-opt .e{font-size:20px}
+  .sheet-opt small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+  .toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 80px);left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,26,40,.96);color:#fff;padding:11px 18px;border-radius:14px;font-size:13.5px;z-index:60;max-width:88%;box-shadow:var(--sh);opacity:0;transition:.25s;border:1px solid var(--line);text-align:center}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{50%{opacity:.5}}
+  @keyframes fade{from{opacity:0}}
+  @keyframes pop{from{transform:scale(0)}}
+  @keyframes bubble{from{opacity:0;transform:translateY(6px) scale(.97)}}
+  @keyframes td{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="view-list">
-    <div class="list-hd">💬 Мои чаты<span class="cnt" id="listCnt"></span></div>
-    <div class="search"><input id="q" placeholder="Поиск по имени или номеру"></div>
-    <div id="chats"><div class="load">Загрузка…</div></div>
+    <div class="top">
+      <h1><span class="spark">💬</span>Мои чаты</h1>
+      <div class="sub" id="sub">Загрузка…</div>
+      <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="q" placeholder="Поиск"></div>
+    </div>
+    <div id="chats"><div class="load"><div class="sp"></div>Загрузка чатов…</div></div>
   </div>
-  <div id="conv" class="hidden">
-    <div class="conv-hd">
+
+  <div id="conv">
+    <div class="chd">
       <span class="back" id="back">‹</span>
       <span class="ava" id="cAva"></span>
-      <div><div class="conv-nm" id="cNm"></div><div class="conv-sub" id="cSub"></div></div>
-      <span class="conv-call" id="cCall" title="Позвонить">📞</span>
+      <div style="flex:1;min-width:0"><div class="nm" id="cNm"></div><div class="st" id="cSt"></div></div>
+      <span class="hd-btn" id="cCall">📞</span>
     </div>
-    <div id="body"><div class="load">Загрузка…</div></div>
-    <div class="composer">
-      <button class="cbtn ghost" id="attach" title="Вложение">📎</button>
+    <div id="body"></div>
+    <div id="quickBar" class="quick"></div>
+    <div class="composer" id="composer">
+      <button class="cbtn ghost" id="plus">＋</button>
       <input type="file" id="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
       <textarea id="text" rows="1" placeholder="Сообщение"></textarea>
+      <button class="cbtn ghost hidden" id="enh" title="Усилить ИИ">✨</button>
+      <button class="cbtn hidden" id="tts" title="Озвучить">🔊</button>
       <button class="cbtn" id="mic" title="Голосовое">🎤</button>
       <button class="cbtn hidden" id="send" title="Отправить">➤</button>
     </div>
   </div>
 </div>
+
 <script>
-const TG = window.Telegram && window.Telegram.WebApp; if (TG) { TG.ready(); TG.expand(); }
-const INIT = (TG && TG.initData) || '';
-const H = { 'X-Tg-Init-Data': INIT };
-let CHATS = [], CUR = null, POLL = null;
-const $ = s => document.querySelector(s);
-const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const AVC = ['#e17076','#7bcb68','#65aadd','#a695e7','#ee7aae','#6ec9cb','#f0a05a'];
-const avc = s => AVC[Math.abs([...String(s)].reduce((a,c)=>a+c.charCodeAt(0),0))%AVC.length];
-const ini = n => String(n||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-const tmm = t => new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
-async function jget(u){ const r=await fetch(u,{headers:H}); if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error||r.status); return r.json(); }
+const TG=window.Telegram&&window.Telegram.WebApp; if(TG){TG.ready();TG.expand();try{TG.setHeaderColor('#0b0f17');TG.setBackgroundColor('#0b0f17')}catch(e){}}
+const hap=(t)=>{try{TG&&TG.HapticFeedback&&TG.HapticFeedback.impactOccurred(t||'light')}catch(e){}};
+const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
+let CHATS=[],CUR=null,POLL=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const AV=[['#5b8cff','#7b5cff'],['#ff7a7a','#ff5ca8'],['#3fca7a','#2fb0c9'],['#ffb35a','#ff7a5a'],['#a58bff','#6e7bff'],['#4fd1c5','#4f9dff']];
+const avg=s=>{const g=AV[Math.abs([...String(s)].reduce((a,c)=>a+c.charCodeAt(0),0))%AV.length];return`linear-gradient(135deg,${g[0]},${g[1]})`};
+const ini=n=>String(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const tmm=t=>new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+let toastT; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div');t.id='tst';t.className='toast';document.body.appendChild(t)}t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2800)}
+async function jget(u){const r=await fetch(u,{headers:H});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||r.status);return r.json()}
+async function jpost(u,body,raw){const o={method:'POST',headers:{...H}};if(raw){o.body=raw.body;if(raw.ct)o.headers['Content-Type']=raw.ct}else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}const r=await fetch(u,o);const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||r.status);return j}
 
-async function loadChats(){
-  try{ CHATS = await jget('/tgapp/api/chats'); renderChats(); }
-  catch(e){ $('#chats').innerHTML = '<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку бота (нужна привязка брокера).</div>'; }
-}
+/* ---------- список ---------- */
+async function loadChats(){try{CHATS=await jget('/tgapp/api/chats');renderChats()}catch(e){$('#chats').innerHTML='<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку «💬 Чаты» у бота (нужна привязка брокера).</div>'}}
+function tot(){return CHATS.reduce((n,c)=>n+(c.unread||0),0)}
 function renderChats(){
-  const q = ($('#q').value||'').toLowerCase().trim();
-  const list = CHATS.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
-  $('#listCnt').textContent = CHATS.length? CHATS.length+' чатов'+(totalUnread()?' · '+totalUnread()+' новых':'') : '';
-  $('#chats').innerHTML = list.length? list.map(c=>`
-    <div class="chat-row" data-id="${c.id}">
-      <span class="ava" style="background:${avc(c.id)}">${esc(ini(c.name))}</span>
-      <div class="chat-mid">
-        <div class="chat-top"><span class="chat-nm">${esc(c.name)}</span><span class="chat-tm">${c.lastMsgAt?tmm(c.lastMsgAt):''}</span></div>
-        <div class="chat-prev">${c.lastDir==='out'?'Вы: ':''}${esc(c.lastText||'нет сообщений')}</div>
+  const q=($('#q').value||'').toLowerCase().trim();
+  const list=CHATS.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
+  $('#sub').textContent=CHATS.length?`${CHATS.length} чатов${tot()?' · '+tot()+' новых':''}`:'Пока нет активных чатов';
+  $('#chats').innerHTML=list.length?list.map(c=>`
+    <div class="row" data-id="${c.id}">
+      <span class="ava" style="background:${avg(c.id)}">${esc(ini(c.name))}${c.unread>0?'<span class="dot"></span>':''}</span>
+      <div class="mid">
+        <div class="rtop"><span class="nm">${esc(c.name)}</span><span class="tm">${c.lastMsgAt?tmm(c.lastMsgAt):''}</span></div>
+        <div class="prev">${c.geo?`<span class="geo-chip">${esc(c.geo)}</span>`:''}${c.lastDir==='out'?'<span class="me">Вы:</span> ':''}<span style="overflow:hidden;text-overflow:ellipsis">${esc(c.lastText||'нет сообщений')}</span></div>
       </div>
-      ${c.unread>0?`<span class="unread">${c.unread>99?'99+':c.unread}</span>`:''}
-    </div>`).join('') : '<div class="empty">Активных чатов нет</div>';
-  document.querySelectorAll('.chat-row').forEach(r=>r.onclick=()=>openChat(r.dataset.id));
+      ${c.unread>0?`<span class="badge-un">${c.unread>99?'99+':c.unread}</span>`:''}
+    </div>`).join(''):'<div class="empty">Ничего не найдено</div>';
+  document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{hap();openChat(r.dataset.id)});
 }
-function totalUnread(){ return CHATS.reduce((n,c)=>n+(c.unread||0),0); }
 
+/* ---------- диалог ---------- */
 async function openChat(id){
-  CUR = CHATS.find(c=>c.id===id) || {id};
-  $('#view-list').classList.add('hidden'); $('#conv').classList.remove('hidden');
-  $('#cAva').style.background=avc(id); $('#cAva').textContent=ini(CUR.name);
-  $('#cNm').textContent=CUR.name||''; $('#cSub').textContent=CUR.phone||'';
-  if(TG&&TG.BackButton){ TG.BackButton.show(); TG.BackButton.onClick(closeChat); }
+  CUR=CHATS.find(c=>c.id===id)||{id};
+  $('#cAva').style.background=avg(id);$('#cAva').textContent=ini(CUR.name);
+  $('#cNm').textContent=CUR.name||'';$('#cSt').textContent=CUR.phone||'';
+  $('#conv').classList.add('open');
+  if(TG&&TG.BackButton){TG.BackButton.show();TG.BackButton.offClick&&TG.BackButton.offClick(closeChat);TG.BackButton.onClick(closeChat)}
+  renderQuick();
   await loadConv(true);
-  clearInterval(POLL); POLL=setInterval(()=>loadConv(false),4000);
+  clearInterval(POLL);POLL=setInterval(()=>loadConv(false),4000);
 }
-function closeChat(){ clearInterval(POLL); $('#conv').classList.add('hidden'); $('#view-list').classList.remove('hidden'); if(TG&&TG.BackButton)TG.BackButton.hide(); loadChats(); }
+function closeChat(){hap();clearInterval(POLL);$('#conv').classList.remove('open');if(TG&&TG.BackButton)TG.BackButton.hide();loadChats()}
 $('#back').onclick=closeChat;
 
+let VPID=0;
+function voicePlayer(url){
+  const id='vp'+(VPID++);
+  const bars=Array.from({length:22},(_,i)=>`<i style="height:${20+30*Math.abs(Math.sin(i*1.7))|0}%"></i>`).join('');
+  return `<div class="vp" data-vp="${id}" data-url="${esc(url)}"><div class="pp">▶</div><div class="wave">${bars}</div><div class="meta"><span class="sp">1×</span><span class="dur">0:00</span></div></div>`;
+}
+function wireVoicePlayers(root){
+  root.querySelectorAll('[data-vp]').forEach(vp=>{
+    if(vp._w)return;vp._w=1;
+    const au=new Audio(vp.dataset.url);au.preload='metadata';
+    const pp=vp.querySelector('.pp'),sp=vp.querySelector('.sp'),dur=vp.querySelector('.dur'),bars=[...vp.querySelectorAll('.wave i')];
+    const speeds=[1,1.5,2];let si=0;
+    au.onloadedmetadata=()=>{if(isFinite(au.duration))dur.textContent=fmtd(au.duration)};
+    au.ontimeupdate=()=>{const p=au.currentTime/(au.duration||1);bars.forEach((b,i)=>b.classList.toggle('on',i/bars.length<=p));dur.textContent=fmtd(au.duration-au.currentTime||0)};
+    au.onended=()=>{pp.textContent='▶';bars.forEach(b=>b.classList.remove('on'))};
+    pp.onclick=()=>{hap();document.querySelectorAll('audio').forEach(a=>{if(a!==au){a.pause()}});if(au.paused){au.play();pp.textContent='⏸'}else{au.pause();pp.textContent='▶'}};
+    sp.onclick=()=>{hap();si=(si+1)%speeds.length;au.playbackRate=speeds[si];sp.textContent=speeds[si]+'×'};
+    vp.querySelector('.wave').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();au.currentTime=(e.clientX-r.left)/r.width*(au.duration||0)};
+  });
+}
+function fmtd(s){s=Math.max(0,s|0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+
 async function loadConv(scroll){
-  let d; try{ d=await jget('/tgapp/api/chat/'+CUR.id); }catch(e){ $('#body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
-  CUR = Object.assign(CUR, {name:d.name,phone:d.phone,stage:d.stage});
-  $('#cNm').textContent=d.name; $('#cSub').textContent=(d.phone||'')+(d.stage?' · '+d.stage:'');
+  let d;try{d=await jget('/tgapp/api/chat/'+CUR.id)}catch(e){$('#body').innerHTML='<div class="empty">'+esc(e.message)+'</div>';return}
+  CUR=Object.assign(CUR,{name:d.name,phone:d.phone,stage:d.stage});
+  $('#cNm').textContent=d.name;$('#cSt').innerHTML=(d.aiOn?'<span class="ai-on">● ИИ ведёт</span>':'вы ведёте')+' · '+esc(d.phone||'');
   let lastDay='';
-  $('#body').innerHTML = (d.messages||[]).map(m=>{
+  $('#body').innerHTML=(d.messages||[]).map(m=>{
     const day=new Date(m.at).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-    const sep=day!==lastDay?`<div class="day">${day}</div>`:''; lastDay=day;
-    let media='';
-    if(m.media&&m.media.url){ const u=esc(m.media.url), t=m.media.type;
-      if(t==='image') media=`<img src="${u}" loading="lazy">`;
-      else if(t==='video') media=`<video src="${u}" controls playsinline preload="metadata"></video>`;
-      else if(t==='voice'||t==='audio') media=`<audio src="${u}" controls preload="none"></audio>`;
-      else media=`<a class="doc" href="${u}" target="_blank">📄 ${esc(m.media.name||'файл')}</a>`;
+    const sep=day!==lastDay?`<div class="day">${day}</div>`:'';lastDay=day;
+    let inner='';
+    if(m.media&&m.media.url){const u=esc(m.media.url),t=m.media.type;
+      if(t==='image')inner=`<img src="${u}" onclick="window.open('${u}')">`;
+      else if(t==='video')inner=`<video src="${u}" controls playsinline preload="metadata"></video>`;
+      else if(t==='voice'||t==='audio')inner=voicePlayer(u);
+      else inner=`<a class="doc" href="${u}" target="_blank"><span class="ic">📄</span><span>${esc(m.media.name||'файл')}</span></a>`;
     }
-    const tick=m.dir==='out'?(m.status==='read'||m.status==='delivered'?'✓✓':'✓'):'';
-    return sep+`<div class="b ${m.dir}">${media}${m.text?esc(m.text):''}<div class="bm">${tmm(m.at)} ${tick}</div></div>`;
-  }).join('') || '<div class="empty">Сообщений пока нет</div>';
-  if(scroll){ const b=$('#body'); b.scrollTop=b.scrollHeight; }
-  else { const b=$('#body'); if(b.scrollHeight-b.scrollTop-b.clientHeight<120) b.scrollTop=b.scrollHeight; }
+    if(m.text)inner+=(inner?'<div style="margin-top:2px">':'')+esc(m.text)+(inner?'</div>':'');
+    const tick=m.dir==='out'?`<span class="tick ${m.status==='read'?'read':''}">${m.status==='read'||m.status==='delivered'?'✓✓':'✓'}</span>`:'';
+    return sep+`<div class="b ${m.dir}">${inner}<div class="bm">${tmm(m.at)} ${tick}</div></div>`;
+  }).join('')||'<div class="empty">Сообщений пока нет</div>';
+  if(d.typing)$('#body').insertAdjacentHTML('beforeend','<div class="typing"><i></i><i></i><i></i></div>');
+  wireVoicePlayers($('#body'));
+  const b=$('#body');if(scroll||b.scrollHeight-b.scrollTop-b.clientHeight<160)b.scrollTop=b.scrollHeight;
 }
 
-/* composer */
-const txt=$('#text'), send=$('#send'), mic=$('#mic');
-txt.addEventListener('input',()=>{ txt.style.height='auto'; txt.style.height=Math.min(txt.scrollHeight,110)+'px'; const has=txt.value.trim(); send.classList.toggle('hidden',!has); mic.classList.toggle('hidden',!!has); });
-txt.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send.click();} });
-send.onclick=async()=>{ const t=txt.value.trim(); if(!t)return; txt.value=''; txt.style.height='auto'; send.classList.add('hidden'); mic.classList.remove('hidden');
-  try{ await fetch('/tgapp/api/chat/'+CUR.id+'/text',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({text:t})}); await loadConv(true); }
-  catch(e){ toast('Не отправилось: '+e.message); } };
-$('#attach').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{ const f=e.target.files[0]; if(!f)return; e.target.value='';
-  const type=/^image\//.test(f.type)?'image':/^video\//.test(f.type)?'video':/^audio\//.test(f.type)?'voice':'document';
-  toast('Отправляю…');
-  try{ await fetch('/tgapp/api/chat/'+CUR.id+'/media?type='+type+'&filename='+encodeURIComponent(f.name),{method:'POST',headers:{...H,'Content-Type':f.type||'application/octet-stream'},body:f}); await loadConv(true); }
-  catch(e){ toast('Не отправилось: '+e.message); } };
+/* ---------- быстрые ответы ---------- */
+const QUICK=['Здравствуйте! 👋','Спасибо, что откликнулись!','Уже готовлю варианты под ваш запрос','Скину подборку в течение часа','Когда удобно созвониться?','Отправлю детали и цены','Рад помочь с выбором 🙌'];
+function renderQuick(){$('#quickBar').innerHTML=QUICK.map((q,i)=>`<span class="qchip" data-q="${i}">${esc(q)}</span>`).join('');
+  document.querySelectorAll('[data-q]').forEach(c=>c.onclick=()=>{hap();const t=$('#text');t.value=t.value?t.value+' '+QUICK[c.dataset.q]:QUICK[c.dataset.q];t.dispatchEvent(new Event('input'));t.focus()})}
 
-/* голосовое */
-let REC=null, CHUNKS=[], recHint=null;
-mic.onclick=async()=>{
-  if(REC){ REC.stop(); return; }
-  try{ const st=await navigator.mediaDevices.getUserMedia({audio:true});
-    REC=new MediaRecorder(st); CHUNKS=[];
+/* ---------- composer ---------- */
+const txt=$('#text'),send=$('#send'),mic=$('#mic'),enh=$('#enh'),tts=$('#tts');
+txt.addEventListener('input',()=>{txt.style.height='auto';txt.style.height=Math.min(txt.scrollHeight,120)+'px';const has=txt.value.trim();
+  send.classList.toggle('hidden',!has);mic.classList.toggle('hidden',!!has);enh.classList.toggle('hidden',!has);tts.classList.toggle('hidden',!has)});
+txt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send.click()}});
+send.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap();txt.value='';txt.dispatchEvent(new Event('input'));
+  try{await jpost('/tgapp/api/chat/'+CUR.id+'/text',{text:t});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message);txt.value=t}};
+enh.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');const old=enh.textContent;enh.textContent='…';enh.style.pointerEvents='none';
+  try{const r=await jpost('/tgapp/api/enhance',{text:t,mode:'improve'});txt.value=r.text;txt.dispatchEvent(new Event('input'));toast('✨ Текст усилен ИИ')}catch(e){toast(e.message)}enh.textContent=old;enh.style.pointerEvents=''};
+tts.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');toast('🔊 Генерирую голосовое…');
+  try{await jpost('/tgapp/api/chat/'+CUR.id+'/tts',{text:t});txt.value='';txt.dispatchEvent(new Event('input'));await loadConv(true);toast('Голосовое отправлено')}catch(e){toast(e.message)}};
+
+/* + меню: вложение / файл / фото */
+$('#plus').onclick=()=>{hap();sheet('Отправить',[
+  {e:'🖼',t:'Фото или видео',s:'из галереи',f:()=>{$('#file').accept='image/*,video/*';$('#file').click()}},
+  {e:'📎',t:'Файл',s:'документ, pdf',f:()=>{$('#file').accept='*/*';$('#file').click()}},
+])};
+$('#file').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
+  const type=/^image\//.test(f.type)?'image':/^video\//.test(f.type)?'video':/^audio\//.test(f.type)?'voice':'document';
+  toast('Отправляю…');try{await jpost('/tgapp/api/chat/'+CUR.id+'/media?type='+type+'&filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'application/octet-stream'});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message)}};
+
+/* запись голосового */
+let REC=null,CHUNKS=[],recT=null,recCancel=false;
+mic.onclick=async()=>{if(REC){REC.stop();return}
+  try{const st=await navigator.mediaDevices.getUserMedia({audio:true});REC=new MediaRecorder(st);CHUNKS=[];recCancel=false;hap('medium');
     REC.ondataavailable=ev=>CHUNKS.push(ev.data);
-    REC.onstop=async()=>{ mic.classList.remove('rec'); if(recHint){recHint.remove();recHint=null;} st.getTracks().forEach(t=>t.stop());
-      const blob=new Blob(CHUNKS,{type:CHUNKS[0]&&CHUNKS[0].type||'audio/ogg'}); REC=null;
-      if(blob.size<800){ toast('Слишком коротко'); return; }
-      const ext=(blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')||blob.type.includes('mp4a')?'m4a':blob.type.includes('webm')?'webm':'ogg');
-      toast('Отправляю голосовое…');
-      try{ await fetch('/tgapp/api/chat/'+CUR.id+'/media?type=voice&filename=voice.'+ext,{method:'POST',headers:{...H,'Content-Type':blob.type||'audio/ogg'},body:blob}); await loadConv(true); }
-      catch(e){ toast('Не отправилось: '+e.message); } };
-    REC.start(); mic.classList.add('rec');
-    recHint=document.createElement('div'); recHint.className='rec-hint'; recHint.textContent='● Запись… нажмите 🎤 чтобы отправить'; document.body.appendChild(recHint);
-  }catch(e){ toast('Нет доступа к микрофону'); }
+    REC.onstop=async()=>{clearInterval(recT);restoreComposer();st.getTracks().forEach(t=>t.stop());const blob=new Blob(CHUNKS,{type:CHUNKS[0]&&CHUNKS[0].type||'audio/ogg'});REC=null;
+      if(recCancel||blob.size<900){return}
+      const ext=blob.type.includes('mp4')?'m4a':blob.type.includes('webm')?'webm':'ogg';toast('Отправляю голосовое…');
+      try{await jpost('/tgapp/api/chat/'+CUR.id+'/media?type=voice&filename=voice.'+ext,null,{body:blob,ct:blob.type||'audio/ogg'});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message)}};
+    REC.start();showRecBar()}catch(e){toast('Нет доступа к микрофону')}
 };
-$('#cCall').onclick=async()=>{ if(!CUR)return;
-  try{ const r=await fetch('/tgapp/api/chat/'+CUR.id+'/call',{method:'POST',headers:H}); const j=await r.json().catch(()=>({}));
-    if(!r.ok||j.error){ if(/не настроен/.test(j.error||'')){ toast('Telnyx не настроен — открываю набор'); window.location.href='tel:'+String(CUR.phone||'').replace(/[^\d+]/g,''); } else toast('Звонок не вышел: '+(j.error||r.status)); return; }
-    toast('☎️ Telnyx набирает ВАС — поднимите трубку, затем соединим с клиентом');
-  }catch(e){ toast('Ошибка: '+e.message); }
-};
+function showRecBar(){const st=Date.now();const c=$('#composer');
+  [...c.children].forEach(ch=>ch.dataset._d=ch.style.display||'',ch.style.display='none');
+  const bar=document.createElement('div');bar.id='recbarWrap';bar.style.cssText='display:flex;align-items:center;gap:8px;flex:1';
+  bar.innerHTML='<div class="recbar"><span class="rd"></span><span class="rt" id="rt">0:00</span><span class="cancel" id="rcancel">Отмена</span></div><button class="cbtn rec" id="rsend">➤</button>';
+  c.appendChild(bar);
+  recT=setInterval(()=>{$('#rt').textContent=fmtd((Date.now()-st)/1000)},250);
+  $('#rsend').onclick=()=>{hap();REC&&REC.stop()};
+  $('#rcancel').onclick=()=>{recCancel=true;hap();REC&&REC.stop();toast('Запись отменена')};
+}
+function restoreComposer(){const c=$('#composer');const bar=$('#recbarWrap');if(bar)bar.remove();
+  [...c.children].forEach(ch=>{if(ch.dataset._d!==undefined){ch.style.display=ch.dataset._d;delete ch.dataset._d}});
+  txt.dispatchEvent(new Event('input'));}
+/* звонок */
+$('#cCall').onclick=async()=>{if(!CUR)return;hap();try{const r=await fetch('/tgapp/api/chat/'+CUR.id+'/call',{method:'POST',headers:H});const j=await r.json().catch(()=>({}));
+  if(!r.ok||j.error){if(/не настроен/.test(j.error||'')){toast('Telnyx не настроен — открываю набор');location.href='tel:'+String(CUR.phone||'').replace(/[^\d+]/g,'')}else toast('Звонок не вышел: '+(j.error||r.status));return}
+  toast('☎️ Telnyx набирает ВАС — поднимите трубку, затем соединим с клиентом')}catch(e){toast(e.message)}};
+
+/* bottom sheet */
+function sheet(title,opts){const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML='<div class="sheet"><div class="grip"></div><h3>'+esc(title)+'</h3>'+opts.map((o,i)=>`<div class="sheet-opt" data-i="${i}"><span class="e">${o.e}</span><div><b>${esc(o.t)}</b>${o.s?'<small>'+esc(o.s)+'</small>':''}</div></div>`).join('')+'</div>';
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};
+  bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelectorAll('.sheet-opt').forEach(el=>el.onclick=()=>{hap();close();opts[el.dataset.i].f()});
+}
 $('#q').addEventListener('input',renderChats);
 
-if(!INIT){ $('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку в Telegram-боте.</div>'; }
-else { loadChats(); setInterval(()=>{ if($('#conv').classList.contains('hidden')) loadChats(); },6000); }
+if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «💬 Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
+else{loadChats();setInterval(()=>{if(!$('#conv').classList.contains('open'))loadChats()},6000)}
 </script>
 </body>
 </html>

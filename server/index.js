@@ -2353,7 +2353,9 @@ const server = http.createServer(async (req, res) => {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         if (lead.unread) { lead.unread = 0; store.save(); }
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at).map(m => ({ dir: m.dir, text: m.text, at: m.at, status: m.status, via: m.via, media: m.media || null }));
-        return json(res, 200, { name: lead.name, phone: lead.phone, stage: lead.stage, messages: msgs });
+        const aiOn = !!(lead.ai && lead.ai.enabled);
+        const typing = aiOn && lead.lastDir === 'in' && !['handover', 'viewing', 'deal', 'lost'].includes(lead.stage);
+        return json(res, 200, { name: lead.name, phone: lead.phone, stage: lead.stage, aiOn, typing, messages: msgs });
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/text$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
@@ -2380,6 +2382,28 @@ const server = http.createServer(async (req, res) => {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         try { await telnyxInitiateCall(db, lead, abroker.phone); return json(res, 200, { ok: true, from: abroker.phone }); }
         catch (e) { return json(res, 400, { error: e.message }); }
+      }
+      /* ✨ усилить/переписать текст ИИ перед отправкой */
+      if (p === '/tgapp/api/enhance' && req.method === 'POST') {
+        const b = await readBody(req); const t = String(b.text || '').trim(); if (!t) return json(res, 400, { error: 'пусто' });
+        if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключа модели)' });
+        try { const out = await llm.rewrite(t, String(b.mode || 'improve'), 'сообщение клиенту от менеджера агентства недвижимости в WhatsApp — живо, коротко, по-человечески, без канцелярита, тот же смысл и язык'); return json(res, 200, { text: String(out).slice(0, 2000) }); }
+        catch (e) { return json(res, 400, { error: e.message }); }
+      }
+      /* 🔊 текст → голосовое (ElevenLabs) → отправить клиенту как voice */
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/tts$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        const b = await readBody(req); const t = String(b.text || '').trim(); if (!t) return json(res, 400, { error: 'пусто' });
+        const v = db.settings.voice || {};
+        if (!v.key || !v.voiceId) return json(res, 400, { error: 'Голос ElevenLabs не подключён (Подключения → Голос брокера)' });
+        try {
+          const r2 = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${v.voiceId}?output_format=mp3_44100_128`, { method: 'POST', headers: { 'xi-api-key': v.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t.slice(0, 900), model_id: 'eleven_multilingual_v2' }) });
+          if (!r2.ok) throw new Error('elevenlabs ' + r2.status);
+          const saved = tgbridge.saveMedia(Buffer.from(await r2.arrayBuffer()), 'mp3');
+          engine.send(db, lead, '', 'human', { channel: 'wa', media: { type: 'voice', url: saved.url, name: 'voice.mp3' } });
+          if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
+          store.save(); return json(res, 200, { ok: true });
+        } catch (e) { return json(res, 400, { error: e.message }); }
       }
       return json(res, 404, { error: 'no route' });
     }
