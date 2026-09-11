@@ -710,7 +710,9 @@ function mountHeroVideos(root, theme) {
   root.querySelectorAll('.ovx-hero, .ha, .f3card').forEach(el => {
     const isPhotoHa = photoPage && el.classList.contains('ha');
     let vid = el.querySelector(':scope > .hero-vid');
-    if (!src || isPhotoHa) { if (vid) vid.remove(); return; }
+    const neb = el.querySelector(':scope > .ovm'); /* navy-nebula: глушим, если своё тематическое видео (иначе дублируется/синит) */
+    if (!src || isPhotoHa) { if (vid) vid.remove(); if (neb) neb.style.display = ''; return; }
+    if (neb) neb.style.display = 'none';
     if (vid) {
       if (vid.getAttribute('data-src') !== src) { vid.setAttribute('data-src', src); vid.src = src; vid.poster = HERO_VIDEO_POSTER[theme] || ''; try { vid.load(); vid.play && vid.play().catch(() => {}); } catch (_) {} }
       return;
@@ -1764,7 +1766,7 @@ const OV_W = {
     const S = {}; L.forEach(l => S[cat(l)] = (S[cat(l)] || 0) + 1);
     const rows = Object.entries(S).sort((a, b) => b[1] - a[1]);
     const tot = L.length || 1;
-    const COL = { 'Реклама · лид-формы': '#2F6BFF', 'Комментарии рекламы': '#E08A6B', 'Импорт / выгрузка': '#7C5BD8', 'От брокера': '#2FA98C', 'Прямые / другое': '#9AA3B2' };
+    const COL = { 'Реклама · лид-формы': 'var(--ov-cat-blue)', 'Комментарии рекламы': 'var(--ov-cat-amber)', 'Импорт / выгрузка': 'var(--ov-cat-purple)', 'От брокера': 'var(--ov-cat-green)', 'Прямые / другое': 'var(--ink-3)' };
     const hd = `<div class="ov2-card-hd">${ic(I.funnel)}Источники лидов<span>${L.length} всего</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
     if (!rows.length) return hd + ovEmpty(I.funnel, 'Пока нет лидов', 'Источники появятся по мере поступления заявок');
     return hd + `<div class="ov-src-bar">${rows.map(([k, v]) => `<span style="width:${v / tot * 100}%;background:${COL[k] || '#9AA3B2'}" title="${esc(k)}: ${v}"></span>`).join('')}</div>
