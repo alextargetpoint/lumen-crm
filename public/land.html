@@ -4,155 +4,184 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lumen — CRM для агентств недвижимости</title>
-<meta name="description" content="Lumen — не ещё одна CRM, а среда, где работает вся команда агентства недвижимости. Ловит клиента, понимает его и ведёт до сделки. Ранний доступ.">
+<meta name="description" content="78% клиентов выбирают того, кто ответил первым. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает агентство.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#080808; --bg2:#0e0e10; --ink:#f4f3f1; --ink2:#a7a6a3; --ink3:#6b6a68;
-    --line:rgba(255,255,255,.11); --line2:rgba(255,255,255,.055);
-    --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif;
-    --ease:cubic-bezier(.19,1,.22,1); --pad:clamp(20px,4vw,40px);
+    --d-bg:#080808; --d-ink:#f4f3f1; --d-ink2:#a7a6a3; --d-ink3:#6b6a68; --d-line:rgba(255,255,255,.11); --d-line2:rgba(255,255,255,.055);
+    --l-bg:#f3f1ec; --l-ink:#141311; --l-ink2:#54524d; --l-ink3:#8b8983; --l-line:rgba(0,0,0,.12); --l-line2:rgba(0,0,0,.06);
+    --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif; --ease:cubic-bezier(.19,1,.22,1); --pad:clamp(20px,4vw,40px);
+    /* активные (тёмная по умолчанию) */
+    --bg:var(--d-bg);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;position:relative}
-  /* амбиент */
-  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:overlay;
+  body{background:var(--d-bg);color:var(--d-ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;position:relative}
+  .grain{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.04;mix-blend-mode:overlay;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-  ::selection{background:rgba(255,255,255,.16)}
+  ::selection{background:rgba(140,140,140,.3)}
   a{color:inherit;text-decoration:none}
   .wrap{max-width:1180px;margin:0 auto;padding-inline:var(--pad)}
 
-  /* nav */
-  .nav{position:fixed;top:0;left:0;right:0;z-index:20;transition:background .5s,backdrop-filter .5s,border-color .5s;border-bottom:1px solid transparent}
-  .nav.solid{background:rgba(8,8,8,.72);backdrop-filter:blur(14px) saturate(140%);border-color:var(--line2)}
-  .nav .bar{display:flex;align-items:center;justify-content:space-between;height:72px}
-  .brand{display:flex;align-items:center;gap:11px}
-  .brand .logo{width:19px;height:23px}
-  .brand .mk{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:.36em;padding-left:.36em}
-  .nlinks{display:flex;align-items:center;gap:30px}
-  .nlinks a{font-size:12.5px;letter-spacing:.06em;color:var(--ink2);transition:color .3s}
-  .nlinks a:hover{color:var(--ink)}
-  .cta{font-size:12.5px;letter-spacing:.08em;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:10px 18px;transition:.4s var(--ease);white-space:nowrap}
-  .cta:hover{background:var(--ink);color:#0a0a0a;border-color:transparent}
-  .cta.fill{background:var(--ink);color:#0a0a0a;border-color:transparent}
-  .cta.fill:hover{transform:translateY(-2px)}
-  @media(max-width:720px){.nlinks a{display:none}}
+  /* ── секции: тёмная/светлая с локальными токенами ── */
+  section,.band{position:relative;z-index:2}
+  .dark{background:var(--d-bg);color:var(--d-ink);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);--cell:var(--d-bg)}
+  .light{background:var(--l-bg);color:var(--l-ink);--ink:var(--l-ink);--ink2:var(--l-ink2);--ink3:var(--l-ink3);--line:var(--l-line);--line2:var(--l-line2);--cell:var(--l-bg)}
+  .sec{padding-block:clamp(84px,12vw,168px)}
+  .tr{height:clamp(80px,10vw,150px);position:relative;z-index:2}
+  .tr.d2l{background:linear-gradient(180deg,var(--d-bg),var(--l-bg))}
+  .tr.l2d{background:linear-gradient(180deg,var(--l-bg),var(--d-bg))}
 
-  /* секции */
-  section{position:relative;z-index:2}
-  .sec{padding-block:clamp(90px,13vw,180px)}
   .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink3);display:inline-flex;align-items:center;gap:10px}
   .eyebrow::before{content:"";width:22px;height:1px;background:var(--line)}
-  h1,h2,h3{font-family:var(--serif);font-weight:300;letter-spacing:-.01em;line-height:1.02}
-  h2{font-size:clamp(34px,5.4vw,68px)}
-  .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:52ch}
-  em{font-style:italic;font-weight:400;background:linear-gradient(180deg,#fff,#b9b7b3 60%,#7c7a77);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .eyebrow.c{justify-content:center}
+  h1,h2,h3{font-family:var(--serif);font-weight:300;letter-spacing:-.012em;line-height:1.02}
+  h2{font-size:clamp(32px,5.2vw,64px)}
+  .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:54ch}
+  em{font-style:italic;font-weight:400}
+  .dark em{background:linear-gradient(180deg,#fff,#b9b7b3 60%,#7c7a77);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .light em{background:linear-gradient(180deg,#141311,#57544e 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
 
   /* reveal */
   [data-r]{opacity:0;transform:translateY(30px);filter:blur(6px);transition:opacity 1s var(--ease),transform 1.05s var(--ease),filter .9s ease}
   [data-r].in{opacity:1;transform:none;filter:none}
   .d1{transition-delay:.09s}.d2{transition-delay:.18s}.d3{transition-delay:.27s}.d4{transition-delay:.36s}
-  .ln{display:block;overflow:hidden;padding:.12em .28em .2em}
-  .ln>span{display:block;transform:translateY(112%);transition:transform 1.1s var(--ease)}
+  .lnw .ln{display:block;overflow:hidden;padding:.12em .28em .2em}
+  .lnw .ln>span{display:block;transform:translateY(112%);transition:transform 1.1s var(--ease)}
   [data-r].in .ln>span{transform:none}
-  .ln:nth-child(2)>span{transition-delay:.1s}.ln:nth-child(3)>span{transition-delay:.2s}
+  .lnw .ln:nth-child(2)>span{transition-delay:.1s}.lnw .ln:nth-child(3)>span{transition-delay:.2s}
+
+  /* nav */
+  .nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .5s,backdrop-filter .5s,border-color .5s,color .4s;border-bottom:1px solid transparent;color:var(--d-ink)}
+  .nav.solid{background:rgba(8,8,8,.72);backdrop-filter:blur(14px) saturate(140%);border-color:var(--d-line2)}
+  .nav.onlight{color:var(--l-ink)}
+  .nav.onlight.solid{background:rgba(243,241,236,.8);border-color:var(--l-line2)}
+  .nav .bar{display:flex;align-items:center;justify-content:space-between;height:70px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand .logo{width:19px;height:23px}
+  .brand .mk{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:.36em;padding-left:.36em}
+  .nlinks{display:flex;align-items:center;gap:28px}
+  .nlinks a{font-size:12.5px;letter-spacing:.06em;opacity:.7;transition:opacity .3s}
+  .nlinks a:hover{opacity:1}
+  .cta{font-size:12.5px;letter-spacing:.08em;border:1px solid currentColor;border-radius:999px;padding:10px 18px;transition:.4s var(--ease);white-space:nowrap;opacity:.9}
+  .cta.fill{background:currentColor;border-color:transparent;opacity:1}
+  .cta.fill span{color:var(--d-bg)}
+  .nav.onlight .cta.fill span{color:var(--l-bg)}
+  .cta.fill:hover{transform:translateY(-2px)}
+  @media(max-width:760px){.nlinks a{display:none}}
 
   /* HERO */
-  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden}
-  .hero .halo{position:absolute;left:50%;top:42%;width:80vmax;height:80vmax;transform:translate(-50%,-50%);z-index:0;pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.06),transparent 70%);animation:breathe 9s ease-in-out infinite}
-  .hero .sheen{position:absolute;inset:-30%;z-index:0;pointer-events:none;opacity:.4;background:conic-gradient(from 210deg at 50% 40%,transparent,rgba(255,255,255,.06) 60deg,transparent 130deg,rgba(255,255,255,.035) 220deg,transparent 300deg);filter:blur(46px);animation:spin 40s linear infinite;mix-blend-mode:screen}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;background:#050505}
+  .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;filter:grayscale(1) contrast(1.05)}
+  .hero .veil{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 30%,rgba(8,8,8,.35),#060606 78%)}
+  .hero .halo{position:absolute;left:50%;top:42%;width:80vmax;height:80vmax;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.05),transparent 70%);animation:breathe 9s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.12)}}
-  .hero-in{position:relative;z-index:2;text-align:center;width:100%}
-  .hero h1{font-size:clamp(48px,10vw,132px);line-height:.98}
-  .hero .lede{margin:26px auto 0;text-align:center}
-  .hero-cta{margin-top:38px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-  .btn{font-size:14px;letter-spacing:.04em;border-radius:999px;padding:15px 28px;transition:.4s var(--ease);cursor:pointer;border:1px solid transparent;font-family:inherit}
-  .btn.primary{background:var(--ink);color:#0a0a0a}
-  .btn.primary:hover{transform:translateY(-3px);box-shadow:0 20px 40px -18px rgba(255,255,255,.3)}
-  .btn.ghost{border-color:var(--line);color:var(--ink);background:rgba(255,255,255,.02)}
+  .hero-in{position:relative;z-index:3;text-align:center;width:100%}
+  .hero .kline{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--d-ink3);opacity:0;animation:up .9s var(--ease) .15s forwards}
+  .hero h1{font-size:clamp(46px,10vw,128px);line-height:.99;margin-top:20px}
+  .hero .lede{margin:26px auto 0;text-align:center;color:var(--d-ink2)}
+  .hero-cta{margin-top:38px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;opacity:0;animation:up 1s var(--ease) 1s forwards}
+  .btn{font-size:14px;letter-spacing:.04em;border-radius:999px;padding:15px 28px;transition:.4s var(--ease);cursor:pointer;border:1px solid transparent;font-family:inherit;display:inline-flex;align-items:center;gap:9px}
+  .dark .btn.primary,.hero .btn.primary{background:var(--d-ink);color:#0a0a0a}
+  .light .btn.primary{background:var(--l-ink);color:var(--l-bg)}
+  .btn.primary:hover{transform:translateY(-3px)}
+  .btn.ghost{border-color:var(--line);color:var(--ink);background:transparent}
   .btn.ghost:hover{border-color:var(--ink2)}
-  .scrollcue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);z-index:2;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink3);display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:up 1s var(--ease) 1.6s forwards}
-  .scrollcue i{width:1px;height:40px;background:linear-gradient(var(--ink3),transparent);animation:cue 2.4s ease-in-out infinite}
+  .scrollcue{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:3;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--d-ink3);display:flex;flex-direction:column;align-items:center;gap:9px;opacity:0;animation:up 1s var(--ease) 1.6s forwards}
+  .scrollcue i{width:1px;height:38px;background:linear-gradient(var(--d-ink3),transparent);animation:cue 2.4s ease-in-out infinite}
   @keyframes cue{0%,100%{transform:scaleY(.4);opacity:.4}50%{transform:scaleY(1);opacity:1}}
   @keyframes up{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+  .hero .kline,.hero-cta{position:relative}
 
-  /* PROBLEM */
-  .prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:56px;background:var(--line2);border:1px solid var(--line2)}
-  .prob-cell{background:var(--bg);padding:clamp(26px,3vw,44px)}
-  .prob-cell .n{font-family:var(--serif);font-size:20px;color:var(--ink3)}
-  .prob-cell h3{font-size:24px;margin:18px 0 12px;font-weight:400}
-  .prob-cell p{color:var(--ink2);font-size:14.5px;font-weight:300;line-height:1.6}
+  /* STAT-строки (боли с цифрами) */
+  .statline{display:grid;grid-template-columns:auto 1fr;gap:clamp(22px,4vw,54px);align-items:baseline;padding:clamp(26px,3.4vw,42px) 0;border-top:1px solid var(--line)}
+  .statline:last-child{border-bottom:1px solid var(--line)}
+  .statline .big{font-family:var(--serif);font-weight:300;font-size:clamp(50px,8vw,112px);line-height:.9;letter-spacing:-.03em;white-space:nowrap}
+  .statline .txt b{font-weight:500;font-size:clamp(17px,2vw,23px);font-family:var(--serif);font-weight:400}
+  .statline .txt p{color:var(--ink2);font-size:14.5px;font-weight:300;line-height:1.6;margin-top:8px;max-width:52ch}
+  @media(max-width:620px){.statline{grid-template-columns:1fr;gap:8px}.statline .big{font-size:clamp(52px,17vw,90px)}}
+
+  /* PROBLEM grid */
+  .prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:52px;background:var(--line2);border:1px solid var(--line2)}
+  .prob-cell{background:var(--cell);padding:clamp(24px,3vw,40px)}
+  .prob-cell .n{font-family:var(--serif);font-size:19px;color:var(--ink3)}
+  .prob-cell h3{font-size:23px;margin:16px 0 11px;font-weight:400}
+  .prob-cell p{color:var(--ink2);font-size:14px;font-weight:300;line-height:1.6}
+  .prob-cell .q{margin-top:14px;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink3);line-height:1.4;padding-top:12px;border-top:1px solid var(--line2)}
   @media(max-width:760px){.prob-grid{grid-template-columns:1fr}}
 
   /* THESIS split */
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,6vw,80px);align-items:center}
-  .split .big{font-family:var(--serif);font-weight:300;font-size:clamp(30px,4vw,52px);line-height:1.08}
-  .thesis-list{display:grid;gap:2px;background:var(--line2);border-block:1px solid var(--line2)}
-  .thesis-list .ti{background:var(--bg);padding:22px 4px;display:flex;gap:18px;align-items:flex-start}
-  .thesis-list .ti .ic{flex:0 0 30px;height:30px;border:1px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2)}
-  .thesis-list .ti .ic svg{width:15px;height:15px}
-  .thesis-list .ti b{font-weight:500;font-size:16px}
-  .thesis-list .ti span{display:block;color:var(--ink3);font-size:13.5px;font-weight:300;margin-top:3px;line-height:1.5}
-  @media(max-width:760px){.split{grid-template-columns:1fr;gap:36px}}
+  .split{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(30px,6vw,80px);align-items:center}
+  .split .big{font-family:var(--serif);font-weight:300;font-size:clamp(29px,3.8vw,50px);line-height:1.1}
+  .tlist{display:grid;gap:1px;background:var(--line2);border-block:1px solid var(--line2)}
+  .tlist .ti{background:var(--cell);padding:22px 2px;display:flex;gap:18px;align-items:flex-start}
+  .tlist .ti .ic{flex:0 0 30px;height:30px;border:1px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2)}
+  .tlist .ti .ic svg{width:15px;height:15px}
+  .tlist .ti b{font-weight:600;font-size:16px}
+  .tlist .ti span{display:block;color:var(--ink3);font-size:13.5px;font-weight:300;margin-top:3px;line-height:1.5}
+  @media(max-width:760px){.split{grid-template-columns:1fr;gap:34px}}
 
   /* FLOW */
-  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:60px;position:relative}
+  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:58px;position:relative}
   .flow::before{content:"";position:absolute;top:19px;left:10%;right:10%;height:1px;background:var(--line)}
   .fstep{text-align:center;padding:0 10px;position:relative;z-index:2}
-  .fstep .dot{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--serif);color:var(--ink2)}
-  .fstep h4{font-size:15.5px;font-weight:500;margin-bottom:7px}
+  .fstep .dot{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;background:var(--cell);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--serif);color:var(--ink2)}
+  .fstep h4{font-size:15.5px;font-weight:600;margin-bottom:7px}
   .fstep p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
-  @media(max-width:760px){.flow{grid-template-columns:1fr;gap:26px}.flow::before{display:none}.fstep{display:flex;text-align:left;gap:16px;align-items:flex-start}.fstep .dot{margin:0}}
+  @media(max-width:760px){.flow{grid-template-columns:1fr;gap:24px}.flow::before{display:none}.fstep{display:flex;text-align:left;gap:16px;align-items:flex-start}.fstep .dot{margin:0}}
 
-  /* SCREENS — монохром-лукс */
-  .screens{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:56px}
+  /* SCREENS */
+  .screens{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
   .shot{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0c0c0e}
   .shot.wide{grid-column:span 2}
-  .shot img{width:100%;display:block;filter:grayscale(1) contrast(1.05) brightness(.92);transition:filter .8s var(--ease),transform .8s var(--ease)}
-  .shot:hover img{filter:grayscale(.15) contrast(1) brightness(1);transform:scale(1.02)}
-  .shot .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 20px;background:linear-gradient(transparent,rgba(6,6,6,.9));display:flex;align-items:baseline;gap:10px}
-  .shot .cap b{font-family:var(--serif);font-weight:500;font-size:19px}
-  .shot .cap span{font-size:12px;color:var(--ink3)}
+  .shot img{width:100%;display:block;filter:grayscale(.85) contrast(1.02) brightness(.95);transition:filter .8s var(--ease),transform .8s var(--ease)}
+  .shot:hover img{filter:none;transform:scale(1.02)}
+  .shot .cap{position:absolute;left:0;right:0;bottom:0;padding:16px 20px;background:linear-gradient(transparent,rgba(6,6,6,.9));display:flex;align-items:baseline;gap:10px;color:#f4f3f1}
+  .shot .cap b{font-family:var(--serif);font-weight:500;font-size:18px}
+  .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
+  /* CONTROL (владелец) */
+  .ctrl{display:grid;grid-template-columns:1fr 1fr;gap:clamp(26px,5vw,64px);align-items:center;margin-top:10px}
+  .ctrl-list{display:grid;gap:14px}
+  .ctrl-list .ci{display:flex;gap:14px;align-items:flex-start;font-size:15px;color:var(--ink2);font-weight:300}
+  .ctrl-list .ci svg{width:17px;height:17px;flex:0 0 17px;margin-top:2px;color:var(--ink)}
+  @media(max-width:760px){.ctrl{grid-template-columns:1fr;gap:30px}}
+
   /* PROOF numbers */
-  .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:52px}
-  .num{background:var(--bg);padding:clamp(26px,3.4vw,44px);text-align:center}
-  .num b{display:block;font-family:var(--serif);font-weight:300;font-size:clamp(40px,5vw,64px);letter-spacing:-.02em;
-    background:linear-gradient(180deg,#fff,#a7a6a3);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .num span{display:block;margin-top:10px;font-size:12px;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
+  .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
+  .num{background:var(--cell);padding:clamp(24px,3.2vw,42px);text-align:center}
+  .num b{display:block;font-family:var(--serif);font-weight:300;font-size:clamp(40px,5vw,62px);letter-spacing:-.02em}
+  .light .num b{color:var(--l-ink)}.dark .num b{background:linear-gradient(180deg,#fff,#a7a6a3);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .num span{display:block;margin-top:9px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
   @media(max-width:620px){.nums{grid-template-columns:1fr 1fr}}
 
   /* PRICING */
-  .price{max-width:560px;margin:52px auto 0;border:1px solid var(--line);border-radius:20px;padding:clamp(30px,4vw,48px);text-align:center;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
-  .price .tag{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:7px 15px;display:inline-block;margin-bottom:22px}
+  .price{max-width:560px;margin:50px auto 0;border:1px solid var(--line);border-radius:20px;padding:clamp(30px,4vw,48px);text-align:center;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
+  .price .tag{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:7px 15px;display:inline-block;margin-bottom:20px}
   .price .val{display:flex;align-items:baseline;justify-content:center;gap:10px}
   .price .val s{font-family:var(--serif);font-size:28px;color:var(--ink3)}
-  .price .val b{font-family:var(--serif);font-weight:300;font-size:clamp(56px,8vw,86px);letter-spacing:-.03em;line-height:1;
-    background:linear-gradient(180deg,#fff,#a7a6a3);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .price .val b{font-family:var(--serif);font-weight:300;font-size:clamp(54px,8vw,84px);letter-spacing:-.03em;line-height:1;background:linear-gradient(180deg,#fff,#a7a6a3);-webkit-background-clip:text;background-clip:text;color:transparent}
   .price .val i{font-style:normal;font-size:16px;color:var(--ink3)}
   .price .sub{font-size:13.5px;color:var(--ink2);margin-top:8px}
-  .price ul{list-style:none;margin:26px 0;display:grid;gap:12px;text-align:left;max-width:360px;margin-inline:auto}
+  .price ul{list-style:none;margin:24px 0;display:grid;gap:12px;text-align:left;max-width:360px;margin-inline:auto}
   .price li{display:flex;gap:11px;font-size:14px;color:var(--ink2);font-weight:300}
   .price li svg{width:15px;height:15px;flex:0 0 15px;color:var(--ink);margin-top:2px}
-  .price .btn.primary{width:100%;justify-content:center;margin-top:6px}
+  .price .btn.primary{width:100%;justify-content:center;margin-top:4px}
   .price .rr{margin-top:14px;font-size:12px;color:var(--ink3)}
 
   /* FINAL */
   .final{text-align:center}
-  .final h2{font-size:clamp(40px,7vw,96px)}
-  .final .lede{margin:24px auto 0;text-align:center}
-  .final .btn.primary{margin-top:34px}
+  .final h2{font-size:clamp(38px,7vw,92px)}
+  .final .lede{margin:22px auto 0;text-align:center}
+  .final .btn.primary{margin-top:32px}
 
-  /* footer */
-  .foot{border-top:1px solid var(--line2);padding-block:40px}
+  .foot{border-top:1px solid var(--line2);padding-block:38px}
   .foot .bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3)}
   .foot a:hover{color:var(--ink)}
-  @media(prefers-reduced-motion:reduce){.hero .halo,.hero .sheen,.scrollcue i{animation:none}.ln>span{transform:none}}
+  @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}}
 </style>
 </head>
 <body>
@@ -160,141 +189,217 @@
 
 <nav class="nav" id="nav"><div class="wrap"><div class="bar">
   <a class="brand" href="#top">
-    <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen"><defs><linearGradient id="lx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#cfcecb"/><stop offset="1" stop-color="#8a8885"/></linearGradient></defs><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="url(#lx)" stroke-width="2.6" stroke-linejoin="round"/></svg>
+    <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen"><defs><linearGradient id="lx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor"/><stop offset="1" stop-color="currentColor" stop-opacity=".55"/></linearGradient></defs><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg>
     <span class="mk">LUMEN</span>
   </a>
   <div class="nlinks">
-    <a href="#thesis">Идея</a><a href="#flow">Как работает</a><a href="#product">Продукт</a><a href="#pricing">Цена</a>
-    <a class="cta fill" href="/soon.html">Ранний доступ</a>
+    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#pricing">Цена</a>
+    <a class="cta fill" href="/soon.html"><span>Ранний доступ</span></a>
   </div>
 </div></div></nav>
 
 <span id="top"></span>
-<!-- HERO -->
+<!-- HERO (dark) -->
 <header class="hero">
-  <div class="halo"></div><div class="sheen"></div>
+  <video autoplay muted loop playsinline poster="/assets/land-hero-poster.jpg" id="heroVid"></video>
+  <div class="veil"></div><div class="halo"></div>
   <div class="wrap hero-in">
-    <h1 data-r class="in">
+    <div class="kline">CRM, рождённая в недвижимости</div>
+    <h1 data-r class="in lnw">
       <span class="ln"><span>Порядок,</span></span>
       <span class="ln"><span>которого <em>не было</em></span></span>
     </h1>
-    <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда.</p>
+    <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
     <div class="hero-cta">
       <a class="btn primary" href="/soon.html">Занять место в бете</a>
-      <a class="btn ghost" href="#thesis">Что это</a>
+      <a class="btn ghost" href="#pain">Смотреть, где течёт</a>
     </div>
   </div>
   <div class="scrollcue">Листайте<i></i></div>
 </header>
 
-<!-- PROBLEM -->
-<section class="sec wrap" id="problem">
-  <div data-r><span class="eyebrow">Проблема отрасли</span>
-    <h2 style="margin-top:22px;max-width:16ch">У недвижимости нет <em>своей</em> CRM</h2></div>
-  <div class="prob-grid">
-    <div class="prob-cell" data-r><div class="n">01</div><h3>Брокеры сливают лидов</h3><p>Оплаченная заявка не обработана, забыта или «остыла» за минуты — и ушла к конкуренту.</p></div>
-    <div class="prob-cell" data-r class="d1"><div class="n">02</div><h3>Брокеры уводят базу</h3><p>Переписка на личном телефоне. Клиент уходит вместе с брокером — контроля нет.</p></div>
-    <div class="prob-cell" data-r class="d2"><div class="n">03</div><h3>Софт не про недвижимость</h3><p>Универсальные CRM не знают ни воронку, ни каналы, ни логику сделки с объектом.</p></div>
+<div class="tr d2l"></div>
+
+<!-- PAIN 1 — скорость (светлая, цифры бьют) -->
+<section class="sec light" id="pain">
+  <div class="wrap">
+    <div data-r><span class="eyebrow">Где на самом деле теряются деньги</span>
+      <h2 class="lnw" style="margin-top:22px;max-width:20ch"><span class="ln"><span>Выигрывает не лучший.</span></span><span class="ln"><span>Выигрывает <em>первый.</em></span></span></h2>
+      <p class="lede" style="margin-top:20px">Клиент оставляет заявку и в ту же минуту пишет ещё троим. Кто ответил первым — с тем и говорят. Остальные догоняют пустоту. Это не про сервис. Это про секунды.</p>
+    </div>
+    <div style="margin-top:44px">
+      <div class="statline" data-r><div class="big">78%</div><div class="txt"><b>покупателей выбирают агента, который ответил первым</b><p>Не самого опытного, не с лучшей ценой — первого. Пока идёт совещание «кому передать лида», клиент уже на встрече у другого.</p></div></div>
+      <div class="statline" data-r class="d1"><div class="big">47<span style="font-family:var(--serif);font-size:.42em"> мин</span></div><div class="txt"><b>средний ответ на заявку по рынку</b><p>Медиана по 28 000 агентов. А контактность падает в 10 раз уже через час. Заявка остыла ещё сорок минут назад — вы просто об этом не знаете.</p></div></div>
+      <div class="statline" data-r class="d2"><div class="big">91%</div><div class="txt"><b>агентств не отвечают за пять минут</b><p>Ответ в первую минуту конвертит 23% — против 5% после получаса. Скорость — самый дешёвый способ вырасти в два раза, и его почти никто не использует.</p></div></div>
+    </div>
   </div>
 </section>
 
-<!-- THESIS -->
-<section class="sec wrap split" id="thesis">
-  <div data-r>
-    <span class="eyebrow">Что такое Lumen</span>
-    <div class="big" style="margin-top:22px">Не инструмент. <em>Среда</em>, в которой живёт агентство — от первого сообщения клиента до закрытой сделки.</div>
-  </div>
-  <div class="thesis-list" data-r class="d1">
-    <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит</b><span>Заявки со всех каналов — WhatsApp, комментарии рекламы, телефония, формы — в одном месте.</span></div></div>
-    <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает</b><span>Отвечает за секунды, квалифицирует и строит психо-портрет — с чем к клиенту заходить.</span></div></div>
-    <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Ведёт до сделки</b><span>Живые подборки объектов, цепочки касаний, встречи, разбор звонков — вся операционка.</span></div></div>
-    <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Собственник видит риски, антислив базы, роли и доступы, оффбординг — всё как на ладони.</span></div></div>
+<div class="tr l2d"></div>
+
+<!-- PAIN 2 — сдаются + слив (тёмная) -->
+<section class="sec dark" id="pain2">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">И это только начало</span>
+      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">Оплаченный лид не остыл. <em>Его просто бросили.</em></h2></div>
+    <div class="prob-grid">
+      <div class="prob-cell" data-r><div class="n">01</div><h3>Сдаются после первого «нет»</h3><p>80% сделок требуют пяти и более касаний. 44% агентов останавливаются после одного. Между «привет» и «позвоните после 18:00» лежит вся выручка — и её никто не забирает.</p><div class="q">«Написал раз — не ответили — забыл»</div></div>
+      <div class="prob-cell" data-r class="d1"><div class="n">02</div><h3>База — на личном телефоне</h3><p>Переписка в личном WhatsApp брокера. Уходит брокер — уходит и вся база к конкуренту. Собственник узнаёт об этом последним. Своей CRM у агентства нет — есть чужие блокноты.</p><div class="q">«Ушёл менеджер — забрал 300 контактов»</div></div>
+      <div class="prob-cell" data-r class="d2"><div class="n">03</div><h3>Софт не про недвижимость</h3><p>Универсальные CRM не знают ни воронку сделки с объектом, ни каналы, ни психологию покупателя. Их не открывают. Данные живут «в голове у менеджера» — до его выходного.</p><div class="q">«CRM есть — ей никто не пользуется»</div></div>
+    </div>
   </div>
 </section>
 
-<!-- FLOW -->
-<section class="sec wrap" id="flow">
-  <div data-r style="text-align:center"><span class="eyebrow" style="justify-content:center">Как это работает</span>
-    <h2 style="margin-top:22px">От клика <em>до сделки</em></h2></div>
-  <div class="flow" data-r class="d1">
-    <div class="fstep"><div class="dot">1</div><h4>Заявка влетает</h4><p>С любого канала — сразу в системе, с привязкой к рекламе.</p></div>
-    <div class="fstep"><div class="dot">2</div><h4>Ответ за секунды</h4><p>Первая линия отвечает на языке клиента, круглосуточно.</p></div>
-    <div class="fstep"><div class="dot">3</div><h4>Квалификация</h4><p>Цель, срок, бюджет, тип — и психо-портрет клиента.</p></div>
-    <div class="fstep"><div class="dot">4</div><h4>Тёплого — брокеру</h4><p>С историей, сценарием и задачей позвонить за 30 минут.</p></div>
-    <div class="fstep"><div class="dot">5</div><h4>Сделка под контролем</h4><p>Подборки, встречи, разбор звонков — до подписи.</p></div>
+<div class="tr d2l"></div>
+
+<!-- THESIS (светлая) -->
+<section class="sec light split" id="thesis">
+  <div class="wrap" style="display:contents">
+    <div data-r>
+      <span class="eyebrow">Что такое Lumen</span>
+      <div class="big" style="margin-top:22px">Не инструмент, который надо заставлять открывать. <em>Среда</em>, в которой агентство живёт само — от первого сообщения до подписи.</div>
+      <a class="btn ghost" href="#product" style="margin-top:26px">Как это выглядит</a>
+    </div>
+    <div class="tlist" data-r class="d1">
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном месте — WhatsApp, комментарии рекламы, телефония, формы. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку, бюджету и типу. Строит психо-портрет — на что давить, чего избегать, с чем заходить.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки касаний не бросают молчунов. Живые подборки объектов, встречи, разбор звонков — вся операционка без ручной рутины.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Собственник видит риски и слив базы, раздаёт роли и доступы, забирает контакты при оффбординге. База — агентства, а не брокера.</span></div></div>
+    </div>
   </div>
 </section>
 
-<!-- PRODUCT -->
-<section class="sec wrap" id="product">
-  <div data-r><span class="eyebrow">Внутри продукта</span>
-    <h2 style="margin-top:22px;max-width:18ch">Рабочий стол агентства, <em>а не набор вкладок</em></h2></div>
-  <div class="screens">
-    <div class="shot wide" data-r><img src="/assets/theme-mono.png" alt="Обзор" loading="lazy"><div class="cap"><b>Обзор</b><span>командный центр: воронка, горячие лиды, задачи, деньги</span></div></div>
-    <div class="shot" data-r class="d1"><img src="/assets/site/cap-funnel.png" alt="Воронка" loading="lazy"><div class="cap"><b>Воронка</b><span>каждый лид и стадия сделки</span></div></div>
-    <div class="shot" data-r class="d2"><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
-    <div class="shot" data-r class="d1"><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Подборки</b><span>живые презентации объектов</span></div></div>
-    <div class="shot" data-r class="d2"><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика</b><span>деньги и эффективность в цифрах</span></div></div>
+<div class="tr l2d"></div>
+
+<!-- FLOW (тёмная) -->
+<section class="sec dark" id="flow">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">Путь заявки</span>
+      <h2 style="margin-top:22px">От клика <em>до сделки</em> — без ручных рук</h2></div>
+    <div class="flow" data-r class="d1">
+      <div class="fstep"><div class="dot">1</div><h4>Заявка влетает</h4><p>С любого канала — сразу в системе, с привязкой к рекламе.</p></div>
+      <div class="fstep"><div class="dot">2</div><h4>Ответ за секунды</h4><p>Первая линия отвечает раньше конкурентов, круглосуточно.</p></div>
+      <div class="fstep"><div class="dot">3</div><h4>Квалификация</h4><p>Цель, срок, бюджет, тип — и психо-портрет клиента.</p></div>
+      <div class="fstep"><div class="dot">4</div><h4>Тёплого — брокеру</h4><p>С историей, сценарием и задачей позвонить за 30 минут.</p></div>
+      <div class="fstep"><div class="dot">5</div><h4>Сделка под контролем</h4><p>Подборки, встречи, разбор звонков — до подписи.</p></div>
+    </div>
   </div>
 </section>
 
-<!-- PROOF -->
-<section class="sec wrap" id="proof">
-  <div data-r style="text-align:center"><span class="eyebrow" style="justify-content:center">Кто за Lumen</span>
-    <h2 style="margin-top:22px;max-width:20ch;margin-inline:auto">5 лет мы приводили трафик недвижимости. <em>Теперь отдаём систему.</em></h2>
-    <p class="lede" style="margin:20px auto 0;text-align:center">Перформанс-агентство: Дубай, Испания, Кипр, Бали, Таиланд. Мы видели одну боль в каждом агентстве — и год жили этим продуктом сами.</p></div>
-  <div class="nums" data-r class="d1">
-    <div class="num"><b class="cu" data-to="54" data-suf="+">0</b><span>проектов недвижимости</span></div>
-    <div class="num"><b class="cu" data-to="8" data-suf="">0</b><span>стран и рынков</span></div>
-    <div class="num"><b>$15</b><span>средний CPL</span></div>
-    <div class="num"><b class="cu" data-to="5" data-suf="+">0</b><span>языков в диалогах</span></div>
+<div class="tr d2l"></div>
+
+<!-- PRODUCT (светлая) -->
+<section class="sec light" id="product">
+  <div class="wrap">
+    <div data-r><span class="eyebrow">Внутри продукта</span>
+      <h2 style="margin-top:22px;max-width:18ch">Рабочий стол агентства, <em>а не набор вкладок</em></h2></div>
+    <div class="screens">
+      <div class="shot wide" data-r><img src="/assets/theme-mono.png" alt="Обзор" loading="lazy"><div class="cap"><b>Обзор</b><span>командный центр: воронка, горячие лиды, задачи, деньги</span></div></div>
+      <div class="shot" data-r class="d1"><img src="/assets/site/cap-funnel.png" alt="Воронка" loading="lazy"><div class="cap"><b>Воронка</b><span>каждый лид и стадия сделки</span></div></div>
+      <div class="shot" data-r class="d2"><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
+      <div class="shot" data-r class="d1"><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Подборки</b><span>живые презентации объектов</span></div></div>
+      <div class="shot" data-r class="d2"><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика</b><span>деньги и эффективность в цифрах</span></div></div>
+    </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="sec wrap" id="pricing">
-  <div data-r style="text-align:center"><span class="eyebrow" style="justify-content:center">Ранний доступ</span>
-    <h2 style="margin-top:22px">Прозрачно. <em>Без оплаты за лида.</em></h2></div>
-  <div class="price" data-r class="d1">
-    <span class="tag">Бета · первым 10 агентствам</span>
-    <div class="val"><s>$300</s><b>$200</b><i>/мес</i></div>
-    <div class="sub">5 брокеров + руководитель · внедрение $200</div>
-    <ul>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Запуск за 7 дней, а не за полгода</li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>WhatsApp, комментарии, телефония — из коробки</li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Квалификация, подборки, психо-портрет</li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Обновления и поддержка, без своей команды</li>
-    </ul>
-    <a class="btn primary" href="/soon.html">Занять место в бете</a>
-    <div class="rr">Первые дни — бесплатно, без карты. Отмена в один клик.</div>
+<div class="tr l2d"></div>
+
+<!-- CONTROL (тёмная) — новый блок -->
+<section class="sec dark" id="control">
+  <div class="wrap ctrl">
+    <div data-r>
+      <span class="eyebrow">Собственнику</span>
+      <h2 style="margin-top:22px;max-width:16ch">База принадлежит <em>агентству</em></h2>
+      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — не офис и не сайт, а контакты. Lumen делает их вашими: брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
+    </div>
+    <div class="ctrl-list" data-r class="d1">
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Пульт контроля: риски, тишина, спорные и «утекающие» лиды — на одном экране</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Роли и доступы: каждый видит только своё, ничего лишнего</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Оффбординг в один клик: забрать контакты и передать дела при уходе брокера</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Мост Telegram ⇄ WhatsApp: брокер отвечает из личного мессенджера, база — в системе</div>
+    </div>
   </div>
 </section>
 
-<!-- FINAL -->
-<section class="sec wrap final" id="final">
-  <div data-r>
-    <h2>Наведите порядок <em>в недвижимости</em></h2>
-    <p class="lede">Ранний доступ открывается скоро. Оставьте почту — позовём одними из первых.</p>
+<div class="tr d2l"></div>
+
+<!-- PROOF (светлая) -->
+<section class="sec light" id="proof">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">Кто за Lumen</span>
+      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">Пять лет мы приводили трафик недвижимости. <em>Теперь отдаём систему.</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">Перформанс-агентство: Дубай, Испания, Кипр, Бали, Таиланд. Мы видели одну и ту же боль в каждом агентстве — и год жили этим продуктом сами, прежде чем предложить его вам.</p></div>
+    <div class="nums" data-r class="d1">
+      <div class="num"><b class="cu" data-to="54" data-suf="+">0</b><span>проектов недвижимости</span></div>
+      <div class="num"><b class="cu" data-to="8" data-suf="">0</b><span>стран и рынков</span></div>
+      <div class="num"><b>$15</b><span>средний CPL</span></div>
+      <div class="num"><b class="cu" data-to="5" data-suf="+">0</b><span>языков в диалогах</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="tr l2d"></div>
+
+<!-- PRICING (тёмная) -->
+<section class="sec dark" id="pricing">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">Ранний доступ</span>
+      <h2 style="margin-top:22px">Прозрачно. <em>Без оплаты за лида.</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">Не арендуете чужой поток заявок — получаете свою систему. Первым десяти агентствам — условия беты.</p></div>
+    <div class="price" data-r class="d1">
+      <span class="tag">Бета · первым 10 агентствам</span>
+      <div class="val"><s>$300</s><b>$200</b><i>/мес</i></div>
+      <div class="sub">5 брокеров + руководитель · внедрение $200</div>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Запуск за 7 дней, а не за полгода</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>WhatsApp, комментарии, телефония — из коробки</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Квалификация, подборки, психо-портрет, пульт контроля</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Обновления и поддержка, без своей команды разработки</li>
+      </ul>
+      <a class="btn primary" href="/soon.html">Занять место в бете</a>
+      <div class="rr">Первые дни — бесплатно, без карты. Отмена в один клик.</div>
+    </div>
+  </div>
+</section>
+
+<div class="tr d2l"></div>
+
+<!-- FINAL (светлая) -->
+<section class="sec light final" id="final">
+  <div class="wrap" data-r>
+    <h2>Пусть выигрывает <em>ваше</em> агентство</h2>
+    <p class="lede">Ранний доступ открывается скоро. Оставьте почту — позовём одними из первых, пока места в бете есть.</p>
     <a class="btn primary" href="/soon.html">Ранний доступ</a>
   </div>
 </section>
 
-<footer class="foot"><div class="wrap bar">
+<footer class="foot light"><div class="wrap bar">
   <span>© 2026 Lumen — продукт TargetPoint</span>
   <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
 </div></footer>
 
 <script>
-  // nav solid on scroll
   var nav=document.getElementById('nav');
-  addEventListener('scroll',function(){nav.classList.toggle('solid',scrollY>20)},{passive:true});
-  // reveal
+  var lights=[].slice.call(document.querySelectorAll('.light'));
+  function onScroll(){
+    nav.classList.toggle('solid',scrollY>20);
+    // цвет навбара по секции под ним
+    var navB=72, onLight=false;
+    for(var i=0;i<lights.length;i++){var r=lights[i].getBoundingClientRect();if(r.top<=navB&&r.bottom>=navB){onLight=true;break;}}
+    nav.classList.toggle('onlight',onLight);
+  }
+  addEventListener('scroll',onScroll,{passive:true});onScroll();
+
   function rv(){document.querySelectorAll('[data-r]:not(.in)').forEach(function(e){if(e.getBoundingClientRect().top<innerHeight*0.9)e.classList.add('in')})}
   rv();addEventListener('scroll',rv,{passive:true});addEventListener('load',rv);
-  setTimeout(function(){document.querySelectorAll('[data-r]:not(.in)').forEach(function(e){e.classList.add('in')})},2400);
-  // count-up (IntersectionObserver — надёжно при smooth-scroll)
+  setTimeout(function(){document.querySelectorAll('[data-r]:not(.in)').forEach(function(e){e.classList.add('in')})},2600);
+
   var cuIO=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var el=e.target;cuIO.unobserve(el);var to=+el.dataset.to,suf=el.dataset.suf||'',t0=performance.now();(function s(t){var p=Math.min(1,(t-t0)/1100),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=v+suf;if(p<1)requestAnimationFrame(s)})(t0)})},{threshold:.5});
   document.querySelectorAll('.cu').forEach(function(el){cuIO.observe(el)});
+
+  // hero-видео подставим когда готово (Higgsfield); poster держит кадр пока
+  (function(){var v=document.getElementById('heroVid');if(!v)return;var s=document.createElement('source');s.src='/assets/land-hero.mp4?v=1';s.type='video/mp4';v.appendChild(s);v.load&&v.load();v.play&&v.play().catch(function(){});})();
 </script>
 </body>
 </html>
