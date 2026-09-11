@@ -1312,6 +1312,12 @@ function gaugeSvg(pct) {
 }
 /* мини-гистограмма притока лидов по дням для тёмного hero (последний столбик — «сегодня»).
    При нуле новых лидов НЕ показываем пустые квадратики — рисуем спокойную базовую линию + подпись. */
+/* тематический ромб-логотип (inline SVG на токенах --logo-*) — замена статичного синего logo.svg,
+   который не перекрашивался под тему (в Бургунди «выбивался синим») */
+function lumenMark() {
+  const id = 'lm' + (lumenMark._n = (lumenMark._n || 0) + 1);
+  return `<svg class="lumen-mark" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="${id}" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="url(#${id})" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>`;
+}
 function heroBars(pts) {
   const total = pts.reduce((a, b) => a + b, 0);
   if (!total) return `<div class="ovx-bars is-empty"><span class="ovx-bars-line"></span><span class="ovx-bars-note">Новых лидов за 14 дней пока нет</span></div>`;
@@ -5038,7 +5044,7 @@ PAGES.collections = async (root) => {
           return `<div class="glass cl2-card ${selSet('collections').has(c.id) ? 'sel' : ''}" data-cl="${c.id}" data-id="${c.id}" data-cllead="${c.leadId || ''}" data-title="${esc(c.title || '')}" data-dragcoll="${c.id}">
           <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
           <div class="cl2-preview">
-            ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}"><img src="logo.svg"></div>`}
+            ${thumbs.length ? thumbs.map(u => `<div class="cl2-thumb" style="background-image:url('${esc(u)}')"></div>`).join('') : `<div class="cl2-thumb grad" style="background:${geoHue[firstGeo]}">${lumenMark()}</div>`}
             ${c.propertyIds.length > thumbs.length && thumbs.length ? `<div class="cl2-thumb more">+${c.propertyIds.length - thumbs.length}</div>` : ''}
             ${c.views ? `<span class="cl2-views">${ic(I.eye)}${c.views}</span>` : ''}
           </div>
@@ -9881,7 +9887,7 @@ PAGES.agency = async (root) => {
     <div class="ag-profile">
       <div class="ag-cover"><video class="ag-cover-v" data-skyline autoplay muted loop playsinline poster="assets/skyline-poster.jpg?v=2" src="${skylineSrc()}"></video></div>
       <div class="ag-ident">
-        <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : `<img src="logo.svg" style="opacity:.55">`}</div>
+        <div class="ag-ava" id="agLogoPrev">${s.agency.logo ? `<img src="${esc(s.agency.logo)}">` : lumenMark()}</div>
         <div class="ag-id-main">
           <div class="ag-name-row"><span class="ag-h">${esc(s.agency.name)}</span><span class="ag-edition">${ic(edition === 'solo' ? I.user : I.building)}${edition === 'solo' ? 'Solo' : 'Агентство'}</span></div>
           <div class="ag-tag">${(s.agency.manager || {}).name ? 'Менеджер — ' + esc(s.agency.manager.name) : 'Агентство недвижимости'}${(s.agency.manager || {}).phone ? ' · ' + esc(s.agency.manager.phone) : ''}</div>
