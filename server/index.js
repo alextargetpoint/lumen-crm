@@ -584,6 +584,9 @@ function publicSettings(db) {
     }
   }
   if (s.tgBridge) { if (s.tgBridge.botToken) { s.tgBridge.tokenSet = true; delete s.tgBridge.botToken; } delete s.tgBridge.secret; }
+  /* SEC: hooks.secret — мастер-ключ вебхуков/интеграций; НИКОГДА не отдаём в общий /api/state.
+     Владельцу он до-инжектится отдельно (owner-ветка в /api/state), брокеры его не видят. */
+  if (s.hooks) { s.hooksSecretSet = !!s.hooks.secret; delete s.hooks.secret; }
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
@@ -1928,6 +1931,22 @@ function mimeToExt(mime) {
   return sub ? sub.replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
 }
 
+/* SEC: простой in-memory лимитер (single-instance launchd) — окно скольжения по ключу */
+const _rlMap = new Map();
+function rateHit(key, max, windowMs) {
+  const now = Date.now(); const e = _rlMap.get(key);
+  if (!e || now - e.t > windowMs) { _rlMap.set(key, { t: now, n: 1 }); return true; }
+  if (e.n >= max) return false; e.n++; return true;
+}
+
+/* SEC: безопасный путь к ассету — резолвим и проверяем, что он ВНУТРИ PUBLIC/assets (защита от ../ traversal) */
+function assetPathSafe(webPath) {
+  const rel = String(webPath || '').replace(/^\/+/, '');
+  const abs = path.resolve(PUBLIC, rel);
+  const base = path.resolve(PUBLIC, 'assets');
+  return (abs === base || abs.startsWith(base + path.sep)) ? abs : null;
+}
+
 /* --- запись звонка → скачать → Whisper → транскрипт в карточку лида (общая для всех провайдеров) --- */
 function ingestCallRecording(db, lead, recUrl, label, durSec) {
   (async () => {
@@ -2233,6 +2252,9 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  /* SEC: безопасные хедеры-страховка (не ломают inline-скрипты приложения) */
+  res.setHeader('Content-Security-Policy', "object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+  if ((req.headers['x-forwarded-proto'] || '') === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   /* базовый URL для ссылок в сообщениях И для серверных скриншотов (shot.capture) — engine берёт из global.
      SSRF-фикс: в проде пиним через env PUBLIC_BASE_URL; иначе доверяем Host, только если он НЕ приватный/внутренний
      (иначе Host: 169.254.169.254 заставил бы сервер сам сходить во внутреннюю сеть Railway). */
@@ -2325,7 +2347,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/tg/webhook' && req.method === 'POST') {
       const secret = db.settings.tgBridge && db.settings.tgBridge.secret;
       /* Telegram шлёт секрет в заголовке — отсекаем чужие POST'ы в интернете */
-      if (!secret || String(req.headers['x-telegram-bot-api-secret-token'] || '') !== secret) return json(res, 403, { error: 'bad token' });
+      const _tgGot = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+      if (!secret || _tgGot.length !== secret.length || !crypto.timingSafeEqual(Buffer.from(_tgGot), Buffer.from(secret))) return json(res, 403, { error: 'bad token' }); /* SEC: constant-time */
       const body = await readBody(req);
       try { await tgbridge.handleUpdate(db, body); } catch (e) { console.error('[tg/webhook]', e); }
       return json(res, 200, { ok: true }); // Telegram нужен только 200
@@ -2482,6 +2505,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- ПУБЛИЧНАЯ форма захвата с лендинга (site.html) — без секрета, ИИ выключен ---------------- */
     if (p === '/site/lead' && req.method === 'POST') {
+      if (!rateHit('site:' + (clientIp(req) || 'x'), 8, 60000)) return json(res, 429, { error: 'слишком часто' }); /* SEC: анти-флуд фейковых лидов */
       const b = await readBody(req);
       if (b && String(b.company || '').trim()) return json(res, 200, { ok: true }); // honeypot: молча глотаем ботов
       const g = (k) => (b[k] != null ? String(b[k]).trim() : '');
@@ -2568,6 +2592,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC: иначе брокер мог подменить бот моста и угнать канал */
       const b = await readBody(req);
       const tb = db.settings.tgBridge;
       if (typeof b.enabled === 'boolean') tb.enabled = b.enabled;
@@ -2578,6 +2603,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/tgbridge/setup' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC */
       /* Telegram нужен ПУБЛИЧНЫЙ адрес: туннель приоритетнее, чем Host запроса
          (иначе клик из localhost прописал бы webhook на localhost — Telegram туда не достучится) */
       const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE;
@@ -2661,6 +2687,10 @@ const server = http.createServer(async (req, res) => {
       for (const k in TH) { if (TH[k].until && TH[k].until < nowT - 3600e3) delete TH[k]; }   /* уборка старых */
       const rec = TH[lip];
       if (rec && rec.until && rec.until > nowT) { await new Promise(r => setTimeout(r, 600)); return json(res, 429, { error: 'слишком много попыток входа, подождите пару минут' }); }
+      /* SEC: глобальный бэкстоп — X-Forwarded-For можно крутить, но общий счётчик неудач за 10 мин нельзя обойти сменой IP */
+      const G = TH.__global__ = TH.__global__ || { fails: 0, winStart: nowT };
+      if (nowT - G.winStart > 600e3) { G.fails = 0; G.winStart = nowT; G.until = 0; }
+      if (G.until && G.until > nowT) { await new Promise(r => setTimeout(r, 800)); return json(res, 429, { error: 'вход временно закрыт (защита от перебора), попробуйте через несколько минут' }); }
       let sess = null;
       if (sha(String(b.password || '')) === db.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
       else {
@@ -2671,6 +2701,7 @@ const server = http.createServer(async (req, res) => {
       if (!sess) {
         const r2 = TH[lip] = TH[lip] || { fails: 0 }; r2.fails++; r2.last = nowT;
         if (r2.fails >= 5) r2.until = nowT + Math.min(15 * 60000, 15000 * Math.pow(2, r2.fails - 5));   /* 15с→…→15мин */
+        G.fails++; if (G.fails >= 40) G.until = nowT + 5 * 60000;   /* SEC: 40 неудач суммарно за 10 мин → закрыть вход всем на 5 мин */
         store.save();
         await new Promise(r => setTimeout(r, 600)); // тормоз перебору
         return json(res, 401, { error: 'wrong password' });
@@ -2785,8 +2816,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/state' && req.method === 'GET') {
+      const pubS = publicSettings(db);
+      if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
       json(res, 200, {
-        settings: publicSettings(db), brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
+        settings: pubS, brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
         templates: db.templates, sequences: db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
@@ -3090,7 +3123,10 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/call$/)) && req.method === 'POST') {
       const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
-      const brokerPhone = String(b.from || '').trim() || (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
+      /* SEC: номер для дозвона берём ТОЛЬКО из серверных данных (назначенный брокер / сам член команды),
+         НИКОГДА не из тела запроса — иначе любой авторизованный мог бы звонить на произвольный (premium-rate) номер за счёт агентства (toll fraud) */
+      const brokerPhone = (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
+      if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'нет валидного номера брокера для звонка' });
       try { await telnyxInitiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone }); }
       catch (e) { return json(res, 400, { error: e.message }); }
     }
@@ -3706,7 +3742,7 @@ const server = http.createServer(async (req, res) => {
       let refBias = null;
       const refB = String(b.refImage || '').replace(/^data:image\/\w+;base64,/, '');
       if (refB && refB.length > 200) { try { refBias = await studio.analyzeReference(refB); } catch (e) { /* */ } }
-      else if (b.refImage && /^\/assets\/[\w./-]+\.(png|jpe?g)$/.test(String(b.refImage))) { try { const buf = fs.readFileSync(path.join(PUBLIC, String(b.refImage).replace(/^\/assets\//, 'assets/'))); refBias = await studio.analyzeReference(buf.toString('base64')); } catch (e) { /* */ } }
+      else if (b.refImage && /^\/assets\/[\w./-]+\.(png|jpe?g)$/.test(String(b.refImage))) { try { const _rp = assetPathSafe(b.refImage); if (_rp) { const buf = fs.readFileSync(_rp); refBias = await studio.analyzeReference(buf.toString('base64')); } } catch (e) { /* */ } }
       let plan, deck;
       try { plan = await studio.artDirectionPlan(project, { count: b.count, refBias }); }
       catch (e) { return json(res, 500, { error: 'director: ' + e.message }); }
@@ -3868,7 +3904,8 @@ const server = http.createServer(async (req, res) => {
       let tgtBuf, targetUrl;
       /* reuseTarget — пере-интерпретировать УЖЕ сгенерённый таргет (без повторной оплаты gpt-image-1) */
       if (b.reuseTarget && /^\/assets\/[\w./-]+\.png$/.test(String(b.reuseTarget))) {
-        try { tgtBuf = fs.readFileSync(path.join(PUBLIC, String(b.reuseTarget).replace(/^\/assets\//, 'assets/'))); targetUrl = b.reuseTarget; }
+        const _rt = assetPathSafe(b.reuseTarget); if (!_rt) return json(res, 400, { error: 'bad path' });
+        try { tgtBuf = fs.readFileSync(_rt); targetUrl = b.reuseTarget; }
         catch (e) { return json(res, 400, { error: 'reuseTarget не найден' }); }
       } else {
         try { tgtBuf = await studio.visualTarget(brief, { quality: b.quality || 'high' }); }
@@ -5064,6 +5101,7 @@ ${SCR}
       return json(res, 200, { ok: true });
     }
     if (p === '/api/hooks' && req.method === 'PATCH') {
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC: раньше любой брокер мог прочитать/ротировать мастер-секрет вебхуков */
       const b = await readBody(req);
       if (b.outboundUrl !== undefined) db.settings.hooks.outboundUrl = String(b.outboundUrl).trim();
       if (b.rotateSecret) db.settings.hooks.secret = crypto.randomBytes(10).toString('hex');
