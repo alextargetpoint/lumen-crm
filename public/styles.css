@@ -6534,19 +6534,19 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* Бургунди: донат/воронка — РАСПОЗНАВАЕМЫЕ цвета стадий (без моно-красного тинта) */
 :root[data-theme="emerald"] .ov2-donut { filter: saturate(.9); }
 
-/* Lumen Glass — environment media: editorial-скайлайн проступает сверху-справа сквозь стекло */
+/* Lumen Glass — ЧИСТАЯ атмосфера: мягкие полноэкранные свечения (БЕЗ фото-скайлайна).
+   Раньше здесь торчал обрезанный кусок фото Дубая в правом-верхнем углу КАЖДОГО экрана — убрано. */
 :root[data-theme="emerald"] .app::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background: url('lumen-media/editorial/skyline-dubai.webp') right -2% top -2% / auto 58% no-repeat;
-  opacity: .42; filter: saturate(.55) hue-rotate(185deg) brightness(1.06) contrast(.98);
-  -webkit-mask-image: linear-gradient(102deg, transparent 0 46%, rgba(0,0,0,.35) 68%, rgba(0,0,0,.85) 100%);
-  mask-image: linear-gradient(102deg, transparent 0 46%, rgba(0,0,0,.35) 68%, rgba(0,0,0,.85) 100%);
+  background:
+    radial-gradient(90% 62% at 92% -12%, rgba(120,165,255,.20), transparent 62%),
+    radial-gradient(70% 55% at 4% 104%, rgba(180,205,255,.13), transparent 58%);
 }
 :root[data-theme="emerald"] .sidebar, :root[data-theme="emerald"] .main { position: relative; z-index: 1; }
 
 /* ═══ Lumen Glass — пер-экранная атмосфера (data-page) ═══ */
-/* Контроль — аналитический, фото почти нет (спека) */
-:root[data-theme="emerald"][data-page="control"] .app::before { opacity: .14; }
+/* Контроль — аналитический, свечение почти убрано */
+:root[data-theme="emerald"][data-page="control"] .app::before { opacity: .5; }
 /* Лента — editorial media-hero: вилла справа, текст слева на холодной стеклянной маске */
 :root[data-theme="emerald"][data-page="feed"] .ha {
   background:
@@ -6583,19 +6583,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* ═══ Lumen Burgundy — editorial media-heroes (Лента + Объекты) ═══
    Маска слева — НЕЙТРАЛЬНО-БЕЛАЯ (workspace-фон), НЕ бордовая (охраняемое правило).
    Фото натуральное; 3D-объект .ha-stage скрыт. */
-/* фото на ВСЮ ширину под равномерной НЕЙТРАЛЬНО-белой вуалью (не бордовой — охраняемое правило),
-   не обрезано «на пол-экрана»; чуть плотнее слева под текст */
-:root[data-theme="warm"][data-page="feed"] .ha {
-  background:
-    linear-gradient(90deg, rgba(250,251,253,.92) 0%, rgba(250,251,253,.74) 30%, rgba(250,251,253,.46) 58%, rgba(250,251,253,.34) 100%),
-    url('lumen-media/editorial/villa-bali.webp') center center / cover no-repeat;
-  color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 190px;
-}
+/* ФОТО УБРАНО — чистый тёплый нейтральный градиент (никакой обрезанной картинки) */
+:root[data-theme="warm"][data-page="feed"] .ha,
 :root[data-theme="warm"][data-page="properties"] .ha {
   background:
-    linear-gradient(90deg, rgba(250,251,253,.92) 0%, rgba(250,251,253,.74) 30%, rgba(250,251,253,.46) 58%, rgba(250,251,253,.34) 100%),
-    url('lumen-media/editorial/villa-desert.webp') center center / cover no-repeat;
-  color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 190px;
+    radial-gradient(120% 140% at 88% -10%, rgba(138,30,56,.06), transparent 55%),
+    linear-gradient(118deg, #FBF5F3 0%, #FCF8F6 55%, #F6EEEB 100%);
+  color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 170px;
 }
 :root[data-theme="warm"][data-page="feed"] .ha-stage,
 :root[data-theme="warm"][data-page="properties"] .ha-stage { display: none; }
@@ -6680,18 +6674,15 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 
 /* 4. EDITORIAL HERO — фото на ВСЮ ширину под равномерной стеклянной вуалью (раньше было обрезано «на пол-экрана»
       right-anchored со швом). Теперь фото центрировано/cover заполняет весь бокс, вуаль чуть плотнее слева под текст. */
-:root[data-theme="emerald"][data-page="feed"] .ha {
-  background:
-    linear-gradient(90deg, rgba(244,249,255,.9) 0%, rgba(244,249,255,.72) 30%, rgba(244,249,255,.46) 58%, rgba(244,249,255,.34) 100%),
-    url('lumen-media/editorial/villa-mediterranean.webp') center center / cover no-repeat !important;
-}
+/* ФОТО УБРАНО — чистый прохладный стеклянный градиент (никакой обрезанной картинки) */
+:root[data-theme="emerald"][data-page="feed"] .ha,
 :root[data-theme="emerald"][data-page="properties"] .ha {
   background:
-    linear-gradient(90deg, rgba(244,249,255,.9) 0%, rgba(244,249,255,.72) 30%, rgba(244,249,255,.46) 58%, rgba(244,249,255,.34) 100%),
-    url('lumen-media/editorial/residence-cliff.webp') center center / cover no-repeat !important;
+    radial-gradient(120% 140% at 88% -10%, rgba(120,165,255,.16), transparent 55%),
+    linear-gradient(118deg, #EEF4FC 0%, #F8FBFE 55%, #E9F1FB 100%) !important;
 }
 :root[data-theme="emerald"][data-page="feed"] .ha-body,
-:root[data-theme="emerald"][data-page="properties"] .ha-body { max-width: 66%; }
+:root[data-theme="emerald"][data-page="properties"] .ha-body { max-width: 100%; }
 
 /* 5. Меньше «выбеленности»: карточки чуть прозрачнее и глубже (стекло, а не белые плиты) */
 :root[data-theme="emerald"] .card, :root[data-theme="emerald"] .glass, :root[data-theme="emerald"] .ov2-card,
@@ -6738,9 +6729,9 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   background: rgba(255,255,255,.86); border-color: rgba(15,35,65,.09);
 }
 :root[data-theme="emerald"] .sidebar { background: rgba(250,252,255,.80); }
-/* атмосферу приглушаем — контент выходит на первый план */
-:root[data-theme="emerald"] .app::before { opacity: .3; }
-:root[data-theme="emerald"][data-page="control"] .app::before { opacity: .1; }
+/* мягкое свечение — деликатно, контент на первом плане (фото убрано, это чистый градиент) */
+:root[data-theme="emerald"] .app::before { opacity: .85; }
+:root[data-theme="emerald"][data-page="control"] .app::before { opacity: .5; }
 /* картинки — заполнять контейнер (фикс «нерастянутых») */
 :root[data-theme="emerald"] .fd-media img, :root[data-theme="emerald"] .prop-thumb img, :root[data-theme="emerald"] .cl2-thumb img,
 :root[data-theme="emerald"] .ov-cap-ava img, :root[data-theme="emerald"] .ava img, :root[data-theme="emerald"] .lc-media img,
