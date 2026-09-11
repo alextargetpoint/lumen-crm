@@ -672,10 +672,6 @@
     .ob-choice:nth-child(2),.ob-tone:nth-child(2){animation-delay:.09s}.ob-tone:nth-child(3){animation-delay:.18s}
     .ob-theme:nth-child(2){animation-delay:.05s}.ob-theme:nth-child(3){animation-delay:.1s}.ob-theme:nth-child(4){animation-delay:.15s}.ob-theme:nth-child(5){animation-delay:.2s}.ob-theme:nth-child(6){animation-delay:.25s}
     @keyframes obCard{from{opacity:0;transform:translateY(22px) scale(.95);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
-    /* ==== вращающийся конический ореол на выбранной карточке ==== */
-    .ob-choice.on,.ob-tone.on{position:relative}
-    .ob-choice.on:before,.ob-tone.on:before{content:"";position:absolute;inset:-3px;border-radius:inherit;z-index:-1;background:conic-gradient(from 0deg,#5B84FF,#6C4CFF,#12B3A6,#5B84FF);animation:obSpin 4.5s linear infinite;filter:blur(6px);opacity:.85}
-    @keyframes obSpin{to{transform:rotate(360deg)}}
     /* ==== магнитные кнопки + пульс градиента ==== */
     .ob-primary:hover{transform:translateY(-3px) scale(1.02)}
     .ob-btn:active{transform:scale(.97)}
