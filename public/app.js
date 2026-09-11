@@ -1906,7 +1906,7 @@ const OV_PREV = {
 
 const FEED_TYPES = { news: ['Новость', '#2563EB'], material: ['Материал', '#0E9E6A'], ref: ['Референс', '#7C3AED'], congrats: ['Поздравление', '#E8B84B'], announce: ['Объявление', '#E0483D'] };
 const FEED_REACTS = ['👍', '❤️', '🔥', '👏', '🎉'];
-const FEED_PROV = { youtube: ['#FF0000', 'YouTube'], tiktok: ['#111', 'TikTok'], instagram: ['#E1306C', 'Instagram'], vk: ['#0077FF', 'VK'], telegram: ['#2AABEE', 'Telegram'], web: ['#2563EB', ''] };
+const FEED_PROV = { youtube: ['#FF0000', 'YouTube'], tiktok: ['#111', 'TikTok'], instagram: ['#E1306C', 'Instagram'], vk: ['#0077FF', 'VK'], telegram: ['#2AABEE', 'Telegram'], web: ['var(--accent)', ''] };
 /* заготовки постов по типу — быстрый красивый старт (вставляются в заголовок+текст) */
 const FEED_TEMPLATES = {
   news: [['📈 Итоги недели', 'Итоги недели', 'За неделю: ___ новых лидов, ___ показов, ___ сделки. Спасибо команде — держим темп!'], ['🏙 Новый объект в базе', 'Новый объект: ___', 'Добавили в базу: ___. Цена ___, ___ м². Кому актуально для клиентов — забирайте в подборки.']],
@@ -4534,8 +4534,8 @@ PAGES.sequences = async (root) => {
 function propCover(pr, big) {
   const img = (pr.images || [])[0];
   if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
-  const hues = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
-  return `<div class="prop-cover ${big ? 'big' : ''}" style="background:${hues[pr.geo] || hues.dubai}">
+  /* фото нет → тематическая тёмная обложка (регион виден в тексте); ноль чужого синего в любой теме */
+  return `<div class="prop-cover ${big ? 'big' : ''}" style="background:linear-gradient(135deg,var(--ov-hero-a),color-mix(in srgb,var(--accent) 30%,var(--ov-hero-c)))">
     <span class="pc-star">${lumenMark()}</span><span>${esc(pr.area || pr.name)}</span></div>`;
 }
 
