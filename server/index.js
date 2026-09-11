@@ -636,49 +636,101 @@ function waitlistEmailHTML(db, rec) {
   const waHref = waNum ? `https://wa.me/${waNum}?text=${encodeURIComponent(waitlistClickText(rec))}` : '';
   const hook = esc(wlHook(rec));
   const s = wlSegment(rec);
-  const bullets = s.role === 'agency'
-    ? ['База принадлежит агентству — брокеры её не уводят', 'Ответ за секунды на всех каналах, круглосуточно', 'Пульт контроля: риски, тишина, «утекающие» лиды']
-    : ['Отвечаете первым — даже когда заняты или спите', 'ИИ квалифицирует и строит психо-портрет клиента', 'Живые подборки и дожим — без ручной рутины'];
-  const bl = bullets.map(t => `<tr><td style="padding:6px 0;color:#cfcdc8;font:400 15px/1.5 Georgia,serif;"><span style="color:#8a8885;">—&nbsp;</span>${esc(t)}</td></tr>`).join('');
+  const feats = s.role === 'agency'
+    ? [['База — ваша, а не брокера', 'Менеджер отвечает из личного мессенджера, но контакты, переписка и история остаются в системе агентства.'],
+       ['Ответ за секунды, 24/7', 'Все каналы в одном месте, на языке клиента — пока конкуренты только набирают первое сообщение.'],
+       ['Пульт контроля', 'Риски, тишина и «утекающие» лиды — на одном экране у собственника, каждый день.']]
+    : [['Вы отвечаете первым', 'ИИ ведёт диалог в живом темпе — вы не упускаете ни одной заявки, даже ночью.'],
+       ['Каждый лид понятен', 'Психо-портрет и квалификация ещё до звонка: на что давить и чего избегать.'],
+       ['Дожим без рутины', 'Цепочки касаний будят молчунов, а живые подборки собираются за минуту.']];
+  const rows = feats.map((f, i) => `
+            <tr><td style="padding:${i ? '18' : '2'}px 0 0;${i ? 'border-top:1px solid rgba(255,255,255,.07);' : ''}">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td valign="top" width="46" style="width:46px;font:400 22px/1 Georgia,serif;color:#8a8885;padding-top:2px;">0${i + 1}</td>
+                <td valign="top">
+                  <div style="font:500 17px/1.3 Georgia,serif;color:#eceae4;">${esc(f[0])}</div>
+                  <div style="margin-top:5px;font:400 13.5px/1.6 Arial,sans-serif;color:#9d9b97;">${esc(f[1])}</div>
+                </td>
+              </tr></table>
+            </td></tr>`).join('');
   const site = (process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || tunnelUrl() || '').replace(/\/$/, '');
-  const waBtn = waHref ? `
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px auto 0;"><tr><td align="center" bgcolor="#f4f3f1" style="border-radius:999px;">
-        <a href="${waHref}" style="display:inline-block;padding:15px 30px;font:600 15px/1 Arial,sans-serif;color:#0a0a0a;text-decoration:none;border-radius:999px;letter-spacing:.02em;">Написать нам в WhatsApp&nbsp;→</a>
-      </td></tr></table>` : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"></head>
-<body style="margin:0;padding:0;background:#070707;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Вы в списке раннего доступа Lumen. ${hook}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#070707;padding:32px 16px;">
-  <tr><td align="center">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0d0d0e;border:1px solid rgba(255,255,255,.09);border-radius:18px;overflow:hidden;">
-      <tr><td style="padding:34px 40px 0;text-align:center;">
-        <div style="font:500 20px/1 Georgia,serif;letter-spacing:.42em;color:#f4f3f1;padding-left:.42em;">LUMEN</div>
-      </td></tr>
-      <tr><td style="padding:26px 40px 0;">
-        <div style="font:600 11px/1 Arial,sans-serif;letter-spacing:.28em;color:#8a8885;text-transform:uppercase;text-align:center;">Ранний доступ</div>
-        <h1 style="margin:16px 0 0;font:300 34px/1.08 Georgia,serif;color:#f4f3f1;text-align:center;letter-spacing:-.01em;">Вы в списке, ${name}.</h1>
-        <p style="margin:16px 0 0;font:400 15px/1.65 Georgia,serif;color:#a7a6a3;text-align:center;">${hook}</p>
-      </td></tr>
-      <tr><td style="padding:26px 40px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);padding:6px 0;">
-          <tr><td style="padding:14px 0 6px;">${bl}</td></tr>
+  const ctaHref = waHref || `mailto:info@targetpoint.agency?subject=${encodeURIComponent('Демо Lumen' + (rec.name ? ' — ' + rec.name : ''))}`;
+  const ctaLabel = waHref ? 'Написать нам в WhatsApp' : 'Записаться на демо';
+  const btn = `
+                <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${ctaHref}" style="height:52px;v-text-anchor:middle;width:320px;" arcsize="50%" fillcolor="#f4f3f1" stroke="f"><w:anchorlock/><center style="color:#0a0a0a;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">${ctaLabel} &#8594;</center></v:roundrect><![endif]-->
+                <!--[if !mso]><!-- --><a href="${ctaHref}" style="display:inline-block;background:#f4f3f1;color:#0a0a0a;font:700 15px/1 Arial,sans-serif;text-decoration:none;padding:17px 34px;border-radius:999px;letter-spacing:.01em;">${ctaLabel}&nbsp;&#8594;</a><!--<![endif]-->`;
+  const orn = `<div style="font:400 15px/1 Georgia,serif;letter-spacing:.6em;color:#5c5b58;text-align:center;padding-left:.6em;">&#10022;</div>`;
+  return `<!doctype html><html lang="ru" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="color-scheme" content="dark only"><meta name="supported-color-schemes" content="dark">
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<style>
+  a{text-decoration:none}
+  @media only screen and (max-width:620px){
+    .px{padding-left:26px!important;padding-right:26px!important}
+    .h1{font-size:30px!important}
+    .cardpad{padding-top:30px!important}
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#060606;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${name}, ваше место в бете Lumen забронировано. ${hook}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#060606;">
+  <tr><td align="center" style="padding:34px 14px;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+      <!-- КАРТОЧКА -->
+      <tr><td bgcolor="#0b0b0c" class="cardpad px" style="background:#0b0b0c;background-image:radial-gradient(130% 70% at 50% 0%, rgba(255,255,255,.07), rgba(255,255,255,0) 62%);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:40px 44px 8px;">
+
+        <!-- шапка -->
+        <div style="font:500 21px/1 Georgia,serif;letter-spacing:.44em;color:#f4f3f1;text-align:center;padding-left:.44em;">LUMEN</div>
+        <div style="margin-top:9px;font:700 9.5px/1 Arial,sans-serif;letter-spacing:.34em;color:#6b6a68;text-transform:uppercase;text-align:center;">Real&nbsp;Estate&nbsp;OS</div>
+
+        <div style="height:26px;line-height:26px;">&nbsp;</div>
+        <div style="height:1px;background:#232322;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.28),rgba(255,255,255,0));font-size:0;">&nbsp;</div>
+        <div style="height:26px;line-height:26px;">&nbsp;</div>
+
+        <!-- эйброу -->
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;"><tr><td style="border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:8px 16px;font:700 10px/1 Arial,sans-serif;letter-spacing:.24em;color:#cfcdc8;text-transform:uppercase;">✦&nbsp;&nbsp;Место в бете забронировано</td></tr></table>
+
+        <!-- заголовок -->
+        <h1 class="h1" style="margin:22px 0 0;font:300 38px/1.06 Georgia,serif;color:#f6f5f2;text-align:center;letter-spacing:-.015em;">Вы в списке,<br><span style="font-style:italic;color:#d9d6d0;">${name}</span>.</h1>
+        <p style="margin:18px auto 0;max-width:430px;font:400 16px/1.62 Georgia,serif;color:#a7a6a3;text-align:center;">${hook}</p>
+
+        <div style="height:34px;line-height:34px;">&nbsp;</div>
+
+        <!-- фичи -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}
         </table>
+
+        <div style="height:34px;line-height:34px;">&nbsp;</div>
+        ${orn}
+        <div style="height:30px;line-height:30px;">&nbsp;</div>
+
+        <!-- CTA -->
+        <div style="font:400 16px/1.55 Georgia,serif;color:#e9e7e2;text-align:center;">Не хотите ждать очередь?</div>
+        <p style="margin:8px auto 22px;max-width:400px;font:400 13.5px/1.6 Arial,sans-serif;color:#9d9b97;text-align:center;">${waHref ? 'Напишите нам в WhatsApp' : 'Оставьте заявку'} — за 15 минут покажем систему живьём на вашем реальном сценарии, без слайдов.</p>
+        <div style="text-align:center;">${btn}</div>
+        <p style="margin:16px 0 0;font:400 12.5px/1.6 Arial,sans-serif;color:#6b6a68;text-align:center;">…или просто ответьте на это письмо — мы читаем каждое.</p>
+
+        <div style="height:30px;line-height:30px;">&nbsp;</div>
+        <div style="height:1px;background:#1c1c1b;font-size:0;">&nbsp;</div>
+        <div style="height:22px;line-height:22px;">&nbsp;</div>
+
+        <!-- подпись -->
+        <div style="font:400 14px/1.6 Georgia,serif;color:#8a8885;text-align:center;">— ${mgr}, Lumen${site ? `&nbsp;&nbsp;·&nbsp;&nbsp;<a href="${esc(site)}/land.html" style="color:#cfcdc8;border-bottom:1px solid rgba(207,205,200,.35);">о продукте</a>` : ''}</div>
+
+        <div style="height:36px;line-height:36px;">&nbsp;</div>
       </td></tr>
-      <tr><td style="padding:26px 40px 4px;text-align:center;">
-        <p style="margin:0 0 14px;font:400 14px/1.6 Georgia,serif;color:#cfcdc8;">Хотите не ждать очередь? Напишите нам в WhatsApp — покажем систему живьём под ваш случай за 15 минут.</p>
-        ${waBtn}
+
+      <!-- ПОДВАЛ -->
+      <tr><td class="px" style="padding:22px 44px 6px;">
+        <div style="font:400 11px/1.7 Arial,sans-serif;color:#5c5b58;text-align:center;">
+          © 2026 Lumen — продукт TargetPoint<br>
+          Rue du Trône 100, 3rd floor · 1050 Brussels, Belgium<br>
+          Вы получили это письмо, потому что оставили заявку на ранний доступ.<br>
+          <a href="mailto:info@targetpoint.agency?subject=unsubscribe" style="color:#7c7a77;border-bottom:1px solid rgba(124,122,119,.4);">Отписаться</a>
+        </div>
       </td></tr>
-      <tr><td style="padding:22px 40px 0;text-align:center;">
-        <p style="margin:0;font:400 14px/1.6 Georgia,serif;color:#8a8885;">— ${mgr}${site ? ` · <a href="${esc(site)}/land.html" style="color:#cfcdc8;">о продукте</a>` : ''}</p>
-      </td></tr>
-      <tr><td style="padding:28px 40px 34px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid rgba(255,255,255,.07);">
-          <tr><td style="padding:18px 0 0;font:400 11px/1.6 Arial,sans-serif;color:#6b6a68;text-align:center;">
-            © 2026 Lumen — продукт TargetPoint · Rue du Trône 100, 1050 Brussels, Belgium<br>
-            Вы получили письмо, потому что оставили заявку на раннний доступ. <a href="mailto:info@targetpoint.agency?subject=unsubscribe" style="color:#8a8885;">Отписаться</a>
-          </td></tr>
-        </table>
-      </td></tr>
+
     </table>
   </td></tr>
 </table></body></html>`;
@@ -1092,6 +1144,25 @@ const COLL_PRESETS = [
 ].filter(p => PAGE_THEMES[p.theme] && COLL_FONTS[p.font]);
 /* самые сильные премиум-палитры для конструктора подборок (новеллти-темы скрыты — они путали) */
 const COLL_STRONG_THEMES = ['klein', 'royal', 'emerald', 'champagne', 'noir', 'mocha', 'sage', 'bordeaux', 'slate'];
+
+/* ===== «Лицо» ВНЕШНИХ клиентских страниц (встреча /m/:id, визитка /b/:id) =====
+   Премиум-палитра + типографика + фоновое skyline-видео под стиль агентства.
+   Стиль = settings.agency.pubTheme (синхронно с темой CRM); дефолт — Ателье (тихая роскошь).
+   Каждое «лицо»: светлая карточка (или тёмная для night) на затемнённом видеофоне-оверлее. */
+const PUB_FACES = {
+  atelier:  { ink:'#141311', paper:'#faf9f5', muted:'#8b8983', line:'rgba(20,19,17,.12)', accent:'#a9884e', dark:'#0c0c0e', chip:'#f1efe9', video:'assets/skyline-mono.mp4?v=1',    poster:'assets/skyline-mono-poster.jpg',    vidFilter:'grayscale(.4) brightness(.5) contrast(1.05)',  scrimA:'rgba(8,8,10,.34)',  scrimB:'rgba(8,8,10,.6)',  scrimC:'rgba(8,8,10,.82)',  display:"'Cormorant',Georgia,serif", dispW:'600', body:"'Manrope',system-ui,sans-serif" },
+  cobalt:   { ink:'#0f1e3a', paper:'#ffffff', muted:'#5a6b8c', line:'rgba(37,99,235,.16)',  accent:'#2563eb', dark:'#061126', chip:'#eef3fc', video:'assets/skyline-cobalt.mp4?v=1',  poster:'assets/skyline-cobalt-poster.jpg',  vidFilter:'brightness(.6) contrast(1.02) saturate(1.05)', scrimA:'rgba(6,17,38,.34)',  scrimB:'rgba(6,17,38,.62)', scrimC:'rgba(6,17,38,.84)', display:"'Manrope',system-ui,sans-serif", dispW:'800', body:"'Manrope',system-ui,sans-serif" },
+  burgundy: { ink:'#42121f', paper:'#fbf8f5', muted:'#8a6b73', line:'rgba(134,28,60,.16)',   accent:'#861c3c', dark:'#1a0a10', chip:'#f4ecef', video:'assets/skyline-burgundy.mp4?v=1', poster:'assets/skyline-burgundy-poster.jpg', vidFilter:'brightness(.5) contrast(1.05) saturate(1.1)', scrimA:'rgba(26,10,16,.36)', scrimB:'rgba(26,10,16,.62)', scrimC:'rgba(26,10,16,.85)', display:"'Cormorant',Georgia,serif", dispW:'600', body:"'Manrope',system-ui,sans-serif" },
+  glass:    { ink:'#0a1930', paper:'#ffffff', muted:'#5a6b8c', line:'rgba(57,123,255,.16)',  accent:'#397bff', dark:'#0a1930', chip:'#eff5ff', video:'assets/skyline-glass.mp4?v=1',   poster:'assets/skyline-glass-poster.jpg',   vidFilter:'brightness(.62) contrast(1.02) saturate(1.08)', scrimA:'rgba(10,25,48,.32)', scrimB:'rgba(10,25,48,.58)', scrimC:'rgba(10,25,48,.82)', display:"'Manrope',system-ui,sans-serif", dispW:'800', body:"'Manrope',system-ui,sans-serif" },
+  mono:     { ink:'#0d0d0d', paper:'#ffffff', muted:'#6b6b6b', line:'rgba(0,0,0,.13)',        accent:'#171717', dark:'#0a0a0a', chip:'#f4f4f4', video:'assets/skyline-mono.mp4?v=1',    poster:'assets/skyline-mono-poster.jpg',    vidFilter:'grayscale(1) brightness(.55) contrast(1.08)',  scrimA:'rgba(8,8,8,.36)',   scrimB:'rgba(8,8,8,.62)',  scrimC:'rgba(8,8,8,.85)',   display:"'Manrope',system-ui,sans-serif", dispW:'800', body:"'Manrope',system-ui,sans-serif" },
+  night:    { ink:'#eaf0ff', paper:'rgba(14,22,42,.9)', muted:'#8fa3c8', line:'rgba(140,170,255,.2)', accent:'#5b84ff', dark:'#050b18', chip:'rgba(255,255,255,.06)', video:'assets/skyline-night.mp4?v=1', poster:'assets/skyline-night-poster.jpg', vidFilter:'brightness(.55) contrast(1.04)', scrimA:'rgba(5,11,24,.4)', scrimB:'rgba(5,11,24,.66)', scrimC:'rgba(5,11,24,.86)', display:"'Cormorant',Georgia,serif", dispW:'600', body:"'Manrope',system-ui,sans-serif" },
+};
+function pubFace(db) {
+  const t = (db && db.settings && db.settings.agency && db.settings.agency.pubTheme) || 'atelier';
+  const f = PUB_FACES[t] || PUB_FACES.atelier;
+  const gf = 'https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap';
+  return Object.assign({ gf }, f);
+}
 
 const CAR_FORMATS = new Set(['square', 'portrait', 'story']);
 const CAR_POS = new Set(['top', 'center', 'bottom']);
@@ -6819,44 +6890,51 @@ h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy
       const title = br.title || ('Эксперт по недвижимости' + (geoName ? ' · ' + geoName : ''));
       const waDigits = (br.phone || '').replace(/\D/g, '');
       const initials = br.avatar || (br.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:40px;max-width:150px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:20px;font-weight:600">${esc(AG)}</span>`;
+      const pf = pubFace(db);
+      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:40px;max-width:150px;object-fit:contain">` : `<span style="font-family:${pf.display};font-size:20px;font-weight:${pf.dispW};color:var(--ink)">${esc(AG)}</span>`;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(br.name)} — ${esc(AG)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${pf.gf}" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Manrope,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 420px at 18% 8%,rgba(37,99,235,.28),transparent 60%),radial-gradient(700px 520px at 88% 92%,rgba(91,43,216,.22),transparent 60%)}
-.card{position:relative;max-width:430px;width:100%;background:rgba(10,24,51,.72);backdrop-filter:blur(16px);border:1px solid rgba(122,158,255,.2);border-radius:24px;padding:30px 28px 26px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.top{display:flex;justify-content:center;margin-bottom:22px}
-.ava{width:104px;height:104px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;font-size:34px;font-weight:700;background:linear-gradient(150deg,#2563EB,#5B2BD8);border:2px solid rgba(134,175,255,.35);overflow:hidden;box-shadow:0 12px 34px -10px rgba(37,99,235,.6)}
+:root{--ink:${pf.ink};--paper:${pf.paper};--muted:${pf.muted};--line:${pf.line};--accent:${pf.accent};--dark:${pf.dark};--chip:${pf.chip}}
+body{font-family:${pf.body};min-height:100vh;background:var(--dark);color:var(--ink);display:grid;place-items:center;padding:22px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:${pf.vidFilter}}
+.scrim{position:fixed;inset:0;z-index:1;background:linear-gradient(180deg,${pf.scrimA},${pf.scrimB} 62%,${pf.scrimC})}
+.card{position:relative;z-index:2;max-width:428px;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:24px;padding:32px 30px 26px;box-shadow:0 44px 120px -24px rgba(0,0,0,.72),0 2px 0 rgba(255,255,255,.5) inset;animation:rise .8s cubic-bezier(.16,1,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(20px) scale(.985)}to{opacity:1;transform:none}}
+.hd{display:flex;justify-content:center;margin-bottom:22px}
+.ava{width:108px;height:108px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};color:var(--ink);background:var(--chip);border:1px solid var(--line);overflow:hidden;box-shadow:0 14px 38px -14px rgba(0,0,0,.5)}
 .ava img{width:100%;height:100%;object-fit:cover}
-.nm{font-family:Fraunces,serif;font-size:27px;font-weight:600;text-align:center;letter-spacing:-.01em}
-.ttl{text-align:center;font-size:13px;color:#9DB8FF;margin-top:6px;letter-spacing:.02em}
-.tags{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:16px 0 6px}
-.tag{font-size:11.5px;font-weight:600;color:#CFE0FF;background:rgba(134,175,255,.13);border:1px solid rgba(134,175,255,.2);padding:5px 11px;border-radius:20px}
-.bio{font-size:13.5px;line-height:1.6;color:#B9C7E8;text-align:center;margin:16px 4px 4px}
-.btns{margin-top:22px;display:flex;flex-direction:column;gap:10px}
-.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;color:#fff}
-.b-book{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
-.b-wa{background:linear-gradient(120deg,#22A45B,#12855F)}
-.b-call{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
-.b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF}
-.foot{margin-top:22px;text-align:center;font-size:11px;color:#5E6E96}
-.hd{display:flex;justify-content:center;margin-bottom:20px}
-.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.24;z-index:0}
-body::before{z-index:1}.card{z-index:2}
+.nm{font-family:${pf.display};font-size:30px;font-weight:${pf.dispW};text-align:center;letter-spacing:-.01em;color:var(--ink);line-height:1.05}
+.ttl{text-align:center;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+.tags{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:18px 0 6px}
+.tag{font-size:11px;font-weight:600;color:var(--ink);background:transparent;border:1px solid var(--line);padding:5px 12px;border-radius:20px}
+.bio{font-size:13.5px;line-height:1.62;color:var(--muted);text-align:center;margin:16px 4px 4px}
+.rule{height:1px;background:var(--line);margin:20px 0 0}
+.btns{margin-top:20px;display:flex;flex-direction:column;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:13px;padding:15px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;transition:transform .15s,box-shadow .15s,border-color .2s,color .2s}
+.btn:active{transform:scale(.985)}
+.b-book{background:var(--ink);color:var(--paper);box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
+.b-book:hover{box-shadow:0 14px 32px -10px rgba(0,0,0,.6)}
+.b-wa{background:transparent;border:1.5px solid var(--ink);color:var(--ink)}
+.b-wa:hover{background:var(--ink);color:var(--paper)}
+.b-call,.b-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+.b-call:hover,.b-ghost:hover{border-color:var(--ink);color:var(--ink)}
+.foot{margin-top:22px;text-align:center;font-size:10.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
 </style></head><body>
-<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg?v=2" src="/assets/skyline-bg.mp4?v=2"></video>
+<video class="bgv" autoplay muted loop playsinline poster="/${pf.poster}" src="/${pf.video}"></video>
+<div class="scrim"></div>
 <div class="card">
   <div class="hd">${brandTop}</div>
   <div class="ava">${br.photo ? `<img src="${esc(br.photo)}" alt="">` : esc(initials)}</div>
   <div class="nm">${esc(br.name)}</div>
   <div class="ttl">${esc(title)}</div>
-  <div class="tags">${geoName ? `<span class="tag">📍 ${esc(geoName)}</span>` : ''}${(br.langs || []).map(l => `<span class="tag">${esc(LN[l] || l)}</span>`).join('')}</div>
+  <div class="tags">${geoName ? `<span class="tag">${esc(geoName)}</span>` : ''}${(br.langs || []).map(l => `<span class="tag">${esc(LN[l] || l)}</span>`).join('')}</div>
   ${br.bio ? `<div class="bio">${esc(br.bio)}</div>` : ''}
+  <div class="rule"></div>
   <div class="btns">
     <a class="btn b-book" href="/b/${br.id}/book">Забронировать звонок</a>
     ${waDigits ? `<a class="btn b-wa" href="https://wa.me/${waDigits}" target="_blank">Написать в WhatsApp</a>` : ''}
@@ -7002,44 +7080,58 @@ if(bk)bk.addEventListener('click',async()=>{
       const when = dt.toLocaleString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
       const gcalDate = (t) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
       const gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(kindRu + ' · ' + AG)}&dates=${gcalDate(mt.at)}/${gcalDate(mt.at + 3600e3)}&details=${encodeURIComponent((broker.name ? 'Эксперт: ' + broker.name + '. ' : '') + (mt.link ? 'Видеовстреча: ' + mt.link : ''))}`;
-      const star2 = logo ? `<img src="${esc(logo)}" style="max-width:170px;max-height:64px;object-fit:contain">` : '<svg viewBox="0 0 100 120" style="width:34px;height:41px"><path fill="#fff" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>';
+      const pf = pubFace(db);            /* палитра/шрифт/видео внешних страниц по теме агентства */
+      const star2 = logo ? `<img src="${esc(logo)}" style="max-width:160px;max-height:60px;object-fit:contain">` : `<svg viewBox="0 0 100 120" style="width:30px;height:36px" aria-hidden="true"><path fill="none" stroke="${pf.ink}" stroke-width="3" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>`;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${kindRu} · ${esc(AG)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${pf.gf}" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Inter,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 400px at 20% 10%,rgba(37,99,235,.25),transparent 60%),radial-gradient(700px 500px at 85% 90%,rgba(91,43,216,.2),transparent 60%)}
-.card{position:relative;max-width:440px;width:100%;background:rgba(10,24,51,.75);backdrop-filter:blur(14px);border:1px solid rgba(122,158,255,.2);border-radius:22px;padding:34px 30px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.brand{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:26px;font-weight:700;letter-spacing:.06em}
-.kind{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#9DB8FF;margin-bottom:10px}
-h1{font-size:25px;font-weight:800;line-height:1.25}
-.when{margin-top:16px;font-size:17px;font-weight:700;color:#CFE0FF;text-transform:capitalize}
-.cd{display:flex;gap:10px;justify-content:center;margin:22px 0}
-.cd div{background:rgba(255,255,255,.07);border:1px solid rgba(122,158,255,.2);border-radius:12px;padding:10px 0;width:74px}
-.cd b{font-size:22px;font-weight:800;display:block}
-.cd span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#8FA3C8}
-.who{font-size:13.5px;color:#B9C7E8;margin-bottom:22px}
-.note{font-size:13px;color:#8FA3C8;margin-bottom:18px;white-space:pre-line}
-.btn{display:block;width:100%;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:10px;text-decoration:none;color:#fff}
-.b-video{background:linear-gradient(120deg,#2563EB,#5B2BD8)}
-.b-ok{background:rgba(35,179,131,.18);border:1.5px solid rgba(35,179,131,.5);color:#7BE8C3}
-.b-ok.done{background:rgba(35,179,131,.35);pointer-events:none}
-.b-ghost{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);color:#CFE0FF;font-weight:650}
-.cal-row{display:flex;gap:10px;margin-top:14px}
-.cal-row a{flex:1;font-size:12.5px;padding:12px}
-.foot{margin-top:22px;font-size:11px;color:#5E6E96}
-@media(max-width:420px){.cd div{width:64px}}
+:root{--ink:${pf.ink};--paper:${pf.paper};--muted:${pf.muted};--line:${pf.line};--accent:${pf.accent};--dark:${pf.dark}}
+html,body{min-height:100%}
+body{font-family:${pf.body};min-height:100vh;background:var(--dark);color:var(--ink);display:grid;place-items:center;padding:22px;position:relative;overflow-x:hidden}
+.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:${pf.vidFilter}}
+.scrim{position:fixed;inset:0;z-index:1;background:linear-gradient(180deg,${pf.scrimA},${pf.scrimB} 62%,${pf.scrimC})}
+.card{position:relative;z-index:2;max-width:432px;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:40px 32px 32px;text-align:center;box-shadow:0 44px 120px -24px rgba(0,0,0,.72),0 2px 0 rgba(255,255,255,.5) inset;animation:rise .8s cubic-bezier(.16,1,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(20px) scale(.985)}to{opacity:1;transform:none}}
+.brand{display:flex;justify-content:center;align-items:center;gap:9px;margin-bottom:22px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
+.kind{font-size:10.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:1.05;color:var(--ink);letter-spacing:-.01em}
+.when{margin-top:14px;font-size:14.5px;font-weight:600;color:var(--ink);text-transform:capitalize}
+.rule{height:1px;background:var(--line);margin:22px 0}
+.cd{display:flex;gap:9px;justify-content:center;margin:6px 0 22px}
+.cd div{background:${pf.chip};border:1px solid var(--line);border-radius:13px;padding:11px 0;width:76px}
+.cd b{font-family:${pf.display};font-size:26px;font-weight:${pf.dispW};display:block;color:var(--ink);font-variant-numeric:tabular-nums}
+.cd span{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:2px;display:block}
+.who{font-size:13.5px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.who b{color:var(--ink);font-weight:700}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px;white-space:pre-line;line-height:1.5}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:13px;padding:15px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;text-decoration:none;transition:transform .15s,box-shadow .15s,background .2s}
+.btn:active{transform:scale(.985)}
+.b-video{background:var(--ink);color:var(--paper);box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
+.b-video:hover{box-shadow:0 14px 32px -10px rgba(0,0,0,.6)}
+.b-ok{background:transparent;border:1.5px solid var(--ink);color:var(--ink);font-weight:700}
+.b-ok.done{background:var(--ink);color:var(--paper);border-color:var(--ink);pointer-events:none}
+.b-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+.b-ghost:hover{border-color:var(--ink);color:var(--ink)}
+.cal-row{display:flex;gap:10px;margin-top:12px}
+.cal-row a{flex:1;font-size:12px;padding:12px 8px}
+.foot{margin-top:22px;font-size:10.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+@media(max-width:420px){.card{padding:32px 22px 26px}h1{font-size:31px}.cd div{width:66px}}
 </style></head><body>
+<video class="bgv" autoplay muted loop playsinline poster="${pf.poster}" src="${pf.video}"></video>
+<div class="scrim"></div>
 <div class="card">
-  <div class="brand">${star2}${logo ? '' : esc(AG)}</div>
+  <div class="brand">${star2}${logo ? '' : `<span style="font-family:${pf.display};font-size:20px;font-weight:${pf.dispW}">${esc(AG)}</span>`}</div>
   <div class="kind">${kindRu}</div>
   <h1>${esc(lead.name ? lead.name.split(' ')[0] + ', ждём вас' : 'Ждём вас')}</h1>
   <div class="when">${esc(when)}</div>
+  <div class="rule"></div>
   <div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>
-  <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note" style="margin-top:10px">${esc(mt.note)}</div>` : ''}</div>
-  ${mt.link ? `<a class="btn b-video" href="${esc(mt.link)}" target="_blank">▶ Подключиться к видеовстрече</a>` : ''}
+  <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note">${esc(mt.note)}</div>` : ''}</div>
+  ${mt.link ? `<a class="btn b-video" href="${esc(mt.link)}" target="_blank">Подключиться к видеовстрече</a>` : ''}
   <button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
   <button class="btn b-ghost" id="moveBtn">Попросить перенос</button>
   <div class="cal-row">
