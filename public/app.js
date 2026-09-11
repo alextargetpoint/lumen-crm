@@ -7855,7 +7855,7 @@ function carGenLoader(show) {
 .cgl-card:nth-child(4){animation-delay:.54s;--r:17deg}
 @keyframes cglFan{0%,100%{transform:rotate(calc(var(--r) * .35)) translateY(6px) scale(.96)}50%{transform:rotate(var(--r)) translateY(-8px) scale(1)}}
 @keyframes cglSheen{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
-.cgl-orb{width:44px;height:44px;margin:0 auto 16px;border-radius:50%;background:conic-gradient(from 0deg,#5E8CFF,#9B8CFF,#4FB6F2,#5E8CFF);animation:cglSpin 1.1s linear infinite;box-shadow:0 0 26px rgba(94,140,255,.6);-webkit-mask:radial-gradient(closest-side,transparent 58%,#000 60%);mask:radial-gradient(closest-side,transparent 58%,#000 60%)}
+.cgl-orb{width:44px;height:44px;margin:0 auto 16px;border-radius:50%;background:conic-gradient(from 0deg,var(--accent),var(--accent-3,var(--accent)),color-mix(in srgb,var(--accent) 55%,#fff),var(--accent));animation:cglSpin 1.1s linear infinite;box-shadow:0 0 26px color-mix(in srgb,var(--accent) 55%,transparent);-webkit-mask:radial-gradient(closest-side,transparent 58%,#000 60%);mask:radial-gradient(closest-side,transparent 58%,#000 60%)}
 @keyframes cglSpin{to{transform:rotate(1turn)}}
 .cgl-t{font-size:17px;font-weight:700;letter-spacing:-.01em;text-shadow:0 2px 14px rgba(0,0,0,.6)}
 .cgl-s{font-size:12.5px;opacity:.82;margin-top:6px;min-height:16px;transition:opacity .3s;text-shadow:0 1px 10px rgba(0,0,0,.6)}`;
