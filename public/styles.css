@@ -6372,3 +6372,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; }
 .ag-theme-ok { color: var(--accent); display: grid; place-items: center; } .ag-theme-ok svg { width: 15px; height: 15px; }
 .ag-theme-hint { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; }
 @media (max-width: 560px) { .ag-themes { grid-template-columns: 1fr; } }
+
+/* координация видеофонов под тему: тонируем скайлайн (лоадер/логин/обложка агентства) */
+:root[data-theme="mono"] #preloader video, :root[data-theme="mono"] #loginScreen video, :root[data-theme="mono"] .ag-cover-v,
+:root[data-theme="frame"] #preloader video, :root[data-theme="frame"] #loginScreen video, :root[data-theme="frame"] .ag-cover-v { filter: grayscale(1) contrast(1.05) brightness(.92); }
+:root[data-theme="warm"] #preloader video, :root[data-theme="warm"] #loginScreen video, :root[data-theme="warm"] .ag-cover-v { filter: hue-rotate(52deg) saturate(1.15); }
+:root[data-theme="emerald"] #preloader video, :root[data-theme="emerald"] #loginScreen video, :root[data-theme="emerald"] .ag-cover-v { filter: hue-rotate(298deg) saturate(1.1) brightness(.98); }
+/* лого лоадера/логина (img src=logo.svg) тонируем под тему, чтобы совпадал с шапкой */
+:root[data-theme="mono"] .pl-logo, :root[data-theme="frame"] .pl-logo { filter: grayscale(1) brightness(1.5) contrast(1.1); }
+:root[data-theme="warm"] .pl-logo { filter: hue-rotate(52deg) saturate(1.3); }
+:root[data-theme="emerald"] .pl-logo { filter: hue-rotate(298deg) saturate(1.25); }
