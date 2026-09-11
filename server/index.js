@@ -2346,7 +2346,7 @@ const server = http.createServer(async (req, res) => {
         const list = db.leads.filter(canSee).map(l => leadView(db, l))
           .filter(l => l.stage !== 'lost')
           .sort((a, b) => (b.lastMsgAt || b.createdAt) - (a.lastMsgAt || a.createdAt))
-          .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0 }));
+          .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, avatar: l.avatarUrl || null, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0 }));
         return json(res, 200, list);
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
@@ -2355,7 +2355,7 @@ const server = http.createServer(async (req, res) => {
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at).map(m => ({ dir: m.dir, text: m.text, at: m.at, status: m.status, via: m.via, media: m.media || null }));
         const aiOn = !!(lead.ai && lead.ai.enabled);
         const typing = aiOn && lead.lastDir === 'in' && !['handover', 'viewing', 'deal', 'lost'].includes(lead.stage);
-        return json(res, 200, { name: lead.name, phone: lead.phone, stage: lead.stage, aiOn, typing, messages: msgs });
+        return json(res, 200, { name: lead.name, phone: lead.phone, avatar: lead.avatarUrl || null, stage: lead.stage, aiOn, typing, messages: msgs });
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/text$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
