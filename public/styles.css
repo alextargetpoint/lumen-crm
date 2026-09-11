@@ -3015,6 +3015,36 @@ body.has-preview { padding-top: 38px; }
 .ov-src-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .ov-src-k { flex: 1; color: var(--navy-900); }
 .ov-src-v { color: var(--ink-3); font-weight: 600; font-size: 12px; }
+/* ═══ расширенная коллекция виджетов ═══ */
+/* воронка конверсии — рельс со шагами и стрелками-% */
+.ovx-rail { display: flex; align-items: stretch; gap: 4px; margin-top: 4px; }
+.ovx-rail-step { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 13px 6px; border-radius: 13px; background: var(--bg-2); border: 1px solid var(--stroke-soft); }
+.ovx-rail-step.acc { background: color-mix(in srgb, var(--accent) 10%, var(--bg-2)); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.ovx-rail-ic { color: var(--accent); } .ovx-rail-ic svg { width: 17px; height: 17px; }
+.ovx-rail-step b { font-size: 22px; font-weight: 800; color: var(--navy-900); line-height: 1; font-variant-numeric: tabular-nums; }
+.ovx-rail-step span { font-size: 10.5px; color: var(--ink-3); text-align: center; }
+.ovx-rail-arr { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-3); gap: 2px; }
+.ovx-rail-arr svg { width: 15px; height: 15px; } .ovx-rail-arr em { font-style: normal; font-size: 10.5px; font-weight: 800; color: var(--accent-2, #7C9BFF); }
+/* ИИ на линии */
+.ovx-now { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 8%, var(--bg-2)); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); }
+.ovx-now-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #2FA98C; box-shadow: 0 0 0 0 color-mix(in srgb, #2FA98C 60%, transparent); animation: aiBreath 1.9s ease-in-out infinite; }
+.ovx-now-b { font-size: 26px; font-weight: 800; color: var(--navy-900); line-height: 1; font-variant-numeric: tabular-nums; }
+.ovx-now-k { font-size: 12px; color: var(--ink-2); }
+/* кольцо винрейта */
+.ovx-ring { position: relative; width: 86px; height: 86px; margin: 6px auto 0; }
+.ovx-ring svg { transform: rotate(-90deg); }
+.ovx-ring-bg { fill: none; stroke: var(--bg-2); stroke-width: 8; }
+.ovx-ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .6s var(--ease-spring, ease); }
+.ovx-ring-c { position: absolute; inset: 0; display: grid; place-items: center; } .ovx-ring-c b { font-size: 20px; font-weight: 800; color: var(--navy-900); }
+.ovx-ring-sub { text-align: center; font-size: 11.5px; color: var(--ink-3); margin-top: 8px; }
+/* компактный список (пора вернуться) */
+.ovx-list { display: flex; flex-direction: column; gap: 2px; }
+.ovx-li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--stroke-soft); }
+.ovx-li:last-child { border-bottom: none; }
+.ovx-li-nm { font-size: 13px; font-weight: 600; color: var(--navy-900); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ovx-li-nm i { font-style: normal; font-weight: 400; font-size: 11px; color: var(--ink-3); margin-left: 6px; }
+.ovx-li-t { flex: none; font-size: 11px; color: var(--accent-2, #E4813D); font-weight: 600; }
+.ovx-li-more { font-size: 11.5px; color: var(--ink-3); padding: 8px 4px 2px; }
 .ov-launch { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 4px; }
 .ov-launch-i { display: flex; align-items: center; gap: 9px; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 13px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--navy-900); cursor: pointer; font-family: inherit; transition: border-color .14s, transform .14s, box-shadow .14s; }
 .ov-launch-i:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--accent) 50%, transparent); }

@@ -1089,6 +1089,7 @@ const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leader
 /* категории для библиотеки виджетов */
 const OV_CAT = [
   ['Руководителю · штаб', ['execsignals', 'teamperf', 'trafficperf']],
+  ['Конверсия и качество', ['conversionrail', 'winrate', 'stagemap', 'qualaxes', 'scoredist', 'ainow', 'freshtoday', 'silent']],
   ['Продажи и лиды', ['kpi', 'funnel', 'hotleads', 'recent', 'leadsources', 'chains', 'reengage', 'dealsmonth']],
   ['Аналитика и реклама', ['clientreport', 'adbundles', 'aivs', 'numbers']],
   ['Задачи и день', ['tasks', 'attention', 'goal', 'meetings']],
@@ -1722,6 +1723,82 @@ const OV_W = {
     if (!sleeping.length) return hd + ovEmpty(I.check, 'База живая', 'Нет лидов, «уснувших» дольше 2 недель');
     return hd + `<div class="ov-rep-nums"><div class="ov-rep-n"><b>${sleeping.length}</b><span>спящих лидов</span></div></div>
       <button class="ov-launch-i" data-ovgo="wake" style="width:100%;margin-top:2px"><span class="ov-launch-ic">${ic(I.wake)}</span>Запустить массовую реанимацию →</button>`;
+  } },
+
+  /* ═══ РАСШИРЕННАЯ КОЛЛЕКЦИЯ ВИДЖЕТОВ (конверсия и качество) ═══ */
+  conversionrail: { name: 'Воронка конверсии', icon: () => I.funnel, full: true, render: (c) => {
+    const L = c.leads || [], QP = ['qualified', 'handover', 'viewing', 'deal'];
+    const active = L.filter(l => l.stage !== 'lost');
+    const reached = L.filter(l => ['dialog', 'qualified', 'handover', 'viewing', 'deal'].includes(l.stage));
+    const qual = L.filter(l => QP.includes(l.stage));
+    const deal = L.filter(l => l.stage === 'deal');
+    const steps = [['Лиды', active.length, I.plus], ['В диалоге', reached.length, I.chat], ['Квалификация', qual.length, I.spark], ['Сделки', deal.length, I.flame]];
+    const hd = `<div class="ov2-card-hd">${ic(I.funnel)}Воронка конверсии<span>лид → диалог → квал → сделка</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>`;
+    if (!active.length) return hd + ovEmpty(I.funnel, 'Пока нет лидов', 'Воронка появится с первыми заявками');
+    const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
+    return hd + `<div class="ovx-rail">${steps.map((s, i) => `${i ? `<div class="ovx-rail-arr"><em>${rate(s[1], steps[i - 1][1])}%</em>${ic(I.chev)}</div>` : ''}<div class="ovx-rail-step ${i === steps.length - 1 ? 'acc' : ''}"><span class="ovx-rail-ic">${ic(s[2])}</span><b>${s[1]}</b><span>${esc(s[0])}</span></div>`).join('')}</div>`;
+  } },
+  qualaxes: { name: 'Квалификация · 4 оси', icon: () => I.spark, render: (c) => {
+    const L = (c.leads || []).filter(l => !['lost', 'new'].includes(l.stage));
+    const AX = [['purpose', 'Цель покупки'], ['timeline', 'Срок'], ['budget', 'Бюджет'], ['type', 'Тип объекта']];
+    const hd = `<div class="ov2-card-hd">${ic(I.spark)}Квалификация<span>что уже выяснено по базе</span></div>`;
+    if (!L.length) return hd + ovEmpty(I.spark, 'Нет активных лидов', 'Оси заполнятся по мере диалогов');
+    return hd + `<div class="ov-bnd">${AX.map(([k, n]) => { const f = L.filter(l => l.quals && l.quals[k]).length; const p = Math.round(f / L.length * 100); return `<div class="ov-bnd-row"><div class="ov-bnd-t">${n}<i>${f} из ${L.length} · ${p}%</i></div><div class="ov-bnd-bar"><span style="width:${p}%"></span></div></div>`; }).join('')}</div>`;
+  } },
+  stagemap: { name: 'Где лиды сейчас', icon: () => I.grid, render: (c) => {
+    const f = (c.an && c.an.funnel) || {};
+    const order = [['new', 'Новые'], ['touch', 'Касание'], ['dialog', 'Диалог'], ['qualified', 'Квал'], ['handover', 'У брокера'], ['viewing', 'Показ'], ['deal', 'Сделка'], ['sleeping', 'Спящие']];
+    const rows = order.map(([k, n]) => ({ k, n, v: f[k] || 0 })).filter(r => r.v);
+    const hd = `<div class="ov2-card-hd">${ic(I.grid)}Где лиды сейчас<span>распределение по стадиям</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
+    if (!rows.length) return hd + ovEmpty(I.grid, 'Воронка пуста', 'Стадии наполнятся с лидами');
+    const mx = Math.max(...rows.map(r => r.v));
+    const worst = rows.filter(r => !['deal', 'sleeping', 'new'].includes(r.k)).sort((a, b) => b.v - a.v)[0];
+    return hd + `<div class="ov-bnd">${rows.map(r => `<div class="ov-bnd-row"><div class="ov-bnd-t">${r.n}${worst && r.k === worst.k ? ' <i style="color:var(--accent);font-weight:700">← затор</i>' : ''}<i>${r.v}</i></div><div class="ov-bnd-bar"><span style="width:${Math.round(r.v / mx * 100)}%"></span></div></div>`).join('')}</div>`;
+  } },
+  ainow: { name: 'ИИ на линии', icon: () => I.spark, render: (c) => {
+    const L = c.leads || [];
+    const leading = L.filter(l => l.ai && l.ai.enabled && ['new', 'touch', 'dialog'].includes(l.stage)).length;
+    const waiting = L.filter(l => (l.tags || []).includes('нужен человек')).length;
+    const paused = L.filter(l => l.ai && !l.ai.enabled && !['deal', 'lost', 'sleeping'].includes(l.stage)).length;
+    const hd = `<div class="ov2-card-hd">${ic(I.spark)}ИИ на линии<span>кто ведёт диалоги сейчас</span></div>`;
+    return hd + `<div class="ovx-now"><span class="ovx-now-dot"></span><b class="ovx-now-b">${leading}</b><span class="ovx-now-k">диалогов ведёт ИИ прямо сейчас</span></div>
+      <div class="ov-rep-nums" style="margin-top:12px"><div class="ov-rep-n"><b>${waiting}</b><span>просят человека</span></div><div class="ov-rep-n"><b>${paused}</b><span>на паузе — ведёте вы</span></div></div>`;
+  } },
+  freshtoday: { name: 'Сегодня', icon: () => I.plus, render: (c) => {
+    const L = c.leads || [], now = new Date(), s = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const today = L.filter(l => l.createdAt >= s);
+    const hd = `<div class="ov2-card-hd">${ic(I.plus)}Сегодня<span>новые заявки за день</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>`;
+    if (!today.length) return hd + ovEmpty(I.plus, 'Пока тихо', 'Сегодняшние заявки появятся здесь');
+    const SRC = {}; today.forEach(l => { const k = l.source || 'other'; SRC[k] = (SRC[k] || 0) + 1; });
+    const nm = { wa_inbound: 'WhatsApp', meta_form: 'Meta лид-форма', landing: 'Лендинг', ad_comment: 'Комментарии', import: 'Импорт', manual: 'Вручную', bitrix24: 'Bitrix24' };
+    const rows = Object.entries(SRC).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    return hd + `<div class="ov-rep-nums"><div class="ov-rep-n"><b>${today.length}</b><span>${plural(today.length, 'лид', 'лида', 'лидов')} сегодня</span></div></div>
+      <div class="ov-src-list" style="margin-top:6px">${rows.map(([k, v]) => `<div class="ov-src-row"><span class="ov-src-dot" style="background:var(--accent)"></span><span class="ov-src-k">${esc(nm[k] || k)}</span><span class="ov-src-v">${v}</span></div>`).join('')}</div>`;
+  } },
+  winrate: { name: 'Винрейт месяца', icon: () => I.flame, render: (c) => {
+    const L = c.leads || [], now = new Date(), ms = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), QP = ['qualified', 'handover', 'viewing', 'deal'];
+    const q = L.filter(l => QP.includes(l.stage)).length;
+    const deals = L.filter(l => l.stage === 'deal').length;
+    const rate = q ? Math.round(deals / q * 100) : 0;
+    const hd = `<div class="ov2-card-hd">${ic(I.flame)}Винрейт<span>сделки к квалам</span></div>`;
+    const R = 30, CC = 2 * Math.PI * R, off = CC * (1 - rate / 100);
+    return hd + `<div class="ovx-ring"><svg viewBox="0 0 72 72" width="86" height="86"><circle class="ovx-ring-bg" cx="36" cy="36" r="${R}"/><circle class="ovx-ring-fg" cx="36" cy="36" r="${R}" stroke-dasharray="${CC.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><div class="ovx-ring-c"><b>${rate}%</b></div></div><div class="ovx-ring-sub">${deals} ${plural(deals, 'сделка', 'сделки', 'сделок')} из ${q} ${plural(q, 'квала', 'квалов', 'квалов')}</div>`;
+  } },
+  silent: { name: 'Пора вернуться', icon: () => I.chat, render: (c) => {
+    const L = c.leads || [], now = Date.now();
+    const sil = L.filter(l => l.lastDir === 'out' && !['deal', 'lost', 'sleeping', 'new'].includes(l.stage) && l.lastMsgAt && (now - l.lastMsgAt) > 2 * 864e5).sort((a, b) => (a.lastMsgAt || 0) - (b.lastMsgAt || 0));
+    const hd = `<div class="ov2-card-hd">${ic(I.chat)}Пора вернуться<span>наше слово последнее · тишина 2+ дня</span><button class="btn btn-sm" data-ovgo="funnel">Все</button></div>`;
+    if (!sil.length) return hd + ovEmpty(I.check, 'Никто не завис', 'Нет диалогов, где мы ждём ответа дольше 2 дней');
+    return hd + `<div class="ovx-list">${sil.slice(0, 5).map(l => `<div class="ovx-li"><span class="ovx-li-nm">${esc(l.name)}<i>${esc(l.geoName || '')}</i></span><span class="ovx-li-t">${ago(l.lastMsgAt)}</span></div>`).join('')}${sil.length > 5 ? `<div class="ovx-li-more">+${sil.length - 5} ещё в воронке</div>` : ''}</div>`;
+  } },
+  scoredist: { name: 'Тепло лидов', icon: () => I.flame, render: (c) => {
+    const L = (c.leads || []).filter(l => !['lost', 'deal'].includes(l.stage));
+    const hd = `<div class="ov2-card-hd">${ic(I.flame)}Тепло лидов<span>распределение по скорингу</span></div>`;
+    if (!L.length) return hd + ovEmpty(I.flame, 'Нет активных лидов', 'Скоринг появится с лидами');
+    const hot = L.filter(l => (l.score || 0) >= 70).length, warm = L.filter(l => (l.score || 0) >= 40 && (l.score || 0) < 70).length, cold = L.filter(l => (l.score || 0) < 40).length;
+    const mx = Math.max(hot, warm, cold, 1);
+    const rows = [['🔥 Горячие · ≥70', hot, '#E4813D'], ['Тёплые · 40–69', warm, '#2F6BFF'], ['Холодные · <40', cold, '#8aa0c8']];
+    return hd + `<div class="ov-bnd">${rows.map(([n, v, col]) => `<div class="ov-bnd-row"><div class="ov-bnd-t">${n}<i>${v}</i></div><div class="ov-bnd-bar"><span style="width:${Math.round(v / mx * 100)}%;background:${col}"></span></div></div>`).join('')}</div>`;
   } },
 };
 
