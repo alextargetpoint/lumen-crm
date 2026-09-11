@@ -13,7 +13,7 @@
     --ink:#eef3fb; --mut:#7e8ca6; --line:rgba(255,255,255,.08);
     --acc:#3b74ff; --acc2:#78a2ff; --grad:linear-gradient(135deg,#3b74ff,#1d34d8);
     --out:linear-gradient(135deg,#2a5bdd,#1d34d8); --in:#18233a; --ok:#38d18a; --danger:#ff5b52;
-    --sh:0 10px 34px rgba(0,0,0,.42); --shacc:0 6px 20px rgba(59,116,255,.45);
+    --sh:0 10px 34px rgba(0,0,0,.42); --shacc:0 6px 20px rgba(0,0,0,.35);   /* нейтральная тень (было синее свечение) */
   }
   /* ── СВЕТЛАЯ ТЕМА ── */
   :root[data-theme="light"]{
@@ -54,11 +54,10 @@
   :root[data-theme="light"] .b.in .doc .ic,:root[data-theme="atelier"] .b.in .doc .ic,:root[data-theme="burgundy"] .b.in .doc .ic,:root[data-theme="glass"] .b.in .doc .ic,:root[data-theme="mono"] .b.in .doc .ic{background:var(--panel2)}
   :root[data-theme="light"] .qchip,:root[data-theme="light"] .quoted,:root[data-theme="atelier"] .qchip,:root[data-theme="atelier"] .quoted,:root[data-theme="burgundy"] .qchip,:root[data-theme="burgundy"] .quoted,:root[data-theme="glass"] .qchip,:root[data-theme="glass"] .quoted,:root[data-theme="mono"] .qchip,:root[data-theme="mono"] .quoted{background:var(--panel2)}
   .b.out{color:#fff}   /* исходящие всегда белым текстом на акценте (все темы) */
-  /* ── АКЦЕНТНЫЕ ЦВЕТА ── */
-  :root[data-accent="violet"]{--acc:#7b5cff;--acc2:#a58bff;--grad:linear-gradient(135deg,#7b5cff,#5b3cff);--out:linear-gradient(135deg,#6a4bf0,#5b3cff);--shacc:0 6px 20px rgba(123,92,255,.45)}
-  :root[data-accent="green"]{--acc:#12b76a;--acc2:#4fd18a;--grad:linear-gradient(135deg,#12b76a,#0e9f5b);--out:linear-gradient(135deg,#0fa863,#0e9f5b);--shacc:0 6px 20px rgba(18,183,106,.4)}
-  :root[data-accent="orange"]{--acc:#ff8a3d;--acc2:#ffb277;--grad:linear-gradient(135deg,#ff8a3d,#f5691a);--out:linear-gradient(135deg,#f57a2a,#f5691a);--shacc:0 6px 20px rgba(255,138,61,.4)}
+  /* акцентная система (violet/green/orange) убрана — только фирменная стилистика церемонки (тема задаёт --acc) */
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  /* курсор ввода — по теме (был белый → на кремовом фоне Ателье сливался) */
+  input,textarea{caret-color:var(--acc)}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:'Manrope',-apple-system,SF Pro Text,Roboto,Segoe UI,sans-serif;font-size:15px;line-height:1.42;
     overscroll-behavior:none;-webkit-font-smoothing:antialiased;letter-spacing:-.1px}
@@ -81,7 +80,7 @@
   .top .sub{color:var(--mut);font-size:12.5px;margin-top:4px;font-weight:600}
   .search{margin:11px 0 2px;position:relative}
   .search input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:14px;padding:11px 14px 11px 40px;font-size:14.5px;outline:none;transition:.2s;font-family:inherit}
-  .search input:focus{border-color:rgba(59,116,255,.55);background:var(--panel2)}
+  .search input:focus{border-color:var(--acc);background:var(--panel2)}
   .search .ic{position:absolute;left:13px;top:11px;color:var(--mut);font-size:17px}
   #chats{flex:1;overflow-y:auto;padding:4px 8px 20px}
   .row{display:flex;gap:12px;align-items:center;padding:11px 10px;border-radius:17px;cursor:pointer;transition:.15s}
@@ -95,7 +94,7 @@
   .prev{color:var(--mut);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;display:flex;align-items:center;gap:6px;font-weight:500}
   .prev .me{color:var(--acc2);font-weight:700}
   .badge-un{background:var(--grad);color:#fff;border-radius:12px;min-width:22px;height:22px;padding:0 7px;display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;box-shadow:var(--shacc);animation:pop .3s}
-  .geo-chip{font-size:10.5px;color:var(--acc2);background:rgba(59,116,255,.14);padding:2px 8px;border-radius:9px;font-weight:700}
+  .geo-chip{font-size:10.5px;color:var(--acc2);background:color-mix(in srgb,var(--acc) 13%,transparent);padding:2px 8px;border-radius:9px;font-weight:700}
   .empty{padding:60px 24px;text-align:center;color:var(--mut);font-size:14px;line-height:1.6}
   .load{padding:44px;text-align:center;color:var(--mut)}
   .load .sp{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:spin .8s linear infinite}
@@ -120,8 +119,8 @@
   .chd .nm{font-weight:700;font-size:16px;letter-spacing:-.3px}
   .chd .st{font-size:12px;color:var(--mut);margin-top:1px;display:flex;align-items:center;gap:5px;font-weight:500}
   .chd .st .ai-on{color:var(--acc2);font-weight:700}
-  .hd-btn{width:41px;height:41px;border-radius:13px;display:grid;place-items:center;font-size:19px;cursor:pointer;color:var(--acc);background:rgba(59,116,255,.11);transition:.15s;flex:none}
-  .hd-btn:active{transform:scale(.9);background:rgba(59,116,255,.22)}
+  .hd-btn{width:41px;height:41px;border-radius:13px;display:grid;place-items:center;font-size:19px;cursor:pointer;color:var(--acc);background:color-mix(in srgb,var(--acc) 11%,transparent);transition:.15s;flex:none}
+  .hd-btn:active{transform:scale(.9);background:color-mix(in srgb,var(--acc) 20%,transparent)}
   #body{flex:1;overflow-y:auto;padding:14px 12px 8px;display:flex;flex-direction:column;gap:3px}
   .day{align-self:center;background:var(--panel2);color:var(--mut);font-size:11.5px;padding:4px 12px;border-radius:11px;margin:8px 0;font-weight:700;box-shadow:var(--sh)}
   .b{max-width:82%;padding:8px 12px 6px;border-radius:19px;font-size:14.7px;word-wrap:break-word;position:relative;animation:bubble .25s cubic-bezier(.22,1,.36,1);line-height:1.4;font-weight:500}
@@ -156,7 +155,7 @@
   .qchip:active{background:var(--panel2);transform:scale(.95)}
   .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px calc(env(safe-area-inset-bottom) + 10px);background:var(--glass);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
   .composer textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:21px;padding:10px 16px;font-size:15px;resize:none;max-height:170px;outline:none;font-family:inherit;transition:border-color .2s;line-height:1.38;font-weight:500}
-  .composer textarea:focus{border-color:rgba(59,116,255,.5)}
+  .composer textarea:focus{border-color:var(--acc)}
   .composer.has-text textarea{border-radius:18px;padding:11px 16px}
   /* многострочный текст (после диктовки) → поле на всю ширину сверху, кнопки строкой снизу */
   .composer.expanded{flex-wrap:wrap;justify-content:flex-end;gap:8px}
@@ -355,7 +354,7 @@ const hap=(t)=>{try{TG&&TG.HapticFeedback&&TG.HapticFeedback.impactOccurred(t||'
 const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
 /* ── персональное оформление брокера (тема + акцент), сохраняется за ним ── */
 const PREF_KEY='lumen_tgprefs_'+((TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user&&TG.initDataUnsafe.user.id)||'x');
-let PREFS={theme:'auto',accent:'blue'};
+let PREFS={theme:'atelier',accent:'blue'};   /* дефолт — церемонка (Ателье), не синий «авто» */
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
 const TH_BG={light:'#eef2f8',atelier:'#f3f1ec',burgundy:'#f7f3f4',glass:'#eef5ff',mono:'#f6f6f6',dark:'#080b12'};
 function applyTheme(){const r=document.documentElement;const th=PREFS.theme==='auto'?((TG&&TG.colorScheme)||'dark'):PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');const bg=TH_BG[th]||'#080b12';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg)}catch(e){}}
@@ -596,22 +595,18 @@ $('#q').addEventListener('input',renderChats);
 /* ── настройки оформления ── */
 function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme();fetch('/tgapp/api/prefs',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(PREFS)}).catch(()=>{})}
 function openSettings(){
+  /* базовые: авто/светлая/тёмная + фирменные стили церемонки (как на десктопе). Акцентный пикер убран. */
   const themes=[['auto','auto','Авто'],['light','sun','Светлая'],['dark','moon','Тёмная']];
-  /* премиум-стили CRM (синхрон с десктопом): [key, фон, бренд-акцент, подпись] */
   const styles=[['atelier','#f3f1ec','#141311','Ателье'],['burgundy','#f7f3f4','#861c3c','Бургунди'],['glass','#eef5ff','#397bff','Стекло'],['mono','#f6f6f6','#171717','Моно']];
-  const accents=[['blue','#3b74ff'],['violet','#7b5cff'],['green','#12b76a'],['orange','#ff8a3d']];
   const bd=document.createElement('div');bd.className='sheet-bd';
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Оформление</h3>
-    <div class="set-lbl">Тема</div>
-    <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div>
-    <div class="set-lbl">Стиль CRM · как на десктопе</div>
+    <div class="set-lbl">Стиль церемонки · как на десктопе</div>
     <div class="style-row">${styles.map(s=>`<button data-th="${s[0]}" class="style-sw ${PREFS.theme===s[0]?'on':''}"><span class="sw2" style="background:${s[1]}"><i style="background:${s[2]}"></i></span>${s[3]}</button>`).join('')}</div>
-    <div class="set-lbl">Акцентный цвет</div>
-    <div class="acc-row">${accents.map(a=>`<span data-acc="${a[0]}" class="acc-sw ${PREFS.accent===a[0]?'on':''}" style="background:${a[1]}"></span>`).join('')}</div></div>`;
+    <div class="set-lbl">Базовые</div>
+    <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div></div>`;
   document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
   bd.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{hap();PREFS.theme=b.dataset.th;bd.querySelectorAll('[data-th]').forEach(x=>x.classList.toggle('on',x===b));savePrefs()});
-  bd.querySelectorAll('[data-acc]').forEach(s=>s.onclick=()=>{hap();PREFS.accent=s.dataset.acc;bd.querySelectorAll('[data-acc]').forEach(x=>x.classList.toggle('on',x===s));savePrefs()});
 }
 $('#settingsBtn').onclick=()=>{hap();openSettings()};
 
