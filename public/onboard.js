@@ -143,14 +143,24 @@
   }
 
   function stepStyle() {
+    // тон-фильтр под тему поверх одного скрина интерфейса (без 6 отдельных захватов)
+    const FILT = { light: 'none', emerald: 'brightness(1.06) saturate(1.15)', dark: 'brightness(.82) saturate(.92)', warm: 'hue-rotate(112deg) saturate(1.15)', mono: 'grayscale(1) contrast(1.04)', frame: 'grayscale(.5) contrast(1.08)' };
     const card = (t) => `
       <button class="ob-theme ${S.theme === t.key ? 'on' : ''}" data-theme="${t.key}">
-        <div class="ob-theme-prev">
-          ${t.vid ? `<video muted loop playsinline preload="none" poster="/assets/${t.vid}-poster.jpg"><source src="/assets/${t.vid}.mp4" type="video/mp4"></video>`
-                  : `<div class="ob-theme-static" style="background:linear-gradient(135deg,${t.sw[1]},${t.sw[0]}22)"></div>`}
-          <div class="ob-theme-swz">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div>
+        <div class="ob-theme-inner">
+          <div class="ob-theme-front">
+            <div class="ob-theme-prev">
+              ${t.vid ? `<video muted loop playsinline preload="none" poster="/assets/${t.vid}-poster.jpg"><source src="/assets/${t.vid}.mp4" type="video/mp4"></video>`
+                      : `<div class="ob-theme-static" style="background:linear-gradient(135deg,${t.sw[1]},${t.sw[0]}22)"></div>`}
+              <div class="ob-theme-swz">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div>
+            </div>
+            <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
+          </div>
+          <div class="ob-theme-back">
+            <img src="/assets/site/cap-overview.png" alt="" loading="lazy" style="filter:${FILT[t.key] || 'none'}">
+            <div class="ob-theme-back-lbl">Интерфейс · ${t.name}</div>
+          </div>
         </div>
-        <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
         <div class="ob-choice-check">${IC.check}</div>
       </button>`;
     return {
@@ -504,7 +514,7 @@
     .ob-center{text-align:center;max-width:760px;margin:0 auto}
     .ob-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8FB4FF;border:1px solid rgba(143,180,255,.3);border-radius:999px;padding:7px 15px;margin-bottom:20px;background:rgba(20,34,64,.4)}
     .ob-pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:26px}
-    .ob-pill{font-size:13.5px;font-weight:600;color:#CBD9F5;background:rgba(20,32,60,.55);border:1px solid rgba(143,180,255,.2);border-radius:999px;padding:9px 15px;backdrop-filter:blur(6px)}
+    .ob-pill{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:#CBD9F5;background:rgba(20,32,60,.55);border:1px solid rgba(143,180,255,.2);border-radius:999px;padding:9px 15px;backdrop-filter:blur(6px)}
     .ob-note{font-size:13px;color:#8296BC;margin-top:16px;line-height:1.5}
     .ob-content{margin-top:4px}
     /* choices (edition) */
@@ -695,11 +705,21 @@
     /* ==== размеры SVG-иконок (вместо эмодзи) ==== */
     .ob-choice-ic{margin-bottom:14px;color:#8FB4FF;line-height:0}
     .ob-choice-ic svg{width:40px;height:40px;filter:drop-shadow(0 8px 18px rgba(37,99,235,.45))}
-    .ob-pill svg{width:15px;height:15px;margin-right:7px;vertical-align:-3px;color:#8FB4FF}
+    .ob-pill svg{width:15px;height:15px;flex:0 0 15px;color:#8FB4FF}
     .ob-guide-l li i svg{width:13px;height:13px}
     .ob-done-mark svg{width:46px;height:46px}
     .ob-choice-check svg{width:15px;height:15px}
     .ob-close svg{width:15px;height:15px}
+    /* ==== флип-карточка стиля: ховер → скрин интерфейса, тонированный под тему ==== */
+    .ob-theme{perspective:1200px;background:none!important;border:none!important;overflow:visible!important;box-shadow:none!important;padding:0}
+    .ob-theme-inner{position:relative;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.16,1,.3,1)}
+    .ob-theme:hover .ob-theme-inner{transform:rotateY(180deg)}
+    .ob-theme-front,.ob-theme-back{border-radius:18px;overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden;border:1.5px solid rgba(143,180,255,.18);background:rgba(13,22,44,.62)}
+    .ob-theme-back{position:absolute;inset:0;transform:rotateY(180deg);display:flex;flex-direction:column;background:#0a1224}
+    .ob-theme-back img{width:100%;flex:1;min-height:0;object-fit:cover;object-position:top left}
+    .ob-theme-back-lbl{padding:10px 14px;font-size:12px;font-weight:700;color:#CBD9F5;background:rgba(10,18,38,.92);border-top:1px solid rgba(143,180,255,.14);text-align:left}
+    .ob-theme.on{box-shadow:0 30px 72px -24px rgba(37,99,235,.62)!important}
+    .ob-theme.on .ob-theme-front,.ob-theme.on .ob-theme-back{border-color:#5B84FF;box-shadow:0 0 0 1px #5B84FF inset}
     @media(prefers-reduced-motion:reduce){.ob-orbs i,.ob-primary:after,.ob-do:after,.ob-bgvid video,.ob-done-mark{animation:none!important}}
     `;
     const s = document.createElement('style'); s.id = 'ob-style'; s.textContent = css; document.head.appendChild(s);
