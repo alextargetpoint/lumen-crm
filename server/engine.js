@@ -5,6 +5,7 @@
    пишется в переписку. */
 const store = require('./store');
 const ai = require('./ai');
+const control = require('./control');
 const llm = require('./llm');
 const wa = require('./wa');
 
@@ -193,6 +194,7 @@ function handoverPreview(db, lead, brokerId) {
 function handover(db, lead, brokerId, opts = {}) {
   let broker = brokerId ? db.brokers.find(b => b.id === brokerId) : null;
   if (!broker) broker = pickBroker(db, lead);
+  if (lead.broker !== broker.id) control.recordOwner(db, lead, broker.id, 'auto', 'передача брокеру');
   lead.broker = broker.id;
   lead.stage = 'handover';
   lead.handoverAt = Date.now();   /* точка отсчёта SLA «коснись за N минут» */
@@ -478,6 +480,7 @@ function tickSla(db) {
       const nb = pool.sort((a2, b2) => a2.load - b2.load)[0];
       if (nb) {
         if (broker) broker.load = Math.max(0, broker.load - 1);
+        control.recordOwner(db, l, nb.id, 'auto', 'SLA ×2 — возврат в пул');
         l.broker = nb.id; nb.load += 1; l.handoverAt = nowT; l.slaFlag = 'reassigned';
         ai.pushEvent(db, { type: 'handover', leadId: l.id, text: `⚠️ SLA ×2: ${l.name} не взят в работу — переназначен на ${nb.name}` });
       }

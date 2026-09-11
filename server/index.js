@@ -22,6 +22,7 @@ const { seed } = require('./seed');
 const ai = require('./ai');
 const engine = require('./engine');
 const capi = require('./capi');
+const control = require('./control');
 
 const PORT = process.env.PORT || 5077;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -433,7 +434,17 @@ function notifyOutbound(db, lead, event) {
 }
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
-engine.onInboundMessage = (db, lead, m) => tgbridge.forwardInbound(db, lead, m); /* мост: входящее клиента → брокеру в Telegram */
+engine.onInboundMessage = (db, lead, m) => {
+  /* антислив: клиент упомянул увод на личный канал → флаг + тревога руководителю */
+  try {
+    const leak = control.detectLeak(m && m.text);
+    if (leak && (!lead.leakFlag || Date.now() - (lead.leakFlag.at || 0) > 6 * 3600e3)) {
+      lead.leakFlag = { reason: leak.reason, at: Date.now(), text: String(m.text || '').slice(0, 200) };
+      ai.pushEvent(db, { type: 'ai_off', leadId: lead.id, text: `🚨 Антислив: ${lead.name} — ${leak.reason}. Проверьте, не уводят ли диалог мимо CRM.` });
+    }
+  } catch (_) {}
+  return tgbridge.forwardInbound(db, lead, m); /* мост: входящее клиента → брокеру в Telegram */
+};
 engine.matchAd = matchAd; /* демо-генератор комментариев цепляет объявление к лиду */
 
 function getSession(req) {
@@ -527,6 +538,7 @@ function audit(db, req, action, extra) {
   if (db.audit.length > 500) db.audit.length = 500;
   store.save();
 }
+const recordOwner = control.recordOwner;   /* цепочка владения — общий хелпер (см. control.js) */
 /* ── RBAC: типы сотрудников и их права (для крупных агентств) ──
    Все не-владельцы держат session.role='broker'; фактические права — из roleType сотрудника.
    leads: 'own' (только свои) | 'all' (все диалоги). allow: доп. группы API поверх базового брокера. */
@@ -2407,6 +2419,7 @@ const server = http.createServer(async (req, res) => {
           stage: lead.stage, source: lead.source || '', createdAt: lead.createdAt || 0, avatar: lead.avatarUrl || null,
           quals: qflat, summary: lead.summary || '', tags: lead.tags || [], nextAction: lead.nextAction || null,
           broker: (db.brokers.find(x => x.id === lead.broker) || {}).name || null, aiOn: !!(lead.ai && lead.ai.enabled),
+          ownerHistory: (lead.ownerHistory || []).slice(-8).map(o => ({ name: o.name, at: o.at, by: o.by, reason: o.reason })),
           events, notes, meetings,
         });
       }
@@ -3023,7 +3036,7 @@ const server = http.createServer(async (req, res) => {
       for (const l of targets) {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
-        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
+        else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } if (l.broker !== br.id) recordOwner(db, l, br.id, 'owner', 'массовое назначение'); l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
         else if (action === 'tag' && b.value) { l.tags = [...new Set([...(l.tags || []), String(b.value).slice(0, 40)])]; done++; }
         else if (action === 'untag' && b.value) { l.tags = (l.tags || []).filter(t => t !== b.value); done++; }
         else if (action === 'ai') { l.ai.enabled = !!b.value; if (b.value) l.tags = (l.tags || []).filter(t => t !== 'нужен человек'); done++; }
@@ -3067,7 +3080,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PATCH') {
         const b = await readBody(req);
         if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; capi.onStageChange(db, lead, b.stage); }
-        if (b.broker !== undefined) lead.broker = b.broker || null;
+        if (b.broker !== undefined) { const nb = b.broker || null; if (nb !== lead.broker) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; }
         if (b.geo) lead.geo = b.geo;
         if (b.ai) {
           if (b.ai.enabled === true) lead.tags = (lead.tags || []).filter(t => t !== 'нужен человек');
@@ -3456,7 +3469,7 @@ const server = http.createServer(async (req, res) => {
     }
     if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'DELETE') {
       if (db.brokers.length <= 1) return json(res, 400, { error: 'нельзя удалить последнего брокера' });
-      for (const l of db.leads) if (l.broker === m[1]) l.broker = null;
+      for (const l of db.leads) if (l.broker === m[1]) { recordOwner(db, l, null, 'system', 'брокер удалён'); l.broker = null; }
       for (const mt of db.meetings || []) if (mt.brokerId === m[1]) mt.brokerId = db.brokers.find(x => x.id !== m[1]).id;
       db.brokers = db.brokers.filter(x => x.id !== m[1]);
       store.save();
@@ -3505,7 +3518,7 @@ const server = http.createServer(async (req, res) => {
         for (const [sid2, s2] of Object.entries(db.settings.auth.sessions)) if (s2.brokerId === br.id) delete db.settings.auth.sessions[sid2];
         const mine = db.leads.filter(l => l.broker === br.id && !['deal', 'lost'].includes(l.stage));
         const pool = db.brokers.filter(x => x.id !== br.id && x.active !== false);
-        mine.forEach(l => { const nb = pool.sort((a2, b2) => a2.load - b2.load)[0]; l.broker = nb ? nb.id : null; if (nb) nb.load += 1; });
+        mine.forEach(l => { const nb = pool.sort((a2, b2) => a2.load - b2.load)[0]; recordOwner(db, l, nb ? nb.id : null, 'auto', `передача при отключении ${br.name}`); l.broker = nb ? nb.id : null; if (nb) nb.load += 1; });
         br.load = 0;
         audit(db, req, `доступ отключён, ${mine.length} лидов переназначено`, { broker: br.name });
         ai.pushEvent(db, { type: 'ai_off', text: `Брокер ${br.name} отключён — ${mine.length} лидов переданы команде` });
@@ -3513,6 +3526,57 @@ const server = http.createServer(async (req, res) => {
       if (b.active === true) { br.active = true; audit(db, req, 'доступ включён', { broker: br.name }); }
       store.save();
       return json(res, 200, br);
+    }
+
+    /* ── Мастер «Передача дел»: предпросмотр и исполнение оффбординга брокера ──
+       preview (GET ?successor=…) — кому что уйдёт; execute (POST) — реассайн+отзыв доступа. */
+    if ((m = p.match(/^\/api\/brokers\/([^/]+)\/offboard$/))) {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const br = db.brokers.find(x => x.id === m[1]);
+      if (!br) return json(res, 404, { error: 'not found' });
+      if (db.brokers.filter(x => x.active !== false).length <= 1) return json(res, 400, { error: 'нельзя отключить последнего активного брокера — некому передать' });
+      if (req.method === 'GET') {
+        const prev = control.offboardPreview(db, br.id, u.searchParams.get('successor') || 'auto');
+        return json(res, 200, prev || { error: 'нет данных' });
+      }
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        const successorId = b.successor || 'auto';
+        const prev = control.offboardPreview(db, br.id, successorId);
+        if (!prev) return json(res, 404, { error: 'not found' });
+        if (prev.poolEmpty) return json(res, 400, { error: 'нет активных брокеров для передачи' });
+        /* исполняем план */
+        let moved = 0;
+        for (const item of prev.plan) {
+          const lead = db.leads.find(l => l.id === item.leadId); if (!lead) continue;
+          const old = db.brokers.find(x => x.id === lead.broker); if (old) old.load = Math.max(0, (old.load || 0) - 1);
+          recordOwner(db, lead, item.toId || null, 'owner', `передача дел от ${br.name}`);
+          lead.broker = item.toId || null;
+          if (item.toId) { const nb = db.brokers.find(x => x.id === item.toId); if (nb) nb.load = (nb.load || 0) + 1; }
+          if (b.notifyClients && item.toId) {
+            const nbName = (db.brokers.find(x => x.id === item.toId) || {}).name || 'наш эксперт';
+            engine.send(db, lead, `${lead.name.split(' ')[0]}, здравствуйте! Теперь с вами работает ${nbName} из нашей команды — вся история сохранена, продолжайте здесь же.`, 'human', { channel: 'wa' });
+          }
+          moved++;
+        }
+        /* встречи → преемнику по гео/пулу */
+        const fallback = db.brokers.filter(x => x.id !== br.id && x.active !== false).sort((a2, b2) => (a2.load || 0) - (b2.load || 0))[0];
+        for (const mt of db.meetings || []) if (mt.brokerId === br.id && (!mt.status || !['done', 'cancelled', 'no_show'].includes(mt.status))) { const tgt = (successorId !== 'auto' && db.brokers.find(x => x.id === successorId && x.active !== false)) || fallback; if (tgt) mt.brokerId = tgt.id; }
+        /* отзыв доступа */
+        br.active = false; br.load = 0;
+        for (const [sid2, s2] of Object.entries(db.settings.auth.sessions)) if (s2.brokerId === br.id) delete db.settings.auth.sessions[sid2];
+        br.tgChatId = null;   /* отвязать Telegram-бот брокера */
+        audit(db, req, `оффбординг: ${moved} лидов передано, доступ отозван`, { broker: br.name, successor: successorId });
+        ai.pushEvent(db, { type: 'handover', text: `📦 Передача дел: ${br.name} отключён, ${moved} лидов переданы команде${b.notifyClients ? ' (клиенты уведомлены)' : ''}` });
+        store.save();
+        return json(res, 200, { ok: true, moved, distribution: prev.distribution });
+      }
+    }
+
+    /* ── Командный центр рисков основателя: всё, что требует внимания, одним запросом ── */
+    if (p === '/api/control-center' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      return json(res, 200, control.scanRisks(db));
     }
 
     if (p === '/api/numbers' && req.method === 'POST') {
