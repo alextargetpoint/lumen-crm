@@ -2521,6 +2521,13 @@ const server = http.createServer(async (req, res) => {
         try { const out = await llm.rewrite(t, String(b.mode || 'improve'), 'сообщение клиенту от менеджера агентства недвижимости в WhatsApp — живо, коротко, по-человечески, без канцелярита, тот же смысл и язык'); return json(res, 200, { text: String(out).slice(0, 2000) }); }
         catch (e) { return json(res, 400, { error: e.message }); }
       }
+      /* ✨ ИИ-суфлёр: подсказать следующий ответ клиенту по контексту диалога (в поле ввода, редактируемо) */
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/suggest$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён (нет ключа модели)' });
+        try { const r = await llm.reply(db, lead); return json(res, 200, { text: String((r && r.text) || '').slice(0, 1200) }); }
+        catch (e) { return json(res, 400, { error: 'не удалось подсказать: ' + e.message }); }
+      }
       /* 🎙️ диктовка: голос брокера → транскрипт → ИИ причёсывает → чистый текст в поле ввода */
       if (p === '/tgapp/api/dictate' && req.method === 'POST') {
         if (!llm.hasImage()) return json(res, 400, { error: 'распознавание речи не подключено (нет ключа модели)' });

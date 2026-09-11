@@ -257,6 +257,7 @@
       <button class="cbtn ghost ic collapsible" id="plus" data-ic="plus"></button>
       <input type="file" id="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
       <button class="cbtn ghost ic collapsible" id="dict" data-ic="wave" title="Диктовка — голос в текст"></button>
+      <button class="cbtn ghost ic collapsible" id="sug" data-ic="spark" title="Подсказать ответ ИИ"></button>
       <textarea id="text" rows="1" placeholder="Сообщение"></textarea>
       <button class="cbtn ghost ic hidden" id="enh" data-ic="ai" title="Усилить ИИ"></button>
       <button class="cbtn ic hidden" id="tts" data-ic="speak" title="Озвучить"></button>
@@ -469,6 +470,9 @@ $('#cAi').onclick=async()=>{hap();const on=!CUR.aiOn;$('#cAi').classList.toggle(
   try{const r=await jpost('/tgapp/api/chat/'+CUR.id+'/ai',{on});CUR.aiOn=r.aiOn;$('#cAi').classList.toggle('aon',r.aiOn);$('#cSt').innerHTML=(r.aiOn?'<span class="ai-on">● ИИ ведёт</span>':'вы ведёте')+' · '+esc(CUR.phone||'');toast(r.aiOn?'ИИ включён — ведёт диалог':'ИИ выключен — вы ведёте')}catch(e){toast(e.message);$('#cAi').classList.toggle('aon',CUR.aiOn)}};
 enh.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');enh.style.pointerEvents='none';enh.style.opacity=.5;
   try{const r=await jpost('/tgapp/api/enhance',{text:t,mode:'improve'});txt.value=r.text;txt.dispatchEvent(new Event('input'));toast('Текст усилен ИИ')}catch(e){toast(e.message)}enh.style.pointerEvents='';enh.style.opacity=''};
+/* ✨ ИИ-суфлёр: подсказать следующий ответ по контексту (в поле ввода, редактируемо) */
+const sug=$('#sug');if(sug)sug.onclick=async()=>{if(!CUR)return;hap('medium');sug.style.pointerEvents='none';sug.style.opacity=.5;toast('ИИ подбирает ответ…');
+  try{const r=await jpost('/tgapp/api/chat/'+CUR.id+'/suggest',{});txt.value=r.text||'';txt.dispatchEvent(new Event('input'));txt.focus();toast('Черновик готов — проверьте и отправьте')}catch(e){toast(e.message)}sug.style.pointerEvents='';sug.style.opacity=''};
 tts.onclick=async()=>{const t=txt.value.trim();if(!t)return;hap('medium');toast('Генерирую голосовое…');
   try{await jpost('/tgapp/api/chat/'+CUR.id+'/tts',{text:t});txt.value='';txt.dispatchEvent(new Event('input'));await loadConv(true);toast('Голосовое отправлено')}catch(e){toast(e.message)}};
 
