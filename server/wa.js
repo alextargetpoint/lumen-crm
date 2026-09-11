@@ -68,6 +68,45 @@ async function createTemplate(db, def) {
 
 function toWaPhone(phone) { return phone.replace(/\D/g, ''); }
 
+/* абсолютный URL для link-медиа: Meta должна суметь скачать файл извне.
+   Относительный /assets/... префиксуем публичной базой (туннель/host, global.LUMEN_BASE). */
+function absUrl(url) {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  return (global.LUMEN_BASE || '') + url;
+}
+
+/* Скачать входящее медиа Cloud API: mediaId → временный url (нужен Bearer) → байты */
+async function downloadMedia(db, mediaId) {
+  const meta = await graphGet(db, mediaId, {}); // { url, mime_type, file_size, id }
+  if (!meta.url) throw new Error('media: нет url');
+  const r = await fetch(meta.url, { headers: { Authorization: `Bearer ${db.settings.wa.token}` } });
+  if (!r.ok) throw new Error('media download ' + r.status);
+  const buf = Buffer.from(await r.arrayBuffer());
+  return { buf, mime: meta.mime_type || '', size: meta.file_size || buf.length };
+}
+
+/* Отправка медиа Cloud API по публичной ссылке. caption поддерживают только
+   image/video/document; для audio/voice/sticker подпись уходит отдельным текстом (см. engine). */
+async function sendMedia(db, lead, media, caption) {
+  const type = ({ image: 'image', video: 'video', voice: 'audio', audio: 'audio', document: 'document', sticker: 'sticker' })[media.type] || 'document';
+  const obj = { link: absUrl(media.url) };
+  if (['image', 'video', 'document'].includes(type) && caption) obj.caption = caption;
+  if (type === 'document' && media.name) obj.filename = media.name;
+  return post(db, `${db.settings.wa.phoneId}/messages`, {
+    messaging_product: 'whatsapp',
+    to: toWaPhone(lead.phone),
+    type,
+    [type]: obj,
+  });
+}
+
+/* можно ли положить подпись прямо в медиа-сообщение (иначе caption шлём отдельным текстом) */
+function mediaSupportsCaption(mediaType) {
+  const t = ({ image: 'image', video: 'video', voice: 'audio', audio: 'audio', document: 'document', sticker: 'sticker' })[mediaType] || 'document';
+  return ['image', 'video', 'document'].includes(t);
+}
+
 async function sendText(db, lead, text) {
   return post(db, `${db.settings.wa.phoneId}/messages`, {
     messaging_product: 'whatsapp',
@@ -103,4 +142,4 @@ function applyStatuses(db, value) {
   return changed;
 }
 
-module.exports = { ready, sendText, sendTemplate, applyStatuses, verify, listTemplates, createTemplate };
+module.exports = { ready, sendText, sendTemplate, sendMedia, downloadMedia, mediaSupportsCaption, applyStatuses, verify, listTemplates, createTemplate };

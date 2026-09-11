@@ -119,7 +119,17 @@ function send(db, lead, text, via, opts = {}) {
   if (lead.ai.silentSince == null) lead.ai.silentSince = m.at;
   if (wa.ready(db)) {
     const tpl = opts.templateId ? db.templates.find(t => t.id === opts.templateId) : null;
-    const job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text) : wa.sendText(db, lead, text);
+    let job;
+    if (opts.media && opts.media.url) {
+      /* медиа: caption вшиваем где Cloud API позволяет (image/video/document);
+         для audio/voice/sticker подпись догоняем отдельным текстовым сообщением */
+      job = wa.sendMedia(db, lead, opts.media, text);
+      if (text && !wa.mediaSupportsCaption(opts.media.type)) {
+        job = job.then(res => { wa.sendText(db, lead, text).catch(() => {}); return res; });
+      }
+    } else {
+      job = tpl && tpl.status === 'approved' ? wa.sendTemplate(db, lead, tpl, text) : wa.sendText(db, lead, text);
+    }
     job.then(res => { m.waId = res.messages?.[0]?.id || null; store.save(); })
       .catch(err => {
         m.status = 'failed';
@@ -580,7 +590,10 @@ function simulateComment(db) {
 /* ---------- единая обработка входящего (вебхук / симулятор / демо-кнопка) ---------- */
 function inbound(db, lead, text, opts = {}) {
   const m = { id: store.nextId('m'), leadId: lead.id, dir: 'in', via: null, text, at: Date.now(), status: 'received' };
+  if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500), name: (opts.media.name || '').slice(0, 120) };
   db.messages.push(m);
+  /* пересылка входящего клиента назначенному брокеру в Telegram (мост) — если подключён */
+  if (module.exports.onInboundMessage) { try { const r = module.exports.onInboundMessage(db, lead, m); if (r && r.catch) r.catch(() => {}); } catch (_) {} }
   const wasWake = (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';
   if (lead.stage === 'sleeping') lead.stage = 'dialog';
   if (wasWake) {

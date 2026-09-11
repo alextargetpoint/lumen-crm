@@ -31,6 +31,7 @@ const llm = require('./llm');
 const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
+const tgbridge = require('./tgbridge'); /* двусторонний мост Telegram ⇄ WhatsApp (брокер отвечает с телефона) */
 const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
 const shot = require('./shot'); /* серверный скриншот (chrome-headless-shell) для автономного QA-цикла */
@@ -112,6 +113,10 @@ const DEFAULT_PASS = 'lumen2026';
     email: { provider: 'resend', key: '', from: '' },
     secondRound: true, // цепочка исчерпана в канале → второй круг на следующем
   };
+  /* мост Telegram ⇄ WhatsApp: брокер отвечает клиенту из личного Telegram, номер централизован */
+  if (!db.settings.tgBridge) db.settings.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
+  if (!db.settings.tgBridge.secret) db.settings.tgBridge.secret = crypto.randomBytes(12).toString('hex');
+  for (const b of db.brokers) if (!b.tgBindCode) b.tgBindCode = crypto.randomBytes(3).toString('hex'); /* 6-символьный код привязки брокера к боту */
   for (const l of db.leads) {
     if (!l.channels) l.channels = { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: (l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown' };
     if (l.activeChannel === undefined) l.activeChannel = 'wa';
@@ -410,7 +415,8 @@ function notifyOutbound(db, lead, event) {
   }).catch(e => console.error('[outbound]', e.message));
 }
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
-engine.onHandover = (db, lead) => notifyOutbound(db, lead, 'lead.handover');
+engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
+engine.onInboundMessage = (db, lead, m) => tgbridge.forwardInbound(db, lead, m); /* мост: входящее клиента → брокеру в Telegram */
 engine.matchAd = matchAd; /* демо-генератор комментариев цепляет объявление к лиду */
 
 function getSession(req) {
@@ -559,6 +565,7 @@ function publicSettings(db) {
       if (c && (c.botToken || c.token || c.key)) { c.keySet = true; delete c.botToken; delete c.token; delete c.key; }
     }
   }
+  if (s.tgBridge) { if (s.tgBridge.botToken) { s.tgBridge.tokenSet = true; delete s.tgBridge.botToken; } delete s.tgBridge.secret; }
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
@@ -1885,6 +1892,22 @@ function sanitizeBlocks(raw) {
 }
 
 
+/* mime → расширение файла (для сохранения входящих медиа WhatsApp) */
+function mimeToExt(mime) {
+  const m = String(mime || '').split(';')[0].trim().toLowerCase();
+  const MAP = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+    'video/mp4': 'mp4', 'video/3gpp': '3gp', 'video/quicktime': 'mov', 'video/webm': 'webm',
+    'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/amr': 'amr', 'audio/wav': 'wav',
+    'application/pdf': 'pdf', 'application/zip': 'zip', 'text/plain': 'txt', 'text/csv': 'csv',
+    'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  };
+  if (MAP[m]) return MAP[m];
+  const sub = m.split('/')[1];
+  return sub ? sub.replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
+}
+
 /* часовой пояс по коду страны телефона (грубо, для тихих часов достаточно) */
 const PHONE_TZ = [['7', 3], ['971', 4], ['966', 3], ['968', 4], ['974', 3], ['62', 8], ['66', 7], ['34', 2], ['39', 2], ['49', 2], ['33', 2], ['44', 1], ['48', 2], ['380', 3], ['375', 3], ['998', 5], ['996', 6], ['992', 5], ['994', 4], ['995', 4], ['374', 4], ['90', 3], ['972', 3], ['20', 3], ['1', -5], ['86', 8], ['91', 5.5], ['81', 9]];
 function tzFromPhone(phone) {
@@ -2164,7 +2187,8 @@ const server = http.createServer(async (req, res) => {
         }
         if (wa.applyStatuses(db, changes)) store.save();
         const wam = changes?.messages?.[0];
-        if (wam && wam.type === 'text') {
+        const MEDIA_TYPES = ['image', 'video', 'audio', 'voice', 'document', 'sticker'];
+        if (wam && (wam.type === 'text' || MEDIA_TYPES.includes(wam.type))) {
           const phone = '+' + wam.from.replace(/\D/g, '');
           let lead = db.leads.find(l => l.phone.replace(/\D/g, '') === wam.from.replace(/\D/g, ''));
           if (!lead) {
@@ -2179,10 +2203,34 @@ const server = http.createServer(async (req, res) => {
             db.leads.push(lead);
             ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Входящий WhatsApp: ${lead.name}${lead.ads && lead.ads.matched ? ' · ' + lead.ads.adName : ''}` });
           }
-          engine.inbound(db, lead, wam.text.body);
+          let text = '', media = null;
+          if (wam.type === 'text') {
+            text = wam.text.body;
+          } else {
+            const part = wam[wam.type] || {};
+            text = part.caption || '';
+            try {
+              const dl = await wa.downloadMedia(db, part.id);
+              const ext = mimeToExt(dl.mime) || ({ image: 'jpg', video: 'mp4', audio: 'ogg', voice: 'ogg', document: 'bin', sticker: 'webp' })[wam.type] || 'bin';
+              const saved = tgbridge.saveMedia(dl.buf, ext);
+              const mt = wam.type === 'audio' && part.voice ? 'voice' : wam.type;
+              media = { type: mt, url: saved.url, name: (part.filename || '').slice(0, 120) };
+            } catch (e) { console.error('[wa-media]', e.message); text = text || '[медиа не удалось загрузить]'; }
+          }
+          if (text || media) engine.inbound(db, lead, text, media ? { media } : {});
         }
       } catch (e) { console.error('[webhook]', e); }
       json(res, 200, { ok: true }); return;
+    }
+
+    /* ---------------- Telegram-мост: апдейты от бота (брокер отвечает клиенту) ---------------- */
+    if (p === '/tg/webhook' && req.method === 'POST') {
+      const secret = db.settings.tgBridge && db.settings.tgBridge.secret;
+      /* Telegram шлёт секрет в заголовке — отсекаем чужие POST'ы в интернете */
+      if (!secret || String(req.headers['x-telegram-bot-api-secret-token'] || '') !== secret) return json(res, 403, { error: 'bad token' });
+      const body = await readBody(req);
+      try { await tgbridge.handleUpdate(db, body); } catch (e) { console.error('[tg/webhook]', e); }
+      return json(res, 200, { ok: true }); // Telegram нужен только 200
     }
 
     /* ---------------- мост приёма лидов (Albato / Make / любой интегратор) ---------------- */
@@ -2310,6 +2358,44 @@ const server = http.createServer(async (req, res) => {
       const text = engine.buildReport(db, 'daily');
       const sent = await engine.sendReport(db, text);
       return json(res, 200, { text, sent });
+    }
+
+    /* ---------------- Telegram-мост: статус / настройка (владелец) ---------------- */
+    if (p === '/api/tgbridge' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const tb = db.settings.tgBridge || {};
+      const base = global.LUMEN_BASE || tunnelUrl() || ('http://localhost:' + (process.env.PORT || 5077));
+      return json(res, 200, {
+        enabled: !!tb.enabled,
+        tokenSet: !!(tb.botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken)),
+        webhookUrl: base.replace(/\/$/, '') + '/tg/webhook',
+        ready: tgbridge.ready(db),
+        brokers: db.brokers.filter(b => b.active !== false).map(b => ({ id: b.id, name: b.name, code: b.tgBindCode, bound: !!b.tgChatId })),
+      });
+    }
+    if (p === '/api/tgbridge' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const tb = db.settings.tgBridge;
+      if (typeof b.enabled === 'boolean') tb.enabled = b.enabled;
+      if (typeof b.botToken === 'string' && b.botToken.trim()) tb.botToken = b.botToken.trim();
+      if (b.botToken === '') tb.botToken = '';
+      store.save();
+      return json(res, 200, { ok: true, enabled: tb.enabled, tokenSet: !!tb.botToken });
+    }
+    if (p === '/api/tgbridge/setup' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const base = process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || tunnelUrl();
+      if (!base) return json(res, 400, { error: 'нет публичного адреса (туннель/PUBLIC_BASE_URL) — Telegram не сможет достучаться до вебхука' });
+      try { const r = await tgbridge.setupWebhook(db, base); return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', result: r }); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    let tgm;
+    if ((tgm = p.match(/^\/api\/brokers\/([^/]+)\/tg-unbind$/)) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const br = db.brokers.find(x => x.id === tgm[1]); if (!br) return json(res, 404, { error: 'not found' });
+      br.tgChatId = null; br.tgActiveLeadId = null; store.save();
+      return json(res, 200, { ok: true });
     }
 
     /* ---------------- голос ElevenLabs: тест генерации ---------------- */

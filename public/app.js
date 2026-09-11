@@ -10011,6 +10011,17 @@ PAGES.settings = async (root) => {
         <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
         <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('') || '<div class="muted" style="font-size:12px">Порталы не заданы</div>'}
       <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>
+    </div>
+    <div class="glass card" style="margin-top:16px">
+      <div class="card-title">${ic(I.send)}Мост Telegram · брокеры отвечают с телефона<span class="sub">клиент в WhatsApp, брокер — из личного Telegram</span></div>
+      <div class="muted" style="font-size:11.8px;margin:6px 0 12px">Брокеру не нужно держать CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят брокеру в личный Telegram, он отвечает <b>reply</b> — и ответ уходит клиенту в WhatsApp с центрального номера. Номер один на всех, персона сохраняется, вся переписка логируется в CRM.</div>
+      <div class="set-row">
+        <div class="sp"><div class="sl">Мост включён</div><div class="sd">${s.tgBridge && s.tgBridge.tokenSet ? 'Токен бота сохранён' : 'Вставьте токен бота от @BotFather'}</div></div>
+        <label class="switch"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+      </div>
+      <div class="form-row" style="margin-top:6px"><label>Telegram Bot Token (отдельный бот моста, от @BotFather)</label><input id="tgbToken" type="password" placeholder="${s.tgBridge && s.tgBridge.tokenSet ? '•••••• сохранён' : '123456:AA… — можно тот же, что для отчётов'}"></div>
+      <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="tgbSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="tgbSetup" title="Прописать вебхук боту (нужен запущенный туннель)">${ic(I.link)}Настроить вебхук</button></div>
+      <div id="tgbBrokers" class="muted" style="font-size:12px">Загрузка кодов привязки…</div>
     </div>`;
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   $('#portalSave')?.addEventListener('click', async () => {
@@ -10019,6 +10030,35 @@ PAGES.settings = async (root) => {
     await api.patch('/portals', body);
     toast('Ключи сохранены', 'Синк листингов включим после проверки ключей', true);
     await loadState(); PAGES.settings(root);
+  });
+  /* ── мост Telegram ⇄ WhatsApp ── */
+  const tgbRenderBrokers = async () => {
+    const box = $('#tgbBrokers'); if (!box) return;
+    try {
+      const d = await api.get('/tgbridge');
+      const rows = (d.brokers || []).map(b => `<div class="set-row" style="padding:7px 0">
+          <div class="sp"><div class="sl">${esc(b.name)}</div><div class="sd">${b.bound ? 'привязан к Telegram' : 'ещё не привязан'}</div></div>
+          <code class="pill" style="padding:6px 9px;cursor:pointer" data-tgbcode="${esc(b.code)}" title="Скопировать команду для брокера">/start ${esc(b.code)}</code>
+          ${b.bound ? `<button class="btn btn-sm" data-tgbunbind="${b.id}" title="Отвязать">${ic(I.x)}</button>` : `<span class="badge">ждёт</span>`}
+        </div>`).join('');
+      box.innerHTML = `<div style="margin-bottom:8px">Вебхук: <code class="pill" style="padding:6px 9px">${esc(d.webhookUrl)}</code> ${d.ready ? '<span class="badge ok">готов</span>' : '<span class="badge warn">включите мост и настройте вебхук</span>'}</div>
+        <div class="sl" style="margin:10px 0 4px">Коды привязки брокеров</div>
+        <div class="muted" style="font-size:11.5px;margin-bottom:6px">Дайте брокеру его команду — он отправит её боту в Telegram и привяжется. После этого все его лиды приходят ему в личку.</div>
+        ${rows || '<span class="muted">Нет активных брокеров</span>'}`;
+      box.querySelectorAll('[data-tgbcode]').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText('/start ' + c.dataset.tgbcode); toast('Скопировано', 'Отправьте брокеру — пусть напишет это боту', true); }));
+      box.querySelectorAll('[data-tgbunbind]').forEach(btn => btn.addEventListener('click', async () => { await api.post('/brokers/' + btn.dataset.tgbunbind + '/tg-unbind', {}); toast('Отвязан', null, true); tgbRenderBrokers(); }));
+    } catch (e) { box.innerHTML = '<span class="badge warn">не удалось загрузить</span>'; }
+  };
+  tgbRenderBrokers();
+  $('#tgbSave')?.addEventListener('click', async () => {
+    const body = { enabled: $('#tgbEnabled').checked };
+    const tok = $('#tgbToken').value.trim(); if (tok) body.botToken = tok;
+    try { await api.post('/tgbridge', body); toast('Мост сохранён', body.enabled ? 'Включён' : 'Выключен', true); await loadState(); PAGES.settings(root); }
+    catch (e) { toast('Не вышло', e.message); }
+  });
+  $('#tgbSetup')?.addEventListener('click', async () => {
+    try { const r = await api.post('/tgbridge/setup', {}); toast('Вебхук настроен', r.webhook, true); tgbRenderBrokers(); }
+    catch (e) { toast('Не вышло', e.message); }
   });
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
