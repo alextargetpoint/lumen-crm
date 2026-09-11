@@ -1,5 +1,7 @@
 node_modules/
-data/db.json
+data/db*.json
+data/db*.backup*
+data/*.backup.*
 .env
 .DS_Store
 public/assets/brokers/
