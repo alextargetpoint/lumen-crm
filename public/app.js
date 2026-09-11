@@ -8723,6 +8723,42 @@ function tplCard(t, stBadge) {
 
 /* ---------------- КАРТА ЖЕЛАНИЙ (личная доска мотивации брокера) ---------------- */
 let MB_STYLE = 'sticker', MB_EDIT = false, MB_ADD_OPEN = false, MB_TEXTMODE = 'auto', MB_PENDING = [];
+/* Авто-детект непрозрачных границ стикера: у PNG бывают прозрачные поля, из-за
+   которых подпись «висит» далеко под графикой, а крепёж — над пустотой. Меряем
+   opaque-bbox по alpha (canvas, same-origin) и подтягиваем текст/крепёж к реальному
+   краю графики. Кэш по URL; die-cut стикеры (поля ≈0) не трогаются. */
+const MB_TRIM = {};
+function mbMeasureTrim(img, url, cb) {
+  if (MB_TRIM[url] !== undefined) return cb(MB_TRIM[url]);
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return cb(null);
+    const cap = 180, s = Math.min(1, cap / Math.max(w, h)), cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, cw, ch);
+    const px = ctx.getImageData(0, 0, cw, ch).data;
+    let minX = cw, minY = ch, maxX = -1, maxY = -1;
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { if (px[(y * cw + x) * 4 + 3] > 24) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; } }
+    if (maxX < 0) { MB_TRIM[url] = null; return cb(null); }
+    const trim = { t: minY / ch, b: (ch - 1 - maxY) / ch, l: minX / cw, r: (cw - 1 - maxX) / cw };
+    MB_TRIM[url] = trim; cb(trim);
+  } catch (e) { MB_TRIM[url] = null; cb(null); }   /* tainted/недоступно — тихо пропускаем */
+}
+/* применяет обрезку к элементам доски: текст ← к низу графики, крепёж → к верху графики */
+function mbApplyTrim(board) {
+  if (!board) return;
+  board.querySelectorAll('.mb-item.stk img').forEach(img => {
+    const run = () => mbMeasureTrim(img, img.currentSrc || img.src, trim => {
+      if (!trim) return;
+      const item = img.closest('.mb-item'); if (!item) return;
+      const hpx = img.clientHeight || img.offsetHeight; if (!hpx) return;
+      const txt = item.querySelector('.mb-txt, .mb-cap');
+      if (txt && trim.b > 0.03) { const pull = Math.min(trim.b * hpx, hpx * 0.4); txt.style.marginTop = Math.round(9 - pull) + 'px'; }
+      const top = item.querySelector('.mb-clip, .mb-tape');
+      if (top && trim.t > 0.03) { const push = Math.min(trim.t * hpx, hpx * 0.35); top.style.marginTop = Math.round(push) + 'px'; }
+    });
+    if (img.complete && img.naturalWidth) run(); else img.addEventListener('load', run, { once: true });
+  });
+}
 /* пересечение объектов (для подсказки «включи Править, чтобы разложить») */
 function mbOverlap(items) { for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const a = items[i], b = items[j], aw = a.w || 200, ah = (a.w || 200) * 1.15, bw = b.w || 200, bh = (b.w || 200) * 1.15; const ox = Math.min(a.x + aw, b.x + bw) - Math.max(a.x, b.x), oy = Math.min(a.y + ah, b.y + bh) - Math.max(a.y, b.y); if (ox > 0 && oy > 0 && (ox * oy) / Math.min(aw * ah, bw * bh) > 0.6) return true; } return false; } /* только СИЛЬНОЕ перекрытие (>60% на квадрат-аппроксимации die-cut) — иначе hint нагаёт даже после аккуратной компоновки (у стикеров прозрачные поля, реальное перекрытие меньше) */
 const MB_FONTS = { fraunces: ['Элегант', "'Fraunces',serif"], playfair: ['Журнал', "'Playfair Display',serif"], caveat: ['От руки', "'Caveat',cursive"], bebas: ['Плакат', "'Bebas Neue',sans-serif"], manrope: ['Чистый', "'Manrope',sans-serif"] };
@@ -9079,6 +9115,7 @@ async function renderMoodboard(root, opts) {
     </div>`;
   const rerender = () => renderMoodboard(root, opts);
   const board = $('#mbBoard', root);
+  mbApplyTrim(board);   /* подтянуть подписи/крепёж к реальному краю графики (прозрачные поля PNG) */
   $$('.mb-st', root).forEach(b => b.addEventListener('click', () => { MB_STYLE = b.dataset.mbst; $$('.mb-st', root).forEach(x => x.classList.toggle('on', x === b)); const tm = $('#mbTmWrap', root); if (tm) tm.classList.toggle('off', MB_STYLE !== 'sticker'); }));
   $('#mbEdit', root)?.addEventListener('click', () => { MB_EDIT = !MB_EDIT; rerender(); });
   /* КОМПОЗИЦИЯ: «Скомпоновать» (текущий сид) / «Другая композиция» (новый сид, анти-повтор) */
