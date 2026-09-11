@@ -1928,6 +1928,51 @@ function mimeToExt(mime) {
   return sub ? sub.replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
 }
 
+/* --- запись звонка → скачать → Whisper → транскрипт в карточку лида (общая для всех провайдеров) --- */
+function ingestCallRecording(db, lead, recUrl, label, durSec) {
+  (async () => {
+    try {
+      const r2 = await fetch(recUrl);
+      if (!r2.ok) throw new Error('запись недоступна: ' + r2.status);
+      const buf = Buffer.from(await r2.arrayBuffer());
+      if (buf.length > 24e6) throw new Error('запись больше 24МБ');
+      const extM = String(recUrl).split('?')[0].match(/\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i);
+      const text = await llm.transcribe(buf, 'call.' + (extM ? extM[1].toLowerCase() : 'mp3'));
+      lead.transcripts = lead.transcripts || [];
+      lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: (label || 'Звонок') + (durSec ? ' · ' + durSec + 'с' : ''), text: String(text).slice(0, 20000) });
+      ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок расшифрован автоматически: ${lead.name} (${Math.round(String(text).length / 1000)}k символов)` });
+      store.save();
+    } catch (e) { console.error('[call-ingest]', e.message); }
+  })();
+}
+
+/* --- Telnyx Call Control: click-to-call (звонок брокеру → соединение с клиентом → запись) --- */
+async function telnyxApi(db, method, pathx, body) {
+  const t = db.settings.telephony || {};
+  const r = await fetch('https://api.telnyx.com/v2' + pathx, { method, headers: { Authorization: 'Bearer ' + t.key, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('telnyx ' + r.status + ': ' + ((j.errors && j.errors[0] && j.errors[0].detail) || 'ошибка'));
+  return j;
+}
+function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || ''; return base ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
+async function telnyxInitiateCall(db, lead, brokerPhone) {
+  const t = db.settings.telephony || {};
+  if (t.provider !== 'telnyx' || !t.key || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key, Connection ID и номер «От»');
+  if (!brokerPhone) throw new Error('нет номера брокера для звонка');
+  const cs = Buffer.from(JSON.stringify({ leadId: lead.id, clientPhone: lead.phone, stage: 'broker' })).toString('base64');
+  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: brokerPhone, from: t.fromNumber, client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+}
+async function telnyxOnAnswered(db, payload, cs) {
+  const t = db.settings.telephony || {}; const ccid = payload.call_control_id;
+  if (cs.stage === 'broker') {
+    try { await telnyxApi(db, 'POST', `/calls/${ccid}/actions/record_start`, { format: 'mp3', channels: 'single' }); } catch (e) { console.error('[telnyx rec]', e.message); }
+    const cs2 = Buffer.from(JSON.stringify({ leadId: cs.leadId, clientPhone: cs.clientPhone, stage: 'client', bridgeTo: ccid })).toString('base64');
+    await telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: cs.clientPhone, from: t.fromNumber, client_state: cs2, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+  } else if (cs.stage === 'client' && cs.bridgeTo) {
+    await telnyxApi(db, 'POST', `/calls/${ccid}/actions/bridge`, { call_control_id: cs.bridgeTo });
+  }
+}
+
 /* --- Telegram Mini App: валидация initData (подпись Telegram bot-token'ом) --- */
 function tgValidateInitData(initData, botToken) {
   if (!initData || !botToken) return null;
@@ -2331,6 +2376,11 @@ const server = http.createServer(async (req, res) => {
         if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) { lead.ai.enabled = false; lead.ai.pausedBy = 'broker'; }
         store.save(); return json(res, 200, { ok: true });
       }
+      if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/call$/)) && req.method === 'POST') {
+        const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
+        try { await telnyxInitiateCall(db, lead, abroker.phone); return json(res, 200, { ok: true, from: abroker.phone }); }
+        catch (e) { return json(res, 400, { error: e.message }); }
+      }
       return json(res, 404, { error: 'no route' });
     }
 
@@ -2534,22 +2584,29 @@ const server = http.createServer(async (req, res) => {
       if (!phone || !rec) return json(res, 400, { error: 'нужны phone и record_url' });
       const lead = db.leads.find(l => l.phone.replace(/\D/g, '').endsWith(phone.slice(-9)));
       if (!lead) return json(res, 200, { ok: true, matched: false });
-      (async () => {
-        try {
-          const r2 = await fetch(rec);
-          if (!r2.ok) throw new Error('запись недоступна: ' + r2.status);
-          const buf = Buffer.from(await r2.arrayBuffer());
-          if (buf.length > 24e6) throw new Error('запись больше 24МБ');
-          const extM = String(rec).split('?')[0].match(/\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i);
-          const text = await llm.transcribe(buf, 'call.' + (extM ? extM[1].toLowerCase() : 'mp3'));
-          const t = { id: store.nextId('tr'), at: Date.now(), label: 'Звонок · телефония' + (b.duration ? ' · ' + b.duration + 'с' : ''), text: text.slice(0, 20000) };
-          lead.transcripts = lead.transcripts || [];
-          lead.transcripts.push(t);
-          ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок расшифрован автоматически: ${lead.name} (${Math.round(text.length / 1000)}k символов)` });
-          store.save();
-        } catch (e) { console.error('[call-hook]', e.message); }
-      })();
+      ingestCallRecording(db, lead, rec, 'Звонок · телефония', b.duration);
       return json(res, 200, { ok: true, matched: true, leadId: lead.id });
+    }
+
+    /* ---------------- Telnyx: события звонка (bridge + запись → карточка) ---------------- */
+    if (p === '/hooks/telnyx' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const ev = b.data || {}; const et = ev.event_type; const pl = ev.payload || {};
+      try {
+        let cs = {}; try { cs = JSON.parse(Buffer.from(pl.client_state || '', 'base64').toString('utf8') || '{}'); } catch (_) {}
+        if (et === 'call.answered') {
+          await telnyxOnAnswered(db, pl, cs);
+        } else if (et === 'call.recording.saved') {
+          const urls = pl.recording_urls || pl.public_recording_urls || {};
+          const recUrl = urls.mp3 || urls.wav;
+          const phone = String(cs.clientPhone || pl.to || pl.from || '').replace(/\D/g, '');
+          let lead = cs.leadId ? db.leads.find(l => l.id === cs.leadId) : null;
+          if (!lead && phone) lead = db.leads.find(l => l.phone.replace(/\D/g, '').endsWith(phone.slice(-9)));
+          if (lead && recUrl) ingestCallRecording(db, lead, recUrl, 'Звонок · Telnyx');
+        }
+      } catch (e) { console.error('[telnyx-hook]', e.message); }
+      return json(res, 200, { ok: true });
     }
 
     /* ---------------- auth ---------------- */
@@ -2985,6 +3042,15 @@ const server = http.createServer(async (req, res) => {
       store.save();
       const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
       return json(res, 200, Object.assign(leadView(db, lead), { messages: msgs }));
+    }
+
+    /* click-to-call: звоним брокеру, соединяем с клиентом, пишем запись → транскрипт в карточку */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/call$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const brokerPhone = String(b.from || '').trim() || (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
+      try { await telnyxInitiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone }); }
+      catch (e) { return json(res, 400, { error: e.message }); }
     }
 
     /* ИИ первое касание: разбор лида + готовое персональное сообщение */

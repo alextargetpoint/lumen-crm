@@ -10219,11 +10219,15 @@ PAGES.settings = async (root) => {
               <option value="telnyx" ${(s.telephony || {}).provider === 'telnyx' ? 'selected' : ''}>Telnyx</option>
             </select></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>API key</label><input id="telKey" type="password" placeholder="${(s.telephony || {}).keySet ? '•••••• сохранён' : 'ключ провайдера'}"></div>
-            <div class="form-row"><label>API secret</label><input id="telSecret" type="password"></div>
+            <div class="form-row"><label>API key ${(s.telephony || {}).provider === 'telnyx' ? '(Telnyx V2, начинается с KEY…)' : ''}</label><input id="telKey" type="password" placeholder="${(s.telephony || {}).keySet ? '•••••• сохранён' : 'ключ провайдера'}"></div>
+            <div class="form-row"><label>API secret ${(s.telephony || {}).provider === 'telnyx' ? '(не нужен)' : ''}</label><input id="telSecret" type="password"></div>
           </div>
-          <div class="form-row"><label>Вебхук записей звонков (вставить у провайдера)</label>
-            <code class="pill" style="display:block;overflow-x:auto;white-space:nowrap;padding:8px 10px">${location.origin}/hooks/call?key=<секрет из «Рекламы»></code></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Connection / App ID ${(s.telephony || {}).provider === 'telnyx' ? '(Telnyx Voice API App)' : ''}</label><input id="telConn" value="${esc((s.telephony || {}).connId || '')}" placeholder="Call Control App ID"></div>
+            <div class="form-row"><label>Номер «От» (звоним с него)</label><input id="telFrom" value="${esc((s.telephony || {}).fromNumber || '')}" placeholder="+1 555 000 00 00 — номер Telnyx"></div>
+          </div>
+          <div class="form-row"><label>Вебхук событий/записей звонков (вставить в Telnyx → Voice App → Webhook URL)</label>
+            <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${s.tunnelUrl || location.origin}/hooks/telnyx?key=${esc((s.hooks || {}).secret || '')}</code><button class="btn btn-sm" id="telWhCopy" type="button">${ic(I.copy)}</button></div></div>
           <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button> ${hint('telhow', 'Как работает телефония', [
             ['Вебхук после звонка', 'Провайдер шлёт номер клиента и ссылку на запись'],
             ['Лид находится по номеру', 'Запись скачивается и расшифровывается Whisper-ом'],
@@ -10377,11 +10381,14 @@ PAGES.settings = async (root) => {
     if (r.ok) $('#vPlayer').innerHTML = `<audio controls autoplay src="${j.url}" style="height:32px;vertical-align:middle"></audio>`;
     else toast('Не сгенерировалось', j.error);
   });
+  $('#telWhCopy')?.addEventListener('click', () => { const c = $('#telWhCopy').previousElementSibling; navigator.clipboard.writeText(c.textContent); toast('Вебхук скопирован', 'Вставьте в Telnyx → Voice App → Webhook URL', true); });
   $('#telSave').addEventListener('click', async () => {
     const t = { provider: $('#telProv').value };
     if ($('#telKey').value.trim()) { t.key = $('#telKey').value.trim(); t.secret = $('#telSecret').value.trim(); }
+    if ($('#telConn')) t.connId = $('#telConn').value.trim();
+    if ($('#telFrom')) t.fromNumber = $('#telFrom').value.trim();
     await api.patch('/settings', { telephony: t });
-    toast('Телефония сохранена', t.provider === 'none' ? undefined : 'Вебхук записей активен', true);
+    toast('Телефония сохранена', t.provider === 'none' ? undefined : 'Настройте вебхук у провайдера — записи пойдут в карточку', true);
     loadState();
   });
   $('#dAcc').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { accelerate: e.target.checked } }); loadState(); });

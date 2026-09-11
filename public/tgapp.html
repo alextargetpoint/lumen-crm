@@ -183,7 +183,12 @@ mic.onclick=async()=>{
     recHint=document.createElement('div'); recHint.className='rec-hint'; recHint.textContent='● Запись… нажмите 🎤 чтобы отправить'; document.body.appendChild(recHint);
   }catch(e){ toast('Нет доступа к микрофону'); }
 };
-$('#cCall').onclick=()=>{ if(CUR&&CUR.phone){ toast('Звоним…'); window.location.href='tel:'+CUR.phone.replace(/[^\d+]/g,''); } };
+$('#cCall').onclick=async()=>{ if(!CUR)return;
+  try{ const r=await fetch('/tgapp/api/chat/'+CUR.id+'/call',{method:'POST',headers:H}); const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.error){ if(/не настроен/.test(j.error||'')){ toast('Telnyx не настроен — открываю набор'); window.location.href='tel:'+String(CUR.phone||'').replace(/[^\d+]/g,''); } else toast('Звонок не вышел: '+(j.error||r.status)); return; }
+    toast('☎️ Telnyx набирает ВАС — поднимите трубку, затем соединим с клиентом');
+  }catch(e){ toast('Ошибка: '+e.message); }
+};
 $('#q').addEventListener('input',renderChats);
 
 if(!INIT){ $('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку в Telegram-боте.</div>'; }
