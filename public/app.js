@@ -3665,7 +3665,7 @@ async function renderChat(id, rebuild) {
     ? '<div class="bubble in typing"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>' : '';
 
   const chn = l.activeChannel || 'wa';
-  pane.className = 'glass chat chat--' + chn;
+  pane.className = 'glass chat chat--' + chn + (l.ai.enabled ? ' ai-live' : '');
   const chnMeta = { wa: ['WhatsApp', '#25D366'], tg: ['Telegram', '#2AABEE'], viber: ['Viber', '#7360F2'], email: ['E-mail', '#8A90A0'] }[chn] || ['WhatsApp', '#25D366'];
   pane.innerHTML = `
     <div class="chat-head">
@@ -3677,6 +3677,10 @@ async function renderChat(id, rebuild) {
       <span class="badge acc">${stageName(l.stage)}</span>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
+    <div class="chat-ai-aura" aria-hidden="true">
+      <video class="chat-ai-aura-v" autoplay muted loop playsinline src="assets/widgets/amb-aurora.mp4"></video>
+      <div class="chat-ai-pill">${ic(I.spark)}<span>ИИ ведёт диалог</span><i class="chat-ai-dot"></i></div>
+    </div>
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -3761,7 +3765,7 @@ async function renderChat(id, rebuild) {
   $('#lpOpenCard').addEventListener('click', () => openLeadModal(id));
   const cp = $('#copyPhone');
   if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
-  $('#aiToggle').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); });
+  $('#aiToggle').addEventListener('change', async (e) => { const chatEl = document.querySelector('.chat'); if (chatEl) chatEl.classList.toggle('ai-live', e.target.checked); await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); renderChat(id, false); });
   $('#takeoverBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: false } }); toast('Диалог у вас', 'ИИ на паузе — пишите клиенту с того же номера', true); renderChat(id, false); });
   $('#resumeAiBtn')?.addEventListener('click', async () => { await api.patch('/leads/' + id, { ai: { enabled: true } }); toast('ИИ снова ведёт диалог', null, true); renderChat(id, false); });
   const hb = $('#handoverBtn');
