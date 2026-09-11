@@ -2154,7 +2154,7 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .share-b { justify-content: flex-start; width: 100%; }
 
 /* соц-помощник: карусели */
-.car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; align-items: start; }
 .car-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .car-prev { aspect-ratio: 1/1; display: grid; place-items: center; padding: 22px; background: linear-gradient(160deg, var(--accent-2, var(--accent)), var(--ov-hero-b)); color: #fff; text-align: center; }
 .car-prev.portrait { aspect-ratio: 4/5; }
@@ -2505,7 +2505,7 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .hp-vid-add svg { color: var(--ink-3); }
 .sh-gen { margin-bottom: 16px; }
 .sh-gen-hd { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 650; color: var(--navy-900); margin-bottom: 14px; }
-.sh-gen-hd svg { width: 17px; height: 17px; color: var(--accent); flex: none; }
+.sh-gen-hd > svg { width: 17px; height: 17px; color: var(--accent); flex: none; }   /* только иконка-заголовок; кнопки внутри (btn-cta) красились в акцент и сливались */
 .sh-gen-hd .sub { font-weight: 400; font-size: 11.5px; color: var(--ink-3); margin-left: auto; text-align: right; max-width: 56%; }
 .sh-hd-bar { margin-bottom: 14px; }
 .sh-mode { margin-bottom: 12px; }
