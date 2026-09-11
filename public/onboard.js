@@ -257,11 +257,13 @@
     const step = STEPS[idx];
     const d = renderStepData(step);
     const total = STEPS.length;
-    const bgVid = d.bg === 'welcome' ? 'onboard-welcome' : d.bg === 'success' ? 'onboard-success' : '';
+    const BGV = { welcome: 'onboard-welcome', edition: 'ob-edition', brand: 'ob-brand', geos: 'ob-geos', tone: 'ob-tone', whatsapp: 'ob-whatsapp', chains: 'ob-chains', listings: 'ob-listings', team: 'ob-team', finish: 'onboard-success' };
+    const bgVid = BGV[step.id] || '';
     root.querySelector('.ob-bgvid').innerHTML = bgVid
       ? `<video autoplay muted loop playsinline poster="/assets/${bgVid}-poster.jpg"><source src="/assets/${bgVid}.mp4?v=1" type="video/mp4"></video>`
       : '';
     root.classList.toggle('ob-cinematic', !!d.bg);
+    root.classList.toggle('ob-hasbg', !!bgVid && !d.bg);
 
     const stepsDots = STEPS.map((s, i) => `<i class="${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}"></i>`).join('');
     const shot = d.shot ? `<div class="ob-shot"><div class="ob-shot-bar"><i></i><i></i><i></i></div><img src="${SHOT(d.shot)}" alt="" loading="lazy"></div>` : '';
@@ -594,6 +596,9 @@
     .ob-root:not(.ob-cinematic) .ob-veil{background:radial-gradient(120% 90% at 16% -4%,rgba(26,48,100,.6),transparent 52%),radial-gradient(120% 90% at 92% 16%,rgba(74,48,140,.42),transparent 52%),linear-gradient(180deg,#070e22,#03060f)}
     .ob-bgvid video{opacity:.52;transform:scale(1.04);animation:obBgZoom 22s ease-in-out infinite alternate}
     @keyframes obBgZoom{to{transform:scale(1.13)}}
+    /* контентные шаги с видео-хуком: видео тоньше, вейл плотнее (формы читаемы) */
+    .ob-root.ob-hasbg .ob-bgvid video{opacity:.34}
+    .ob-root.ob-hasbg .ob-veil{background:radial-gradient(120% 90% at 18% -4%,rgba(24,44,92,.5),transparent 48%),radial-gradient(120% 90% at 90% 12%,rgba(74,48,140,.34),transparent 48%),linear-gradient(180deg,rgba(6,11,26,.8),rgba(3,6,15,.9))}
     .ob-close{background:rgba(10,18,38,.5);box-shadow:0 8px 24px -10px rgba(0,0,0,.6)}
     .ob-panel{filter:drop-shadow(0 44px 100px rgba(0,0,0,.55))}
     @keyframes obIn{from{opacity:0;transform:translateY(36px) scale(.968);filter:blur(11px)}to{opacity:1;transform:none;filter:none}}
