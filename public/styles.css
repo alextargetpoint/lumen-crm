@@ -6334,8 +6334,8 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
   --violet: #7657D9; --violet-bg: #EDE8FB;
   --ov-primary: #861C3C; --ov-primary-hover: #741832;
   --ov-chip-gray: #F1F4F8; --gauge-track: rgba(30,40,60,.10);
-  /* hero — глубокое ВИНО (чистый бордо, без синего/мутного) для data-hero */
-  --ov-hero-a: #4E1226; --ov-hero-b: #3A0F1C; --ov-hero-c: #5C1229;
+  /* hero — тёмное почти-чёрное ВИНО (глубоко, не «кровь»; служит базой под видеофон) */
+  --ov-hero-a: #2C0C15; --ov-hero-b: #180710; --ov-hero-c: #45121F;
   /* логотип на ТЁМНОМ сайдбаре — светлый бордо */
   --logo-a: #F4C9D5; --logo-b: #DD7693; --logo-c: #AC2852;
   /* accent-soft границы под бордо (были хардкод-синие #C3D6FA/#B9CBEE → клеш с розовым фоном) */
@@ -6497,15 +6497,28 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* Бургунди — категорийные цвета РАЗЛИЧИМЫЕ и семантические (blue/green/amber/purple),
    НЕ моно-винный спред: графики/донат/воронка должны читаться. Бордо — только бренд-акцент. */
 :root[data-theme="warm"] {
-  --ov-soft-blue: #E8F0FD; --ov-soft-green: #DFF5EC; --ov-soft-red: #FCE5E8; --ov-soft-amber: #FFF2D8; --ov-soft-purple: #EDE8FB;
-  --ov-cat-blue: #3F7CEC; --ov-cat-green: #1F9D73; --ov-cat-red: #D94757; --ov-cat-amber: #D99A34; --ov-cat-purple: #7657D9;
+  --ov-soft-blue: #EAEEF5; --ov-soft-green: #E6F1EC; --ov-soft-red: #FBE6E9; --ov-soft-amber: #F6EEDD; --ov-soft-purple: #EFE9F0;
+  /* приглушённая ТЁПЛАЯ дата-виз (не радуга, не яркий синий): пыльно-синий/муравленый-зелёный/золото/плюм — читается, но тихо и когерентно с бордо */
+  --ov-cat-blue: #6E86B0; --ov-cat-green: #4E9E82; --ov-cat-red: #C85462; --ov-cat-amber: #C39A52; --ov-cat-purple: #8A6A9E;
   --ov-chip-gray: #F1F4F8; --ov-gold-soft: #FBF3E4;
 }
 /* Стекло — Apple-системные цвета (яркие, но на матовом — премиально и когерентно) */
 :root[data-theme="emerald"] {
-  --ov-soft-blue: rgba(0,113,227,.10); --ov-soft-green: rgba(52,199,89,.12); --ov-soft-red: rgba(255,59,48,.10); --ov-soft-amber: rgba(255,149,0,.12); --ov-soft-purple: rgba(175,82,222,.10);
-  --ov-cat-blue: #0071E3; --ov-cat-green: #34C759; --ov-cat-red: #FF3B30; --ov-cat-amber: #FF9500; --ov-cat-purple: #AF52DE;
+  --ov-soft-blue: rgba(0,113,227,.09); --ov-soft-green: rgba(48,168,90,.10); --ov-soft-red: rgba(255,59,48,.09); --ov-soft-amber: rgba(245,147,49,.10); --ov-soft-purple: rgba(94,92,230,.10);
+  /* Apple-системные, но чуть приглушены (неон зелёного/оранжевого «кричал» на стекле) + purple→индиго = синяя семья, когерентнее */
+  --ov-cat-blue: #0071E3; --ov-cat-green: #2FA85A; --ov-cat-red: #F0453B; --ov-cat-amber: #F0902A; --ov-cat-purple: #5E5CE6;
   --ov-chip-gray: rgba(0,0,0,.05); --ov-gold-soft: rgba(0,0,0,.04);
+}
+/* Цвета СТАДИЙ (донат/канбан) тематизированы через --stg-* (JS отдаёт var(--stg-id, дефолт)).
+   Бургунди — тихая ТЁПЛАЯ шкала (без яркого синего): роза/мов/шалфей/золото/плюм/вино. */
+:root[data-theme="warm"] {
+  --stg-new:#9C8791; --stg-touch:#C08A9A; --stg-dialog:#A85E7A; --stg-qualified:#5E9E86;
+  --stg-handover:#9A7BA0; --stg-viewing:#C39A52; --stg-deal:#2E9E76; --stg-sleeping:#A99AA0; --stg-lost:#C85462;
+}
+/* Стекло — прохладная Apple-шкала (синий/тил/индиго/зелёный/оранж), приглушённая */
+:root[data-theme="emerald"] {
+  --stg-new:#8A94A6; --stg-touch:#5AC8FA; --stg-dialog:#0071E3; --stg-qualified:#30B85C;
+  --stg-handover:#5E5CE6; --stg-viewing:#F0902A; --stg-deal:#2FA85A; --stg-sleeping:#98A2B3; --stg-lost:#F0453B;
 }
 
 /* Донат «Статусы» (цвета стадий — data-viz): координируем под тему */

@@ -411,7 +411,8 @@ const STAGE_COLORS = {
 };
 const STAGE_PALETTE = ['#4F7DFF', '#2FA98C', '#8B7BD8', '#C9922E', '#129B6E', '#E08A6B', '#5AAFD6', '#B07CC9'];
 function stageColor(id) {
-  if (STAGE_COLORS[id]) return STAGE_COLORS[id];
+  /* через CSS-переменную --stg-<id> (тема может перекрасить донат/канбан), фолбэк = дефолт-палитра */
+  if (STAGE_COLORS[id]) return `var(--stg-${id}, ${STAGE_COLORS[id]})`;
   /* кастомным стадиям — стабильный цвет из палитры по хешу id */
   let h = 0; for (let i = 0; i < String(id).length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return STAGE_PALETTE[h % STAGE_PALETTE.length];
