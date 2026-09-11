@@ -2461,48 +2461,105 @@ html[data-night] .ws-tab:hover { background: rgba(140, 165, 230, .1); }
 .sh-tab.on::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--hue, var(--accent)); }
 .sh-main { min-width: 0; }
 
-/* ── Схемы хантинга (плейбук лидогена) — айдентичный блок ── */
-.hp-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr 300px; gap: 10px; align-items: center; padding: 26px 28px; margin-bottom: 18px; border-radius: var(--r-lg, 18px); background: linear-gradient(150deg, var(--ov-hero-a), var(--ov-hero-b) 55%, color-mix(in srgb, var(--accent) 26%, var(--ov-hero-c)) 135%); border: 1px solid rgba(255,255,255,.1); color: #fff; box-shadow: var(--shadow-lift, 0 18px 50px rgba(6,17,38,.28)); }
-.hp-hero-k { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--accent) 30%, #fff); }
-.hp-hero-k svg { width: 15px; height: 15px; }
-.hp-hero-t { font-family: 'Fraunces', serif; font-weight: 550; font-size: 27px; letter-spacing: .01em; margin: 10px 0 8px; color: #fff; }
-.hp-hero-s { font-size: 13.5px; line-height: 1.55; color: rgba(255,255,255,.82); max-width: 62ch; }
-.hp-hero-art { align-self: stretch; min-height: 168px; background-size: contain; background-position: center right; background-repeat: no-repeat; }
-@media (max-width: 640px) { .hp-hero { grid-template-columns: 1fr; } .hp-hero-art { display: none; } }
+/* ── Схемы хантинга (плейбук лидогена) — графический, схематичный блок ── */
+.hp-top { margin-bottom: 18px; }
+.hp-top-k { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.hp-top-k svg { width: 14px; height: 14px; }
+.hp-top-t { font-weight: 800; font-size: 25px; letter-spacing: -.02em; margin: 8px 0 6px; color: var(--navy-900); }
+.hp-top-s { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); max-width: 70ch; }
 
-.hp-list { display: flex; flex-direction: column; gap: 16px; }
-.hp-card { background: var(--card); border: 1px solid var(--stroke); border-radius: var(--r-lg, 18px); padding: 22px 24px; box-shadow: var(--shadow); }
-.hp-card-hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.hp-card-t { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.hp-card-t b { font-family: 'Fraunces', serif; font-weight: 550; font-size: 19px; color: var(--navy-900); }
-.hp-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 3px 9px; border-radius: 99px; }
-.hp-chan { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.hp-list { display: flex; flex-direction: column; gap: 14px; }
+.hp-card { background: var(--card); border: 1px solid var(--stroke); border-radius: var(--r-lg, 18px); padding: 0; overflow: hidden; box-shadow: var(--shadow); transition: border-color .16s, box-shadow .16s; }
+.hp-card:hover:not(.open) { border-color: color-mix(in srgb, var(--accent) 32%, var(--stroke)); box-shadow: var(--shadow-lift, var(--shadow)); }
+.hp-card-hd { width: 100%; display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
+.hp-card-hd-l { flex: 1; min-width: 0; }
+.hp-card-t { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.hp-card-t b { font-weight: 750; font-size: 18px; letter-spacing: -.015em; color: var(--navy-900); }
+.hp-tag { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 3px 9px; border-radius: 99px; }
+.hp-chan { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-3); flex: none; }
 .hp-chan svg { width: 14px; height: 14px; }
-.hp-lead { font-size: 14px; line-height: 1.6; color: var(--ink-2); margin: 0 0 18px; }
-.hp-sec { margin-top: 16px; }
-.hp-sec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+.hp-chev { flex: none; color: var(--ink-3); display: grid; place-items: center; transition: transform .2s var(--ease-spring, ease); }
+.hp-chev svg { width: 18px; height: 18px; transform: rotate(90deg); }
+.hp-card.open .hp-chev svg { transform: rotate(-90deg); }
+.hp-card-body { display: none; padding: 2px 24px 24px; }
+.hp-card.open .hp-card-body { display: block; animation: gsIn .26s var(--ease-spring, ease); }
+.hp-lead { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin: 0; }
+@media (max-width: 640px) { .hp-chan { display: none; } }
+.hp-sec { margin-top: 22px; }
+.hp-sec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
 .hp-sec-h svg { width: 15px; height: 15px; color: var(--accent); }
-.hp-why { display: flex; flex-direction: column; gap: 8px; }
-.hp-why-r { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 12px; padding: 9px 12px; background: var(--bg-2); border-radius: 10px; border: 1px solid var(--stroke-soft); align-items: baseline; }
-.hp-why-r b { font-size: 13px; color: var(--navy-900); font-weight: 650; }
-.hp-why-r span { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
-.hp-steps { margin: 0; padding: 0; list-style: none; counter-reset: hps; display: flex; flex-direction: column; gap: 9px; }
-.hp-steps li { counter-increment: hps; position: relative; padding-left: 34px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
-.hp-steps li::before { content: counter(hps); position: absolute; left: 0; top: -1px; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
-.hp-tip { display: flex; gap: 9px; margin-top: 16px; padding: 12px 14px; background: color-mix(in srgb, var(--accent) 7%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--ink); }
+
+/* Анатомия рилса: телефон-фрейм с хуком + разбор по секундам */
+.hp-anat { display: grid; grid-template-columns: 190px 1fr; gap: 22px; align-items: center; margin-top: 20px; padding: 20px; border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, var(--bg-2)), var(--bg-2)); border: 1px solid var(--stroke-soft); }
+.hp-phone { position: relative; width: 190px; aspect-ratio: 9/17; border-radius: 26px; overflow: hidden; background: #0a0a12; box-shadow: 0 18px 40px -12px rgba(6,17,38,.5), inset 0 0 0 5px rgba(20,20,30,.9), inset 0 0 0 7px rgba(120,120,140,.3); flex: none; }
+.hp-phone-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hp-phone-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.32), transparent 30%, transparent 62%, rgba(0,0,0,.5)); }
+.hp-phone-hook { position: absolute; left: 12px; right: 12px; top: 30px; text-align: center; }
+.hp-phone-live { display: inline-block; font-size: 8.5px; font-weight: 800; letter-spacing: .08em; color: #fff; background: rgba(220,40,60,.9); padding: 2px 7px; border-radius: 99px; margin-bottom: 8px; }
+.hp-phone-hook b { display: block; font-size: 16px; font-weight: 800; letter-spacing: .02em; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.7); line-height: 1.1; text-transform: uppercase; }
+.hp-phone-hook i { display: block; font-style: normal; font-size: 9.5px; color: rgba(255,255,255,.9); margin-top: 5px; text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+.hp-phone-ui { position: absolute; right: 10px; bottom: 44px; display: flex; flex-direction: column; gap: 12px; }
+.hp-phone-ui span { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.22); backdrop-filter: blur(4px); }
+.hp-anat-x { min-width: 0; }
+.hp-anat-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
+.hp-anat-h svg { width: 15px; height: 15px; color: var(--accent); }
+.hp-anat-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hp-anat-steps li { display: grid; grid-template-columns: 82px 1fr; gap: 12px; align-items: baseline; }
+.hp-anat-s { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: var(--accent); padding: 3px 8px; border-radius: 7px; text-align: center; }
+.hp-anat-steps b { font-size: 13.5px; color: var(--navy-900); font-weight: 650; }
+.hp-anat-steps i { display: block; font-style: normal; font-size: 12.5px; color: var(--ink-2); line-height: 1.45; margin-top: 1px; }
+
+/* Почему работает: визуальное сравнение тёплые/холодные */
+.hp-cmp { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
+.hp-cmp-c { padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--stroke-soft); }
+.hp-cmp-c svg { width: 22px; height: 22px; }
+.hp-cmp-c b { font-size: 13.5px; color: var(--navy-900); font-weight: 650; }
+.hp-cmp-c span { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.hp-cmp-c em { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; margin-top: auto; padding-top: 6px; }
+.hp-cmp-c.warm { background: color-mix(in srgb, var(--ok) 9%, transparent); border-color: color-mix(in srgb, var(--ok) 24%, transparent); }
+.hp-cmp-c.warm svg, .hp-cmp-c.warm em { color: var(--ok); }
+.hp-cmp-c.cold { background: color-mix(in srgb, var(--ink-3) 8%, transparent); }
+.hp-cmp-c.cold svg, .hp-cmp-c.cold em { color: var(--ink-3); }
+.hp-cmp-vs { align-self: center; font-size: 12px; font-weight: 800; color: var(--ink-3); }
+.hp-key { display: flex; gap: 9px; margin-top: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--navy-900); font-weight: 500; }
+.hp-key svg { width: 16px; height: 16px; color: var(--accent); flex: none; margin-top: 1px; }
+
+/* Схема по шагам: горизонтальный флоу с иконками и стрелками */
+.hp-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.hp-step { flex: 1 1 120px; min-width: 108px; padding: 13px 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--stroke-soft); text-align: center; }
+.hp-step-ic { display: grid; place-items: center; width: 34px; height: 34px; margin: 0 auto 8px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.hp-step-ic svg { width: 17px; height: 17px; }
+.hp-step b { display: block; font-size: 12.5px; color: var(--navy-900); font-weight: 650; }
+.hp-step i { display: block; font-style: normal; font-size: 11px; color: var(--ink-3); margin-top: 2px; line-height: 1.35; }
+.hp-arr { align-self: center; color: color-mix(in srgb, var(--accent) 60%, var(--ink-3)); font-weight: 700; }
+@media (max-width: 720px) { .hp-arr { display: none; } .hp-step { flex-basis: calc(50% - 6px); } }
+
+.hp-tip { display: flex; gap: 9px; margin-top: 16px; padding: 12px 14px; background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--ink); }
 .hp-tip svg { width: 16px; height: 16px; color: var(--accent); flex: none; margin-top: 1px; }
+
+/* Хук-фразы с таймингом 0:00 */
 .hp-hooks { display: flex; flex-direction: column; gap: 7px; }
-.hp-hook { display: flex; align-items: center; gap: 10px; padding: 9px 11px 9px 14px; background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 10px; }
-.hp-hook > span { flex: 1; font-size: 13px; color: var(--navy-900); font-weight: 500; }
-.hp-vids { display: flex; flex-direction: column; gap: 7px; }
-.hp-vid { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 11px; color: var(--ink); font-size: 13px; font-weight: 550; transition: border-color .14s, background .14s; }
-.hp-vid:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--bg-2)); }
-.hp-vid > span { flex: 1; }
-.hp-vid svg { width: 15px; height: 15px; color: var(--accent); flex: none; }
-.hp-vid svg:last-child { color: var(--ink-3); }
-.hp-vid-add { color: var(--ink-3); font-weight: 400; border-style: dashed; cursor: default; }
-.hp-vid-add:hover { border-color: var(--stroke); background: var(--bg-2); }
-.hp-vid-add svg { color: var(--ink-3); }
+.hp-hook { display: flex; align-items: center; gap: 11px; padding: 9px 11px 9px 11px; background: var(--bg-2); border: 1px solid var(--stroke-soft); border-radius: 10px; }
+.hp-hook-t { font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 3px 8px; border-radius: 7px; flex: none; }
+.hp-hook-x { flex: 1; font-size: 13px; color: var(--navy-900); font-weight: 500; }
+
+/* Примеры-превью: телефон-фреймы с проигрыванием */
+.hp-exs { display: flex; gap: 14px; flex-wrap: wrap; }
+.hp-ex { width: 150px; margin: 0; text-decoration: none; }
+.hp-ex-ph { position: relative; width: 150px; aspect-ratio: 9/16; border-radius: 16px; overflow: hidden; background: #0a0a12; box-shadow: 0 10px 26px -10px rgba(6,17,38,.4); display: grid; place-items: center; }
+.hp-ex-v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hp-ex-play { position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.9); display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+.hp-ex-play svg { width: 18px; height: 18px; color: #111; margin-left: 2px; }
+.hp-ex figcaption { margin-top: 9px; }
+.hp-ex figcaption b { display: block; font-size: 12.5px; color: var(--navy-900); font-weight: 650; }
+.hp-ex figcaption span { font-size: 11.5px; color: var(--ink-3); }
+.hp-ex-ext { background: linear-gradient(150deg, var(--ov-hero-a), color-mix(in srgb, var(--accent) 30%, var(--ov-hero-b))); }
+.hp-ex-ext svg { width: 30px; height: 30px; color: rgba(255,255,255,.92); }
+.hp-ex-badge { position: absolute; top: 8px; right: 8px; font-size: 9px; font-weight: 800; letter-spacing: .05em; color: #fff; background: rgba(0,0,0,.4); backdrop-filter: blur(4px); padding: 2px 6px; border-radius: 6px; }
+.hp-ex-link:hover .hp-ex-ph { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hp-ex-add { width: 150px; aspect-ratio: 9/16; border-radius: 16px; border: 1.5px dashed var(--stroke); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 14px; color: var(--ink-3); }
+.hp-ex-add svg { width: 22px; height: 22px; }
+.hp-ex-add span { font-size: 11.5px; line-height: 1.4; }
 .sh-gen { margin-bottom: 16px; }
 .sh-gen-hd { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 650; color: var(--navy-900); margin-bottom: 14px; }
 .sh-gen-hd > svg { width: 17px; height: 17px; color: var(--accent); flex: none; }   /* только иконка-заголовок; кнопки внутри (btn-cta) красились в акцент и сливались */

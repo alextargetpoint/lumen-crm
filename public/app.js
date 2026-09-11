@@ -7651,21 +7651,24 @@ const HUNT_PLAYS = [
     title: 'Нативные обзоры вторички',
     tag: 'Органика · протестировано',
     channel: 'Органический трафик',
-    lead: 'Каждый день — новый сильный листинг, короткий нативный обзор. Объект продаёт сам. Ролики залетают на органике, а ты собираешь лидов со сформированным спросом.',
-    why: [
-      ['Обзор конкретного объекта', 'лиды со СФОРМИРОВАННЫМ спросом — прямые, реально ищут недвижку'],
-      ['Виральные / хайповые ролики', 'более холодные лиды: шире охват, слабее намерение'],
-      ['Сильный визуал объекта', 'объект продаёт сам — брокеру не нужно «продавать» в кадре'],
+    lead: 'Каждый день — новый сильный листинг. Короткий нативный обзор, где объект продаёт сам. Ролик залетает на органике, ты собираешь лидов со сформированным спросом.',
+    reel: { hook: 'СРОЧНАЯ ПРОДАЖА', sub: 'уникальный лот только вышел на рынок', video: 'assets/play-reel-1.mp4', poster: 'assets/play-reel-1-poster.jpg' },
+    anatomy: [
+      { s: '0:00–0:02', t: 'Хук', d: 'тезисная фраза на экране и голосом — сразу' },
+      { s: '0:02–0:25', t: 'Нативный обзор', d: 'объект продаёт сам, без «продаж» в кадре' },
+      { s: 'финал', t: 'Заземление', d: 'веди в директ и личный бренд' },
     ],
-    steps: [
-      'Найди партнёров с богатой коллекцией вторички по локации (напр. рынок Дубая).',
-      'Отбирай объекты с сильным визуалом — где сам объект продаёт.',
-      'Снимай пачкой: за день заехал на 5 проектов → быстро отснял → смонтировал → опубликовал.',
-      'Публикуй КАЖДЫЙ день без остановок: новый проект = новый ролик.',
-      'Хук в первые 1–2 секунды — тезисная фраза («Срочная продажа», «Уникальный лот только вышел на рынок»).',
-      'Заземляй аудиторию на личный бренд в Instagram — тёплые дожимающие посты на личности и более специфичные темы.',
+    warm: { t: 'Обзор конкретного объекта', o: 'Сформированный спрос — прямые лиды, реально ищут недвижку' },
+    cold: { t: 'Виральные / хайповые ролики', o: 'Холодные лиды — шире охват, но слабее намерение' },
+    key: 'Сильный визуал = ролик продаёт сам. Брокеру не нужно продавать в кадре.',
+    flow: [
+      { ic: I.chain,  t: 'Партнёры-вторичка', s: 'коллекция по локации' },
+      { ic: I.spark,  t: 'Сильный визуал',    s: 'объект продаёт сам' },
+      { ic: I.layers, t: 'Снимай пачкой',     s: '5 проектов/день' },
+      { ic: I.wake,   t: 'Каждый день',       s: 'проект = ролик' },
+      { ic: I.flame,  t: 'Хук 1–2 сек',       s: 'тезис сразу' },
+      { ic: I.target, t: 'Заземляй',          s: 'в личный бренд' },
     ],
-    tip: 'Визуальный хук: рука в кадре впереди (маникюр, браслеты) — частично триггерит и задерживает внимание, особенно женскую аудиторию.',
     hooks: [
       'Срочная продажа — уникальный лот только что вышел на рынок',
       'Такого в Дубае за эти деньги вы ещё не видели',
@@ -7673,46 +7676,80 @@ const HUNT_PLAYS = [
       'Вот что реально можно купить здесь за $[сумма]',
       'Объект дня — показываю всё как есть, без прикрас',
     ],
-    videos: [
-      { url: 'https://www.instagram.com/reel/DdD73mDxvGW/', label: 'Референс: нативный обзор вторички' },
+    tip: 'Визуальный хук: рука в кадре впереди (маникюр, браслеты) — задерживает внимание, особенно женскую аудиторию.',
+    examples: [
+      { video: 'assets/play-reel-1.mp4', poster: 'assets/play-reel-1-poster.jpg', t: 'Апартаменты · Marina', s: 'обзор интерьера' },
+      { video: 'assets/play-reel-2.mp4', poster: 'assets/play-reel-2-poster.jpg', t: 'Вилла · инфинити', s: 'заход дроном' },
     ],
   },
 ];
+const PLAY_OPEN = new Set(['listing-reviews']);   /* какие схемы развёрнуты (первая — сразу) */
 async function shPlays(main) {
   const plays = HUNT_PLAYS;
+  const phone = (r) => `<div class="hp-phone"><video class="hp-phone-v" autoplay muted loop playsinline poster="${esc(r.poster)}"><source src="${esc(r.video)}" type="video/mp4"></video>
+    <div class="hp-phone-scrim"></div>
+    <div class="hp-phone-hook"><span class="hp-phone-live">● 0:01</span><b>${esc(r.hook)}</b><i>${esc(r.sub)}</i></div>
+    <div class="hp-phone-ui"><span></span><span></span><span></span></div></div>`;
+  const exCard = (e) => `<figure class="hp-ex"><div class="hp-ex-ph"><video class="hp-ex-v" autoplay muted loop playsinline poster="${esc(e.poster)}"><source src="${esc(e.video)}" type="video/mp4"></video><span class="hp-ex-play">${ic(I.play)}</span></div><figcaption><b>${esc(e.t)}</b><span>${esc(e.s)}</span></figcaption></figure>`;
   const card = (pl) => `
-    <article class="hp-card">
-      <div class="hp-card-hd">
-        <div class="hp-card-t"><b>${esc(pl.title)}</b><span class="hp-tag">${esc(pl.tag)}</span></div>
-        <span class="hp-chan">${ic(I.target, 2)}${esc(pl.channel)}</span>
-      </div>
-      <p class="hp-lead">${esc(pl.lead)}</p>
-      <div class="hp-sec"><div class="hp-sec-h">${ic(I.spark, 2)}Почему работает</div>
-        <div class="hp-why">${pl.why.map(([a, b]) => `<div class="hp-why-r"><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join('')}</div>
-      </div>
-      <div class="hp-sec"><div class="hp-sec-h">${ic(I.layers, 2)}Как делать</div>
-        <ol class="hp-steps">${pl.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
-      </div>
-      ${pl.tip ? `<div class="hp-tip">${ic(I.bolt, 2)}<span>${esc(pl.tip)}</span></div>` : ''}
-      <div class="hp-sec"><div class="hp-sec-h">${ic(I.flame, 2)}Хук-фразы для начала ролика</div>
-        <div class="hp-hooks">${pl.hooks.map(h => `<div class="hp-hook"><span>${esc(h)}</span>${cpBtn(h)}</div>`).join('')}</div>
-      </div>
-      <div class="hp-sec"><div class="hp-sec-h">${ic(I.play, 2)}Видео-примеры</div>
-        <div class="hp-vids">${pl.videos.map(v => `<a class="hp-vid" href="${esc(v.url)}" target="_blank" rel="noopener">${ic(I.play, 2)}<span>${esc(v.label)}</span>${ic(I.arrow, 2)}</a>`).join('')}
-          <div class="hp-vid hp-vid-add">${ic(I.plus, 2)}<span>ещё примеры — скинь ссылки, добавлю в схему</span></div>
+    <article class="hp-card ${PLAY_OPEN.has(pl.id) ? 'open' : ''}" data-play="${esc(pl.id)}">
+      <button type="button" class="hp-card-hd" data-playtoggle="${esc(pl.id)}">
+        <div class="hp-card-hd-l">
+          <div class="hp-card-t"><b>${esc(pl.title)}</b><span class="hp-tag">${esc(pl.tag)}</span></div>
+          <p class="hp-lead">${esc(pl.lead)}</p>
         </div>
+        <span class="hp-chan">${ic(I.target, 2)}${esc(pl.channel)}</span>
+        <span class="hp-chev">${ic(I.arrow, 2)}</span>
+      </button>
+      <div class="hp-card-body">
+      <div class="hp-anat">
+        ${phone(pl.reel)}
+        <div class="hp-anat-x">
+          <div class="hp-anat-h">${ic(I.play, 2)}Как выглядит ролик — по секундам</div>
+          <ol class="hp-anat-steps">${pl.anatomy.map(a => `<li><span class="hp-anat-s">${esc(a.s)}</span><div><b>${esc(a.t)}</b><i>${esc(a.d)}</i></div></li>`).join('')}</ol>
+        </div>
+      </div>
+
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.spark, 2)}Почему работает</div>
+        <div class="hp-cmp">
+          <div class="hp-cmp-c warm">${ic(I.target)}<b>${esc(pl.warm.t)}</b><span>${esc(pl.warm.o)}</span><em>тёплые · прямые</em></div>
+          <div class="hp-cmp-vs">vs</div>
+          <div class="hp-cmp-c cold">${ic(I.wake)}<b>${esc(pl.cold.t)}</b><span>${esc(pl.cold.o)}</span><em>холодные · охват</em></div>
+        </div>
+        <div class="hp-key">${ic(I.bolt, 2)}<span>${esc(pl.key)}</span></div>
+      </div>
+
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.layers, 2)}Схема по шагам</div>
+        <div class="hp-flow">${pl.flow.map((f, i) => `<div class="hp-step"><span class="hp-step-ic">${ic(f.ic)}</span><b>${esc(f.t)}</b><i>${esc(f.s)}</i></div>${i < pl.flow.length - 1 ? '<span class="hp-arr">→</span>' : ''}`).join('')}</div>
+      </div>
+
+      ${pl.tip ? `<div class="hp-tip">${ic(I.bolt, 2)}<span>${esc(pl.tip)}</span></div>` : ''}
+
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.flame, 2)}Хук-фразы · первые 1–2 секунды</div>
+        <div class="hp-hooks">${pl.hooks.map(h => `<div class="hp-hook"><span class="hp-hook-t">0:00</span><span class="hp-hook-x">${esc(h)}</span>${cpBtn(h)}</div>`).join('')}</div>
+      </div>
+
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.play, 2)}Примеры — играются прямо здесь</div>
+        <div class="hp-exs">${pl.examples.map(exCard).join('')}
+          <div class="hp-ex hp-ex-add">${ic(I.plus)}<span>скинь рилы — подтяну внутрь, будут играться тут же</span></div>
+        </div>
+      </div>
       </div>
     </article>`;
   main.innerHTML = `
-    <div class="hp-hero">
-      <div class="hp-hero-x">
-        <div class="hp-hero-k">${ic(I.target)}Библиотека схем</div>
-        <div class="hp-hero-t">Схемы хантинга лидов</div>
-        <div class="hp-hero-s">Проверенные схемы органического и платного лидогена для агентств недвижимости. Собираем со временем — бери, разбирай на брокеров, повторяй.</div>
-      </div>
-      <div class="hp-hero-art" style="background-image:url('assets/play-hunt-cover.webp')" aria-hidden="true"></div>
+    <div class="hp-top">
+      <div class="hp-top-k">${ic(I.target, 2)}Библиотека схем · растёт со временем</div>
+      <div class="hp-top-t">Схемы хантинга лидов</div>
+      <div class="hp-top-s">Проверенные схемы органического и платного лидогена для агентств недвижимости. Бери, разбирай на брокеров, повторяй.</div>
     </div>
     <div class="hp-list">${plays.map(card).join('')}</div>`;
+  $$('[data-playtoggle]', main).forEach(h => h.addEventListener('click', () => {
+    const id = h.dataset.playtoggle, art = h.closest('.hp-card');
+    const open = art.classList.toggle('open');
+    if (open) PLAY_OPEN.add(id); else PLAY_OPEN.delete(id);
+    /* видео в свёрнутой карточке — пауза (экономим ресурсы), в развёрнутой — играем */
+    art.querySelectorAll('video').forEach(v => { try { open ? v.play() : v.pause(); } catch (_) {} });
+  }));
 }
 
 /* ── Сценарии Reels ── */
