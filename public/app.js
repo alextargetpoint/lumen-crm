@@ -1948,7 +1948,7 @@ PAGES.feed = async (root) => {
             <button class="btn btn-accent btn-sm" id="fdPublish">${ic(I.send)}Опубликовать</button>
           </div>
         </div>` : ''}
-        <div id="fdPosts">${posts.map(postCard).join('') || '<div class="glass card empty">Пока пусто. ' + (canPost ? 'Опубликуйте первую новость ↑' : 'Скоро здесь появятся новости агентства') + '</div>'}</div>
+        <div id="fdPosts">${posts.map(postCard).join('') || '<div class="glass card empty es-art es-feed"><span class="es-art-img"></span><span class="es-art-tx">Пока пусто. ' + (canPost ? 'Опубликуйте первую новость ↑' : 'Скоро здесь появятся новости агентства') + '</span></div>'}</div>
       </div>
       <div class="fd-side">
         <div class="glass card fd-board">
@@ -4805,7 +4805,7 @@ PAGES.properties = async (root) => {
           </div>
           ${[pr.type, pr.handover].filter(x => x && x !== '—').length ? `<div class="pc2-meta">${[pr.type, pr.handover].filter(x => x && x !== '—').map(esc).join('&nbsp;·&nbsp;')}</div>` : ''}
         </div>
-      </div>`).join('') || '<div class="glass card empty">Объектов нет — добавьте первый</div>'}
+      </div>`).join('') || '<div class="glass card empty es-art es-props"><span class="es-art-img"></span><span class="es-art-tx">Объектов нет — добавьте первый</span></div>'}
     </div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
@@ -5024,7 +5024,7 @@ PAGES.collections = async (root) => {
               <button class="btn-ghost" data-act="del" title="Удалить">${ic(I.x)}</button>
             </div>
           </div>
-        </div>`; }).join('') || '<div class="glass card empty">Подборок нет — соберите первую слева</div>'}
+        </div>`; }).join('') || '<div class="glass card empty es-art es-coll"><span class="es-art-img"></span><span class="es-art-tx">Подборок нет — соберите первую слева</span></div>'}
       </div>
     </div>`;
   $$('[data-cfopen]', root).forEach(f => f.addEventListener('click', (e) => {

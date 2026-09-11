@@ -1,0 +1,83 @@
+{
+  "generated": "2026-09-11",
+  "model_image": "cinematic_studio_2_5",
+  "model_video": "kling3_0_turbo",
+  "note": "Editorial real-estate media for Lumen CRM premium themes. Natural colors only — theme is set by UI, never by a color filter on the photo (see CLAUDE.md: BURGUNDY IS NOT A PAGE FILTER).",
+  "items": [
+    {
+      "file": "editorial/villa-bali.webp",
+      "screen": "feed",
+      "theme": "warm",
+      "purpose": "Editorial media-hero for Лента in Lumen Burgundy. Contemporary concrete villa with mirror infinity pool at warm dusk; architecture right, negative space left under a neutral white gradient mask.",
+      "prompt": "Premium editorial real-estate photography, contemporary Balinese luxury villa, travertine stone, teak wood, infinity pool mirror reflection, natural greenery, clean natural morning light, architecture on RIGHT third, LEFT 60% soft haze negative space for UI. No people/text/logos/HDR/color filter.",
+      "ratio": "21:9",
+      "fallback": "assets/art/mega.png"
+    },
+    {
+      "file": "editorial/villa-desert.webp",
+      "screen": "properties",
+      "theme": "warm",
+      "purpose": "Editorial media-hero for База/Объекты in Lumen Burgundy. Stone-and-glass pavilion over a reflecting pool in a warm desert plateau; architecture right, big airy sky left.",
+      "prompt": "Premium cinematic real-estate photography, contemporary luxury villa, stone and glass, calm reflecting pool, warm natural light, expansive negative space on the left. No people/text/logos/HDR/color filter.",
+      "ratio": "21:9",
+      "fallback": "assets/art/mega.png"
+    },
+    {
+      "file": "editorial/residence-cliff.webp",
+      "screen": "properties",
+      "theme": "emerald",
+      "purpose": "Editorial media-hero for База/Объекты in Lumen Glass. Cool stone-and-wood residence over the ocean under a soft overcast sky; architecture right, cool negative space left — harmonizes with the glass blue accent.",
+      "prompt": "Premium editorial real-estate photography, contemporary luxury residence, stone and wood, ocean cliff, soft overcast cool light, architecture on RIGHT third, LEFT negative space for UI. No people/text/logos/HDR/color filter.",
+      "ratio": "21:9",
+      "fallback": "assets/art/mega.png"
+    },
+    {
+      "file": "editorial/villa-mediterranean.webp",
+      "screen": "feed",
+      "theme": "emerald",
+      "purpose": "Existing editorial media-hero for Лента in Lumen Glass (kept).",
+      "prompt": "(pre-existing)",
+      "ratio": "16:9",
+      "fallback": "assets/art/mega.png"
+    },
+    {
+      "file": "editorial/skyline-dubai.webp",
+      "screen": "app-atmosphere",
+      "theme": "emerald",
+      "purpose": "Existing environment skyline that bleeds through the glass app background (kept).",
+      "prompt": "(pre-existing)",
+      "ratio": "21:9",
+      "fallback": null
+    },
+    {
+      "file": "empty/room-empty.webp",
+      "screen": "properties-empty",
+      "theme": "warm,emerald",
+      "purpose": "Empty state «нет объектов» — quiet sunlit empty room with wood beams and floor.",
+      "prompt": "Premium editorial interior, empty serene luxury room, soft daylight, neutral stone/oak/off-white, generous negative space. No people/text/logos/HDR/color filter.",
+      "ratio": "16:9",
+      "fallback": null
+    },
+    {
+      "file": "empty/still-console.webp",
+      "screen": "feed-empty",
+      "theme": "warm,emerald",
+      "purpose": "Empty state «нет постов» — calm still life of a console with a vase and sculpture, deep negative space.",
+      "prompt": "Premium editorial interior still life, console table, vase and sculpture, soft natural light, neutral tones, abundant negative space. No people/text/logos/HDR/color filter.",
+      "ratio": "16:9",
+      "fallback": null
+    },
+    {
+      "file": "empty/facade-calm.webp",
+      "screen": "funnel-empty",
+      "theme": "warm,emerald",
+      "purpose": "Empty state «нет лидов» — minimalist concrete facade under a calm cloudy sky.",
+      "prompt": "Premium editorial architectural photography, minimalist concrete facade, soft cloudy sky, neutral palette, quiet composition. No people/text/logos/HDR/color filter.",
+      "ratio": "16:9",
+      "fallback": null
+    }
+  ],
+  "login_video": {
+    "note": "Per-theme immersive login/loader videos already exist and are wired via THEME_VIDEO in app.js (assets/skyline-<theme>.mp4 + -poster.jpg). Burgundy=skyline-burgundy.mp4, Glass=skyline-glass.mp4. Not regenerated."
+  }
+}
