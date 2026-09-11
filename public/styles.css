@@ -364,7 +364,7 @@ textarea { resize: vertical; min-height: 70px; }
 .vs-row .k { font-size: 12px; color: var(--ink-3); }
 .vs-row .v { font-size: 15px; font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
 .vs-col.ai .vs-row { border-bottom-color: color-mix(in srgb, var(--accent) 16%, transparent); }
-.vs-col.ai .vs-row .k { color: #8CA0CC; }
+.vs-col.ai .vs-row .k { color: var(--ink-3); }
 .vs-col.ai .vs-row .v { color: #fff; }
 
 /* ---------- канбан ---------- */
@@ -1206,7 +1206,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .fl-node.fl-over { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
 .fl-trigger, .fl-end { cursor: default; background: linear-gradient(155deg, var(--navy-700), var(--navy-950)); border: none; color: #E3EAFB; }
 .fl-trigger .fl-title b, .fl-end .fl-title b { color: #fff; }
-.fl-trigger .fl-prev, .fl-end .fl-prev { color: #8CA0CC; }
+.fl-trigger .fl-prev, .fl-end .fl-prev { color: var(--ink-3); }
 .fl-trigger .fl-title svg { color: var(--blue-300); }
 .fl-end .fl-title svg { color: #E4B33D; }
 .fl-day {
@@ -1454,7 +1454,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .f3row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .f3txt { min-width: 0; }
 .f3name { font-size: 13.5px; font-weight: 750; color: #fff; }
-.f3conv { font-size: 11px; color: #7E93C4; margin-top: 3px; }
+.f3conv { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
 .f3num { font-weight: 800; font-size: 24px; color: #fff; letter-spacing: -.5px; flex: 0 0 auto; min-width: 34px; }
 /* коннекторы к воронке: слева строки тянутся вправо, справа — влево */
 .f3side.left .f3row { justify-content: flex-end; text-align: right; }
@@ -1524,7 +1524,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .ha-row .nm2 b { color: #fff; font-weight: 750; }
 .ha-row .sp2 { flex: 1; }
 .ha-row .val2 { font-weight: 800; font-size: 16px; color: #fff; }
-.ha-row .sub2 { font-size: 11px; color: #7E93C4; }
+.ha-row .sub2 { font-size: 11px; color: var(--ink-3); }
 /* видеофон data-hero: абстрактный луп поверх тёмного градиента, контент выше */
 .ovx-hero, .f3card { position: relative; overflow: hidden; }
 .hero-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: .5; pointer-events: none; mix-blend-mode: screen; }
@@ -1553,10 +1553,10 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .sidebar::before { content: ''; position: absolute; left: 0; right: 0; top: -55%; height: 215%; background: url('assets/sidebar-veil.jpg') center / cover; opacity: .22; animation: veilDrift 70s ease-in-out infinite alternate; pointer-events: none; }
 @keyframes veilDrift { from { transform: translateY(0) scale(1.06); } to { transform: translateY(5.5%) scale(1.14); } }
 .sidebar > * { position: relative; z-index: 1; }
-.brand-mark { animation: markBreath 6.5s ease-in-out infinite; }
-@keyframes markBreath { 0%, 100% { filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent)); } 50% { filter: drop-shadow(0 2px 15px rgba(130, 168, 255, .8)); } }
-.nav-item.active { animation: navGlow 4.5s ease-in-out infinite; }
-@keyframes navGlow { 0%, 100% { box-shadow: 0 0 0 color-mix(in srgb, var(--accent) 1%, transparent); } 50% { box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 26%, transparent); } }
+/* markBreath/navGlow УБРАНЫ: анимация drop-shadow интерполировалась через oklab и давала
+   ядовито-ЗЕЛЁНУЮ подсветку за логотипом (out-of-gamut overshoot) + пульс раздражал.
+   Статичное спокойное свечение — Apple-стиль. */
+.brand-mark { filter: drop-shadow(0 2px 9px color-mix(in srgb, var(--accent) 36%, transparent)); }
 @media (prefers-reduced-motion: reduce) { .sidebar::before, .brand-mark, .nav-item.active { animation: none; } }
 
 /* ---------- деталка объекта v2: контрастные секции + премиум-поля ---------- */
@@ -2067,7 +2067,7 @@ html[data-night] .hero-lvl { border-color: #2A3C6B; }
 .cl2-thumb.grad { display: grid; place-items: center; }
 .cl2-thumb.grad img { width: 26px; height: 31px; opacity: .55; }
 .cl2-thumb.more { flex: 0 0 46px; display: grid; place-items: center; background: rgba(6,17,38,.72); color: #fff; font-weight: 800; font-size: 13px; }
-.cl2-views { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(6,17,38,.6); backdrop-filter: blur(6px); padding: 3px 9px; border-radius: 999px; }
+.cl2-views { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(6,17,38,.82); backdrop-filter: blur(6px); padding: 3px 9px; border-radius: 999px; }
 .cl2-views svg { width: 12px; height: 12px; }
 .cl2-body { padding: 14px 16px 15px; }
 .cl2-name { font-size: 14.5px; font-weight: 750; color: var(--navy-900); display: inline-flex; align-items: center; gap: 6px; cursor: text; }
