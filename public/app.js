@@ -340,6 +340,7 @@ function enhanceControls(root) {
 const I_FEED = '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h7"/>';
 const NAV = {
   overview:  { name: 'Обзор', icon: I.grid, sub: '' },
+  control:   { name: 'Контроль', icon: I.shield || I.spark, sub: 'риски и точки контроля · только для владельца' },
   feed:      { name: 'Лента', icon: I_FEED, sub: '' },
   funnel:    { name: 'Воронка', icon: I.funnel, sub: '' },
   inbox:     { name: 'Диалоги', icon: I.chat, sub: '' },
@@ -702,7 +703,7 @@ const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
-const BROKER_HIDDEN_PAGES = ['qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
+const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
 function applyRoleUi() {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
@@ -2501,6 +2502,100 @@ function celebrate(action, n, cfg) {
   setTimeout(() => { o.classList.remove('show'); setTimeout(() => o.remove(), 350); }, 1150);
 }
 
+/* ═══════════ КОНТРОЛЬ — командный центр рисков основателя ═══════════ */
+const CTRL_BUCKETS = {
+  unassigned:   { t: 'Ничьи лиды',            s: 'crit', ic: I.user,     d: 'активный лид без брокера', lead: true },
+  slaBreach:    { t: 'Нарушения SLA',         s: 'crit', ic: I.bolt,     d: 'брокер не коснулся вовремя', lead: true },
+  leak:         { t: 'Антислив',              s: 'crit', ic: I.flame,    d: 'риск увода на личный канал', lead: true },
+  silentBroker: { t: 'Брокер молчит',         s: 'warn', ic: I.chat,     d: 'клиент ждёт ответа', lead: true },
+  vipStalled:   { t: 'Крупные без движения',  s: 'warn', ic: I.spark,    d: 'большой бюджет застрял', lead: true },
+  orphanMeetings:{ t: 'Встречи-сироты',       s: 'warn', ic: I.cal,      d: 'встреча у отключённого брокера', lead: false },
+  overloaded:   { t: 'Перегруз брокеров',     s: 'warn', ic: I.users,    d: 'лидов сверх ёмкости', lead: false },
+  geoUncovered: { t: 'Гео без покрытия',      s: 'warn', ic: I.building, d: 'лиды из региона без брокера', lead: false },
+};
+function ctrlItemRow(key, it) {
+  const open = CTRL_BUCKETS[key].lead && it.id;
+  const attr = open ? ` data-ovlead="${esc(it.id)}" style="cursor:pointer"` : '';
+  let meta = '';
+  if (key === 'unassigned') { const gn = (STATE.settings.geoNames && STATE.settings.geoNames[it.geo]) || it.geo || ''; meta = `${stageName(it.stage)}${it.budget ? ' · $' + (it.budget / 1000 | 0) + 'k' : ''}${gn ? ' · ' + gn : ''}`; }
+  if (key === 'slaBreach') meta = `${it.broker || '—'} · ${it.flag === 'reassigned' ? 'возвращён в пул' : 'просрочка'}`;
+  if (key === 'leak') meta = `${it.reason}${it.broker ? ' · ' + it.broker : ''}`;
+  if (key === 'silentBroker') meta = `${it.broker || '—'} · ждёт ${it.waitingH} ч`;
+  if (key === 'vipStalled') meta = `$${(it.budget / 1000 | 0)}k · ${it.broker || 'без брокера'} · ${it.idleDays > 900 ? 'нет активности' : it.idleDays + ' дн. тишины'}`;
+  if (key === 'orphanMeetings') meta = `${it.lead} · ${new Date(it.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${it.broker}`;
+  if (key === 'overloaded') meta = `нагрузка ${it.load} / ёмкость ${it.capacity}`;
+  if (key === 'geoUncovered') meta = `${it.name} · ${it.leads} активных лидов`;
+  const nm = it.name || it.lead || it.geo || '—';
+  return `<div class="ctrl-row"${attr}><span class="ctrl-row-nm">${esc(nm)}</span><span class="ctrl-row-meta">${esc(meta)}</span>${open ? `<span class="ctrl-row-go">${ic(I.arrow)}</span>` : ''}</div>`;
+}
+async function openOffboard(brokerId) {
+  const br = (STATE.brokers || []).find(b => b.id === brokerId); if (!br) return;
+  let prev;
+  try { prev = await api.get('/brokers/' + brokerId + '/offboard?successor=auto'); } catch (e) { toast('Не удалось загрузить план', e.message); return; }
+  if (prev.error) { toast(prev.error); return; }
+  const others = (STATE.brokers || []).filter(b => b.id !== brokerId && b.active !== false);
+  const succOpts = `<option value="auto">Авто — по гео и нагрузке</option>` + others.map(b => `<option value="${b.id}">${esc(b.name)}${b.geo ? ' · ' + (STATE.settings.geoNames && STATE.settings.geoNames[b.geo] || b.geo) : ''}</option>`).join('');
+  const distHtml = (dist) => Object.entries(dist).map(([k, v]) => `<div class="off-dist-row"><span>${esc(k)}</span><b>${v}</b></div>`).join('') || '<div class="m-empty">Открытых лидов нет</div>';
+  const body = `
+    <div class="off-sum">Отключение <b>${esc(br.name)}</b>: <b>${prev.openLeads}</b> открытых лидов и <b>${prev.meetings}</b> встреч будут переданы. Контакты и переписка остаются у агентства.</div>
+    <label class="off-lbl">Кому передать</label>
+    <select id="offSucc">${succOpts}</select>
+    <div class="off-dist" id="offDist"><div class="off-dist-hd">Распределение</div>${distHtml(prev.distribution)}</div>
+    <label class="off-check"><input type="checkbox" id="offNotify"> Уведомить клиентов в WhatsApp («теперь с вами работает …»)</label>
+    ${prev.poolEmpty ? '<div class="off-warn">Нет активных брокеров для передачи — лиды останутся ничьими.</div>' : ''}`;
+  const bd = modal({
+    title: 'Передача дел и отключение', sub: 'Мастер оффбординга — доступ отзывается сразу', body, wide: true,
+    actions: [
+      { label: 'Отмена' },
+      { label: 'Передать и отключить', cls: 'btn-danger', onClick: async (bd2) => {
+          const successor = $('#offSucc', bd2).value; const notifyClients = $('#offNotify', bd2).checked;
+          try { const r = await api.post('/brokers/' + brokerId + '/offboard', { successor, notifyClients });
+            toast(`Передано ${r.moved} лидов`, br.name + ' отключён', true); await loadState(); go('control'); }
+          catch (e) { toast('Ошибка', e.message); return false; }
+        } },
+    ],
+  });
+  /* пересчёт распределения при смене преемника */
+  $('#offSucc', bd).addEventListener('change', async (e) => {
+    try { const p2 = await api.get('/brokers/' + brokerId + '/offboard?successor=' + encodeURIComponent(e.target.value));
+      $('#offDist', bd).innerHTML = '<div class="off-dist-hd">Распределение</div>' + distHtml(p2.distribution); } catch (_) {}
+  });
+}
+PAGES.control = async (root) => {
+  let d;
+  try { d = await api.get('/control-center'); } catch (e) { root.innerHTML = `<div class="m-empty">Не удалось загрузить: ${esc(e.message)}</div>`; return; }
+  const order = ['unassigned', 'slaBreach', 'leak', 'silentBroker', 'vipStalled', 'orphanMeetings', 'overloaded', 'geoUncovered'];
+  const active = order.filter(k => (d.buckets[k] || []).length);
+  const crit = active.filter(k => CTRL_BUCKETS[k].s === 'crit').reduce((s, k) => s + d.buckets[k].length, 0);
+  const hero = `<div class="ctrl-hero ${d.total === 0 ? 'calm' : crit ? 'alarm' : 'watch'}">
+    <div class="ctrl-hero-l">
+      <div class="ctrl-hero-big">${d.total}</div>
+      <div class="ctrl-hero-t">${d.total === 0 ? 'Всё под контролем' : 'точек внимания'}${crit ? ` · <span class="ctrl-crit">${crit} критичных</span>` : ''}</div>
+    </div>
+    <button class="btn btn-sm" id="ctrlRefresh">${ic(I.refresh || I.arrow)} Обновить</button>
+  </div>`;
+  const cards = active.length ? `<div class="ctrl-grid">${active.map(k => { const B = CTRL_BUCKETS[k]; const items = d.buckets[k];
+    return `<div class="ctrl-card s-${B.s}">
+      <div class="ctrl-card-hd"><span class="ctrl-ico">${ic(B.ic)}</span><div><b>${B.t}</b><small>${B.d}</small></div><span class="ctrl-badge">${items.length}</span></div>
+      <div class="ctrl-list">${items.slice(0, 8).map(it => ctrlItemRow(k, it)).join('')}${items.length > 8 ? `<div class="ctrl-more">+ ещё ${items.length - 8}</div>` : ''}</div>
+    </div>`; }).join('')}</div>`
+    : `<div class="ctrl-calm-box">${ic(I.check)}<div><b>Ни одной тревоги</b><span>Ничьих лидов нет, SLA соблюдается, увода не зафиксировано, все гео под покрытием.</span></div></div>`;
+  /* панель команды и передачи дел */
+  const brs = (STATE.brokers || []).filter(b => b.active !== false);
+  const team = `<div class="ctrl-team">
+    <div class="ctrl-team-hd">${ic(I.users)} Команда и передача дел<small>отключение брокера мгновенно отзывает доступ и передаёт лидов</small></div>
+    <div class="ctrl-team-list">${brs.map(b => { const cap = b.capacity || 0; const over = cap && (b.load || 0) > cap;
+      return `<div class="ctrl-team-row">
+        <span class="ctrl-team-nm">${esc(b.name)}${b.geo ? `<i>${esc((STATE.settings.geoNames && STATE.settings.geoNames[b.geo]) || b.geo)}</i>` : ''}</span>
+        <span class="ctrl-team-load ${over ? 'over' : ''}">${b.load || 0}${cap ? ' / ' + cap : ''}</span>
+        <button class="btn btn-sm btn-ghost" data-offboard="${b.id}">Передать дела</button>
+      </div>`; }).join('') || '<div class="m-empty">Нет активных брокеров</div>'}</div>
+  </div>`;
+  root.innerHTML = `<div class="ctrl-wrap">${hero}${cards}${team}</div>`;
+  $('#ctrlRefresh', root)?.addEventListener('click', () => { render._silent = false; go('control'); });
+  $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', () => openLeadModal(b.dataset.ovlead)));
+  $$('[data-offboard]', root).forEach(b => b.addEventListener('click', () => openOffboard(b.dataset.offboard)));
+};
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
   LEAD_LOOKUP = Object.fromEntries(all.map(l => [l.id, l]));

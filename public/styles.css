@@ -6141,3 +6141,65 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 .adtab.on svg { color: var(--accent); }
 .adtab.on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2.5px; border-radius: 3px; background: var(--accent); }
 .adtab-panel { animation: reveal .3s var(--ease-soft) both; }
+
+/* ═══════════ КОНТРОЛЬ — командный центр рисков ═══════════ */
+.ctrl-wrap { display: flex; flex-direction: column; gap: 16px; }
+.ctrl-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--card); border: 1px solid var(--stroke); border-radius: 16px; padding: 20px 24px; box-shadow: var(--shadow); border-left: 4px solid var(--ok); }
+.ctrl-hero.alarm { border-left-color: var(--bad); }
+.ctrl-hero.watch { border-left-color: var(--warn); }
+.ctrl-hero.calm { border-left-color: var(--ok); }
+.ctrl-hero-l { display: flex; align-items: baseline; gap: 14px; }
+.ctrl-hero-big { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.ctrl-hero.alarm .ctrl-hero-big { color: var(--bad); }
+.ctrl-hero.watch .ctrl-hero-big { color: var(--warn); }
+.ctrl-hero.calm .ctrl-hero-big { color: var(--ok); }
+.ctrl-hero-t { font-size: 14px; color: var(--ink-2); font-weight: 550; }
+.ctrl-crit { color: var(--bad); font-weight: 700; }
+.ctrl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.ctrl-card { background: var(--card); border: 1px solid var(--stroke); border-radius: 15px; padding: 16px 17px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.ctrl-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.ctrl-card.s-crit::before { background: var(--bad); }
+.ctrl-card.s-warn::before { background: var(--warn); }
+.ctrl-card-hd { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+.ctrl-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--bg-2); }
+.ctrl-ico svg { width: 17px; height: 17px; color: var(--ink-2); }
+.ctrl-card.s-crit .ctrl-ico { background: var(--bad-bg); } .ctrl-card.s-crit .ctrl-ico svg { color: var(--bad); }
+.ctrl-card.s-warn .ctrl-ico { background: var(--warn-bg); } .ctrl-card.s-warn .ctrl-ico svg { color: var(--warn); }
+.ctrl-card-hd b { font-size: 14.5px; letter-spacing: -.01em; display: block; }
+.ctrl-card-hd small { font-size: 11.5px; color: var(--ink-3); }
+.ctrl-card-hd > div { flex: 1; min-width: 0; }
+.ctrl-badge { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg-2); border-radius: 9px; padding: 3px 10px; flex: none; }
+.ctrl-card.s-crit .ctrl-badge { color: var(--bad); background: var(--bad-bg); }
+.ctrl-card.s-warn .ctrl-badge { color: var(--warn); background: var(--warn-bg); }
+.ctrl-list { display: flex; flex-direction: column; }
+.ctrl-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--stroke); }
+.ctrl-row:first-child { border-top: none; }
+.ctrl-row[data-ovlead]:hover { background: var(--bg-2); margin: 0 -8px; padding: 9px 8px; border-radius: 8px; }
+.ctrl-row-nm { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.ctrl-row-meta { font-size: 12px; color: var(--ink-3); margin-left: auto; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62%; }
+.ctrl-row-go { flex: none; } .ctrl-row-go svg { width: 14px; height: 14px; color: var(--ink-3); }
+.ctrl-more { font-size: 12px; color: var(--accent); padding: 9px 0 2px; font-weight: 600; }
+.ctrl-calm-box { display: flex; align-items: center; gap: 14px; background: var(--ok-bg); border: 1px solid #C4E6D6; border-radius: 15px; padding: 20px 22px; }
+.ctrl-calm-box svg { width: 26px; height: 26px; color: var(--ok); flex: none; }
+.ctrl-calm-box b { display: block; font-size: 15px; } .ctrl-calm-box span { font-size: 13px; color: var(--ink-2); }
+html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
+.ctrl-team { background: var(--card); border: 1px solid var(--stroke); border-radius: 15px; padding: 16px 18px; box-shadow: var(--shadow); }
+.ctrl-team-hd { display: flex; align-items: center; gap: 9px; font-size: 14.5px; font-weight: 700; margin-bottom: 12px; }
+.ctrl-team-hd svg { width: 17px; height: 17px; color: var(--ink-2); }
+.ctrl-team-hd small { font-weight: 400; font-size: 11.5px; color: var(--ink-3); margin-left: auto; }
+.ctrl-team-list { display: flex; flex-direction: column; }
+.ctrl-team-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--stroke); }
+.ctrl-team-row:first-child { border-top: none; }
+.ctrl-team-nm { font-size: 14px; font-weight: 600; flex: 1; } .ctrl-team-nm i { font-style: normal; color: var(--ink-3); font-weight: 400; font-size: 12px; margin-left: 8px; }
+.ctrl-team-load { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--bg-2); border-radius: 8px; padding: 3px 9px; }
+.ctrl-team-load.over { color: var(--bad); background: var(--bad-bg); }
+/* мастер передачи дел */
+.off-sum { font-size: 14px; line-height: 1.55; margin-bottom: 16px; }
+.off-lbl { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); display: block; margin-bottom: 7px; }
+.off-dist { background: var(--bg-2); border-radius: 12px; padding: 12px 14px; margin: 14px 0; }
+.off-dist-hd { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin-bottom: 8px; }
+.off-dist-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 4px 0; }
+.off-dist-row b { font-variant-numeric: tabular-nums; }
+.off-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-2); margin-top: 6px; cursor: pointer; }
+.off-check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.off-warn { margin-top: 12px; font-size: 13px; color: var(--bad); background: var(--bad-bg); border-radius: 10px; padding: 10px 12px; }
