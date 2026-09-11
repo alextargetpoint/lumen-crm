@@ -6253,3 +6253,42 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 .cst-deleg select { width: 100%; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 10px; background: var(--card); color: var(--ink); font-family: inherit; font-size: 14px; }
 .cst-note { margin-top: 16px; font-size: 12.5px; color: var(--ink-3); background: var(--bg-2); border-radius: 10px; padding: 11px 13px; }
 @media (max-width: 560px) { .cst-grid { grid-template-columns: 1fr; } }
+
+/* ═══════════ ТЕМА «МОНО» — чёрно-белый минимализм 2026 ═══════════
+   Пресет поверх светлой базы: хром обесцвечен (акцент→графит, синие/фиолет→серые,
+   hero→уголь), семантика (ok/warn/bad) приглушена, но различима. Только токены —
+   компоненты уже на var(). Не комбинируется с data-night (свой самостоятельный вид). */
+:root[data-theme="mono"] {
+  --navy-950: #0a0a0a; --navy-900: #141414; --navy-700: #262626;
+  --accent: #171717; --accent-2: #262626;
+  --blue-300: #9a9a9a; --blue-100: #ededed;
+  --bg: #f6f6f6; --bg-2: #efefef; --card: #ffffff;
+  --ink: #0d0d0d; --ink-2: #3a3a3a; --ink-3: #6b6b6b;
+  --stroke: #e0e0e0; --stroke-soft: #eaeaea; --glass: rgba(255,255,255,.7);
+  --violet: #4a4a4a; --violet-bg: #eeeeee;
+  --ok: #2f6b52; --ok-bg: #e9efeb;
+  --warn: #6d5a2e; --warn-bg: #f0ece2;
+  --bad: #7a3a34; --bad-bg: #f0e7e5;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 3px 8px -3px rgba(0,0,0,.08), 0 14px 32px -16px rgba(0,0,0,.14);
+  --shadow-lift: 0 2px 6px -2px rgba(0,0,0,.12), 0 20px 48px -18px rgba(0,0,0,.28);
+  /* Обзор/виджеты */
+  --ov-primary: #171717; --ov-primary-hover: #000000;
+  --ov-soft-blue: #eeeeee; --ov-soft-green: #eaefec; --ov-soft-red: #f0e7e5;
+  --ov-soft-amber: #f0ece2; --ov-soft-purple: #ededed;
+  --ov-cat-blue: #2b2b2b; --ov-cat-green: #4a5f54; --ov-cat-red: #7a4b45;
+  --ov-cat-amber: #6d5a2e; --ov-cat-purple: #4a4a4a;
+  --ov-chip-gray: #f0f0f0; --ov-gold-soft: #f3f1ec;
+  --gauge-track: #e6e6e6;
+  --ov-hero-a: #0d0d0d; --ov-hero-b: #1f1f1f; --ov-hero-c: #2e2e2e;
+}
+/* приглушаем цветные градиенты бренда в моно (кнопки-акценты, орбы) */
+:root[data-theme="mono"] .btn-accent, :root[data-theme="mono"] .btn-primary {
+  background: #171717; border-color: #171717; color: #fff;
+}
+:root[data-theme="mono"] .btn-accent:hover, :root[data-theme="mono"] .btn-primary:hover { background: #000; }
+/* моно: обесцветить фирменные хардкод-градиенты (FAB-орб, логотип, ИИ-палочка) */
+:root[data-theme="mono"] .qfab-orb { background: radial-gradient(circle at 32% 28%, #4a4a4a, #1f1f1f 45%, #000 100%); box-shadow: 0 10px 30px -6px rgba(0,0,0,.5), inset 0 2px 6px rgba(255,255,255,.25), inset 0 -6px 12px rgba(0,0,0,.5); }
+:root[data-theme="mono"] .qfab-orb::after { background: radial-gradient(circle, rgba(0,0,0,.4), transparent 70%); }
+:root[data-theme="mono"] .brand-mark { filter: grayscale(1) contrast(1.05) drop-shadow(0 2px 8px rgba(0,0,0,.35)); }
+:root[data-theme="mono"] .aiwand { background: linear-gradient(120deg, #2b2b2b, #0d0d0d); }
+:root[data-theme="mono"] .brand-mark img { filter: grayscale(1) contrast(1.04); }

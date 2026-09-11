@@ -672,20 +672,28 @@ function wireHeroArt(root) {
   });
 }
 
-/* ночной режим: переключатель + память выбора */
+/* тема: Светлая / Тёмная / Моно (чёрно-белый минимализм) — переключатель + память */
 (() => {
-  const apply = (on) => {
-    document.documentElement.toggleAttribute('data-night', on);
+  const THEMES = ['light', 'dark', 'mono'];
+  const LABEL = { light: 'Светлая', dark: 'Тёмная', mono: 'Моно' };
+  const ICON = { light: '🌙', dark: '☀️', mono: '◐' };   /* иконка = текущая тема */
+  const apply = (t) => {
+    const root = document.documentElement;
+    root.toggleAttribute('data-night', t === 'dark');
+    if (t === 'mono') root.setAttribute('data-theme', 'mono'); else root.removeAttribute('data-theme');
     const b = document.getElementById('nightBtn');
-    if (b) b.textContent = on ? '☀️' : '🌙';
+    if (b) { b.textContent = ICON[t]; b.title = 'Тема: ' + LABEL[t] + ' (клик — следующая)'; }
   };
-  const saved = localStorage.getItem('lumen_night') === '1';
-  apply(saved);
+  let cur = localStorage.getItem('lumen_theme');
+  if (!THEMES.includes(cur)) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'light';
+  apply(cur);
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#nightBtn')) return;
-    const on = !document.documentElement.hasAttribute('data-night');
-    localStorage.setItem('lumen_night', on ? '1' : '0');
-    apply(on);
+    cur = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    localStorage.setItem('lumen_theme', cur);
+    localStorage.setItem('lumen_night', cur === 'dark' ? '1' : '0');   /* обратная совместимость */
+    apply(cur);
+    if (window.toast) toast('Тема: ' + LABEL[cur]);
   });
 })();
 
