@@ -465,16 +465,16 @@ function renderLogin() {
       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
     <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
     <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
-        background:rgba(10,24,51,.5);border:1px solid rgba(134,175,255,.2);
+        background:rgba(10,24,51,.5);border:1px solid rgba(255,255,255,.14);
         backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
         box-shadow:0 30px 80px -20px rgba(3,8,25,.85);text-align:center;
         animation:reveal .8s var(--ease-spring) both">
       ${loginBrand}
       <img src="logo.svg" class="pl-logo" style="width:44px;height:53px;margin:0 auto 14px">
       <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
-      <div style="font-size:10px;letter-spacing:.16em;color:#86AFFF;margin:4px 0 26px">REAL ESTATE CRM</div>
+      <div style="font-size:10px;letter-spacing:.16em;color:var(--blue-300);margin:4px 0 26px">REAL ESTATE CRM</div>
       <input id="loginPass" type="password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);
-        border:1px solid rgba(134,175,255,.25);color:#fff;text-align:center;font-size:14px;padding:11px">
+        border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:#f28b8b"></div>
       <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:44px;font-size:14px">Войти</button>
     </div>

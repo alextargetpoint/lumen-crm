@@ -6401,3 +6401,12 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="mono"] .page-sub,
 :root[data-theme="mono"] .lp-ai-state small { display: none !important; }
 :root[data-theme="mono"] .card, :root[data-theme="mono"] .glass, :root[data-theme="mono"] .ov2-card { padding: 21px 23px; }
+
+/* Контур — углубление минимала: KPI-карточки только цифра+заголовок, цифры крупнее */
+:root[data-theme="frame"] .ovx-kc-s, :root[data-theme="frame"] .kpi .delta small { display: none !important; }
+:root[data-theme="frame"] .ovx-kc-v { font-size: 31px; letter-spacing: -.035em; }
+:root[data-theme="frame"] .ovx-hero-num { letter-spacing: -.04em; }
+:root[data-theme="frame"] .ovx-kcard { padding: 18px 18px; }
+/* Моно — редакторская сдержанность: тоньше, чуть больше воздуха между карточками */
+:root[data-theme="mono"] .ovx-kc-s { opacity: .62; }
+:root[data-theme="mono"] .ovx-kcard, :root[data-theme="mono"] .card { letter-spacing: -.01em; }
