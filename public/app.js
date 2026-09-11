@@ -4828,10 +4828,10 @@ PAGES.properties = async (root) => {
     </div>
     <div class="shelf">
       <div class="fold ${!folderF ? 'active' : ''}" data-fopen="">
-        <img src="assets/folder.png"><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
+        <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
       </div>
       ${folders.map(f => `<div class="fold ${folderF === f.id ? 'active' : ''}" data-fopen="${f.id}" data-fid="${f.id}">
-        <img src="assets/folder.png">
+        <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span>
         <div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count} ${plural(f.count, 'объект', 'объекта', 'объектов')}</i></div>
         <div class="fold-acts">
           <button class="btn-ghost" data-fcoll="${f.id}" title="Собрать подборку из папки">${ic(I.layers)}</button>
@@ -5044,9 +5044,9 @@ PAGES.collections = async (root) => {
       </div>
       <div>
         <div class="shelf shelf-sm">
-          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><img src="assets/folder.png"><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
+          <div class="fold ${!cFolderF ? 'active' : ''}" data-cfopen=""><span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>Все</b><i>${cols0.length}</i></div></div>
           ${cFolders.map(f => `<div class="fold ${cFolderF === f.id ? 'active' : ''}" data-cfopen="${f.id}" data-cfid="${f.id}">
-            <img src="assets/folder.png"><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
+            <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>${esc(f.name)}</b><i>${f.count}</i></div>
             <div class="fold-acts"><button class="btn-ghost" data-cfdel2="${f.id}">${ic(I.x)}</button></div>
           </div>`).join('')}
           <button class="fold fold-new" id="cfNew">${ic(I.plus)}<span>Папка</span></button>
