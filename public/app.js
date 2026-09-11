@@ -471,7 +471,7 @@ function renderLogin() {
         box-shadow:0 30px 80px -20px rgba(3,8,25,.85);text-align:center;
         animation:reveal .8s var(--ease-spring) both">
       ${loginBrand}
-      <img src="logo.svg" class="pl-logo" style="width:44px;height:53px;margin:0 auto 14px">
+      <svg class="pl-logo" viewBox="0 0 100 120" style="width:44px;height:53px;margin:0 auto 14px" aria-hidden="true"><defs><linearGradient id="lumenLg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenLg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
       <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
       <div style="font-size:10px;letter-spacing:.16em;color:var(--blue-300);margin:4px 0 26px">REAL ESTATE CRM</div>
       <input id="loginPass" type="password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);
@@ -2258,6 +2258,9 @@ PAGES.overview = async (root) => {
     }
     ovAnimateCounts(root);
     wireMotion(root);
+    mountHeroVideos(root);   /* ⚠️ ОБЯЗАТЕЛЬНО: paint() пересобирает innerHTML → hero-видео (.ovx-hero/.ha/.f3card)
+                               теряются, а .ovm navy-nebula «возвращается». Без этого при любой переконфиге
+                               виджетов (add/rm/reorder/resize/мотион-тумблер) видеофоны сбивались. */
     ovMasonryWatch(root);   /* мозаичная упаковка виджетов */
     ovWireResize(root, () => paint());   /* ресайз виджетов углом (ширина колонок + высота) */
   };

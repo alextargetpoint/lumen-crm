@@ -6556,10 +6556,8 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 @media (max-width: 560px) { .ag-themes { grid-template-columns: 1fr; } }
 
 /* все темы теперь на НАТИВНЫХ AI-видеофонах (skyline-<theme>.mp4) — CSS-тинт видео не нужен */
-/* лого лоадера/логина (img src=logo.svg) тонируем под тему, чтобы совпадал с шапкой */
-:root[data-theme="mono"] .pl-logo, :root[data-theme="frame"] .pl-logo { filter: grayscale(1) brightness(1.5) contrast(1.1); }
-:root[data-theme="warm"] .pl-logo { filter: hue-rotate(122deg) saturate(1.5); }   /* → бургунди */
-/* Стекло — лого родной Apple-синий, тинт не нужен */
+/* лого лоадера/логина теперь ИНЛАЙН-SVG на токенах --logo-* → цвет верный сам по себе.
+   Фильтры перекраски (grayscale/hue-rotate) УБРАНЫ: они ломали уже-правильный токен-цвет (warm крутил бордо). */
 
 /* ═══════════ РАЗНЫЙ ПОДХОД НА КАЖДУЮ ТЕМУ (не только цвет) ═══════════
    Контур/Моно = минимализм: меньше текста на виджетах, больше воздуха, суть.
@@ -6864,7 +6862,6 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="atelier"] .navsearch input::placeholder { color: #8b8983; }
 :root[data-theme="atelier"] .side-foot .agency .nm { color: #f3f1ec; }
 :root[data-theme="atelier"] .side-foot .agency .rl { color: #8b8983; }
-:root[data-theme="atelier"] .pl-logo { filter: grayscale(1) brightness(1.6); }
 /* карточки — тёплый near-white, hairline */
 :root[data-theme="atelier"] .card, :root[data-theme="atelier"] .glass, :root[data-theme="atelier"] .ov2-card,
 :root[data-theme="atelier"] .kpi, :root[data-theme="atelier"] .ctrl-card, :root[data-theme="atelier"] .ovx-kcard, :root[data-theme="atelier"] .modal {
@@ -6914,6 +6911,17 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* Бургунди — мягкий бордо rounded-square (глубже радиус) */
 :root[data-theme="warm"] .page-emblem, :root[data-theme="warm"] .ovx-kc-ic, :root[data-theme="warm"] .ov2-kpi-ic,
 :root[data-theme="warm"] .ov-launch-ic, :root[data-theme="warm"] .attn-ic, :root[data-theme="warm"] .kc-chip-ic { border-radius: 13px !important; }
+
+/* ЦВЕТ ИКОНКИ внутри чипа следует за темой — иначе базовый .page-emblem svg{color:#fff}
+   на прозрачном (Ателье/Контур) и светлом frost (Стекло) фоне сливается с кремом. */
+:root[data-theme="atelier"] .page-emblem svg, :root[data-theme="atelier"] .ovx-kc-ic svg, :root[data-theme="atelier"] .ov2-kpi-ic svg,
+:root[data-theme="atelier"] .ov-launch-ic svg, :root[data-theme="atelier"] .attn-ic svg, :root[data-theme="atelier"] .kc-chip-ic svg { color: var(--ink-2) !important; }
+:root[data-theme="frame"] .page-emblem svg, :root[data-theme="frame"] .ovx-kc-ic svg, :root[data-theme="frame"] .ov2-kpi-ic svg,
+:root[data-theme="frame"] .ov-launch-ic svg, :root[data-theme="frame"] .attn-ic svg, :root[data-theme="frame"] .kc-chip-ic svg { color: var(--ink) !important; }
+:root[data-theme="emerald"] .page-emblem svg, :root[data-theme="emerald"] .ovx-kc-ic svg, :root[data-theme="emerald"] .ov2-kpi-ic svg,
+:root[data-theme="emerald"] .ov-launch-ic svg, :root[data-theme="emerald"] .attn-ic svg, :root[data-theme="emerald"] .kc-chip-ic svg { color: var(--accent) !important; }
+:root[data-theme="mono"] .page-emblem svg, :root[data-theme="mono"] .ovx-kc-ic svg, :root[data-theme="mono"] .ov2-kpi-ic svg,
+:root[data-theme="mono"] .ov-launch-ic svg, :root[data-theme="mono"] .attn-ic svg, :root[data-theme="mono"] .kc-chip-ic svg { color: #fff !important; }
 
 /* ——— SEVERITY-чипы (сигналы Обзора · внимание) — ТОЛЬКО форма, цвет-смысл сохраняем ———
    color контейнера уже = цвет severity (crit/warn/ok/info) → currentColor даёт кольцо/бордер в том же тоне. */

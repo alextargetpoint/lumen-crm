@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;700&family=Bebas+Neue&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=252">
+<link rel="stylesheet" href="styles.css?v=253">
 </head>
 <body>
 <!-- прелоадер: кобальтовый скайлайн (недвижимость) + дышащая искра; прячет app.js после загрузки -->
@@ -22,12 +22,18 @@
     var PO={light:'assets/skyline-cobalt-poster.jpg',dark:'assets/skyline-night-poster.jpg',mono:'assets/skyline-mono-poster.jpg',frame:'assets/skyline-mono-poster.jpg',warm:'assets/skyline-burgundy-poster.jpg',emerald:'assets/skyline-glass-poster.jpg',atelier:'assets/skyline-mono-poster.jpg'};
     var t;try{t=localStorage.getItem('lumen_theme');if(!M[t])t=(localStorage.getItem('lumen_night')==='1'?'dark':'light');}catch(e){t='light';}
     if(!M[t])t='light';
+    /* ТЕМА ДО ПЕРВОЙ ОТРИСОВКИ — иначе прелоадер рисуется дефолтным светлым, потом app.js
+       ставит data-theme → видимая «перезагрузка»/вспышка фона. Держать в синхроне с applyTheme().
+       Единственный тёмный пресет (dark:true) — 'dark'; остальные светлые → data-night только для него. */
+    try{var root=document.documentElement;
+      if(t!=='light'&&t!=='dark')root.setAttribute('data-theme',t);
+      if(t==='dark')root.setAttribute('data-night','');}catch(e){}
     var v=document.currentScript.previousElementSibling;
     if(v&&v.hasAttribute('data-skyline')){v.setAttribute('poster',PO[t]);v.setAttribute('src',M[t]);try{v.load&&v.load();}catch(e){}}
   })();
   </script>
   <div class="pl-center">
-    <img src="logo.svg" class="pl-logo" alt="">
+    <svg class="pl-logo" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="lumenPl" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenPl)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
     <div class="pl-word">LUMEN</div>
     <div class="pl-sub">REAL ESTATE CRM</div>
   </div>
@@ -101,7 +107,7 @@
   </div>
 </div>
 <div class="toasts" id="toasts"></div>
-<script src="app.js?v=260"></script>
+<script src="app.js?v=261"></script>
 <script src="onboard.js?v=12"></script>
 </body>
 </html>
