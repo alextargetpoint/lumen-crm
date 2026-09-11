@@ -7,8 +7,8 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;700&family=Bebas+Neue&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=243">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;700&family=Bebas+Neue&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=244">
 </head>
 <body>
 <!-- прелоадер: кобальтовый скайлайн (недвижимость) + дышащая искра; прячет app.js после загрузки -->
@@ -18,8 +18,8 @@
   /* видеофон СРАЗУ по теме из localStorage — иначе грузился дефолтный skyline-bg, потом app.js
      подменял на видео темы → видимая ДВОЙНАЯ смена фона. Карту держать в синхроне с THEME_VIDEO в app.js. */
   (function(){
-    var M={light:'assets/skyline-cobalt.mp4?v=1',dark:'assets/skyline-night.mp4?v=1',mono:'assets/skyline-mono.mp4?v=1',frame:'assets/skyline-mono.mp4?v=1',warm:'assets/skyline-burgundy.mp4?v=1',emerald:'assets/skyline-glass.mp4?v=1'};
-    var PO={light:'assets/skyline-cobalt-poster.jpg',dark:'assets/skyline-night-poster.jpg',mono:'assets/skyline-mono-poster.jpg',frame:'assets/skyline-mono-poster.jpg',warm:'assets/skyline-burgundy-poster.jpg',emerald:'assets/skyline-glass-poster.jpg'};
+    var M={light:'assets/skyline-cobalt.mp4?v=1',dark:'assets/skyline-night.mp4?v=1',mono:'assets/skyline-mono.mp4?v=1',frame:'assets/skyline-mono.mp4?v=1',warm:'assets/skyline-burgundy.mp4?v=1',emerald:'assets/skyline-glass.mp4?v=1',atelier:'assets/skyline-mono.mp4?v=1'};
+    var PO={light:'assets/skyline-cobalt-poster.jpg',dark:'assets/skyline-night-poster.jpg',mono:'assets/skyline-mono-poster.jpg',frame:'assets/skyline-mono-poster.jpg',warm:'assets/skyline-burgundy-poster.jpg',emerald:'assets/skyline-glass-poster.jpg',atelier:'assets/skyline-mono-poster.jpg'};
     var t;try{t=localStorage.getItem('lumen_theme');if(!M[t])t=(localStorage.getItem('lumen_night')==='1'?'dark':'light');}catch(e){t='light';}
     if(!M[t])t='light';
     var v=document.currentScript.previousElementSibling;
@@ -101,7 +101,7 @@
   </div>
 </div>
 <div class="toasts" id="toasts"></div>
-<script src="app.js?v=255"></script>
+<script src="app.js?v=256"></script>
 <script src="onboard.js?v=12"></script>
 </body>
 </html>

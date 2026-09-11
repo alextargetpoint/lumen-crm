@@ -6595,6 +6595,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="mono"] { --logo-a: #f0f0f0; --logo-b: #c8c8c8; --logo-c: #9a9a9a; }
 :root[data-theme="frame"] { --logo-a: #E2E8F0; --logo-b: #CBD5E1; --logo-c: #94A3B8; }
 /* Higgsfield 3D-объекты (art/*.png — синие) тонируем под стилистику, тень сохраняем */
+:root[data-theme="atelier"] .ha-obj { filter: grayscale(1) brightness(1.1) contrast(1.02) drop-shadow(0 20px 26px rgba(0,0,0,.6)); }
 :root[data-theme="mono"] .ha-obj, :root[data-theme="frame"] .ha-obj { filter: grayscale(1) brightness(1.08) drop-shadow(0 20px 26px rgba(0,0,0,.5)); }
 
 /* ═══ Категорийные цвета (--ov-cat/--ov-soft) под каждую тему — убираем «чужую» синеву/зелень ═══ */
@@ -6806,12 +6807,71 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   border: 1px solid rgba(255,255,255,.55) !important;
 }
 
+/* ═══════════ Ателье — тихая роскошь (near-black + Cormorant serif), по айденту лендинга land.html ═══════════ */
+:root[data-theme="atelier"] {
+  --bg: #080808; --bg-2: #131211; --card: #131211;
+  --ink: #f3f1ec; --ink-2: #a7a6a3; --ink-3: #6f6c64;
+  --navy-900: #f3f1ec; --navy-950: #050505; --navy-700: #35322c;
+  --stroke: rgba(255,255,255,.11); --stroke-soft: rgba(255,255,255,.06); --glass: rgba(255,255,255,.04);
+  --accent: #d6d2ca; --accent-2: #c4bfb5; --accent-3: #a7a6a3;
+  --accent-soft-bd: rgba(255,255,255,.14); --hover-bd: rgba(255,255,255,.2);
+  --blue-100: rgba(255,255,255,.06); --blue-300: #a7a6a3;
+  --ok: #8ba888; --ok-bg: rgba(139,168,136,.15); --warn: #c9a96a; --warn-bg: rgba(201,169,106,.15);
+  --bad: #cf8478; --bad-bg: rgba(207,132,120,.15); --violet: #ada0c2; --violet-bg: rgba(173,160,194,.15);
+  --ov-primary: #f3f1ec; --ov-primary-hover: #e4e0d8; --gauge-track: rgba(255,255,255,.08);
+  --ov-hero-a: #0c0c0e; --ov-hero-b: #131211; --ov-hero-c: #1a1714;
+  --logo-a: #ece9e2; --logo-b: #c4bfb5; --logo-c: #8b8983;
+  --shadow: 0 10px 34px rgba(0,0,0,.55); --shadow-lift: 0 24px 66px rgba(0,0,0,.66);
+  --stg-new:#7c7a77; --stg-touch:#9aa0b0; --stg-dialog:#a7a6a3; --stg-qualified:#8ba888; --stg-handover:#ada0c2; --stg-viewing:#c9a96a; --stg-deal:#8ba888; --stg-sleeping:#57544e; --stg-lost:#cf8478;
+  --ov-cat-blue:#9aa0b0; --ov-cat-green:#8ba888; --ov-cat-red:#cf8478; --ov-cat-amber:#c9a96a; --ov-cat-purple:#ada0c2;
+  --ov-soft-blue:rgba(255,255,255,.05); --ov-soft-green:rgba(139,168,136,.12); --ov-soft-red:rgba(207,132,120,.12); --ov-soft-amber:rgba(201,169,106,.12); --ov-soft-purple:rgba(173,160,194,.12);
+  --ov-chip-gray: rgba(255,255,255,.05); --r-lg:16px; --r-md:12px; --r-sm:9px;
+}
+:root[data-theme="atelier"] .app, :root[data-theme="atelier"] body { background: #080808; }
+/* Cormorant serif — ТОЛЬКО для крупного дисплея (заголовки, большие цифры, hero) — как на лендинге */
+:root[data-theme="atelier"] .page-title,
+:root[data-theme="atelier"] .ovx-hero-num, :root[data-theme="atelier"] .ovx-kc-v,
+:root[data-theme="atelier"] .kpi .val, :root[data-theme="atelier"] .ha-title, :root[data-theme="atelier"] .ha h1,
+:root[data-theme="atelier"] .an-hero-hd b, :root[data-theme="atelier"] .hp-top-t {
+  font-family: 'Cormorant', Georgia, serif !important; font-weight: 500; letter-spacing: 0; }
+:root[data-theme="atelier"] .page-title { font-size: 27px; }
+:root[data-theme="atelier"] .ovx-hero-num { font-weight: 500; }
+:root[data-theme="atelier"] .brand-name { font-family: 'Cormorant', Georgia, serif; font-size: 19px; font-weight: 500; letter-spacing: .12em; }
+/* uppercase spaced микро-лейблы — редакторский приём */
+:root[data-theme="atelier"] .nav-label, :root[data-theme="atelier"] .card-title, :root[data-theme="atelier"] .ov2-card-hd,
+:root[data-theme="atelier"] .sh-sec-h, :root[data-theme="atelier"] .hp-sec-h, :root[data-theme="atelier"] .hd {
+  letter-spacing: .13em; text-transform: uppercase; font-weight: 600; }
+/* пилюли-кнопки (как на лендинге): primary — off-white filled, dark text */
+:root[data-theme="atelier"] .btn { border-radius: 999px; }
+:root[data-theme="atelier"] .btn-accent, :root[data-theme="atelier"] .btn-primary { background: #f3f1ec; color: #131211; border: 1px solid transparent; }
+:root[data-theme="atelier"] .btn-accent:hover, :root[data-theme="atelier"] .btn-primary:hover { background: #fff; }
+:root[data-theme="atelier"] .btn-accent svg, :root[data-theme="atelier"] .btn-primary svg { color: #131211; }
+:root[data-theme="atelier"] .btn-cta { background: #f3f1ec; color: #131211; box-shadow: none; }
+:root[data-theme="atelier"] .btn-cta svg { color: #131211; }
+:root[data-theme="atelier"] .btn:not(.btn-accent):not(.btn-primary):not(.btn-cta):not(.btn-danger) { border-color: rgba(255,255,255,.18); color: var(--ink); }
+/* сайдбар — near-black, тонкие линии, без вуали */
+:root[data-theme="atelier"] .sidebar { background: #0a0a0a; border-right: 1px solid rgba(255,255,255,.08); }
+:root[data-theme="atelier"] .sidebar::before { display: none; }
+:root[data-theme="atelier"] .nav-item { color: var(--ink-2) !important; }
+:root[data-theme="atelier"] .nav-item:hover { background: rgba(255,255,255,.05); color: var(--ink) !important; }
+:root[data-theme="atelier"] .nav-item.active { background: rgba(255,255,255,.06); color: var(--ink) !important; box-shadow: inset 2px 0 0 var(--ink); }
+:root[data-theme="atelier"] .nav-item.active svg { color: var(--ink); }
+/* карточки/поверхности — near-black, hairline, минимум тени (тихо и дорого) */
+:root[data-theme="atelier"] .card, :root[data-theme="atelier"] .glass, :root[data-theme="atelier"] .ov2-card,
+:root[data-theme="atelier"] .kpi, :root[data-theme="atelier"] .ctrl-card, :root[data-theme="atelier"] .ovx-kcard,
+:root[data-theme="atelier"] .modal, :root[data-theme="atelier"] .navsearch, :root[data-theme="atelier"] .gsearch {
+  background: #131211; border: 1px solid rgba(255,255,255,.08); box-shadow: none; }
+:root[data-theme="atelier"] .topbar { background: transparent; border: none; }
+:root[data-theme="atelier"] .brand-mark { filter: grayscale(1) brightness(1.5); }
+:root[data-theme="atelier"] .pl-logo { filter: grayscale(1) brightness(1.6); }
+
 /* ═══ Пер-темовая персонализация иконок: каждая стилистика — свой характер штриха ═══
    ic()-иконки в рабочей области несут атрибут stroke-width; CSS-свойство его перекрывает.
    Стекло (Apple) — тоньше/воздушнее; Бургунди — плотнее/характернее; Моно/Контур — швейцарски-тонко. */
 :root[data-theme="emerald"] .content svg[stroke-width], :root[data-theme="emerald"] .sidebar svg[stroke-width] { stroke-width: 1.55; }
 :root[data-theme="warm"] .content svg[stroke-width], :root[data-theme="warm"] .sidebar svg[stroke-width] { stroke-width: 1.8; }
-:root[data-theme="mono"] .content svg[stroke-width], :root[data-theme="frame"] .content svg[stroke-width],
+:root[data-theme="atelier"] .content svg[stroke-width], :root[data-theme="atelier"] .sidebar svg[stroke-width],
+  :root[data-theme="mono"] .content svg[stroke-width], :root[data-theme="frame"] .content svg[stroke-width],
 :root[data-theme="mono"] .sidebar svg[stroke-width], :root[data-theme="frame"] .sidebar svg[stroke-width] { stroke-width: 1.5; }
 
 /* ═══ Editorial empty states (нет объектов / постов / подборок) ═══
