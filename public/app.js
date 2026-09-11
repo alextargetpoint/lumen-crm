@@ -9900,6 +9900,142 @@ PAGES.roles = async (root) => {
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
 };
 
+/* ── Интерактивный мастер подключения WhatsApp Cloud API ──
+   Пошагово: где что взять в Meta (со схемами полей) → вставить в Lumen → живая проверка → боевой режим. */
+function openWaWizard() {
+  if (!document.getElementById('waw-style')) {
+    document.head.appendChild(el(`<style id="waw-style">
+      .waw-wrap{display:grid;grid-template-columns:200px 1fr;gap:18px;min-height:360px}
+      @media(max-width:760px){.waw-wrap{grid-template-columns:1fr}.waw-rail{flex-direction:row;overflow-x:auto}}
+      .waw-rail{display:flex;flex-direction:column;gap:3px}
+      .waw-rstep{display:flex;gap:9px;align-items:center;padding:7px 9px;border-radius:9px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+      .waw-rstep .n{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);font-size:10.5px;flex:none}
+      .waw-rstep.active{background:var(--bg);color:var(--ink);font-weight:600}
+      .waw-rstep.active .n{background:var(--accent);color:#fff;border-color:var(--accent)}
+      .waw-rstep.done .n{background:#16a34a;color:#fff;border-color:transparent}
+      .waw-step h4{font-size:15.5px;margin:0 0 6px}
+      .waw-step .lead{font-size:12.6px;color:var(--ink-2);line-height:1.6;margin-bottom:10px}
+      .mock{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:10px 0;background:var(--card)}
+      .mock-bar{display:flex;gap:5px;align-items:center;padding:6px 10px;background:var(--bg);border-bottom:1px solid var(--line)}
+      .mock-bar i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+      .mock-bar span{font-size:10.5px;color:var(--ink-2);margin-left:6px}
+      .mock-body{padding:11px 13px}
+      .mock-f{border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:12px;color:var(--ink-2);margin:6px 0;background:var(--bg)}
+      .mock-f.hi{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);color:var(--ink)}
+      .mock-f .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#8a90a0;display:block;margin-bottom:2px}
+      .mock-btn{display:inline-block;padding:5px 11px;border-radius:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:600}
+      .waw-note{font-size:11.4px;color:var(--ink-2);background:var(--bg);border-radius:8px;padding:9px 11px;line-height:1.5;margin-top:8px}
+      .waw-cp{display:flex;gap:8px;align-items:center;margin:6px 0}
+      .waw-cp code{flex:1;overflow-x:auto;white-space:nowrap;padding:7px 10px;font-size:11.5px}
+      .waw-foot{display:flex;justify-content:space-between;gap:8px;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+      .waw-res{border-radius:9px;padding:10px 12px;font-size:12.5px;margin-top:10px}
+      .waw-res.ok{background:color-mix(in srgb,#16a34a 12%,transparent);border:1px solid #16a34a}
+      .waw-res.bad{background:color-mix(in srgb,#dc2626 10%,transparent);border:1px solid #dc2626}
+    </style>`));
+  }
+  const sw = STATE.settings.wa || {};
+  const WZ = { step: 0, phoneId: sw.phoneId || '', wabaId: sw.wabaId || '', token: '', appSecret: '',
+    verify: sw.number ? { ok: true, number: sw.number, quality: sw.quality, verifiedName: sw.verifiedName } : null,
+    sub: false, rec: false };
+  const hook = (STATE.settings.tunnelUrl || location.origin) + '/wa/webhook';
+  const vtoken = sw.webhookVerifyToken || 'lumen-verify';
+  const TITLES = ['Портфолио и номер', 'ID номера', 'Токен (Never)', 'App Secret', 'Проверка', 'Вебхук', 'Запуск'];
+
+  const bd = el(`<div class="modal-bd"><div class="modal glass" style="width:940px;max-width:95vw"><h3>${ic(I.spark)} Мастер подключения WhatsApp</h3><div class="m-body" id="wawBody"></div></div></div>`);
+  document.body.appendChild(bd);
+  requestAnimationFrame(() => bd.classList.add('show'));
+  const close = () => { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); };
+  bd.addEventListener('mousedown', e => { if (e.target === bd) close(); });
+
+  const capture = () => {
+    const g = id => { const x = bd.querySelector('#' + id); return x ? x.value.trim() : undefined; };
+    ['phoneId', 'wabaId', 'token', 'appSecret'].forEach(k => { const v = g('waw_' + k); if (v !== undefined) WZ[k] = v; });
+    const sub = bd.querySelector('#waw_sub'); if (sub) WZ.sub = sub.checked;
+    const rec = bd.querySelector('#waw_rec'); if (rec) WZ.rec = rec.checked;
+  };
+
+  const stepHtml = () => {
+    switch (WZ.step) {
+      case 0: return `<h4>Шаг 1. Бизнес-портфолио и номер</h4>
+        <div class="lead">В Meta Business нужен бизнес-портфолио и в нём номер WhatsApp — боевой или бесплатный <b>тест-номер</b> из API Setup. Если уже есть — жми «Далее».</div>
+        <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>WhatsApp Manager › Phone numbers</span></div>
+          <div class="mock-body"><div class="mock-f hi"><span class="lbl">Phone number</span>+1 555 …  ·  <b>Connected</b></div></div></div>
+        <div class="waw-note">Тест-номер шлёт только на разрешённые номера — годится для прогонки CRM. Боевой — для клиентов.</div>`;
+      case 1: return `<h4>Шаг 2. Phone Number ID и WABA ID</h4>
+        <div class="lead">Открой <b>WhatsApp → API Setup</b>. Скопируй два идентификатора и вставь сюда.</div>
+        <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>WhatsApp › API Setup</span></div>
+          <div class="mock-body"><div class="mock-f hi"><span class="lbl">Phone number ID</span>1239824009222121</div>
+          <div class="mock-f hi"><span class="lbl">WhatsApp Business Account ID</span>1419979086730572</div></div></div>
+        <div class="form-row"><label>Phone Number ID</label><input id="waw_phoneId" value="${esc(WZ.phoneId)}" placeholder="из API Setup"></div>
+        <div class="form-row"><label>WABA ID</label><input id="waw_wabaId" value="${esc(WZ.wabaId)}" placeholder="WhatsApp Business Account ID"></div>`;
+      case 2: return `<h4>Шаг 3. Постоянный токен (System User)</h4>
+        <div class="lead">Business Settings → <b>System Users</b> → выбери/создай юзера → <b>Add assets</b> (приложение + WABA, Full control) → <b>Generate token</b>.</div>
+        <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>Business Settings › System Users</span></div>
+          <div class="mock-body"><div class="mock-f"><span class="lbl">Token expiration</span><b>Never</b> ← бессрочный</div>
+          <div class="mock-f"><span class="lbl">Permissions</span>whatsapp_business_messaging · whatsapp_business_management</div>
+          <div style="text-align:right"><span class="mock-btn">Generate token</span></div></div></div>
+        <div class="form-row"><label>Постоянный токен</label><input id="waw_token" type="password" value="${esc(WZ.token)}" placeholder="${sw.tokenSet ? '•••••• уже сохранён — можно оставить пустым' : 'EAAG…'}"></div>
+        <div class="waw-note">⚠️ Meta показывает токен один раз — вставь сразу. Лимит непроверенного бизнеса: 1 админ-юзер (используй существующего или роль Employee).</div>`;
+      case 3: return `<h4>Шаг 4. App Secret</h4>
+        <div class="lead">Нужен, чтобы Lumen проверял подпись входящих вебхуков. <b>Meta App → Settings → Basic</b> → поле <b>App Secret</b> → Show.</div>
+        <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>App Dashboard › App settings › Basic</span></div>
+          <div class="mock-body"><div class="mock-f hi"><span class="lbl">App Secret</span>••••••••••••••••  <span class="mock-btn" style="float:right;padding:2px 8px">Show</span></div></div></div>
+        <div class="form-row"><label>App Secret</label><input id="waw_appSecret" type="password" value="${esc(WZ.appSecret)}" placeholder="${sw.appSecretSet ? '•••••• уже сохранён' : 'без него входящие отклоняются (401)'}"></div>`;
+      case 4: return `<h4>Шаг 5. Проверка подключения</h4>
+        <div class="lead">Сохраним реквизиты и спросим Meta, живо ли подключение.</div>
+        <button class="btn btn-accent" id="waw_verify" style="width:100%;justify-content:center">${ic(I.spark)}Проверить подключение</button>
+        ${WZ.verify ? (WZ.verify.ok
+          ? `<div class="waw-res ok">✅ Подключено: <b>${esc(WZ.verify.verifiedName || WZ.verify.number || '')}</b>${WZ.verify.number ? ' · ' + esc(WZ.verify.number) : ''} · качество ${esc(WZ.verify.quality || '—')}</div>`
+          : `<div class="waw-res bad">❌ ${esc(WZ.verify.error || 'не прошло')}<div style="font-size:11px;margin-top:4px">Проверь Phone Number ID и токен на прошлых шагах.</div></div>`) : ''}`;
+      case 5: return `<h4>Шаг 6. Вебхук — входящие, мост, «Отписаться»</h4>
+        <div class="lead">В Meta App → <b>WhatsApp → Configuration</b> вставь эти два значения, «Verify and save», затем у поля <b>messages</b> нажми <b>Subscribe</b>.</div>
+        <div class="waw-cp"><span style="font-size:11px;color:#8a90a0;width:92px">Callback URL</span><code class="pill">${esc(hook)}</code>${cpBtn(hook)}</div>
+        <div class="waw-cp"><span style="font-size:11px;color:#8a90a0;width:92px">Verify token</span><code class="pill">${esc(vtoken)}</code>${cpBtn(vtoken)}</div>
+        <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>App › WhatsApp › Configuration › Webhook fields</span></div>
+          <div class="mock-body"><div class="mock-f hi"><span class="lbl">messages</span>Subscribe ✓</div></div></div>
+        <label class="fd-toggle" style="margin-top:8px"><input type="checkbox" id="waw_sub" ${WZ.sub ? 'checked' : ''}> Я вставил вебхук и подписался на <b>messages</b></label>
+        ${STATE.settings.tunnelUrl ? '' : '<div class="waw-note">⚠️ Туннель не запущен — публичного адреса нет, Meta не достучится. Подними туннель и вернись сюда.</div>'}`;
+      default: return `<h4>Шаг 7. Получатель и боевой режим</h4>
+        <div class="lead">Для <b>тест-номера</b> добавь свой телефон: API Setup → поле <b>To → Manage phone number list</b> → добавь → подтверди код (тест-номер шлёт только на разрешённые).</div>
+        <label class="fd-toggle"><input type="checkbox" id="waw_rec" ${WZ.rec ? 'checked' : ''}> Добавил и подтвердил свой номер (для тест-номера)</label>
+        <div class="waw-note" style="margin:12px 0">Финал: включаем боевой режим — Lumen начинает реально слать через Cloud API.</div>
+        <button class="btn btn-accent" id="waw_finish" style="width:100%;justify-content:center">${ic(I.check)}Включить боевой режим и завершить</button>`;
+    }
+  };
+
+  const render = () => {
+    const rail = TITLES.map((t, i) => `<div class="waw-rstep ${i === WZ.step ? 'active' : ''} ${i < WZ.step ? 'done' : ''}"><span class="n">${i < WZ.step ? '✓' : i + 1}</span>${esc(t)}</div>`).join('');
+    const last = WZ.step === TITLES.length - 1;
+    bd.querySelector('#wawBody').innerHTML = `<div class="waw-wrap"><div class="waw-rail">${rail}</div>
+      <div class="waw-step">${stepHtml()}
+        <div class="waw-foot">
+          <button class="btn" id="waw_prev" ${WZ.step === 0 ? 'style="visibility:hidden"' : ''}>${ic(I.chev)}Назад</button>
+          ${last ? '<button class="btn" id="waw_close">Закрыть</button>' : `<button class="btn btn-accent" id="waw_next">Далее${ic(I.chev)}</button>`}
+        </div></div></div>`;
+    enhanceControls(bd);
+    bd.querySelector('#waw_prev')?.addEventListener('click', () => { capture(); WZ.step--; render(); });
+    bd.querySelector('#waw_next')?.addEventListener('click', () => { capture(); WZ.step++; render(); });
+    bd.querySelector('#waw_close')?.addEventListener('click', close);
+    bd.querySelector('#waw_verify')?.addEventListener('click', async (e) => {
+      capture();
+      if (!WZ.phoneId) { toast('Впишите Phone Number ID (шаг 2)'); return; }
+      const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Проверяю…';
+      try {
+        await api.patch('/settings', { wa: Object.assign({ phoneId: WZ.phoneId, wabaId: WZ.wabaId }, WZ.token ? { token: WZ.token } : {}, WZ.appSecret ? { appSecret: WZ.appSecret } : {}) });
+        WZ.verify = await api.post('/wa/verify');
+        await loadState();
+      } catch (err) { WZ.verify = { ok: false, error: err.message }; }
+      render();
+    });
+    bd.querySelector('#waw_finish')?.addEventListener('click', async () => {
+      capture();
+      try { await api.patch('/settings', { wa: { mode: 'cloud' } }); toast('Готово!', 'Боевой режим включён — Lumen шлёт через Cloud API', true); close(); await loadState(); go('settings'); }
+      catch (e) { toast('Не вышло', e.message); }
+    });
+  };
+  render();
+}
+
 PAGES.settings = async (root) => {
   const s = STATE.settings;
   const teamN = (STATE.brokers || []).length;
@@ -9913,6 +10049,7 @@ PAGES.settings = async (root) => {
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
+        <button class="btn btn-accent" id="waWizard" style="width:100%;justify-content:center;margin-bottom:10px">${ic(I.spark)}Мастер подключения — шаг за шагом</button>
         <div class="set-row">
           <div class="sp"><div class="sl">Боевой режим</div><div class="sd">${s.wa.mode === 'mock' ? 'Выключен: сообщения пишутся только в CRM' : 'Включён: отправка через Cloud API'}</div></div>
           <label class="switch"><input type="checkbox" id="waMode" ${s.wa.mode === 'cloud' ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
@@ -10065,6 +10202,7 @@ PAGES.settings = async (root) => {
     try { const r = await api.post('/tgbridge/setup', {}); toast('Вебхук настроен', r.webhook, true); tgbRenderBrokers(); }
     catch (e) { toast('Не вышло', e.message); }
   });
+  $('#waWizard')?.addEventListener('click', openWaWizard);
   const tc = $('#tunCopy');
   if (tc) tc.addEventListener('click', () => { navigator.clipboard.writeText(s.tunnelUrl); toast('Внешняя ссылка скопирована', null, true); });
   const whc = $('#whCopy');
