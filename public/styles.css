@@ -6890,21 +6890,38 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="frame"] .content svg[stroke-width], :root[data-theme="mono"] .content svg[stroke-width],
 :root[data-theme="frame"] .sidebar svg[stroke-width], :root[data-theme="mono"] .sidebar svg[stroke-width] { stroke-linecap: square; stroke-linejoin: miter; }
 
-/* ЧИП-КОНТЕЙНЕРЫ ИКОНОК — своя отрисовка на каждую стилистику (виджет/эмблема/attention) */
+/* ЧИП-КОНТЕЙНЕРЫ ИКОНОК — своя отрисовка на каждую стилистику.
+   Две группы: НЕЙТРАЛЬНЫЕ (эмблема/KPI/запуск/attention-бейдж) — полная перекраска формы;
+   SEVERITY (сигналы Обзора/внимание, где ЦВЕТ = СМЫСЛ) — меняем ТОЛЬКО форму, цвет сохраняем. */
+
+/* ——— Нейтральные чипы (эмблема страницы, KPI, запуск, мелкие бейджи) ——— */
 /* Ателье — редакторские hairline-КОЛЬЦА (тонкий контур, без заливки, монохром) */
-:root[data-theme="atelier"] .page-emblem, :root[data-theme="atelier"] .ovx-kc-ic, :root[data-theme="atelier"] .ov2-att-ic {
-  background: transparent !important; border: 1px solid var(--stroke); border-radius: 50% !important; color: var(--ink-2) !important; }
+:root[data-theme="atelier"] .page-emblem, :root[data-theme="atelier"] .ovx-kc-ic, :root[data-theme="atelier"] .ov2-kpi-ic,
+:root[data-theme="atelier"] .ov-launch-ic, :root[data-theme="atelier"] .attn-ic, :root[data-theme="atelier"] .kc-chip-ic {
+  background: transparent !important; border: 1px solid var(--stroke); border-radius: 50% !important; color: var(--ink-2) !important; box-shadow: none !important; }
 /* Стекло — frosted КРУГИ с бликом */
-:root[data-theme="emerald"] .page-emblem, :root[data-theme="emerald"] .ovx-kc-ic, :root[data-theme="emerald"] .ov2-att-ic {
+:root[data-theme="emerald"] .page-emblem, :root[data-theme="emerald"] .ovx-kc-ic, :root[data-theme="emerald"] .ov2-kpi-ic,
+:root[data-theme="emerald"] .ov-launch-ic, :root[data-theme="emerald"] .attn-ic, :root[data-theme="emerald"] .kc-chip-ic {
   border-radius: 50% !important; -webkit-backdrop-filter: blur(10px) saturate(1.3); backdrop-filter: blur(10px) saturate(1.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
 /* Контур — острые бордер-КВАДРАТЫ, без заливки (швейцарски) */
-:root[data-theme="frame"] .page-emblem, :root[data-theme="frame"] .ovx-kc-ic, :root[data-theme="frame"] .ov2-att-ic {
-  background: transparent !important; border: 1.5px solid var(--ink); border-radius: 6px !important; color: var(--ink) !important; }
+:root[data-theme="frame"] .page-emblem, :root[data-theme="frame"] .ovx-kc-ic, :root[data-theme="frame"] .ov2-kpi-ic,
+:root[data-theme="frame"] .ov-launch-ic, :root[data-theme="frame"] .attn-ic, :root[data-theme="frame"] .kc-chip-ic {
+  background: transparent !important; border: 1.5px solid var(--ink); border-radius: 6px !important; color: var(--ink) !important; box-shadow: none !important; }
 /* Моно — ЧЁРНЫЙ залитый квадрат, белая иконка */
-:root[data-theme="mono"] .page-emblem, :root[data-theme="mono"] .ovx-kc-ic, :root[data-theme="mono"] .ov2-att-ic {
-  background: var(--ink) !important; color: #fff !important; border-radius: 8px !important; }
+:root[data-theme="mono"] .page-emblem, :root[data-theme="mono"] .ovx-kc-ic, :root[data-theme="mono"] .ov2-kpi-ic,
+:root[data-theme="mono"] .ov-launch-ic, :root[data-theme="mono"] .attn-ic, :root[data-theme="mono"] .kc-chip-ic {
+  background: var(--ink) !important; color: #fff !important; border-radius: 8px !important; box-shadow: none !important; }
 /* Бургунди — мягкий бордо rounded-square (глубже радиус) */
-:root[data-theme="warm"] .page-emblem, :root[data-theme="warm"] .ovx-kc-ic, :root[data-theme="warm"] .ov2-att-ic { border-radius: 13px !important; }
+:root[data-theme="warm"] .page-emblem, :root[data-theme="warm"] .ovx-kc-ic, :root[data-theme="warm"] .ov2-kpi-ic,
+:root[data-theme="warm"] .ov-launch-ic, :root[data-theme="warm"] .attn-ic, :root[data-theme="warm"] .kc-chip-ic { border-radius: 13px !important; }
+
+/* ——— SEVERITY-чипы (сигналы Обзора · внимание) — ТОЛЬКО форма, цвет-смысл сохраняем ———
+   color контейнера уже = цвет severity (crit/warn/ok/info) → currentColor даёт кольцо/бордер в том же тоне. */
+:root[data-theme="atelier"] .ov-sig-ic, :root[data-theme="atelier"] .ov2-att-ic { border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+:root[data-theme="frame"] .ov-sig-ic, :root[data-theme="frame"] .ov2-att-ic { border-radius: 5px; background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+:root[data-theme="emerald"] .ov-sig-ic, :root[data-theme="emerald"] .ov2-att-ic { border-radius: 50%; -webkit-backdrop-filter: blur(8px) saturate(1.3); backdrop-filter: blur(8px) saturate(1.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+:root[data-theme="mono"] .ov-sig-ic, :root[data-theme="mono"] .ov2-att-ic { border-radius: 5px; }
+:root[data-theme="warm"] .ov-sig-ic, :root[data-theme="warm"] .ov2-att-ic { border-radius: 12px; }
 
 /* ═══ Editorial empty states (нет объектов / постов / подборок) ═══
    Натуральное фото сверху карточки + приглушённый текст. Работает во всех темах. */
