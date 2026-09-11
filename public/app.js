@@ -701,8 +701,8 @@ function applyThemeVideo(theme) {
   mountHeroVideos(document, theme);
 }
 /* видеофоны data-hero панелей (тёмный градиент + абстрактный луп) — только для тем с видео */
-const HERO_VIDEO = { warm: 'assets/hero-burgundy.mp4?v=1', emerald: 'assets/hero-glass.mp4?v=1', atelier: 'assets/hero-glass.mp4?v=1' };
-const HERO_VIDEO_POSTER = { warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg' , atelier: 'assets/hero-glass-poster.jpg' };
+const HERO_VIDEO = { light: 'assets/hero-glass.mp4?v=1', dark: 'assets/hero-glass.mp4?v=1', mono: 'assets/hero-glass.mp4?v=1', frame: 'assets/hero-glass.mp4?v=1', warm: 'assets/hero-burgundy.mp4?v=1', emerald: 'assets/hero-glass.mp4?v=1', atelier: 'assets/hero-glass.mp4?v=1' };
+const HERO_VIDEO_POSTER = { light: 'assets/hero-glass-poster.jpg', dark: 'assets/hero-glass-poster.jpg', mono: 'assets/hero-glass-poster.jpg', frame: 'assets/hero-glass-poster.jpg', warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg', atelier: 'assets/hero-glass-poster.jpg' };
 function mountHeroVideos(root, theme) {
   root = root || document;
   theme = theme || localStorage.getItem('lumen_theme') || 'light';
@@ -1316,7 +1316,7 @@ function gaugeSvg(pct) {
    который не перекрашивался под тему (в Бургунди «выбивался синим») */
 function lumenMark() {
   const id = 'lm' + (lumenMark._n = (lumenMark._n || 0) + 1);
-  return `<svg class="lumen-mark" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="${id}" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="url(#${id})" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>`;
+  return `<svg class="lumen-mark" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="${id}" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#${id})" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>`;
 }
 function heroBars(pts) {
   const total = pts.reduce((a, b) => a + b, 0);
