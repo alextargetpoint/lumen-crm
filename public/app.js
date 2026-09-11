@@ -681,7 +681,7 @@ const THEME_PRESETS = [
   { k: 'warm',    name: 'Lumen Burgundy',  desc: 'бордо-бренд, светлый workspace',   sw: ['#861C3C', '#F8FAFD', '#42121F'], dark: false },
   { k: 'frame',   name: 'Контур',   desc: 'чёткие рамки, без теней',       sw: ['#111827', '#FFFFFF', '#111827'], dark: false },
   { k: 'emerald', name: 'Lumen Glass', desc: 'атмосферное стекло, premium-OS', sw: ['#397BFF', '#EEF5FF', '#0A1930'], dark: false },
-  { k: 'atelier', name: 'Ателье', desc: 'тихая роскошь · near-black + serif', sw: ['#D6D2CA', '#131211', '#F3F1EC'], dark: true },
+  { k: 'atelier', name: 'Ателье', desc: 'тихая роскошь · крем + serif, тёмные акценты', sw: ['#1A1815', '#F3F1EC', '#141311'], dark: false },
 ];
 /* бесповоротные AI-видеофоны под тему (сгенерированы через Higgsfield);
    у кого своего нет — родной скайлайн + CSS-тинт под палитру */
@@ -701,8 +701,8 @@ function applyThemeVideo(theme) {
   mountHeroVideos(document, theme);
 }
 /* видеофоны data-hero панелей (тёмный градиент + абстрактный луп) — только для тем с видео */
-const HERO_VIDEO = { warm: 'assets/hero-burgundy.mp4?v=1', emerald: 'assets/hero-glass.mp4?v=1' };
-const HERO_VIDEO_POSTER = { warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg' };
+const HERO_VIDEO = { warm: 'assets/hero-burgundy.mp4?v=1', emerald: 'assets/hero-glass.mp4?v=1', atelier: 'assets/hero-glass.mp4?v=1' };
+const HERO_VIDEO_POSTER = { warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg' , atelier: 'assets/hero-glass-poster.jpg' };
 function mountHeroVideos(root, theme) {
   root = root || document;
   theme = theme || localStorage.getItem('lumen_theme') || 'light';
