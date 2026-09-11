@@ -478,8 +478,18 @@ footer .foot-word{font-family:var(--disp);font-weight:700;font-size:clamp(74px,1
 @media(max-width:560px){footer .foot-grid{grid-template-columns:1fr}footer .foot-bot{flex-direction:column;align-items:flex-start}}
 
 /* ============ REVEAL ============ */
-[data-r]{opacity:0;transform:translateY(34px) scale(.986);filter:blur(4px);transition:opacity .85s var(--ease-spring),transform .9s var(--ease-spring),filter .7s ease}
+[data-r]{opacity:0;transform:translateY(44px) scale(.972);filter:blur(6px);transition:opacity .95s var(--ease-spring),transform 1.05s var(--ease-spring),filter .85s ease;will-change:opacity,transform,filter}
 [data-r].in{opacity:1;transform:none;filter:none}
+/* каскад детей блока (для контейнеров без пер-детишного data-r) */
+.rvc{opacity:0;transform:translateY(26px) scale(.98);filter:blur(4px);transition:opacity .8s var(--ease-spring),transform .85s var(--ease-spring),filter .6s ease}
+.rvc.in{opacity:1;transform:none;filter:none}
+/* маска-ревил по строкам (hero) */
+.hero-lines{opacity:1!important;transform:none!important;filter:none!important}
+.hero-lines .ln{display:block;overflow:hidden;padding-bottom:.04em}
+.hero-lines .ln>span{display:block;transform:translateY(112%);transition:transform 1s var(--ease-spring)}
+.hero-lines .ln:nth-child(2)>span{transition-delay:.1s}
+.hero-lines .ln:nth-child(3)>span{transition-delay:.2s}
+.hero-lines.in .ln>span{transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}.d4{transition-delay:.32s}
 @media (prefers-reduced-motion:reduce){
   /* не глушим всё: контент показываем сразу, но нежное «дыхание» интерфейса оставляем */
@@ -906,7 +916,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   <div class="wrap grid">
     <div>
       <span class="hero-badge" data-r><b>Платформа продаж</b> для агентств недвижимости</span>
-      <h1 data-r class="d1">Отдел продаж,<br>который <span class="it">не спит</span><br>и не теряет заявки</h1>
+      <h1 data-r class="d1 hero-lines"><span class="ln"><span>Отдел продаж,</span></span><span class="ln"><span>который <span class="it">не спит</span></span></span><span class="ln"><span>и не теряет заявки</span></span></h1>
       <p class="lead d2" data-r>Lumen отвечает клиенту первым — в WhatsApp, в комментариях под рекламой и в Telegram — ведёт диалог в живом темпе, квалифицирует как менеджер и отдаёт брокеру тёплого покупателя с психо-портретом и готовым сценарием сделки.</p>
       <div class="cta-row d3" data-r>
         <a class="btn btn-p" href="/" target="_blank">Открыть живое демо
@@ -1901,6 +1911,16 @@ revealVisible();
 addEventListener('scroll',revealVisible,{passive:true});
 addEventListener('load',()=>{revealVisible();setTimeout(revealVisible,150);});
 setTimeout(()=>document.querySelectorAll('[data-r]:not(.in)').forEach(e=>e.classList.add('in')),2000);
+
+// каскад детей: контейнеры без пер-детишного data-r — дети влетают по очереди
+(function(){
+  var conts=[].slice.call(document.querySelectorAll('.gap-grid,.native-grid,.platform-grid,.proof-stats,.modes,.tgcols,.bcost'));
+  var kids=[];
+  conts.forEach(function(c){ [].slice.call(c.children).forEach(function(k){ if(!k.hasAttribute('data-r') && !k.classList.contains('rvc')){ k.classList.add('rvc'); kids.push(k); } }); });
+  function rvc(){ kids.forEach(function(k){ if(!k.classList.contains('in') && k.getBoundingClientRect().top < innerHeight*0.92){ var idx=[].indexOf.call(k.parentNode.children,k); k.style.transitionDelay=(Math.min(idx,7)*0.07)+'s'; k.classList.add('in'); } }); }
+  rvc(); addEventListener('scroll',rvc,{passive:true}); addEventListener('load',rvc);
+  setTimeout(function(){ kids.forEach(function(k){ k.classList.add('in'); }); },2500);
+})();
 
 // swipe-карусели: точки-индикаторы (только мобилка)
 if(matchMedia('(max-width:640px)').matches){
