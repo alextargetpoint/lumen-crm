@@ -200,6 +200,12 @@
   .ish:focus{outline:none;border-color:var(--acc)}
   .ish-ok{width:100%;border:none;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:var(--shacc)}
   .ms-ch{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--mut);font-weight:600;margin:4px 2px 14px}.ms-ch input{width:18px;height:18px;accent-color:var(--acc)}
+  .segflt{display:flex;gap:6px;margin-top:11px}
+  .segflt button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-family:inherit;font-weight:700;font-size:12.5px;padding:8px 6px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
+  .segflt button.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:var(--shacc)}
+  .segflt .cnt{background:rgba(255,255,255,.22);color:inherit;font-size:11px;font-weight:800;padding:0 6px;border-radius:8px;min-width:16px;text-align:center}
+  .segflt button:not(.on) .cnt{background:var(--acc);color:#fff}
+  .dot-me{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{50%{opacity:.5}}
   @keyframes fade{from{opacity:0}}
@@ -216,6 +222,11 @@
       <h1><span class="spark ic" data-ic="chat"></span>Мои чаты<span class="hd-btn ic" id="settingsBtn" data-ic="gear" style="margin-left:auto;color:var(--mut);background:var(--panel)"></span></h1>
       <div class="sub" id="sub">Загрузка…</div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
+      <div class="segflt" id="segflt">
+        <button data-f="all" class="on">Все</button>
+        <button data-f="mine">Нужен я <span class="cnt" id="cntMine"></span></button>
+        <button data-f="unread">Непрочитанные <span class="cnt" id="cntUnread"></span></button>
+      </div>
     </div>
     <div id="chats"><div class="load"><div class="sp"></div>Загрузка чатов…</div></div>
   </div>
@@ -299,10 +310,15 @@ async function jpost(u,body,raw){const o={method:'POST',headers:{...H}};if(raw){
 
 async function loadChats(){try{CHATS=await jget('/tgapp/api/chats');const fp=JSON.stringify(CHATS.map(c=>[c.id,c.lastMsgAt,c.unread,c.lastText]));if(fp!==window._cfp){window._cfp=fp;renderChats()}}catch(e){$('#chats').innerHTML='<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку «Чаты» у бота (нужна привязка брокера).</div>'}}
 function tot(){return CHATS.reduce((n,c)=>n+(c.unread||0),0)}
+let CHFILTER='all';
 function renderChats(){
   const q=($('#q').value||'').toLowerCase().trim();
-  const list=CHATS.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
-  $('#sub').textContent=CHATS.length?`${CHATS.length} чатов${tot()?' · '+tot()+' новых':''}`:'Пока нет активных чатов';
+  const nMine=CHATS.filter(c=>c.needsMe).length, nUnread=CHATS.filter(c=>c.unread>0).length;
+  const cm=$('#cntMine'),cu=$('#cntUnread');if(cm){cm.textContent=nMine||'';cm.style.display=nMine?'':'none'}if(cu){cu.textContent=nUnread||'';cu.style.display=nUnread?'':'none'}
+  let list=CHATS.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
+  if(CHFILTER==='mine')list=list.filter(c=>c.needsMe);
+  else if(CHFILTER==='unread')list=list.filter(c=>c.unread>0);
+  $('#sub').textContent=CHATS.length?`${CHATS.length} чатов${nMine?' · '+nMine+' ждут вас':(tot()?' · '+tot()+' новых':'')}`:'Пока нет активных чатов';
   $('#chats').innerHTML=list.length?list.map(c=>`
     <div class="row" data-id="${c.id}">
       ${avaHtml(c)}
@@ -310,10 +326,11 @@ function renderChats(){
         <div class="rtop"><span class="nm">${esc(c.name)}</span><span class="tm">${c.lastMsgAt?tmm(c.lastMsgAt):''}</span></div>
         <div class="prev">${c.geo?`<span class="geo-chip">${esc(c.geo)}</span>`:''}${c.lastDir==='out'?'<span class="me">Вы:</span> ':''}<span style="overflow:hidden;text-overflow:ellipsis">${esc(c.lastText||'нет сообщений')}</span></div>
       </div>
-      ${c.unread>0?`<span class="badge-un">${c.unread>99?'99+':c.unread}</span>`:''}
-    </div>`).join(''):'<div class="empty">Ничего не найдено</div>';
+      ${c.unread>0?`<span class="badge-un">${c.unread>99?'99+':c.unread}</span>`:(c.needsMe?'<span class="dot-me" title="ждёт вашего ответа"></span>':'')}
+    </div>`).join(''):`<div class="empty">${CHFILTER==='mine'?'Никто не ждёт ответа — всё под контролем 👌':CHFILTER==='unread'?'Непрочитанных нет':'Ничего не найдено'}</div>`;
   document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{hap();openChat(r.dataset.id)});
 }
+$('#segflt')&&$('#segflt').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();CHFILTER=b.dataset.f;$('#segflt').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));renderChats()});
 
 async function openChat(id){
   CUR=CHATS.find(c=>c.id===id)||{id};

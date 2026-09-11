@@ -2384,7 +2384,7 @@ const server = http.createServer(async (req, res) => {
         const list = db.leads.filter(canSee).map(l => leadView(db, l))
           .filter(l => l.stage !== 'lost')
           .sort((a, b) => (b.lastMsgAt || b.createdAt) - (a.lastMsgAt || a.createdAt))
-          .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, avatar: l.avatarUrl || null, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0 }));
+          .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, avatar: l.avatarUrl || null, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0, stage: l.stage, aiOn: !!(l.ai && l.ai.enabled), needsMe: !(l.ai && l.ai.enabled) && l.lastDir === 'in' && !['deal', 'lost'].includes(l.stage) }));
         return json(res, 200, list);
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
