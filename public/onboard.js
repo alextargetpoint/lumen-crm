@@ -145,8 +145,6 @@
   }
 
   function stepStyle() {
-    // тон-фильтр под тему поверх одного скрина интерфейса (без 6 отдельных захватов)
-    const FILT = { light: 'none', emerald: 'brightness(1.06) saturate(1.15)', dark: 'brightness(.82) saturate(.92)', warm: 'hue-rotate(112deg) saturate(1.15)', mono: 'grayscale(1) contrast(1.04)', frame: 'grayscale(.5) contrast(1.08)' };
     const card = (t) => `
       <button class="ob-theme ${S.theme === t.key ? 'on' : ''}" data-theme="${t.key}">
         <div class="ob-theme-inner">
@@ -159,7 +157,7 @@
             <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
           </div>
           <div class="ob-theme-back">
-            <img src="/assets/site/cap-overview.png" alt="" loading="lazy" style="filter:${FILT[t.key] || 'none'}">
+            <img src="/assets/theme-${t.key}.png" alt="" loading="lazy">
             <div class="ob-theme-back-lbl">Интерфейс · ${t.name}</div>
           </div>
         </div>
@@ -372,22 +370,19 @@
     }
     if (step.id === 'style') {
       const zoom = root.querySelector('.ob-zoom'), zImg = zoom.querySelector('img'), zLbl = zoom.querySelector('.ob-zoom-lbl');
-      let hideT;
-      qq('[data-theme]').forEach(b => {
-        const v = b.querySelector('video');
+      let zCard = null, zCd = 0;               // блок авто-переключения: пока не увёл курсор в сторону
+      function openZoom(b) {
         const backImg = b.querySelector('.ob-theme-back img');
         const name = (b.querySelector('.ob-theme-meta b') || {}).textContent || '';
-        b.onmouseenter = () => {
-          if (v) v.play().catch(() => {});
-          clearTimeout(hideT);
-          if (backImg) { zImg.setAttribute('src', backImg.getAttribute('src')); zImg.style.filter = backImg.style.filter || 'none'; }
-          zLbl.textContent = 'Интерфейс · ' + name;
-          zoom.classList.add('on');
-        };
-        b.onmouseleave = () => {
-          if (v && S.theme !== b.dataset.theme) v.pause();
-          hideT = setTimeout(() => { root && zoom.classList.remove('on'); }, 130);
-        };
+        if (backImg) { zImg.setAttribute('src', backImg.getAttribute('src')); zImg.style.filter = backImg.style.filter || 'none'; }
+        zLbl.textContent = 'Интерфейс · ' + name;
+        zoom.classList.add('on'); zCard = b;
+      }
+      function closeZoom() { zoom.classList.remove('on'); zCard = null; zCd = Date.now() + 340; }
+      qq('[data-theme]').forEach(b => {
+        const v = b.querySelector('video');
+        b.onmouseenter = () => { if (v) v.play().catch(() => {}); if (!zCard && Date.now() > zCd) openZoom(b); };
+        b.onmouseleave = () => { if (v && S.theme !== b.dataset.theme) v.pause(); if (b === zCard) closeZoom(); };
         b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };
       });
     }
@@ -772,6 +767,14 @@
     .ob-theme-back-lbl{padding:10px 14px;font-size:12px;font-weight:700;color:#CBD9F5;background:rgba(10,18,38,.92);border-top:1px solid rgba(143,180,255,.14);text-align:left}
     .ob-theme.on{box-shadow:0 30px 72px -24px rgba(37,99,235,.62)!important}
     .ob-theme.on .ob-theme-front,.ob-theme.on .ob-theme-back{border-color:#5B84FF;box-shadow:0 0 0 1px #5B84FF inset}
+    /* равная высота карточек тем (все ряды + внутри ряда) */
+    .ob-themes{align-items:stretch;grid-auto-rows:1fr}
+    .ob-theme{height:100%}
+    .ob-theme-inner{height:100%}
+    .ob-theme-front{height:100%;display:flex;flex-direction:column}
+    .ob-theme-back{height:100%}
+    .ob-theme-prev{flex:0 0 auto}
+    .ob-theme-meta{flex:1 1 auto}
     /* фикс крестика: центрируем SVG */
     .ob-close{display:flex;align-items:center;justify-content:center}
     /* ==== шаг тарифов ==== */
