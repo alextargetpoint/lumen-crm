@@ -30,9 +30,15 @@
   .dark{background:var(--d-bg);color:var(--d-ink);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);--cell:var(--d-bg)}
   .light{background:var(--l-bg);color:var(--l-ink);--ink:var(--l-ink);--ink2:var(--l-ink2);--ink3:var(--l-ink3);--line:var(--l-line);--line2:var(--l-line2);--cell:var(--l-bg)}
   .sec{padding-block:clamp(84px,12vw,168px)}
-  .tr{height:clamp(80px,10vw,150px);position:relative;z-index:2}
-  .tr.d2l{background:linear-gradient(180deg,var(--d-bg),var(--l-bg))}
-  .tr.l2d{background:linear-gradient(180deg,var(--l-bg),var(--d-bg))}
+  /* видеофон светлой зоны — живая текстура под сильной светлой вуалью (текст читаем) */
+  .vidbg{position:relative;overflow:hidden}
+  .vidbg>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
+  .vidbg>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(.9)}
+  .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(243,241,236,.9),rgba(243,241,236,.8) 50%,rgba(243,241,236,.92))}
+  .vidbg>.wrap{position:relative;z-index:1}
+  .tr{height:clamp(170px,22vw,320px);position:relative;z-index:2}
+  .tr.d2l{background:linear-gradient(180deg,var(--d-bg) 0%,#0f0f0f 22%,#3a3936 52%,#c9c6bf 80%,var(--l-bg) 100%)}
+  .tr.l2d{background:linear-gradient(180deg,var(--l-bg) 0%,#c9c6bf 20%,#3a3936 48%,#0f0f0f 78%,var(--d-bg) 100%)}
 
   .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink3);display:inline-flex;align-items:center;gap:10px}
   .eyebrow::before{content:"";width:22px;height:1px;background:var(--line)}
@@ -221,7 +227,8 @@
 <div class="tr d2l"></div>
 
 <!-- PAIN 1 — скорость (светлая, цифры бьют) -->
-<section class="sec light" id="pain">
+<section class="sec light vidbg" id="pain">
+  <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-light1-poster.jpg"><source src="/assets/land-light1.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
     <div data-r><span class="eyebrow">Где на самом деле теряются деньги</span>
       <h2 class="lnw" style="margin-top:22px;max-width:20ch"><span class="ln"><span>Выигрывает не лучший.</span></span><span class="ln"><span>Выигрывает <em>первый.</em></span></span></h2>
@@ -235,10 +242,8 @@
   </div>
 </section>
 
-<div class="tr l2d"></div>
-
-<!-- PAIN 2 — сдаются + слив (тёмная) -->
-<section class="sec dark" id="pain2">
+<!-- PAIN 2 — сдаются + слив (светлая, та же зона) -->
+<section class="sec light" id="pain2">
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">И это только начало</span>
       <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">Оплаченный лид не остыл. <em>Его просто бросили.</em></h2></div>
@@ -250,10 +255,10 @@
   </div>
 </section>
 
-<div class="tr d2l"></div>
+<div class="tr l2d"></div>
 
-<!-- THESIS (светлая) -->
-<section class="sec light split" id="thesis">
+<!-- THESIS (тёмная) -->
+<section class="sec dark split" id="thesis">
   <div class="wrap" style="display:contents">
     <div data-r>
       <span class="eyebrow">Что такое Lumen</span>
@@ -269,9 +274,7 @@
   </div>
 </section>
 
-<div class="tr l2d"></div>
-
-<!-- FLOW (тёмная) -->
+<!-- FLOW (тёмная, та же зона) -->
 <section class="sec dark" id="flow">
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">Путь заявки</span>
@@ -289,7 +292,8 @@
 <div class="tr d2l"></div>
 
 <!-- PRODUCT (светлая) -->
-<section class="sec light" id="product">
+<section class="sec light vidbg" id="product">
+  <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-light2-poster.jpg"><source src="/assets/land-light2.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
     <div data-r><span class="eyebrow">Внутри продукта</span>
       <h2 style="margin-top:22px;max-width:18ch">Рабочий стол агентства, <em>а не набор вкладок</em></h2></div>
@@ -303,10 +307,8 @@
   </div>
 </section>
 
-<div class="tr l2d"></div>
-
-<!-- CONTROL (тёмная) — новый блок -->
-<section class="sec dark" id="control">
+<!-- CONTROL (светлая, та же зона) — новый блок -->
+<section class="sec light" id="control">
   <div class="wrap ctrl">
     <div data-r>
       <span class="eyebrow">Собственнику</span>
@@ -322,9 +324,7 @@
   </div>
 </section>
 
-<div class="tr d2l"></div>
-
-<!-- PROOF (светлая) -->
+<!-- PROOF (светлая, та же зона) -->
 <section class="sec light" id="proof">
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">Кто за Lumen</span>
