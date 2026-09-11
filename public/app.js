@@ -677,9 +677,9 @@ const THEME_PRESETS = [
   { k: 'light',   name: 'Кобальт',  desc: 'фирменный синий, мягкие тени',  sw: ['#2563EB', '#F4F7FB', '#111827'], dark: false },
   { k: 'dark',    name: 'Ночь',     desc: 'тёмный кобальт',                sw: ['#5B84FF', '#0A1833', '#EAF0FF'], dark: true },
   { k: 'mono',    name: 'Моно',     desc: 'чёрно-белый минимализм',        sw: ['#171717', '#F6F6F6', '#0D0D0D'], dark: false },
-  { k: 'warm',    name: 'Тёплый',   desc: 'кремовая бумага, терракота',    sw: ['#B5643C', '#F5F1E8', '#2B2420'], dark: false },
+  { k: 'warm',    name: 'Аметист',  desc: 'глубокий фиолет, премиум',      sw: ['#7C3AED', '#F7F6FC', '#1A1626'], dark: false },
   { k: 'frame',   name: 'Контур',   desc: 'чёткие рамки, без теней',       sw: ['#111827', '#FFFFFF', '#111827'], dark: false },
-  { k: 'emerald', name: 'Изумруд',  desc: 'глубокий зелёный, элегантно',   sw: ['#0E7C5A', '#F3F7F4', '#132019'], dark: false },
+  { k: 'emerald', name: 'Изумруд',  desc: 'чистый насыщенный emerald',     sw: ['#059669', '#F4FBF7', '#0C1F17'], dark: false },
 ];
 (() => {
   const P = Object.fromEntries(THEME_PRESETS.map(p => [p.k, p]));
