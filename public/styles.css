@@ -358,13 +358,13 @@ textarea { resize: vertical; min-height: 70px; }
   box-shadow: var(--shadow-lift);
 }
 .vs-col .hd { font-size: 11.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
-.vs-col.ai .hd { color: var(--blue-300); }
+.vs-col.ai .hd { color: color-mix(in srgb, var(--accent) 35%, #fff); }
 .vs-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--stroke-soft); }
 .vs-row:last-child { border-bottom: none; }
 .vs-row .k { font-size: 12px; color: var(--ink-3); }
 .vs-row .v { font-size: 15px; font-weight: 700; color: var(--navy-900); font-variant-numeric: tabular-nums; }
 .vs-col.ai .vs-row { border-bottom-color: color-mix(in srgb, var(--accent) 16%, transparent); }
-.vs-col.ai .vs-row .k { color: var(--ink-3); }
+.vs-col.ai .vs-row .k { color: rgba(255,255,255,.74); }   /* тёмная navy-колонка → СВЕТЛЫЙ текст (был сломан на var(--ink-3)) */
 .vs-col.ai .vs-row .v { color: #fff; }
 
 /* ---------- канбан ---------- */
@@ -1454,7 +1454,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .f3row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .f3txt { min-width: 0; }
 .f3name { font-size: 13.5px; font-weight: 750; color: #fff; }
-.f3conv { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+.f3conv { font-size: 11px; color: rgba(255,255,255,.66); margin-top: 3px; }   /* на тёмном f3card — светлый */
 .f3num { font-weight: 800; font-size: 24px; color: #fff; letter-spacing: -.5px; flex: 0 0 auto; min-width: 34px; }
 /* коннекторы к воронке: слева строки тянутся вправо, справа — влево */
 .f3side.left .f3row { justify-content: flex-end; text-align: right; }
@@ -1524,7 +1524,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .ha-row .nm2 b { color: #fff; font-weight: 750; }
 .ha-row .sp2 { flex: 1; }
 .ha-row .val2 { font-weight: 800; font-size: 16px; color: #fff; }
-.ha-row .sub2 { font-size: 11px; color: var(--ink-3); }
+.ha-row .sub2 { font-size: 11px; color: rgba(255,255,255,.68); }   /* на тёмном hero — светлый нейтраль (был сломан на var(--ink-3)) */
 /* видеофон data-hero: абстрактный луп поверх тёмного градиента, контент выше */
 .ovx-hero, .f3card { position: relative; overflow: hidden; }
 .hero-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: .5; pointer-events: none; mix-blend-mode: screen; }
