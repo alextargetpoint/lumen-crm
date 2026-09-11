@@ -968,7 +968,7 @@ function go(page) {
   /* волна входа проигрывается ТОЛЬКО на НОВОМ содержимом (после fn), а не на старом во время фетча —
      иначе старый раздел мигал (fade-out) пока грузился новый. Флаг снимается в render(). */
   go._wave = true;
-  render();
+  return render();
 }
 
 /* count-up крупных цифр в волну входа */
@@ -10969,10 +10969,11 @@ window.addEventListener('hashchange', () => {
     }
     return;
   }
-  go(startPage());
+  await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
   mountFab();
-  /* прелоадеру — минимум 900мс жизни, чтобы вихрь успел «дохнуть» */
-  setTimeout(hidePreloader, Math.max(0, 900 - (Date.now() - t0)));
+  /* прелоадеру — минимум 900мс жизни (вихрь «дышит»), затем reveal после гарантированного paint (двойной rAF) */
+  const reveal = () => requestAnimationFrame(() => requestAnimationFrame(hidePreloader));
+  setTimeout(reveal, Math.max(0, 900 - (Date.now() - t0)));
 })();
 
 /* ---------- плавающая кнопка быстрых действий (правый нижний угол) ---------- */
