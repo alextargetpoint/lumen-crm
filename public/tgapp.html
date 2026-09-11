@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,interactive-widget=resizes-content">
 <title>Lumen · Чаты</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -304,6 +304,21 @@ const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
 
 const TG=window.Telegram&&window.Telegram.WebApp; if(TG){TG.ready();TG.expand();try{TG.setHeaderColor('#080b12');TG.setBackgroundColor('#080b12')}catch(e){}}
+/* ⌨️ ФИКС ЛАГА «поле ввода над клавиатурой»: layout-viewport не ужимается мгновенно под софт-клавиатуру,
+   поэтому композер всплывал над ней с заметной задержкой. Привязываем высоту #app к visualViewport
+   в реальном времени → композер садится ровно над клавиатурой сразу. Плюс meta interactive-widget=resizes-content
+   (современные webview делают это сами). Учитываем body{zoom:.82}: visualViewport в НЕзумленных px, #app — в зумленных. */
+(function(){
+  var vv=window.visualViewport; if(!vv) return; var Z=0.82;
+  var raf=null, app=null;
+  var fix=function(){ app=app||document.getElementById('app'); if(!app) return;
+    app.style.height=(vv.height/Z)+'px';
+    app.style.transform = vv.offsetTop ? 'translateY('+(vv.offsetTop/Z)+'px)' : ''; };
+  var onvv=function(){ if(raf) return; raf=requestAnimationFrame(function(){raf=null;fix();}); };
+  vv.addEventListener('resize',onvv); vv.addEventListener('scroll',onvv);
+  window.addEventListener('orientationchange',function(){setTimeout(fix,300)});
+  fix();
+})();
 const hap=(t)=>{try{TG&&TG.HapticFeedback&&TG.HapticFeedback.impactOccurred(t||'light')}catch(e){}};
 const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
 /* ── персональное оформление брокера (тема + акцент), сохраняется за ним ── */
