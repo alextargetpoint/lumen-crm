@@ -9851,6 +9851,11 @@ PAGES.agency = async (root) => {
     <div class="two-col">
       <div>
         <div class="glass card mb">
+          <div class="card-title">${ic(I.grid || I.spark)}Оформление интерфейса<span class="sub">тема всей CRM · применяется сразу</span></div>
+          <div class="ag-themes">${(typeof THEME_PRESETS !== 'undefined' ? THEME_PRESETS : []).map(p => { const curTh = localStorage.getItem('lumen_theme') || 'light'; return `<button class="ag-theme ${p.k === curTh ? 'on' : ''}" data-set-theme="${p.k}"><span class="ag-theme-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="ag-theme-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span>${p.k === curTh ? `<span class="ag-theme-ok">${ic(I.check)}</span>` : ''}</button>`; }).join('')}</div>
+          <div class="ag-theme-hint">Быстрее сменить — иконка ◐ в правом верхнем углу шапки.</div>
+        </div>
+        <div class="glass card mb">
           <div class="card-title">${ic(I.building)}Идентификация бренда<span class="sub">лого, название, формат</span></div>
           <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Формат работы</label>
             <div class="chips-row">
@@ -9931,6 +9936,7 @@ PAGES.agency = async (root) => {
     if (r.ok) { $('#agLogoPrev').innerHTML = `<img src="${j.logo}">`; toast('Логотип загружен', 'Уже на обложках подборок', true); loadState(); }
     else toast('Не загрузился', j.error);
   });
+  $$('[data-set-theme]', root).forEach(b => b.addEventListener('click', () => { if (window.setTheme) window.setTheme(b.dataset.setTheme); go('agency'); }));
   $$('[data-edition]', root).forEach(ch => ch.addEventListener('click', async () => {
     await api.patch('/settings', { agency: { edition: ch.dataset.edition } });
     await loadState();

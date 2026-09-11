@@ -6353,3 +6353,15 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
   --ov-primary: #0E7C5A; --ov-primary-hover: #0B664A; --gauge-track: #DCE8E1;
   --ov-hero-a: #0A1A12; --ov-hero-b: #12362554; --ov-hero-c: #1E5540;
 }
+
+/* Оформление в профиле агентства (свотчи тем) */
+.ag-themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ag-theme { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1.5px solid var(--stroke); border-radius: 12px; background: var(--card); cursor: pointer; font-family: inherit; color: var(--ink); text-align: left; transition: border-color .14s, background .14s; }
+.ag-theme:hover { background: var(--bg-2); }
+.ag-theme.on { border-color: var(--accent); background: var(--bg-2); }
+.ag-theme-sw { display: flex; flex: none; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.ag-theme-sw i { width: 11px; height: 26px; display: block; }
+.ag-theme-tx { flex: 1; min-width: 0; } .ag-theme-tx b { font-size: 13px; font-weight: 700; display: block; } .ag-theme-tx small { font-size: 10.5px; color: var(--ink-3); }
+.ag-theme-ok { color: var(--accent); display: grid; place-items: center; } .ag-theme-ok svg { width: 15px; height: 15px; }
+.ag-theme-hint { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; }
+@media (max-width: 560px) { .ag-themes { grid-template-columns: 1fr; } }
