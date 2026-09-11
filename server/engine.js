@@ -797,6 +797,17 @@ function maybeInstantNotify(db, e) {
   if (k && inst[k]) sendReport(db, '🔔 ' + e.text);
 }
 
+/* проактивный алерт руководителю по тихим рискам (троттлинг внутри controlAlert) */
+function tickControl(db) {
+  try {
+    const r = control.controlAlert(db);
+    if (r && r.fire && r.text) {
+      ai.pushEvent(db, { type: 'ai_off', text: r.text });
+      if (module.exports.onControlAlert) { try { module.exports.onControlAlert(db, r); } catch (_) {} }
+    }
+  } catch (e) { console.error('[control]', e.message); }
+}
+
 /* ---------- основной цикл ---------- */
 function startLoop() {
   setInterval(() => {
@@ -808,6 +819,7 @@ function startLoop() {
       tickSla(db);
       tickReports(db);
       tickSimulator(db);
+      tickControl(db);
       store.save();
     } catch (e) { console.error('[engine]', e); }
   }, 5000);

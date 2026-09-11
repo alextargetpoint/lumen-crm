@@ -161,5 +161,21 @@ ok(!control.toneScan('ОК'), 'tone: короткий капс не ложно-�
   ok(fa.byGeo.find(x => x.key === 'bali').winRate === 0, 'funnel: срез по гео (Бали 0%)');
 }
 
+/* проактивный алерт: дедуп + троттлинг + повтор */
+{
+  const db = mkDb();   /* содержит ничьих/vip → тихие риски есть */
+  const t0 = 1000000000000;
+  const a1 = control.controlAlert(db, t0);
+  ok(a1.fire === true && /Требуют/.test(a1.text), 'alert: первый скан — срабатывает с текстом');
+  const a2 = control.controlAlert(db, t0 + 60000);   /* +1 мин, ничего нового → троттлинг */
+  ok(a2.fire === false, 'alert: повтор через минуту не срабатывает (троттлинг/нет нового)');
+  /* добавили новый ничей лид спустя cooldown → снова алерт */
+  db.leads.push({ id: 'newu', name: 'Новый ничей', geo: 'dubai', stage: 'qualified', broker: null, quals: {}, ai: {} });
+  const a3 = control.controlAlert(db, t0 + 31 * 60000);
+  ok(a3.fire === true, 'alert: новый риск после cooldown → снова срабатывает');
+  const a4 = control.controlAlert(db, t0 + 62 * 60000);   /* опять ничего нового */
+  ok(a4.fire === false, 'alert: без нового — молчит даже после cooldown');
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

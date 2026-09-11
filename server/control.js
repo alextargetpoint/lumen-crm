@@ -304,6 +304,52 @@ function funnelAnalysis(db) {
   return { overallWin, totals: { deal: totDeal, lost: totLost, active: db.leads.filter(l => !CLOSED_STAGES.includes(l.stage) && l.stage !== 'sleeping').length }, stageDist, byBroker, byGeo, bySource, leaks };
 }
 
+/* ── проактивный алерт руководителю по ТИХИМ накапливающимся рискам ──
+   Событийные (антислив/SLA/тон) уже пушатся в момент. Здесь — то, что копится молча:
+   ничьи, VIP-застой, сделки-без-следов, дубли, встречи-сироты, гео без покрытия, ждут
+   заместителя. Дедуп по ключам + троттлинг: алерт не чаще раза в cooldown, и только
+   когда появился НОВЫЙ элемент. Возвращает {fire, text, counts, newCount}. */
+const ALERT_BUCKETS = {
+  unassigned: { pfx: 'u', k: it => it.id, label: 'ничьих лидов' },
+  vipStalled: { pfx: 'v', k: it => it.id, label: 'VIP застряло' },
+  dealCheck: { pfx: 'd', k: it => it.id, label: 'сделок без следов' },
+  awayWaiting: { pfx: 'aw', k: it => it.id, label: 'ждут заместителя' },
+  duplicates: { pfx: 'dup', k: it => it.phone, label: 'дублей' },
+  orphanMeetings: { pfx: 'om', k: it => it.id, label: 'встреч-сирот' },
+  geoUncovered: { pfx: 'g', k: it => it.geo, label: 'гео без покрытия' },
+};
+function controlAlert(db, now) {
+  now = now || Date.now();
+  const C = cfg(db);
+  const cooldownMs = (C.alertCooldownMin || 30) * 60e3;
+  const reMs = (C.alertRepeatH || 24) * 3600e3;
+  db.settings.control = db.settings.control || {};
+  const st = db.settings.control.alertState = db.settings.control.alertState || { seen: {}, lastAt: 0 };
+  const scan = scanRisks(db);
+  const curKeys = new Set();
+  const counts = {};
+  let newCount = 0;
+  for (const [bucket, def] of Object.entries(ALERT_BUCKETS)) {
+    const items = scan.buckets[bucket] || [];
+    counts[bucket] = items.length;
+    for (const it of items) {
+      const key = def.pfx + ':' + def.k(it); if (!key || key.endsWith(':')) continue;
+      curKeys.add(key);
+      const seenAt = st.seen[key];
+      if (!seenAt || now - seenAt > reMs) newCount++;    /* новый или «протух» → снова считается новым */
+    }
+  }
+  /* чистим ключи, которых больше нет; помечаем текущие */
+  for (const k of Object.keys(st.seen)) if (!curKeys.has(k)) delete st.seen[k];
+  for (const k of curKeys) st.seen[k] = now;
+  const throttled = now - (st.lastAt || 0) < cooldownMs;
+  const fire = newCount > 0 && !throttled;
+  if (fire) st.lastAt = now;
+  const parts = Object.entries(ALERT_BUCKETS).filter(([b]) => counts[b]).map(([b, def]) => `${counts[b]} ${def.label}`);
+  const text = parts.length ? `⚡ Требуют вашего внимания: ${parts.join(' · ')}` : '';
+  return { fire, text, counts, newCount };
+}
+
 /* ── цепочка владения: неизменяемый лог передач лида (для атрибуции комиссий) ── */
 function recordOwner(db, lead, brokerId, by, reason) {
   if (!lead) return;
@@ -315,4 +361,4 @@ function recordOwner(db, lead, brokerId, by, reason) {
   if (lead.ownerHistory.length > 40) lead.ownerHistory.splice(0, lead.ownerHistory.length - 40);
 }
 
-module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, funnelAnalysis, normPhone, FUNNEL_ORDER, ACTIVE_STAGES, CLOSED_STAGES, cfg };
+module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, funnelAnalysis, controlAlert, normPhone, FUNNEL_ORDER, ACTIVE_STAGES, CLOSED_STAGES, cfg };

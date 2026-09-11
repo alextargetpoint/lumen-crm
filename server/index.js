@@ -432,6 +432,12 @@ function notifyOutbound(db, lead, event) {
     }),
   }).catch(e => console.error('[outbound]', e.message));
 }
+/* проактивный алерт рисков руководителю → вебхук (Telegram/Make/Zapier) */
+engine.onControlAlert = (db, r) => {
+  const url = db.settings.hooks && db.settings.hooks.outboundUrl;
+  if (!url) return;
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'control.alert', at: Date.now(), text: r.text, counts: r.counts }) }).catch(e => console.error('[control-alert]', e.message));
+};
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
 engine.onInboundMessage = (db, lead, m) => {
