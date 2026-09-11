@@ -9060,8 +9060,8 @@ async function mbApplyCompose(root, opts, items, board, seed, forceHeroId) {
   toast('Композиция собрана', null, true);
 }
 PAGES.moodboard = async (root) => { await renderMoodboard(root, {}); };
-/* ⭐ готовые die-cut стикеры-визион (28 шт, /assets/vision-board) — заменили кривую нарезку */
-const MB_VISION = ['01_big_goals', '02_g63', '03_dream_villa', '04_real_estate_freedom', '05_private_jet', '06_travel_more', '07_dubai', '08_cash_stack', '09_macbook', '10_passport', '11_tropical_destination', '12_coffee_discipline', '13_work_smart', '14_dream_apartment', '15_financial_freedom', '16_chihuahua_good_boy', '17_healthy_energy_dumbbell', '18_healthy_mind_leaf', '19_business_books', '20_luxury_watch', '21_italy', '22_consistent_progress', '23_inspiring_people_quote', '24_ceo_mindset_workspace', '25_bigger_deals', '26_invest_real_assets_tree', '27_collect_moments_suitcase', '28_porsche_freedom', '29_grateful_sunset', '30_same_vision_bigger_results'];
+/* ⭐ готовые die-cut стикеры-визион (8 люкс-символов, /assets/vision-board) — новый набор */
+const MB_VISION = ['01_private_jet', '02_super_yacht', '03_villa_pool', '04_g63_amg', '05_rolex', '06_cash_stack', '07_villa_infinity', '08_g63_night'];
 /* РАНДОМНО берём 7–9 стикеров, раскидываем по слабой сетке (без жёсткого перекрытия), поворот+стаггер+плавание */
 function mbDemoStickers() {
   const pool = MB_VISION.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[pool[i], pool[j]] = [pool[j], pool[i]]; }
