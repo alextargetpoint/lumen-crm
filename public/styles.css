@@ -6886,6 +6886,26 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   :root[data-theme="mono"] .content svg[stroke-width], :root[data-theme="frame"] .content svg[stroke-width],
 :root[data-theme="mono"] .sidebar svg[stroke-width], :root[data-theme="frame"] .sidebar svg[stroke-width] { stroke-width: 1.5; }
 
+/* ФОРМА ШТРИХА: технические темы (Контур/Моно) — острые концы; остальные — мягкие круглые (дефолт ic) */
+:root[data-theme="frame"] .content svg[stroke-width], :root[data-theme="mono"] .content svg[stroke-width],
+:root[data-theme="frame"] .sidebar svg[stroke-width], :root[data-theme="mono"] .sidebar svg[stroke-width] { stroke-linecap: square; stroke-linejoin: miter; }
+
+/* ЧИП-КОНТЕЙНЕРЫ ИКОНОК — своя отрисовка на каждую стилистику (виджет/эмблема/attention) */
+/* Ателье — редакторские hairline-КОЛЬЦА (тонкий контур, без заливки, монохром) */
+:root[data-theme="atelier"] .page-emblem, :root[data-theme="atelier"] .ovx-kc-ic, :root[data-theme="atelier"] .ov2-att-ic {
+  background: transparent !important; border: 1px solid var(--stroke); border-radius: 50% !important; color: var(--ink-2) !important; }
+/* Стекло — frosted КРУГИ с бликом */
+:root[data-theme="emerald"] .page-emblem, :root[data-theme="emerald"] .ovx-kc-ic, :root[data-theme="emerald"] .ov2-att-ic {
+  border-radius: 50% !important; -webkit-backdrop-filter: blur(10px) saturate(1.3); backdrop-filter: blur(10px) saturate(1.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
+/* Контур — острые бордер-КВАДРАТЫ, без заливки (швейцарски) */
+:root[data-theme="frame"] .page-emblem, :root[data-theme="frame"] .ovx-kc-ic, :root[data-theme="frame"] .ov2-att-ic {
+  background: transparent !important; border: 1.5px solid var(--ink); border-radius: 6px !important; color: var(--ink) !important; }
+/* Моно — ЧЁРНЫЙ залитый квадрат, белая иконка */
+:root[data-theme="mono"] .page-emblem, :root[data-theme="mono"] .ovx-kc-ic, :root[data-theme="mono"] .ov2-att-ic {
+  background: var(--ink) !important; color: #fff !important; border-radius: 8px !important; }
+/* Бургунди — мягкий бордо rounded-square (глубже радиус) */
+:root[data-theme="warm"] .page-emblem, :root[data-theme="warm"] .ovx-kc-ic, :root[data-theme="warm"] .ov2-att-ic { border-radius: 13px !important; }
+
 /* ═══ Editorial empty states (нет объектов / постов / подборок) ═══
    Натуральное фото сверху карточки + приглушённый текст. Работает во всех темах. */
 .es-art { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0 !important; overflow: hidden; }
