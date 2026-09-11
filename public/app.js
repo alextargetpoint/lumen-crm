@@ -683,7 +683,11 @@ const THEME_PRESETS = [
 ];
 /* бесповоротные AI-видеофоны под тему (сгенерированы через Higgsfield);
    у кого своего нет — родной скайлайн + CSS-тинт под палитру */
-const THEME_VIDEO = { warm: 'assets/skyline-warm.mp4?v=1' };
+const THEME_VIDEO = {
+  light: 'assets/skyline-cobalt.mp4?v=1', dark: 'assets/skyline-night.mp4?v=1',
+  mono: 'assets/skyline-mono.mp4?v=1', frame: 'assets/skyline-mono.mp4?v=1',
+  warm: 'assets/skyline-warm.mp4?v=1', emerald: 'assets/skyline-emerald.mp4?v=1',
+};
 function skylineSrc(theme) { return THEME_VIDEO[theme || localStorage.getItem('lumen_theme') || 'light'] || 'assets/skyline-bg.mp4?v=2'; }
 function applyThemeVideo(theme) {
   const src = skylineSrc(theme);
