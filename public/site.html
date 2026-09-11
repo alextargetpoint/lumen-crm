@@ -213,7 +213,17 @@ h2 em{font-style:italic;font-weight:500;color:var(--blue)}
 
 /* ============ WHATSAPP SCENE ============ */
 .scene{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(30px,5vw,70px);align-items:center}
-.phone{width:320px;max-width:100%;margin:0 auto;border-radius:44px;padding:12px;background:linear-gradient(160deg,#1a2740,#0a1120);box-shadow:var(--shadow-lg);position:relative}
+.phone{width:320px;max-width:100%;margin:0 auto;border-radius:46px;padding:11px;position:relative;
+  background:linear-gradient(145deg,#4a556e 0%,#161d2e 14%,#0b1120 50%,#161d2e 86%,#3a4560 100%);
+  box-shadow:0 1px 2px rgba(255,255,255,.22) inset,0 -1px 2px rgba(0,0,0,.5) inset,0 60px 70px -34px rgba(0,0,0,.7),0 30px 50px -30px rgba(37,99,235,.35);
+  transform:perspective(1400px) rotateY(-8deg) rotateX(2.5deg);transform-style:preserve-3d;
+  animation:ph3d 9s ease-in-out infinite}
+.phone::before{content:"";position:absolute;inset:5px;border-radius:40px;z-index:1;pointer-events:none;box-shadow:0 0 0 1.5px rgba(0,0,0,.6),0 0 0 2.5px rgba(120,140,180,.25)}
+.phone .screen{position:relative}
+.phone .screen::after{content:"";position:absolute;inset:0;z-index:20;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(128deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.03) 20%,transparent 42%,transparent 74%,rgba(255,255,255,.05) 100%)}
+@keyframes ph3d{0%,100%{transform:perspective(1400px) rotateY(-8deg) rotateX(2.5deg) translateY(0)}50%{transform:perspective(1400px) rotateY(5deg) rotateX(1deg) translateY(-9px)}}
+@media(prefers-reduced-motion:reduce){.phone{animation:none;transform:perspective(1400px) rotateY(-6deg) rotateX(2deg)}}
 .phone .island{position:absolute;top:22px;left:50%;transform:translateX(-50%);width:92px;height:24px;background:#000;border-radius:999px;z-index:5}
 .phone .screen{border-radius:33px;overflow:hidden;background:#0b141a;aspect-ratio:9/19.3}
 .wa-top{background:#0d2b26;padding:44px 16px 12px;display:flex;align-items:center;gap:10px}
@@ -769,8 +779,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   /* карточки — тонкая верхняя блик-линия */
   .gap-item,.leak,.fail,.ncard,.pcard,.tgcol{background-image:linear-gradient(180deg,rgba(255,255,255,.5),transparent 40%)}
   html[data-theme="dark"] .gap-item,html[data-theme="dark"] .leak,html[data-theme="dark"] .fail,html[data-theme="dark"] .ncard,html[data-theme="dark"] .pcard,html[data-theme="dark"] .tgcol{background-image:linear-gradient(180deg,rgba(143,180,255,.06),transparent 40%)}
-  /* дорогая анимация: телефон мягко парит */
-  .phone{animation:phfloat 5.5s var(--ease-soft) infinite}
+  /* телефон: 3D-разворот+парение из базового .phone (ph3d) */
   /* тап-таргеты */
   .tgl,.burger{width:44px;height:44px}
 }
