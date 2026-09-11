@@ -257,13 +257,13 @@
     const step = STEPS[idx];
     const d = renderStepData(step);
     const total = STEPS.length;
-    const BGV = { welcome: 'onboard-welcome', edition: 'ob-edition', brand: 'ob-brand', geos: 'ob-geos', tone: 'ob-tone', whatsapp: 'ob-whatsapp', chains: 'ob-chains', listings: 'ob-listings', team: 'ob-team', finish: 'onboard-success' };
+    // только «моменты» получают кино-видео; на всех рабочих шагах живёт WebGL-шейдер (единый премиум-эмбиент)
+    const BGV = { welcome: 'onboard-welcome', finish: 'onboard-success' };
     const bgVid = BGV[step.id] || '';
     root.querySelector('.ob-bgvid').innerHTML = bgVid
       ? `<video autoplay muted loop playsinline poster="/assets/${bgVid}-poster.jpg"><source src="/assets/${bgVid}.mp4?v=1" type="video/mp4"></video>`
       : '';
     root.classList.toggle('ob-cinematic', !!d.bg);
-    root.classList.toggle('ob-hasbg', !!bgVid && !d.bg);
 
     const stepsDots = STEPS.map((s, i) => `<i class="${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}"></i>`).join('');
     const shot = d.shot ? `<div class="ob-shot"><div class="ob-shot-bar"><i></i><i></i><i></i></div><img src="${SHOT(d.shot)}" alt="" loading="lazy"></div>` : '';
@@ -381,9 +381,16 @@
     // ветвление пересобирается после выбора edition
     if (step.id === 'edition') STEPS = buildSteps();
     idx = Math.min(idx + 1, STEPS.length - 1);
-    playTrans(); paint();
+    stepChange();
   }
-  function back() { if (idx <= 0) return; idx = Math.max(0, idx - 1); playTrans(); paint(); }
+  function back() { if (idx <= 0) return; idx = Math.max(0, idx - 1); stepChange(); }
+  function stepChange() {
+    const stage = root && root.querySelector('.ob-stage');
+    if (!stage) { paint(); return; }
+    stage.classList.add('ob-leaving');
+    pulseShader();
+    setTimeout(() => { if (root) { stage.classList.remove('ob-leaving'); paint(); } }, 175);
+  }
 
   async function saveProgress(markDone) {
     const agency = {
@@ -432,7 +439,6 @@
         <div class="ob-veil"></div>
         <div class="ob-orbs"><i></i><i></i><i></i></div>
         <div class="ob-grain"></div>
-        <div class="ob-trans"><video muted playsinline></video></div>
         <button class="ob-close" title="Закрыть">✕</button>
         <div class="ob-wrap">
           <div class="ob-stage"></div>
@@ -642,13 +648,15 @@
     @keyframes obDoneGlow{0%,100%{box-shadow:0 0 0 12px rgba(52,211,153,.12),0 0 64px -6px rgba(16,185,129,.72),0 24px 60px -18px rgba(16,185,129,.6)}50%{box-shadow:0 0 0 20px rgba(52,211,153,.05),0 0 96px 2px rgba(16,185,129,.92),0 24px 60px -18px rgba(16,185,129,.6)}}
     .ob-recap{background:linear-gradient(rgba(14,24,46,.4),rgba(14,24,46,.4)) padding-box;border-radius:16px;padding:8px 22px}
     /* ==== шейдер-слой + генеративные переходы + z-порядок ==== */
-    .ob-shader{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:.92}
-    .ob-orbs{z-index:2;opacity:.4}
+    .ob-shader{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:1;transition:filter .42s ease,transform .42s ease,opacity .5s ease}
+    .ob-root.ob-cinematic .ob-shader{opacity:0}
+    .ob-root.ob-pulse .ob-shader{filter:brightness(1.4) saturate(1.2);transform:scale(1.015)}
+    .ob-orbs{z-index:2;opacity:.32}
     .ob-grain{z-index:3}
-    .ob-trans{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;transition:opacity .1s}
-    .ob-trans.on{opacity:1}
-    .ob-trans video{width:100%;height:100%;object-fit:cover;mix-blend-mode:screen;filter:saturate(1.35) brightness(1.15)}
     .ob-wrap{z-index:5}.ob-foot{z-index:5}.ob-close{z-index:7}
+    /* чистый переход панели (fade+blur), без дешёвых видео-вспышек */
+    .ob-stage{transition:opacity .17s ease,transform .17s ease,filter .17s ease}
+    .ob-stage.ob-leaving{opacity:0;transform:translateY(-14px) scale(.986);filter:blur(7px)}
     /* ==== усиленные входы: каскад детей ==== */
     .ob-panel .ob-body>*{animation:obUp .72s cubic-bezier(.16,1,.3,1) both}
     .ob-panel .ob-body>*:nth-child(1){animation-delay:.04s}
@@ -693,15 +701,16 @@
       'precision highp float;uniform vec2 r;uniform float t;uniform vec2 m;',
       'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
       'float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}',
-      'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.02;a*=.5;}return v;}',
-      'void main(){vec2 uv=gl_FragCoord.xy/r.xy;vec2 q=uv;q.x*=r.x/r.y;float tt=t*.045;',
-      'vec2 fl=vec2(fbm(q*2.2+tt),fbm(q*2.2-tt+5.));',
-      'float f=fbm(q*3.2+fl*1.7+vec2(tt*2.,-tt));',
-      'vec3 c1=vec3(.012,.028,.085),c2=vec3(.08,.20,.60),c3=vec3(.34,.27,.86);',
-      'vec3 col=mix(c1,c2,smoothstep(.22,.78,f));col=mix(col,c3,smoothstep(.62,.96,f)*.6);',
-      'vec2 mp=m;mp.x*=r.x/r.y;float d=distance(q,mp);col+=vec3(.16,.36,.95)*exp(-d*3.2)*.6;',
-      'col+=vec3(.05,.12,.4)*pow(fbm(q*6.+tt*3.),3.)*1.2;',
-      'col*=1.-.55*distance(uv,vec2(.5));gl_FragColor=vec4(col,1.);}'
+      'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.03;a*=.5;}return v;}',
+      'void main(){vec2 uv=gl_FragCoord.xy/r.xy;vec2 q=uv;q.x*=r.x/r.y;float tt=t*.028;',
+      'vec2 fl=vec2(fbm(q*1.5+tt),fbm(q*1.5-tt+7.));',
+      'float f=fbm(q*2.3+fl*1.35+vec2(tt*1.4,-tt));',
+      'vec3 deep=vec3(.006,.018,.05),cob=vec3(.04,.13,.46),hi=vec3(.18,.30,.78);',
+      'vec3 col=mix(deep,cob,smoothstep(.30,.86,f));',
+      'col=mix(col,hi,smoothstep(.72,.99,f)*.38);',
+      'vec2 mp=m;mp.x*=r.x/r.y;float d=distance(q,mp);col+=vec3(.09,.22,.62)*exp(-d*3.9)*.42;',
+      'col*=1.-.62*smoothstep(.28,1.05,distance(uv,vec2(.5,.44)));',
+      'gl_FragColor=vec4(col,1.);}'
     ].join('');
     function sh(ty, src) { const s = gl.createShader(ty); gl.shaderSource(s, src); gl.compileShader(s); return s; }
     const prog = gl.createProgram();
@@ -728,17 +737,11 @@
   }
   function stopShader() { if (_raf) cancelAnimationFrame(_raf); _raf = 0; }
 
-  // ---------- генеративные переходы между шагами (Higgsfield) ----------
-  const TRANS = ['ob-trans-sweep', 'ob-trans-burst', 'ob-trans-ripple'];
-  let _transI = 0;
-  function playTrans() {
-    const box = root && root.querySelector('.ob-trans'); if (!box) return;
-    const v = box.querySelector('video');
-    const name = TRANS[_transI++ % TRANS.length];
-    if ((v.getAttribute('src') || '').indexOf(name) < 0) v.src = '/assets/' + name + '.mp4?v=1';
-    box.classList.add('on');
-    try { v.currentTime = 0; const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
-    clearTimeout(box._t); box._t = setTimeout(() => box.classList.remove('on'), 640);
+  // ---------- переход между шагами: мягкая вспышка шейдера (без дешёвых видео) ----------
+  function pulseShader() {
+    if (!root) return;
+    root.classList.add('ob-pulse');
+    clearTimeout(pulseShader._t); pulseShader._t = setTimeout(() => { root && root.classList.remove('ob-pulse'); }, 420);
   }
 
   // ---------- авто-открытие на первом запуске (владелец + не пройдено) ----------
