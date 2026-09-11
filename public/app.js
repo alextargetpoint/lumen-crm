@@ -6467,6 +6467,9 @@ PAGES.mediaplan = async (root) => {
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;
     const targetPage = v === 'analytics' ? 'adsAnalytics' : 'mediaplan';
+    /* переключение Планы⇄Аналитика — ТИХО: hero и сегмент одинаковы в обоих видах, поэтому
+       мгновенная подмена без волны входа и без скачка скролла = ощущение статики, а не перезагрузки */
+    render._silent = true;
     if (targetPage !== CUR) go(targetPage); else { MP_VIEW = v; render(); }
   }));
 
