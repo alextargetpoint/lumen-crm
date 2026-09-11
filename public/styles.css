@@ -4958,8 +4958,8 @@ html[data-night] .cmp-prev-b { background: rgba(80, 140, 90, .16); border-color:
 .ov-goal2-p i { font-size: 10.5px; font-style: normal; color: var(--ink-3); }
 .ov-goal2-note { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; padding: 8px 11px; border-radius: 10px; }
 .ov-goal2-note svg { width: 15px; height: 15px; flex: none; }
-.ov-goal2-note.ok { color: var(--ov-cat-green); background: var(--ov-soft-green); }
-.ov-goal2-note.warn { color: var(--ov-cat-amber); background: var(--ov-soft-amber); }
+.ov-goal2-note.ok { color: color-mix(in srgb, var(--ov-cat-green) 74%, #06170f); background: var(--ov-soft-green); }
+.ov-goal2-note.warn { color: color-mix(in srgb, var(--ov-cat-amber) 56%, #3a2200); background: var(--ov-soft-amber); }
 
 /* ── ГОРЯЧИЕ ЛИДЫ: рельс срочности ── */
 .ov-urg { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -5418,8 +5418,8 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .mpa-h-d { font-size: 12px; }
 
 .mpa-delta { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 20px; font-variant-numeric: tabular-nums; }
-.mpa-delta.good { color: var(--ok); background: var(--ok-bg); }
-.mpa-delta.bad { color: var(--bad); background: var(--bad-bg); }
+.mpa-delta.good { color: color-mix(in srgb, var(--ok) 74%, #06170f); background: var(--ok-bg); }
+.mpa-delta.bad { color: color-mix(in srgb, var(--bad) 78%, #2a0209); background: var(--bad-bg); }
 
 .mpa-ct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .mpa-ct { border: 1px solid var(--stroke-soft); border-radius: var(--r-md); padding: 15px; background: var(--bg); }
@@ -6185,8 +6185,8 @@ input:not([type=checkbox]):not([type=radio]):focus, textarea:focus, select:focus
 .ctrl-card-hd small { font-size: 11.5px; color: var(--ink-3); }
 .ctrl-card-hd > div { flex: 1; min-width: 0; }
 .ctrl-badge { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg-2); border-radius: 9px; padding: 3px 10px; flex: none; }
-.ctrl-card.s-crit .ctrl-badge { color: var(--bad); background: var(--bad-bg); }
-.ctrl-card.s-warn .ctrl-badge { color: var(--warn); background: var(--warn-bg); }
+.ctrl-card.s-crit .ctrl-badge { color: color-mix(in srgb, var(--bad) 78%, #2a0209); background: var(--bad-bg); }
+.ctrl-card.s-warn .ctrl-badge { color: color-mix(in srgb, var(--warn) 56%, #3a2200); background: var(--warn-bg); }
 .ctrl-list { display: flex; flex-direction: column; }
 .ctrl-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--stroke); }
 .ctrl-row:first-child { border-top: none; }
@@ -6246,7 +6246,7 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
 .cav-leak { padding: 9px 12px; background: var(--bad-bg); border-radius: 10px; font-size: 13px; }
 .cav-leak-k { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--bad); margin-right: 7px; }
 .cav-leak b { font-size: 13.5px; } .cav-leak-v { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
-.cav-ok { font-size: 13px; color: var(--ok); background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
+.cav-ok { font-size: 13px; color: color-mix(in srgb, var(--ok) 74%, #06170f); background: var(--ok-bg); border-radius: 10px; padding: 12px 14px; }
 .cav-segs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); }
 .cav-seg-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin-bottom: 9px; }
 .cav-seg-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
@@ -6335,7 +6335,7 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
   --blue-300: #DD7693; --blue-100: #F9E4EA;
   /* нейтрали — workspace остаётся ЧИСТЫМ светлым, БЕЗ розового тинта */
   --bg: #F8FAFD; --bg-2: #F2F5F9; --card: #FFFFFF;
-  --ink: #141821; --ink-2: #596273; --ink-3: #8A93A3;
+  --ink: #141821; --ink-2: #56505A; --ink-3: #78727A;
   --stroke: rgba(30,40,60,.08); --stroke-soft: rgba(30,40,60,.05); --glass: rgba(255,255,255,.7);
   /* семантика — НОРМАЛЬНЫЕ цвета (НЕ бордо!) */
   --ok: #1F9D73; --ok-bg: #DFF5EC; --warn: #D99A34; --warn-bg: #FFF2D8; --bad: #D94757; --bad-bg: #FCE5E8;
@@ -6376,7 +6376,7 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
   --accent: #397BFF; --accent-2: #2868FF; --accent-3: #65A0FF;
   --blue-300: #9AC1FF; --blue-100: #E8F1FF;
   --bg: #F5F8FD; --bg-2: #EAF1FB; --card: rgba(255,255,255,.68);
-  --ink: #0F1E36; --ink-2: #344054; --ink-3: #667085;
+  --ink: #0F1E36; --ink-2: #344054; --ink-3: #5C6675;
   --stroke: rgba(15,35,65,.08); --stroke-soft: rgba(255,255,255,.62); --glass: rgba(255,255,255,.55);
   --ok: #24B47E; --ok-bg: #E4F6EE; --warn: #F4A340; --warn-bg: #FBF1DF; --bad: #EF596F; --bad-bg: #FCE9EC;
   --violet: #8268FF; --violet-bg: #EEEAFF;
