@@ -711,7 +711,7 @@ function applyRoleUi() {
   const rt = (me && me.roleType) || 'broker';
   const hardBroker = isBroker && rt === 'broker';   /* жёсткий список — только для брокера; маркетологу/менеджеру нужны реклама/аналитика */
   const hidePages = (me && me.hidePages) || [];      /* сервер уже собрал: дефолт роли ∪ индивидуальное скрытие */
-  const isHidden = (pg) => isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg));
+  const isHidden = (pg) => pg === 'control' && me && me.canControl ? false : isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg));
   $$('.nav-item').forEach(btn => {
     const hideS = solo && btn.dataset.page === 'brokers';
     btn.style.display = (isHidden(btn.dataset.page) || hideS) ? 'none' : '';
@@ -834,6 +834,7 @@ function initNavSearch() {
   const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return def.label; return ''; };
   const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
   const hidden = new Set(isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || []));
+  if (me && me.canControl) hidden.delete('control');   /* делегат контроля видит раздел */
   const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: v.name, sub: v.sub || '', parent: parentOf(k), icon: v.icon }));
   const norm = (s) => String(s || '').toLowerCase();
   const goTo = (pk) => { go(pk); inp.value = ''; res.hidden = true; inp.blur(); };
@@ -2598,7 +2599,10 @@ PAGES.control = async (root) => {
       <div class="ctrl-hero-big">${d.total}</div>
       <div class="ctrl-hero-t">${d.total === 0 ? 'Всё под контролем' : 'точек внимания'}${crit ? ` · <span class="ctrl-crit">${crit} критичных</span>` : ''}</div>
     </div>
-    <button class="btn btn-sm" id="ctrlRefresh">${ic(I.refresh || I.arrow)} Обновить</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm btn-ghost" id="ctrlSettings">${ic(I.gear)} Настройки</button>
+      <button class="btn btn-sm" id="ctrlRefresh">${ic(I.refresh || I.arrow)} Обновить</button>
+    </div>
   </div>`;
   const dupRows = (items) => items.slice(0, 6).map((c, i) => `<div class="ctrl-row"><span class="ctrl-row-nm">${esc(c.leads.map(l => l.name).join(' · '))}</span><span class="ctrl-row-meta">+${esc(String(c.phone).slice(-4))} · ${c.count} записи</span><button class="btn btn-xs" data-merge="${i}">Объединить</button></div>`).join('');
   const cards = active.length ? `<div class="ctrl-grid">${active.map(k => { const B = CTRL_BUCKETS[k]; const items = d.buckets[k];
@@ -2621,6 +2625,7 @@ PAGES.control = async (root) => {
   </div>`;
   root.innerHTML = `<div class="ctrl-wrap">${hero}${cards}${team}${ctrlAnalyticsHTML(fa)}</div>`;
   $('#ctrlRefresh', root)?.addEventListener('click', () => { render._silent = false; go('control'); });
+  $('#ctrlSettings', root)?.addEventListener('click', () => openControlSettings());
   $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', () => openLeadModal(b.dataset.ovlead)));
   $$('[data-offboard]', root).forEach(b => b.addEventListener('click', () => openOffboard(b.dataset.offboard)));
   $$('[data-merge]', root).forEach(b => b.addEventListener('click', () => openMerge((window._ctrlDups || [])[+b.dataset.merge])));
@@ -2628,6 +2633,38 @@ PAGES.control = async (root) => {
     try { await api.patch('/brokers/' + b.dataset.away, { away: b.dataset.on !== '1' }); await loadState(); go('control'); } catch (e) { toast('Ошибка', e.message); }
   }));
 };
+async function openControlSettings() {
+  let s; try { s = await api.get('/control-settings'); } catch (e) { toast('Не удалось загрузить', e.message); return; }
+  const isOwner = !(STATE.me && STATE.me.role === 'broker');
+  const brs = (STATE.brokers || []).filter(b => b.active !== false);
+  const ruleOpt = (v, t) => `<option value="${v}" ${s.commissionRule === v ? 'selected' : ''}>${t}</option>`;
+  const body = `
+    <div class="cst-grid">
+      <label class="cst-f"><span>Крупный бюджет (VIP), $</span><input id="cstVip" type="number" min="10000" step="10000" value="${s.vipBudget}"></label>
+      <label class="cst-f"><span>Брокер «молчит» после, ч</span><input id="cstSilent" type="number" min="1" max="72" value="${s.silentHours}"></label>
+      <label class="cst-f"><span>Лид «застрял» после, дн.</span><input id="cstStalled" type="number" min="1" max="90" value="${s.stalledDays}"></label>
+      <label class="cst-f"><span>Перегруз при load/ёмкость ≥</span><input id="cstOver" type="number" min="0.5" max="3" step="0.1" value="${s.overloadPct}"></label>
+      <label class="cst-f"><span>Комиссия за сделку</span><select id="cstRule">${ruleOpt('last', 'Последнему брокеру')}${ruleOpt('first', 'Первому касанию')}${ruleOpt('split', 'Поровну между всеми')}</select></label>
+      <label class="cst-f"><span>Алерты не чаще раза в, мин</span><input id="cstCool" type="number" min="5" max="1440" value="${s.alertCooldownMin}"></label>
+      <label class="cst-f"><span>Повтор непрочитанного через, ч</span><input id="cstRep" type="number" min="1" max="336" value="${s.alertRepeatH}"></label>
+    </div>
+    ${isOwner ? `<div class="cst-deleg"><div class="cst-deleg-h">${ic(I.users)} Делегировать контроль</div>
+      <p class="cst-deleg-d">Передайте «Пульт контроля» ассистенту, директору или руководителю отдела продаж — он получит доступ к этому разделу и алерты в свой Telegram. Вы сохраняете полный доступ.</p>
+      <select id="cstDeleg"><option value="">— Никому (только владелец)</option>${brs.map(b => `<option value="${b.id}" ${s.delegateBrokerId === b.id ? 'selected' : ''}>${esc(b.name)}${b.tgChatId ? '' : ' (нет Telegram — алерты не дойдут)'}</option>`).join('')}</select></div>` : '<div class="cst-note">Пороги может настроить и делегат; передать контроль другому — только владелец.</div>'}`;
+  modal({ title: 'Настройки контроля', sub: 'Чувствительность рисков, комиссии и делегирование', body, wide: true, actions: [
+    { label: 'Отмена' },
+    { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+        const payload = {
+          vipBudget: +$('#cstVip', bd).value, silentHours: +$('#cstSilent', bd).value, stalledDays: +$('#cstStalled', bd).value,
+          overloadPct: +$('#cstOver', bd).value, commissionRule: $('#cstRule', bd).value,
+          alertCooldownMin: +$('#cstCool', bd).value, alertRepeatH: +$('#cstRep', bd).value,
+        };
+        if (isOwner) payload.delegateBrokerId = $('#cstDeleg', bd).value || null;
+        try { await api.post('/control-settings', payload); toast('Настройки сохранены', null, true); await loadState(); render._silent = false; go('control'); }
+        catch (e) { toast('Ошибка', e.message); return false; }
+      } },
+  ] });
+}
 function openMerge(cluster) {
   if (!cluster) return;
   const ls = cluster.leads;

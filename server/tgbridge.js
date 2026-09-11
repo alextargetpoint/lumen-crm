@@ -249,7 +249,13 @@ async function setMenuButton(db, baseUrl) {
   return api(db, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url } } });
 }
 
+/* прямое уведомление в чат Telegram (для алертов делегату контроля) */
+async function notify(db, chatId, text) {
+  if (!chatId || !token(db)) return;
+  try { await api(db, 'sendMessage', { chat_id: chatId, text, parse_mode: 'HTML' }); } catch (e) { console.error('[tg-notify]', e.message); }
+}
+
 module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardHandover, bindBroker,
-  setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl,
+  setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
 };

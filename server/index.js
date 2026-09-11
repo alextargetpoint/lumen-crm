@@ -435,8 +435,10 @@ function notifyOutbound(db, lead, event) {
 /* проактивный алерт рисков руководителю → вебхук (Telegram/Make/Zapier) */
 engine.onControlAlert = (db, r) => {
   const url = db.settings.hooks && db.settings.hooks.outboundUrl;
-  if (!url) return;
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'control.alert', at: Date.now(), text: r.text, counts: r.counts }) }).catch(e => console.error('[control-alert]', e.message));
+  if (url) fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'control.alert', at: Date.now(), text: r.text, counts: r.counts }) }).catch(e => console.error('[control-alert]', e.message));
+  /* делегат контроля получает алерт прямо в свой Telegram */
+  const did = db.settings.control && db.settings.control.delegateBrokerId;
+  if (did) { const del = db.brokers.find(b => b.id === did); if (del && del.tgChatId) tgbridge.notify(db, del.tgChatId, r.text).catch(() => {}); }
 };
 engine.onQualified = (db, lead) => notifyOutbound(db, lead, 'lead.qualified');
 engine.onHandover = (db, lead) => { notifyOutbound(db, lead, 'lead.handover'); tgbridge.forwardHandover(db, lead).catch(() => {}); };
@@ -2920,7 +2922,11 @@ const server = http.createServer(async (req, res) => {
     const MEMBER = IS_BROKER ? (db.brokers.find(b => b.id === ROLE.brokerId) || {}) : null;
     const CAP = IS_BROKER ? (ROLE_CAPS[MEMBER.roleType] || ROLE_CAPS.broker) : null;
     const GRANTED = CAP ? new Set(CAP.allow) : new Set();
-    if (IS_BROKER && p.startsWith('/api/') && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
+    /* делегирование контроля: founder может передать «Пульт контроля» одному сотруднику */
+    const isControlDelegate = IS_BROKER && !!(db.settings.control && db.settings.control.delegateBrokerId && db.settings.control.delegateBrokerId === ROLE.brokerId);
+    const canControl = () => !!ROLE && (!IS_BROKER || isControlDelegate);
+    const CONTROL_PATH = /^\/api\/(control-center|control-analytics|control-settings)$/.test(p) || /^\/api\/brokers\/[^/]+\/offboard$/.test(p) || p === '/api/leads/merge' || /^\/api\/leads\/[^/]+\/commission$/.test(p);
+    if (IS_BROKER && p.startsWith('/api/') && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
     const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); return !!(byTag || bySrc); };
@@ -2954,7 +2960,7 @@ const server = http.createServer(async (req, res) => {
         templates: db.templates, sequences: db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
-        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])] : [] } : null,
+        me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
     /* журнал доступа (только владелец) */
@@ -3557,7 +3563,7 @@ const server = http.createServer(async (req, res) => {
     /* ── Мастер «Передача дел»: предпросмотр и исполнение оффбординга брокера ──
        preview (GET ?successor=…) — кому что уйдёт; execute (POST) — реассайн+отзыв доступа. */
     if ((m = p.match(/^\/api\/brokers\/([^/]+)\/offboard$/))) {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
       const br = db.brokers.find(x => x.id === m[1]);
       if (!br) return json(res, 404, { error: 'not found' });
       if (db.brokers.filter(x => x.active !== false).length <= 1) return json(res, 400, { error: 'нельзя отключить последнего активного брокера — некому передать' });
@@ -3601,19 +3607,46 @@ const server = http.createServer(async (req, res) => {
 
     /* ── Командный центр рисков основателя: всё, что требует внимания, одним запросом ── */
     if (p === '/api/control-center' && req.method === 'GET') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
       return json(res, 200, control.scanRisks(db));
     }
 
     /* ── Риск-срез воронки: где течёт (стадии/брокеры/гео/каналы) ── */
     if (p === '/api/control-analytics' && req.method === 'GET') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
       return json(res, 200, control.funnelAnalysis(db));
+    }
+
+    /* ── Настройки порогов контроля (владелец): чувствительность рисков и алертов ── */
+    if (p === '/api/control-settings' && (req.method === 'GET' || req.method === 'POST')) {
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
+      db.settings.control = db.settings.control || {};
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        const c = db.settings.control;
+        const clamp = (v, lo, hi, dflt) => { const n = +v; return isNaN(n) ? dflt : Math.max(lo, Math.min(hi, n)); };
+        if (b.vipBudget != null) c.vipBudget = clamp(b.vipBudget, 10000, 100000000, 500000);
+        if (b.silentHours != null) c.silentHours = clamp(b.silentHours, 1, 72, 4);
+        if (b.stalledDays != null) c.stalledDays = clamp(b.stalledDays, 1, 90, 5);
+        if (b.overloadPct != null) c.overloadPct = clamp(b.overloadPct, 0.5, 3, 1);
+        if (b.commissionRule && ['first', 'last', 'split'].includes(b.commissionRule)) c.commissionRule = b.commissionRule;
+        if (b.alertCooldownMin != null) c.alertCooldownMin = clamp(b.alertCooldownMin, 5, 1440, 30);
+        if (b.alertRepeatH != null) c.alertRepeatH = clamp(b.alertRepeatH, 1, 336, 24);
+        /* делегирование контроля: только владелец может передать/забрать; broker-делегат не может переназначить себя же */
+        if (b.delegateBrokerId !== undefined && !IS_BROKER) {
+          const nid = b.delegateBrokerId && db.brokers.some(x => x.id === b.delegateBrokerId) ? b.delegateBrokerId : null;
+          if (nid !== (c.delegateBrokerId || null)) { c.delegateBrokerId = nid; audit(db, req, nid ? `контроль делегирован: ${(db.brokers.find(x => x.id === nid) || {}).name || nid}` : 'делегирование контроля снято'); }
+        }
+        audit(db, req, 'изменены пороги контроля');
+        store.save();
+      }
+      const c = control.cfg(db);
+      return json(res, 200, { vipBudget: c.vipBudget, silentHours: c.silentHours, stalledDays: c.stalledDays, overloadPct: c.overloadPct, commissionRule: (db.settings.control.commissionRule || 'last'), alertCooldownMin: c.alertCooldownMin || 30, alertRepeatH: c.alertRepeatH || 24, delegateBrokerId: db.settings.control.delegateBrokerId || null });
     }
 
     /* ── Слияние дублей лида: перенести переписку/встречи/заметки/владение в один тред ── */
     if (p === '/api/leads/merge' && req.method === 'POST') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
       const b = await readBody(req);
       const ids = (b.ids || []).filter(x => typeof x === 'string');
       const keepId = b.keepId || ids[0];
@@ -3639,7 +3672,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ── Атрибуция комиссии по цепочке владения (правило из настроек) ── */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/commission$/)) && req.method === 'GET') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!canControl()) return json(res, 403, { error: 'нет доступа к контролю' });
       const lead = db.leads.find(l => l.id === m[1]); if (!lead) return json(res, 404, { error: 'not found' });
       const rule = (db.settings.control && db.settings.control.commissionRule) || 'last';
       return json(res, 200, { rule, split: control.commissionSplit(lead.ownerHistory || [], rule) });
