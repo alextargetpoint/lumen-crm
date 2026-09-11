@@ -1,0 +1,603 @@
+/* ============================================================
+   Lumen · Онбординг-церемония (first-run setup wizard)
+   Самодостаточный модуль. Пишет конфиг через /api/settings,
+   ветвится agency ⇄ solo, даёт выбор стиля с живыми превью,
+   ведёт к боевым визардам (WhatsApp, брокеры, база, цепочки).
+   Триггеры: авто на первом запуске (из app.js), window.Onboard.open(),
+   hash #setup, кнопка [data-onboard].
+   ============================================================ */
+(function () {
+  'use strict';
+
+  // ---------- утилиты ----------
+  const B = () => (window.LUMEN || {});
+  async function api(method, path, body) {
+    const r = await fetch('/api' + path, {
+      method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!r.ok) throw new Error(path + ' ' + r.status);
+    const t = await r.text(); try { return JSON.parse(t); } catch (e) { return t; }
+  }
+  const el = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- данные ----------
+  const THEMES = [
+    { key: 'light',   name: 'Кобальт',        desc: 'Фирменный синий, мягкие тени — базовый вид Lumen.', vid: 'skyline-cobalt',   sw: ['#2563EB', '#F4F7FB', '#111827'] },
+    { key: 'emerald', name: 'Lumen Glass',    desc: 'Атмосферное стекло, premium-OS, глубина.',          vid: 'skyline-glass',    sw: ['#397BFF', '#EEF5FF', '#0A1833'] },
+    { key: 'dark',    name: 'Ночь',           desc: 'Тёмный кобальт — для работы вечером и премиум-подачи.', vid: 'skyline-night', sw: ['#5B84FF', '#0A1833', '#EAF0FF'] },
+    { key: 'warm',    name: 'Lumen Burgundy', desc: 'Бордо-бренд, тёплый люкс, светлый workspace.',      vid: 'skyline-burgundy', sw: ['#861C3C', '#F8FAFD', '#2A0E17'] },
+    { key: 'mono',    name: 'Моно',           desc: 'Чёрно-белый минимализм, максимум контента.',        vid: 'skyline-mono',     sw: ['#171717', '#F6F6F6', '#171717'] },
+    { key: 'frame',   name: 'Контур',         desc: 'Чёткие рамки без теней — строгий редакторский вид.', vid: '',                sw: ['#111827', '#FFFFFF', '#2563EB'] },
+  ];
+  const GEOS = [
+    { k: 'dubai', l: 'Дубай' }, { k: 'abudhabi', l: 'Абу-Даби' }, { k: 'bali', l: 'Бали' },
+    { k: 'phuket', l: 'Пхукет' }, { k: 'spain', l: 'Испания' }, { k: 'cyprus', l: 'Кипр' },
+    { k: 'thailand', l: 'Таиланд' }, { k: 'turkey', l: 'Турция' }, { k: 'georgia', l: 'Грузия' },
+    { k: 'montenegro', l: 'Черногория' }, { k: 'greece', l: 'Греция' }, { k: 'other', l: 'Другое' },
+  ];
+  const TONES = [
+    { k: 'warm',    name: 'Тёплая и заботливая', ex: '«Понимаю, это важное решение — подскажу и ничего не буду навязывать 🙌 Рассматриваете под доход или для себя?»', tone: 'тёплая, заботливая, человечная — как хороший личный менеджер; без давления' },
+    { k: 'expert',  name: 'Экспертная и уверенная', ex: '«Хороший выбор района. По этому пулу за 12 мес рост ~18% и рассрочка 0% до ключей. Уточню бюджет — подберу 3 точных варианта.»', tone: 'экспертная, уверенная, по делу; оперирует цифрами и фактами рынка' },
+    { k: 'concise', name: 'Короткая и деловая', ex: '«Принял. Бюджет и цель покупки? Пришлю 3 варианта под вас в течение часа.»', tone: 'короткая, деловая, без воды; быстрые чёткие сообщения' },
+  ];
+  // иллюстрации к шагам-фичам
+  const SHOT = (n) => '/assets/site/cap-' + n + '.png';
+
+  // ---------- состояние ----------
+  let S = null;         // накопленный конфиг онбординга
+  let STEPS = [];       // активные шаги (после ветвления)
+  let idx = 0;
+  let root = null, auto = false;
+
+  function freshState(st) {
+    const a = (st && st.settings && st.settings.agency) || {};
+    return {
+      edition: a.edition || '',                 // '' пока не выбрано
+      theme: (localStorage.getItem('lumen_theme') || 'light'),
+      name: a.name && a.name !== 'One Agency' ? a.name : '',
+      logo: a.logo || '',
+      geos: Array.isArray(a.geos) ? a.geos.slice() : [],
+      manager: Object.assign({ name: '', phone: '', email: '' }, a.manager || {}),
+      tone: 'warm',
+      autopilot: !!(st && st.settings && st.settings.ai && st.settings.ai.autopilot),
+    };
+  }
+
+  // ---------- определение шагов (data-driven + branch) ----------
+  function buildSteps() {
+    const solo = S.edition === 'solo';
+    const all = [
+      { id: 'welcome' },
+      { id: 'edition' },
+      { id: 'style' },
+      { id: 'brand' },
+      { id: 'geos' },
+      { id: 'tone' },
+      { id: 'whatsapp' },
+      { id: 'chains' },
+      { id: 'listings' },
+      !solo && { id: 'team' },
+      { id: 'finish' },
+    ].filter(Boolean);
+    return all;
+  }
+
+  // ============================================================
+  //  РЕНДЕР ШАГОВ
+  // ============================================================
+  function stepWelcome() {
+    return {
+      bg: 'welcome', pad: true,
+      html: `
+        <div class="ob-center">
+          <div class="ob-badge">Церемония запуска</div>
+          <h1 class="ob-h1">Добро пожаловать в <span class="ob-grad">Lumen</span></h1>
+          <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
+          <div class="ob-pills">
+            <span class="ob-pill">🎨 Свой стиль</span>
+            <span class="ob-pill">🏢 Агентство или соло</span>
+            <span class="ob-pill">💬 WhatsApp из коробки</span>
+            <span class="ob-pill">⚡ Запуск за 7 дней</span>
+          </div>
+        </div>`,
+      primary: 'Начать настройку →',
+      hideBack: true,
+    };
+  }
+
+  function stepEdition() {
+    const pick = (e) => `
+      <button class="ob-choice ${S.edition === e ? 'on' : ''}" data-edition="${e}">
+        <div class="ob-choice-ic">${e === 'agency' ? '🏢' : '🧑‍💼'}</div>
+        <div class="ob-choice-t">${e === 'agency' ? 'Агентство недвижимости' : 'Соло-брокер'}</div>
+        <div class="ob-choice-d">${e === 'agency'
+          ? 'Команда брокеров, распределение лидов, контроль собственника, роли и доступы, антислив.'
+          : 'Вы работаете сами на себя. Короткая настройка — без команды, ролей и распределения.'}</div>
+        <ul class="ob-choice-l">${(e === 'agency'
+          ? ['Брокеры и роли', 'Пульт контроля', 'Распределение и SLA', 'Общая база и лента']
+          : ['Только ваши лиды', 'Ничего лишнего', 'Быстрый запуск', 'Весь ИИ-функционал']).map(x => `<li>${x}</li>`).join('')}</ul>
+        <div class="ob-choice-check">✓</div>
+      </button>`;
+    return {
+      title: 'Кто вы?',
+      sub: 'От этого зависит, что мы настроим. Всегда можно переключить позже в «Профиль агентства».',
+      html: `<div class="ob-choices">${pick('agency')}${pick('solo')}</div>`,
+      primaryDisabled: !S.edition,
+    };
+  }
+
+  function stepStyle() {
+    const card = (t) => `
+      <button class="ob-theme ${S.theme === t.key ? 'on' : ''}" data-theme="${t.key}">
+        <div class="ob-theme-prev">
+          ${t.vid ? `<video muted loop playsinline preload="none" poster="/assets/${t.vid}-poster.jpg"><source src="/assets/${t.vid}.mp4" type="video/mp4"></video>`
+                  : `<div class="ob-theme-static" style="background:linear-gradient(135deg,${t.sw[1]},${t.sw[0]}22)"></div>`}
+          <div class="ob-theme-swz">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div>
+        </div>
+        <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
+        <div class="ob-choice-check">✓</div>
+      </button>`;
+    return {
+      title: 'Выберите стиль пространства',
+      sub: 'Наведите на карточку — увидите живое превью. Выбор применится сразу, поменять можно в любой момент.',
+      html: `<div class="ob-themes">${THEMES.map(card).join('')}</div>
+        <p class="ob-note">Это внешний вид вашего рабочего кабинета. Стиль клиентских материалов (подборки, карусели) настраивается отдельно в конструкторах — там ещё больше пресетов.</p>`,
+    };
+  }
+
+  function stepBrand() {
+    return {
+      title: 'Ваш бренд',
+      sub: 'Имя и логотип появятся в кабинете, в подборках объектов и на PDF для клиентов.',
+      shot: 'collections',
+      html: `
+        <div class="ob-form">
+          <label class="ob-field"><span>Название ${S.edition === 'solo' ? '(ваше имя / бренд)' : 'агентства'}</span>
+            <input id="obName" type="text" placeholder="${S.edition === 'solo' ? 'Напр. Артур · недвижимость Дубая' : 'Напр. One Agency'}" value="${esc(S.name)}"></label>
+          <div class="ob-field"><span>Логотип</span>
+            <div class="ob-logo">
+              <div class="ob-logo-prev" id="obLogoPrev">${S.logo ? `<img src="${esc(S.logo)}">` : '<span>Лого</span>'}</div>
+              <label class="ob-logo-btn">Загрузить PNG/SVG<input id="obLogo" type="file" accept="image/*" hidden></label>
+              ${S.logo ? '<button class="ob-logo-clear" id="obLogoClear">Убрать</button>' : ''}
+            </div>
+          </div>
+          <div class="ob-field ob-manager"><span>Подпись менеджера (в подборках и документах)</span>
+            <div class="ob-row3">
+              <input id="obMgrName" type="text" placeholder="Имя" value="${esc(S.manager.name)}">
+              <input id="obMgrPhone" type="text" placeholder="Телефон / WhatsApp" value="${esc(S.manager.phone)}">
+              <input id="obMgrEmail" type="text" placeholder="E-mail" value="${esc(S.manager.email)}">
+            </div>
+          </div>
+        </div>`,
+    };
+  }
+
+  function stepGeos() {
+    const chip = (g) => `<button class="ob-chip ${S.geos.includes(g.k) ? 'on' : ''}" data-geo="${g.k}">${g.l}</button>`;
+    return {
+      title: 'Направления и рынки',
+      sub: 'По каким гео вы работаете? Под них Lumen настроит критерии квалификации, тон и подборки.',
+      html: `<div class="ob-chips">${GEOS.map(chip).join('')}</div>
+        <p class="ob-note">Выбрано: <b id="obGeoCount">${S.geos.length}</b>. Для каждого рынка позже можно задать порог бюджета и правила в «ИИ-квалификаторе».</p>`,
+      primaryDisabled: S.geos.length === 0,
+    };
+  }
+
+  function stepTone() {
+    const card = (t) => `
+      <button class="ob-tone ${S.tone === t.k ? 'on' : ''}" data-tone="${t.k}">
+        <div class="ob-tone-name">${t.name}</div>
+        <div class="ob-tone-ex">${esc(t.ex)}</div>
+        <div class="ob-choice-check">✓</div>
+      </button>`;
+    return {
+      title: 'Тон первой линии',
+      sub: 'Так Lumen будет отвечать вашим клиентам в WhatsApp. Пример — как звучит каждый тон.',
+      shot: 'ai',
+      html: `<div class="ob-tones">${TONES.map(card).join('')}</div>
+        <label class="ob-toggle"><input type="checkbox" id="obAutopilot" ${S.autopilot ? 'checked' : ''}><span class="ob-tg"></span>
+          <div><b>Автопилот первой линии</b><small>Lumen сам отвечает и квалифицирует новые заявки. Можно включить позже.</small></div></label>`,
+    };
+  }
+
+  function stepGuide(o) {
+    // шаги-передачи в боевые визарды
+    return {
+      title: o.title, sub: o.sub, shot: o.shot,
+      html: `
+        <div class="ob-guide">
+          <ul class="ob-guide-l">${o.points.map(p => `<li><i>✓</i>${p}</li>`).join('')}</ul>
+          <div class="ob-guide-cta">
+            <button class="ob-do" data-do="${o.action}">${o.cta}</button>
+            <span class="ob-later">или настройте позже — этот шаг не блокирует запуск</span>
+          </div>
+        </div>`,
+    };
+  }
+
+  function stepFinish() {
+    return {
+      bg: 'success', pad: true,
+      html: `
+        <div class="ob-center">
+          <div class="ob-done-mark">✓</div>
+          <h1 class="ob-h1">Пространство собрано</h1>
+          <p class="ob-lead">${S.name ? esc(S.name) + ' — ' : ''}всё готово. Lumen берёт первую линию: отвечает за секунды, квалифицирует и передаёт тёплых. Вы видите заявки, квалы и сделки в реальном времени.</p>
+          <div class="ob-recap" id="obRecap"></div>
+        </div>`,
+      primary: 'Запустить Lumen →',
+      hideBack: true,
+      hideSkip: true,
+    };
+  }
+
+  function renderStepData(step) {
+    switch (step.id) {
+      case 'welcome': return stepWelcome();
+      case 'edition': return stepEdition();
+      case 'style': return stepStyle();
+      case 'brand': return stepBrand();
+      case 'geos': return stepGeos();
+      case 'tone': return stepTone();
+      case 'whatsapp': return stepGuide({ title: 'WhatsApp — сердце системы', sub: 'Главный канал. Через WhatsApp Cloud API Lumen отвечает клиентам с вашего номера.', shot: 'dialogs', action: 'wa', cta: 'Подключить WhatsApp', points: ['Ответы с вашего номера, а не с чужого', 'Первый ответ за секунды, круглосуточно', 'Шаблон первого касания под модерацию Meta', 'Мастер подключения — 7 понятных шагов'] });
+      case 'chains': return stepGuide({ title: 'Цепочки касаний', sub: 'Не ответил сразу — Lumen мягко дожимает по расписанию и уважает тихие часы.', shot: 'sequences', action: 'chains', cta: 'Открыть цепочки', points: ['Готовая цепочка на 7 касаний / 18 дней', 'Переключение между каналами', 'Останавливается, как только клиент ответил', 'Реанимация «спящей» базы'] });
+      case 'listings': return stepGuide({ title: 'База объектов', sub: 'Загрузите объекты — Lumen соберёт из них живые подборки под клиента.', shot: 'collections', action: 'listings', cta: 'Импортировать объекты', points: ['Импорт Reelly / CSV / Excel / JSON', 'Синк порталов (Property Finder, Bayut, DLD)', 'Подборки с вашим лого и подписью', 'Публичная страница с трекингом просмотров'] });
+      case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Пульт контроля и антислив базы', 'Мост Telegram ⇄ WhatsApp для брокеров'] });
+      case 'finish': return stepFinish();
+    }
+  }
+
+  // ============================================================
+  //  ОТРИСОВКА КАРКАСА
+  // ============================================================
+  function paint() {
+    const step = STEPS[idx];
+    const d = renderStepData(step);
+    const total = STEPS.length;
+    const bgVid = d.bg === 'welcome' ? 'onboard-welcome' : d.bg === 'success' ? 'onboard-success' : '';
+    root.querySelector('.ob-bgvid').innerHTML = bgVid
+      ? `<video autoplay muted loop playsinline poster="/assets/${bgVid}-poster.jpg"><source src="/assets/${bgVid}.mp4?v=1" type="video/mp4"></video>`
+      : '';
+    root.classList.toggle('ob-cinematic', !!d.bg);
+
+    const stepsDots = STEPS.map((s, i) => `<i class="${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}"></i>`).join('');
+    const shot = d.shot ? `<div class="ob-shot"><div class="ob-shot-bar"><i></i><i></i><i></i></div><img src="${SHOT(d.shot)}" alt="" loading="lazy"></div>` : '';
+
+    root.querySelector('.ob-stage').innerHTML = `
+      <div class="ob-panel ${d.bg ? 'ob-panel-cine' : ''} ${shot ? 'ob-panel-split' : ''}" key="${step.id}">
+        <div class="ob-body">
+          ${d.title ? `<div class="ob-step-n">Шаг ${idx} из ${total - 2}</div><h2 class="ob-h2">${d.title}</h2>${d.sub ? `<p class="ob-sub">${d.sub}</p>` : ''}` : ''}
+          <div class="ob-content">${d.html}</div>
+        </div>
+        ${shot}
+      </div>`;
+
+    // низ: прогресс + кнопки
+    root.querySelector('.ob-foot').innerHTML = `
+      <div class="ob-dots">${stepsDots}</div>
+      <div class="ob-actions">
+        ${d.hideBack ? '' : `<button class="ob-btn ob-ghost" data-act="back">Назад</button>`}
+        ${d.hideSkip || d.hideBack ? '' : `<button class="ob-btn ob-ghost ob-skip" data-act="skip">Пропустить</button>`}
+        <button class="ob-btn ob-primary ${d.primaryDisabled ? 'dis' : ''}" data-act="next">${d.primary || 'Далее →'}</button>
+      </div>`;
+
+    wireStep(step, d);
+    // мягкая волна появления
+    const p = root.querySelector('.ob-panel'); if (p) { p.style.animation = 'none'; void p.offsetWidth; p.style.animation = ''; }
+    if (step.id === 'finish') buildRecap();
+  }
+
+  function wireStep(step, d) {
+    const q = (s) => root.querySelector(s);
+    const qq = (s) => Array.from(root.querySelectorAll(s));
+
+    // навигация
+    qq('[data-act]').forEach(b => b.onclick = () => {
+      const a = b.dataset.act;
+      if (a === 'back') return back();
+      if (a === 'skip') return next(true);
+      if (a === 'next') { if (b.classList.contains('dis')) return; next(false); }
+    });
+
+    // per-step
+    if (step.id === 'edition') {
+      qq('[data-edition]').forEach(b => b.onclick = () => { S.edition = b.dataset.edition; paint(); });
+    }
+    if (step.id === 'style') {
+      qq('[data-theme]').forEach(b => {
+        const v = b.querySelector('video');
+        b.onmouseenter = () => { if (v) v.play().catch(() => {}); };
+        b.onmouseleave = () => { if (v && S.theme !== b.dataset.theme) { v.pause(); } };
+        b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };
+      });
+    }
+    if (step.id === 'brand') {
+      q('#obName').oninput = e => S.name = e.target.value;
+      q('#obMgrName').oninput = e => S.manager.name = e.target.value;
+      q('#obMgrPhone').oninput = e => S.manager.phone = e.target.value;
+      q('#obMgrEmail').oninput = e => S.manager.email = e.target.value;
+      q('#obLogo').onchange = e => {
+        const f = e.target.files[0]; if (!f) return;
+        const rd = new FileReader(); rd.onload = () => { S.logo = rd.result; paint(); }; rd.readAsDataURL(f);
+      };
+      const clr = q('#obLogoClear'); if (clr) clr.onclick = () => { S.logo = ''; paint(); };
+    }
+    if (step.id === 'geos') {
+      qq('[data-geo]').forEach(b => b.onclick = () => {
+        const k = b.dataset.geo; const i = S.geos.indexOf(k);
+        if (i >= 0) S.geos.splice(i, 1); else S.geos.push(k);
+        b.classList.toggle('on'); q('#obGeoCount').textContent = S.geos.length;
+        const nb = root.querySelector('[data-act="next"]'); if (nb) nb.classList.toggle('dis', S.geos.length === 0);
+      });
+    }
+    if (step.id === 'tone') {
+      qq('[data-tone]').forEach(b => b.onclick = () => { S.tone = b.dataset.tone; qq('[data-tone]').forEach(x => x.classList.toggle('on', x === b)); });
+      q('#obAutopilot').onchange = e => S.autopilot = e.target.checked;
+    }
+    if (d.action) {
+      const btn = q('[data-do]'); if (btn) btn.onclick = () => runGuide(d.action);
+    }
+  }
+
+  function runGuide(action) {
+    // сохраняем прогресс, закрываем церемонию (не финализируя onboarded) и уводим в боевой поток
+    saveProgress(false);
+    close(true);
+    const b = B();
+    try {
+      if (action === 'wa') { b.openWa ? b.openWa() : b.go && b.go('settings'); }
+      else if (action === 'chains') { b.go && b.go('sequences'); }
+      else if (action === 'listings') { b.go && b.go('properties'); }
+      else if (action === 'team') { b.go && b.go('brokers'); }
+    } catch (e) {}
+  }
+
+  function buildRecap() {
+    const box = root.querySelector('#obRecap'); if (!box) return;
+    const th = THEMES.find(t => t.key === S.theme);
+    const rows = [
+      ['Формат', S.edition === 'solo' ? 'Соло-брокер' : 'Агентство'],
+      ['Стиль', th ? th.name : S.theme],
+      ['Бренд', S.name || '—'],
+      ['Направления', S.geos.length ? S.geos.map(k => (GEOS.find(g => g.k === k) || {}).l || k).join(', ') : '—'],
+      ['Тон', (TONES.find(t => t.k === S.tone) || {}).name || '—'],
+      ['Автопилот', S.autopilot ? 'Вкл' : 'Выкл'],
+    ];
+    box.innerHTML = rows.map(r => `<div class="ob-recap-row"><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join('');
+  }
+
+  // ============================================================
+  //  НАВИГАЦИЯ + СОХРАНЕНИЕ
+  // ============================================================
+  function next(skip) {
+    const step = STEPS[idx];
+    if (step.id === 'edition' && !S.edition) return;
+    if (step.id === 'finish') return finish();
+    // ветвление пересобирается после выбора edition
+    if (step.id === 'edition') STEPS = buildSteps();
+    idx = Math.min(idx + 1, STEPS.length - 1);
+    paint();
+  }
+  function back() { idx = Math.max(0, idx - 1); paint(); }
+
+  async function saveProgress(markDone) {
+    const agency = {
+      edition: S.edition || 'agency',
+      geos: S.geos,
+      manager: S.manager,
+    };
+    if (S.name) agency.name = S.name;
+    if (S.logo) agency.logo = S.logo;
+    if (markDone) agency.onboarded = true;
+    const patch = { agency };
+    const tone = (TONES.find(t => t.k === S.tone) || {}).tone;
+    patch.ai = { autopilot: !!S.autopilot };
+    if (tone) patch.ai.persona = { tone };
+    try { await api('PATCH', '/settings', patch); } catch (e) { console.warn('onboard save', e); }
+    try { (B().setTheme || window.setTheme)(S.theme); } catch (e) {}
+  }
+
+  async function finish() {
+    const fin = root.querySelector('[data-act="next"]'); if (fin) { fin.classList.add('dis'); fin.textContent = 'Запускаем…'; }
+    await saveProgress(true);
+    root.classList.add('ob-launch');
+    setTimeout(async () => {
+      close(false);
+      try { const b = B(); if (b.refresh) await b.refresh(); } catch (e) {}
+      try { const b = B(); if (b.go) b.go('overview'); } catch (e) {}
+    }, 900);
+  }
+
+  // ============================================================
+  //  ОТКРЫТИЕ / ЗАКРЫТИЕ
+  // ============================================================
+  function open(opts) {
+    opts = opts || {};
+    if (root) return;
+    auto = !!opts.auto;
+    injectCSS();
+    const st = (B().state) || (window.STATE) || {};
+    S = freshState(st);
+    STEPS = buildSteps();
+    idx = 0;
+    root = el(`
+      <div id="lumenOnboard" class="ob-root" role="dialog" aria-label="Настройка Lumen">
+        <div class="ob-bgvid"></div>
+        <div class="ob-veil"></div>
+        <button class="ob-close" title="Закрыть">✕</button>
+        <div class="ob-wrap">
+          <div class="ob-stage"></div>
+          <div class="ob-foot"></div>
+        </div>
+      </div>`);
+    document.body.appendChild(root);
+    document.documentElement.style.overflow = 'hidden';
+    root.querySelector('.ob-close').onclick = () => { saveProgress(false); close(true); };
+    requestAnimationFrame(() => root.classList.add('in'));
+    paint();
+  }
+  function close(keepScroll) {
+    if (!root) return;
+    const r = root; root = null;
+    r.classList.remove('in');
+    document.documentElement.style.overflow = '';
+    setTimeout(() => r.remove(), 420);
+  }
+
+  // ============================================================
+  //  CSS
+  // ============================================================
+  function injectCSS() {
+    if (document.getElementById('ob-style')) return;
+    const css = `
+    .ob-root{position:fixed;inset:0;z-index:5000;opacity:0;transition:opacity .4s cubic-bezier(.16,1,.3,1);font-family:'Manrope',system-ui,sans-serif;color:#EAF1FF}
+    .ob-root.in{opacity:1}
+    .ob-root.ob-launch{opacity:0;transform:scale(1.03);transition:opacity .8s ease,transform .8s ease}
+    .ob-bgvid,.ob-bgvid video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .ob-veil{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0,rgba(12,22,48,.72),#040912 78%)}
+    .ob-root:not(.ob-cinematic) .ob-veil{background:linear-gradient(180deg,#070d1c,#040912)}
+    .ob-close{position:absolute;top:20px;right:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(143,180,255,.22);background:rgba(10,18,38,.5);color:#AEBFE0;font-size:15px;cursor:pointer;backdrop-filter:blur(8px);transition:.2s}
+    .ob-close:hover{background:rgba(20,32,60,.8);color:#fff}
+    .ob-wrap{position:absolute;inset:0;display:flex;flex-direction:column;z-index:3}
+    .ob-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 26px 12px;overflow:auto}
+    .ob-panel{width:100%;max-width:980px;animation:obIn .6s cubic-bezier(.16,1,.3,1)}
+    .ob-panel-split{max-width:1080px;display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center}
+    @keyframes obIn{from{opacity:0;transform:translateY(26px) scale(.985);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+    .ob-body{min-width:0}
+    .ob-step-n{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5F86D8}
+    .ob-h1{font-size:clamp(34px,5vw,60px);font-weight:800;letter-spacing:-.03em;line-height:1.02;margin:6px 0 14px}
+    .ob-h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.025em;margin:8px 0 10px}
+    .ob-grad{background:linear-gradient(120deg,#8FB4FF,#2F6BFF);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .ob-lead{font-size:clamp(15px,1.5vw,18px);color:#AEBFE0;line-height:1.6;max-width:60ch}
+    .ob-sub{font-size:15px;color:#9DB0D6;line-height:1.55;max-width:64ch;margin-bottom:22px}
+    .ob-center{text-align:center;max-width:760px;margin:0 auto}
+    .ob-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8FB4FF;border:1px solid rgba(143,180,255,.3);border-radius:999px;padding:7px 15px;margin-bottom:20px;background:rgba(20,34,64,.4)}
+    .ob-pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:26px}
+    .ob-pill{font-size:13.5px;font-weight:600;color:#CBD9F5;background:rgba(20,32,60,.55);border:1px solid rgba(143,180,255,.2);border-radius:999px;padding:9px 15px;backdrop-filter:blur(6px)}
+    .ob-note{font-size:13px;color:#8296BC;margin-top:16px;line-height:1.5}
+    .ob-content{margin-top:4px}
+    /* choices (edition) */
+    .ob-choices{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .ob-choice{position:relative;text-align:left;padding:26px;border-radius:20px;border:1.5px solid rgba(143,180,255,.18);background:rgba(14,24,46,.55);color:#EAF1FF;cursor:pointer;transition:.25s cubic-bezier(.16,1,.3,1);backdrop-filter:blur(8px)}
+    .ob-choice:hover{transform:translateY(-4px);border-color:rgba(143,180,255,.4);background:rgba(20,32,60,.7)}
+    .ob-choice.on{border-color:#2F6BFF;background:rgba(37,99,235,.16);box-shadow:0 20px 50px -20px rgba(37,99,235,.5)}
+    .ob-choice-ic{font-size:34px;margin-bottom:12px}
+    .ob-choice-t{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
+    .ob-choice-d{font-size:13.5px;color:#9DB0D6;line-height:1.5;margin-bottom:14px}
+    .ob-choice-l{list-style:none;padding:0;margin:0;display:grid;gap:7px}
+    .ob-choice-l li{font-size:13px;color:#C3D2F0;padding-left:20px;position:relative}
+    .ob-choice-l li:before{content:"→";position:absolute;left:0;color:#5F86D8}
+    .ob-choice-check{position:absolute;top:18px;right:18px;width:26px;height:26px;border-radius:50%;background:#2F6BFF;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0;transform:scale(.5);transition:.25s}
+    .ob-choice.on .ob-choice-check{opacity:1;transform:scale(1)}
+    /* themes */
+    .ob-themes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .ob-theme{position:relative;text-align:left;padding:0;border-radius:18px;overflow:hidden;border:1.5px solid rgba(143,180,255,.16);background:rgba(14,24,46,.5);color:#EAF1FF;cursor:pointer;transition:.25s cubic-bezier(.16,1,.3,1)}
+    .ob-theme:hover{transform:translateY(-4px);border-color:rgba(143,180,255,.4)}
+    .ob-theme.on{border-color:#2F6BFF;box-shadow:0 20px 50px -20px rgba(37,99,235,.55)}
+    .ob-theme-prev{position:relative;aspect-ratio:16/10;overflow:hidden;background:#0a1224}
+    .ob-theme-prev video,.ob-theme-static{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .ob-theme-swz{position:absolute;left:10px;bottom:10px;display:flex;gap:5px;z-index:2}
+    .ob-theme-swz i{width:15px;height:15px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+    .ob-theme-meta{padding:13px 15px}
+    .ob-theme-meta b{display:block;font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+    .ob-theme-meta span{display:block;font-size:12px;color:#93A6CC;line-height:1.4;margin-top:3px}
+    /* form */
+    .ob-form{display:grid;gap:18px;max-width:620px}
+    .ob-field{display:block}
+    .ob-field>span{display:block;font-size:13px;font-weight:600;color:#9DB0D6;margin-bottom:8px}
+    .ob-field input[type=text]{width:100%;padding:13px 15px;border-radius:12px;border:1.5px solid rgba(143,180,255,.2);background:rgba(10,18,38,.6);color:#EAF1FF;font-size:15px;font-family:inherit;transition:.2s}
+    .ob-field input[type=text]:focus{outline:none;border-color:#2F6BFF;background:rgba(16,26,50,.8)}
+    .ob-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .ob-logo{display:flex;align-items:center;gap:14px}
+    .ob-logo-prev{width:120px;height:64px;border-radius:12px;border:1.5px dashed rgba(143,180,255,.3);display:flex;align-items:center;justify-content:center;background:rgba(10,18,38,.5);color:#5F86D8;font-size:12px;overflow:hidden}
+    .ob-logo-prev img{max-width:100%;max-height:100%;object-fit:contain}
+    .ob-logo-btn{font-size:13.5px;font-weight:600;color:#CBD9F5;border:1px solid rgba(143,180,255,.3);border-radius:10px;padding:11px 15px;cursor:pointer;background:rgba(20,32,60,.5)}
+    .ob-logo-btn:hover{background:rgba(30,44,74,.7)}
+    .ob-logo-clear{font-size:12.5px;color:#8296BC;background:none;border:none;cursor:pointer;text-decoration:underline}
+    /* chips */
+    .ob-chips{display:flex;flex-wrap:wrap;gap:10px}
+    .ob-chip{font-size:14.5px;font-weight:600;color:#CBD9F5;background:rgba(16,26,50,.6);border:1.5px solid rgba(143,180,255,.2);border-radius:999px;padding:11px 18px;cursor:pointer;transition:.2s}
+    .ob-chip:hover{border-color:rgba(143,180,255,.45)}
+    .ob-chip.on{background:#2563EB;border-color:#2F6BFF;color:#fff;box-shadow:0 10px 24px -10px rgba(37,99,235,.6)}
+    /* tones */
+    .ob-tones{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    .ob-tone{position:relative;text-align:left;padding:20px;border-radius:16px;border:1.5px solid rgba(143,180,255,.18);background:rgba(14,24,46,.55);color:#EAF1FF;cursor:pointer;transition:.25s}
+    .ob-tone:hover{transform:translateY(-3px);border-color:rgba(143,180,255,.4)}
+    .ob-tone.on{border-color:#2F6BFF;background:rgba(37,99,235,.14)}
+    .ob-tone-name{font-size:16px;font-weight:800;margin-bottom:10px}
+    .ob-tone-ex{font-size:13px;color:#AEBFE0;line-height:1.5;font-style:italic}
+    .ob-toggle{display:flex;align-items:center;gap:14px;margin-top:22px;cursor:pointer;padding:16px 18px;border-radius:14px;border:1px solid rgba(143,180,255,.16);background:rgba(14,24,46,.4);max-width:560px}
+    .ob-toggle input{display:none}
+    .ob-tg{flex:0 0 46px;width:46px;height:27px;border-radius:999px;background:rgba(90,110,150,.4);position:relative;transition:.25s}
+    .ob-tg:before{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.25s}
+    .ob-toggle input:checked+.ob-tg{background:#2563EB}
+    .ob-toggle input:checked+.ob-tg:before{transform:translateX(19px)}
+    .ob-toggle b{display:block;font-size:14.5px}
+    .ob-toggle small{display:block;font-size:12.5px;color:#8296BC;margin-top:2px}
+    /* guide */
+    .ob-guide-l{list-style:none;padding:0;margin:0 0 24px;display:grid;gap:12px;max-width:600px}
+    .ob-guide-l li{display:flex;gap:12px;align-items:flex-start;font-size:15px;color:#CBD9F5}
+    .ob-guide-l li i{flex:0 0 22px;height:22px;border-radius:50%;background:rgba(37,99,235,.2);color:#8FB4FF;display:flex;align-items:center;justify-content:center;font-size:12px;font-style:normal;margin-top:1px}
+    .ob-guide-cta{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+    .ob-do{font-size:15px;font-weight:700;color:#fff;background:linear-gradient(180deg,#2F6BFF,#1D4FD8);border:none;border-radius:12px;padding:14px 24px;cursor:pointer;box-shadow:0 16px 34px -14px rgba(37,99,235,.7);transition:.2s}
+    .ob-do:hover{transform:translateY(-2px)}
+    .ob-later{font-size:12.5px;color:#8296BC}
+    /* shot */
+    .ob-shot{border-radius:18px;overflow:hidden;border:1px solid rgba(143,180,255,.2);box-shadow:0 40px 80px -30px rgba(0,0,0,.7);background:#0a1224;animation:obFloat 7s ease-in-out infinite}
+    .ob-shot-bar{display:flex;gap:6px;padding:11px 14px;background:rgba(14,24,46,.9);border-bottom:1px solid rgba(143,180,255,.12)}
+    .ob-shot-bar i{width:9px;height:9px;border-radius:50%}
+    .ob-shot-bar i:nth-child(1){background:#ff5f57}.ob-shot-bar i:nth-child(2){background:#febc2e}.ob-shot-bar i:nth-child(3){background:#28c840}
+    .ob-shot img{width:100%;display:block}
+    @keyframes obFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+    /* recap + done */
+    .ob-done-mark{width:88px;height:88px;border-radius:50%;background:linear-gradient(180deg,#34d399,#059669);color:#fff;font-size:44px;display:flex;align-items:center;justify-content:center;margin:0 auto 22px;box-shadow:0 0 0 10px rgba(52,211,153,.15),0 20px 50px -16px rgba(16,185,129,.6);animation:obPop .6s cubic-bezier(.16,1,.3,1)}
+    @keyframes obPop{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+    .ob-recap{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;max-width:560px;margin:28px auto 0;text-align:left}
+    .ob-recap-row{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid rgba(143,180,255,.12)}
+    .ob-recap-row span{font-size:13px;color:#8296BC}
+    .ob-recap-row b{font-size:14px;color:#EAF1FF;font-weight:700}
+    /* foot */
+    .ob-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 30px 26px;position:relative;z-index:4}
+    .ob-dots{display:flex;gap:7px}
+    .ob-dots i{width:8px;height:8px;border-radius:50%;background:rgba(143,180,255,.25);transition:.3s}
+    .ob-dots i.on{background:#2F6BFF;width:26px;border-radius:5px}
+    .ob-dots i.done{background:#3E5FA8}
+    .ob-actions{display:flex;align-items:center;gap:12px}
+    .ob-btn{font-size:14.5px;font-weight:700;border-radius:12px;padding:13px 22px;cursor:pointer;border:1px solid transparent;transition:.2s;font-family:inherit}
+    .ob-ghost{background:rgba(20,32,60,.5);border-color:rgba(143,180,255,.2);color:#CBD9F5}
+    .ob-ghost:hover{background:rgba(30,44,74,.7);color:#fff}
+    .ob-skip{opacity:.7}
+    .ob-primary{background:linear-gradient(180deg,#2F6BFF,#1D4FD8);color:#fff;box-shadow:0 14px 30px -12px rgba(37,99,235,.7)}
+    .ob-primary:hover{transform:translateY(-2px)}
+    .ob-primary.dis{opacity:.4;pointer-events:none;box-shadow:none}
+    @media(max-width:820px){
+      .ob-panel-split{grid-template-columns:1fr}.ob-shot{display:none}
+      .ob-choices{grid-template-columns:1fr}.ob-themes{grid-template-columns:1fr 1fr}.ob-tones{grid-template-columns:1fr}
+      .ob-row3{grid-template-columns:1fr}
+      .ob-stage{padding:26px 16px 8px}.ob-foot{padding:14px 16px 20px}
+      .ob-actions{flex:1;justify-content:flex-end}
+    }`;
+    const s = document.createElement('style'); s.id = 'ob-style'; s.textContent = css; document.head.appendChild(s);
+  }
+
+  // ---------- авто-открытие на первом запуске (владелец + не пройдено) ----------
+  let _autoShown = false;
+  function maybeAuto() {
+    if (_autoShown || root) return true;
+    const st = (B().state) || null;
+    if (!st || !st.me || !st.settings || !st.settings.agency) return false;
+    const isOwner = st.me.role === 'owner' || st.me.role === 'master';
+    if (isOwner && !st.settings.agency.onboarded) { _autoShown = true; setTimeout(() => open({ auto: true }), 400); return true; }
+    return false;
+  }
+  // самополлинг — на случай, если app.js вызвал maybeAuto раньше нашей загрузки
+  (function pollAuto(n) { if (_autoShown || root) return; if (maybeAuto()) return; if (n > 0) setTimeout(() => pollAuto(n - 1), 350); })(16);
+
+  // ---------- публичный API + триггеры ----------
+  window.Onboard = { open, close, maybeAuto };
+  addEventListener('hashchange', () => { if (location.hash === '#setup') { history.replaceState(null, '', location.pathname); open(); } });
+  document.addEventListener('click', (e) => { const t = e.target.closest('[data-onboard]'); if (t) { e.preventDefault(); open(); } });
+})();

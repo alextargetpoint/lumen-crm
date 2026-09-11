@@ -810,6 +810,7 @@ async function loadState() {
   $('#agencyName').textContent = STATE.settings.agency.name;
   try { localStorage.setItem('lumen_brand', JSON.stringify({ logo: STATE.settings.agency.logo || '', name: STATE.settings.agency.name || '' })); } catch (e) {}
   $('#agencyAva').textContent = STATE.settings.agency.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  try { if (window.Onboard && window.Onboard.maybeAuto) window.Onboard.maybeAuto(); } catch (e) {}
   $('#demoChip').style.display = STATE.settings.demo.simulateReplies ? 'flex' : 'none';
   /* живые счётчики в меню: непрочитанные диалоги и активные лиды */
   rebuildStages();
@@ -1469,7 +1470,7 @@ const OV_W = {
     ];
     const done = steps.filter(x => x.ok).length;
     const seg = `<div class="ov-setup-prog"><div class="ov-setup-segs">${steps.map(x => `<span class="ov-setup-seg ${x.ok ? 'on' : ''}"></span>`).join('')}</div><span class="ov-setup-frac">${done} <i>из ${steps.length}</i></span></div>`;
-    return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done === steps.length ? 'всё готово' : 'шаги настройки'}</span></div>${seg}<div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? `<span class="ov-setup-done">готово</span>` : ic(I.arrow, 2)}</button>`).join('')}</div>`;
+    return `<div class="ov2-card-hd">${ic(I.bolt)}Запуск агентства<span>${done === steps.length ? 'всё готово' : 'шаги настройки'}</span></div>${seg}<button data-onboard style="width:100%;margin:10px 0 6px;padding:11px 14px;border-radius:11px;border:none;background:linear-gradient(180deg,#2F6BFF,#1D4FD8);color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 12px 26px -12px rgba(37,99,235,.7)">✨ Пройти церемонию настройки</button><div class="ov2-ob">${steps.map(st2 => `<button class="ov2-ob-row ${st2.ok ? 'ok' : ''}" data-ovgo="${st2.go}"><span class="ov2-ob-dot">${st2.ok ? ic(I.check, 2.6) : ''}</span><span class="ov2-ob-t">${st2.t}<i>${st2.d}</i></span>${st2.ok ? `<span class="ov-setup-done">готово</span>` : ic(I.arrow, 2)}</button>`).join('')}</div>`;
   } },
   recent: { name: 'Свежие лиды', icon: () => I.plus, full: false, render: (c) => {
     const now = Date.now();
@@ -10933,3 +10934,13 @@ function quickTaskModal() {
     } }, { label: 'Отмена' }],
   });
 }
+
+/* ---- мост для онбординг-церемонии (onboard.js) ---- */
+window.LUMEN = {
+  go: (p) => go(p),
+  openWa: () => { try { if (typeof openWaWizard === 'function') return openWaWizard(); } catch (e) {} go('settings'); },
+  refresh: async () => { try { await loadState(); render(); } catch (e) {} },
+  setTheme: (k) => { try { window.setTheme(k); } catch (e) {} },
+  patchSettings: (b) => api.patch('/settings', b),
+  get state() { return STATE; },
+};
