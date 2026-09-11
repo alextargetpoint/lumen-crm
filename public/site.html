@@ -799,7 +799,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   /* единый премиум-радиус карточек */
   .leak,.fail,.gap-item,.niche,.plan,.vs-card,.bcard,.ncard,.pcard,.tgcol,.calc,.showcase,.frame,.q,.pbig,.pwide,.betabar{border-radius:18px}
   /* ===== ГРАФИЧЕСКИЕ СВАЙП-КАРУСЕЛИ вместо стен карточек ===== */
-  .fails,.niche-grid,.nrow3{
+  .fails,.niche-grid,.nrow3,.cgrid{
     display:flex!important;overflow-x:auto;overflow-y:visible;scroll-snap-type:x mandatory;align-items:stretch;
     gap:14px;grid-template-columns:none;margin-inline:calc(var(--pad)*-1);padding:18px var(--pad) 34px;
     scrollbar-width:none;-webkit-overflow-scrolling:touch;
@@ -808,7 +808,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .fails>*,.nrow3>*{scroll-snap-align:center;flex:0 0 85%;min-width:0}
   .niche-grid>*{scroll-snap-align:center;flex:0 0 76%;min-width:0}
   /* подсказка «листай» */
-  .fails,.niche-grid,.nrow3{position:relative}
+  .fails,.niche-grid,.nrow3,.cgrid{position:relative}
 
   /* ===== МЕНЬШЕ ПРОЗЫ ===== */
   .feat p{display:none}                 /* описание фичи скрыто — остаются заголовок+буллеты+скрин */
@@ -941,6 +941,58 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <div class="lb">Lumen — <b>первая централизованная CRM под недвижимость,</b> где это закрыто by design.</div>
     </div>
   </div>
+</section>
+
+<!-- SOCIAL PROOF / origin -->
+<style>
+.proof-stats{display:flex;flex-wrap:wrap;gap:14px;margin:30px 0 34px;justify-content:center}
+.proof-stats>div{flex:1;min-width:130px;text-align:center;padding:18px 14px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow)}
+.proof-stats b{display:block;font-family:var(--disp);font-weight:800;font-size:34px;letter-spacing:-.03em;color:var(--blue);line-height:1}
+.proof-stats span{display:block;margin-top:6px;font-size:13px;color:var(--ink2)}
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.ccase{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:4/5;box-shadow:var(--shadow);isolation:isolate;transition:transform .45s var(--ease-spring),box-shadow .45s}
+.ccase img,.ccase video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:transform .8s var(--ease-spring)}
+.ccase::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,11,22,.15) 0,rgba(6,11,22,.05) 38%,rgba(6,11,22,.82) 100%)}
+.ccase .flag{position:absolute;top:11px;left:12px;font-size:19px;z-index:2;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.ccase .kpi{position:absolute;top:11px;right:11px;z-index:2;background:rgba(37,99,235,.92);color:#fff;padding:5px 10px;border-radius:11px;font-weight:800;font-size:14px;letter-spacing:-.01em;box-shadow:0 8px 20px -6px rgba(37,99,235,.6)}
+.ccase .kpi small{display:block;font-weight:600;font-size:9.5px;opacity:.85;letter-spacing:.02em}
+.ccase .meta{position:absolute;left:14px;right:14px;bottom:14px;z-index:2;color:#fff}
+.ccase .meta .nm{font-family:var(--disp);font-weight:800;font-size:17px;letter-spacing:-.01em}
+.ccase .meta .d{font-size:11.5px;color:rgba(255,255,255,.86);margin-top:3px;line-height:1.3}
+@media(hover:hover){.ccase:hover{transform:translateY(-6px)}.ccase:hover img,.ccase:hover video{transform:scale(1.07)}}
+.proof-bridge{text-align:center;margin-top:30px;font-size:clamp(17px,2vw,22px);color:var(--ink2)}
+.proof-bridge b{color:var(--ink);font-weight:800}
+@media(max-width:640px){
+  .proof-stats>div{min-width:calc(50% - 7px);padding:14px 10px}
+  .proof-stats b{font-size:27px}
+  .cgrid{display:flex;overflow-x:auto;overflow-y:visible;scroll-snap-type:x mandatory;gap:12px;margin-inline:calc(var(--pad)*-1);padding:14px var(--pad) 30px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .cgrid::-webkit-scrollbar{display:none}
+  .cgrid>*{scroll-snap-align:center;flex:0 0 68%;min-width:0}
+}
+</style>
+<section class="sec wrap" id="proof">
+  <div class="sec-head center" data-r>
+    <span class="kicker"><span class="dot"></span>Кто стоит за Lumen</span>
+    <h2>5 лет мы приводили трафик недвижимости. <em>Теперь отдаём систему.</em></h2>
+    <p class="lead">Мы — перформанс-агентство недвижимости: Дубай, Испания, Кипр, Бали, Таиланд. Сотни тысяч лидов и реальные сделки. И в каждом агентстве мы видели одну и ту же боль: трафик есть, а порядка в работе с лидом — нет. Ни одна CRM не сделана под недвижимость. Lumen — продукт, которым мы сами жили последний год.</p>
+  </div>
+  <div class="proof-stats" data-r>
+    <div><b>54+</b><span>проектов недвижимости</span></div>
+    <div><b>8</b><span>стран и рынков</span></div>
+    <div><b>$15</b><span>средний CPL</span></div>
+    <div><b>5+</b><span>языков в диалогах</span></div>
+  </div>
+  <div class="cgrid">
+    <div class="ccase" data-r><video autoplay muted loop playsinline poster="/assets/site/cases/baytify.jpg"><source src="/assets/site/cases/baytify.mp4?v=1" type="video/mp4"></video><span class="flag">🇦🇪</span><span class="kpi">17<small>сделок</small></span><div class="meta"><div class="nm">Baytify</div><div class="d">825 лидов за 4 месяца · Дубай</div></div></div>
+    <div class="ccase d1" data-r><video autoplay muted loop playsinline poster="/assets/site/cases/orange.jpg"><source src="/assets/site/cases/orange.mp4?v=1" type="video/mp4"></video><span class="flag">🇦🇪</span><span class="kpi">$17<small>за лида</small></span><div class="meta"><div class="nm">OrangeLife</div><div class="d">Дубай · бюджет $48 000</div></div></div>
+    <div class="ccase d2" data-r><img src="/assets/site/cases/buro.jpg" alt="Buro"><span class="flag">🇪🇸</span><span class="kpi">489<small>лидов</small></span><div class="meta"><div class="nm">Buro</div><div class="d">€13.9 CPL · RU + EN рынки</div></div></div>
+    <div class="ccase d3" data-r><img src="/assets/site/cases/highgrove.jpg" alt="Highgrove"><span class="flag">🇦🇪</span><span class="kpi">4+<small>сделки</small></span><div class="meta"><div class="nm">Highgrove</div><div class="d">Дубай · за 3.5 месяца</div></div></div>
+    <div class="ccase" data-r><img src="/assets/site/cases/ourplace.jpg" alt="Our Place"><span class="flag">🇮🇩</span><span class="kpi">386<small>лидов</small></span><div class="meta"><div class="nm">Our Place</div><div class="d">Бали · $13.24 CPL</div></div></div>
+    <div class="ccase" data-r><img src="/assets/site/cases/premium.jpg" alt="Premium Quality"><span class="flag">🇦🇪</span><span class="kpi">30%+<small>квал</small></span><div class="meta"><div class="nm">Premium Quality</div><div class="d">Бюджет $50 000 · RU/EN</div></div></div>
+    <div class="ccase" data-r><img src="/assets/site/cases/adamco.jpg" alt="Adamco"><span class="flag">🌍</span><span class="kpi">20+<small>сделок</small></span><div class="meta"><div class="nm">Adamco</div><div class="d">25% квал · EN/TR/FR</div></div></div>
+    <div class="ccase" data-r style="display:grid;place-items:center;background:linear-gradient(158deg,var(--navy3),var(--navy));aspect-ratio:4/5"><a href="https://targetpoint.agency/cases.html" target="_blank" rel="noopener" style="text-align:center;color:#fff;text-decoration:none;padding:16px"><div style="font-family:var(--disp);font-weight:800;font-size:34px;line-height:1;color:#fff">+40</div><div style="font-size:12px;color:#aebfe0;margin-top:8px">кейсов на сайте агентства →</div></a></div>
+  </div>
+  <p class="proof-bridge" data-r>Эти цифры — про трафик <b>до</b> клика. Lumen — про то, что происходит с лидом <b>после</b>.</p>
 </section>
 
 <!-- BIG NUMBER BAND -->
@@ -1726,7 +1778,7 @@ setTimeout(()=>document.querySelectorAll('[data-r]:not(.in)').forEach(e=>e.class
 
 // swipe-карусели: точки-индикаторы (только мобилка)
 if(matchMedia('(max-width:640px)').matches){
-  document.querySelectorAll('.fails,.niche-grid,.nrow3').forEach(car=>{
+  document.querySelectorAll('.fails,.niche-grid,.nrow3,.cgrid').forEach(car=>{
     const items=[...car.children]; if(items.length<2) return;
     const dots=document.createElement('div'); dots.className='cdots';
     items.forEach((_,i)=>{const d=document.createElement('i'); if(!i)d.classList.add('on'); dots.appendChild(d);});
@@ -1753,7 +1805,7 @@ if(matchMedia('(max-width:640px)').matches){
 // скролл-привязка каруселей: скролл страницы вниз → карусель едет справа налево (форс)
 (function(){
   if(!matchMedia('(max-width:640px)').matches) return;
-  var cars=[].slice.call(document.querySelectorAll('.fails,.niche-grid,.nrow3'));
+  var cars=[].slice.call(document.querySelectorAll('.fails,.niche-grid,.nrow3,.cgrid'));
   if(!cars.length) return;
   cars.forEach(function(c){
     var drop=function(){c._manual=true;};
