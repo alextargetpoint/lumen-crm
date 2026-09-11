@@ -251,12 +251,14 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .btn-accent:hover { background: color-mix(in srgb, var(--accent) 86%, #000); border-color: color-mix(in srgb, var(--accent) 86%, #000); box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--accent) 60%, transparent); }
 /* заметная CTA-кнопка — не сливается ни со светлым, ни с кобальтовым фоном (градиент + чёткая тень + светлый кант сверху) */
+/* тематизирован: был захардкожен сине-фиолетовым (#2E6BFF→#6A3CE0) — клеш в Бургунди.
+   Теперь градиент акцента темы → его тёмный оттенок (бордо в warm, синий в Стекле). */
 .btn-cta {
-  background: linear-gradient(120deg, #2E6BFF 0%, #6A3CE0 100%);
+  background: linear-gradient(120deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 66%, #000) 100%);
   border: 1px solid rgba(255, 255, 255, .18); color: #fff; font-weight: 700;
-  box-shadow: 0 10px 26px -8px rgba(74, 58, 224, .6), inset 0 1px 0 rgba(255, 255, 255, .28);
+  box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, .28);
 }
-.btn-cta:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 14px 32px -8px rgba(74, 58, 224, .72), inset 0 1px 0 rgba(255, 255, 255, .3); }
+.btn-cta:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 14px 32px -8px color-mix(in srgb, var(--accent) 62%, transparent), inset 0 1px 0 rgba(255, 255, 255, .3); }
 .btn-cta svg { color: #fff; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--ink-3); display: inline-flex; align-items: center; gap: 5px; }
 .btn-ghost:hover { background: var(--bg-2); color: var(--ink); }

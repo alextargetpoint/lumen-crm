@@ -4536,7 +4536,7 @@ function propCover(pr, big) {
   if (img) return `<div class="prop-cover ${big ? 'big' : ''}" style="background-image:url('${esc(img)}')"></div>`;
   const hues = { dubai: 'linear-gradient(135deg,#102B5C,#2F6BFF)', bali: 'linear-gradient(135deg,#0E3B2E,#23B383)', phuket: 'linear-gradient(135deg,#1D3A6E,#6D5BD0)', spain: 'linear-gradient(135deg,#5C2B10,#E4813D)' };
   return `<div class="prop-cover ${big ? 'big' : ''}" style="background:${hues[pr.geo] || hues.dubai}">
-    <img src="logo.svg" class="pc-star"><span>${esc(pr.area || pr.name)}</span></div>`;
+    <span class="pc-star">${lumenMark()}</span><span>${esc(pr.area || pr.name)}</span></div>`;
 }
 
 PAGES.properties = async (root) => {
