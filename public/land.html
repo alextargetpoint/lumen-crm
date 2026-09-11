@@ -43,7 +43,7 @@
   .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#080808 0%,rgba(8,8,8,.84) 12%,rgba(8,8,8,.7) 34%,rgba(8,8,8,.66) 50%,rgba(8,8,8,.7) 66%,rgba(8,8,8,.84) 88%,#080808 100%)}
   .vidbg-d>.wrap{position:relative;z-index:1}
   /* переходы зон: smoothstep-градиент (скорость 0 у обоих краёв → нет обрыва) + зернистость-дизеринг */
-  .tr{height:clamp(300px,38vw,560px);position:relative;z-index:2}
+  .tr{height:clamp(190px,24vw,340px);position:relative;z-index:2}
   .tr::after{content:"";position:absolute;inset:0;opacity:.14;mix-blend-mode:overlay;pointer-events:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px}
   .tr.d2l{background:linear-gradient(180deg,#080808 0%,#090908 8%,#0d0c0b 16%,#161513 25%,#242220 34%,#39352f 43%,#524d45 52%,#6f6a61 61%,#8d887e 70%,#aaa59b 78%,#c5c1b8 85%,#dcd8d0 91%,#ebe8e2 96%,#f3f1ec 100%)}
@@ -57,10 +57,10 @@
   .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:54ch}
   em{font-style:italic;font-weight:400}
   /* ── луксовый живой металлик-градиент: подсветка важных моментов по всему сайту ── */
-  em,.gld{-webkit-background-clip:text;background-clip:text;color:transparent;background-repeat:no-repeat;background-size:220% 100%;animation:sheen 9s linear infinite}
-  .dark em,.dark .gld{background-image:linear-gradient(100deg,#bfbdb8 0%,#ffffff 16%,#e9e7e2 30%,#9d9b97 48%,#ffffff 64%,#c7c5c0 80%,#f4f3f1 100%)}
-  .light em,.light .gld{background-image:linear-gradient(100deg,#33302a 0%,#141311 20%,#57524a 40%,#141311 58%,#6b6459 78%,#201e1a 100%)}
-  @keyframes sheen{0%{background-position:120% 0}100%{background-position:-120% 0}}
+  em,.gld{-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:sheen 10s linear infinite}
+  .dark em,.dark .gld{background-image:linear-gradient(100deg,#cac8c3,#ffffff 25%,#a2a09c 50%,#ffffff 75%,#cac8c3)}
+  .light em,.light .gld{background-image:linear-gradient(100deg,#2b2823,#141311 25%,#5a554d 50%,#141311 75%,#2b2823)}
+  @keyframes sheen{0%{background-position:0 0}100%{background-position:200% 0}}
   @media(prefers-reduced-motion:reduce){em,.gld{animation:none;background-position:0 0}}
 
   /* reveal */
@@ -447,7 +447,7 @@
     <div class="feats">
       <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">Психо-портрет клиента</div><p>ИИ читает переписку и строит профиль покупателя: тип личности, на что давить, чего избегать, с чем заходить. Брокер получает не «лид №47», а инструкцию, как его закрыть.</p><span class="only">только в Lumen</span></div>
       <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">ИИ, которого не отличить</div><p>Отвечает с паузами и статусом «печатает…», в живом человеческом темпе. Клиент уверен, что общается с менеджером — а не с автоответчиком, который выдаёт себя первой же секундой.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.4 10.6h7"/><path d="M13.4 8.4l2.2 2.2-2.2 2.2"/><path d="M15.6 13.4h-7"/><path d="M10.6 15.6l-2.2-2.2 2.2-2.2"/></svg></span><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает клиенту прямо из личного Telegram — удобно и привычно. А вся переписка, медиа и история остаются в системе агентства. Уходит брокер — база остаётся.</p><span class="only">только в Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает клиенту прямо из личного Telegram — удобно и привычно. А вся переписка, медиа и история остаются в системе агентства. Уходит брокер — база остаётся.</p><span class="only">только в Lumen</span></div>
       <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Живые подборки за минуту</div><p>ИИ собирает брендированную подборку объектов под конкретного клиента — с вашим лого и подписью. И показывает, что именно он открывал и сколько смотрел.</p></div>
       <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Лиды из комментариев рекламы</div><p>Ловим тех, кто написал под объявлением в Instagram, и уводим в личный диалог — автоматически, пока конкуренты вообще не читают комментарии.</p><span class="only">только в Lumen</span></div>
       <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">Звонок в вашем голосе</div><p>Говорите по-русски — клиент слышит вас на своём языке и вашим голосом. По ходу разговора ИИ-суфлёр подсказывает, что ответить на возражение.</p><span class="only">только в Lumen</span></div>
