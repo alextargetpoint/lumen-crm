@@ -21,13 +21,39 @@
     --ink:#0f1a2e; --mut:#64748b; --line:rgba(15,26,46,.1);
     --in:#ffffff; --sh:0 8px 26px rgba(16,32,70,.12);
   }
-  :root[data-theme="light"] #bgart{opacity:.12}
-  :root[data-theme="light"] .b.in{border:1px solid var(--line)}
-  :root[data-theme="light"] .b.in .vp .wave i{background:rgba(15,26,46,.18)}
-  :root[data-theme="light"] .b.in .vp .wave i.on{background:var(--acc)}
-  :root[data-theme="light"] .b.in .doc .ic{background:var(--panel2)}
-  :root[data-theme="light"] .qchip,:root[data-theme="light"] .quoted{background:var(--panel2)}
-  .b.out{color:#fff}   /* исходящие всегда белым текстом на акценте (обе темы) */
+  /* ── ПРЕМИУМ-СТИЛИ CRM (синхрон с десктопом): светлое семейство, свой акцент/бренд-цвет ── */
+  :root[data-theme="atelier"]{  /* тихая роскошь: крем + уголь */
+    --bg:#f3f1ec; --bg2:#eae7df; --panel:#faf9f5; --panel2:#f1efe9; --glass:rgba(250,249,245,.82);
+    --ink:#141311; --mut:#8b8983; --line:rgba(20,19,17,.1);
+    --acc:#1a1815; --acc2:#57544e; --grad:linear-gradient(135deg,#2a2620,#141311); --out:linear-gradient(135deg,#26221c,#141311);
+    --in:#faf9f5; --sh:0 10px 30px rgba(20,19,17,.1); --shacc:0 8px 22px rgba(20,19,17,.28);
+  }
+  :root[data-theme="burgundy"]{ /* бордо-бренд, светлый workspace */
+    --bg:#f7f3f4; --bg2:#efe7e9; --panel:#ffffff; --panel2:#f6eef0; --glass:rgba(255,255,255,.82);
+    --ink:#42121f; --mut:#8a6b73; --line:rgba(134,28,60,.13);
+    --acc:#861c3c; --acc2:#b04a63; --grad:linear-gradient(135deg,#9d2646,#6e1330); --out:linear-gradient(135deg,#8f2140,#6e1330);
+    --in:#ffffff; --sh:0 10px 30px rgba(66,18,31,.12); --shacc:0 8px 22px rgba(134,28,60,.32);
+  }
+  :root[data-theme="glass"]{    /* атмосферное стекло, premium-OS */
+    --bg:#eef5ff; --bg2:#e4eefc; --panel:#ffffff; --panel2:#eff5ff; --glass:rgba(255,255,255,.78);
+    --ink:#0a1930; --mut:#5a6b8c; --line:rgba(57,123,255,.14);
+    --acc:#397bff; --acc2:#79a4ff; --grad:linear-gradient(135deg,#397bff,#1f4fd0); --out:linear-gradient(135deg,#2f6cf0,#1f4fd0);
+    --in:#ffffff; --sh:0 10px 30px rgba(10,25,48,.12); --shacc:0 8px 22px rgba(57,123,255,.34);
+  }
+  :root[data-theme="mono"]{     /* чёрно-белый минимализм */
+    --bg:#f6f6f6; --bg2:#ededed; --panel:#ffffff; --panel2:#f3f3f3; --glass:rgba(255,255,255,.82);
+    --ink:#0d0d0d; --mut:#6b6b6b; --line:rgba(0,0,0,.12);
+    --acc:#171717; --acc2:#555555; --grad:linear-gradient(135deg,#2a2a2a,#0d0d0d); --out:linear-gradient(135deg,#242424,#0d0d0d);
+    --in:#ffffff; --sh:0 10px 30px rgba(0,0,0,.1); --shacc:0 8px 22px rgba(0,0,0,.3);
+  }
+  /* хелперы светлого семейства — общие для light + премиум-стилей CRM */
+  :root[data-theme="light"] #bgart,:root[data-theme="atelier"] #bgart,:root[data-theme="burgundy"] #bgart,:root[data-theme="glass"] #bgart,:root[data-theme="mono"] #bgart{opacity:.1}
+  :root[data-theme="light"] .b.in,:root[data-theme="atelier"] .b.in,:root[data-theme="burgundy"] .b.in,:root[data-theme="glass"] .b.in,:root[data-theme="mono"] .b.in{border:1px solid var(--line)}
+  :root[data-theme="light"] .b.in .vp .wave i,:root[data-theme="atelier"] .b.in .vp .wave i,:root[data-theme="burgundy"] .b.in .vp .wave i,:root[data-theme="glass"] .b.in .vp .wave i,:root[data-theme="mono"] .b.in .vp .wave i{background:rgba(15,26,46,.18)}
+  :root[data-theme="light"] .b.in .vp .wave i.on,:root[data-theme="atelier"] .b.in .vp .wave i.on,:root[data-theme="burgundy"] .b.in .vp .wave i.on,:root[data-theme="glass"] .b.in .vp .wave i.on,:root[data-theme="mono"] .b.in .vp .wave i.on{background:var(--acc)}
+  :root[data-theme="light"] .b.in .doc .ic,:root[data-theme="atelier"] .b.in .doc .ic,:root[data-theme="burgundy"] .b.in .doc .ic,:root[data-theme="glass"] .b.in .doc .ic,:root[data-theme="mono"] .b.in .doc .ic{background:var(--panel2)}
+  :root[data-theme="light"] .qchip,:root[data-theme="light"] .quoted,:root[data-theme="atelier"] .qchip,:root[data-theme="atelier"] .quoted,:root[data-theme="burgundy"] .qchip,:root[data-theme="burgundy"] .quoted,:root[data-theme="glass"] .qchip,:root[data-theme="glass"] .quoted,:root[data-theme="mono"] .qchip,:root[data-theme="mono"] .quoted{background:var(--panel2)}
+  .b.out{color:#fff}   /* исходящие всегда белым текстом на акценте (все темы) */
   /* ── АКЦЕНТНЫЕ ЦВЕТА ── */
   :root[data-accent="violet"]{--acc:#7b5cff;--acc2:#a58bff;--grad:linear-gradient(135deg,#7b5cff,#5b3cff);--out:linear-gradient(135deg,#6a4bf0,#5b3cff);--shacc:0 6px 20px rgba(123,92,255,.45)}
   :root[data-accent="green"]{--acc:#12b76a;--acc2:#4fd18a;--grad:linear-gradient(135deg,#12b76a,#0e9f5b);--out:linear-gradient(135deg,#0fa863,#0e9f5b);--shacc:0 6px 20px rgba(18,183,106,.4)}
@@ -169,6 +195,12 @@
   .acc-row{display:flex;gap:13px;padding:2px}
   .acc-sw{width:40px;height:40px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:.15s;box-shadow:var(--sh)}
   .acc-sw.on{border-color:var(--ink);transform:scale(1.08)}
+  /* премиум-стили CRM — свотчи (фон-плашка + бренд-точка) */
+  .style-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .style-sw{border:1.5px solid var(--line);background:var(--panel);color:var(--mut);font-family:inherit;font-weight:700;font-size:11.5px;padding:9px 4px 8px;border-radius:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:.15s}
+  .style-sw .sw2{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line)}
+  .style-sw .sw2 i{width:13px;height:13px;border-radius:50%}
+  .style-sw.on{border-color:var(--ink);color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset}
   /* карточка лида */
   #leadcard{position:absolute;inset:0;z-index:20;background:var(--bg);transform:translateX(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);overflow-y:auto;display:flex;flex-direction:column}
   #leadcard.open{transform:none}
@@ -325,7 +357,8 @@ const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
 const PREF_KEY='lumen_tgprefs_'+((TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user&&TG.initDataUnsafe.user.id)||'x');
 let PREFS={theme:'auto',accent:'blue'};
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
-function applyTheme(){const r=document.documentElement;const th=PREFS.theme==='auto'?((TG&&TG.colorScheme)||'dark'):PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');try{TG&&TG.setHeaderColor&&TG.setHeaderColor(th==='light'?'#eef2f8':'#080b12');TG&&TG.setBackgroundColor&&TG.setBackgroundColor(th==='light'?'#eef2f8':'#080b12')}catch(e){}}
+const TH_BG={light:'#eef2f8',atelier:'#f3f1ec',burgundy:'#f7f3f4',glass:'#eef5ff',mono:'#f6f6f6',dark:'#080b12'};
+function applyTheme(){const r=document.documentElement;const th=PREFS.theme==='auto'?((TG&&TG.colorScheme)||'dark'):PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');const bg=TH_BG[th]||'#080b12';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg)}catch(e){}}
 applyTheme();
 if(TG&&TG.onEvent)TG.onEvent('themeChanged',()=>{if(PREFS.theme==='auto')applyTheme()});
 let CHATS=[],CUR=null,POLL=null;
@@ -564,11 +597,15 @@ $('#q').addEventListener('input',renderChats);
 function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme();fetch('/tgapp/api/prefs',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(PREFS)}).catch(()=>{})}
 function openSettings(){
   const themes=[['auto','auto','Авто'],['light','sun','Светлая'],['dark','moon','Тёмная']];
+  /* премиум-стили CRM (синхрон с десктопом): [key, фон, бренд-акцент, подпись] */
+  const styles=[['atelier','#f3f1ec','#141311','Ателье'],['burgundy','#f7f3f4','#861c3c','Бургунди'],['glass','#eef5ff','#397bff','Стекло'],['mono','#f6f6f6','#171717','Моно']];
   const accents=[['blue','#3b74ff'],['violet','#7b5cff'],['green','#12b76a'],['orange','#ff8a3d']];
   const bd=document.createElement('div');bd.className='sheet-bd';
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Оформление</h3>
     <div class="set-lbl">Тема</div>
     <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div>
+    <div class="set-lbl">Стиль CRM · как на десктопе</div>
+    <div class="style-row">${styles.map(s=>`<button data-th="${s[0]}" class="style-sw ${PREFS.theme===s[0]?'on':''}"><span class="sw2" style="background:${s[1]}"><i style="background:${s[2]}"></i></span>${s[3]}</button>`).join('')}</div>
     <div class="set-lbl">Акцентный цвет</div>
     <div class="acc-row">${accents.map(a=>`<span data-acc="${a[0]}" class="acc-sw ${PREFS.accent===a[0]?'on':''}" style="background:${a[1]}"></span>`).join('')}</div></div>`;
   document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
