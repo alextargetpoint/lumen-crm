@@ -7227,6 +7227,7 @@ const SHOOT_FMT = { talking: 'Говорящая голова', dialogue: 'Ди�
 /* проверенные вирусные формулы (психо-механика) — для пикера; логика/каркасы на сервере (REELS_FORMULAS) */
 const REEL_FORMULAS_UI = { pas: 'PAS · Боль → Решение', contrarian: 'Контр-интуиция', openloop: 'Открытая петля', mythbust: 'Разрушение мифа', listicle: 'Список · N ошибок', insider: 'Инсайд «скрывают»', casereveal: 'Кейс с цифрой', bab: 'Было → Стало → Мост', fomo: 'FOMO · срочность', storypov: 'История / POV', question: 'Вопрос-крючок' };
 const SOCIAL_TOOLS = {
+  plays:     { name: 'Схемы хантинга', icon: I.target,  sub: 'проверенные схемы лидогена', hue: '#A83250' },
   scripts:   { name: 'Сценарии Reels', icon: I.play,   sub: 'хук → структура → CTA', hue: '#2FA98C' },
   hunt:      { name: 'Хантинг идей',   icon: I.spark,  sub: 'листай как в Tinder',   hue: '#C9922E' },
   bank:      { name: 'Копилка идей',   icon: I.wake,   sub: 'поймал мысль — запиши', hue: '#8B7BD8' },
@@ -7634,13 +7635,85 @@ PAGES.social = async (root) => {
     </div>`;
   $$('.sh-tab', root).forEach(b => b.addEventListener('click', () => { SOCIAL_TOOL = b.dataset.tool; render(); }));
   const main = $('#shMain', root);
-  if (tool === 'scripts') await shScripts(main);
+  if (tool === 'plays') await shPlays(main);
+  else if (tool === 'scripts') await shScripts(main);
   else if (tool === 'hunt') await shHunt(main);
   else if (tool === 'bank') await shBank(main);
   else if (tool === 'carousels') await shCarousels(main);
   else if (tool === 'launch') await shLaunch(main);
   else if (tool === 'post') await shPost(main);
 };
+
+/* ── Схемы хантинга лидов (растущая библиотека проверенных маркетинг-схем) ── */
+const HUNT_PLAYS = [
+  {
+    id: 'listing-reviews',
+    title: 'Нативные обзоры вторички',
+    tag: 'Органика · протестировано',
+    channel: 'Органический трафик',
+    lead: 'Каждый день — новый сильный листинг, короткий нативный обзор. Объект продаёт сам. Ролики залетают на органике, а ты собираешь лидов со сформированным спросом.',
+    why: [
+      ['Обзор конкретного объекта', 'лиды со СФОРМИРОВАННЫМ спросом — прямые, реально ищут недвижку'],
+      ['Виральные / хайповые ролики', 'более холодные лиды: шире охват, слабее намерение'],
+      ['Сильный визуал объекта', 'объект продаёт сам — брокеру не нужно «продавать» в кадре'],
+    ],
+    steps: [
+      'Найди партнёров с богатой коллекцией вторички по локации (напр. рынок Дубая).',
+      'Отбирай объекты с сильным визуалом — где сам объект продаёт.',
+      'Снимай пачкой: за день заехал на 5 проектов → быстро отснял → смонтировал → опубликовал.',
+      'Публикуй КАЖДЫЙ день без остановок: новый проект = новый ролик.',
+      'Хук в первые 1–2 секунды — тезисная фраза («Срочная продажа», «Уникальный лот только вышел на рынок»).',
+      'Заземляй аудиторию на личный бренд в Instagram — тёплые дожимающие посты на личности и более специфичные темы.',
+    ],
+    tip: 'Визуальный хук: рука в кадре впереди (маникюр, браслеты) — частично триггерит и задерживает внимание, особенно женскую аудиторию.',
+    hooks: [
+      'Срочная продажа — уникальный лот только что вышел на рынок',
+      'Такого в Дубае за эти деньги вы ещё не видели',
+      'Успей: 1 из 3 таких уже в резерве',
+      'Вот что реально можно купить здесь за $[сумма]',
+      'Объект дня — показываю всё как есть, без прикрас',
+    ],
+    videos: [
+      { url: 'https://www.instagram.com/reel/DdD73mDxvGW/', label: 'Референс: нативный обзор вторички' },
+    ],
+  },
+];
+async function shPlays(main) {
+  const plays = HUNT_PLAYS;
+  const card = (pl) => `
+    <article class="hp-card">
+      <div class="hp-card-hd">
+        <div class="hp-card-t"><b>${esc(pl.title)}</b><span class="hp-tag">${esc(pl.tag)}</span></div>
+        <span class="hp-chan">${ic(I.target, 2)}${esc(pl.channel)}</span>
+      </div>
+      <p class="hp-lead">${esc(pl.lead)}</p>
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.spark, 2)}Почему работает</div>
+        <div class="hp-why">${pl.why.map(([a, b]) => `<div class="hp-why-r"><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join('')}</div>
+      </div>
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.layers, 2)}Как делать</div>
+        <ol class="hp-steps">${pl.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+      </div>
+      ${pl.tip ? `<div class="hp-tip">${ic(I.bolt, 2)}<span>${esc(pl.tip)}</span></div>` : ''}
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.flame, 2)}Хук-фразы для начала ролика</div>
+        <div class="hp-hooks">${pl.hooks.map(h => `<div class="hp-hook"><span>${esc(h)}</span>${cpBtn(h)}</div>`).join('')}</div>
+      </div>
+      <div class="hp-sec"><div class="hp-sec-h">${ic(I.play, 2)}Видео-примеры</div>
+        <div class="hp-vids">${pl.videos.map(v => `<a class="hp-vid" href="${esc(v.url)}" target="_blank" rel="noopener">${ic(I.play, 2)}<span>${esc(v.label)}</span>${ic(I.arrow, 2)}</a>`).join('')}
+          <div class="hp-vid hp-vid-add">${ic(I.plus, 2)}<span>ещё примеры — скинь ссылки, добавлю в схему</span></div>
+        </div>
+      </div>
+    </article>`;
+  main.innerHTML = `
+    <div class="hp-hero">
+      <div class="hp-hero-x">
+        <div class="hp-hero-k">${ic(I.target)}Библиотека схем</div>
+        <div class="hp-hero-t">Схемы хантинга лидов</div>
+        <div class="hp-hero-s">Проверенные схемы органического и платного лидогена для агентств недвижимости. Собираем со временем — бери, разбирай на брокеров, повторяй.</div>
+      </div>
+      <div class="hp-hero-art" style="background-image:url('assets/play-hunt-cover.webp')" aria-hidden="true"></div>
+    </div>
+    <div class="hp-list">${plays.map(card).join('')}</div>`;
+}
 
 /* ── Сценарии Reels ── */
 async function shScripts(main) {
