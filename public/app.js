@@ -2155,9 +2155,18 @@ async function loadSeats() {
    и задаём grid-row span на мелкой сетке строк → виджеты «заклиниваются» без пустот, сохраняя ширины (spans).
    Аддитивно поверх 12-колоночной сетки; выключается в режиме правки и на 1 колонке. */
 const OV_MROW = 8, OV_MGAP = 8;
+function ovScroller(grid) {
+  /* ближайший вертикально-скроллящийся предок (обычно #content) — для сохранения позиции */
+  let n = grid && grid.parentElement;
+  while (n && n !== document.body) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 4) return n; n = n.parentElement; }
+  return null;
+}
 function ovMasonry(grid) {
   if (!grid) return;
   grid.classList.add('ov-masonry');
+  /* ⚠️ спаны сбрасываются ниже → сетка на миг схлопывается → страница короче → браузер КЛАМПИТ скролл вверх.
+     При живом ресайзе нижних виджетов это выглядело как «экран слетает наверх». Сохраняем/возвращаем скролл. */
+  const sc = ovScroller(grid); const savedTop = sc ? sc.scrollTop : window.scrollY;
   const cs = getComputedStyle(grid);
   const cols = cs.gridTemplateColumns.split(' ').filter(Boolean).length;
   const items = [...grid.querySelectorAll('.ov-w')];
@@ -2178,6 +2187,8 @@ function ovMasonry(grid) {
     const h = w.getBoundingClientRect().height;
     w.style.gridRowEnd = 'span ' + Math.max(1, Math.round(h + GAP));
   });
+  /* вернуть скролл на место (спаны восстановили высоту сетки — клампа больше нет) */
+  if (sc) { if (sc.scrollTop !== savedTop) sc.scrollTop = savedTop; } else if (window.scrollY !== savedTop) window.scrollTo(0, savedTop);
 }
 let _ovMasonryHook = false, _ovMasonryTmr = null;
 function ovMasonryWatch(root) {

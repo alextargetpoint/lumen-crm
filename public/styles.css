@@ -4594,7 +4594,7 @@ html[data-night] {
 .ov2-edit.on { opacity:1; background:var(--ov-primary); color:#fff; }
 
 /* 12-колоночная сетка */
-.ov2-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:18px; max-width:1600px; align-items:start; column-count:initial; }
+.ov2-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:22px; max-width:1600px; align-items:start; column-count:initial; }
 .ov-w { grid-column:span 6; min-width:0; margin:0; display:block; }
 .ov-w.full { grid-column:span 12; }
 @media (max-width:1180px){ .ov2-grid { grid-template-columns:repeat(6,1fr); } .ov-w, .ov-w.full { grid-column:span 6; } }
