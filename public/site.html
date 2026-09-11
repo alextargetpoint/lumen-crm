@@ -288,6 +288,12 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 .page.p-front{width:300px;left:0;top:36px;z-index:2}
 .sc-phone{position:absolute;right:0;bottom:0;width:158px;border-radius:26px;padding:7px;background:linear-gradient(160deg,#1a2740,#0a1120);box-shadow:var(--shadow-lg);z-index:3}
 .sc-phone img{width:100%;border-radius:20px;display:block}
+/* showcase: плавающие страницы подборки */
+.page.p-front{animation:scFloat 7s var(--ease-soft) infinite}
+.page.p-back{animation:scFloat 7.5s var(--ease-soft) .6s infinite}
+.sc-phone{animation:scFloat 6s var(--ease-soft) 1s infinite}
+@keyframes scFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+@keyframes calcPop{0%{transform:scale(1)}42%{transform:scale(1.075)}100%{transform:scale(1)}}
 .showcase .cap{margin-top:24px}
 .showcase .cap h3{font-size:clamp(24px,2.6vw,34px);margin-bottom:12px}
 .showcase .cbul{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
@@ -1677,7 +1683,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <li><span>Дизайн и правки подборок</span><b>$500/мес</b></li>
         <li><span>Тестирование и мониторинг</span><b>$500/мес</b></li>
       </ul>
-      <div class="btotal">≈ $5 000<span>/мес на поддержку</span></div>
+      <div class="btotal">≈ $<b class="countup" data-to="5000" style="font:inherit;color:inherit">0</b><span>/мес на поддержку</span></div>
       <div class="bnote">И это только чтобы система работала. Разработать её с нуля — отдельные полгода-год и в разы дороже.</div>
     </div>
     <div class="bcard lumen d1" data-r>
@@ -1992,8 +1998,10 @@ if(matchMedia('(min-width:861px)').matches){
 
 // count-up numbers
 const _cuReduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const cuIO=new IntersectionObserver((es)=>{es.forEach(e=>{if(!e.isIntersecting)return;const el=e.target,to=+el.dataset.to,suf=el.dataset.suffix||'';cuIO.unobserve(el);if(_cuReduced){el.textContent=to+suf;return;}const dur=1200,t0=performance.now();const step=(t)=>{const p=Math.min(1,(t-t0)/dur),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=v+suf;if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);})},{threshold:.6});
+const cuIO=new IntersectionObserver((es)=>{es.forEach(e=>{if(!e.isIntersecting)return;const el=e.target,to=+el.dataset.to,suf=el.dataset.suffix||'';cuIO.unobserve(el);const _f=(n)=>n.toLocaleString('ru-RU');if(_cuReduced){el.textContent=_f(to)+suf;return;}const dur=1200,t0=performance.now();const step=(t)=>{const p=Math.min(1,(t-t0)/dur),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=_f(v)+suf;if(p<1)requestAnimationFrame(step);};requestAnimationFrame(step);})},{threshold:.6});
 document.querySelectorAll('.countup').forEach(el=>cuIO.observe(el));
+// пульс вывода калькулятора при движении слайдеров
+(function(){var lost=document.getElementById('lost');if(!lost)return;['leads','comm','conv'].forEach(function(id){var el=document.getElementById(id);el&&el.addEventListener('input',function(){lost.style.animation='none';void lost.offsetWidth;lost.style.animation='calcPop .32s var(--ease-spring)';});});})();
 
 // whatsapp play
 const waBody=document.getElementById('waBody');
