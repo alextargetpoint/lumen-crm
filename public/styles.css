@@ -6583,14 +6583,19 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* ═══ Lumen Burgundy — editorial media-heroes (Лента + Объекты) ═══
    Маска слева — НЕЙТРАЛЬНО-БЕЛАЯ (workspace-фон), НЕ бордовая (охраняемое правило).
    Фото натуральное; 3D-объект .ha-stage скрыт. */
-/* ФОТО УБРАНО — чистый тёплый нейтральный градиент (никакой обрезанной картинки) */
+/* ХУК-ГРАФИКА: тёмный hero + абстракт-видеофон (атлас), как у data-hero. Белый текст, ноль обрезки. */
 :root[data-theme="warm"][data-page="feed"] .ha,
 :root[data-theme="warm"][data-page="properties"] .ha {
-  background:
-    radial-gradient(120% 140% at 88% -10%, rgba(138,30,56,.06), transparent 55%),
-    linear-gradient(118deg, #FBF5F3 0%, #FCF8F6 55%, #F6EEEB 100%);
-  color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 170px;
+  background: linear-gradient(150deg, var(--ov-hero-a), var(--ov-hero-b) 52%, color-mix(in srgb, var(--accent) 26%, var(--ov-hero-c)) 135%) !important;
+  color: #fff !important; border: 1px solid rgba(255,255,255,.1) !important; grid-template-columns: 1fr; min-height: 172px;
 }
+:root[data-theme="warm"][data-page="feed"] .ha .ha-title, :root[data-theme="warm"][data-page="feed"] .ha .ha-body .nm2, :root[data-theme="warm"][data-page="feed"] .ha h1,
+:root[data-theme="warm"][data-page="properties"] .ha .ha-title, :root[data-theme="warm"][data-page="properties"] .ha .ha-body .nm2, :root[data-theme="warm"][data-page="properties"] .ha h1 { color: #fff !important; }
+:root[data-theme="warm"][data-page="feed"] .ha .ha-title .sub, :root[data-theme="warm"][data-page="feed"] .ha .ha-body,
+:root[data-theme="warm"][data-page="properties"] .ha .ha-title .sub, :root[data-theme="warm"][data-page="properties"] .ha .ha-body { color: rgba(255,255,255,.84) !important; }
+:root[data-theme="warm"][data-page="feed"] .ha .ha-title svg, :root[data-theme="warm"][data-page="properties"] .ha .ha-title svg,
+:root[data-theme="warm"][data-page="properties"] .ha .ha-row .nm2 b { color: #fff !important; }
+:root[data-theme="warm"][data-page="feed"] .ha .ha-chip, :root[data-theme="warm"][data-page="properties"] .ha .ha-chip { background: rgba(255,255,255,.14) !important; color: #fff !important; border-color: rgba(255,255,255,.22) !important; }
 :root[data-theme="warm"][data-page="feed"] .ha-stage,
 :root[data-theme="warm"][data-page="properties"] .ha-stage { display: none; }
 :root[data-theme="warm"][data-page="feed"] .ha-body,
@@ -6674,13 +6679,19 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 
 /* 4. EDITORIAL HERO — фото на ВСЮ ширину под равномерной стеклянной вуалью (раньше было обрезано «на пол-экрана»
       right-anchored со швом). Теперь фото центрировано/cover заполняет весь бокс, вуаль чуть плотнее слева под текст. */
-/* ФОТО УБРАНО — чистый прохладный стеклянный градиент (никакой обрезанной картинки) */
+/* ХУК-ГРАФИКА: тёмный hero + абстракт-видеофон (жидкое стекло), белый текст, ноль обрезки */
 :root[data-theme="emerald"][data-page="feed"] .ha,
 :root[data-theme="emerald"][data-page="properties"] .ha {
-  background:
-    radial-gradient(120% 140% at 88% -10%, rgba(120,165,255,.16), transparent 55%),
-    linear-gradient(118deg, #EEF4FC 0%, #F8FBFE 55%, #E9F1FB 100%) !important;
+  background: linear-gradient(150deg, var(--ov-hero-a), var(--ov-hero-b) 52%, color-mix(in srgb, var(--accent) 26%, var(--ov-hero-c)) 135%) !important;
+  color: #fff !important; border: 1px solid rgba(255,255,255,.1) !important;
 }
+:root[data-theme="emerald"][data-page="feed"] .ha .ha-title, :root[data-theme="emerald"][data-page="feed"] .ha .ha-body .nm2, :root[data-theme="emerald"][data-page="feed"] .ha h1,
+:root[data-theme="emerald"][data-page="properties"] .ha .ha-title, :root[data-theme="emerald"][data-page="properties"] .ha .ha-body .nm2, :root[data-theme="emerald"][data-page="properties"] .ha h1 { color: #fff !important; }
+:root[data-theme="emerald"][data-page="feed"] .ha .ha-title .sub, :root[data-theme="emerald"][data-page="feed"] .ha .ha-body,
+:root[data-theme="emerald"][data-page="properties"] .ha .ha-title .sub, :root[data-theme="emerald"][data-page="properties"] .ha .ha-body { color: rgba(255,255,255,.84) !important; }
+:root[data-theme="emerald"][data-page="feed"] .ha .ha-title svg, :root[data-theme="emerald"][data-page="properties"] .ha .ha-title svg,
+:root[data-theme="emerald"][data-page="properties"] .ha .ha-row .nm2 b { color: #BEDBFF !important; }
+:root[data-theme="emerald"][data-page="feed"] .ha .ha-chip, :root[data-theme="emerald"][data-page="properties"] .ha .ha-chip { background: rgba(255,255,255,.14) !important; color: #fff !important; border-color: rgba(255,255,255,.22) !important; }
 :root[data-theme="emerald"][data-page="feed"] .ha-body,
 :root[data-theme="emerald"][data-page="properties"] .ha-body { max-width: 100%; }
 

@@ -705,13 +705,10 @@ function mountHeroVideos(root, theme) {
   root = root || document;
   theme = theme || localStorage.getItem('lumen_theme') || 'light';
   const src = HERO_VIDEO[theme];
-  const page = document.documentElement.getAttribute('data-page');
-  const photoPage = (page === 'feed' || page === 'properties'); /* там у .ha фото-обложка — видео не нужно */
   root.querySelectorAll('.ovx-hero, .ha, .f3card').forEach(el => {
-    const isPhotoHa = photoPage && el.classList.contains('ha');
     let vid = el.querySelector(':scope > .hero-vid');
     const neb = el.querySelector(':scope > .ovm'); /* navy-nebula: глушим, если своё тематическое видео (иначе дублируется/синит) */
-    if (!src || isPhotoHa) { if (vid) vid.remove(); if (neb) neb.style.display = ''; return; }
+    if (!src) { if (vid) vid.remove(); if (neb) neb.style.display = ''; return; }
     if (neb) neb.style.display = 'none';
     if (vid) {
       if (vid.getAttribute('data-src') !== src) { vid.setAttribute('data-src', src); vid.src = src; vid.poster = HERO_VIDEO_POSTER[theme] || ''; try { vid.load(); vid.play && vid.play().catch(() => {}); } catch (_) {} }
