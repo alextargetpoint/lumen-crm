@@ -34,13 +34,13 @@
   .vidbg{position:relative;overflow:hidden}
   .vidbg>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(.9)}
-  .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(243,241,236,.9),rgba(243,241,236,.8) 50%,rgba(243,241,236,.92))}
+  .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--l-bg) 0%,rgba(243,241,236,.9) 12%,rgba(243,241,236,.78) 34%,rgba(243,241,236,.76) 50%,rgba(243,241,236,.78) 66%,rgba(243,241,236,.9) 88%,var(--l-bg) 100%)}
   .vidbg>.wrap{position:relative;z-index:1}
   /* тёмный видеофон — абстракция под тёмной вуалью */
   .vidbg-d{position:relative;overflow:hidden}
   .vidbg-d>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg-d>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.38;filter:grayscale(1) contrast(1.05)}
-  .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 40%,rgba(8,8,8,.72),rgba(8,8,8,.88) 70%)}
+  .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#080808 0%,rgba(8,8,8,.84) 12%,rgba(8,8,8,.7) 34%,rgba(8,8,8,.66) 50%,rgba(8,8,8,.7) 66%,rgba(8,8,8,.84) 88%,#080808 100%)}
   .vidbg-d>.wrap{position:relative;z-index:1}
   .tr{height:clamp(240px,30vw,440px);position:relative;z-index:2}
   .tr::after{content:"";position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;pointer-events:none;
