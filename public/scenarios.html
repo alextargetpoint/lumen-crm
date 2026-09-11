@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen · Сценарии — живой демо-обзор</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/assets/land/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060A14; --bg2:#0A1120; --card:rgba(18,28,48,.6); --card2:rgba(14,22,40,.75);
+  --ink:#EFF3FC; --ink2:#AEBCDB; --ink3:#6A7CA3;
+  --line:rgba(143,180,255,.14); --line2:rgba(143,180,255,.08);
+  --blue:#2563EB; --blue2:#4F7DFF; --sky:#8FB4FF; --klein:#1D34D8;
+  --bad:#E5646A; --good:#5FD6A6; --gold:#E9C77E;
+  --disp:'Cormorant',Georgia,serif; --text:'Manrope',system-ui,sans-serif;
+  --spring:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden;position:relative}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(1000px 700px at 80% -10%,rgba(37,99,235,.22),transparent 60%),radial-gradient(800px 600px at 5% 20%,rgba(29,52,216,.16),transparent 58%)}
+.app{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:320px 1fr;gap:0}
+
+/* ---- rail ---- */
+.rail{border-right:1px solid var(--line);background:rgba(8,14,26,.6);backdrop-filter:blur(10px);display:flex;flex-direction:column;overflow:hidden}
+.rail .rh{padding:20px 20px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line2)}
+.rail .rh svg{width:22px;height:26px;filter:drop-shadow(0 0 8px rgba(79,125,255,.6))}
+.rail .rh b{font-weight:800;letter-spacing:.05em;font-size:16px}
+.rail .rh span{font-size:11px;color:var(--ink3);margin-left:auto;letter-spacing:.14em;text-transform:uppercase}
+.rlist{overflow-y:auto;padding:10px;flex:1}
+.ritem{display:flex;gap:12px;align-items:flex-start;padding:13px 12px;border-radius:13px;cursor:pointer;transition:background .2s,border-color .2s;border:1px solid transparent}
+.ritem:hover{background:rgba(143,180,255,.06)}
+.ritem.on{background:linear-gradient(120deg,rgba(37,99,235,.22),rgba(37,99,235,.06));border-color:rgba(79,125,255,.4)}
+.ritem .n{flex:0 0 30px;height:30px;border-radius:9px;background:rgba(143,180,255,.1);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:600;font-size:16px;color:var(--sky)}
+.ritem.on .n{background:var(--blue);color:#fff;border-color:transparent}
+.ritem .rt{font-size:13.5px;font-weight:600;line-height:1.3}
+.ritem .rtag{font-size:10.5px;color:var(--ink3);margin-top:3px}
+.rail .rf{padding:12px 16px;border-top:1px solid var(--line2);font-size:11.5px;color:var(--ink3);display:flex;gap:14px;flex-wrap:wrap}
+.rail .rf b{color:var(--ink2);font-weight:600}
+
+/* ---- stage ---- */
+.stage{position:relative;overflow-y:auto;padding:clamp(24px,4vw,54px);display:flex;flex-direction:column}
+.top-tags{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.tag{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--line)}
+.tag.aud{color:var(--sky);background:rgba(37,99,235,.14)}
+.tag.frm{color:var(--gold);background:rgba(233,199,126,.12)}
+.hook{font-family:var(--disp);font-size:clamp(30px,4.4vw,54px);font-weight:600;line-height:1.05;letter-spacing:-.01em;max-width:22ch;margin-bottom:6px}
+.hook em{font-style:italic;color:var(--sky)}
+.subhook{color:var(--ink2);font-size:15px;margin-bottom:26px;max-width:60ch}
+
+/* flow */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0 6px;margin:8px 0 28px}
+.node{opacity:0;transform:translateY(16px) scale(.96);transition:opacity .5s var(--spring),transform .5s var(--spring),box-shadow .3s,border-color .3s;
+  flex:1 1 190px;min-width:170px;max-width:260px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;position:relative;cursor:pointer}
+.node.show{opacity:1;transform:none}
+.node.cur{border-color:rgba(79,125,255,.55);box-shadow:0 0 0 3px rgba(79,125,255,.18),0 24px 50px -24px rgba(37,99,235,.5)}
+.node.focus{transform:scale(1.05);z-index:5;border-color:var(--sky);box-shadow:0 0 0 3px rgba(143,180,255,.28),0 30px 60px -20px rgba(37,99,235,.6)}
+.flow.dim .node:not(.focus){opacity:.32;filter:saturate(.6)}
+.node .ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px;background:rgba(143,180,255,.1);border:1px solid var(--line)}
+.node.bad .ic{background:rgba(229,100,106,.14);border-color:rgba(229,100,106,.3)}
+.node.ai .ic{background:linear-gradient(180deg,var(--blue2),var(--klein));border-color:transparent;box-shadow:0 0 22px -4px var(--blue2)}
+.node.good .ic{background:rgba(95,214,166,.14);border-color:rgba(95,214,166,.3)}
+.node h4{font-size:15.5px;font-weight:700;line-height:1.2;margin-bottom:5px}
+.node.bad h4{color:#F1A6AA}.node.good h4{color:#9BE8C8}.node.ai h4{color:var(--sky)}
+.node p{font-size:12.5px;color:var(--ink2);line-height:1.4}
+.node .bub{margin-top:10px;display:grid;gap:6px}
+.node .bub .m{font-size:12px;line-height:1.35;padding:7px 10px;border-radius:10px;max-width:92%}
+.node .bub .m.in{background:#1b2733;color:#e9f0f5;border-top-left-radius:3px;justify-self:start}
+.node .bub .m.out{background:#144d3e;color:#eafff4;border-top-right-radius:3px;justify-self:end}
+.node .step-dot{position:absolute;top:12px;right:14px;font-family:var(--disp);font-size:13px;color:var(--ink3);font-weight:600}
+.conn{flex:0 0 26px;align-self:center;display:flex;align-items:center;justify-content:center;color:var(--ink3);position:relative;height:2px;min-width:26px}
+.conn::before{content:"";position:absolute;inset:0;height:2px;top:50%;transform:translateY(-50%);background:var(--line);border-radius:2px}
+.conn::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);height:2px;width:0;background:linear-gradient(90deg,var(--blue2),var(--sky));border-radius:2px;transition:width .45s var(--spring)}
+.conn.fill::after{width:100%}
+.conn svg{width:14px;height:14px;position:relative;z-index:2;background:var(--bg);opacity:0;transition:opacity .3s}
+.conn.fill svg{opacity:1;color:var(--sky)}
+@media(max-width:820px){.flow{flex-direction:column;gap:0}.node{max-width:none;flex:none;width:100%}.conn{transform:rotate(90deg);height:22px;min-width:0;width:22px;margin:2px auto}}
+
+/* CTA + controls */
+.cta{margin-top:auto;padding-top:22px;border-top:1px solid var(--line2);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cta .lab{font-size:13px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase}
+.cta .word{font-family:var(--disp);font-size:26px;font-weight:600;color:#fff;background:linear-gradient(180deg,var(--blue2),var(--blue));padding:6px 18px;border-radius:12px;box-shadow:0 12px 30px -10px rgba(37,99,235,.7)}
+.cta .word:before{content:"💬 "}
+.controls{position:sticky;bottom:0;margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:linear-gradient(0deg,var(--bg) 60%,transparent);padding-top:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:11px;padding:11px 16px;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.btn:hover{transform:translateY(-1px);border-color:var(--blue)}
+.btn.pri{background:linear-gradient(180deg,var(--blue2),var(--blue));border-color:transparent;box-shadow:0 12px 30px -12px rgba(37,99,235,.8)}
+.btn svg{width:16px;height:16px}
+.prog{margin-left:auto;font-size:13px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.hint{font-size:12px;color:var(--ink3);width:100%;margin-top:2px}
+.hint kbd{background:rgba(143,180,255,.1);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:var(--text);font-size:11px}
+
+/* present toggle / mobile */
+.railtoggle{display:none}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{position:fixed;inset:0 auto 0 0;width:290px;z-index:30;transform:translateX(-100%);transition:transform .3s var(--spring)}
+  .rail.open{transform:none}
+  .railtoggle{display:inline-flex}
+  .stage{padding:20px 18px 16px}
+}
+body.present .rail{transform:translateX(-100%)}
+body.present .app{grid-template-columns:1fr}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" id="rail">
+    <div class="rh">
+      <svg viewBox="0 0 100 120"><defs><linearGradient id="lg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#B4CFFF"/><stop offset="45%" stop-color="#4E82FF"/><stop offset="100%" stop-color="#1D4FD8"/></linearGradient></defs><path fill="url(#lg)" d="M50 0 C54.5 37 66 52 93 60 C66 68 54.5 83 50 120 C45.5 83 34 68 7 60 C34 52 45.5 37 50 0 Z"/></svg>
+      <b>Lumen</b><span>Сценарии</span>
+    </div>
+    <div class="rlist" id="rlist"></div>
+    <div class="rf"><span>Кому: <b>Ф</b> фаундер · <b>Б</b> брокер</span></div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="top-tags" id="tags"></div>
+    <div class="hook" id="hook"></div>
+    <div class="subhook" id="subhook"></div>
+    <div class="flow" id="flow"></div>
+    <div class="cta"><span class="lab">Кодовое слово в комменты</span><span class="word" id="ctaWord"></span></div>
+    <div class="controls">
+      <button class="btn railtoggle" id="railBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Сценарии</button>
+      <button class="btn pri" id="playBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Проиграть</button>
+      <button class="btn" id="stepBtn">Шаг →</button>
+      <button class="btn" id="resetBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button class="btn" id="prevBtn">← Пред</button>
+      <button class="btn" id="nextBtn">След →</button>
+      <button class="btn" id="presentBtn">▢ Презентация</button>
+      <span class="prog" id="prog"></span>
+      <div class="hint"><kbd>Space</kbd>/<kbd>→</kbd> шаг · <kbd>P</kbd> проиграть · <kbd>↑</kbd><kbd>↓</kbd> сценарий · клик по узлу — подсветить (для «тыкал и говорил»)</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const S=[
+ {n:1,title:'Ты платишь за лида — брокер платит тишиной',aud:'Ф',frm:'PAS · страх потери',
+  hook:'Ты платишь за лида. Брокер платит тебе <em>тишиной</em>.',
+  sub:'Ночная заявка стоит денег и остывает за часы, пока команда спит.',
+  flow:[
+   {ic:'📩',t:'Заявка · 02:47',p:'студия JVC, с рекламы (−$50)',tone:'bad'},
+   {ic:'😴',t:'Брокер спит',p:'увидит только утром',tone:'bad'},
+   {ic:'⚡',t:'Lumen отвечает за 1 мин',tone:'ai',bub:[['in','Под аренду или для себя?']]},
+   {ic:'✅',t:'Квалифицирует',p:'цель · бюджет · гео'},
+   {ic:'🌅',t:'Утром брокеру',p:'тёплый лид + запись 19:30',tone:'good'},
+  ],cta:'СКОРОСТЬ'},
+
+ {n:2,title:'Самый дорогой сотрудник уносит твою базу',aud:'Ф',frm:'Contrarian · разрыв шаблона',
+  hook:'Самый дорогой сотрудник — тот, кто <em>уносит твою базу</em>.',
+  sub:'Брокер ведёт твоих клиентов на своём телефоне. Уходит — уводит базу.',
+  flow:[
+   {ic:'👤',t:'Брокер + личный телефон',p:'переписка у него',tone:'bad'},
+   {ic:'📦',t:'Уходит к конкуренту',p:'уводит оплаченную базу',tone:'bad'},
+   {ic:'🏛',t:'Централизация',p:'один номер, всё в системе фонда',tone:'ai'},
+   {ic:'🔒',t:'Брокер видит только своих'},
+   {ic:'⛔',t:'Kill-switch',p:'отключил → лиды перелетели',tone:'good'},
+  ],cta:'КОНТРОЛЬ'},
+
+ {n:3,title:'Заявка в 02:47 — сделка жива',aud:'Ф · Б',frm:'Case reveal · специфичность',
+  hook:'Заявка в <em>02:47</em>. Брокер спал. Сделка — жива.',
+  sub:'Реальный кейс: за 4 минуты ночью лид прошёл полную квалификацию.',
+  flow:[
+   {ic:'📩',t:'02:47 заявка',p:'JVC, с рекламы',tone:'bad'},
+   {ic:'💬',t:'Диалог в живом темпе',tone:'ai',bub:[['in','Под аренду или для себя?'],['out','Под доход']]},
+   {ic:'🎯',t:'Уточняет бюджет и гео',bub:[['in','Бюджет до $250k или выше?'],['out','до 250']]},
+   {ic:'📅',t:'Ставит созвон',bub:[['in','Вы из Казахстана? Во сколько?'],['out','вечером после 19']]},
+   {ic:'🗂',t:'Утром: карточка',p:'цель·бюджет·гео·психо + 19:30',tone:'good'},
+  ],cta:'НОЧЬ'},
+
+ {n:4,title:'Ответил за секунду — клиент понял, что бот',aud:'Ф · Б',frm:'Mythbust · авторитет',
+  hook:'Ответил за секунду — клиент сразу понял, <em>что это бот</em>.',
+  sub:'«Мгновенный автоответ» убивает доверие. Отвечать надо как человек.',
+  flow:[
+   {ic:'🤖',t:'Робот: ответ за 0.4с',p:'простыня на 3 абзаца',tone:'bad'},
+   {ic:'🛡',t:'Клиент включил защиту',p:'«это бот»',tone:'bad'},
+   {ic:'⏳',t:'Lumen: живой темп',p:'печатает… пауза',tone:'ai'},
+   {ic:'🎙',t:'Голосовые, тон под клиента'},
+   {ic:'💬',t:'Уверен, что пишет менеджер',tone:'good'},
+  ],cta:'ЖИВОЙ'},
+
+ {n:5,title:'Больше не привязан к компьютеру',aud:'Б',frm:'BAB · трансформация',
+  hook:'Больше не привязан к компьютеру. <em>Закрываю больше.</em>',
+  sub:'Вся переписка — WhatsApp и Telegram — в телефоне брокера. Работа откуда угодно.',
+  flow:[
+   {ic:'🏗',t:'Брокер на объекте'},
+   {ic:'🔥',t:'Прилетел горячий лид',tone:'bad'},
+   {ic:'📱',t:'Telegram-приложение',p:'WhatsApp клиента в телефоне',tone:'ai'},
+   {ic:'✨',t:'Подсказка',p:'«клиент тёплый → предложи слот»'},
+   {ic:'✅',t:'Закрыл + история у фонда',tone:'good'},
+  ],cta:'ТЕЛЕФОН'},
+
+ {n:6,title:'Топ-брокер сливает лидов — по цифрам',aud:'Ф',frm:'Open loop · Зейгарник',
+  hook:'Узнал, что топ-брокер <em>сливает лидов</em>. Не по интуиции — по цифрам.',
+  sub:'Отчёты, которые брокер рисует сам, врут. Система показывает правду.',
+  flow:[
+   {ic:'📊',t:'Отчёт брокера: «звезда»'},
+   {ic:'🕵',t:'Реальность',p:'40 лидов → написал 12 → бюджет у 3',tone:'bad'},
+   {ic:'📉',t:'Воронка: провал на квалификации',tone:'bad'},
+   {ic:'🎧',t:'ИИ-оценка звонка 68/100',p:'с конкретными репликами',tone:'ai'},
+   {ic:'✅',t:'Слитого лида не спрятать',tone:'good'},
+  ],cta:'ЦИФРЫ'},
+
+ {n:7,title:'Клиенты пишут в комментах — никто не отвечает',aud:'Ф · Мкт',frm:'Curiosity · деньги на полу',
+  hook:'Клиенты пишут тебе <em>в комментах</em>. И никто им не отвечает.',
+  sub:'Под рекламой лежат горячие лиды. Бесплатно. И сливаются каждый день.',
+  flow:[
+   {ic:'💬',t:'Комменты под рекламой',tone:'bad',bub:[['in','а цена? рассрочка есть?']]},
+   {ic:'🙈',t:'Ответов — ноль',p:'менеджер не мониторит',tone:'bad'},
+   {ic:'🤖',t:'Lumen отвечает',p:'ротация + анти-бан',tone:'ai'},
+   {ic:'➡️',t:'Уводит в директ'},
+   {ic:'🗂',t:'Карточка лида',tone:'good'},
+  ],cta:'КОММЕНТЫ'},
+
+ {n:8,title:'Почему в недвижимости нет своей CRM',aud:'Ф · Б',frm:'Question · провокация',
+  hook:'Почему в недвижимости <em>нет своей CRM</em>?',
+  sub:'Универсальные не решают боли рынка — поэтому агентства пишут самопис за сотни тысяч.',
+  flow:[
+   {ic:'🧩',t:'Универсальные CRM',p:'не закрывают брокер-проблемы',tone:'bad'},
+   {ic:'🩸',t:'Сливают и крадут лидов',tone:'bad'},
+   {ic:'🙈',t:'Собственник не видит',tone:'bad'},
+   {ic:'🏛',t:'Lumen — ПОД недвижку',tone:'ai'},
+   {ic:'✅',t:'Первая линия + централизация',tone:'good'},
+  ],cta:'СВОЯ'},
+
+ {n:9,title:'ИИ разобрал клиента как психолог',aud:'Б',frm:'Insider · нечестное преимущество',
+  hook:'ИИ разобрал клиента <em>как психолог</em> — и сказал, на что давить.',
+  sub:'Продажа — это психоанализ. Только теперь тип клиента выдают до звонка.',
+  flow:[
+   {ic:'🎯',t:'Перед звонком'},
+   {ic:'🧠',t:'Психо-портрет',p:'«Аналитик-инвестор»',tone:'ai'},
+   {ic:'💪',t:'Давить на ROI и цифры'},
+   {ic:'🚫',t:'Не давить эмоциями и срочностью'},
+   {ic:'✅',t:'Готовые ответы → закрыл',tone:'good'},
+  ],cta:'ПСИХО'},
+
+ {n:10,title:'Своя система = $5000. Или $200 — первым 10',aud:'Ф',frm:'FOMO · честный дефицит',
+  hook:'Своя такая система = <em>$5000/мес</em>. Или $200. Для первых 10.',
+  sub:'Готовое, заточенное под недвижимость, внедрение под ключ за неделю.',
+  flow:[
+   {ic:'🧑‍💻',t:'Своими силами',p:'разраб + WhatsApp + телефония + серверы',tone:'bad'},
+   {ic:'💸',t:'≈ $5000 / мес',p:'и это только поддержка',tone:'bad'},
+   {ic:'🚀',t:'Lumen под ключ за 7 дней',tone:'ai'},
+   {ic:'🔥',t:'Бета: $200/мес + внедрение $200',tone:'good'},
+   {ic:'⏳',t:'Осталось N из 10 мест',tone:'good'},
+  ],cta:'БЕТА'},
+];
+
+let cur=0, step=0, timer=null;
+const rlist=document.getElementById('rlist');
+S.forEach((s,i)=>{
+  const el=document.createElement('div'); el.className='ritem'+(i===0?' on':''); el.dataset.i=i;
+  el.innerHTML=`<div class="n">${s.n}</div><div><div class="rt">${s.title}</div><div class="rtag">${s.aud} · ${s.frm}</div></div>`;
+  el.onclick=()=>{load(i); closeRail();}; rlist.appendChild(el);
+});
+
+const $=id=>document.getElementById(id);
+function render(){
+  const s=S[cur];
+  $('tags').innerHTML=`<span class="tag aud">Кому: ${s.aud}</span><span class="tag frm">${s.frm}</span><span class="tag" style="color:var(--ink2)">№ ${s.n} / 10</span>`;
+  $('hook').innerHTML=s.hook;
+  $('subhook').textContent=s.sub;
+  $('ctaWord').textContent=s.cta;
+  const f=$('flow'); f.className='flow'; f.innerHTML='';
+  s.flow.forEach((nd,j)=>{
+    if(j>0){const c=document.createElement('div');c.className='conn';c.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>';f.appendChild(c);}
+    const el=document.createElement('div'); el.className='node'+(nd.tone?' '+nd.tone:''); el.dataset.j=j;
+    let bub=''; if(nd.bub){bub='<div class="bub">'+nd.bub.map(b=>`<span class="m ${b[0]}">${b[1]}</span>`).join('')+'</div>';}
+    el.innerHTML=`<span class="step-dot">${j+1}</span><div class="ic">${nd.ic}</div><h4>${nd.t}</h4>${nd.p?`<p>${nd.p}</p>`:''}${bub}`;
+    el.onclick=()=>focusNode(el);
+    f.appendChild(el);
+  });
+  step=0; updateProg();
+  document.querySelectorAll('.ritem').forEach((r,i)=>r.classList.toggle('on',i===cur));
+}
+function nodesAndConns(){return [...$('flow').children];}
+function showUpTo(k){ // reveal nodes 0..k, fill connectors below k
+  const kids=nodesAndConns(); let nodeIdx=-1;
+  kids.forEach(el=>{
+    if(el.classList.contains('node')){nodeIdx++; el.classList.toggle('show',nodeIdx<=k); el.classList.toggle('cur',nodeIdx===k);}
+  });
+  kids.filter(e=>e.classList.contains('conn')).forEach((c,ci)=>c.classList.toggle('fill', ci+1<=k));
+}
+function totalSteps(){return S[cur].flow.length-1;}
+function updateProg(){$('prog').textContent=`Шаг ${Math.min(step+1,totalSteps()+1)} / ${totalSteps()+1}  ·  Сценарий ${cur+1}/10`;}
+function stepNext(){ if(step<totalSteps()){step++;} showUpTo(step); updateProg(); }
+function play(){ clearInterval(timer); $('flow').classList.remove('dim'); document.querySelectorAll('.node.focus').forEach(n=>n.classList.remove('focus'));
+  step=0; showUpTo(0);
+  timer=setInterval(()=>{ if(step>=totalSteps()){clearInterval(timer);return;} step++; showUpTo(step); updateProg(); },820);
+  updateProg();
+}
+function reset(){ clearInterval(timer); step=0; $('flow').classList.remove('dim'); showUpTo(-1); nodesAndConns().forEach(e=>{e.classList.remove('show','cur','fill','focus');}); step=0; updateProg(); }
+function focusNode(el){ const f=$('flow'); if(el.classList.contains('focus')){el.classList.remove('focus');f.classList.remove('dim');return;} document.querySelectorAll('.node.focus').forEach(n=>n.classList.remove('focus')); el.classList.add('focus'); f.classList.add('dim'); }
+function load(i){cur=(i+S.length)%S.length; render(); showUpTo(-1);}
+
+$('playBtn').onclick=play;
+$('stepBtn').onclick=stepNext;
+$('resetBtn').onclick=reset;
+$('prevBtn').onclick=()=>load(cur-1);
+$('nextBtn').onclick=()=>load(cur+1);
+$('presentBtn').onclick=()=>{document.body.classList.toggle('present'); try{if(document.body.classList.contains('present'))document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); else document.exitFullscreen&&document.exitFullscreen();}catch(e){}};
+$('railBtn').onclick=()=>document.getElementById('rail').classList.toggle('open');
+function closeRail(){document.getElementById('rail').classList.remove('open');}
+
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();stepNext();}
+  else if(e.key==='ArrowLeft'){e.preventDefault(); if(step>0){step--;showUpTo(step);updateProg();}}
+  else if(e.key==='ArrowDown'){e.preventDefault();load(cur+1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();load(cur-1);}
+  else if(e.key==='p'||e.key==='P'){play();}
+  else if(e.key==='r'||e.key==='R'){reset();}
+  else if(/^[0-9]$/.test(e.key)){const idx=e.key==='0'?9:parseInt(e.key)-1; load(idx);}
+});
+
+// init
+render(); showUpTo(-1);
+setTimeout(play,500);
+</script>
+</body>
+</html>
