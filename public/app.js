@@ -1634,21 +1634,21 @@ const OV_W = {
     const body = cs.map(k => `<div class="ov2-case" data-ovcase="${k.id}"><div class="ov2-case-b"><div class="ov2-case-n">${esc(k.name)}${k.outcome ? `<span class="ov2-oc ${OC[k.outcome] || ''}">${esc(k.outcome)}</span>` : ''}</div><div class="ov2-case-s">${esc(k.geoName || '')}${k.verdict ? ' · ' + esc(k.verdict.slice(0, 60)) : ''}</div></div></div>`).join('');
     return hd + body;
   } },
-  /* ⭐ Отчёт клиенту — сводка лидогенерации в формате агентства + отправка/PDF/ссылка */
-  clientreport: { name: 'Отчёт клиенту', icon: () => I.doc, render: (c) => {
+  /* ⭐ Сводка недели — отчёт по лидам/рекламе руководителю (обзор или отправка партнёру/застройщику) */
+  clientreport: { name: 'Сводка недели', icon: () => I.doc, render: (c) => {
     const L = c.leads || [], now = Date.now(), wk = now - 7 * 864e5, pw = now - 14 * 864e5;
     const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
     const nl = L.filter(l => l.createdAt && l.createdAt >= wk);
     const pl = L.filter(l => l.createdAt && l.createdAt >= pw && l.createdAt < wk);
     const nq = nl.filter(l => QUAL.includes(l.stage));
     const conv = nl.length ? Math.round(nq.length / nl.length * 100) : 0;
-    return `<div class="ov2-card-hd">${ic(I.doc)}Отчёт клиенту<span>сводка недели · отправить клиенту</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
-      <div class="ov-rep-sub">Готовая сводка по лидам и рекламе за неделю — как её ждёт клиент. Одной кнопкой в Telegram, PDF или ссылкой.</div>
+    return `<div class="ov2-card-hd">${ic(I.doc)}Сводка недели<span>лиды и реклама за 7 дней</span><button class="btn btn-sm" data-ovgo="analytics">Аналитика</button></div>
+      <div class="ov-rep-sub">Готовый отчёт по лидам и рекламе за неделю — руководителю на обзор или отправить партнёру/застройщику. В Telegram, PDF или ссылкой.</div>
       <div class="ov-rep-nums">
         <div class="ov-rep-n"><b>${nl.length}</b><span>лидов за неделю</span>${deltaChip(nl.length, pl.length)}</div>
         <div class="ov-rep-n"><b>${nq.length}</b><span>целевых (${conv}%)</span></div>
       </div>
-      <div class="ov-rep-acts"><button class="btn btn-sm btn-accent" data-ovrep="tg">${ic(I.send)}В Telegram</button><button class="btn btn-sm" data-ovrep="pdf">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-ovrep="link">${ic(I.link || I.copy)}Ссылка клиенту</button></div>`;
+      <div class="ov-rep-acts"><button class="btn btn-sm btn-accent" data-ovrep="tg">${ic(I.send)}В Telegram</button><button class="btn btn-sm" data-ovrep="pdf">${ic(I.doc)}PDF</button><button class="btn btn-sm" data-ovrep="link">${ic(I.link || I.copy)}Ссылка</button></div>`;
   } },
   /* ⭐ Реклама · связки — топ кампаний/адсетов по лидам (атрибуция из лидов) */
   adbundles: { name: 'Реклама · связки', icon: () => I.target, render: (c) => {
@@ -9586,7 +9586,7 @@ PAGES.agency = async (root) => {
     const a = b.dataset.ovrep;
     if (a === 'tg') { try { const r = await api.post('/reports/test'); toast(r.sent === 'tg' ? 'Отчёт отправлен в Telegram' : 'Telegram не подключён — настрой в «Подключения»', null, r.sent === 'tg'); } catch (e) { toast('Не вышло', e.message); } }
     else if (a === 'pdf') window.open(url + '&print=1', '_blank');
-    else if (a === 'link') { navigator.clipboard.writeText(url); toast('Ссылка на отчёт скопирована', 'read-only для клиента', true); }
+    else if (a === 'link') { navigator.clipboard.writeText(url); toast('Ссылка на отчёт скопирована', 'read-only — руководителю или партнёру', true); }
   }));
   /* живой бренд-превью: как агентство видит клиент на обложке подборки */
   const agPreview = () => {
