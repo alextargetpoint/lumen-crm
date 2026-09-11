@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lumen — ранний доступ</title>
-<meta name="description" content="Отдел продаж, который не спит. Ранний доступ к Lumen — CRM для агентств недвижимости. Оставьте заявку в лист ожидания.">
+<meta name="description" content="Порядок, которого не было. Ранний доступ к Lumen — среде для агентств недвижимости. Оставьте заявку в лист ожидания.">
 <meta name="robots" content="noindex">
 <meta property="og:title" content="Lumen — скоро. Ранний доступ.">
-<meta property="og:description" content="Отдел продаж, который не спит. Лист ожидания открыт.">
+<meta property="og:description" content="Порядок, которого не было. Лист ожидания открыт.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@300;400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -112,6 +112,33 @@
   .hint svg{width:13px;height:13px;opacity:.7}
   .hint.err{color:#e8a0a0}
 
+  /* ── пошаговая форма ── */
+  .wsteps{position:relative;transition:height .5s var(--ease)}
+  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .45s var(--ease),transform .5s var(--ease)}
+  .wstep.on{opacity:1;transform:none;pointer-events:auto}
+  .qlabel{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;display:flex;align-items:center;gap:10px;justify-content:flex-start}
+  .qlabel .qn{color:var(--ink2);font-variant-numeric:tabular-nums;letter-spacing:.12em}
+  .consent{display:flex;gap:12px;align-items:flex-start;margin-top:10px;cursor:pointer;text-align:left;user-select:none}
+  .consent input{position:absolute;opacity:0;width:0;height:0}
+  .consent .cbox{flex:0 0 20px;width:20px;height:20px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.3s var(--ease);margin-top:1px}
+  .consent .cbox svg{width:12px;height:12px;opacity:0;transform:scale(.5);transition:.3s var(--ease);stroke:#0a0a0a;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .consent input:checked+.cbox{background:#f4f3f1;border-color:transparent}
+  .consent input:checked+.cbox svg{opacity:1;transform:none}
+  .consent input:focus-visible+.cbox{border-color:var(--ink2)}
+  .consent .ctxt{font-size:12.2px;line-height:1.55;color:var(--ink2);font-weight:300}
+  .consent .ctxt a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  .go.gowide{width:100%;height:auto;border-radius:999px;padding:15px 24px;margin-top:16px;font-size:14px;letter-spacing:.04em;background:#f4f3f1;color:#0a0a0a;border-color:transparent;gap:9px}
+  .go.gowide:hover{transform:translateY(-2px)}
+  .go.gowide.busy{pointer-events:none;color:transparent}
+  .go.gowide.busy::before{content:"";position:absolute;top:50%;left:50%;width:17px;height:17px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid rgba(0,0,0,.25);border-top-color:#0a0a0a;animation:spin .7s linear infinite}
+  .wdots{display:flex;gap:7px;justify-content:center;margin-top:20px}
+  .wdots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:.4s var(--ease)}
+  .wdots i.on{background:var(--ink);transform:scale(1.18)}
+  .wdots i.done{background:var(--ink2)}
+  .wback{background:none;border:none;color:var(--ink3);font-family:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;padding:4px;display:inline-flex;align-items:center;gap:6px;transition:color .3s;margin-top:12px}
+  .wback:hover{color:var(--ink)}
+  .wback[hidden]{display:none}
+
   /* ── успех ── */
   .done{width:min(520px,92vw);display:none;flex-direction:column;align-items:center;gap:16px;text-align:center}
   .done.on{display:flex;animation:up .8s var(--ease) forwards}
@@ -172,15 +199,44 @@
       <span class="ln"><span>Порядок,</span></span>
       <span class="ln"><span>которого <em>не было</em></span></span>
     </h1>
-    <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте почту — позовём в бету одними из первых.</p>
+    <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте контакты — позовём в бету одними из первых.</p>
 
     <form class="wl" id="wl" novalidate>
-      <div class="field" id="field">
-        <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@agency.com" aria-label="E-mail">
-        <button class="go" id="go" type="submit" aria-label="Оставить заявку">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </button>
+      <div class="wsteps" id="wsteps">
+        <div class="wstep on" data-step="0">
+          <div class="qlabel"><span class="qn">01 / 04</span> Как к вам обращаться?</div>
+          <div class="field">
+            <input data-k="name" type="text" autocomplete="name" placeholder="Ваше имя" aria-label="Имя">
+            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="wstep" data-step="1">
+          <div class="qlabel"><span class="qn">02 / 04</span> Ваш WhatsApp</div>
+          <div class="field">
+            <input data-k="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="+971 50 123 4567" aria-label="WhatsApp">
+            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="wstep" data-step="2">
+          <div class="qlabel"><span class="qn">03 / 04</span> Куда прислать приглашение</div>
+          <div class="field">
+            <input data-k="email" type="email" inputmode="email" autocomplete="email" placeholder="you@agency.com" aria-label="E-mail">
+            <button class="go" type="button" data-next aria-label="Далее"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="wstep" data-step="3">
+          <div class="qlabel"><span class="qn">04 / 04</span> Последний шаг</div>
+          <label class="consent">
+            <input type="checkbox" id="consent">
+            <span class="cbox"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
+            <span class="ctxt">Даю согласие на обработку моих персональных данных для связи по раннему доступу — в соответствии с <a href="/privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a>, и принимаю <a href="/terms.html" target="_blank" rel="noopener">условия</a>.</span>
+          </label>
+          <input type="text" id="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <button class="go gowide" id="go" type="submit"><span>Занять место в бете</span></button>
+        </div>
       </div>
+      <div class="wdots" id="wdots"><i class="on"></i><i></i><i></i><i></i></div>
+      <button type="button" class="wback" id="wback" hidden>← назад</button>
       <div class="hint" id="hint">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 13l4 4L19 7"/></svg>
         Без спама. Только приглашение в бету и дата запуска.
@@ -204,48 +260,66 @@
 </div>
 
 <script>
-  var field=document.getElementById('field'), input=document.getElementById('email'),
-      form=document.getElementById('wl'), hint=document.getElementById('hint'),
+  var form=document.getElementById('wl'), hint=document.getElementById('hint'),
       done=document.getElementById('done'), pos=document.getElementById('pos'),
-      cnum=document.getElementById('cnum'), doneMsg=document.getElementById('doneMsg');
+      cnum=document.getElementById('cnum'), doneMsg=document.getElementById('doneMsg'),
+      wsteps=document.getElementById('wsteps'),
+      steps=[].slice.call(wsteps.querySelectorAll('.wstep')),
+      dots=[].slice.call(document.getElementById('wdots').children),
+      wback=document.getElementById('wback'),
+      goB=document.getElementById('go'),
+      consent=document.getElementById('consent');
   var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var data={name:'',whatsapp:'',email:''}, cur=0, busy=false;
+  var HINT_DEFAULT=' Без спама. Только приглашение в бету и дата запуска.';
 
-  input.addEventListener('focus',function(){field.classList.add('focus')});
-  input.addEventListener('blur',function(){if(!input.value)field.classList.remove('focus')});
-  input.addEventListener('input',function(){if(hint.classList.contains('err')){hint.classList.remove('err');hint.lastChild.textContent=' Без спама. Только приглашение в бету и дата запуска.'}});
+  function clearErr(){if(hint.classList.contains('err')){hint.classList.remove('err');hint.lastChild.textContent=HINT_DEFAULT}}
+  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;var f=steps[cur].querySelector('.field')||steps[cur];f.classList.add('shake');setTimeout(function(){f.classList.remove('shake')},420);}
 
-  // живой счётчик (анимация набора к базовому числу; уточняется с сервера)
-  function animCount(to){var from=Math.max(0,to-140),t0=performance.now(),dur=1400;
-    (function s(t){var p=Math.min(1,(t-t0)/dur),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));cnum.textContent=v.toLocaleString('ru-RU');if(p<1)requestAnimationFrame(s)})(t0);}
-  var SEED=214; // ранняя заинтересованность (реальные заявки прибавляются поверх)
-  fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
+  // подчёркивание + Enter + очистка ошибки для всех полей шагов
+  [].forEach.call(wsteps.querySelectorAll('input[data-k]'),function(inp){
+    var f=inp.closest('.field');
+    inp.addEventListener('focus',function(){f.classList.add('focus')});
+    inp.addEventListener('blur',function(){if(!inp.value)f.classList.remove('focus')});
+    inp.addEventListener('input',clearErr);
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();nextStep()}});
+  });
 
-  // ── дрейфующая пыль (люкс-искры) ──
-  (function(){var d=document.getElementById('dust');if(!d)return;var N=innerWidth<560?7:13;for(var i=0;i<N;i++){var s=document.createElement('i');var dur=9+Math.random()*11,sz=1+Math.random()*2.2,dx=(Math.random()*2-1)*46;s.style.left=(Math.random()*100)+'vw';s.style.width=s.style.height=sz+'px';s.style.animationDuration=dur+'s';s.style.animationDelay=(-Math.random()*dur)+'s';s.style.setProperty('--dx',dx+'px');d.appendChild(s);}})();
-  // ── курсор-параллакс заголовка (тонко) ──
-  var _h1=document.querySelector('.core h1');
-  addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
-  // ── магнитная кнопка-стрелка ──
-  var goB=document.getElementById('go');
-  if(goB){addEventListener('pointermove',function(e){var r=goB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;if(Math.hypot(dx,dy)<130&&!field.classList.contains('busy')){goB.style.transform='translate('+(dx*.3).toFixed(1)+'px,'+(dy*.3).toFixed(1)+'px)';}else if(!field.classList.contains('busy')){goB.style.transform='';}},{passive:true});goB.addEventListener('pointerleave',function(){goB.style.transform='';});}
-  function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
+  function setHeight(){if(steps[cur])wsteps.style.height=steps[cur].offsetHeight+'px'}
+  function show(i){
+    cur=i;
+    steps.forEach(function(s,idx){s.classList.toggle('on',idx===i)});
+    dots.forEach(function(d,idx){d.classList.toggle('on',idx===i);d.classList.toggle('done',idx<i)});
+    wback.hidden=(i===0);
+    setHeight();
+    var inp=steps[i].querySelector('input[data-k]');
+    setTimeout(function(){inp&&inp.focus()},80);
+  }
+  function validStep(i){
+    var inp=steps[i].querySelector('input[data-k]'), v=inp?inp.value.trim():'';
+    if(i===0){if(v.length<2){fail('Подскажите, как к вам обращаться.');return false}data.name=v;return true}
+    if(i===1){if(v.replace(/\D/g,'').length<7){fail('Проверьте номер WhatsApp.');return false}data.whatsapp=v;return true}
+    if(i===2){if(!EMAIL.test(v)){fail('Проверьте адрес — кажется, есть опечатка.');return false}data.email=v;return true}
+    return true;
+  }
+  function nextStep(){if(!validStep(cur))return;if(cur<3){clearErr();show(cur+1)}else submit();}
 
-  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;field.classList.remove('busy');field.classList.add('shake');setTimeout(function(){field.classList.remove('shake')},420);}
+  [].forEach.call(wsteps.querySelectorAll('[data-next]'),function(b){b.addEventListener('click',nextStep)});
+  wback.addEventListener('click',function(){if(cur>0){clearErr();show(cur-1)}});
+  form.addEventListener('submit',function(e){e.preventDefault();nextStep()});
 
-  form.addEventListener('submit',function(e){
-    e.preventDefault();
-    var v=(input.value||'').trim();
-    if(!EMAIL.test(v)){fail('Проверьте адрес — кажется, есть опечатка.');input.focus();return;}
-    if(field.classList.contains('busy'))return;
-    field.classList.add('busy');
+  function submit(){
+    if(busy)return;
+    if(!consent.checked){fail('Отметьте согласие на обработку персональных данных.');return;}
+    if(document.getElementById('company').value)return; // honeypot
+    busy=true;goB.classList.add('busy');
     fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:v,ref:(location.search||''),ts:Date.now(),company:''})})
+      body:JSON.stringify({name:data.name,whatsapp:data.whatsapp,email:data.email,consent:true,ref:(location.search||''),ts:Date.now(),company:''})})
       .then(function(r){return r.json().catch(function(){return {}})})
       .then(function(j){
-        if(j&&j.error){fail(j.error);return;}
-        // успех: поле уезжает, появляется done
-        field.parentNode.style.transition='opacity .5s, transform .5s';
-        field.parentNode.style.opacity='0';field.parentNode.style.transform='translateY(-10px)';
+        if(j&&j.error){busy=false;goB.classList.remove('busy');fail(j.error);return;}
+        form.style.transition='opacity .5s, transform .5s';
+        form.style.opacity='0';form.style.transform='translateY(-10px)';
         setTimeout(function(){
           form.style.display='none';
           if(j&&j.position){pos.textContent='вы №'+(SEED+j.position)+' в очереди';}else{pos.style.display='none';}
@@ -253,8 +327,28 @@
           done.classList.add('on');successPulse();
         },420);
       })
-      .catch(function(){fail('Сеть подвела. Попробуйте ещё раз.');});
-  });
+      .catch(function(){busy=false;goB.classList.remove('busy');fail('Сеть подвела. Попробуйте ещё раз.');});
+  }
+
+  // живой счётчик (анимация набора к базовому числу; уточняется с сервера)
+  function animCount(to){var from=Math.max(0,to-140),t0=performance.now(),dur=1400;
+    (function s(t){var p=Math.min(1,(t-t0)/dur),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));cnum.textContent=v.toLocaleString('ru-RU');if(p<1)requestAnimationFrame(s)})(t0);}
+  var SEED=214; // ранняя заинтересованность (реальные заявки прибавляются поверх)
+  fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
+
+  // высота степпера: инициализация + пересчёт (шрифты/ресайз)
+  addEventListener('load',setHeight);setTimeout(setHeight,300);setTimeout(setHeight,1200);addEventListener('resize',setHeight);
+
+  // ── дрейфующая пыль (люкс-искры) ──
+  (function(){var d=document.getElementById('dust');if(!d)return;var N=innerWidth<560?7:13;for(var i=0;i<N;i++){var s=document.createElement('i');var dur=9+Math.random()*11,sz=1+Math.random()*2.2,dx=(Math.random()*2-1)*46;s.style.left=(Math.random()*100)+'vw';s.style.width=s.style.height=sz+'px';s.style.animationDuration=dur+'s';s.style.animationDelay=(-Math.random()*dur)+'s';s.style.setProperty('--dx',dx+'px');d.appendChild(s);}})();
+  // ── курсор-параллакс заголовка (тонко) ──
+  var _h1=document.querySelector('.core h1');
+  addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
+  // ── магнитная финальная кнопка (только на шаге согласия) ──
+  if(goB){addEventListener('pointermove',function(e){if(busy||cur!==3){return;}var r=goB.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;if(Math.hypot(dx,dy)<170){goB.style.transform='translate('+(dx*.14).toFixed(1)+'px,'+(dy*.14).toFixed(1)+'px)';}else{goB.style.transform='';}},{passive:true});goB.addEventListener('pointerleave',function(){goB.style.transform='';});}
+  function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
+
+  show(0);
 </script>
 </body>
 </html>
