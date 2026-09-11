@@ -2702,6 +2702,22 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /* ---------------- лист ожидания (предрегистрация, публично) ---------------- */
+    if (p === '/api/waitlist/count' && req.method === 'GET') {
+      return json(res, 200, { count: (db.waitlist || []).length });
+    }
+    if (p === '/api/waitlist' && req.method === 'POST') {
+      if (!rateHit('wl:' + (clientIp(req) || 'x'), 8, 60000)) return json(res, 429, { error: 'слишком часто' });
+      const b = await readBody(req);
+      if (b && String(b.company || '').trim()) return json(res, 200, { ok: true, count: (db.waitlist || []).length }); // honeypot
+      const email = String((b && b.email) || '').trim().toLowerCase().slice(0, 160);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json(res, 400, { error: 'проверьте адрес' });
+      db.waitlist = db.waitlist || [];
+      let idx = db.waitlist.findIndex(w => w.email === email);
+      if (idx < 0) { db.waitlist.push({ email, ref: String((b && b.ref) || '').slice(0, 200), at: Date.now() }); idx = db.waitlist.length - 1; store.save(); }
+      return json(res, 200, { ok: true, count: db.waitlist.length, position: idx + 1 });
+    }
+
     /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
     if (p === '/hooks/comment' && req.method === 'POST') {
       if (!rateHit('hookcmt:' + clientIp(req), 60, 60000)) return json(res, 429, { error: 'rate limit' });

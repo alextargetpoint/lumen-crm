@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen — ранний доступ</title>
+<meta name="description" content="Отдел продаж, который не спит. Ранний доступ к Lumen — CRM для агентств недвижимости. Оставьте заявку в лист ожидания.">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="Lumen — скоро. Ранний доступ.">
+<meta property="og:description" content="Отдел продаж, который не спит. Лист ожидания открыт.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@300;400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080808; --bg2:#0e0e10; --ink:#f4f3f1; --ink2:#a7a6a3; --ink3:#6b6a68;
+    --line:rgba(255,255,255,.12); --line2:rgba(255,255,255,.06);
+    --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif;
+    --ease:cubic-bezier(.19,1,.22,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overflow:hidden; position:relative;
+  }
+  /* ── амбиент: глубокий графитовый радиал + медленное сияние + зерно ── */
+  .bg{position:fixed;inset:0;z-index:0;background:
+    radial-gradient(120% 90% at 50% -10%, #17171a 0%, #0c0c0e 45%, #060606 100%);}
+  .sheen{position:fixed;inset:-30%;z-index:0;pointer-events:none;opacity:.5;
+    background:conic-gradient(from 210deg at 50% 40%, transparent 0deg, rgba(255,255,255,.07) 60deg, transparent 130deg, rgba(255,255,255,.04) 220deg, transparent 300deg);
+    filter:blur(40px); animation:spin 34s linear infinite; mix-blend-mode:screen;}
+  .halo{position:fixed;left:50%;top:38%;width:70vmax;height:70vmax;transform:translate(-50%,-50%);z-index:0;pointer-events:none;
+    background:radial-gradient(closest-side, rgba(255,255,255,.06), transparent 70%); animation:breathe 9s ease-in-out infinite;}
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .vign{position:fixed;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 0 200px 40px rgba(0,0,0,.7);}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.9;transform:translate(-50%,-50%) scale(1.12)}}
+
+  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+    padding:clamp(22px,4vw,44px); max-width:1180px;margin:0 auto}
+
+  /* ── шапка ── */
+  .top{display:flex;align-items:center;justify-content:space-between;opacity:0;animation:up .9s var(--ease) .1s forwards}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand .mk{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:.42em;padding-left:.42em}
+  .brand .sub{font-size:9.5px;letter-spacing:.34em;color:var(--ink3);text-transform:uppercase}
+  .top .st{font-size:10.5px;letter-spacing:.28em;color:var(--ink3);text-transform:uppercase;display:flex;align-items:center;gap:9px}
+  .top .st i{width:5px;height:5px;border-radius:50%;background:#d8d6d2;box-shadow:0 0 0 0 rgba(216,214,210,.6);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(216,214,210,.5)}50%{box-shadow:0 0 0 6px rgba(216,214,210,0)}}
+
+  /* ── центр ── */
+  .core{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(20px,3vh,34px)}
+  .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink2);
+    border:1px solid var(--line);border-radius:999px;padding:9px 18px;opacity:0;animation:up .9s var(--ease) .28s forwards;
+    background:rgba(255,255,255,.02);backdrop-filter:blur(6px)}
+
+  h1{font-family:var(--serif);font-weight:300;font-size:clamp(46px,10vw,124px);line-height:.96;letter-spacing:-.015em}
+  h1 .ln{display:block;overflow:hidden;padding-bottom:.06em}
+  h1 .ln>span{display:block;transform:translateY(110%);animation:rise 1.15s var(--ease) forwards}
+  h1 .ln:nth-child(1)>span{animation-delay:.42s}
+  h1 .ln:nth-child(2)>span{animation-delay:.56s}
+  h1 em{font-style:italic;font-weight:400;
+    background:linear-gradient(180deg,#ffffff,#b9b7b3 60%,#7c7a77);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{max-width:44ch;font-size:clamp(14.5px,1.5vw,17px);font-weight:300;line-height:1.6;color:var(--ink2);opacity:0;animation:up 1s var(--ease) .9s forwards}
+
+  /* ── форма (минимализм: подчёркнутое поле + стрелка) ── */
+  .wl{width:min(520px,92vw);opacity:0;animation:up 1s var(--ease) 1.05s forwards}
+  .field{position:relative;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:14px 2px 15px;transition:border-color .5s var(--ease)}
+  .field::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:0;background:linear-gradient(90deg,#fff,#8f8d8a);transition:width .6s var(--ease)}
+  .field.focus{border-color:transparent}
+  .field.focus::after{width:100%}
+  .field input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-family:var(--sans);font-size:clamp(15px,1.7vw,18px);font-weight:300;letter-spacing:.01em}
+  .field input::placeholder{color:var(--ink3)}
+  .field .go{flex:0 0 auto;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.45s var(--ease);position:relative;overflow:hidden}
+  .field .go:hover{background:#f4f3f1;color:#0a0a0a;border-color:transparent;transform:translateX(2px)}
+  .field .go svg{width:19px;height:19px;transition:transform .45s var(--ease)}
+  .field .go:hover svg{transform:translateX(2px)}
+  .field.busy .go{pointer-events:none}
+  .field.busy .go svg{opacity:0}
+  .field.busy .go::before{content:"";position:absolute;width:17px;height:17px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:spin .7s linear infinite}
+  .field.shake{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  .hint{margin-top:14px;font-size:11.5px;letter-spacing:.06em;color:var(--ink3);display:flex;align-items:center;gap:8px;justify-content:center}
+  .hint svg{width:13px;height:13px;opacity:.7}
+  .hint.err{color:#e8a0a0}
+
+  /* ── успех ── */
+  .done{width:min(520px,92vw);display:none;flex-direction:column;align-items:center;gap:16px;text-align:center}
+  .done.on{display:flex;animation:up .8s var(--ease) forwards}
+  .done .mark{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+  .done .mark svg{width:30px;height:30px}
+  .done .mark path{stroke:#f4f3f1;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;animation:draw .7s var(--ease) .15s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .done h3{font-family:var(--serif);font-weight:400;font-size:clamp(26px,4vw,40px);letter-spacing:-.01em}
+  .done p{font-size:14px;font-weight:300;color:var(--ink2);max-width:38ch;line-height:1.6}
+  .done .pos{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 16px}
+
+  /* ── счётчик ── */
+  .count{font-size:12px;letter-spacing:.14em;color:var(--ink3);opacity:0;animation:up 1s var(--ease) 1.3s forwards}
+  .count b{color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* ── подвал ── */
+  .foot{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--ink3);opacity:0;animation:up 1s var(--ease) 1.4s forwards}
+  .foot a{color:var(--ink3);text-decoration:none;transition:color .3s}
+  .foot a:hover{color:var(--ink)}
+
+  @keyframes up{from{opacity:0;transform:translateY(20px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  @keyframes rise{to{transform:none}}
+  ::selection{background:rgba(255,255,255,.16)}
+
+  @media(max-width:560px){
+    .brand .sub{display:none}
+    .foot{flex-direction:column;gap:8px;text-align:center}
+    .core{gap:24px}
+  }
+  @media(prefers-reduced-motion:reduce){.sheen,.halo,.top .st i{animation:none}h1 .ln>span{transform:none}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="sheen"></div>
+<div class="halo"></div>
+<div class="grain"></div>
+<div class="vign"></div>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="mk">LUMEN</span><span class="sub">Real Estate CRM</span></div>
+    <div class="st"><i></i>Ранний доступ · 2026</div>
+  </div>
+
+  <div class="core">
+    <div class="eyebrow">Скоро · лист ожидания открыт</div>
+    <h1>
+      <span class="ln"><span>Отдел продаж,</span></span>
+      <span class="ln"><span>который <em>не спит</em></span></span>
+    </h1>
+    <p class="lede">Первая линия отвечает за секунды, квалифицирует и передаёт тёплых — пока вы закрываете сделки. Оставьте почту — позовём в бету одними из первых.</p>
+
+    <form class="wl" id="wl" novalidate>
+      <div class="field" id="field">
+        <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@agency.com" aria-label="E-mail">
+        <button class="go" id="go" type="submit" aria-label="Оставить заявку">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div class="hint" id="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 13l4 4L19 7"/></svg>
+        Без спама. Только приглашение в бету и дата запуска.
+      </div>
+    </form>
+
+    <div class="done" id="done">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+      <h3>Вы в списке.</h3>
+      <p id="doneMsg">Как только откроем ранний доступ — напишем вам одним из первых. Спасибо, что верите в порядок в недвижимости.</p>
+      <div class="pos" id="pos"></div>
+    </div>
+
+    <div class="count" id="count">уже <b id="cnum">—</b> агентств в листе ожидания</div>
+  </div>
+
+  <div class="foot">
+    <span>© 2026 Lumen — продукт TargetPoint</span>
+    <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
+  </div>
+</div>
+
+<script>
+  var field=document.getElementById('field'), input=document.getElementById('email'),
+      form=document.getElementById('wl'), hint=document.getElementById('hint'),
+      done=document.getElementById('done'), pos=document.getElementById('pos'),
+      cnum=document.getElementById('cnum'), doneMsg=document.getElementById('doneMsg');
+  var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  input.addEventListener('focus',function(){field.classList.add('focus')});
+  input.addEventListener('blur',function(){if(!input.value)field.classList.remove('focus')});
+  input.addEventListener('input',function(){if(hint.classList.contains('err')){hint.classList.remove('err');hint.lastChild.textContent=' Без спама. Только приглашение в бету и дата запуска.'}});
+
+  // живой счётчик (анимация набора к базовому числу; уточняется с сервера)
+  function animCount(to){var from=Math.max(0,to-140),t0=performance.now(),dur=1400;
+    (function s(t){var p=Math.min(1,(t-t0)/dur),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));cnum.textContent=v.toLocaleString('ru-RU');if(p<1)requestAnimationFrame(s)})(t0);}
+  var SEED=214; // ранняя заинтересованность (реальные заявки прибавляются поверх)
+  fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
+
+  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;field.classList.remove('busy');field.classList.add('shake');setTimeout(function(){field.classList.remove('shake')},420);}
+
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var v=(input.value||'').trim();
+    if(!EMAIL.test(v)){fail('Проверьте адрес — кажется, есть опечатка.');input.focus();return;}
+    if(field.classList.contains('busy'))return;
+    field.classList.add('busy');
+    fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:v,ref:(location.search||''),ts:Date.now(),company:''})})
+      .then(function(r){return r.json().catch(function(){return {}})})
+      .then(function(j){
+        if(j&&j.error){fail(j.error);return;}
+        // успех: поле уезжает, появляется done
+        field.parentNode.style.transition='opacity .5s, transform .5s';
+        field.parentNode.style.opacity='0';field.parentNode.style.transform='translateY(-10px)';
+        setTimeout(function(){
+          form.style.display='none';
+          if(j&&j.position){pos.textContent='вы №'+(SEED+j.position)+' в очереди';}else{pos.style.display='none';}
+          if(j&&typeof j.count==='number'){cnum.textContent=(SEED+j.count).toLocaleString('ru-RU');}
+          done.classList.add('on');
+        },420);
+      })
+      .catch(function(){fail('Сеть подвела. Попробуйте ещё раз.');});
+  });
+</script>
+</body>
+</html>
