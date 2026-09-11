@@ -6846,7 +6846,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="atelier"] .btn-accent, :root[data-theme="atelier"] .btn-primary, :root[data-theme="atelier"] .btn-cta { background: #1a1815; color: #f3f1ec; border: 1px solid transparent; box-shadow: none; }
 :root[data-theme="atelier"] .btn-accent:hover, :root[data-theme="atelier"] .btn-primary:hover, :root[data-theme="atelier"] .btn-cta:hover { background: #000; filter: none; }
 :root[data-theme="atelier"] .btn-accent svg, :root[data-theme="atelier"] .btn-primary svg, :root[data-theme="atelier"] .btn-cta svg { color: #f3f1ec; }
-:root[data-theme="atelier"] .btn:not(.btn-accent):not(.btn-primary):not(.btn-cta):not(.btn-danger) { border-color: rgba(20,19,17,.18); color: var(--ink); }
+:root[data-theme="atelier"] .btn:not(.btn-accent):not(.btn-primary):not(.btn-cta):not(.btn-danger):not(.active):not(.on) { border-color: rgba(20,19,17,.18); color: var(--ink); }
+/* ⚠️ АКТИВНЫЕ плашки-табы/тумблеры (.active/.on) красятся тёмным фоном (navy-900) → текст ОБЯЗАН быть светлым.
+   Раньше atelier-правило .btn выше (специфичнее) перебивало базовый color:#fff → чёрное-по-чёрному (баг lc-f). */
+:root[data-theme="atelier"] .btn.active:not(.btn-danger), :root[data-theme="atelier"] .btn.on:not(.btn-danger),
+:root[data-theme="mono"] .btn.active:not(.btn-danger), :root[data-theme="mono"] .btn.on:not(.btn-danger) { color: #fff; }
+:root[data-theme="atelier"] .btn.active:not(.btn-danger) svg, :root[data-theme="atelier"] .btn.on:not(.btn-danger) svg,
+:root[data-theme="mono"] .btn.active:not(.btn-danger) svg, :root[data-theme="mono"] .btn.on:not(.btn-danger) svg { color: #fff; }
 /* САЙДБАР — тёмный near-black (контраст-якорь) на кремовом workspace */
 :root[data-theme="atelier"] .sidebar { background: #0c0c0e; border-right: 1px solid rgba(255,255,255,.07); }
 :root[data-theme="atelier"] .sidebar::before { display: none; }
@@ -6947,7 +6953,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="emerald"] .btn-accent { background: linear-gradient(180deg,#17345F,#09182D); background-image: linear-gradient(180deg,#17345F,#09182D); border: 1px solid rgba(255,255,255,.08); color: #fff; box-shadow: 0 8px 24px rgba(11,31,60,.16), inset 0 1px 0 rgba(255,255,255,.12); }
 :root[data-theme="emerald"] .btn-accent:hover { background-image: linear-gradient(180deg,#1D3F70,#0B1F3C); }
 /* Secondary/btn — стеклянные (primary/accent НЕ трогаем — остаётся navy) */
-:root[data-theme="emerald"] .btn:not(.btn-accent):not(.btn-primary):not(.btn-danger) { background: rgba(255,255,255,.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--stroke-soft); }
+:root[data-theme="emerald"] .btn:not(.btn-accent):not(.btn-primary):not(.btn-danger):not(.active):not(.on) { background: rgba(255,255,255,.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--stroke-soft); }
 /* Таблицы — editorial: мягкие строки, без вертикальных линий и жирных рамок (спека §19) */
 :root[data-theme="emerald"] .tbl, :root[data-theme="emerald"] .mp-tbl, :root[data-theme="emerald"] .an-tbl,
 :root[data-theme="emerald"] .lead-tbl, :root[data-theme="emerald"] .ad-tbl { border: none; }
