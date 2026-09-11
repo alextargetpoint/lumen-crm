@@ -130,7 +130,15 @@ input, select, textarea {
   border-radius: var(--r-sm); padding: 9px 12px; outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(47, 107, 255, .13); }
+/* фокус-кольцо INSET (внутрь поля) — внешний box-shadow обрезался родителями с overflow:hidden
+   (та самая «обрывистая синяя полоска» по всей CRM). Inset рисуется внутри бокса и не клипается нигде. */
+input:focus, select:focus, textarea:focus { border-color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2), inset 0 0 0 4px rgba(47, 107, 255, .10); }
+/* индикатор «ИИ ведёт диалог» — тонкая бегущая линия + подпись, БЕЗ белого блока (сидит на фоне чата) */
+.chat-ai-line { flex: none; padding: 6px 0 7px; text-align: center; position: relative; }
+.chat-ai-line::before { content: ''; position: absolute; top: 0; left: 14%; right: 14%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); background-size: 200% 100%; animation: aiFlow 2.4s linear infinite; }
+.chat-ai-line b { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--accent); opacity: .8; display: inline-flex; align-items: center; gap: 5px; }
+.chat-ai-line b svg { width: 12px; height: 12px; }
+@keyframes aiFlow { to { background-position: -200% 0; } }
 input::placeholder, textarea::placeholder { color: #9AA6B8; }
 textarea { resize: vertical; min-height: 70px; }
 
@@ -522,7 +530,9 @@ textarea { resize: vertical; min-height: 70px; }
 .bubble.in .via-tag { background: var(--blue-100); color: var(--accent); }
 .day-sep { align-self: center; font-size: 10.5px; color: var(--ink-3); background: var(--card); border: 1px solid var(--stroke-soft); padding: 3px 12px; border-radius: 12px; margin: 6px 0; }
 .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--stroke-soft); align-items: flex-end; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg); }
-.composer textarea { flex: 1 1 auto; min-width: 0; width: 100%; min-height: 42px; max-height: 120px; background: var(--bg); }
+/* flex:1 1 0 (basis 0) — textarea растёт от нуля и заполняет остаток на КАЖДОМ рендере (было 1 1 auto+width:100% → intrinsic ~185px при первом открытии) */
+.composer textarea { flex: 1 1 0; min-width: 0; width: auto; min-height: 42px; max-height: 120px; background: var(--bg); }
+.composer .btn, .composer button { flex: 0 0 auto; }
 .chat-empty { flex: 1; display: grid; place-items: center; color: var(--ink-3); font-size: 13px; }
 
 .lead-panel { overflow-y: auto; padding: 18px; }

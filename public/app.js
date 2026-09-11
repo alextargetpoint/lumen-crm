@@ -3783,6 +3783,7 @@ async function renderChat(id, rebuild) {
       <span class="badge acc">${stageName(l.stage)}</span>
     </div>
     <div class="chat-body" id="chatBody">${(msgs + typing) || '<div class="chat-empty">Сообщений пока нет — цепочка сделает первое касание сама</div>'}</div>
+    ${l.ai.enabled ? `<div class="chat-ai-line"><b>${ic(I.spark)}ИИ ведёт диалог</b></div>` : ''}
     <div class="composer">
       <textarea id="composerText" placeholder="Написать от имени менеджера… (перехват у ИИ)"></textarea>
       <button class="btn btn-accent" id="sendBtn">${ic(I.send)}</button>
@@ -3790,14 +3791,16 @@ async function renderChat(id, rebuild) {
   $('#composerText').value = draft;
   const body = $('#chatBody');
   body.scrollTop = body.scrollHeight;
-  /* фикс «узкое поле при первом открытии»: textarea меряет ширину до того, как flex устоялся →
-     форс-рефлоу после раскладки + явная ширина/высота */
-  requestAnimationFrame(() => {
+  /* фикс «узкое поле при первом открытии»: flex:1 1 auto + width:100% в flex резолвился в
+     intrinsic-ширину textarea (~185px) до того, как раскладка устоялась. Ставим flex:1 1 0 (basis 0 —
+     textarea растёт от нуля и надёжно заполняет остаток), кнопку не сжимаем. Плюс повтор после раскладки. */
+  const fixTa = () => {
     const ta = $('#composerText'); if (!ta) return;
-    void pane.offsetWidth;
-    ta.style.width = '100%';
+    ta.style.flex = '1 1 0'; ta.style.width = 'auto'; ta.style.minWidth = '0';
+    const sb = $('#sendBtn'); if (sb) sb.style.flex = '0 0 auto';
     ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  });
+  };
+  fixTa(); requestAnimationFrame(() => requestAnimationFrame(fixTa)); setTimeout(fixTa, 90); setTimeout(fixTa, 300);
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
