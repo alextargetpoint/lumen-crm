@@ -6991,42 +6991,47 @@ body{font-family:${pf.body};min-height:100vh;background:var(--dark);color:var(--
       }
       const geoName = db.settings.geoNames[br.geo] || br.geo || '';
       const initials = br.avatar || (br.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:36px;max-width:140px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:19px;font-weight:600">${esc(AG)}</span>`;
+      const pf = pubFace(db);
+      const brandTop = logo ? `<img src="${esc(logo)}" style="max-height:36px;max-width:140px;object-fit:contain">` : `<span style="font-family:${pf.display};font-size:19px;font-weight:${pf.dispW};color:var(--ink)">${esc(AG)}</span>`;
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Запись к ${esc(br.name)} — ${esc(AG)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${pf.gf}" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Manrope,sans-serif;min-height:100vh;background:#061126;color:#fff;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(600px 420px at 18% 8%,rgba(37,99,235,.28),transparent 60%),radial-gradient(700px 520px at 88% 92%,rgba(91,43,216,.22),transparent 60%)}
-.card{position:relative;max-width:460px;width:100%;background:rgba(10,24,51,.72);backdrop-filter:blur(16px);border:1px solid rgba(122,158,255,.2);border-radius:24px;padding:28px 26px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+:root{--ink:${pf.ink};--paper:${pf.paper};--muted:${pf.muted};--line:${pf.line};--accent:${pf.accent};--dark:${pf.dark};--chip:${pf.chip}}
+body{font-family:${pf.body};min-height:100vh;background:var(--dark);color:var(--ink);display:grid;place-items:center;padding:22px;position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:${pf.vidFilter}}
+.scrim{position:fixed;inset:0;z-index:1;background:linear-gradient(180deg,${pf.scrimA},${pf.scrimB} 62%,${pf.scrimC})}
+.card{position:relative;z-index:2;max-width:460px;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:24px;padding:30px 28px 26px;box-shadow:0 44px 120px -24px rgba(0,0,0,.72),0 2px 0 rgba(255,255,255,.5) inset;animation:rise .8s cubic-bezier(.16,1,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(20px) scale(.985)}to{opacity:1;transform:none}}
 .hd{display:flex;justify-content:center;margin-bottom:18px}
-.top{display:flex;gap:14px;align-items:center;margin-bottom:22px}
-.ava{width:60px;height:60px;border-radius:50%;flex:0 0 60px;display:grid;place-items:center;font-size:20px;font-weight:700;background:linear-gradient(150deg,#2563EB,#5B2BD8);border:2px solid rgba(134,175,255,.35);overflow:hidden}
+.top{display:flex;gap:14px;align-items:center;margin-bottom:6px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.ava{width:60px;height:60px;border-radius:50%;flex:0 0 60px;display:grid;place-items:center;font-family:${pf.display};font-size:22px;font-weight:${pf.dispW};color:var(--ink);background:var(--chip);border:1px solid var(--line);overflow:hidden}
 .ava img{width:100%;height:100%;object-fit:cover}
-.nm{font-family:Fraunces,serif;font-size:21px;font-weight:600}
-.ttl{font-size:12.5px;color:#9DB8FF;margin-top:2px}
-.lbl{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9DB8FF;margin:18px 0 10px}
-.day{margin-bottom:14px}
-.day b{font-size:13px;color:#CFE0FF;font-weight:600;text-transform:capitalize}
-.slots{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.slot{padding:10px 16px;border-radius:11px;background:rgba(255,255,255,.06);border:1.5px solid rgba(122,158,255,.2);font-size:14px;font-weight:600;color:#CFE0FF;cursor:pointer;transition:.15s}
-.slot:hover{border-color:rgba(122,158,255,.5)}
-.slot.on{background:linear-gradient(120deg,#2563EB,#5B2BD8);border-color:transparent;color:#fff}
-input{width:100%;background:rgba(6,17,38,.6);border:1.5px solid rgba(134,175,255,.22);color:#fff;border-radius:11px;padding:13px 14px;font-size:14px;font-family:inherit;margin-top:10px;outline:none}
-input:focus{border-color:#7C9BFF}
-.btn{display:block;width:100%;border:none;border-radius:13px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;background:linear-gradient(120deg,#2563EB,#5B2BD8);margin-top:16px}
-.btn:disabled{opacity:.5}
-.foot{margin-top:20px;text-align:center;font-size:11px;color:#5E6E96}
+.nm{font-family:${pf.display};font-size:22px;font-weight:${pf.dispW};color:var(--ink)}
+.ttl{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.lbl{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin:20px 0 12px}
+.day{margin-bottom:16px}
+.day b{font-size:12.5px;color:var(--ink);font-weight:700;text-transform:capitalize}
+.slots{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.slot{padding:10px 17px;border-radius:11px;background:transparent;border:1.5px solid var(--line);font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s;font-variant-numeric:tabular-nums}
+.slot:hover{border-color:var(--ink)}
+.slot.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+input{width:100%;background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:11px;padding:13px 14px;font-size:14px;font-family:inherit;margin-top:10px;outline:none}
+input::placeholder{color:var(--muted)}
+input:focus{border-color:var(--ink)}
+.btn{display:block;width:100%;border:none;border-radius:13px;padding:16px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--paper);background:var(--ink);margin-top:16px;box-shadow:0 10px 26px -10px rgba(0,0,0,.5);transition:transform .15s}
+.btn:active{transform:scale(.99)}
+.btn:disabled{opacity:.4}
+.foot{margin-top:20px;text-align:center;font-size:10.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
 .done{text-align:center;padding:14px 0}
-.done .ok{width:64px;height:64px;border-radius:50%;background:rgba(35,179,131,.2);border:1.5px solid rgba(35,179,131,.5);display:grid;place-items:center;font-size:30px;margin:0 auto 16px;color:#7BE8C3}
-.err{color:#f28b8b;font-size:12.5px;margin-top:8px;min-height:16px}
-.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;z-index:0}
-body::before{z-index:1}.card{z-index:2}
+.done .ok{width:64px;height:64px;border-radius:50%;background:var(--ink);display:grid;place-items:center;font-size:30px;margin:0 auto 16px;color:var(--paper)}
+.err{color:#c0392b;font-size:12.5px;margin-top:8px;min-height:16px}
 </style></head><body>
-<video class="bgv" autoplay muted loop playsinline poster="/assets/skyline-poster.jpg?v=2" src="/assets/skyline-bg.mp4?v=2"></video>
+<video class="bgv" autoplay muted loop playsinline poster="/${pf.poster}" src="/${pf.video}"></video>
+<div class="scrim"></div>
 <div class="card" id="card">
   <div class="hd">${brandTop}</div>
   <div class="top">
@@ -7056,7 +7061,7 @@ if(bk)bk.addEventListener('click',async()=>{
     const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,note:document.getElementById('bkNote').value,at:selAt})});
     const j=await r.json();if(!r.ok)throw new Error(j.error||'ошибка');
     const dt=new Date(selAt).toLocaleString('ru-RU',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
-    document.getElementById('card').innerHTML='<div class="done"><div class="ok">✓</div><div class="nm">Вы записаны</div><p style="color:#B9C7E8;font-size:14px;margin-top:10px">${esc(br.name)} позвонит вам:<br><b style="color:#CFE0FF;text-transform:capitalize">'+dt+'</b></p><a class="btn" style="text-decoration:none;text-align:center" href="/m/'+j.mId+'">Детали встречи</a></div>';
+    document.getElementById('card').innerHTML='<div class="done"><div class="ok">✓</div><div class="nm">Вы записаны</div><p style="color:var(--muted);font-size:14px;margin-top:10px">${esc(br.name)} позвонит вам:<br><b style="color:var(--ink);text-transform:capitalize">'+dt+'</b></p><a class="btn" style="text-decoration:none;text-align:center" href="/m/'+j.mId+'">Детали встречи</a></div>';
   }catch(e){err.textContent=e.message;bk.disabled=false;bk.textContent='Записаться на звонок';}
 });
 </${'script'}>
