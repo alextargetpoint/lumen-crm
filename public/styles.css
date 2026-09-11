@@ -3409,7 +3409,7 @@ html[data-night] .qfab-ai { background: #14203A; border-color: #26355A; }
 /* Диктовка в однострочных свободных полях — компактный микрофон-оверлей справа */
 .dic-inp { position: relative; display: block; }
 .dic-inp > input { width: 100%; padding-right: 34px !important; box-sizing: border-box; }
-.dic-inp-btn { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 24px; height: 24px; border: none; border-radius: 7px; background: rgba(16,43,92,.55); color: #fff; cursor: pointer; opacity: .34; transition: opacity .15s, background .15s; display: grid; place-items: center; z-index: 3; }
+.dic-inp-btn { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 24px; height: 24px; border: none; border-radius: 7px; background: color-mix(in srgb, var(--ink) 52%, transparent); color: #fff; cursor: pointer; opacity: .34; transition: opacity .15s, background .15s; display: grid; place-items: center; z-index: 3; }
 .dic-inp:hover .dic-inp-btn, .dic-inp > input:focus + .dic-inp-btn { opacity: .8; }
 .dic-inp-btn:hover { opacity: 1; }
 .dic-inp-btn svg { width: 13px; height: 13px; }
