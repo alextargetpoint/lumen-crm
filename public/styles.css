@@ -6560,16 +6560,18 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* ═══ Lumen Burgundy — editorial media-heroes (Лента + Объекты) ═══
    Маска слева — НЕЙТРАЛЬНО-БЕЛАЯ (workspace-фон), НЕ бордовая (охраняемое правило).
    Фото натуральное; 3D-объект .ha-stage скрыт. */
+/* фото на ВСЮ ширину под равномерной НЕЙТРАЛЬНО-белой вуалью (не бордовой — охраняемое правило),
+   не обрезано «на пол-экрана»; чуть плотнее слева под текст */
 :root[data-theme="warm"][data-page="feed"] .ha {
   background:
-    linear-gradient(100deg, rgba(250,251,253,.96) 0%, rgba(250,251,253,.82) 42%, rgba(250,251,253,.32) 68%, rgba(250,251,253,.05) 100%),
-    url('lumen-media/editorial/villa-bali.webp') right center / cover no-repeat;
+    linear-gradient(90deg, rgba(250,251,253,.92) 0%, rgba(250,251,253,.74) 30%, rgba(250,251,253,.46) 58%, rgba(250,251,253,.34) 100%),
+    url('lumen-media/editorial/villa-bali.webp') center center / cover no-repeat;
   color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 190px;
 }
 :root[data-theme="warm"][data-page="properties"] .ha {
   background:
-    linear-gradient(100deg, rgba(250,251,253,.96) 0%, rgba(250,251,253,.82) 42%, rgba(250,251,253,.32) 68%, rgba(250,251,253,.05) 100%),
-    url('lumen-media/editorial/villa-desert.webp') right center / cover no-repeat;
+    linear-gradient(90deg, rgba(250,251,253,.92) 0%, rgba(250,251,253,.74) 30%, rgba(250,251,253,.46) 58%, rgba(250,251,253,.34) 100%),
+    url('lumen-media/editorial/villa-desert.webp') center center / cover no-repeat;
   color: var(--ink); border: 1px solid var(--stroke); grid-template-columns: 1fr; min-height: 190px;
 }
 :root[data-theme="warm"][data-page="feed"] .ha-stage,
@@ -6611,39 +6613,67 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="emerald"] .brand-mark { animation: none !important; filter: drop-shadow(0 2px 10px rgba(57,123,255,.28)) !important; }
 :root[data-theme="emerald"] .nav-item.active { animation: none !important; }
 
-/* 2. ПОИСК — деликатная стеклянная капсула (vibrancy), а не жирная белая плита.
-      Полупрозрачно + тончайший блик; при фокусе мягко подсвечивается акцентом. */
+/* 2. ПОИСК — стилим САМ input (единый скруглённый капсуль). Контейнер прозрачный:
+      раньше фон висел на КОНТЕЙНЕРе, а input внутри имел свой бордер+радиус → двойной бокс,
+      и на фокусе синела внутренняя прямоугольная рамка «торчащими углами». Теперь один капсуль,
+      фокус-ринг box-shadow идёт ПО РАДИУСУ (без квадратных углов). */
 :root[data-theme="emerald"] .navsearch,
 :root[data-theme="emerald"] .gsearch {
-  background: rgba(255,255,255,.5) !important;
-  border: 1px solid rgba(255,255,255,.65) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 3px rgba(14,30,55,.05) !important;
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
-:root[data-theme="emerald"] .navsearch:focus-within,
-:root[data-theme="emerald"] .gsearch:focus-within {
-  background: rgba(255,255,255,.7) !important;
-  border-color: color-mix(in srgb, var(--accent) 42%, transparent) !important;
-  box-shadow: 0 0 0 3px rgba(57,123,255,.13), inset 0 1px 0 rgba(255,255,255,.9) !important;
+:root[data-theme="emerald"] .navsearch input,
+:root[data-theme="emerald"] #gsInput {
+  background: rgba(255,255,255,.6) !important;
+  border: 1px solid rgba(255,255,255,.72) !important;
+  border-radius: 12px !important;
+  color: var(--ink) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(14,30,55,.05) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important; backdrop-filter: blur(16px) saturate(1.3) !important;
+}
+:root[data-theme="emerald"] .navsearch input:focus,
+:root[data-theme="emerald"] #gsInput:focus {
+  background: rgba(255,255,255,.84) !important;
+  border-color: color-mix(in srgb, var(--accent) 48%, transparent) !important;
+  box-shadow: 0 0 0 3px rgba(57,123,255,.15) !important;  /* округлый ринг, следует радиусу */
+  outline: none !important;
 }
 
-/* 3. EDITORIAL HERO — фото деликатно растворяется в стекле (без «шва на середине» и жёсткой белизны).
-      Мягкий длинный градиент + фото right-anchored, тает к прозрачности; светлый glass-подслой снизу. */
+/* 3. ВЫПАДАШКИ + ПОПАПЫ — плотное матовое стекло + ЗЕРНО (frosted grain), чтобы не сливались с фоном.
+      Раньше меню/поповеры были блёклые (полупрозрачный --card просвечивал). */
+:root[data-theme="emerald"] .cs-list, :root[data-theme="emerald"] .dtp-pop, :root[data-theme="emerald"] .pop,
+:root[data-theme="emerald"] .navsearch-res, :root[data-theme="emerald"] .gs-results, :root[data-theme="emerald"] .navsearch-res,
+:root[data-theme="emerald"] .modal, :root[data-theme="emerald"] .menu, :root[data-theme="emerald"] .ctx {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.05'/></svg>"),
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.9)) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.6) !important; backdrop-filter: blur(30px) saturate(1.6) !important;
+  border: 1px solid rgba(255,255,255,.75) !important;
+  box-shadow: 0 24px 64px -12px rgba(14,30,55,.28), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+/* блёклые фильтр-кнопки выпадашек — плотнее (были прозрачный --card .68) */
+:root[data-theme="emerald"] .cs-btn { background: rgba(255,255,255,.72) !important; border-color: rgba(15,35,65,.1) !important; }
+:root[data-theme="emerald"] .cs-opt:hover { background: rgba(57,123,255,.1) !important; }
+
+/* 4. EDITORIAL HERO — фото на ВСЮ ширину под равномерной стеклянной вуалью (раньше было обрезано «на пол-экрана»
+      right-anchored со швом). Теперь фото центрировано/cover заполняет весь бокс, вуаль чуть плотнее слева под текст. */
 :root[data-theme="emerald"][data-page="feed"] .ha {
   background:
-    linear-gradient(100deg, rgba(247,250,255,.90) 0%, rgba(247,250,255,.60) 40%, rgba(247,250,255,.18) 66%, rgba(247,250,255,0) 90%),
-    url('lumen-media/editorial/villa-mediterranean.webp') right center / cover no-repeat,
-    linear-gradient(120deg, #EDF3FC, #F6F9FD) !important;
+    linear-gradient(90deg, rgba(244,249,255,.9) 0%, rgba(244,249,255,.72) 30%, rgba(244,249,255,.46) 58%, rgba(244,249,255,.34) 100%),
+    url('lumen-media/editorial/villa-mediterranean.webp') center center / cover no-repeat !important;
 }
 :root[data-theme="emerald"][data-page="properties"] .ha {
   background:
-    linear-gradient(100deg, rgba(247,250,255,.90) 0%, rgba(247,250,255,.60) 40%, rgba(247,250,255,.18) 66%, rgba(247,250,255,0) 90%),
-    url('lumen-media/editorial/residence-cliff.webp') right center / cover no-repeat,
-    linear-gradient(120deg, #EDF3FC, #F6F9FD) !important;
+    linear-gradient(90deg, rgba(244,249,255,.9) 0%, rgba(244,249,255,.72) 30%, rgba(244,249,255,.46) 58%, rgba(244,249,255,.34) 100%),
+    url('lumen-media/editorial/residence-cliff.webp') center center / cover no-repeat !important;
 }
-/* 4. Меньше «выбеленности»: карточки чуть прозрачнее и глубже (стекло, а не белые плиты) */
+:root[data-theme="emerald"][data-page="feed"] .ha-body,
+:root[data-theme="emerald"][data-page="properties"] .ha-body { max-width: 66%; }
+
+/* 5. Меньше «выбеленности»: карточки чуть прозрачнее и глубже (стекло, а не белые плиты) */
 :root[data-theme="emerald"] .card, :root[data-theme="emerald"] .glass, :root[data-theme="emerald"] .ov2-card,
 :root[data-theme="emerald"] .kpi, :root[data-theme="emerald"] .ctrl-card, :root[data-theme="emerald"] .ctrl-hero,
-:root[data-theme="emerald"] .ctrl-team, :root[data-theme="emerald"] .modal, :root[data-theme="emerald"] .ovx-kcard {
+:root[data-theme="emerald"] .ctrl-team, :root[data-theme="emerald"] .ovx-kcard {
   background: rgba(255,255,255,.58) !important;
   box-shadow: 0 10px 34px rgba(14,30,55,.08), inset 0 1px 0 rgba(255,255,255,.7) !important;
   border: 1px solid rgba(255,255,255,.55) !important;
