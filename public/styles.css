@@ -6806,6 +6806,14 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   border: 1px solid rgba(255,255,255,.55) !important;
 }
 
+/* ═══ Пер-темовая персонализация иконок: каждая стилистика — свой характер штриха ═══
+   ic()-иконки в рабочей области несут атрибут stroke-width; CSS-свойство его перекрывает.
+   Стекло (Apple) — тоньше/воздушнее; Бургунди — плотнее/характернее; Моно/Контур — швейцарски-тонко. */
+:root[data-theme="emerald"] .content svg[stroke-width], :root[data-theme="emerald"] .sidebar svg[stroke-width] { stroke-width: 1.55; }
+:root[data-theme="warm"] .content svg[stroke-width], :root[data-theme="warm"] .sidebar svg[stroke-width] { stroke-width: 1.8; }
+:root[data-theme="mono"] .content svg[stroke-width], :root[data-theme="frame"] .content svg[stroke-width],
+:root[data-theme="mono"] .sidebar svg[stroke-width], :root[data-theme="frame"] .sidebar svg[stroke-width] { stroke-width: 1.5; }
+
 /* ═══ Editorial empty states (нет объектов / постов / подборок) ═══
    Натуральное фото сверху карточки + приглушённый текст. Работает во всех темах. */
 .es-art { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0 !important; overflow: hidden; }
