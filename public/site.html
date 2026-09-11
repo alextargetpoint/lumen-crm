@@ -130,10 +130,24 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 .fcard .ttl .pip{width:8px;height:8px;border-radius:50%}
 .fcard .row{font-size:12px;color:#AEBFE0;display:flex;justify-content:space-between;gap:14px;margin-top:3px}
 .fcard .row b{color:#fff;font-weight:700}
-.fc1{right:-4%;top:16%;width:210px;animation-delay:0s}
-.fc2{left:-5%;bottom:20%;width:210px;animation-delay:1.2s}
-.fc3{right:2%;bottom:7%;width:200px;animation-delay:.6s}
+.fc1{right:-4%;top:16%;width:210px;animation:floatA 5.5s ease-in-out infinite}
+.fc2{left:-5%;bottom:20%;width:210px;animation:floatB 6.6s ease-in-out infinite}
+.fc3{right:2%;bottom:7%;width:200px;animation:floatC 5s ease-in-out infinite}
+.fcard .ttl .pip{animation:pipPulse 2.2s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes floatA{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-15px) rotate(.6deg)}}
+@keyframes floatB{0%,100%{transform:translateY(0) rotate(1deg)}50%{transform:translateY(-19px) rotate(-1deg)}}
+@keyframes floatC{0%,100%{transform:translateY(0) translateX(0)}50%{transform:translateY(-12px) translateX(7px)}}
+@keyframes tlpulse{0%,100%{box-shadow:0 0 0 5px var(--bg),0 0 0 0 color-mix(in srgb,var(--blue) 45%,transparent)}50%{box-shadow:0 0 0 5px var(--bg),0 0 16px 3px color-mix(in srgb,var(--blue) 60%,transparent)}}
+@keyframes pipPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.55}}
+@keyframes livePulse{0%,100%{opacity:.95}50%{opacity:.4}}
+.scr-live{animation:livePulse 1.8s ease-in-out infinite}
+/* дорогой hover-подъём карточек */
+.gap-item,.niche,.fail,.pcard,.ncard,.tgcol,.bcard,.plan{transition:transform .45s var(--ease-spring),box-shadow .45s ease,border-color .3s}
+@media(hover:hover){
+  .gap-item:hover,.niche:hover,.fail:hover,.pcard:hover,.ncard:hover,.tgcol:hover{transform:translateY(-7px)}
+  .niche:hover{box-shadow:0 40px 70px -30px rgba(37,99,235,.4)}
+}
 
 /* ============ BIG NUMBER BAND ============ */
 .band{padding:clamp(70px,9vw,120px) 0;position:relative;overflow:hidden}
@@ -307,8 +321,9 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 /* ============ NICHES (photo cards) ============ */
 .niche-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .niche{position:relative;border-radius:20px;overflow:hidden;min-height:340px;display:flex;flex-direction:column;justify-content:flex-end;padding:26px;box-shadow:var(--shadow);isolation:isolate}
-.niche img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:transform .8s var(--ease-spring)}
-.niche:hover img{transform:scale(1.06)}
+.niche img,.niche video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:transform .8s var(--ease-spring)}
+.niche::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,11,22,.05) 30%,rgba(6,11,22,.72) 100%);pointer-events:none}
+.niche:hover img,.niche:hover video{transform:scale(1.06)}
 .niche::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,11,22,.15),rgba(6,11,22,.86))}
 .niche .em{font-family:var(--text);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#BFD2FF}
 .niche h3{color:#fff;font-size:25px;margin:10px 0 8px}
@@ -384,6 +399,8 @@ h1 em,h2 em,h3 em,.big-say em,.gap-h em,.manifesto .q em,.display em,.serif-acce
 .bcard.lumen::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 50% at 85% 0,rgba(79,125,255,.34),transparent 60%);pointer-events:none}
 .bcard.lumen h3{color:#fff;position:relative}
 .bcard.lumen .bsub{color:#9db4e6;position:relative}
+.bcard.lumen .lprice{position:relative;z-index:1}
+.bcard.lumen .lprice .was{color:#c3d2f0;opacity:.8;text-decoration:line-through;text-decoration-color:var(--rose);text-decoration-thickness:3px;margin-right:10px}
 .lprice{font-family:var(--disp);font-size:clamp(50px,7vw,76px);font-weight:600;line-height:1;color:#fff;position:relative}
 .lprice span{font-family:var(--text);font-size:18px;color:#9db4e6;font-weight:400}
 .lwin{list-style:none;display:grid;gap:13px;margin:24px 0;position:relative}
@@ -440,7 +457,12 @@ footer .foot-word{font-family:var(--disp);font-weight:700;font-size:clamp(74px,1
 [data-r]{opacity:0;transform:translateY(34px) scale(.986);filter:blur(4px);transition:opacity .85s var(--ease-spring),transform .9s var(--ease-spring),filter .7s ease}
 [data-r].in{opacity:1;transform:none;filter:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}.d4{transition-delay:.32s}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}[data-r]{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  /* не глушим всё: контент показываем сразу, но нежное «дыхание» интерфейса оставляем */
+  [data-r]{opacity:1!important;transform:none!important;filter:none!important}
+  .aura,.big .n,.countup{animation:none!important}
+  .stage .shot,.phone{animation-duration:12s}
+}
 
 /* ============ AMPLIFY: grain, progress, glow, manifesto, tilt ============ */
 body::after{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
@@ -630,7 +652,15 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .feat{grid-template-columns:1fr;gap:30px}.feat.rev .fx{order:0}
   .steps .row{grid-template-columns:repeat(2,1fr);gap:34px}.steps .line{display:none}
   .niche-grid{grid-template-columns:repeat(2,1fr)}
-  .tl{grid-template-columns:repeat(2,1fr);gap:34px}.tl::before{display:none}.tl .d{padding-top:52px}
+  /* вертикальный таймлайн: линия слева через точки, контент справа */
+  .tl{grid-template-columns:1fr;gap:0;position:relative}
+  .tl::before{display:block;content:"";position:absolute;left:7px;top:12px;bottom:16px;width:2px;height:auto;right:auto;background:linear-gradient(180deg,var(--blue) 0%,var(--blue) 70%,color-mix(in srgb,var(--blue) 15%,transparent) 100%)}
+  .tl .d{padding:0 0 26px 34px;position:relative}
+  .tl .d:last-child{padding-bottom:0}
+  .tl .d .dot{top:3px;left:0;width:16px;height:16px;box-shadow:0 0 0 5px var(--bg),0 0 14px 2px color-mix(in srgb,var(--blue) 55%,transparent);animation:tlpulse 2.4s ease-in-out infinite}
+  .tl .d:nth-child(2) .dot{animation-delay:.4s}.tl .d:nth-child(3) .dot{animation-delay:.8s}.tl .d:nth-child(4) .dot{animation-delay:1.2s}
+  .tl .d .day{font-size:16px;margin-bottom:5px}
+  .tl .d h4{font-size:16px}
   .plans{grid-template-columns:1fr;max-width:460px;margin:0 auto}.plan.pop{transform:none}
   .bigs{grid-template-columns:1fr}.big:not(:last-child){border-right:none;border-bottom:1px solid var(--line2);padding-bottom:32px}
   .flow{gap:6px}.flow .con{margin-top:24px}
@@ -650,7 +680,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   .mobnav a{font-family:var(--disp);font-size:30px;font-weight:600;padding:10px}
   .mobnav .btn{margin-top:22px}
   .fcard{display:none}
-  .fc1{display:block;right:-6px;top:5%;width:150px!important;padding:9px 11px;animation:float 5s var(--ease-soft) infinite}
+  .fc1{display:block;right:-6px;top:5%;width:150px!important;padding:9px 11px;animation:floatA 5s ease-in-out infinite}
   .fc1 .ttl{font-size:11px;margin-bottom:3px}
   .fc1 .row{font-size:10px}
   .fc1 .row:nth-of-type(n+2){display:none}
@@ -662,7 +692,15 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   body{overflow-wrap:break-word;word-break:break-word}
   .sec{padding-block:50px}
   .sec-head{margin-bottom:26px}
-  h2{font-size:clamp(27px,7.6vw,34px);line-height:1.07}
+  /* мобильный ребаланс типографики: после перехода на тяжёлый Manrope прежние размеры «весили» слишком крупно */
+  h2{font-size:clamp(23px,6.4vw,28px)!important;line-height:1.1}
+  h3{font-size:19px!important;line-height:1.22!important}
+  .manifesto .q{font-size:22px;line-height:1.28}
+  .q summary{font-size:16px;padding:18px 18px}
+  .btotal{font-size:clamp(32px,8.4vw,40px)!important}
+  .lprice{font-size:clamp(34px,10vw,42px)}
+  .big-say{font-size:clamp(22px,6.2vw,27px)}
+  .gap-h{font-size:clamp(23px,6.6vw,28px)}
   .lead{font-size:15.5px}
   .kicker{font-size:11px}
 
@@ -676,7 +714,8 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   /* ТЕЛЕФОНЫ-МОКАПЫ — меньше и по центру */
   /* ТЕЛЕФОН-МОКАП пересобран под мобилу: экран по высоте контента (без обрезки) */
   .phone{width:198px;padding:6px;border-radius:30px;margin:0 auto}
-  .phone .island{width:56px;height:15px;top:15px}
+  .phone::before{inset:4px;border-radius:25px;box-shadow:0 0 0 1px rgba(0,0,0,.45)}
+  .phone .island{width:52px;height:14px;top:14px}
   .phone .screen{border-radius:24px;aspect-ratio:9/19.3;height:auto;min-height:0;overflow:hidden}
   .wa-body,.tg-body{min-height:0;gap:7px;padding:11px 9px 14px;flex:1}
   .wa-top,.tg-top{padding:30px 11px 9px;gap:7px;align-items:center}
@@ -844,13 +883,13 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <div>
       <span class="hero-badge" data-r><b>Платформа продаж</b> для агентств недвижимости</span>
       <h1 data-r class="d1">Отдел продаж,<br>который <span class="it">не спит</span><br>и не теряет заявки</h1>
-      <p class="lead" data-r class="d2">Lumen отвечает клиенту первым — в WhatsApp, в комментариях под рекламой и в Telegram — ведёт диалог в живом темпе, квалифицирует как менеджер и отдаёт брокеру тёплого покупателя с психо-портретом и готовым сценарием сделки.</p>
-      <div class="cta-row" data-r class="d3">
+      <p class="lead d2" data-r>Lumen отвечает клиенту первым — в WhatsApp, в комментариях под рекламой и в Telegram — ведёт диалог в живом темпе, квалифицирует как менеджер и отдаёт брокеру тёплого покупателя с психо-портретом и готовым сценарием сделки.</p>
+      <div class="cta-row d3" data-r>
         <a class="btn btn-p" href="/" target="_blank">Открыть живое демо
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         <button class="btn btn-g js-lead" type="button">Получить консультацию</button>
       </div>
-      <div class="microtrust" data-r class="d4">
+      <div class="microtrust d4" data-r>
         <div class="m"><div class="n">≈1<span class="u"> мин</span></div><div class="l">ответ на заявку вместо 47 минут</div></div>
         <div class="m"><div class="n"><span class="countup" data-to="72">0</span><span class="u">%</span></div><div class="l">квалифицированных вместо 25–35%</div></div>
         <div class="m"><div class="n">24/7</div><div class="l">первая линия ночью и в выходные</div></div>
@@ -913,8 +952,8 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     </div>
     <div class="bigs">
       <div class="big" data-r><div class="from">47 мин</div><div class="n">1 мин</div><div class="l">первый ответ — пока конкуренты ещё спят</div></div>
-      <div class="big" data-r class="d1"><div class="from">25–35%</div><div class="n countup" data-to="72" data-suffix="%">0%</div><div class="l">доля квалифицированных заявок</div></div>
-      <div class="big" data-r class="d2"><div class="from">8×5</div><div class="n">24/7</div><div class="l">без выходных, обеда и «перезвоню завтра»</div></div>
+      <div class="big d1" data-r><div class="from">25–35%</div><div class="n countup" data-to="72" data-suffix="%">0%</div><div class="l">доля квалифицированных заявок</div></div>
+      <div class="big d2" data-r><div class="from">8×5</div><div class="n">24/7</div><div class="l">без выходных, обеда и «перезвоню завтра»</div></div>
     </div>
   </div>
 </section>
@@ -927,8 +966,8 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     </div>
     <div class="leaks">
       <div class="leak" data-r><div class="fig">78%</div><div><h4>Побеждает тот, кто первый</h4><p>Клиенты выбирают агентство, ответившее первым. Ночная заявка без мгновенного ответа — почти всегда потеряна.</p></div></div>
-      <div class="leak" data-r class="d1"><div class="fig">47′</div><div><h4>Рутина съедает скорость</h4><p>Средняя задержка ответа у живого отдела. Квалификация вручную — долго, неровно, по настроению.</p></div></div>
-      <div class="leak" data-r class="d2"><div class="fig">60%</div><div><h4>База лежит мёртвым грузом</h4><p>Больше половины контактов «спят». Никто не дожимает молчунов системно — а там оплаченные, прогретые лиды.</p></div></div>
+      <div class="leak d1" data-r><div class="fig">47′</div><div><h4>Рутина съедает скорость</h4><p>Средняя задержка ответа у живого отдела. Квалификация вручную — долго, неровно, по настроению.</p></div></div>
+      <div class="leak d2" data-r><div class="fig">60%</div><div><h4>База лежит мёртвым грузом</h4><p>Больше половины контактов «спят». Никто не дожимает молчунов системно — а там оплаченные, прогретые лиды.</p></div></div>
     </div>
   </div>
 </section>
@@ -942,11 +981,11 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   </div>
   <div class="fails">
     <div class="fail" data-r><span class="tag">Скорость</span><div class="quote">«Заявка пришла ночью. Менеджер увидел её утром — клиент уже купил у других.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen отвечает первым, круглосуточно</div></div>
-    <div class="fail" data-r class="d1"><span class="tag">Квалификация</span><div class="quote">«Проплавал 15 минут разговора и не узнал ни бюджета, ни сроков, ни кто принимает решение.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Квалифицирует автоматически по цели, сроку, бюджету и ЛПР — с цитатами</div></div>
-    <div class="fail" data-r class="d2"><span class="tag">Слив</span><div class="quote">«Отправил клиенту 10 объектов до того, как выяснил бюджет — и клиент пропал.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen квалифицирует до показа, не сливает варианты</div></div>
+    <div class="fail d1" data-r><span class="tag">Квалификация</span><div class="quote">«Проплавал 15 минут разговора и не узнал ни бюджета, ни сроков, ни кто принимает решение.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Квалифицирует автоматически по цели, сроку, бюджету и ЛПР — с цитатами</div></div>
+    <div class="fail d2" data-r><span class="tag">Слив</span><div class="quote">«Отправил клиенту 10 объектов до того, как выяснил бюджет — и клиент пропал.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen квалифицирует до показа, не сливает варианты</div></div>
     <div class="fail" data-r><span class="tag">Follow-up</span><div class="quote">«"Давайте спишемся в WhatsApp" — и клиент не ответил. Заявка потеряна.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Цепочка касаний сама возвращает клиента по всем каналам</div></div>
-    <div class="fail" data-r class="d1"><span class="tag">Комментарии</span><div class="quote">«Клиент спросил цену в комментариях под рекламой — ему никто не ответил.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Ловит комментарии и уводит в директ</div></div>
-    <div class="fail" data-r class="d2"><span class="tag">Язык</span><div class="quote">«Ответили на ломаном английском — и клиент начал молча игнорировать.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen отвечает грамотно на языке клиента</div></div>
+    <div class="fail d1" data-r><span class="tag">Комментарии</span><div class="quote">«Клиент спросил цену в комментариях под рекламой — ему никто не ответил.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Ловит комментарии и уводит в директ</div></div>
+    <div class="fail d2" data-r><span class="tag">Язык</span><div class="quote">«Ответили на ломаном английском — и клиент начал молча игнорировать.»</div><div class="fix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Lumen отвечает грамотно на языке клиента</div></div>
   </div>
 </section>
 
@@ -961,9 +1000,9 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <div class="line"></div>
     <div class="row">
       <div class="stp on" data-r><div class="num">1</div><h3>Заявка влетает</h3><p>Из рекламы, формы, комментария под постом или CTWA — лид сразу в системе, с привязкой к объявлению.</p></div>
-      <div class="stp on" data-r class="d1"><div class="num">2</div><h3>Ведёт диалог сам</h3><p>Отвечает в живом темпе на языке клиента и квалифицирует по цели, сроку, бюджету и типу.</p></div>
-      <div class="stp on" data-r class="d2"><div class="num">3</div><h3>Психо-портрет</h3><p>Определяет тип клиента, на что давить и чего избегать, готовит подборку и ответы на возражения.</p></div>
-      <div class="stp on" data-r class="d3"><div class="num">4</div><h3>Брокеру — тёплого</h3><p>В тот же чат, без смены номера. С историей, сценарием и задачей «позвонить за 30 минут».</p></div>
+      <div class="stp on d1" data-r><div class="num">2</div><h3>Ведёт диалог сам</h3><p>Отвечает в живом темпе на языке клиента и квалифицирует по цели, сроку, бюджету и типу.</p></div>
+      <div class="stp on d2" data-r><div class="num">3</div><h3>Психо-портрет</h3><p>Определяет тип клиента, на что давить и чего избегать, готовит подборку и ответы на возражения.</p></div>
+      <div class="stp on d3" data-r><div class="num">4</div><h3>Брокеру — тёплого</h3><p>В тот же чат, без смены номера. С историей, сценарием и задачей «позвонить за 30 минут».</p></div>
     </div>
   </div>
 </section>
@@ -1070,8 +1109,8 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       </div>
       <div class="pts">
         <div class="pt" data-r><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div><div><h4>Пишет в живом темпе</h4><p>Не мгновенно-роботом, а с естественной задержкой и индикатором «печатает». Клиент видит живой темп переписки — и уверен, что пишет живой менеджер.</p></div></div>
-        <div class="pt" data-r class="d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><h4>Квалифицирует как человек</h4><p>Цель, срок, бюджет, тип — с цитатами из переписки и вшитым плейбуком продаж.</p></div></div>
-        <div class="pt" data-r class="d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0M23 21v-2a4 4 0 00-3-3.87"/></svg></div><div><h4>Бесшовно передаёт брокеру</h4><p>Тот же номер, тот же чат. Клиент не чувствует переключения — конверсия не рвётся.</p></div></div>
+        <div class="pt d1" data-r><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><h4>Квалифицирует как человек</h4><p>Цель, срок, бюджет, тип — с цитатами из переписки и вшитым плейбуком продаж.</p></div></div>
+        <div class="pt d2" data-r><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0M23 21v-2a4 4 0 00-3-3.87"/></svg></div><div><h4>Бесшовно передаёт брокеру</h4><p>Тот же номер, тот же чат. Клиент не чувствует переключения — конверсия не рвётся.</p></div></div>
       </div>
     </div>
   </div>
@@ -1110,7 +1149,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Личная тема и оформление под себя</li>
           </ul>
         </div>
-        <div class="tgcol own" data-r class="d1">
+        <div class="tgcol own d1" data-r>
           <div class="tch"><span class="d" style="background:var(--mint)"></span>Собственнику спокойно</div>
           <ul>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>Все лиды и переписка — в одной системе фонда</li>
@@ -1150,12 +1189,12 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
         <h3>Прямая телефония</h3><p>Звонки и авто-транскрипция прямо в карточке лида — договорённости из разговора сами попадают в сводку.</p>
         <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: отдельный сервис + ручная расшифровка</span></div>
       </div>
-      <div class="ncard" data-r class="d1">
+      <div class="ncard d1" data-r>
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
         <h3>Комментарии напрямую</h3><p>Отвечает на комментарии под рекламой в Instagram и уводит в директ — без Zapier и ручного мониторинга.</p>
         <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: никто не разбирает или костыли</span></div>
       </div>
-      <div class="ncard" data-r class="d2">
+      <div class="ncard d2" data-r>
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5zM2 2l7.6 7.6"/></svg></div>
         <h3>Живой конструктор</h3><p>Собирает сильный дизайн подборок и PDF под запрос клиента — не шаблон, а продуманная презентация.</p>
         <div class="usual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Обычно: отдельный дизайнер и часы работы</span></div>
@@ -1226,7 +1265,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   <video autoplay muted loop playsinline poster="/assets/site/city-poster.jpg"><source src="/assets/site/city-bg.mp4?v=4" type="video/mp4"></video>
   <div class="wrap">
     <p class="q" data-r>Клиент выбирает того, кто <em>ответил вовремя</em> и <em>понял его.</em> Lumen делает и то, и другое — пока ваши брокеры закрывают сделки.</p>
-    <div class="by" data-r class="d1">заточено под недвижимость · работает из коробки</div>
+    <div class="by d1" data-r>заточено под недвижимость · работает из коробки</div>
   </div>
 </section>
 
@@ -1318,10 +1357,10 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
     <p class="lead">Справочники застройщиков, районов, планов оплаты и критериев квалификации уже внутри. Система не отправит клиента «не по тому направлению».</p>
   </div>
   <div class="niche-grid">
-    <div class="niche" data-r><img src="/assets/lib/dubai-skyline.jpg" alt="Дубай" onerror="this.src='/assets/lib/dubai-night.jpg'"><span class="em">Дубай</span><h3>Off-plan и рассрочка</h3><p>Застройщики, районы, ROI и планы оплаты. Квалификация под инвестора и переезд.</p></div>
-    <div class="niche" data-r class="d1"><img src="/assets/lib/bali-villa.jpg" alt="Бали" onerror="this.src='/assets/lib/bali-sunset.jpg'"><span class="em">Бали</span><h3>Виллы и доходность</h3><p>Лизхолд, управление, окупаемость. Диалог под инвест-логику.</p></div>
-    <div class="niche" data-r class="d2"><img src="/assets/lib/phuket-villa.jpg" alt="Пхукет"><span class="em">Пхукет</span><h3>Инвестиции у моря</h3><p>Кондо и виллы, гарантированный доход, перепродажа.</p></div>
-    <div class="niche" data-r class="d3"><img src="/assets/lib/penthouse.jpg" alt="Испания" onerror="this.src='/assets/lib/bedroom.jpg'"><span class="em">Испания</span><h3>ВНЖ и релокация</h3><p>Связка «недвижимость + статус» под гражданство и переезд семьёй.</p></div>
+    <div class="niche" data-r><video autoplay muted loop playsinline poster="/assets/site/niche-dubai-poster.jpg"><source src="/assets/site/niche-dubai.mp4?v=1" type="video/mp4"></video><span class="em">Дубай</span><h3>Off-plan и рассрочка</h3><p>Застройщики, районы, ROI и планы оплаты. Квалификация под инвестора и переезд.</p></div>
+    <div class="niche d1" data-r><video autoplay muted loop playsinline poster="/assets/site/niche-bali-poster.jpg"><source src="/assets/site/niche-bali.mp4?v=1" type="video/mp4"></video><span class="em">Бали</span><h3>Виллы и доходность</h3><p>Лизхолд, управление, окупаемость. Диалог под инвест-логику.</p></div>
+    <div class="niche d2" data-r><video autoplay muted loop playsinline poster="/assets/site/niche-phuket-poster.jpg"><source src="/assets/site/niche-phuket.mp4?v=1" type="video/mp4"></video><span class="em">Пхукет</span><h3>Инвестиции у моря</h3><p>Кондо и виллы, гарантированный доход, перепродажа.</p></div>
+    <div class="niche d3" data-r><video autoplay muted loop playsinline poster="/assets/site/niche-spain-poster.jpg"><source src="/assets/site/niche-spain.mp4?v=1" type="video/mp4"></video><span class="em">Испания</span><h3>ВНЖ и релокация</h3><p>Связка «недвижимость + статус» под гражданство и переезд семьёй.</p></div>
   </div>
 </section>
 
@@ -1354,9 +1393,9 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   </div>
   <div class="tl">
     <div class="d" data-r><div class="dot"></div><div class="day">День 1–2</div><h4>Подключаем</h4><p>Ваш WhatsApp Cloud API, бренд, брокеры, критерии и источники лидов.</p></div>
-    <div class="d" data-r class="d1"><div class="dot"></div><div class="day">День 3–4</div><h4>Настраиваем сценарии</h4><p>Тон, направления, цепочки касаний и шаблоны под модерацию. Заливаем базу объектов.</p></div>
-    <div class="d" data-r class="d2"><div class="dot"></div><div class="day">День 5–6</div><h4>Разгон</h4><p>Тестовые диалоги, прогрев номера, обучение команды. Проверяем каждую ветку.</p></div>
-    <div class="d" data-r class="d3"><div class="dot"></div><div class="day">День 7</div><h4>Боевой режим</h4><p>Lumen берёт первую линию. Вы видите заявки, квалы и сделки в реальном времени.</p></div>
+    <div class="d d1" data-r><div class="dot"></div><div class="day">День 3–4</div><h4>Настраиваем сценарии</h4><p>Тон, направления, цепочки касаний и шаблоны под модерацию. Заливаем базу объектов.</p></div>
+    <div class="d d2" data-r><div class="dot"></div><div class="day">День 5–6</div><h4>Разгон</h4><p>Тестовые диалоги, прогрев номера, обучение команды. Проверяем каждую ветку.</p></div>
+    <div class="d d3" data-r><div class="dot"></div><div class="day">День 7</div><h4>Боевой режим</h4><p>Lumen берёт первую линию. Вы видите заявки, квалы и сделки в реальном времени.</p></div>
   </div>
 </section>
 
@@ -1383,7 +1422,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       <div class="btotal">≈ $5 000<span>/мес на поддержку</span></div>
       <div class="bnote">И это только чтобы система работала. Разработать её с нуля — отдельные полгода-год и в разы дороже.</div>
     </div>
-    <div class="bcard lumen" data-r class="d1">
+    <div class="bcard lumen d1" data-r>
       <h3>С Lumen</h3>
       <div class="bsub">Всё уже построено и заточено под недвижимость</div>
       <div class="lprice"><span class="was" style="font-size:30px">$300</span>$200<span>/мес</span></div>
@@ -1426,7 +1465,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       </ul>
       <a class="btn btn-g" href="/" target="_blank">Попробовать</a>
     </div>
-    <div class="plan pop" data-r class="d1">
+    <div class="plan pop d1" data-r>
       <div class="badge">Бета · первым 10 агентствам</div>
       <div class="nm">Агентство</div><div class="ds">Команда брокеров, руководитель, RBAC, автораспределение.</div>
       <div class="pr"><span class="was">$300</span><span data-m="200" data-y="160">$200</span><span class="per">/мес</span></div>
@@ -1440,7 +1479,7 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
       </ul>
       <button type="button" class="btn btn-p js-lead" data-title="Занять место в бете" data-sub="Оставьте контакт — забронируем место в бете (первым 10 агентствам: $200/мес и внедрение $200) и покажем Lumen на вашем агентстве.">Занять место в бете</button>
     </div>
-    <div class="plan" data-r class="d2">
+    <div class="plan d2" data-r>
       <div class="nm">Сеть</div><div class="ds">Несколько офисов, много номеров, свои интеграции.</div>
       <div class="pr" style="font-size:38px">Договорная</div>
       <div class="setup">Индивидуальный контур и SLA</div>
@@ -1476,8 +1515,8 @@ html[data-theme="dark"] .pcard .hrlist svg{color:var(--sky)}
   <video autoplay muted loop playsinline poster="/assets/site/silk-poster.jpg"><source src="/assets/site/silk-bg.mp4?v=4" type="video/mp4"></video>
   <div class="wrap">
     <h2 data-r>Перестаньте терять <em>оплаченные заявки</em></h2>
-    <p class="lead" data-r class="d1">Откройте живое демо прямо сейчас — внутри реальные данные агентства, живые диалоги и подборки. Без регистрации.</p>
-    <div class="cta-row" data-r class="d2">
+    <p class="lead d1" data-r>Откройте живое демо прямо сейчас — внутри реальные данные агентства, живые диалоги и подборки. Без регистрации.</p>
+    <div class="cta-row d2" data-r>
       <a class="btn btn-p" href="/" target="_blank">Открыть живое демо
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       <a class="btn btn-g" href="#pricing" style="color:#fff;border-color:rgba(143,180,255,.3)">Посмотреть тарифы</a>
