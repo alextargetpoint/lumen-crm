@@ -9918,6 +9918,7 @@ PAGES.settings = async (root) => {
         <div class="form-row" style="margin-top:6px"><label>Phone Number ID</label><input id="waPhoneId" value="${esc(s.wa.phoneId)}" placeholder="из Meta Business → WhatsApp → API Setup"></div>
         <div class="form-row"><label>WABA ID</label><input id="waWabaId" value="${esc(s.wa.wabaId)}" placeholder="WhatsApp Business Account ID"></div>
         <div class="form-row"><label>Постоянный токен (System User)</label><input id="waToken" type="password" placeholder="${s.wa.tokenSet ? '•••••• сохранён' : 'EAAG… из Business Settings → System Users'}"></div>
+        <div class="form-row"><label>App Secret (Meta App → Settings → Basic — для проверки подписи входящих)</label><input id="waAppSecret" type="password" placeholder="${s.wa.appSecretSet ? '•••••• сохранён' : 'без него входящие вебхуки отклоняются (401)'}"></div>
         <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="saveWa" style="flex:1;justify-content:center">Сохранить и проверить</button><button class="btn" id="waVerify" title="Проверить текущее подключение">${ic(I.spark)}Проверить</button></div>
         <div class="form-row"><label>Внешняя ссылка (туннель) — для команды и вебхуков</label>
           <div style="display:flex;gap:8px;align-items:center">${s.tunnelUrl ? `<code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${esc(s.tunnelUrl)}</code><button class="btn btn-sm" id="tunCopy">${ic(I.copy)}</button>` : '<span class="badge warn">туннель не запущен</span>'}</div></div>
@@ -10068,9 +10069,11 @@ PAGES.settings = async (root) => {
   /* Сохранить реквизиты (без флипа режима) и сразу проверить их живьём */
   const saveWaCreds = async () => {
     const token = $('#waToken').value.trim();
+    const appSecret = $('#waAppSecret') ? $('#waAppSecret').value.trim() : '';
     await api.patch('/settings', { wa: {
       phoneId: $('#waPhoneId').value.trim(), wabaId: $('#waWabaId').value.trim(),
       ...(token ? { token } : {}),
+      ...(appSecret ? { appSecret } : {}),
     } });
   };
   const runVerify = async (announce) => {

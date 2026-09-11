@@ -567,6 +567,7 @@ function publicSettings(db) {
   delete s.auth;
   delete s.billing; // отдаётся отдельным computed-роутом /api/billing (с расчётом/расходниками)
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
+  if (s.wa.appSecret) { s.wa.appSecretSet = true; delete s.wa.appSecret; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
   if (s.channels) {
