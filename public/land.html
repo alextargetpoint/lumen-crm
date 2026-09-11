@@ -165,6 +165,19 @@
   .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
+  /* Telegram-мессенджер брокера (телефон) */
+  .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
+  .tgshow .eyebrow{margin-bottom:20px}
+  .tgshow h3{font-family:var(--serif);font-weight:300;font-size:clamp(26px,3.4vw,42px);line-height:1.08;letter-spacing:-.01em}
+  .tgshow p{color:var(--ink2);font-weight:300;line-height:1.6;font-size:15px;margin-top:16px;max-width:44ch}
+  .tgshow .tgb{margin-top:20px;display:grid;gap:11px}
+  .tgshow .tgb div{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink2);font-weight:300}
+  .tgshow .tgb svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px;color:var(--ink)}
+  .phone{width:clamp(228px,25vw,290px);border-radius:40px;padding:11px;background:linear-gradient(165deg,#1b1b1e,#0a0a0b);border:1px solid rgba(0,0,0,.18);box-shadow:0 44px 90px rgba(20,19,17,.28),0 8px 24px rgba(20,19,17,.14);position:relative;justify-self:center}
+  .phone::before{content:"";position:absolute;z-index:2;top:20px;left:50%;transform:translateX(-50%);width:34%;height:5px;border-radius:4px;background:rgba(255,255,255,.16)}
+  .phone img{width:100%;display:block;border-radius:31px}
+  @media(max-width:760px){.tgshow{grid-template-columns:1fr;text-align:center}.tgshow p,.tgshow .tgb{margin-inline:auto}.tgshow .tgb div{text-align:left}}
+
   /* KILLER FEATURES — «вкусняшки» */
   .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
   .feat{background:var(--cell);padding:clamp(26px,2.6vw,38px);position:relative;transition:background .5s var(--ease),transform .6s var(--ease)}
@@ -435,6 +448,20 @@
       <div class="shot d2" data-r><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
       <div class="shot d1" data-r><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Подборки</b><span>живые презентации объектов</span></div></div>
       <div class="shot d2" data-r><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика</b><span>деньги и эффективность в цифрах</span></div></div>
+    </div>
+
+    <div class="tgshow" data-r>
+      <div>
+        <span class="eyebrow">Мессенджер брокера</span>
+        <h3>Telegram, из которого <em>не уводят базу</em></h3>
+        <p>Брокер отвечает клиенту прямо из личного Telegram — привычно и быстро. Когда он занят, диалог ведёт ИИ. А вся переписка, медиа и история остаются в системе агентства.</p>
+        <div class="tgb">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Личный Telegram брокера — но база остаётся в системе</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>ИИ подхватывает диалог и подсказывает ответ на возражение</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Звонок, голосовые, карточка лида — прямо в чате</div>
+        </div>
+      </div>
+      <div class="phone"><img src="/assets/site/cap-tg-chat.png" alt="Мессенджер Lumen в Telegram — ИИ ведёт диалог" loading="lazy"></div>
     </div>
   </div>
 </section>
