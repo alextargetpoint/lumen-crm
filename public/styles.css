@@ -2154,6 +2154,7 @@ html[data-night] .br2-name, html[data-night] .br2-load b, html[data-night] .br2-
 .share-b { justify-content: flex-start; width: 100%; }
 
 /* соц-помощник: карусели */
+.car-filter { margin: 2px 0 14px; }
 .car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; align-items: start; }
 .car-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .car-prev { aspect-ratio: 1/1; display: grid; place-items: center; padding: 22px; background: linear-gradient(160deg, var(--accent-2, var(--accent)), var(--ov-hero-b)); color: #fff; text-align: center; }

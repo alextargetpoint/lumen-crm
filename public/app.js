@@ -7236,6 +7236,7 @@ const SOCIAL_TOOLS = {
   /* post (Посты и сторис) временно скрыт по просьбе — блок будем дорабатывать позже */
 };
 let SOCIAL_TOOL = 'scripts';
+let CAR_FILTER = 'all';   /* фильтр каруселей: all / post / story */
 let SOCIAL_SCRIPT_FMTS = new Set(['talking']);
 let SOCIAL_SCRIPT_MODE = 'idea';
 let SOCIAL_PREFILL = '';
@@ -7935,13 +7936,19 @@ async function shBank(main) {
 }
 
 /* ── Карусели ── */
+const carIsStory = (c) => c.format === 'story';
 async function shCarousels(main) {
   const cars = await api.get('/carousels');
+  const nStory = cars.filter(carIsStory).length, nPost = cars.length - nStory;
+  const shown = cars.filter(c => CAR_FILTER === 'all' ? true : CAR_FILTER === 'story' ? carIsStory(c) : !carIsStory(c));
+  const fbtn = (k, n, label) => `<button type="button" class="seg-btn ${CAR_FILTER === k ? 'on' : ''}" data-carf="${k}">${label}<span class="seg-badge">${n}</span></button>`;
   main.innerHTML = `
     <div class="sh-gen-hd sh-hd-bar">${ic(I.layers)}Карусели<span class="sub">ИИ-карусели для Instagram и Threads</span><span class="tb-spacer"></span><button class="btn btn-cta" id="carStudio" title="AI Design Engine — премиум арт-дирекшн, редактируемый дизайн" style="margin-right:8px">${ic(I.spark)}Студия · AI-дизайн</button><button class="btn btn-cta" id="carNew">${ic(I.plus)}Новая карусель</button></div>
-    <div class="car-grid">${cars.length ? cars.map(carCardHTML).join('') : '<div class="glass card empty" style="grid-column:1/-1">Каруселей пока нет — соберите первую с ИИ</div>'}</div>`;
+    ${cars.length ? `<div class="seg-toggle car-filter">${fbtn('all', cars.length, 'Все')}${fbtn('post', nPost, 'Посты')}${fbtn('story', nStory, 'Сторис')}</div>` : ''}
+    <div class="car-grid">${shown.length ? shown.map(carCardHTML).join('') : `<div class="glass card empty" style="grid-column:1/-1">${cars.length ? 'В этом фильтре пусто — переключи формат' : 'Каруселей пока нет — соберите первую с ИИ'}</div>`}</div>`;
   $('#carNew', main).addEventListener('click', openCarouselModal);
   const _cs = $('#carStudio', main); if (_cs) _cs.addEventListener('click', openStudioModal);
+  $$('[data-carf]', main).forEach(b => b.addEventListener('click', () => { CAR_FILTER = b.dataset.carf; shCarousels(main); }));
   wireCarCards(main);
 }
 
