@@ -36,6 +36,12 @@
   .vidbg>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.55;filter:saturate(.9)}
   .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(243,241,236,.9),rgba(243,241,236,.8) 50%,rgba(243,241,236,.92))}
   .vidbg>.wrap{position:relative;z-index:1}
+  /* тёмный видеофон — абстракция под тёмной вуалью */
+  .vidbg-d{position:relative;overflow:hidden}
+  .vidbg-d>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
+  .vidbg-d>.vwrap video{width:100%;height:100%;object-fit:cover;opacity:.38;filter:grayscale(1) contrast(1.05)}
+  .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 40%,rgba(8,8,8,.72),rgba(8,8,8,.88) 70%)}
+  .vidbg-d>.wrap{position:relative;z-index:1}
   .tr{height:clamp(240px,30vw,440px);position:relative;z-index:2}
   .tr::after{content:"";position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;pointer-events:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
@@ -87,10 +93,11 @@
   .hero .halo{position:absolute;left:50%;top:42%;width:80vmax;height:80vmax;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.05),transparent 70%);animation:breathe 9s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.12)}}
   .hero-in{position:relative;z-index:3;text-align:center;width:100%}
-  .hero .kline{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--d-ink3);opacity:0;animation:up .9s var(--ease) .15s forwards}
+  .hero .kline{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--d-ink3);opacity:0;animation:upc .9s var(--ease) .15s forwards}
+  @keyframes upc{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   .hero h1{font-size:clamp(46px,10vw,128px);line-height:.99;margin-top:20px}
   .hero .lede{margin:26px auto 0;text-align:center;color:var(--d-ink2)}
-  .hero-cta{margin-top:38px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;opacity:0;animation:up 1s var(--ease) 1s forwards}
+  .hero-cta{margin-top:38px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;opacity:0;animation:upc 1s var(--ease) 1s forwards}
   .btn{font-size:14px;letter-spacing:.04em;border-radius:999px;padding:15px 28px;transition:.4s var(--ease);cursor:pointer;border:1px solid transparent;font-family:inherit;display:inline-flex;align-items:center;gap:9px}
   .dark .btn.primary,.hero .btn.primary{background:var(--d-ink);color:#0a0a0a}
   .light .btn.primary{background:var(--l-ink);color:var(--l-bg)}
@@ -232,7 +239,7 @@
     <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
     <div class="hero-cta">
       <a class="btn primary" href="/soon.html">Занять место в бете</a>
-      <a class="btn ghost" href="#pain">Смотреть, где течёт</a>
+      <a class="btn ghost" href="#thesis">Как это работает</a>
     </div>
   </div>
   <div class="scrollcue">Листайте<i></i></div>
@@ -375,7 +382,8 @@
 <div class="tr l2d"></div>
 
 <!-- PRICING (тёмная) -->
-<section class="sec dark" id="pricing">
+<section class="sec dark vidbg-d" id="pricing">
+  <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-dark-poster.jpg"><source src="/assets/land-dark.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">Ранний доступ</span>
       <h2 style="margin-top:22px">Прозрачно. <em>Без оплаты за лида.</em></h2>
