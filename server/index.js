@@ -1954,7 +1954,7 @@ async function telnyxApi(db, method, pathx, body) {
   if (!r.ok) throw new Error('telnyx ' + r.status + ': ' + ((j.errors && j.errors[0] && j.errors[0].detail) || 'ошибка'));
   return j;
 }
-function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || ''; return base ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
+function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
   if (t.provider !== 'telnyx' || !t.key || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key, Connection ID и номер «От»');
