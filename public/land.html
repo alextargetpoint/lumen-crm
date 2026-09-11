@@ -216,11 +216,110 @@
   .foot{border-top:1px solid var(--line2);padding-block:38px}
   .foot .bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3)}
   .foot a:hover{color:var(--ink)}
-  @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}}
+  /* ── LOADER ── */
+  #load{position:fixed;inset:0;z-index:200;background:#080808;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:22px;transition:opacity .8s var(--ease),visibility .8s}
+  #load.gone{opacity:0;visibility:hidden;pointer-events:none}
+  #load .lmk{width:42px;height:50px;color:#f4f3f1;animation:lpulse 2.4s ease-in-out infinite}
+  #load .lmk svg{width:100%;height:100%}
+  #load .lbar{width:118px;height:1px;background:rgba(255,255,255,.13);overflow:hidden;position:relative;border-radius:1px}
+  #load .lbar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:42%;background:linear-gradient(90deg,transparent,#f4f3f1,transparent);animation:lslide 1.25s var(--ease) infinite}
+  #load .lwd{font-family:var(--serif);letter-spacing:.46em;font-size:13px;color:#8b8a87;padding-left:.46em}
+  @keyframes lpulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.07)}}
+  @keyframes lslide{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+
+  /* ── COOKIE ── */
+  #cook{position:fixed;left:20px;right:20px;bottom:20px;z-index:120;max-width:540px;margin-inline:auto;background:rgba(12,12,12,.88);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:20px 22px;color:#e8e7e4;transform:translateY(180%);opacity:0;transition:transform .7s var(--ease),opacity .7s;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+  #cook.in{transform:none;opacity:1}
+  #cook p{font-size:12.8px;line-height:1.6;color:#b7b6b3;font-weight:300}
+  #cook p a{color:#f4f3f1;text-decoration:underline;text-underline-offset:2px}
+  #cook .cbtns{display:flex;gap:10px;margin-top:15px;flex-wrap:wrap}
+  #cook .cbtns button{font-family:inherit;font-size:12.5px;letter-spacing:.03em;border-radius:999px;padding:10px 18px;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:transparent;color:#e8e7e4;transition:.3s var(--ease)}
+  #cook .cbtns button.acc{background:#f4f3f1;color:#0a0a0a;border-color:transparent}
+  #cook .cbtns button:hover{transform:translateY(-2px)}
+
+  /* ── MODAL / КОНСУЛЬТАЦИЯ / КАЛЕНДАРЬ ── */
+  .ovl{position:fixed;inset:0;z-index:150;background:rgba(6,6,6,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s;display:flex;align-items:center;justify-content:center;padding:20px}
+  .ovl.in{opacity:1;visibility:visible}
+  .modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:#0e0e0f;color:#f4f3f1;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:clamp(24px,3.2vw,42px);transform:translateY(30px) scale(.98);transition:transform .6s var(--ease);position:relative}
+  .ovl.in .modal{transform:none}
+  .modal .x{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:transparent;color:#a7a6a3;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.3s;font-size:16px}
+  .modal .x:hover{color:#fff;border-color:rgba(255,255,255,.32);transform:rotate(90deg)}
+  .modal .mhead{display:flex;gap:16px;align-items:center}
+  .modal .mav{width:58px;height:58px;border-radius:50%;flex:0 0 58px;overflow:hidden;background:linear-gradient(135deg,#2a2a2c,#141416);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:22px;color:#cfcdc8;border:1px solid rgba(255,255,255,.12)}
+  .modal .mav img{width:100%;height:100%;object-fit:cover}
+  .modal h3{font-family:var(--serif);font-weight:300;font-size:clamp(23px,3vw,32px);line-height:1.05}
+  .modal .msub{color:#a7a6a3;font-size:13px;font-weight:300;line-height:1.5;margin-top:5px}
+  .cal{margin-top:22px;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px}
+  .cal .chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .cal .chd b{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:capitalize}
+  .cal .chd button{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:transparent;color:#e8e7e4;cursor:pointer;transition:.3s;font-size:15px}
+  .cal .chd button:hover:not(:disabled){border-color:rgba(255,255,255,.34)}
+  .cal .chd button:disabled{opacity:.28;cursor:default}
+  .cal .cdow,.cal .cgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal .cdow span{text-align:center;font-size:10px;letter-spacing:.08em;color:#6b6a68;text-transform:uppercase;padding-bottom:6px}
+  .cal .cgrid button{aspect-ratio:1;border-radius:9px;border:1px solid transparent;background:rgba(255,255,255,.03);color:#e8e7e4;font-family:inherit;font-size:13.5px;cursor:pointer;transition:.22s;font-variant-numeric:lining-nums tabular-nums}
+  .cal .cgrid button:hover:not(:disabled){background:rgba(255,255,255,.09)}
+  .cal .cgrid button:disabled{opacity:.2;cursor:default}
+  .cal .cgrid button.sel{background:#f4f3f1;color:#0a0a0a;font-weight:600}
+  .cal .cgrid button.today{border-color:rgba(255,255,255,.22)}
+  .cal .cgrid .emp{background:transparent;pointer-events:none}
+  .slots{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .slots .slab{width:100%;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6b6a68;margin-bottom:2px}
+  .slots button{font-family:inherit;font-size:13px;padding:9px 15px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#e8e7e4;cursor:pointer;transition:.22s;font-variant-numeric:lining-nums tabular-nums}
+  .slots button:hover{border-color:rgba(255,255,255,.34)}
+  .slots button.sel{background:#f4f3f1;color:#0a0a0a;border-color:transparent}
+  .mform{display:grid;gap:11px;margin-top:20px}
+  .mform input,.mform textarea{font-family:inherit;font-size:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:13px 15px;color:#f4f3f1;transition:.3s;width:100%}
+  .mform input::placeholder,.mform textarea::placeholder{color:#6b6a68}
+  .mform input:focus,.mform textarea:focus{outline:none;border-color:rgba(255,255,255,.34);background:rgba(255,255,255,.06)}
+  .mform textarea{min-height:66px;resize:vertical}
+  .mpick{font-size:12.5px;color:#a7a6a3;margin-top:12px;min-height:1.2em}
+  .mpick b{color:#f4f3f1;font-weight:500}
+  .modal .btn.primary{width:100%;justify-content:center;margin-top:14px;background:#f4f3f1;color:#0a0a0a}
+  .modal .btn.primary:hover{transform:translateY(-3px)}
+  .modal .mok{text-align:center;padding:26px 0}
+  .modal .mok .okc{width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;color:#f4f3f1}
+  .modal .mok h3{margin-bottom:8px}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+
+  /* ── FAQ ── */
+  .faq{max-width:840px;margin:44px auto 0;display:grid;gap:1px;background:var(--line2);border:1px solid var(--line2)}
+  .faq details{background:var(--cell);transition:background .3s}
+  .faq summary{list-style:none;cursor:pointer;padding:22px clamp(18px,2.4vw,28px);display:flex;align-items:center;justify-content:space-between;gap:20px;font-family:var(--serif);font-size:clamp(17px,1.9vw,21px);font-weight:400}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary .qx{flex:0 0 18px;width:18px;height:18px;position:relative;margin-top:4px}
+  .faq summary .qx::before,.faq summary .qx::after{content:"";position:absolute;top:50%;left:0;right:0;height:1px;background:var(--ink2);transition:transform .4s var(--ease)}
+  .faq summary .qx::after{transform:rotate(90deg)}
+  .faq details[open] summary .qx::after{transform:rotate(0)}
+  .faq .qa{padding:0 clamp(18px,2.4vw,28px) 24px;color:var(--ink2);font-size:14.5px;font-weight:300;line-height:1.65;max-width:66ch}
+  .faq details[open]{background:color-mix(in srgb,var(--ink) 3%,var(--cell))}
+
+  /* ── FOOTER (юр.) ── */
+  .foot{border-top:1px solid var(--line2);padding-block:clamp(46px,6vw,70px)}
+  .foot .fcols{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:clamp(26px,4vw,54px)}
+  .foot .fbrand .brand{margin-bottom:15px}
+  .foot .fbrand p{font-size:12.8px;color:var(--ink3);font-weight:300;line-height:1.65;max-width:32ch}
+  .foot .fcol h5{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);margin-bottom:15px;font-weight:600}
+  .foot .fcol a,.foot .fcol address,.foot .fcol .fln{display:block;font-size:12.8px;color:var(--ink2);font-weight:300;line-height:1.5;margin-bottom:10px;font-style:normal;transition:color .3s}
+  .foot .fcol a{cursor:pointer}
+  .foot .fcol a:hover{color:var(--ink)}
+  .foot .fbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:clamp(32px,4vw,50px);padding-top:22px;border-top:1px solid var(--line2);font-size:11.3px;letter-spacing:.03em;color:var(--ink3)}
+  .foot .fbar .fbr-links{display:flex;gap:18px;flex-wrap:wrap}
+  .foot .fbar a:hover{color:var(--ink)}
+  @media(max-width:760px){.foot .fcols{grid-template-columns:1fr 1fr}.foot .fbrand{grid-column:span 2}}
+
+  @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}#load .lmk,#load .lbar::after{animation:none}}
 </style>
 </head>
 <body>
 <div class="grain"></div>
+
+<!-- LOADER -->
+<div id="load">
+  <span class="lmk"><svg viewBox="0 0 100 120" aria-hidden="true"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg></span>
+  <div class="lbar"></div>
+  <div class="lwd">LUMEN</div>
+</div>
 
 <nav class="nav" id="nav"><div class="wrap"><div class="bar">
   <a class="brand" href="#top">
@@ -228,7 +327,8 @@
     <span class="mk">LUMEN</span>
   </a>
   <div class="nlinks">
-    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#pricing">Цена</a>
+    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#faq">Вопросы</a><a href="#pricing">Цена</a>
+    <a class="cta" data-consult href="#consult">Демо</a>
     <a class="cta fill" href="/soon.html"><span>Ранний доступ</span></a>
   </div>
 </div></div></nav>
@@ -387,6 +487,22 @@
   </div>
 </section>
 
+<!-- FAQ (светлая, та же зона) -->
+<section class="sec light" id="faq">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">Вопросы, которые задают до нас</span>
+      <h2 style="margin-top:22px">Коротко и <em>честно</em></h2></div>
+    <div class="faq" data-r>
+      <details><summary>Чем это отличается от обычной CRM?<span class="qx"></span></summary><div class="qa">Обычную CRM надо заставлять открывать — и её всё равно не открывают. Lumen работает сам: ловит заявку с любого канала, отвечает за секунды, квалифицирует, строит психо-портрет и не даёт лиду остыть. Вы приходите к готовому — тёплому клиенту с историей и сценарием, а не к пустой карточке, которую нужно заполнять вручную.</div></details>
+      <details><summary>Заберёт ли брокер базу, если уйдёт?<span class="qx"></span></summary><div class="qa">Нет. Брокер отвечает клиенту из личного Telegram — привычно и удобно, — но вся переписка, медиа и контакты остаются в системе агентства. При оффбординге контакты передаются в один клик. База принадлежит агентству, а не телефону сотрудника.</div></details>
+      <details><summary>Нужна ли своя команда разработки?<span class="qx"></span></summary><div class="qa">Нет. Мы год вели этот продукт сами и отдаём готовую систему: настройка, интеграции (WhatsApp, комментарии рекламы, телефония), обновления и поддержка — на нас. Запуск занимает дни, а не полгода.</div></details>
+      <details><summary>На каких языках общается ИИ?<span class="qx"></span></summary><div class="qa">Диалоги, подборки и звонки — на языке клиента. Русский, английский, испанский, арабский и другие. В звонке вы говорите по-русски, а клиент слышит вас на своём языке и вашим голосом.</div></details>
+      <details><summary>Что с безопасностью данных?<span class="qx"></span></summary><div class="qa">Доступы разграничены по ролям — каждый видит только своё. Собственник контролирует риски, спорные и «утекающие» лиды на отдельном пульте. Данные обрабатываются в соответствии с GDPR; компания зарегистрирована в ЕС (Бельгия).</div></details>
+      <details><summary>Сколько стоит и есть ли пробный период?<span class="qx"></span></summary><div class="qa">Первым десяти агентствам — условия беты: $200/мес вместо $300 за команду из 5 брокеров и руководителя. Первые дни — бесплатно, без карты, отмена в один клик. Вы платите за систему, а не за каждый лид.</div></details>
+    </div>
+  </div>
+</section>
+
 <div class="tr l2d"></div>
 
 <!-- PRICING (тёмная) -->
@@ -418,15 +534,87 @@
 <section class="sec light final" id="final">
   <div class="wrap" data-r>
     <h2>Пусть выигрывает <em>ваше</em> агентство</h2>
-    <p class="lede">Ранний доступ открывается скоро. Оставьте почту — позовём одними из первых, пока места в бете есть.</p>
-    <a class="btn primary" href="/soon.html">Ранний доступ</a>
+    <p class="lede">Ранний доступ открывается скоро. Оставьте почту — позовём одними из первых. Или посмотрите систему вживую на 20-минутном демо.</p>
+    <div class="hero-cta" style="animation:none;opacity:1">
+      <a class="btn primary" href="/soon.html">Ранний доступ</a>
+      <a class="btn ghost" data-consult href="#consult">Записаться на демо</a>
+    </div>
   </div>
 </section>
 
-<footer class="foot light"><div class="wrap bar">
-  <span>© 2026 Lumen — продукт TargetPoint</span>
-  <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
+<footer class="foot light"><div class="wrap">
+  <div class="fcols">
+    <div class="fbrand">
+      <a class="brand" href="#top">
+        <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg>
+        <span class="mk">LUMEN</span>
+      </a>
+      <p>Среда, в которой живёт агентство недвижимости — от первого сообщения до подписи. Продукт перформанс-агентства TargetPoint.</p>
+    </div>
+    <div class="fcol">
+      <h5>Продукт</h5>
+      <a href="#thesis">Идея</a>
+      <a href="#product">Возможности</a>
+      <a href="#faq">Вопросы</a>
+      <a href="#pricing">Цена</a>
+      <a data-consult href="#consult">Записаться на демо</a>
+    </div>
+    <div class="fcol">
+      <h5>Правовое</h5>
+      <a href="/privacy.html">Политика конфиденциальности</a>
+      <a href="/terms.html">Условия использования</a>
+      <a href="/cookies.html">Политика cookie</a>
+      <a href="#" data-cookie-settings>Настройки cookie</a>
+    </div>
+    <div class="fcol">
+      <h5>Компания</h5>
+      <address>TargetPoint<br>Rue du Trône 100, 3rd floor<br>1050 Brussels, Belgium</address>
+      <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
+      <a href="https://targetpoint.agency" target="_blank" rel="noopener">targetpoint.agency</a>
+    </div>
+  </div>
+  <div class="fbar">
+    <span>© 2026 Lumen — продукт TargetPoint. Все права защищены.</span>
+    <span class="fbr-links"><a href="/privacy.html">Конфиденциальность</a><a href="/terms.html">Условия</a><a href="/cookies.html">Cookie</a></span>
+  </div>
 </div></footer>
+
+<!-- КОНСУЛЬТАЦИЯ / ДЕМО -->
+<div class="ovl" id="consultOvl" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+    <button class="x" id="cClose" aria-label="Закрыть">✕</button>
+    <div id="cBody">
+      <div class="mhead">
+        <div class="mav" id="cAvatar">TP</div>
+        <div>
+          <h3 id="cTitle">Живое демо <em>Lumen</em></h3>
+          <div class="msub">20 минут, без слайдов. Покажем систему на вашем сценарии и ответим на вопросы. Выберите удобное время.</div>
+        </div>
+      </div>
+      <div class="cal" id="cal">
+        <div class="chd"><button type="button" id="calPrev" aria-label="Назад">‹</button><b id="calMon"></b><button type="button" id="calNext" aria-label="Вперёд">›</button></div>
+        <div class="cdow"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="cgrid" id="calGrid"></div>
+      </div>
+      <div class="slots" id="slots" hidden><span class="slab">Время (по вашему часовому поясу)</span></div>
+      <form class="mform" id="cForm" novalidate>
+        <input type="text" name="name" placeholder="Ваше имя" autocomplete="name" required>
+        <input type="text" name="agency" placeholder="Агентство" autocomplete="organization">
+        <input type="text" name="contact" placeholder="Телефон или e-mail для связи" required>
+        <textarea name="note" placeholder="Пара слов о задаче (необязательно)"></textarea>
+        <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="mpick" id="cPick">Выберите дату и время</div>
+        <button type="submit" class="btn primary">Записаться на демо</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- COOKIE -->
+<div id="cook" role="dialog" aria-label="Использование cookie">
+  <p>Мы используем cookie, чтобы сайт работал и становился лучше. Подробнее — в <a href="/cookies.html">политике cookie</a> и <a href="/privacy.html">конфиденциальности</a>.</p>
+  <div class="cbtns"><button class="acc" id="ckAccept">Принять</button><button id="ckReject">Только необходимые</button></div>
+</div>
 
 <script>
   var nav=document.getElementById('nav');
@@ -449,6 +637,89 @@
 
   // hero-видео подставим когда готово (Higgsfield); poster держит кадр пока
   (function(){var v=document.getElementById('heroVid');if(!v)return;var s=document.createElement('source');s.src='/assets/land-hero.mp4?v=1';s.type='video/mp4';v.appendChild(s);v.load&&v.load();v.play&&v.play().catch(function(){});})();
+
+  /* ── LOADER ── */
+  (function(){var l=document.getElementById('load');if(!l)return;var done=false;function hide(){if(done)return;done=true;l.classList.add('gone');setTimeout(function(){l.parentNode&&l.remove()},900);}setTimeout(hide,900);addEventListener('load',function(){setTimeout(hide,300)});setTimeout(hide,4000);})();
+
+  /* ── COOKIE ── */
+  (function(){var c=document.getElementById('cook');if(!c)return;var KEY='lumen_cookie_consent';
+    function has(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+    function set(v){try{localStorage.setItem(KEY,v)}catch(e){}c.classList.remove('in')}
+    if(!has())setTimeout(function(){c.classList.add('in')},1200);
+    var a=document.getElementById('ckAccept'),r=document.getElementById('ckReject');
+    a&&(a.onclick=function(){set('all')});r&&(r.onclick=function(){set('necessary')});
+    document.querySelectorAll('[data-cookie-settings]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();c.classList.add('in')})});
+  })();
+
+  /* ── КОНСУЛЬТАЦИЯ + КАЛЕНДАРЬ ── */
+  (function(){
+    var ovl=document.getElementById('consultOvl');if(!ovl)return;
+    var grid=document.getElementById('calGrid'),monL=document.getElementById('calMon'),prev=document.getElementById('calPrev'),next=document.getElementById('calNext');
+    var slotsBox=document.getElementById('slots'),pick=document.getElementById('cPick'),form=document.getElementById('cForm'),body=document.getElementById('cBody');
+    var MON=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    var MONG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    var SLOTS=['10:00','11:30','13:00','15:00','16:30','18:00'];
+    var today=new Date();today.setHours(0,0,0,0);
+    var view=new Date(today.getFullYear(),today.getMonth(),1);
+    var selDate=null,selSlot=null;
+    function sameMonth(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()}
+    function fmt(d){return d.getDate()+' '+MONG[d.getMonth()]}
+    function render(){
+      monL.textContent=MON[view.getMonth()]+' '+view.getFullYear();
+      prev.disabled=sameMonth(view,today);
+      var first=new Date(view.getFullYear(),view.getMonth(),1);
+      var lead=(first.getDay()+6)%7; // неделя с Пн
+      var days=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+      var max=new Date(today);max.setDate(max.getDate()+60);
+      var html='';var i;
+      for(i=0;i<lead;i++)html+='<button class="emp" disabled></button>';
+      for(var d=1;d<=days;d++){
+        var dd=new Date(view.getFullYear(),view.getMonth(),d);
+        var dis=dd<today||dd>max||dd.getDay()===0; // без воскресений и прошлого
+        var cls=[];if(dd.getTime()===today.getTime())cls.push('today');if(selDate&&dd.getTime()===selDate.getTime())cls.push('sel');
+        html+='<button type="button" data-d="'+d+'"'+(dis?' disabled':'')+(cls.length?' class="'+cls.join(' ')+'"':'')+'>'+d+'</button>';
+      }
+      grid.innerHTML=html;
+    }
+    grid.addEventListener('click',function(e){var b=e.target.closest('button[data-d]');if(!b||b.disabled)return;
+      selDate=new Date(view.getFullYear(),view.getMonth(),+b.dataset.d);selSlot=null;render();renderSlots();updatePick();});
+    function renderSlots(){
+      slotsBox.hidden=!selDate;if(!selDate)return;
+      var h='<span class="slab">Время (по вашему часовому поясу)</span>';
+      SLOTS.forEach(function(s){h+='<button type="button" data-s="'+s+'">'+s+'</button>';});
+      slotsBox.innerHTML=h;
+    }
+    slotsBox.addEventListener('click',function(e){var b=e.target.closest('button[data-s]');if(!b)return;
+      selSlot=b.dataset.s;slotsBox.querySelectorAll('button').forEach(function(x){x.classList.toggle('sel',x===b)});updatePick();});
+    function updatePick(){pick.innerHTML=selDate?('Выбрано: <b>'+fmt(selDate)+(selSlot?', '+selSlot:'')+'</b>'+(selSlot?'':' — выберите время')):'Выберите дату и время';}
+    prev.onclick=function(){if(prev.disabled)return;view.setMonth(view.getMonth()-1);render()};
+    next.onclick=function(){view.setMonth(view.getMonth()+1);render()};
+    render();
+    function open(){ovl.classList.add('in');ovl.setAttribute('aria-hidden','false');document.body.style.overflow='hidden'}
+    function close(){ovl.classList.remove('in');ovl.setAttribute('aria-hidden','true');document.body.style.overflow=''}
+    document.querySelectorAll('[data-consult]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();open()})});
+    document.getElementById('cClose').onclick=close;
+    ovl.addEventListener('click',function(e){if(e.target===ovl)close()});
+    addEventListener('keydown',function(e){if(e.key==='Escape'&&ovl.classList.contains('in'))close()});
+    form.addEventListener('submit',function(e){e.preventDefault();
+      if(form.company.value)return; // honeypot
+      var name=form.name.value.trim(),contact=form.contact.value.trim();
+      if(!name||!contact){pick.innerHTML='<b>Заполните имя и контакт</b>';return;}
+      if(!selDate||!selSlot){pick.innerHTML='<b>Выберите дату и время</b>';return;}
+      var disp=fmt(selDate)+', '+selSlot;
+      var btn=form.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Отправляем…';
+      var payload={name:name,agency:form.agency.value.trim(),contact:contact,note:form.note.value.trim(),
+        date:selDate.getFullYear()+'-'+('0'+(selDate.getMonth()+1)).slice(-2)+'-'+('0'+selDate.getDate()).slice(-2),slot:selSlot,disp:disp,
+        tz:(window.Intl&&Intl.DateTimeFormat().resolvedOptions().timeZone)||''};
+      fetch('/api/consult',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(function(r){return r.json().catch(function(){return{}})}).then(function(){done(disp)})
+        .catch(function(){done(disp)});
+    });
+    function done(disp){
+      body.innerHTML='<div class="mok"><div class="okc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>Готово, ждём вас</h3><div class="msub">Демо забронировано на <b style="color:#f4f3f1">'+disp+'</b>. Мы свяжемся по указанному контакту и пришлём ссылку на встречу.</div><button class="btn primary" id="cDone" style="max-width:220px;margin-inline:auto">Закрыть</button></div>';
+      document.getElementById('cDone').onclick=close;
+    }
+  })();
 </script>
 </body>
 </html>

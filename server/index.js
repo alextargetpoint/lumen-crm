@@ -2712,10 +2712,40 @@ const server = http.createServer(async (req, res) => {
       if (b && String(b.company || '').trim()) return json(res, 200, { ok: true, count: (db.waitlist || []).length }); // honeypot
       const email = String((b && b.email) || '').trim().toLowerCase().slice(0, 160);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json(res, 400, { error: 'проверьте адрес' });
+      const consent = !!(b && b.consent); /* GDPR: явное согласие на обработку ПДн */
+      if (!consent) return json(res, 400, { error: 'нужно согласие на обработку персональных данных' });
       db.waitlist = db.waitlist || [];
       let idx = db.waitlist.findIndex(w => w.email === email);
-      if (idx < 0) { db.waitlist.push({ email, ref: String((b && b.ref) || '').slice(0, 200), at: Date.now() }); idx = db.waitlist.length - 1; store.save(); }
+      const rec = {
+        name: String((b && b.name) || '').trim().slice(0, 120),
+        whatsapp: String((b && b.whatsapp) || '').trim().slice(0, 40),
+        ref: String((b && b.ref) || '').slice(0, 200),
+        consent: true, consentAt: Date.now()
+      };
+      if (idx < 0) { db.waitlist.push(Object.assign({ email, at: Date.now() }, rec)); idx = db.waitlist.length - 1; store.save(); }
+      else { Object.assign(db.waitlist[idx], rec); store.save(); } // дозаполняем контакт/согласие
       return json(res, 200, { ok: true, count: db.waitlist.length, position: idx + 1 });
+    }
+    if (p === '/api/consult' && req.method === 'POST') {
+      if (!rateHit('cs:' + (clientIp(req) || 'x'), 8, 60000)) return json(res, 429, { error: 'слишком часто' });
+      const b = await readBody(req);
+      if (b && String(b.company || '').trim()) return json(res, 200, { ok: true }); // honeypot
+      const name = String((b && b.name) || '').trim().slice(0, 120);
+      const contact = String((b && b.contact) || '').trim().slice(0, 160);
+      const date = String((b && b.date) || '').trim().slice(0, 10);
+      const slot = String((b && b.slot) || '').trim().slice(0, 8);
+      if (!name || !contact) return json(res, 400, { error: 'укажите имя и контакт' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(slot)) return json(res, 400, { error: 'выберите дату и время' });
+      db.consults = db.consults || [];
+      db.consults.push({
+        name, contact, date, slot,
+        agency: String((b && b.agency) || '').trim().slice(0, 160),
+        note: String((b && b.note) || '').trim().slice(0, 800),
+        tz: String((b && b.tz) || '').trim().slice(0, 60),
+        at: Date.now()
+      });
+      store.save();
+      return json(res, 200, { ok: true });
     }
 
     /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
