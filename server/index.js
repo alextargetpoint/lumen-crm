@@ -2354,6 +2354,21 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true }); // Telegram нужен только 200
     }
 
+    /* ---------------- юридические страницы (публичные, для App Review Meta) ---------------- */
+    if ((p === '/privacy' || p === '/terms' || p === '/data-deletion') && req.method === 'GET') {
+      const f = p === '/privacy' ? 'privacy.html' : p === '/terms' ? 'terms.html' : 'data-deletion.html';
+      try { const html = fs.readFileSync(path.join(PUBLIC, f), 'utf8'); res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); }
+      catch (e) { res.writeHead(404); res.end('not found'); }
+      return;
+    }
+    /* data deletion callback (Meta signed_request) — авто-обработка запроса на удаление */
+    if ((p === '/data-deletion' && req.method === 'POST') || p === '/data-deletion/callback') {
+      const b = await readBody(req).catch(() => ({}));
+      const code = crypto.randomBytes(8).toString('hex');
+      const base = process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077));
+      return json(res, 200, { url: base.replace(/\/$/, '') + '/data-deletion?code=' + code, confirmation_code: code });
+    }
+
     /* ---------------- Telegram Mini App: мессенджер брокера в телефоне ---------------- */
     if (p === '/tgapp' || p === '/tgapp/') {
       try { const html = fs.readFileSync(path.join(PUBLIC, 'tgapp.html'), 'utf8'); res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(html); }
