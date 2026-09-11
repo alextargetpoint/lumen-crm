@@ -133,5 +133,33 @@ ok(!control.toneScan('ОК'), 'tone: короткий капс не ложно-�
   ok(r.counts.awayWaiting === 2, `scan: awayWaiting корзина (${r.counts.awayWaiting}) — l3(Молчун)+aw1`);
 }
 
+/* риск-срез воронки */
+{
+  const db = {
+    settings: { control: {}, geoNames: { dubai: 'Дубай', bali: 'Бали' } },
+    brokers: [{ id: 'b1', name: 'Сильный' }, { id: 'b2', name: 'Слабый' }],
+    leads: [
+      /* b1: 3 сделки, 1 потеря → win 75% */
+      { id: 'a1', broker: 'b1', geo: 'dubai', source: 'ig', stage: 'deal', quals: {} },
+      { id: 'a2', broker: 'b1', geo: 'dubai', source: 'ig', stage: 'deal', quals: {} },
+      { id: 'a3', broker: 'b1', geo: 'dubai', source: 'ig', stage: 'deal', quals: {} },
+      { id: 'a4', broker: 'b1', geo: 'dubai', source: 'ig', stage: 'lost', quals: {} },
+      /* b2: 0 сделок, 4 потери → win 0% (утечка) */
+      { id: 'c1', broker: 'b2', geo: 'bali', source: 'wa', stage: 'lost', quals: {} },
+      { id: 'c2', broker: 'b2', geo: 'bali', source: 'wa', stage: 'lost', quals: {} },
+      { id: 'c3', broker: 'b2', geo: 'bali', source: 'wa', stage: 'lost', quals: {} },
+      { id: 'c4', broker: 'b2', geo: 'bali', source: 'wa', stage: 'dialog', quals: {} },
+    ],
+    messages: [], meetings: [],
+  };
+  const fa = control.funnelAnalysis(db);
+  ok(fa.overallWin === 43, `funnel: общий винрейт 3/7=43% (${fa.overallWin})`);
+  const b2 = fa.byBroker.find(x => x.key === 'b2');
+  ok(b2.winRate === 0 && b2.resolved === 3, 'funnel: слабый брокер win 0% из 3 решённых');
+  ok(fa.leaks.some(l => l.kind === 'Брокер' && l.name === 'Слабый'), 'funnel: слабый брокер помечен утечкой');
+  ok(fa.stageDist.deal.count === 3 && fa.stageDist.lost.count === 4, 'funnel: распределение по стадиям верно');
+  ok(fa.byGeo.find(x => x.key === 'bali').winRate === 0, 'funnel: срез по гео (Бали 0%)');
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

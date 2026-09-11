@@ -2566,9 +2566,29 @@ async function openOffboard(brokerId) {
       $('#offDist', bd).innerHTML = '<div class="off-dist-hd">Распределение</div>' + distHtml(p2.distribution); } catch (_) {}
   });
 }
+function ctrlAnalyticsHTML(fa) {
+  if (!fa) return '';
+  const SN = { new: 'Новые', touch: 'Касание', dialog: 'Диалог', qualified: 'Квал', handover: 'У брокера', viewing: 'Показ', deal: 'Сделка' };
+  const flow = ['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'];
+  const maxC = Math.max(1, ...flow.map(s => (fa.stageDist[s] || {}).count || 0));
+  const bars = flow.map(s => { const c = (fa.stageDist[s] || {}).count || 0; const st = (fa.stageDist[s] || {}).stalled || 0;
+    return `<div class="cav-bar"><div class="cav-bar-t">${SN[s]}<b>${c}</b></div><div class="cav-track"><span style="width:${Math.round(c / maxC * 100)}%"></span>${st ? `<i class="cav-stall" title="застряли">${st}</i>` : ''}</div></div>`; }).join('');
+  const segTable = (arr, label) => { const top = arr.filter(a => a.resolved >= 1).slice(0, 6);
+    if (!top.length) return '';
+    return `<div class="cav-seg"><div class="cav-seg-h">${label}</div>${top.map(a => `<div class="cav-seg-row"><span class="cav-seg-nm">${esc(a.name || '—')}</span><span class="cav-seg-bars"><span class="cav-win" style="width:${a.winRate || 0}%" title="сделки"></span><span class="cav-loss" style="width:${a.lossRate || 0}%" title="потери"></span></span><span class="cav-seg-pct ${a.winRate != null && fa.overallWin != null && a.winRate < fa.overallWin - 15 ? 'bad' : ''}">${a.winRate == null ? '—' : a.winRate + '%'}</span></div>`).join('')}</div>`; };
+  const leaks = fa.leaks.length ? `<div class="cav-leaks">${fa.leaks.slice(0, 6).map(l => `<div class="cav-leak"><span class="cav-leak-k">${esc(l.kind)}</span><b>${esc(l.name)}</b><span class="cav-leak-v">${l.winRate}% сделок · ${l.lost} потерь из ${l.resolved}</span></div>`).join('')}</div>` : `<div class="cav-ok">Явных провалов по сегментам нет — конверсия ровная.</div>`;
+  return `<div class="ctrl-team cav-wrap">
+    <div class="ctrl-team-hd">${ic(I.bars)} Риск-срез воронки<small>где именно теряются лиды · общая конверсия ${fa.overallWin == null ? '—' : fa.overallWin + '%'} (сделок ${fa.totals.deal} / потерь ${fa.totals.lost})</small></div>
+    <div class="cav-grid">
+      <div class="cav-col"><div class="cav-sub">Где лиды сейчас (и сколько застряло)</div>${bars}</div>
+      <div class="cav-col"><div class="cav-sub">Слабые звенья</div>${leaks}</div>
+    </div>
+    <div class="cav-segs">${segTable(fa.byBroker, 'По брокерам')}${segTable(fa.byGeo, 'По гео')}${segTable(fa.bySource, 'По каналам')}</div>
+  </div>`;
+}
 PAGES.control = async (root) => {
-  let d;
-  try { d = await api.get('/control-center'); } catch (e) { root.innerHTML = `<div class="m-empty">Не удалось загрузить: ${esc(e.message)}</div>`; return; }
+  let d, fa = null;
+  try { [d, fa] = await Promise.all([api.get('/control-center'), api.get('/control-analytics').catch(() => null)]); } catch (e) { root.innerHTML = `<div class="m-empty">Не удалось загрузить: ${esc(e.message)}</div>`; return; }
   const order = ['unassigned', 'slaBreach', 'leak', 'dealCheck', 'silentBroker', 'vipStalled', 'awayWaiting', 'duplicates', 'orphanMeetings', 'overloaded', 'geoUncovered'];
   const active = order.filter(k => (d.buckets[k] || []).length);
   window._ctrlDups = d.buckets.duplicates || [];
@@ -2599,7 +2619,7 @@ PAGES.control = async (root) => {
         <button class="btn btn-xs btn-ghost" data-offboard="${b.id}">Передать дела</button>
       </div>`; }).join('') || '<div class="m-empty">Нет активных брокеров</div>'}</div>
   </div>`;
-  root.innerHTML = `<div class="ctrl-wrap">${hero}${cards}${team}</div>`;
+  root.innerHTML = `<div class="ctrl-wrap">${hero}${cards}${team}${ctrlAnalyticsHTML(fa)}</div>`;
   $('#ctrlRefresh', root)?.addEventListener('click', () => { render._silent = false; go('control'); });
   $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', () => openLeadModal(b.dataset.ovlead)));
   $$('[data-offboard]', root).forEach(b => b.addEventListener('click', () => openOffboard(b.dataset.offboard)));

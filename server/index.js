@@ -3599,6 +3599,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, control.scanRisks(db));
     }
 
+    /* ── Риск-срез воронки: где течёт (стадии/брокеры/гео/каналы) ── */
+    if (p === '/api/control-analytics' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      return json(res, 200, control.funnelAnalysis(db));
+    }
+
     /* ── Слияние дублей лида: перенести переписку/встречи/заметки/владение в один тред ── */
     if (p === '/api/leads/merge' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });

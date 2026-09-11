@@ -255,6 +255,55 @@ function toneScan(text) {
   return null;
 }
 
+/* ── риск-срез воронки: где именно течёт — по стадиям, брокерам, гео, каналам ── */
+const FUNNEL_ORDER = ['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal'];
+function funnelAnalysis(db) {
+  const now = Date.now();
+  const brokerName = id => (db.brokers.find(b => b.id === id) || {}).name || null;
+  const geoName = g => (db.settings.geoNames && db.settings.geoNames[g]) || g || '—';
+
+  /* распределение по стадиям (снимок) + застрявшие (>stalledDays без активности) */
+  const C = cfg(db);
+  const stageDist = {}; FUNNEL_ORDER.concat(['sleeping', 'lost']).forEach(s => stageDist[s] = { count: 0, stalled: 0 });
+  const lastAny = {};
+  for (const m of db.messages) { if (!lastAny[m.leadId] || m.at > lastAny[m.leadId]) lastAny[m.leadId] = m.at; }
+  for (const l of db.leads) {
+    const s = stageDist[l.stage] || (stageDist[l.stage] = { count: 0, stalled: 0 });
+    s.count++;
+    const idle = (now - (lastAny[l.id] || l.createdAt || now)) / 86400e3;
+    if (!CLOSED_STAGES.includes(l.stage) && l.stage !== 'sleeping' && idle > C.stalledDays) s.stalled++;
+  }
+
+  /* агрегатор по ключу (брокер/гео/канал): выигрыш = deal/(deal+lost) */
+  function seg(keyFn, nameFn) {
+    const acc = {};
+    for (const l of db.leads) {
+      const k = keyFn(l); if (k == null || k === '') continue;
+      const a = acc[k] = acc[k] || { key: k, name: nameFn(k), total: 0, deal: 0, lost: 0, active: 0 };
+      a.total++;
+      if (l.stage === 'deal') a.deal++;
+      else if (l.stage === 'lost') a.lost++;
+      else a.active++;
+    }
+    return Object.values(acc).map(a => { const resolved = a.deal + a.lost; return Object.assign(a, { resolved, winRate: resolved ? Math.round(a.deal / resolved * 100) : null, lossRate: resolved ? Math.round(a.lost / resolved * 100) : null }); })
+      .sort((x, y) => y.total - x.total);
+  }
+  const byBroker = seg(l => l.broker, brokerName);
+  const byGeo = seg(l => l.geo, geoName);
+  const bySource = seg(l => l.source, s => s);
+
+  /* общий винрейт + «утечки»: сегменты с решёнными≥3 и винрейтом заметно ниже общего */
+  const totDeal = db.leads.filter(l => l.stage === 'deal').length;
+  const totLost = db.leads.filter(l => l.stage === 'lost').length;
+  const overallWin = (totDeal + totLost) ? Math.round(totDeal / (totDeal + totLost) * 100) : null;
+  const leaks = [];
+  const scan = (arr, kind) => arr.forEach(a => { if (a.resolved >= 3 && a.winRate != null && overallWin != null && a.winRate < overallWin - 15) leaks.push({ kind, name: a.name, winRate: a.winRate, lost: a.lost, resolved: a.resolved }); });
+  scan(byBroker, 'Брокер'); scan(byGeo, 'Гео'); scan(bySource, 'Канал');
+  leaks.sort((a, b) => a.winRate - b.winRate);
+
+  return { overallWin, totals: { deal: totDeal, lost: totLost, active: db.leads.filter(l => !CLOSED_STAGES.includes(l.stage) && l.stage !== 'sleeping').length }, stageDist, byBroker, byGeo, bySource, leaks };
+}
+
 /* ── цепочка владения: неизменяемый лог передач лида (для атрибуции комиссий) ── */
 function recordOwner(db, lead, brokerId, by, reason) {
   if (!lead) return;
@@ -266,4 +315,4 @@ function recordOwner(db, lead, brokerId, by, reason) {
   if (lead.ownerHistory.length > 40) lead.ownerHistory.splice(0, lead.ownerHistory.length - 40);
 }
 
-module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, normPhone, ACTIVE_STAGES, CLOSED_STAGES, cfg };
+module.exports = { scanRisks, detectLeak, offboardPreview, recordOwner, findDuplicates, dealFactCheck, commissionSplit, toneScan, funnelAnalysis, normPhone, FUNNEL_ORDER, ACTIVE_STAGES, CLOSED_STAGES, cfg };
