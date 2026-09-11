@@ -36,6 +36,8 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:'Manrope',-apple-system,SF Pro Text,Roboto,Segoe UI,sans-serif;font-size:15px;line-height:1.42;
     overscroll-behavior:none;-webkit-font-smoothing:antialiased;letter-spacing:-.1px}
+  /* компактнее на ~18%: интерфейс был крупноват — равномерное полностраничное уменьшение */
+  body{zoom:.82}
   #bgart{position:fixed;inset:0;z-index:0;background:url(/assets/tgapp-bg.png) top center/cover no-repeat;opacity:.5}
   #bgart::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,11,18,.35),var(--bg) 78%)}
   #app{height:100%;display:flex;flex-direction:column;max-width:680px;margin:0 auto;position:relative;overflow:hidden;z-index:1}
