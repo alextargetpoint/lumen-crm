@@ -57,12 +57,13 @@
   h2{font-size:clamp(32px,5.2vw,64px)}
   .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:54ch}
   em{font-style:italic;font-weight:400}
-  /* ── луксовый живой металлик-градиент: подсветка важных моментов по всему сайту ── */
-  em,.gld{-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:sheen 10s linear infinite}
-  .dark em,.dark .gld{background-image:linear-gradient(100deg,#cac8c3,#ffffff 25%,#a2a09c 50%,#ffffff 75%,#cac8c3)}
-  .light em,.light .gld{background-image:linear-gradient(100deg,#2b2823,#141311 25%,#5a554d 50%,#141311 75%,#2b2823)}
-  @keyframes sheen{0%{background-position:0 0}100%{background-position:200% 0}}
-  @media(prefers-reduced-motion:reduce){em,.gld{animation:none;background-position:0 0}}
+  /* ── премиум-подсветка важных слов: ВСЕГДА видимый базовый цвет + статический металлик-градиент там, где поддержан background-clip (без анимации — она ломала перерисовку и слово пропадало) ── */
+  .dark em,.dark .gld,.hero em{color:#cfccc6}
+  .light em,.light .gld{color:#33302a}
+  @supports ((-webkit-background-clip:text) or (background-clip:text)){
+    .dark em,.dark .gld,.hero em{background-image:linear-gradient(100deg,#cbc9c4,#ffffff 32%,#a4a29d 60%,#eeece7);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .light em,.light .gld{background-image:linear-gradient(100deg,#2b2823,#141311 32%,#57524a 62%,#201e1a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  }
 
   /* reveal */
   [data-r]{opacity:0;transform:translateY(30px);filter:blur(6px);transition:opacity 1s var(--ease),transform 1.05s var(--ease),filter .9s ease}
@@ -176,19 +177,40 @@
   .tgshow .tgb{margin-top:18px;display:grid;gap:11px}
   .tgshow .tgb div{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink2);font-weight:300}
   .tgshow .tgb svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px;color:var(--ink)}
-  .phone{position:relative;width:clamp(238px,26vw,298px);padding:12px;border-radius:clamp(46px,4.8vw,58px);justify-self:center;
-    background:linear-gradient(150deg,#48474320 0%,#26251f 8%,#141310 46%,#050504 100%),linear-gradient(150deg,#3f3e3a,#111,#040404);
-    box-shadow:inset 0 1.5px 2px rgba(255,255,255,.28),inset 0 0 0 1px rgba(255,255,255,.05),0 60px 110px -26px rgba(20,19,17,.5),0 26px 50px -20px rgba(20,19,17,.32);
-    transition:transform .7s var(--ease),box-shadow .7s var(--ease)}
-  .phone:hover{transform:translateY(-6px)}
-  .phone::after{content:"";position:absolute;inset:5px;border-radius:inherit;border:1px solid rgba(0,0,0,.6);pointer-events:none}
-  .pscr{position:relative;border-radius:clamp(36px,3.9vw,47px);overflow:hidden;background:#0d1621;box-shadow:0 0 0 2px #000}
+  /* 3D-макет iPhone (титан, наклон под углом, отклик на курсор) */
+  .phone3d{justify-self:center;width:clamp(240px,27vw,300px);perspective:1700px;animation:phFloat 8s ease-in-out infinite}
+  @keyframes phFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+  .phone{position:relative;width:100%;padding:11px;border-radius:clamp(48px,5vw,60px);transform-style:preserve-3d;
+    transform:rotateY(var(--ry,-19deg)) rotateX(var(--rx,5deg));transition:transform .5s var(--ease);will-change:transform;
+    background:linear-gradient(135deg,#efeadf 0%,#c7bfae 20%,#9b9384 42%,#d5cdbd 63%,#867e70 82%,#b7af9f 100%);
+    box-shadow:inset 0 1.5px 2px rgba(255,255,255,.55),inset 0 -1px 2px rgba(0,0,0,.4),0 2px 0 rgba(255,255,255,.2);
+    filter:drop-shadow(0 46px 60px rgba(20,19,17,.4)) drop-shadow(0 18px 28px rgba(20,19,17,.26))}
+  .phone .pbody{position:absolute;inset:0;border-radius:inherit;transform:translateZ(-15px);
+    background:linear-gradient(135deg,#a99f8d,#6f695d 55%,#4b463d);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+  .phone::after{content:"";position:absolute;inset:5px;border-radius:calc(clamp(48px,5vw,60px) - 6px);border:1px solid rgba(0,0,0,.35);pointer-events:none;z-index:4}
+  .pscr{position:relative;border-radius:clamp(38px,4vw,49px);overflow:hidden;background:#0d1621;box-shadow:0 0 0 2px #000,inset 0 0 0 1px rgba(255,255,255,.03);transform:translateZ(1px)}
   .psbar{height:34px;background:#0d1621}
-  .pisl{position:absolute;z-index:3;top:9px;left:50%;transform:translateX(-50%);width:33%;height:19px;border-radius:11px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+  .pisl{position:absolute;z-index:3;top:9px;left:50%;transform:translateX(-50%);width:32%;height:19px;border-radius:11px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
   .pscr img{display:block;width:100%;margin-top:-1px}
-  .pbtn{position:absolute;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#3a3934,#100f0d);z-index:0}
-  .pbtn.l1{left:-2px;top:27%;height:30px}.pbtn.l2{left:-2px;top:calc(27% + 42px);height:52px}
-  .pbtn.r1{right:-2px;left:auto;border-radius:3px 0 0 3px;top:31%;height:64px}
+  .pbtn{position:absolute;width:2.5px;border-radius:0 2px 2px 0;background:linear-gradient(180deg,#c8c7b6,#8a8273);z-index:0;transform:translateZ(-3px)}
+  .pbtn.l1{left:-2px;top:26%;height:26px}.pbtn.l2{left:-2px;top:calc(26% + 40px);height:50px}
+  .pbtn.r1{right:-2px;left:auto;border-radius:2px 0 0 2px;top:30%;height:62px;background:linear-gradient(180deg,#bcb4a3,#7a7263)}
+  @media(prefers-reduced-motion:reduce){.phone3d{animation:none}}
+
+  /* каналы → визуальные ноды, стекающиеся в телефон */
+  .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
+  .tgflow .chan{display:flex;flex-direction:column;align-items:center;gap:7px;width:62px}
+  .tgflow .chan .ci{width:46px;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--cell);display:flex;align-items:center;justify-content:center;transition:.45s var(--ease);position:relative;overflow:hidden}
+  .tgflow .chan .ci::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 40%,rgba(140,140,140,.12) 50%,transparent 60%);transform:translateX(-120%);transition:transform .6s var(--ease)}
+  .tgflow .chan:hover .ci{border-color:var(--ink2);transform:translateY(-3px)}
+  .tgflow .chan:hover .ci::after{transform:translateX(120%)}
+  .tgflow .chan .ci svg{width:23px;height:23px;fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .tgflow .chan span{font-size:10px;color:var(--ink3);letter-spacing:.02em;text-align:center;line-height:1.2}
+  .tgflow .tgarrow{display:flex;align-items:center;color:var(--ink3);align-self:flex-start;margin-top:12px}
+  .tgflow .tgarrow svg{width:34px;height:20px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+  .tgflow .tgarrow i{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--ink);opacity:0;animation:flowDot 2.4s var(--ease) infinite}
+  @keyframes flowDot{0%{opacity:0;transform:translateX(-14px)}20%{opacity:.8}80%{opacity:.8}100%{opacity:0;transform:translateX(14px)}}
+  @media(max-width:760px){.tgflow{justify-content:center}.tgflow .tgarrow{display:none}}
   @media(max-width:760px){.tgshow{grid-template-columns:1fr;text-align:center}.tgshow p,.tgshow .tgb{margin-inline:auto}.tgshow .tgchips{justify-content:center}.tgshow .tgb div{text-align:left}}
 
   /* KILLER FEATURES — «вкусняшки» */
@@ -468,16 +490,26 @@
         <span class="eyebrow">Единый мессенджер брокера</span>
         <h3>Все каналы стекаются <em>в один Telegram</em></h3>
         <p>WhatsApp, Instagram Direct, комментарии рекламы, формы — всё падает брокеру в личный Telegram. Он отвечает из привычного окна, ИИ подхватывает, когда брокер занят, а вся переписка и база остаются в системе агентства.</p>
-        <div class="tgchips"><span>WhatsApp</span><span>Instagram</span><span>Директ</span><span>Комментарии рекламы</span><span>Формы</span></div>
+        <div class="tgflow">
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-7.7 13.7L3 21l4.5-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 8.8c-.2.5-.2 1.6.6 2.8.9 1.4 2.3 2.2 3 2.4.7.2 1.2 0 1.5-.4.2-.3.2-.6.1-.8l-1-.7c-.2-.1-.4 0-.6.1l-.4.4a3.8 3.8 0 0 1-1.8-1.8l.4-.4c.1-.2.2-.4.1-.6l-.6-1c-.2-.3-.6-.4-.9-.2z"/></svg></span><span>WhatsApp</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.4"/><circle cx="16.7" cy="7.3" r=".6" fill="currentColor" stroke="none"/></svg></span><span>Instagram</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M21 4L3 10.6l6.2 2.3L11.7 20l3.1-6.9z"/><path d="M9.2 12.9L21 4"/></svg></span><span>Директ</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M4 5h13v8H9l-4 3v-3H4z"/><path d="M7.5 8.4h6M7.5 10.8h3.5"/></svg></span><span>Комментарии</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></span><span>Реклама</span></div>
+          <span class="tgarrow" style="position:relative"><svg viewBox="0 0 34 20"><path d="M2 10h27M23 5l6 5-6 5"/></svg><i></i></span>
+        </div>
         <div class="tgb">
           <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Один вход для всех каналов — не нужно прыгать по приложениям</div>
           <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>ИИ ведёт диалог и подсказывает ответ на возражение</div>
           <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Личный Telegram брокера — но контакты остаются у агентства</div>
         </div>
       </div>
-      <div class="phone">
-        <span class="pbtn l1"></span><span class="pbtn l2"></span><span class="pbtn r1"></span>
-        <div class="pscr"><div class="psbar"></div><span class="pisl"></span><img src="/assets/site/cap-tg-chat.png" alt="Мессенджер Lumen в Telegram — все каналы в одном окне, ИИ ведёт диалог" loading="lazy"></div>
+      <div class="phone3d" id="phone3d">
+        <div class="phone">
+          <div class="pbody"></div>
+          <span class="pbtn l1"></span><span class="pbtn l2"></span><span class="pbtn r1"></span>
+          <div class="pscr"><div class="psbar"></div><span class="pisl"></span><img src="/assets/site/cap-tg-chat.png" alt="Мессенджер Lumen в Telegram — все каналы в одном окне, ИИ ведёт диалог" loading="lazy"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -785,6 +817,17 @@
       body.innerHTML='<div class="mok"><div class="okc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>Готово, ждём вас</h3><div class="msub">Демо забронировано на <b style="color:#f4f3f1">'+disp+'</b>. Мы свяжемся по указанному контакту и пришлём ссылку на встречу.</div><button class="btn primary" id="cDone" style="max-width:220px;margin-inline:auto">Закрыть</button></div>';
       document.getElementById('cDone').onclick=close;
     }
+  })();
+  /* ── 3D-телефон: отклик наклона на курсор ── */
+  (function(){var w=document.getElementById('phone3d');if(!w)return;var ph=w.querySelector('.phone');if(!ph)return;
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+    var host=w.closest('.tgshow')||w;
+    host.addEventListener('pointermove',function(e){var r=w.getBoundingClientRect();
+      var dx=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width)));
+      var dy=Math.max(-1,Math.min(1,(e.clientY-(r.top+r.height/2))/(r.height)));
+      ph.style.setProperty('--ry',(-19+dx*15).toFixed(1)+'deg');
+      ph.style.setProperty('--rx',(5-dy*11).toFixed(1)+'deg');},{passive:true});
+    host.addEventListener('pointerleave',function(){ph.style.setProperty('--ry','-19deg');ph.style.setProperty('--rx','5deg');});
   })();
 </script>
 </body>
