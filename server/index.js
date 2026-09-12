@@ -3125,6 +3125,25 @@ const server = http.createServer(async (req, res) => {
       br.tgChatId = null; br.tgActiveLeadId = null; store.save();
       return json(res, 200, { ok: true });
     }
+    /* ПРОВЕРКА ICS-ссылки календаря брокера: тянем, парсим, отдаём «нашли N событий, ближайшее занятое окно».
+       Делает подключение дуракоустойчивым — брокер сразу видит, верную ли ссылку вставил. */
+    if ((tgm = p.match(/^\/api\/brokers\/([^/]+)\/ics-test$/)) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const br = db.brokers.find(x => x.id === tgm[1]); if (!br) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const url = String((b && b.url) || br.busyIcsUrl || '').trim();
+      if (!url) return json(res, 400, { error: 'нет ссылки' });
+      if (!/^https?:\/\//i.test(url)) return json(res, 200, { ok: false, reason: 'Ссылка должна начинаться с http(s)://' });
+      try {
+        const { text } = await safeFetch(url);
+        if (!/BEGIN:VCALENDAR/i.test(text)) return json(res, 200, { ok: false, reason: 'По ссылке нет календаря (нет BEGIN:VCALENDAR). Проверьте, что это прямая ICS-ссылка.' });
+        const iv = parseIcsBusy(text);
+        const now = Date.now();
+        const next = iv.filter(x => x.e > now).sort((a, c) => a.s - c.s)[0] || null;
+        const fmt = t => new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return json(res, 200, { ok: true, count: iv.length, next: next ? { from: fmt(next.s), to: fmt(next.e) } : null });
+      } catch (e) { return json(res, 200, { ok: false, reason: 'Не удалось загрузить ссылку: ' + (e.message || 'ошибка сети') }); }
+    }
 
     /* ---------------- голос ElevenLabs: тест генерации ---------------- */
     if (p === '/api/voice/test' && req.method === 'POST') {

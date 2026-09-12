@@ -137,6 +137,44 @@ document.addEventListener('click', (e) => {
 });
 window.addEventListener('scroll', (e) => { if (!e.target.closest?.('.hint-pop')) closeHint(); }, true);
 
+/* ═══ ГАЙД-ЦЕНТР: красивые пошаговые инструкции под каждый функционал ═══
+   Расширяемо: добавляй ключ в GUIDES и вызывай openGuide('ключ'). Рендерится премиум-модалкой. */
+const GUIDES = {
+  calendar: {
+    icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
+    intro: 'Lumen сам подбирает клиенту свободное время — но только если знает, когда брокер занят. Дайте системе <b>публичную ICS-ссылку</b> личного календаря (Apple или Google), и занятые часы автоматически исчезнут из предложений. Настраивается один раз за 2 минуты.',
+    sections: [
+      { badge: '🍎 Apple Calendar (iCloud)', steps: [
+        ['Откройте iCloud.com → «Календарь»', 'На компьютере в браузере войдите на <b>icloud.com</b> и откройте раздел «Календарь».'],
+        ['Нажмите «Поделиться» у нужного календаря', 'Наведите на календарь слева → появится значок человечка (общий доступ) → кликните.'],
+        ['Включите «Открытый календарь»', 'Поставьте галочку <b>Public Calendar / Открытый календарь</b>. Появится ссылка вида <code>webcal://…</code>.'],
+        ['Скопируйте ссылку и замените webcal:// на https://', 'Скопируйте ссылку, вставьте в Lumen и в начале поменяйте <code>webcal://</code> на <code>https://</code>.'],
+      ] },
+      { badge: '🗓️ Google Календарь', steps: [
+        ['Откройте настройки нужного календаря', 'В браузере на <b>calendar.google.com</b> наведите на календарь слева → «⋮» → <b>«Настройки и общий доступ»</b>.'],
+        ['Найдите «Интеграция календаря»', 'Прокрутите вниз до раздела <b>«Интеграция календаря»</b>.'],
+        ['Скопируйте «Секретный адрес в формате iCal»', 'Это приватная ссылка (её видите только вы), заканчивается на <code>/basic.ics</code>. Календарь публичным делать НЕ нужно.'],
+        ['Вставьте ссылку в Lumen', 'Вставьте её в поле «Личный календарь» в карточке брокера.'],
+      ] },
+    ],
+    outro: 'После вставки нажмите <b>«Проверить»</b> — Lumen загрузит календарь и покажет, сколько занятых окон нашёл и ближайшее из них. Если видите «✓ нашли N событий» — всё работает, занятое время больше не предложат клиенту.',
+    img: 'assets/guides/cal-field.png',
+  },
+};
+function openGuide(id) {
+  const g = GUIDES[id]; if (!g) return;
+  const stepCard = (s, i) => `<div class="gd-step"><span class="gd-n">${i + 1}</span><div class="gd-tx"><b>${s[0]}</b><span>${s[1]}</span></div></div>`;
+  const secBlock = (sec) => `<div class="gd-sec"><div class="gd-sec-h">${esc(sec.badge)}</div>${sec.steps.map(stepCard).join('')}</div>`;
+  const body = `<div class="gd">
+    <div class="gd-intro">${g.intro}</div>
+    ${(g.sections || []).map(secBlock).join('')}
+    ${g.img ? `<div class="gd-shot"><img src="${g.img}" alt="" onerror="this.parentNode.style.display='none'"><span>Поле для ссылки — в карточке брокера</span></div>` : ''}
+    ${g.outro ? `<div class="gd-outro">${ic(I.spark, 2)}<span>${g.outro}</span></div>` : ''}
+  </div>`;
+  modal({ title: g.title, sub: g.tagline, body, wide: true, actions: [{ label: 'Понятно' }] });
+}
+window.openGuide = openGuide;
+
 function plural(n, one, few, many) {
   const m = Math.abs(n) % 100, d = m % 10;
   if (m > 10 && m < 20) return many;
@@ -9679,8 +9717,9 @@ PAGES.brokers = async (root) => {
               ${b.calKey ? `<div class="pd-fact"><label class="lc-lbl">Личный календарь (Apple / Google)</label>
                 <div class="muted" style="font-size:11.5px;padding:4px 0 6px">① Подписка «Lumen → календарь брокера»: встречи+задачи живьём. В Apple Calendar: «Файл → Новая подписка» → вставить.</div>
                 <button type="button" class="btn btn-sm br-calcopy" data-calurl="${location.origin}/cal/${b.id}.ics?key=${b.calKey}">${ic(I.cal)}Скопировать ссылку подписки</button>
-                <div class="muted" style="font-size:11.5px;padding:10px 0 4px">② Учитывать занятость в ИИ-планировании: вставь <b>публичную ICS-ссылку личного календаря</b> брокера (Apple: «Сделать общим» → публичная ссылка). ИИ не будет предлагать лидам занятое время.</div>
-                <div style="display:flex;gap:6px"><input class="lc-inp br-busyics" data-brbusyid="${b.id}" value="${esc(b.busyIcsUrl || '')}" placeholder="https://…/basic.ics" style="flex:1"><button type="button" class="btn btn-sm br-busysave">Сохранить</button></div></div>` : ''}
+                <div class="muted" style="font-size:11.5px;padding:10px 0 4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">② Учитывать занятость в ИИ-планировании: вставь <b>публичную ICS-ссылку личного календаря</b>. ИИ не предложит лидам занятое время. <button type="button" class="br-calguide" style="background:none;border:none;padding:0;color:var(--accent);font-weight:700;font-size:11.5px;cursor:pointer;text-decoration:underline">Как настроить? →</button></div>
+                <div style="display:flex;gap:6px"><input class="lc-inp br-busyics" data-brbusyid="${b.id}" value="${esc(b.busyIcsUrl || '')}" placeholder="https://…/basic.ics" style="flex:1"><button type="button" class="btn btn-sm br-busytest">Проверить</button><button type="button" class="btn btn-sm br-busysave">Сохранить</button></div>
+                <div class="br-ics-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div></div>` : ''}
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
@@ -9836,6 +9875,19 @@ PAGES.brokers = async (root) => {
     if (calC) calC.addEventListener('click', () => { navigator.clipboard.writeText(calC.dataset.calurl); toast('Ссылка календаря скопирована', 'Подписка в Apple/Google Calendar — обновляется сама', true); });
     const busySave = eb.querySelector('.br-busysave');
     if (busySave) busySave.addEventListener('click', async () => { const inp = eb.querySelector('.br-busyics'); const id = inp.dataset.brbusyid; try { await api.patch('/brokers/' + id, { busyIcsUrl: inp.value.trim() }); toast('Личный календарь подключён', 'ИИ будет учитывать занятость при планировании', true); } catch (e) { toast('Не вышло', e.message); } });
+    const busyTest = eb.querySelector('.br-busytest');
+    if (busyTest) busyTest.addEventListener('click', async () => {
+      const inp = eb.querySelector('.br-busyics'); const id = inp.dataset.brbusyid; const res = eb.querySelector('.br-ics-res');
+      const url = inp.value.trim(); if (!url) { res.innerHTML = '<span style="color:var(--ink-3)">Вставьте ссылку, потом проверьте.</span>'; return; }
+      res.innerHTML = '<span style="color:var(--ink-3)">Проверяю…</span>'; busyTest.disabled = true;
+      try { const r = await api.post('/brokers/' + id + '/ics-test', { url });
+        if (r.ok) res.innerHTML = `<span style="color:var(--ok,#1E7A64);font-weight:600">✓ Календарь подключён — нашли ${r.count} ${plural(r.count, 'событие', 'события', 'событий')}.</span>${r.next ? `<br><span style="color:var(--ink-3)">Ближайшее занятое окно: ${esc(r.next.from)} – ${esc(r.next.to)}</span>` : ''}`;
+        else res.innerHTML = `<span style="color:var(--bad,#C0392B);font-weight:600">✗ ${esc(r.reason || 'не удалось')}</span>`;
+      } catch (e) { res.innerHTML = `<span style="color:var(--bad,#C0392B)">Ошибка: ${esc(e.message)}</span>`; }
+      busyTest.disabled = false;
+    });
+    const calGuide = eb.querySelector('.br-calguide');
+    if (calGuide) calGuide.addEventListener('click', () => openGuide('calendar'));
     const pv = eb.querySelector('[data-brpreview]');
     if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
     const pr = eb.querySelector('[data-brprovision]');
