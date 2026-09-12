@@ -2244,6 +2244,36 @@ async function waGrayApi(db, method, pathx, body) {
   if (!r.ok) throw new Error('worker ' + r.status + ': ' + (j.error || 'ошибка'));
   return j;
 }
+
+/* --- Серый прогрев: подключённые номера тенанта периодически переписываются между собой --- */
+const WARMUP_MSGS = ['Привет! Как дела?', 'Ты на созвоне сегодня?', 'Скинь потом отчёт', 'Ок, договорились 👍', 'Спасибо!', 'Доброе утро ☀️', 'Обедаем в час?', 'Готово, посмотри', 'Хорошего дня', 'Наберу чуть позже', 'Всё в силе?', 'Принял, спасибо'];
+let warmupBusy = false;
+async function warmupTick() {
+  if (warmupBusy) return; warmupBusy = true;
+  try {
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get();
+        const g = db.settings.waGray;
+        if (!g || !g.url || !g.warmup || !g.warmup.running) return;
+        const today = new Date().toISOString().slice(0, 10);
+        if (g.warmup._day !== today) { g.warmup._day = today; g.warmup._sent = 0; }
+        const cap = (g.warmup.perDay || 16) * Math.max(1, (g.numbers || []).length);
+        if ((g.warmup._sent || 0) >= cap) return;
+        let live = {};
+        try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
+        const conn = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
+        if (conn.length < 2) return;
+        const i = Math.floor(Math.random() * conn.length);
+        let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
+        const from = conn[i], to = conn[k];
+        const msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
+        try { await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg }); g.warmup._sent = (g.warmup._sent || 0) + 1; store.save(); } catch (e) {}
+      });
+    }
+  } finally { warmupBusy = false; }
+}
+setInterval(() => { warmupTick().catch(() => {}); }, 12 * 60e3);   /* каждые ~12 мин, cost-safe */
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
   if (t.provider !== 'telnyx' || !t.key || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key, Connection ID и номер «От»');
@@ -4615,7 +4645,7 @@ const server = http.createServer(async (req, res) => {
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
-      return json(res, 200, { ok: true, url: g.url || '', tokenSet: !!g.token, numbers });
+      return json(res, 200, { ok: true, url: g.url || '', tokenSet: !!g.token, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
     }
     /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
     if (p === '/api/wa/gray/connect' && req.method === 'POST') {
@@ -4659,6 +4689,17 @@ const server = http.createServer(async (req, res) => {
       db.settings.waGray.numbers = (db.settings.waGray.numbers || []).filter(n => n.phone !== phone);
       store.save();
       return json(res, 200, { ok: true });
+    }
+    /* прогрев: вкл/выкл + интенсивность */
+    if (p === '/api/wa/gray/warmup' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.waGray = db.settings.waGray || {};
+      db.settings.waGray.warmup = db.settings.waGray.warmup || { running: false, perDay: 16 };
+      if (b.running !== undefined) db.settings.waGray.warmup.running = !!b.running;
+      if (b.perDay !== undefined) db.settings.waGray.warmup.perDay = Math.max(2, Math.min(60, +b.perDay || 16));
+      store.save();
+      return json(res, 200, { ok: true, warmup: db.settings.waGray.warmup });
     }
     /* входящие/события ОТ воркера (публично, но с токеном воркера в Authorization) */
     if (p === '/api/wa/gray/incoming' && req.method === 'POST') {

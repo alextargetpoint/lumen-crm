@@ -792,6 +792,11 @@ window.openGrayManager = async function () {
               <button class="btn btn-sm gn-rm" data-p="${esc(n.phone)}">Убрать</button>
             </div>
           </div>`).join('') || '<div class="muted" style="font-size:13px">Номеров пока нет — добавьте выше.</div>'}
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">
+          <div class="set-row"><div class="sp"><div class="sl">Прогрев номеров</div><div class="sd">Подключённые номера переписываются между собой, чтобы прогреть аккаунты (нужно ≥2 на связи)</div></div>
+            <label class="switch"><input type="checkbox" id="gwWarm" ${data.warmup && data.warmup.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px"><label style="margin:0">Сообщений в день на номер</label><input id="gwPerDay" type="number" min="2" max="60" value="${(data.warmup && data.warmup.perDay) || 16}" style="width:90px"></div>
+        </div>
       ` : '<div class="muted" style="font-size:13px">Сначала сохраните URL и токен воркера (из Railway).</div>'}`;
     $('#gwSave', bd)?.addEventListener('click', async () => {
       try { await api.post('/wa/gray/config', { url: $('#gwUrl', bd).value.trim(), token: $('#gwTok', bd).value.trim() || undefined }); toast('Воркер сохранён', '', true); await refresh(); }
@@ -800,6 +805,8 @@ window.openGrayManager = async function () {
     $('#gwAdd', bd)?.addEventListener('click', () => connectNumber($('#gwPhone', bd).value.trim(), $('#gwLabel', bd).value.trim()));
     $$('.gn-qr', bd).forEach(b => b.addEventListener('click', () => connectNumber(b.dataset.p, '')));
     $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); } catch (e) { toast('Не вышло', e.message); } }));
+    $('#gwWarm', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', '', true); } catch (er) { toast('Не вышло', er.message); } });
+    $('#gwPerDay', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); } catch (er) {} });
   }
   async function connectNumber(phone, label) {
     if (!phone) { toast('Введите номер'); return; }

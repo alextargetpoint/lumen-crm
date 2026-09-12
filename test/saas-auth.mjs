@@ -149,6 +149,12 @@ async function main() {
   let reg3 = {}; try { reg3 = JSON.parse(readFileSync(join(DATA_DIR, 'registry.json'), 'utf8')); } catch {}
   ok('verify: тенант стал verified=true', reg3.tenants?.[regE.tid]?.verified === true);
 
+  // M. прогрев (toggle)
+  const Aown2 = jar(); await jpost(Aown2, '/auth/login', { email: 'a@x.com', password: 'secretA' });
+  const wr = await (await jpost(Aown2, '/api/wa/gray/warmup', { running: true, perDay: 10 })).json().catch(() => ({}));
+  ok('warmup: владелец включает → running=true, perDay=10', wr.ok && wr.warmup?.running === true && wr.warmup?.perDay === 10, JSON.stringify(wr.warmup || {}));
+  ok('warmup: без сессии → 401', (await jpost(jar(), '/api/wa/gray/warmup', { running: true })).status === 401);
+
   finish(srv);
 }
 
