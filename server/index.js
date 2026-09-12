@@ -2597,6 +2597,21 @@ const server = http.createServer(async (req, res) => {
           .map(l => ({ id: l.id, name: l.name, phone: l.phone, geo: l.geoName, avatar: l.avatarUrl || null, lastText: l.lastText, lastMsgAt: l.lastMsgAt, lastDir: l.lastDir, unread: l.unread || 0, stage: l.stage, aiOn: !!(l.ai && l.ai.enabled), needsMe: !(l.ai && l.ai.enabled) && l.lastDir === 'in' && !['deal', 'lost'].includes(l.stage) }));
         return json(res, 200, list);
       }
+      /* СПИСОК ЛИДОВ брокера (мини-CRM: все лиды, не только с чатами) — группируется по стадии на клиенте */
+      if (p === '/tgapp/api/leads' && req.method === 'GET') {
+        const ORDER = ['new', 'first_touch', 'ai_dialog', 'qualified', 'handover', 'viewing', 'deal', 'sleep', 'lost'];
+        const list = db.leads.filter(canSee).map(l => {
+          const v = leadView(db, l);
+          const bud = (l.quals && l.quals.budget && l.quals.budget.value) || '';
+          return {
+            id: l.id, name: l.name, phone: l.phone, geo: v.geoName || '', stage: l.stage, score: l.score || 0,
+            budget: bud, tags: (l.tags || []).slice(0, 3), lastMsgAt: l.lastMsgAt || l.createdAt || 0, lastDir: l.lastDir || null,
+            aiOn: !!(l.ai && l.ai.enabled), unread: l.unread || 0,
+            needsMe: !(l.ai && l.ai.enabled) && l.lastDir === 'in' && !['deal', 'lost'].includes(l.stage),
+          };
+        }).sort((a, b) => { const sa = ORDER.indexOf(a.stage), sb = ORDER.indexOf(b.stage); if (sa !== sb) return (sa < 0 ? 99 : sa) - (sb < 0 ? 99 : sb); return (b.lastMsgAt || 0) - (a.lastMsgAt || 0); });
+        return json(res, 200, list);
+      }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         if (lead.unread) { lead.unread = 0; store.save(); }
