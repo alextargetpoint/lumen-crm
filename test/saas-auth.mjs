@@ -181,6 +181,11 @@ async function main() {
   ok('broker НЕ видит hooks.secret в /api/state', !bfState.b?.settings?.hooks?.secret);
   ok('broker /api/collections без editKey-секрета', (await jget(BF, '/api/collections')).b?.every?.(c => !c.editKey) !== false);
 
+  // Q. изоляция файлов лидов (документы/медиа)
+  ok('leadfile без сессии → 403', (await fetch(BASE + '/assets/leadfiles/anything.jpg')).status === 403);
+  ok('leadfile с сессией, но файл не свой → 403', (await F.req('/assets/leadfiles/anything.jpg')).status === 403);
+  ok('обычный ассет (app.js) отдаётся 200', (await fetch(BASE + '/app.js')).status === 200);
+
   finish(srv);
 }
 

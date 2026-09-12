@@ -9160,8 +9160,14 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     const full = path.join(PUBLIC, file);
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
     /* SEC(#7): документы лида и входящие WA-медиа (паспорта/ВНЖ и пр.) — ТОЛЬКО под валидной сессией,
-       иначе любая утечка URL = вечный доступ постороннего к чувствительному файлу */
-    if (/^\/assets\/(leadfiles|wa-media)\//.test(p) && !getSession(req)) { res.writeHead(403); res.end('forbidden'); return; }
+       иначе любая утечка URL = вечный доступ постороннего к чувствительному файлу.
+       SEC(изоляция тенантов): плюс проверяем, что файл принадлежит ТЕКУЩЕМУ тенанту (его БД ссылается
+       на этот путь) — иначе пользователь другого агентства не скачает чужой документ по угаданному URL. */
+    if (/^\/assets\/(leadfiles|wa-media)\//.test(p)) {
+      if (!getSession(req)) { res.writeHead(403); res.end('forbidden'); return; }
+      let ownsFile = false; try { ownsFile = JSON.stringify(store.get()).includes(p); } catch (e) { ownsFile = false; }
+      if (!ownsFile) { res.writeHead(403); res.end('forbidden'); return; }
+    }
     fs.readFile(full, (err, buf) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       const ext = path.extname(full);
