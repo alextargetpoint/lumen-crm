@@ -365,24 +365,25 @@
   .vids{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
   .vcard{position:relative;aspect-ratio:4/5;border-radius:18px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:#1a1815;display:block;padding:0;font-family:inherit;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
   .vcard:hover{transform:translateY(-4px);box-shadow:0 30px 52px -28px rgba(20,19,17,.4)}
-  .vcard .vposter{position:absolute;inset:0;background:linear-gradient(155deg,#2c2a25,#4a463f 45%,#161309);filter:grayscale(1)}
-  .vcard.v2 .vposter{background:linear-gradient(155deg,#333029,#565049 52%,#1a1714)}
-  .vcard.v3 .vposter{background:linear-gradient(155deg,#26241f,#413d36 55%,#12100c)}
-  .vcard .vposter::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 95% at 50% 18%,rgba(255,255,255,.08),transparent 45%),radial-gradient(120% 90% at 50% 100%,rgba(0,0,0,.62),transparent 55%)}
+  .vcard img.vposter{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.03) brightness(.9);z-index:0;transition:transform .7s var(--ease),filter .6s var(--ease)}
+  .vcard:hover img.vposter{transform:scale(1.04);filter:grayscale(1) contrast(1.05) brightness(.82)}
+  .vcard .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(transparent 20%,rgba(9,8,7,.55) 46%,rgba(9,8,7,.94)),radial-gradient(120% 55% at 50% 0%,rgba(0,0,0,.5),transparent 50%)}
   .vcard video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
-  .vcard .play{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:50%;background:rgba(243,241,236,.94);display:flex;align-items:center;justify-content:center;transition:transform .4s var(--ease);z-index:2}
+  .vcard .play{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:50%;background:rgba(243,241,236,.94);display:flex;align-items:center;justify-content:center;transition:transform .4s var(--ease);z-index:3}
   .vcard:hover .play{transform:translate(-50%,-50%) scale(1.09)}
-  .vcard .play svg{width:19px;height:19px;margin-left:3px;fill:#141311}
-  .vcard .vtag{position:absolute;top:14px;left:14px;z-index:2;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#f3f1ec;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 11px;backdrop-filter:blur(6px)}
-  .vcard .vcap{position:absolute;left:0;right:0;bottom:0;padding:18px;z-index:2;background:linear-gradient(transparent,rgba(9,8,7,.85));color:#f3f1ec;text-align:left}
+  .vcard .play svg{width:18px;height:18px;margin-left:3px;fill:#141311}
+  .vcard .vtag{position:absolute;top:14px;left:14px;z-index:3;font-size:9.5px;letter-spacing:.1em;color:#f3f1ec;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.24);border-radius:999px;padding:5px 11px;backdrop-filter:blur(6px)}
+  .vcard .vcap{position:absolute;left:0;right:0;bottom:0;padding:20px 18px 18px;z-index:3;color:#f3f1ec;text-align:left;text-shadow:0 1px 12px rgba(0,0,0,.55);background:linear-gradient(transparent,rgba(9,8,7,.35) 22%,rgba(9,8,7,.82) 62%)}
+  .vcard .vkpi{display:block;font-family:var(--serif);font-weight:300;font-size:32px;line-height:1;letter-spacing:-.02em;margin-bottom:8px;color:#fff;text-shadow:0 2px 16px rgba(0,0,0,.75)}
+  .vcard .vkpi em{font-style:normal;font-size:12px;color:#c9c5be;letter-spacing:0}
   .vcard .vcap b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.1}
-  .vcard .vcap span{font-size:12px;color:#c9c5be}
+  .vcard .vcap>span{font-size:12px;color:#c9c5be}
   @media(max-width:760px){.vids{grid-template-columns:1fr 1fr}}
   @media(max-width:480px){.vids{grid-template-columns:1fr}}
   .vlb{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:22px}
   .vlb.on{display:flex}
-  .vlb-in{width:min(392px,92vw);aspect-ratio:9/16;max-height:88vh;border-radius:22px;overflow:hidden;background:#000;position:relative;border:1px solid rgba(255,255,255,.14)}
-  .vlb-in video{width:100%;height:100%;object-fit:cover}
+  .vlb-in{width:min(440px,92vw);max-height:86vh;border-radius:22px;overflow:hidden;background:#000;position:relative;border:1px solid rgba(255,255,255,.14);line-height:0}
+  .vlb-in video{width:100%;height:auto;max-height:86vh;display:block;object-fit:contain}
   .vlb-x{position:absolute;top:-46px;right:0;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;color:#f3f1ec;cursor:pointer;font-size:15px}
   .vcard.vshake{animation:vsh .42s}
   @keyframes vsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(5px)}}
@@ -797,13 +798,16 @@
 <!-- КЕЙСЫ · ОТЗЫВЫ (светлая, та же зона) -->
 <section class="sec light" id="cases">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Голоса рынка</span>
-      <h2 style="margin-top:22px">Кейсы и <em>отзывы</em></h2>
-      <p class="lede" style="margin:18px auto 0;text-align:center">Коротко и по делу — агентства и брокеры о том, что изменилось, когда лиды перестали теряться.</p></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">Кейсы TargetPoint</span>
+      <h2 style="margin-top:22px">За Lumen — команда, <em>которая уже привела эти цифры</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">Lumen построило перформанс-агентство TargetPoint: пять лет, 16 рынков, тысячи лидов в недвижимости. Часть кейсов — вживую.</p></div>
     <div class="vids" data-r>
-      <button class="vcard" type="button" data-video="/assets/reviews/1.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Руководитель агентства</b><span>Дубай · команда из 6 брокеров</span></div></button>
-      <button class="vcard v2" type="button" data-video="/assets/reviews/2.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Соло-брокер</b><span>Бали · продажи вилл</span></div></button>
-      <button class="vcard v3" type="button" data-video="/assets/reviews/3.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Основатель агентства</b><span>Испания · ВНЖ и недвижимость</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-baytify.mp4"><img class="vposter" src="/assets/cases/covers/baytify.jpg" loading="lazy" alt="Baytify"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">17 <em>сделок</em></span><b>Baytify</b><span>825 лидов за 4 месяца · масштаб в Дубае</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-ourplace.mp4"><img class="vposter" src="/assets/cases/covers/ourplace.jpg" loading="lazy" alt="Our Place"><span class="scrim"></span><span class="vtag">🇮🇩 Бали</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">32% <em>квал.</em></span><b>Our Place</b><span>386 лидов для проекта на Бали · $13 CPL</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-buro.mp4"><img class="vposter" src="/assets/cases/covers/buro.jpg" loading="lazy" alt="Buro"><span class="scrim"></span><span class="vtag">🇪🇸 Испания</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">€13,9 <em>CPL</em></span><b>Buro</b><span>489 лидов на рынках RU и EN</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-premium.mp4"><img class="vposter" src="/assets/cases/covers/premium.jpg" loading="lazy" alt="Premium Quality"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">30%+ <em>квал.</em></span><b>Premium Quality</b><span>Качественные RU/EN лиды на бюджете $50k</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ лид</em></span><b>OrangeLife</b><span>Инвестцентр в Дубае · бюджет $48k</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>сделки</em></span><b>Highgrove</b><span>Объекты в Дубае за 3,5 месяца</span></div></button>
     </div>
   </div>
 </section>
