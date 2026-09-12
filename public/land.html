@@ -311,9 +311,6 @@
   .pl-img.c{background:linear-gradient(140deg,#d4cec2,#8a8375)}
   .pl-info b{display:block;font-family:var(--serif);font-weight:500;font-size:13px;color:#141311}
   .pl-info span{font-size:10.5px;color:#8b8983}
-  .ap-dots{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:6}
-  .ap-dots i{width:5px;height:5px;border-radius:50%;background:#cbc4b8;transition:.35s var(--ease)}
-  .ap-dots i.on{background:#1a1815;width:15px;border-radius:3px}
 
   /* каналы → визуальные ноды, стекающиеся в телефон */
   .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
@@ -367,6 +364,8 @@
   .vcard:hover{transform:translateY(-4px);box-shadow:0 30px 52px -28px rgba(20,19,17,.4)}
   .vcard img.vposter{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.03) brightness(.9);z-index:0;transition:transform .7s var(--ease),filter .6s var(--ease)}
   .vcard:hover img.vposter{transform:scale(1.04);filter:grayscale(1) contrast(1.05) brightness(.82)}
+  .vcard .vvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.04) brightness(.86);z-index:0;opacity:0;transition:opacity .55s var(--ease)}
+  .vcard:hover .vvid{opacity:1}
   .vcard .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(transparent 20%,rgba(9,8,7,.55) 46%,rgba(9,8,7,.94)),radial-gradient(120% 55% at 50% 0%,rgba(0,0,0,.5),transparent 50%)}
   .vcard video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
   .vcard .play{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;border-radius:50%;background:rgba(243,241,236,.94);display:flex;align-items:center;justify-content:center;transition:transform .4s var(--ease);z-index:3}
@@ -380,11 +379,23 @@
   .vcard .vcap>span{font-size:12px;color:#c9c5be}
   @media(max-width:760px){.vids{grid-template-columns:1fr 1fr}}
   @media(max-width:480px){.vids{grid-template-columns:1fr}}
-  .vlb{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:22px}
-  .vlb.on{display:flex}
-  .vlb-in{width:min(440px,92vw);max-height:86vh;border-radius:22px;overflow:hidden;background:#000;position:relative;border:1px solid rgba(255,255,255,.14);line-height:0}
-  .vlb-in video{width:100%;height:auto;max-height:86vh;display:block;object-fit:contain}
-  .vlb-x{position:absolute;top:-46px;right:0;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;color:#f3f1ec;cursor:pointer;font-size:15px}
+  .cpop{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.86);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px}
+  .cpop.on{display:flex}
+  .cpop-card{position:relative;width:min(720px,94vw);max-height:88vh;background:#0f0f10;border:1px solid rgba(255,255,255,.12);border-radius:22px;overflow:hidden;display:grid;grid-template-columns:290px 1fr;box-shadow:0 40px 90px rgba(0,0,0,.5);transform:translateY(20px) scale(.98);transition:transform .5s var(--ease)}
+  .cpop.on .cpop-card{transform:none}
+  .cpop-vid{background:#000;position:relative;overflow:hidden}
+  .cpop-vid video{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(1) contrast(1.03) brightness(.92)}
+  .cpop-txt{padding:clamp(24px,3vw,34px);color:#f3f1ec;display:flex;flex-direction:column;min-width:0}
+  .cpop-geo{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#a9a49b}
+  .cpop-kpi{font-family:var(--serif);font-weight:300;font-size:clamp(40px,5vw,56px);line-height:1;letter-spacing:-.02em;margin:14px 0 2px;color:#fff}
+  .cpop-kpi em{font-style:normal;font-size:14px;color:#a9a49b;letter-spacing:0}
+  .cpop-txt h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:8px 0 10px}
+  .cpop-txt p{font-size:14px;line-height:1.6;color:#a7a6a3;font-weight:300}
+  .cpop-link{margin-top:auto;padding-top:22px;font-size:12.5px;letter-spacing:.03em;color:#cfcdc8;border-bottom:1px solid rgba(207,205,200,.3);align-self:flex-start;transition:color .3s}
+  .cpop-link:hover{color:#fff}
+  .cpop-x{position:absolute;top:14px;right:14px;z-index:4;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(10,10,11,.5);color:#f3f1ec;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.3s}
+  .cpop-x:hover{border-color:rgba(255,255,255,.4);transform:rotate(90deg)}
+  @media(max-width:640px){.cpop-card{grid-template-columns:1fr;max-height:92vh;overflow:auto}.cpop-vid{aspect-ratio:5/4}}
   .vcard.vshake{animation:vsh .42s}
   @keyframes vsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(5px)}}
 
@@ -685,7 +696,6 @@
             <span class="pisl"></span>
             <div class="appui" aria-label="Приложение Lumen — переписка, карточка, сводка">
               <div class="ap-sb"></div>
-              <div class="ap-dots" id="apDots"><i class="on"></i><i></i><i></i><i></i></div>
               <!-- 1 · Переписка -->
               <div class="ap-scr on" data-s="chat">
                 <div class="ap-hd">
@@ -802,12 +812,12 @@
       <h2 style="margin-top:22px">За Lumen — команда, <em>которая уже привела эти цифры</em></h2>
       <p class="lede" style="margin:18px auto 0;text-align:center">Lumen построило перформанс-агентство TargetPoint: пять лет, 16 рынков, тысячи лидов в недвижимости. Часть кейсов — вживую.</p></div>
     <div class="vids" data-r>
-      <button class="vcard" type="button" data-video="/assets/cases/case-baytify.mp4"><img class="vposter" src="/assets/cases/covers/baytify.jpg" loading="lazy" alt="Baytify"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">17 <em>сделок</em></span><b>Baytify</b><span>825 лидов за 4 месяца · масштаб в Дубае</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-ourplace.mp4"><img class="vposter" src="/assets/cases/covers/ourplace.jpg" loading="lazy" alt="Our Place"><span class="scrim"></span><span class="vtag">🇮🇩 Бали</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">32% <em>квал.</em></span><b>Our Place</b><span>386 лидов для проекта на Бали · $13 CPL</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-buro.mp4"><img class="vposter" src="/assets/cases/covers/buro.jpg" loading="lazy" alt="Buro"><span class="scrim"></span><span class="vtag">🇪🇸 Испания</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">€13,9 <em>CPL</em></span><b>Buro</b><span>489 лидов на рынках RU и EN</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-premium.mp4"><img class="vposter" src="/assets/cases/covers/premium.jpg" loading="lazy" alt="Premium Quality"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">30%+ <em>квал.</em></span><b>Premium Quality</b><span>Качественные RU/EN лиды на бюджете $50k</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ лид</em></span><b>OrangeLife</b><span>Инвестцентр в Дубае · бюджет $48k</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>сделки</em></span><b>Highgrove</b><span>Объекты в Дубае за 3,5 месяца</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-baytify.mp4"><img class="vposter" src="/assets/cases/covers/baytify.jpg" loading="lazy" alt="Baytify"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-baytify.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">17 <em>сделок</em></span><b>Baytify</b><span>825 лидов за 4 месяца · масштаб в Дубае</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-ourplace.mp4"><img class="vposter" src="/assets/cases/covers/ourplace.jpg" loading="lazy" alt="Our Place"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-ourplace.mp4"></video><span class="scrim"></span><span class="vtag">🇮🇩 Бали</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">32% <em>квал.</em></span><b>Our Place</b><span>386 лидов для проекта на Бали · $13 CPL</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-buro.mp4"><img class="vposter" src="/assets/cases/covers/buro.jpg" loading="lazy" alt="Buro"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-buro.mp4"></video><span class="scrim"></span><span class="vtag">🇪🇸 Испания</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">€13,9 <em>CPL</em></span><b>Buro</b><span>489 лидов на рынках RU и EN</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-premium.mp4"><img class="vposter" src="/assets/cases/covers/premium.jpg" loading="lazy" alt="Premium Quality"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-premium.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">30%+ <em>квал.</em></span><b>Premium Quality</b><span>Качественные RU/EN лиды на бюджете $50k</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-orange.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ лид</em></span><b>OrangeLife</b><span>Инвестцентр в Дубае · бюджет $48k</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-highgrove.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>сделки</em></span><b>Highgrove</b><span>Объекты в Дубае за 3,5 месяца</span></div></button>
     </div>
   </div>
 </section>
@@ -941,8 +951,18 @@
   <div class="cbtns"><button class="acc" id="ckAccept">Принять</button><button id="ckReject">Только необходимые</button></div>
 </div>
 
-<!-- ВИДЕО-ЛАЙТБОКС -->
-<div class="vlb" id="vlb"><div class="vlb-in"><button class="vlb-x" id="vlbX" aria-label="Закрыть">✕</button><video id="vlbV" controls playsinline></video></div></div>
+<!-- POPUP КЕЙСА (видео + текст) -->
+<div class="cpop" id="cpop" aria-hidden="true"><div class="cpop-card">
+  <button class="cpop-x" id="cpopX" aria-label="Закрыть">✕</button>
+  <div class="cpop-vid"><video id="cpopV" muted loop playsinline></video></div>
+  <div class="cpop-txt">
+    <span class="cpop-geo" id="cpopGeo"></span>
+    <div class="cpop-kpi" id="cpopKpi"></div>
+    <h3 id="cpopName"></h3>
+    <p id="cpopDesc"></p>
+    <a class="cpop-link" id="cpopLink" target="_blank" rel="noopener">Смотреть кейс на targetpoint.agency →</a>
+  </div>
+</div></div>
 
 <script>
   var nav=document.getElementById('nav');
@@ -1104,25 +1124,38 @@
   })();
 
   /* ── тур по экранам телефона: переписка → карточка → сводка → подборка ── */
-  (function(){var scrs=[].slice.call(document.querySelectorAll('.appui .ap-scr'));var dots=[].slice.call(document.querySelectorAll('#apDots i'));if(scrs.length<2)return;
+  (function(){var scrs=[].slice.call(document.querySelectorAll('.appui .ap-scr'));if(scrs.length<2)return;
     var i=0,started=false;
-    function show(n){scrs.forEach(function(s,k){s.classList.toggle('on',k===n)});dots.forEach(function(d,k){d.classList.toggle('on',k===n)});}
+    function show(n){scrs.forEach(function(s,k){s.classList.toggle('on',k===n)});}
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting&&!started){started=true;
       setTimeout(function tick(){i=(i+1)%scrs.length;show(i);setTimeout(tick,3600);},4400);
     }})},{threshold:.2});
     io.observe(document.getElementById('phone3d'));
   })();
 
-  /* ── видео-отзывы: лайтбокс (открывает только реальный файл; иначе мягкий shake) ── */
-  (function(){var lb=document.getElementById('vlb');if(!lb)return;var v=document.getElementById('vlbV');
-    function open(src){v.src=src;lb.classList.add('on');document.body.style.overflow='hidden';v.play&&v.play().catch(function(){});}
-    function close(){lb.classList.remove('on');try{v.pause();}catch(e){}v.removeAttribute('src');try{v.load();}catch(e){}document.body.style.overflow='';}
-    document.querySelectorAll('.vcard').forEach(function(c){c.addEventListener('click',function(){var src=c.getAttribute('data-video');if(!src){return;}
-      fetch(src,{method:'HEAD'}).then(function(r){if(r.ok)open(src);else shake(c);}).catch(function(){shake(c);});});});
-    function shake(c){c.classList.add('vshake');setTimeout(function(){c.classList.remove('vshake');},440);}
-    document.getElementById('vlbX').onclick=close;
-    lb.addEventListener('click',function(e){if(e.target===lb)close();});
-    addEventListener('keydown',function(e){if(e.key==='Escape'&&lb.classList.contains('on'))close();});
+  /* ── кейсы: видео по ховеру в карточке + минимальный popup с текстом кейса ── */
+  (function(){var pop=document.getElementById('cpop');if(!pop)return;var pv=document.getElementById('cpopV');
+    function txt(c,sel){var e=c.querySelector(sel);return e?e.textContent.trim():'';}
+    document.querySelectorAll('.vcard').forEach(function(c){
+      var vid=c.querySelector('.vvid');
+      if(vid){c.addEventListener('mouseenter',function(){vid.play&&vid.play().catch(function(){});});
+        c.addEventListener('mouseleave',function(){try{vid.pause();}catch(e){}});}
+      c.addEventListener('click',function(){openPop(c);});
+    });
+    function openPop(c){var src=c.getAttribute('data-video')||'';
+      document.getElementById('cpopGeo').textContent=txt(c,'.vtag');
+      document.getElementById('cpopKpi').innerHTML=(c.querySelector('.vkpi')||{}).innerHTML||'';
+      document.getElementById('cpopName').textContent=txt(c,'.vcap b');
+      document.getElementById('cpopDesc').textContent=txt(c,'.vcap > span:not(.vkpi)');
+      var m=src.match(/case-([a-z0-9]+)\.mp4/),link=document.getElementById('cpopLink');
+      if(m){link.href='https://targetpoint.agency/case.html?id='+m[1];link.style.display='';}else{link.style.display='none';}
+      if(src){pv.src=src;pv.play&&pv.play().catch(function(){});}
+      pop.classList.add('on');pop.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
+    }
+    function close(){pop.classList.remove('on');pop.setAttribute('aria-hidden','true');try{pv.pause();}catch(e){}pv.removeAttribute('src');try{pv.load();}catch(e){}document.body.style.overflow='';}
+    document.getElementById('cpopX').onclick=close;
+    pop.addEventListener('click',function(e){if(e.target===pop)close();});
+    addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.classList.contains('on'))close();});
   })();
 </script>
 </body>
