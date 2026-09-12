@@ -167,6 +167,43 @@
   .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
+  /* ── НАТИВНЫЕ ВИДЖЕТЫ «Ателье» (вместо скриншотов) ── */
+  .dash{margin-top:50px}
+  .dgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:15px;align-items:stretch}
+  .dcard{background:#fffdfa;border:1px solid #e8e1d8;border-radius:18px;padding:22px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 26px 44px -30px rgba(20,19,17,.28)}
+  .dcard .dc-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--serif);font-weight:500;font-size:18px;color:#141311;margin-bottom:16px}
+  .dcard .dc-hd span{font-family:var(--sans);font-size:10.5px;letter-spacing:.08em;color:#8b8983;text-transform:uppercase;font-weight:600}
+  .dhero{grid-row:span 2;background:linear-gradient(160deg,#221f1a,#131110);border-color:transparent;color:#f3f1ec;display:flex;flex-direction:column}
+  .dhero .dh-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#a9a49b;letter-spacing:.03em}
+  .dhero .dh-badge{font-size:11px;color:#8fce9e;background:rgba(143,206,158,.13);border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .dhero .dh-num{font-family:var(--serif);font-weight:300;font-size:clamp(54px,7vw,90px);line-height:1;margin-top:16px;letter-spacing:-.03em}
+  .dhero .dh-sub{font-size:12.5px;color:#8b8681;margin-top:7px}
+  .dhero .dh-bars{display:flex;align-items:flex-end;gap:5px;height:78px;margin-top:auto;padding-top:24px}
+  .dhero .dh-bars i{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,rgba(243,241,236,.5),rgba(243,241,236,.1))}
+  .dhero .dh-bars i:nth-last-child(-n+2){background:linear-gradient(180deg,#f3f1ec,rgba(243,241,236,.35))}
+  .dkpis{display:flex;flex-direction:column;gap:15px}
+  .dkpi{background:#fffdfa;border:1px solid #e8e1d8;border-radius:16px;padding:15px 18px;display:flex;flex-direction:column;gap:2px;flex:1;justify-content:center}
+  .dkpi b{font-family:var(--serif);font-weight:300;font-size:clamp(28px,3vw,36px);line-height:1;color:#141311}
+  .dkpi span{font-size:13px;color:#141311;font-weight:600;margin-top:4px}
+  .dkpi em{font-style:normal;font-size:11.5px;color:#8b8983}
+  .ddonut .dd-row{display:flex;align-items:center;gap:18px}
+  .donut{width:100px;height:100px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative;background:conic-gradient(#1a1815 0 52%,#a79f92 52% 68%,#cbc4b8 68% 84%,#e8e2d9 84% 100%)}
+  .donut::before{content:"";position:absolute;inset:13px;background:#fffdfa;border-radius:50%}
+  .donut b{position:relative;font-family:var(--serif);font-weight:400;font-size:25px;color:#141311;text-align:center;line-height:1}
+  .donut b span{display:block;font-family:var(--sans);font-size:8.5px;letter-spacing:.1em;color:#8b8983;text-transform:uppercase;font-weight:600;margin-top:1px}
+  .dlegend{list-style:none;display:grid;gap:9px;flex:1;margin:0;padding:0}
+  .dlegend li{display:flex;align-items:center;gap:9px;font-size:13px;color:#54524d}
+  .dlegend li i{width:8px;height:8px;border-radius:2px;flex:none}
+  .dlegend li b{margin-left:auto;font-weight:600;color:#141311;font-variant-numeric:tabular-nums}
+  .dtasks ul{list-style:none;display:grid;gap:0;margin:0;padding:0}
+  .dtasks li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #efe9e2;font-size:13.5px;color:#141311}
+  .dtasks li:first-child{border-top:none}
+  .dtasks li .chk{width:17px;height:17px;border-radius:5px;border:1.5px solid #cdc6bc;flex:none}
+  .dtasks li em{margin-left:auto;font-style:normal;font-size:10.5px;color:#b06a52;background:rgba(176,106,82,.1);border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .dtasks li .who{margin-left:auto;font-size:11px;color:#8b8983;white-space:nowrap}
+  @media(max-width:860px){.dgrid{grid-template-columns:1fr 1fr}.dhero{grid-row:auto;grid-column:span 2}}
+  @media(max-width:560px){.dgrid{grid-template-columns:1fr}.dhero{grid-column:span 1}}
+
   /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
@@ -477,12 +514,40 @@
   <div class="wrap">
     <div data-r><span class="eyebrow">Внутри продукта</span>
       <h2 style="margin-top:22px;max-width:18ch">Рабочий стол агентства, <em>а не набор вкладок</em></h2></div>
-    <div class="screens">
-      <div class="shot wide" data-r><img src="/assets/theme-mono.png" alt="Обзор" loading="lazy"><div class="cap"><b>Обзор</b><span>командный центр: воронка, горячие лиды, задачи, деньги</span></div></div>
-      <div class="shot d1" data-r><img src="/assets/site/cap-funnel.png" alt="Воронка" loading="lazy"><div class="cap"><b>Воронка</b><span>каждый лид и стадия сделки</span></div></div>
-      <div class="shot d2" data-r><img src="/assets/site/cap-leadcard.png" alt="Карточка лида" loading="lazy"><div class="cap"><b>Карточка лида</b><span>переписка, психо-портрет, история</span></div></div>
-      <div class="shot d1" data-r><img src="/assets/site/cap-collections.png" alt="Подборки" loading="lazy"><div class="cap"><b>Подборки</b><span>живые презентации объектов</span></div></div>
-      <div class="shot d2" data-r><img src="/assets/site/cap-analytics.png" alt="Аналитика" loading="lazy"><div class="cap"><b>Аналитика</b><span>деньги и эффективность в цифрах</span></div></div>
+    <div class="dash" data-r>
+      <div class="dgrid">
+        <div class="dcard dhero">
+          <div class="dh-top"><span>Новые лиды · 14 дней</span><span class="dh-badge">▲ 100%</span></div>
+          <div class="dh-num">23</div>
+          <div class="dh-sub">30 всего в работе · 5 в живом диалоге</div>
+          <div class="dh-bars"><i style="height:36%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:64%"></i><i style="height:50%"></i><i style="height:73%"></i><i style="height:58%"></i><i style="height:85%"></i><i style="height:70%"></i><i style="height:97%"></i></div>
+        </div>
+        <div class="dkpis">
+          <div class="dkpi"><b>5</b><span>В диалоге с ИИ</span><em>отвечает за секунды</em></div>
+          <div class="dkpi"><b>12</b><span>Квалифицировано</span><em>с психо-портретом</em></div>
+          <div class="dkpi"><b>3</b><span>Дошло до сделки</span><em>переданы брокеру</em></div>
+        </div>
+        <div class="dcard ddonut">
+          <div class="dc-hd">Статусы лидов <span>воронка</span></div>
+          <div class="dd-row">
+            <div class="donut"><b>31<span>лида</span></b></div>
+            <ul class="dlegend">
+              <li><i style="background:#1a1815"></i>Новые<b>16</b></li>
+              <li><i style="background:#a79f92"></i>В диалоге<b>5</b></li>
+              <li><i style="background:#cbc4b8"></i>Квалификация<b>5</b></li>
+              <li><i style="background:#e8e2d9"></i>У брокера<b>4</b></li>
+            </ul>
+          </div>
+        </div>
+        <div class="dcard dtasks">
+          <div class="dc-hd">Мои задачи <span>16 открыто</span></div>
+          <ul>
+            <li><span class="chk"></span>Перезвонить лиду с Пхукета<em>просрочено</em></li>
+            <li><span class="chk"></span>Показ ЖК Marina, 16:00<span class="who">сегодня</span></li>
+            <li><span class="chk"></span>Follow-up тёплых лидов<span class="who">3 шт</span></li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="tgshow" data-r>
