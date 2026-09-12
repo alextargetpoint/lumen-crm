@@ -4327,7 +4327,9 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 .mb-addpanel:not(.open) { display: none; }   /* закрытая — 0 высоты (холст сразу под шапкой, без остаточного зазора) */
 .mb-addpanel.open { display: grid; grid-template-rows: 1fr; grid-auto-rows: auto; opacity: 1; pointer-events: auto; margin: -4px 0 2px; }
 .mb-addpanel > * { min-height: 0; overflow: hidden; }
-.mb-addpanel .mb-inp { display: flex; gap: 8px; padding-top: 4px; }
+/* padding по бокам/снизу = запас под 3px фокус-ринг инпута: .mb-addpanel>* имеет overflow:hidden
+   (нужен для грид-коллапса), и без запаса ринг обрезался по краям. */
+.mb-addpanel .mb-inp { display: flex; gap: 8px; padding: 5px 5px 6px; }
 .mb-inp input { flex: 1; min-width: 0; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 15px; font-size: 13.5px; outline: none; background: var(--card); }
 .mb-inp input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
 .mb-addopts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 2px 2px; }
