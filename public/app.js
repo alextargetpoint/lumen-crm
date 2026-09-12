@@ -10887,6 +10887,7 @@ PAGES.settings = async (root) => {
       <div class="form-row" style="margin-top:6px"><label>Telegram Bot Token (отдельный бот моста, от @BotFather)</label><input id="tgbToken" type="password" placeholder="${s.tgBridge && s.tgBridge.tokenSet ? '•••••• сохранён' : '123456:AA… — можно тот же, что для отчётов'}"></div>
       <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="tgbSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="tgbSetup" title="Прописать вебхук боту (нужен запущенный туннель)">${ic(I.link)}Настроить вебхук</button></div>
       <div id="tgbBrokers" class="muted" style="font-size:12px">Загрузка кодов привязки…</div>
+      <div class="muted" style="font-size:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">👑 <b>Основатель</b> — аналитика агентства и пульт с телефона. Отправьте боту: <code class="pill" data-tgbcode="${esc(s.ownerTgCode || '')}" style="padding:6px 9px;cursor:pointer" title="Скопировать">/start ${esc(s.ownerTgCode || '—')}</code>${s.ownerTgChatId ? ' · <span class="badge ok">привязан</span>' : ''}</div>
     </div>`;
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   $('#portalSave')?.addEventListener('click', async () => {

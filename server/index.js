@@ -85,6 +85,7 @@ const DEFAULT_PASS = 'lumen2026';
   if (db.settings.ai.provider === 'mock') { db.settings.ai.provider = 'auto'; store.save(); }
   /* миграция: мост лидов + база рекламных объявлений */
   if (!db.settings.hooks) db.settings.hooks = { secret: crypto.randomBytes(10).toString('hex'), outboundUrl: '' };
+  if (!db.settings.ownerTgCode) db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');   /* код привязки основателя к боту (аналитика с телефона) */
   if (!db.ads) db.ads = [
     { adId: '120211478921230508', name: 'Дубай · Мортгейдж 0% · видео-тур JVC', priceFrom: 190000, adsetName: 'RU 30-55 инвесторы', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
     { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', priceFrom: 180000, adsetName: 'RU широкая', campaignName: 'DXB Lead Forms Сентябрь', geo: 'dubai' },
@@ -2234,6 +2235,16 @@ function tgAppBroker(req, db) {
   if (!user || !user.id) return null;
   return db.brokers.find(b => String(b.tgChatId) === String(user.id) && b.active !== false) || null;
 }
+/* роль пользователя мини-аппа: брокер (по tgChatId) ИЛИ основатель (по settings.ownerTgChatId).
+   Брокерская резолюция идентична tgAppBroker — существующий путь не меняется. */
+function tgAppUser(req, db) {
+  const user = tgValidateInitData(req.headers['x-tg-init-data'] || '', tgbridge.token(db));
+  if (!user || !user.id) return null;
+  const broker = db.brokers.find(b => String(b.tgChatId) === String(user.id) && b.active !== false);
+  if (broker) return { role: 'broker', broker };
+  if (db.settings.ownerTgChatId && String(db.settings.ownerTgChatId) === String(user.id)) return { role: 'owner' };
+  return null;
+}
 
 /* часовой пояс по коду страны телефона (грубо, для тихих часов достаточно) */
 const PHONE_TZ = [['7', 3], ['971', 4], ['966', 3], ['968', 4], ['974', 3], ['62', 8], ['66', 7], ['34', 2], ['39', 2], ['49', 2], ['33', 2], ['44', 1], ['48', 2], ['380', 3], ['375', 3], ['998', 5], ['996', 6], ['992', 5], ['994', 4], ['995', 4], ['374', 4], ['90', 3], ['972', 3], ['20', 3], ['1', -5], ['86', 8], ['91', 5.5], ['81', 9]];
@@ -2600,10 +2611,37 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (p.startsWith('/tgapp/api/')) {
-      const abroker = tgAppBroker(req, db);
-      if (!abroker) return json(res, 401, { error: 'нет привязки брокера — откройте через кнопку бота' });
-      const canSee = l => l && l.broker === abroker.id;
+      const auser = tgAppUser(req, db);
+      if (!auser) return json(res, 401, { error: 'нет привязки — откройте через кнопку бота' });
+      const abroker = auser.broker || null;   /* для основателя null → брокерские эндпоинты вернут пусто (canSee=false) */
+      const canSee = l => !!abroker && l && l.broker === abroker.id;
       let tam;
+      /* кто я: роль + имя (бот строит навигацию по роли) */
+      if (p === '/tgapp/api/me' && req.method === 'GET') {
+        return json(res, 200, { role: auser.role, name: auser.role === 'owner' ? 'Основатель' : (abroker && abroker.name) || '', agency: (db.settings.agency && db.settings.agency.name) || '' });
+      }
+      /* АНАЛИТИКА ДЛЯ ОСНОВАТЕЛЯ (сводка с телефона) */
+      if (p === '/tgapp/api/analytics' && req.method === 'GET') {
+        if (auser.role !== 'owner') return json(res, 403, { error: 'только для основателя' });
+        const a = analytics(db);
+        const src = (a.bySource || []).filter(s => s.total >= 3);
+        const best = src.slice().sort((x, y) => y.conv - x.conv)[0] || null;
+        const worst = src.slice().sort((x, y) => x.conv - y.conv)[0] || null;
+        const _ds = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+        const today = _ds(Date.now()), yest = _ds(Date.now() - 864e5);
+        const todayLeads = db.leads.filter(l => _ds(l.createdAt || 0) === today).length;
+        const yestLeads = db.leads.filter(l => _ds(l.createdAt || 0) === yest).length;
+        const qTotal = db.leads.filter(l => ['qualified', 'handover', 'viewing', 'deal'].includes(l.stage)).length;
+        return json(res, 200, {
+          totalActive: a.totalActive || 0, unread: a.unread || 0, qualified: qTotal,
+          todayLeads, yestLeads,
+          funnel: a.funnel || {},
+          byBroker: (a.byBroker || []).slice(0, 8).map(b => ({ name: b.name, leads: b.leads || b.total || 0, qualified: b.qualified || 0, conv: b.conv || (b.total ? Math.round((b.qualified || 0) / b.total * 100) : 0) })),
+          bestSource: best ? { k: best.k || best.name, conv: best.conv, total: best.total } : null,
+          worstSource: worst && worst !== best ? { k: worst.k || worst.name, conv: worst.conv, total: worst.total } : null,
+          trend: (a.trend || []).slice(-14).map(t => t.total),
+        });
+      }
       if (p === '/tgapp/api/chats' && req.method === 'GET') {
         const list = db.leads.filter(canSee).map(l => leadView(db, l))
           .filter(l => l.stage !== 'lost')

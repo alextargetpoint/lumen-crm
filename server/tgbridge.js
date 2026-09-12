@@ -147,6 +147,12 @@ async function handleUpdate(db, update) {
   /* привязка: /start <код> */
   if (text.startsWith('/start')) {
     const code = text.split(/\s+/)[1] || '';
+    /* код основателя → привязка owner (аналитика/пульт с телефона) */
+    if (code && db.settings.ownerTgCode && code.trim().toLowerCase() === String(db.settings.ownerTgCode).toLowerCase()) {
+      db.settings.ownerTgChatId = chatId; store.save();
+      await safeApi(db, 'sendMessage', { chat_id: chatId, text: '✅ Привязано: Основатель.\nОткройте мини-приложение — увидите аналитику агентства и пульт с телефона.' });
+      return { bound: true, owner: true };
+    }
     const r = bindBroker(db, chatId, code);
     await safeApi(db, 'sendMessage', {
       chat_id: chatId,
