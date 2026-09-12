@@ -3394,7 +3394,10 @@ const server = http.createServer(async (req, res) => {
     const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Медиапланы: публичное утверждение/отклонение подрядчиком авторизуется тем же edit-ключом (?key=hooks.secret), что и /mp/:id */
     const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk) return json(res, 401, { error: 'auth required' });
+    /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
+    const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
+    const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -4421,6 +4424,24 @@ const server = http.createServer(async (req, res) => {
         }
       } catch (e) {}
       return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- Одноразовая миграция базы локаль→облако ----------------
+       Работает ТОЛЬКО если задан env MIGRATION_TOKEN и он совпадает с Bearer.
+       После переноса переменную убрать (эндпоинт снова закроется). */
+    if (p === '/api/admin/import-db' && req.method === 'POST') {
+      const mt = process.env.MIGRATION_TOKEN || '';
+      const auth = req.headers.authorization || ''; const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      if (!mt || tok !== mt) return json(res, 401, { error: 'unauthorized' });
+      const b = await readBody(req);
+      if (!b || typeof b !== 'object' || !b.settings || !Array.isArray(b.leads)) return json(res, 400, { error: 'не похоже на db.json (нет settings/leads)' });
+      try {
+        const tmp = store.DB_FILE + '.import';
+        fs.writeFileSync(tmp, JSON.stringify(b, null, 1));
+        fs.renameSync(tmp, store.DB_FILE);
+        store.reloadFromDisk();
+        return json(res, 200, { ok: true, leads: b.leads.length, brokers: (b.brokers || []).length });
+      } catch (e) { return json(res, 500, { ok: false, error: e.message }); }
     }
 
     /* ---------------- встречи ---------------- */

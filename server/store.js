@@ -52,10 +52,16 @@ function reset(seedFn) {
   return db;
 }
 
+/* перечитать БД с диска (после внешнего импорта файла) */
+function reloadFromDisk() {
+  if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  return db;
+}
+
 let idCounter = Date.now() % 1e8;
 function nextId(prefix) {
   idCounter += 1;
   return prefix + '_' + idCounter.toString(36);
 }
 
-module.exports = { load, get, save, saveNow, reset, nextId, DB_FILE };
+module.exports = { load, get, save, saveNow, reset, reloadFromDisk, nextId, DB_FILE };
