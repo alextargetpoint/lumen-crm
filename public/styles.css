@@ -7074,3 +7074,15 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .gd-shot span { display: block; padding: 8px 12px; font-size: 11.5px; color: var(--ink-3); text-align: center; border-top: 1px solid var(--stroke-soft); }
 .gd-outro { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.6; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 7%, var(--bg-2)); border: 1px solid var(--accent-soft-bd, var(--stroke)); border-radius: 13px; padding: 13px 15px; }
 .gd-outro svg { width: 17px; height: 17px; flex: none; color: var(--accent); margin-top: 1px; }
+
+/* Центр инструкций — грид карточек-гайдов (openGuideCenter) */
+.gdc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 11px; }
+.gdc-card { display: flex; align-items: center; gap: 13px; text-align: left; border: 1px solid var(--stroke); border-radius: 15px; padding: 14px 15px; background: var(--card); cursor: pointer; font-family: inherit; transition: transform .14s, box-shadow .14s, border-color .14s; }
+.gdc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-elevated); border-color: var(--accent-soft-bd, var(--stroke)); }
+.gdc-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent); }
+.gdc-ic svg { width: 20px; height: 20px; }
+.gdc-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gdc-tx b { font-size: 13.5px; font-weight: 700; color: var(--navy-900); }
+.gdc-tx i { font-size: 11.5px; font-style: normal; color: var(--ink-3); line-height: 1.4; }
+.gdc-go { flex: none; color: var(--ink-3); opacity: .55; }
+.gdc-go svg { width: 16px; height: 16px; }
