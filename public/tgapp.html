@@ -351,6 +351,20 @@
   .idea-m{flex:1;font-size:11px;color:var(--mut);font-weight:600}
   .idea-x{flex:none;border:none;background:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
   .idea-x:hover{color:var(--danger)}
+  /* ── Поп-ап «на экран Домой» ── */
+  .a2hs{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.4);opacity:0;transition:opacity .28s;padding:0 0 max(env(safe-area-inset-bottom),14px)}
+  .a2hs.on{opacity:1}
+  .a2hs-card{width:calc(100% - 24px);max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:22px 20px 18px;text-align:center;box-shadow:0 24px 60px -16px rgba(0,0,0,.5);transform:translateY(30px) scale(.97);transition:transform .34s cubic-bezier(.22,1,.36,1)}
+  .a2hs.on .a2hs-card{transform:none}
+  .a2hs-badge{display:flex;justify-content:center;margin-bottom:14px}
+  .a2hs-logo{width:60px;height:60px;border-radius:18px;background:var(--grad);display:grid;place-items:center;box-shadow:0 12px 28px -10px rgba(0,0,0,.4);animation:a2float 2.6s ease-in-out infinite}
+  .a2hs-logo svg{width:30px;height:36px}
+  @keyframes a2float{50%{transform:translateY(-5px)}}
+  .a2hs-t{font-size:18px;font-weight:800;letter-spacing:-.3px;color:var(--ink);margin-bottom:6px}
+  .a2hs-d{font-size:13.5px;line-height:1.5;color:var(--mut);margin-bottom:16px}
+  .a2hs-btn{width:100%;border:none;border-radius:14px;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:15px;cursor:pointer}
+  .a2hs-btn:active{transform:scale(.985)}
+  .a2hs-later{width:100%;border:none;background:none;color:var(--mut);font-family:inherit;font-weight:600;font-size:13.5px;padding:12px 0 2px;cursor:pointer}
   .segflt button:not(.on) .cnt{background:var(--acc);color:#fff}
   .dot-me{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
   #dict.rec{color:#fff;background:#e5484d!important;animation:dictpulse 1.1s ease-in-out infinite}
@@ -413,6 +427,16 @@
     </div>
   </div>
   <div id="leadcard"></div>
+</div>
+
+<div id="a2hs" class="a2hs hidden">
+  <div class="a2hs-card">
+    <div class="a2hs-badge"><span class="a2hs-logo"><svg viewBox="0 0 100 120" aria-hidden="true"><path fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg></span></div>
+    <div class="a2hs-t">Lumen на экран «Домой»</div>
+    <div class="a2hs-d">Открывайте пульт в один тап — как обычное приложение на iPhone.</div>
+    <button id="a2hsAdd" class="a2hs-btn">Добавить на экран</button>
+    <button id="a2hsLater" class="a2hs-later">Позже</button>
+  </div>
 </div>
 
 <script>
@@ -545,9 +569,12 @@ let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
 const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
 const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи',ideas:'Копилка идей'};
+const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark'};
+function setSparkIcon(name){const sp=document.querySelector('.top h1 .spark');if(sp)sp.innerHTML=svg(name||'chat');}
 function setMode(m){MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
+  setSparkIcon(IC_MODE[m]);
   ['chats','leads','tasks','meets','ideas'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
   $('#segflt').style.display=m==='chats'?'':'none';
   $('#q').closest('.search').style.display=(m==='meets'||m==='ideas')?'none':'';
@@ -999,11 +1026,28 @@ $('#cProfile').onclick=()=>{if(CUR)openLeadCard(CUR.id)};
 $('#cAva').onclick=()=>{if(CUR)openLeadCard(CUR.id)};
 
 paintIcons();
+/* ── Быстрый доступ: добавить мини-апп на экран «Домой» (Telegram Bot API 8.0+) ── */
+function hideA2HS(){const el=$('#a2hs');if(!el)return;el.classList.remove('on');setTimeout(()=>el.classList.add('hidden'),320);}
+function showA2HS(){const el=$('#a2hs');if(!el)return;el.classList.remove('hidden');requestAnimationFrame(()=>el.classList.add('on'));}
+function initA2HS(){
+  if(!TG||!TG.isVersionAtLeast||!TG.isVersionAtLeast('8.0')||!TG.addToHomeScreen)return;   /* нет нативной поддержки → не показываем */
+  try{if(localStorage.getItem('lumen_a2hs_done')==='1')return;
+    const sn=+localStorage.getItem('lumen_a2hs_snooze')||0; if(sn&&Date.now()-sn<3*864e5)return;   /* «позже» → не тревожим 3 дня */
+  }catch(e){}
+  const offer=()=>setTimeout(showA2HS,1400);
+  if(TG.checkHomeScreenStatus){ try{TG.checkHomeScreenStatus(st=>{ if(st==='added'){try{localStorage.setItem('lumen_a2hs_done','1')}catch(e){}return;} if(st==='unsupported')return; offer(); });}catch(e){offer();} }
+  else offer();
+}
+document.getElementById('a2hsAdd')&&document.getElementById('a2hsAdd').addEventListener('click',()=>{hap();try{TG&&TG.addToHomeScreen&&TG.addToHomeScreen();}catch(e){}});
+document.getElementById('a2hsLater')&&document.getElementById('a2hsLater').addEventListener('click',()=>{hap();try{localStorage.setItem('lumen_a2hs_snooze',String(Date.now()))}catch(e){}hideA2HS();});
+if(TG&&TG.onEvent){TG.onEvent('homeScreenAdded',()=>{try{localStorage.setItem('lumen_a2hs_done','1')}catch(e){}hideA2HS();if(window.toast)toast('Готово','Иконка добавлена на экран «Домой»');});}
+
 if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
 else{
   fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
   applyRole().then(()=>{ if(ROLE!=='owner'){ loadChats();prefetchLeadsBadge();prefetchDayBadges(); } });
   setInterval(()=>{ if(ROLE==='owner'){ loadAnalytics(); } else if(!$('#conv').classList.contains('open')){ loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
+  initA2HS();
 }
 </script>
 </body>
