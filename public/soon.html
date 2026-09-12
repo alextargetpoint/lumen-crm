@@ -20,11 +20,11 @@
     --ease:cubic-bezier(.19,1,.22,1);
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%}
+  html,body{min-height:100%}
   body{
     background:var(--bg); color:var(--ink); font-family:var(--sans);
     -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    overflow:hidden; position:relative;
+    overflow-x:hidden; overflow-y:auto; position:relative;
   }
   /* ── амбиент: глубокий графитовый радиал + медленное сияние + зерно ── */
   .bg{position:fixed;inset:0;z-index:0;background:
@@ -65,7 +65,7 @@
   .halo,.core h1{will-change:transform}
   @media(prefers-reduced-motion:reduce){.dust,.beam,.eyebrow::after{animation:none;display:none}}
 
-  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+  .wrap{position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;
     padding:clamp(22px,4vw,44px); max-width:1180px;margin:0 auto}
 
   /* ── шапка ── */
@@ -78,7 +78,12 @@
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(216,214,210,.5)}50%{box-shadow:0 0 0 6px rgba(216,214,210,0)}}
 
   /* ── центр ── */
-  .core{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(20px,3vh,34px)}
+  .core{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(20px,3vh,34px);padding-block:clamp(24px,5vh,60px)}
+  /* когда открыта форма — ужимаем hero, чтобы визард гарантированно помещался */
+  .core.slim{gap:22px;justify-content:flex-start;padding-top:clamp(40px,8vh,90px)}
+  .core.slim h1{font-size:clamp(28px,4.6vw,48px);line-height:1.06}
+  .core.slim h1 .ln{padding:.05em .2em .1em}
+  .core.slim .eyebrow,.core.slim .lede{display:none}
   .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink2);
     border:1px solid var(--line);border-radius:999px;padding:9px 18px;opacity:0;animation:up .9s var(--ease) .28s forwards;
     background:rgba(255,255,255,.02);backdrop-filter:blur(6px)}
@@ -115,9 +120,9 @@
 
   /* ── пошаговая форма ── */
   .wsteps{position:relative;transition:height .55s var(--ease)}
-  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(18px) scale(.992);filter:blur(5px);pointer-events:none;transition:opacity .5s var(--ease),transform .6s var(--ease),filter .5s var(--ease)}
-  .wstep.on{opacity:1;transform:none;filter:none;pointer-events:auto}
-  .wstep.leaving{opacity:0;transform:translateY(-16px) scale(.992);filter:blur(5px);pointer-events:none}
+  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .5s var(--ease),transform .55s var(--ease)}
+  .wstep.on{opacity:1;transform:none;pointer-events:auto}
+  .wstep.leaving{opacity:0;transform:translateY(-14px);pointer-events:none}
   /* стартовый экран формы */
   .wlgate{width:min(520px,92vw);text-align:center;opacity:0;animation:up 1s var(--ease) 1.05s forwards}
   .wlgate.hide{opacity:0;transform:translateY(-12px);pointer-events:none;transition:opacity .5s var(--ease),transform .5s var(--ease)}
@@ -128,9 +133,8 @@
   .wlcta::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-18deg);animation:ctaSheen 3.8s ease-in-out infinite}
   @keyframes ctaSheen{0%{left:-60%}46%,100%{left:135%}}
   .wlnote{margin-top:15px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3)}
-  .wl{display:none}
-  .wl.on{display:block;animation:wlIn .7s var(--ease)}
-  @keyframes wlIn{from{opacity:0;transform:translateY(22px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  .wl{display:none;opacity:1}
+  .wl.on{display:block}
   @media(prefers-reduced-motion:reduce){.wlcta::after{animation:none;display:none}.wstep{filter:none}.wstep.leaving{filter:none}}
   .qlabel{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;display:flex;align-items:center;gap:10px;justify-content:flex-start}
   .qlabel .qn{color:var(--ink2);font-variant-numeric:tabular-nums;letter-spacing:.12em}
@@ -319,7 +323,7 @@
     dotsWrap.innerHTML=qs.map(function(_,i){return '<i class="'+(i===cur?'on':i<cur?'done':'')+'"></i>'}).join('');
     wsteps.innerHTML='';
     var el=buildStep(s,cur,total); wsteps.appendChild(el);
-    requestAnimationFrame(function(){el.classList.add('on');setHeight();});
+    void el.offsetWidth; el.classList.add('on'); setHeight();
     wback.hidden=(cur===0);
     var inp=el.querySelector('input[data-k]');
     if(inp){var f=inp.closest('.field');inp.value=data[s.k]||'';
@@ -350,14 +354,14 @@
     return true;
   }
   /* плавный кросс-фейд: текущий шаг уезжает, затем рисуем новый */
-  function transitionTo(){var old=wsteps.querySelector('.wstep');if(old){old.classList.add('leaving');old.classList.remove('on');setTimeout(paint,250);}else paint();}
+  function transitionTo(){var old=wsteps.querySelector('.wstep');if(old){old.classList.add('leaving');old.classList.remove('on');setTimeout(paint,220);}else paint();}
   function next(){ if(!collectCurrent())return; var qs=activeQs(); if(cur<qs.length-1){clearErr();cur++;transitionTo();} else submit(); }
   wback.addEventListener('click',function(){if(cur>0){clearErr();cur--;transitionTo();}});
   form.addEventListener('submit',function(e){e.preventDefault();var qs=activeQs();if(qs[cur].type==='consent')submit();else next();});
 
   /* стартовый экран: форма прячется, пока не нажали «Получить доступ к бете» */
   var wlGate=document.getElementById('wlGate'), wlStart=document.getElementById('wlStart');
-  function startForm(){if(form.classList.contains('on'))return;wlGate.classList.add('hide');setTimeout(function(){wlGate.style.display='none';form.classList.add('on');cur=0;paint();},360);}
+  function startForm(){if(form.classList.contains('on'))return;var core=document.querySelector('.core');if(core)core.classList.add('slim');wlGate.classList.add('hide');setTimeout(function(){wlGate.style.display='none';form.classList.add('on');cur=0;paint();setHeight();},360);}
   if(wlStart)wlStart.addEventListener('click',startForm);
 
   function submit(){
