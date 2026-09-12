@@ -75,6 +75,25 @@ engine.startLoop();
 /* ---------- авторизация ---------- */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const DEFAULT_PASS = 'lumen2026';
+/* SaaS: минимальные критичные дефолты для НОВОГО тенанта (seed даёт только agency).
+   Мигрирующий boot-блок ниже трогает primary; для новых агентств хватает этого набора. */
+function ensureTenantDefaults(db) {
+  db.settings = db.settings || {};
+  const s = db.settings;
+  if (!s.auth) s.auth = { passHash: sha(DEFAULT_PASS), sessions: {} };
+  s.auth.sessions = s.auth.sessions || {};
+  if (!s.customFields) s.customFields = [];
+  if (!s.stagesCfg) s.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
+  if (!s.telephony) s.telephony = { provider: 'none', key: '', secret: '', note: '' };
+  if (!s.voice) s.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
+  if (!s.reports) s.reports = { channel: 'tg', tgChatId: '', daily: true, dailyAt: '09:00', weekly: true, monthly: true, instant: { hotView: true, qualified: true, aiOff: true, deal: true }, lastDaily: 0, lastWeekly: 0, lastMonthly: 0 };
+  if (!s.reports.shareKey) s.reports.shareKey = crypto.randomBytes(10).toString('hex');
+  if (!s.channels) s.channels = { priority: ['wa', 'tg', 'viber', 'email'], enabled: { wa: true, tg: false, viber: false, email: false }, tg: { botToken: '' }, viber: { token: '' }, email: { provider: 'resend', key: '', from: '' }, secondRound: true };
+  if (!s.waGray) s.waGray = { url: '', token: '', numbers: [], warmup: { running: false, perDay: 16 } };
+  if (!s.tgBridge) s.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
+  if (!s.hooks) s.hooks = { secret: crypto.randomBytes(12).toString('hex') };
+  return db;
+}
 {
   const db = store.get();
   if (!db.settings.auth) {
@@ -2501,6 +2520,12 @@ async function genCarouselPhotos(need, opts = {}) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   const p = u.pathname;
+  /* SaaS: резолв тенанта из глобального реестра (sid→tid), ДО загрузки БД тенанта.
+     Нет сессии/маппинга → PRIMARY (обратная совместимость с текущим агентством). */
+  const _sidM = (req.headers.cookie || '').match(/lumen_sid=([a-f0-9]{32})/);
+  const _reg = store.getRegistry();
+  const _tid = (_sidM && _reg.sessions[_sidM[1]] && _reg.sessions[_sidM[1]].tid) || store.PRIMARY;
+  store.enterTenant(_tid);
   const db = store.get();
   /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -3324,6 +3349,7 @@ const server = http.createServer(async (req, res) => {
       const sid = crypto.randomBytes(16).toString('hex');
       sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
       db.settings.auth.sessions[sid] = sess;
+      { const rg = store.getRegistry(); rg.sessions[sid] = { tid: store.currentTid(), at: Date.now() }; store.saveRegistry(); }   /* SaaS: маршрутизация sid→tid */
       recordSeat(req, sid);
       if (sess.role === 'broker') { const brName = (db.brokers.find(x => x.id === sess.brokerId) || {}).name; db.audit = db.audit || []; db.audit.unshift({ at: Date.now(), who: brName, role: 'broker', action: 'вход в систему' }); }
       const keys = Object.keys(db.settings.auth.sessions);
@@ -3338,9 +3364,38 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/auth/logout' && req.method === 'POST') {
       const sid = getSession(req);
-      if (sid) { delete db.settings.auth.sessions[sid]; store.save(); }
+      if (sid) { delete db.settings.auth.sessions[sid]; store.save(); const rg = store.getRegistry(); if (rg.sessions[sid]) { delete rg.sessions[sid]; store.saveRegistry(); } }
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
       res.end(JSON.stringify({ ok: true })); return;
+    }
+    /* ---------------- SaaS: публичная регистрация агентства/соло-брокера ---------------- */
+    if (p === '/auth/register' && req.method === 'POST') {
+      const b = await readBody(req);
+      const email = String(b.email || '').trim().toLowerCase();
+      const password = String(b.password || '');
+      const agencyName = String(b.agency || b.name || '').trim().slice(0, 120);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(res, 400, { error: 'нужен корректный e-mail' });
+      if (password.length < 6) return json(res, 400, { error: 'пароль минимум 6 символов' });
+      const reg = store.getRegistry();
+      if (reg.byEmail[email]) return json(res, 409, { error: 'агентство с этой почтой уже зарегистрировано' });
+      const tid = 't_' + crypto.randomBytes(6).toString('hex');
+      store.createTenant(tid, { name: agencyName || email, ownerEmail: email, plan: 'trial', createdAt: Date.now() });
+      reg.byEmail[email] = tid;
+      const sid = crypto.randomBytes(16).toString('hex');
+      store.runInTenant(tid, () => {
+        const tdb = store.get();
+        ensureTenantDefaults(tdb);
+        tdb.settings.auth.passHash = sha(password);
+        tdb.settings.auth.ownerEmail = email;
+        if (agencyName) { tdb.settings.agency = tdb.settings.agency || {}; tdb.settings.agency.name = agencyName; }
+        tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'owner', ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
+        store.saveNow();
+      });
+      reg.sessions[sid] = { tid, at: Date.now() };
+      store.saveRegistry();
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
+      res.end(JSON.stringify({ ok: true, tid })); return;
     }
     /* владелец смотрит кабинет брокера (view-as) — читаем как брокер, выходим одной кнопкой */
     if (p === '/api/preview' && req.method === 'POST') {
