@@ -186,6 +186,13 @@ async function main() {
   ok('leadfile с сессией, но файл не свой → 403', (await F.req('/assets/leadfiles/anything.jpg')).status === 403);
   ok('обычный ассет (app.js) отдаётся 200', (await fetch(BASE + '/app.js')).status === 200);
 
+  // R. публичная шаринг-ссылка НЕ-primary агентства резолвится (мультиарендный роутинг)
+  const G2 = jar(); await jpost(G2, '/auth/register', { email: 'g2@x.com', password: 'secretG2', agency: 'Agency G2' });
+  const coll = await (await jpost(G2, '/api/collections', { title: 'ТестШаринг' })).json().catch(() => ({}));
+  ok('создана подборка в не-primary агентстве', !!coll.id, JSON.stringify(coll).slice(0, 60));
+  const pubResp = await fetch(BASE + '/p/' + coll.id, { redirect: 'manual' });
+  ok('публичная /p/:id не-primary агентства резолвится (не 404)', pubResp.status !== 404, 'status ' + pubResp.status);
+
   finish(srv);
 }
 

@@ -111,6 +111,8 @@ function ensureTenantDefaults(db) {
   if (!s.waGray) s.waGray = { url: '', token: '', numbers: [], warmup: { running: false, perDay: 16 } };
   if (!s.tgBridge) s.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
   if (!s.hooks) s.hooks = { secret: crypto.randomBytes(12).toString('hex') };
+  /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
+  for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates']) if (!Array.isArray(db[k])) db[k] = [];
   return db;
 }
 {
@@ -517,6 +519,17 @@ function rateLimited(key, max, windowMs) {
   r.c++;
   if (_rl.size > 5000) { for (const [k, v] of _rl) if (now - v.t > windowMs) _rl.delete(k); }  /* уборка */
   return r.c > max;
+}
+/* SaaS: найти тенанта-владельца публичного ресурса (шаринг-ссылки без сессии).
+   Ищем по всем тенантам — ids уникальны; при росте заменить на индекс в реестре. */
+function findTenant(pred) { for (const tid of store.listTenants()) { let ok = false; try { ok = store.runInTenant(tid, pred); } catch (e) {} if (ok) return tid; } return null; }
+function publicTenantFor(p) {
+  let m;
+  if ((m = p.match(/^\/(?:p|c)\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/collections\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id)); }
+  if ((m = p.match(/^\/mp\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/mediaplans\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().mediaplans || []).some(x => x.id === id)); }
+  if ((m = p.match(/^\/learn\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => { const L = store.get().settings.learn; return !!(L && L.shareToken === tok); }); }
+  if ((m = p.match(/^\/cal\/([a-zA-Z0-9_]+)\.ics/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id) || (store.get().meetings || []).some(x => x.id === id)); }
+  return null;
 }
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
 function uaFingerprint(ua) {
@@ -2589,7 +2602,9 @@ const server = http.createServer(async (req, res) => {
      Нет сессии/маппинга → PRIMARY (обратная совместимость с текущим агентством). */
   const _sidM = (req.headers.cookie || '').match(/lumen_sid=([a-f0-9]{32})/);
   const _reg = store.getRegistry();
-  const _tid = (_sidM && _reg.sessions[_sidM[1]] && _reg.sessions[_sidM[1]].tid) || store.PRIMARY;
+  let _tid = (_sidM && _reg.sessions[_sidM[1]] && _reg.sessions[_sidM[1]].tid) || store.PRIMARY;
+  /* SaaS: публичные шаринг-ссылки без сессии — найти тенанта-владельца ресурса, иначе всё резолвится в primary (404 у чужих агентств) */
+  if (!_sidM) { const _pt = publicTenantFor(p); if (_pt) _tid = _pt; }
   store.enterTenant(_tid);
   const db = store.get();
   /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
