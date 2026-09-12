@@ -215,6 +215,54 @@
   @keyframes softpulse{0%,100%{opacity:1}50%{opacity:.5}}
   @media(prefers-reduced-motion:reduce){.dh-bars i{transform:none;animation:none}.ddonut .donut{transform:none;opacity:1}.dtasks li em{animation:none}}
 
+  /* ── доп. интерактивные виджеты ── */
+  .dgrid2{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-top:15px}
+  .dlive{display:inline-flex;align-items:center;gap:6px;font-size:10px!important;color:#b0563f!important;letter-spacing:.06em!important}
+  .dlive::before{content:"";width:6px;height:6px;border-radius:50%;background:#b0563f;animation:softpulse 1.6s ease-in-out infinite}
+  /* живая лента */
+  .dfeed ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;overflow:hidden}
+  .dfeed li{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid #efe9e2;font-size:12.5px;color:#141311;animation:feedIn .5s var(--ease)}
+  .dfeed li:first-child{border-top:none}
+  .dfeed li .fdot{width:7px;height:7px;border-radius:50%;flex:none}
+  .dfeed li b{font-weight:600}
+  .dfeed li span{color:#8b8983;margin-left:auto;font-size:11px;white-space:nowrap}
+  @keyframes feedIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  /* каналы — интерактивные бары */
+  .dbars{display:grid;gap:12px}
+  .dbar{cursor:default}
+  .dbar .dbtop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
+  .dbar .dbtop b{font-weight:600;font-variant-numeric:tabular-nums}
+  .dbar .dbtrack{height:7px;border-radius:4px;background:#efe9e2;overflow:hidden}
+  .dbar .dbtrack i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#8f887b,#1a1815);transition:width 1s var(--ease),filter .3s}
+  .dash.in .dbar .dbtrack i{width:var(--v,50%)}
+  .dbar:hover .dbtrack i{filter:brightness(1.15)}
+  .dbar:hover .dbtop{color:#000}
+  /* автопилот ИИ — переключатель */
+  .dai-row{display:flex;align-items:center;gap:14px}
+  .dai-txt{flex:1}
+  .dai-txt b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;color:#141311}
+  .dai-txt span{font-size:11.5px;color:#8b8983}
+  .dtog{width:46px;height:26px;border-radius:999px;border:none;background:#dcd5cb;cursor:pointer;position:relative;transition:background .35s var(--ease);flex:none;padding:0}
+  .dtog span{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .35s var(--ease)}
+  .dtog.on{background:#1a1815}
+  .dtog.on span{transform:translateX(20px)}
+  .dai-typing{display:flex;align-items:center;gap:7px;margin-top:16px;padding-top:14px;border-top:1px solid #efe9e2;font-size:12px;color:#8b8983}
+  .dai-typing .dt-dots{display:inline-flex;gap:3px}
+  .dai-typing .dt-dots i{width:5px;height:5px;border-radius:50%;background:#1a1815;animation:typedot 1.2s infinite}
+  .dai-typing .dt-dots i:nth-child(2){animation-delay:.18s}.dai-typing .dt-dots i:nth-child(3){animation-delay:.36s}
+  .dai.off .dai-typing{opacity:.4}
+  .dai.off .dai-typing .dt-dots i{animation:none;opacity:.4}
+  /* мини-воронка */
+  .dfunnel{display:grid;gap:11px}
+  .dfstep .dftop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
+  .dfstep .dftop b{font-weight:600;font-variant-numeric:tabular-nums}
+  .dfstep .dftrack{height:9px;border-radius:5px;background:#efe9e2;overflow:hidden}
+  .dfstep .dftrack i{display:block;height:100%;width:0;border-radius:5px;background:#1a1815;transition:width 1.1s var(--ease)}
+  .dfstep:nth-child(2) .dftrack i{background:#4a463f}.dfstep:nth-child(3) .dftrack i{background:#8f887b}.dfstep:nth-child(4) .dftrack i{background:#b9b2a6}
+  .dash.in .dfstep .dftrack i{width:var(--w,50%)}
+  @media(max-width:860px){.dgrid2{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.dgrid2{grid-template-columns:1fr}}
+
   /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
@@ -693,6 +741,25 @@
             <li><span class="chk"></span>Follow-up тёплых лидов<span class="who">3 шт</span></li>
           </ul>
         </div>
+      </div>
+      <div class="dgrid2">
+        <div class="dcard dfeed"><div class="dc-hd">Живая лента <span class="dlive">live</span></div><ul id="dfeedList"></ul></div>
+        <div class="dcard dchan"><div class="dc-hd">Источники лидов <span>7 дней</span></div><div class="dbars">
+          <div class="dbar"><div class="dbtop"><span>WhatsApp</span><b>82</b></div><div class="dbtrack"><i style="--v:88%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>Instagram</span><b>54</b></div><div class="dbtrack"><i style="--v:60%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>Комментарии</span><b>31</b></div><div class="dbtrack"><i style="--v:36%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>Формы</span><b>18</b></div><div class="dbtrack"><i style="--v:22%"></i></div></div>
+        </div></div>
+        <div class="dcard dai" id="daiCard"><div class="dc-hd">Автопилот ИИ</div>
+          <div class="dai-row"><div class="dai-txt"><b id="daiTxt">Ведёт 5 диалогов</b><span>среднее время ответа 8 сек</span></div><button class="dtog on" id="dtog" type="button" aria-label="Автопилот ИИ"><span></span></button></div>
+          <div class="dai-typing">Мария — печатает ответ <span class="dt-dots"><i></i><i></i><i></i></span></div>
+        </div>
+        <div class="dcard dfun"><div class="dc-hd">Воронка недели</div><div class="dfunnel">
+          <div class="dfstep"><div class="dftop"><span>Лиды</span><b>54</b></div><div class="dftrack"><i style="--w:100%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Квалифицированы</span><b>31</b></div><div class="dftrack"><i style="--w:57%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Встречи</span><b>13</b></div><div class="dftrack"><i style="--w:24%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Сделки</span><b>5</b></div><div class="dftrack"><i style="--w:9%"></i></div></div>
+        </div></div>
       </div>
     </div>
 
@@ -1209,6 +1276,32 @@
     var pv=document.getElementById('voiPrev'),nx=document.getElementById('voiNext');
     if(pv)pv.onclick=function(){tr.scrollBy({left:-step()*1.6,behavior:'smooth'});};
     if(nx)nx.onclick=function(){tr.scrollBy({left:step()*1.6,behavior:'smooth'});};
+  })();
+
+  /* ── живая лента лидов (тикер) ── */
+  (function(){var list=document.getElementById('dfeedList');if(!list)return;
+    var EV=[
+      {c:'#7fb98a',b:'Новый лид',t:'Мария · Дубай · WhatsApp',w:'сейчас'},
+      {c:'#8ab8d8',b:'ИИ ответил',t:'за 6 секунд',w:'1 мин'},
+      {c:'#d8b26a',b:'Квалифицирован',t:'бюджет $650k',w:'3 мин'},
+      {c:'#b06a52',b:'Просят менеджера',t:'Артём · Бали',w:'5 мин'},
+      {c:'#7fb98a',b:'Новый лид',t:'Ольга · Пхукет · Instagram',w:'8 мин'},
+      {c:'#8ab8d8',b:'Встреча назначена',t:'показ ЖК Marina · 16:00',w:'12 мин'},
+      {c:'#d8b26a',b:'Подборка открыта',t:'клиент смотрел 4 мин',w:'15 мин'}
+    ];
+    function inner(e){return '<span class="fdot" style="background:'+e.c+'"></span><span><b>'+e.b+'</b> · '+e.t+'</span><span>'+e.w+'</span>';}
+    list.innerHTML=EV.slice(0,4).map(function(e){return '<li>'+inner(e)+'</li>';}).join('');
+    var i=4,paused=false,card=list.closest('.dcard');
+    card.addEventListener('mouseenter',function(){paused=true;});card.addEventListener('mouseleave',function(){paused=false;});
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.disconnect();
+      setInterval(function(){if(paused)return;var e2=Object.assign({},EV[i%EV.length],{w:'сейчас'});i++;var li=document.createElement('li');li.innerHTML=inner(e2);list.insertBefore(li,list.firstChild);while(list.children.length>4)list.removeChild(list.lastChild);},2700);
+    }})},{threshold:.3});
+    io.observe(card);
+  })();
+
+  /* ── автопилот ИИ: переключатель ── */
+  (function(){var t=document.getElementById('dtog');if(!t)return;var card=document.getElementById('daiCard'),txt=document.getElementById('daiTxt');
+    t.addEventListener('click',function(){var on=t.classList.toggle('on');card.classList.toggle('off',!on);if(txt)txt.textContent=on?'Ведёт 5 диалогов':'На паузе — ведёте вы';});
   })();
 </script>
 </body>
