@@ -271,6 +271,49 @@
   .ap-inp .ap-fld{flex:1;background:#fff;border:1px solid #e8e1d8;border-radius:999px;padding:8px 13px;color:#a9a49b;font-size:11px}
   .ap-inp .ap-mic{width:31px;height:31px;border-radius:50%;background:#1a1815;color:#f3f1ec;display:flex;align-items:center;justify-content:center;flex:none}
   .ap-inp .ap-mic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  /* мультиэкранность — тур по приложению */
+  .ap-scr{position:absolute;left:0;right:0;top:32px;bottom:0;display:flex;flex-direction:column;background:#f3f1ec;opacity:0;transform:translateX(18px) scale(.99);transition:opacity .5s var(--ease),transform .55s var(--ease);pointer-events:none}
+  .ap-scr.on{opacity:1;transform:none;pointer-events:auto;z-index:1}
+  .ap-htitle{flex:1;font-family:var(--serif);font-weight:500;font-size:14.5px;color:#141311;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ap-ic.plain{background:transparent;color:#8b8983}
+  .ap-cbody{flex:1;overflow:hidden;padding:14px 14px 16px;display:flex;flex-direction:column;gap:11px}
+  .lc-top{display:flex;align-items:center;gap:11px}
+  .ap-av.lg{width:44px;height:44px;font-size:19px;flex:none}
+  .lc-top{align-items:center}
+  .lc-top>.lc-nm{flex:1;min-width:0;overflow:hidden}
+  .lc-top .lc-nm b{display:block;font-family:var(--serif);font-weight:500;font-size:16px;color:#141311;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lc-top .lc-nm span{display:block;font-size:11px;color:#8b8983;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lc-stage{align-self:flex-start;font-size:9.5px;letter-spacing:.03em;color:#f3f1ec;background:#1a1815;border-radius:999px;padding:5px 11px;white-space:nowrap;margin-top:-4px}
+  .lc-quals{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .lc-quals>div{background:#fffdfa;border:1px solid #e8e1d8;border-radius:12px;padding:9px 11px}
+  .lc-quals span{display:block;font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:#8b8983}
+  .lc-quals b{font-size:12px;color:#141311;font-weight:600;margin-top:2px;display:block}
+  .lc-psy{background:#1a1815;border-radius:14px;padding:11px 14px;color:#f3f1ec}
+  .lc-psy span{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:#a9a49b}
+  .lc-psy p{font-size:11px;line-height:1.45;margin-top:5px;color:#e9e6df}
+  .lc-acts{display:flex;gap:8px;margin-top:auto}
+  .lc-acts button{flex:1;font-family:inherit;font-size:11.5px;border-radius:999px;padding:11px;border:1px solid #dcd5cb;background:#fffdfa;color:#141311;cursor:default}
+  .lc-acts button.pri{background:#1a1815;color:#f3f1ec;border-color:transparent}
+  .sum-card{background:#fffdfa;border:1px solid #e8e1d8;border-radius:14px;padding:13px 15px}
+  .sum-card p{font-size:12px;line-height:1.5;color:#141311}
+  .sum-card p b{font-weight:600}
+  .sum-list{list-style:none;display:grid;gap:8px;margin:0;padding:0}
+  .sum-list li{position:relative;padding-left:18px;font-size:11.5px;color:#54524d;line-height:1.4}
+  .sum-list li::before{content:"";position:absolute;left:2px;top:6px;width:6px;height:6px;border-radius:50%;background:#1a1815}
+  .sum-next{margin-top:auto;background:#1a1815;border-radius:14px;padding:11px 14px;color:#f3f1ec}
+  .sum-next span{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:#a9a49b}
+  .sum-next b{display:block;font-size:12px;margin-top:3px}
+  .ap-cbody.coll{gap:9px}
+  .pl-item{display:flex;gap:11px;align-items:center;background:#fffdfa;border:1px solid #e8e1d8;border-radius:14px;padding:8px}
+  .pl-img{width:62px;height:50px;border-radius:9px;flex:none;filter:grayscale(1)}
+  .pl-img.a{background:linear-gradient(140deg,#cbc4b6,#7c7568)}
+  .pl-img.b{background:linear-gradient(140deg,#bcb4a6,#6f695d)}
+  .pl-img.c{background:linear-gradient(140deg,#d4cec2,#8a8375)}
+  .pl-info b{display:block;font-family:var(--serif);font-weight:500;font-size:13px;color:#141311}
+  .pl-info span{font-size:10.5px;color:#8b8983}
+  .ap-dots{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:6}
+  .ap-dots i{width:5px;height:5px;border-radius:50%;background:#cbc4b8;transition:.35s var(--ease)}
+  .ap-dots i.on{background:#1a1815;width:15px;border-radius:3px}
 
   /* каналы → визуальные ноды, стекающиеся в телефон */
   .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
@@ -639,17 +682,59 @@
           <span class="pbtn l1"></span><span class="pbtn l2"></span><span class="pbtn r1"></span>
           <div class="pscr">
             <span class="pisl"></span>
-            <div class="appui" aria-label="Мессенджер Lumen — ИИ ведёт диалог">
+            <div class="appui" aria-label="Приложение Lumen — переписка, карточка, сводка">
               <div class="ap-sb"></div>
-              <div class="ap-hd">
-                <span class="ap-back">‹</span>
-                <span class="ap-av">М</span>
-                <div class="ap-who"><b>Мария · Дубай Marina</b><span class="ap-st"><i></i> ИИ ведёт · +971 50…</span></div>
-                <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span>
-                <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z"/></svg></span>
+              <div class="ap-dots" id="apDots"><i class="on"></i><i></i><i></i><i></i></div>
+              <!-- 1 · Переписка -->
+              <div class="ap-scr on" data-s="chat">
+                <div class="ap-hd">
+                  <span class="ap-back">‹</span>
+                  <span class="ap-av">М</span>
+                  <div class="ap-who"><b>Мария · Дубай Marina</b><span class="ap-st"><i></i> ИИ ведёт · +971 50…</span></div>
+                  <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span>
+                  <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z"/></svg></span>
+                </div>
+                <div class="ap-body" id="apBody"><div class="ap-day">Сегодня</div></div>
+                <div class="ap-inp"><span class="ap-fld">Сообщение…</span><span class="ap-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/></svg></span></div>
               </div>
-              <div class="ap-body" id="apBody"><div class="ap-day">Сегодня</div></div>
-              <div class="ap-inp"><span class="ap-fld">Сообщение…</span><span class="ap-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/></svg></span></div>
+              <!-- 2 · Карточка лида -->
+              <div class="ap-scr" data-s="card">
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Карточка лида</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div>
+                <div class="ap-cbody">
+                  <div class="lc-top"><span class="ap-av lg">М</span><div class="lc-nm"><b>Мария</b><span>Dubai Marina · 2BR у воды</span></div></div>
+                  <span class="lc-stage">Квалифицирован · из Instagram</span>
+                  <div class="lc-quals">
+                    <div><span>Цель</span><b>Покупка для себя</b></div>
+                    <div><span>Бюджет</span><b>$650 000</b></div>
+                    <div><span>Срок</span><b>1–2 месяца</b></div>
+                    <div><span>Тип</span><b>2BR у воды</b></div>
+                  </div>
+                  <div class="lc-psy"><span>Психо-портрет</span><p>Ценит статус и вид. Заходить через эксклюзив и панораму воды; не давить ценой — давить образом жизни.</p></div>
+                  <div class="lc-acts"><button>Позвонить</button><button class="pri">Собрать подборку</button></div>
+                </div>
+              </div>
+              <!-- 3 · ИИ-сводка -->
+              <div class="ap-scr" data-s="sum">
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">ИИ-сводка по лиду</b><span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span></div>
+                <div class="ap-cbody">
+                  <div class="sum-card"><p><b>Мария</b> — тёплый лид из Dubai Marina. Готова к покупке для себя в течение 1–2 месяцев, бюджет $650k, ищет 2BR у воды.</p></div>
+                  <ul class="sum-list">
+                    <li>Триггер — панорамный вид на воду</li>
+                    <li>Возражение — интересует рассрочка</li>
+                    <li>Тон — статус, эксклюзив, без давления ценой</li>
+                  </ul>
+                  <div class="sum-next"><span>Следующий шаг</span><b>Перезвонить и назначить показ · сегодня 16:00</b></div>
+                </div>
+              </div>
+              <!-- 4 · Подборка -->
+              <div class="ap-scr" data-s="coll">
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Подборка · 3 объекта</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></div>
+                <div class="ap-cbody coll">
+                  <div class="pl-item"><div class="pl-img a"></div><div class="pl-info"><b>Marina Vista · 2BR</b><span>Вид на воду · $640k</span></div></div>
+                  <div class="pl-item"><div class="pl-img b"></div><div class="pl-info"><b>Beach Residence · 2BR</b><span>1-я линия · $665k</span></div></div>
+                  <div class="pl-item"><div class="pl-img c"></div><div class="pl-info"><b>Palm Tower · 2BR</b><span>Панорама · $690k</span></div></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1012,6 +1097,16 @@
       else{addMsg(m);setTimeout(step,1400);}}
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.disconnect();setTimeout(step,600);}})},{threshold:.2});
     io.observe(document.getElementById('phone3d')||body);
+  })();
+
+  /* ── тур по экранам телефона: переписка → карточка → сводка → подборка ── */
+  (function(){var scrs=[].slice.call(document.querySelectorAll('.appui .ap-scr'));var dots=[].slice.call(document.querySelectorAll('#apDots i'));if(scrs.length<2)return;
+    var i=0,started=false;
+    function show(n){scrs.forEach(function(s,k){s.classList.toggle('on',k===n)});dots.forEach(function(d,k){d.classList.toggle('on',k===n)});}
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting&&!started){started=true;
+      setTimeout(function tick(){i=(i+1)%scrs.length;show(i);setTimeout(tick,3600);},4400);
+    }})},{threshold:.2});
+    io.observe(document.getElementById('phone3d'));
   })();
 
   /* ── видео-отзывы: лайтбокс (открывает только реальный файл; иначе мягкий shake) ── */
