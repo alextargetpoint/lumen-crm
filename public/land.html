@@ -263,6 +263,27 @@
   @media(max-width:860px){.dgrid2{grid-template-columns:1fr 1fr}}
   @media(max-width:560px){.dgrid2{grid-template-columns:1fr}}
 
+  /* третий ряд: гейдж скорости, рынки, психо-портрет */
+  .dgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px}
+  .dgauge{display:flex;align-items:center;gap:18px}
+  .dgauge .garc{width:98px;height:98px;flex:none;position:relative}
+  .dgauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .dgauge .gtrack{fill:none;stroke:#efe9e2;stroke-width:8}
+  .dgauge .gfill{fill:none;stroke:#1a1815;stroke-width:8;stroke-linecap:round;stroke-dasharray:264;stroke-dashoffset:264;transition:stroke-dashoffset 1.4s var(--ease)}
+  .dash.in .dgauge .gfill{stroke-dashoffset:var(--off,60)}
+  .dgauge .gval{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .dgauge .gval b{font-family:var(--serif);font-weight:400;font-size:25px;color:#141311;line-height:1}
+  .dgauge .gval span{font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#8b8983;margin-top:2px}
+  .dgauge .ginfo b{display:block;font-family:var(--serif);font-weight:500;font-size:16px;color:#141311}
+  .dgauge .ginfo p{font-size:12px;color:#8b8983;margin-top:5px;line-height:1.45}
+  .dgauge .ginfo s{color:#b06a52;text-decoration:none;font-weight:600;font-style:normal}
+  .dpsy .dchips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+  .dpsy .dchips span{font-size:11.5px;color:#141311;border:1px solid #e3dcd2;border-radius:999px;padding:6px 12px;background:#fffdfa;transition:.3s var(--ease);cursor:default}
+  .dpsy .dchips span:hover{border-color:#1a1815;background:#1a1815;color:#f3f1ec;transform:translateY(-2px)}
+  .dpsy .dpsy-note{font-size:12.5px;line-height:1.5;color:#54524d;padding-top:12px;border-top:1px solid #efe9e2}
+  .dpsy .dpsy-note em{font-style:normal;color:#141311;font-weight:600}
+  @media(max-width:860px){.dgrid3{grid-template-columns:1fr}.dgauge{max-width:none}}
+
   /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
@@ -760,6 +781,22 @@
           <div class="dfstep"><div class="dftop"><span>Встречи</span><b>13</b></div><div class="dftrack"><i style="--w:24%"></i></div></div>
           <div class="dfstep"><div class="dftop"><span>Сделки</span><b>5</b></div><div class="dftrack"><i style="--w:9%"></i></div></div>
         </div></div>
+      </div>
+      <div class="dgrid3">
+        <div class="dcard dgauge">
+          <div class="garc"><svg viewBox="0 0 100 100"><circle class="gtrack" cx="50" cy="50" r="42"/><circle class="gfill" cx="50" cy="50" r="42" style="--off:32"/></svg><div class="gval"><b>8с</b><span>ответ</span></div></div>
+          <div class="ginfo"><b>Скорость ответа</b><p>Первая линия отвечает за секунды. Рынок — <s>47 минут</s>.</p></div>
+        </div>
+        <div class="dcard"><div class="dc-hd">Рынки <span>лиды</span></div><div class="dbars">
+          <div class="dbar"><div class="dbtop"><span>🇦🇪 Дубай</span><b>38</b></div><div class="dbtrack"><i style="--v:92%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇮🇩 Бали</span><b>21</b></div><div class="dbtrack"><i style="--v:56%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇪🇸 Испания</span><b>14</b></div><div class="dbtrack"><i style="--v:38%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇹🇭 Пхукет</span><b>9</b></div><div class="dbtrack"><i style="--v:24%"></i></div></div>
+        </div></div>
+        <div class="dcard dpsy"><div class="dc-hd">Психо-портрет · Мария</div>
+          <div class="dchips"><span>Статусность</span><span>Решает быстро</span><span>Ценит вид</span><span>Не давить ценой</span></div>
+          <p class="dpsy-note"><em>Заход:</em> эксклюзив и панорама воды. Триггер — образ жизни, а не цена.</p>
+        </div>
       </div>
     </div>
 
