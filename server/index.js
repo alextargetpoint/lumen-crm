@@ -3319,6 +3319,31 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- auth ---------------- */
     if (p === '/auth/login' && req.method === 'POST') {
       const b = await readBody(req);
+      /* SaaS: вход по e-mail → резолвим тенанта по реестру, проверяем пароль в ЕГО контексте */
+      const _email = String(b.email || '').trim().toLowerCase();
+      if (_email) {
+        const reg = store.getRegistry();
+        const ltid = reg.byEmail[_email];
+        const sidOk = ltid && store.runInTenant(ltid, () => {
+          const tdb = store.get();
+          let sess = null;
+          if (tdb.settings.auth && sha(String(b.password || '')) === tdb.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
+          else { const br = (tdb.brokers || []).find(x => x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false); if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id }; }
+          if (!sess) return null;
+          const sid = crypto.randomBytes(16).toString('hex');
+          sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
+          tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
+          tdb.settings.auth.sessions[sid] = sess;
+          const keys = Object.keys(tdb.settings.auth.sessions); if (keys.length > 20) delete tdb.settings.auth.sessions[keys[0]];
+          store.saveNow();
+          return sid;
+        });
+        if (!sidOk) { await new Promise(r => setTimeout(r, 600)); return json(res, 401, { error: 'wrong password' }); }
+        const reg2 = store.getRegistry(); reg2.sessions[sidOk] = { tid: ltid, at: Date.now() }; store.saveRegistry();
+        const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sidOk}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
+        res.end(JSON.stringify({ ok: true })); return;
+      }
       /* защита от перебора пароля/PIN: персистентный счётчик неудач по IP + экспоненциальный лок-аут */
       const lip = clientIp(req) || 'unknown';
       db.settings.auth.throttle = db.settings.auth.throttle || {};
