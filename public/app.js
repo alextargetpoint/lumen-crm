@@ -733,6 +733,74 @@ function modal({ title, sub, body, actions, wide }) {
   return bd;
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
+
+/* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
+window.openGrayManager = async function () {
+  let data = { url: '', tokenSet: false, numbers: [] };
+  try { data = await api.get('/wa/gray/list'); } catch (e) {}
+  let pollTimer = null;
+  const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+  const bd = modal({ title: 'WhatsApp — серый способ (QR)', sub: 'Подключение номеров по QR + прогрев, без Meta', wide: true, body: '<div id="grayMgr">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => { stopPoll(); } }] });
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) stopPoll(); });
+  const host = () => $('#grayMgr', bd);
+  const badge = (live) => {
+    const st = (live && live.status) || 'none';
+    const map = { connected: ['ok', 'На связи'], qr: ['warn', 'Ждёт QR'], connecting: ['warn', 'Подключение'], reconnecting: ['warn', 'Переподключение'], logged_out: ['bad', 'Вышел'], none: ['', '—'] };
+    const [cls, tx] = map[st] || ['', st];
+    return `<span class="badge ${cls}">${tx}${live && live.phone ? ' · ' + esc(live.phone) : ''}</span>`;
+  };
+  async function refresh() { try { data = await api.get('/wa/gray/list'); } catch (e) {} renderMgr(); }
+  function renderMgr() {
+    stopPoll();
+    const cfgOk = data.url && data.tokenSet;
+    host().innerHTML = `
+      <div class="form-row"><label>URL воркера</label><input id="gwUrl" value="${esc(data.url || '')}" placeholder="https://…up.railway.app"></div>
+      <div class="form-row"><label>Токен воркера</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• сохранён' : 'WORKER_TOKEN'}"></div>
+      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:14px">Сохранить воркер</button>
+      ${cfgOk ? `
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input id="gwPhone" placeholder="Номер (971501234567)" style="flex:1">
+          <input id="gwLabel" placeholder="Метка" style="width:110px">
+          <button class="btn btn-accent" id="gwAdd">Подключить</button>
+        </div>
+        ${(data.numbers || []).map(n => `
+          <div class="set-row">
+            <div class="sp"><div class="sl">${esc(n.label || n.phone)} · ${esc(n.phone)}</div><div class="sd">${badge(n.live)}</div></div>
+            <div style="display:flex;gap:6px">
+              ${(n.live && n.live.status) !== 'connected' ? `<button class="btn btn-sm gn-qr" data-p="${esc(n.phone)}">QR</button>` : ''}
+              <button class="btn btn-sm gn-rm" data-p="${esc(n.phone)}">Убрать</button>
+            </div>
+          </div>`).join('') || '<div class="muted" style="font-size:13px">Номеров пока нет — добавьте выше.</div>'}
+      ` : '<div class="muted" style="font-size:13px">Сначала сохраните URL и токен воркера (из Railway).</div>'}`;
+    $('#gwSave', bd)?.addEventListener('click', async () => {
+      try { await api.post('/wa/gray/config', { url: $('#gwUrl', bd).value.trim(), token: $('#gwTok', bd).value.trim() || undefined }); toast('Воркер сохранён', '', true); await refresh(); }
+      catch (e) { toast('Не вышло', e.message); }
+    });
+    $('#gwAdd', bd)?.addEventListener('click', () => connectNumber($('#gwPhone', bd).value.trim(), $('#gwLabel', bd).value.trim()));
+    $$('.gn-qr', bd).forEach(b => b.addEventListener('click', () => connectNumber(b.dataset.p, '')));
+    $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); } catch (e) { toast('Не вышло', e.message); } }));
+  }
+  async function connectNumber(phone, label) {
+    if (!phone) { toast('Введите номер'); return; }
+    try { await api.post('/wa/gray/connect', { phone, label }); } catch (e) { toast('Не вышло', e.message); return; }
+    stopPoll();
+    host().innerHTML = `<button class="btn btn-sm" id="gqBack">${ic(I.chev)}Назад</button>
+      <div style="text-align:center;margin-top:8px"><b>Подключение ${esc(phone)}</b>
+      <div id="grayQr" style="min-height:250px;display:grid;place-items:center;margin-top:10px">Готовим QR…</div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">WhatsApp → Связанные устройства → Привязать устройство → сканируйте</div></div>`;
+    $('#gqBack', bd)?.addEventListener('click', () => { stopPoll(); refresh(); });
+    pollTimer = setInterval(async () => {
+      const box = $('#grayQr', bd); if (!box) { stopPoll(); return; }
+      let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
+      const st = r.session && r.session.status;
+      if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" style="width:240px;height:240px;border-radius:10px;background:#fff;padding:8px">`;
+      else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--good,#4caf50)">✓ Номер подключён${r.session.phone ? ' · ' + esc(r.session.phone) : ''}</div>`; stopPoll(); setTimeout(refresh, 1400); }
+      else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта. Попробуйте заново.</div>'; stopPoll(); }
+      else box.innerHTML = 'Подключение…';
+    }, 1800);
+  }
+  renderMgr();
+};
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
 function uiConfirm(title, sub, opts = {}) {
   return new Promise(res => {
@@ -10862,6 +10930,11 @@ PAGES.settings = async (root) => {
       </div>
       <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}Мастер настройки Lumen</button>
     </div>
+    <button class="glass card set-link" onclick="window.openGrayManager&&window.openGrayManager()">
+      <span class="set-link-ic">${ic(I.chat)}</span>
+      <span class="set-link-main"><b>WhatsApp — серый способ (QR)</b><i>Подключение номеров по QR-коду и прогрев, без Meta. Через облачный воркер.</i></span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
