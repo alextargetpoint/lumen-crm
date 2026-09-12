@@ -2612,6 +2612,42 @@ const server = http.createServer(async (req, res) => {
         }).sort((a, b) => { const sa = ORDER.indexOf(a.stage), sb = ORDER.indexOf(b.stage); if (sa !== sb) return (sa < 0 ? 99 : sa) - (sb < 0 ? 99 : sb); return (b.lastMsgAt || 0) - (a.lastMsgAt || 0); });
         return json(res, 200, list);
       }
+      /* ===== ПУЛЬТ БРОКЕРА: задачи + встречи (синхрон с десктопом, та же БД) ===== */
+      const _ds = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+      if (p === '/tgapp/api/tasks' && req.method === 'GET') {
+        const today = _ds(Date.now());
+        const brief = lid => { const l = db.leads.find(x => x.id === lid); return l ? { id: l.id, name: l.name, stage: l.stage } : null; };
+        const mine = (db.brokerTasks || []).filter(t => (t.brokerId || null) === abroker.id);
+        const list = mine.map(t => ({ id: t.id, title: t.title, priority: t.priority || 'normal', status: t.status, due: t.due || null, scheduled: t.scheduled || null, doneAt: t.doneAt || null, sphere: t.sphere || null, lead: t.leadId ? brief(t.leadId) : null }))
+          .sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0) || (a.due || a.scheduled || '9') > (b.due || b.scheduled || '9') ? 1 : -1);
+        const stats = {
+          open: list.filter(t => t.status !== 'done').length,
+          today: list.filter(t => t.status !== 'done' && (t.scheduled === today || (t.due && _ds(t.due) <= today))).length,
+          overdue: list.filter(t => t.status !== 'done' && t.due && _ds(t.due) < today).length,
+          doneToday: list.filter(t => t.status === 'done' && t.doneAt && _ds(t.doneAt) === today).length,
+        };
+        return json(res, 200, { tasks: list, stats });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)\/toggle$/)) && req.method === 'POST') {
+        const t = (db.brokerTasks || []).find(x => x.id === tam[1] && (x.brokerId || null) === abroker.id);
+        if (!t) return json(res, 404, { error: 'not found' });
+        if (t.status === 'done') { t.status = 'todo'; t.doneAt = null; } else { t.status = 'done'; t.doneAt = Date.now(); }
+        store.save(); return json(res, 200, { ok: true, status: t.status });
+      }
+      if (p === '/tgapp/api/task' && req.method === 'POST') {
+        const b = await readBody(req); const title = String(b.title || '').trim().slice(0, 200);
+        if (!title) return json(res, 400, { error: 'пустая задача' });
+        const t = { id: crypto.randomBytes(5).toString('hex'), brokerId: abroker.id, title, priority: b.priority || 'normal', status: 'todo', due: b.due ? +b.due : null, scheduled: b.scheduled || _ds(Date.now()), leadId: b.leadId || null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null };
+        db.brokerTasks = db.brokerTasks || []; db.brokerTasks.unshift(t);
+        store.save(); return json(res, 200, t);
+      }
+      if (p === '/tgapp/api/meetings' && req.method === 'GET') {
+        const now = Date.now();
+        const list = (db.meetings || []).filter(mt => mt.brokerId === abroker.id && mt.at && mt.at > now - 12 * 3600e3)
+          .sort((a, b) => a.at - b.at)
+          .map(mt => ({ id: mt.id, at: mt.at, kind: mt.kind || 'call', status: mt.status || 'scheduled', note: mt.note || '', link: mt.link || null, dur: mt.dur || 60, leadId: mt.leadId, leadName: (db.leads.find(l => l.id === mt.leadId) || {}).name || '—', clientConfirmed: !!mt.clientConfirmed }));
+        return json(res, 200, list);
+      }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         if (lead.unread) { lead.unread = 0; store.save(); }

@@ -249,14 +249,16 @@
   .segflt button:not(.on) .cnt{background:var(--panel2);color:var(--mut)}
   .segflt .fdot{width:8px;height:8px;border-radius:50%;flex:none}
   .segflt .fsep{flex:0 0 1px;align-self:stretch;background:var(--line);margin:4px 2px}
-  /* переключатель Чаты | Лиды (мини-CRM) */
-  .viewseg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-top:2px}
-  .viewseg button{flex:1;border:none;background:transparent;color:var(--mut);font-family:inherit;font-weight:700;font-size:13.5px;padding:8px 6px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s}
+  /* переключатель разделов (пульт брокера): Чаты · Лиды · Задачи · Встречи */
+  .viewseg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-top:2px;overflow-x:auto;scrollbar-width:none}
+  .viewseg::-webkit-scrollbar{height:0}
+  .viewseg button{flex:1 0 auto;border:none;background:transparent;color:var(--mut);font-family:inherit;font-weight:700;font-size:13px;padding:8px 11px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s;white-space:nowrap}
   .viewseg button.on{background:var(--grad);color:#fff;box-shadow:var(--shacc)}
   .viewseg .ic svg{width:16px;height:16px}
-  .viewseg .vbadge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;background:var(--danger);color:#fff;line-height:1}
+  .viewseg .vbadge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ink) 42%,transparent);color:#fff;line-height:1}
+  .viewseg .vbadge.warn{background:var(--danger)}
   .viewseg .vbadge.show{display:inline-flex}
-  .viewseg button.on .vbadge{background:rgba(255,255,255,.28)}
+  .viewseg button.on .vbadge{background:rgba(255,255,255,.28)!important}
   /* группы лидов по стадии */
   #leads{flex:1;overflow-y:auto;padding:4px 8px 24px}
   .lgrp{margin:2px 0 10px}
@@ -276,6 +278,40 @@
   .lrow-score{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:13px;font-weight:800;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-variant-numeric:tabular-nums}
   .lrow-need{width:8px;height:8px;border-radius:50%;background:var(--danger);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 20%,transparent)}
   .lrow-ai{font-size:10px;font-weight:800;letter-spacing:.03em;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:7px;padding:1px 6px}
+  /* ── Задачи ── */
+  #tasks,#meets{flex:1;overflow-y:auto;padding:8px 10px 24px}
+  .tkstat{display:flex;gap:8px;margin:2px 2px 12px}
+  .tkstat .s{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:9px 6px;text-align:center;box-shadow:var(--sh)}
+  .tkstat .s b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .tkstat .s.warn b{color:var(--danger)} .tkstat .s span{font-size:10.5px;color:var(--mut);font-weight:600}
+  .tkadd{display:flex;gap:8px;margin-bottom:12px}
+  .tkadd input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:13px;padding:11px 14px;font-size:14px;outline:none;font-family:inherit}
+  .tkadd input:focus{border-color:var(--acc)}
+  .tkadd button{flex:none;width:46px;border:none;border-radius:13px;background:var(--grad);color:#fff;font-size:22px;cursor:pointer;box-shadow:var(--shacc)}
+  .tk{display:flex;gap:11px;align-items:flex-start;padding:12px 12px;border-radius:15px;transition:.15s;border:1px solid transparent}
+  .tk:active{background:var(--panel)}
+  .tk-ck{flex:none;width:24px;height:24px;border-radius:8px;border:2px solid var(--line);cursor:pointer;display:grid;place-items:center;margin-top:1px;transition:.15s;color:transparent}
+  .tk-ck svg{width:15px;height:15px}
+  .tk.done .tk-ck{background:var(--acc);border-color:var(--acc);color:#fff}
+  .tk-main{flex:1;min-width:0}
+  .tk-t{font-size:14.5px;font-weight:600;line-height:1.35;color:var(--ink)}
+  .tk.done .tk-t{text-decoration:line-through;color:var(--mut);font-weight:500}
+  .tk-sub{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:11.5px;color:var(--mut);font-weight:600}
+  .tk-lead{color:var(--acc);background:color-mix(in srgb,var(--acc) 11%,transparent);border-radius:7px;padding:1px 7px;cursor:pointer}
+  .tk-due.over{color:var(--danger)}
+  /* ── Встречи ── */
+  .mt{display:flex;gap:12px;padding:13px 13px;background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:10px;box-shadow:var(--sh);cursor:pointer;transition:.15s}
+  .mt:active{transform:scale(.99)}
+  .mt-time{flex:none;width:58px;text-align:center;border-right:1px solid var(--line);padding-right:11px}
+  .mt-time b{display:block;font-size:17px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .mt-time span{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .mt-main{flex:1;min-width:0}
+  .mt-nm{font-size:14.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mt-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11.5px;color:var(--mut);font-weight:600}
+  .mt-kind{background:var(--panel2);border-radius:7px;padding:1px 8px;color:var(--ink)}
+  .mt-conf{color:#0e9f5b}
+  .mt-join{flex:none;align-self:center;background:var(--grad);color:#fff;border-radius:11px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;box-shadow:var(--shacc)}
+  .daygrp{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:6px 4px 9px}
   .segflt button:not(.on) .cnt{background:var(--acc);color:#fff}
   .dot-me{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
   #dict.rec{color:#fff;background:#e5484d!important;animation:dictpulse 1.1s ease-in-out infinite}
@@ -299,12 +335,16 @@
       <div class="viewseg" id="viewseg">
         <button data-v="chats" class="on"><span class="ic" data-ic="chat"></span>Чаты<span class="vbadge" id="vbChats"></span></button>
         <button data-v="leads"><span class="ic" data-ic="user"></span>Лиды<span class="vbadge" id="vbLeads"></span></button>
+        <button data-v="tasks"><span class="ic" data-ic="check"></span>Задачи<span class="vbadge" id="vbTasks"></span></button>
+        <button data-v="meets"><span class="ic" data-ic="cal"></span>Встречи<span class="vbadge" id="vbMeets"></span></button>
       </div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
       <div class="segflt" id="segflt"></div>
     </div>
     <div id="chats"><div class="load"><div class="sp"></div>Загрузка чатов…</div></div>
     <div id="leads" class="hidden"></div>
+    <div id="tasks" class="hidden"></div>
+    <div id="meets" class="hidden"></div>
   </div>
 
   <div id="conv">
@@ -459,29 +499,82 @@ function renderChats(){
 }
 
 /* ── мини-CRM: вкладка «Лиды» (все лиды брокера, группировка по стадии, тап → полная карточка) ── */
-let MODE='chats', LEADS=[], LGRP_CLOSED={};
+let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
 const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
+const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи'};
 function setMode(m){MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
-  $('#h1t').textContent=m==='leads'?'Мои лиды':'Мои чаты';
-  $('#chats').classList.toggle('hidden',m==='leads');
-  $('#leads').classList.toggle('hidden',m!=='leads');
-  $('#segflt').style.display=m==='leads'?'none':'';
-  $('#q').placeholder=m==='leads'?'Поиск лида или номера':'Поиск';
-  if(m==='leads')loadLeads();else renderChats();
+  $('#h1t').textContent=H1[m]||'Пульт';
+  ['chats','leads','tasks','meets'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  $('#segflt').style.display=m==='chats'?'':'none';
+  $('#q').closest('.search').style.display=(m==='meets')?'none':'';
+  $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
+  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
   const stale=/no route|404/i.test(String(e.message));
   $('#leads').innerHTML='<div class="empty">'+(stale?'Раздел «Лиды» ещё разворачивается на сервере — обновите приложение через минуту 🙌':'Не удалось загрузить лидов.<br>'+esc(e.message))+'</div>'}}
-/* счётчики на вкладках: Чаты — непрочитанные, Лиды — ждут вас (needsMe) */
+/* счётчики на вкладках: Чаты — непрочитанные, Лиды — ждут вас, Задачи — на сегодня, Встречи — сегодня */
 function updateTabBadges(){
   const un=CHATS.reduce((n,c)=>n+(c.unread>0?1:0),0), nd=LEADS.filter(l=>l.needsMe).length;
-  const set=(el,v)=>{if(el){el.textContent=v>99?'99+':v;el.classList.toggle('show',v>0)}};
-  set($('#vbChats'),un);set($('#vbLeads'),nd);
+  const set=(el,v,warn)=>{if(el){el.textContent=v>99?'99+':v;el.classList.toggle('show',v>0);el.classList.toggle('warn',!!warn)}};
+  set($('#vbChats'),un,true);set($('#vbLeads'),nd,true);
+  set($('#vbTasks'),TSTATS.today||0,(TSTATS.overdue||0)>0);
+  const td=_todayStr();set($('#vbMeets'),MEETS.filter(m=>_dstr(m.at)===td&&!['done','cancelled','no_show'].includes(m.status)).length,false);
 }
 function prefetchLeadsBadge(){jget('/tgapp/api/leads').then(d=>{LEADS=d;updateTabBadges()}).catch(()=>{})}
+function prefetchDayBadges(){jget('/tgapp/api/tasks').then(d=>{TASKS=d.tasks||[];TSTATS=d.stats||{};updateTabBadges()}).catch(()=>{});jget('/tgapp/api/meetings').then(d=>{MEETS=d||[];updateTabBadges()}).catch(()=>{})}
+/* дата-хелперы клиента */
+function _dstr(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function _todayStr(){return _dstr(Date.now())}
+/* ── ЗАДАЧИ ── */
+async function loadTasks(){try{const d=await jget('/tgapp/api/tasks');TASKS=d.tasks||[];TSTATS=d.stats||{};renderTasks()}catch(e){const stale=/no route|404/i.test(String(e.message));$('#tasks').innerHTML='<div class="empty">'+(stale?'Раздел разворачивается — обновите через минуту 🙌':'Не удалось загрузить.<br>'+esc(e.message))+'</div>'}}
+function renderTasks(){
+  const q=($('#q').value||'').toLowerCase().trim();
+  const list=TASKS.filter(t=>!q||(t.title||'').toLowerCase().includes(q));
+  const today=_todayStr();
+  const open=list.filter(t=>t.status!=='done'), done=list.filter(t=>t.status==='done');
+  const head=`<div class="tkstat"><div class="s"><b>${TSTATS.today||0}</b><span>на сегодня</span></div><div class="s ${TSTATS.overdue?'warn':''}"><b>${TSTATS.overdue||0}</b><span>просрочено</span></div><div class="s"><b>${TSTATS.doneToday||0}</b><span>сделано</span></div></div>
+    <div class="tkadd"><input id="tkNew" placeholder="Новая задача…" autocomplete="off"><button id="tkAdd">＋</button></div>`;
+  const row=t=>{const over=t.status!=='done'&&t.due&&_dstr(t.due)<today;const due=t.due?_dstr(t.due):(t.scheduled||'');
+    return `<div class="tk ${t.status==='done'?'done':''}" data-id="${esc(t.id)}">
+      <div class="tk-ck" data-ck>${svg('check')}</div>
+      <div class="tk-main"><div class="tk-t">${esc(t.title)}</div>
+        <div class="tk-sub">${t.lead?`<span class="tk-lead" data-lead="${esc(t.lead.id)}">${esc(t.lead.name)}</span>`:''}${due?`<span class="tk-due ${over?'over':''}">${over?'просрочено · ':''}${esc(due===today?'сегодня':due)}</span>`:''}</div>
+      </div></div>`;};
+  const body=(open.length?open.map(row).join(''):'<div class="empty" style="padding:22px">Открытых задач нет 🎉</div>')
+    +(done.length?`<div class="daygrp" style="margin-top:14px">Выполнено · ${done.length}</div>`+done.slice(0,20).map(row).join(''):'');
+  $('#tasks').innerHTML=head+body;paintIcons($('#tasks'));
+  const add=async()=>{const inp=$('#tkNew');const v=(inp.value||'').trim();if(!v)return;inp.value='';try{await jpost('/tgapp/api/task',{title:v});hap();loadTasks()}catch(e){toast(e.message)}};
+  $('#tkAdd').onclick=add;$('#tkNew').addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+  $('#tasks').querySelectorAll('.tk-ck').forEach(c=>c.onclick=async()=>{const t=c.closest('.tk');t.classList.toggle('done');hap();try{await jpost('/tgapp/api/task/'+t.dataset.id+'/toggle',{});loadTasks();prefetchDayBadges()}catch(e){toast(e.message);loadTasks()}});
+  $('#tasks').querySelectorAll('[data-lead]').forEach(el=>el.onclick=e=>{e.stopPropagation();hap();openLeadCard(el.dataset.lead)});
+  updateTabBadges();
+}
+/* ── ВСТРЕЧИ ── */
+async function loadMeets(){try{MEETS=await jget('/tgapp/api/meetings');renderMeets()}catch(e){const stale=/no route|404/i.test(String(e.message));$('#meets').innerHTML='<div class="empty">'+(stale?'Раздел разворачивается — обновите через минуту 🙌':'Не удалось загрузить.<br>'+esc(e.message))+'</div>'}}
+function renderMeets(){
+  if(!MEETS.length){$('#meets').innerHTML='<div class="empty" style="padding:40px 24px">Запланированных встреч нет.<br>Назначить можно из карточки лида.</div>';updateTabBadges();return}
+  const KIND={call:'Созвон',video:'Видео-показ',tour:'Показ объекта'};
+  const groups={};MEETS.forEach(m=>{(groups[_dstr(m.at)]=groups[_dstr(m.at)]||[]).push(m)});
+  const today=_todayStr();
+  const dlabel=ds=>{if(ds===today)return'Сегодня';const t=new Date();t.setDate(t.getDate()+1);if(ds===_dstr(t.getTime()))return'Завтра';const d=new Date(ds);return d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'})};
+  $('#meets').innerHTML=Object.keys(groups).sort().map(ds=>{
+    return `<div class="daygrp">${esc(dlabel(ds))}</div>`+groups[ds].map(m=>{
+      const d=new Date(m.at),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0');
+      const past=m.at<Date.now()-3600e3;
+      return `<div class="mt" data-lead="${esc(m.leadId||'')}" style="${past?'opacity:.55':''}">
+        <div class="mt-time"><b>${hh}:${mm}</b><span>${KIND[m.kind]?KIND[m.kind].split(' ')[0].slice(0,4):''}</span></div>
+        <div class="mt-main"><div class="mt-nm">${esc(m.leadName)}</div>
+          <div class="mt-meta"><span class="mt-kind">${esc(KIND[m.kind]||'Встреча')}</span>${m.clientConfirmed?'<span class="mt-conf">✓ подтвердил</span>':''}${m.note?`<span>${esc(m.note.slice(0,40))}</span>`:''}</div></div>
+        ${m.link?`<a class="mt-join" href="${esc(m.link)}" target="_blank" onclick="event.stopPropagation()">Подключиться</a>`:''}</div>`;
+    }).join('');
+  }).join('');
+  $('#meets').querySelectorAll('.mt[data-lead]').forEach(el=>el.onclick=()=>{if(el.dataset.lead){hap();openLeadCard(el.dataset.lead)}});
+  updateTabBadges();
+}
 function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
   return `<div class="lrow" data-id="${esc(l.id)}">${avaHtml({id:l.id,name:l.name,avatar:null})}
     <div class="lrow-main"><div class="lrow-top"><span class="lrow-nm">${esc(l.name)}</span>${l.needsMe?'<span class="lrow-need" title="ждёт вас"></span>':''}${l.aiOn?'<span class="lrow-ai">ИИ</span>':''}</div>
@@ -815,7 +908,7 @@ paintIcons();
 if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
 else{
   fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
-  loadChats();prefetchLeadsBadge();setInterval(()=>{if(!$('#conv').classList.contains('open')){loadChats();prefetchLeadsBadge();}},6000);
+  loadChats();prefetchLeadsBadge();prefetchDayBadges();setInterval(()=>{if(!$('#conv').classList.contains('open')){loadChats();prefetchLeadsBadge();prefetchDayBadges();}},6000);
 }
 </script>
 </body>
