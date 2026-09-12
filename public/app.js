@@ -139,7 +139,43 @@ window.addEventListener('scroll', (e) => { if (!e.target.closest?.('.hint-pop'))
 
 /* ═══ ГАЙД-ЦЕНТР: красивые пошаговые инструкции под каждый функционал ═══
    Расширяемо: добавляй ключ в GUIDES и вызывай openGuide('ключ'). Рендерится премиум-модалкой. */
+/* Telegram-гайд: живые телефон-мокапы (рендерятся как чёткие «скриншоты» флоу) */
+const TG_DIAGRAM = `<div class="tgdiag">
+  <div class="tgdiag-node"><div class="ic2">💬</div><b>Клиент</b><small>пишет в WhatsApp</small></div>
+  <div class="tgdiag-arr">⇄</div>
+  <div class="tgdiag-node mid"><div class="ic2">✦</div><b>Lumen</b><small>ИИ + CRM</small></div>
+  <div class="tgdiag-arr">⇄</div>
+  <div class="tgdiag-node"><div class="ic2">📲</div><b>Брокер</b><small>отвечает в Telegram</small></div>
+</div>`;
+const TG_SHOT_FIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot · @lumenmessengerbot</small></div></div><div class="tgph-body"><div class="tg-day">сегодня</div><div class="tg-bub in">Привет! Я мобильный пульт Lumen. Отправьте код брокера, чтобы подключиться.</div><div class="tg-menu">▶ Запустить</div></div></div>`;
+const TG_SHOT_BIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub out"><span class="cmd">/start 4F2K9</span></div><div class="tg-bub in"><span class="ok">✓ Готово.</span> Вы на связи как <b>Алексей</b>. Открываю пульт.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div></div></div>`;
+const TG_SHOT_MENU = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub in">Пульт готов. Нажмите кнопку меню внизу — откроются чаты, лиды и задачи.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div><div class="tg-menu">💬 Чаты</div></div></div>`;
+const TG_SHOT_APP = `<div class="tgph"><div class="tgph-hd"><div class="av">💬</div><div><b>Чаты</b><small>мини-приложение Lumen</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a"></span><span class="m"><b>Марина К.</b><i>Актуальна 2-к в Marina?</i></span><span class="badge2">2</span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Иван С.</b><i>Спасибо, подумаю</i></span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Дмитрий А.</b><i>Пришлите рассрочку</i></span><span class="badge2">1</span></div></div></div>`;
 const GUIDES = {
+  tgsetup: {
+    icon: 'chat', title: 'Telegram-бот: подключение', tagline: 'Пошагово, с экранами — за 3 минуты',
+    intro: 'Telegram-бот <b>@lumenmessengerbot</b> — это карманный пульт брокера: чаты клиентов, лиды, задачи и встречи прямо в телефоне. Ответ брокера из Telegram уходит клиенту в WhatsApp, а входящие клиента появляются у брокера в Telegram. Всё синхронно с десктопом.',
+    diagram: TG_DIAGRAM,
+    sections: [
+      { badge: '1 · Найдите бота', shot: TG_SHOT_FIND, steps: [
+        ['Откройте бота', 'В Telegram найдите <b>@lumenmessengerbot</b> и нажмите «Запустить».'],
+        ['Возьмите код брокера', 'В CRM: <b>Настройки → Мост Telegram</b> — там персональный код каждого брокера.'],
+      ] },
+      { badge: '2 · Привяжите брокера', shot: TG_SHOT_BIND, steps: [
+        ['Отправьте код', 'Брокер пишет боту <code>/start ВАШ_КОД</code>.'],
+        ['Готово', 'Бот подтверждает привязку — брокер на связи, чат Telegram склеен с его лидами.'],
+      ] },
+      { badge: '3 · Откройте пульт', shot: TG_SHOT_MENU, steps: [
+        ['Кнопка меню', 'Синяя кнопка <b>«💬 Чаты»</b> внизу бота открывает мини-приложение.'],
+        ['Мини-апп', 'Это полноценный интерфейс: чаты, лиды, задачи, встречи.'],
+      ] },
+      { badge: '4 · Работа и синхронизация', shot: TG_SHOT_APP, steps: [
+        ['Чаты', 'Живая переписка с клиентами; ответ брокера уходит клиенту в WhatsApp автоматически.'],
+        ['Синхрон с CRM', 'Стадии, заметки, задачи — те же, что на десктопе, в реальном времени.'],
+      ] },
+    ],
+    outro: 'Если брокер отвечает сам — ИИ по этому лиду отключается автоматически, чтобы не было двух голосов. Оформление бота наследует тему из Настройки → Оформление.',
+  },
   calendar: {
     icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
     intro: 'Lumen сам подбирает клиенту свободное время — но только если знает, когда брокер занят. Дайте системе <b>публичную ICS-ссылку</b> личного календаря (Apple или Google), и занятые часы автоматически исчезнут из предложений. Настраивается один раз за 2 минуты.',
@@ -252,7 +288,7 @@ const GUIDES = {
 };
 /* Центр инструкций: грид всех гайдов. Вызов: openGuideCenter() */
 function openGuideCenter() {
-  const order = ['leads', 'chains', 'waagent', 'calendar', 'mediaplan', 'docs', 'botpanel'];
+  const order = ['tgsetup', 'botpanel', 'leads', 'chains', 'waagent', 'calendar', 'mediaplan', 'docs'];
   const cards = order.filter(k => GUIDES[k]).map(k => { const g = GUIDES[k];
     return `<button class="gdc-card" data-guide="${k}"><span class="gdc-ic">${ic(I[g.icon] || I.doc)}</span><span class="gdc-tx"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span><span class="gdc-go">${ic(I.arrow, 2)}</span></button>`;
   }).join('');
@@ -263,9 +299,10 @@ window.openGuideCenter = openGuideCenter;
 function openGuide(id) {
   const g = GUIDES[id]; if (!g) return;
   const stepCard = (s, i) => `<div class="gd-step"><span class="gd-n">${i + 1}</span><div class="gd-tx"><b>${s[0]}</b><span>${s[1]}</span></div></div>`;
-  const secBlock = (sec) => `<div class="gd-sec"><div class="gd-sec-h">${esc(sec.badge)}</div>${sec.steps.map(stepCard).join('')}</div>`;
+  const secBlock = (sec) => `<div class="gd-sec"><div class="gd-sec-h">${esc(sec.badge)}</div>${sec.steps.map(stepCard).join('')}${sec.shot ? `<div class="gd-shot2">${sec.shot}</div>` : ''}</div>`;
   const body = `<div class="gd">
     <div class="gd-intro">${g.intro}</div>
+    ${g.diagram || ''}
     ${(g.sections || []).map(secBlock).join('')}
     ${g.img ? `<div class="gd-shot"><img src="${g.img}" alt="" onerror="this.parentNode.style.display='none'"><span>Поле для ссылки — в карточке брокера</span></div>` : ''}
     ${g.outro ? `<div class="gd-outro">${ic(I.spark, 2)}<span>${g.outro}</span></div>` : ''}
@@ -610,21 +647,55 @@ function renderLogin() {
       ${loginBrand}
       <svg class="pl-logo" viewBox="0 0 100 120" style="width:44px;height:53px;margin:0 auto 14px" aria-hidden="true"><defs><linearGradient id="lumenLg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenLg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
       <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
-      <div style="font-size:10px;letter-spacing:.16em;color:var(--blue-300);margin:4px 0 26px">REAL ESTATE CRM</div>
-      <input id="loginPass" type="password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);
-        border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
+      <div style="font-size:10px;letter-spacing:.16em;color:var(--blue-300);margin:4px 0 20px">REAL ESTATE CRM</div>
+      <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(6,17,38,.5);border-radius:10px;padding:4px">
+        <button id="tabLogin" style="flex:1;height:32px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:var(--accent,#c8a86a);color:#0a1833;font-weight:600">Вход</button>
+        <button id="tabReg" style="flex:1;height:32px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:transparent;color:rgba(255,255,255,.7)">Регистрация</button>
+      </div>
+      <input id="regAgency" placeholder="Название агентства" style="display:none;width:100%;margin-bottom:8px;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;margin-bottom:8px;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:#f28b8b"></div>
       <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:44px;font-size:14px">Войти</button>
+      <div id="loginHint" style="font-size:11px;color:rgba(255,255,255,.5);margin-top:12px">Вход владельца — по паролю или e-mail</div>
     </div>
   </div>`);
   document.body.appendChild(s);
-  const doLogin = async () => {
-    const r = await fetch('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('#loginPass').value }) });
-    if (r.ok) location.reload();
-    else $('#loginErr').textContent = 'Неверный пароль';
+  let mode = 'login';
+  const setMode = (m) => {
+    mode = m;
+    $('#tabLogin').style.background = m === 'login' ? 'var(--accent,#c8a86a)' : 'transparent';
+    $('#tabLogin').style.color = m === 'login' ? '#0a1833' : 'rgba(255,255,255,.7)';
+    $('#tabReg').style.background = m === 'register' ? 'var(--accent,#c8a86a)' : 'transparent';
+    $('#tabReg').style.color = m === 'register' ? '#0a1833' : 'rgba(255,255,255,.7)';
+    $('#regAgency').style.display = m === 'register' ? 'block' : 'none';
+    $('#loginBtn').textContent = m === 'register' ? 'Создать аккаунт' : 'Войти';
+    $('#loginHint').textContent = m === 'register' ? 'Новое агентство — отдельный изолированный аккаунт' : 'Вход владельца — по паролю или e-mail';
+    $('#loginErr').textContent = '';
   };
-  $('#loginBtn').addEventListener('click', doLogin);
-  $('#loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+  $('#tabLogin').addEventListener('click', () => setMode('login'));
+  $('#tabReg').addEventListener('click', () => setMode('register'));
+  const submit = async () => {
+    $('#loginErr').textContent = '';
+    const email = $('#loginEmail').value.trim();
+    const password = $('#loginPass').value;
+    try {
+      if (mode === 'register') {
+        const agency = $('#regAgency').value.trim();
+        if (!agency) return void ($('#loginErr').textContent = 'Введите название агентства');
+        if (!email) return void ($('#loginErr').textContent = 'Введите e-mail');
+        if (password.length < 6) return void ($('#loginErr').textContent = 'Пароль минимум 6 символов');
+        const r = await fetch('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, agency }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok) location.reload(); else $('#loginErr').textContent = j.error || 'Не удалось зарегистрировать';
+      } else {
+        const r = await fetch('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(email ? { email, password } : { password }) });
+        if (r.ok) location.reload(); else $('#loginErr').textContent = 'Неверный e-mail или пароль';
+      }
+    } catch (e) { $('#loginErr').textContent = 'Сеть недоступна'; }
+  };
+  $('#loginBtn').addEventListener('click', submit);
+  ['#loginEmail', '#loginPass', '#regAgency'].forEach(sel => { const i = $(sel); if (i) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }); });
   $('#loginPass').focus();
 }
 
@@ -10760,11 +10831,18 @@ PAGES.settings = async (root) => {
       <span class="set-link-meta">${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}</span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
-    <button class="glass card set-link" id="setGuides">
+    <button class="glass card set-link" id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()">
       <span class="set-link-ic">${ic(I.doc)}</span>
-      <span class="set-link-main"><b>Инструкции и гайды</b><i>Пошаговые руководства по функциям — для команды и новичков</i></span>
+      <span class="set-link-main"><b>Инструкции и гайды</b><i>Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое</i></span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
+    <div class="glass card">
+      <div class="card-title">${ic(I.gear)}Оформление<span class="sub">тема интерфейса и мастер настройки</span></div>
+      <div class="theme-inline">
+        ${THEME_PRESETS.map(p => `<button class="tm-item" onclick="window.setTheme('${p.k}')"><span class="tm-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="tm-tx"><b>${p.name}</b><small>${p.desc}</small></span></button>`).join('')}
+      </div>
+      <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}Мастер настройки Lumen</button>
+    </div>
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>

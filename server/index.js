@@ -3410,6 +3410,8 @@ const server = http.createServer(async (req, res) => {
       store.runInTenant(tid, () => {
         const tdb = store.get();
         ensureTenantDefaults(tdb);
+        /* чистый старт нового агентства: убрать демо-данные, оставить полезные дефолты (цепочки+шаблоны) */
+        ['leads', 'brokers', 'messages', 'events', 'campaigns', 'numbers'].forEach(k => { if (Array.isArray(tdb[k])) tdb[k] = []; });
         tdb.settings.auth.passHash = sha(password);
         tdb.settings.auth.ownerEmail = email;
         if (agencyName) { tdb.settings.agency = tdb.settings.agency || {}; tdb.settings.agency.name = agencyName; }

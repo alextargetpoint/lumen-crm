@@ -59,6 +59,7 @@ async function main() {
   ok('reg: дубликат e-mail → 409', (await jpost(jar(), '/auth/register', { email: 'a@x.com', password: 'secretA', agency: 'Dup' })).status === 409);
   const stA = await jget(A, '/api/state');
   ok('A: своё агентство в /api/state', stA.s === 200 && stA.b && stA.b.settings && stA.b.settings.agency && stA.b.settings.agency.name === 'Agency A', stA.b?.settings?.agency?.name);
+  ok('A: чистый старт — 0 лидов (без демо)', (await jget(A, '/api/leads')).b?.length === 0);
 
   // D. изоляция: лид в A не виден primary и B
   await jpost(A, '/api/leads', { name: 'ALEAD-ISO' });
