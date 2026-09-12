@@ -2221,7 +2221,8 @@ async function telnyxApi(db, method, pathx, body) {
 function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
 
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
-const waGraySid = (phone) => 'n_' + String(phone || '').replace(/[^0-9]/g, '');
+/* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
+const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').replace(/[^0-9]/g, '');
 async function waGrayApi(db, method, pathx, body) {
   const g = db.settings.waGray || {};
   const base = String(g.url || '').replace(/\/$/, '');
@@ -3328,7 +3329,7 @@ const server = http.createServer(async (req, res) => {
           const tdb = store.get();
           let sess = null;
           if (tdb.settings.auth && sha(String(b.password || '')) === tdb.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
-          else { const br = (tdb.brokers || []).find(x => x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false); if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id }; }
+          else { const br = (tdb.brokers || []).find(x => x.email === _email && x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false); if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id }; }
           if (!sess) return null;
           const sid = crypto.randomBytes(16).toString('hex');
           sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
@@ -3423,6 +3424,80 @@ const server = http.createServer(async (req, res) => {
       const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
       res.end(JSON.stringify({ ok: true, tid })); return;
+    }
+    /* ---------------- SaaS: приглашение брокера по e-mail ---------------- */
+    if (p === '/api/brokers/invite' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const bb = await readBody(req);
+      const email = String(bb.email || '').trim().toLowerCase();
+      const name = String(bb.name || '').trim().slice(0, 80);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(res, 400, { error: 'нужен корректный e-mail' });
+      const reg = store.getRegistry();
+      const tid = store.currentTid();
+      if (reg.byEmail[email] && reg.byEmail[email] !== tid) return json(res, 409, { error: 'этот e-mail уже привязан к другому агентству' });
+      let br = (db.brokers || []).find(x => x.email === email);
+      if (!br) { br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br); }
+      else if (name) br.name = name;
+      const token = crypto.randomBytes(16).toString('hex');
+      reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
+      reg.byEmail[email] = tid;
+      store.saveRegistry(); store.save();
+      const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+      const link = base + '/invite?token=' + token;
+      let mailed = false;
+      try {
+        const ec = (db.settings.channels && db.settings.channels.email) || {};
+        if (ec.key && ec.from) {
+          const agencyNm = (db.settings.agency && db.settings.agency.name) || 'Lumen';
+          const r2 = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Приглашение в ' + agencyNm, html: `<p>Вас пригласили в CRM <b>${esc(agencyNm)}</b>. Перейдите по ссылке, чтобы задать пароль и войти:</p><p><a href="${link}">${link}</a></p>` }) });
+          mailed = r2.ok;
+        }
+      } catch (e) {}
+      audit(db, req, 'пригласил брокера', { email });
+      return json(res, 200, { ok: true, link, mailed, broker: { id: br.id, name: br.name, email } });
+    }
+    /* страница принятия приглашения (публичная, по токену) */
+    if (p === '/invite' && req.method === 'GET') {
+      const token = u.searchParams.get('token') || '';
+      const inv = store.getRegistry().invites[token];
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      const head = '<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Приглашение · Lumen</title><style>body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#061126;color:#fff;display:grid;place-items:center;min-height:100vh}.c{width:340px;max-width:calc(100vw - 40px);padding:32px;border-radius:18px;background:rgba(10,24,51,.6);border:1px solid rgba(255,255,255,.14);text-align:center}input{width:100%;box-sizing:border-box;margin:8px 0;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(6,17,38,.6);color:#fff;text-align:center}button{width:100%;padding:12px;border:0;border-radius:10px;background:#c8a86a;color:#0a1833;font-weight:600;cursor:pointer;margin-top:6px}.e{color:#f28b8b;font-size:13px;min-height:18px}h2{font-weight:650;letter-spacing:.1em}.muted{color:rgba(255,255,255,.6);font-size:13px}</style></head><body><div class=c>';
+      if (inv) {
+        res.end(head + `<h2>LUMEN</h2><div class=muted>Приглашение для<br><b>${esc(inv.email)}</b></div><input id=nm placeholder="Ваше имя"><input id=pw type=password placeholder="Придумайте пароль (мин. 6)"><div class=e id=err></div><button id=go>Принять и войти</button></div><script>document.getElementById('go').onclick=async()=>{var pw=document.getElementById('pw').value,nm=document.getElementById('nm').value;if(pw.length<6){document.getElementById('err').textContent='Пароль минимум 6 символов';return}var r=await fetch('/auth/accept-invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:${JSON.stringify(token)},password:pw,name:nm})});if(r.ok)location.href='/';else{var j=await r.json().catch(function(){return{}});document.getElementById('err').textContent=j.error||'Ошибка'}}</script></body></html>`);
+      } else {
+        res.end(head + '<h2>Ссылка недействительна</h2><div class=muted>Приглашение не найдено или уже использовано.</div></div></body></html>');
+      }
+      return;
+    }
+    /* принять приглашение: задать пароль брокеру + сессия */
+    if (p === '/auth/accept-invite' && req.method === 'POST') {
+      const bb = await readBody(req);
+      const token = String(bb.token || '');
+      const password = String(bb.password || '');
+      const reg = store.getRegistry();
+      const inv = reg.invites[token];
+      if (!inv) return json(res, 400, { error: 'приглашение не найдено или использовано' });
+      if (password.length < 6) return json(res, 400, { error: 'пароль минимум 6 символов' });
+      const sid = crypto.randomBytes(16).toString('hex');
+      const okDone = store.runInTenant(inv.tid, () => {
+        const tdb = store.get();
+        const br = (tdb.brokers || []).find(x => x.id === inv.brokerId);
+        if (!br) return false;
+        br.pinHash = sha(password); br.active = true; br.invited = false;
+        if (bb.name) br.name = String(bb.name).slice(0, 80);
+        tdb.settings.auth = tdb.settings.auth || { sessions: {} };
+        tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
+        tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'broker', brokerId: br.id, ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
+        store.saveNow();
+        return true;
+      });
+      if (!okDone) return json(res, 400, { error: 'брокер не найден' });
+      reg.sessions[sid] = { tid: inv.tid, at: Date.now() };
+      delete reg.invites[token];
+      store.saveRegistry();
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
+      res.end(JSON.stringify({ ok: true })); return;
     }
     /* владелец смотрит кабинет брокера (view-as) — читаем как брокер, выходим одной кнопкой */
     if (p === '/api/preview' && req.method === 'POST') {

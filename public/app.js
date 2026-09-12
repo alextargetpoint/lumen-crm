@@ -9844,6 +9844,7 @@ PAGES.brokers = async (root) => {
   `, { v: 'mark', hue: '#4F5BD5' })}
   <div class="filters"><span class="muted" style="font-size:12px">${STATE.brokers.length} в команде · распределение: ${{ load: 'по загрузке', roundrobin: 'по очереди', shift: 'по сменам' }[(st.automations || {}).assignMode] || ''} <button class="btn btn-sm" id="brAutoLink" style="margin-left:8px">Настроить</button></span>
     <button class="btn btn-accent page-primary" id="brAdd">${ic(I.plus)}Брокер</button>
+    <button class="btn" id="brInvite" style="margin-left:6px">Пригласить по e-mail</button>
     ${hint('brokers', 'Как ИИ выбирает брокера', [
       ['Режим распределения', 'По загрузке, по очереди или по сменам — в «Автоматизациях»'],
       ['Саммари вместе с лидом', '4 оси с цитатами, источник, история диалога'],
@@ -9948,6 +9949,24 @@ PAGES.brokers = async (root) => {
     await loadState();
     PAGE_STATE.brokerEdit = nb.id;
     render();
+  });
+  $('#brInvite')?.addEventListener('click', () => {
+    modal({ title: 'Пригласить брокера по e-mail', body: `
+      <div class="form-row"><label>Имя</label><input id="invNm" placeholder="Имя брокера"></div>
+      <div class="form-row"><label>E-mail</label><input id="invEm" type="email" placeholder="broker@email.com"></div>
+      <div id="invOut" class="muted" style="margin-top:6px;font-size:12.5px">Брокер получит ссылку, задаст свой пароль и войдёт в рабочее место — увидит только назначенных ему лидов.</div>`,
+      actions: [
+        { label: 'Создать приглашение', cls: 'btn-accent', onClick: async (bd) => {
+          const email = $('#invEm', bd).value.trim(), name = $('#invNm', bd).value.trim();
+          if (!email) { $('#invOut', bd).textContent = 'Введите e-mail'; return false; }
+          try {
+            const r = await api.post('/brokers/invite', { email, name });
+            $('#invOut', bd).innerHTML = `Готово${r.mailed ? ' — письмо отправлено' : ''}. Ссылка-приглашение (скопируйте и отправьте брокеру):<br><input readonly value="${esc(r.link)}" style="width:100%;margin-top:6px" onclick="this.select()">`;
+          } catch (e) { $('#invOut', bd).textContent = e.message || 'Не удалось'; }
+          return false; /* держим модалку открытой, чтобы показать ссылку */
+        } },
+        { label: 'Готово', onClick: () => { loadState().then(render); } },
+      ] });
   });
   $$('[data-brok]', root).forEach(c => c.addEventListener('click', () => { PAGE_STATE.brokerEdit = c.dataset.brok; render(); }));
   const eb = root.querySelector('[data-bredit]');

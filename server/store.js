@@ -39,6 +39,7 @@ function loadRegistry() {
   registry.tenants = registry.tenants || {};
   registry.byEmail = registry.byEmail || {};
   registry.sessions = registry.sessions || {};
+  registry.invites = registry.invites || {};   // token -> {tid, brokerId, email, at}
   return registry;
 }
 function saveRegistry() {

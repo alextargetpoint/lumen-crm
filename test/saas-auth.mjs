@@ -90,6 +90,28 @@ async function main() {
   ok('gray/config без сессии → 401', (await jpost(jar(), '/api/wa/gray/config', { url: 'x' })).status === 401);
   ok('gray/list в тенанте A → 200', (await jget((await (async () => { const j = jar(); await jpost(j, '/auth/login', { email: 'a@x.com', password: 'secretA' }); return j; })()), '/api/wa/gray/list')).s === 200);
 
+  // H. инвайт брокера
+  const Aowner = jar(); await jpost(Aowner, '/auth/login', { email: 'a@x.com', password: 'secretA' });
+  const invR = await jpost(Aowner, '/api/brokers/invite', { email: 'broker@a.com', name: 'Брокер А' });
+  const inv = await invR.json().catch(() => ({}));
+  ok('invite: владелец получил ссылку с токеном', invR.status === 200 && inv.link && inv.link.includes('token='), JSON.stringify(inv).slice(0, 80));
+  const token = (inv.link || '').split('token=')[1] || '';
+  ok('invite: чужой (не владелец) → 403', (await jpost(jar(), '/api/brokers/invite', { email: 'x@y.com' })).status === 401);
+  const pageHtml = await (await fetch(BASE + '/invite?token=' + token)).text();
+  ok('invite page: /invite?token → HTML с формой', pageHtml.includes('Принять и войти'));
+  ok('invite page: битый токен → «недействительна»', (await (await fetch(BASE + '/invite?token=bad')).text()).includes('недействительна'));
+  const BR = jar();
+  ok('accept: короткий пароль → 400', (await jpost(BR, '/auth/accept-invite', { token, password: '123' })).status === 400);
+  ok('accept: верно → 200', (await jpost(BR, '/auth/accept-invite', { token, password: 'brokerpass', name: 'Брокер А' })).status === 200);
+  ok('broker: /api/leads 200 (массив, роль-скоуп)', Array.isArray((await jget(BR, '/api/leads')).b));
+  const brState = await jget(BR, '/api/state');
+  ok('broker: роль broker в /api/state', brState.b && brState.b.me && brState.b.me.role === 'broker', brState.b?.me?.role);
+  ok('broker: в агентстве A (тенант-роутинг)', brState.b?.settings?.agency?.name === 'Agency A', brState.b?.settings?.agency?.name);
+  ok('accept: токен одноразовый (повтор → 400)', (await jpost(jar(), '/auth/accept-invite', { token, password: 'again123' })).status === 400);
+  const BR2 = jar();
+  ok('broker: повторный вход по e-mail → 200', (await jpost(BR2, '/auth/login', { email: 'broker@a.com', password: 'brokerpass' })).status === 200);
+  ok('broker (перевход): в агентстве A', (await jget(BR2, '/api/state')).b?.settings?.agency?.name === 'Agency A');
+
   finish(srv);
 }
 
