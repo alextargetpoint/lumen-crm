@@ -240,10 +240,15 @@
   .ish:focus{outline:none;border-color:var(--acc)}
   .ish-ok{width:100%;border:none;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:var(--shacc)}
   .ms-ch{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--mut);font-weight:600;margin:4px 2px 14px}.ms-ch input{width:18px;height:18px;accent-color:var(--acc)}
-  .segflt{display:flex;gap:6px;margin-top:11px}
-  .segflt button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-family:inherit;font-weight:700;font-size:12.5px;padding:8px 6px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s}
+  /* панель фильтров чатов — горизонтальный скролл чипов (быстрые + по стадиям + по гео) */
+  .segflt{display:flex;gap:7px;margin-top:11px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .segflt::-webkit-scrollbar{height:0}
+  .segflt button{flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-family:inherit;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
   .segflt button.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:var(--shacc)}
   .segflt .cnt{background:rgba(255,255,255,.22);color:inherit;font-size:11px;font-weight:800;padding:0 6px;border-radius:8px;min-width:16px;text-align:center}
+  .segflt button:not(.on) .cnt{background:var(--panel2);color:var(--mut)}
+  .segflt .fdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .segflt .fsep{flex:0 0 1px;align-self:stretch;background:var(--line);margin:4px 2px}
   /* переключатель Чаты | Лиды (мини-CRM) */
   .viewseg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-top:2px}
   .viewseg button{flex:1;border:none;background:transparent;color:var(--mut);font-family:inherit;font-weight:700;font-size:13.5px;padding:8px 6px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s}
@@ -293,11 +298,7 @@
         <button data-v="leads"><span class="ic" data-ic="user"></span>Лиды</button>
       </div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
-      <div class="segflt" id="segflt">
-        <button data-f="all" class="on">Все</button>
-        <button data-f="mine">Нужен я <span class="cnt" id="cntMine"></span></button>
-        <button data-f="unread">Непрочитанные <span class="cnt" id="cntUnread"></span></button>
-      </div>
+      <div class="segflt" id="segflt"></div>
     </div>
     <div id="chats"><div class="load"><div class="sp"></div>Загрузка чатов…</div></div>
     <div id="leads" class="hidden"></div>
@@ -406,13 +407,40 @@ async function jpost(u,body,raw){const o={method:'POST',headers:{...H}};if(raw){
 async function loadChats(){try{CHATS=await jget('/tgapp/api/chats');const fp=JSON.stringify(CHATS.map(c=>[c.id,c.lastMsgAt,c.unread,c.lastText]));if(fp!==window._cfp){window._cfp=fp;renderChats()}}catch(e){$('#chats').innerHTML='<div class="empty">Не удалось загрузить.<br>'+esc(e.message)+'<br><br>Откройте через кнопку «Чаты» у бота (нужна привязка брокера).</div>'}}
 function tot(){return CHATS.reduce((n,c)=>n+(c.unread||0),0)}
 let CHFILTER='all';
+/* предикат фильтра: быстрые + по стадии (stage:key) + по гео (geo:name) */
+function chatMatch(c,f){
+  if(f==='all')return true;
+  if(f==='mine')return c.needsMe;
+  if(f==='unread')return c.unread>0;
+  if(f==='ai')return c.aiOn;
+  if(f==='manual')return !c.aiOn;
+  if(f.slice(0,6)==='stage:')return c.stage===f.slice(6);
+  if(f.slice(0,4)==='geo:')return c.geo===f.slice(4);
+  return true;
+}
+/* динамическая панель фильтров: быстрые + чипы стадий и гео, что реально есть в чатах */
+function buildChatFilters(){
+  const seg=$('#segflt');if(!seg)return;const sl=seg.scrollLeft;
+  const n=f=>CHATS.filter(c=>chatMatch(c,f)).length;
+  const cnt=v=>v?`<span class="cnt">${v}</span>`:'';
+  const on=f=>CHFILTER===f?'on':'';
+  let h=`<button data-f="all" class="${on('all')}">Все</button>`
+    +`<button data-f="mine" class="${on('mine')}">Нужен я${cnt(n('mine'))}</button>`
+    +`<button data-f="unread" class="${on('unread')}">Непрочитанные${cnt(n('unread'))}</button>`
+    +`<button data-f="ai" class="${on('ai')}">ИИ ведёт${cnt(n('ai'))}</button>`
+    +`<button data-f="manual" class="${on('manual')}">Я веду${cnt(n('manual'))}</button>`;
+  const stages=[...new Set(CHATS.map(c=>c.stage).filter(Boolean))].sort((a,b)=>(STG_ORDER.indexOf(a)+1||99)-(STG_ORDER.indexOf(b)+1||99));
+  if(stages.length){h+='<span class="fsep"></span>';stages.forEach(st=>{const m=STG[st]||[st,'#8b93a7'],f='stage:'+st;h+=`<button data-f="${f}" class="${on(f)}"><span class="fdot" style="background:${m[1]}"></span>${esc(m[0])}${cnt(n(f))}</button>`;});}
+  const geos=[...new Set(CHATS.map(c=>c.geo).filter(Boolean))].sort();
+  if(geos.length){h+='<span class="fsep"></span>';geos.forEach(g=>{const f='geo:'+g;h+=`<button data-f="${f}" class="${on(f)}">${esc(g)}${cnt(n(f))}</button>`;});}
+  seg.innerHTML=h;seg.scrollLeft=sl;
+  seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();CHFILTER=b.dataset.f;renderChats()});
+}
 function renderChats(){
   const q=($('#q').value||'').toLowerCase().trim();
-  const nMine=CHATS.filter(c=>c.needsMe).length, nUnread=CHATS.filter(c=>c.unread>0).length;
-  const cm=$('#cntMine'),cu=$('#cntUnread');if(cm){cm.textContent=nMine||'';cm.style.display=nMine?'':'none'}if(cu){cu.textContent=nUnread||'';cu.style.display=nUnread?'':'none'}
-  let list=CHATS.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
-  if(CHFILTER==='mine')list=list.filter(c=>c.needsMe);
-  else if(CHFILTER==='unread')list=list.filter(c=>c.unread>0);
+  buildChatFilters();
+  const nMine=CHATS.filter(c=>c.needsMe).length;
+  let list=CHATS.filter(c=>chatMatch(c,CHFILTER)).filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
   $('#sub').textContent=CHATS.length?`${CHATS.length} чатов${nMine?' · '+nMine+' ждут вас':(tot()?' · '+tot()+' новых':'')}`:'Пока нет активных чатов';
   $('#chats').innerHTML=list.length?list.map(c=>`
     <div class="row" data-id="${c.id}">
@@ -422,10 +450,9 @@ function renderChats(){
         <div class="prev">${c.geo?`<span class="geo-chip">${esc(c.geo)}</span>`:''}${c.lastDir==='out'?'<span class="me">Вы:</span> ':''}<span style="overflow:hidden;text-overflow:ellipsis">${esc(c.lastText||'нет сообщений')}</span></div>
       </div>
       ${c.unread>0?`<span class="badge-un">${c.unread>99?'99+':c.unread}</span>`:(c.needsMe?'<span class="dot-me" title="ждёт вашего ответа"></span>':'')}
-    </div>`).join(''):`<div class="empty">${CHFILTER==='mine'?'Никто не ждёт ответа — всё под контролем 👌':CHFILTER==='unread'?'Непрочитанных нет':'Ничего не найдено'}</div>`;
+    </div>`).join(''):`<div class="empty">${CHFILTER==='mine'?'Никто не ждёт ответа — всё под контролем 👌':CHFILTER==='unread'?'Непрочитанных нет':CHFILTER==='all'?'Ничего не найдено':'В этом фильтре пусто'}</div>`;
   document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{hap();openChat(r.dataset.id)});
 }
-$('#segflt')&&$('#segflt').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();CHFILTER=b.dataset.f;$('#segflt').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));renderChats()});
 
 /* ── мини-CRM: вкладка «Лиды» (все лиды брокера, группировка по стадии, тап → полная карточка) ── */
 let MODE='chats', LEADS=[], LGRP_CLOSED={};
