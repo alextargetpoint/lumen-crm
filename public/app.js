@@ -658,6 +658,7 @@ function renderLogin() {
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:#f28b8b"></div>
       <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:44px;font-size:14px">Войти</button>
       <div id="loginHint" style="font-size:11px;color:rgba(255,255,255,.5);margin-top:12px">Вход владельца — по паролю или e-mail</div>
+      <div id="forgotLink" style="font-size:11px;color:var(--blue-300);margin-top:8px;cursor:pointer;text-decoration:underline">Забыли пароль?</div>
     </div>
   </div>`);
   document.body.appendChild(s);
@@ -696,6 +697,11 @@ function renderLogin() {
   };
   $('#loginBtn').addEventListener('click', submit);
   ['#loginEmail', '#loginPass', '#regAgency'].forEach(sel => { const i = $(sel); if (i) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }); });
+  $('#forgotLink')?.addEventListener('click', async () => {
+    const email = $('#loginEmail').value.trim();
+    if (!email) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = 'Впишите e-mail выше, затем «Забыли пароль?»'; return; }
+    try { await fetch('/auth/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); $('#loginErr').style.color = '#8fd39a'; $('#loginErr').textContent = 'Если такой e-mail есть — ссылка для сброса отправлена на почту.'; } catch (e) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = 'Сеть недоступна'; }
+  });
   $('#loginPass').focus();
 }
 

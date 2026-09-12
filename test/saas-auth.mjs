@@ -2,7 +2,7 @@
 /* Lumen SaaS auth/tenancy test — самодостаточный: поднимает свой сервер на временных
    данных, гоняет всю матрицу входов/изоляции, гасит. Запуск: node test/saas-auth.mjs */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -124,6 +124,30 @@ async function main() {
   ok('plan: триал + лимит брокеров 3', planC.b?.plan === 'trial' && planC.b?.limits?.maxBrokers === 3, JSON.stringify(planC.b?.limits || {}));
   for (let i = 1; i <= 3; i++) await jpost(C, '/api/brokers/invite', { email: `b${i}@c.com`, name: 'B' + i });
   ok('лимит брокеров: 4-й инвайт на триале → 402', (await jpost(C, '/api/brokers/invite', { email: 'b4@c.com', name: 'B4' })).status === 402);
+
+  // K. сброс пароля
+  const D = jar(); await jpost(D, '/auth/register', { email: 'd@x.com', password: 'secretD', agency: 'Agency D' });
+  ok('forgot: всегда 200 (не раскрывает e-mail)', (await jpost(jar(), '/auth/forgot', { email: 'd@x.com' })).status === 200);
+  ok('forgot: несуществующий e-mail тоже 200', (await jpost(jar(), '/auth/forgot', { email: 'ghost@x.com' })).status === 200);
+  let resetToken = '';
+  try { const reg = JSON.parse(readFileSync(join(DATA_DIR, 'registry.json'), 'utf8')); resetToken = Object.keys(reg.resets || {}).find(t => reg.resets[t].email === 'd@x.com') || ''; } catch {}
+  ok('reset: токен создан в реестре', !!resetToken);
+  ok('reset page /reset?token → HTML', (await (await fetch(BASE + '/reset?token=' + resetToken)).text()).includes('Сохранить и войти'));
+  ok('reset: короткий пароль → 400', (await jpost(jar(), '/auth/reset', { token: resetToken, password: '123' })).status === 400);
+  ok('reset: верно → 200', (await jpost(jar(), '/auth/reset', { token: resetToken, password: 'newpass123' })).status === 200);
+  ok('reset: вход новым паролем → 200', (await jpost(jar(), '/auth/login', { email: 'd@x.com', password: 'newpass123' })).status === 200);
+  ok('reset: старый пароль больше не пускает → 401', (await jpost(jar(), '/auth/login', { email: 'd@x.com', password: 'secretD' })).status === 401);
+  ok('reset: токен одноразовый (повтор → 400)', (await jpost(jar(), '/auth/reset', { token: resetToken, password: 'again123' })).status === 400);
+
+  // L. верификация e-mail
+  const E = jar(); const regE = await (await jpost(E, '/auth/register', { email: 'e@x.com', password: 'secretE', agency: 'Agency E' })).json();
+  let reg2 = {}; try { reg2 = JSON.parse(readFileSync(join(DATA_DIR, 'registry.json'), 'utf8')); } catch {}
+  ok('verify: новый тенант verified=false', reg2.tenants?.[regE.tid]?.verified === false);
+  const vtok = Object.keys(reg2.verifs || {}).find(t => reg2.verifs[t].email === 'e@x.com') || '';
+  ok('verify: токен создан', !!vtok);
+  ok('verify: переход по ссылке → 302', (await fetch(BASE + '/auth/verify?token=' + vtok, { redirect: 'manual' })).status === 302);
+  let reg3 = {}; try { reg3 = JSON.parse(readFileSync(join(DATA_DIR, 'registry.json'), 'utf8')); } catch {}
+  ok('verify: тенант стал verified=true', reg3.tenants?.[regE.tid]?.verified === true);
 
   finish(srv);
 }

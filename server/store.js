@@ -40,6 +40,8 @@ function loadRegistry() {
   registry.byEmail = registry.byEmail || {};
   registry.sessions = registry.sessions || {};
   registry.invites = registry.invites || {};   // token -> {tid, brokerId, email, at}
+  registry.resets = registry.resets || {};      // token -> {tid, email, at}  (сброс пароля)
+  registry.verifs = registry.verifs || {};      // token -> {tid, email, at}  (верификация e-mail)
   return registry;
 }
 function saveRegistry() {

@@ -3427,11 +3427,24 @@ const server = http.createServer(async (req, res) => {
         tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'owner', ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
         store.saveNow();
       });
+      reg.tenants[tid].verified = false;
+      const vtok = crypto.randomBytes(16).toString('hex');
+      reg.verifs[vtok] = { tid, email, at: Date.now() };
       reg.sessions[sid] = { tid, at: Date.now() };
       store.saveRegistry();
+      /* письмо-подтверждение (если у тенанта настроен Resend — обычно ещё нет; тихо пропускаем) */
+      try { await store.runInTenant(tid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) { const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, ''); await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Подтвердите e-mail — Lumen', html: `<p>Подтвердите адрес, чтобы активировать аккаунт:</p><p><a href="${base}/auth/verify?token=${vtok}">Подтвердить e-mail</a></p>` }) }); } }); } catch (e) {}
       const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
       res.end(JSON.stringify({ ok: true, tid })); return;
+    }
+    /* подтверждение e-mail по ссылке из письма */
+    if (p === '/auth/verify' && req.method === 'GET') {
+      const token = u.searchParams.get('token') || '';
+      const reg = store.getRegistry();
+      const v = reg.verifs[token];
+      if (v && reg.tenants[v.tid]) { reg.tenants[v.tid].verified = true; delete reg.verifs[token]; store.saveRegistry(); }
+      res.writeHead(302, { Location: '/' }); res.end(); return;
     }
     /* ---------------- SaaS: приглашение брокера по e-mail ---------------- */
     if (p === '/api/brokers/invite' && req.method === 'POST') {
@@ -3514,6 +3527,57 @@ const server = http.createServer(async (req, res) => {
       if (!okDone) return json(res, 400, { error: 'брокер не найден' });
       reg.sessions[sid] = { tid: inv.tid, at: Date.now() };
       delete reg.invites[token];
+      store.saveRegistry();
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
+    /* ---------------- SaaS: сброс пароля (forgot/reset) ---------------- */
+    if (p === '/auth/forgot' && req.method === 'POST') {
+      const bb = await readBody(req);
+      const email = String(bb.email || '').trim().toLowerCase();
+      const reg = store.getRegistry();
+      const rtid = reg.byEmail[email];
+      if (rtid) {
+        const token = crypto.randomBytes(16).toString('hex');
+        reg.resets[token] = { tid: rtid, email, at: Date.now() };
+        store.saveRegistry();
+        const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+        const link = base + '/reset?token=' + token;
+        try { await store.runInTenant(rtid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Сброс пароля Lumen', html: `<p>Запрошен сброс пароля. Ссылка:</p><p><a href="${link}">${link}</a></p>` }) }); }); } catch (e) {}
+      }
+      return json(res, 200, { ok: true }); /* не раскрываем, существует ли e-mail */
+    }
+    if (p === '/reset' && req.method === 'GET') {
+      const token = u.searchParams.get('token') || '';
+      const rs = store.getRegistry().resets[token];
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      const head = '<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Сброс пароля · Lumen</title><style>body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#061126;color:#fff;display:grid;place-items:center;min-height:100vh}.c{width:340px;max-width:calc(100vw - 40px);padding:32px;border-radius:18px;background:rgba(10,24,51,.6);border:1px solid rgba(255,255,255,.14);text-align:center}input{width:100%;box-sizing:border-box;margin:8px 0;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(6,17,38,.6);color:#fff;text-align:center}button{width:100%;padding:12px;border:0;border-radius:10px;background:#c8a86a;color:#0a1833;font-weight:600;cursor:pointer;margin-top:6px}.e{color:#f28b8b;font-size:13px;min-height:18px}h2{letter-spacing:.1em}.muted{color:rgba(255,255,255,.6);font-size:13px}</style></head><body><div class=c>';
+      if (rs) res.end(head + `<h2>LUMEN</h2><div class=muted>Новый пароль для<br><b>${esc(rs.email)}</b></div><input id=pw type=password placeholder="Новый пароль (мин. 6)"><div class=e id=err></div><button id=go>Сохранить и войти</button></div><script>document.getElementById('go').onclick=async()=>{var pw=document.getElementById('pw').value;if(pw.length<6){document.getElementById('err').textContent='Минимум 6 символов';return}var r=await fetch('/auth/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:${JSON.stringify(token)},password:pw})});if(r.ok)location.href='/';else{var j=await r.json().catch(function(){return{}});document.getElementById('err').textContent=j.error||'Ошибка'}}</script></body></html>`);
+      else res.end(head + '<h2>Ссылка недействительна</h2><div class=muted>Запросите сброс заново.</div></div></body></html>');
+      return;
+    }
+    if (p === '/auth/reset' && req.method === 'POST') {
+      const bb = await readBody(req);
+      const token = String(bb.token || ''); const password = String(bb.password || '');
+      const reg = store.getRegistry();
+      const rs = reg.resets[token];
+      if (!rs) return json(res, 400, { error: 'ссылка недействительна' });
+      if (password.length < 6) return json(res, 400, { error: 'пароль минимум 6 символов' });
+      const sid = crypto.randomBytes(16).toString('hex');
+      const done = store.runInTenant(rs.tid, () => {
+        const tdb = store.get();
+        let role = null, brokerId = null;
+        if (tdb.settings.auth && tdb.settings.auth.ownerEmail === rs.email) { tdb.settings.auth.passHash = sha(password); role = 'owner'; }
+        else { const br = (tdb.brokers || []).find(x => x.email === rs.email); if (!br) return false; br.pinHash = sha(password); br.active = true; role = 'broker'; brokerId = br.id; }
+        tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
+        tdb.settings.auth.sessions[sid] = { at: Date.now(), role, brokerId, ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
+        store.saveNow();
+        return true;
+      });
+      if (!done) return json(res, 400, { error: 'аккаунт не найден' });
+      reg.sessions[sid] = { tid: rs.tid, at: Date.now() };
+      delete reg.resets[token];
       store.saveRegistry();
       const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
