@@ -112,6 +112,12 @@ async function main() {
   ok('broker: повторный вход по e-mail → 200', (await jpost(BR2, '/auth/login', { email: 'broker@a.com', password: 'brokerpass' })).status === 200);
   ok('broker (перевход): в агентстве A', (await jget(BR2, '/api/state')).b?.settings?.agency?.name === 'Agency A');
 
+  // I. удаление брокера чистит реестр (byEmail/сессии)
+  await jpost(Aowner, '/api/brokers/invite', { email: 'broker2@a.com', name: 'Второй' }); // чтобы не остаться с одним
+  const delR = await Aowner.req('/api/brokers/' + inv.broker.id, { method: 'DELETE' });
+  ok('удаление брокера → 200', delR.status === 200, 'status ' + delR.status);
+  ok('удалённый брокер: вход по e-mail → 401 (реестр очищен)', (await jpost(jar(), '/auth/login', { email: 'broker@a.com', password: 'brokerpass' })).status === 401);
+
   finish(srv);
 }
 

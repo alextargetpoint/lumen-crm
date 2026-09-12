@@ -4139,9 +4139,18 @@ const server = http.createServer(async (req, res) => {
     }
     if ((m = p.match(/^\/api\/brokers\/([^/]+)$/)) && req.method === 'DELETE') {
       if (db.brokers.length <= 1) return json(res, 400, { error: 'нельзя удалить последнего брокера' });
+      const gone = db.brokers.find(x => x.id === m[1]);
       for (const l of db.leads) if (l.broker === m[1]) { recordOwner(db, l, null, 'system', 'брокер удалён'); l.broker = null; }
       for (const mt of db.meetings || []) if (mt.brokerId === m[1]) mt.brokerId = db.brokers.find(x => x.id !== m[1]).id;
       db.brokers = db.brokers.filter(x => x.id !== m[1]);
+      /* SaaS: чистим реестр и сессии удалённого брокера (e-mail-маппинг, инвайты, активные входы) */
+      try {
+        const reg = store.getRegistry(); const tid = store.currentTid();
+        if (gone && gone.email && reg.byEmail[gone.email] === tid) delete reg.byEmail[gone.email];
+        for (const tok of Object.keys(reg.invites)) if (reg.invites[tok].brokerId === m[1]) delete reg.invites[tok];
+        if (db.settings.auth && db.settings.auth.sessions) for (const sid of Object.keys(db.settings.auth.sessions)) if (db.settings.auth.sessions[sid].brokerId === m[1]) { delete db.settings.auth.sessions[sid]; delete reg.sessions[sid]; }
+        store.saveRegistry();
+      } catch (e) {}
       store.save();
       return json(res, 200, { ok: true });
     }
