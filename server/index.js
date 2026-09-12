@@ -609,6 +609,7 @@ function editKeyFor(req) { const r = realRole(req); return (r && r.role === 'own
    Ключ из env PLATFORM_ADMIN_KEY (прод) либо авто-ключ registry.adminKey (виден в логах при старте). */
 function platformAdminKey() { return process.env.PLATFORM_ADMIN_KEY || (store.getRegistry().adminKey || ''); }
 function isPlatformAdmin(req) { const m = (req.headers.cookie || '').match(/lumen_admin=([a-f0-9]{32})/); return !!(m && store.getRegistry().adminSessions[m[1]]); }
+function adminLog(action, extra) { const reg = store.getRegistry(); reg.adminAudit = reg.adminAudit || []; reg.adminAudit.unshift(Object.assign({ at: Date.now(), action }, extra || {})); if (reg.adminAudit.length > 500) reg.adminAudit.length = 500; store.saveRegistry(); }
 /* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
 function audit(db, req, action, extra) {
   const s = sessionRole(req);
@@ -3792,17 +3793,30 @@ const server = http.createServer(async (req, res) => {
         const ts = store.listTenants().map(tenantStat);
         return json(res, 200, { ok: true, tenants: ts.length, leads: ts.reduce((s, t) => s + t.leads, 0), brokers: ts.reduce((s, t) => s + t.brokers, 0), suspended: ts.filter(t => t.suspended).length, byPlan: ts.reduce((a, t) => (a[t.plan] = (a[t.plan] || 0) + 1, a), {}), mrr: ts.reduce((s, t) => s + ((PLANS[t.plan] || {}).price || 0), 0) });
       }
-      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/plan$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); if (!PLANS[b.plan]) return json(res, 400, { error: 'нет плана' }); reg.tenants[am[1]].plan = b.plan; store.saveRegistry(); return json(res, 200, { ok: true }); }
-      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/suspend$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); reg.tenants[am[1]].suspended = !!b.suspended; store.saveRegistry(); return json(res, 200, { ok: true, suspended: reg.tenants[am[1]].suspended }); }
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/plan$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); if (!PLANS[b.plan]) return json(res, 400, { error: 'нет плана' }); reg.tenants[am[1]].plan = b.plan; store.saveRegistry(); adminLog('plan', { tid: am[1], plan: b.plan }); return json(res, 200, { ok: true }); }
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/suspend$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); reg.tenants[am[1]].suspended = !!b.suspended; store.saveRegistry(); adminLog('suspend', { tid: am[1], suspended: reg.tenants[am[1]].suspended }); return json(res, 200, { ok: true, suspended: reg.tenants[am[1]].suspended }); }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)$/)) && req.method === 'DELETE') {
         const tid = am[1]; if (tid === store.PRIMARY) return json(res, 400, { error: 'нельзя удалить primary' });
         if (!reg.tenants[tid]) return json(res, 404, { error: 'нет тенанта' });
         for (const em of Object.keys(reg.byEmail)) if (reg.byEmail[em] === tid) delete reg.byEmail[em];
         for (const s of Object.keys(reg.sessions)) if (reg.sessions[s].tid === tid) delete reg.sessions[s];
         for (const t of Object.keys(reg.invites)) if (reg.invites[t].tid === tid) delete reg.invites[t];
-        delete reg.tenants[tid]; store.saveRegistry();
+        delete reg.tenants[tid]; store.saveRegistry(); adminLog('delete', { tid });
         return json(res, 200, { ok: true });
       }
+      /* войти в кабинет агентства под супер-админом (поддержка/дебаг) — выдаём tenant-сессию */
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/impersonate$/)) && req.method === 'POST') {
+        const tid = am[1]; if (!reg.tenants[tid]) return json(res, 404, { error: 'нет тенанта' });
+        const sid = crypto.randomBytes(16).toString('hex');
+        store.runInTenant(tid, () => { const tdb = store.get(); tdb.settings.auth = tdb.settings.auth || { sessions: {} }; tdb.settings.auth.sessions = tdb.settings.auth.sessions || {}; tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'owner', imp: true, ip: clientIp(req) }; store.saveNow(); });
+        reg.sessions[sid] = { tid, at: Date.now(), imp: true }; store.saveRegistry();
+        adminLog('impersonate', { tid, name: reg.tenants[tid].name || '' });
+        const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax${secure}` });
+        res.end(JSON.stringify({ ok: true, tid })); return;
+      }
+      /* журнал действий супер-админа */
+      if (p === '/api/admin/audit' && req.method === 'GET') return json(res, 200, { ok: true, audit: (reg.adminAudit || []).slice(0, 200) });
       /* рассылка персонализированных кейсов/касаний: email — владельцам тенантов; wa — на список телефонов через gray-воркер */
       if (p === '/api/admin/campaign' && req.method === 'POST') {
         const b = await readBody(req);
@@ -3813,6 +3827,7 @@ const server = http.createServer(async (req, res) => {
             const d = store.get(); const g = d.settings.waGray || {}; const num = (g.numbers || [])[0];
             for (const ph of phones) { let okS = false, err = ''; try { if (g.url && g.token && num) { await waGrayApi(d, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', { to: ph, text: bodyTpl }); okS = true; } else err = 'gray-воркер не настроен'; } catch (e) { err = e.message; } sent.push({ to: ph, ok: okS, err }); }
           });
+          adminLog('campaign', { channel: 'wa', count: sent.filter(s => s.ok).length });
           return json(res, 200, { ok: true, channel: 'wa', sent });
         }
         const targets = Array.isArray(b.tenantIds) && b.tenantIds.length ? b.tenantIds : store.listTenants();
@@ -3829,6 +3844,7 @@ const server = http.createServer(async (req, res) => {
             sent.push({ tid, email, ok: okS, err });
           });
         }
+        adminLog('campaign', { channel: 'email', count: sent.filter(s => s.ok).length });
         return json(res, 200, { ok: true, channel: 'email', sent });
       }
       return json(res, 404, { error: 'unknown admin endpoint' });

@@ -211,6 +211,13 @@ async function main() {
   const Csess2 = jar(); await jpost(Csess2, '/auth/login', { email: 'c@x.com', password: 'secretC' });
   ok('после снятия приостановки: /api/leads снова 200', (await jget(Csess2, '/api/leads')).s === 200);
   ok('owner тенанта НЕ имеет доступа к /api/admin/tenants → 403', (await jget(Aown3, '/api/admin/tenants')).s === 403);
+  // журнал действий (ADM ещё только админ) — plan+suspend уже записаны
+  const aud = await jget(ADM, '/api/admin/audit');
+  ok('admin: журнал содержит plan+suspend', (aud.b?.audit?.length || 0) >= 2 && aud.b.audit.some(a => a.action === 'plan') && aud.b.audit.some(a => a.action === 'suspend'));
+  // impersonation (отдельный admin-jar: cookie перезапишется на lumen_sid тенанта)
+  const ADM2 = jar(); await jpost(ADM2, '/auth/admin-login', { key: adminKey });
+  ok('admin: impersonate тенанта → 200', (await jpost(ADM2, '/api/admin/tenant/' + cTid + '/impersonate', {})).status === 200);
+  ok('impersonation: /api/state = агентство C', (await jget(ADM2, '/api/state')).b?.settings?.agency?.name === 'Agency C');
 
   finish(srv);
 }
