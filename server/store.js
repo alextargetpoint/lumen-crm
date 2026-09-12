@@ -4,7 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+/* DATA_DIR из окружения — для облака (том Railway монтируется, напр., на /data).
+   Локально по умолчанию — ../data, поведение не меняется. */
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 let db = null;

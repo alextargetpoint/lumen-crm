@@ -132,6 +132,9 @@ const DEFAULT_PASS = 'lumen2026';
     email: { provider: 'resend', key: '', from: '' },
     secondRound: true, // цепочка исчерпана в канале → второй круг на следующем
   };
+  /* серый WhatsApp через облачный воркер (Baileys, QR-вход): url+токен воркера + список номеров агентства.
+     Статусы/QR живут в воркере; здесь только реквизиты и пул номеров с ролями (рассылки/прозвоны). */
+  if (!db.settings.waGray) db.settings.waGray = { url: '', token: '', numbers: [], warmup: { running: false, perDay: 16 } };
   /* мост Telegram ⇄ WhatsApp: брокер отвечает клиенту из личного Telegram, номер централизован */
   if (!db.settings.tgBridge) db.settings.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
   if (!db.settings.tgBridge.secret) db.settings.tgBridge.secret = crypto.randomBytes(12).toString('hex');
@@ -2197,6 +2200,22 @@ async function telnyxApi(db, method, pathx, body) {
   return j;
 }
 function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
+
+/* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
+const waGraySid = (phone) => 'n_' + String(phone || '').replace(/[^0-9]/g, '');
+async function waGrayApi(db, method, pathx, body) {
+  const g = db.settings.waGray || {};
+  const base = String(g.url || '').replace(/\/$/, '');
+  if (!base) throw new Error('WA-воркер не настроен (укажи URL в Настройках)');
+  const r = await fetch(base + pathx, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (g.token || '') },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('worker ' + r.status + ': ' + (j.error || 'ошибка'));
+  return j;
+}
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
   if (t.provider !== 'telnyx' || !t.key || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key, Connection ID и номер «От»');
@@ -4322,6 +4341,86 @@ const server = http.createServer(async (req, res) => {
       }
       audit(db, req, 'создал стартовые WhatsApp-шаблоны');
       return json(res, 200, { results });
+    }
+
+    /* ---------------- Серый WhatsApp через облачный воркер (Baileys/QR) ---------------- */
+    /* сохранить реквизиты воркера (владелец) + пингануть /health */
+    if (p === '/api/wa/gray/config' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.waGray = db.settings.waGray || { numbers: [] };
+      if (b.url !== undefined) db.settings.waGray.url = String(b.url || '').trim().replace(/\/$/, '');
+      if (b.token !== undefined) db.settings.waGray.token = String(b.token || '').trim();
+      store.save();
+      let health = null;
+      try { const base = db.settings.waGray.url; if (base) { const r = await fetch(base + '/health'); health = await r.json().catch(() => null); } } catch (e) { health = { ok: false, error: e.message }; }
+      return json(res, 200, { ok: true, url: db.settings.waGray.url, tokenSet: !!db.settings.waGray.token, health });
+    }
+    /* список номеров агентства + живой статус из воркера */
+    if (p === '/api/wa/gray/list' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const g = db.settings.waGray || { numbers: [] };
+      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
+      const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
+      return json(res, 200, { ok: true, url: g.url || '', tokenSet: !!g.token, numbers });
+    }
+    /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
+    if (p === '/api/wa/gray/connect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      if (!phone) return json(res, 400, { error: 'нужен номер' });
+      db.settings.waGray = db.settings.waGray || { numbers: [] };
+      db.settings.waGray.numbers = db.settings.waGray.numbers || [];
+      let rec = db.settings.waGray.numbers.find(n => n.phone === phone);
+      if (!rec) { rec = { phone, label: String(b.label || '').slice(0, 60), roles: { send: true, call: false }, addedAt: Date.now() }; db.settings.waGray.numbers.push(rec); }
+      if (b.label !== undefined) rec.label = String(b.label).slice(0, 60);
+      if (b.roles) rec.roles = { send: !!b.roles.send, call: !!b.roles.call };
+      store.save();
+      let session = null;
+      try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/start'); session = r.session; }
+      catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
+      return json(res, 200, { ok: true, phone, session });
+    }
+    /* статус одного номера (CRM опрашивает раз в ~1.5с пока status==='qr') */
+    if (p === '/api/wa/gray/status' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const phone = String(u.searchParams.get('phone') || '').replace(/[^0-9]/g, '');
+      try { const r = await waGrayApi(db, 'GET', '/sessions/' + waGraySid(phone)); return json(res, 200, { ok: true, session: r.session }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* отправить сообщение с конкретного номера */
+    if (p === '/api/wa/gray/send' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/send', { to: b.to, text: b.text }); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* выйти и убрать номер из пула */
+    if (p === '/api/wa/gray/remove' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      try { await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/logout'); } catch (e) {}
+      db.settings.waGray.numbers = (db.settings.waGray.numbers || []).filter(n => n.phone !== phone);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* входящие/события ОТ воркера (публично, но с токеном воркера в Authorization) */
+    if (p === '/api/wa/gray/incoming' && req.method === 'POST') {
+      const auth = req.headers.authorization || ''; const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+      if (!db.settings.waGray || !db.settings.waGray.token || tok !== db.settings.waGray.token) return json(res, 401, { error: 'unauthorized' });
+      const b = await readBody(req);
+      try {
+        if (b.event === 'message' && !b.fromMe && b.text) {
+          db.settings.waGray.inbox = db.settings.waGray.inbox || [];
+          db.settings.waGray.inbox.unshift({ at: Date.now(), sessionId: b.sessionId, from: b.phone, name: b.name || '', text: String(b.text).slice(0, 2000) });
+          db.settings.waGray.inbox = db.settings.waGray.inbox.slice(0, 200);
+          store.save();
+        }
+      } catch (e) {}
+      return json(res, 200, { ok: true });
     }
 
     /* ---------------- встречи ---------------- */
