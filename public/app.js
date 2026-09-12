@@ -734,6 +734,21 @@ function modal({ title, sub, body, actions, wide }) {
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
 
+/* ---------- Тариф и лимиты ---------- */
+window.openPlanManager = async function () {
+  let d = { plan: 'trial', limits: {}, usage: {}, plans: {} };
+  try { d = await api.get('/plan'); } catch (e) {}
+  const bar = (used, max) => { const pct = max ? Math.min(100, Math.round(used / max * 100)) : 0; return `<div style="background:rgba(255,255,255,.08);border-radius:6px;height:8px;overflow:hidden;margin-top:4px"><i style="display:block;height:100%;width:${pct}%;background:${pct >= 90 ? 'var(--bad,#e05555)' : 'var(--accent,#c8a86a)'}"></i></div>`; };
+  const row = (label, used, max) => `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${label}</span><span class="muted">${used} / ${max}</span></div>${bar(used, max)}</div>`;
+  modal({ title: 'Тариф и лимиты', sub: 'Текущий план агентства', body: `
+    <div style="margin-bottom:14px"><span class="badge ok">${esc((d.plans[d.plan] || {}).name || d.plan)}</span></div>
+    ${row('Брокеры', d.usage.brokers || 0, d.limits.maxBrokers || 0)}
+    ${row('Лиды', d.usage.leads || 0, d.limits.maxLeads || 0)}
+    ${row('Номера WhatsApp', d.usage.numbers || 0, d.limits.maxNumbers || 0)}
+    <div class="muted" style="font-size:12px;margin-top:12px">Смена тарифа появится после подключения оплаты.</div>`,
+    actions: [{ label: 'Закрыть' }] });
+};
+
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
 window.openGrayManager = async function () {
   let data = { url: '', tokenSet: false, numbers: [] };
@@ -10933,6 +10948,11 @@ PAGES.settings = async (root) => {
     <button class="glass card set-link" onclick="window.openGrayManager&&window.openGrayManager()">
       <span class="set-link-ic">${ic(I.chat)}</span>
       <span class="set-link-main"><b>WhatsApp — серый способ (QR)</b><i>Подключение номеров по QR-коду и прогрев, без Meta. Через облачный воркер.</i></span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
+    <button class="glass card set-link" onclick="window.openPlanManager&&window.openPlanManager()">
+      <span class="set-link-ic">${ic(I.spark)}</span>
+      <span class="set-link-main"><b>Тариф и лимиты</b><i>Текущий план агентства: брокеры, лиды, номера WhatsApp</i></span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
     <div class="two-col">

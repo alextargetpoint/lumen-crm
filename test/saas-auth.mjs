@@ -118,6 +118,13 @@ async function main() {
   ok('удаление брокера → 200', delR.status === 200, 'status ' + delR.status);
   ok('удалённый брокер: вход по e-mail → 401 (реестр очищен)', (await jpost(jar(), '/auth/login', { email: 'broker@a.com', password: 'brokerpass' })).status === 401);
 
+  // J. тарифы/лимиты
+  const C = jar(); await jpost(C, '/auth/register', { email: 'c@x.com', password: 'secretC', agency: 'Agency C' });
+  const planC = await jget(C, '/api/plan');
+  ok('plan: триал + лимит брокеров 3', planC.b?.plan === 'trial' && planC.b?.limits?.maxBrokers === 3, JSON.stringify(planC.b?.limits || {}));
+  for (let i = 1; i <= 3; i++) await jpost(C, '/api/brokers/invite', { email: `b${i}@c.com`, name: 'B' + i });
+  ok('лимит брокеров: 4-й инвайт на триале → 402', (await jpost(C, '/api/brokers/invite', { email: 'b4@c.com', name: 'B4' })).status === 402);
+
   finish(srv);
 }
 

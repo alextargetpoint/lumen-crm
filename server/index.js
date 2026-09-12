@@ -75,6 +75,14 @@ engine.startLoop();
 /* ---------- авторизация ---------- */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const DEFAULT_PASS = 'lumen2026';
+/* SaaS: тарифные планы (лимиты работают без Stripe; оплата подключится позже) */
+const PLANS = {
+  trial: { name: 'Триал', maxBrokers: 3, maxLeads: 300, maxNumbers: 1, price: 0 },
+  starter: { name: 'Starter', maxBrokers: 5, maxLeads: 2000, maxNumbers: 3, price: 49 },
+  pro: { name: 'Pro', maxBrokers: 25, maxLeads: 50000, maxNumbers: 15, price: 149 },
+};
+function planOf(tid) { try { const t = store.getRegistry().tenants[tid]; return PLANS[(t && t.plan) || 'trial'] || PLANS.trial; } catch (e) { return PLANS.trial; } }
+
 /* SaaS: минимальные критичные дефолты для НОВОГО тенанта (seed даёт только agency).
    Мигрирующий boot-блок ниже трогает primary; для новых агентств хватает этого набора. */
 function ensureTenantDefaults(db) {
@@ -3436,7 +3444,11 @@ const server = http.createServer(async (req, res) => {
       const tid = store.currentTid();
       if (reg.byEmail[email] && reg.byEmail[email] !== tid) return json(res, 409, { error: 'этот e-mail уже привязан к другому агентству' });
       let br = (db.brokers || []).find(x => x.email === email);
-      if (!br) { br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br); }
+      if (!br) {
+        const lim = planOf(store.currentTid()).maxBrokers;
+        if ((db.brokers || []).filter(x => x.active !== false).length >= lim) return json(res, 402, { error: `Лимит брокеров на вашем тарифе — ${lim}. Обновите тариф, чтобы добавить больше.` });
+        br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br);
+      }
       else if (name) br.name = name;
       const token = crypto.randomBytes(16).toString('hex');
       reg.invites[token] = { tid, brokerId: br.id, email, at: Date.now() };
@@ -3455,6 +3467,14 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {}
       audit(db, req, 'пригласил брокера', { email });
       return json(res, 200, { ok: true, link, mailed, broker: { id: br.id, name: br.name, email } });
+    }
+    /* SaaS: текущий тариф + лимиты + использование */
+    if (p === '/api/plan' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const tid = store.currentTid();
+      const t = store.getRegistry().tenants[tid] || {};
+      const usage = { brokers: (db.brokers || []).filter(x => x.active !== false).length, leads: (db.leads || []).length, numbers: ((db.settings.waGray && db.settings.waGray.numbers) || []).length };
+      return json(res, 200, { ok: true, plan: t.plan || 'trial', limits: planOf(tid), usage, plans: PLANS });
     }
     /* страница принятия приглашения (публичная, по токену) */
     if (p === '/invite' && req.method === 'GET') {
