@@ -42,6 +42,8 @@ function loadRegistry() {
   registry.invites = registry.invites || {};   // token -> {tid, brokerId, email, at}
   registry.resets = registry.resets || {};      // token -> {tid, email, at}  (сброс пароля)
   registry.verifs = registry.verifs || {};      // token -> {tid, email, at}  (верификация e-mail)
+  registry.adminSessions = registry.adminSessions || {};   // sid -> {at}  (сессии супер-админа платформы)
+  if (!registry.adminKey) registry.adminKey = require('crypto').randomBytes(20).toString('hex'); // фолбэк-ключ, если нет env PLATFORM_ADMIN_KEY
   return registry;
 }
 function saveRegistry() {

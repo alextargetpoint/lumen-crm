@@ -605,6 +605,10 @@ function realRole(req) {
 /* SEC: edit-ключ (= мастер-секрет вебхуков hooks.secret) отдаём ТОЛЬКО владельцу.
    Брокерам/маркетологам в списочных ответах — пустая строка, чтобы секрет не утекал (крит-дыра аудита). */
 function editKeyFor(req) { const r = realRole(req); return (r && r.role === 'owner') ? (store.get().settings.hooks && store.get().settings.hooks.secret) || '' : ''; }
+/* SEC: супер-админ ПЛАТФОРМЫ (основатель) — отдельная авторизация НАД тенантами.
+   Ключ из env PLATFORM_ADMIN_KEY (прод) либо авто-ключ registry.adminKey (виден в логах при старте). */
+function platformAdminKey() { return process.env.PLATFORM_ADMIN_KEY || (store.getRegistry().adminKey || ''); }
+function isPlatformAdmin(req) { const m = (req.headers.cookie || '').match(/lumen_admin=([a-f0-9]{32})/); return !!(m && store.getRegistry().adminSessions[m[1]]); }
 /* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
 function audit(db, req, action, extra) {
   const s = sessionRole(req);
@@ -2607,6 +2611,8 @@ const server = http.createServer(async (req, res) => {
   if (!_sidM) { const _pt = publicTenantFor(p); if (_pt) _tid = _pt; }
   store.enterTenant(_tid);
   const db = store.get();
+  /* SaaS: приостановленный админом тенант — блок всех API-операций (кроме платформенного админа) */
+  if (_tid !== store.PRIMARY && _reg.tenants[_tid] && _reg.tenants[_tid].suspended && p.startsWith('/api/') && !p.startsWith('/api/admin/')) return json(res, 403, { error: 'Аккаунт приостановлен. Свяжитесь с поддержкой.' });
   /* заголовки безопасности на все ответы: анти-кликджекинг + анти-MIME-sniffing + реферер-политика */
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -3476,6 +3482,27 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
       res.end(JSON.stringify({ ok: true })); return;
     }
+    /* ---------------- Супер-админ платформы (основатель) ---------------- */
+    if (p === '/auth/admin-login' && req.method === 'POST') {
+      if (rateLimited('adminlogin:' + clientIp(req), 8, 900e3)) { await new Promise(r => setTimeout(r, 800)); return json(res, 429, { error: 'слишком много попыток' }); }
+      const b = await readBody(req);
+      const key = String(b.key || ''); const real = platformAdminKey();
+      const okKey = !!real && key.length === real.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(real)); } catch (e) { return false; } })();
+      if (!okKey) { await new Promise(r => setTimeout(r, 700)); return json(res, 401, { error: 'неверный ключ' }); }
+      const sid = crypto.randomBytes(16).toString('hex');
+      const reg = store.getRegistry(); reg.adminSessions[sid] = { at: Date.now(), ip: clientIp(req) };
+      const ks = Object.keys(reg.adminSessions); if (ks.length > 10) delete reg.adminSessions[ks[0]];
+      store.saveRegistry();
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_admin=${sid}; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax${secure}` });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
+    if (p === '/auth/admin-logout' && req.method === 'POST') {
+      const m2 = (req.headers.cookie || '').match(/lumen_admin=([a-f0-9]{32})/);
+      if (m2) { const reg = store.getRegistry(); delete reg.adminSessions[m2[1]]; store.saveRegistry(); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_admin=; Path=/; Max-Age=0' });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
     /* ---------------- SaaS: публичная регистрация агентства/соло-брокера ---------------- */
     if (p === '/auth/register' && req.method === 'POST') {
       if (rateLimited('reg:' + clientIp(req), 20, 3600e3)) return json(res, 429, { error: 'слишком много регистраций с этого адреса, попробуйте позже' });
@@ -3714,7 +3741,8 @@ const server = http.createServer(async (req, res) => {
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk) return json(res, 401, { error: 'auth required' });
+    const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk && !adminApiOk) return json(res, 401, { error: 'auth required' });
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -3753,6 +3781,58 @@ const server = http.createServer(async (req, res) => {
       return json(res, 404, { error: 'not found' });
     }
 
+    /* ---------------- API супер-админа платформы (isPlatformAdmin, над тенантами) ---------------- */
+    if (p.startsWith('/api/admin/') && p !== '/api/admin/import-db') {
+      if (!isPlatformAdmin(req)) return json(res, 403, { error: 'нет доступа' });
+      const reg = store.getRegistry();
+      let am;
+      const tenantStat = (tid) => store.runInTenant(tid, () => { const d = store.get(); const meta = reg.tenants[tid] || {}; return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, createdAt: meta.createdAt || 0, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length }; });
+      if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
+      if (p === '/api/admin/stats' && req.method === 'GET') {
+        const ts = store.listTenants().map(tenantStat);
+        return json(res, 200, { ok: true, tenants: ts.length, leads: ts.reduce((s, t) => s + t.leads, 0), brokers: ts.reduce((s, t) => s + t.brokers, 0), suspended: ts.filter(t => t.suspended).length, byPlan: ts.reduce((a, t) => (a[t.plan] = (a[t.plan] || 0) + 1, a), {}), mrr: ts.reduce((s, t) => s + ((PLANS[t.plan] || {}).price || 0), 0) });
+      }
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/plan$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); if (!PLANS[b.plan]) return json(res, 400, { error: 'нет плана' }); reg.tenants[am[1]].plan = b.plan; store.saveRegistry(); return json(res, 200, { ok: true }); }
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/suspend$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); reg.tenants[am[1]].suspended = !!b.suspended; store.saveRegistry(); return json(res, 200, { ok: true, suspended: reg.tenants[am[1]].suspended }); }
+      if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)$/)) && req.method === 'DELETE') {
+        const tid = am[1]; if (tid === store.PRIMARY) return json(res, 400, { error: 'нельзя удалить primary' });
+        if (!reg.tenants[tid]) return json(res, 404, { error: 'нет тенанта' });
+        for (const em of Object.keys(reg.byEmail)) if (reg.byEmail[em] === tid) delete reg.byEmail[em];
+        for (const s of Object.keys(reg.sessions)) if (reg.sessions[s].tid === tid) delete reg.sessions[s];
+        for (const t of Object.keys(reg.invites)) if (reg.invites[t].tid === tid) delete reg.invites[t];
+        delete reg.tenants[tid]; store.saveRegistry();
+        return json(res, 200, { ok: true });
+      }
+      /* рассылка персонализированных кейсов/касаний: email — владельцам тенантов; wa — на список телефонов через gray-воркер */
+      if (p === '/api/admin/campaign' && req.method === 'POST') {
+        const b = await readBody(req);
+        const subject = String(b.subject || '').slice(0, 200), bodyTpl = String(b.body || '').slice(0, 5000);
+        if (b.channel === 'wa') {
+          const phones = Array.isArray(b.phones) ? b.phones.slice(0, 500) : []; const sent = [];
+          await store.runInTenant(b.fromTenant && reg.tenants[b.fromTenant] ? b.fromTenant : store.PRIMARY, async () => {
+            const d = store.get(); const g = d.settings.waGray || {}; const num = (g.numbers || [])[0];
+            for (const ph of phones) { let okS = false, err = ''; try { if (g.url && g.token && num) { await waGrayApi(d, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', { to: ph, text: bodyTpl }); okS = true; } else err = 'gray-воркер не настроен'; } catch (e) { err = e.message; } sent.push({ to: ph, ok: okS, err }); }
+          });
+          return json(res, 200, { ok: true, channel: 'wa', sent });
+        }
+        const targets = Array.isArray(b.tenantIds) && b.tenantIds.length ? b.tenantIds : store.listTenants();
+        const sent = [];
+        for (const tid of targets) {
+          const meta = reg.tenants[tid]; if (!meta) continue;
+          await store.runInTenant(tid, async () => {
+            const d = store.get();
+            const email = meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '';
+            const agency = (d.settings.agency && d.settings.agency.name) || meta.name || '';
+            const msg = bodyTpl.replace(/\{agency\}/g, agency).replace(/\{email\}/g, email);
+            let okS = false, err = '';
+            try { const ec = (d.settings.channels && d.settings.channels.email) || {}; if (ec.key && ec.from && email) { const r2 = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: subject || 'Сообщение от Lumen', html: '<p>' + esc(msg).replace(/\n/g, '<br>') + '</p>' }) }); okS = r2.ok; if (!r2.ok) err = 'resend ' + r2.status; } else err = 'email не настроен у тенанта'; } catch (e) { err = e.message; }
+            sent.push({ tid, email, ok: okS, err });
+          });
+        }
+        return json(res, 200, { ok: true, channel: 'email', sent });
+      }
+      return json(res, 404, { error: 'unknown admin endpoint' });
+    }
     if (p === '/api/state' && req.method === 'GET') {
       const pubS = publicSettings(db);
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
@@ -9200,4 +9280,9 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
 /* curl/интеграторы с Expect: 100-continue — отвечаем и продолжаем как обычный запрос */
 server.on('checkContinue', (req, res) => { res.writeContinue(); server.emit('request', req, res); });
 
-server.listen(PORT, () => console.log(`Lumen CRM → http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Lumen CRM → http://localhost:${PORT}`);
+  /* супер-админ платформы: если нет env-ключа — печатаем авто-ключ (только в логи, один раз) */
+  if (!process.env.PLATFORM_ADMIN_KEY) console.log(`[admin] Панель основателя: /admin.html · ключ (auto): ${store.getRegistry().adminKey} — задайте PLATFORM_ADMIN_KEY в env для прода`);
+  else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
+});

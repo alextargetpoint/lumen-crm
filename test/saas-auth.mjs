@@ -193,6 +193,25 @@ async function main() {
   const pubResp = await fetch(BASE + '/p/' + coll.id, { redirect: 'manual' });
   ok('публичная /p/:id не-primary агентства резолвится (не 404)', pubResp.status !== 404, 'status ' + pubResp.status);
 
+  // S. супер-админ платформы (основатель)
+  ok('admin: /api/admin/tenants без сессии админа → блок', [401, 403].includes((await jget(jar(), '/api/admin/tenants')).s));
+  ok('admin: неверный ключ → 401', (await jpost(jar(), '/auth/admin-login', { key: 'wrongkey' })).status === 401);
+  let adminKey = ''; try { adminKey = JSON.parse(readFileSync(join(DATA_DIR, 'registry.json'), 'utf8')).adminKey || ''; } catch {}
+  const ADM = jar();
+  ok('admin: вход по ключу → 200', (await jpost(ADM, '/auth/admin-login', { key: adminKey })).status === 200);
+  const tl = await jget(ADM, '/api/admin/tenants');
+  ok('admin: видит все тенанты (>=3)', (tl.b?.tenants?.length || 0) >= 3, 'n=' + (tl.b?.tenants?.length));
+  ok('admin: /api/admin/stats с MRR', typeof (await jget(ADM, '/api/admin/stats')).b?.mrr === 'number');
+  const cTid = tl.b?.tenants?.find(t => t.ownerEmail === 'c@x.com')?.tid;
+  ok('admin: смена тарифа тенанта → ok', (await (await jpost(ADM, '/api/admin/tenant/' + cTid + '/plan', { plan: 'pro' })).json().catch(() => ({}))).ok === true);
+  ok('admin: приостановка тенанта → suspended', (await (await jpost(ADM, '/api/admin/tenant/' + cTid + '/suspend', { suspended: true })).json().catch(() => ({}))).suspended === true);
+  const Csess = jar(); await jpost(Csess, '/auth/login', { email: 'c@x.com', password: 'secretC' });
+  ok('suspended тенант: /api/leads → 403', (await jget(Csess, '/api/leads')).s === 403);
+  await jpost(ADM, '/api/admin/tenant/' + cTid + '/suspend', { suspended: false });
+  const Csess2 = jar(); await jpost(Csess2, '/auth/login', { email: 'c@x.com', password: 'secretC' });
+  ok('после снятия приостановки: /api/leads снова 200', (await jget(Csess2, '/api/leads')).s === 200);
+  ok('owner тенанта НЕ имеет доступа к /api/admin/tenants → 403', (await jget(Aown3, '/api/admin/tenants')).s === 403);
+
   finish(srv);
 }
 
