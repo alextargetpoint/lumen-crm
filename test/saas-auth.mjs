@@ -171,6 +171,16 @@ async function main() {
   try { const adb = JSON.parse(readFileSync(join(DATA_DIR, 'tenants', aTid, 'db.json'), 'utf8')); ok('пароль хранится как scrypt (s2$…), не голый sha', String(adb.settings.auth.passHash).startsWith('s2$')); } catch (e) { ok('пароль scrypt', false, e.message); }
   try { const pdb = JSON.parse(readFileSync(join(DATA_DIR, 'tenants', 'primary', 'db.json'), 'utf8')); ok('legacy-пароль primary мигрировал в scrypt после входа', String(pdb.settings.auth.passHash).startsWith('s2$')); } catch (e) { ok('legacy upgrade', false, e.message); }
 
+  // P. мастер-секрет hooks.secret не утекает брокеру (крит-фикс аудита)
+  const F = jar(); await jpost(F, '/auth/register', { email: 'f@x.com', password: 'secretF', agency: 'Agency F' });
+  ok('owner видит hooks.secret в /api/state', !!(await jget(F, '/api/state')).b?.settings?.hooks?.secret);
+  const invF = await (await jpost(F, '/api/brokers/invite', { email: 'brf@x.com', name: 'BrF' })).json().catch(() => ({}));
+  const tokF = (invF.link || '').split('token=')[1] || '';
+  const BF = jar(); await jpost(BF, '/auth/accept-invite', { token: tokF, password: 'brfpass1' });
+  const bfState = await jget(BF, '/api/state');
+  ok('broker НЕ видит hooks.secret в /api/state', !bfState.b?.settings?.hooks?.secret);
+  ok('broker /api/collections без editKey-секрета', (await jget(BF, '/api/collections')).b?.every?.(c => !c.editKey) !== false);
+
   finish(srv);
 }
 

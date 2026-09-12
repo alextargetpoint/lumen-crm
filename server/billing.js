@@ -151,7 +151,7 @@ function issueInvoice(db, { method } = {}) {
 /* SEC(#3): отметить счёт оплаченным — вызывается ТОЛЬКО из верифицированного Stripe-вебхука */
 function markInvoicePaid(db, invId) {
   const b = db.settings.billing;
-  const inv = (b.invoices || []).find(i => i.id === invId) || (b.invoices || [])[0];
+  const inv = (b.invoices || []).find(i => i.id === invId);   /* SEC: только точное совпадение — без фолбэка на первый счёт */
   if (!inv) return { error: 'invoice not found' };
   if (inv.status === 'paid') return { invoice: inv, view: view(db) };
   inv.status = 'paid';

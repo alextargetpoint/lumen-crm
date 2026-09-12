@@ -589,6 +589,9 @@ function realRole(req) {
   const s = store.get().settings.auth.sessions[sid];
   return { sid, role: s.role || 'owner', brokerId: s.brokerId || null, previewAs: s.previewAs || null };
 }
+/* SEC: edit-ключ (= мастер-секрет вебхуков hooks.secret) отдаём ТОЛЬКО владельцу.
+   Брокерам/маркетологам в списочных ответах — пустая строка, чтобы секрет не утекал (крит-дыра аудита). */
+function editKeyFor(req) { const r = realRole(req); return (r && r.role === 'owner') ? (store.get().settings.hooks && store.get().settings.hooks.secret) || '' : ''; }
 /* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
 function audit(db, req, action, extra) {
   const s = sessionRole(req);
@@ -3384,6 +3387,8 @@ const server = http.createServer(async (req, res) => {
       /* SaaS: вход по e-mail → резолвим тенанта по реестру, проверяем пароль в ЕГО контексте */
       const _email = String(b.email || '').trim().toLowerCase();
       if (_email) {
+        const _lk = 'login:' + clientIp(req) + ':' + _email;
+        if (rateLimited(_lk, 12, 15 * 60e3)) { await new Promise(r => setTimeout(r, 800)); return json(res, 429, { error: 'слишком много попыток входа, подождите несколько минут' }); }
         const reg = store.getRegistry();
         const ltid = reg.byEmail[_email];
         const sidOk = ltid && store.runInTenant(ltid, () => {
@@ -3401,6 +3406,7 @@ const server = http.createServer(async (req, res) => {
           return sid;
         });
         if (!sidOk) { await new Promise(r => setTimeout(r, 600)); return json(res, 401, { error: 'wrong password' }); }
+        _rl.delete(_lk); /* успех → сброс счётчика попыток */
         const reg2 = store.getRegistry(); reg2.sessions[sidOk] = { tid: ltid, at: Date.now() }; store.saveRegistry();
         const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
         res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sidOk}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
@@ -3457,7 +3463,7 @@ const server = http.createServer(async (req, res) => {
     }
     /* ---------------- SaaS: публичная регистрация агентства/соло-брокера ---------------- */
     if (p === '/auth/register' && req.method === 'POST') {
-      if (rateLimited('reg:' + clientIp(req), 8, 3600e3)) return json(res, 429, { error: 'слишком много регистраций с этого адреса, попробуйте позже' });
+      if (rateLimited('reg:' + clientIp(req), 20, 3600e3)) return json(res, 429, { error: 'слишком много регистраций с этого адреса, попробуйте позже' });
       const b = await readBody(req);
       const email = String(b.email || '').trim().toLowerCase();
       const password = String(b.password || '');
@@ -4830,7 +4836,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- соц-помощник: карусели ---------------- */
     if (p === '/api/carousels' && req.method === 'GET') {
-      return json(res, 200, db.carousels.map(c => Object.assign({}, c, { editKey: db.settings.hooks.secret })));
+      return json(res, 200, db.carousels.map(c => Object.assign({}, c, { editKey: editKeyFor(req) })));
     }
     if (p === '/api/carousels' && req.method === 'POST') {
       const b = await readBody(req);
@@ -4884,7 +4890,7 @@ const server = http.createServer(async (req, res) => {
       /* мало исходных фактов → сигнал UI предложить добавить инфо и пересобрать для конкретики */
       const factPart = (String(b.topic || '').split(/условия и факты:/i)[1] || '').replace(/[—\s·]+/g, ' ').trim();
       const thin = b.template === 'launch' && factPart.length < 30;
-      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, thin });
+      return json(res, 200, { id: c.id, editKey: editKeyFor(req), thin });
     }
     /* ════════════ AI DESIGN ENGINE («Студия») ════════════
        Креативный директор (ArtDirectionPlan + сжатый копирайт) → грамматики → сцен-граф-слайды. */
@@ -4902,7 +4908,7 @@ const server = http.createServer(async (req, res) => {
         catch (e) { return json(res, 500, { error: 'compose: ' + e.message }); }
         const c2 = { id: crypto.randomBytes(5).toString('hex'), title: deck2.title + ' · v', template: 'studio', format: 'portrait', theme: deck2.theme, font: deck2.font, footer: { on: false, text: '' }, slides: deck2.slides.map(s => sanSlide(s)), studio: { mode: 'smart', concept: src.studio.concept, tokens: deck2.tokens, project: src.studio.project, plan: src.studio.plan, photos: src.studio.photos }, createdAt: Date.now() };
         db.carousels.unshift(c2); store.save();
-        return json(res, 200, { id: c2.id, editKey: db.settings.hooks.secret, slides: c2.slides.length, grammars: c2.slides.map(s => s.grammar), recomposed: true });
+        return json(res, 200, { id: c2.id, editKey: editKeyFor(req), slides: c2.slides.length, grammars: c2.slides.map(s => s.grammar), recomposed: true });
       }
       /* пул фото проекта с ролями */
       let photos = [];
@@ -4932,7 +4938,7 @@ const server = http.createServer(async (req, res) => {
         createdAt: Date.now(),
       };
       db.carousels.unshift(c); store.save();
-      return json(res, 200, { id: c.id, editKey: db.settings.hooks.secret, concept: plan.concept, slides: c.slides.length, grammars: c.slides.map(s => s.grammar) });
+      return json(res, 200, { id: c.id, editKey: editKeyFor(req), concept: plan.concept, slides: c.slides.length, grammars: c.slides.map(s => s.grammar) });
     }
     /* Phase 32: регенерация НА СЦЕН-ГРАФЕ — одна композиция слайда (цикл грамматик), не трогая остальные. */
     if (p === '/api/studio/regen-slide' && req.method === 'POST') {
@@ -5002,7 +5008,7 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { out.push({ direction: d.key, error: e.message }); }
       }
       store.save();
-      return json(res, 200, { editKey: db.settings.hooks.secret, directions: out });
+      return json(res, 200, { editKey: editKeyFor(req), directions: out });
     }
     /* Визуальный критик: скриншот рендера + референс-эталон → правки сцен-графа (авто-коррекция). */
     if (p === '/api/studio/critique' && req.method === 'POST') {
@@ -5102,7 +5108,7 @@ const server = http.createServer(async (req, res) => {
       let created = false;
       if (!c) { c = { id: crypto.randomBytes(5).toString('hex'), title: 'Studio AI', template: 'studio', format: 'portrait', theme: 'champagne', font: 'playfair', footer: { on: false, text: '' }, slides: [], studio: { mode: 'studio' }, createdAt: Date.now() }; db.carousels.unshift(c); created = true; }
       c.slides.push(slide); store.save();
-      return json(res, 200, { cid: c.id, idx: c.slides.length - 1, targetUrl, editKey: db.settings.hooks.secret, created, layers: (slide.layers || []).length, region: (sg && sg.photo && sg.photo.region) || '' });
+      return json(res, 200, { cid: c.id, idx: c.slides.length - 1, targetUrl, editKey: editKeyFor(req), created, layers: (slide.layers || []).length, region: (sg && sg.photo && sg.photo.region) || '' });
     }
     if ((m = p.match(/^\/api\/carousels\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
       if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
@@ -5798,7 +5804,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/mediaplans' && req.method === 'GET') {
       return json(res, 200, db.mediaplans.map(mp => Object.assign({}, mp, {
         contractorName: (db.mpContractors.find(c => c.id === mp.contractorId) || {}).name || null,
-        totals: mpTotals(mp), editKey: db.settings.hooks.secret,
+        totals: mpTotals(mp), editKey: editKeyFor(req),
       })));
     }
     /* ── Аналитика медиапланов (Фаза 2): многослойный план-факт по подрядчикам / каналам / гео / связкам ──
@@ -5901,7 +5907,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const mp = { id: 'mp_' + crypto.randomBytes(6).toString('hex'), contractorId: b.contractorId || null,   /* непредсказуемый id (был последовательный store.nextId → перебор соседних медиапланов) */ title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
       db.mediaplans.unshift(mp); store.save();
-      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: db.settings.hooks.secret }));
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req) }));
     }
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'PATCH') {
       const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
@@ -5918,7 +5924,7 @@ const server = http.createServer(async (req, res) => {
         if (b.status === 'draft') { mp.approvedAt = null; mp.approvedBy = null; }
       }
       store.save();
-      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: db.settings.hooks.secret }));
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req) }));
     }
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'DELETE') {
       db.mediaplans = db.mediaplans.filter(x => x.id !== m[1]); store.save();
@@ -6402,7 +6408,7 @@ ${SCR}
       db.collections.unshift(c);
       ai.pushEvent(db, { type: 'msg_in', leadId: lead.id, text: `Авто-подборка собрана для ${lead.name}: ${ids.length} объектов` });
       store.save();
-      return json(res, 200, { id: c.id, count: ids.length, title: c.title, editKey: db.settings.hooks.secret, url: `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/p/${c.id}` });
+      return json(res, 200, { id: c.id, count: ids.length, title: c.title, editKey: editKeyFor(req), url: `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/p/${c.id}` });
     }
 
     /* ---------------- папки (объекты и подборки) ---------------- */
@@ -6463,7 +6469,7 @@ ${SCR}
 
     /* ---------------- подборки ---------------- */
     if (p === '/api/collections' && req.method === 'GET') {
-      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: db.settings.hooks.secret })));
+      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: editKeyFor(req) })));
     }
     if (p === '/api/collections/bulk' && req.method === 'POST') {
       const b = await readBody(req);
