@@ -9818,7 +9818,17 @@ PAGES.brokers = async (root) => {
                 <button type="button" class="btn btn-sm br-calcopy" data-calurl="${location.origin}/cal/${b.id}.ics?key=${b.calKey}">${ic(I.cal)}Скопировать ссылку подписки</button>
                 <div class="muted" style="font-size:11.5px;padding:10px 0 4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">② Учитывать занятость в ИИ-планировании: вставь <b>публичную ICS-ссылку личного календаря</b>. ИИ не предложит лидам занятое время. <button type="button" class="br-calguide" style="background:none;border:none;padding:0;color:var(--accent);font-weight:700;font-size:11.5px;cursor:pointer;text-decoration:underline">Как настроить? →</button></div>
                 <div style="display:flex;gap:6px"><input class="lc-inp br-busyics" data-brbusyid="${b.id}" value="${esc(b.busyIcsUrl || '')}" placeholder="https://…/basic.ics" style="flex:1"><button type="button" class="btn btn-sm br-busytest">Проверить</button><button type="button" class="btn btn-sm br-busysave">Сохранить</button></div>
-                <div class="br-ics-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div></div>` : ''}
+                <div class="br-ics-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
+                <div class="br-blocks" data-brblkid="${b.id}">
+                  <div class="muted" style="font-size:11.5px;padding:12px 0 6px">③ Персональные окна «не ставить» — повторяются каждую неделю (обед, спортзал, не звонить после…). ИИ не предложит эти часы клиенту.</div>
+                  <div class="br-blk-list">${(b.busyBlocks || []).map((x, i) => `<span class="br-blk">${['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][x.dow]} ${esc(x.from)}–${esc(x.to)}${x.label ? ' · ' + esc(x.label) : ''}<button type="button" data-blkrm="${i}" title="Убрать">×</button></span>`).join('') || '<span class="muted" style="font-size:11.5px">Окон нет</span>'}</div>
+                  <div class="br-blk-add">
+                    <select class="br-blk-dow">${[1, 2, 3, 4, 5, 6, 7].map(d => `<option value="${d}">${['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][d]}</option>`).join('')}</select>
+                    <input type="time" class="br-blk-from" value="13:00"><span class="muted">–</span><input type="time" class="br-blk-to" value="14:00">
+                    <input class="br-blk-label" placeholder="подпись (необяз.)" maxlength="40">
+                    <button type="button" class="btn btn-sm br-blk-add-btn">${ic(I.plus)}Окно</button>
+                  </div>
+                </div></div>` : ''}
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Языки</label>
               <div class="chips-row">${[...new Set(['ru', 'en', 'ar', 'id', 'es', 'de', 'fr', 'it', 'zh', ...b.langs])].map(lg => `<button type="button" class="chip-t lang-chip ${b.langs.includes(lg) ? 'on' : ''}" data-lg="${esc(lg)}">${esc(langName(lg))}</button>`).join('')}
@@ -9987,6 +9997,21 @@ PAGES.brokers = async (root) => {
     });
     const calGuide = eb.querySelector('.br-calguide');
     if (calGuide) calGuide.addEventListener('click', () => openGuide('calendar'));
+    const blkWrap = eb.querySelector('.br-blocks');
+    if (blkWrap) {
+      const id = blkWrap.dataset.brblkid;
+      const brk = (STATE.brokers || []).find(x => x.id === id) || {};
+      const saveBlocks = async (arr) => { try { await api.patch('/brokers/' + id, { busyBlocks: arr }); brk.busyBlocks = arr; toast('Окна обновлены', 'ИИ учтёт при планировании', true); } catch (e) { toast('Не вышло', e.message); } };
+      const redraw = () => { const list = blkWrap.querySelector('.br-blk-list'); const DN = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        list.innerHTML = (brk.busyBlocks || []).map((x, i) => `<span class="br-blk">${DN[x.dow]} ${esc(x.from)}–${esc(x.to)}${x.label ? ' · ' + esc(x.label) : ''}<button type="button" data-blkrm="${i}" title="Убрать">×</button></span>`).join('') || '<span class="muted" style="font-size:11.5px">Окон нет</span>';
+        list.querySelectorAll('[data-blkrm]').forEach(btn => btn.addEventListener('click', async () => { const arr = (brk.busyBlocks || []).slice(); arr.splice(+btn.dataset.blkrm, 1); await saveBlocks(arr); redraw(); })); };
+      redraw();
+      blkWrap.querySelector('.br-blk-add-btn').addEventListener('click', async () => {
+        const dow = +blkWrap.querySelector('.br-blk-dow').value, from = blkWrap.querySelector('.br-blk-from').value, to = blkWrap.querySelector('.br-blk-to').value, label = blkWrap.querySelector('.br-blk-label').value.trim();
+        if (!from || !to || from >= to) { toast('Проверьте время', 'Начало должно быть раньше конца'); return; }
+        const arr = (brk.busyBlocks || []).slice(); arr.push({ dow, from, to, label }); await saveBlocks(arr); blkWrap.querySelector('.br-blk-label').value = ''; redraw();
+      });
+    }
     const pv = eb.querySelector('[data-brpreview]');
     if (pv) pv.addEventListener('click', () => previewBroker(pv.dataset.brpreview));
     const pr = eb.querySelector('[data-brprovision]');

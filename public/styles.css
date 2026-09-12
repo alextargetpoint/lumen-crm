@@ -7086,3 +7086,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .gdc-tx i { font-size: 11.5px; font-style: normal; color: var(--ink-3); line-height: 1.4; }
 .gdc-go { flex: none; color: var(--ink-3); opacity: .55; }
 .gdc-go svg { width: 16px; height: 16px; }
+
+/* Персональные окна занятости брокера (busyBlocks) */
+.br-blk-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.br-blk { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--navy-900); background: var(--bg-2); border: 1px solid var(--stroke); border-radius: 9px; padding: 4px 6px 4px 10px; }
+.br-blk button { border: none; background: none; color: var(--ink-3); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.br-blk button:hover { color: var(--bad, #C0392B); }
+.br-blk-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 7px; }
+.br-blk-add select, .br-blk-add input[type="time"], .br-blk-add .br-blk-label { border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 9px; font-family: inherit; font-size: 12.5px; background: var(--card); color: var(--ink); outline: none; }
+.br-blk-add select:focus, .br-blk-add input:focus { border-color: var(--accent); }
+.br-blk-add .br-blk-label { flex: 1; min-width: 110px; }

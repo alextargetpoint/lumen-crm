@@ -1019,6 +1019,20 @@ function brokerBusyIntervals(db, b) {
   (db.brokerTasks || []).filter(t => t.brokerId === b.id && t.due && t.status !== 'done').forEach(t => iv.push({ s: t.due, e: t.due + 30 * 60000 }));
   const c = ICS_CACHE[b.id]; if (c) iv.push(...c.intervals);
   if (b.busyIcsUrl && (!c || Date.now() - c.at > 30 * 60000)) refreshIcsBusy(b);   /* фоновое обновление кэша */
+  /* ручные повторяющиеся блоки → конкретные интервалы на 14 дней вперёд (dow 1..7, Пн=1) */
+  if (Array.isArray(b.busyBlocks) && b.busyBlocks.length) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    for (let d = 0; d < 14; d++) {
+      const day = new Date(now); day.setDate(now.getDate() + d);
+      const dow = day.getDay() === 0 ? 7 : day.getDay();
+      b.busyBlocks.filter(x => x.dow === dow).forEach(x => {
+        const [fh, fm] = x.from.split(':').map(Number), [th, tm] = x.to.split(':').map(Number);
+        const s = new Date(day); s.setHours(fh, fm, 0, 0);
+        const e = new Date(day); e.setHours(th, tm, 0, 0);
+        if (e > s) iv.push({ s: s.getTime(), e: e.getTime() });
+      });
+    }
+  }
   return iv;
 }
 const PB_TYPES = {
@@ -3924,6 +3938,11 @@ const server = http.createServer(async (req, res) => {
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: сменить тип сотрудника */
       if (Array.isArray(b.hidePages)) br.hidePages = b.hidePages.filter(x => typeof x === 'string').slice(0, 40);  /* индивидуальное скрытие разделов */
       if (typeof b.busyIcsUrl === 'string') { br.busyIcsUrl = b.busyIcsUrl.trim().slice(0, 500); refreshIcsBusy(br); }   /* личный ICS-календарь → занятость для ИИ */
+      /* ручные повторяющиеся блоки занятости: [{dow:1..7, from:'HH:MM', to:'HH:MM', label?}] — «не ставить созвоны в это окно» */
+      if (Array.isArray(b.busyBlocks)) {
+        br.busyBlocks = b.busyBlocks.filter(x => x && +x.dow >= 1 && +x.dow <= 7 && /^\d{1,2}:\d{2}$/.test(String(x.from || '')) && /^\d{1,2}:\d{2}$/.test(String(x.to || '')))
+          .slice(0, 30).map(x => ({ dow: +x.dow, from: String(x.from), to: String(x.to), label: String(x.label || '').slice(0, 40) }));
+      }
       if (b.leadFilter && typeof b.leadFilter === 'object') { br.leadFilter = { tags: (Array.isArray(b.leadFilter.tags) ? b.leadFilter.tags : []).filter(x => typeof x === 'string').slice(0, 30), sources: (Array.isArray(b.leadFilter.sources) ? b.leadFilter.sources : []).filter(x => typeof x === 'string').slice(0, 20) }; }   /* фильтр видимости карточек лидов по тегам/источникам */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту агентства */
       /* поля публичной визитки брокера (/b/:id) */
