@@ -241,10 +241,10 @@
   .ish-ok{width:100%;border:none;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:var(--shacc)}
   .ms-ch{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--mut);font-weight:600;margin:4px 2px 14px}.ms-ch input{width:18px;height:18px;accent-color:var(--acc)}
   /* панель фильтров чатов — горизонтальный скролл чипов (быстрые + по стадиям + по гео) */
-  .segflt{display:flex;gap:7px;margin-top:11px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .segflt{display:flex;gap:7px;margin-top:11px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding:3px 1px 5px;-webkit-overflow-scrolling:touch}
   .segflt::-webkit-scrollbar{height:0}
   .segflt button{flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-family:inherit;font-weight:700;font-size:12.5px;padding:8px 12px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
-  .segflt button.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:var(--shacc)}
+  .segflt button.on{background:var(--grad);color:#fff;border-color:transparent}   /* без тени: overflow-x резал её → «обрезка/чёрное свечение» у «Все» */
   .segflt .cnt{background:rgba(255,255,255,.22);color:inherit;font-size:11px;font-weight:800;padding:0 6px;border-radius:8px;min-width:16px;text-align:center}
   .segflt button:not(.on) .cnt{background:var(--panel2);color:var(--mut)}
   .segflt .fdot{width:8px;height:8px;border-radius:50%;flex:none}
@@ -253,7 +253,7 @@
   .viewseg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:4px;margin-top:2px;overflow-x:auto;scrollbar-width:none}
   .viewseg::-webkit-scrollbar{height:0}
   .viewseg button{flex:1 0 auto;border:none;background:transparent;color:var(--mut);font-family:inherit;font-weight:700;font-size:13px;padding:8px 11px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s;white-space:nowrap}
-  .viewseg button.on{background:var(--grad);color:#fff;box-shadow:var(--shacc)}
+  .viewseg button.on{background:var(--grad);color:#fff}   /* без тени — overflow-x резал её */
   .viewseg .ic svg{width:16px;height:16px}
   .viewseg .vbadge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ink) 42%,transparent);color:#fff;line-height:1}
   .viewseg .vbadge.warn{background:var(--danger)}
@@ -343,6 +343,14 @@
   .an-spark{display:flex;align-items:flex-end;gap:3px;height:42px;margin-top:4px}
   .an-spark i{flex:1;background:color-mix(in srgb,var(--acc) 55%,transparent);border-radius:3px 3px 0 0;min-height:2px}
   .an-spark i.now{background:var(--acc)}
+  /* ── Копилка идей ── */
+  #ideas{flex:1;overflow-y:auto;padding:8px 10px 24px}
+  .idea{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:12px 14px;margin-bottom:9px;box-shadow:var(--sh)}
+  .idea-tx{font-size:14px;line-height:1.45;color:var(--ink);white-space:pre-wrap}
+  .idea-b{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .idea-m{flex:1;font-size:11px;color:var(--mut);font-weight:600}
+  .idea-x{flex:none;border:none;background:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+  .idea-x:hover{color:var(--danger)}
   .segflt button:not(.on) .cnt{background:var(--acc);color:#fff}
   .dot-me{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
   #dict.rec{color:#fff;background:#e5484d!important;animation:dictpulse 1.1s ease-in-out infinite}
@@ -368,6 +376,7 @@
         <button data-v="leads"><span class="ic" data-ic="user"></span>Лиды<span class="vbadge" id="vbLeads"></span></button>
         <button data-v="tasks"><span class="ic" data-ic="check"></span>Задачи<span class="vbadge" id="vbTasks"></span></button>
         <button data-v="meets"><span class="ic" data-ic="cal"></span>Встречи<span class="vbadge" id="vbMeets"></span></button>
+        <button data-v="ideas"><span class="ic" data-ic="spark"></span>Идеи</button>
       </div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
       <div class="segflt" id="segflt"></div>
@@ -376,6 +385,7 @@
     <div id="leads" class="hidden"></div>
     <div id="tasks" class="hidden"></div>
     <div id="meets" class="hidden"></div>
+    <div id="ideas" class="hidden"></div>
     <div id="analytics" class="hidden"></div>
   </div>
 
@@ -464,7 +474,7 @@ const PREF_KEY='lumen_tgprefs_'+((TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user&
 let PREFS={theme:'atelier',accent:'blue'};   /* дефолт — церемонка (Ателье), не синий «авто» */
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
 const TH_BG={light:'#eef2f8',atelier:'#f3f1ec',burgundy:'#f7f3f4',glass:'#eef5ff',mono:'#f6f6f6',dark:'#080b12'};
-function applyTheme(){const r=document.documentElement;const th=PREFS.theme==='auto'?((TG&&TG.colorScheme)||'dark'):PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');const bg=TH_BG[th]||'#080b12';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg)}catch(e){}}
+function applyTheme(){const r=document.documentElement;const th=(!PREFS.theme||PREFS.theme==='auto')?'atelier':PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');const bg=TH_BG[th]||'#080b12';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg)}catch(e){}}
 applyTheme();
 if(TG&&TG.onEvent)TG.onEvent('themeChanged',()=>{if(PREFS.theme==='auto')applyTheme()});
 let CHATS=[],CUR=null,POLL=null;
@@ -534,15 +544,15 @@ function renderChats(){
 let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
 const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
-const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи'};
+const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи',ideas:'Копилка идей'};
 function setMode(m){MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
-  ['chats','leads','tasks','meets'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  ['chats','leads','tasks','meets','ideas'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
   $('#segflt').style.display=m==='chats'?'':'none';
-  $('#q').closest('.search').style.display=(m==='meets')?'none':'';
+  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas')?'none':'';
   $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
-  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else renderChats();
+  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
@@ -643,6 +653,21 @@ function renderAnalytics(a){
     <div class="an-sec"><h4>Брокеры · конверсия в квал</h4>${brows}</div>
     ${tr.length?`<div class="an-sec"><h4>Новые лиды · 14 дней</h4><div class="an-spark">${spark}</div></div>`:''}
   `;
+}
+/* ── КОПИЛКА ИДЕЙ (командная, синхрон с десктопом) ── */
+let IDEAS=[];
+async function loadIdeas(){try{IDEAS=await jget('/tgapp/api/ideas');renderIdeas()}catch(e){const stale=/no route|404/i.test(String(e.message));$('#ideas').innerHTML=ideaHead()+'<div class="empty">'+(stale?'Раздел разворачивается на сервере — обновите через минуту 🙌':'Не удалось загрузить.<br>'+esc(e.message))+'</div>';wireIdeaAdd()}}
+function ideaHead(){return `<div class="tkadd" style="margin:2px 0 12px"><input id="idNew" placeholder="Записать идею для контента…" autocomplete="off"><button id="idAdd">＋</button></div>`;}
+function wireIdeaAdd(){
+  const add=async()=>{const inp=$('#idNew');const v=(inp.value||'').trim();if(!v)return;inp.value='';try{await jpost('/tgapp/api/ideas',{text:v});hap();loadIdeas()}catch(e){toast(e.message)}};
+  const a=$('#idAdd'),i=$('#idNew');if(a)a.onclick=add;if(i)i.addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+}
+function renderIdeas(){
+  const body=IDEAS.length?IDEAS.map(x=>{const meta=[x.source,x.platform,x.geo].filter(Boolean).join(' · ');
+    return `<div class="idea" data-id="${esc(x.id)}"><div class="idea-tx">${esc(x.text)}</div><div class="idea-b">${meta?`<span class="idea-m">${esc(meta)}</span>`:''}<button class="idea-x" data-idrm="${esc(x.id)}" title="Удалить">×</button></div></div>`;
+  }).join(''):'<div class="empty" style="padding:30px 24px">Копилка пуста. Запишите первую идею для Reels/сторис — она появится и на десктопе.</div>';
+  $('#ideas').innerHTML=ideaHead()+body;wireIdeaAdd();
+  $('#ideas').querySelectorAll('[data-idrm]').forEach(b=>b.onclick=async()=>{const el=b.closest('.idea');el.style.opacity=.4;try{await jpost('/tgapp/api/ideas/'+b.dataset.idrm,{});hap();loadIdeas()}catch(e){toast(e.message);el.style.opacity=1}});
 }
 function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
   return `<div class="lrow" data-id="${esc(l.id)}">${avaHtml({id:l.id,name:l.name,avatar:null})}

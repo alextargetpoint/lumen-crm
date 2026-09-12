@@ -2700,6 +2700,21 @@ const server = http.createServer(async (req, res) => {
           .map(mt => ({ id: mt.id, at: mt.at, kind: mt.kind || 'call', status: mt.status || 'scheduled', note: mt.note || '', link: mt.link || null, dur: mt.dur || 60, leadId: mt.leadId, leadName: (db.leads.find(l => l.id === mt.leadId) || {}).name || '—', clientConfirmed: !!mt.clientConfirmed }));
         return json(res, 200, list);
       }
+      /* КОПИЛКА ИДЕЙ (командная, синхрон с десктопом «Соцсети → идеи»): список / быстрый захват / удаление */
+      if (p === '/tgapp/api/ideas' && req.method === 'GET') {
+        return json(res, 200, (db.ideaBank || []).slice(0, 120).map(x => ({ id: x.id, text: x.text, source: x.source || '', geo: x.geo || '', platform: x.platform || '', hook: x.hook || '', format: x.format || '', createdAt: x.createdAt || 0 })));
+      }
+      if (p === '/tgapp/api/ideas' && req.method === 'POST') {
+        const b = await readBody(req); const text = String((b && b.text) || '').trim().slice(0, 1200);
+        if (!text) return json(res, 400, { error: 'пустая идея' });
+        const item = { id: crypto.randomBytes(5).toString('hex'), text, source: (auser.role === 'owner' ? 'основатель' : (abroker && abroker.name) || 'бот'), geo: '', hook: '', format: '', refWhat: '', refQuery: '', platform: '', createdAt: Date.now() };
+        db.ideaBank = db.ideaBank || []; db.ideaBank.unshift(item); db.ideaBank = db.ideaBank.slice(0, 300); store.save();
+        return json(res, 200, item);
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/ideas\/([a-f0-9]+)$/)) && req.method === 'POST') {   /* POST c _method=delete (у мини-аппа только GET/POST удобны) */
+        db.ideaBank = (db.ideaBank || []).filter(x => x.id !== tam[1]); store.save();
+        return json(res, 200, { ok: true });
+      }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         if (lead.unread) { lead.unread = 0; store.save(); }
