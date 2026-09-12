@@ -420,7 +420,8 @@
   .voi-card .vmeta b{display:block;font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.15}
   .voi-card .vmeta a{font-size:11px;color:#c9c5be;border-bottom:none;display:inline-block;margin-top:2px}
   .voi-card .vmeta a:hover{color:#fff}
-  .voi-card iframe{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:3}
+  .voi-card iframe,.voi-card video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover;background:#000;z-index:3}
+  .voi-card .vmeta span{display:block;font-size:11px;color:#c9c5be;margin-top:2px}
   .voi-card.playing .poster,.voi-card.playing .vscrim,.voi-card.playing .vplay,.voi-card.playing .vmeta{opacity:0;pointer-events:none;transition:opacity .3s}
   .vcard.vshake{animation:vsh .42s}
   @keyframes vsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(5px)}}
@@ -1195,18 +1196,15 @@
   /* ── карусель видеоотзывов клиентов (kinescope по клику) ── */
   (function(){var tr=document.getElementById('voiTrack');if(!tr)return;
     var VOICES=[
-      {id:'7bgTc8NjPbH7CEFo3ZwNZL',name:'LV Homes · Mohammed',ig:'lvhomeps'},
-      {id:'7dw7EKwVUsjamG6DemZUYy',name:'Citrine Signature',ig:'citrine_signature'},
-      {id:'xrgwq6H7q2zDC6iDdzDJVf',name:'Baytify',ig:'baytify'},
-      {id:'82LnQyJ5eBfrtkpj3FX3CA',name:'Диана Хватова',ig:'hvatova_diana.uae'},
-      {id:'hsWm9DyVGsw9Pm3cZz5vDR',name:'Beauty by Tomyna',ig:'beauty_bytomyna'},
-      {id:'iknkgcxF38GgKZXVbZfjqe',name:'Blackberry Real Estate',ig:'blackberry_real_estate'},
-      {id:'dZRZdELr8VTFKEmDpHCfuD',name:'Sand & Towers',ig:'sandandtowers'},
-      {id:'cWovSMbutT4NCQUVTcp7MM',name:'RED Realty',ig:'redrealtydubai'},
-      {id:'jjwuMghPFt1bvF5ykjFkHL',name:'Сапфир · Зарина',ig:'zarina.yahsibay'}
+      {f:'tropicana',name:'Tropicana Development',sub:'Недвижимость · Дубай'},
+      {f:'mortix',name:'Mortix',sub:'Консалтинг · Дубай'},
+      {f:'anastasia',name:'Anastasia',sub:'Риелтор · Мадейра'},
+      {f:'wellstate',name:'Wellstate',sub:'Отзыв клиента'},
+      {f:'levon',name:'Levon',sub:'Отзыв клиента'},
+      {f:'ns',name:'NS',sub:'Отзыв клиента'}
     ];
-    tr.innerHTML=VOICES.map(function(v){return '<div class="voi-card" data-id="'+v.id+'"><img class="poster" src="/assets/testi/'+v.id+'.jpg" loading="lazy" alt="'+v.name+'"><span class="vscrim"></span><span class="vplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vmeta"><b>'+v.name+'</b><a href="https://instagram.com/'+v.ig+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">@'+v.ig+' ↗</a></div></div>';}).join('');
-    tr.querySelectorAll('.voi-card').forEach(function(card){card.addEventListener('click',function(){if(card.classList.contains('playing'))return;var f=document.createElement('iframe');f.src='https://kinescope.io/embed/'+card.dataset.id+'?autoplay=1';f.allow='autoplay; fullscreen; encrypted-media; picture-in-picture';f.setAttribute('allowfullscreen','');card.appendChild(f);card.classList.add('playing');});});
+    tr.innerHTML=VOICES.map(function(v){return '<div class="voi-card" data-f="'+v.f+'"><img class="poster" src="/assets/testi/'+v.f+'.jpg" loading="lazy" alt="'+v.name+'"><span class="vscrim"></span><span class="vplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vmeta"><b>'+v.name+'</b><span>'+v.sub+'</span></div></div>';}).join('');
+    tr.querySelectorAll('.voi-card').forEach(function(card){card.addEventListener('click',function(){if(card.classList.contains('playing'))return;var vd=document.createElement('video');vd.src='/assets/testi/'+card.dataset.f+'.mp4';vd.controls=true;vd.autoplay=true;vd.setAttribute('playsinline','');card.appendChild(vd);card.classList.add('playing');vd.play&&vd.play().catch(function(){});});});
     function step(){var c=tr.querySelector('.voi-card');return (c?c.offsetWidth:200)+14;}
     var pv=document.getElementById('voiPrev'),nx=document.getElementById('voiNext');
     if(pv)pv.onclick=function(){tr.scrollBy({left:-step()*1.6,behavior:'smooth'});};
