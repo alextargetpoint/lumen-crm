@@ -149,7 +149,7 @@ async function load() {
   const plansN = list.plans || {};
   $('#stats').innerHTML = [
     ['Агентств', st.tenants], ['Лидов всего', st.leads], ['Брокеров', st.brokers],
-    ['Приостановлено', st.suspended], ['MRR (оценка)', '$' + (st.mrr || 0)],
+    ['Спящих (>7д)', st.sleeping || 0], ['Приостановлено', st.suspended], ['MRR (оценка)', '$' + (st.mrr || 0)],
   ].map(([k, v]) => `<div class="stat"><b>${v}</b><i>${k}</i></div>`).join('');
   TENANTS = list.tenants || [];
   const planOpts = (cur) => Object.keys(plansN).map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(plansN[k].name)} ($${plansN[k].price})</option>`).join('');
@@ -158,7 +158,7 @@ async function load() {
     <td class="muted">${esc(t.ownerEmail || '—')}</td>
     <td><select class="mini plan">${planOpts(t.plan)}</select></td>
     <td>${t.leads}</td><td>${t.brokers}</td><td>${t.numbers}</td>
-    <td>${t.suspended ? '<span class="badge bad">приостановлен</span>' : '<span class="badge ok">активен</span>'}</td>
+    <td>${t.suspended ? '<span class="badge bad">приостановлен</span>' : (t.sleeping ? '<span class="badge">спит &gt;7д</span>' : '<span class="badge ok">активен</span>')}${t.onboarded ? '' : ' <span class="badge" title="не прошёл онбординг">новый</span>'}</td>
     <td class="row" style="gap:6px">
       <button class="ghost imp">Войти как</button>
       <button class="ghost susp">${t.suspended ? 'Включить' : 'Приостановить'}</button>

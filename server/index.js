@@ -3787,11 +3787,17 @@ const server = http.createServer(async (req, res) => {
       if (!isPlatformAdmin(req)) return json(res, 403, { error: 'нет доступа' });
       const reg = store.getRegistry();
       let am;
-      const tenantStat = (tid) => store.runInTenant(tid, () => { const d = store.get(); const meta = reg.tenants[tid] || {}; return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, createdAt: meta.createdAt || 0, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length }; });
+      const tenantStat = (tid) => store.runInTenant(tid, () => {
+        const d = store.get(); const meta = reg.tenants[tid] || {};
+        const leadAct = Math.max(0, ...(d.leads || []).map(l => Math.max(l.lastMsgAt || 0, l.createdAt || 0)));
+        const seenAct = d.settings.auth && d.settings.auth.sessions ? Math.max(0, ...Object.values(d.settings.auth.sessions).map(s => s.lastSeen || 0)) : 0;
+        const lastActivity = Math.max(leadAct, seenAct, meta.createdAt || 0);
+        return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, onboarded: !!(d.settings.agency && d.settings.agency.onboarded), createdAt: meta.createdAt || 0, lastActivity, sleeping: lastActivity > 0 && (Date.now() - lastActivity) > 7 * 864e5, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length };
+      });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
       if (p === '/api/admin/stats' && req.method === 'GET') {
         const ts = store.listTenants().map(tenantStat);
-        return json(res, 200, { ok: true, tenants: ts.length, leads: ts.reduce((s, t) => s + t.leads, 0), brokers: ts.reduce((s, t) => s + t.brokers, 0), suspended: ts.filter(t => t.suspended).length, byPlan: ts.reduce((a, t) => (a[t.plan] = (a[t.plan] || 0) + 1, a), {}), mrr: ts.reduce((s, t) => s + ((PLANS[t.plan] || {}).price || 0), 0) });
+        return json(res, 200, { ok: true, tenants: ts.length, leads: ts.reduce((s, t) => s + t.leads, 0), brokers: ts.reduce((s, t) => s + t.brokers, 0), suspended: ts.filter(t => t.suspended).length, sleeping: ts.filter(t => t.sleeping).length, byPlan: ts.reduce((a, t) => (a[t.plan] = (a[t.plan] || 0) + 1, a), {}), mrr: ts.reduce((s, t) => s + ((PLANS[t.plan] || {}).price || 0), 0) });
       }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/plan$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); if (!PLANS[b.plan]) return json(res, 400, { error: 'нет плана' }); reg.tenants[am[1]].plan = b.plan; store.saveRegistry(); adminLog('plan', { tid: am[1], plan: b.plan }); return json(res, 200, { ok: true }); }
       if ((am = p.match(/^\/api\/admin\/tenant\/([^/]+)\/suspend$/)) && req.method === 'POST') { const b = await readBody(req); if (!reg.tenants[am[1]]) return json(res, 404, { error: 'нет тенанта' }); reg.tenants[am[1]].suspended = !!b.suspended; store.saveRegistry(); adminLog('suspend', { tid: am[1], suspended: reg.tenants[am[1]].suspended }); return json(res, 200, { ok: true, suspended: reg.tenants[am[1]].suspended }); }
