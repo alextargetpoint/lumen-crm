@@ -203,6 +203,17 @@
   .dtasks li .who{margin-left:auto;font-size:11px;color:#8b8983;white-space:nowrap}
   @media(max-width:860px){.dgrid{grid-template-columns:1fr 1fr}.dhero{grid-row:auto;grid-column:span 2}}
   @media(max-width:560px){.dgrid{grid-template-columns:1fr}.dhero{grid-column:span 1}}
+  /* оживление виджетов «Ателье» */
+  .dcard,.dkpi{transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+  .dcard:hover,.dkpi:hover,.dhero:hover{transform:translateY(-4px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 34px 56px -28px rgba(20,19,17,.34)}
+  .dh-bars i{transform:scaleY(0);transform-origin:bottom}
+  .dash.in .dh-bars i{animation:barGrow .85s var(--ease) both;animation-delay:var(--d,0s)}
+  @keyframes barGrow{0%{transform:scaleY(0)}72%{transform:scaleY(1.05)}100%{transform:scaleY(1)}}
+  .ddonut .donut{transform:scale(.86);opacity:0;transition:transform .7s var(--ease),opacity .6s var(--ease)}
+  .dash.in .ddonut .donut{transform:none;opacity:1;transition-delay:.12s}
+  .dtasks li em{animation:softpulse 2.6s ease-in-out infinite}
+  @keyframes softpulse{0%,100%{opacity:1}50%{opacity:.5}}
+  @media(prefers-reduced-motion:reduce){.dh-bars i{transform:none;animation:none}.ddonut .donut{transform:none;opacity:1}.dtasks li em{animation:none}}
 
   /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
@@ -225,14 +236,41 @@
   .phone .pbody{position:absolute;inset:0;border-radius:inherit;transform:translateZ(-15px);
     background:linear-gradient(135deg,#a99f8d,#6f695d 55%,#4b463d);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
   .phone::after{content:"";position:absolute;inset:5px;border-radius:calc(clamp(48px,5vw,60px) - 6px);border:1px solid rgba(0,0,0,.35);pointer-events:none;z-index:4}
-  .pscr{position:relative;border-radius:clamp(38px,4vw,49px);overflow:hidden;background:#0d1621;box-shadow:0 0 0 2px #000,inset 0 0 0 1px rgba(255,255,255,.03);transform:translateZ(1px)}
-  .psbar{height:34px;background:#0d1621}
+  .pscr{position:relative;border-radius:clamp(38px,4vw,49px);overflow:hidden;background:#f3f1ec;box-shadow:0 0 0 2px #000,inset 0 0 0 1px rgba(255,255,255,.03);transform:translateZ(1px)}
   .pisl{position:absolute;z-index:3;top:9px;left:50%;transform:translateX(-50%);width:32%;height:19px;border-radius:11px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
   .pscr img{display:block;width:100%;margin-top:-1px}
   .pbtn{position:absolute;width:2.5px;border-radius:0 2px 2px 0;background:linear-gradient(180deg,#c8c7b6,#8a8273);z-index:0;transform:translateZ(-3px)}
   .pbtn.l1{left:-2px;top:26%;height:26px}.pbtn.l2{left:-2px;top:calc(26% + 40px);height:50px}
   .pbtn.r1{right:-2px;left:auto;border-radius:2px 0 0 2px;top:30%;height:62px;background:linear-gradient(180deg,#bcb4a3,#7a7263)}
   @media(prefers-reduced-motion:reduce){.phone3d{animation:none}}
+  /* нативное «живое» приложение в стиле Ателье внутри телефона (видеофон-формат) */
+  .appui{position:relative;height:clamp(440px,54vw,540px);display:flex;flex-direction:column;background:#f3f1ec;color:#141311;overflow:hidden}
+  .ap-sb{height:32px;flex:none}
+  .ap-hd{display:flex;align-items:center;gap:9px;padding:4px 13px 11px;border-bottom:1px solid #e6ded4;background:#f3f1ec}
+  .ap-hd .ap-back{color:#8b8983;font-size:18px;line-height:1}
+  .ap-hd .ap-av{width:31px;height:31px;border-radius:50%;background:linear-gradient(140deg,#caa69b,#9c6559);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:15px;flex:none}
+  .ap-hd .ap-who{flex:1;min-width:0}
+  .ap-hd .ap-who b{display:block;font-family:var(--serif);font-weight:500;font-size:13.5px;color:#141311;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+  .ap-hd .ap-st{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#8b8983;margin-top:1px}
+  .ap-hd .ap-st i{width:5px;height:5px;border-radius:50%;background:#1a1815;animation:aiPulse 1.9s ease-in-out infinite}
+  @keyframes aiPulse{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:1;transform:scale(1.25)}}
+  .ap-hd .ap-ic{width:27px;height:27px;border-radius:9px;background:#1a1815;color:#f3f1ec;display:flex;align-items:center;justify-content:center;flex:none}
+  .ap-hd .ap-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .ap-body{flex:1;overflow:hidden;padding:12px 12px 4px;display:flex;flex-direction:column;gap:7px;justify-content:flex-end}
+  .ap-day{align-self:center;font-size:9px;color:#8b8983;background:#e7dfd4;border-radius:999px;padding:3px 11px;margin-bottom:3px;flex:none}
+  .ap-msg{max-width:80%;padding:8px 11px 6px;border-radius:15px;font-size:11.5px;line-height:1.36;opacity:0;transform:translateY(9px) scale(.98);animation:msgIn .5s var(--ease) forwards;flex:none}
+  .ap-msg.inc{align-self:flex-start;background:#fffdfa;border:1px solid #e8e1d8;color:#141311;border-bottom-left-radius:5px}
+  .ap-msg.out{align-self:flex-end;background:#1a1815;color:#f3f1ec;border-bottom-right-radius:5px}
+  .ap-msg .tm{display:block;font-size:8px;opacity:.55;margin-top:3px;text-align:right}
+  @keyframes msgIn{to{opacity:1;transform:none}}
+  .ap-typing{align-self:flex-start;background:#fffdfa;border:1px solid #e8e1d8;border-radius:15px;border-bottom-left-radius:5px;padding:11px 14px;display:flex;gap:4px;flex:none;opacity:0;animation:msgIn .3s var(--ease) forwards}
+  .ap-typing i{width:5px;height:5px;border-radius:50%;background:#b3aa9d;animation:typedot 1.2s infinite}
+  .ap-typing i:nth-child(2){animation-delay:.18s}.ap-typing i:nth-child(3){animation-delay:.36s}
+  @keyframes typedot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+  .ap-inp{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px 11px;border-top:1px solid #e6ded4;background:#f3f1ec}
+  .ap-inp .ap-fld{flex:1;background:#fff;border:1px solid #e8e1d8;border-radius:999px;padding:8px 13px;color:#a9a49b;font-size:11px}
+  .ap-inp .ap-mic{width:31px;height:31px;border-radius:50%;background:#1a1815;color:#f3f1ec;display:flex;align-items:center;justify-content:center;flex:none}
+  .ap-inp .ap-mic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
   /* каналы → визуальные ноды, стекающиеся в телефон */
   .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
@@ -518,19 +556,19 @@
       <div class="dgrid">
         <div class="dcard dhero">
           <div class="dh-top"><span>Новые лиды · 14 дней</span><span class="dh-badge">▲ 100%</span></div>
-          <div class="dh-num">23</div>
+          <div class="dh-num"><span class="cu" data-to="23">0</span></div>
           <div class="dh-sub">30 всего в работе · 5 в живом диалоге</div>
-          <div class="dh-bars"><i style="height:36%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:64%"></i><i style="height:50%"></i><i style="height:73%"></i><i style="height:58%"></i><i style="height:85%"></i><i style="height:70%"></i><i style="height:97%"></i></div>
+          <div class="dh-bars"><i style="height:36%;--d:.02s"></i><i style="height:52%;--d:.07s"></i><i style="height:44%;--d:.12s"></i><i style="height:64%;--d:.17s"></i><i style="height:50%;--d:.22s"></i><i style="height:73%;--d:.27s"></i><i style="height:58%;--d:.32s"></i><i style="height:85%;--d:.37s"></i><i style="height:70%;--d:.42s"></i><i style="height:97%;--d:.47s"></i></div>
         </div>
         <div class="dkpis">
-          <div class="dkpi"><b>5</b><span>В диалоге с ИИ</span><em>отвечает за секунды</em></div>
-          <div class="dkpi"><b>12</b><span>Квалифицировано</span><em>с психо-портретом</em></div>
-          <div class="dkpi"><b>3</b><span>Дошло до сделки</span><em>переданы брокеру</em></div>
+          <div class="dkpi"><b class="cu" data-to="5">0</b><span>В диалоге с ИИ</span><em>отвечает за секунды</em></div>
+          <div class="dkpi"><b class="cu" data-to="12">0</b><span>Квалифицировано</span><em>с психо-портретом</em></div>
+          <div class="dkpi"><b class="cu" data-to="3">0</b><span>Дошло до сделки</span><em>переданы брокеру</em></div>
         </div>
         <div class="dcard ddonut">
           <div class="dc-hd">Статусы лидов <span>воронка</span></div>
           <div class="dd-row">
-            <div class="donut"><b>31<span>лида</span></b></div>
+            <div class="donut"><b><span class="cu" data-to="31">0</span><span>лида</span></b></div>
             <ul class="dlegend">
               <li><i style="background:#1a1815"></i>Новые<b>16</b></li>
               <li><i style="background:#a79f92"></i>В диалоге<b>5</b></li>
@@ -573,7 +611,21 @@
         <div class="phone">
           <div class="pbody"></div>
           <span class="pbtn l1"></span><span class="pbtn l2"></span><span class="pbtn r1"></span>
-          <div class="pscr"><div class="psbar"></div><span class="pisl"></span><img src="/assets/site/cap-tg-chat.png" alt="Мессенджер Lumen в Telegram — все каналы в одном окне, ИИ ведёт диалог" loading="lazy"></div>
+          <div class="pscr">
+            <span class="pisl"></span>
+            <div class="appui" aria-label="Мессенджер Lumen — ИИ ведёт диалог">
+              <div class="ap-sb"></div>
+              <div class="ap-hd">
+                <span class="ap-back">‹</span>
+                <span class="ap-av">М</span>
+                <div class="ap-who"><b>Мария · Дубай Marina</b><span class="ap-st"><i></i> ИИ ведёт · +971 50…</span></div>
+                <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span>
+                <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z"/></svg></span>
+              </div>
+              <div class="ap-body" id="apBody"><div class="ap-day">Сегодня</div></div>
+              <div class="ap-inp"><span class="ap-fld">Сообщение…</span><span class="ap-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/></svg></span></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -893,6 +945,30 @@
       ph.style.setProperty('--ry',(-19+dx*15).toFixed(1)+'deg');
       ph.style.setProperty('--rx',(5-dy*11).toFixed(1)+'deg');},{passive:true});
     host.addEventListener('pointerleave',function(){ph.style.setProperty('--ry','-19deg');ph.style.setProperty('--rx','5deg');});
+  })();
+
+  /* ── живой Ателье-мессенджер в телефоне (видеофон-формат) ── */
+  (function(){var body=document.getElementById('apBody');if(!body)return;
+    var msgs=[
+      {d:'inc',t:'Здравствуйте! Смотрю Dubai Marina, 2 спальни',tm:'01:46'},
+      {d:'out',t:'Мария, добрый день! Отличный выбор 🙌 Подскажите бюджет и сроки?',tm:'01:48'},
+      {d:'inc',t:'До 650 тысяч, ближайшие пару месяцев',tm:'02:04'},
+      {d:'out',t:'Поняла. Важна близость к воде? Для себя или под аренду?',tm:'02:06'},
+      {d:'inc',t:'Для себя, обязательно у воды',tm:'02:20'},
+      {d:'out',t:'Отобрала 3 варианта у воды под ваш бюджет — сейчас пришлю ✨',tm:'02:21'}
+    ];
+    var i=0;
+    function trim(){while(body.children.length>6)body.children[1].remove();}
+    function addMsg(m){var el=document.createElement('div');el.className='ap-msg '+(m.d==='inc'?'inc':'out');
+      el.appendChild(document.createTextNode(m.t));var s=document.createElement('span');s.className='tm';s.textContent=m.tm;el.appendChild(s);
+      body.appendChild(el);trim();}
+    function typing(cb){var t=document.createElement('div');t.className='ap-typing';t.innerHTML='<i></i><i></i><i></i>';body.appendChild(t);trim();
+      setTimeout(function(){t.remove();cb();},1150);}
+    function step(){var m=msgs[i%msgs.length];i++;
+      if(m.d==='out'){typing(function(){addMsg(m);setTimeout(step,1700);});}
+      else{addMsg(m);setTimeout(step,1400);}}
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.disconnect();setTimeout(step,600);}})},{threshold:.2});
+    io.observe(document.getElementById('phone3d')||body);
   })();
 </script>
 </body>
