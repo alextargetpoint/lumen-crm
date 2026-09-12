@@ -396,6 +396,32 @@
   .cpop-x{position:absolute;top:14px;right:14px;z-index:4;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(10,10,11,.5);color:#f3f1ec;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.3s}
   .cpop-x:hover{border-color:rgba(255,255,255,.4);transform:rotate(90deg)}
   @media(max-width:640px){.cpop-card{grid-template-columns:1fr;max-height:92vh;overflow:auto}.cpop-vid{aspect-ratio:5/4}}
+
+  /* карусель видеоотзывов клиентов */
+  .voi{margin-top:clamp(52px,7vw,84px)}
+  .voi-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
+  .voi-hd h3{font-family:var(--serif);font-weight:300;font-size:clamp(24px,3vw,36px);letter-spacing:-.01em;line-height:1.05}
+  .voi-hd .eyebrow{margin-bottom:12px}
+  .voi-nav{display:flex;gap:8px;flex:none}
+  .voi-nav button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;transition:.3s var(--ease);display:flex;align-items:center;justify-content:center}
+  .voi-nav button:hover{border-color:var(--ink2);transform:translateY(-2px)}
+  .voi-nav svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .voi-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px;scrollbar-width:none;-ms-overflow-style:none}
+  .voi-track::-webkit-scrollbar{display:none}
+  .voi-card{position:relative;flex:0 0 auto;width:clamp(178px,21vw,214px);aspect-ratio:9/14;border-radius:16px;overflow:hidden;border:1px solid var(--line);cursor:pointer;scroll-snap-align:start;background:#1a1815;transition:transform .5s var(--ease)}
+  .voi-card:hover{transform:translateY(-4px)}
+  .voi-card .poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.02) brightness(.9);transition:transform .6s var(--ease)}
+  .voi-card:hover .poster{transform:scale(1.05)}
+  .voi-card .vscrim{position:absolute;inset:0;background:linear-gradient(transparent 42%,rgba(9,8,7,.86))}
+  .voi-card .vplay{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:rgba(243,241,236,.94);display:flex;align-items:center;justify-content:center;transition:transform .4s var(--ease);z-index:2}
+  .voi-card:hover .vplay{transform:translate(-50%,-50%) scale(1.1)}
+  .voi-card .vplay svg{width:16px;height:16px;margin-left:2px;fill:#141311}
+  .voi-card .vmeta{position:absolute;left:0;right:0;bottom:0;padding:14px;color:#f3f1ec;z-index:2;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+  .voi-card .vmeta b{display:block;font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.15}
+  .voi-card .vmeta a{font-size:11px;color:#c9c5be;border-bottom:none;display:inline-block;margin-top:2px}
+  .voi-card .vmeta a:hover{color:#fff}
+  .voi-card iframe{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:3}
+  .voi-card.playing .poster,.voi-card.playing .vscrim,.voi-card.playing .vplay,.voi-card.playing .vmeta{opacity:0;pointer-events:none;transition:opacity .3s}
   .vcard.vshake{animation:vsh .42s}
   @keyframes vsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(5px)}}
 
@@ -819,6 +845,14 @@
       <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-orange.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ лид</em></span><b>OrangeLife</b><span>Инвестцентр в Дубае · бюджет $48k</span></div></button>
       <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-highgrove.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>сделки</em></span><b>Highgrove</b><span>Объекты в Дубае за 3,5 месяца</span></div></button>
     </div>
+
+    <div class="voi" data-r>
+      <div class="voi-hd">
+        <div><span class="eyebrow">Голосом клиентов</span><h3>Что говорят <em>агентства и брокеры</em></h3></div>
+        <div class="voi-nav"><button id="voiPrev" type="button" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><button id="voiNext" type="button" aria-label="Вперёд"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>
+      </div>
+      <div class="voi-track" id="voiTrack"></div>
+    </div>
   </div>
 </section>
 
@@ -1156,6 +1190,27 @@
     document.getElementById('cpopX').onclick=close;
     pop.addEventListener('click',function(e){if(e.target===pop)close();});
     addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.classList.contains('on'))close();});
+  })();
+
+  /* ── карусель видеоотзывов клиентов (kinescope по клику) ── */
+  (function(){var tr=document.getElementById('voiTrack');if(!tr)return;
+    var VOICES=[
+      {id:'7bgTc8NjPbH7CEFo3ZwNZL',name:'LV Homes · Mohammed',ig:'lvhomeps'},
+      {id:'7dw7EKwVUsjamG6DemZUYy',name:'Citrine Signature',ig:'citrine_signature'},
+      {id:'xrgwq6H7q2zDC6iDdzDJVf',name:'Baytify',ig:'baytify'},
+      {id:'82LnQyJ5eBfrtkpj3FX3CA',name:'Диана Хватова',ig:'hvatova_diana.uae'},
+      {id:'hsWm9DyVGsw9Pm3cZz5vDR',name:'Beauty by Tomyna',ig:'beauty_bytomyna'},
+      {id:'iknkgcxF38GgKZXVbZfjqe',name:'Blackberry Real Estate',ig:'blackberry_real_estate'},
+      {id:'dZRZdELr8VTFKEmDpHCfuD',name:'Sand & Towers',ig:'sandandtowers'},
+      {id:'cWovSMbutT4NCQUVTcp7MM',name:'RED Realty',ig:'redrealtydubai'},
+      {id:'jjwuMghPFt1bvF5ykjFkHL',name:'Сапфир · Зарина',ig:'zarina.yahsibay'}
+    ];
+    tr.innerHTML=VOICES.map(function(v){return '<div class="voi-card" data-id="'+v.id+'"><img class="poster" src="/assets/testi/'+v.id+'.jpg" loading="lazy" alt="'+v.name+'"><span class="vscrim"></span><span class="vplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vmeta"><b>'+v.name+'</b><a href="https://instagram.com/'+v.ig+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">@'+v.ig+' ↗</a></div></div>';}).join('');
+    tr.querySelectorAll('.voi-card').forEach(function(card){card.addEventListener('click',function(){if(card.classList.contains('playing'))return;var f=document.createElement('iframe');f.src='https://kinescope.io/embed/'+card.dataset.id+'?autoplay=1';f.allow='autoplay; fullscreen; encrypted-media; picture-in-picture';f.setAttribute('allowfullscreen','');card.appendChild(f);card.classList.add('playing');});});
+    function step(){var c=tr.querySelector('.voi-card');return (c?c.offsetWidth:200)+14;}
+    var pv=document.getElementById('voiPrev'),nx=document.getElementById('voiNext');
+    if(pv)pv.onclick=function(){tr.scrollBy({left:-step()*1.6,behavior:'smooth'});};
+    if(nx)nx.onclick=function(){tr.scrollBy({left:step()*1.6,behavior:'smooth'});};
   })();
 </script>
 </body>
