@@ -167,6 +167,10 @@ async function main() {
   const inOther = await (async () => { const j = jar(); await jpost(j, '/auth/login', { email: 'c@x.com', password: 'secretC' }); return jget(j, '/api/leads'); })();
   ok('gray incoming: НЕ виден в другом агентстве (изоляция)', !(inOther.b?.some(l => (l.phone || '').includes('79990001122'))));
 
+  // O. шифр паролей (scrypt) + миграция legacy
+  try { const adb = JSON.parse(readFileSync(join(DATA_DIR, 'tenants', aTid, 'db.json'), 'utf8')); ok('пароль хранится как scrypt (s2$…), не голый sha', String(adb.settings.auth.passHash).startsWith('s2$')); } catch (e) { ok('пароль scrypt', false, e.message); }
+  try { const pdb = JSON.parse(readFileSync(join(DATA_DIR, 'tenants', 'primary', 'db.json'), 'utf8')); ok('legacy-пароль primary мигрировал в scrypt после входа', String(pdb.settings.auth.passHash).startsWith('s2$')); } catch (e) { ok('legacy upgrade', false, e.message); }
+
   finish(srv);
 }
 

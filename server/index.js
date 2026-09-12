@@ -75,6 +75,17 @@ engine.startLoop();
 /* ---------- авторизация ---------- */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const DEFAULT_PASS = 'lumen2026';
+/* SEC: пароли — scrypt с солью (формат s2$salt$hash). verifyPassword понимает и старый SHA256
+   (legacy) для бесшовной миграции: при удачном входе legacy-хэш перезаписывается на scrypt (upgrade-on-login). */
+function hashPassword(pw) { const salt = crypto.randomBytes(16).toString('hex'); return 's2$' + salt + '$' + crypto.scryptSync(String(pw), salt, 64).toString('hex'); }
+function isLegacyHash(stored) { return !!stored && !String(stored).startsWith('s2$'); }
+function verifyPassword(pw, stored) {
+  if (!stored) return false;
+  try {
+    if (String(stored).startsWith('s2$')) { const [, salt, h] = String(stored).split('$'); const cand = crypto.scryptSync(String(pw), salt, 64).toString('hex'); const a = Buffer.from(h, 'hex'), b = Buffer.from(cand, 'hex'); return a.length === b.length && crypto.timingSafeEqual(a, b); }
+    return sha(String(pw)) === stored; /* legacy SHA256 */
+  } catch (e) { return false; }
+}
 /* SaaS: тарифные планы (лимиты работают без Stripe; оплата подключится позже) */
 const PLANS = {
   trial: { name: 'Триал', maxBrokers: 3, maxLeads: 300, maxNumbers: 1, price: 0 },
@@ -88,7 +99,7 @@ function planOf(tid) { try { const t = store.getRegistry().tenants[tid]; return 
 function ensureTenantDefaults(db) {
   db.settings = db.settings || {};
   const s = db.settings;
-  if (!s.auth) s.auth = { passHash: sha(DEFAULT_PASS), sessions: {} };
+  if (!s.auth) s.auth = { passHash: hashPassword(DEFAULT_PASS), sessions: {} };
   s.auth.sessions = s.auth.sessions || {};
   if (!s.customFields) s.customFields = [];
   if (!s.stagesCfg) s.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
@@ -497,6 +508,16 @@ function clientIp(req) {
   const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return xf || (req.socket && req.socket.remoteAddress) || '';
 }
+/* SEC: простой in-memory rate-limit для публичных auth-роутов (регистрация/сброс) — анти-спам/DoS */
+const _rl = new Map();
+function rateLimited(key, max, windowMs) {
+  const now = Date.now();
+  let r = _rl.get(key);
+  if (!r || now - r.t > windowMs) { r = { c: 0, t: now }; _rl.set(key, r); }
+  r.c++;
+  if (_rl.size > 5000) { for (const [k, v] of _rl) if (now - v.t > windowMs) _rl.delete(k); }  /* уборка */
+  return r.c > max;
+}
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
 function uaFingerprint(ua) {
   ua = String(ua || '');
@@ -804,6 +825,8 @@ function publicSettings(db) {
     }
   }
   if (s.tgBridge) { if (s.tgBridge.botToken) { s.tgBridge.tokenSet = true; delete s.tgBridge.botToken; } delete s.tgBridge.secret; }
+  /* SEC: токен серого WA-воркера — секрет, наружу только флаг */
+  if (s.waGray) { if (s.waGray.token) { s.waGray.tokenSet = true; delete s.waGray.token; } delete s.waGray.inbox; }
   /* SEC: hooks.secret — мастер-ключ вебхуков/интеграций; НИКОГДА не отдаём в общий /api/state.
      Владельцу он до-инжектится отдельно (owner-ветка в /api/state), брокеры его не видят. */
   if (s.hooks) { s.hooksSecretSet = !!s.hooks.secret; delete s.hooks.secret; }
@@ -3366,8 +3389,8 @@ const server = http.createServer(async (req, res) => {
         const sidOk = ltid && store.runInTenant(ltid, () => {
           const tdb = store.get();
           let sess = null;
-          if (tdb.settings.auth && sha(String(b.password || '')) === tdb.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
-          else { const br = (tdb.brokers || []).find(x => x.email === _email && x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false); if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id }; }
+          if (tdb.settings.auth && verifyPassword(b.password, tdb.settings.auth.passHash)) { sess = { at: Date.now(), role: 'owner' }; if (isLegacyHash(tdb.settings.auth.passHash)) tdb.settings.auth.passHash = hashPassword(b.password); }
+          else { const br = (tdb.brokers || []).find(x => x.email === _email && x.pinHash && verifyPassword(b.password, x.pinHash) && x.active !== false); if (br) { sess = { at: Date.now(), role: 'broker', brokerId: br.id }; if (isLegacyHash(br.pinHash)) br.pinHash = hashPassword(b.password); } }
           if (!sess) return null;
           const sid = crypto.randomBytes(16).toString('hex');
           sess.ip = clientIp(req); sess.ua = req.headers['user-agent'] || ''; sess.lastSeen = Date.now();
@@ -3395,11 +3418,11 @@ const server = http.createServer(async (req, res) => {
       if (nowT - G.winStart > 600e3) { G.fails = 0; G.winStart = nowT; G.until = 0; }
       if (G.until && G.until > nowT) { await new Promise(r => setTimeout(r, 800)); return json(res, 429, { error: 'вход временно закрыт (защита от перебора), попробуйте через несколько минут' }); }
       let sess = null;
-      if (sha(String(b.password || '')) === db.settings.auth.passHash) sess = { at: Date.now(), role: 'owner' };
+      if (verifyPassword(b.password, db.settings.auth.passHash)) { sess = { at: Date.now(), role: 'owner' }; if (isLegacyHash(db.settings.auth.passHash)) db.settings.auth.passHash = hashPassword(b.password); }
       else {
         /* личный PIN брокера → роль broker (урезанный доступ) */
-        const br = db.brokers.find(x => x.pinHash && x.pinHash === sha(String(b.password || '')) && x.active !== false);
-        if (br) sess = { at: Date.now(), role: 'broker', brokerId: br.id };
+        const br = db.brokers.find(x => x.pinHash && verifyPassword(b.password, x.pinHash) && x.active !== false);
+        if (br) { sess = { at: Date.now(), role: 'broker', brokerId: br.id }; if (isLegacyHash(br.pinHash)) br.pinHash = hashPassword(b.password); }
       }
       if (!sess) {
         const r2 = TH[lip] = TH[lip] || { fails: 0 }; r2.fails++; r2.last = nowT;
@@ -3434,6 +3457,7 @@ const server = http.createServer(async (req, res) => {
     }
     /* ---------------- SaaS: публичная регистрация агентства/соло-брокера ---------------- */
     if (p === '/auth/register' && req.method === 'POST') {
+      if (rateLimited('reg:' + clientIp(req), 8, 3600e3)) return json(res, 429, { error: 'слишком много регистраций с этого адреса, попробуйте позже' });
       const b = await readBody(req);
       const email = String(b.email || '').trim().toLowerCase();
       const password = String(b.password || '');
@@ -3451,7 +3475,7 @@ const server = http.createServer(async (req, res) => {
         ensureTenantDefaults(tdb);
         /* чистый старт нового агентства: убрать демо-данные, оставить полезные дефолты (цепочки+шаблоны) */
         ['leads', 'brokers', 'messages', 'events', 'campaigns', 'numbers'].forEach(k => { if (Array.isArray(tdb[k])) tdb[k] = []; });
-        tdb.settings.auth.passHash = sha(password);
+        tdb.settings.auth.passHash = hashPassword(password);
         tdb.settings.auth.ownerEmail = email;
         if (agencyName) { tdb.settings.agency = tdb.settings.agency || {}; tdb.settings.agency.name = agencyName; }
         tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'owner', ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
@@ -3546,7 +3570,7 @@ const server = http.createServer(async (req, res) => {
         const tdb = store.get();
         const br = (tdb.brokers || []).find(x => x.id === inv.brokerId);
         if (!br) return false;
-        br.pinHash = sha(password); br.active = true; br.invited = false;
+        br.pinHash = hashPassword(password); br.active = true; br.invited = false;
         if (bb.name) br.name = String(bb.name).slice(0, 80);
         tdb.settings.auth = tdb.settings.auth || { sessions: {} };
         tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
@@ -3564,6 +3588,7 @@ const server = http.createServer(async (req, res) => {
     }
     /* ---------------- SaaS: сброс пароля (forgot/reset) ---------------- */
     if (p === '/auth/forgot' && req.method === 'POST') {
+      if (rateLimited('forgot:' + clientIp(req), 6, 900e3)) return json(res, 200, { ok: true }); /* тихо игнорируем — не раскрываем лимит */
       const bb = await readBody(req);
       const email = String(bb.email || '').trim().toLowerCase();
       const reg = store.getRegistry();
@@ -3598,8 +3623,8 @@ const server = http.createServer(async (req, res) => {
       const done = store.runInTenant(rs.tid, () => {
         const tdb = store.get();
         let role = null, brokerId = null;
-        if (tdb.settings.auth && tdb.settings.auth.ownerEmail === rs.email) { tdb.settings.auth.passHash = sha(password); role = 'owner'; }
-        else { const br = (tdb.brokers || []).find(x => x.email === rs.email); if (!br) return false; br.pinHash = sha(password); br.active = true; role = 'broker'; brokerId = br.id; }
+        if (tdb.settings.auth && tdb.settings.auth.ownerEmail === rs.email) { tdb.settings.auth.passHash = hashPassword(password); role = 'owner'; }
+        else { const br = (tdb.brokers || []).find(x => x.email === rs.email); if (!br) return false; br.pinHash = hashPassword(password); br.active = true; role = 'broker'; brokerId = br.id; }
         tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
         tdb.settings.auth.sessions[sid] = { at: Date.now(), role, brokerId, ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
         store.saveNow();
@@ -3627,9 +3652,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/auth/password' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
-      if (sha(String(b.current || '')) !== db.settings.auth.passHash) return json(res, 400, { error: 'текущий пароль неверен' });
+      if (!verifyPassword(b.current, db.settings.auth.passHash)) return json(res, 400, { error: 'текущий пароль неверен' });
       if (String(b.next || '').length < 8) return json(res, 400, { error: 'новый пароль короче 8 символов' });
-      db.settings.auth.passHash = sha(String(b.next));
+      db.settings.auth.passHash = hashPassword(String(b.next));
       db.settings.auth.sessions = { [getSession(req)]: { at: Date.now() } }; // остальные сессии — в сброс
       store.save();
       return json(res, 200, { ok: true });
@@ -4189,10 +4214,9 @@ const server = http.createServer(async (req, res) => {
       /* PIN: свой или авто-6 цифр, уникальный против пароля и других брокеров */
       let pin = String(b.pin || '').trim();
       if (pin) { if (pin.length < 6) return json(res, 400, { error: 'PIN короче 6 символов' }); }
-      else { let tries = 0; do { pin = String(Math.floor(100000 + Math.random() * 900000)); tries++; } while ((sha(pin) === db.settings.auth.passHash || db.brokers.some(x => x.pinHash === sha(pin))) && tries < 40); }
-      const ph = sha(pin);
-      if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
-      br.pinHash = ph; br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
+      else { let tries = 0; do { pin = String(Math.floor(100000 + Math.random() * 900000)); tries++; } while ((verifyPassword(pin, db.settings.auth.passHash) || db.brokers.some(x => x.pinPlain === pin)) && tries < 40); }
+      if (verifyPassword(pin, db.settings.auth.passHash) || db.brokers.some(x => x.id !== br.id && x.pinPlain === pin)) return json(res, 400, { error: 'такой PIN уже занят' });
+      br.pinHash = hashPassword(pin); br.pinPlain = pin; br.active = true; br.preset = preset; br.hidePages = PRESETS[preset].hide.slice(); br.accessAt = Date.now();
       if (ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* тип сотрудника: broker/assistant/marketer/manager */
       if (b.feedPost != null) br.feedPost = !!b.feedPost;   /* право публикации в Ленту */
       /* стартовый чеклист в его кабинет — один раз (br.onboarded) */
@@ -4307,10 +4331,10 @@ const server = http.createServer(async (req, res) => {
       if (b.bio != null) br.bio = String(b.bio).slice(0, 600);
       /* личный PIN для входа (роль broker); минимум 6 символов, уникальность против пароля владельца */
       if (b.pin) {
-        const ph = sha(String(b.pin));
-        if (String(b.pin).length < 6) return json(res, 400, { error: 'PIN короче 6 символов' });
-        if (ph === db.settings.auth.passHash || db.brokers.some(x => x.id !== br.id && x.pinHash === ph)) return json(res, 400, { error: 'такой PIN уже занят' });
-        br.pinHash = ph; br.pinPlain = String(b.pin); br.accessAt = Date.now();
+        const pin = String(b.pin);
+        if (pin.length < 6) return json(res, 400, { error: 'PIN короче 6 символов' });
+        if (verifyPassword(pin, db.settings.auth.passHash) || db.brokers.some(x => x.id !== br.id && x.pinPlain === pin)) return json(res, 400, { error: 'такой PIN уже занят' });
+        br.pinHash = hashPassword(pin); br.pinPlain = pin; br.accessAt = Date.now();
         audit(db, req, 'задан PIN брокеру', { broker: br.name });
       }
       /* kill-switch: отключение доступа + переназначение лидов + сброс сессий брокера */
@@ -6927,7 +6951,7 @@ ${SCR}
       { const rr = realRole(req); if (!rr || rr.role !== 'owner') return json(res, 403, { error: 'только владелец' }); }
       const b = await readBody(req); const L = db.settings.learn = db.settings.learn || {};
       if (typeof b.on === 'boolean') L.shareOn = b.on;
-      if (b.password != null && String(b.password)) L.sharePassHash = sha(String(b.password));
+      if (b.password != null && String(b.password)) L.sharePassHash = hashPassword(String(b.password));
       if (b.clearPass) L.sharePassHash = '';
       if (b.rotate) L.shareToken = crypto.randomBytes(6).toString('hex');
       if (!L.shareToken) L.shareToken = crypto.randomBytes(6).toString('hex');
@@ -6943,7 +6967,7 @@ ${SCR}
       if (rec && rec.until && rec.until > nowT) { await new Promise(r => setTimeout(r, 500)); return json(res, 429, { error: 'слишком много попыток' }); }
       if (!L.shareOn || m[1] !== L.shareToken) return json(res, 404, { error: 'ссылка недоступна' });
       const b = await readBody(req);
-      if (L.sharePassHash && sha(String(b.password || '')) !== L.sharePassHash) {
+      if (L.sharePassHash && !verifyPassword(b.password, L.sharePassHash)) {
         const r2 = TH['learn:' + lip] = TH['learn:' + lip] || { fails: 0 }; r2.fails++; if (r2.fails >= 5) r2.until = nowT + Math.min(15 * 60000, 15000 * Math.pow(2, r2.fails - 5)); store.save();
         await new Promise(r => setTimeout(r, 500)); return json(res, 401, { error: 'неверный пароль' });
       }
