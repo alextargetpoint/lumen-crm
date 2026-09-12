@@ -468,7 +468,9 @@ function setMode(m){MODE=m;
   if(m==='leads')loadLeads();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
-async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){$('#leads').innerHTML='<div class="empty">Не удалось загрузить лидов.<br>'+esc(e.message)+'</div>'}}
+async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
+  const stale=/no route|404/i.test(String(e.message));
+  $('#leads').innerHTML='<div class="empty">'+(stale?'Раздел «Лиды» ещё разворачивается на сервере — обновите приложение через минуту 🙌':'Не удалось загрузить лидов.<br>'+esc(e.message))+'</div>'}}
 function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
   return `<div class="lrow" data-id="${esc(l.id)}">${avaHtml({id:l.id,name:l.name,avatar:null})}
     <div class="lrow-main"><div class="lrow-top"><span class="lrow-nm">${esc(l.name)}</span>${l.needsMe?'<span class="lrow-need" title="ждёт вас"></span>':''}${l.aiOn?'<span class="lrow-ai">ИИ</span>':''}</div>
