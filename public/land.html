@@ -318,6 +318,32 @@
   .num span{display:block;margin-top:9px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
   @media(max-width:620px){.nums{grid-template-columns:1fr 1fr}}
 
+  /* КЕЙСЫ · ВИДЕООТЗЫВЫ */
+  .vids{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+  .vcard{position:relative;aspect-ratio:4/5;border-radius:18px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:#1a1815;display:block;padding:0;font-family:inherit;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+  .vcard:hover{transform:translateY(-4px);box-shadow:0 30px 52px -28px rgba(20,19,17,.4)}
+  .vcard .vposter{position:absolute;inset:0;background:linear-gradient(155deg,#2c2a25,#4a463f 45%,#161309);filter:grayscale(1)}
+  .vcard.v2 .vposter{background:linear-gradient(155deg,#333029,#565049 52%,#1a1714)}
+  .vcard.v3 .vposter{background:linear-gradient(155deg,#26241f,#413d36 55%,#12100c)}
+  .vcard .vposter::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 95% at 50% 18%,rgba(255,255,255,.08),transparent 45%),radial-gradient(120% 90% at 50% 100%,rgba(0,0,0,.62),transparent 55%)}
+  .vcard video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+  .vcard .play{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:50%;background:rgba(243,241,236,.94);display:flex;align-items:center;justify-content:center;transition:transform .4s var(--ease);z-index:2}
+  .vcard:hover .play{transform:translate(-50%,-50%) scale(1.09)}
+  .vcard .play svg{width:19px;height:19px;margin-left:3px;fill:#141311}
+  .vcard .vtag{position:absolute;top:14px;left:14px;z-index:2;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#f3f1ec;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 11px;backdrop-filter:blur(6px)}
+  .vcard .vcap{position:absolute;left:0;right:0;bottom:0;padding:18px;z-index:2;background:linear-gradient(transparent,rgba(9,8,7,.85));color:#f3f1ec;text-align:left}
+  .vcard .vcap b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.1}
+  .vcard .vcap span{font-size:12px;color:#c9c5be}
+  @media(max-width:760px){.vids{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.vids{grid-template-columns:1fr}}
+  .vlb{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:22px}
+  .vlb.on{display:flex}
+  .vlb-in{width:min(392px,92vw);aspect-ratio:9/16;max-height:88vh;border-radius:22px;overflow:hidden;background:#000;position:relative;border:1px solid rgba(255,255,255,.14)}
+  .vlb-in video{width:100%;height:100%;object-fit:cover}
+  .vlb-x{position:absolute;top:-46px;right:0;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:transparent;color:#f3f1ec;cursor:pointer;font-size:15px}
+  .vcard.vshake{animation:vsh .42s}
+  @keyframes vsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(5px)}}
+
   /* PRICING */
   .price{max-width:560px;margin:50px auto 0;border:1px solid var(--line);border-radius:20px;padding:clamp(30px,4vw,48px);text-align:center;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
   .price .tag{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:7px 15px;display:inline-block;margin-bottom:20px}
@@ -453,7 +479,7 @@
     <span class="mk">LUMEN</span>
   </a>
   <div class="nlinks">
-    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#faq">Вопросы</a><a href="#pricing">Цена</a>
+    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#cases">Отзывы</a><a href="#faq">Вопросы</a><a href="#pricing">Цена</a>
     <a class="cta" data-consult href="#consult">Демо</a>
     <a class="cta fill" href="/soon.html"><span>Ранний доступ</span></a>
   </div>
@@ -683,6 +709,20 @@
   </div>
 </section>
 
+<!-- КЕЙСЫ · ОТЗЫВЫ (светлая, та же зона) -->
+<section class="sec light" id="cases">
+  <div class="wrap">
+    <div data-r style="text-align:center"><span class="eyebrow c">Голоса рынка</span>
+      <h2 style="margin-top:22px">Кейсы и <em>отзывы</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">Коротко и по делу — агентства и брокеры о том, что изменилось, когда лиды перестали теряться.</p></div>
+    <div class="vids" data-r>
+      <button class="vcard" type="button" data-video="/assets/reviews/1.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Руководитель агентства</b><span>Дубай · команда из 6 брокеров</span></div></button>
+      <button class="vcard v2" type="button" data-video="/assets/reviews/2.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Соло-брокер</b><span>Бали · продажи вилл</span></div></button>
+      <button class="vcard v3" type="button" data-video="/assets/reviews/3.mp4"><div class="vposter"></div><span class="vtag">Видео-отзыв</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><b>Основатель агентства</b><span>Испания · ВНЖ и недвижимость</span></div></button>
+    </div>
+  </div>
+</section>
+
 <!-- FAQ (светлая, та же зона) -->
 <section class="sec light" id="faq">
   <div class="wrap">
@@ -811,6 +851,9 @@
   <p>Мы используем cookie, чтобы сайт работал и становился лучше. Подробнее — в <a href="/cookies.html">политике cookie</a> и <a href="/privacy.html">конфиденциальности</a>.</p>
   <div class="cbtns"><button class="acc" id="ckAccept">Принять</button><button id="ckReject">Только необходимые</button></div>
 </div>
+
+<!-- ВИДЕО-ЛАЙТБОКС -->
+<div class="vlb" id="vlb"><div class="vlb-in"><button class="vlb-x" id="vlbX" aria-label="Закрыть">✕</button><video id="vlbV" controls playsinline></video></div></div>
 
 <script>
   var nav=document.getElementById('nav');
@@ -969,6 +1012,18 @@
       else{addMsg(m);setTimeout(step,1400);}}
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.disconnect();setTimeout(step,600);}})},{threshold:.2});
     io.observe(document.getElementById('phone3d')||body);
+  })();
+
+  /* ── видео-отзывы: лайтбокс (открывает только реальный файл; иначе мягкий shake) ── */
+  (function(){var lb=document.getElementById('vlb');if(!lb)return;var v=document.getElementById('vlbV');
+    function open(src){v.src=src;lb.classList.add('on');document.body.style.overflow='hidden';v.play&&v.play().catch(function(){});}
+    function close(){lb.classList.remove('on');try{v.pause();}catch(e){}v.removeAttribute('src');try{v.load();}catch(e){}document.body.style.overflow='';}
+    document.querySelectorAll('.vcard').forEach(function(c){c.addEventListener('click',function(){var src=c.getAttribute('data-video');if(!src){return;}
+      fetch(src,{method:'HEAD'}).then(function(r){if(r.ok)open(src);else shake(c);}).catch(function(){shake(c);});});});
+    function shake(c){c.classList.add('vshake');setTimeout(function(){c.classList.remove('vshake');},440);}
+    document.getElementById('vlbX').onclick=close;
+    lb.addEventListener('click',function(e){if(e.target===lb)close();});
+    addEventListener('keydown',function(e){if(e.key==='Escape'&&lb.classList.contains('on'))close();});
   })();
 </script>
 </body>
