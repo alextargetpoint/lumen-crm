@@ -155,6 +155,18 @@ async function main() {
   ok('warmup: владелец включает → running=true, perDay=10', wr.ok && wr.warmup?.running === true && wr.warmup?.perDay === 10, JSON.stringify(wr.warmup || {}));
   ok('warmup: без сессии → 401', (await jpost(jar(), '/api/wa/gray/warmup', { running: true })).status === 401);
 
+  // N. входящие серые WhatsApp → лид (тенант из sessionId, токен тенанта)
+  const Aown3 = jar(); await jpost(Aown3, '/auth/login', { email: 'a@x.com', password: 'secretA' });
+  await jpost(Aown3, '/api/wa/gray/config', { token: 'wt_secret_A' });
+  const aTid = regAj.tid;
+  const incBad = await fetch(BASE + '/api/wa/gray/incoming', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer WRONG' }, body: JSON.stringify({ event: 'message', sessionId: aTid + '__79990001122', phone: '79990001122', text: 'hi' }) });
+  ok('gray incoming: чужой токен → 401', incBad.status === 401);
+  const incOk = await fetch(BASE + '/api/wa/gray/incoming', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer wt_secret_A' }, body: JSON.stringify({ event: 'message', sessionId: aTid + '__79990001122', phone: '79990001122', name: 'Клиент Серый', text: 'Здравствуйте, интересует квартира' }) });
+  ok('gray incoming: верный токен → 200', incOk.status === 200);
+  ok('gray incoming: создан лид у A', (await jget(Aown3, '/api/leads')).b?.some(l => (l.phone || '').includes('79990001122')));
+  const inOther = await (async () => { const j = jar(); await jpost(j, '/auth/login', { email: 'c@x.com', password: 'secretC' }); return jget(j, '/api/leads'); })();
+  ok('gray incoming: НЕ виден в другом агентстве (изоляция)', !(inOther.b?.some(l => (l.phone || '').includes('79990001122'))));
+
   finish(srv);
 }
 

@@ -4701,19 +4701,35 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, warmup: db.settings.waGray.warmup });
     }
-    /* входящие/события ОТ воркера (публично, но с токеном воркера в Authorization) */
+    /* входящие/события ОТ воркера (публично; тенант — из sessionId, токен — этого тенанта) */
     if (p === '/api/wa/gray/incoming' && req.method === 'POST') {
       const auth = req.headers.authorization || ''; const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      if (!db.settings.waGray || !db.settings.waGray.token || tok !== db.settings.waGray.token) return json(res, 401, { error: 'unauthorized' });
       const b = await readBody(req);
-      try {
-        if (b.event === 'message' && !b.fromMe && b.text) {
-          db.settings.waGray.inbox = db.settings.waGray.inbox || [];
-          db.settings.waGray.inbox.unshift({ at: Date.now(), sessionId: b.sessionId, from: b.phone, name: b.name || '', text: String(b.text).slice(0, 2000) });
-          db.settings.waGray.inbox = db.settings.waGray.inbox.slice(0, 200);
-          store.save();
+      const sid0 = String(b.sessionId || '');
+      const tid = sid0.includes('__') ? sid0.split('__')[0] : store.PRIMARY;
+      let okAuth = false;
+      await store.runInTenant(tid, async () => {
+        const tdb = store.get();
+        const g = tdb.settings.waGray || {};
+        if (!g.token || tok !== g.token) return;      /* не тот тенант/токен */
+        okAuth = true;
+        if (b.event !== 'message' || b.fromMe || !b.text) return;
+        const senderDigits = String(b.phone || '').replace(/\D/g, '');
+        if (!senderDigits) return;
+        /* трафик прогрева (отправитель — наш же номер) в лиды не превращаем */
+        if ((g.numbers || []).some(n => String(n.phone).replace(/\D/g, '') === senderDigits)) return;
+        const phone = '+' + senderDigits;
+        let lead = (tdb.leads || []).find(l => (l.phone || '').replace(/\D/g, '') === senderDigits);
+        if (!lead) {
+          const geo0 = ((tdb.settings.agency && tdb.settings.agency.geos) || ['dubai'])[0];
+          lead = { id: store.nextId('ld'), name: b.name || phone, phone, geo: geo0, lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0, source: 'wa_gray', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['серый WhatsApp'], numberId: null, ads: null };
+          tdb.leads = tdb.leads || []; tdb.leads.push(lead);
+          ai.pushEvent(tdb, { type: 'lead_new', leadId: lead.id, text: `Входящий (серый WhatsApp): ${lead.name}` });
         }
-      } catch (e) {}
+        try { engine.inbound(tdb, lead, String(b.text).slice(0, 4000), {}); } catch (e) {}
+        store.save();
+      });
+      if (!okAuth) return json(res, 401, { error: 'unauthorized' });
       return json(res, 200, { ok: true });
     }
 
