@@ -1526,7 +1526,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .ha-title .sub { font-weight: 500; font-size: 11.5px; color: var(--ink-3); }
 .ha-row { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 11px; cursor: default; transition: background .18s var(--ease-spring, ease), transform .18s var(--ease-spring, ease); }
 .ha-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); transform: translateX(5px); }
-.ha-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--blue-300); box-shadow: 0 0 8px rgba(124, 155, 255, .8); }
+.ha-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--accent); box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 55%, transparent); }
 .ha-row .nm2 { font-size: 12.5px; color: #B9C7E8; min-width: 0; }
 .ha-row .nm2 b { color: #fff; font-weight: 750; }
 .ha-row .sp2 { flex: 1; }
@@ -5612,8 +5612,8 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .plo-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 17px; border-radius: 13px; font-size: 13.5px; font-weight: 650; color: var(--ink-2); background: var(--card); border: 1px solid var(--stroke); cursor: pointer; transition: transform .14s var(--ease-soft), box-shadow .16s, border-color .16s; }
 .plo-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 40%, var(--stroke)); box-shadow: 0 8px 20px -12px rgba(16,43,92,.4); }
 .plo-btn.lg { padding: 12px 20px; font-size: 14px; border-radius: 14px; }
-.plo-btn.primary { color: #fff; border: none; background: linear-gradient(120deg, var(--accent), var(--accent-3) 60%, var(--accent-3)); box-shadow: 0 12px 30px -12px rgba(94,73,230,.6); }
-.plo-btn.primary:hover { box-shadow: 0 16px 38px -12px rgba(94,73,230,.7); }
+.plo-btn.primary { color: #fff; border: none; background: linear-gradient(120deg, var(--accent), var(--accent-3) 60%, var(--accent-3)); box-shadow: 0 12px 30px -12px color-mix(in srgb, var(--accent) 45%, transparent); }
+.plo-btn.primary:hover { box-shadow: 0 16px 38px -12px color-mix(in srgb, var(--accent) 50%, transparent); }
 .plo-btn.ghost { background: transparent; border-color: transparent; color: var(--ink-3); }
 .plo-btn.ghost:hover { color: var(--accent); box-shadow: none; }
 .plo-langs { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); }
@@ -5673,7 +5673,7 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .plo-mock-cap .pm-wv i:nth-child(1) { height: 6px; animation: ploWv 1s infinite; } .plo-mock-cap .pm-wv i:nth-child(2) { height: 12px; animation: ploWv 1s infinite .15s; } .plo-mock-cap .pm-wv i:nth-child(3) { height: 8px; animation: ploWv 1s infinite .3s; }
 @keyframes ploWv { 50% { transform: scaleY(.4); } }
 .plo-mock-cap .pm-txt { font-size: 13px; line-height: 1.4; color: #fff; }
-.plo-mock-cop { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: linear-gradient(120deg, var(--accent), var(--accent-3)); color: #fff; border-radius: 11px; padding: 8px 12px; font-size: 12px; font-weight: 600; box-shadow: 0 12px 26px -12px rgba(94,73,230,.7); }
+.plo-mock-cop { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: linear-gradient(120deg, var(--accent), var(--accent-3)); color: #fff; border-radius: 11px; padding: 8px 12px; font-size: 12px; font-weight: 600; box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--accent) 45%, transparent); }
 .plo-mock-cop svg { width: 15px; height: 15px; }
 /* ⭐ статы */
 .plo-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 24px 26px; border-radius: 22px;
