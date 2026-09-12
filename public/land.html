@@ -284,6 +284,36 @@
   .dpsy .dpsy-note em{font-style:normal;color:#141311;font-weight:600}
   @media(max-width:860px){.dgrid3{grid-template-columns:1fr}.dgauge{max-width:none}}
 
+  /* четвёртый ряд: комиссия, путь лида, разбор звонка */
+  .dmoney .dtrend{color:#5f9e73!important;font-size:11px!important;letter-spacing:.02em!important}
+  .dm-val{font-family:var(--serif);font-weight:300;font-size:clamp(38px,4.4vw,52px);line-height:1;letter-spacing:-.02em;color:#141311;margin:8px 0 14px}
+  .dspark{width:100%;height:48px;display:block}
+  .dspark path.sl{fill:none;stroke:#1a1815;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset 1.7s var(--ease)}
+  .dash.in .dspark path.sl{stroke-dashoffset:0}
+  .dspark path.sf{fill:#1a1815;opacity:0;transition:opacity .9s .5s}
+  .dash.in .dspark path.sf{opacity:.08}
+  .dpath .dp-line{display:grid;position:relative;margin-top:2px}
+  .dp-step{display:flex;align-items:center;gap:12px;padding:7px 0;position:relative;font-size:12.5px;color:#8b8983}
+  .dp-step i{width:12px;height:12px;border-radius:50%;border:2px solid #cdc6bc;background:#fffdfa;flex:none;z-index:1}
+  .dp-step::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;background:#e7dfd4}
+  .dp-step:first-child::before{top:50%}.dp-step:last-child::before{bottom:50%}
+  .dp-step.done{color:#141311}.dp-step.done i{border-color:#1a1815;background:#1a1815}
+  .dp-step.done::before{background:#1a1815}
+  .dp-step.now i{border-color:#1a1815;box-shadow:0 0 0 4px rgba(26,24,21,.12);animation:softpulse 1.8s ease-in-out infinite}
+  .dp-step.now{color:#141311;font-weight:600}
+  .dcall .dc-row{display:flex;align-items:center;gap:16px;margin-bottom:2px}
+  .dc-score{flex:none;display:flex;align-items:baseline;gap:2px}
+  .dc-score b{font-family:var(--serif);font-weight:300;font-size:42px;line-height:1;color:#141311}
+  .dc-score span{font-size:14px;color:#8b8983}
+  .dwave{flex:1;display:flex;align-items:center;gap:3px;height:42px}
+  .dwave i{flex:1;background:#cdc6bc;border-radius:2px;height:22%;animation:wave 1.5s ease-in-out infinite}
+  .dwave i:nth-child(3n){background:#1a1815}
+  .dwave i:nth-child(2n){animation-delay:.15s}.dwave i:nth-child(3n){animation-delay:.32s}.dwave i:nth-child(5n){animation-delay:.48s}.dwave i:nth-child(7n){animation-delay:.24s}
+  @keyframes wave{0%,100%{height:22%}50%{height:var(--h,60%)}}
+  .dcall .dc-note{font-size:12.5px;line-height:1.5;color:#54524d;padding-top:12px;margin-top:12px;border-top:1px solid #efe9e2}
+  .dcall .dc-note em{font-style:normal;color:#141311;font-weight:600}
+  @media(prefers-reduced-motion:reduce){.dwave i{animation:none}.dp-step.now i{animation:none}}
+
   /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
@@ -796,6 +826,23 @@
         <div class="dcard dpsy"><div class="dc-hd">Психо-портрет · Мария</div>
           <div class="dchips"><span>Статусность</span><span>Решает быстро</span><span>Ценит вид</span><span>Не давить ценой</span></div>
           <p class="dpsy-note"><em>Заход:</em> эксклюзив и панорама воды. Триггер — образ жизни, а не цена.</p>
+        </div>
+      </div>
+      <div class="dgrid3">
+        <div class="dcard dmoney"><div class="dc-hd">Комиссия в работе <span class="dtrend">▲ 18% за неделю</span></div>
+          <div class="dm-val">$2,4M</div>
+          <svg class="dspark" viewBox="0 0 100 32" preserveAspectRatio="none"><path class="sf" d="M0 25 L14 21 L28 23 L42 15 L56 18 L70 10 L84 13 L100 4 L100 32 L0 32 Z"/><path class="sl" d="M0 25 L14 21 L28 23 L42 15 L56 18 L70 10 L84 13 L100 4"/></svg>
+        </div>
+        <div class="dcard dpath"><div class="dc-hd">Путь лида</div><div class="dp-line">
+          <div class="dp-step done"><i></i><span>Заявка · WhatsApp</span></div>
+          <div class="dp-step done"><i></i><span>Ответ ИИ · 6 сек</span></div>
+          <div class="dp-step done"><i></i><span>Квалификация · $650k</span></div>
+          <div class="dp-step now"><i></i><span>Встреча · сегодня 16:00</span></div>
+          <div class="dp-step"><i></i><span>Сделка</span></div>
+        </div></div>
+        <div class="dcard dcall"><div class="dc-hd">Разбор звонка <span>ИИ</span></div>
+          <div class="dc-row"><div class="dc-score"><b>8.4</b><span>/10</span></div><div class="dwave"><i style="--h:60%"></i><i style="--h:85%"></i><i style="--h:45%"></i><i style="--h:70%"></i><i style="--h:95%"></i><i style="--h:55%"></i><i style="--h:75%"></i><i style="--h:40%"></i><i style="--h:88%"></i><i style="--h:62%"></i><i style="--h:50%"></i><i style="--h:80%"></i><i style="--h:66%"></i><i style="--h:44%"></i></div></div>
+          <p class="dc-note"><em>Сильное открытие.</em> Не дожали на возражении по цене — предложить рассрочку.</p>
         </div>
       </div>
     </div>
