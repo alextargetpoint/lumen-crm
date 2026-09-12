@@ -47,7 +47,7 @@
     --in:#ffffff; --sh:0 10px 30px rgba(0,0,0,.1); --shacc:0 8px 22px rgba(0,0,0,.3);
   }
   /* хелперы светлого семейства — общие для light + премиум-стилей CRM */
-  :root[data-theme="light"] #bgart,:root[data-theme="atelier"] #bgart,:root[data-theme="burgundy"] #bgart,:root[data-theme="glass"] #bgart,:root[data-theme="mono"] #bgart{opacity:.1}
+  :root[data-theme="light"] #bgart,:root[data-theme="atelier"] #bgart,:root[data-theme="burgundy"] #bgart,:root[data-theme="glass"] #bgart,:root[data-theme="mono"] #bgart{opacity:.04}
   :root[data-theme="light"] .b.in,:root[data-theme="atelier"] .b.in,:root[data-theme="burgundy"] .b.in,:root[data-theme="glass"] .b.in,:root[data-theme="mono"] .b.in{border:1px solid var(--line)}
   :root[data-theme="light"] .b.in .vp .wave i,:root[data-theme="atelier"] .b.in .vp .wave i,:root[data-theme="burgundy"] .b.in .vp .wave i,:root[data-theme="glass"] .b.in .vp .wave i,:root[data-theme="mono"] .b.in .vp .wave i{background:rgba(15,26,46,.18)}
   :root[data-theme="light"] .b.in .vp .wave i.on,:root[data-theme="atelier"] .b.in .vp .wave i.on,:root[data-theme="burgundy"] .b.in .vp .wave i.on,:root[data-theme="glass"] .b.in .vp .wave i.on,:root[data-theme="mono"] .b.in .vp .wave i.on{background:var(--acc)}
@@ -63,7 +63,7 @@
     overscroll-behavior:none;-webkit-font-smoothing:antialiased;letter-spacing:-.1px}
   /* компактнее на ~18%: интерфейс был крупноват — равномерное полностраничное уменьшение */
   body{zoom:.82}
-  #bgart{position:fixed;inset:0;z-index:0;background:url(/assets/tgapp-bg.png) top center/cover no-repeat;opacity:.5}
+  #bgart{position:fixed;inset:0;z-index:0;background:url(/assets/tgapp-bg.png) top center/cover no-repeat;opacity:.3;filter:grayscale(1)}   /* grayscale — убирает неоновую цветную дымку */
   #bgart::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,11,18,.35),var(--bg) 78%)}
   #app{height:100%;display:flex;flex-direction:column;max-width:680px;margin:0 auto;position:relative;overflow:hidden;z-index:1}
   .hidden{display:none!important}
@@ -125,7 +125,7 @@
   .day{align-self:center;background:var(--panel2);color:var(--mut);font-size:11.5px;padding:4px 12px;border-radius:11px;margin:8px 0;font-weight:700;box-shadow:var(--sh)}
   .b{max-width:82%;padding:8px 12px 6px;border-radius:19px;font-size:14.7px;word-wrap:break-word;position:relative;animation:bubble .25s cubic-bezier(.22,1,.36,1);line-height:1.4;font-weight:500}
   .b.in{align-self:flex-start;background:var(--in);border-bottom-left-radius:6px}
-  .b.out{align-self:flex-end;background:var(--out);border-bottom-right-radius:6px;box-shadow:0 3px 16px rgba(29,52,216,.3)}
+  .b.out{align-self:flex-end;background:var(--out);border-bottom-right-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.12)}   /* нейтральная мягкая тень (было синее неон-свечение) */
   .b img,.b video{max-width:min(260px,72vw);border-radius:14px;display:block;margin:-2px -4px 5px;cursor:pointer}
   .b .doc{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;padding:5px 2px}
   .b .doc .ic{width:36px;height:36px;border-radius:11px;background:rgba(255,255,255,.16);font-size:18px;flex:none}
