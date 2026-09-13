@@ -20,8 +20,8 @@
   (function(){
     var M={light:'assets/skyline-cobalt.mp4?v=1',dark:'assets/skyline-night.mp4?v=1',mono:'assets/skyline-mono.mp4?v=1',frame:'assets/skyline-mono.mp4?v=1',warm:'assets/skyline-burgundy.mp4?v=1',emerald:'assets/skyline-glass.mp4?v=1',atelier:'assets/skyline-mono.mp4?v=1'};
     var PO={light:'assets/skyline-cobalt-poster.jpg',dark:'assets/skyline-night-poster.jpg',mono:'assets/skyline-mono-poster.jpg',frame:'assets/skyline-mono-poster.jpg',warm:'assets/skyline-burgundy-poster.jpg',emerald:'assets/skyline-glass-poster.jpg',atelier:'assets/skyline-mono-poster.jpg'};
-    var t;try{t=localStorage.getItem('lumen_theme');if(!M[t])t=(localStorage.getItem('lumen_night')==='1'?'dark':'light');}catch(e){t='light';}
-    if(!M[t])t='light';
+    var t;try{t=localStorage.getItem('lumen_theme');if(!M[t])t=(localStorage.getItem('lumen_night')==='1'?'dark':'atelier');}catch(e){t='atelier';}
+    if(!M[t])t='atelier';
     /* ТЕМА ДО ПЕРВОЙ ОТРИСОВКИ — иначе прелоадер рисуется дефолтным светлым, потом app.js
        ставит data-theme → видимая «перезагрузка»/вспышка фона. Держать в синхроне с applyTheme().
        Единственный тёмный пресет (dark:true) — 'dark'; остальные светлые → data-night только для него. */
@@ -110,7 +110,7 @@
   </div>
 </div>
 <div class="toasts" id="toasts"></div>
-<script src="app.js?v=265"></script>
+<script src="app.js?v=266"></script>
 <script src="onboard.js?v=12"></script>
 </body>
 </html>

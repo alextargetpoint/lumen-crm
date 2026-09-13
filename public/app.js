@@ -635,40 +635,40 @@ function renderLogin() {
     const b = JSON.parse(localStorage.getItem('lumen_brand') || 'null');
     if (b && b.logo) loginBrand = `<div style="text-align:center;margin-bottom:22px"><img src="${b.logo}" style="max-width:170px;max-height:70px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(255,255,255,.28))"><div style="font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6);opacity:.85;margin-top:12px">работает на Lumen</div></div>`;
   } catch (e) {}
-  const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:#061126;overflow:hidden">
+  const s = el(`<div id="loginScreen" style="position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:var(--bg,#f3f1ec);overflow:hidden">
     <video data-skyline autoplay muted loop playsinline src="${typeof skylineSrc==='function'?skylineSrc():'assets/skyline-bg.mp4?v=2'}" poster="assets/skyline-poster.jpg?v=2"
-      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"></video>
-    <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 25%,rgba(6,17,38,.6))"></div>
-    <div style="position:relative;width:360px;max-width:calc(100vw - 40px);padding:36px 32px;border-radius:20px;
-        background:rgba(10,24,51,.5);border:1px solid rgba(255,255,255,.14);
-        backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
-        box-shadow:0 30px 80px -20px rgba(3,8,25,.85);text-align:center;
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.2"></video>
+    <div style="position:absolute;inset:0;background:radial-gradient(closest-side,transparent 18%,var(--bg,#f3f1ec) 92%)"></div>
+    <div style="position:relative;width:372px;max-width:calc(100vw - 40px);padding:40px 34px;border-radius:20px;
+        background:var(--card,#faf9f5);border:1px solid var(--stroke,rgba(20,19,17,.13));
+        backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+        box-shadow:0 30px 80px -24px rgba(53,50,44,.32);text-align:center;
         animation:reveal .8s var(--ease-spring) both">
       ${loginBrand}
-      <svg class="pl-logo" viewBox="0 0 100 120" style="width:44px;height:53px;margin:0 auto 14px" aria-hidden="true"><defs><linearGradient id="lumenLg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenLg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
-      <div style="font-size:19px;font-weight:650;letter-spacing:.22em;color:#fff">LUMEN</div>
-      <div style="font-size:10px;letter-spacing:.16em;color:var(--blue-300);margin:4px 0 20px">REAL ESTATE CRM</div>
-      <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(6,17,38,.5);border-radius:10px;padding:4px">
-        <button id="tabLogin" style="flex:1;height:32px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:var(--accent,#c8a86a);color:#0a1833;font-weight:600">Вход</button>
-        <button id="tabReg" style="flex:1;height:32px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:transparent;color:rgba(255,255,255,.7)">Регистрация</button>
+      <svg class="pl-logo" viewBox="0 0 100 120" style="width:42px;height:50px;margin:0 auto 12px" aria-hidden="true"><defs><linearGradient id="lumenLg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenLg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
+      <div style="font-family:'Cormorant',Georgia,serif;font-size:31px;font-weight:500;letter-spacing:.1em;color:var(--ink,#141311);line-height:1">LUMEN</div>
+      <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:7px 0 22px">Real Estate CRM</div>
+      <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--blue-100,rgba(20,19,17,.05));border-radius:10px;padding:4px">
+        <button id="tabLogin" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:var(--accent,#1a1815);color:var(--card,#faf9f5);font-weight:600">Вход</button>
+        <button id="tabReg" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink-2,#57544e)">Регистрация</button>
       </div>
-      <input id="regAgency" placeholder="Название агентства" style="display:none;width:100%;margin-bottom:8px;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
-      <input id="loginEmail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;margin-bottom:8px;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
-      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;background:rgba(6,17,38,.6);border:1px solid rgba(255,255,255,.16);color:#fff;text-align:center;font-size:14px;padding:11px">
-      <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:#f28b8b"></div>
-      <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:44px;font-size:14px">Войти</button>
-      <div id="loginHint" style="font-size:11px;color:rgba(255,255,255,.5);margin-top:12px">Вход владельца — по паролю или e-mail</div>
-      <div id="forgotLink" style="font-size:11px;color:var(--blue-300);margin-top:8px;cursor:pointer;text-decoration:underline">Забыли пароль?</div>
+      <input id="regAgency" placeholder="Название агентства" style="display:none;width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;box-sizing:border-box;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:var(--bad,#a9564a)"></div>
+      <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:2px">Войти</button>
+      <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:12px">Вход владельца — по паролю или e-mail</div>
+      <div id="forgotLink" style="font-size:11px;color:var(--accent,#1a1815);margin-top:8px;cursor:pointer;text-decoration:underline">Забыли пароль?</div>
     </div>
   </div>`);
   document.body.appendChild(s);
   let mode = 'login';
   const setMode = (m) => {
     mode = m;
-    $('#tabLogin').style.background = m === 'login' ? 'var(--accent,#c8a86a)' : 'transparent';
-    $('#tabLogin').style.color = m === 'login' ? '#0a1833' : 'rgba(255,255,255,.7)';
-    $('#tabReg').style.background = m === 'register' ? 'var(--accent,#c8a86a)' : 'transparent';
-    $('#tabReg').style.color = m === 'register' ? '#0a1833' : 'rgba(255,255,255,.7)';
+    $('#tabLogin').style.background = m === 'login' ? 'var(--accent)' : 'transparent';
+    $('#tabLogin').style.color = m === 'login' ? 'var(--card)' : 'var(--ink-2)';
+    $('#tabReg').style.background = m === 'register' ? 'var(--accent)' : 'transparent';
+    $('#tabReg').style.color = m === 'register' ? 'var(--card)' : 'var(--ink-2)';
     $('#regAgency').style.display = m === 'register' ? 'block' : 'none';
     $('#loginBtn').textContent = m === 'register' ? 'Создать аккаунт' : 'Войти';
     $('#loginHint').textContent = m === 'register' ? 'Новое агентство — отдельный изолированный аккаунт' : 'Вход владельца — по паролю или e-mail';
@@ -1015,7 +1015,7 @@ const THEME_VIDEO = {
   warm: 'assets/skyline-burgundy.mp4?v=1', emerald: 'assets/skyline-glass.mp4?v=1',
   atelier: 'assets/skyline-mono.mp4?v=1',
 };
-function skylineSrc(theme) { return THEME_VIDEO[theme || localStorage.getItem('lumen_theme') || 'light'] || 'assets/skyline-bg.mp4?v=2'; }
+function skylineSrc(theme) { return THEME_VIDEO[theme || localStorage.getItem('lumen_theme') || 'atelier'] || 'assets/skyline-bg.mp4?v=2'; }
 function applyThemeVideo(theme) {
   const src = skylineSrc(theme);
   document.querySelectorAll('[data-skyline]').forEach(v => {
@@ -1029,7 +1029,7 @@ const HERO_VIDEO = { light: 'assets/hero-glass.mp4?v=1', dark: 'assets/hero-glas
 const HERO_VIDEO_POSTER = { light: 'assets/hero-glass-poster.jpg', dark: 'assets/hero-glass-poster.jpg', mono: 'assets/hero-glass-poster.jpg', frame: 'assets/hero-glass-poster.jpg', warm: 'assets/hero-burgundy-poster.jpg', emerald: 'assets/hero-glass-poster.jpg', atelier: 'assets/hero-glass-poster.jpg' };
 function mountHeroVideos(root, theme) {
   root = root || document;
-  theme = theme || localStorage.getItem('lumen_theme') || 'light';
+  theme = theme || localStorage.getItem('lumen_theme') || 'atelier';
   const src = HERO_VIDEO[theme];
   root.querySelectorAll('.ovx-hero, .ha, .f3card').forEach(el => {
     let vid = el.querySelector(':scope > .hero-vid');
@@ -1059,9 +1059,9 @@ function mountHeroVideos(root, theme) {
     applyThemeVideo(k);
   };
   let cur = localStorage.getItem('lumen_theme');
-  if (!P[cur]) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'light';
+  if (!P[cur]) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'atelier';
   applyTheme(cur);
-  window.setTheme = (k) => { cur = P[k] ? k : 'light'; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
+  window.setTheme = (k) => { cur = P[k] ? k : 'atelier'; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
   document.addEventListener('click', (e) => {
     if (e.target.closest('#logoutBtn')) {
       e.preventDefault();
@@ -10428,7 +10428,7 @@ PAGES.agency = async (root) => {
       <div>
         <div class="glass card mb">
           <div class="card-title">${ic(I.grid || I.spark)}Оформление интерфейса<span class="sub">тема всей CRM · применяется сразу</span></div>
-          <div class="ag-themes">${(typeof THEME_PRESETS !== 'undefined' ? THEME_PRESETS : []).map(p => { const curTh = localStorage.getItem('lumen_theme') || 'light'; return `<button class="ag-theme ${p.k === curTh ? 'on' : ''}" data-set-theme="${p.k}"><span class="ag-theme-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="ag-theme-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span>${p.k === curTh ? `<span class="ag-theme-ok">${ic(I.check)}</span>` : ''}</button>`; }).join('')}</div>
+          <div class="ag-themes">${(typeof THEME_PRESETS !== 'undefined' ? THEME_PRESETS : []).map(p => { const curTh = localStorage.getItem('lumen_theme') || 'atelier'; return `<button class="ag-theme ${p.k === curTh ? 'on' : ''}" data-set-theme="${p.k}"><span class="ag-theme-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="ag-theme-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span>${p.k === curTh ? `<span class="ag-theme-ok">${ic(I.check)}</span>` : ''}</button>`; }).join('')}</div>
           <div class="ag-theme-hint">Быстрее сменить — иконка ◐ в правом верхнем углу шапки.</div>
         </div>
         <div class="glass card mb">
