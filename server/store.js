@@ -35,19 +35,36 @@ function tenantDbFile(tid) { return path.join(TENANTS_DIR, tid, 'db.json'); }
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const lastLeads = {};   // tid -> число лидов при последнем сохранении (детектор подозрительного обнуления)
 const KEEP_BACKUPS = 40;
+const SAFETY_TAGS = /-(PRE-WIPE|manual|PRE-RESTORE|daily)-/;   /* эти копии НИКОГДА не выпиливаем прунингом */
 function backupTenant(tid, tag) {
   const src = tenantDbFile(tid);
   if (!fs.existsSync(src)) return null;
+  /* ЦЕЛОСТНОСТЬ: не бэкапим повреждённый исходник — иначе затрём хорошие копии мусором */
+  try { const d = JSON.parse(fs.readFileSync(src, 'utf8')); if (!d || typeof d !== 'object' || !Array.isArray(d.leads)) { console.warn('[backup] пропуск ' + tid + ': исходный db без валидного leads[]'); return null; } } catch (e) { console.warn('[backup] пропуск ' + tid + ': исходный db повреждён (' + e.message + ')'); return null; }
   const dir = path.join(BACKUP_DIR, tid);
   try {
     fs.mkdirSync(dir, { recursive: true });
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const dst = path.join(dir, `db-${(tag || 'auto')}-${ts}.json`);
     fs.copyFileSync(src, dst);
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort();
-    while (files.length > KEEP_BACKUPS) { try { fs.unlinkSync(path.join(dir, files.shift())); } catch (e) {} }
+    /* прунинг: авто-снимки — последние KEEP_BACKUPS; safety-копии (PRE-WIPE/manual/PRE-RESTORE/daily) не трогаем */
+    const auto = fs.readdirSync(dir).filter(f => f.endsWith('.json') && !SAFETY_TAGS.test(f)).sort();
+    while (auto.length > KEEP_BACKUPS) { try { fs.unlinkSync(path.join(dir, auto.shift())); } catch (e) {} }
+    /* daily-копии — держим последние 30 */
+    const daily = fs.readdirSync(dir).filter(f => f.includes('-daily-')).sort();
+    while (daily.length > 30) { try { fs.unlinkSync(path.join(dir, daily.shift())); } catch (e) {} }
     return dst;
   } catch (e) { console.error('[backup]', tid, e.message); return null; }
+}
+/* восстановление из последнего ВАЛИДНОГО бэкапа (при повреждении/пропаже db.json) */
+function recoverFromBackup(tid) {
+  const dir = path.join(BACKUP_DIR, tid);
+  if (!fs.existsSync(dir)) return null;
+  let files; try { files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse(); } catch (e) { return null; }
+  for (const bf of files) {
+    try { const d = JSON.parse(fs.readFileSync(path.join(dir, bf), 'utf8')); if (d && typeof d === 'object' && Array.isArray(d.leads)) { fs.copyFileSync(path.join(dir, bf), tenantDbFile(tid)); console.warn('[store] ⚠ ' + tid + ' восстановлен из бэкапа ' + bf); return d; } } catch (e) {}
+  }
+  return null;
 }
 function listBackups(tid) {
   const dir = path.join(BACKUP_DIR, tid);
@@ -99,7 +116,12 @@ function loadTenant(tid) {
   let db = null;
   const f = tenantDbFile(tid);
   if (fs.existsSync(f)) {
-    try { db = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { console.error('[store] db тенанта', tid, 'повреждён:', e.message); db = null; }
+    try { db = JSON.parse(fs.readFileSync(f, 'utf8')); if (!db || typeof db !== 'object') db = null; } catch (e) { console.error('[store] db тенанта', tid, 'ПОВРЕЖДЁН:', e.message); db = null; }
+  }
+  if (!db && registry && registry.tenants && registry.tenants[tid]) {
+    /* известный тенант, а файл битый/пропал → НЕ сидируем поверх (это была бы потеря данных),
+       а восстанавливаем из последнего валидного бэкапа */
+    db = recoverFromBackup(tid);
   }
   if (!db) { db = seedFn(); tenants.set(tid, db); saveTenantNow(tid); }
   else tenants.set(tid, db);

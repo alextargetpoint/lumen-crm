@@ -9341,6 +9341,19 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
 /* curl/интеграторы с Expect: 100-continue — отвечаем и продолжаем как обычный запрос */
 server.on('checkContinue', (req, res) => { res.writeContinue(); server.emit('request', req, res); });
 
+/* ОФФ-САЙТ бэкап: если задан env BACKUP_WEBHOOK_URL — раз в сутки шлём снимок каждого тенанта наружу
+   (на случай, если сам том Railway сломается/пропадёт; получатель — любой ваш endpoint/бакет-прокси). */
+async function offsiteBackup() {
+  const url = process.env.BACKUP_WEBHOOK_URL; if (!url) return;
+  for (const tid of store.listTenants()) {
+    try {
+      const dbx = store.runInTenant(tid, () => store.get());
+      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Backup-Tenant': tid, Authorization: 'Bearer ' + (process.env.BACKUP_WEBHOOK_TOKEN || '') }, body: JSON.stringify({ tid, at: Date.now(), leads: (dbx.leads || []).length, db: dbx }) });
+    } catch (e) { console.warn('[offsite]', tid, e.message); }
+  }
+  console.log('[backup] офф-сайт снимок отправлен');
+}
+
 server.listen(PORT, () => {
   console.log(`Lumen CRM → http://localhost:${PORT}`);
   /* супер-админ платформы: если нет env-ключа — печатаем авто-ключ (только в логи, один раз) */
@@ -9348,7 +9361,10 @@ server.listen(PORT, () => {
   else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
   /* БЭКАПЫ: снимок всех тенантов при старте + каждые 6 часов (data/backups/<tid>/, последние 40) */
   try { store.backupAll('startup'); console.log('[backup] стартовый снимок всех агентств готов'); } catch (e) {}
-  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 6 * 3600e3);
+  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 3 * 3600e3);    /* авто-снимок каждые 3ч (последние 40) */
+  setInterval(() => { try { store.backupAll('daily'); } catch (e) {} }, 24 * 3600e3);  /* суточный снимок (хранится 30, не выпиливается) */
+  /* офф-сайт: если задан BACKUP_WEBHOOK_URL — раз в сутки шлём снимки наружу (защита от сбоя самого тома) */
+  if (process.env.BACKUP_WEBHOOK_URL) setInterval(() => { try { offsiteBackup(); } catch (e) {} }, 24 * 3600e3);
   /* САМОЛЕЧЕНИЕ Telegram-бота: перепривязываем вебхук+меню к СТАБИЛЬНОМУ домену при каждом старте
      (иначе после смены временного туннеля/деплоя бот «не грузится» — вебхук/мини-апп смотрят на мёртвый URL). */
   const _tgBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
