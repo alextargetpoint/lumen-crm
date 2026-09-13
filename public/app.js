@@ -1043,6 +1043,16 @@ function mountHeroVideos(root, theme) {
   applyTheme(cur);
   window.setTheme = (k) => { cur = P[k] ? k : 'light'; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
   document.addEventListener('click', (e) => {
+    if (e.target.closest('#logoutBtn')) {
+      e.preventDefault();
+      (async () => {
+        const okc = window.uiConfirm ? await uiConfirm('Выйти из аккаунта?', 'Вы вернётесь на экран входа — оттуда можно войти в другой аккаунт или зарегистрировать новое агентство.', { ok: 'Выйти', danger: true }) : confirm('Выйти из аккаунта?');
+        if (!okc) return;
+        try { await fetch('/auth/logout', { method: 'POST' }); } catch (_) {}
+        location.href = '/';
+      })();
+      return;
+    }
     if (e.target.closest('#nightBtn')) {
       e.stopPropagation();
       const open = document.getElementById('themeMenu');

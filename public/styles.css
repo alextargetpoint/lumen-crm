@@ -280,11 +280,11 @@ textarea { resize: vertical; min-height: 70px; }
 .badge i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge svg { width: 12px; height: 12px; }
 /* текст бейджей — затемнённый оттенок семантики (не сам токен): контраст на светлой заливке был низкий (warn ~1.85), теперь читаемо; цвет-хью сохранён */
-.badge.ok { color: color-mix(in srgb, var(--ok) 76%, #071a10); background: var(--ok-bg); border-color: #C4E6D6; }
-.badge.warn { color: color-mix(in srgb, var(--warn) 58%, #3a2200); background: var(--warn-bg); border-color: #EBD9B0; }
-.badge.bad { color: color-mix(in srgb, var(--bad) 78%, #2a0209); background: var(--bad-bg); border-color: #EDC5C0; }
+.badge.ok { color: color-mix(in srgb, var(--ok) 76%, #071a10); background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.badge.warn { color: color-mix(in srgb, var(--warn) 58%, #3a2200); background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+.badge.bad { color: color-mix(in srgb, var(--bad) 78%, #2a0209); background: var(--bad-bg); border-color: color-mix(in srgb, var(--bad) 34%, transparent); }
 .badge.acc { color: color-mix(in srgb, var(--accent) 80%, #05122e); background: var(--blue-100); border-color: var(--accent-soft-bd); }
-.badge.violet { color: color-mix(in srgb, var(--violet) 78%, #14092e); background: var(--violet-bg); border-color: #D9D2F4; }
+.badge.violet { color: color-mix(in srgb, var(--violet) 78%, #14092e); background: var(--violet-bg); border-color: color-mix(in srgb, var(--violet) 34%, transparent); }
 .badge.ok i, .badge.warn i, .badge.bad i, .badge.acc i, .badge.violet i { background: currentColor; }
 .muted { color: var(--ink-3); }
 .grid { display: grid; gap: 16px; }
