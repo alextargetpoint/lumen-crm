@@ -740,6 +740,26 @@ function modal({ title, sub, body, actions, wide }) {
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
 
+/* ---------- Состояние системы (реальный статус интеграций) ---------- */
+window.openHealthPanel = async function () {
+  let h = null;
+  try { h = (await api.get('/health')).health; } catch (e) {}
+  if (!h) { modal({ title: 'Состояние системы', body: '<div class="muted">Не удалось загрузить статус.</div>', actions: [{ label: 'Закрыть' }] }); return; }
+  const dot = (ok) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ok ? 'var(--ok,#4caf7d)' : 'var(--bad,#e0685f)'};margin-right:9px;flex:0 0 auto"></span>`;
+  const row = (ok, label, detail) => `<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--stroke)"><div style="flex:1;display:flex;align-items:center">${dot(ok)}<b style="font-weight:600">${esc(label)}</b></div><div class="muted" style="font-size:12px;text-align:right;max-width:56%">${detail || ''}</div></div>`;
+  const tg = h.telegram, gw = h.grayWa, ca = h.cloudApi, em = h.email;
+  const body = `
+    ${row(h.ai.gemini && h.ai.openai, 'ИИ (Gemini + OpenAI)', (h.ai.gemini ? 'Gemini ✓' : 'Gemini ✗') + ' · ' + (h.ai.openai ? 'OpenAI ✓' : 'OpenAI ✗'))}
+    ${row(tg.healthy, 'Telegram-бот', !tg.tokenSet ? 'токен не задан в Настройках' : (tg.live ? ('вебхук: ' + (tg.live.url ? esc(tg.live.url.replace(/^https?:\/\//, '')) : 'НЕ установлен') + (tg.live.lastError ? ' · ⚠ ' + esc(tg.live.lastError) : '') + (tg.live.pending ? ' · очередь ' + tg.live.pending : '')) : 'бот не отвечает (проверьте токен)'))}
+    ${row(gw.workerLive === true, 'WhatsApp-воркер (серый)', !gw.workerSet ? 'не настроен' : (gw.workerLive ? gw.numbers + ' номер(ов)' + (gw.warmup ? ' · прогрев вкл' : '') : 'воркер недоступен'))}
+    ${row(gw.incomingWebhookSet, 'Входящие серые → CRM', gw.incomingWebhookSet ? 'вебхук воркера задан' : 'LUMEN_WEBHOOK_URL не задан на воркере')}
+    ${row(ca.live, 'WhatsApp Cloud API (Meta)', !ca.phoneIdSet ? 'не подключён' : (ca.verifiedName ? 'имя: ' + esc(ca.verifiedName) + (ca.live ? ' · боевой' : ' · демо') : (ca.live ? 'боевой' : 'настроен, но не боевой')))}
+    ${row(em.resendSet, 'E-mail (Resend)', em.resendSet ? ('от ' + esc(em.from || '—')) : 'не настроен — письма/инвайты не уходят')}
+    ${row(h.billing.stripe, 'Оплата (Stripe)', h.billing.stripe ? 'подключён' : 'не подключён (тарифы-лимиты работают и так)')}
+    <div class="muted" style="font-size:11.5px;margin-top:12px">Публичный адрес платформы: ${esc(h.publicBase || '(не задан PUBLIC_BASE_URL)')}</div>`;
+  modal({ title: '🩺 Состояние системы', sub: 'Реальный статус подключений (живая проверка)', body, wide: true, actions: [{ label: 'Обновить', cls: 'btn-accent', onClick: () => { closeModal(); setTimeout(() => window.openHealthPanel(), 60); } }, { label: 'Закрыть' }] });
+};
+
 /* ---------- Тариф и лимиты ---------- */
 window.openPlanManager = async function () {
   let d = { plan: 'trial', limits: {}, usage: {}, plans: {} };
@@ -10976,6 +10996,11 @@ PAGES.settings = async (root) => {
     <button class="glass card set-link" onclick="window.openPlanManager&&window.openPlanManager()">
       <span class="set-link-ic">${ic(I.spark)}</span>
       <span class="set-link-main"><b>Тариф и лимиты</b><i>Текущий план агентства: брокеры, лиды, номера WhatsApp</i></span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
+    <button class="glass card set-link" onclick="window.openHealthPanel&&window.openHealthPanel()">
+      <span class="set-link-ic">${ic(I.shield)}</span>
+      <span class="set-link-main"><b>Состояние системы</b><i>Реальный статус: Telegram-бот, WhatsApp, e-mail, ИИ, оплата — зелёный/красный</i></span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
     <div class="two-col">

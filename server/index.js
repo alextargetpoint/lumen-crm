@@ -3866,6 +3866,27 @@ const server = http.createServer(async (req, res) => {
         me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
+    /* СОСТОЯНИЕ СИСТЕМЫ: реальный статус всех интеграций тенанта (в т.ч. ЖИВАЯ проверка вебхука бота) */
+    if (p === '/api/health' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const base = (process.env.PUBLIC_BASE_URL || global.LUMEN_BASE || '').replace(/\/$/, '');
+      const s = db.settings || {};
+      const tg = s.tgBridge || {}, gray = s.waGray || {}, wa = s.wa || {}, em = (s.channels && s.channels.email) || {};
+      const tgTok = tg.botToken || (s.channels && s.channels.tg && s.channels.tg.botToken);
+      let tgLive = null;
+      if (tgTok) { try { const r = await fetch('https://api.telegram.org/bot' + tgTok + '/getWebhookInfo'); const j = await r.json(); if (j.ok) tgLive = { url: j.result.url || '', pending: j.result.pending_update_count || 0, lastError: j.result.last_error_message || null }; } catch (e) {} }
+      let grayLive = null;
+      if (gray.url && gray.token) { try { const r = await fetch(String(gray.url).replace(/\/$/, '') + '/health', { headers: { Authorization: 'Bearer ' + gray.token } }); grayLive = r.ok; } catch (e) { grayLive = false; } }
+      return json(res, 200, { ok: true, health: {
+        publicBase: base || '',
+        ai: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY },
+        telegram: { tokenSet: !!tgTok, enabled: !!tg.enabled, expectedWebhook: base ? base + '/tg/webhook' : '', live: tgLive, healthy: !!(tgLive && tgLive.url && (!base || tgLive.url.indexOf(base) === 0)) },
+        grayWa: { workerSet: !!(gray.url && gray.token), workerLive: grayLive, numbers: (gray.numbers || []).length, warmup: !!(gray.warmup && gray.warmup.running), incomingWebhookSet: !!process.env.LUMEN_WEBHOOK_URL || false },
+        cloudApi: { phoneIdSet: !!wa.phoneId, tokenSet: !!wa.tokenSet, verifiedName: wa.verifiedName || '', live: wa.mode === 'cloud', appSecretSet: !!wa.appSecretSet },
+        email: { resendSet: !!(em.key || em.keySet), from: em.from || '' },
+        billing: { stripe: !!process.env.STRIPE_SECRET_KEY },
+      } });
+    }
     /* журнал доступа (только владелец) */
     if (p === '/api/audit' && req.method === 'GET') {
       return json(res, 200, (db.audit || []).slice(0, 200));
