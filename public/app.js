@@ -1307,6 +1307,7 @@ function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remov
 
 function go(page) {
   CUR = page;
+  document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
   navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
@@ -1765,9 +1766,10 @@ const OV_W = {
   } },
   funnel: { name: 'Воронка', icon: () => I.funnel, full: false, render: (c) => {
     const f = c.f; const shown = STAGES.filter(s => !['lost', 'sleeping'].includes(s.id));
-    const total = shown.reduce((a, s) => a + (f[s.id] || 0), 0) || 1;
+    const total = shown.reduce((a, s) => a + (f[s.id] || 0), 0);
+    const denom = total || 1;   /* делитель для SVG-сегментов; total (может быть 0) — для отображения */
     const R = 52, C = 2 * Math.PI * R; let off = 0;
-    const segs = shown.map(s => { const val = f[s.id] || 0; const frac = val / total; const seg = `<circle class="ovx-donut-seg" cx="60" cy="60" r="${R}" fill="none" stroke="${stageColor(s.id)}" stroke-width="15" stroke-linecap="round" stroke-dasharray="${(frac * C).toFixed(1)} ${C}" stroke-dashoffset="${(-off * C).toFixed(1)}" transform="rotate(-90 60 60)"/>`; off += frac; return seg; }).join('');
+    const segs = shown.map(s => { const val = f[s.id] || 0; const frac = val / denom; const seg = `<circle class="ovx-donut-seg" cx="60" cy="60" r="${R}" fill="none" stroke="${stageColor(s.id)}" stroke-width="15" stroke-linecap="round" stroke-dasharray="${(frac * C).toFixed(1)} ${C}" stroke-dashoffset="${(-off * C).toFixed(1)}" transform="rotate(-90 60 60)"/>`; off += frac; return seg; }).join('');
     const legend = shown.filter(s => f[s.id]).map(s => `<button class="ov2-dl-row" data-ovgo="funnel"><i style="background:${stageColor(s.id)}"></i><span>${s.name}</span><b>${f[s.id] || 0}</b></button>`).join('');
     return `<div class="ov2-card-hd">${ic(I.funnel)}Статусы лидов<span>по стадиям воронки</span><button class="btn btn-sm" data-ovgo="funnel">Воронка</button></div>
       <div class="ov2-donut"><div class="ov2-donut-c"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--gauge-track)" stroke-width="15"/>${segs}</svg><div class="ov2-donut-mid"><b>${cup(total)}</b><i>лидов</i></div></div><div class="ov2-donut-leg">${legend}</div></div>`;
@@ -4028,7 +4030,7 @@ async function openLeadModal(id) {
         if (btn) { btn.disabled = true; btn.textContent = '✦ ИИ подбирает…'; }
         try {
           const r = await api.post(`/leads/${l.id}/auto-collection`, {});
-          toast('Авто-подборка собрана', `${r.count} объектов под запрос — открываю`, true);
+          toast('Авто-подборка собрана', `${r.count} ${plural(r.count, 'объект', 'объекта', 'объектов')} под запрос — открываю`, true);
           window.open('/p/' + r.id + '?edit=1&key=' + r.editKey, '_blank');
           PAGE_STATE.collLead = l.id; go('collections');
         } catch (e) { toast('Не вышло', e.message); if (btn) { btn.disabled = false; btn.textContent = '✦ Авто-подборка'; } }
@@ -5166,14 +5168,14 @@ PAGES.properties = async (root) => {
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     ${heroArt('assets/art/tower.png', `
-      <div class="ha-title">${ic(I.building || I.doc)}База объектов<span class="sub">${props.length} проектов · подборки собираются отсюда</span></div>
+      <div class="ha-title">${ic(I.building || I.doc)}База объектов<span class="sub">${props.length} ${plural(props.length, 'проект', 'проекта', 'проектов')} · подборки собираются отсюда</span></div>
       <div class="ha-chips">${st.agency.geos.map(g => { const n = props.filter(p2 => p2.geo === g).length; return n ? `<span class="ha-chip" data-ha>${st.geoNames[g]} <b>${n}</b></span>` : ''; }).join('')}</div>
       ${(() => { const mp = Math.min(...props.map(p2 => p2.priceFrom || Infinity)); return isFinite(mp) ? `<div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вход в рынок от <b>$${mp.toLocaleString('ru-RU')}</b> · первичка ${props.filter(p2 => p2.market === 'offplan').length} · вторичка ${props.filter(p2 => p2.market === 'secondary').length}</span></div>` : ''; })()}
     `, { v: 'mark', hue: '#C89B4B' })}
     <div class="filters">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
-      <span class="muted" style="font-size:12px">${list.length} объектов</span>
+      <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
@@ -11380,6 +11382,7 @@ function syncTopAction() {
 /* ---------- цикл обновления ---------- */
 setInterval(async () => {
   try {
+    if (document.getElementById('loginScreen')) return; // FIX: не поллим и не спамим 401, пока не залогинены
     await loadState();
     setConn(true);
     if (DRAG.active) return; // не перерисовываем канбан посреди перетаскивания

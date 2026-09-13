@@ -1978,7 +1978,8 @@ tr.sel .lc-check.tbl { opacity: 1; background: var(--accent); border-color: var(
 tr.sel .lc-check.tbl svg { opacity: 1; }
 tr:hover .lc-check.tbl { opacity: 1; }
 /* панель массовых действий */
-.bulk-bar { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; align-items: center; gap: 7px; background: var(--navy-900); color: #fff; padding: 9px 10px 9px 16px; border-radius: 14px; box-shadow: 0 16px 44px rgba(6,17,38,.4); animation: bbIn .22s var(--ease-spring, ease); }
+.bulk-bar { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; align-items: center; gap: 7px; background: var(--navy-900); color: #fff; padding: 9px 10px 9px 16px; border-radius: 14px; box-shadow: 0 16px 44px rgba(6,17,38,.4); animation: bbIn .22s var(--ease-spring, ease); max-width: calc(100vw - 20px); flex-wrap: wrap; justify-content: center; box-sizing: border-box; }
+@media (max-width: 560px) { .bulk-bar { bottom: 12px; gap: 6px; padding: 8px 10px; } .bulk-bar .btn { font-size: 12px; padding: 6px 9px; } }
 @keyframes bbIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .bb-count { background: var(--accent); color: #fff; font-weight: 800; font-size: 13px; min-width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; padding: 0 7px; }
 .bb-lbl { font-size: 12px; color: var(--blue-300); margin-right: 6px; }
