@@ -27,10 +27,14 @@
   li{margin-top:8px}
   strong{font-weight:600;color:var(--ink)}
   a.ln{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  .cfg{color:var(--ink3);font-style:italic;font-size:13px}
   table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px}
   th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top}
   th{font-weight:600;color:var(--ink);font-size:12.5px;letter-spacing:.02em}
   .btn{display:inline-block;margin-top:20px;font-family:inherit;font-size:13px;letter-spacing:.03em;border:1px solid var(--ink);border-radius:999px;padding:11px 20px;background:var(--ink);color:var(--bg);cursor:pointer;text-decoration:none}
+  .disc{border:1px dashed var(--line);border-radius:14px;padding:18px 20px;margin-top:36px;background:rgba(0,0,0,.02)}
+  .disc p{font-size:13.5px;color:var(--ink3);margin-top:8px}
+  .disc strong{color:var(--ink2)}
   footer{border-top:1px solid var(--line);margin-top:clamp(44px,6vw,72px);padding-top:24px;font-size:12px;color:var(--ink3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
   footer a{color:var(--ink3);text-decoration:none;margin-left:18px}
   footer a:hover{color:var(--ink)}
@@ -44,13 +48,14 @@
   </div>
 
   <h1>Политика cookie</h1>
-  <div class="upd">Обновлено: 12 сентября 2026</div>
-  <p class="lead">Cookie — небольшие файлы, которые сайт сохраняет в вашем браузере. Мы используем их, чтобы сайт работал корректно и становился лучше. Ниже — какие именно и как ими управлять.</p>
+  <div class="upd">Обновлено: 13 сентября 2026 <span class="cfg">(дата настраивается)</span></div>
+  <p class="lead">Cookie - небольшие файлы, которые сайт сохраняет в вашем браузере. Мы используем их, чтобы сайт работал корректно и становился лучше. Ниже описано, какие именно и как ими управлять. Аналитические и маркетинговые cookie включаются только с вашего согласия (GDPR и Директива ePrivacy).</p>
 
   <h2>Категории cookie</h2>
   <ul>
-    <li><strong>Строго необходимые</strong> — обеспечивают базовую работу сайта, безопасность и запоминание вашего выбора по cookie. Всегда активны, согласия не требуют.</li>
-    <li><strong>Аналитические</strong> — помогают понять, как посетители пользуются сайтом (обезличенно), чтобы мы улучшали его. Включаются только с вашего согласия.</li>
+    <li><strong>Строго необходимые</strong> - обеспечивают базовую работу сайта, безопасность и запоминание вашего выбора по cookie. Всегда активны, согласия не требуют.</li>
+    <li><strong>Аналитические</strong> - помогают понять, как посетители пользуются сайтом (обезличенно), чтобы мы улучшали его. Включаются только с вашего согласия.</li>
+    <li><strong>Маркетинговые</strong> - при наличии, используются для измерения эффективности рекламы. Включаются только с вашего согласия. <span class="cfg">(включать в перечень только если фактически используются)</span></li>
   </ul>
 
   <h2>Какие cookie мы используем</h2>
@@ -58,25 +63,30 @@
     <thead><tr><th>Cookie / ключ</th><th>Назначение</th><th>Категория</th><th>Срок</th></tr></thead>
     <tbody>
       <tr><td>lumen_cookie_consent</td><td>Запоминает ваш выбор по cookie, чтобы не показывать баннер повторно</td><td>Необходимая</td><td>12 мес.</td></tr>
-      <tr><td>Сессионные</td><td>Работа сайта и защита от злоупотреблений</td><td>Необходимая</td><td>Сессия</td></tr>
+      <tr><td>Сессионные</td><td>Работа сайта, авторизация и защита от злоупотреблений</td><td>Необходимая</td><td>Сессия</td></tr>
       <tr><td>Аналитика (при согласии)</td><td>Обезличенная статистика посещений и улучшение продукта</td><td>Аналитическая</td><td>до 24 мес.</td></tr>
     </tbody>
   </table>
+  <p class="cfg">Точный перечень настраивается под фактически подключённые инструменты аналитики и рекламы.</p>
 
   <h2>Как управлять cookie</h2>
-  <p>Свой выбор вы делаете в баннере при первом визите: «Принять» или «Только необходимые». Изменить его можно кнопкой ниже, а также в настройках браузера — там можно удалить или заблокировать cookie. Блокировка необходимых cookie может нарушить работу сайта.</p>
+  <p>Свой выбор вы делаете в баннере при первом визите: «Принять» или «Только необходимые». Изменить его можно кнопкой ниже, а также в настройках браузера, где можно удалить или заблокировать cookie. Блокировка необходимых cookie может нарушить работу сайта.</p>
   <a class="btn" href="/land.html#" data-cookie-open>Изменить настройки cookie</a>
 
   <h2>Изменения</h2>
-  <p>Мы можем обновлять эту политику. Актуальная версия всегда на этой странице. Подробнее об обработке данных — в <a class="ln" href="/privacy.html">Политике конфиденциальности</a>.</p>
+  <p>Мы можем обновлять эту политику. Актуальная версия всегда на этой странице. Подробнее об обработке данных - в <a class="ln" href="/privacy.html">Политике конфиденциальности</a>.</p>
+
+  <div class="disc">
+    <p><strong>Важная оговорка.</strong> Это профессиональный шаблон, требующий финальной проверки квалифицированным юристом и сверки с фактически используемыми на сайте cookie и трекерами перед боевым использованием. Мы не оказываем юридических услуг, и данный текст не является юридической консультацией.</p>
+  </div>
 
   <footer>
     <span>© 2026 Lumen — продукт TargetPoint</span>
-    <span><a href="/privacy.html">Конфиденциальность</a><a href="/terms.html">Условия</a><a href="/land.html">Сайт</a></span>
+    <span><a href="/privacy.html">Конфиденциальность</a><a href="/terms.html">Условия</a><a href="/dpa.html">DPA</a><a href="/acceptable-use.html">Правила</a><a href="/land.html">Сайт</a></span>
   </footer>
 </div>
 <script>
-  // «Изменить настройки cookie» — уводим на сайт и открываем баннер
+  // «Изменить настройки cookie»: уводим на сайт и открываем баннер
   document.querySelectorAll('[data-cookie-open]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();try{localStorage.removeItem('lumen_cookie_consent')}catch(_){}location.href='/land.html'})});
 </script>
 </body>

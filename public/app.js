@@ -655,6 +655,7 @@ function renderLogin() {
       <input id="regAgency" placeholder="Название агентства" style="display:none;width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
       <input id="loginEmail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
       <input id="loginPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;box-sizing:border-box;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <label id="regConsent" style="display:none;font-size:11px;color:var(--ink-2,#57544e);margin-top:11px;text-align:left;gap:8px;align-items:flex-start;line-height:1.45"><input type="checkbox" id="agreeTerms" style="margin-top:2px;flex:0 0 auto;width:15px;height:15px"><span>Регистрируясь, я принимаю <a href="/terms.html" target="_blank" style="color:var(--accent,#1a1815)">Условия</a>, <a href="/privacy.html" target="_blank" style="color:var(--accent,#1a1815)">Политику конфиденциальности</a> и <a href="/dpa.html" target="_blank" style="color:var(--accent,#1a1815)">DPA</a>.</span></label>
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:var(--bad,#a9564a)"></div>
       <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:2px">Войти</button>
       <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:12px">Вход владельца — по паролю или e-mail</div>
@@ -670,6 +671,7 @@ function renderLogin() {
     $('#tabReg').style.background = m === 'register' ? 'var(--accent)' : 'transparent';
     $('#tabReg').style.color = m === 'register' ? 'var(--card)' : 'var(--ink-2)';
     $('#regAgency').style.display = m === 'register' ? 'block' : 'none';
+    $('#regConsent').style.display = m === 'register' ? 'flex' : 'none';
     $('#loginBtn').textContent = m === 'register' ? 'Создать аккаунт' : 'Войти';
     $('#loginHint').textContent = m === 'register' ? 'Новое агентство — отдельный изолированный аккаунт' : 'Вход владельца — по паролю или e-mail';
     $('#loginErr').textContent = '';
@@ -686,7 +688,8 @@ function renderLogin() {
         if (!agency) return void ($('#loginErr').textContent = 'Введите название агентства');
         if (!email) return void ($('#loginErr').textContent = 'Введите e-mail');
         if (password.length < 6) return void ($('#loginErr').textContent = 'Пароль минимум 6 символов');
-        const r = await fetch('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, agency }) });
+        if (!$('#agreeTerms') || !$('#agreeTerms').checked) return void ($('#loginErr').textContent = 'Примите Условия и Политику конфиденциальности');
+        const r = await fetch('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, agency, consent: true }) });
         const j = await r.json().catch(() => ({}));
         if (r.ok) location.reload(); else $('#loginErr').textContent = j.error || 'Не удалось зарегистрировать';
       } else {
@@ -739,6 +742,20 @@ function modal({ title, sub, body, actions, wide }) {
   return bd;
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
+
+/* ---------- Резервные копии агентства ---------- */
+window.openBackups = async function () {
+  let list = [];
+  try { list = (await api.get('/backups')).backups || []; } catch (e) {}
+  const fmt = (ts) => { try { return new Date(ts).toLocaleString('ru-RU'); } catch (e) { return ''; } };
+  const rows = list.map(b => `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--stroke)"><div style="flex:1;font-size:12.5px">${esc(b.name.replace(/^db-/, '').replace(/\.json$/, ''))}<div class="muted" style="font-size:11px">${fmt(b.at)} · ${Math.round((b.size || 0) / 1024)} КБ</div></div><button class="btn btn-sm bk-restore" data-n="${esc(b.name)}">Восстановить</button></div>`).join('') || '<div class="muted" style="font-size:13px">Копий пока нет — появятся автоматически (каждые 6ч и перед любым подозрительным стиранием).</div>';
+  const bd = modal({ title: 'Резервные копии агентства', sub: 'Авто-снимки каждые 6ч + перед подозрительным обнулением. Хранятся последние 40.', wide: true, body: `<button class="btn btn-accent" id="bkNow" style="margin-bottom:14px">Сделать копию сейчас</button><div id="bkList">${rows}</div>`, actions: [{ label: 'Закрыть' }] });
+  $('#bkNow', bd)?.addEventListener('click', async () => { try { await api.post('/backups/create', {}); toast('Копия создана', '', true); closeModal(); window.openBackups(); } catch (e) { toast('Не вышло', e.message); } });
+  $$('.bk-restore', bd).forEach(x => x.addEventListener('click', async () => {
+    if (!await uiConfirm('Восстановить эту копию?', 'Текущее состояние заменится данными из копии. Перед этим автоматически сделается копия текущего — откат возможен.', { ok: 'Восстановить', danger: true })) return;
+    try { await api.post('/backups/restore', { name: x.dataset.n }); toast('Восстановлено', 'Данные вернулись из копии', true); closeModal(); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); }
+  }));
+};
 
 /* ---------- Состояние системы (реальный статус интеграций) ---------- */
 window.openHealthPanel = async function () {
@@ -11001,6 +11018,11 @@ PAGES.settings = async (root) => {
     <button class="glass card set-link" onclick="window.openHealthPanel&&window.openHealthPanel()">
       <span class="set-link-ic">${ic(I.shield)}</span>
       <span class="set-link-main"><b>Состояние системы</b><i>Реальный статус: Telegram-бот, WhatsApp, e-mail, ИИ, оплата — зелёный/красный</i></span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
+    <button class="glass card set-link" onclick="window.openBackups&&window.openBackups()">
+      <span class="set-link-ic">${ic(I.shield)}</span>
+      <span class="set-link-main"><b>Резервные копии</b><i>Авто-снимки базы каждые 6ч + перед подозрительным стиранием · восстановление одним кликом</i></span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
     <div class="two-col">

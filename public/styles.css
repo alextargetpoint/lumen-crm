@@ -5844,6 +5844,10 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 /* Настройки → карта-ссылка на подстраницу «Роли и доступы» + кнопка назад */
 .set-link { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; cursor: pointer; padding: 16px 18px; margin-bottom: 16px; font-family: inherit; transition: transform .14s, box-shadow .14s; }
 .set-link:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+/* FIX: обычные карточки настроек (Оформление, two-col Cloud API, Источники, Мост) не имели нижнего отступа
+   и «прилипали» к соседним. Даём тот же зазор, что у .set-link — только на экране настроек. */
+:root[data-page="settings"] #content > .glass.card,
+:root[data-page="settings"] #content > .two-col { margin-bottom: 16px; }
 .set-link-ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .set-link-ic svg { width: 20px; height: 20px; }
 .set-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

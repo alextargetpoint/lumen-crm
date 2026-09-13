@@ -31,6 +31,40 @@ function ensureDirs() {
 }
 function tenantDbFile(tid) { return path.join(TENANTS_DIR, tid, 'db.json'); }
 
+/* --- БЭКАПЫ на каждого арендатора + защита от катастрофического стирания --- */
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const lastLeads = {};   // tid -> число лидов при последнем сохранении (детектор подозрительного обнуления)
+const KEEP_BACKUPS = 40;
+function backupTenant(tid, tag) {
+  const src = tenantDbFile(tid);
+  if (!fs.existsSync(src)) return null;
+  const dir = path.join(BACKUP_DIR, tid);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const dst = path.join(dir, `db-${(tag || 'auto')}-${ts}.json`);
+    fs.copyFileSync(src, dst);
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort();
+    while (files.length > KEEP_BACKUPS) { try { fs.unlinkSync(path.join(dir, files.shift())); } catch (e) {} }
+    return dst;
+  } catch (e) { console.error('[backup]', tid, e.message); return null; }
+}
+function listBackups(tid) {
+  const dir = path.join(BACKUP_DIR, tid);
+  if (!fs.existsSync(dir)) return [];
+  try { return fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse().map(f => { const st = fs.statSync(path.join(dir, f)); return { name: f, at: st.mtimeMs, size: st.size }; }); } catch (e) { return []; }
+}
+function restoreBackup(tid, name) {
+  const dir = path.join(BACKUP_DIR, tid);
+  const src = path.join(dir, path.basename(String(name || '')));
+  if (!src.startsWith(dir) || !fs.existsSync(src)) return false;
+  backupTenant(tid, 'PRE-RESTORE');              /* сначала бэкап текущего — откат отката возможен */
+  fs.copyFileSync(src, tenantDbFile(tid));
+  tenants.delete(tid); loadTenant(tid);
+  return true;
+}
+function backupAll(tag) { for (const tid of Object.keys((registry && registry.tenants) || {})) backupTenant(tid, tag); }
+
 function loadRegistry() {
   if (fs.existsSync(REGISTRY_FILE)) {
     try { registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8')); } catch (e) { console.error('[store] registry повреждён:', e.message); registry = null; }
@@ -69,6 +103,7 @@ function loadTenant(tid) {
   }
   if (!db) { db = seedFn(); tenants.set(tid, db); saveTenantNow(tid); }
   else tenants.set(tid, db);
+  lastLeads[tid] = (tenants.get(tid).leads || []).length;   /* базовая точка для детектора обнуления */
   return db;
 }
 
@@ -112,10 +147,16 @@ function saveTenantNow(tid) {
   const db = tenants.get(tid);
   if (!db) return;
   const f = tenantDbFile(tid);
+  /* SEC: защита от катастрофического стирания — если было >5 лидов, а стало 0 или менее 20%,
+     сначала снимаем PRE-WIPE бэкап (данные не потеряются при баге/ошибке нового обновления). */
+  const newN = (db.leads || []).length;
+  const prev = lastLeads[tid];
+  if (prev != null && prev > 5 && (newN === 0 || newN < prev * 0.2)) { backupTenant(tid, 'PRE-WIPE'); console.warn(`[store] ⚠ подозрительное сокращение лидов ${tid}: ${prev}→${newN} — сделан PRE-WIPE бэкап`); }
   fs.mkdirSync(path.dirname(f), { recursive: true });
   const tmp = f + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(db, null, 1));
   fs.renameSync(tmp, f);
+  lastLeads[tid] = newN;
 }
 function saveNow() { saveTenantNow(currentTid()); }
 
@@ -142,5 +183,7 @@ module.exports = {
   // многоарендность:
   runInTenant, enterTenant, currentTid, PRIMARY,
   getRegistry, saveRegistry, createTenant, listTenants, loadTenant,
+  // бэкапы:
+  backupTenant, listBackups, restoreBackup, backupAll,
 };
 Object.defineProperty(module.exports, 'DB_FILE', { get() { return tenantDbFile(currentTid()); }, enumerable: true });

@@ -3526,6 +3526,7 @@ const server = http.createServer(async (req, res) => {
         ['leads', 'brokers', 'messages', 'events', 'campaigns', 'numbers'].forEach(k => { if (Array.isArray(tdb[k])) tdb[k] = []; });
         tdb.settings.auth.passHash = hashPassword(password);
         tdb.settings.auth.ownerEmail = email;
+        tdb.settings.consent = { terms: !!b.consent, privacy: !!b.consent, dpa: !!b.consent, at: Date.now(), ip: clientIp(req), version: '2026-09' }; /* журнал согласия (GDPR/PDPL — доказуемость) */
         if (agencyName) { tdb.settings.agency = tdb.settings.agency || {}; tdb.settings.agency.name = agencyName; }
         tdb.settings.auth.sessions[sid] = { at: Date.now(), role: 'owner', ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
         store.saveNow();
@@ -3886,6 +3887,23 @@ const server = http.createServer(async (req, res) => {
         email: { resendSet: !!(em.key || em.keySet), from: em.from || '' },
         billing: { stripe: !!process.env.STRIPE_SECRET_KEY },
       } });
+    }
+    /* РЕЗЕРВНЫЕ КОПИИ агентства (владелец): список / ручной снимок / восстановление */
+    if (p === '/api/backups' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      return json(res, 200, { ok: true, backups: store.listBackups(store.currentTid()) });
+    }
+    if (p === '/api/backups/create' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      store.saveNow(); const dst = store.backupTenant(store.currentTid(), 'manual');
+      return json(res, 200, { ok: !!dst });
+    }
+    if (p === '/api/backups/restore' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const okr = store.restoreBackup(store.currentTid(), b.name);
+      audit(db, req, 'восстановил резервную копию', { name: b.name });
+      return json(res, okr ? 200 : 400, okr ? { ok: true } : { error: 'копия не найдена' });
     }
     /* журнал доступа (только владелец) */
     if (p === '/api/audit' && req.method === 'GET') {
@@ -9328,6 +9346,9 @@ server.listen(PORT, () => {
   /* супер-админ платформы: если нет env-ключа — печатаем авто-ключ (только в логи, один раз) */
   if (!process.env.PLATFORM_ADMIN_KEY) console.log(`[admin] Панель основателя: /admin.html · ключ (auto): ${store.getRegistry().adminKey} — задайте PLATFORM_ADMIN_KEY в env для прода`);
   else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
+  /* БЭКАПЫ: снимок всех тенантов при старте + каждые 6 часов (data/backups/<tid>/, последние 40) */
+  try { store.backupAll('startup'); console.log('[backup] стартовый снимок всех агентств готов'); } catch (e) {}
+  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 6 * 3600e3);
   /* САМОЛЕЧЕНИЕ Telegram-бота: перепривязываем вебхук+меню к СТАБИЛЬНОМУ домену при каждом старте
      (иначе после смены временного туннеля/деплоя бот «не грузится» — вебхук/мини-апп смотрят на мёртвый URL). */
   const _tgBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
