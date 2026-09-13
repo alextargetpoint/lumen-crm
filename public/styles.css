@@ -20,6 +20,11 @@
   --ink-3: #667085;
   --stroke: #DCE3ED;
   --stroke-soft: #E7ECF3;
+  /* SEC/UI: легаси-алиасы — многие компоненты (разбор звонка, академия, чипы, модалки) использовали
+     var(--muted)/var(--line) с ТЁМНЫМИ фолбэками (#9fb0d0/#2a3550) → сливались на светлых темах (особенно Ателье-крем).
+     Теперь они наследуются от --ink-3/--stroke каждой темы → контраст и стиль синхронны во ВСЕХ пресетах. */
+  --muted: var(--ink-3, #667085);
+  --line: var(--stroke, #DCE3ED);
   --glass: rgba(255, 255, 255, .65);
   /* границы accent-soft чипов и hover-рамок карточек — следуют за темой (по умолчанию = кобальт) */
   --accent-soft-bd: #C3D6FA;
@@ -1572,13 +1577,16 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pd2-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 17, 38, .55), rgba(6, 17, 38, .82)); }
 .pd2-in { position: relative; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; min-height: inherit; }
 .pd2-top { display: flex; gap: 9px; align-items: center; }
-.pd2-ghost { background: rgba(6, 17, 38, .5); color: #fff; border: 1px solid rgba(255, 255, 255, .3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
-.pd2-ghost:hover { background: rgba(6, 17, 38, .72); border-color: rgba(255, 255, 255, .5); }
-.pd2-ghost.danger:hover { background: rgba(224, 82, 82, .55); border-color: rgba(224, 82, 82, .7); }
+/* Контраст: подложка кнопок над hero всегда достаточно тёмная (иначе на светлом фото/в светлых темах текст сливался), плюс тень текста */
+.pd2-ghost { background: rgba(6, 17, 38, .68); color: #fff; border: 1px solid rgba(255, 255, 255, .34); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); text-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
+.pd2-ghost:hover { background: rgba(6, 17, 38, .82); border-color: rgba(255, 255, 255, .5); }
+.pd2-ghost.danger:hover { background: rgba(224, 82, 82, .6); border-color: rgba(224, 82, 82, .75); }
 /* #prBack — «Все объекты»: чуть заметнее, стрелка ясная */
 #prBack { padding-left: 12px; }
-.pd2-save { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; color: var(--blue-300); }
+.pd2-save { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; color: rgba(255, 255, 255, .92); text-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
 .pd2-save svg { width: 12px; height: 12px; }
+/* «В подборку» (accent) над фото: тень текста, чтобы белый не тонул на светлом акценте */
+.pd2-top .btn-accent { text-shadow: 0 1px 3px rgba(0, 0, 0, .38); }
 .pd2-main { display: flex; gap: 20px; align-items: flex-end; margin-top: auto; flex-wrap: wrap; }
 .pd2-namebox { flex: 1; min-width: 260px; }
 .pd2-name { background: transparent !important; border: none !important; color: #fff !important; font-size: 27px !important; font-weight: 800 !important; letter-spacing: -.4px; padding: 4px 6px !important; border-radius: 8px; width: 100%; }
@@ -5737,7 +5745,7 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .cr-wrap{max-width:900px;margin:0 auto}
 .cr-input{padding:18px;border-radius:16px;margin-bottom:16px}
 .cr-hd{font-size:15px;font-weight:700;margin-bottom:10px}
-.cr-ta{width:100%;min-height:180px;resize:vertical;background:rgba(6,17,38,.5);border:1px solid var(--line,#2a3550);border-radius:12px;color:var(--ink,#dbe4f7);font-size:13.5px;padding:12px;font-family:inherit;line-height:1.5}
+.cr-ta{width:100%;min-height:180px;resize:vertical;background:var(--bg-2,rgba(6,17,38,.5));border:1px solid var(--line);border-radius:12px;color:var(--ink);font-size:13.5px;padding:12px;font-family:inherit;line-height:1.5}
 .cr-actions{display:flex;align-items:center;gap:12px;margin-top:12px}
 .cr-status{font-size:12.5px;color:var(--muted,#9fb0d0)}
 .cr-result{margin-top:6px}
@@ -5754,8 +5762,8 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .cr-block{margin-bottom:16px}
 .cr-block h4{font-size:13px;font-weight:700;margin:0 0 8px;display:flex;align-items:center;gap:7px}
 .cr-mist{padding:11px 13px;border-radius:11px;background:rgba(255,150,90,.08);border-left:3px solid #F59E5B;margin-bottom:8px;font-size:13px;line-height:1.5}
-.cr-mist b{color:#F5B77E}
-.cr-mist .better{margin-top:5px;color:var(--ink,#dbe4f7)}
+.cr-mist b{color:var(--bad)}
+.cr-mist .better{margin-top:5px;color:var(--ink)}
 .cr-scr{padding:10px 13px;border-radius:11px;background:rgba(124,155,255,.09);border-left:3px solid var(--blue-300);margin-bottom:8px;font-size:13px;line-height:1.5;font-style:italic}
 .cr-q{padding:7px 12px;border-radius:9px;background:rgba(255,255,255,.03);margin-bottom:6px;font-size:12.5px;font-style:italic;color:var(--muted,#c3d0ea)}
 .cr-hist{margin-top:22px}
@@ -7096,3 +7104,44 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .br-blk-add select, .br-blk-add input[type="time"], .br-blk-add .br-blk-label { border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 9px; font-family: inherit; font-size: 12.5px; background: var(--card); color: var(--ink); outline: none; }
 .br-blk-add select:focus, .br-blk-add input:focus { border-color: var(--accent); }
 .br-blk-add .br-blk-label { flex: 1; min-width: 110px; }
+
+/* Пикер оформления внутри раздела «Настройки» (перенесён из шапки) */
+.theme-inline { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 2px; }
+.theme-inline .tm-item { width: auto; display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--stroke); border-radius: 11px; background: var(--bg-2); cursor: pointer; text-align: left; color: var(--ink); font-family: inherit; }
+.theme-inline .tm-item:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.theme-inline .tm-sw { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+.theme-inline .tm-sw i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.theme-inline .tm-tx b { display: block; font-size: 13px; }
+.theme-inline .tm-tx small { color: var(--mut); font-size: 11px; }
+
+/* ===== Визуальный Telegram-гайд: телефон-мокапы + схема синка ===== */
+.gd-shot2 { margin: 12px 0 2px; display: flex; justify-content: center; }
+.tgph { width: 244px; border-radius: 26px; overflow: hidden; background: #0e1621; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 22px 50px -18px rgba(0,0,0,.6); font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+.tgph-hd { display: flex; align-items: center; gap: 9px; padding: 12px 13px; background: linear-gradient(180deg,#517da2,#3d6f97); color: #fff; }
+.tgph-hd .av { width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8fd0ff, #229ED9); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.tgph-hd b { font-size: 13.5px; line-height: 1.1; }
+.tgph-hd small { display: block; font-size: 10.5px; opacity: .8; font-weight: 400; }
+.tgph-body { padding: 14px 12px 12px; background: #0e1621; min-height: 150px; display: flex; flex-direction: column; gap: 8px; }
+.tg-day { align-self: center; font-size: 10px; color: #7d93a8; background: rgba(255,255,255,.06); padding: 2px 10px; border-radius: 10px; }
+.tg-bub { max-width: 82%; padding: 8px 11px; border-radius: 14px; font-size: 12.5px; line-height: 1.35; color: #e9f0f6; }
+.tg-bub.in { align-self: flex-start; background: #182533; border-bottom-left-radius: 5px; }
+.tg-bub.out { align-self: flex-end; background: #2b5278; border-bottom-right-radius: 5px; color: #fff; }
+.tg-bub .cmd { color: #7cc0ff; font-weight: 600; }
+.tg-bub .ok { color: #62d38a; font-weight: 700; }
+.tg-menu { margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #229ED9; color: #fff; font-size: 13px; font-weight: 600; padding: 11px; border-radius: 10px; }
+.tg-input { display: flex; align-items: center; gap: 8px; margin-top: 4px; background: #182533; border-radius: 20px; padding: 9px 13px; color: #8aa0b4; font-size: 12px; }
+.tg-input .snd { margin-left: auto; color: #229ED9; font-size: 15px; }
+/* мини-апп список чатов */
+.tgapp-row { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 10px; background: #141f2b; }
+.tgapp-row .a { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#c8a86a,#6b5a34); flex: 0 0 auto; }
+.tgapp-row .m b { font-size: 12px; color: #e9f0f6; display: block; }
+.tgapp-row .m i { font-size: 10.5px; color: #7d93a8; font-style: normal; }
+.tgapp-row .badge2 { margin-left: auto; background: #229ED9; color: #fff; font-size: 10px; min-width: 17px; height: 17px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+/* схема синхронизации */
+.tgdiag { display: flex; align-items: stretch; gap: 10px; margin: 14px 0 2px; }
+.tgdiag-node { flex: 1; text-align: center; border: 1px solid var(--stroke); border-radius: 14px; padding: 14px 8px; background: var(--bg-2); }
+.tgdiag-node .ic2 { font-size: 22px; }
+.tgdiag-node b { display: block; font-size: 12.5px; margin-top: 6px; color: var(--ink); }
+.tgdiag-node small { font-size: 10.5px; color: var(--mut); }
+.tgdiag-node.mid { border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tgdiag-arr { display: flex; align-items: center; color: var(--accent); font-size: 18px; }
