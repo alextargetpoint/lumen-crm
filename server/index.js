@@ -9307,4 +9307,21 @@ server.listen(PORT, () => {
   /* супер-админ платформы: если нет env-ключа — печатаем авто-ключ (только в логи, один раз) */
   if (!process.env.PLATFORM_ADMIN_KEY) console.log(`[admin] Панель основателя: /admin.html · ключ (auto): ${store.getRegistry().adminKey} — задайте PLATFORM_ADMIN_KEY в env для прода`);
   else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
+  /* САМОЛЕЧЕНИЕ Telegram-бота: перепривязываем вебхук+меню к СТАБИЛЬНОМУ домену при каждом старте
+     (иначе после смены временного туннеля/деплоя бот «не грузится» — вебхук/мини-апп смотрят на мёртвый URL). */
+  const _tgBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  if (_tgBase && !/localhost|127\.0\.0\.1/.test(_tgBase)) {
+    setTimeout(() => {
+      for (const tid of store.listTenants()) {
+        store.runInTenant(tid, async () => {
+          const db = store.get();
+          const tb = (db.settings && db.settings.tgBridge) || {};
+          const tok = tb.botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken);
+          if (!tok) return;
+          try { await tgbridge.setupWebhook(db, _tgBase); try { await tgbridge.setMenuButton(db, _tgBase); } catch (_) {} console.log('[tg] webhook перепривязан:', tid, '→', _tgBase + '/tg/webhook'); }
+          catch (e) { console.warn('[tg] rehook fail', tid, e.message); }
+        });
+      }
+    }, 2500);
+  }
 });
