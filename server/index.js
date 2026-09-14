@@ -2812,6 +2812,21 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (p.startsWith('/tgapp/api/')) {
+      /* МУЛЬТИТЕНАНТНОСТЬ: мини-апп открывается из бота конкретного агентства, а initData
+         подписан ЕГО bot-токеном (без нашей cookie → внешний db всегда primary). Находим тенанта,
+         чей токен валидирует подпись, и дальше работаем строго в его контексте. Иначе брокеры
+         не-primary агентств получали бы 401, а данные искались бы в чужой базе. */
+      const _initData = req.headers['x-tg-init-data'] || '';
+      let _tgTid = null;
+      if (_initData) for (const tid of store.listTenants()) {
+        let tdb; try { tdb = store.loadTenant(tid); } catch (_) { continue; }
+        const tok = tgbridge.token(tdb); if (!tok) continue;
+        const u2 = tgValidateInitData(_initData, tok);
+        if (u2 && u2.id) { _tgTid = tid; break; }
+      }
+      if (!_tgTid) return json(res, 401, { error: 'нет привязки — откройте через кнопку бота' });
+      store.enterTenant(_tgTid);
+      const db = store.loadTenant(_tgTid);
       const auser = tgAppUser(req, db);
       if (!auser) return json(res, 401, { error: 'нет привязки — откройте через кнопку бота' });
       const abroker = auser.broker || null;   /* для основателя null → брокерские эндпоинты вернут пусто (canSee=false) */
