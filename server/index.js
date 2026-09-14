@@ -3780,8 +3780,18 @@ const server = http.createServer(async (req, res) => {
       reg.verifs[vtok] = { tid, email, at: Date.now() };
       reg.sessions[sid] = { tid, at: Date.now() };
       store.saveRegistry();
-      /* письмо-подтверждение (если у тенанта настроен Resend — обычно ещё нет; тихо пропускаем) */
-      try { await store.runInTenant(tid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) { const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, ''); await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Подтвердите e-mail — Lumen', html: `<p>Подтвердите адрес, чтобы активировать аккаунт:</p><p><a href="${base}/auth/verify?token=${vtok}">Подтвердить e-mail</a></p>` }) }); } }); } catch (e) {}
+      /* welcome-письмо в Atelier-шаблоне (платформенный Resend) — best-effort; кнопка = подтвердить e-mail + войти */
+      try {
+        const plat = mailer.platformEmailCfg(reg);
+        if (plat.key) {
+          const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+          const wl = mailer.renderTemplate(reg, 'welcome', { name: agencyName || 'коллега', agency: agencyName || 'ваше агентство', link: base + '/auth/verify?token=' + vtok, buttonLabel: 'Подтвердить e-mail и войти' }, 'ru');
+          await mailer.sendViaResend(plat, email, wl.subject, wl.html);
+        } else {
+          /* фолбэк: если платформенный ключ не задан, а у тенанта есть свой Resend — плейн-подтверждение */
+          await store.runInTenant(tid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) { const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, ''); await mailer.sendViaResend({ key: ec.key, from: ec.from }, email, 'Подтвердите e-mail — Lumen', `<p>Подтвердите адрес, чтобы активировать аккаунт:</p><p><a href="${base}/auth/verify?token=${vtok}">Подтвердить e-mail</a></p>`); } });
+        }
+      } catch (e) {}
       const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
       res.end(JSON.stringify({ ok: true, tid })); return;
