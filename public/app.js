@@ -1504,13 +1504,19 @@ const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'sequences', 'wake', 'autom
    диалоги, база объектов/подборки, встречи, задачи, СВОЯ реклама (атрибуция) + аналитика,
    контент-цех, автоматизация. Флаг обратимый — командное издание не трогаем. */
 const SOLO_HIDDEN_PAGES = ['feed', 'hr', 'brokers', 'roles', 'control', 'learn', 'mediaplan', 'adsAnalytics', 'comments'];
-/* единый предикат видимости раздела: роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
+/* СКРЫТО ПО ДЕФОЛТУ ДЛЯ ВСЕХ агентств (можно вернуть через settings.agency.enabledPages):
+   academy — «зашита» в мозг ИИ (как работать с клиентами), не отдельная страница;
+   studio  — «Видео-студия» в доработке, выкатим в апдейте. */
+const DEFAULT_HIDDEN_PAGES = ['academy', 'studio'];
+/* единый предикат видимости раздела: дефолт-скрытие ∪ роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
 function pageHiddenForUser(pg) {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const rt = (me && me.roleType) || 'broker';
   const hardBroker = isBroker && rt === 'broker';   /* жёсткий список — только для брокера; маркетологу/менеджеру нужны реклама/аналитика */
   const hidePages = (me && me.hidePages) || [];      /* сервер уже собрал: дефолт роли ∪ индивидуальное скрытие */
+  const enabledPages = (STATE && STATE.settings && STATE.settings.agency && STATE.settings.agency.enabledPages) || [];
+  if (DEFAULT_HIDDEN_PAGES.includes(pg) && !enabledPages.includes(pg)) return true;   /* academy/studio — скрыты, пока агентство явно не включит */
   if (IS_SOLO() && SOLO_HIDDEN_PAGES.includes(pg)) return true;   /* solo: командное скрыто всегда (в т.ч. «Контроль» — команды нет) */
   if (pg === 'control' && me && me.canControl) return false;
   if (isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg))) return true;

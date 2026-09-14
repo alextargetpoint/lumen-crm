@@ -3067,6 +3067,85 @@ const server = http.createServer(async (req, res) => {
         db.ideaBank = (db.ideaBank || []).filter(x => x.id !== tam[1]); store.save();
         return json(res, 200, { ok: true });
       }
+      /* ═══ КАРТА ЖЕЛАНИЙ (мудборд) в мини-аппе — ТА ЖЕ доска, что на десктопе (db.moodboard[uid]) ═══
+         uid = owner|brokerId (как desktop mbUid) → доска синхронна между телефоном и десктопом. */
+      {
+        const _mbUid = auser.role === 'owner' ? 'owner' : (abroker && abroker.id);
+        if (p === '/tgapp/api/moodboard' && req.method === 'GET') {
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          db.moodboard = db.moodboard || {}; db.moodboardCfg = db.moodboardCfg || {};
+          return json(res, 200, { items: db.moodboard[_mbUid] || [], cfg: db.moodboardCfg[_mbUid] || {} });
+        }
+        if (p === '/tgapp/api/moodboard/config' && req.method === 'POST') {
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          const b = await readBody(req); db.moodboardCfg = db.moodboardCfg || {}; const c = db.moodboardCfg[_mbUid] = db.moodboardCfg[_mbUid] || {};
+          if (b.title != null) c.title = String(b.title).slice(0, 60);
+          if (b.font != null) c.font = String(b.font).slice(0, 24);
+          if (b.bg != null) c.bg = String(b.bg).slice(0, 24);
+          store.save(); return json(res, 200, c);
+        }
+        if (p === '/tgapp/api/moodboard' && req.method === 'POST') {
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          const b = await readBody(req);
+          if (!b.url || !/^(\/assets\/|https?:\/\/)/.test(String(b.url))) return json(res, 400, { error: 'нет картинки' });
+          db.moodboard = db.moodboard || {}; db.moodboard[_mbUid] = db.moodboard[_mbUid] || [];
+          const n = db.moodboard[_mbUid].length;
+          const item = { id: crypto.randomBytes(5).toString('hex'), type: b.type === 'sticker' ? 'sticker' : 'image', url: String(b.url).slice(0, 500), caption: String(b.caption || '').slice(0, 80), x: +b.x || (40 + (n % 5) * 30), y: +b.y || (40 + (n % 5) * 24), w: Math.max(80, Math.min(440, +b.w || 220)), rot: Math.max(-20, Math.min(20, +b.rot || 0)), at: Date.now() };
+          db.moodboard[_mbUid].unshift(item); db.moodboard[_mbUid] = db.moodboard[_mbUid].slice(0, 80); store.save();
+          return json(res, 200, item);
+        }
+        if (p === '/tgapp/api/moodboard/upload' && req.method === 'POST') {   /* загрузка своего фото с телефона (бинарный body) */
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          const chunks = []; let size = 0, over = false;
+          await new Promise(r => { req.on('data', c => { size += c.length; if (size > 12e6) { over = true; req.destroy(); r(); } else chunks.push(c); }); req.on('end', r); req.on('close', r); });
+          if (over) return json(res, 400, { error: 'файл больше 12 МБ' });
+          if (!size) return json(res, 400, { error: 'пустой файл' });
+          const fn = String(u.searchParams.get('filename') || 'photo.jpg');
+          const ext = (fn.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+          const saved = tgbridge.saveMedia(Buffer.concat(chunks), ext);
+          db.moodboard = db.moodboard || {}; db.moodboard[_mbUid] = db.moodboard[_mbUid] || [];
+          const n = db.moodboard[_mbUid].length;
+          const item = { id: crypto.randomBytes(5).toString('hex'), type: 'image', url: saved.url, caption: '', x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
+          db.moodboard[_mbUid].unshift(item); db.moodboard[_mbUid] = db.moodboard[_mbUid].slice(0, 80); store.save();
+          return json(res, 200, item);
+        }
+        if ((tam = p.match(/^\/tgapp\/api\/moodboard\/([a-f0-9]+)$/)) && req.method === 'POST') {   /* move/resize/caption; {_delete:1} → удалить */
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          const b = await readBody(req);
+          if (b._delete) { db.moodboard = db.moodboard || {}; db.moodboard[_mbUid] = ((db.moodboard || {})[_mbUid] || []).filter(x => x.id !== tam[1]); store.save(); return json(res, 200, { ok: true }); }
+          const it = ((db.moodboard || {})[_mbUid] || []).find(x => x.id === tam[1]); if (!it) return json(res, 404, { error: 'nf' });
+          if (b.x != null) it.x = Math.round(+b.x); if (b.y != null) it.y = Math.round(+b.y);
+          if (b.w != null) it.w = Math.max(56, Math.min(560, +b.w)); if (b.rot != null) it.rot = Math.max(-20, Math.min(20, +b.rot));
+          if (b.caption != null) it.caption = String(b.caption).slice(0, 80);
+          store.save(); return json(res, 200, it);
+        }
+        if (p === '/tgapp/api/moodboard/generate' && req.method === 'POST') {
+          if (!_mbUid) return json(res, 401, { error: 'auth' });
+          if (!llm.hasImage()) return json(res, 400, { error: 'ИИ-картинки не подключены (нет OPENAI_API_KEY)' });
+          const b = await readBody(req); const want = String(b.prompt || '').slice(0, 400).trim(); if (!want) return json(res, 400, { error: 'что тебя мотивирует?' });
+          const isSticker = b.style === 'sticker';
+          const textMode = (llm.MB_TEXT_MODES && llm.MB_TEXT_MODES[b.textMode]) ? b.textMode : 'auto';
+          let prompt, cap = want.slice(0, 60), txt = null;
+          if (isSticker) {
+            let st = null; try { st = await llm.structureVisionSticker(want, textMode); } catch (_) {}
+            prompt = llm.masterStickerPrompt(st, want, false);
+            if (st) { cap = (st.secondary || st.object || want).slice(0, 60); txt = { mode: st.textMode || 'none', primary: st.primary || '', secondary: st.secondary || '', micro: st.micro || '', cat: st.category || '', meaning: st.meaning || '' }; }
+          } else {
+            prompt = `${want}, realistic high-resolution photograph, clean, crisp, well-lit, professional, no text, no watermark, no logo`;
+          }
+          try {
+            const buf = await llm.generateImage(prompt, isSticker ? { size: '1024x1024', quality: 'high', background: 'transparent', output_format: 'png' } : { size: '1024x1024', quality: 'medium' });
+            fs.mkdirSync(path.join(PUBLIC, 'assets', 'mood'), { recursive: true });
+            const fname = `mood/${crypto.randomBytes(6).toString('hex')}.png`;
+            fs.writeFileSync(path.join(PUBLIC, 'assets', fname), buf);
+            db.moodboard = db.moodboard || {}; db.moodboard[_mbUid] = db.moodboard[_mbUid] || [];
+            const n = db.moodboard[_mbUid].length;
+            const item = { id: crypto.randomBytes(5).toString('hex'), type: isSticker ? 'sticker' : 'image', url: '/assets/' + fname, caption: cap, ...(txt ? { txt } : {}), x: 40 + (n % 5) * 30, y: 40 + (n % 5) * 24, w: 224, rot: 0, at: Date.now() };
+            db.moodboard[_mbUid].unshift(item); db.moodboard[_mbUid] = db.moodboard[_mbUid].slice(0, 80); store.save();
+            return json(res, 200, item);
+          } catch (e) { return json(res, 500, { error: 'не сгенерировалось: ' + e.message }); }
+        }
+      }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)$/)) && req.method === 'GET') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         if (lead.unread) { lead.unread = 0; store.save(); }

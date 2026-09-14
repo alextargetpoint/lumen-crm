@@ -51,15 +51,16 @@
     </div>
 
     <nav class="nav" id="nav">
+      <!-- Порядок = хронология рабочего дня брокера: обзор → воронка → диалоги → база → встречи → задачи.
+           Командное (лента/контроль/брокеры/HR) — ниже, в «Росте»/«Итогах», где оно и логично. -->
       <div class="nav-label">Работа</div>
       <button class="nav-item active" data-page="overview"></button>
-      <button class="nav-item" data-page="control"></button>
-      <button class="nav-item" data-page="feed"></button>
       <button class="nav-item" data-ws="pipeline" data-page="funnel"></button>
       <button class="nav-item" data-ws="dialogs" data-page="inbox"></button>
       <button class="nav-item" data-ws="base" data-page="properties"></button>
       <button class="nav-item" data-page="meetings"></button>
       <button class="nav-item" data-page="tasks"></button>
+      <button class="nav-item" data-page="feed"></button>
 
       <div class="nav-label">Рост</div>
       <button class="nav-item" data-ws="ads" data-page="mediaplan"></button>
@@ -68,6 +69,7 @@
 
       <div class="nav-label">Итоги</div>
       <button class="nav-item" data-ws="analytics" data-page="analytics"></button>
+      <button class="nav-item" data-page="control"></button>
       <button class="nav-item" data-page="brokers"></button>
       <button class="nav-item" data-page="hr"></button>
 

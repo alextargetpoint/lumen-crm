@@ -370,6 +370,27 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .idea-m{flex:1;font-size:11px;color:var(--mut);font-weight:600}
   .idea-x{flex:none;border:none;background:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
   .idea-x:hover{color:var(--danger)}
+  /* ── Карта желаний (мудборд) ── */
+  #mood{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .mb-tools{display:flex;gap:8px;padding:8px 10px 6px}
+  .mb-tools button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:inherit;font-weight:700;font-size:13px;padding:11px 8px;border-radius:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:var(--sh);transition:transform .15s}
+  .mb-tools button:active{transform:scale(.96)}
+  .mb-tools button.prim{background:var(--grad);color:#fff;border-color:transparent}
+  .mb-tools button .ic svg{width:17px;height:17px}
+  .mb-canvas{flex:1;position:relative;overflow:auto;margin:2px 8px 10px;border-radius:18px;background:var(--panel2);border:1px solid var(--line);-webkit-overflow-scrolling:touch}
+  .mb-inner{position:relative;min-width:100%;min-height:100%}
+  .mb-item{position:absolute;border-radius:12px;box-shadow:var(--sh);cursor:grab;touch-action:none}
+  .mb-item.drag{cursor:grabbing;z-index:50;box-shadow:0 18px 40px rgba(0,0,0,.4)}
+  .mb-item img{width:100%;height:auto;display:block;border-radius:12px;pointer-events:none;-webkit-user-drag:none}
+  .mb-item.sticker{box-shadow:none}
+  .mb-item.sticker img{border-radius:0;filter:drop-shadow(0 7px 14px rgba(0,0,0,.32))}
+  .mb-item .mb-cap{font-size:11.5px;text-align:center;color:var(--ink);margin-top:4px;font-weight:600;word-break:break-word;background:var(--glass);border-radius:8px;padding:2px 6px;backdrop-filter:blur(6px)}
+  .mb-item.sel{outline:2px solid var(--acc);outline-offset:3px;border-radius:13px}
+  .mb-item .mb-del,.mb-item .mb-rs{position:absolute;width:26px;height:26px;border-radius:50%;color:#fff;display:none;place-items:center;box-shadow:var(--sh);cursor:pointer;z-index:3;font-size:15px}
+  .mb-item .mb-del{top:-11px;right:-11px;background:var(--danger)}
+  .mb-item .mb-rs{bottom:-11px;right:-11px;background:var(--acc);cursor:nwse-resize;touch-action:none;font-size:12px}
+  .mb-item.sel .mb-del,.mb-item.sel .mb-rs{display:grid}
+  .mb-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mut);font-size:14px;line-height:1.6;padding:34px}
   /* ── Поп-ап «на экран Домой» ── */
   .a2hs{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.4);opacity:0;transition:opacity .28s;padding:0 0 max(env(safe-area-inset-bottom),14px)}
   .a2hs.on{opacity:1}
@@ -432,6 +453,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
         <button data-v="tasks"><span class="ic" data-ic="check"></span>Задачи<span class="vbadge" id="vbTasks"></span></button>
         <button data-v="meets"><span class="ic" data-ic="cal"></span>Встречи<span class="vbadge" id="vbMeets"></span></button>
         <button data-v="ideas"><span class="ic" data-ic="spark"></span>Идеи</button>
+        <button data-v="mood"><span class="ic" data-ic="img"></span>Карта</button>
       </div>
       <div class="search"><span class="ic" data-ic="search"></span><input id="q" placeholder="Поиск"></div>
       <div class="segflt" id="segflt"></div>
@@ -441,6 +463,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
     <div id="tasks" class="hidden"></div>
     <div id="meets" class="hidden"></div>
     <div id="ideas" class="hidden"></div>
+    <div id="mood" class="hidden"></div>
     <div id="analytics" class="hidden"></div>
   </div>
 
@@ -616,19 +639,19 @@ function renderChats(){
 let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
 const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
-const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи',ideas:'Копилка идей'};
-const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark'};
+const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний'};
+const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img'};
 function setSparkIcon(name){const sp=document.querySelector('.top h1 .spark');if(sp)sp.innerHTML=svg(name||'chat');}
 function setMode(m){MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
   setSparkIcon(IC_MODE[m]);
-  ['chats','leads','tasks','meets','ideas'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  ['chats','leads','tasks','meets','ideas','mood'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
   const cont=$('#'+m); if(cont){cont.classList.remove('viewshow');void cont.offsetWidth;cont.classList.add('viewshow');}   /* плавный вход раздела */
   $('#segflt').style.display=m==='chats'?'':'none';
-  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas')?'none':'';
+  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas'||m==='mood')?'none':'';
   $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
-  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else renderChats();
+  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else if(m==='mood')loadMood();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
@@ -747,6 +770,72 @@ function renderIdeas(){
   }).join(''):'<div class="empty" style="padding:30px 24px">Копилка пуста. Запишите первую идею для Reels/сторис — она появится и на десктопе.</div>';
   $('#ideas').innerHTML=ideaHead()+body;wireIdeaAdd();
   $('#ideas').querySelectorAll('[data-idrm]').forEach(b=>b.onclick=async()=>{const el=b.closest('.idea');el.style.opacity=.4;try{await jpost('/tgapp/api/ideas/'+b.dataset.idrm,{});hap();loadIdeas()}catch(e){toast(e.message);el.style.opacity=1}});
+}
+/* ── КАРТА ЖЕЛАНИЙ (мудборд) — та же доска, что на десктопе; фото/ИИ/перетаскивание ── */
+let MOOD={items:[],cfg:{}};
+async function loadMood(){try{MOOD=await jget('/tgapp/api/moodboard')}catch(e){MOOD={items:[],cfg:{}}}renderMood()}
+function mbItemHtml(it){
+  return `<div class="mb-item ${it.type==='sticker'?'sticker':''}" data-mb="${esc(it.id)}" style="left:${it.x||30}px;top:${it.y||30}px;width:${it.w||220}px;transform:rotate(${it.rot||0}deg)">
+    <div class="mb-del" data-mbdel>×</div>
+    <img src="${esc(it.url)}" alt="" draggable="false">
+    ${it.caption?`<div class="mb-cap">${esc(it.caption)}</div>`:''}
+    <div class="mb-rs" data-mbrs>⤡</div>
+  </div>`;
+}
+function renderMood(){
+  const root=$('#mood');const items=MOOD.items||[];
+  const maxX=Math.max(360,...items.map(it=>(it.x||0)+(it.w||220)+40));
+  const maxY=Math.max(400,...items.map(it=>(it.y||0)+(it.w||220)+140));
+  root.innerHTML=`<div class="mb-tools">
+      <button id="mbPhoto"><span class="ic" data-ic="img"></span>Фото</button>
+      <button id="mbGen" class="prim"><span class="ic" data-ic="spark"></span>Сгенерировать ИИ</button>
+    </div>
+    <div class="mb-canvas"><div class="mb-inner" id="mbInner" style="width:${maxX}px;height:${maxY}px">
+      ${items.length?'':'<div class="mb-empty">Пусто. Добавьте фото своей мечты — квартиру, машину, путешествие — или сгенерируйте ИИ. Держите цель перед глазами каждый день.</div>'}
+      ${items.map(mbItemHtml).join('')}
+    </div></div>
+    <input type="file" id="mbFile" accept="image/*" hidden>`;
+  paintIcons(root);
+  $('#mbPhoto').onclick=()=>{hap();$('#mbFile').click()};
+  $('#mbFile').onchange=mbUpload;
+  $('#mbGen').onclick=()=>{hap();mbGenSheet()};
+  root.querySelectorAll('.mb-item').forEach(wireMbItem);
+}
+function wireMbItem(el){
+  const id=el.dataset.mb;const Z=()=>window.TGZOOM||0.9;
+  let sx,sy,ox,oy,moved;
+  const onMove=e=>{const dx=(e.clientX-sx)/Z(),dy=(e.clientY-sy)/Z();if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;el.style.left=Math.max(0,ox+dx)+'px';el.style.top=Math.max(0,oy+dy)+'px'};
+  const onUp=async e=>{el.classList.remove('drag');el.removeEventListener('pointermove',onMove);el.removeEventListener('pointerup',onUp);
+    if(!moved){
+      if(el.classList.contains('sel')){inputSheet('Подпись к желанию',{value:(el.querySelector('.mb-cap')||{}).textContent||'',placeholder:'Например: моя цель на год'},async v=>{try{await jpost('/tgapp/api/moodboard/'+id,{caption:v});loadMood()}catch(err){toast(err.message)}});}
+      else{document.querySelectorAll('.mb-item.sel').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');hap()}
+      return;
+    }
+    try{await jpost('/tgapp/api/moodboard/'+id,{x:parseInt(el.style.left),y:parseInt(el.style.top)})}catch(err){}
+  };
+  el.addEventListener('pointerdown',e=>{if(e.target.closest('[data-mbdel]')||e.target.closest('[data-mbrs]'))return;
+    moved=false;sx=e.clientX;sy=e.clientY;ox=parseInt(el.style.left)||0;oy=parseInt(el.style.top)||0;
+    el.classList.add('drag');el.setPointerCapture&&el.setPointerCapture(e.pointerId);
+    el.addEventListener('pointermove',onMove);el.addEventListener('pointerup',onUp)});
+  const del=el.querySelector('[data-mbdel]');if(del)del.onclick=async e=>{e.stopPropagation();hap('medium');el.style.opacity=.4;try{await jpost('/tgapp/api/moodboard/'+id,{_delete:1});loadMood()}catch(err){toast(err.message);el.style.opacity=1}};
+  const rs=el.querySelector('[data-mbrs]');if(rs){let rw,rsx;
+    const rm=e=>{const dw=(e.clientX-rsx)/Z();el.style.width=Math.max(70,Math.min(500,rw+dw))+'px'};
+    const ru=async e=>{rs.removeEventListener('pointermove',rm);rs.removeEventListener('pointerup',ru);try{await jpost('/tgapp/api/moodboard/'+id,{w:parseInt(el.style.width)})}catch(err){}};
+    rs.addEventListener('pointerdown',e=>{e.stopPropagation();rsx=e.clientX;rw=parseInt(el.style.width)||220;rs.setPointerCapture&&rs.setPointerCapture(e.pointerId);rs.addEventListener('pointermove',rm);rs.addEventListener('pointerup',ru)});}
+}
+async function mbUpload(e){const f=e.target.files[0];if(!f)return;e.target.value='';toast('Загружаю фото…');
+  try{await jpost('/tgapp/api/moodboard/upload?filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'image/jpeg'});hap();loadMood();toast('Добавлено на карту')}catch(err){toast('Не вышло: '+err.message)}}
+function mbGenSheet(){
+  const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Сгенерировать желание ИИ</h3>
+    <textarea class="ish" id="mbP" rows="2" placeholder="Что вдохновляет? напр.: белоснежная вилла у моря в Дубае на закате"></textarea>
+    <div class="set-lbl">Стиль</div><div class="seg" id="mbStyle"><button data-s="photo" class="on">Фото</button><button data-s="sticker">Стикер</button></div>
+    <button class="ish-ok" id="mbGo">Сгенерировать</button></div>`;
+  document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
+  let style='photo';bd.querySelectorAll('#mbStyle button').forEach(b=>b.onclick=()=>{hap();style=b.dataset.s;bd.querySelectorAll('#mbStyle button').forEach(x=>x.classList.toggle('on',x===b))});
+  bd.querySelector('#mbGo').onclick=async()=>{const prompt=bd.querySelector('#mbP').value.trim();if(!prompt){toast('Опишите желание');return}hap('medium');close();toast('ИИ рисует… ~10–20 сек');
+    try{await jpost('/tgapp/api/moodboard/generate',{prompt,style});hap();loadMood();toast('Готово ✨')}catch(err){toast(err.message)}};
 }
 function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
   return `<div class="lrow" data-id="${esc(l.id)}">${avaHtml({id:l.id,name:l.name,avatar:null})}
