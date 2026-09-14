@@ -3928,12 +3928,23 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, previewAs: s.previewAs || null });
     }
     if (p === '/auth/password' && req.method === 'POST') {
-      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const sid = getSession(req); if (!sid) return json(res, 401, { error: 'auth' });
       const b = await readBody(req);
-      if (!verifyPassword(b.current, db.settings.auth.passHash)) return json(res, 400, { error: 'текущий пароль неверен' });
-      if (String(b.next || '').length < 8) return json(res, 400, { error: 'новый пароль короче 8 символов' });
-      db.settings.auth.passHash = hashPassword(String(b.next));
-      db.settings.auth.sessions = { [getSession(req)]: { at: Date.now() } }; // остальные сессии — в сброс
+      const next = String(b.next || '');
+      if (next.length < 8) return json(res, 400, { error: 'новый пароль короче 8 символов' });
+      const R = sessionRole(req);
+      if (R && R.role === 'broker') {
+        /* брокер меняет СВОЙ пароль (pinHash) — самообслуживание внутри агентства */
+        const br = db.brokers.find(x => x.id === R.brokerId);
+        if (!br || !br.pinHash || !verifyPassword(b.current, br.pinHash)) return json(res, 400, { error: 'текущий пароль неверен' });
+        br.pinHash = hashPassword(next);
+      } else {
+        /* владелец меняет пароль агентства + выкидывает все остальные сессии (безопасность) */
+        if (!verifyPassword(b.current, db.settings.auth.passHash)) return json(res, 400, { error: 'текущий пароль неверен' });
+        db.settings.auth.passHash = hashPassword(next);
+        const cur = db.settings.auth.sessions[sid] || { at: Date.now() };
+        db.settings.auth.sessions = { [sid]: cur };
+      }
       store.save();
       return json(res, 200, { ok: true });
     }
@@ -9714,7 +9725,7 @@ server.listen(PORT, () => {
   else console.log('[admin] Панель основателя: /admin.html · ключ из env PLATFORM_ADMIN_KEY');
   /* БЭКАПЫ: снимок всех тенантов при старте + каждые 6 часов (data/backups/<tid>/, последние 40) */
   try { store.backupAll('startup'); console.log('[backup] стартовый снимок всех агентств готов'); } catch (e) {}
-  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 3 * 3600e3);    /* авто-снимок каждые 3ч (последние 40) */
+  setInterval(() => { try { store.backupAll('auto'); } catch (e) {} }, 3600e3);        /* авто-снимок КАЖДЫЙ ЧАС (последние 40 ≈ 40ч истории) — «очень частые» бэкапы */
   setInterval(() => { try { store.backupAll('daily'); } catch (e) {} }, 24 * 3600e3);  /* суточный снимок (хранится 30, не выпиливается) */
   /* офф-сайт: если задан BACKUP_WEBHOOK_URL — раз в сутки шлём снимки наружу (защита от сбоя самого тома) */
   if (process.env.BACKUP_WEBHOOK_URL) setInterval(() => { try { offsiteBackup(); } catch (e) {} }, 24 * 3600e3);

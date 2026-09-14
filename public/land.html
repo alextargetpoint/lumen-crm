@@ -96,9 +96,11 @@
   @media(max-width:760px){.nlinks a{display:none}}
 
   /* HERO */
-  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;background:#050505}
+  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
   .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;filter:grayscale(1) contrast(1.05)}
-  .hero .veil{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 30%,rgba(8,8,8,.35),#060606 78%)}
+  .hero #heroFx{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:0;animation:fxin 2.2s var(--ease) .2s forwards}
+  @keyframes fxin{to{opacity:1}}
+  .hero .veil{position:absolute;inset:0;z-index:2;background:radial-gradient(120% 92% at 50% 34%,rgba(6,6,5,.14),rgba(6,6,5,.72) 82%)}
   .hero .halo{position:absolute;left:50%;top:42%;width:80vmax;height:80vmax;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.05),transparent 70%);animation:breathe 9s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.12)}}
   .hero-in{position:relative;z-index:3;text-align:center;width:100%}
@@ -670,7 +672,7 @@
 <span id="top"></span>
 <!-- HERO (dark) -->
 <header class="hero">
-  <video autoplay muted loop playsinline poster="/assets/land-hero-poster.jpg" id="heroVid"></video>
+  <canvas id="heroFx" aria-hidden="true"></canvas>
   <div class="veil"></div><div class="halo"></div>
   <div class="wrap hero-in">
     <div class="kline">CRM, рождённая в недвижимости</div>
@@ -1189,8 +1191,60 @@
   var cuIO=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var el=e.target;cuIO.unobserve(el);var to=+el.dataset.to,suf=el.dataset.suf||'',t0=performance.now();(function s(t){var p=Math.min(1,(t-t0)/1100),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=v+suf;if(p<1)requestAnimationFrame(s)})(t0)})},{threshold:.5});
   document.querySelectorAll('.cu').forEach(function(el){cuIO.observe(el)});
 
-  // hero-видео подставим когда готово (Higgsfield); poster держит кадр пока
-  (function(){var v=document.getElementById('heroVid');if(!v)return;var s=document.createElement('source');s.src='/assets/land-hero.mp4?v=1';s.type='video/mp4';v.appendChild(s);v.load&&v.load();v.play&&v.play().catch(function(){});})();
+  // hero: абстрактная световая архитектура (Lumen = свет) — тонкие «жалюзи»-линии, по которым
+  // медленно проходит световой луч, + пара геометрических фигур в дрейфе. Canvas, без зависимостей.
+  (function(){
+    var c=document.getElementById('heroFx'); if(!c) return;
+    var ctx=c.getContext('2d'); if(!ctx) return;
+    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var W=0,H=0,DPR=1,lines=[],shapes=[],raf=0,vis=true,INK='244,243,241';
+    function build(){
+      lines=[]; var n=Math.max(9,Math.round(W/96));
+      for(var i=0;i<n;i++){var f=n>1?i/(n-1):.5;
+        lines.push({x:f*W,a:.05+Math.random()*.06,sway:5+Math.random()*16,ph:Math.random()*6.28,sp:.12+Math.random()*.22});}
+      shapes=[
+        {t:'rect',x:W*.19,y:H*.34,s:Math.min(150,W*.14),r:.2,dr:.02,vx:.05,vy:-.028,a:.08},
+        {t:'circ',x:W*.8,y:H*.62,s:Math.min(120,W*.12),r:0,dr:-.014,vx:-.045,vy:.036,a:.07},
+        {t:'plus',x:W*.62,y:H*.2,s:Math.min(58,W*.05),r:.4,dr:.03,vx:.028,vy:.05,a:.09}
+      ];
+    }
+    function size(){DPR=Math.min(2,window.devicePixelRatio||1);W=c.clientWidth;H=c.clientHeight;c.width=W*DPR;c.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);build();if(reduce)draw(0);}
+    function draw(t){
+      ctx.clearRect(0,0,W,H);
+      var bp=(t*0.00003)%1.6-.3, bx=bp*W; // луч медленно проходит слева направо, с паузой за краем
+      // видимый мягкий световой столб (Lumen) — скользит вместе с лучом
+      var bw=W*0.17;
+      ctx.save();ctx.globalCompositeOperation='lighter';
+      var cg=ctx.createLinearGradient(bx-bw,0,bx+bw,0);
+      cg.addColorStop(0,'rgba('+INK+',0)');cg.addColorStop(.5,'rgba('+INK+',.05)');cg.addColorStop(1,'rgba('+INK+',0)');
+      ctx.fillStyle=cg;ctx.fillRect(bx-bw,0,bw*2,H);ctx.restore();
+      for(var i=0;i<lines.length;i++){var L=lines[i];
+        var x=L.x+Math.sin(t*0.0004*L.sp+L.ph)*L.sway;
+        var beam=Math.max(0,1-Math.abs(x-bx)/bw);
+        var al=L.a+beam*beam*.55;
+        var g=ctx.createLinearGradient(0,H*.06,0,H*.97);
+        g.addColorStop(0,'rgba('+INK+',0)');g.addColorStop(.5,'rgba('+INK+','+al.toFixed(3)+')');g.addColorStop(1,'rgba('+INK+',0)');
+        ctx.strokeStyle=g;ctx.lineWidth=1+beam*1.1;
+        ctx.beginPath();ctx.moveTo(x,H*.05);ctx.lineTo(x,H*.97);ctx.stroke();
+      }
+      for(var j=0;j<shapes.length;j++){var S=shapes[j];
+        if(!reduce){S.x+=S.vx;S.y+=S.vy;S.r+=S.dr*.01;}
+        if(S.x<-160)S.x=W+160;else if(S.x>W+160)S.x=-160;
+        if(S.y<-160)S.y=H+160;else if(S.y>H+160)S.y=-160;
+        ctx.save();ctx.translate(S.x,S.y);ctx.rotate(S.r);
+        ctx.strokeStyle='rgba('+INK+','+S.a+')';ctx.lineWidth=1;var h=S.s/2;
+        if(S.t==='rect')ctx.strokeRect(-h,-h,S.s,S.s);
+        else if(S.t==='circ'){ctx.beginPath();ctx.arc(0,0,h,0,6.2832);ctx.stroke();}
+        else{ctx.beginPath();ctx.moveTo(-h,0);ctx.lineTo(h,0);ctx.moveTo(0,-h);ctx.lineTo(0,h);ctx.stroke();}
+        ctx.restore();
+      }
+    }
+    function loop(t){if(vis)draw(t);raf=requestAnimationFrame(loop);}
+    window.addEventListener('resize',size,{passive:true});
+    document.addEventListener('visibilitychange',function(){vis=!document.hidden;});
+    size();
+    if(!reduce)raf=requestAnimationFrame(loop);
+  })();
 
   /* ── LOADER ── */
   (function(){var l=document.getElementById('load');if(!l)return;var done=false;function hide(){if(done)return;done=true;l.classList.add('gone');setTimeout(function(){l.parentNode&&l.remove()},900);}setTimeout(hide,900);addEventListener('load',function(){setTimeout(hide,300)});setTimeout(hide,4000);})();
