@@ -808,7 +808,8 @@
     const st = (B().state) || null;
     if (!st || !st.me || !st.settings || !st.settings.agency) return false;
     const isOwner = st.me.role === 'owner' || st.me.role === 'master';
-    if (isOwner && !st.settings.agency.onboarded) { _autoShown = true; setTimeout(() => open({ auto: true }), 400); return true; }
+    const forced = location.hash === '#setup';   /* прямая ссылка на церемонию — открыть даже у «пройденных» */
+    if (isOwner && (forced || !st.settings.agency.onboarded)) { _autoShown = true; if (forced) history.replaceState(null, '', location.pathname); setTimeout(() => open({ auto: true }), forced ? 200 : 400); return true; }
     return false;
   }
   // самополлинг — на случай, если app.js вызвал maybeAuto раньше нашей загрузки
