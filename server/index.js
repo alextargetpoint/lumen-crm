@@ -520,6 +520,49 @@ function rateLimited(key, max, windowMs) {
   if (_rl.size > 5000) { for (const [k, v] of _rl) if (now - v.t > windowMs) _rl.delete(k); }  /* уборка */
   return r.c > max;
 }
+/* ═══ Детектор аномалий безопасности (лёгкий, in-memory счётчики + журнал в реестре) ═══
+   Ловим всплески отказов/сканирования/брутфорса по IP, пишем сигналы в registry.securityLog
+   (капнутый) и алертим основателю на crit. Cost-safe, без внешнего SIEM (его добавим при росте). */
+const _secCounters = new Map();
+function _secBump(key, windowMs) {
+  const now = Date.now(); let r = _secCounters.get(key);
+  if (!r || now - r.t > windowMs) { r = { c: 0, t: now }; _secCounters.set(key, r); }
+  r.c++;
+  if (_secCounters.size > 8000) { for (const [k, v] of _secCounters) if (now - v.t > windowMs) _secCounters.delete(k); }
+  return r.c;
+}
+const _secAlerted = new Map();
+function secSignal(kind, severity, detail) {
+  try {
+    detail = detail || {};
+    const reg = store.getRegistry();
+    reg.securityLog = reg.securityLog || [];
+    const ev = { at: Date.now(), kind, severity, ip: detail.ip || '', tid: detail.tid || null, path: detail.path || '', msg: detail.msg || '', ua: detail.ua || '' };
+    reg.securityLog.unshift(ev);
+    if (reg.securityLog.length > 500) reg.securityLog.length = 500;
+    store.saveRegistry();
+    if (severity === 'crit') {
+      const ak = kind + ':' + ev.ip, now = Date.now();
+      if (now - (_secAlerted.get(ak) || 0) > 600e3) { _secAlerted.set(ak, now); secNotifyFounder(ev); }
+    }
+  } catch (e) {}
+}
+async function secNotifyFounder(ev) {
+  try {
+    const tdb = store.loadTenant(store.PRIMARY);
+    const chat = tdb.settings && tdb.settings.ownerTgChatId;
+    if (chat && tgbridge.ready(tdb)) await tgbridge.notify(tdb, chat, `🛡 Сигнал безопасности: ${ev.kind}\nIP: ${ev.ip || '—'}\n${ev.msg || ''}`);
+  } catch (e) {}
+}
+/* вызывать на каждом отказе гейта: всплеск 401 = скан/перебор, 403 = зондирование доступа */
+function secOnDeny(req, code, p) {
+  try {
+    const ip = clientIp(req), ua = uaFingerprint(req.headers['user-agent']);
+    if (code === 401) { const c = _secBump('401:' + ip, 300e3); if (c === 25 || c === 120) secSignal('auth_scan', c >= 120 ? 'crit' : 'warn', { ip, ua, path: p, msg: `${c} отказов 401 за 5 мин` }); }
+    else if (code === 403) { const c = _secBump('403:' + ip, 300e3); if (c === 15 || c === 70) secSignal('access_probe', c >= 70 ? 'crit' : 'warn', { ip, ua, path: p, msg: `${c} отказов 403 за 5 мин` }); }
+  } catch (e) {}
+}
+
 /* SaaS: найти тенанта-владельца публичного ресурса (шаринг-ссылки без сессии).
    Ищем по всем тенантам — ids уникальны; при росте заменить на индекс в реестре. */
 function findTenant(pred) { for (const tid of store.listTenants()) { let ok = false; try { ok = store.runInTenant(tid, pred); } catch (e) {} if (ok) return tid; } return null; }
@@ -2823,7 +2866,7 @@ const server = http.createServer(async (req, res) => {
         if (!sec || sec.length !== _tgGot.length) continue;
         try { if (crypto.timingSafeEqual(gotBuf, Buffer.from(sec))) { matchTid = tid; break; } } catch (_) {}
       }
-      if (!matchTid) return json(res, 403, { error: 'bad token' }); /* SEC: constant-time поиск по всем тенантам */
+      if (!matchTid) { secOnDeny(req, 403, p); if (_tgGot) secSignal('tg_bad_secret', 'warn', { ip: clientIp(req), path: p, msg: 'POST на /tg/webhook с неизвестным secret_token' }); return json(res, 403, { error: 'bad token' }); } /* SEC: constant-time поиск по всем тенантам */
       const body = await readBody(req);
       await store.runInTenant(matchTid, async () => {
         const tdb = store.loadTenant(matchTid);
@@ -3662,7 +3705,11 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const key = String(b.key || ''); const real = platformAdminKey();
       const okKey = !!real && key.length === real.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(real)); } catch (e) { return false; } })();
-      if (!okKey) { await new Promise(r => setTimeout(r, 700)); return json(res, 401, { error: 'неверный ключ' }); }
+      if (!okKey) {
+        const ip = clientIp(req); const c = _secBump('adminfail:' + ip, 900e3);
+        secSignal('admin_bruteforce', c >= 5 ? 'crit' : 'warn', { ip, ua: uaFingerprint(req.headers['user-agent']), path: p, msg: `${c}-я неверная попытка входа супер-админа` });
+        await new Promise(r => setTimeout(r, 700)); return json(res, 401, { error: 'неверный ключ' });
+      }
       const sid = crypto.randomBytes(16).toString('hex');
       const reg = store.getRegistry(); reg.adminSessions[sid] = { at: Date.now(), ip: clientIp(req) };
       const ks = Object.keys(reg.adminSessions); if (ks.length > 10) delete reg.adminSessions[ks[0]];
@@ -3917,7 +3964,7 @@ const server = http.createServer(async (req, res) => {
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk && !adminApiOk) return json(res, 401, { error: 'auth required' });
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -3958,7 +4005,7 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- API супер-админа платформы (isPlatformAdmin, над тенантами) ---------------- */
     if (p.startsWith('/api/admin/') && p !== '/api/admin/import-db') {
-      if (!isPlatformAdmin(req)) return json(res, 403, { error: 'нет доступа' });
+      if (!isPlatformAdmin(req)) { secOnDeny(req, 403, p); secSignal('admin_api_denied', 'warn', { ip: clientIp(req), path: p, msg: 'запрос к /api/admin/ без прав супер-админа' }); return json(res, 403, { error: 'нет доступа' }); }
       const reg = store.getRegistry();
       let am;
       const tenantStat = (tid) => store.runInTenant(tid, () => {
@@ -3997,6 +4044,18 @@ const server = http.createServer(async (req, res) => {
       }
       /* журнал действий супер-админа */
       if (p === '/api/admin/audit' && req.method === 'GET') return json(res, 200, { ok: true, audit: (reg.adminAudit || []).slice(0, 200) });
+      /* детектор аномалий безопасности: журнал сигналов + сводка за 24ч */
+      if (p === '/api/admin/security' && req.method === 'GET') {
+        const log = (reg.securityLog || []).slice(0, 300);
+        const dayAgo = Date.now() - 864e5;
+        const last24 = log.filter(e => e.at > dayAgo);
+        const byKind = {}; last24.forEach(e => { byKind[e.kind] = (byKind[e.kind] || 0) + 1; });
+        const crit24 = last24.filter(e => e.severity === 'crit').length;
+        const topIps = {}; last24.forEach(e => { if (e.ip) topIps[e.ip] = (topIps[e.ip] || 0) + 1; });
+        const topIp = Object.entries(topIps).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([ip, n]) => ({ ip, n }));
+        return json(res, 200, { ok: true, log, summary: { total24: last24.length, crit24, byKind, topIp } });
+      }
+      if (p === '/api/admin/security/clear' && req.method === 'POST') { reg.securityLog = []; store.saveRegistry(); return json(res, 200, { ok: true }); }
       /* рассылка персонализированных кейсов/касаний: email — владельцам тенантов; wa — на список телефонов через gray-воркер */
       if (p === '/api/admin/campaign' && req.method === 'POST') {
         const b = await readBody(req);
@@ -4083,7 +4142,9 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const data = JSON.stringify(store.get(), null, 1);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="lumen-export-' + store.currentTid() + '.json"' });
-      res.end(data); audit(db, req, 'экспортировал данные агентства'); return;
+      res.end(data); audit(db, req, 'экспортировал данные агентства');
+      secSignal('data_export', 'info', { ip: clientIp(req), tid: store.currentTid(), path: p, msg: `экспорт всей базы (${(store.get().leads || []).length} лидов)` });
+      return;
     }
     /* GDPR: удаление аккаунта агентства (право на забвение) — с подтверждением паролем, бэкап перед удалением */
     if (p === '/api/account/delete' && req.method === 'POST') {
@@ -4093,6 +4154,7 @@ const server = http.createServer(async (req, res) => {
       const tid = store.currentTid();
       if (tid === store.PRIMARY) return json(res, 400, { error: 'нельзя удалить основной аккаунт' });
       store.backupTenant(tid, 'PRE-DELETE');   /* бэкап перед удалением — grace-window на восстановление */
+      secSignal('account_delete', 'crit', { ip: clientIp(req), tid, path: p, msg: `удаление аккаунта агентства (бэкап PRE-DELETE сделан)` });
       const reg = store.getRegistry();
       for (const em of Object.keys(reg.byEmail)) if (reg.byEmail[em] === tid) delete reg.byEmail[em];
       for (const s of Object.keys(reg.sessions)) if (reg.sessions[s].tid === tid) delete reg.sessions[s];

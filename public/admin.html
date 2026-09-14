@@ -64,6 +64,7 @@
     <button class="on" data-tab="tenants">Аккаунты</button>
     <button data-tab="campaign">Рассылки</button>
     <button data-tab="audit">Журнал</button>
+    <button data-tab="security">🛡 Безопасность</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -103,6 +104,17 @@
       <div id="auditList" style="margin-top:10px;font-size:13px"></div>
     </div>
   </div>
+
+  <div class="sect" id="sect-security">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Детектор аномалий безопасности</b><span class="row" style="gap:8px"><button class="ghost" id="reloadSec">Обновить</button><button class="ghost" id="clearSec">Очистить журнал</button></span></div>
+      <div id="secSummary" class="stats" style="margin-top:10px"></div>
+      <div style="overflow:auto;margin-top:10px"><table id="secTbl"><thead><tr>
+        <th>Когда</th><th>Сигнал</th><th>Уровень</th><th>IP</th><th>Что</th>
+      </tr></thead><tbody id="secBody"></tbody></table></div>
+      <div class="muted" style="margin-top:10px;font-size:12px">Ловит: всплески отказов авторизации (скан/перебор), зондирование доступа (403), брутфорс ключа супер-админа, чужой secret на TG-вебхуке, экспорт/удаление аккаунтов. Критичные события дублируются алертом в ваш Telegram (если привязан). Внешний anti-fraud/WAF добавим при росте нагрузки.</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -130,7 +142,25 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on')); b.classList.add('on');
   document.querySelectorAll('.sect').forEach(s => s.classList.remove('on')); $('#sect-' + b.dataset.tab).classList.add('on');
   if (b.dataset.tab === 'audit') loadAudit();
+  if (b.dataset.tab === 'security') loadSecurity();
 }));
+const SEV = { crit: ['🔴 критично', '#ff5252'], warn: ['🟡 внимание', '#e0a800'], info: ['⚪ инфо', '#7d8aa0'] };
+const KIND_RU = { auth_scan: 'Скан авторизации (401)', access_probe: 'Зондирование доступа (403)', admin_bruteforce: 'Брутфорс ключа админа', admin_api_denied: 'Доступ к admin-API без прав', tg_bad_secret: 'Чужой secret на TG-вебхуке', data_export: 'Экспорт базы', account_delete: 'Удаление аккаунта' };
+async function loadSecurity() {
+  const r = await api('/api/admin/security');
+  const fmt = (ts) => new Date(ts).toLocaleString('ru-RU');
+  const s = r.summary || {};
+  $('#secSummary').innerHTML = [
+    ['Сигналов за 24ч', s.total24 || 0], ['Критичных', s.crit24 || 0],
+    ['Топ-IP', (s.topIp && s.topIp[0]) ? (s.topIp[0].ip + ' ×' + s.topIp[0].n) : '—'],
+  ].map(([k, v]) => `<div class="stat"><b>${esc(v)}</b><span>${k}</span></div>`).join('');
+  $('#secBody').innerHTML = (r.log || []).map(e => {
+    const sev = SEV[e.severity] || ['—', '#888'];
+    return `<tr><td class="muted" style="white-space:nowrap">${fmt(e.at)}</td><td>${esc(KIND_RU[e.kind] || e.kind)}</td><td style="color:${sev[1]};white-space:nowrap">${sev[0]}</td><td class="muted">${esc(e.ip || '—')}</td><td>${esc(e.msg || '')}${e.path ? ' <span class="muted">· ' + esc(e.path) + '</span>' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="muted">Тихо — сигналов нет</td></tr>';
+}
+document.getElementById('reloadSec')?.addEventListener('click', loadSecurity);
+document.getElementById('clearSec')?.addEventListener('click', async () => { if (confirm('Очистить журнал сигналов безопасности?')) { await api('/api/admin/security/clear', { method: 'POST' }); loadSecurity(); } });
 async function loadAudit() {
   const r = await api('/api/admin/audit');
   const fmt = (ts) => new Date(ts).toLocaleString('ru-RU');

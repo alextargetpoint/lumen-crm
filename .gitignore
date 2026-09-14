@@ -16,3 +16,6 @@ public/assets/wa-media/
 
 # рантайм-данные тенантов и бэкапы (секреты интеграций!) — НИКОГДА в git
 data/
+
+# Local Netlify folder
+.netlify
