@@ -40,6 +40,7 @@ const wa = require('./wa');
 const comments = require('./comments');
 const inventory = require('./inventory');
 const tgbridge = require('./tgbridge'); /* двусторонний мост Telegram ⇄ WhatsApp (брокер отвечает с телефона) */
+const mailer = require('./email'); /* SaaS-почта: Atelier-шаблоны (RU/EN) + Resend + конструктор в админке */
 const design = require('./design'); /* Ф1: движок арт-дирекшна подборок (design.js) */
 const studio = require('./studio'); /* ⭐ AI Design Engine («Студия»): креативный директор → сцен-граф → визуальный QA */
 const shot = require('./shot'); /* серверный скриншот (chrome-headless-shell) для автономного QA-цикла */
@@ -3892,7 +3893,14 @@ const server = http.createServer(async (req, res) => {
         store.saveRegistry();
         const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
         const link = base + '/reset?token=' + token;
-        try { await store.runInTenant(rtid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + ec.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: ec.from, to: email, subject: 'Сброс пароля Lumen', html: `<p>Запрошен сброс пароля. Ссылка:</p><p><a href="${link}">${link}</a></p>` }) }); }); } catch (e) {}
+        /* Atelier-шаблон сброса пароля: сперва платформенный Resend, иначе — per-tenant ключ агентства */
+        try {
+          const rendered = mailer.renderTemplate(reg, 'passwordReset', { link, buttonLabel: 'Задать новый пароль' }, 'ru');
+          const plat = mailer.platformEmailCfg(reg);
+          let sent = { ok: false };
+          if (plat.key) sent = await mailer.sendViaResend(plat, email, rendered.subject, rendered.html);
+          if (!sent.ok) await store.runInTenant(rtid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) await mailer.sendViaResend({ key: ec.key, from: ec.from }, email, rendered.subject, rendered.html); });
+        } catch (e) {}
       }
       return json(res, 200, { ok: true }); /* не раскрываем, существует ли e-mail */
     }
@@ -4090,6 +4098,40 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, log, summary: { total24: last24.length, crit24, byKind, topIp } });
       }
       if (p === '/api/admin/security/clear' && req.method === 'POST') { reg.securityLog = []; store.saveRegistry(); return json(res, 200, { ok: true }); }
+      /* ── Конструктор писем (SaaS) ── */
+      if (p === '/api/admin/email' && req.method === 'GET') {
+        const cfg = mailer.platformEmailCfg(reg);
+        return json(res, 200, { ok: true, templates: mailer.getTemplates(reg), config: { from: cfg.from, keySet: !!cfg.key }, keys: Object.keys(mailer.DEFAULT_TEMPLATES) });
+      }
+      if (p === '/api/admin/email/config' && req.method === 'POST') {
+        const b = await readBody(req); reg.email = reg.email || {};
+        if (b.from !== undefined) reg.email.from = String(b.from || '').trim().slice(0, 160);
+        if (b.key) reg.email.key = String(b.key).trim().slice(0, 200);
+        store.saveRegistry(); const cfg = mailer.platformEmailCfg(reg);
+        return json(res, 200, { ok: true, config: { from: cfg.from, keySet: !!cfg.key } });
+      }
+      if (p === '/api/admin/email/template' && req.method === 'POST') {
+        const b = await readBody(req); const key = String(b.key || '');
+        if (!mailer.DEFAULT_TEMPLATES[key]) return json(res, 400, { error: 'неизвестный шаблон' });
+        reg.emailTemplates = reg.emailTemplates || {}; const cur = reg.emailTemplates[key] || {};
+        for (const f of ['subject_ru', 'subject_en', 'body_ru', 'body_en']) if (b[f] !== undefined) cur[f] = String(b[f]).slice(0, 12000);
+        reg.emailTemplates[key] = cur; store.saveRegistry();
+        return json(res, 200, { ok: true, template: mailer.getTemplates(reg)[key] });
+      }
+      if (p === '/api/admin/email/preview' && req.method === 'POST') {
+        const b = await readBody(req);
+        const vars = Object.assign({ name: 'Алексей', agency: 'Ваше агентство', title: 'Заголовок', message: 'Текст уведомления.', subject: 'Тема письма', link: 'https://app.lumen247.com', unsubscribe: '#' }, b.vars || {});
+        const r = mailer.renderTemplate(reg, String(b.key || 'notification'), vars, b.lang === 'en' ? 'en' : 'ru');
+        return json(res, 200, { ok: true, subject: r.subject, html: r.html });
+      }
+      if (p === '/api/admin/email/test' && req.method === 'POST') {
+        const b = await readBody(req); const to = String(b.to || '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json(res, 400, { error: 'нужен корректный e-mail' });
+        const vars = Object.assign({ name: 'Тест', agency: 'Тест-агентство', title: 'Тестовое письмо', message: 'Это тестовая отправка из конструктора Lumen.', subject: 'Тест Lumen', link: 'https://app.lumen247.com', unsubscribe: '#' }, b.vars || {});
+        const r = mailer.renderTemplate(reg, String(b.key || 'notification'), vars, b.lang === 'en' ? 'en' : 'ru');
+        const sent = await mailer.sendViaResend(mailer.platformEmailCfg(reg), to, r.subject, r.html);
+        return json(res, sent.ok ? 200 : 400, sent);
+      }
       /* рассылка персонализированных кейсов/касаний: email — владельцам тенантов; wa — на список телефонов через gray-воркер */
       if (p === '/api/admin/campaign' && req.method === 'POST') {
         const b = await readBody(req);
@@ -9690,7 +9732,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
     /* ---------------- статика ---------------- */
-    let file = p === '/' ? '/land.html' : p === '/landing' ? '/landing.html' : p;
+    let file = p === '/' ? '/index.html' : p === '/landing' ? '/landing.html' : p;
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
     const full = path.join(PUBLIC, file);
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
