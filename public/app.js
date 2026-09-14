@@ -1161,6 +1161,26 @@ window.openGrayManager = async function () {
   }
   renderMgr();
 };
+/* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
+window.grayAddQR = function (phone, label) {
+  phone = String(phone || '').replace(/[^0-9]/g, '');
+  if (!phone) { toast('Укажите номер'); return; }
+  let pollTimer = null;
+  const bd = modal({ title: 'Подключение WhatsApp по QR', sub: '+' + esc(phone) + ' · привяжите устройство',
+    body: `<div id="gqrBox" style="min-height:250px;display:grid;place-items:center;font-size:13px;color:var(--ink-3)">Готовим QR…</div>
+      <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;line-height:1.5">На телефоне: <b>WhatsApp → Настройки → Связанные устройства → Привязка устройства</b> → наведите на QR</div>`,
+    actions: [{ label: 'Готово', onClick: () => { if (pollTimer) clearInterval(pollTimer); } }] });
+  api.post('/wa/gray/connect', { phone, label: label || '' }).catch(e => toast('Не вышло', e.message));
+  pollTimer = setInterval(async () => {
+    const box = document.getElementById('gqrBox'); if (!box) { clearInterval(pollTimer); return; }
+    let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
+    const st = r.session && r.session.status;
+    if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" alt="QR" style="width:240px;height:240px;border-radius:10px;background:#fff;padding:8px">`;
+    else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--ok,#3f7d4f)">✓ Номер подключён${r.session.phone ? ' · +' + esc(r.session.phone) : ''}</div>`; clearInterval(pollTimer); if (typeof CUR !== 'undefined' && CUR === 'numbers' && PAGES.numbers) setTimeout(() => PAGES.numbers(document.getElementById('view') || document.querySelector('[data-view-root]') || document.body), 1200); }
+    else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта. Попробуйте заново.</div>'; clearInterval(pollTimer); }
+    else box.innerHTML = '<div style="color:var(--ink-3)">Подключение…</div>';
+  }, 1800);
+};
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
 function uiConfirm(title, sub, opts = {}) {
   return new Promise(res => {
@@ -9609,7 +9629,11 @@ PAGES.numbers = async (root) => {
       actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
         const phone = $('#nnPhone', bd).value.trim();
         if (!phone) { toast('Укажите номер'); return false; }
-        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel: $('#nnChannel', bd).value, label: $('#nnLabel', bd).value, state: $('#nnState', bd).value });
+        const channel = $('#nnChannel', bd).value, label = $('#nnLabel', bd).value;
+        /* web-протокол (тёплый номер) → РЕАЛЬНОЕ подключение по QR через воркер, тут же */
+        if (channel === 'web') { window.grayAddQR(phone, label); return; }
+        /* официальный Cloud API → в пул */
+        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel, label, state: $('#nnState', bd).value });
         toast('Номер добавлен', 'В пуле — можно вести к активации', true);
         render();
       } }, { label: 'Отмена' }],
@@ -11544,7 +11568,7 @@ PAGES.settings = async (root) => {
     ${linkCard('onclick="window.openPlanManager&&window.openPlanManager()"', I.spark, 'Тариф и лимиты', 'Текущий план агентства: брокеры, лиды, номера WhatsApp')}
 
     <div class="set-sec-h">${ic(I.chat)}Каналы связи</div>
-    ${linkCard('onclick="window.openGrayManager&&window.openGrayManager()"', I.chat, 'WhatsApp — серый способ (QR)', 'Подключение номеров по QR-коду и прогрев, без Meta. Через облачный воркер.')}
+    ${'' /* WhatsApp-номера (QR/воркер) переехали в единый раздел «Номера» — не плодим места */}
     ${coll(`${ic(I.chat)}WhatsApp Cloud API — официальный канал Meta`, waCloudForm, { open: false })}
     ${coll(`${ic(I.send)}Мост Telegram — брокеры отвечают с телефона`, tgBridgeForm, { open: false })}
     ${coll(`${ic(I.phone)}Телефония — звонки в карточку`, telForm, { open: false })}
