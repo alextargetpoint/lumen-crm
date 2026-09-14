@@ -176,6 +176,27 @@ const GUIDES = {
     ],
     outro: 'Если брокер отвечает сам — ИИ по этому лиду отключается автоматически, чтобы не было двух голосов. Оформление бота наследует тему из Настройки → Оформление.',
   },
+  wanumbers: {
+    icon: 'chat', title: 'WhatsApp-номера: свои, по QR', tagline: 'Базовый тариф — до 3 номеров, подключаете сами за 5 минут',
+    intro: 'На базовом тарифе вы используете <b>свои номера</b> — до <b>3 активных</b>. Номера вы заводите и держите на своём телефоне, а к Lumen подключаете по <b>QR-коду</b> (как WhatsApp Web) и ставите на <b>прогрев</b> перед рассылками. Покупка номеров через нас — на старших тарифах; здесь всё в ваших руках.',
+    sections: [
+      { badge: '1 · Где взять 3 активных номера', steps: [
+        ['Android — клон приложения', 'Купите SIM/eSIM нужной страны. В Android включите <b>Dual Apps / Клонирование приложений</b> (или Parallel Space) — получите второй и третий WhatsApp с разными номерами на одном телефоне.'],
+        ['iPhone — 2 аккаунта + Business', 'В самом WhatsApp можно добавить <b>второй аккаунт</b> (Настройки → переключение аккаунтов), плюс отдельно поставить <b>WhatsApp Business</b>. Итого до <b>3 активных</b> аккаунтов на одном iPhone.'],
+        ['Отдельные номера', 'Каждому аккаунту — свой номер (SIM/eSIM/виртуальный, который принимает SMS для регистрации). Один номер = один аккаунт.'],
+      ] },
+      { badge: '2 · Подключение по QR', steps: [
+        ['Откройте в Lumen', '<b>Настройки → WhatsApp (серый способ)</b> → «Добавить номер» → введите номер и метку.'],
+        ['Появится QR-код', 'В телефоне откройте нужный аккаунт WhatsApp → <b>Настройки → Связанные устройства → Привязка устройства</b> → наведите на QR в Lumen.'],
+        ['Готово', 'Номер подключён и виден в списке со статусом «на связи». Так же добавьте второй и третий.'],
+      ] },
+      { badge: '3 · Прогрев перед рассылкой', steps: [
+        ['Поставьте на прогрев', 'Свежий номер сразу в массовую рассылку — прямой путь к бану. Включите <b>прогрев</b>: номера постепенно переписываются между собой, растёт «живая» активность.'],
+        ['Дайте отлежаться', 'Несколько дней прогрева — и номер готов к рассылкам с минимальным риском блокировки.'],
+      ] },
+    ],
+    outro: 'Лимит базового тарифа — <b>3 номера</b>. Нужно больше номеров, официальная «белая» рассылка через WhatsApp Cloud API или покупка номеров прямо в дашборде — это старшие тарифы. Внимание: не рассылайте «в холодную» без прогрева и без согласия — это главный триггер бана номера.',
+  },
   calendar: {
     icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
     intro: 'Lumen сам подбирает клиенту свободное время — но только если знает, когда брокер занят. Дайте системе <b>публичную ICS-ссылку</b> личного календаря (Apple или Google), и занятые часы автоматически исчезнут из предложений. Настраивается один раз за 2 минуты.',
@@ -288,7 +309,7 @@ const GUIDES = {
 };
 /* Центр инструкций: грид всех гайдов. Вызов: openGuideCenter() */
 function openGuideCenter() {
-  const order = ['tgsetup', 'botpanel', 'leads', 'chains', 'waagent', 'calendar', 'mediaplan', 'docs'];
+  const order = ['tgsetup', 'wanumbers', 'botpanel', 'leads', 'chains', 'waagent', 'calendar', 'mediaplan', 'docs'];
   const cards = order.filter(k => GUIDES[k]).map(k => { const g = GUIDES[k];
     return `<button class="gdc-card" data-guide="${k}"><span class="gdc-ic">${ic(I[g.icon] || I.doc)}</span><span class="gdc-tx"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span><span class="gdc-go">${ic(I.arrow, 2)}</span></button>`;
   }).join('');
@@ -962,6 +983,7 @@ window.openGrayManager = async function () {
           <input id="gwLabel" placeholder="Метка" style="width:110px">
           <button class="btn btn-accent" id="gwAdd">Подключить</button>
         </div>
+        <div class="muted" style="font-size:12px;margin:-4px 0 12px">${ic(I.doc)} <a href="#" id="gwGuide" style="color:var(--accent);text-decoration:none">Как завести до 3 своих номеров и подключить по QR →</a></div>
         ${(data.numbers || []).map(n => `
           <div class="set-row">
             <div class="sp"><div class="sl">${esc(n.label || n.phone)} · ${esc(n.phone)}</div><div class="sd">${badge(n.live)}</div></div>
@@ -981,6 +1003,7 @@ window.openGrayManager = async function () {
       catch (e) { toast('Не вышло', e.message); }
     });
     $('#gwAdd', bd)?.addEventListener('click', () => connectNumber($('#gwPhone', bd).value.trim(), $('#gwLabel', bd).value.trim()));
+    $('#gwGuide', bd)?.addEventListener('click', (e) => { e.preventDefault(); openGuide('wanumbers'); });
     $$('.gn-qr', bd).forEach(b => b.addEventListener('click', () => connectNumber(b.dataset.p, '')));
     $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); } catch (e) { toast('Не вышло', e.message); } }));
     $('#gwWarm', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', '', true); } catch (er) { toast('Не вышло', er.message); } });

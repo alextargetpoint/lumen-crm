@@ -5147,7 +5147,12 @@ const server = http.createServer(async (req, res) => {
       db.settings.waGray = db.settings.waGray || { numbers: [] };
       db.settings.waGray.numbers = db.settings.waGray.numbers || [];
       let rec = db.settings.waGray.numbers.find(n => n.phone === phone);
-      if (!rec) { rec = { phone, label: String(b.label || '').slice(0, 60), roles: { send: true, call: false }, addedAt: Date.now() }; db.settings.waGray.numbers.push(rec); }
+      if (!rec) {
+        /* лимит номеров по тарифу (Base = 3): свои номера подключаются по QR, но не больше квоты плана */
+        const lim = planOf(store.currentTid()).maxNumbers || 0;
+        if (db.settings.waGray.numbers.length >= lim) return json(res, 403, { error: `Достигнут лимит номеров вашего тарифа (${lim}). Освободите номер или перейдите на план выше.`, limit: lim });
+        rec = { phone, label: String(b.label || '').slice(0, 60), roles: { send: true, call: false }, addedAt: Date.now() }; db.settings.waGray.numbers.push(rec);
+      }
       if (b.label !== undefined) rec.label = String(b.label).slice(0, 60);
       if (b.roles) rec.roles = { send: !!b.roles.send, call: !!b.roles.call };
       store.save();
