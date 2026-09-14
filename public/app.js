@@ -1322,6 +1322,8 @@ function mountHeroVideos(root, theme) {
     /* смена оформления → премиум-«церемония» в палитре новой темы; первичная установка/тот же пресет — тихо */
     if (nk !== cur && !(opts && opts.silent) && window.showThemeLoader) window.showThemeLoader(nk, doApply);
     else doApply();
+    /* синк темы на внешние страницы (встреча/визитка) — только владелец, тихо, fire-and-forget */
+    if (!document.getElementById('loginScreen')) { try { api.patch('/settings', { agency: { pubTheme: nk } }); } catch (e) {} }
   };
   document.addEventListener('click', (e) => {
     if (e.target.closest('#logoutBtn')) {

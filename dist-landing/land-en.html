@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%23080808%27/%3E%3Cpath d=%27M50 14C53 44 61 54 84 60 61 66 53 76 50 106 47 76 39 66 16 60 39 54 47 44 50 14Z%27 fill=%27%23f4f3f1%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lumen — CRM для агентств недвижимости</title>
-<meta name="description" content="78% клиентов выбирают того, кто ответил первым. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает агентство.">
+<title>Lumen: the CRM for real estate agencies</title>
+<meta name="description" content="78% of clients choose whoever replies first. Lumen answers in seconds, qualifies every lead and stops brokers from letting deals slip or walking off with your database. Not one more CRM: the environment your whole agency runs on.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
     --d-bg:#080808; --d-ink:#f4f3f1; --d-ink2:#a7a6a3; --d-ink3:#6b6a68; --d-line:rgba(255,255,255,.11); --d-line2:rgba(255,255,255,.055);
     --l-bg:#f3f1ec; --l-ink:#141311; --l-ink2:#54524d; --l-ink3:#8b8983; --l-line:rgba(0,0,0,.12); --l-line2:rgba(0,0,0,.06);
     --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif; --ease:cubic-bezier(.19,1,.22,1); --pad:clamp(20px,4vw,40px);
-    /* активные (тёмная по умолчанию) */
+    /* active tokens (dark by default) */
     --bg:var(--d-bg);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -26,24 +26,24 @@
   a{color:inherit;text-decoration:none}
   .wrap{max-width:1180px;margin:0 auto;padding-inline:var(--pad)}
 
-  /* ── секции: тёмная/светлая с локальными токенами ── */
+  /* ── sections: dark/light with local tokens ── */
   section,.band{position:relative;z-index:2}
   .dark{background:var(--d-bg);color:var(--d-ink);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);--cell:var(--d-bg)}
   .light{background:var(--l-bg);color:var(--l-ink);--ink:var(--l-ink);--ink2:var(--l-ink2);--ink3:var(--l-ink3);--line:var(--l-line);--line2:var(--l-line2);--cell:var(--l-bg)}
   .sec{padding-block:clamp(84px,12vw,168px)}
-  /* видеофон светлой зоны — живая текстура под сильной светлой вуалью (текст читаем) */
+  /* light-zone video background — live texture under a strong light veil (text stays readable) */
   .vidbg{position:relative;overflow:hidden}
   .vidbg>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg>.vwrap video{position:absolute;top:-14%;left:0;width:100%;height:128%;object-fit:cover;opacity:.55;filter:saturate(.9);will-change:transform}
   .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--l-bg) 0%,rgba(243,241,236,.9) 12%,rgba(243,241,236,.78) 34%,rgba(243,241,236,.76) 50%,rgba(243,241,236,.78) 66%,rgba(243,241,236,.9) 88%,var(--l-bg) 100%)}
   .vidbg>.wrap{position:relative;z-index:1}
-  /* тёмный видеофон — абстракция под тёмной вуалью */
+  /* dark video background — abstraction under a dark veil */
   .vidbg-d{position:relative;overflow:hidden}
   .vidbg-d>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg-d>.vwrap video{position:absolute;top:-14%;left:0;width:100%;height:128%;object-fit:cover;opacity:.38;filter:grayscale(1) contrast(1.05);will-change:transform}
   .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#080808 0%,rgba(8,8,8,.84) 12%,rgba(8,8,8,.7) 34%,rgba(8,8,8,.66) 50%,rgba(8,8,8,.7) 66%,rgba(8,8,8,.84) 88%,#080808 100%)}
   .vidbg-d>.wrap{position:relative;z-index:1}
-  /* переходы зон: smoothstep-градиент (скорость 0 у обоих краёв → нет обрыва) + зернистость-дизеринг */
+  /* zone transitions: smoothstep gradient (zero slope at both ends → no hard edge) + grain dithering */
   .tr{height:clamp(190px,24vw,340px);position:relative;z-index:2}
   .tr::after{content:"";position:absolute;inset:0;opacity:.14;mix-blend-mode:overlay;pointer-events:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px}
@@ -57,7 +57,7 @@
   h2{font-size:clamp(32px,5.2vw,64px)}
   .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:54ch}
   em{font-style:italic;font-weight:400}
-  /* ── премиум-подсветка важных слов: ВСЕГДА видимый базовый цвет + статический металлик-градиент там, где поддержан background-clip (без анимации — она ломала перерисовку и слово пропадало) ── */
+  /* ── premium highlight for key words: an ALWAYS-visible base color + a static metallic gradient where background-clip is supported (no animation — it broke repaints and made the word vanish) ── */
   .dark em,.dark .gld,.hero em{color:#cfccc6}
   .light em,.light .gld{color:#33302a}
   @supports ((-webkit-background-clip:text) or (background-clip:text)){
@@ -74,7 +74,7 @@
   [data-r].in .ln>span{transform:none}
   .lnw .ln:nth-child(2)>span{transition-delay:.1s}.lnw .ln:nth-child(3)>span{transition-delay:.2s}
 
-  /* прогресс чтения */
+  /* reading progress */
   .prog{position:fixed;top:0;left:0;height:2px;width:0;z-index:70;background:linear-gradient(90deg,#8a8885,#f4f3f1);pointer-events:none}
   /* nav */
   .nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .5s,backdrop-filter .5s,border-color .5s,color .4s;border-bottom:1px solid transparent;color:var(--d-ink)}
@@ -119,7 +119,7 @@
   @keyframes up{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
   .hero .kline,.hero-cta{position:relative}
 
-  /* STAT-строки (боли с цифрами) */
+  /* STAT rows (pain points with numbers) */
   .statline{display:grid;grid-template-columns:auto 1fr;gap:clamp(22px,4vw,54px);align-items:baseline;padding:clamp(26px,3.4vw,42px) 0;border-top:1px solid var(--line)}
   .statline:last-child{border-bottom:1px solid var(--line)}
   .statline .big{font-family:var(--serif);font-weight:300;font-size:clamp(50px,8vw,112px);line-height:.9;letter-spacing:-.03em;white-space:nowrap}
@@ -167,7 +167,7 @@
   .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
-  /* ── НАТИВНЫЕ ВИДЖЕТЫ «Ателье» (вместо скриншотов) ── */
+  /* ── native "Atelier" widgets (instead of screenshots) ── */
   .dash{margin-top:50px}
   .dgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:15px;align-items:stretch}
   .dcard{background:#fffdfa;border:1px solid #e8e1d8;border-radius:18px;padding:22px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 26px 44px -30px rgba(20,19,17,.28)}
@@ -203,7 +203,7 @@
   .dtasks li .who{margin-left:auto;font-size:11px;color:#8b8983;white-space:nowrap}
   @media(max-width:860px){.dgrid{grid-template-columns:1fr 1fr}.dhero{grid-row:auto;grid-column:span 2}}
   @media(max-width:560px){.dgrid{grid-template-columns:1fr}.dhero{grid-column:span 1}}
-  /* оживление виджетов «Ателье» */
+  /* animating the "Atelier" widgets */
   .dcard,.dkpi{transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
   .dcard:hover,.dkpi:hover,.dhero:hover{transform:translateY(-4px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 34px 56px -28px rgba(20,19,17,.34)}
   .dh-bars i{transform:scaleY(0);transform-origin:bottom}
@@ -215,11 +215,11 @@
   @keyframes softpulse{0%,100%{opacity:1}50%{opacity:.5}}
   @media(prefers-reduced-motion:reduce){.dh-bars i{transform:none;animation:none}.ddonut .donut{transform:none;opacity:1}.dtasks li em{animation:none}}
 
-  /* ── доп. интерактивные виджеты ── */
+  /* ── extra interactive widgets ── */
   .dgrid2{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-top:15px}
   .dlive{display:inline-flex;align-items:center;gap:6px;font-size:10px!important;color:#b0563f!important;letter-spacing:.06em!important}
   .dlive::before{content:"";width:6px;height:6px;border-radius:50%;background:#b0563f;animation:softpulse 1.6s ease-in-out infinite}
-  /* живая лента */
+  /* live feed */
   .dfeed ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;overflow:hidden}
   .dfeed li{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid #efe9e2;font-size:12.5px;color:#141311;animation:feedIn .5s var(--ease)}
   .dfeed li:first-child{border-top:none}
@@ -227,7 +227,7 @@
   .dfeed li b{font-weight:600}
   .dfeed li span{color:#8b8983;margin-left:auto;font-size:11px;white-space:nowrap}
   @keyframes feedIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-  /* каналы — интерактивные бары */
+  /* channels — interactive bars */
   .dbars{display:grid;gap:12px}
   .dbar{cursor:default}
   .dbar .dbtop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
@@ -237,7 +237,7 @@
   .dash.in .dbar .dbtrack i{width:var(--v,50%)}
   .dbar:hover .dbtrack i{filter:brightness(1.15)}
   .dbar:hover .dbtop{color:#000}
-  /* автопилот ИИ — переключатель */
+  /* AI autopilot — toggle */
   .dai-row{display:flex;align-items:center;gap:14px}
   .dai-txt{flex:1}
   .dai-txt b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;color:#141311}
@@ -252,7 +252,7 @@
   .dai-typing .dt-dots i:nth-child(2){animation-delay:.18s}.dai-typing .dt-dots i:nth-child(3){animation-delay:.36s}
   .dai.off .dai-typing{opacity:.4}
   .dai.off .dai-typing .dt-dots i{animation:none;opacity:.4}
-  /* мини-воронка */
+  /* mini funnel */
   .dfunnel{display:grid;gap:11px}
   .dfstep .dftop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
   .dfstep .dftop b{font-weight:600;font-variant-numeric:tabular-nums}
@@ -263,7 +263,7 @@
   @media(max-width:860px){.dgrid2{grid-template-columns:1fr 1fr}}
   @media(max-width:560px){.dgrid2{grid-template-columns:1fr}}
 
-  /* третий ряд: гейдж скорости, рынки, психо-портрет */
+  /* third row: speed gauge, markets, psychological profile */
   .dgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px}
   .dgauge{display:flex;align-items:center;gap:18px}
   .dgauge .garc{width:98px;height:98px;flex:none;position:relative}
@@ -284,7 +284,7 @@
   .dpsy .dpsy-note em{font-style:normal;color:#141311;font-weight:600}
   @media(max-width:860px){.dgrid3{grid-template-columns:1fr}.dgauge{max-width:none}}
 
-  /* четвёртый ряд: комиссия, путь лида, разбор звонка */
+  /* fourth row: commission, lead journey, call review */
   .dmoney .dtrend{color:#5f9e73!important;font-size:11px!important;letter-spacing:.02em!important}
   .dm-val{font-family:var(--serif);font-weight:300;font-size:clamp(38px,4.4vw,52px);line-height:1;letter-spacing:-.02em;color:#141311;margin:8px 0 14px}
   .dspark{width:100%;height:48px;display:block}
@@ -314,7 +314,7 @@
   .dcall .dc-note em{font-style:normal;color:#141311;font-weight:600}
   @media(prefers-reduced-motion:reduce){.dwave i{animation:none}.dp-step.now i{animation:none}}
 
-  /* Telegram-мессенджер брокера (телефон) */
+  /* broker's Telegram messenger (phone) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
   .tgshow h3{font-family:var(--serif);font-weight:300;font-size:clamp(26px,3.4vw,42px);line-height:1.08;letter-spacing:-.01em}
@@ -324,7 +324,7 @@
   .tgshow .tgb{margin-top:18px;display:grid;gap:11px}
   .tgshow .tgb div{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink2);font-weight:300}
   .tgshow .tgb svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px;color:var(--ink)}
-  /* 3D-макет iPhone (титан, наклон под углом, отклик на курсор) */
+  /* 3D iPhone mockup (titanium, angled tilt, cursor-reactive) */
   .phone3d{justify-self:center;width:clamp(240px,27vw,300px);perspective:1700px;animation:phFloat 8s ease-in-out infinite}
   @keyframes phFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
   .phone{position:relative;width:100%;padding:11px;border-radius:clamp(48px,5vw,60px);transform-style:preserve-3d;
@@ -342,7 +342,7 @@
   .pbtn.l1{left:-2px;top:26%;height:26px}.pbtn.l2{left:-2px;top:calc(26% + 40px);height:50px}
   .pbtn.r1{right:-2px;left:auto;border-radius:2px 0 0 2px;top:30%;height:62px;background:linear-gradient(180deg,#bcb4a3,#7a7263)}
   @media(prefers-reduced-motion:reduce){.phone3d{animation:none}}
-  /* нативное «живое» приложение в стиле Ателье внутри телефона (видеофон-формат) */
+  /* native "live" Atelier-style app inside the phone (video-background format) */
   .appui{position:relative;height:clamp(440px,54vw,540px);display:flex;flex-direction:column;background:#f3f1ec;color:#141311;overflow:hidden}
   .ap-sb{height:32px;flex:none}
   .ap-hd{display:flex;align-items:center;gap:9px;padding:4px 13px 11px;border-bottom:1px solid #e6ded4;background:#f3f1ec}
@@ -370,7 +370,7 @@
   .ap-inp .ap-fld{flex:1;background:#fff;border:1px solid #e8e1d8;border-radius:999px;padding:8px 13px;color:#a9a49b;font-size:11px}
   .ap-inp .ap-mic{width:31px;height:31px;border-radius:50%;background:#1a1815;color:#f3f1ec;display:flex;align-items:center;justify-content:center;flex:none}
   .ap-inp .ap-mic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-  /* мультиэкранность — тур по приложению */
+  /* multi-screen — a tour of the app */
   .ap-scr{position:absolute;left:0;right:0;top:32px;bottom:0;display:flex;flex-direction:column;background:#f3f1ec;opacity:0;transform:translateX(18px) scale(.99);transition:opacity .5s var(--ease),transform .55s var(--ease);pointer-events:none}
   .ap-scr.on{opacity:1;transform:none;pointer-events:auto;z-index:1}
   .ap-htitle{flex:1;font-family:var(--serif);font-weight:500;font-size:14.5px;color:#141311;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -411,7 +411,7 @@
   .pl-info b{display:block;font-family:var(--serif);font-weight:500;font-size:13px;color:#141311}
   .pl-info span{font-size:10.5px;color:#8b8983}
 
-  /* каналы → визуальные ноды, стекающиеся в телефон */
+  /* channels → visual nodes flowing into the phone */
   .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
   .tgflow .chan{display:flex;flex-direction:column;align-items:center;gap:7px;width:62px}
   .tgflow .chan .ci{width:46px;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--cell);display:flex;align-items:center;justify-content:center;transition:.45s var(--ease);position:relative;overflow:hidden}
@@ -427,7 +427,7 @@
   @media(max-width:760px){.tgflow{justify-content:center}.tgflow .tgarrow{display:none}}
   @media(max-width:760px){.tgshow{grid-template-columns:1fr;text-align:center}.tgshow p,.tgshow .tgb{margin-inline:auto}.tgshow .tgchips{justify-content:center}.tgshow .tgb div{text-align:left}}
 
-  /* KILLER FEATURES — «вкусняшки» */
+  /* KILLER FEATURES — the "treats" */
   .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
   .feat{background:var(--cell);padding:clamp(26px,2.6vw,38px);position:relative;transition:background .5s var(--ease),transform .6s var(--ease)}
   .feat:hover{background:color-mix(in srgb,var(--ink) 4%,var(--cell))}
@@ -442,7 +442,7 @@
   @media(max-width:860px){.feats{grid-template-columns:1fr 1fr}}
   @media(max-width:560px){.feats{grid-template-columns:1fr}}
 
-  /* CONTROL (владелец) */
+  /* CONTROL (owner) */
   .ctrl{display:grid;grid-template-columns:1fr 1fr;gap:clamp(26px,5vw,64px);align-items:center;margin-top:10px}
   .ctrl-list{display:grid;gap:14px}
   .ctrl-list .ci{display:flex;gap:14px;align-items:flex-start;font-size:15px;color:var(--ink2);font-weight:300}
@@ -457,7 +457,7 @@
   .num span{display:block;margin-top:9px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
   @media(max-width:620px){.nums{grid-template-columns:1fr 1fr}}
 
-  /* КЕЙСЫ · ВИДЕООТЗЫВЫ */
+  /* CASE STUDIES · VIDEO TESTIMONIALS */
   .vids{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
   .vcard{position:relative;aspect-ratio:4/5;border-radius:18px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:#1a1815;display:block;padding:0;font-family:inherit;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
   .vcard:hover{transform:translateY(-4px);box-shadow:0 30px 52px -28px rgba(20,19,17,.4)}
@@ -496,7 +496,7 @@
   .cpop-x:hover{border-color:rgba(255,255,255,.4);transform:rotate(90deg)}
   @media(max-width:640px){.cpop-card{grid-template-columns:1fr;max-height:92vh;overflow:auto}.cpop-vid{aspect-ratio:5/4}}
 
-  /* карусель видеоотзывов клиентов */
+  /* client video-testimonial carousel */
   .voi{margin-top:clamp(52px,7vw,84px)}
   .voi-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
   .voi-hd h3{font-family:var(--serif);font-weight:300;font-size:clamp(24px,3vw,36px);letter-spacing:-.01em;line-height:1.05}
@@ -569,7 +569,7 @@
   #cook .cbtns button.acc{background:#f4f3f1;color:#0a0a0a;border-color:transparent}
   #cook .cbtns button:hover{transform:translateY(-2px)}
 
-  /* ── MODAL / КОНСУЛЬТАЦИЯ / КАЛЕНДАРЬ ── */
+  /* ── MODAL / CONSULTATION / CALENDAR ── */
   .ovl{position:fixed;inset:0;z-index:150;background:rgba(6,6,6,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s;display:flex;align-items:center;justify-content:center;padding:20px}
   .ovl.in{opacity:1;visibility:visible}
   .modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:#0e0e0f;color:#f4f3f1;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:clamp(24px,3.2vw,42px);transform:translateY(30px) scale(.98);transition:transform .6s var(--ease);position:relative}
@@ -626,7 +626,7 @@
   .faq .qa{padding:0 clamp(18px,2.4vw,28px) 24px;color:var(--ink2);font-size:14.5px;font-weight:300;line-height:1.65;max-width:66ch}
   .faq details[open]{background:color-mix(in srgb,var(--ink) 3%,var(--cell))}
 
-  /* ── FOOTER (юр.) ── */
+  /* ── FOOTER (legal) ── */
   .foot{border-top:1px solid var(--line2);padding-block:clamp(46px,6vw,70px)}
   .foot .fcols{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:clamp(26px,4vw,54px)}
   .foot .fbrand .brand{margin-bottom:15px}
@@ -660,10 +660,10 @@
     <span class="mk">LUMEN</span>
   </a>
   <div class="nlinks">
-    <a href="#pain">Боль</a><a href="#thesis">Идея</a><a href="#product">Продукт</a><a href="#cases">Отзывы</a><a href="#faq">Вопросы</a><a href="#pricing">Цена</a>
-    <a href="/land-en.html" title="English" style="opacity:.6;letter-spacing:.08em">EN</a>
-    <a class="cta" data-consult href="#consult">Демо</a>
-    <a class="cta fill" href="/soon.html"><span>Ранний доступ</span></a>
+    <a href="#pain">The pain</a><a href="#thesis">The idea</a><a href="#product">Product</a><a href="#cases">Testimonials</a><a href="#faq">FAQ</a><a href="#pricing">Pricing</a>
+    <a href="/land.html" title="Русский" style="opacity:.6;letter-spacing:.08em">RU</a>
+    <a class="cta" data-consult href="#consult">Demo</a>
+    <a class="cta fill" href="/soon.html"><span>Early access</span></a>
   </div>
 </div></div></nav>
 
@@ -673,198 +673,198 @@
   <video autoplay muted loop playsinline poster="/assets/land-hero-poster.jpg" id="heroVid"></video>
   <div class="veil"></div><div class="halo"></div>
   <div class="wrap hero-in">
-    <div class="kline">CRM, рождённая в недвижимости</div>
+    <div class="kline">A CRM born in real estate</div>
     <h1 data-r class="in lnw">
-      <span class="ln"><span>Порядок,</span></span>
-      <span class="ln"><span>которого <em>не было</em></span></span>
+      <span class="ln"><span>The order</span></span>
+      <span class="ln"><span>you <em>never had</em></span></span>
     </h1>
-    <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
+    <p class="lede">While your manager is still typing a reply, the client has already messaged three competitors. Lumen answers in seconds, qualifies every lead and stops brokers from letting deals slip or walking off with your database. Not one more CRM: the environment your whole agency runs on.</p>
     <div class="hero-cta">
-      <a class="btn primary" href="/soon.html">Занять место в бете</a>
-      <a class="btn ghost" href="#thesis">Как это работает</a>
+      <a class="btn primary" href="/soon.html">Claim your beta spot</a>
+      <a class="btn ghost" href="#thesis">How it works</a>
     </div>
   </div>
-  <div class="scrollcue">Листайте<i></i></div>
+  <div class="scrollcue">Scroll<i></i></div>
 </header>
 
 <div class="tr d2l"></div>
 
-<!-- PAIN 1 — скорость (светлая, цифры бьют) -->
+<!-- PAIN 1 — speed (light, the numbers hit) -->
 <section class="sec light vidbg" id="pain">
   <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-light1-poster.jpg"><source src="/assets/land-light1.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
-    <div data-r><span class="eyebrow">Где на самом деле теряются деньги</span>
-      <h2 class="lnw" style="margin-top:22px;max-width:20ch"><span class="ln"><span>Выигрывает не лучший.</span></span><span class="ln"><span>Выигрывает <em>первый.</em></span></span></h2>
-      <p class="lede" style="margin-top:20px">Клиент оставляет заявку и в ту же минуту пишет ещё троим. Кто ответил первым — с тем и говорят. Остальные догоняют пустоту. Это не про сервис. Это про секунды.</p>
+    <div data-r><span class="eyebrow">Where the money actually leaks</span>
+      <h2 class="lnw" style="margin-top:22px;max-width:20ch"><span class="ln"><span>The best one doesn't win.</span></span><span class="ln"><span>The <em>first</em> one does.</span></span></h2>
+      <p class="lede" style="margin-top:20px">A client leaves an inquiry and, in the same minute, messages three more agencies. Whoever answers first is the one they talk to. Everyone else chases an empty line. This isn't about service. It's about seconds.</p>
     </div>
     <div style="margin-top:44px">
-      <div class="statline" data-r><div class="big">78%</div><div class="txt"><b>покупателей выбирают агента, который ответил первым</b><p>Не самого опытного, не с лучшей ценой — первого. Пока идёт совещание «кому передать лида», клиент уже на встрече у другого.</p></div></div>
-      <div class="statline d1" data-r><div class="big">47<span style="font-family:var(--serif);font-size:.42em"> мин</span></div><div class="txt"><b>средний ответ на заявку по рынку</b><p>Медиана по 28 000 агентов. А контактность падает в 10 раз уже через час. Заявка остыла ещё сорок минут назад — вы просто об этом не знаете.</p></div></div>
-      <div class="statline d2" data-r><div class="big">91%</div><div class="txt"><b>агентств не отвечают за пять минут</b><p>Ответ в первую минуту конвертит 23% — против 5% после получаса. Скорость — самый дешёвый способ вырасти в два раза, и его почти никто не использует.</p></div></div>
+      <div class="statline" data-r><div class="big">78%</div><div class="txt"><b>of buyers choose the agent who replied first</b><p>Not the most experienced, not the best price: the first. While you're still deciding who gets the lead, the client is already in a meeting with someone else.</p></div></div>
+      <div class="statline d1" data-r><div class="big">47<span style="font-family:var(--serif);font-size:.42em"> min</span></div><div class="txt"><b>the market's average response time to an inquiry</b><p>Median across 28,000 agents. And the odds of reaching a lead drop 10x within an hour. The inquiry went cold forty minutes ago, you just don't know it yet.</p></div></div>
+      <div class="statline d2" data-r><div class="big">91%</div><div class="txt"><b>of agencies don't reply within five minutes</b><p>A reply in the first minute converts at 23%, versus 5% after half an hour. Speed is the cheapest way to double your results, and almost no one uses it.</p></div></div>
     </div>
   </div>
 </section>
 
-<!-- PAIN 2 — сдаются + слив (светлая, та же зона) -->
+<!-- PAIN 2 — giving up + leakage (light, same zone) -->
 <section class="sec light" id="pain2">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">И это только начало</span>
-      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">Оплаченный лид не остыл. <em>Его просто бросили.</em></h2></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">And that's only the start</span>
+      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">The paid lead never went cold. <em>It was simply abandoned.</em></h2></div>
     <div class="prob-grid">
-      <div class="prob-cell" data-r><div class="n">01</div><h3>Сдаются после первого «нет»</h3><p>80% сделок требуют пяти и более касаний. 44% агентов останавливаются после одного. Между «привет» и «позвоните после 18:00» лежит вся выручка — и её никто не забирает.</p><div class="q">«Написал раз — не ответили — забыл»</div></div>
-      <div class="prob-cell d1" data-r><div class="n">02</div><h3>База — на личном телефоне</h3><p>Переписка в личном WhatsApp брокера. Уходит брокер — уходит и вся база к конкуренту. Собственник узнаёт об этом последним. Своей CRM у агентства нет — есть чужие блокноты.</p><div class="q">«Ушёл менеджер — забрал 300 контактов»</div></div>
-      <div class="prob-cell d2" data-r><div class="n">03</div><h3>Софт не про недвижимость</h3><p>Универсальные CRM не знают ни воронку сделки с объектом, ни каналы, ни психологию покупателя. Их не открывают. Данные живут «в голове у менеджера» — до его выходного.</p><div class="q">«CRM есть — ей никто не пользуется»</div></div>
+      <div class="prob-cell" data-r><div class="n">01</div><h3>They give up after the first "no"</h3><p>80% of deals take five or more follow-ups. 44% of agents stop after one. All the revenue sits between "hi" and "call me after 6pm", and no one goes back for it.</p><div class="q">"Messaged once, got no reply, forgot about it"</div></div>
+      <div class="prob-cell d1" data-r><div class="n">02</div><h3>The database lives on a personal phone</h3><p>The conversation sits in the broker's personal WhatsApp. When the broker leaves, the whole database walks over to a competitor. The owner is the last to find out. The agency has no CRM of its own, just other people's notebooks.</p><div class="q">"A manager left and took 300 contacts with them"</div></div>
+      <div class="prob-cell d2" data-r><div class="n">03</div><h3>The software isn't built for real estate</h3><p>Generic CRMs don't understand a property deal's pipeline, the channels, or buyer psychology. So no one opens them. The data lives "in the manager's head", right up until their day off.</p><div class="q">"We have a CRM, nobody uses it"</div></div>
     </div>
   </div>
 </section>
 
 <div class="tr l2d"></div>
 
-<!-- THESIS (тёмная) -->
+<!-- THESIS (dark) -->
 <section class="sec dark" id="thesis">
   <div class="wrap split">
     <div data-r>
-      <span class="eyebrow">Что такое Lumen</span>
-      <div class="big" style="margin-top:22px">Не инструмент, который надо заставлять открывать. <em>Среда</em>, в которой агентство живёт само — от первого сообщения до подписи.</div>
-      <a class="btn ghost" href="#product" style="margin-top:26px">Как это выглядит</a>
+      <span class="eyebrow">What Lumen is</span>
+      <div class="big" style="margin-top:22px">Not a tool you have to force people to open. An <em>environment</em> the agency lives in on its own, from the first message to the signature.</div>
+      <a class="btn ghost" href="#product" style="margin-top:26px">See what it looks like</a>
     </div>
     <div class="tlist d1" data-r>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном месте — WhatsApp, комментарии рекламы, телефония, формы. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку, бюджету и типу. Строит психо-портрет — на что давить, чего избегать, с чем заходить.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки касаний не бросают молчунов. Живые подборки объектов, встречи, разбор звонков — вся операционка без ручной рутины.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Собственник видит риски и слив базы, раздаёт роли и доступы, забирает контакты при оффбординге. База — агентства, а не брокера.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Catches the lead first</b><span>Every channel in one place: WhatsApp, ad comments, telephony, forms. It replies in seconds, around the clock, in the client's language.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Understands the client</b><span>Qualifies by goal, timeline, budget and property type. Builds a psychological profile: what to lean on, what to avoid, how to approach.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Closes the deal</b><span>Follow-up sequences never let the quiet ones slip. Live property shortlists, meetings, call reviews: the whole operation without the manual grind.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Keeps it under control</b><span>The owner sees the risks and any database leakage, assigns roles and access, and reclaims contacts at offboarding. The database belongs to the agency, not the broker.</span></div></div>
     </div>
   </div>
 </section>
 
-<!-- FLOW (тёмная, та же зона) -->
+<!-- FLOW (dark, same zone) -->
 <section class="sec dark" id="flow">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Путь заявки</span>
-      <h2 style="margin-top:22px">От клика <em>до сделки</em> — без ручных рук</h2></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">The inquiry's journey</span>
+      <h2 style="margin-top:22px">From click <em>to deal</em>, without lifting a finger</h2></div>
     <div class="flow d1" data-r>
-      <div class="fstep"><div class="dot">1</div><h4>Заявка влетает</h4><p>С любого канала — сразу в системе, с привязкой к рекламе.</p></div>
-      <div class="fstep"><div class="dot">2</div><h4>Ответ за секунды</h4><p>Первая линия отвечает раньше конкурентов, круглосуточно.</p></div>
-      <div class="fstep"><div class="dot">3</div><h4>Квалификация</h4><p>Цель, срок, бюджет, тип — и психо-портрет клиента.</p></div>
-      <div class="fstep"><div class="dot">4</div><h4>Тёплого — брокеру</h4><p>С историей, сценарием и задачей позвонить за 30 минут.</p></div>
-      <div class="fstep"><div class="dot">5</div><h4>Сделка под контролем</h4><p>Подборки, встречи, разбор звонков — до подписи.</p></div>
+      <div class="fstep"><div class="dot">1</div><h4>The inquiry lands</h4><p>From any channel, instantly in the system and tied to the ad it came from.</p></div>
+      <div class="fstep"><div class="dot">2</div><h4>A reply in seconds</h4><p>The front line answers ahead of competitors, around the clock.</p></div>
+      <div class="fstep"><div class="dot">3</div><h4>Qualification</h4><p>Goal, timeline, budget, type, plus a psychological profile of the client.</p></div>
+      <div class="fstep"><div class="dot">4</div><h4>Warm lead to the broker</h4><p>With full history, a playbook and a task to call within 30 minutes.</p></div>
+      <div class="fstep"><div class="dot">5</div><h4>The deal, under control</h4><p>Shortlists, meetings, call reviews, all the way to the signature.</p></div>
     </div>
   </div>
 </section>
 
 <div class="tr d2l"></div>
 
-<!-- PRODUCT (светлая) -->
+<!-- PRODUCT (light) -->
 <section class="sec light vidbg" id="product">
   <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-light2-poster.jpg"><source src="/assets/land-light2.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
-    <div data-r><span class="eyebrow">Внутри продукта</span>
-      <h2 style="margin-top:22px;max-width:18ch">Рабочий стол агентства, <em>а не набор вкладок</em></h2></div>
+    <div data-r><span class="eyebrow">Inside the product</span>
+      <h2 style="margin-top:22px;max-width:18ch">An agency's workspace, <em>not a pile of tabs</em></h2></div>
     <div class="dash" data-r>
       <div class="dgrid">
         <div class="dcard dhero">
-          <div class="dh-top"><span>Новые лиды · 14 дней</span><span class="dh-badge">▲ 100%</span></div>
+          <div class="dh-top"><span>New leads · 14 days</span><span class="dh-badge">▲ 100%</span></div>
           <div class="dh-num"><span class="cu" data-to="23">0</span></div>
-          <div class="dh-sub">30 всего в работе · 5 в живом диалоге</div>
+          <div class="dh-sub">30 in progress · 5 in a live conversation</div>
           <div class="dh-bars"><i style="height:36%;--d:.02s"></i><i style="height:52%;--d:.07s"></i><i style="height:44%;--d:.12s"></i><i style="height:64%;--d:.17s"></i><i style="height:50%;--d:.22s"></i><i style="height:73%;--d:.27s"></i><i style="height:58%;--d:.32s"></i><i style="height:85%;--d:.37s"></i><i style="height:70%;--d:.42s"></i><i style="height:97%;--d:.47s"></i></div>
         </div>
         <div class="dkpis">
-          <div class="dkpi"><b class="cu" data-to="5">0</b><span>В диалоге с ИИ</span><em>отвечает за секунды</em></div>
-          <div class="dkpi"><b class="cu" data-to="12">0</b><span>Квалифицировано</span><em>с психо-портретом</em></div>
-          <div class="dkpi"><b class="cu" data-to="3">0</b><span>Дошло до сделки</span><em>переданы брокеру</em></div>
+          <div class="dkpi"><b class="cu" data-to="5">0</b><span>In an AI conversation</span><em>replies in seconds</em></div>
+          <div class="dkpi"><b class="cu" data-to="12">0</b><span>Qualified</span><em>with a psychological profile</em></div>
+          <div class="dkpi"><b class="cu" data-to="3">0</b><span>Reached deal stage</span><em>handed to a broker</em></div>
         </div>
         <div class="dcard ddonut">
-          <div class="dc-hd">Статусы лидов <span>воронка</span></div>
+          <div class="dc-hd">Lead statuses <span>pipeline</span></div>
           <div class="dd-row">
-            <div class="donut"><b><span class="cu" data-to="31">0</span><span>лида</span></b></div>
+            <div class="donut"><b><span class="cu" data-to="31">0</span><span>leads</span></b></div>
             <ul class="dlegend">
-              <li><i style="background:#1a1815"></i>Новые<b>16</b></li>
-              <li><i style="background:#a79f92"></i>В диалоге<b>5</b></li>
-              <li><i style="background:#cbc4b8"></i>Квалификация<b>5</b></li>
-              <li><i style="background:#e8e2d9"></i>У брокера<b>4</b></li>
+              <li><i style="background:#1a1815"></i>New<b>16</b></li>
+              <li><i style="background:#a79f92"></i>In conversation<b>5</b></li>
+              <li><i style="background:#cbc4b8"></i>Qualification<b>5</b></li>
+              <li><i style="background:#e8e2d9"></i>With a broker<b>4</b></li>
             </ul>
           </div>
         </div>
         <div class="dcard dtasks">
-          <div class="dc-hd">Мои задачи <span>16 открыто</span></div>
+          <div class="dc-hd">My tasks <span>16 open</span></div>
           <ul>
-            <li><span class="chk"></span>Перезвонить лиду с Пхукета<em>просрочено</em></li>
-            <li><span class="chk"></span>Показ ЖК Marina, 16:00<span class="who">сегодня</span></li>
-            <li><span class="chk"></span>Follow-up тёплых лидов<span class="who">3 шт</span></li>
+            <li><span class="chk"></span>Call back the Phuket lead<em>overdue</em></li>
+            <li><span class="chk"></span>Marina viewing, 4:00pm<span class="who">today</span></li>
+            <li><span class="chk"></span>Follow up warm leads<span class="who">3</span></li>
           </ul>
         </div>
       </div>
       <div class="dgrid2">
-        <div class="dcard dfeed"><div class="dc-hd">Живая лента <span class="dlive">live</span></div><ul id="dfeedList"></ul></div>
-        <div class="dcard dchan"><div class="dc-hd">Источники лидов <span>7 дней</span></div><div class="dbars">
+        <div class="dcard dfeed"><div class="dc-hd">Live feed <span class="dlive">live</span></div><ul id="dfeedList"></ul></div>
+        <div class="dcard dchan"><div class="dc-hd">Lead sources <span>7 days</span></div><div class="dbars">
           <div class="dbar"><div class="dbtop"><span>WhatsApp</span><b>82</b></div><div class="dbtrack"><i style="--v:88%"></i></div></div>
           <div class="dbar"><div class="dbtop"><span>Instagram</span><b>54</b></div><div class="dbtrack"><i style="--v:60%"></i></div></div>
-          <div class="dbar"><div class="dbtop"><span>Комментарии</span><b>31</b></div><div class="dbtrack"><i style="--v:36%"></i></div></div>
-          <div class="dbar"><div class="dbtop"><span>Формы</span><b>18</b></div><div class="dbtrack"><i style="--v:22%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>Comments</span><b>31</b></div><div class="dbtrack"><i style="--v:36%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>Forms</span><b>18</b></div><div class="dbtrack"><i style="--v:22%"></i></div></div>
         </div></div>
-        <div class="dcard dai" id="daiCard"><div class="dc-hd">Автопилот ИИ</div>
-          <div class="dai-row"><div class="dai-txt"><b id="daiTxt">Ведёт 5 диалогов</b><span>среднее время ответа 8 сек</span></div><button class="dtog on" id="dtog" type="button" aria-label="Автопилот ИИ"><span></span></button></div>
-          <div class="dai-typing">Мария — печатает ответ <span class="dt-dots"><i></i><i></i><i></i></span></div>
+        <div class="dcard dai" id="daiCard"><div class="dc-hd">AI autopilot</div>
+          <div class="dai-row"><div class="dai-txt"><b id="daiTxt">Running 5 conversations</b><span>average reply time 8 sec</span></div><button class="dtog on" id="dtog" type="button" aria-label="AI autopilot"><span></span></button></div>
+          <div class="dai-typing">Maria is typing a reply <span class="dt-dots"><i></i><i></i><i></i></span></div>
         </div>
-        <div class="dcard dfun"><div class="dc-hd">Воронка недели</div><div class="dfunnel">
-          <div class="dfstep"><div class="dftop"><span>Лиды</span><b>54</b></div><div class="dftrack"><i style="--w:100%"></i></div></div>
-          <div class="dfstep"><div class="dftop"><span>Квалифицированы</span><b>31</b></div><div class="dftrack"><i style="--w:57%"></i></div></div>
-          <div class="dfstep"><div class="dftop"><span>Встречи</span><b>13</b></div><div class="dftrack"><i style="--w:24%"></i></div></div>
-          <div class="dfstep"><div class="dftop"><span>Сделки</span><b>5</b></div><div class="dftrack"><i style="--w:9%"></i></div></div>
+        <div class="dcard dfun"><div class="dc-hd">This week's funnel</div><div class="dfunnel">
+          <div class="dfstep"><div class="dftop"><span>Leads</span><b>54</b></div><div class="dftrack"><i style="--w:100%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Qualified</span><b>31</b></div><div class="dftrack"><i style="--w:57%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Meetings</span><b>13</b></div><div class="dftrack"><i style="--w:24%"></i></div></div>
+          <div class="dfstep"><div class="dftop"><span>Deals</span><b>5</b></div><div class="dftrack"><i style="--w:9%"></i></div></div>
         </div></div>
       </div>
       <div class="dgrid3">
         <div class="dcard dgauge">
-          <div class="garc"><svg viewBox="0 0 100 100"><circle class="gtrack" cx="50" cy="50" r="42"/><circle class="gfill" cx="50" cy="50" r="42" style="--off:32"/></svg><div class="gval"><b>8с</b><span>ответ</span></div></div>
-          <div class="ginfo"><b>Скорость ответа</b><p>Первая линия отвечает за секунды. Рынок — <s>47 минут</s>.</p></div>
+          <div class="garc"><svg viewBox="0 0 100 100"><circle class="gtrack" cx="50" cy="50" r="42"/><circle class="gfill" cx="50" cy="50" r="42" style="--off:32"/></svg><div class="gval"><b>8s</b><span>reply</span></div></div>
+          <div class="ginfo"><b>Response speed</b><p>The front line replies in seconds. The market: <s>47 minutes</s>.</p></div>
         </div>
-        <div class="dcard"><div class="dc-hd">Рынки <span>лиды</span></div><div class="dbars">
-          <div class="dbar"><div class="dbtop"><span>🇦🇪 Дубай</span><b>38</b></div><div class="dbtrack"><i style="--v:92%"></i></div></div>
-          <div class="dbar"><div class="dbtop"><span>🇮🇩 Бали</span><b>21</b></div><div class="dbtrack"><i style="--v:56%"></i></div></div>
-          <div class="dbar"><div class="dbtop"><span>🇪🇸 Испания</span><b>14</b></div><div class="dbtrack"><i style="--v:38%"></i></div></div>
-          <div class="dbar"><div class="dbtop"><span>🇹🇭 Пхукет</span><b>9</b></div><div class="dbtrack"><i style="--v:24%"></i></div></div>
+        <div class="dcard"><div class="dc-hd">Markets <span>leads</span></div><div class="dbars">
+          <div class="dbar"><div class="dbtop"><span>🇦🇪 Dubai</span><b>38</b></div><div class="dbtrack"><i style="--v:92%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇮🇩 Bali</span><b>21</b></div><div class="dbtrack"><i style="--v:56%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇪🇸 Spain</span><b>14</b></div><div class="dbtrack"><i style="--v:38%"></i></div></div>
+          <div class="dbar"><div class="dbtop"><span>🇹🇭 Phuket</span><b>9</b></div><div class="dbtrack"><i style="--v:24%"></i></div></div>
         </div></div>
-        <div class="dcard dpsy"><div class="dc-hd">Психо-портрет · Мария</div>
-          <div class="dchips"><span>Статусность</span><span>Решает быстро</span><span>Ценит вид</span><span>Не давить ценой</span></div>
-          <p class="dpsy-note"><em>Заход:</em> эксклюзив и панорама воды. Триггер — образ жизни, а не цена.</p>
+        <div class="dcard dpsy"><div class="dc-hd">Psychological profile · Maria</div>
+          <div class="dchips"><span>Status-driven</span><span>Decides fast</span><span>Values the view</span><span>Don't push on price</span></div>
+          <p class="dpsy-note"><em>Approach:</em> exclusivity and a panoramic water view. The trigger is lifestyle, not price.</p>
         </div>
       </div>
       <div class="dgrid3">
-        <div class="dcard dmoney"><div class="dc-hd">Комиссия в работе <span class="dtrend">▲ 18% за неделю</span></div>
-          <div class="dm-val">$2,4M</div>
+        <div class="dcard dmoney"><div class="dc-hd">Commission in the pipeline <span class="dtrend">▲ 18% this week</span></div>
+          <div class="dm-val">$2.4M</div>
           <svg class="dspark" viewBox="0 0 100 32" preserveAspectRatio="none"><path class="sf" d="M0 25 L14 21 L28 23 L42 15 L56 18 L70 10 L84 13 L100 4 L100 32 L0 32 Z"/><path class="sl" d="M0 25 L14 21 L28 23 L42 15 L56 18 L70 10 L84 13 L100 4"/></svg>
         </div>
-        <div class="dcard dpath"><div class="dc-hd">Путь лида</div><div class="dp-line">
-          <div class="dp-step done"><i></i><span>Заявка · WhatsApp</span></div>
-          <div class="dp-step done"><i></i><span>Ответ ИИ · 6 сек</span></div>
-          <div class="dp-step done"><i></i><span>Квалификация · $650k</span></div>
-          <div class="dp-step now"><i></i><span>Встреча · сегодня 16:00</span></div>
-          <div class="dp-step"><i></i><span>Сделка</span></div>
+        <div class="dcard dpath"><div class="dc-hd">Lead journey</div><div class="dp-line">
+          <div class="dp-step done"><i></i><span>Inquiry · WhatsApp</span></div>
+          <div class="dp-step done"><i></i><span>AI reply · 6 sec</span></div>
+          <div class="dp-step done"><i></i><span>Qualification · $650k</span></div>
+          <div class="dp-step now"><i></i><span>Meeting · today 4:00pm</span></div>
+          <div class="dp-step"><i></i><span>Deal</span></div>
         </div></div>
-        <div class="dcard dcall"><div class="dc-hd">Разбор звонка <span>ИИ</span></div>
+        <div class="dcard dcall"><div class="dc-hd">Call review <span>AI</span></div>
           <div class="dc-row"><div class="dc-score"><b>8.4</b><span>/10</span></div><div class="dwave"><i style="--h:60%"></i><i style="--h:85%"></i><i style="--h:45%"></i><i style="--h:70%"></i><i style="--h:95%"></i><i style="--h:55%"></i><i style="--h:75%"></i><i style="--h:40%"></i><i style="--h:88%"></i><i style="--h:62%"></i><i style="--h:50%"></i><i style="--h:80%"></i><i style="--h:66%"></i><i style="--h:44%"></i></div></div>
-          <p class="dc-note"><em>Сильное открытие.</em> Не дожали на возражении по цене — предложить рассрочку.</p>
+          <p class="dc-note"><em>Strong opening.</em> The price objection wasn't closed out, offer a payment plan.</p>
         </div>
       </div>
     </div>
 
     <div class="tgshow" data-r>
       <div>
-        <span class="eyebrow">Единый мессенджер брокера</span>
-        <h3>Все каналы стекаются <em>в один Telegram</em></h3>
-        <p>WhatsApp, Instagram Direct, комментарии рекламы, формы — всё падает брокеру в личный Telegram. Он отвечает из привычного окна, ИИ подхватывает, когда брокер занят, а вся переписка и база остаются в системе агентства.</p>
+        <span class="eyebrow">One inbox for the broker</span>
+        <h3>Every channel flows <em>into one Telegram</em></h3>
+        <p>WhatsApp, Instagram Direct, ad comments, forms: it all lands in the broker's personal Telegram. They reply from a window they already know, the AI steps in when they're busy, and every message and contact stays in the agency's system.</p>
         <div class="tgflow">
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-7.7 13.7L3 21l4.5-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 8.8c-.2.5-.2 1.6.6 2.8.9 1.4 2.3 2.2 3 2.4.7.2 1.2 0 1.5-.4.2-.3.2-.6.1-.8l-1-.7c-.2-.1-.4 0-.6.1l-.4.4a3.8 3.8 0 0 1-1.8-1.8l.4-.4c.1-.2.2-.4.1-.6l-.6-1c-.2-.3-.6-.4-.9-.2z"/></svg></span><span>WhatsApp</span></div>
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.4"/><circle cx="16.7" cy="7.3" r=".6" fill="currentColor" stroke="none"/></svg></span><span>Instagram</span></div>
-          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M21 4L3 10.6l6.2 2.3L11.7 20l3.1-6.9z"/><path d="M9.2 12.9L21 4"/></svg></span><span>Директ</span></div>
-          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M4 5h13v8H9l-4 3v-3H4z"/><path d="M7.5 8.4h6M7.5 10.8h3.5"/></svg></span><span>Комментарии</span></div>
-          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></span><span>Реклама</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M21 4L3 10.6l6.2 2.3L11.7 20l3.1-6.9z"/><path d="M9.2 12.9L21 4"/></svg></span><span>Direct</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M4 5h13v8H9l-4 3v-3H4z"/><path d="M7.5 8.4h6M7.5 10.8h3.5"/></svg></span><span>Comments</span></div>
+          <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></span><span>Ads</span></div>
           <span class="tgarrow" style="position:relative"><svg viewBox="0 0 34 20"><path d="M2 10h27M23 5l6 5-6 5"/></svg><i></i></span>
         </div>
         <div class="tgb">
-          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Один вход для всех каналов — не нужно прыгать по приложениям</div>
-          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>ИИ ведёт диалог и подсказывает ответ на возражение</div>
-          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Личный Telegram брокера — но контакты остаются у агентства</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>One inbox for every channel, no jumping between apps</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>The AI runs the conversation and suggests answers to objections</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>The broker's personal Telegram, but the contacts stay with the agency</div>
         </div>
       </div>
       <div class="phone3d" id="phone3d">
@@ -873,56 +873,56 @@
           <span class="pbtn l1"></span><span class="pbtn l2"></span><span class="pbtn r1"></span>
           <div class="pscr">
             <span class="pisl"></span>
-            <div class="appui" aria-label="Приложение Lumen — переписка, карточка, сводка">
+            <div class="appui" aria-label="Lumen app: conversation, lead card, summary">
               <div class="ap-sb"></div>
-              <!-- 1 · Переписка -->
+              <!-- 1 · Conversation -->
               <div class="ap-scr on" data-s="chat">
                 <div class="ap-hd">
                   <span class="ap-back">‹</span>
-                  <span class="ap-av">М</span>
-                  <div class="ap-who"><b>Мария · Дубай Marina</b><span class="ap-st"><i></i> ИИ ведёт · +971 50…</span></div>
+                  <span class="ap-av">M</span>
+                  <div class="ap-who"><b>Maria · Dubai Marina</b><span class="ap-st"><i></i> AI running · +971 50…</span></div>
                   <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span>
                   <span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z"/></svg></span>
                 </div>
-                <div class="ap-body" id="apBody"><div class="ap-day">Сегодня</div></div>
-                <div class="ap-inp"><span class="ap-fld">Сообщение…</span><span class="ap-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/></svg></span></div>
+                <div class="ap-body" id="apBody"><div class="ap-day">Today</div></div>
+                <div class="ap-inp"><span class="ap-fld">Message…</span><span class="ap-mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/></svg></span></div>
               </div>
-              <!-- 2 · Карточка лида -->
+              <!-- 2 · Lead card -->
               <div class="ap-scr" data-s="card">
-                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Карточка лида</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div>
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Lead card</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div>
                 <div class="ap-cbody">
-                  <div class="lc-top"><span class="ap-av lg">М</span><div class="lc-nm"><b>Мария</b><span>Dubai Marina · 2BR у воды</span></div></div>
-                  <span class="lc-stage">Квалифицирован · из Instagram</span>
+                  <div class="lc-top"><span class="ap-av lg">M</span><div class="lc-nm"><b>Maria</b><span>Dubai Marina · 2BR by the water</span></div></div>
+                  <span class="lc-stage">Qualified · from Instagram</span>
                   <div class="lc-quals">
-                    <div><span>Цель</span><b>Покупка для себя</b></div>
-                    <div><span>Бюджет</span><b>$650 000</b></div>
-                    <div><span>Срок</span><b>1–2 месяца</b></div>
-                    <div><span>Тип</span><b>2BR у воды</b></div>
+                    <div><span>Goal</span><b>Buying for herself</b></div>
+                    <div><span>Budget</span><b>$650,000</b></div>
+                    <div><span>Timeline</span><b>1-2 months</b></div>
+                    <div><span>Type</span><b>2BR by the water</b></div>
                   </div>
-                  <div class="lc-psy"><span>Психо-портрет</span><p>Ценит статус и вид. Заходить через эксклюзив и панораму воды; не давить ценой — давить образом жизни.</p></div>
-                  <div class="lc-acts"><button>Позвонить</button><button class="pri">Собрать подборку</button></div>
+                  <div class="lc-psy"><span>Psychological profile</span><p>Values status and the view. Approach through exclusivity and a panoramic water view; don't push on price, push on lifestyle.</p></div>
+                  <div class="lc-acts"><button>Call</button><button class="pri">Build a shortlist</button></div>
                 </div>
               </div>
-              <!-- 3 · ИИ-сводка -->
+              <!-- 3 · AI summary -->
               <div class="ap-scr" data-s="sum">
-                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">ИИ-сводка по лиду</b><span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span></div>
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">AI lead summary</b><span class="ap-ic"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg></span></div>
                 <div class="ap-cbody">
-                  <div class="sum-card"><p><b>Мария</b> — тёплый лид из Dubai Marina. Готова к покупке для себя в течение 1–2 месяцев, бюджет $650k, ищет 2BR у воды.</p></div>
+                  <div class="sum-card"><p><b>Maria</b> is a warm lead from Dubai Marina. Ready to buy for herself within 1-2 months, budget $650k, looking for a 2BR by the water.</p></div>
                   <ul class="sum-list">
-                    <li>Триггер — панорамный вид на воду</li>
-                    <li>Возражение — интересует рассрочка</li>
-                    <li>Тон — статус, эксклюзив, без давления ценой</li>
+                    <li>Trigger: a panoramic water view</li>
+                    <li>Objection: interested in a payment plan</li>
+                    <li>Tone: status, exclusivity, no pressure on price</li>
                   </ul>
-                  <div class="sum-next"><span>Следующий шаг</span><b>Перезвонить и назначить показ · сегодня 16:00</b></div>
+                  <div class="sum-next"><span>Next step</span><b>Call back and book a viewing · today 4:00pm</b></div>
                 </div>
               </div>
-              <!-- 4 · Подборка -->
+              <!-- 4 · Shortlist -->
               <div class="ap-scr" data-s="coll">
-                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Подборка · 3 объекта</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></div>
+                <div class="ap-hd"><span class="ap-back">‹</span><b class="ap-htitle">Shortlist · 3 properties</b><span class="ap-ic plain"><svg viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg></span></div>
                 <div class="ap-cbody coll">
-                  <div class="pl-item"><div class="pl-img a"></div><div class="pl-info"><b>Marina Vista · 2BR</b><span>Вид на воду · $640k</span></div></div>
-                  <div class="pl-item"><div class="pl-img b"></div><div class="pl-info"><b>Beach Residence · 2BR</b><span>1-я линия · $665k</span></div></div>
-                  <div class="pl-item"><div class="pl-img c"></div><div class="pl-info"><b>Palm Tower · 2BR</b><span>Панорама · $690k</span></div></div>
+                  <div class="pl-item"><div class="pl-img a"></div><div class="pl-info"><b>Marina Vista · 2BR</b><span>Water view · $640k</span></div></div>
+                  <div class="pl-item"><div class="pl-img b"></div><div class="pl-info"><b>Beach Residence · 2BR</b><span>Beachfront · $665k</span></div></div>
+                  <div class="pl-item"><div class="pl-img c"></div><div class="pl-info"><b>Palm Tower · 2BR</b><span>Panorama · $690k</span></div></div>
                 </div>
               </div>
             </div>
@@ -933,133 +933,133 @@
   </div>
 </section>
 
-<!-- KILLER FEATURES (светлая, та же зона) -->
+<!-- KILLER FEATURES (light, same zone) -->
 <section class="sec light" id="feats">
   <div class="wrap">
-    <div data-r><span class="eyebrow">Детали, которых нет у других</span>
-      <h2 style="margin-top:22px;max-width:20ch">Не «есть CRM». <em>Есть то, чего нет ни у кого</em></h2></div>
+    <div data-r><span class="eyebrow">Details no one else has</span>
+      <h2 style="margin-top:22px;max-width:20ch">Not "we have a CRM". <em>We have what no one else does</em></h2></div>
     <div class="feats">
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">Психо-портрет клиента</div><p>ИИ читает переписку и строит профиль покупателя: тип личности, на что давить, чего избегать, с чем заходить. Брокер получает не «лид №47», а инструкцию, как его закрыть.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">ИИ, которого не отличить</div><p>Отвечает с паузами и статусом «печатает…», в живом человеческом темпе. Клиент уверен, что общается с менеджером — а не с автоответчиком, который выдаёт себя первой же секундой.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает клиенту прямо из личного Telegram — удобно и привычно. А вся переписка, медиа и история остаются в системе агентства. Уходит брокер — база остаётся.</p><span class="only">только в Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Живые подборки за минуту</div><p>ИИ собирает брендированную подборку объектов под конкретного клиента — с вашим лого и подписью. И показывает, что именно он открывал и сколько смотрел.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Лиды из комментариев рекламы</div><p>Ловим тех, кто написал под объявлением в Instagram, и уводим в личный диалог — автоматически, пока конкуренты вообще не читают комментарии.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">Звонок в вашем голосе</div><p>Говорите по-русски — клиент слышит вас на своём языке и вашим голосом. По ходу разговора ИИ-суфлёр подсказывает, что ответить на возражение.</p><span class="only">только в Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">Разбор каждого звонка</div><p>ИИ слушает записи и оценивает по методологии продаж: что упустили, где не дожали, какой следующий шаг. Тренер для команды, который не спит.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Реанимация спящей базы</div><p>Молчуны — это уже оплаченные лиды. Цепочки касаний будят их по всем каналам, уважая тихие часы по поясу клиента, и останавливаются, как только человек ответил.</p></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">Академия рынка внутри</div><p>Встроенные знания по Дубаю, Пхукету, Бали: районы, ROI, планы оплаты, скрипты. Новый брокер выходит на сделки, не изучая рынок полгода.</p></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">A psychological profile of the client</div><p>The AI reads the conversation and builds a buyer profile: personality type, what to lean on, what to avoid, how to approach. The broker gets not "lead #47" but a playbook for closing them.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">AI you can't tell apart</div><p>It replies with pauses and a "typing…" status, at a natural human pace. The client is sure they're talking to a real manager, not an auto-responder that gives itself away in the first second.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">A Telegram ⇄ WhatsApp bridge</div><p>The broker answers the client straight from their personal Telegram: familiar and convenient. Yet every message, media file and piece of history stays in the agency's system. When the broker leaves, the database stays.</p><span class="only">only in Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Live shortlists in a minute</div><p>The AI assembles a branded property shortlist for a specific client, with your logo and signature. And it shows exactly what they opened and how long they looked.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Leads from ad comments</div><p>We catch everyone who comments under an Instagram ad and pull them into a private conversation, automatically, while competitors don't even read their comments.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">A call in your own voice</div><p>Speak your language, and the client hears you in theirs, in your voice. As the call unfolds, an AI prompter suggests how to handle each objection.</p><span class="only">only in Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">A review of every call</div><p>The AI listens to the recordings and scores them against a sales methodology: what was missed, where it wasn't closed out, what the next step is. A coach for the team that never sleeps.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Reviving a dormant database</div><p>The quiet ones are leads you've already paid for. Follow-up sequences wake them across every channel, respecting quiet hours in the client's own time zone, and stop the moment they reply.</p></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">A market academy built in</div><p>Built-in knowledge of Dubai, Phuket and Bali: neighborhoods, ROI, payment plans, scripts. A new broker starts closing deals without spending six months learning the market.</p></div>
     </div>
   </div>
 </section>
 
-<!-- CONTROL (светлая, та же зона) — новый блок -->
+<!-- CONTROL (light, same zone) — new block -->
 <section class="sec light" id="control">
   <div class="wrap ctrl">
     <div data-r>
-      <span class="eyebrow">Собственнику</span>
-      <h2 style="margin-top:22px;max-width:16ch">База принадлежит <em>агентству</em></h2>
-      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — не офис и не сайт, а контакты. Lumen делает их вашими: брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
+      <span class="eyebrow">For the owner</span>
+      <h2 style="margin-top:22px;max-width:16ch">The database belongs to <em>the agency</em></h2>
+      <p class="lede" style="margin-top:18px">An agency's most valuable asset isn't the office or the website, it's the contacts. Lumen makes them yours: the broker works from their phone, but the conversation, the history and the client stay in the system. When someone leaves, the database stays.</p>
     </div>
     <div class="ctrl-list d1" data-r>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Пульт контроля: риски, тишина, спорные и «утекающие» лиды — на одном экране</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Роли и доступы: каждый видит только своё, ничего лишнего</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Оффбординг в один клик: забрать контакты и передать дела при уходе брокера</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Мост Telegram ⇄ WhatsApp: брокер отвечает из личного мессенджера, база — в системе</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>A control panel: risks, silence, disputed and "leaking" leads, all on one screen</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Roles and access: everyone sees only their own, nothing extra</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>One-click offboarding: reclaim contacts and hand over deals when a broker leaves</div>
+      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>A Telegram ⇄ WhatsApp bridge: the broker replies from their personal messenger, the database stays in the system</div>
     </div>
   </div>
 </section>
 
-<!-- PROOF (светлая, та же зона) -->
+<!-- PROOF (light, same zone) -->
 <section class="sec light" id="proof">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Кто за Lumen</span>
-      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">Пять лет мы приводили трафик недвижимости. <em>Теперь отдаём систему.</em></h2>
-      <p class="lede" style="margin:18px auto 0;text-align:center">Перформанс-агентство: Дубай, Испания, Кипр, Бали, Таиланд. Мы видели одну и ту же боль в каждом агентстве — и год жили этим продуктом сами, прежде чем предложить его вам.</p></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">Who's behind Lumen</span>
+      <h2 style="margin-top:22px;max-width:22ch;margin-inline:auto">For five years we drove real estate traffic. <em>Now we're handing over the system.</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">A performance agency across Dubai, Spain, Cyprus, Bali and Thailand. We saw the same pain in every agency, and we lived with this product ourselves for a year before offering it to you.</p></div>
     <div class="nums d1" data-r>
-      <div class="num"><b class="cu" data-to="54" data-suf="+">0</b><span>проектов недвижимости</span></div>
-      <div class="num"><b class="cu" data-to="8" data-suf="">0</b><span>стран и рынков</span></div>
-      <div class="num"><b>$15</b><span>средний CPL</span></div>
-      <div class="num"><b class="cu" data-to="5" data-suf="+">0</b><span>языков в диалогах</span></div>
+      <div class="num"><b class="cu" data-to="54" data-suf="+">0</b><span>real estate projects</span></div>
+      <div class="num"><b class="cu" data-to="8" data-suf="">0</b><span>countries and markets</span></div>
+      <div class="num"><b>$15</b><span>average CPL</span></div>
+      <div class="num"><b class="cu" data-to="5" data-suf="+">0</b><span>languages in conversations</span></div>
     </div>
   </div>
 </section>
 
-<!-- КЕЙСЫ · ОТЗЫВЫ (светлая, та же зона) -->
+<!-- CASE STUDIES · TESTIMONIALS (light, same zone) -->
 <section class="sec light" id="cases">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Кейсы TargetPoint</span>
-      <h2 style="margin-top:22px">За Lumen — команда, <em>которая уже привела эти цифры</em></h2>
-      <p class="lede" style="margin:18px auto 0;text-align:center">Lumen построило перформанс-агентство TargetPoint: пять лет, 16 рынков, тысячи лидов в недвижимости. Часть кейсов — вживую.</p></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">TargetPoint case studies</span>
+      <h2 style="margin-top:22px">Behind Lumen is a team <em>that already delivered these numbers</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">Lumen was built by the performance agency TargetPoint: five years, 16 markets, thousands of real estate leads. A few of the cases, live.</p></div>
     <div class="vids" data-r>
-      <button class="vcard" type="button" data-video="/assets/cases/case-baytify.mp4"><img class="vposter" src="/assets/cases/covers/baytify.jpg" loading="lazy" alt="Baytify"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-baytify.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">17 <em>сделок</em></span><b>Baytify</b><span>825 лидов за 4 месяца · масштаб в Дубае</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-ourplace.mp4"><img class="vposter" src="/assets/cases/covers/ourplace.jpg" loading="lazy" alt="Our Place"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-ourplace.mp4"></video><span class="scrim"></span><span class="vtag">🇮🇩 Бали</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">32% <em>квал.</em></span><b>Our Place</b><span>386 лидов для проекта на Бали · $13 CPL</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-buro.mp4"><img class="vposter" src="/assets/cases/covers/buro.jpg" loading="lazy" alt="Buro"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-buro.mp4"></video><span class="scrim"></span><span class="vtag">🇪🇸 Испания</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">€13,9 <em>CPL</em></span><b>Buro</b><span>489 лидов на рынках RU и EN</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-premium.mp4"><img class="vposter" src="/assets/cases/covers/premium.jpg" loading="lazy" alt="Premium Quality"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-premium.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">30%+ <em>квал.</em></span><b>Premium Quality</b><span>Качественные RU/EN лиды на бюджете $50k</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-orange.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ лид</em></span><b>OrangeLife</b><span>Инвестцентр в Дубае · бюджет $48k</span></div></button>
-      <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-highgrove.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Дубай</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>сделки</em></span><b>Highgrove</b><span>Объекты в Дубае за 3,5 месяца</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-baytify.mp4"><img class="vposter" src="/assets/cases/covers/baytify.jpg" loading="lazy" alt="Baytify"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-baytify.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Dubai</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">17 <em>deals</em></span><b>Baytify</b><span>825 leads in 4 months · scaling in Dubai</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-ourplace.mp4"><img class="vposter" src="/assets/cases/covers/ourplace.jpg" loading="lazy" alt="Our Place"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-ourplace.mp4"></video><span class="scrim"></span><span class="vtag">🇮🇩 Bali</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">32% <em>qual.</em></span><b>Our Place</b><span>386 leads for a Bali project · $13 CPL</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-buro.mp4"><img class="vposter" src="/assets/cases/covers/buro.jpg" loading="lazy" alt="Buro"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-buro.mp4"></video><span class="scrim"></span><span class="vtag">🇪🇸 Spain</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">€13.9 <em>CPL</em></span><b>Buro</b><span>489 leads across RU and EN markets</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-premium.mp4"><img class="vposter" src="/assets/cases/covers/premium.jpg" loading="lazy" alt="Premium Quality"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-premium.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Dubai</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">30%+ <em>qual.</em></span><b>Premium Quality</b><span>Quality RU/EN leads on a $50k budget</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-orange.mp4"><img class="vposter" src="/assets/cases/covers/orange.jpg" loading="lazy" alt="OrangeLife"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-orange.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Dubai</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">$17 <em>/ lead</em></span><b>OrangeLife</b><span>Investment hub in Dubai · $48k budget</span></div></button>
+      <button class="vcard" type="button" data-video="/assets/cases/case-highgrove.mp4"><img class="vposter" src="/assets/cases/covers/highgrove.jpg" loading="lazy" alt="Highgrove"><video class="vvid" muted loop playsinline preload="none" src="/assets/cases/case-highgrove.mp4"></video><span class="scrim"></span><span class="vtag">🇦🇪 Dubai</span><span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vcap"><span class="vkpi">4+ <em>deals</em></span><b>Highgrove</b><span>Dubai properties in 3.5 months</span></div></button>
     </div>
 
     <div class="voi" data-r>
       <div class="voi-hd">
-        <div><span class="eyebrow">Голосом клиентов</span><h3>Что говорят <em>агентства и брокеры</em></h3></div>
-        <div class="voi-nav"><button id="voiPrev" type="button" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><button id="voiNext" type="button" aria-label="Вперёд"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>
+        <div><span class="eyebrow">In our clients' words</span><h3>What <em>agencies and brokers</em> say</h3></div>
+        <div class="voi-nav"><button id="voiPrev" type="button" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><button id="voiNext" type="button" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>
       </div>
       <div class="voi-track" id="voiTrack"></div>
     </div>
   </div>
 </section>
 
-<!-- FAQ (светлая, та же зона) -->
+<!-- FAQ (light, same zone) -->
 <section class="sec light" id="faq">
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Вопросы, которые задают до нас</span>
-      <h2 style="margin-top:22px">Коротко и <em>честно</em></h2></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">The questions clients ask first</span>
+      <h2 style="margin-top:22px">Short and <em>honest</em></h2></div>
     <div class="faq" data-r>
-      <details><summary>Чем это отличается от обычной CRM?<span class="qx"></span></summary><div class="qa">Обычную CRM надо заставлять открывать — и её всё равно не открывают. Lumen работает сам: ловит заявку с любого канала, отвечает за секунды, квалифицирует, строит психо-портрет и не даёт лиду остыть. Вы приходите к готовому — тёплому клиенту с историей и сценарием, а не к пустой карточке, которую нужно заполнять вручную.</div></details>
-      <details><summary>Заберёт ли брокер базу, если уйдёт?<span class="qx"></span></summary><div class="qa">Нет. Брокер отвечает клиенту из личного Telegram — привычно и удобно, — но вся переписка, медиа и контакты остаются в системе агентства. При оффбординге контакты передаются в один клик. База принадлежит агентству, а не телефону сотрудника.</div></details>
-      <details><summary>Нужна ли своя команда разработки?<span class="qx"></span></summary><div class="qa">Нет. Мы год вели этот продукт сами и отдаём готовую систему: настройка, интеграции (WhatsApp, комментарии рекламы, телефония), обновления и поддержка — на нас. Запуск занимает дни, а не полгода.</div></details>
-      <details><summary>На каких языках общается ИИ?<span class="qx"></span></summary><div class="qa">Диалоги, подборки и звонки — на языке клиента. Русский, английский, испанский, арабский и другие. В звонке вы говорите по-русски, а клиент слышит вас на своём языке и вашим голосом.</div></details>
-      <details><summary>Что с безопасностью данных?<span class="qx"></span></summary><div class="qa">Доступы разграничены по ролям — каждый видит только своё. Собственник контролирует риски, спорные и «утекающие» лиды на отдельном пульте. Данные обрабатываются в соответствии с GDPR; компания зарегистрирована в ЕС (Бельгия).</div></details>
-      <details><summary>Сколько стоит и есть ли пробный период?<span class="qx"></span></summary><div class="qa">Первым десяти агентствам — условия беты: $200/мес вместо $300 за команду из 5 брокеров и руководителя. Первые дни — бесплатно, без карты, отмена в один клик. Вы платите за систему, а не за каждый лид.</div></details>
+      <details><summary>How is this different from a regular CRM?<span class="qx"></span></summary><div class="qa">A regular CRM has to be forced open, and it still doesn't get opened. Lumen works on its own: it catches an inquiry from any channel, replies in seconds, qualifies, builds a psychological profile and never lets a lead go cold. You arrive to a finished, warm client with a full history and a playbook, not an empty card you have to fill in by hand.</div></details>
+      <details><summary>Will a broker take the database if they leave?<span class="qx"></span></summary><div class="qa">No. The broker answers the client from their personal Telegram, which is familiar and convenient, but every message, media file and contact stays in the agency's system. At offboarding, the contacts are handed over in one click. The database belongs to the agency, not to an employee's phone.</div></details>
+      <details><summary>Do we need our own development team?<span class="qx"></span></summary><div class="qa">No. We ran this product ourselves for a year and hand over a finished system: setup, integrations (WhatsApp, ad comments, telephony), updates and support are all on us. Launch takes days, not six months.</div></details>
+      <details><summary>What languages does the AI speak?<span class="qx"></span></summary><div class="qa">Conversations, shortlists and calls happen in the client's language: Russian, English, Spanish, Arabic and more. On a call you speak your own language, and the client hears you in theirs, in your voice.</div></details>
+      <details><summary>What about data security?<span class="qx"></span></summary><div class="qa">Access is scoped by role, so everyone sees only their own. The owner monitors risks, disputed and "leaking" leads on a dedicated control panel. Data is processed in line with GDPR; the company is registered in the EU (Belgium).</div></details>
+      <details><summary>How much does it cost, and is there a trial?<span class="qx"></span></summary><div class="qa">The first ten agencies get beta terms: $200/month instead of $300 for a team of 5 brokers plus a manager. The first few days are free, no card required, cancel in one click. You pay for the system, not for each lead.</div></details>
     </div>
   </div>
 </section>
 
 <div class="tr l2d"></div>
 
-<!-- PRICING (тёмная) -->
+<!-- PRICING (dark) -->
 <section class="sec dark vidbg-d" id="pricing">
   <div class="vwrap"><video autoplay muted loop playsinline poster="/assets/land-dark-poster.jpg"><source src="/assets/land-dark.mp4?v=1" type="video/mp4"></video></div>
   <div class="wrap">
-    <div data-r style="text-align:center"><span class="eyebrow c">Ранний доступ</span>
-      <h2 style="margin-top:22px">Прозрачно. <em>Без оплаты за лида.</em></h2>
-      <p class="lede" style="margin:18px auto 0;text-align:center">Не арендуете чужой поток заявок — получаете свою систему. Первым десяти агентствам — условия беты.</p></div>
+    <div data-r style="text-align:center"><span class="eyebrow c">Early access</span>
+      <h2 style="margin-top:22px">Transparent. <em>No pay-per-lead.</em></h2>
+      <p class="lede" style="margin:18px auto 0;text-align:center">You're not renting someone else's stream of inquiries, you get your own system. The first ten agencies get beta terms.</p></div>
     <div class="price d1" data-r>
-      <span class="tag">Бета · первым 10 агентствам</span>
-      <div class="val"><s>$300</s><b>$200</b><i>/мес</i></div>
-      <div class="sub">5 брокеров + руководитель · внедрение $200</div>
+      <span class="tag">Beta · first 10 agencies</span>
+      <div class="val"><s>$300</s><b>$200</b><i>/mo</i></div>
+      <div class="sub">5 brokers + a manager · $200 onboarding</div>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Запуск за 7 дней, а не за полгода</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>WhatsApp, комментарии, телефония — из коробки</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Квалификация, подборки, психо-портрет, пульт контроля</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Обновления и поддержка, без своей команды разработки</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Launch in 7 days, not six months</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>WhatsApp, comments and telephony, out of the box</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Qualification, shortlists, psychological profiles, a control panel</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Updates and support, with no development team of your own</li>
       </ul>
-      <a class="btn primary" href="/soon.html">Занять место в бете</a>
-      <div class="rr">Первые дни — бесплатно, без карты. Отмена в один клик.</div>
+      <a class="btn primary" href="/soon.html">Claim your beta spot</a>
+      <div class="rr">The first few days are free, no card. Cancel in one click.</div>
     </div>
   </div>
 </section>
 
 <div class="tr d2l"></div>
 
-<!-- FINAL (светлая) -->
+<!-- FINAL (light) -->
 <section class="sec light final" id="final">
   <div class="wrap" data-r>
-    <h2>Пусть выигрывает <em>ваше</em> агентство</h2>
-    <p class="lede">Ранний доступ открывается скоро. Оставьте почту — позовём одними из первых. Или посмотрите систему вживую на 20-минутном демо.</p>
+    <h2>Let <em>your</em> agency be the one that wins</h2>
+    <p class="lede">Early access opens soon. Leave your email and we'll invite you among the first. Or see the system live in a 20-minute demo.</p>
     <div class="hero-cta" style="animation:none;opacity:1">
-      <a class="btn primary" href="/soon.html">Ранний доступ</a>
-      <a class="btn ghost" data-consult href="#consult">Записаться на демо</a>
+      <a class="btn primary" href="/soon.html">Early access</a>
+      <a class="btn ghost" data-consult href="#consult">Book a demo</a>
     </div>
   </div>
 </section>
@@ -1071,83 +1071,83 @@
         <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg>
         <span class="mk">LUMEN</span>
       </a>
-      <p>Среда, в которой живёт агентство недвижимости — от первого сообщения до подписи. Продукт перформанс-агентства TargetPoint.</p>
+      <p>The environment a real estate agency lives in, from the first message to the signature. A product by the performance agency TargetPoint.</p>
     </div>
     <div class="fcol">
-      <h5>Продукт</h5>
-      <a href="#thesis">Идея</a>
-      <a href="#product">Возможности</a>
-      <a href="#faq">Вопросы</a>
-      <a href="#pricing">Цена</a>
-      <a data-consult href="#consult">Записаться на демо</a>
+      <h5>Product</h5>
+      <a href="#thesis">The idea</a>
+      <a href="#product">Features</a>
+      <a href="#faq">FAQ</a>
+      <a href="#pricing">Pricing</a>
+      <a data-consult href="#consult">Book a demo</a>
     </div>
     <div class="fcol">
-      <h5>Правовое</h5>
-      <a href="/privacy.html">Политика конфиденциальности</a>
-      <a href="/terms.html">Условия использования</a>
-      <a href="/cookies.html">Политика cookie</a>
-      <a href="#" data-cookie-settings>Настройки cookie</a>
+      <h5>Legal</h5>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Use</a>
+      <a href="/cookies.html">Cookie Policy</a>
+      <a href="#" data-cookie-settings>Cookie settings</a>
     </div>
     <div class="fcol">
-      <h5>Компания</h5>
+      <h5>Company</h5>
       <address>TargetPoint<br>Rue du Trône 100, 3rd floor<br>1050 Brussels, Belgium</address>
       <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
       <a href="https://targetpoint.agency" target="_blank" rel="noopener">targetpoint.agency</a>
     </div>
   </div>
   <div class="fbar">
-    <span>© 2026 Lumen — продукт TargetPoint. Все права защищены.</span>
-    <span class="fbr-links"><a href="/privacy.html">Конфиденциальность</a><a href="/terms.html">Условия</a><a href="/cookies.html">Cookie</a></span>
+    <span>© 2026 Lumen - a TargetPoint product. All rights reserved.</span>
+    <span class="fbr-links"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/cookies.html">Cookie</a></span>
   </div>
 </div></footer>
 
-<!-- КОНСУЛЬТАЦИЯ / ДЕМО -->
+<!-- CONSULTATION / DEMO -->
 <div class="ovl" id="consultOvl" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cTitle">
-    <button class="x" id="cClose" aria-label="Закрыть">✕</button>
+    <button class="x" id="cClose" aria-label="Close">✕</button>
     <div id="cBody">
       <div class="mhead">
         <div class="mav" id="cAvatar">TP</div>
         <div>
-          <h3 id="cTitle">Живое демо <em>Lumen</em></h3>
-          <div class="msub">20 минут, без слайдов. Покажем систему на вашем сценарии и ответим на вопросы. Выберите удобное время.</div>
+          <h3 id="cTitle">A live <em>Lumen</em> demo</h3>
+          <div class="msub">20 minutes, no slides. We'll show the system on your own scenario and answer your questions. Pick a time that works for you.</div>
         </div>
       </div>
       <div class="cal" id="cal">
-        <div class="chd"><button type="button" id="calPrev" aria-label="Назад">‹</button><b id="calMon"></b><button type="button" id="calNext" aria-label="Вперёд">›</button></div>
-        <div class="cdow"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="chd"><button type="button" id="calPrev" aria-label="Previous">‹</button><b id="calMon"></b><button type="button" id="calNext" aria-label="Next">›</button></div>
+        <div class="cdow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
         <div class="cgrid" id="calGrid"></div>
       </div>
-      <div class="slots" id="slots" hidden><span class="slab">Время (по вашему часовому поясу)</span></div>
+      <div class="slots" id="slots" hidden><span class="slab">Time (in your time zone)</span></div>
       <form class="mform" id="cForm" novalidate>
-        <input type="text" name="name" placeholder="Ваше имя" autocomplete="name" required>
-        <input type="text" name="agency" placeholder="Агентство" autocomplete="organization">
-        <input type="text" name="contact" placeholder="Телефон или e-mail для связи" required>
-        <textarea name="note" placeholder="Пара слов о задаче (необязательно)"></textarea>
+        <input type="text" name="name" placeholder="Your name" autocomplete="name" required>
+        <input type="text" name="agency" placeholder="Agency" autocomplete="organization">
+        <input type="text" name="contact" placeholder="Phone or email to reach you" required>
+        <textarea name="note" placeholder="A few words about your challenge (optional)"></textarea>
         <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <div class="mpick" id="cPick">Выберите дату и время</div>
-        <button type="submit" class="btn primary">Записаться на демо</button>
+        <div class="mpick" id="cPick">Pick a date and time</div>
+        <button type="submit" class="btn primary">Book a demo</button>
       </form>
     </div>
   </div>
 </div>
 
 <!-- COOKIE -->
-<div id="cook" role="dialog" aria-label="Использование cookie">
-  <p>Мы используем cookie, чтобы сайт работал и становился лучше. Подробнее — в <a href="/cookies.html">политике cookie</a> и <a href="/privacy.html">конфиденциальности</a>.</p>
-  <div class="cbtns"><button class="acc" id="ckAccept">Принять</button><button id="ckReject">Только необходимые</button></div>
+<div id="cook" role="dialog" aria-label="Cookie usage">
+  <p>We use cookies to keep the site running and make it better. Learn more in our <a href="/cookies.html">cookie policy</a> and <a href="/privacy.html">privacy policy</a>.</p>
+  <div class="cbtns"><button class="acc" id="ckAccept">Accept</button><button id="ckReject">Only necessary</button></div>
 </div>
 
-<!-- POPUP КЕЙСА (видео + текст) -->
+<!-- CASE POPUP (video + text) -->
 <div class="cpop" id="cpop" aria-hidden="true"><div class="cpop-card">
-  <button class="cpop-x" id="cpopX" aria-label="Закрыть">✕</button>
+  <button class="cpop-x" id="cpopX" aria-label="Close">✕</button>
   <div class="cpop-vid"><video id="cpopV" muted loop playsinline></video></div>
   <div class="cpop-txt">
     <span class="cpop-geo" id="cpopGeo"></span>
     <div class="cpop-kpi" id="cpopKpi"></div>
     <h3 id="cpopName"></h3>
     <p id="cpopDesc"></p>
-    <a class="cpop-link" id="cpopLink" target="_blank" rel="noopener">Смотреть кейс на targetpoint.agency →</a>
+    <a class="cpop-link" id="cpopLink" target="_blank" rel="noopener">See the case on targetpoint.agency →</a>
   </div>
 </div></div>
 
@@ -1156,14 +1156,14 @@
   var lights=[].slice.call(document.querySelectorAll('.light'));
   function onScroll(){
     nav.classList.toggle('solid',scrollY>20);
-    // цвет навбара по секции под ним
+    // navbar color based on the section beneath it
     var navB=72, onLight=false;
     for(var i=0;i<lights.length;i++){var r=lights[i].getBoundingClientRect();if(r.top<=navB&&r.bottom>=navB){onLight=true;break;}}
     nav.classList.toggle('onlight',onLight);
   }
   addEventListener('scroll',onScroll,{passive:true});onScroll();
 
-  /* ── прогресс чтения + параллакс видеофонов (competitor-grade motion) ── */
+  /* ── reading progress + video-background parallax (competitor-grade motion) ── */
   var prog=document.getElementById('prog');
   var RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
   var pars=[].slice.call(document.querySelectorAll('.vwrap video'));
@@ -1189,7 +1189,7 @@
   var cuIO=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var el=e.target;cuIO.unobserve(el);var to=+el.dataset.to,suf=el.dataset.suf||'',t0=performance.now();(function s(t){var p=Math.min(1,(t-t0)/1100),v=Math.round((1-Math.pow(1-p,3))*to);el.textContent=v+suf;if(p<1)requestAnimationFrame(s)})(t0)})},{threshold:.5});
   document.querySelectorAll('.cu').forEach(function(el){cuIO.observe(el)});
 
-  // hero-видео подставим когда готово (Higgsfield); poster держит кадр пока
+  // hero video is swapped in when ready (Higgsfield); the poster holds the frame until then
   (function(){var v=document.getElementById('heroVid');if(!v)return;var s=document.createElement('source');s.src='/assets/land-hero.mp4?v=1';s.type='video/mp4';v.appendChild(s);v.load&&v.load();v.play&&v.play().catch(function(){});})();
 
   /* ── LOADER ── */
@@ -1205,13 +1205,13 @@
     document.querySelectorAll('[data-cookie-settings]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();c.classList.add('in')})});
   })();
 
-  /* ── КОНСУЛЬТАЦИЯ + КАЛЕНДАРЬ ── */
+  /* ── CONSULTATION + CALENDAR ── */
   (function(){
     var ovl=document.getElementById('consultOvl');if(!ovl)return;
     var grid=document.getElementById('calGrid'),monL=document.getElementById('calMon'),prev=document.getElementById('calPrev'),next=document.getElementById('calNext');
     var slotsBox=document.getElementById('slots'),pick=document.getElementById('cPick'),form=document.getElementById('cForm'),body=document.getElementById('cBody');
-    var MON=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-    var MONG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var MONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
     var SLOTS=['10:00','11:30','13:00','15:00','16:30','18:00'];
     var today=new Date();today.setHours(0,0,0,0);
     var view=new Date(today.getFullYear(),today.getMonth(),1);
@@ -1222,14 +1222,14 @@
       monL.textContent=MON[view.getMonth()]+' '+view.getFullYear();
       prev.disabled=sameMonth(view,today);
       var first=new Date(view.getFullYear(),view.getMonth(),1);
-      var lead=(first.getDay()+6)%7; // неделя с Пн
+      var lead=(first.getDay()+6)%7; // week starts on Mon
       var days=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
       var max=new Date(today);max.setDate(max.getDate()+60);
       var html='';var i;
       for(i=0;i<lead;i++)html+='<button class="emp" disabled></button>';
       for(var d=1;d<=days;d++){
         var dd=new Date(view.getFullYear(),view.getMonth(),d);
-        var dis=dd<today||dd>max||dd.getDay()===0; // без воскресений и прошлого
+        var dis=dd<today||dd>max||dd.getDay()===0; // no Sundays and no past dates
         var cls=[];if(dd.getTime()===today.getTime())cls.push('today');if(selDate&&dd.getTime()===selDate.getTime())cls.push('sel');
         html+='<button type="button" data-d="'+d+'"'+(dis?' disabled':'')+(cls.length?' class="'+cls.join(' ')+'"':'')+'>'+d+'</button>';
       }
@@ -1239,13 +1239,13 @@
       selDate=new Date(view.getFullYear(),view.getMonth(),+b.dataset.d);selSlot=null;render();renderSlots();updatePick();});
     function renderSlots(){
       slotsBox.hidden=!selDate;if(!selDate)return;
-      var h='<span class="slab">Время (по вашему часовому поясу)</span>';
+      var h='<span class="slab">Time (in your time zone)</span>';
       SLOTS.forEach(function(s){h+='<button type="button" data-s="'+s+'">'+s+'</button>';});
       slotsBox.innerHTML=h;
     }
     slotsBox.addEventListener('click',function(e){var b=e.target.closest('button[data-s]');if(!b)return;
       selSlot=b.dataset.s;slotsBox.querySelectorAll('button').forEach(function(x){x.classList.toggle('sel',x===b)});updatePick();});
-    function updatePick(){pick.innerHTML=selDate?('Выбрано: <b>'+fmt(selDate)+(selSlot?', '+selSlot:'')+'</b>'+(selSlot?'':' — выберите время')):'Выберите дату и время';}
+    function updatePick(){pick.innerHTML=selDate?('Selected: <b>'+fmt(selDate)+(selSlot?', '+selSlot:'')+'</b>'+(selSlot?'':' - pick a time')):'Pick a date and time';}
     prev.onclick=function(){if(prev.disabled)return;view.setMonth(view.getMonth()-1);render()};
     next.onclick=function(){view.setMonth(view.getMonth()+1);render()};
     render();
@@ -1258,10 +1258,10 @@
     form.addEventListener('submit',function(e){e.preventDefault();
       if(form.company.value)return; // honeypot
       var name=form.name.value.trim(),contact=form.contact.value.trim();
-      if(!name||!contact){pick.innerHTML='<b>Заполните имя и контакт</b>';return;}
-      if(!selDate||!selSlot){pick.innerHTML='<b>Выберите дату и время</b>';return;}
+      if(!name||!contact){pick.innerHTML='<b>Please fill in your name and contact</b>';return;}
+      if(!selDate||!selSlot){pick.innerHTML='<b>Pick a date and time</b>';return;}
       var disp=fmt(selDate)+', '+selSlot;
-      var btn=form.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Отправляем…';
+      var btn=form.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Sending…';
       var payload={name:name,agency:form.agency.value.trim(),contact:contact,note:form.note.value.trim(),
         date:selDate.getFullYear()+'-'+('0'+(selDate.getMonth()+1)).slice(-2)+'-'+('0'+selDate.getDate()).slice(-2),slot:selSlot,disp:disp,
         tz:(window.Intl&&Intl.DateTimeFormat().resolvedOptions().timeZone)||''};
@@ -1270,11 +1270,11 @@
         .catch(function(){done(disp)});
     });
     function done(disp){
-      body.innerHTML='<div class="mok"><div class="okc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>Готово, ждём вас</h3><div class="msub">Демо забронировано на <b style="color:#f4f3f1">'+disp+'</b>. Мы свяжемся по указанному контакту и пришлём ссылку на встречу.</div><button class="btn primary" id="cDone" style="max-width:220px;margin-inline:auto">Закрыть</button></div>';
+      body.innerHTML='<div class="mok"><div class="okc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3>All set, see you there</h3><div class="msub">Your demo is booked for <b style="color:#f4f3f1">'+disp+'</b>. We\'ll reach out on the contact you provided and send a link to the meeting.</div><button class="btn primary" id="cDone" style="max-width:220px;margin-inline:auto">Close</button></div>';
       document.getElementById('cDone').onclick=close;
     }
   })();
-  /* ── 3D-телефон: отклик наклона на курсор ── */
+  /* ── 3D phone: tilt reacts to the cursor ── */
   (function(){var w=document.getElementById('phone3d');if(!w)return;var ph=w.querySelector('.phone');if(!ph)return;
     if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
     var host=w.closest('.tgshow')||w;
@@ -1286,15 +1286,15 @@
     host.addEventListener('pointerleave',function(){ph.style.setProperty('--ry','-19deg');ph.style.setProperty('--rx','5deg');});
   })();
 
-  /* ── живой Ателье-мессенджер в телефоне (видеофон-формат) ── */
+  /* ── live Atelier messenger inside the phone (video-background format) ── */
   (function(){var body=document.getElementById('apBody');if(!body)return;
     var msgs=[
-      {d:'inc',t:'Здравствуйте! Смотрю Dubai Marina, 2 спальни',tm:'01:46'},
-      {d:'out',t:'Мария, добрый день! Отличный выбор 🙌 Подскажите бюджет и сроки?',tm:'01:48'},
-      {d:'inc',t:'До 650 тысяч, ближайшие пару месяцев',tm:'02:04'},
-      {d:'out',t:'Поняла. Важна близость к воде? Для себя или под аренду?',tm:'02:06'},
-      {d:'inc',t:'Для себя, обязательно у воды',tm:'02:20'},
-      {d:'out',t:'Отобрала 3 варианта у воды под ваш бюджет — сейчас пришлю ✨',tm:'02:21'}
+      {d:'inc',t:'Hi! Looking at Dubai Marina, 2 bedrooms',tm:'01:46'},
+      {d:'out',t:'Hi Maria, great choice 🙌 What\'s your budget and timeline?',tm:'01:48'},
+      {d:'inc',t:'Up to 650k, in the next couple of months',tm:'02:04'},
+      {d:'out',t:'Got it. Is being close to the water important? For yourself or to rent out?',tm:'02:06'},
+      {d:'inc',t:'For myself, and it has to be by the water',tm:'02:20'},
+      {d:'out',t:'I\'ve picked 3 waterfront options within your budget, sending them now ✨',tm:'02:21'}
     ];
     var i=0;
     function trim(){while(body.children.length>6)body.children[1].remove();}
@@ -1310,7 +1310,7 @@
     io.observe(document.getElementById('phone3d')||body);
   })();
 
-  /* ── тур по экранам телефона: переписка → карточка → сводка → подборка ── */
+  /* ── tour of the phone screens: conversation → card → summary → shortlist ── */
   (function(){var scrs=[].slice.call(document.querySelectorAll('.appui .ap-scr'));if(scrs.length<2)return;
     var i=0,started=false;
     function show(n){scrs.forEach(function(s,k){s.classList.toggle('on',k===n)});}
@@ -1320,7 +1320,7 @@
     io.observe(document.getElementById('phone3d'));
   })();
 
-  /* ── кейсы: видео по ховеру в карточке + минимальный popup с текстом кейса ── */
+  /* ── cases: hover-to-play video in the card + a minimal popup with the case text ── */
   (function(){var pop=document.getElementById('cpop');if(!pop)return;var pv=document.getElementById('cpopV');
     function txt(c,sel){var e=c.querySelector(sel);return e?e.textContent.trim():'';}
     document.querySelectorAll('.vcard').forEach(function(c){
@@ -1345,15 +1345,15 @@
     addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.classList.contains('on'))close();});
   })();
 
-  /* ── карусель видеоотзывов клиентов (kinescope по клику) ── */
+  /* ── client video-testimonial carousel (kinescope on click) ── */
   (function(){var tr=document.getElementById('voiTrack');if(!tr)return;
     var VOICES=[
-      {f:'tropicana',name:'Tropicana Development',sub:'Недвижимость · Дубай'},
-      {f:'mortix',name:'Mortix',sub:'Консалтинг · Дубай'},
-      {f:'anastasia',name:'Anastasia',sub:'Риелтор · Мадейра'},
-      {f:'wellstate',name:'Wellstate',sub:'Отзыв клиента'},
-      {f:'levon',name:'Levon',sub:'Отзыв клиента'},
-      {f:'ns',name:'NS',sub:'Отзыв клиента'}
+      {f:'tropicana',name:'Tropicana Development',sub:'Real estate · Dubai'},
+      {f:'mortix',name:'Mortix',sub:'Consulting · Dubai'},
+      {f:'anastasia',name:'Anastasia',sub:'Realtor · Madeira'},
+      {f:'wellstate',name:'Wellstate',sub:'Client testimonial'},
+      {f:'levon',name:'Levon',sub:'Client testimonial'},
+      {f:'ns',name:'NS',sub:'Client testimonial'}
     ];
     tr.innerHTML=VOICES.map(function(v){return '<div class="voi-card" data-f="'+v.f+'"><img class="poster" src="/assets/testi/'+v.f+'.jpg" loading="lazy" alt="'+v.name+'"><span class="vscrim"></span><span class="vplay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><div class="vmeta"><b>'+v.name+'</b><span>'+v.sub+'</span></div></div>';}).join('');
     tr.querySelectorAll('.voi-card').forEach(function(card){card.addEventListener('click',function(){if(card.classList.contains('playing'))return;var vd=document.createElement('video');vd.src='/assets/testi/'+card.dataset.f+'.mp4';vd.controls=true;vd.autoplay=true;vd.setAttribute('playsinline','');card.appendChild(vd);card.classList.add('playing');vd.play&&vd.play().catch(function(){});});});
@@ -1363,30 +1363,30 @@
     if(nx)nx.onclick=function(){tr.scrollBy({left:step()*1.6,behavior:'smooth'});};
   })();
 
-  /* ── живая лента лидов (тикер) ── */
+  /* ── live lead feed (ticker) ── */
   (function(){var list=document.getElementById('dfeedList');if(!list)return;
     var EV=[
-      {c:'#7fb98a',b:'Новый лид',t:'Мария · Дубай · WhatsApp',w:'сейчас'},
-      {c:'#8ab8d8',b:'ИИ ответил',t:'за 6 секунд',w:'1 мин'},
-      {c:'#d8b26a',b:'Квалифицирован',t:'бюджет $650k',w:'3 мин'},
-      {c:'#b06a52',b:'Просят менеджера',t:'Артём · Бали',w:'5 мин'},
-      {c:'#7fb98a',b:'Новый лид',t:'Ольга · Пхукет · Instagram',w:'8 мин'},
-      {c:'#8ab8d8',b:'Встреча назначена',t:'показ ЖК Marina · 16:00',w:'12 мин'},
-      {c:'#d8b26a',b:'Подборка открыта',t:'клиент смотрел 4 мин',w:'15 мин'}
+      {c:'#7fb98a',b:'New lead',t:'Maria · Dubai · WhatsApp',w:'now'},
+      {c:'#8ab8d8',b:'AI replied',t:'in 6 seconds',w:'1 min'},
+      {c:'#d8b26a',b:'Qualified',t:'budget $650k',w:'3 min'},
+      {c:'#b06a52',b:'Asked for a manager',t:'Artem · Bali',w:'5 min'},
+      {c:'#7fb98a',b:'New lead',t:'Olga · Phuket · Instagram',w:'8 min'},
+      {c:'#8ab8d8',b:'Meeting booked',t:'Marina viewing · 4:00pm',w:'12 min'},
+      {c:'#d8b26a',b:'Shortlist opened',t:'client viewed for 4 min',w:'15 min'}
     ];
     function inner(e){return '<span class="fdot" style="background:'+e.c+'"></span><span><b>'+e.b+'</b> · '+e.t+'</span><span>'+e.w+'</span>';}
     list.innerHTML=EV.slice(0,4).map(function(e){return '<li>'+inner(e)+'</li>';}).join('');
     var i=4,paused=false,card=list.closest('.dcard');
     card.addEventListener('mouseenter',function(){paused=true;});card.addEventListener('mouseleave',function(){paused=false;});
     var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.disconnect();
-      setInterval(function(){if(paused)return;var e2=Object.assign({},EV[i%EV.length],{w:'сейчас'});i++;var li=document.createElement('li');li.innerHTML=inner(e2);list.insertBefore(li,list.firstChild);while(list.children.length>4)list.removeChild(list.lastChild);},2700);
+      setInterval(function(){if(paused)return;var e2=Object.assign({},EV[i%EV.length],{w:'now'});i++;var li=document.createElement('li');li.innerHTML=inner(e2);list.insertBefore(li,list.firstChild);while(list.children.length>4)list.removeChild(list.lastChild);},2700);
     }})},{threshold:.3});
     io.observe(card);
   })();
 
-  /* ── автопилот ИИ: переключатель ── */
+  /* ── AI autopilot: toggle ── */
   (function(){var t=document.getElementById('dtog');if(!t)return;var card=document.getElementById('daiCard'),txt=document.getElementById('daiTxt');
-    t.addEventListener('click',function(){var on=t.classList.toggle('on');card.classList.toggle('off',!on);if(txt)txt.textContent=on?'Ведёт 5 диалогов':'На паузе — ведёте вы';});
+    t.addEventListener('click',function(){var on=t.classList.toggle('on');card.classList.toggle('off',!on);if(txt)txt.textContent=on?'Running 5 conversations':'Paused, you\'re in control';});
   })();
 </script>
 </body>

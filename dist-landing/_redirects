@@ -1,1 +1,3 @@
-/*    /index.html   200
+/api/*  https://norm-dirt-pottery-broadcasting.trycloudflare.com/api/:splat  200
+/waitlist  /waitlist.html  200
+/soon  /soon.html  200

@@ -572,6 +572,10 @@ function publicTenantFor(p) {
   if ((m = p.match(/^\/mp\/([a-zA-Z0-9_]+)/)) || (m = p.match(/^\/api\/mediaplans\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().mediaplans || []).some(x => x.id === id)); }
   if ((m = p.match(/^\/learn\/([a-zA-Z0-9]+)/))) { const tok = m[1]; return findTenant(() => { const L = store.get().settings.learn; return !!(L && L.shareToken === tok); }); }
   if ((m = p.match(/^\/cal\/([a-zA-Z0-9_]+)\.ics/))) { const id = m[1]; return findTenant(() => (store.get().collections || []).some(c => c.id === id) || (store.get().meetings || []).some(x => x.id === id)); }
+  /* внешняя страница встречи /m/:id (+ /confirm, /reschedule, /ics) — резолвим тенанта-владельца встречи */
+  if ((m = p.match(/^\/m\/(mt_[\w]+)/))) { const id = m[1]; return findTenant(() => (store.get().meetings || []).some(x => x.id === id)); }
+  /* визитка брокера /b/:id */
+  if ((m = p.match(/^\/b\/([a-zA-Z0-9_]+)/))) { const id = m[1]; return findTenant(() => (store.get().brokers || []).some(x => x.id === id || x.cardId === id)); }
   return null;
 }
 /* короткий отпечаток устройства из UA (без внешних либ): платформа + браузер */
@@ -1289,8 +1293,12 @@ const PUB_FACES = {
   mono:     { ink:'#0d0d0d', paper:'#ffffff', muted:'#6b6b6b', line:'rgba(0,0,0,.13)',        accent:'#171717', dark:'#0a0a0a', chip:'#f4f4f4', video:'assets/skyline-mono.mp4?v=1',    poster:'assets/skyline-mono-poster.jpg',    vidFilter:'grayscale(1) brightness(.55) contrast(1.08)',  scrimA:'rgba(8,8,8,.36)',   scrimB:'rgba(8,8,8,.62)',  scrimC:'rgba(8,8,8,.85)',   display:"'Manrope',system-ui,sans-serif", dispW:'800', body:"'Manrope',system-ui,sans-serif" },
   night:    { ink:'#eaf0ff', paper:'rgba(14,22,42,.9)', muted:'#8fa3c8', line:'rgba(140,170,255,.2)', accent:'#5b84ff', dark:'#050b18', chip:'rgba(255,255,255,.06)', video:'assets/skyline-night.mp4?v=1', poster:'assets/skyline-night-poster.jpg', vidFilter:'brightness(.55) contrast(1.04)', scrimA:'rgba(5,11,24,.4)', scrimB:'rgba(5,11,24,.66)', scrimC:'rgba(5,11,24,.86)', display:"'Cormorant',Georgia,serif", dispW:'600', body:"'Manrope',system-ui,sans-serif" },
 };
+/* тема CRM (light/dark/warm/emerald/frame/mono/atelier) → «лицо» внешних страниц.
+   Так внешние страницы (встреча/визитка) синхронны с оформлением, выбранным агентством. */
+const PUB_THEME_MAP = { light: 'cobalt', dark: 'night', warm: 'burgundy', emerald: 'glass', mono: 'mono', frame: 'mono', atelier: 'atelier', cobalt: 'cobalt', burgundy: 'burgundy', glass: 'glass', night: 'night' };
 function pubFace(db) {
-  const t = (db && db.settings && db.settings.agency && db.settings.agency.pubTheme) || 'atelier';
+  const raw = (db && db.settings && db.settings.agency && db.settings.agency.pubTheme) || 'atelier';
+  const t = PUB_THEME_MAP[raw] || 'atelier';
   const f = PUB_FACES[t] || PUB_FACES.atelier;
   const gf = 'https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap';
   return Object.assign({ gf }, f);
@@ -5259,9 +5267,10 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const lead = db.leads.find(l => l.id === b.leadId);
       if (!lead) return json(res, 400, { error: 'lead not found' });
-      const broker = db.brokers.find(x => x.id === (b.brokerId || lead.broker)) || db.brokers.find(x => x.geo === lead.geo) || db.brokers[0];
+      /* solo-агентство без брокеров: встречу ведёт сам владелец → broker может быть null (страница это учитывает) */
+      const broker = db.brokers.find(x => x.id === (b.brokerId || lead.broker)) || db.brokers.find(x => x.geo === lead.geo) || db.brokers[0] || null;
       const mt = {
-        id: store.nextId('mt'), leadId: lead.id, brokerId: broker.id,
+        id: store.nextId('mt'), leadId: lead.id, brokerId: broker ? broker.id : null,
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
         dur: Math.max(15, Math.min(240, +b.dur || 60)),
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
@@ -5275,9 +5284,10 @@ const server = http.createServer(async (req, res) => {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
         const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
         const base = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu} с ${broker.name} — ${when}. Вся информация, напоминание и кнопка подключения: ${base}/m/${mt.id} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
+        const withWho = broker ? ' с ' + broker.name : '';
+        engine.send(db, lead, `${lead.name.split(' ')[0]}, подтверждаю: ${kindRu}${withWho} — ${when}. Вся информация, напоминание и кнопка подключения: ${base}/m/${mt.id} Если время перестанет подходить, просто напишите сюда, перенесём.`, 'ai');
       }
-      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name} + ${broker.name} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
+      ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name}${broker ? ' + ' + broker.name : ''} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
       store.save();
       return json(res, 200, mt);
     }
@@ -8190,6 +8200,14 @@ h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:
 .btn:active{transform:scale(.985)}
 .b-video{background:var(--ink);color:var(--paper);box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
 .b-video:hover{box-shadow:0 14px 32px -10px rgba(0,0,0,.6)}
+.b-video .ld{width:9px;height:9px;border-radius:50%;background:#22c55e;display:none;flex:none}
+.b-video.live{background:#16a34a;color:#fff;animation:livePulse 2.2s ease-in-out infinite}
+.b-video.live .ld{display:inline-block;animation:livedot 1.4s infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 10px 26px -10px rgba(22,163,74,.55)}50%{box-shadow:0 16px 44px -6px rgba(22,163,74,.85)}}
+@keyframes livedot{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}}
+.livebn{display:none;align-items:center;justify-content:center;gap:8px;color:#16a34a;font-weight:700;font-size:14px;margin:4px 0 16px}
+.livebn i{width:9px;height:9px;border-radius:50%;background:#16a34a;animation:livedot 1.4s infinite}
+.soon{color:var(--accent);font-weight:700;font-size:12.5px;letter-spacing:.02em;margin-top:-4px;margin-bottom:6px}
 .b-ok{background:transparent;border:1.5px solid var(--ink);color:var(--ink);font-weight:700}
 .b-ok.done{background:var(--ink);color:var(--paper);border-color:var(--ink);pointer-events:none}
 .b-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
@@ -8207,9 +8225,10 @@ h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:
   <h1>${esc(lead.name ? lead.name.split(' ')[0] + ', ждём вас' : 'Ждём вас')}</h1>
   <div class="when">${esc(when)}</div>
   <div class="rule"></div>
+  <div class="livebn" id="liveBn"><i></i>Встреча идёт прямо сейчас</div>
   <div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>
   <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note">${esc(mt.note)}</div>` : ''}</div>
-  ${mt.link ? `<a class="btn b-video" href="${esc(mt.link)}" target="_blank">Подключиться к видеовстрече</a>` : ''}
+  ${mt.link ? `<a class="btn b-video" id="joinBtn" href="${esc(mt.link)}" target="_blank"><span class="ld"></span><span id="joinTx">Подключиться к видеовстрече</span></a>` : ''}
   <button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
   <button class="btn b-ghost" id="moveBtn">Попросить перенос</button>
   <div class="cal-row">
@@ -8219,9 +8238,25 @@ h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:
   <div class="foot">${esc(AG)}${broker.phone ? ' · ' + esc(broker.phone) : ''}</div>
 </div>
 <script>
-const AT=${mt.at};
-const tick=()=>{const d=Math.max(0,AT-Date.now());document.getElementById('cdD').textContent=Math.floor(d/864e5);document.getElementById('cdH').textContent=Math.floor(d%864e5/36e5);document.getElementById('cdM').textContent=Math.floor(d%36e5/6e4);};
-tick();setInterval(tick,15000);
+const AT=${mt.at},DUR=${mt.dur || 60};
+const cd=document.getElementById('cd'),liveBn=document.getElementById('liveBn'),jb=document.getElementById('joinBtn'),jt=document.getElementById('joinTx');
+const tick=()=>{
+  const now=Date.now(),d=AT-now,endAt=AT+DUR*6e4;
+  /* окно «идёт»: за 5 мин до старта и до конца длительности → живое состояние + пульс на кнопке */
+  const live=now>=AT-3e5&&now<=endAt;
+  if(live){
+    cd.style.display='none';liveBn.style.display='flex';
+    if(jb){jb.classList.add('live');if(jt)jt.textContent='Подключиться — встреча идёт';}
+  }else if(now>endAt){
+    cd.style.display='none';liveBn.style.display='none';
+    if(jb){jb.classList.remove('live');if(jt)jt.textContent='Открыть комнату встречи';}
+  }else{
+    liveBn.style.display='none';cd.style.display='';
+    if(jb){jb.classList.remove('live');if(jt)jt.textContent='Подключиться к видеовстрече';}
+    const dd=Math.max(0,d);document.getElementById('cdD').textContent=Math.floor(dd/864e5);document.getElementById('cdH').textContent=Math.floor(dd%864e5/36e5);document.getElementById('cdM').textContent=Math.floor(dd%36e5/6e4);
+  }
+};
+tick();setInterval(tick,5000);
 document.getElementById('okBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/confirm',{method:'POST'});e.target.textContent='✓ Вы подтвердили участие';e.target.classList.add('done');});
 document.getElementById('moveBtn').addEventListener('click',async(e)=>{await fetch('/m/${mt.id}/reschedule',{method:'POST'});e.target.textContent='Передали менеджеру — свяжемся с вами';e.target.disabled=true;});
 </${'script'}></body></html>`);
@@ -9629,7 +9664,7 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
 
     /* ---------------- статика ---------------- */
-    let file = p === '/' ? '/index.html' : p === '/landing' ? '/landing.html' : p;
+    let file = p === '/' ? '/land.html' : p === '/landing' ? '/landing.html' : p;
     file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
     const full = path.join(PUBLIC, file);
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }

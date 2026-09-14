@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%23080808%27/%3E%3Cpath d=%27M50 14C53 44 61 54 84 60 61 66 53 76 50 106 47 76 39 66 16 60 39 54 47 44 50 14Z%27 fill=%27%23f4f3f1%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen — ранний доступ</title>
+<meta name="description" content="Порядок, которого не было. Ранний доступ к Lumen — среде для агентств недвижимости. Оставьте заявку в лист ожидания.">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="Lumen — скоро. Ранний доступ.">
+<meta property="og:description" content="Порядок, которого не было. Лист ожидания открыт.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@300;400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080808; --bg2:#0e0e10; --ink:#f4f3f1; --ink2:#a7a6a3; --ink3:#6b6a68;
+    --line:rgba(255,255,255,.12); --line2:rgba(255,255,255,.06);
+    --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif;
+    --ease:cubic-bezier(.19,1,.22,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overflow-x:hidden; overflow-y:auto; position:relative;
+  }
+  /* ── амбиент: глубокий графитовый радиал + медленное сияние + зерно ── */
+  .bg{position:fixed;inset:0;z-index:0;background:
+    radial-gradient(120% 90% at 50% -10%, #17171a 0%, #0c0c0e 45%, #060606 100%);}
+  .sheen{position:fixed;inset:-30%;z-index:0;pointer-events:none;opacity:.5;
+    background:conic-gradient(from 210deg at 50% 40%, transparent 0deg, rgba(255,255,255,.07) 60deg, transparent 130deg, rgba(255,255,255,.04) 220deg, transparent 300deg);
+    filter:blur(40px); animation:spin 34s linear infinite; mix-blend-mode:screen;}
+  .halo{position:fixed;left:50%;top:38%;width:70vmax;height:70vmax;transform:translate(-50%,-50%);z-index:0;pointer-events:none;
+    background:radial-gradient(closest-side, rgba(255,255,255,.06), transparent 70%); animation:breathe 9s ease-in-out infinite;}
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .vign{position:fixed;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 0 200px 40px rgba(0,0,0,.7);}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.9;transform:translate(-50%,-50%) scale(1.12)}}
+  /* ── дрейфующая пыль (люкс-искры, монохром) ── */
+  .dust{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+  .dust i{position:absolute;bottom:-12px;width:2px;height:2px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 7px rgba(255,255,255,.45);opacity:0;animation:floatUp linear infinite}
+  @keyframes floatUp{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.6}88%{opacity:.5}100%{transform:translateY(-106vh) translateX(var(--dx,0));opacity:0}}
+  /* ── тонкий вертикальный луч, дышит ── */
+  .beam{position:fixed;left:50%;top:0;width:1px;height:100%;z-index:0;pointer-events:none;transform:translateX(-50%);
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.13) 42%,rgba(255,255,255,.05) 60%,transparent);
+    animation:beamB 7s ease-in-out infinite}
+  @keyframes beamB{0%,100%{opacity:.22;transform:translateX(-50%) scaleY(.92)}50%{opacity:.55;transform:translateX(-50%) scaleY(1)}}
+  /* ── вспышка успеха (радиальное кольцо) ── */
+  .pulse{position:fixed;left:50%;top:44%;width:10px;height:10px;z-index:1;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%) scale(0);opacity:0;box-shadow:0 0 0 1px rgba(255,255,255,.55)}
+  .pulse.go{animation:pl 1.15s var(--ease) forwards}
+  @keyframes pl{0%{opacity:.7;transform:translate(-50%,-50%) scale(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(60)}}
+  /* ── сияющий свип по вордмарку на ховер ── */
+  .brand .mk{cursor:default;background-image:linear-gradient(90deg,#f4f3f1 0%,#f4f3f1 42%,#ffffff 50%,#f4f3f1 58%,#f4f3f1 100%);background-size:250% 100%;background-position:120% 0;-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand .mk:hover{animation:sweepmk 1.05s var(--ease)}
+  @keyframes sweepmk{from{background-position:130% 0}to{background-position:-130% 0}}
+  /* ── мерцание eyebrow ── */
+  .eyebrow{position:relative;overflow:hidden}
+  .eyebrow::after{content:"";position:absolute;top:0;left:-45%;width:45%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:shimmer 5s ease-in-out infinite;animation-delay:1.5s}
+  @keyframes shimmer{0%{left:-45%}50%,100%{left:135%}}
+  /* ── магнитная кнопка (плавный возврат) + параллакс ── */
+  .field .go{transition:transform .35s var(--ease),background .45s var(--ease),color .45s var(--ease),border-color .45s var(--ease)}
+  .halo,.core h1{will-change:transform}
+  @media(prefers-reduced-motion:reduce){.dust,.beam,.eyebrow::after{animation:none;display:none}}
+
+  .wrap{position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;
+    padding:clamp(22px,4vw,44px); max-width:1180px;margin:0 auto}
+
+  /* ── шапка ── */
+  .top{display:flex;align-items:center;justify-content:space-between;opacity:0;animation:up .9s var(--ease) .1s forwards}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand .mk{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:.42em;padding-left:.42em}
+  .brand .sub{font-size:9.5px;letter-spacing:.34em;color:var(--ink3);text-transform:uppercase}
+  .top .st{font-size:10.5px;letter-spacing:.28em;color:var(--ink3);text-transform:uppercase;display:flex;align-items:center;gap:9px}
+  .top .st i{width:5px;height:5px;border-radius:50%;background:#d8d6d2;box-shadow:0 0 0 0 rgba(216,214,210,.6);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(216,214,210,.5)}50%{box-shadow:0 0 0 6px rgba(216,214,210,0)}}
+
+  /* ── центр ── */
+  .core{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(20px,3vh,34px);padding-block:clamp(24px,5vh,60px)}
+  /* когда открыта форма — ужимаем hero, чтобы визард гарантированно помещался */
+  .core.slim{gap:22px;justify-content:flex-start;padding-top:clamp(40px,8vh,90px)}
+  .core.slim h1{font-size:clamp(28px,4.6vw,48px);line-height:1.06}
+  .core.slim h1 .ln{padding:.05em .2em .1em}
+  .core.slim .eyebrow,.core.slim .lede{display:none}
+  .eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink2);
+    border:1px solid var(--line);border-radius:999px;padding:9px 18px;opacity:0;animation:up .9s var(--ease) .28s forwards;
+    background:rgba(255,255,255,.02);backdrop-filter:blur(6px)}
+
+  h1{font-family:var(--serif);font-weight:300;font-size:clamp(44px,9vw,108px);line-height:.98;letter-spacing:-.015em}
+  h1 .ln{display:block;overflow:hidden;padding:.12em .28em .2em}
+  h1 .ln>span{display:block;transform:translateY(110%);animation:rise 1.15s var(--ease) forwards}
+  h1 .ln:nth-child(1)>span{animation-delay:.42s}
+  h1 .ln:nth-child(2)>span{animation-delay:.56s}
+  h1 em{font-style:italic;font-weight:400;
+    background:linear-gradient(180deg,#ffffff,#b9b7b3 60%,#7c7a77);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{max-width:44ch;font-size:clamp(14.5px,1.5vw,17px);font-weight:300;line-height:1.6;color:var(--ink2);opacity:0;animation:up 1s var(--ease) .9s forwards}
+
+  /* ── форма (минимализм: подчёркнутое поле + стрелка) ── */
+  .wl{width:min(520px,92vw);opacity:0;animation:up 1s var(--ease) 1.05s forwards}
+  .field{position:relative;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:14px 2px 15px;transition:border-color .5s var(--ease)}
+  .field::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:0;background:linear-gradient(90deg,#fff,#8f8d8a);transition:width .6s var(--ease)}
+  .field.focus{border-color:transparent}
+  .field.focus::after{width:100%}
+  .field input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-family:var(--sans);font-size:clamp(15px,1.7vw,18px);font-weight:300;letter-spacing:.01em}
+  .field input::placeholder{color:var(--ink3)}
+  .field .go{flex:0 0 auto;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.45s var(--ease);position:relative;overflow:hidden}
+  .field .go:hover{background:#f4f3f1;color:#0a0a0a;border-color:transparent;transform:translateX(2px)}
+  .field .go svg{width:19px;height:19px;transition:transform .45s var(--ease)}
+  .field .go:hover svg{transform:translateX(2px)}
+  .field.busy .go{pointer-events:none}
+  .field.busy .go svg{opacity:0}
+  .field.busy .go::before{content:"";position:absolute;width:17px;height:17px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:spin .7s linear infinite}
+  .field.shake{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  .hint{margin-top:14px;font-size:11.5px;letter-spacing:.06em;color:var(--ink3);display:flex;align-items:center;gap:8px;justify-content:center}
+  .hint svg{width:13px;height:13px;opacity:.7}
+  .hint.err{color:#e8a0a0}
+
+  /* ── пошаговая форма ── */
+  .wsteps{position:relative;transition:height .55s var(--ease)}
+  .wstep{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .5s var(--ease),transform .55s var(--ease)}
+  .wstep.on{opacity:1;transform:none;pointer-events:auto}
+  .wstep.leaving{opacity:0;transform:translateY(-14px);pointer-events:none}
+  /* стартовый экран формы */
+  .wlgate{width:min(520px,92vw);text-align:center;opacity:0;animation:up 1s var(--ease) 1.05s forwards}
+  .wlgate.hide{opacity:0;transform:translateY(-12px);pointer-events:none;transition:opacity .5s var(--ease),transform .5s var(--ease)}
+  .wlcta{position:relative;overflow:hidden;font-family:inherit;font-size:15px;letter-spacing:.02em;font-weight:600;color:#0a0a0a;background:#f4f3f1;border:1px solid transparent;border-radius:999px;padding:17px 34px;cursor:pointer;display:inline-flex;align-items:center;gap:12px;transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+  .wlcta:hover{transform:translateY(-3px);box-shadow:0 20px 44px rgba(0,0,0,.45)}
+  .wlcta .ar{transition:transform .4s var(--ease)}
+  .wlcta:hover .ar{transform:translateX(4px)}
+  .wlcta::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-18deg);animation:ctaSheen 3.8s ease-in-out infinite}
+  @keyframes ctaSheen{0%{left:-60%}46%,100%{left:135%}}
+  .wlnote{margin-top:15px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3)}
+  .wl{display:none;opacity:1}
+  .wl.on{display:block}
+  @media(prefers-reduced-motion:reduce){.wlcta::after{animation:none;display:none}.wstep{filter:none}.wstep.leaving{filter:none}}
+  .qlabel{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;display:flex;align-items:center;gap:10px;justify-content:flex-start}
+  .qlabel .qn{color:var(--ink2);font-variant-numeric:tabular-nums;letter-spacing:.12em}
+  .consent{display:flex;gap:12px;align-items:flex-start;margin-top:10px;cursor:pointer;text-align:left;user-select:none}
+  .consent input{position:absolute;opacity:0;width:0;height:0}
+  .consent .cbox{flex:0 0 20px;width:20px;height:20px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.3s var(--ease);margin-top:1px}
+  .consent .cbox svg{width:12px;height:12px;opacity:0;transform:scale(.5);transition:.3s var(--ease);stroke:#0a0a0a;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .consent input:checked+.cbox{background:#f4f3f1;border-color:transparent}
+  .consent input:checked+.cbox svg{opacity:1;transform:none}
+  .consent input:focus-visible+.cbox{border-color:var(--ink2)}
+  .consent .ctxt{font-size:12.2px;line-height:1.55;color:var(--ink2);font-weight:300}
+  .consent .ctxt a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  .go.gowide{width:100%;height:auto;border-radius:999px;padding:15px 24px;margin-top:16px;font-size:14px;letter-spacing:.04em;background:#f4f3f1;color:#0a0a0a;border-color:transparent;gap:9px}
+  .go.gowide:hover{transform:translateY(-2px)}
+  .go.gowide.busy{pointer-events:none;color:transparent}
+  .go.gowide.busy::before{content:"";position:absolute;top:50%;left:50%;width:17px;height:17px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid rgba(0,0,0,.25);border-top-color:#0a0a0a;animation:spin .7s linear infinite}
+  .wdots{display:flex;gap:7px;justify-content:center;margin-top:20px}
+  .wdots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:.4s var(--ease)}
+  .wdots i.on{background:var(--ink);transform:scale(1.18)}
+  .wdots i.done{background:var(--ink2)}
+  .wback{background:none;border:none;color:var(--ink3);font-family:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;padding:4px;display:inline-flex;align-items:center;gap:6px;transition:color .3s;margin-top:12px}
+  .wback:hover{color:var(--ink)}
+  .wback[hidden]{display:none}
+  /* choice / multi опции */
+  .qopts{display:grid;gap:10px;margin-top:4px}
+  .qopts.two{grid-template-columns:1fr 1fr}
+  .qopt{display:flex;align-items:center;gap:12px;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:13px;padding:15px 17px;color:var(--ink);font-family:inherit;font-size:15px;font-weight:300;cursor:pointer;transition:.28s var(--ease)}
+  .qopt:hover{border-color:rgba(255,255,255,.34);background:rgba(255,255,255,.05);transform:translateY(-1px)}
+  .qopt .qtick{flex:0 0 18px;width:18px;height:18px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.25s}
+  .qopt.multi .qtick{border-radius:6px}
+  .qopt .qtick svg{width:11px;height:11px;stroke:#0a0a0a;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.5);transition:.25s}
+  .qopt.sel{border-color:transparent;background:rgba(255,255,255,.1)}
+  .qopt.sel .qtick{background:#f4f3f1;border-color:transparent}
+  .qopt.sel .qtick svg{opacity:1;transform:none}
+  .qopt .qem{margin-left:auto;opacity:.5;font-size:16px}
+  @media(max-width:520px){.qopts.two{grid-template-columns:1fr}}
+
+  /* ── успех ── */
+  .done{width:min(520px,92vw);display:none;flex-direction:column;align-items:center;gap:16px;text-align:center}
+  .done.on{display:flex;animation:up .8s var(--ease) forwards}
+  .done .mark{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+  .done .mark svg{width:30px;height:30px}
+  .done .mark path{stroke:#f4f3f1;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;animation:draw .7s var(--ease) .15s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .done h3{font-family:var(--serif);font-weight:400;font-size:clamp(26px,4vw,40px);letter-spacing:-.01em}
+  .done p{font-size:14px;font-weight:300;color:var(--ink2);max-width:38ch;line-height:1.6}
+  .done .pos{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line);border-radius:999px;padding:8px 16px}
+
+  /* ── счётчик ── */
+  .count{font-size:12px;letter-spacing:.14em;color:var(--ink3);opacity:0;animation:up 1s var(--ease) 1.3s forwards}
+  .count b{color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* ── подвал ── */
+  .foot{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--ink3);opacity:0;animation:up 1s var(--ease) 1.4s forwards}
+  .foot a{color:var(--ink3);text-decoration:none;transition:color .3s}
+  .foot a:hover{color:var(--ink)}
+
+  @keyframes up{from{opacity:0;transform:translateY(20px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  @keyframes rise{to{transform:none}}
+  ::selection{background:rgba(255,255,255,.16)}
+
+  @media(max-width:560px){
+    .brand .sub{display:none}
+    .foot{flex-direction:column;gap:8px;text-align:center}
+    .core{gap:24px}
+  }
+  @media(prefers-reduced-motion:reduce){.sheen,.halo,.top .st i{animation:none}h1 .ln>span{transform:none}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="sheen"></div>
+<div class="halo"></div>
+<div class="grain"></div>
+<div class="vign"></div>
+<div class="dust" id="dust"></div>
+<div class="beam"></div>
+<div class="pulse" id="pulse"></div>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 100 120" aria-label="Lumen">
+        <defs><linearGradient id="lx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#cfcecb"/><stop offset="1" stop-color="#8a8885"/></linearGradient></defs>
+        <path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z" fill="none" stroke="url(#lx)" stroke-width="2.6" stroke-linejoin="round"/>
+      </svg>
+      <span class="mk">LUMEN</span><span class="sub">Real Estate CRM</span>
+    </div>
+    <div class="st"><i></i>Ранний доступ · 2026</div>
+  </div>
+
+  <div class="core">
+    <div class="eyebrow">Скоро · лист ожидания открыт</div>
+    <h1>
+      <span class="ln"><span>Порядок,</span></span>
+      <span class="ln"><span>которого <em>не было</em></span></span>
+    </h1>
+    <p class="lede">Lumen ловит каждого клиента, понимает его и ведёт до сделки — на всех каналах. А собственник впервые держит агентство под контролем. Не ещё одна CRM — среда, где работает вся команда. Оставьте контакты — позовём в бету одними из первых.</p>
+
+    <div class="wlgate" id="wlGate">
+      <button class="wlcta" id="wlStart" type="button"><span>Получить доступ к бете</span><i class="ar">→</i></button>
+      <div class="wlnote">30 секунд · несколько коротких вопросов</div>
+    </div>
+
+    <form class="wl" id="wl" novalidate>
+      <div class="wsteps" id="wsteps"></div>
+      <div class="wdots" id="wdots"></div>
+      <button type="button" class="wback" id="wback" hidden>← назад</button>
+      <input type="text" id="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      <div class="hint" id="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 13l4 4L19 7"/></svg>
+        Без спама. Только приглашение в бету и дата запуска.
+      </div>
+    </form>
+
+    <div class="done" id="done">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+      <h3>Вы в списке.</h3>
+      <p id="doneMsg">Как только откроем ранний доступ — напишем вам одним из первых. Спасибо, что верите в порядок в недвижимости.</p>
+      <div class="pos" id="pos"></div>
+    </div>
+
+    <div class="count" id="count">уже <b id="cnum">—</b> агентств в листе ожидания</div>
+  </div>
+
+  <div class="foot">
+    <span>© 2026 Lumen — продукт TargetPoint</span>
+    <a href="mailto:info@targetpoint.agency">info@targetpoint.agency</a>
+  </div>
+</div>
+
+<script>
+  var form=document.getElementById('wl'), hint=document.getElementById('hint'),
+      done=document.getElementById('done'), pos=document.getElementById('pos'),
+      cnum=document.getElementById('cnum'),
+      wsteps=document.getElementById('wsteps'),
+      dotsWrap=document.getElementById('wdots'),
+      wback=document.getElementById('wback');
+  var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var HINT_DEFAULT=' Без спама. Только приглашение в бету и дата запуска.';
+  var data={}, cur=0, busy=false;
+
+  /* ── конфиг вопросов: квалификация → контакты → согласие ── */
+  var QS=[
+    {k:'role',type:'choice',two:true,q:'Вы — соло-брокер или агентство?',opts:[
+      {v:'solo',t:'Соло-брокер',em:'🧭'},{v:'agency',t:'Агентство недвижимости',em:'🏢'}]},
+    {k:'brokers',type:'choice',two:true,q:'Сколько брокеров в команде?',when:function(d){return d.role==='agency'},opts:[
+      {v:'2-3',t:'2–3'},{v:'4-10',t:'4–10'},{v:'11-30',t:'11–30'},{v:'30+',t:'30+'}]},
+    {k:'pains',type:'multi',q:'Что болит сильнее всего?',opts:[
+      {v:'speed',t:'Медленно отвечаем — лиды уходят'},
+      {v:'leak',t:'Брокеры уводят базу'},
+      {v:'qual',t:'Нет нормальной квалификации'},
+      {v:'chaos',t:'Хаос в переписках и каналах'},
+      {v:'nurture',t:'Не дожимаем — лиды остывают'}]},
+    {k:'name',type:'text',q:'Как к вам обращаться?',ph:'Ваше имя',ac:'name',val:function(v){return v.trim().length>=2?'':'Подскажите, как к вам обращаться.'}},
+    {k:'whatsapp',type:'tel',q:'Ваш WhatsApp',ph:'+971 50 123 4567',ac:'tel',val:function(v){return v.replace(/\D/g,'').length>=7?'':'Проверьте номер WhatsApp.'}},
+    {k:'email',type:'email',q:'Куда прислать приглашение',ph:'you@agency.com',ac:'email',val:function(v){return EMAIL.test(v.trim())?'':'Проверьте адрес — кажется, есть опечатка.'}},
+    {k:'consent',type:'consent',q:'Последний шаг'}
+  ];
+  function activeQs(){return QS.filter(function(s){return !s.when||s.when(data)})}
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function clearErr(){if(hint.classList.contains('err')){hint.classList.remove('err');hint.lastChild.textContent=HINT_DEFAULT}}
+  function fail(msg){hint.classList.add('err');hint.lastChild.textContent=' '+msg;var st=wsteps.querySelector('.wstep');if(st){st.classList.add('shake');setTimeout(function(){st.classList.remove('shake')},420)}}
+  function svgArrow(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}
+  function svgTick(){return '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>'}
+  function setHeight(){var st=wsteps.querySelector('.wstep');if(st)wsteps.style.height=st.offsetHeight+'px'}
+
+  function buildStep(s,idx,total){
+    var el=document.createElement('div');el.className='wstep';
+    var lab='<div class="qlabel"><span class="qn">'+String(idx+1).padStart(2,'0')+' / '+String(total).padStart(2,'0')+'</span> '+esc(s.q)+'</div>';
+    if(s.type==='text'||s.type==='tel'||s.type==='email'){
+      el.innerHTML=lab+'<div class="field"><input data-k="'+s.k+'" type="'+s.type+'"'+(s.type==='tel'?' inputmode="tel"':s.type==='email'?' inputmode="email"':'')+' autocomplete="'+(s.ac||'off')+'" placeholder="'+esc(s.ph||'')+'" aria-label="'+esc(s.q)+'"><button class="go" type="button" data-next aria-label="Далее">'+svgArrow()+'</button></div>';
+    } else if(s.type==='choice'){
+      el.innerHTML=lab+'<div class="qopts'+(s.two?' two':'')+'">'+s.opts.map(function(o){return '<button type="button" class="qopt'+(data[s.k]===o.v?' sel':'')+'" data-v="'+esc(o.v)+'"><span class="qtick">'+svgTick()+'</span>'+esc(o.t)+(o.em?'<span class="qem">'+o.em+'</span>':'')+'</button>'}).join('')+'</div>';
+    } else if(s.type==='multi'){
+      el.innerHTML=lab+'<div class="qopts">'+s.opts.map(function(o){return '<button type="button" class="qopt multi" data-v="'+esc(o.v)+'"><span class="qtick">'+svgTick()+'</span>'+esc(o.t)+'</button>'}).join('')+'</div><button class="go gowide" type="button" data-next style="margin-top:14px"><span>Далее</span></button>';
+    } else if(s.type==='consent'){
+      el.innerHTML=lab+'<label class="consent"><input type="checkbox" id="consent"><span class="cbox">'+svgTick()+'</span><span class="ctxt">Даю согласие на обработку моих персональных данных для связи по раннему доступу — в соответствии с <a href="/privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a>, и принимаю <a href="/terms.html" target="_blank" rel="noopener">условия</a>.</span></label><button class="go gowide" id="go" type="submit"><span>Занять место в бете</span></button>';
+    }
+    return el;
+  }
+
+  function paint(){
+    var qs=activeQs(), total=qs.length, s=qs[cur];
+    dotsWrap.innerHTML=qs.map(function(_,i){return '<i class="'+(i===cur?'on':i<cur?'done':'')+'"></i>'}).join('');
+    wsteps.innerHTML='';
+    var el=buildStep(s,cur,total); wsteps.appendChild(el);
+    void el.offsetWidth; el.classList.add('on'); setHeight();
+    wback.hidden=(cur===0);
+    var inp=el.querySelector('input[data-k]');
+    if(inp){var f=inp.closest('.field');inp.value=data[s.k]||'';
+      inp.addEventListener('focus',function(){f.classList.add('focus')});
+      inp.addEventListener('blur',function(){if(!inp.value)f.classList.remove('focus')});
+      inp.addEventListener('input',clearErr);
+      inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();next()}});
+      if(inp.value)f.classList.add('focus');
+      setTimeout(function(){inp.focus()},90);
+    }
+    el.querySelectorAll('.qopt:not(.multi)').forEach(function(b){b.addEventListener('click',function(){data[s.k]=b.dataset.v;clearErr();next()})});
+    el.querySelectorAll('.qopt.multi').forEach(function(b){
+      if((data[s.k]||[]).indexOf(b.dataset.v)>=0)b.classList.add('sel');
+      b.addEventListener('click',function(){b.classList.toggle('sel');clearErr();setHeight()});
+    });
+    el.querySelectorAll('[data-next]').forEach(function(b){b.addEventListener('click',next)});
+  }
+
+  function collectCurrent(){
+    var qs=activeQs(), s=qs[cur], el=wsteps.querySelector('.wstep');
+    if(s.type==='text'||s.type==='tel'||s.type==='email'){
+      var v=(el.querySelector('input').value||'').trim(); var err=s.val?s.val(v):''; if(err){fail(err);return false} data[s.k]=v; return true;
+    }
+    if(s.type==='multi'){
+      var sel=[].map.call(el.querySelectorAll('.qopt.sel'),function(x){return x.dataset.v}); if(!sel.length){fail('Выберите хотя бы один вариант.');return false} data[s.k]=sel; return true;
+    }
+    if(s.type==='choice'){ if(!data[s.k]){fail('Выберите вариант.');return false} return true; }
+    return true;
+  }
+  /* плавный кросс-фейд: текущий шаг уезжает, затем рисуем новый */
+  function transitionTo(){var old=wsteps.querySelector('.wstep');if(old){old.classList.add('leaving');old.classList.remove('on');setTimeout(paint,220);}else paint();}
+  function next(){ if(!collectCurrent())return; var qs=activeQs(); if(cur<qs.length-1){clearErr();cur++;transitionTo();} else submit(); }
+  wback.addEventListener('click',function(){if(cur>0){clearErr();cur--;transitionTo();}});
+  form.addEventListener('submit',function(e){e.preventDefault();var qs=activeQs();if(qs[cur].type==='consent')submit();else next();});
+
+  /* стартовый экран: форма прячется, пока не нажали «Получить доступ к бете» */
+  var wlGate=document.getElementById('wlGate'), wlStart=document.getElementById('wlStart');
+  function startForm(){if(form.classList.contains('on'))return;var core=document.querySelector('.core');if(core)core.classList.add('slim');wlGate.classList.add('hide');setTimeout(function(){wlGate.style.display='none';form.classList.add('on');cur=0;paint();setHeight();},360);}
+  if(wlStart)wlStart.addEventListener('click',startForm);
+
+  function submit(){
+    if(busy)return;
+    var cb=document.getElementById('consent'); if(!cb||!cb.checked){fail('Отметьте согласие на обработку персональных данных.');return;}
+    if(document.getElementById('company').value)return; // honeypot
+    busy=true;var goB=document.getElementById('go');if(goB)goB.classList.add('busy');
+    fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:data.name,whatsapp:data.whatsapp,email:data.email,role:data.role||'',brokers:data.brokers||'',pains:data.pains||[],consent:true,ref:(location.search||''),ts:Date.now(),company:''})})
+      .then(function(r){return r.json().catch(function(){return {}})})
+      .then(function(j){
+        if(j&&j.error){busy=false;if(goB)goB.classList.remove('busy');fail(j.error);return;}
+        form.style.transition='opacity .5s, transform .5s';form.style.opacity='0';form.style.transform='translateY(-10px)';
+        setTimeout(function(){
+          form.style.display='none';
+          if(j&&j.position){pos.textContent='вы №'+(SEED+j.position)+' в очереди';}else{pos.style.display='none';}
+          if(j&&typeof j.count==='number'){cnum.textContent=(SEED+j.count).toLocaleString('ru-RU');}
+          done.classList.add('on');successPulse();
+        },420);
+      })
+      .catch(function(){busy=false;if(goB)goB.classList.remove('busy');fail('Сеть подвела. Попробуйте ещё раз.');});
+  }
+
+  // живой счётчик
+  function animCount(to){var from=Math.max(0,to-140),t0=performance.now(),dur=1400;
+    (function s(t){var p=Math.min(1,(t-t0)/dur),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));cnum.textContent=v.toLocaleString('ru-RU');if(p<1)requestAnimationFrame(s)})(t0);}
+  var SEED=214;
+  fetch('/api/waitlist/count').then(function(r){return r.json()}).then(function(j){animCount(SEED+((j&&j.count)||0))}).catch(function(){animCount(SEED)});
+  addEventListener('resize',setHeight);
+
+  // дрейфующая пыль
+  (function(){var d=document.getElementById('dust');if(!d)return;var N=innerWidth<560?7:13;for(var i=0;i<N;i++){var s=document.createElement('i');var dur=9+Math.random()*11,sz=1+Math.random()*2.2,dx=(Math.random()*2-1)*46;s.style.left=(Math.random()*100)+'vw';s.style.width=s.style.height=sz+'px';s.style.animationDuration=dur+'s';s.style.animationDelay=(-Math.random()*dur)+'s';s.style.setProperty('--dx',dx+'px');d.appendChild(s);}})();
+  var _h1=document.querySelector('.core h1');
+  addEventListener('pointermove',function(e){var x=(e.clientX/innerWidth-.5),y=(e.clientY/innerHeight-.5);if(_h1)_h1.style.transform='translate('+(x*-11).toFixed(1)+'px,'+(y*-7).toFixed(1)+'px)';},{passive:true});
+  function successPulse(){var pl=document.getElementById('pulse');if(pl){pl.classList.remove('go');void pl.offsetWidth;pl.classList.add('go');}}
+  // форма стартует по кнопке (wlStart) — здесь ничего не открываем
+</script>
+</body>
+</html>
