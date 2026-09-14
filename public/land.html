@@ -457,6 +457,15 @@
   .ctrl-list .ci{display:flex;gap:14px;align-items:flex-start;font-size:15px;color:var(--ink2);font-weight:300}
   .ctrl-list .ci svg{width:17px;height:17px;flex:0 0 17px;margin-top:2px;color:var(--ink)}
   @media(max-width:760px){.ctrl{grid-template-columns:1fr;gap:30px}}
+  /* CONTROL → 2×2 карточки с разными иконками (вместо одинаковых галочек) */
+  .ctrl-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cc{background:var(--cell);border:1px solid var(--line);border-radius:14px;padding:18px 16px;display:flex;flex-direction:column;transition:transform .5s var(--ease),border-color .5s}
+  .cc:hover{transform:translateY(-3px);border-color:var(--ink2)}
+  .cc .cc-ic{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink);margin-bottom:13px}
+  .cc .cc-ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .cc b{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:5px;line-height:1.15}
+  .cc span{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
+  @media(max-width:360px){.ctrl-cards{grid-template-columns:1fr}}
 
   /* PROOF numbers */
   .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
@@ -1051,13 +1060,13 @@
     <div data-r>
       <span class="eyebrow">Собственнику</span>
       <h2 style="margin-top:22px;max-width:16ch">База принадлежит <em>агентству</em></h2>
-      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — не офис и не сайт, а контакты. Lumen делает их вашими: брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
+      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — контакты. Брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
     </div>
-    <div class="ctrl-list d1" data-r>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Пульт контроля: риски, тишина, спорные и «утекающие» лиды — на одном экране</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Роли и доступы: каждый видит только своё, ничего лишнего</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Оффбординг в один клик: забрать контакты и передать дела при уходе брокера</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Мост Telegram ⇄ WhatsApp: брокер отвечает из личного мессенджера, база — в системе</div>
+    <div class="ctrl-cards d1" data-r>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1.6"/><path d="M8 20h8M12 17v3"/></svg></span><b>Пульт контроля</b><span>Риски, тишина и «утекающие» лиды на одном экране.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16 8a3 3 0 0 1 0 6"/></svg></span><b>Роли и доступы</b><span>Каждый видит только своё, ничего лишнего.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12h8"/><path d="M13 9l3 3-3 3"/></svg></span><b>Оффбординг в клик</b><span>Забрать контакты при уходе брокера.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><b>Мост TG ⇄ WA</b><span>Брокер пишет из личного, база — в системе.</span></div>
     </div>
   </div>
 </section>
