@@ -4444,7 +4444,12 @@ async function renderChat(id, rebuild) {
     const ta = $('#composerText'); if (!ta) return;
     ta.style.flex = '1 1 0'; ta.style.width = 'auto'; ta.style.minWidth = '0';
     const sb = $('#sendBtn'); if (sb) sb.style.flex = '0 0 auto';
-    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    /* высота: пустое поле ВСЕГДА одна строка (42px). Раньше мерили scrollHeight пустого
+       textarea — а плейсхолдер в неустоявшейся раскладке переносился на 2 строки → поле
+       «прыгало» 42↔60px при первом открытии и на каждом poll-ре-рендере. Меряем контент
+       только когда он реально есть. */
+    if (ta.value.trim()) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; }
+    else ta.style.height = '42px';
   };
   fixTa(); requestAnimationFrame(() => requestAnimationFrame(fixTa)); setTimeout(fixTa, 90); setTimeout(fixTa, 300);
   $('#sendBtn').addEventListener('click', async () => {
@@ -4457,6 +4462,7 @@ async function renderChat(id, rebuild) {
   $('#composerText').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#sendBtn').click(); } // Shift+Enter — перенос строки
   });
+  $('#composerText').addEventListener('input', fixTa); // поле растёт по мере набора, пустое → 42px
 
   const panel = $('#leadPanel');
   /* карточка «для ленивых»: одно главное действие по контексту, всё остальное — в один клик */
