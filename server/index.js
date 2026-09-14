@@ -9812,7 +9812,9 @@ server.listen(PORT, () => {
   if (process.env.BACKUP_WEBHOOK_URL) setInterval(() => { try { offsiteBackup(); } catch (e) {} }, 24 * 3600e3);
   /* САМОЛЕЧЕНИЕ Telegram-бота: перепривязываем вебхук+меню к СТАБИЛЬНОМУ домену при каждом старте
      (иначе после смены временного туннеля/деплоя бот «не грузится» — вебхук/мини-апп смотрят на мёртвый URL). */
-  const _tgBase = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  /* фолбэк: если PUBLIC_BASE_URL не задан на Railway — берём известный прод-домен, иначе бот «не грузится»
+     (вебхук/меню мини-аппа не перепривязываются). Задать PUBLIC_BASE_URL всё равно рекомендуется. */
+  const _tgBase = (process.env.PUBLIC_BASE_URL || process.env.LUMEN_PROD_BASE || 'https://app.lumen247.com').replace(/\/$/, '');
   if (_tgBase && !/localhost|127\.0\.0\.1/.test(_tgBase)) {
     setTimeout(() => {
       for (const tid of store.listTenants()) {
