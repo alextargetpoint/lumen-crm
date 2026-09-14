@@ -1201,11 +1201,11 @@
     function build(){
       lines=[]; var n=Math.max(9,Math.round(W/96));
       for(var i=0;i<n;i++){var f=n>1?i/(n-1):.5;
-        lines.push({x:f*W,a:.05+Math.random()*.06,sway:5+Math.random()*16,ph:Math.random()*6.28,sp:.12+Math.random()*.22});}
+        lines.push({x:f*W,a:.10+Math.random()*.09,sway:5+Math.random()*16,ph:Math.random()*6.28,sp:.12+Math.random()*.22});}
       shapes=[
-        {t:'rect',x:W*.19,y:H*.34,s:Math.min(150,W*.14),r:.2,dr:.02,vx:.05,vy:-.028,a:.08},
-        {t:'circ',x:W*.8,y:H*.62,s:Math.min(120,W*.12),r:0,dr:-.014,vx:-.045,vy:.036,a:.07},
-        {t:'plus',x:W*.62,y:H*.2,s:Math.min(58,W*.05),r:.4,dr:.03,vx:.028,vy:.05,a:.09}
+        {t:'rect',x:W*.19,y:H*.34,s:Math.min(150,W*.14),r:.2,dr:.02,vx:.05,vy:-.028,a:.14},
+        {t:'circ',x:W*.8,y:H*.62,s:Math.min(120,W*.12),r:0,dr:-.014,vx:-.045,vy:.036,a:.12},
+        {t:'plus',x:W*.62,y:H*.2,s:Math.min(58,W*.05),r:.4,dr:.03,vx:.028,vy:.05,a:.16}
       ];
     }
     function size(){DPR=Math.min(2,window.devicePixelRatio||1);W=c.clientWidth;H=c.clientHeight;c.width=W*DPR;c.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);build();if(reduce)draw(0);}
@@ -1213,10 +1213,10 @@
       ctx.clearRect(0,0,W,H);
       var bp=(t*0.00003)%1.6-.3, bx=bp*W; // луч медленно проходит слева направо, с паузой за краем
       // видимый мягкий световой столб (Lumen) — скользит вместе с лучом
-      var bw=W*0.17;
+      var bw=W*0.18;
       ctx.save();ctx.globalCompositeOperation='lighter';
       var cg=ctx.createLinearGradient(bx-bw,0,bx+bw,0);
-      cg.addColorStop(0,'rgba('+INK+',0)');cg.addColorStop(.5,'rgba('+INK+',.05)');cg.addColorStop(1,'rgba('+INK+',0)');
+      cg.addColorStop(0,'rgba('+INK+',0)');cg.addColorStop(.5,'rgba('+INK+',.08)');cg.addColorStop(1,'rgba('+INK+',0)');
       ctx.fillStyle=cg;ctx.fillRect(bx-bw,0,bw*2,H);ctx.restore();
       for(var i=0;i<lines.length;i++){var L=lines[i];
         var x=L.x+Math.sin(t*0.0004*L.sp+L.ph)*L.sway;

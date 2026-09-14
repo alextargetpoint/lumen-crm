@@ -38,6 +38,7 @@
 
   // ---------- данные ----------
   const THEMES = [
+    { key: 'atelier', name: 'Ателье',         desc: 'Тихая роскошь — крем + serif, тёмные акценты. Стиль по умолчанию.', vid: 'skyline-mono', sw: ['#1A1815', '#F3F1EC', '#141311'] },
     { key: 'light',   name: 'Кобальт',        desc: 'Фирменный синий, мягкие тени — базовый вид Lumen.', vid: 'skyline-cobalt',   sw: ['#2563EB', '#F4F7FB', '#111827'] },
     { key: 'emerald', name: 'Lumen Glass',    desc: 'Атмосферное стекло, premium-OS, глубина.',          vid: 'skyline-glass',    sw: ['#397BFF', '#EEF5FF', '#0A1833'] },
     { key: 'dark',    name: 'Ночь',           desc: 'Тёмный кобальт — для работы вечером и премиум-подачи.', vid: 'skyline-night', sw: ['#5B84FF', '#0A1833', '#EAF0FF'] },
@@ -70,7 +71,7 @@
     const a = (st && st.settings && st.settings.agency) || {};
     return {
       edition: a.edition || '',                 // '' пока не выбрано
-      theme: (localStorage.getItem('lumen_theme') || 'light'),
+      theme: (localStorage.getItem('lumen_theme') || 'atelier'),   /* дефолт приложения = Atelier (тихая роскошь) — первый экран нового агентства ему соответствует */
       name: a.name && a.name !== 'One Agency' ? a.name : '',
       logo: a.logo || '',
       geos: Array.isArray(a.geos) ? a.geos.slice() : [],
@@ -157,7 +158,7 @@
             <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
           </div>
           <div class="ob-theme-back">
-            <img src="/assets/theme-${t.key}.png" alt="" loading="lazy">
+            <img src="/assets/theme-${t.key}.png" alt="" loading="lazy" onerror="this.style.display='none'">
             <div class="ob-theme-back-lbl">Интерфейс · ${t.name}</div>
           </div>
         </div>
