@@ -186,7 +186,57 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   document.querySelectorAll('.sect').forEach(s => s.classList.remove('on')); $('#sect-' + b.dataset.tab).classList.add('on');
   if (b.dataset.tab === 'audit') loadAudit();
   if (b.dataset.tab === 'security') loadSecurity();
+  if (b.dataset.tab === 'email') loadEmail();
 }));
+
+// ── Конструктор писем ──
+let EMAIL = { templates: {}, keys: [], cur: null, pvLang: 'ru' };
+async function loadEmail() {
+  const r = await api('/api/admin/email');
+  EMAIL.templates = r.templates || {}; EMAIL.keys = r.keys || [];
+  $('#emFrom').value = (r.config && r.config.from) || '';
+  $('#emCfgState').textContent = (r.config && r.config.keySet) ? 'Ключ Resend сохранён ✓' : 'Ключ Resend не задан — письма не отправятся';
+  const sel = $('#emTpl');
+  sel.innerHTML = EMAIL.keys.map(k => `<option value="${k}">${esc((EMAIL.templates[k]||{}).name || k)}</option>`).join('');
+  EMAIL.cur = EMAIL.keys[0];
+  fillTpl();
+}
+function fillTpl() {
+  const t = EMAIL.templates[EMAIL.cur] || {};
+  $('#emSubjRu').value = t.subject_ru || ''; $('#emBodyRu').value = t.body_ru || '';
+  $('#emSubjEn').value = t.subject_en || ''; $('#emBodyEn').value = t.body_en || '';
+  refreshPreview();
+}
+async function refreshPreview() {
+  // сохраняем черновик в объект (не на сервер) для превью
+  const t = EMAIL.templates[EMAIL.cur] || (EMAIL.templates[EMAIL.cur] = {});
+  t.subject_ru = $('#emSubjRu').value; t.body_ru = $('#emBodyRu').value;
+  t.subject_en = $('#emSubjEn').value; t.body_en = $('#emBodyEn').value;
+  try {
+    const r = await api('/api/admin/email/preview', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, lang: EMAIL.pvLang, vars: {} }) });
+    $('#emPvSubj').textContent = (EMAIL.pvLang==='en'?'Subject: ':'Тема: ') + (r.subject||'');
+    $('#emPreview').srcdoc = r.html || '';
+  } catch(e) {}
+}
+$('#emTpl').addEventListener('change', e => { EMAIL.cur = e.target.value; fillTpl(); });
+['emSubjRu','emBodyRu','emSubjEn','emBodyEn'].forEach(id => { let d; $('#'+id).addEventListener('input', () => { clearTimeout(d); d = setTimeout(refreshPreview, 350); }); });
+$('#emPvRu').addEventListener('click', () => { EMAIL.pvLang='ru'; $('#emPvRu').classList.add('on'); $('#emPvEn').classList.remove('on'); refreshPreview(); });
+$('#emPvEn').addEventListener('click', () => { EMAIL.pvLang='en'; $('#emPvEn').classList.add('on'); $('#emPvRu').classList.remove('on'); refreshPreview(); });
+$('#emSave').addEventListener('click', async () => {
+  const t = EMAIL.templates[EMAIL.cur] || {};
+  const r = await api('/api/admin/email/template', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, subject_ru:t.subject_ru, subject_en:t.subject_en, body_ru:t.body_ru, body_en:t.body_en }) });
+  $('#emState').textContent = r.ok ? 'Шаблон сохранён ✓' : ('Ошибка: ' + (r.error||''));
+});
+$('#emCfgSave').addEventListener('click', async () => {
+  const r = await api('/api/admin/email/config', { method:'POST', body: JSON.stringify({ from: $('#emFrom').value, key: $('#emKey').value }) });
+  $('#emKey').value = ''; $('#emCfgState').textContent = (r.config && r.config.keySet) ? 'Сохранено · ключ есть ✓' : 'Сохранено · ключ не задан';
+});
+$('#emTest').addEventListener('click', async () => {
+  const to = $('#emTestTo').value.trim(); if (!to) { $('#emState').textContent = 'Введите e-mail для теста'; return; }
+  $('#emState').textContent = 'Отправляю…';
+  const r = await api('/api/admin/email/test', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, lang: EMAIL.pvLang, to }) });
+  $('#emState').textContent = r.ok ? ('Тест отправлен на ' + to + ' ✓') : ('Не отправилось: ' + (r.error||''));
+});
 const SEV = { crit: ['🔴 критично', '#ff5252'], warn: ['🟡 внимание', '#e0a800'], info: ['⚪ инфо', '#7d8aa0'] };
 const KIND_RU = { auth_scan: 'Скан авторизации (401)', access_probe: 'Зондирование доступа (403)', admin_bruteforce: 'Брутфорс ключа админа', admin_api_denied: 'Доступ к admin-API без прав', tg_bad_secret: 'Чужой secret на TG-вебхуке', data_export: 'Экспорт базы', account_delete: 'Удаление аккаунта' };
 async function loadSecurity() {
