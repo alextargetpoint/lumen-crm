@@ -4470,7 +4470,7 @@ async function openLeadModal(id) {
       { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
       { label: '＋ Задача', onClick: () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo }); return false; } },
       { label: 'Печать / PDF', onClick: () => { window.open('/lead/' + l.id + '/print', '_blank'); return false; } },
-      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { if (!await uiConfirm('Удалить лида «' + l.name + '»?', 'Карточка, переписка и история удалятся безвозвратно.', { ok: 'Удалить', danger: true })) return false; try { await api.del('/leads/' + l.id); toast('Лид удалён', null, true); if (['funnel', 'overview', 'inbox', 'analytics'].includes(CUR)) render(); } catch (e) { toast('Не удалилось', e.message); return false; } } },
+      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { if (!await uiConfirm('Удалить лида «' + l.name + '»?', 'Карточка, переписка и история удалятся безвозвратно.', { ok: 'Удалить', danger: true })) return false; try { await api.post('/leads/bulk', { action: 'delete', ids: [l.id] }); toast('Лид удалён', null, true); if (['funnel', 'overview', 'inbox', 'analytics'].includes(CUR)) render(); } catch (e) { toast('Не удалилось', e.message); return false; } } },
       { label: 'Закрыть' },
     ],
   });
