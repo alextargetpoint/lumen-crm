@@ -1084,14 +1084,57 @@ const DICTATE_SEL = 'textarea:not([data-nodic])';
 /* свободные однострочные поля (в .form-row — колоночный лейаут, оверлей-микрофон безопасен, не ломает flex-строки) */
 const DIC_INPUT_SEL = '.form-row > input[type="text"]:not([data-nodic]), .form-row > input:not([type]):not([data-nodic])';
 let DIC_ACTIVE = null;
-/* общий рекордер: пишет голос → /voice/dictate (ИИ причёсывает) → дописывает в поле */
+/* Живая диктовка: текст появляется в поле СРАЗУ по мере речи (Web Speech API, бесплатно,
+   без сервера). Фолбэк для браузеров без поддержки (Firefox) — запись → серверная
+   транскрибация после остановки. Один активный распознаватель на всю страницу (DIC_ACTIVE). */
+const DIC_SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function dicLang() { try { return (STATE && STATE.settings && STATE.settings.agency && STATE.settings.agency.dictateLang) || 'ru-RU'; } catch (e) { return 'ru-RU'; } }
 function dicBind(field, btn) {
-  btn.addEventListener('click', async () => {
-    if (btn.classList.contains('rec')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('rec') || btn.classList.contains('busy')) { DIC_ACTIVE && DIC_ACTIVE.stop(); return; }
     if (DIC_ACTIVE) { toast('Уже идёт запись в другом поле'); return; }
-    let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); return; }
+    if (DIC_SR) startLiveDictation(field, btn); else startServerDictation(field, btn);
+  });
+}
+/* живой режим — интерим-текст пишется в поле в реальном времени */
+function startLiveDictation(field, btn) {
+  const rec = new DIC_SR();
+  rec.lang = dicLang(); rec.continuous = true; rec.interimResults = true;
+  const base = field.value.trim();
+  let finalText = '', stopped = false;
+  const paint = (interim) => {
+    const parts = [base, finalText, (interim || '').trim()].filter(Boolean);
+    field.value = parts.join(' ');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    /* прокрутка длинного текста к концу — видно, что пишется прямо сейчас */
+    try { field.scrollTop = field.scrollHeight; } catch (e) {}
+  };
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tr = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += (finalText ? ' ' : '') + tr.trim();
+      else interim += tr;
+    }
+    paint(interim);
+  };
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopped = true; toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'); }
+    else if (e.error === 'audio-capture') { stopped = true; toast('Микрофон не найден'); }
+    /* no-speech / aborted — не критично, onend перезапустит либо завершит */
+  };
+  rec.onend = () => {
+    if (!stopped && btn.classList.contains('rec')) { try { rec.start(); return; } catch (e) {} }  /* держим запись, пока юзер не нажал стоп */
+    btn.classList.remove('rec'); DIC_ACTIVE = null;
+    paint('');  /* финал без интерим-хвоста */
+    field.focus();
+  };
+  DIC_ACTIVE = { stop: () => { stopped = true; try { rec.stop(); } catch (e) {} } };
+  try { rec.start(); btn.classList.add('rec'); } catch (e) { DIC_ACTIVE = null; toast('Не удалось запустить диктовку', e.message); }
+}
+/* фолбэк — запись → серверная транскрибация (ИИ причёсывает) после остановки */
+function startServerDictation(field, btn) {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
     const rec = new MediaRecorder(stream); const parts = [];
     rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
     rec.onstop = async () => {
@@ -1107,7 +1150,7 @@ function dicBind(field, btn) {
       btn.classList.remove('busy');
     };
     DIC_ACTIVE = rec; rec.start(); btn.classList.add('rec');
-  });
+  }).catch(() => toast('Нет доступа к микрофону', 'Разрешите доступ в браузере'));
 }
 function wireDictate(root) {
   $$(DICTATE_SEL, root).forEach((field) => {
@@ -1116,7 +1159,7 @@ function wireDictate(root) {
     const inWand = field.closest('.aiwrap');
     let wrap = inWand;
     if (!wrap) { wrap = document.createElement('div'); wrap.className = 'aiwrap'; field.parentNode.insertBefore(wrap, field); wrap.appendChild(field); }
-    const btn = el(`<button type="button" class="dic-btn ${inWand ? 'with-wand' : ''}" title="Диктовать голосом — ИИ причешет текст">${ic(I.mic || I.phone)}</button>`);
+    const btn = el(`<button type="button" class="dic-btn ${inWand ? 'with-wand' : ''}" title="Диктовать голосом — текст появляется сразу">${ic(I.mic || I.phone)}</button>`);
     wrap.appendChild(btn);
     dicBind(field, btn);
   });
@@ -1125,7 +1168,7 @@ function wireDictate(root) {
     if (field.dataset.dicw) return;
     field.dataset.dicw = '1';
     const w = document.createElement('span'); w.className = 'dic-inp'; field.parentNode.insertBefore(w, field); w.appendChild(field);
-    const btn = el(`<button type="button" class="dic-btn dic-inp-btn" title="Диктовать голосом — ИИ причешет текст">${ic(I.mic || I.phone)}</button>`);
+    const btn = el(`<button type="button" class="dic-btn dic-inp-btn" title="Диктовать голосом — текст появляется сразу">${ic(I.mic || I.phone)}</button>`);
     w.appendChild(btn);
     dicBind(field, btn);
   });
