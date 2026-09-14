@@ -109,7 +109,7 @@
       bg: 'welcome', pad: true,
       html: `
         <div class="ob-center">
-          <div style="max-width:440px;margin:0 auto 22px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 70px -26px rgba(0,0,0,.7);animation:obFloat 8s ease-in-out infinite"><img src="/assets/ob-atelier-welcome.png" alt="" style="width:100%;display:block" loading="eager"></div>
+          <div style="margin:0 auto 26px;width:96px;height:110px;display:grid;place-items:center;animation:obFloat 8s ease-in-out infinite"><svg viewBox="0 0 100 120" width="72" height="86" fill="none" stroke="#c9a86a" stroke-width="2.2" stroke-linejoin="round" style="filter:drop-shadow(0 10px 30px rgba(201,168,106,.35))"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg></div>
           <div class="ob-badge">Церемония запуска</div>
           <h1 class="ob-h1">Добро пожаловать в <span class="ob-grad">Lumen</span></h1>
           <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
@@ -560,13 +560,13 @@
     @keyframes obIn{from{opacity:0;transform:translateY(26px) scale(.985);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
     .ob-body{min-width:0}
     .ob-step-n{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5F86D8}
-    .ob-h1{font-size:clamp(34px,5vw,60px);font-weight:800;letter-spacing:-.03em;line-height:1.02;margin:6px 0 14px}
-    .ob-h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.025em;margin:8px 0 10px}
+    .ob-h1{font-family:'Cormorant',Georgia,serif;font-size:clamp(40px,5.6vw,66px);font-weight:500;letter-spacing:-.005em;line-height:1.03;margin:6px 0 14px}
+    .ob-h2{font-family:'Cormorant',Georgia,serif;font-size:clamp(30px,3.8vw,46px);font-weight:500;letter-spacing:-.005em;margin:8px 0 10px}
     .ob-grad{background:linear-gradient(120deg,#e0d3b8,#c9a86a);-webkit-background-clip:text;background-clip:text;color:transparent}
     .ob-lead{font-size:clamp(15px,1.5vw,18px);color:#cabfa8;line-height:1.6;max-width:60ch}
     .ob-sub{font-size:15px;color:#bcae96;line-height:1.55;max-width:64ch;margin-bottom:22px}
     .ob-center{text-align:center;max-width:760px;margin:0 auto}
-    .ob-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#e0d3b8;border:1px solid rgba(214,199,168,.3);border-radius:999px;padding:7px 15px;margin-bottom:20px;background:rgba(20,34,64,.4)}
+    .ob-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#e0d3b8;border:1px solid rgba(214,199,168,.3);border-radius:999px;padding:7px 15px;margin-bottom:20px;background:rgba(30,26,20,.4)}
     .ob-pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:26px}
     .ob-pill{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:#e6dcc6;background:rgba(20,32,60,.55);border:1px solid rgba(214,199,168,.2);border-radius:999px;padding:9px 15px;backdrop-filter:blur(6px)}
     .ob-note{font-size:13px;color:#a89a82;margin-top:16px;line-height:1.5}
@@ -690,8 +690,8 @@
     .ob-close{background:rgba(18,15,12,.5);box-shadow:0 8px 24px -10px rgba(0,0,0,.6)}
     .ob-panel{filter:drop-shadow(0 44px 100px rgba(0,0,0,.55))}
     @keyframes obIn{from{opacity:0;transform:translateY(36px) scale(.968);filter:blur(11px)}to{opacity:1;transform:none;filter:none}}
-    .ob-h1{font-size:clamp(40px,6.2vw,80px);letter-spacing:-.04em;text-shadow:0 6px 46px rgba(201,168,106,.28)}
-    .ob-h2{font-size:clamp(30px,4vw,52px);letter-spacing:-.035em}
+    .ob-h1{font-size:clamp(40px,6.2vw,80px);letter-spacing:-.008em;text-shadow:0 6px 46px rgba(201,168,106,.28)}
+    .ob-h2{font-size:clamp(30px,4vw,52px);letter-spacing:-.008em}
     .ob-grad{background:linear-gradient(110deg,#F1ECE2,#e0d0b0 42%,#d4b878);-webkit-background-clip:text;background-clip:text;color:transparent}
     .ob-step-n{background:linear-gradient(90deg,#e0d0b0,#d4b878);-webkit-background-clip:text;background-clip:text;color:transparent}
     .ob-badge{background:linear-gradient(90deg,rgba(201,168,106,.28),rgba(201,168,106,.22));border-color:rgba(214,199,168,.42);box-shadow:0 10px 34px -12px rgba(201,168,106,.6);color:#eae0cc}
