@@ -150,13 +150,20 @@
   @media(max-width:760px){.split{grid-template-columns:1fr;gap:34px}}
 
   /* FLOW */
-  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:58px;position:relative}
-  .flow::before{content:"";position:absolute;top:19px;left:10%;right:10%;height:1px;background:var(--line)}
-  .fstep{text-align:center;padding:0 10px;position:relative;z-index:2}
-  .fstep .dot{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;background:var(--cell);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px;line-height:1;font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1;color:var(--ink2)}
-  .fstep h4{font-size:15.5px;font-weight:600;margin-bottom:7px}
-  .fstep p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
-  @media(max-width:760px){.flow{grid-template-columns:1fr;gap:24px}.flow::before{display:none}.fstep{display:flex;text-align:left;gap:16px;align-items:flex-start}.fstep .dot{margin:0}}
+  /* FLOW v2 — путь заявки с козырями */
+  .flow2{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:58px}
+  .fstep2{position:relative;background:rgba(255,255,255,.022);border:1px solid var(--line);border-radius:16px;padding:24px 18px 20px;display:flex;flex-direction:column;overflow:hidden;transition:transform .55s var(--ease),border-color .5s,background .5s}
+  .fstep2:hover{transform:translateY(-6px);border-color:rgba(214,199,168,.42);background:rgba(255,255,255,.05)}
+  .fstep2 .fs-num{position:absolute;top:6px;right:14px;font-family:var(--serif);font-size:48px;font-weight:300;line-height:1;color:rgba(255,255,255,.05);font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1}
+  .fstep2 .fs-ic{width:40px;height:40px;border-radius:11px;background:rgba(214,199,168,.09);border:1px solid rgba(214,199,168,.22);display:flex;align-items:center;justify-content:center;color:#d6c7a8;margin-bottom:16px;position:relative;z-index:1}
+  .fstep2 .fs-ic svg{width:20px;height:20px}
+  .fstep2 h4{font-size:16px;font-weight:600;color:var(--ink);margin:0 0 7px;letter-spacing:-.01em}
+  .fstep2 p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.55;margin:0 0 15px;flex:1}
+  .fstep2 .fs-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.01em;color:#e6dcc6;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.24);border-radius:999px;padding:5px 11px;font-weight:500;line-height:1.3}
+  .fstep2 .fs-chip::before{content:"";width:5px;height:5px;border-radius:50%;background:#d6c7a8;box-shadow:0 0 8px rgba(214,199,168,.75);flex:0 0 5px}
+  .fstep2:not(:last-child)::after{content:"";position:absolute;top:42px;right:-9px;width:14px;height:14px;border-top:1px solid var(--line);border-right:1px solid var(--line);transform:rotate(45deg);opacity:.55;z-index:2}
+  @media(max-width:900px){.flow2{grid-template-columns:repeat(2,1fr)}.fstep2::after{display:none}}
+  @media(max-width:560px){.flow2{grid-template-columns:1fr}}
 
   /* SCREENS */
   .screens{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
@@ -747,12 +754,42 @@
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">Путь заявки</span>
       <h2 style="margin-top:22px">От клика <em>до сделки</em> — без ручных рук</h2></div>
-    <div class="flow d1" data-r>
-      <div class="fstep"><div class="dot">1</div><h4>Заявка влетает</h4><p>С любого канала — сразу в системе, с привязкой к рекламе.</p></div>
-      <div class="fstep"><div class="dot">2</div><h4>Ответ за секунды</h4><p>Первая линия отвечает раньше конкурентов, круглосуточно.</p></div>
-      <div class="fstep"><div class="dot">3</div><h4>Квалификация</h4><p>Цель, срок, бюджет, тип — и психо-портрет клиента.</p></div>
-      <div class="fstep"><div class="dot">4</div><h4>Тёплого — брокеру</h4><p>С историей, сценарием и задачей позвонить за 30 минут.</p></div>
-      <div class="fstep"><div class="dot">5</div><h4>Сделка под контролем</h4><p>Подборки, встречи, разбор звонков — до подписи.</p></div>
+    <div class="flow2 d1" data-r>
+      <article class="fstep2">
+        <span class="fs-num">01</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a2 2 0 002 2h12a2 2 0 002-2v-5"/><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M12 3v7m0 0l-2.5-2.5M12 10l2.5-2.5"/></svg></span>
+        <h4>Заявка влетает</h4>
+        <p>WhatsApp, Instagram, форма, звонок — всё в одном окне за секунду. И сразу видно, какое объявление её привело.</p>
+        <span class="fs-chip">ROI по каждому лиду</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">02</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg></span>
+        <h4>Отвечает за 60 секунд</h4>
+        <p>ИИ ведёт живой диалог, а не шлёт шаблон. Ночью, в выходные, без пауз — пока конкуренты спят.</p>
+        <span class="fs-chip">ИИ не отличить от человека</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">03</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+        <h4>Квалификация</h4>
+        <p>Цель, срок, бюджет, тип — и психо-портрет клиента: как с ним говорить, чтобы довести до сделки.</p>
+        <span class="fs-chip">Психо-портрет клиента</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">04</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg></span>
+        <h4>Тёплого — брокеру</h4>
+        <p>С историей, готовым сценарием и задачей позвонить за 30 минут. База закреплена — увести с собой нельзя.</p>
+        <span class="fs-chip">База не утечёт</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">05</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <h4>Сделка под контролем</h4>
+        <p>Подборки, встречи, ИИ-разбор каждого звонка и пульт основателя — всё видно до самой подписи.</p>
+        <span class="fs-chip">ИИ-разбор звонков</span>
+      </article>
     </div>
   </div>
 </section>
