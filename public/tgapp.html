@@ -198,6 +198,14 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .sheet-opt small{display:block;color:var(--mut);font-size:12px;margin-top:2px;font-weight:500}
   .toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 82px);left:50%;transform:translateX(-50%) translateY(10px);background:rgba(17,26,43,.97);color:#fff;padding:11px 18px;border-radius:15px;font-size:13.5px;z-index:60;max-width:88%;box-shadow:var(--sh);opacity:0;transition:.25s;border:1px solid var(--line);text-align:center;font-weight:600}
   .toast.on{opacity:1;transform:translateX(-50%)}
+  /* ПРАВДИВЫЙ индикатор долгих операций — не исчезает, показывает стадию + секунды, пока идёт работа */
+  .busy-bd{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.52);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .2s;padding:24px}
+  .busy-bd.on{opacity:1}
+  .busy-card{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:26px 30px;text-align:center;box-shadow:var(--sh);max-width:88%;transform:scale(.94);transition:transform .22s cubic-bezier(.22,1,.36,1)}
+  .busy-bd.on .busy-card{transform:none}
+  .busy-sp{width:42px;height:42px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite}
+  .busy-msg{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+  .busy-sub{font-size:12px;color:var(--mut);margin-top:7px;font-variant-numeric:tabular-nums}
   /* настройки оформления */
   .set-lbl{font-size:11.5px;color:var(--mut);font-weight:800;margin:14px 2px 9px;text-transform:uppercase;letter-spacing:.06em}
   .seg{display:flex;gap:6px;background:var(--panel);border-radius:14px;padding:5px}
@@ -310,8 +318,8 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .tk{display:flex;gap:11px;align-items:flex-start;padding:12px 12px;border-radius:15px;transition:.15s;border:1px solid transparent}
   .tk:active{background:var(--panel)}
   .tk-ck{flex:none;width:24px;height:24px;border-radius:8px;border:2px solid var(--line);cursor:pointer;display:grid;place-items:center;margin-top:1px;transition:.15s;color:transparent}
-  .tk-ck svg{width:15px;height:15px}
-  .tk.done .tk-ck{background:var(--acc);border-color:var(--acc);color:#fff}
+  .tk-ck svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}   /* был залитый чёрный «треугольник» — теперь чистая обводка-галочка */
+  .tk.done .tk-ck{background:var(--ok);border-color:var(--ok);color:#fff}   /* зелёная заливка + белая галочка = чёткий контраст «выполнено» */
   .tk-main{flex:1;min-width:0}
   .tk-t{font-size:14.5px;font-weight:600;line-height:1.35;color:var(--ink)}
   .tk.done .tk-t{text-decoration:line-through;color:var(--mut);font-weight:500}
@@ -578,6 +586,15 @@ const ini=n=>String(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('')
 const tmm=t=>new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 const avaHtml=(c)=>c.avatar?`<span class="ava" style="background-image:url('${esc(c.avatar)}')">${c.unread>0?'<span class="dot"></span>':''}</span>`:`<span class="ava" style="background:${avg(c.id)}">${esc(ini(c.name))}${c.unread>0?'<span class="dot"></span>':''}</span>`;
 let toastT; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div');t.id='tst';t.className='toast';document.body.appendChild(t)}t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2800)}
+/* ПРАВДИВЫЙ индикатор долгих операций: не исчезает, тикает секунды, можно менять стадию. Возвращает {update,close}. */
+function tgBusy(msg){
+  const bd=document.createElement('div');bd.className='busy-bd';
+  bd.innerHTML='<div class="busy-card"><div class="busy-sp"></div><div class="busy-msg"></div><div class="busy-sub"></div></div>';
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const m=bd.querySelector('.busy-msg'),s=bd.querySelector('.busy-sub');m.textContent=msg||'Обрабатываю…';
+  const t0=Date.now();const ti=setInterval(()=>{s.textContent=Math.round((Date.now()-t0)/1000)+' с · не закрывайте окно';},250);s.textContent='0 с · не закрывайте окно';
+  return {update:t=>{if(t)m.textContent=t;},close:()=>{clearInterval(ti);bd.classList.remove('on');setTimeout(()=>bd.remove(),240);}};
+}
 async function jget(u){const r=await fetch(u,{headers:H});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||r.status);return r.json()}
 async function jpost(u,body,raw){const o={method:'POST',headers:{...H}};if(raw){o.body=raw.body;if(raw.ct)o.headers['Content-Type']=raw.ct}else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}const r=await fetch(u,o);const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||r.status);return j}
 
@@ -823,8 +840,8 @@ function wireMbItem(el){
     const ru=async e=>{rs.removeEventListener('pointermove',rm);rs.removeEventListener('pointerup',ru);try{await jpost('/tgapp/api/moodboard/'+id,{w:parseInt(el.style.width)})}catch(err){}};
     rs.addEventListener('pointerdown',e=>{e.stopPropagation();rsx=e.clientX;rw=parseInt(el.style.width)||220;rs.setPointerCapture&&rs.setPointerCapture(e.pointerId);rs.addEventListener('pointermove',rm);rs.addEventListener('pointerup',ru)});}
 }
-async function mbUpload(e){const f=e.target.files[0];if(!f)return;e.target.value='';toast('Загружаю фото…');
-  try{await jpost('/tgapp/api/moodboard/upload?filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'image/jpeg'});hap();loadMood();toast('Добавлено на карту')}catch(err){toast('Не вышло: '+err.message)}}
+async function mbUpload(e){const f=e.target.files[0];if(!f)return;e.target.value='';const bz=tgBusy('Загружаю фото…');
+  try{await jpost('/tgapp/api/moodboard/upload?filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'image/jpeg'});hap();bz.close();loadMood();toast('Добавлено на карту')}catch(err){bz.close();toast('Не вышло: '+err.message)}}
 function mbGenSheet(){
   const bd=document.createElement('div');bd.className='sheet-bd';
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Сгенерировать желание ИИ</h3>
@@ -834,8 +851,10 @@ function mbGenSheet(){
   document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>bd.classList.add('on'));
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
   let style='photo';bd.querySelectorAll('#mbStyle button').forEach(b=>b.onclick=()=>{hap();style=b.dataset.s;bd.querySelectorAll('#mbStyle button').forEach(x=>x.classList.toggle('on',x===b))});
-  bd.querySelector('#mbGo').onclick=async()=>{const prompt=bd.querySelector('#mbP').value.trim();if(!prompt){toast('Опишите желание');return}hap('medium');close();toast('ИИ рисует… ~10–20 сек');
-    try{await jpost('/tgapp/api/moodboard/generate',{prompt,style});hap();loadMood();toast('Готово ✨')}catch(err){toast(err.message)}};
+  bd.querySelector('#mbGo').onclick=async()=>{const prompt=bd.querySelector('#mbP').value.trim();if(!prompt){toast('Опишите желание');return}hap('medium');close();
+    const stages=style==='sticker'?['Придумываю композицию…','Рисую стикер…','Вырезаю по контуру…','Почти готово…']:['Придумываю кадр…','Рисую изображение…','Почти готово…'];
+    const bz=tgBusy(stages[0]);let si=0;const stp=setInterval(()=>{si=Math.min(si+1,stages.length-1);bz.update(stages[si])},6000);
+    try{await jpost('/tgapp/api/moodboard/generate',{prompt,style});hap();clearInterval(stp);bz.close();loadMood();toast('Готово ✨')}catch(err){clearInterval(stp);bz.close();toast(err.message)}};
 }
 function leadRow(l){const sub=[l.geo,l.budget].filter(Boolean).join(' · ');
   return `<div class="lrow" data-id="${esc(l.id)}">${avaHtml({id:l.id,name:l.name,avatar:null})}
@@ -1012,7 +1031,13 @@ function dictateInto(input,btn){
     if(rec){
       rec.lang='ru-RU';rec.continuous=true;rec.interimResults=true;
       const base=input.value||'';let finalTxt='';let ended=false;
-      const cleanup=()=>{if(ended)return;ended=true;busy(false);if(btn)btn._dictStop=null;try{input.focus()}catch(e){}};
+      const cleanup=()=>{if(ended)return;ended=true;busy(false);if(btn)btn._dictStop=null;
+        const raw=(finalTxt||'').trim();
+        if(raw){ /* причёсываем надиктованное: пунктуация/абзацы, слова сохраняем (живой текст остаётся на экране, пока идёт) */
+          const bz=tgBusy('Причёсываю текст…');
+          jpost('/tgapp/api/dictate-clean',{text:raw}).then(r=>{const cl=((r&&r.text)||'').trim()||raw;input.value=_dcatAppend(base,cl);fire();}).catch(()=>{}).finally(()=>{bz.close();try{input.focus()}catch(e){}hap();});
+        } else { try{input.focus()}catch(e){} }
+      };
       busy(true);hap('medium');toast('Говорите — текст появляется вживую…');
       rec.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)finalTxt=_dcatAppend(finalTxt,r[0].transcript);else interim+=r[0].transcript}
         input.value=_dcatAppend(base,_dcatAppend(finalTxt,interim));fire()};
@@ -1030,10 +1055,10 @@ function dictateInto(input,btn){
     mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());busy(false);if(btn)btn._dictStop=null;
       const blob=new Blob(chunks,{type:(chunks[0]&&chunks[0].type)||'audio/webm'});if(!blob.size)return;
       const ext=((blob.type.split('/')[1]||'webm').split(';')[0]);
-      if(btn)btn.classList.add('busy');toast('Распознаю и причёсываю…');
+      if(btn)btn.classList.add('busy');const bz=tgBusy('Распознаю и причёсываю…');
       try{const r=await jpost('/tgapp/api/dictate?filename=dictate.'+ext,null,{body:blob,ct:blob.type||'audio/webm'});
         const t=(r.text||'').trim();if(t){input.value=_dcatAppend(input.value,t);fire();try{input.focus()}catch(e){}hap();toast('Готово — проверьте')}else toast('Ничего не распозналось')}
-      catch(e){toast(e.message)}if(btn)btn.classList.remove('busy')};
+      catch(e){toast(e.message)}bz.close();if(btn)btn.classList.remove('busy')};
     if(btn)btn._dictStop=()=>{try{mr.stop()}catch(e){}};
     mr.start();
   }).catch(()=>toast('Нет доступа к микрофону'));

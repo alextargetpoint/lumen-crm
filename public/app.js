@@ -1507,7 +1507,10 @@ const SOLO_HIDDEN_PAGES = ['feed', 'hr', 'brokers', 'roles', 'control', 'learn',
 /* СКРЫТО ПО ДЕФОЛТУ ДЛЯ ВСЕХ агентств (можно вернуть через settings.agency.enabledPages):
    academy — «зашита» в мозг ИИ (как работать с клиентами), не отдельная страница;
    studio  — «Видео-студия» в доработке, выкатим в апдейте. */
-const DEFAULT_HIDDEN_PAGES = ['academy', 'studio'];
+/* ПУБЛИЧНАЯ (сокращённая) версия: движки, которые ещё дорабатываются, скрыты по дефолту у ВСЕХ.
+   Аккаунт разработки видит их через settings.agency.betaAll=true; отдельные страницы можно
+   выкатывать в паблик по мере готовности через settings.agency.enabledPages. */
+const DEFAULT_HIDDEN_PAGES = ['academy', 'studio', 'hr', 'social'];
 /* единый предикат видимости раздела: дефолт-скрытие ∪ роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
 function pageHiddenForUser(pg) {
   const me = STATE && STATE.me;
@@ -1515,8 +1518,10 @@ function pageHiddenForUser(pg) {
   const rt = (me && me.roleType) || 'broker';
   const hardBroker = isBroker && rt === 'broker';   /* жёсткий список — только для брокера; маркетологу/менеджеру нужны реклама/аналитика */
   const hidePages = (me && me.hidePages) || [];      /* сервер уже собрал: дефолт роли ∪ индивидуальное скрытие */
-  const enabledPages = (STATE && STATE.settings && STATE.settings.agency && STATE.settings.agency.enabledPages) || [];
-  if (DEFAULT_HIDDEN_PAGES.includes(pg) && !enabledPages.includes(pg)) return true;   /* academy/studio — скрыты, пока агентство явно не включит */
+  const ag = (STATE && STATE.settings && STATE.settings.agency) || {};
+  const enabledPages = ag.enabledPages || [];
+  const betaAll = ag.betaAll === true;   /* аккаунт разработки видит ВСЕ скрытые движки */
+  if (DEFAULT_HIDDEN_PAGES.includes(pg) && !betaAll && !enabledPages.includes(pg)) return true;   /* публичная версия сокращена; выкат по мере готовности */
   if (IS_SOLO() && SOLO_HIDDEN_PAGES.includes(pg)) return true;   /* solo: командное скрыто всегда (в т.ч. «Контроль» — команды нет) */
   if (pg === 'control' && me && me.canControl) return false;
   if (isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg))) return true;
@@ -1775,6 +1780,10 @@ async function render() {
         wireHeroArt(c0);
         mountHeroVideos(c0);
         applyI18n(c0);  /* авто-перевод контента при LANG='en' (пер-нодовый, по словарю) */
+        /* анти-дубль заголовка: раздел со своим крупным заголовком (.ha-title/.sh-h-t/.plo-h1) не должен
+           повторять название ещё и в топбаре («сверху и снизу») — прячем текст топбара, оставляя эмблему/действия.
+           Разделы без своего заголовка (Настройки/Профиль/Оплата/Роли/Воронка/Обзор) сохраняют заголовок топбара. */
+        { const tb = document.querySelector('.topbar'); if (tb) tb.classList.toggle('hide-title', !!c0.querySelector('.ha-title, .sh-h-t, .plo-h1')); }
         if (silent) {
           /* тихое обновление данных: DOM меняется мгновенно, скролл на месте, без fade — глазу незаметно */
           c0.scrollTop = prevScroll;
@@ -8328,11 +8337,10 @@ PAGES.parlo = async (root) => {
         <div class="plo-beta">${ic(I.spark, 2)}<span><b>Бета-тестирование.</b> В первый период — бонусом бесплатно, пока идёт бета-разработка.</span></div>
         <p class="plo-sub">Parlo переводит ваш звонок в реальном времени <b>вашим же голосом</b> и подсказывает, что ответить. Для брокеров, которые звонят покупателям в Дубае, на Бали и Пхукете.</p>
         <div class="plo-cta">
-          <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать для Mac<span class="plo-beta-tag">бета</span></button>
-          <button class="plo-btn lg" data-plo-dl>${win}Windows<span class="plo-beta-tag">бета</span></button>
+          <span class="plo-btn primary lg" style="cursor:default" aria-disabled="true">${ic(I.spark, 2)}Скоро запуск<span class="plo-beta-tag">бета</span></span>
           <button class="plo-btn ghost lg" data-plo-how>Как это работает</button>
         </div>
-        <div class="plo-cta-note">${ic(I.spark, 2)}Пока бета: устанавливаем и настраиваем вместе на коротком созвоне-консультации — чтобы всё сразу заработало.</div>
+        <div class="plo-cta-note">${ic(I.spark, 2)}Движок ещё дорабатываем — приложение появится для скачивания в ближайшем обновлении. Хотите в первую волну беты? Подключим вместе на коротком созвоне, как только откроем доступ.</div>
         <div class="plo-langs"><span class="plo-dot"></span>Переводит на <b>EN · IT · DE · FR</b> · работает в Zoom и Google Meet</div>
       </div>
       <div class="plo-hero-r">
@@ -8357,7 +8365,7 @@ PAGES.parlo = async (root) => {
     <div class="plo-how glass card" id="ploHow">
       <div class="plo-how-hd">${ic(I.bolt, 2)}<span>Как это работает — за 3 шага</span></div>
       <div class="plo-steps">
-        <div class="plo-step"><span class="plo-step-n">1</span><b>Скачали и открыли</b><span>Один клик. Приложение само настроит виртуальное аудио и подтянет ключи из Lumen.</span></div>
+        <div class="plo-step"><span class="plo-step-n">1</span><b>Установим вместе</b><span>Когда откроем доступ — поставим и настроим на коротком созвоне: приложение само поднимет виртуальное аудио и подтянет ключи из Lumen.</span></div>
         <div class="plo-step"><span class="plo-step-n">2</span><b>Позвонили клиенту</b><span>В Zoom или Google Meet выбрали Parlo микрофоном. Говорите по-русски — клиент слышит вас на своём языке, вашим голосом.</span></div>
         <div class="plo-step"><span class="plo-step-n">3</span><b>Закрыли — получили сводку</b><span>Итоги, следующие шаги и транскрипт сами лягут в карточку лида и Telegram.</span></div>
       </div>
@@ -8384,8 +8392,8 @@ PAGES.parlo = async (root) => {
       <div class="plo-cs-note">Обычные телефонные звонки и мессенджеры пока не поддерживаются — только видео-встречи Zoom и Google Meet на компьютере (Mac и Windows).</div>
     </div>
     <div class="plo-band glass card">
-      <div><div class="plo-band-t">Звучите увереннее на любом языке</div><div class="plo-band-s">Бесплатно для команды Lumen · macOS и Windows</div></div>
-      <button class="plo-btn primary lg" data-plo-dl>${apple}Скачать Parlo</button>
+      <div><div class="plo-band-t">Звучите увереннее на любом языке</div><div class="plo-band-s">Движок в финальной доработке — запуск скоро. Бесплатно для команды Lumen в первую волну беты.</div></div>
+      <span class="plo-btn primary lg" style="cursor:default" aria-disabled="true">${ic(I.spark, 2)}Скоро запуск</span>
     </div>
   </div>`;
   $$('[data-plo-dl]', root).forEach(b => b.addEventListener('click', dl));
@@ -10860,6 +10868,13 @@ PAGES.agency = async (root) => {
             </div>
             <div class="muted" style="font-size:11px;margin-top:6px">Solo прячет команду, распределение и SLA — все лиды ведёте вы, «передача» становится «взять в работу»</div>
           </div>
+          <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Версия функционала</label>
+            <div class="chips-row">
+              <button type="button" class="chip-t ${!s.agency.betaAll ? 'on' : ''}" data-betaall="0">${ic(I.check)}Публичная · сокращённая</button>
+              <button type="button" class="chip-t ${s.agency.betaAll ? 'on' : ''}" data-betaall="1">${ic(I.spark)}Все разделы · разработка</button>
+            </div>
+            <div class="muted" style="font-size:11px;margin-top:6px">В публичной версии скрыты недоработанные движки (Контент-цех, Академия, Видео-студия, HR). Включите «Все разделы», чтобы видеть и дорабатывать их в своём аккаунте — публичным агентствам они по-прежнему не видны.</div>
+          </div>
           <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
           <div style="display:flex;gap:8px;margin-top:4px">
             <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
@@ -10937,6 +10952,12 @@ PAGES.agency = async (root) => {
     await api.patch('/settings', { agency: { edition: ch.dataset.edition } });
     await loadState();
     toast(ch.dataset.edition === 'solo' ? 'Режим Solo включён' : 'Режим агентства включён', null, true);
+    render();
+  }));
+  $$('[data-betaall]', root).forEach(ch => ch.addEventListener('click', async () => {
+    await api.patch('/settings', { agency: { betaAll: ch.dataset.betaall === '1' } });
+    await loadState();   /* applyRoleUi пересчитает видимость разделов */
+    toast(ch.dataset.betaall === '1' ? 'Показаны все разделы' : 'Публичная версия', null, true);
     render();
   }));
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
@@ -11052,7 +11073,7 @@ PAGES.billing = async (root) => {
     const on = B.plan === key;
     const price = def.custom ? 'договорная' : (B.cycle === 'yearly' ? money(def.yearly) : money(def.monthly)) + '/мес';
     const sub = key === 'broker' ? '1 брокер · до 400 лидов/мес'
-      : key === 'agency' ? '3 места включено · +' + money(B.cycle === 'yearly' ? def.seatYearly : def.seat) + '/брокер'
+      : key === 'agency' ? (def.seatsIncluded || 6) + ' мест включено · +' + money(B.cycle === 'yearly' ? def.seatYearly : def.seat) + '/брокер'
       : 'мультиофис · white-label · от объёма';
     return `<button type="button" class="bill-plan chip-t ${on ? 'on' : ''}" data-plan="${key}">
       <span class="bp-name">${def.name}</span>
@@ -11080,6 +11101,7 @@ PAGES.billing = async (root) => {
     <div class="bill-total">
       <div class="bt-line"><span>Платформа «${q.name}»</span><b>${money(q.base)}/мес</b></div>
       ${q.extraSeats ? `<div class="bt-line"><span>Доп. места × ${q.extraSeats}</span><b>${money(q.extraSeats * q.seatPrice)}/мес</b></div>` : ''}
+      ${(B.prices[q.plan] && B.prices[q.plan].setup) ? `<div class="bt-line"><span>Внедрение (разово)</span><b>${money(B.prices[q.plan].setup)}</b></div>` : ''}
       <div class="bt-line bt-grand"><span>Итого${q.cycle === 'yearly' ? ' в месяц' : ''}</span><b>${money(q.monthlyTotal)}/мес</b></div>
       ${q.cycle === 'yearly' ? `<div class="bt-line bt-year"><span>К оплате за год (−${q.saveYearlyPct}%)</span><b>${money(q.billedNow)}</b></div>` : ''}
     </div>`;

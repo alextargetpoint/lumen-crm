@@ -3258,6 +3258,14 @@ const server = http.createServer(async (req, res) => {
         try { const out = await llm.rewrite(t, String(b.mode || 'improve'), 'сообщение клиенту от менеджера агентства недвижимости в WhatsApp — живо, коротко, по-человечески, без канцелярита, тот же смысл и язык'); return json(res, 200, { text: String(out).slice(0, 2000) }); }
         catch (e) { return json(res, 400, { error: e.message }); }
       }
+      /* ✍️ причёсывание ЖИВОЙ диктовки (Web Speech даёт текст без пунктуации): расставить знаки/абзацы,
+         НЕ меняя слов и смысла. При любой ошибке/без ИИ — вернуть исходник (не терять надиктованное). */
+      if (p === '/tgapp/api/dictate-clean' && req.method === 'POST') {
+        const b = await readBody(req); const t = String(b.text || '').trim(); if (!t) return json(res, 200, { text: '' });
+        if (!llm.available()) return json(res, 200, { text: t });
+        try { const out = await llm.rewrite(t, 'improve', 'это надиктованный голосом текст, распознанный без пунктуации: расставь знаки препинания, заглавные буквы и абзацы, поправь очевидные оговорки и слова-паразиты, приведи синтаксис в порядок. СТРОГО сохрани смысл, слова, факты и язык оригинала — ничего не добавляй, не сокращай и не перефразируй по смыслу, только оформи читаемо'); const clean = String(out || '').trim(); return json(res, 200, { text: (clean || t).slice(0, 4000) }); }
+        catch (e) { return json(res, 200, { text: t }); }
+      }
       /* ✨ ИИ-суфлёр: подсказать следующий ответ клиенту по контексту диалога (в поле ввода, редактируемо) */
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/suggest$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
