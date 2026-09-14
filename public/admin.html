@@ -66,6 +66,7 @@
     <button data-tab="audit">Журнал</button>
     <button data-tab="security">🛡 Безопасность</button>
     <button data-tab="email">✉️ Письма</button>
+    <button data-tab="map">🗺 Карта</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -158,6 +159,17 @@
       </div>
     </div>
   </div>
+
+  <div class="sect" id="sect-map">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <b>Все ссылки платформы</b>
+        <span class="muted" style="font-size:12.5px">Домен: <code id="mapOrigin"></code></span>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Всё живёт на одном домене, на разных путях. Нажми «Открыть» или «⧉» чтобы скопировать ссылку.</div>
+      <div id="mapBody" style="margin-top:14px"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -187,7 +199,72 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'audit') loadAudit();
   if (b.dataset.tab === 'security') loadSecurity();
   if (b.dataset.tab === 'email') loadEmail();
+  if (b.dataset.tab === 'map') renderMap();
 }));
+
+// ── Карта ссылок ──
+const MAP = [
+  ['CRM — рабочее приложение', [
+    ['/', 'CRM', 'Лиды, диалоги, воронка, встречи — основной интерфейс агентства', 1],
+  ]],
+  ['Лендинги (публичные)', [
+    ['/land.html', 'Лендинг RU', 'Главная посадочная (русский)', 1],
+    ['/land-en.html', 'Landing EN', 'Посадочная на английском', 1],
+    ['/site.html', 'Премиум-лендинг', 'Тёмный dark-premium вариант', 1],
+    ['/scenarios.html', 'Сценарии', 'Страница сценариев использования', 1],
+    ['/soon.html', 'Coming soon', 'Заглушка «скоро»', 1],
+  ]],
+  ['Клиентам / заявки', [
+    ['/waitlist.html', 'Лист ожидания', 'Заявки на демо + рассылка приветствий', 1],
+  ]],
+  ['Управление (для тебя)', [
+    ['/admin.html', 'Админка основателя', 'Эта панель: аккаунты, тарифы, безопасность, письма', 1],
+    ['/tgapp', 'Мини-апп брокера', 'Открывается из Telegram-бота (по кнопке), тут — для проверки', 1],
+  ]],
+  ['Юридические', [
+    ['/privacy.html', 'Конфиденциальность', 'GDPR + PDPL, субпроцессоры', 1],
+    ['/terms.html', 'Условия', 'Пользовательское соглашение', 1],
+    ['/dpa.html', 'DPA', 'Обработка данных (Art. 28)', 1],
+    ['/acceptable-use.html', 'Допустимое использование', '', 1],
+    ['/cookies.html', 'Cookie', '', 1],
+    ['/data-deletion.html', 'Удаление данных', 'Право на забвение', 1],
+    ['/partner-agreement.html', 'Партнёрский договор', 'Аффилиат/реферал', 1],
+    ['/service-agreement.html', 'Договор услуг', '', 1],
+  ]],
+  ['Публичные по ссылке-токену (нужен id/токен)', [
+    ['/m/&lt;id&gt;', 'Страница встречи', 'Клиенту: подтверждение + подключение (live)', 0],
+    ['/b/&lt;id&gt;', 'Визитка брокера', '', 0],
+    ['/p/&lt;id&gt;', 'Подборка объектов', 'Клиенту по ссылке', 0],
+    ['/mp/&lt;id&gt;', 'Медиаплан', 'Подрядчику/клиенту', 0],
+    ['/reset?token=…', 'Сброс пароля', 'Из письма', 0],
+    ['/invite?token=…', 'Приглашение брокера', 'Из письма-инвайта', 0],
+  ]],
+];
+function renderMap() {
+  const O = location.origin;
+  $('#mapOrigin').textContent = O;
+  $('#mapBody').innerHTML = MAP.map(([group, items]) => `
+    <div style="margin-bottom:18px">
+      <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px">${group}</div>
+      ${items.map(([path, name, desc, live]) => {
+        const url = O + path.replace(/&lt;.*?&gt;/,'').replace(/\?.*$/,'');
+        return `<div class="row" style="justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))">
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:600;font-size:14px">${name}</div>
+            <div class="muted" style="font-size:12px">${desc||''}</div>
+            <code style="font-size:11.5px;color:var(--mut);word-break:break-all">${O}${path}</code>
+          </div>
+          <div class="row" style="gap:6px;flex:none">
+            ${live ? `<a class="ghost" style="text-decoration:none;padding:6px 12px;font-size:12.5px" href="${O}${path}" target="_blank">Открыть</a>` : ''}
+            <button class="ghost mapcopy" data-u="${O}${path}" style="padding:6px 10px;font-size:12.5px" title="Скопировать">⧉</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  document.querySelectorAll('.mapcopy').forEach(b => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.u); b.textContent='✓'; setTimeout(()=>b.textContent='⧉',1200); } catch(e){}
+  }));
+}
 
 // ── Конструктор писем ──
 let EMAIL = { templates: {}, keys: [], cur: null, pvLang: 'ru' };
