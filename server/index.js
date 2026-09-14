@@ -2322,9 +2322,12 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
 }
 
 /* --- Telnyx Call Control: click-to-call (звонок брокеру → соединение с клиентом → запись) --- */
+/* ключ Telnyx: сперва из настроек тенанта, иначе платформенный из env TELNYX_API_KEY (Railway).
+   Так один аккаунт-менеджер обслуживает всех + позже — провижн Managed Accounts тем же ключом. */
+function telnyxKey(t) { return (t && t.key) || process.env.TELNYX_API_KEY || ''; }
 async function telnyxApi(db, method, pathx, body) {
   const t = db.settings.telephony || {};
-  const r = await fetch('https://api.telnyx.com/v2' + pathx, { method, headers: { Authorization: 'Bearer ' + t.key, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch('https://api.telnyx.com/v2' + pathx, { method, headers: { Authorization: 'Bearer ' + telnyxKey(t), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error('telnyx ' + r.status + ': ' + ((j.errors && j.errors[0] && j.errors[0].detail) || 'ошибка'));
   return j;
@@ -2379,7 +2382,7 @@ async function warmupTick() {
 setInterval(() => { warmupTick().catch(() => {}); }, 12 * 60e3);   /* каждые ~12 мин, cost-safe */
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
-  if (t.provider !== 'telnyx' || !t.key || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key, Connection ID и номер «От»');
+  if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key (в настройках или env TELNYX_API_KEY), Connection ID и номер «От»');
   if (!brokerPhone) throw new Error('нет номера брокера для звонка');
   const cs = Buffer.from(JSON.stringify({ leadId: lead.id, clientPhone: lead.phone, stage: 'broker' })).toString('base64');
   return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: brokerPhone, from: t.fromNumber, client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
