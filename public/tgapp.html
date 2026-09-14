@@ -68,8 +68,9 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:'Manrope',-apple-system,SF Pro Text,Roboto,Segoe UI,sans-serif;font-size:15px;line-height:1.42;
     overscroll-behavior:none;-webkit-font-smoothing:antialiased;letter-spacing:-.1px}
-  /* компактнее на ~18%: интерфейс был крупноват — равномерное полностраничное уменьшение */
-  body{zoom:.82}
+  /* масштаб интерфейса — настраивается (80/90/100 %); дефолт 90. JS переопределяет из PREFS.scale.
+     Раньше было жёстко .82 и поля казались мелкими — теперь крупнее и с выбором для слабого зрения. */
+  body{zoom:.9}
   #bgart{position:fixed;inset:0;z-index:0;background:url(/assets/tgapp-bg.png) top center/cover no-repeat;opacity:.3;filter:grayscale(1)}   /* grayscale — убирает неоновую цветную дымку */
   #bgart::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,11,18,.35),var(--bg) 78%)}
   #app{height:100%;display:flex;flex-direction:column;max-width:680px;margin:0 auto;position:relative;overflow:hidden;z-index:1}
@@ -102,6 +103,10 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .prev .me{color:var(--acc2);font-weight:700}
   .badge-un{background:var(--grad);color:#fff;border-radius:12px;min-width:22px;height:22px;padding:0 7px;display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;box-shadow:var(--shacc);animation:pop .3s}
   .geo-chip{font-size:10.5px;color:var(--acc2);background:color-mix(in srgb,var(--acc) 13%,transparent);padding:2px 8px;border-radius:9px;font-weight:700}
+  /* быстрый переход в карточку лида прямо со списка чатов (без «открыть чат → тап по имени») */
+  .row-lead{width:36px;height:36px;border-radius:12px;flex:none;display:grid;place-items:center;color:var(--acc2);background:color-mix(in srgb,var(--acc) 10%,transparent);cursor:pointer;transition:transform .15s,background .15s}
+  .row-lead:active{transform:scale(.86);background:color-mix(in srgb,var(--acc) 22%,transparent)}
+  .row-lead svg{width:18px;height:18px}
   .empty{padding:60px 24px;text-align:center;color:var(--mut);font-size:14px;line-height:1.6}
   .load{padding:44px;text-align:center;color:var(--mut)}
   .load .sp{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 12px;animation:spin .8s linear infinite}
@@ -161,12 +166,13 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .qchip{white-space:nowrap;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12.5px;padding:7px 13px;border-radius:13px;cursor:pointer;transition:.15s;flex:none;font-weight:600}
   .qchip:active{background:var(--panel2);transform:scale(.95)}
   .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px calc(env(safe-area-inset-bottom) + 10px);background:var(--glass);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
-  .composer textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:21px;padding:10px 16px;font-size:15px;resize:none;max-height:170px;outline:none;font-family:inherit;transition:border-color .2s;line-height:1.38;font-weight:500}
+  .composer textarea{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:21px;padding:11px 16px;font-size:16px;resize:none;max-height:170px;outline:none;font-family:inherit;transition:border-color .2s;line-height:1.4;font-weight:500}
   .composer textarea:focus{border-color:var(--acc)}
   .composer.has-text textarea{border-radius:18px;padding:11px 16px}
-  /* многострочный текст (после диктовки) → поле на всю ширину сверху, кнопки строкой снизу */
-  .composer.expanded{flex-wrap:wrap;justify-content:flex-end;gap:8px}
-  .composer.expanded textarea{flex:1 0 100%;order:-1;max-height:200px}
+  /* КЛАССИЧЕСКИЙ МЕССЕНДЖЕР: поле растёт ВВЕРХ, а кнопки отправки/⋯ и микрофон ВСЕГДА
+     остаются сбоку внизу (align-items:flex-end) — раньше при многострочном тексте
+     (после диктовки) поле уезжало на всю ширину, а кнопки падали под него. Больше нет. */
+  .composer textarea{max-height:200px}
   /* при наборе второстепенные кнопки плавно сворачиваются — поле остаётся широким */
   .cbtn.collapsible{transition:width .26s cubic-bezier(.22,1,.36,1),min-width .26s,opacity .18s,margin .26s,transform .2s,padding .26s}
   .composer.has-text .cbtn.collapsible{width:0;min-width:0;padding:0;opacity:0;margin-left:-8px;pointer-events:none;transform:scale(.4);overflow:hidden}
@@ -243,7 +249,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .lcd-acts button .ic svg{width:21px;height:21px;color:var(--acc)}
   .lcd-next{font-size:14px;line-height:1.5;cursor:pointer;font-weight:600}.lcd-next.empty{color:var(--mut);font-weight:500}
   .lcd-ax{cursor:pointer}.lcd-ax .v.empty{color:var(--acc);font-weight:600}
-  .ish{width:100%;box-sizing:border-box;border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);font-family:inherit;font-size:15px;padding:12px 14px;border-radius:13px;margin-bottom:12px;resize:none}
+  .ish{width:100%;box-sizing:border-box;border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);font-family:inherit;font-size:16px;padding:13px 15px;border-radius:13px;margin-bottom:12px;resize:none;line-height:1.4}
   .ish:focus{outline:none;border-color:var(--acc)}
   .ish-ok{width:100%;border:none;background:var(--grad);color:#fff;font-family:inherit;font-weight:800;font-size:15px;padding:13px;border-radius:13px;cursor:pointer;box-shadow:var(--shacc)}
   .ms-ch{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--mut);font-weight:600;margin:4px 2px 14px}.ms-ch input{width:18px;height:18px;accent-color:var(--acc)}
@@ -292,9 +298,15 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .tkstat .s b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
   .tkstat .s.warn b{color:var(--danger)} .tkstat .s span{font-size:10.5px;color:var(--mut);font-weight:600}
   .tkadd{display:flex;gap:8px;margin-bottom:12px}
-  .tkadd input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:13px;padding:11px 14px;font-size:14px;outline:none;font-family:inherit}
+  .tkadd input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:13px;padding:12px 15px;font-size:15px;outline:none;font-family:inherit}
   .tkadd input:focus{border-color:var(--acc)}
   .tkadd button{flex:none;width:46px;border:none;border-radius:13px;background:var(--grad);color:#fff;font-size:22px;cursor:pointer;box-shadow:var(--shacc)}
+  /* микрофон диктовки в текстовых полях (задачи/идеи/шиты ввода) */
+  .fieldmic{flex:none;width:46px;border:1px solid var(--line)!important;border-radius:13px;background:var(--panel)!important;color:var(--acc2)!important;cursor:pointer;display:grid;place-items:center;box-shadow:none!important;transition:transform .15s,background .15s}
+  .fieldmic svg{width:20px;height:20px}
+  .fieldmic:active{transform:scale(.9)}
+  .fieldmic.rec{background:#e5484d!important;color:#fff!important;border-color:transparent!important;animation:dictpulse 1.1s ease-in-out infinite}
+  .fieldmic.busy{opacity:.45;pointer-events:none}
   .tk{display:flex;gap:11px;align-items:flex-start;padding:12px 12px;border-radius:15px;transition:.15s;border:1px solid transparent}
   .tk:active{background:var(--panel)}
   .tk-ck{flex:none;width:24px;height:24px;border-radius:8px;border:2px solid var(--line);cursor:pointer;display:grid;place-items:center;margin-top:1px;transition:.15s;color:transparent}
@@ -382,6 +394,12 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   @keyframes fade{from{opacity:0}}
   @keyframes pop{from{transform:scale(0)}}
   @keyframes bubble{from{opacity:0;transform:translateY(6px) scale(.97)}}
+  /* плавная смена разделов (Чаты/Лиды/Задачи/Встречи/Идеи) — раньше переключалось резко */
+  @keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .viewshow{animation:viewIn .34s cubic-bezier(.22,1,.36,1)}
+  @keyframes tabpop{from{transform:scale(.9)}to{transform:none}}
+  .viewseg button.on{animation:tabpop .22s cubic-bezier(.22,1,.36,1)}
+  @media (prefers-reduced-motion:reduce){.viewshow,.viewseg button.on{animation:none}}
   @keyframes td{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 </style>
 </head>
@@ -504,25 +522,29 @@ const TG=window.Telegram&&window.Telegram.WebApp; if(TG){TG.ready();TG.expand();
    в реальном времени → композер садится ровно над клавиатурой сразу. Плюс meta interactive-widget=resizes-content
    (современные webview делают это сами). Учитываем body{zoom:.82}: visualViewport в НЕзумленных px, #app — в зумленных. */
 (function(){
-  var vv=window.visualViewport; if(!vv) return; var Z=0.82;
+  var vv=window.visualViewport; if(!vv) return;
+  var Zget=function(){ return window.TGZOOM||0.9; };   /* масштаб теперь настраиваемый → читаем динамически */
   var raf=null, app=null;
-  var fix=function(){ app=app||document.getElementById('app'); if(!app) return;
+  var fix=function(){ app=app||document.getElementById('app'); if(!app) return; var Z=Zget();
     app.style.height=(vv.height/Z)+'px';
     app.style.transform = vv.offsetTop ? 'translateY('+(vv.offsetTop/Z)+'px)' : ''; };
   var onvv=function(){ if(raf) return; raf=requestAnimationFrame(function(){raf=null;fix();}); };
   vv.addEventListener('resize',onvv); vv.addEventListener('scroll',onvv);
   window.addEventListener('orientationchange',function(){setTimeout(fix,300)});
-  fix();
+  window.__vvfix=fix; fix();
 })();
 const hap=(t)=>{try{TG&&TG.HapticFeedback&&TG.HapticFeedback.impactOccurred(t||'light')}catch(e){}};
 const INIT=(TG&&TG.initData)||''; const H={'X-Tg-Init-Data':INIT};
 /* ── персональное оформление брокера (тема + акцент), сохраняется за ним ── */
 const PREF_KEY='lumen_tgprefs_'+((TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user&&TG.initDataUnsafe.user.id)||'x');
-let PREFS={theme:'atelier',accent:'blue'};   /* дефолт — церемонка (Ателье), не синий «авто» */
+let PREFS={theme:'atelier',accent:'blue',scale:0.9};   /* дефолт — церемонка (Ателье); масштаб 90% */
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
 const TH_BG={light:'#eef2f8',atelier:'#f3f1ec',burgundy:'#f7f3f4',glass:'#eef5ff',mono:'#f6f6f6',dark:'#080b12'};
+/* масштаб интерфейса (80/90/100) — крупнее для слабого зрения; синхронит window.TGZOOM с фиксом клавиатуры */
+function applyScale(){const z=+PREFS.scale||0.9;window.TGZOOM=z;try{document.body.style.zoom=z}catch(e){}if(window.__vvfix)window.__vvfix();}
 function applyTheme(){const r=document.documentElement;const th=(!PREFS.theme||PREFS.theme==='auto')?'atelier':PREFS.theme;r.setAttribute('data-theme',th);r.setAttribute('data-accent',PREFS.accent||'blue');const bg=TH_BG[th]||'#080b12';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg)}catch(e){}}
-applyTheme();
+window.TGZOOM=+PREFS.scale||0.9; applyTheme();
+document.addEventListener('DOMContentLoaded',applyScale); applyScale();
 if(TG&&TG.onEvent)TG.onEvent('themeChanged',()=>{if(PREFS.theme==='auto')applyTheme()});
 let CHATS=[],CUR=null,POLL=null;
 const $=s=>document.querySelector(s);
@@ -582,7 +604,10 @@ function renderChats(){
         <div class="prev">${c.geo?`<span class="geo-chip">${esc(c.geo)}</span>`:''}${c.lastDir==='out'?'<span class="me">Вы:</span> ':''}<span style="overflow:hidden;text-overflow:ellipsis">${esc(c.lastText||'нет сообщений')}</span></div>
       </div>
       ${c.unread>0?`<span class="badge-un">${c.unread>99?'99+':c.unread}</span>`:(c.needsMe?'<span class="dot-me" title="ждёт вашего ответа"></span>':'')}
+      <span class="row-lead ic" data-lead="${c.id}" data-ic="user" title="Карточка лида"></span>
     </div>`).join(''):`<div class="empty">${CHFILTER==='mine'?'Никто не ждёт ответа — всё под контролем 👌':CHFILTER==='unread'?'Непрочитанных нет':CHFILTER==='all'?'Ничего не найдено':'В этом фильтре пусто'}</div>`;
+  paintIcons($('#chats'));
+  document.querySelectorAll('#chats .row-lead').forEach(b=>b.onclick=e=>{e.stopPropagation();hap();openLeadCard(b.dataset.lead)});
   document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{hap();openChat(r.dataset.id)});
   updateTabBadges();
 }
@@ -599,6 +624,7 @@ function setMode(m){MODE=m;
   $('#h1t').textContent=H1[m]||'Пульт';
   setSparkIcon(IC_MODE[m]);
   ['chats','leads','tasks','meets','ideas'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  const cont=$('#'+m); if(cont){cont.classList.remove('viewshow');void cont.offsetWidth;cont.classList.add('viewshow');}   /* плавный вход раздела */
   $('#segflt').style.display=m==='chats'?'':'none';
   $('#q').closest('.search').style.display=(m==='meets'||m==='ideas')?'none':'';
   $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
@@ -629,7 +655,7 @@ function renderTasks(){
   const today=_todayStr();
   const open=list.filter(t=>t.status!=='done'), done=list.filter(t=>t.status==='done');
   const head=`<div class="tkstat"><div class="s"><b>${TSTATS.today||0}</b><span>на сегодня</span></div><div class="s ${TSTATS.overdue?'warn':''}"><b>${TSTATS.overdue||0}</b><span>просрочено</span></div><div class="s"><b>${TSTATS.doneToday||0}</b><span>сделано</span></div></div>
-    <div class="tkadd"><input id="tkNew" placeholder="Новая задача…" autocomplete="off"><button id="tkAdd">＋</button></div>`;
+    <div class="tkadd"><input id="tkNew" placeholder="Новая задача…" autocomplete="off"><button class="fieldmic ic" id="tkMic" data-ic="mic" title="Продиктовать задачу"></button><button id="tkAdd">＋</button></div>`;
   const row=t=>{const over=t.status!=='done'&&t.due&&_dstr(t.due)<today;const due=t.due?_dstr(t.due):(t.scheduled||'');
     return `<div class="tk ${t.status==='done'?'done':''}" data-id="${esc(t.id)}">
       <div class="tk-ck" data-ck>${svg('check')}</div>
@@ -641,6 +667,7 @@ function renderTasks(){
   $('#tasks').innerHTML=head+body;paintIcons($('#tasks'));
   const add=async()=>{const inp=$('#tkNew');const v=(inp.value||'').trim();if(!v)return;inp.value='';try{await jpost('/tgapp/api/task',{title:v});hap();loadTasks()}catch(e){toast(e.message)}};
   $('#tkAdd').onclick=add;$('#tkNew').addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+  $('#tkMic')&&($('#tkMic').onclick=()=>dictateInto($('#tkNew'),$('#tkMic')));
   $('#tasks').querySelectorAll('.tk-ck').forEach(c=>c.onclick=async()=>{const t=c.closest('.tk');t.classList.toggle('done');hap();try{await jpost('/tgapp/api/task/'+t.dataset.id+'/toggle',{});loadTasks();prefetchDayBadges()}catch(e){toast(e.message);loadTasks()}});
   $('#tasks').querySelectorAll('[data-lead]').forEach(el=>el.onclick=e=>{e.stopPropagation();hap();openLeadCard(el.dataset.lead)});
   updateTabBadges();
@@ -707,10 +734,12 @@ function renderAnalytics(a){
 /* ── КОПИЛКА ИДЕЙ (командная, синхрон с десктопом) ── */
 let IDEAS=[];
 async function loadIdeas(){try{IDEAS=await jget('/tgapp/api/ideas');renderIdeas()}catch(e){const stale=/no route|404/i.test(String(e.message));$('#ideas').innerHTML=ideaHead()+'<div class="empty">'+(stale?'Раздел разворачивается на сервере — обновите через минуту 🙌':'Не удалось загрузить.<br>'+esc(e.message))+'</div>';wireIdeaAdd()}}
-function ideaHead(){return `<div class="tkadd" style="margin:2px 0 12px"><input id="idNew" placeholder="Записать идею для контента…" autocomplete="off"><button id="idAdd">＋</button></div>`;}
+function ideaHead(){return `<div class="tkadd" style="margin:2px 0 12px"><input id="idNew" placeholder="Записать идею для контента…" autocomplete="off"><button class="fieldmic ic" id="idMic" data-ic="mic" title="Продиктовать идею"></button><button id="idAdd">＋</button></div>`;}
 function wireIdeaAdd(){
+  paintIcons($('#ideas'));
   const add=async()=>{const inp=$('#idNew');const v=(inp.value||'').trim();if(!v)return;inp.value='';try{await jpost('/tgapp/api/ideas',{text:v});hap();loadIdeas()}catch(e){toast(e.message)}};
   const a=$('#idAdd'),i=$('#idNew');if(a)a.onclick=add;if(i)i.addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+  $('#idMic')&&($('#idMic').onclick=()=>dictateInto($('#idNew'),$('#idMic')));
 }
 function renderIdeas(){
   const body=IDEAS.length?IDEAS.map(x=>{const meta=[x.source,x.platform,x.geo].filter(Boolean).join(' · ');
@@ -845,8 +874,7 @@ const txt=$('#text'),send=$('#send'),mic=$('#mic'),enh=$('#enh'),tts=$('#tts'),c
 /* дигитальный композер: при наборе второстепенные кнопки сворачиваются, поле остаётся
    широким и растёт; доп-действия (усилить/озвучить/диктовка/вложение) — в кнопке-меню «⋯» */
 txt.addEventListener('input',()=>{txt.style.height='auto';txt.style.height=Math.min(txt.scrollHeight,200)+'px';const has=!!txt.value.trim();
-  composer.classList.toggle('has-text',has);
-  composer.classList.toggle('expanded',has&&txt.scrollHeight>58);   /* многострочно → поле на всю ширину сверху, кнопки снизу */
+  composer.classList.toggle('has-text',has);   /* поле растёт вверх, кнопки — сбоку снизу (без .expanded) */
   send.classList.toggle('hidden',!has);
   actions.classList.toggle('hidden',!has)});
 actions.onclick=()=>{hap();sheet('Действия с сообщением',[
@@ -878,31 +906,50 @@ $('#file').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.va
   const type=/^image\//.test(f.type)?'image':/^video\//.test(f.type)?'video':/^audio\//.test(f.type)?'voice':'document';
   toast('Отправляю…');try{await jpost('/tgapp/api/chat/'+CUR.id+'/media?type='+type+'&filename='+encodeURIComponent(f.name),null,{body:f,ct:f.type||'application/octet-stream'});await loadConv(true)}catch(e){toast('Не отправилось: '+e.message)}};
 
-/* 🎙️ диктовка: голос → транскрипт → ИИ причёсывает → чистый текст в поле (на правку) */
-let DREC=null,DCH=[];
-$('#dict').onclick=async()=>{
-  if(DREC){DREC.stop();return}
-  try{
-    const st=await navigator.mediaDevices.getUserMedia({audio:true});
-    DREC=new MediaRecorder(st);DCH=[];hap('medium');$('#dict').classList.add('rec');toast('Говорите… нажмите ещё раз, чтобы закончить');
-    DREC.ondataavailable=ev=>DCH.push(ev.data);
-    DREC.onstop=async()=>{
-      st.getTracks().forEach(t=>t.stop());$('#dict').classList.remove('rec');
-      const blob=new Blob(DCH,{type:(DCH[0]&&DCH[0].type)||'audio/webm'});DREC=null;
-      if(!blob.size){return}
+/* 🎙️ ЕДИНЫЙ ДВИЖОК ДИКТОВКИ — работает в любом текстовом поле:
+   1) ЖИВАЯ диктовка (Web Speech API): текст появляется в поле ПО МЕРЕ РЕЧИ (interimResults);
+   2) ФОЛБЭК (Telegram iOS WKWebView без Web Speech): запись → сервер /dictate → ИИ причёсывает.
+   Повторный тап по кнопке — остановить. Кнопка получает класс .rec во время записи. */
+const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+function _dcatAppend(base,add){base=(base||'').trim();add=(add||'').trim();return base&&add?base+' '+add:(base||add)}
+function dictateInto(input,btn){
+  if(!input)return;
+  if(btn&&btn._dictStop){btn._dictStop();return}   /* повторный тап → стоп */
+  const busy=b=>{if(btn)btn.classList.toggle('rec',!!b)};
+  const fire=()=>input.dispatchEvent(new Event('input'));
+  /* ── живая диктовка ── */
+  if(SpeechRec){
+    let rec;try{rec=new SpeechRec()}catch(e){rec=null}
+    if(rec){
+      rec.lang='ru-RU';rec.continuous=true;rec.interimResults=true;
+      const base=input.value||'';let finalTxt='';let ended=false;
+      const cleanup=()=>{if(ended)return;ended=true;busy(false);if(btn)btn._dictStop=null;try{input.focus()}catch(e){}};
+      busy(true);hap('medium');toast('Говорите — текст появляется вживую…');
+      rec.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)finalTxt=_dcatAppend(finalTxt,r[0].transcript);else interim+=r[0].transcript}
+        input.value=_dcatAppend(base,_dcatAppend(finalTxt,interim));fire()};
+      rec.onerror=ev=>{if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){toast('Нет доступа к микрофону');cleanup()}else if(ev.error==='no-speech'){/* тишина — продолжаем */}else{cleanup()}};
+      rec.onend=cleanup;
+      if(btn)btn._dictStop=()=>{try{rec.stop()}catch(e){}};
+      try{rec.start();return}catch(e){busy(false);if(btn)btn._dictStop=null;/* провалимся в фолбэк */}
+    }
+  }
+  /* ── фолбэк: запись → сервер ── */
+  navigator.mediaDevices.getUserMedia({audio:true}).then(st=>{
+    const mr=new MediaRecorder(st),chunks=[];
+    busy(true);hap('medium');toast('Говорите… нажмите ещё раз, чтобы закончить');
+    mr.ondataavailable=e=>chunks.push(e.data);
+    mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());busy(false);if(btn)btn._dictStop=null;
+      const blob=new Blob(chunks,{type:(chunks[0]&&chunks[0].type)||'audio/webm'});if(!blob.size)return;
       const ext=((blob.type.split('/')[1]||'webm').split(';')[0]);
-      $('#dict').classList.add('busy');toast('Распознаю и причёсываю…');
-      try{
-        const r=await jpost('/tgapp/api/dictate?filename=dictate.'+ext,null,{body:blob,ct:blob.type||'audio/webm'});
-        const t=(r.text||'').trim();
-        if(t){const cur=txt.value.trim();txt.value=cur?cur+' '+t:t;txt.dispatchEvent(new Event('input'));txt.focus();hap();toast('Готово — проверьте и отправьте')}
-        else toast('Ничего не распозналось');
-      }catch(e){toast(e.message)}
-      $('#dict').classList.remove('busy');
-    };
-    DREC.start();
-  }catch(e){toast('Нет доступа к микрофону')}
-};
+      if(btn)btn.classList.add('busy');toast('Распознаю и причёсываю…');
+      try{const r=await jpost('/tgapp/api/dictate?filename=dictate.'+ext,null,{body:blob,ct:blob.type||'audio/webm'});
+        const t=(r.text||'').trim();if(t){input.value=_dcatAppend(input.value,t);fire();try{input.focus()}catch(e){}hap();toast('Готово — проверьте')}else toast('Ничего не распозналось')}
+      catch(e){toast(e.message)}if(btn)btn.classList.remove('busy')};
+    if(btn)btn._dictStop=()=>{try{mr.stop()}catch(e){}};
+    mr.start();
+  }).catch(()=>toast('Нет доступа к микрофону'));
+}
+$('#dict').onclick=()=>dictateInto(txt,$('#dict'));
 
 let REC=null,CHUNKS=[],recT=null,recCancel=false;
 mic.onclick=async()=>{if(REC){REC.stop();return}
@@ -940,7 +987,7 @@ function sheet(title,opts){const bd=document.createElement('div');bd.className='
 $('#q').addEventListener('input',()=>{MODE==='leads'?renderLeads():renderChats()});
 
 /* ── настройки оформления ── */
-function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme();fetch('/tgapp/api/prefs',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(PREFS)}).catch(()=>{})}
+function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme();applyScale();fetch('/tgapp/api/prefs',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(PREFS)}).catch(()=>{})}
 function openSettings(){
   /* базовые: авто/светлая/тёмная + фирменные стили церемонки (как на десктопе). Акцентный пикер убран. */
   const themes=[['auto','auto','Авто'],['light','sun','Светлая'],['dark','moon','Тёмная']];
@@ -950,10 +997,13 @@ function openSettings(){
     <div class="set-lbl">Стиль церемонки · как на десктопе</div>
     <div class="style-row">${styles.map(s=>`<button data-th="${s[0]}" class="style-sw ${PREFS.theme===s[0]?'on':''}"><span class="sw2" style="background:${s[1]}"><i style="background:${s[2]}"></i></span>${s[3]}</button>`).join('')}</div>
     <div class="set-lbl">Базовые</div>
-    <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div></div>`;
+    <div class="seg">${themes.map(t=>`<button data-th="${t[0]}" class="${PREFS.theme===t[0]?'on':''}"><span class="ic">${svg(t[1])}</span>${t[2]}</button>`).join('')}</div>
+    <div class="set-lbl">Масштаб интерфейса · крупнее для чтения</div>
+    <div class="seg" id="scaleSeg">${[['0.8','80 %'],['0.9','90 %'],['1','100 %']].map(s=>`<button data-scale="${s[0]}" class="${(+PREFS.scale||0.9)==+s[0]?'on':''}">${s[1]}</button>`).join('')}</div></div>`;
   document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
   bd.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{hap();PREFS.theme=b.dataset.th;bd.querySelectorAll('[data-th]').forEach(x=>x.classList.toggle('on',x===b));savePrefs()});
+  bd.querySelectorAll('[data-scale]').forEach(b=>b.onclick=()=>{hap();PREFS.scale=+b.dataset.scale;bd.querySelectorAll('[data-scale]').forEach(x=>x.classList.toggle('on',x===b));savePrefs()});
 }
 $('#settingsBtn').onclick=()=>{hap();openSettings()};
 
@@ -967,12 +1017,15 @@ let LEADID=null;
 /* универсальный инпут-шит (текст/дата) */
 function inputSheet(title,o,cb){
   const bd=document.createElement('div');bd.className='sheet-bd';
+  const noMic=o.type==='date'||o.type==='datetime-local'||o.type==='number';
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>${esc(title)}</h3>
     ${o.multiline?`<textarea class="ish" rows="3" placeholder="${esc(o.placeholder||'')}">${esc(o.value||'')}</textarea>`:`<input class="ish" type="${o.type||'text'}" placeholder="${esc(o.placeholder||'')}" value="${esc(o.value||'')}">`}
+    ${noMic?'':`<div style="display:flex;justify-content:flex-end;margin:-4px 0 12px"><button class="fieldmic ic" id="ishMic" data-ic="mic" title="Продиктовать" style="width:44px;height:40px"></button></div>`}
     <button class="ish-ok">${esc(o.ok||'Сохранить')}</button></div>`;
-  document.body.appendChild(bd);requestAnimationFrame(()=>{bd.classList.add('on');const f=bd.querySelector('.ish');f.focus();f.setSelectionRange&&f.setSelectionRange(f.value.length,f.value.length)});
+  document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>{bd.classList.add('on');const f=bd.querySelector('.ish');f.focus();f.setSelectionRange&&f.setSelectionRange(f.value.length,f.value.length)});
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};
   bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelector('#ishMic')&&(bd.querySelector('#ishMic').onclick=()=>dictateInto(bd.querySelector('.ish'),bd.querySelector('#ishMic')));
   bd.querySelector('.ish-ok').onclick=()=>{const v=bd.querySelector('.ish').value.trim();hap();close();cb(v)};
 }
 /* шит назначения встречи */
