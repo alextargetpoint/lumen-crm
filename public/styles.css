@@ -4681,8 +4681,11 @@ html[data-night] {
 .ovx-hero .ov-delta.flat { color:#CFE0FF; background:rgba(255,255,255,.12); }
 
 .ovx-kcards { display:flex; flex-direction:column; gap:12px; }
-.ovx-kcard { display:flex; align-items:center; gap:13px; text-align:left; padding:14px 16px; border-radius:16px; background:var(--card); border:1px solid var(--stroke); box-shadow:var(--ov-shadow-card); transition:transform .16s var(--ease-soft), box-shadow .16s var(--ease-soft); }
-.ovx-kcard:hover { transform:translateY(-1px); box-shadow:var(--ov-shadow-elev); }
+.ovx-kcard { position:relative; display:flex; align-items:center; gap:13px; text-align:left; padding:14px 16px; border-radius:16px; background:var(--card); border:1px solid var(--stroke); box-shadow:var(--ov-shadow-card); transition:transform .18s var(--ease-spring), box-shadow .18s var(--ease-soft), border-color .18s var(--ease-soft); }
+/* каждая карточка поднимается САМА (не полотном): заметный подъём + тень + z-index над соседями.
+   --shadow-lift/--hover-bd заданы во всех темах, в отличие от --ov-shadow-elev (в Atelier его нет). */
+.ovx-kcard:hover { transform:translateY(-3px); box-shadow:var(--shadow-lift); border-color:var(--hover-bd); z-index:2; }
+@media (prefers-reduced-motion:reduce){ .ovx-kcard{transition:box-shadow .18s} .ovx-kcard:hover{transform:none} }
 .ovx-kc-ic { flex:none; width:40px; height:40px; border-radius:12px; display:grid; place-items:center; box-shadow:none; }
 .ovx-kc-ic svg { width:19px; height:19px; }
 .ovx-kc-ic.cat-blue { background:var(--ov-soft-blue); color:var(--ov-cat-blue); }
