@@ -2432,6 +2432,48 @@ function tzFromPhone(phone) {
   return best ? best[1] : 4;
 }
 
+/* Робастный CSV-парсер: кавычки, экранированные "" , запятые/переносы внутри полей,
+   авто-разделитель (, ; или таб). Для миграции из amoCRM/Bitrix/HubSpot/Excel-экспортов. */
+function parseCsvTable(text) {
+  text = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!text.trim()) return { header: [], rows: [], sep: ',' };
+  const nl = text.indexOf('\n'); const firstLine = nl < 0 ? text : text.slice(0, nl);
+  const sep = firstLine.includes('\t') ? '\t' : (firstLine.split(';').length > firstLine.split(',').length ? ';' : ',');
+  const rows = []; let row = [], cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  const header = (rows.shift() || []).map(h => h.trim());
+  const clean = rows.filter(r => r.some(c => (c || '').trim() !== ''));
+  return { header, rows: clean, sep };
+}
+/* авто-угадывание колонок по заголовку (общий словарь для analyze и import) */
+function guessImportMapping(header) {
+  const lc = header.map(h => String(h || '').toLowerCase());
+  const g = (names) => lc.findIndex(h => names.some(n => h.includes(n)));
+  return {
+    name: g(['name', 'имя', 'фио', 'контакт', 'title', 'название', 'client', 'клиент']),
+    phone: g(['phone', 'телефон', 'тел', 'mobile', 'моб', 'whatsapp', 'вотсап']),
+    email: g(['mail', 'почта', 'e-mail']),
+    stage: g(['stage', 'status', 'стади', 'статус', 'этап', 'воронк', 'pipeline']),
+    source: g(['source', 'источник', 'канал', 'utm']),
+    broker: g(['broker', 'ответствен', 'менеджер', 'агент', 'manager', 'owner', 'responsible']),
+    budget: g(['budget', 'бюджет', 'opportunity', 'сумма', 'price', 'цена']),
+    geo: g(['geo', 'гео', 'направлен', 'город', 'регион', 'country', 'страна']),
+    note: g(['comment', 'коммент', 'примечан', 'note', 'описан', 'заметк']),
+    created: g(['created', 'дата созд', 'создан', 'date', 'дата']),
+    tags: g(['tag', 'тег', 'метк']),
+  };
+}
+
 /* безопасная загрузка страницы (SSRF-гард) — для скрейпинга инфы и фото лонча */
 /* SSRF-гард: блокируем приватные/loopback/link-local хосты, включая decimal/hex/octal-запись IPv4 и IPv6-маппинг */
 function ssrfBlocked(hostname) {
@@ -4933,7 +4975,7 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const t = db.settings.telephony || {};
       if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера Twilio и сохраните ключи' });
-      try { const a = await twilioApi(db, 'GET', '.json'); return json(res, 200, { ok: true, account: a.friendly_name || a.sid, status: a.status }); }
+      try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
       catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
     }
     /* поиск доступных номеров по стране: /api/telephony/numbers/search?country=FR&type=local&contains= */
@@ -7083,61 +7125,69 @@ ${SCR}
     }
 
     /* ---------------- импорт базы (CSV из Bitrix/amo + Bitrix24 API) ---------------- */
+    /* Анализ файла миграции: колонки + примеры + авто-угаданный маппинг (для мастера) */
+    if (p === '/api/import/analyze' && req.method === 'POST') {
+      const b = await readBody(req);
+      const t = parseCsvTable(b.csv || '');
+      if (!t.header.length) return json(res, 400, { error: 'пустой файл или нет строки заголовков' });
+      const columns = t.header.map((h, i) => ({ idx: i, header: h || `Колонка ${i + 1}`, samples: t.rows.slice(0, 3).map(r => String(r[i] || '').slice(0, 48)) }));
+      return json(res, 200, { columns, guess: guessImportMapping(t.header), rowCount: t.rows.length, sep: t.sep });
+    }
     if (p === '/api/import/csv' && req.method === 'POST') {
       const b = await readBody(req);
-      const lines = String(b.csv || '').split('\n').map(x => x.trim()).filter(Boolean);
-      if (lines.length < 2) return json(res, 400, { error: 'нужен заголовок и хотя бы одна строка' });
-      const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
-      const head = lines[0].toLowerCase().split(sep).map(h => h.trim().replace(/^"|"$/g, ''));
-      const col = (names) => head.findIndex(h => names.some(n => h.includes(n)));
-      const ci = {
-        name: col(['name', 'имя', 'фио', 'контакт', 'title', 'название']),
-        phone: col(['phone', 'телефон', 'тел', 'mobile', 'моб']),
-        email: col(['mail', 'почта']),
-        stage: col(['stage', 'status', 'стади', 'статус', 'этап']),
-        note: col(['comment', 'коммент', 'примечан', 'note', 'описан']),
-        budget: col(['budget', 'бюджет', 'opportunity', 'сумма']),
-        geo: col(['geo', 'гео', 'направлен', 'город', 'регион']),
-      };
-      if (ci.phone < 0) return json(res, 400, { error: 'не найдена колонка телефона (phone/телефон)' });
-      const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      const t = parseCsvTable(b.csv || '');
+      if (!t.header.length || !t.rows.length) return json(res, 400, { error: 'нужен заголовок и хотя бы одна строка' });
       const defaults = b.defaults || {};
+      /* маппинг из мастера {поле: индексКолонки}; нет → авто-угадывание (обратная совместимость с пастом) */
+      let map = (b.mapping && typeof b.mapping === 'object') ? b.mapping : guessImportMapping(t.header);
+      const gi = (f) => (map[f] == null || map[f] < 0) ? -1 : +map[f];
+      if (gi('phone') < 0) return json(res, 400, { error: 'укажите колонку с телефоном' });
+      const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
+      /* СЕЙФ: снимок базы ДО импорта — откат одним кликом, если данные пришли криво */
+      let backup = false; try { store.backupTenant(store.currentTid(), 'PRE-IMPORT'); backup = true; } catch (_) {}
+      const brokersByName = {}; (db.brokers || []).forEach(br => { if (br.name) brokersByName[br.name.toLowerCase().trim()] = br.id; });
       let created = 0, merged = 0, skipped = 0;
-      for (const line of lines.slice(1)) {
-        const c = line.split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
-        const phone = c[ci.phone];
+      for (const c of t.rows) {
+        const val = (f) => gi(f) >= 0 ? String(c[gi(f)] || '').trim() : '';
+        const phone = val('phone');
         if (!phone || norm(phone).length < 8) { skipped++; continue; }
+        const noteTxt = val('note').slice(0, 1500);
+        const email = val('email');
         const ex = db.leads.find(l => norm(l.phone) === norm(phone));
-        const noteTxt = ci.note >= 0 && c[ci.note] ? c[ci.note].slice(0, 1500) : '';
-        const email = ci.email >= 0 ? c[ci.email] : '';
         if (ex) {
           merged++;
           if (noteTxt) { ex.notes = ex.notes || []; ex.notes.unshift({ id: store.nextId('nt'), at: Date.now(), text: '[импорт] ' + noteTxt }); }
           if (email && !(ex.contacts || []).some(x => x.kind === 'email')) (ex.contacts = ex.contacts || []).push({ kind: 'email', value: email });
           continue;
         }
+        const brokerName = val('broker');
+        const brokerId = brokerName ? (brokersByName[brokerName.toLowerCase()] || null) : null;
+        let createdAt = Date.now();
+        if (gi('created') >= 0) { const d = Date.parse(val('created')); if (!isNaN(d)) createdAt = d; }
+        const geoRaw = val('geo').toLowerCase();
+        const geoGuess = geoRaw.match(/dubai|дубай/) ? 'dubai' : geoRaw.match(/bali|бали/) ? 'bali' : geoRaw.match(/phuket|пхукет/) ? 'phuket' : null;
+        const extraTags = ['импорт'];
+        if (val('stage')) extraTags.push('было: ' + val('stage').slice(0, 30));
+        (val('tags').split(/[,;|]/).map(x => x.trim()).filter(Boolean).slice(0, 5)).forEach(tg => extraTags.push(tg.slice(0, 24)));
         const lead = {
-          id: store.nextId('ld'), name: (ci.name >= 0 && c[ci.name]) || phone, phone,
-          geo: (ci.geo >= 0 && (c[ci.geo] || '').toLowerCase().match(/dubai|дубай/) ? 'dubai' : null) || defaults.geo || db.settings.agency.geos[0],
-          lang: 'ru', tz: 4, stage: defaults.stage || 'sleeping', score: 0, source: 'import',
-          createdAt: Date.now(), lastMsgAt: null, lastDir: null,
+          id: store.nextId('ld'), name: val('name') || phone, phone,
+          geo: geoGuess || defaults.geo || db.settings.agency.geos[0],
+          lang: 'ru', tz: tzFromPhone(phone), stage: defaults.stage || 'sleeping', score: 0, source: 'import',
+          createdAt, lastMsgAt: null, lastDir: null,
           quals: { purpose: null, timeline: null, budget: null, type: null },
           ai: { enabled: !!defaults.aiOn, chainStep: 99, nextTouchAt: null, silentSince: null },
-          broker: null, summary: noteTxt || null, tags: ['импорт'], numberId: null,
-          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
+          broker: brokerId, summary: noteTxt || null, tags: extraTags, numberId: null,
+          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: { origSource: val('source') || null }, transcripts: [],
           channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' }, activeChannel: 'wa', avatarUrl: null,
         };
-        if (ci.budget >= 0 && c[ci.budget]) {
-          const n = +String(c[ci.budget]).replace(/\D/g, '');
-          if (n > 1000) lead.quals.budget = { value: '$' + n.toLocaleString('ru-RU'), num: n, quote: 'из импорта' };
-        }
-        if (ci.stage >= 0 && c[ci.stage]) lead.tags.push('было: ' + c[ci.stage].slice(0, 30));
+        const bnum = +String(val('budget')).replace(/[^\d]/g, '');
+        if (bnum > 1000) lead.quals.budget = { value: '$' + bnum.toLocaleString('ru-RU'), num: bnum, quote: 'из импорта' };
         db.leads.push(lead);
         created++;
       }
-      ai.pushEvent(db, { type: 'merge', text: `Импорт базы: +${created} лидов, обогащено дублей: ${merged}, пропущено: ${skipped}` });
+      ai.pushEvent(db, { type: 'merge', text: `Миграция базы: +${created} лидов, обогащено дублей: ${merged}, пропущено: ${skipped}` });
       store.save();
-      return json(res, 200, { created, merged, skipped });
+      return json(res, 200, { created, merged, skipped, backup });
     }
     if (p === '/api/import/bitrix' && req.method === 'POST') {
       const b = await readBody(req);
