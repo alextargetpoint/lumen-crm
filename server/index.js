@@ -2345,14 +2345,14 @@ function fromNumberList(t) {
   if (t.fromNumber && !arr.includes(t.fromNumber)) arr.push(t.fromNumber);
   return arr.map(e164);
 }
+/* коды стран (longest-match) — чтобы +33(FR) не путать с +34(ES) */
+const CALL_CODES = ['1', '7', '20', '27', '30', '31', '32', '33', '34', '36', '39', '40', '41', '43', '44', '45', '46', '47', '48', '49', '52', '54', '55', '57', '60', '61', '62', '63', '64', '65', '66', '81', '82', '84', '86', '90', '91', '92', '94', '98', '211', '212', '213', '216', '218', '220', '221', '233', '234', '250', '251', '254', '255', '256', '351', '352', '353', '357', '358', '359', '370', '371', '372', '373', '374', '375', '376', '377', '380', '381', '385', '386', '387', '420', '421', '852', '853', '855', '856', '880', '886', '960', '961', '962', '963', '964', '965', '966', '967', '968', '970', '971', '972', '973', '974', '975', '976', '977', '992', '993', '994', '995', '996', '998'].sort((a, b) => b.length - a.length);
+function countryCode(e) { const d = String(e || '').replace(/\D/g, ''); for (const c of CALL_CODES) if (d.startsWith(c)) return c; return d.slice(0, 2); }
 function pickCallerId(t, leadPhone) {
   const list = fromNumberList(t); if (!list.length) return e164(t.fromNumber || '');
-  const lp = e164(leadPhone); let best = null, bestLen = 0;
-  for (const fn of list) { let len = 0; const max = Math.min(lp.length, fn.length);
-    for (let i = 1; i < max; i++) { if (lp[i] === fn[i]) len++; else break; }   /* совпадение кода страны после «+» */
-    if (len > bestLen) { bestLen = len; best = fn; }
-  }
-  return (bestLen >= 1 ? best : null) || e164(t.fromNumber || list[0]);
+  const lc = countryCode(e164(leadPhone));
+  const m = list.find(fn => countryCode(fn) === lc);   /* тот же код страны → local presence */
+  return m || e164(t.fromNumber || list[0]);
 }
 function callBase(db) { return (process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || '').replace(/\/$/, ''); }
 function twilioAuthHeader(t) { return 'Basic ' + Buffer.from((t.key || '') + ':' + (t.secret || '')).toString('base64'); }
