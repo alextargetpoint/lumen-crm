@@ -5297,7 +5297,18 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/telephony/test' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const t = db.settings.telephony || {};
-      if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера Twilio и сохраните ключи' });
+      if (t.provider === 'telnyx') {
+        if (!telnyxKey(t)) return json(res, 200, { ok: false, reason: 'нет API-ключа (ни в настройках, ни в env TELNYX_API_KEY)' });
+        try {
+          const bal = await telnyxApi(db, 'GET', '/balance');   // ключ валиден?
+          let connOk = true, connName = '';
+          if (t.connId) { try { const c = await telnyxApi(db, 'GET', '/connections/' + encodeURIComponent(t.connId)); connName = (c.data && (c.data.connection_name || c.data.friendly_name)) || ''; } catch (e) { connOk = false; } }
+          if (t.connId && !connOk) return json(res, 200, { ok: false, reason: 'ключ валиден, но Connection ID не найден — проверьте, что вставили ID приложения «Lumen Calls»' });
+          const b0 = bal.data || {};
+          return json(res, 200, { ok: true, hint: 'ключ валиден · баланс ' + (b0.balance || '?') + ' ' + (b0.currency || '') + (connName ? ' · приложение «' + connName + '»' : (t.connId ? ' · Connection ID найден' : ' · впишите Connection ID')) + (!t.fromNumber ? ' · ⚠️ нет номера «От»' : '') });
+        } catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
+      }
+      if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера (Twilio или Telnyx) и сохраните' });
       try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
       catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
     }

@@ -11723,7 +11723,7 @@ PAGES.settings = async (root) => {
   $('#telTest')?.addEventListener('click', async () => {
     const res = root.querySelector('.tel-test-res'); res.innerHTML = '<span style="color:var(--ink-3)">Проверяю…</span>';
     try { const r = await api.post('/telephony/test', {});
-      res.innerHTML = r.ok ? `<span style="color:var(--ok,#1E7A64);font-weight:600">✓ Ключи валидны${r.numbers != null ? ` · номеров: ${r.numbers}` : ''}</span>` : `<span style="color:var(--bad,#C0392B);font-weight:600">✗ ${esc(r.reason || 'не вышло')}</span>`;
+      res.innerHTML = r.ok ? `<span style="color:var(--ok,#1E7A64);font-weight:600">✓ ${esc(r.hint || ('Ключи валидны' + (r.numbers != null ? ' · номеров: ' + r.numbers : '')))}</span>` : `<span style="color:var(--bad,#C0392B);font-weight:600">✗ ${esc(r.reason || 'не вышло')}</span>`;
       loadMyNumbers();
     } catch (e) { res.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; }
   });
