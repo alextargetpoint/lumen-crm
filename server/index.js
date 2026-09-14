@@ -5290,8 +5290,18 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/templates\/([^/]+)$/)) && req.method === 'PATCH') {
       const tpl = db.templates.find(t => t.id === m[1]);
       if (!tpl) return json(res, 404, { error: 'not found' });
-      Object.assign(tpl, await readBody(req)); store.save();
+      const pb = await readBody(req);
+      if (pb.name != null) tpl.name = String(pb.name).slice(0, 120);
+      if (pb.body != null) tpl.body = String(pb.body).slice(0, 2000);
+      if (pb.category != null) tpl.category = pb.category === 'marketing' ? 'marketing' : 'utility';
+      if (pb.lang != null) tpl.lang = String(pb.lang).slice(0, 8);
+      tpl.status = 'pending';   /* правка шаблона → снова на модерацию Meta */
+      store.save();
       return json(res, 200, tpl);
+    }
+    if ((m = p.match(/^\/api\/templates\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.templates = (db.templates || []).filter(t => t.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
     }
 
     if (p === '/api/settings' && req.method === 'PATCH') {
@@ -5307,6 +5317,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
+      /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
+      if (b.geoNames && typeof b.geoNames === 'object') { db.settings.geoNames = db.settings.geoNames || {}; for (const [gk, gv] of Object.entries(b.geoNames)) { const key = String(gk).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24); const nm = String(gv || '').trim().slice(0, 60); if (key && nm) db.settings.geoNames[key] = nm; } }
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
@@ -5589,6 +5601,10 @@ const server = http.createServer(async (req, res) => {
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Встреча: ${lead.name}${broker ? ' + ' + broker.name : ''} · ${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
       store.save();
       return json(res, 200, mt);
+    }
+    if ((m = p.match(/^\/api\/meetings\/([^/]+)$/)) && req.method === 'DELETE') {
+      db.meetings = (db.meetings || []).filter(x => x.id !== m[1]); store.save();
+      return json(res, 200, { ok: true });
     }
     if ((m = p.match(/^\/api\/meetings\/([^/]+)$/)) && req.method === 'PATCH') {
       const mt = (db.meetings || []).find(x => x.id === m[1]);

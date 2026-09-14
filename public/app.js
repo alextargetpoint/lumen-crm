@@ -3949,12 +3949,18 @@ PAGES.meetings = async (root) => {
             ${stBadge[mt.status] || ''}
             <button class="btn btn-sm btn-accent" data-mtprep="${mt.leadId}" title="Открыть карточку лида: заметки, файлы, переписка, подборки, презентация">${ic(I.eye)}Подготовиться</button>
             ${mt.status === 'scheduled' ? `<button class="btn btn-sm" data-mt="${mt.id}" data-st="done">Прошла</button>
-            <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>` : ''}
+            <button class="btn btn-sm btn-danger" data-mt="${mt.id}" data-st="no_show">Не пришёл</button>
+            <button class="btn btn-sm" data-mt="${mt.id}" data-st="canceled" title="Отменить встречу">Отменить</button>` : ''}
+            <button class="btn-ghost" data-mtdel="${mt.id}" title="Удалить встречу">${ic(I.x)}</button>
           </div>`).join(''), { open: di < 3, count: items.length, icon: I.cal })).join('') : '<div class="glass card empty">Встреч пока нет — назначайте из карточки лида в «Диалогах»</div>'}
     </div>`;
   $$('[data-mt]', root).forEach(b => b.addEventListener('click', async () => {
     await api.patch('/meetings/' + b.dataset.mt, { status: b.dataset.st });
     render();
+  }));
+  $$('[data-mtdel]', root).forEach(b => b.addEventListener('click', async () => {
+    if (!await uiConfirm('Удалить встречу?', 'Она исчезнет из календаря безвозвратно. Чтобы уведомить клиента об отмене — используйте «Отменить».', { ok: 'Удалить', danger: true })) return;
+    try { await api.del('/meetings/' + b.dataset.mtdel); toast('Встреча удалена', null, true); render(); } catch (e) { toast('Не удалилось', e.message); }
   }));
   $$('[data-mtprep]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openLeadModal(b.dataset.mtprep); }));
   $('#mtPrint').addEventListener('click', () => window.open('/meetings/print?w=' + (PAGE_STATE.calWeek || 0), '_blank'));
@@ -9726,25 +9732,37 @@ PAGES.templates = async (root) => {
       <div><div class="nav-label" style="padding-left:2px">Marketing — инициация и реанимация</div>
         ${st.templates.filter(t => t.category === 'marketing').map(t => tplCard(t, stBadge)).join('')}</div>
     </div>`;
-  $('#newTpl').addEventListener('click', () => modal({
-    title: 'Новый шаблон',
+  const openTplModal = (tpl) => modal({
+    title: tpl ? 'Изменить шаблон' : 'Новый шаблон',
     sub: 'Уйдёт на модерацию Meta (обычно минуты—часы). Переменные: {name}, {geo}, {agency}, {broker}',
     body: `
-      <div class="form-row"><label>Название</label><input id="tName"></div>
-      <div class="form-row"><label>Категория</label><select id="tCat"><option value="utility">Utility</option><option value="marketing">Marketing</option></select></div>
-      <div class="form-row"><label>Текст</label><textarea id="tBody" style="min-height:110px"></textarea></div>`,
+      <div class="form-row"><label>Название</label><input id="tName" value="${tpl ? esc(tpl.name) : ''}"></div>
+      <div class="form-row"><label>Категория</label><select id="tCat"><option value="utility" ${tpl && tpl.category === 'utility' ? 'selected' : ''}>Utility</option><option value="marketing" ${tpl && tpl.category === 'marketing' ? 'selected' : ''}>Marketing</option></select></div>
+      <div class="form-row"><label>Текст</label><textarea id="tBody" style="min-height:110px">${tpl ? esc(tpl.body) : ''}</textarea></div>`,
     actions: [
-      { label: 'Отправить на модерацию', cls: 'btn-accent', onClick: async (bd) => {
-        await api.post('/templates', { name: $('#tName', bd).value, category: $('#tCat', bd).value, body: $('#tBody', bd).value });
+      { label: tpl ? 'Сохранить (на модерацию)' : 'Отправить на модерацию', cls: 'btn-accent', onClick: async (bd) => {
+        const payload = { name: $('#tName', bd).value, category: $('#tCat', bd).value, body: $('#tBody', bd).value };
+        if (tpl) await api.patch('/templates/' + tpl.id, payload); else await api.post('/templates', payload);
         render();
       } },
       { label: 'Отмена' },
     ],
+  });
+  $('#newTpl').addEventListener('click', () => openTplModal(null));
+  $$('[data-tpledit]', root).forEach(b => b.addEventListener('click', () => { const tpl = (st.templates || []).find(t => t.id === b.dataset.tpledit); if (tpl) openTplModal(tpl); }));
+  $$('[data-tpldel]', root).forEach(b => b.addEventListener('click', async () => {
+    const tpl = (st.templates || []).find(t => t.id === b.dataset.tpldel);
+    if (!await uiConfirm('Удалить шаблон' + (tpl ? ' «' + tpl.name + '»' : '') + '?', 'Он исчезнет из списка. Отправленные ранее сообщения не затрагиваются.', { ok: 'Удалить', danger: true })) return;
+    try { await api.del('/templates/' + b.dataset.tpldel); toast('Шаблон удалён', null, true); render(); } catch (e) { toast('Не удалилось', e.message); }
   }));
 };
 function tplCard(t, stBadge) {
-  return `<div class="glass tpl-card">
-    <div class="tpl-head"><div class="nm">${esc(t.name)}</div><span class="badge">${t.lang.toUpperCase()}</span>${stBadge[t.status]}</div>
+  return `<div class="glass tpl-card" data-tplid="${t.id}">
+    <div class="tpl-head"><div class="nm">${esc(t.name)}</div><span class="badge">${t.lang.toUpperCase()}</span>${stBadge[t.status]}
+      <span style="margin-left:auto;display:inline-flex;gap:2px">
+        <button class="btn-ghost" data-tpledit="${t.id}" title="Изменить">${ic(I.gear)}</button>
+        <button class="btn-ghost" data-tpldel="${t.id}" title="Удалить">${ic(I.x)}</button>
+      </span></div>
     <div class="tpl-body">${esc(t.body)}</div>
   </div>`;
 }
@@ -10952,6 +10970,8 @@ PAGES.agency = async (root) => {
         <div class="glass card mb">
           <div class="card-title">${ic(I.pin || I.building)}Направления работы<span class="sub">можно одно или несколько</span></div>
           <div class="ag-geo-grid">${Object.entries(s.geoNames || {}).map(([k, n]) => `<button type="button" class="ag-geo ${geos.includes(k) ? 'on' : ''}" data-geo="${k}">${ic(I.pin || I.building)}${esc(n)}</button>`).join('')}</div>
+          <div class="lc-note-row" style="margin-top:9px"><input id="agGeoNew" placeholder="Добавить направление (напр. Пхукет, Лиссабон)" style="flex:1"><button class="btn btn-sm" id="agGeoAdd">${ic(I.plus)}Добавить</button></div>
+          <div class="muted" style="font-size:11px;margin-top:4px">Нового рынка нет в списке? Добавьте — он появится тумблером выше и станет доступен в фильтрах, лидах и гео-номерах.</div>
           <div class="muted" style="font-size:11px;margin-top:8px">Отмеченные направления доступны в лидах, объектах, цепочках и профиле. Агентство может работать хоть по одной локации.</div>
         </div>
         <div class="glass card mb">
@@ -11081,6 +11101,18 @@ PAGES.agency = async (root) => {
   $('#agBadgeInp')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') addBadge(e.target.value); });
   $$('[data-bpreset]', root).forEach(b => b.addEventListener('click', () => addBadge(b.dataset.bpreset)));
   $$('[data-brm]', root).forEach(b => b.addEventListener('click', async () => { const arr = curBadges(); arr.splice(+b.dataset.brm, 1); await saveBadges(arr); }));
+  /* добавить новое направление (гео) — раньше можно было только тумблерить пресеты */
+  $('#agGeoAdd', root)?.addEventListener('click', async () => {
+    const nm = $('#agGeoNew', root).value.trim(); if (!nm) return;
+    const key = nm.toLowerCase().replace(/[^a-z0-9]+/g, '') || ('geo' + Math.random().toString(36).slice(2, 7));
+    try {
+      await api.patch('/settings', { geoNames: { [key]: nm } });
+      const arr = [...(STATE.settings.agency.geos || [])]; if (!arr.includes(key)) arr.push(key);
+      await api.patch('/settings', { agency: { geos: arr } });
+      toast('Направление добавлено', nm + ' — включено', true); await loadState(); render();
+    } catch (e) { toast('Не вышло', e.message); }
+  });
+  $('#agGeoNew', root)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#agGeoAdd', root).click(); });
   /* направления работы: тумблеры гео (минимум одно) */
   $$('[data-geo]', root).forEach(b => b.addEventListener('click', async () => {
     const g = b.dataset.geo; let arr = [...(STATE.settings.agency.geos || [])];
