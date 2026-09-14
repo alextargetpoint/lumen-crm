@@ -2385,7 +2385,7 @@ async function telnyxInitiateCall(db, lead, brokerPhone) {
   if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key (в настройках или env TELNYX_API_KEY), Connection ID и номер «От»');
   if (!brokerPhone) throw new Error('нет номера брокера для звонка');
   const cs = Buffer.from(JSON.stringify({ leadId: lead.id, clientPhone: lead.phone, stage: 'broker' })).toString('base64');
-  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: brokerPhone, from: t.fromNumber, client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(brokerPhone), from: e164(t.fromNumber), client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });   /* E.164: Telnyx требует +<код><номер> без пробелов */
 }
 async function telnyxOnAnswered(db, payload, cs) {
   const t = db.settings.telephony || {}; const ccid = payload.call_control_id;
