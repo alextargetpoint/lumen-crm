@@ -5298,15 +5298,19 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const t = db.settings.telephony || {};
       if (t.provider === 'telnyx') {
-        if (!telnyxKey(t)) return json(res, 200, { ok: false, reason: 'нет API-ключа (ни в настройках, ни в env TELNYX_API_KEY)' });
+        const key = telnyxKey(t);
+        const src = t.key ? 'настроек' : (process.env.TELNYX_API_KEY ? 'env TELNYX_API_KEY' : '');
+        if (!key) return json(res, 200, { ok: false, reason: 'API-ключ не найден: в настройках пусто И переменная env TELNYX_API_KEY отсутствует/пустая. Проверь имя переменной в Railway — должно быть ровно TELNYX_API_KEY.' });
+        const looksOk = /^KEY[A-Za-z0-9]{10,}_[A-Za-z0-9]{10,}$/.test(key);
+        if (!looksOk) return json(res, 200, { ok: false, reason: `Ключ (из ${src}, длина ${key.length}) не похож на Telnyx V2: нужен ОДНОЙ строкой формата KEY…_… (с «_» и хвостом). Похоже, вставлена только часть/ID. Создай ключ заново и вставь целиком.` });
         try {
           const bal = await telnyxApi(db, 'GET', '/balance');   // ключ валиден?
           let connOk = true, connName = '';
           if (t.connId) { try { const c = await telnyxApi(db, 'GET', '/connections/' + encodeURIComponent(t.connId)); connName = (c.data && (c.data.connection_name || c.data.friendly_name)) || ''; } catch (e) { connOk = false; } }
           if (t.connId && !connOk) return json(res, 200, { ok: false, reason: 'ключ валиден, но Connection ID не найден — проверьте, что вставили ID приложения «Lumen Calls»' });
           const b0 = bal.data || {};
-          return json(res, 200, { ok: true, hint: 'ключ валиден · баланс ' + (b0.balance || '?') + ' ' + (b0.currency || '') + (connName ? ' · приложение «' + connName + '»' : (t.connId ? ' · Connection ID найден' : ' · впишите Connection ID')) + (!t.fromNumber ? ' · ⚠️ нет номера «От»' : '') });
-        } catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
+          return json(res, 200, { ok: true, hint: 'ключ из ' + src + ' валиден · баланс ' + (b0.balance || '?') + ' ' + (b0.currency || '') + (connName ? ' · приложение «' + connName + '»' : (t.connId ? ' · Connection ID найден' : ' · впишите Connection ID')) + (!t.fromNumber ? ' · ⚠️ нет номера «От»' : '') });
+        } catch (e) { return json(res, 200, { ok: false, reason: e.message + ' (ключ из ' + src + ', длина ' + key.length + ' — если это 401/unauthorized, ключ неверный/обрезан)' }); }
       }
       if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера (Twilio или Telnyx) и сохраните' });
       try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
