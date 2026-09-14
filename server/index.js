@@ -4098,6 +4098,20 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, log, summary: { total24: last24.length, crit24, byKind, topIp } });
       }
       if (p === '/api/admin/security/clear' && req.method === 'POST') { reg.securityLog = []; store.saveRegistry(); return json(res, 200, { ok: true }); }
+      /* Гейт выката: последний прогон release-gate (release.json) + текущая версия на проде + журнал релизов */
+      if (p === '/api/admin/release' && req.method === 'GET') {
+        let gate = null;
+        try { gate = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'release.json'), 'utf8')); } catch (e) {}
+        let liveVer = '';
+        try { liveVer = ((fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8').match(/app\.js\?v=(\d+)/) || [])[1]) || ''; } catch (e) {}
+        return json(res, 200, { ok: true, gate, liveVersion: liveVer, log: (reg.releaseLog || []).slice(0, 30) });
+      }
+      if (p === '/api/admin/release/log' && req.method === 'POST') {
+        const b = await readBody(req); reg.releaseLog = reg.releaseLog || [];
+        reg.releaseLog.unshift({ at: Date.now(), note: String(b.note || '').slice(0, 200), version: String(b.version || '').slice(0, 10), passed: !!b.passed });
+        if (reg.releaseLog.length > 100) reg.releaseLog.length = 100;
+        store.saveRegistry(); return json(res, 200, { ok: true });
+      }
       /* ── Конструктор писем (SaaS) ── */
       if (p === '/api/admin/email' && req.method === 'GET') {
         const cfg = mailer.platformEmailCfg(reg);

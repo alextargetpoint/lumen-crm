@@ -67,6 +67,7 @@
     <button data-tab="security">🛡 Безопасность</button>
     <button data-tab="email">✉️ Письма</button>
     <button data-tab="map">🗺 Карта</button>
+    <button data-tab="release">🚀 Релиз</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -170,6 +171,22 @@
       <div id="mapBody" style="margin-top:14px"></div>
     </div>
   </div>
+
+  <div class="sect" id="sect-release">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><b>Готовность к выкату</b><button class="ghost" id="relReload">Обновить</button></div>
+      <div id="relGate" style="margin-top:12px"></div>
+      <div class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6">
+        <b>Правило выката (SaaS-дисциплина):</b> обновление НЕ уходит в прод, пока гейт не «PASS».<br>
+        Процесс: <b>1.</b> правки локально → <b>2.</b> <code>node test/release-gate.mjs "что меняли"</code> (изоляция+антивзлом) → <b>3.</b> локальная проверка в браузере → <b>4.</b> при PASS — <code>git push</code> (Railway выкатит) → <b>5.</b> сверить версию на проде. Полный регламент — <code>docs/RELEASE-PROCESS.md</code>.
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><b>Журнал выкатов</b>
+        <span class="row" style="gap:8px"><input id="relNote" placeholder="что выкатили" style="width:auto;min-width:180px"><button id="relLogAdd" class="ghost">Записать выкат</button></span></div>
+      <div id="relLog" style="margin-top:10px;font-size:13px"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -200,7 +217,38 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'security') loadSecurity();
   if (b.dataset.tab === 'email') loadEmail();
   if (b.dataset.tab === 'map') renderMap();
+  if (b.dataset.tab === 'release') loadRelease();
 }));
+
+// ── Гейт выката ──
+async function loadRelease() {
+  const r = await api('/api/admin/release');
+  const g = r.gate;
+  const fmt = (ts) => { try { return new Date(ts).toLocaleString('ru-RU'); } catch(e){ return ''; } };
+  if (!g) {
+    $('#relGate').innerHTML = `<div class="muted">Гейт ещё не запускался. Выполни <code>node test/release-gate.mjs</code> перед выкатом.</div>`;
+  } else {
+    const ok = g.passed;
+    const verMatch = g.appVersion && r.liveVersion && g.appVersion === r.liveVersion;
+    $('#relGate').innerHTML = `
+      <div style="display:inline-flex;align-items:center;gap:10px;padding:12px 18px;border-radius:12px;font-weight:700;font-size:15px;background:${ok?'rgba(31,122,84,.18)':'rgba(200,60,60,.18)'};color:${ok?'#5FCF9C':'#ff8080'}">
+        ${ok?'✅ PASS — можно выкатывать':'⛔ FAIL — выкат запрещён'}</div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><b>${esc(g.appVersion||'—')}</b><span>версия в гейте</span></div>
+        <div class="stat"><b>${esc(r.liveVersion||'—')}</b><span>версия на проде ${verMatch?'✓':'(отличается)'}</span></div>
+        <div class="stat"><b>${esc((g.git||'').split(' ')[0]||'—')}</b><span>коммит</span></div>
+      </div>
+      <div style="margin-top:12px;font-size:13.5px">${Object.values(g.suites||{}).map(s=>`<div class="row" style="gap:8px;padding:6px 0"><span>${s.passed?'✅':'❌'}</span><b>${esc(s.name)}</b><span class="muted">${esc(s.summary)}</span></div>`).join('')}</div>
+      <div class="muted" style="font-size:12px;margin-top:8px">Последний прогон: ${fmt(g.at)}${g.note?' · '+esc(g.note):''}</div>`;
+  }
+  $('#relLog').innerHTML = (r.log||[]).map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))"><span class="muted">${fmt(e.at)}</span> — ${e.passed?'✅':'⚠️'} <b>${esc(e.version||'')}</b> ${esc(e.note||'')}</div>`).join('') || '<div class="muted">Пусто</div>';
+}
+document.getElementById('relReload')?.addEventListener('click', loadRelease);
+document.getElementById('relLogAdd')?.addEventListener('click', async () => {
+  const note = $('#relNote').value.trim(); const g = (await api('/api/admin/release')).gate || {};
+  await api('/api/admin/release/log', { method:'POST', body: JSON.stringify({ note, version: g.appVersion||'', passed: !!g.passed }) });
+  $('#relNote').value=''; loadRelease();
+});
 
 // ── Карта ссылок ──
 const MAP = [
