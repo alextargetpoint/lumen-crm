@@ -4652,6 +4652,18 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, phone: lead.phone, name: lead.name, geo: lead.geo });
     }
+    /* редактирование оси квалификации из десктоп-карточки (пробел: раньше правилось только в TG-мини-аппе) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/qual$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req); const k = String(b.key || '');
+      if (!['purpose', 'timeline', 'budget', 'type'].includes(k)) return json(res, 400, { error: 'неизвестная ось' });
+      lead.quals = lead.quals || {}; const v = String(b.value || '').trim();
+      if (v) { lead.quals[k] = Object.assign({}, lead.quals[k] || {}, { value: v.slice(0, 200) }); if (k === 'budget') { const num = parseInt(v.replace(/[^\d]/g, ''), 10); if (num) lead.quals[k].num = num; } }
+      else lead.quals[k] = null;
+      store.save();
+      return json(res, 200, { ok: true });
+    }
 
     /* файлы в карточку лида: презентации, PDF, картинки, документы — полный менеджмент */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/attach$/)) && req.method === 'POST') {

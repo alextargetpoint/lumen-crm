@@ -648,6 +648,7 @@ const api = {
   get: (p) => apiReq('GET', p),
   post: (p, b) => apiReq('POST', p, b),
   patch: (p, b) => apiReq('PATCH', p, b),
+  del: (p) => apiReq('DELETE', p),
 };
 
 /* ---------- экран входа (тёмный, по бренду) ---------- */
@@ -4412,7 +4413,7 @@ async function openLeadModal(id) {
           </div>
           ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
-          <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b title="${q ? esc(q.value) : ''}">${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
+          <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
           ${l.summary ? coll(`Сводка ИИ${l.summaryAt ? ` · ${ago(l.summaryAt)}` : ''}`, `<div class="summary-box" style="margin-top:8px">${esc(l.summary)}</div>`, { open: false, icon: I.doc }) : ''}
           ${coll('Свои поля', `
             <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn-ghost" id="cfGear" title="Настроить поля">${ic(I.gear)}Настроить</button></div>
@@ -4429,6 +4430,11 @@ async function openLeadModal(id) {
           ${coll('Файлы и голосовые', `<div id="lcFVWrap">${fvBody(l)}</div>`,
     { open: !!((l.attachments || []).length || (l.voiceNotes || []).length), icon: I.doc, count: ((l.attachments || []).length + (l.voiceNotes || []).length) || null })}
           ${coll('Контакты', `
+            <label class="lc-lbl">Имя лида</label>
+            <div class="lc-note-row" style="margin:4px 0 9px">
+              <input id="lcName" value="${esc(l.name)}" placeholder="Имя Фамилия" style="flex:1">
+              <button class="btn btn-sm" id="lcNameSave">Сохранить</button>
+            </div>
             <label class="lc-lbl">Основной телефон · звонок и WhatsApp</label>
             <div class="lc-note-row" style="margin:4px 0 3px">
               <input id="lcMainPhone" value="${esc(l.phone || '')}" placeholder="+971 50 123 4567" style="flex:1">
@@ -4464,6 +4470,7 @@ async function openLeadModal(id) {
       { label: 'Назначить встречу', onClick: () => { openMeetingModal(l, () => openLeadModal(id)); return false; } },
       { label: '＋ Задача', onClick: () => { openQuickTask({ id: l.id, name: l.name, geoName: l.geoName, geo: l.geo }); return false; } },
       { label: 'Печать / PDF', onClick: () => { window.open('/lead/' + l.id + '/print', '_blank'); return false; } },
+      { label: 'Удалить', cls: 'btn-danger', onClick: async () => { if (!await uiConfirm('Удалить лида «' + l.name + '»?', 'Карточка, переписка и история удалятся безвозвратно.', { ok: 'Удалить', danger: true })) return false; try { await api.del('/leads/' + l.id); toast('Лид удалён', null, true); if (['funnel', 'overview', 'inbox', 'analytics'].includes(CUR)) render(); } catch (e) { toast('Не удалилось', e.message); return false; } } },
       { label: 'Закрыть' },
     ],
   });
@@ -4696,6 +4703,22 @@ async function openLeadModal(id) {
     catch (e) { toast('Не сохранилось', e.message); }
   });
   $('#lcMainPhone', bd)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcMainPhoneSave', bd).click(); });
+  $('#lcNameSave', bd)?.addEventListener('click', async () => {
+    const nm = $('#lcName', bd).value.trim(); if (!nm) { toast('Имя не может быть пустым'); return; }
+    try { await api.post(`/leads/${id}/update`, { name: nm }); toast('Имя сохранено', null, true); openLeadModal(id); } catch (e) { toast('Не сохранилось', e.message); }
+  });
+  $('#lcName', bd)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcNameSave', bd).click(); });
+  /* инлайн-редактирование осей квалификации (клик по оси → поле → Enter сохраняет) */
+  $$('.axg-c[data-qual]', bd).forEach(el => el.addEventListener('click', () => {
+    if (el.querySelector('input')) return;
+    const k = el.dataset.qual; const b2 = el.querySelector('b'); const old = b2.innerHTML; const cur = (l.quals[k] || {}).value || '';
+    b2.innerHTML = `<input class="axg-inp" value="${esc(cur)}" style="width:100%;box-sizing:border-box;font:inherit;border:1px solid var(--accent);border-radius:6px;padding:2px 6px;background:var(--bg-2,#fff);color:inherit">`;
+    const inp = b2.querySelector('input'); inp.focus(); inp.select();
+    let saved = false;
+    const save = async () => { if (saved) return; saved = true; const v = inp.value.trim(); try { await api.post(`/leads/${id}/qual`, { key: k, value: v }); openLeadModal(id); } catch (e) { toast('Не сохранилось', e.message); b2.innerHTML = old; } };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { saved = true; b2.innerHTML = old; } });
+    inp.addEventListener('blur', save);
+  }));
   $('#lcCAdd', bd).addEventListener('click', () => {
     const v = $('#lcCVal', bd).value.trim();
     if (!v) return;
