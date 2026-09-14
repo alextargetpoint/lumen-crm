@@ -3905,6 +3905,30 @@ const server = http.createServer(async (req, res) => {
       audit(db, req, 'восстановил резервную копию', { name: b.name });
       return json(res, okr ? 200 : 400, okr ? { ok: true } : { error: 'копия не найдена' });
     }
+    /* GDPR: экспорт всех данных агентства (право на переносимость) */
+    if (p === '/api/export' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const data = JSON.stringify(store.get(), null, 1);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="lumen-export-' + store.currentTid() + '.json"' });
+      res.end(data); audit(db, req, 'экспортировал данные агентства'); return;
+    }
+    /* GDPR: удаление аккаунта агентства (право на забвение) — с подтверждением паролем, бэкап перед удалением */
+    if (p === '/api/account/delete' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      if (!verifyPassword(b.password, db.settings.auth && db.settings.auth.passHash)) { await new Promise(r => setTimeout(r, 500)); return json(res, 400, { error: 'неверный пароль' }); }
+      const tid = store.currentTid();
+      if (tid === store.PRIMARY) return json(res, 400, { error: 'нельзя удалить основной аккаунт' });
+      store.backupTenant(tid, 'PRE-DELETE');   /* бэкап перед удалением — grace-window на восстановление */
+      const reg = store.getRegistry();
+      for (const em of Object.keys(reg.byEmail)) if (reg.byEmail[em] === tid) delete reg.byEmail[em];
+      for (const s of Object.keys(reg.sessions)) if (reg.sessions[s].tid === tid) delete reg.sessions[s];
+      for (const t of Object.keys(reg.invites)) if (reg.invites[t].tid === tid) delete reg.invites[t];
+      if (reg.tenants[tid]) { reg.tenants[tid].deletedAt = Date.now(); delete reg.tenants[tid]; }
+      store.saveRegistry();
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'lumen_sid=; Path=/; Max-Age=0' });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
     /* журнал доступа (только владелец) */
     if (p === '/api/audit' && req.method === 'GET') {
       return json(res, 200, (db.audit || []).slice(0, 200));

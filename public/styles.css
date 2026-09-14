@@ -1578,7 +1578,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pd2-in { position: relative; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; min-height: inherit; }
 .pd2-top { display: flex; gap: 9px; align-items: center; }
 /* Контраст: подложка кнопок над hero всегда достаточно тёмная (иначе на светлом фото/в светлых темах текст сливался), плюс тень текста */
-.pd2-ghost { background: rgba(6, 17, 38, .68); color: #fff; border: 1px solid rgba(255, 255, 255, .34); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); text-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
+.pd2-ghost { background: rgba(6, 17, 38, .72); color: #fff; border: 1px solid rgba(255, 255, 255, .5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
 .pd2-ghost:hover { background: rgba(6, 17, 38, .82); border-color: rgba(255, 255, 255, .5); }
 .pd2-ghost.danger:hover { background: rgba(224, 82, 82, .6); border-color: rgba(224, 82, 82, .75); }
 /* #prBack — «Все объекты»: чуть заметнее, стрелка ясная */
@@ -1586,7 +1586,9 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .pd2-save { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; color: rgba(255, 255, 255, .92); text-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
 .pd2-save svg { width: 12px; height: 12px; }
 /* «В подборку» (accent) над фото: тень текста, чтобы белый не тонул на светлом акценте */
-.pd2-top .btn-accent { text-shadow: 0 1px 3px rgba(0, 0, 0, .38); }
+.pd2-top .btn-accent { background: #fff; color: #141311; border: none; text-shadow: none; font-weight: 650; }
+.pd2-top .btn-accent:hover { background: rgba(255, 255, 255, .88); color: #141311; }
+.pd2-top .btn-accent svg { color: #141311; }
 .pd2-main { display: flex; gap: 20px; align-items: flex-end; margin-top: auto; flex-wrap: wrap; }
 .pd2-namebox { flex: 1; min-width: 260px; }
 .pd2-name { background: transparent !important; border: none !important; color: #fff !important; font-size: 27px !important; font-weight: 800 !important; letter-spacing: -.4px; padding: 4px 6px !important; border-radius: 8px; width: 100%; }
@@ -5845,6 +5847,17 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 /* Настройки → карта-ссылка на подстраницу «Роли и доступы» + кнопка назад */
 .set-link { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; cursor: pointer; padding: 16px 18px; margin-bottom: 16px; font-family: inherit; transition: transform .14s, box-shadow .14s; }
 .set-link:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+/* меню аккаунта (кнопка-агентство внизу сайдбара + всплывашка «Профиль/Настройки/Выйти») */
+.side-foot .agency { background: transparent; border: 1px solid transparent; width: 100%; font-family: inherit; text-align: left; }
+.side-foot .agency:hover { border-color: var(--stroke); }
+.agency-tx { flex: 1; min-width: 0; }
+.agency-chev { color: var(--ink-3); flex: 0 0 auto; }
+.agency-menu { position: fixed; z-index: 600; background: var(--card); border: 1px solid var(--stroke); border-radius: 12px; box-shadow: var(--shadow-lift); padding: 6px; min-width: 210px; animation: reveal .15s ease both; }
+.agency-menu button { display: flex; align-items: center; gap: 9px; width: 100%; background: transparent; border: 0; border-radius: 8px; padding: 9px 11px; font-size: 13px; color: var(--ink); cursor: pointer; text-align: left; font-family: inherit; }
+.agency-menu button:hover { background: var(--bg-2); }
+.agency-menu button svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-3); }
+.agency-menu .am-logout, .agency-menu .am-logout svg { color: var(--bad); }
+.agency-menu .am-sep { height: 1px; background: var(--stroke); margin: 4px 6px; }
 /* FIX: обычные карточки настроек (Оформление, two-col Cloud API, Источники, Мост) не имели нижнего отступа
    и «прилипали» к соседним. Даём тот же зазор, что у .set-link — только на экране настроек. */
 :root[data-page="settings"] #content > .glass.card,

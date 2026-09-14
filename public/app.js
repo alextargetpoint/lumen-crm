@@ -743,6 +743,32 @@ function modal({ title, sub, body, actions, wide }) {
 }
 function closeModal() { const bd = $('.modal-bd'); if (bd) { bd.classList.remove('show'); setTimeout(() => bd.remove(), 180); } }
 
+/* ---------- Данные и приватность (GDPR: экспорт / документы / удаление) ---------- */
+window.openDataPrivacy = function () {
+  const bd = modal({ title: 'Данные и приватность', sub: 'Ваши права: экспорт, документы, удаление аккаунта', wide: true, body: `
+    <button class="btn btn-accent" id="dpExport" style="width:100%;justify-content:center;margin-bottom:8px">Экспортировать все данные (JSON)</button>
+    <div class="muted" style="font-size:12px;margin-bottom:16px">Выгрузит лидов, переписки и настройки агентства в машиночитаемом файле (право на переносимость).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <a class="btn btn-sm" href="/privacy.html" target="_blank">Политика конфиденциальности</a>
+      <a class="btn btn-sm" href="/terms.html" target="_blank">Условия</a>
+      <a class="btn btn-sm" href="/dpa.html" target="_blank">DPA</a>
+      <a class="btn btn-sm" href="/acceptable-use.html" target="_blank">Допустимое использование</a>
+    </div>
+    <div style="border-top:1px solid var(--stroke);padding-top:14px">
+      <div style="font-weight:600;color:var(--bad);margin-bottom:6px">Удалить аккаунт агентства</div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Доступ будет удалён. Перед удалением делается резервная копия (окно на восстановление). Подтвердите паролем.</div>
+      <input id="dpPass" type="password" placeholder="Ваш пароль" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:10px;border-radius:9px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink)">
+      <button class="btn btn-danger" id="dpDelete" style="width:100%;justify-content:center">Удалить аккаунт навсегда</button>
+      <div id="dpErr" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>
+    </div>`, actions: [{ label: 'Закрыть' }] });
+  $('#dpExport', bd)?.addEventListener('click', () => window.open('/api/export', '_blank'));
+  $('#dpDelete', bd)?.addEventListener('click', async () => {
+    const pw = $('#dpPass', bd).value; if (!pw) { $('#dpErr', bd).textContent = 'Введите пароль'; return; }
+    if (!await uiConfirm('Точно удалить аккаунт агентства?', 'Доступ удалится. Резервная копия сохранится на срок восстановления.', { ok: 'Удалить', danger: true })) return;
+    try { const r = await fetch('/api/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) }); if (r.ok) location.href = '/'; else { const j = await r.json().catch(() => ({})); $('#dpErr', bd).textContent = j.error || 'Не удалось'; } } catch (e) { $('#dpErr', bd).textContent = 'Сеть недоступна'; }
+  });
+};
+
 /* ---------- Резервные копии агентства ---------- */
 window.openBackups = async function () {
   let list = [];
@@ -11027,6 +11053,11 @@ PAGES.settings = async (root) => {
       <span class="set-link-main"><b>Резервные копии</b><i>Авто-снимки базы каждые 6ч + перед подозрительным стиранием · восстановление одним кликом</i></span>
       <span class="set-link-chev">${ic(I.chev)}</span>
     </button>
+    <button class="glass card set-link" onclick="window.openDataPrivacy&&window.openDataPrivacy()">
+      <span class="set-link-ic">${ic(I.doc)}</span>
+      <span class="set-link-main"><b>Данные и приватность</b><i>Экспорт всех данных · юр-документы · удаление аккаунта (GDPR)</i></span>
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>
     <div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
@@ -11405,7 +11436,27 @@ setInterval(async () => {
 }, 7000);
 
 /* ---------- старт ---------- */
-document.querySelector('.side-foot .agency')?.addEventListener('click', () => go('agency'));
+/* меню аккаунта: клик по агентству внизу → всплывашка (Профиль / Настройки / Выйти) — выход спрятан по методологии топ-SaaS */
+document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const ex = document.getElementById('agencyMenu'); if (ex) { ex.remove(); return; }
+  const r = e.currentTarget.getBoundingClientRect();
+  const m = el(`<div id="agencyMenu" class="agency-menu">
+    <button data-am="profile">${ic(I.gear)}Профиль агентства</button>
+    <button data-am="settings">${ic(I.gear)}Настройки</button>
+    <div class="am-sep"></div>
+    <button data-am="logout" class="am-logout">${ic(I.x)}Выйти из аккаунта</button>
+  </div>`);
+  m.style.left = r.left + 'px'; m.style.bottom = (window.innerHeight - r.top + 8) + 'px'; m.style.width = r.width + 'px';
+  document.body.appendChild(m);
+  m.addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-am]'); if (!b) return; const act = b.dataset.am; m.remove();
+    if (act === 'profile') go('agency');
+    else if (act === 'settings') go('settings');
+    else if (act === 'logout') { const okc = window.uiConfirm ? await uiConfirm('Выйти из аккаунта?', 'Вы вернётесь на экран входа — оттуда можно войти в другой аккаунт.', { ok: 'Выйти', danger: true }) : confirm('Выйти?'); if (!okc) return; try { await fetch('/auth/logout', { method: 'POST' }); } catch (_) {} location.href = '/'; }
+  });
+  setTimeout(() => document.addEventListener('click', function h(ev) { if (!ev.target.closest('#agencyMenu,#agencyMenuBtn')) { m.remove(); document.removeEventListener('click', h); } }), 0);
+});
 
 /* стартовый раздел — из hash (переживает F5); битый hash → обзор */
 const startPage = () => (NAV[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
