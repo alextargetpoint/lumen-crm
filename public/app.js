@@ -1433,18 +1433,38 @@ const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
 const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
-function applyRoleUi() {
+/* СИНГЛ-БРОКЕР (edition:'solo') — личное пространство одного брокера. Убираем всё «командное/
+   управленческое»: лента, HR-подбор, брокеры, роли и доступы, контроль, академия агентства,
+   подрядчики трафика (медиапланы/план-факт), комментарии. Остаётся: воронка, реанимация базы,
+   диалоги, база объектов/подборки, встречи, задачи, СВОЯ реклама (атрибуция) + аналитика,
+   контент-цех, автоматизация. Флаг обратимый — командное издание не трогаем. */
+const SOLO_HIDDEN_PAGES = ['feed', 'hr', 'brokers', 'roles', 'control', 'learn', 'mediaplan', 'adsAnalytics', 'comments'];
+/* единый предикат видимости раздела: роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
+function pageHiddenForUser(pg) {
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
-  const solo = IS_SOLO();
   const rt = (me && me.roleType) || 'broker';
   const hardBroker = isBroker && rt === 'broker';   /* жёсткий список — только для брокера; маркетологу/менеджеру нужны реклама/аналитика */
   const hidePages = (me && me.hidePages) || [];      /* сервер уже собрал: дефолт роли ∪ индивидуальное скрытие */
-  const isHidden = (pg) => pg === 'control' && me && me.canControl ? false : isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg));
+  if (IS_SOLO() && SOLO_HIDDEN_PAGES.includes(pg)) return true;   /* solo: командное скрыто всегда (в т.ч. «Контроль» — команды нет) */
+  if (pg === 'control' && me && me.canControl) return false;
+  if (isBroker && ((hardBroker && BROKER_HIDDEN_PAGES.includes(pg)) || hidePages.includes(pg))) return true;
+  return false;
+}
+const wsFirstVisible = (ws) => (ws.pages.find(p => !pageHiddenForUser(p)) || ws.pages[0]);
+const wsAllHidden = (ws) => ws.pages.every(p => pageHiddenForUser(p));
+function applyRoleUi() {
+  const me = STATE && STATE.me;
+  const isBroker = me && me.role === 'broker';
+  const rt = (me && me.roleType) || 'broker';
+  const isHidden = pageHiddenForUser;
   $$('.nav-item').forEach(btn => {
-    const hideS = solo && btn.dataset.page === 'brokers';
-    btn.style.display = (isHidden(btn.dataset.page) || hideS) ? 'none' : '';
+    let hide = false;
+    if (btn.dataset.ws) { const w = WORKSPACES[btn.dataset.ws]; hide = !!w && wsAllHidden(w); }   /* пространство прячем, только если ВСЕ его страницы скрыты */
+    else if (btn.dataset.page) hide = pageHiddenForUser(btn.dataset.page);
+    btn.style.display = hide ? 'none' : '';
   });
+  $$('.nav-subitem').forEach(sb => { sb.style.display = pageHiddenForUser(sb.dataset.subpage) ? 'none' : ''; });   /* под-пункты пространств */
   /* баннер «просмотр кабинета брокера» для владельца */
   const existing = document.getElementById('previewBanner');
   if (me && me.preview) {
@@ -1458,7 +1478,7 @@ function applyRoleUi() {
   $$('.nav-label').forEach(lb => { /* прячем осиротевшие заголовки групп */
     let el2 = lb.nextElementSibling, any = false;
     while (el2 && !el2.classList.contains('nav-label')) { if (el2.style.display !== 'none') any = true; el2 = el2.nextElementSibling; }
-    lb.style.display = isBroker && !any ? 'none' : '';
+    lb.style.display = !any ? 'none' : '';   /* прячем осиротевший заголовок группы для любого издания (в т.ч. solo) */
   });
   if (isBroker && isHidden(CUR)) go('overview');
   const RT_NAME = { broker: 'брокер', assistant: 'ассистент', marketer: 'маркетолог', manager: 'менеджер' };
@@ -1533,7 +1553,7 @@ function initNav() {
     btn.addEventListener('click', () => {
       /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */
       let target = btn.dataset.page;
-      if (ws) { target = ws.pages.includes(CUR) ? CUR : (PAGE_STATE['ws_' + btn.dataset.ws] || ws.pages[0]); }
+      if (ws) { const stored = PAGE_STATE['ws_' + btn.dataset.ws]; target = ws.pages.includes(CUR) ? CUR : ((stored && !pageHiddenForUser(stored)) ? stored : wsFirstVisible(ws)); }
       if (target === 'properties') PAGE_STATE.propView = null;
       if (target === 'collections') PAGE_STATE.collLead = '';
       if (target === 'sequences') PAGE_STATE.seqEdit = null;
@@ -1566,7 +1586,7 @@ function initNavSearch() {
   if (res.parentElement !== document.body) document.body.appendChild(res);
   const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return t(def.label, def.labelEn); return ''; };
   const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
-  const hidden = new Set(isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || []));
+  const hidden = new Set((isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || [])).concat(IS_SOLO() ? SOLO_HIDDEN_PAGES : []));
   if (me && me.canControl) hidden.delete('control');   /* делегат контроля видит раздел */
   const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: navName(k), sub: navSub(k), parent: parentOf(k), icon: v.icon }));
   const norm = (s) => String(s || '').toLowerCase();
@@ -1606,7 +1626,7 @@ function injectWorkspaceTabs(c0, page) {
   const parent = PARENT_OF[page];
   if (!parent) return;
   const ws = WORKSPACES[parent];
-  const bar = el(`<div class="ws-tabs">${ws.pages.map(pk => `<button class="ws-tab${pk === page ? ' on' : ''}" data-p="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span></button>`).join('')}</div>`);
+  const bar = el(`<div class="ws-tabs">${ws.pages.filter(pk => !pageHiddenForUser(pk)).map(pk => `<button class="ws-tab${pk === page ? ' on' : ''}" data-p="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span></button>`).join('')}</div>`);
   bar.querySelectorAll('.ws-tab').forEach(b => b.addEventListener('click', () => { if (b.dataset.p !== CUR) go(b.dataset.p); }));
   c0.insertBefore(bar, c0.firstChild);
 }
