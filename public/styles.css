@@ -6535,7 +6535,7 @@ html[data-night] .ctrl-calm-box { border-color: #1D4A38; }
   --blue-300: #DD7693; --blue-100: #F9E4EA;
   /* нейтрали — workspace остаётся ЧИСТЫМ светлым, БЕЗ розового тинта */
   --bg: #F8FAFD; --bg-2: #F2F5F9; --card: #FFFFFF;
-  --ink: #141821; --ink-2: #56505A; --ink-3: #78727A;
+  --ink: #141821; --ink-2: #56505A; --ink-3: #655f68;   /* был #78727A (~4.3) → ~4.6 AA на светлом workspace */
   --stroke: rgba(30,40,60,.08); --stroke-soft: rgba(30,40,60,.05); --glass: rgba(255,255,255,.7);
   /* семантика — НОРМАЛЬНЫЕ цвета (НЕ бордо!) */
   --ok: #1F9D73; --ok-bg: #DFF5EC; --warn: #D99A34; --warn-bg: #FFF2D8; --bad: #D94757; --bad-bg: #FCE5E8;
