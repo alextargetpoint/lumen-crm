@@ -4127,7 +4127,8 @@ async function openLeadModal(id) {
           <div class="lc-note-row">
             <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
             <button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.plus)}</button>
-            <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Звонок</button>
+            <button class="btn btn-sm" id="lcCallBtn" title="Загрузить запись звонка/Zoom — расшифруется сама">${ic(I.mic || I.phone)}Запись</button>
+            <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
           <div class="lc-filters">
@@ -4378,6 +4379,13 @@ async function openLeadModal(id) {
   };
   $('#lcNoteAdd', bd).addEventListener('click', addNote);
   $('#lcCallBtn', bd).addEventListener('click', () => $('#lcCallFile', bd).click());
+  $('#lcDial', bd)?.addEventListener('click', async () => {
+    const btn = $('#lcDial', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
+    try { const r = await api.post('/leads/' + l.id + '/call', {});
+      toast('Звоним', 'Сначала звонок вам' + (r.from ? ' (' + r.from + ')' : '') + ', затем соединим с лидом', true);
+    } catch (e) { toast('Не вышло', e.message); }
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
+  });
   $('#lcCallFile', bd).addEventListener('change', async (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -11251,15 +11259,27 @@ PAGES.settings = async (root) => {
             <div class="form-row"><label>API secret ${(s.telephony || {}).provider === 'telnyx' ? '(не нужен)' : ''}</label><input id="telSecret" type="password"></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Connection / App ID ${(s.telephony || {}).provider === 'telnyx' ? '(Telnyx Voice API App)' : ''}</label><input id="telConn" value="${esc((s.telephony || {}).connId || '')}" placeholder="Call Control App ID"></div>
-            <div class="form-row"><label>Номер «От» (звоним с него)</label><input id="telFrom" value="${esc((s.telephony || {}).fromNumber || '')}" placeholder="+1 555 000 00 00 — номер Telnyx"></div>
+            <div class="form-row"><label>${(s.telephony || {}).provider === 'twilio' ? 'Account SID (Twilio, AC…)' : 'Connection / App ID'}</label><input id="telConn" value="${esc((s.telephony || {}).provider === 'twilio' ? ((s.telephony || {}).accountSid || '') : ((s.telephony || {}).connId || ''))}" placeholder="${(s.telephony || {}).provider === 'twilio' ? 'AC… из Twilio Console → Account Info' : 'Call Control App ID'}"></div>
+            <div class="form-row"><label>Номер «От» (дефолт)</label><input id="telFrom" value="${esc((s.telephony || {}).fromNumber || '')}" placeholder="+971 5X… — купленный номер"></div>
           </div>
-          <div class="form-row"><label>Вебхук событий/записей звонков (вставить в Telnyx → Voice App → Webhook URL)</label>
-            <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${s.tunnelUrl || location.origin}/hooks/telnyx?key=${esc((s.hooks || {}).secret || '')}</code><button class="btn btn-sm" id="telWhCopy" type="button">${ic(I.copy)}</button></div></div>
-          <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button> ${hint('telhow', 'Как работает телефония', [
-            ['Вебхук после звонка', 'Провайдер шлёт номер клиента и ссылку на запись'],
-            ['Лид находится по номеру', 'Запись скачивается и расшифровывается Whisper-ом'],
-            ['Транскрипт в карточку', 'Хронология + ИИ-сводка — руками ничего']])}`;
+          <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
+          <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
+          ${(s.telephony || {}).provider === 'twilio' ? `
+          <div class="tel-numbers" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+            <div class="lc-lbl">Номера · покупка в дашборде</div>
+            <div class="muted" style="font-size:11.5px;padding:4px 0 8px">Клиент видит номер своей страны (гео caller-ID). Покупай номера под свои рынки — они попадут в пул подбора.</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="telCountry" class="lc-inp" style="width:150px">${['AE','ES','GB','US','FR','DE','NL','TR','SA','PL'].map(c => `<option value="${c}">${({ AE: 'ОАЭ', ES: 'Испания', GB: 'Британия', US: 'США', FR: 'Франция', DE: 'Германия', NL: 'Нидерланды', TR: 'Турция', SA: 'Сауд.Аравия', PL: 'Польша' })[c]} (${c})</option>`).join('')}</select>
+              <button class="btn btn-sm" id="telSearch" type="button">${ic(I.search || I.spark)}Найти</button>
+            </div>
+            <div class="tel-search-res" style="margin-top:8px"></div>
+            <div class="lc-lbl" style="margin-top:12px">Мои номера</div>
+            <div class="tel-my-numbers muted" style="font-size:12px;margin-top:4px">—</div>
+          </div>` : ''}
+          ${hint('telhow', 'Как работает телефония', [
+            ['Click-to-call', 'Жмёшь «Позвонить» в карточке — Twilio соединяет тебя с лидом'],
+            ['Гео caller-ID', 'Клиент видит номер своей страны → выше отклик'],
+            ['Запись → транскрипт', 'Разговор пишется и расшифровывается в карточку автоматически']])}`;
   const tgBridgeForm = `
       <div class="muted" style="font-size:11.8px;margin:0 0 12px">Брокеру не нужно держать CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят брокеру в личный Telegram, он отвечает <b>reply</b> — и ответ уходит клиенту в WhatsApp с центрального номера. Номер один на всех, персона сохраняется, вся переписка логируется в CRM.</div>
       <div class="set-row">
@@ -11445,14 +11465,38 @@ PAGES.settings = async (root) => {
   });
   $('#telWhCopy')?.addEventListener('click', () => { const c = $('#telWhCopy').previousElementSibling; navigator.clipboard.writeText(c.textContent); toast('Вебхук скопирован', 'Вставьте в Telnyx → Voice App → Webhook URL', true); });
   $('#telSave').addEventListener('click', async () => {
-    const t = { provider: $('#telProv').value };
+    const prov = $('#telProv').value; const t = { provider: prov };
     if ($('#telKey').value.trim()) { t.key = $('#telKey').value.trim(); t.secret = $('#telSecret').value.trim(); }
-    if ($('#telConn')) t.connId = $('#telConn').value.trim();
+    if ($('#telConn')) { if (prov === 'twilio') t.accountSid = $('#telConn').value.trim(); else t.connId = $('#telConn').value.trim(); }
     if ($('#telFrom')) t.fromNumber = $('#telFrom').value.trim();
     await api.patch('/settings', { telephony: t });
-    toast('Телефония сохранена', t.provider === 'none' ? undefined : 'Настройте вебхук у провайдера — записи пойдут в карточку', true);
+    toast('Телефония сохранена', prov === 'twilio' ? 'Нажми «Проверить», затем купи номер ниже' : (prov === 'none' ? undefined : 'Настрой вебхук у провайдера'), true);
     loadState();
   });
+  /* Twilio: проверка ключей */
+  $('#telTest')?.addEventListener('click', async () => {
+    const res = root.querySelector('.tel-test-res'); res.innerHTML = '<span style="color:var(--ink-3)">Проверяю…</span>';
+    try { const r = await api.post('/telephony/test', {});
+      res.innerHTML = r.ok ? `<span style="color:var(--ok,#1E7A64);font-weight:600">✓ Ключи валидны${r.numbers != null ? ` · номеров: ${r.numbers}` : ''}</span>` : `<span style="color:var(--bad,#C0392B);font-weight:600">✗ ${esc(r.reason || 'не вышло')}</span>`;
+      loadMyNumbers();
+    } catch (e) { res.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; }
+  });
+  /* Twilio: поиск + покупка номеров */
+  const loadMyNumbers = async () => { const box = root.querySelector('.tel-my-numbers'); if (!box) return;
+    try { const r = await api.get('/telephony/numbers'); box.innerHTML = (r.list || []).length ? r.list.map(n => `<span class="br-blk" style="margin:0 6px 6px 0">${esc(n.number)}</span>`).join('') : '<span class="muted">Пока нет — купи ниже</span>'; }
+    catch (e) { box.innerHTML = '<span class="muted">' + esc(e.message) + '</span>'; } };
+  $('#telSearch')?.addEventListener('click', async () => {
+    const box = root.querySelector('.tel-search-res'); const country = $('#telCountry').value;
+    box.innerHTML = '<span class="muted" style="font-size:12px">Ищу номера…</span>';
+    try { const r = await api.get('/telephony/numbers/search?country=' + country + '&type=Local');
+      const list = r.list || [];
+      box.innerHTML = list.length ? list.slice(0, 8).map(n => `<div class="tel-num-row" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-weight:600">${esc(n.number)}</span><span class="muted" style="font-size:11px">${esc(n.region || '')}</span><button class="btn btn-sm tel-buy" data-num="${esc(n.number)}">Купить</button></div>`).join('') : `<span class="muted" style="font-size:12px">Нет доступных (${esc(r.error || 'по этой стране')})</span>`;
+      box.querySelectorAll('.tel-buy').forEach(b => b.addEventListener('click', async () => { b.disabled = true; b.textContent = '…';
+        try { const rr = await api.post('/telephony/numbers/buy', { number: b.dataset.num }); if (rr.ok) { toast('Номер куплен', rr.number, true); b.textContent = '✓ куплен'; loadMyNumbers(); } else { toast('Не куплен', rr.error); b.disabled = false; b.textContent = 'Купить'; } }
+        catch (e) { toast('Ошибка', e.message); b.disabled = false; b.textContent = 'Купить'; } }));
+    } catch (e) { box.innerHTML = '<span class="muted">' + esc(e.message) + '</span>'; }
+  });
+  if (root.querySelector('.tel-my-numbers')) loadMyNumbers();
   $('#dAcc').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { accelerate: e.target.checked } }); loadState(); });
   $('#dSim').addEventListener('change', async (e) => { await api.patch('/settings', { demo: { simulateReplies: e.target.checked } }); loadState(); });
   $('#dReset').addEventListener('click', () => modal({
