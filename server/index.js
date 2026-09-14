@@ -4637,6 +4637,21 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { notes: lead.notes, contacts: lead.contacts });
     }
+    /* редактирование базовых полей лида из карточки (пробел: раньше телефон/имя/гео нельзя было изменить) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/update$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (b.name != null) { const nm = String(b.name).trim().slice(0, 120); if (nm) lead.name = nm; }
+      if (b.phone != null) {
+        const ph = String(b.phone).trim().slice(0, 40);
+        if (ph && !/^\+?[0-9\s()\-]{6,25}$/.test(ph)) return json(res, 400, { error: 'Номер в формате +971 … (только цифры, «+», пробелы)' });
+        lead.phone = ph; if (ph) { try { lead.tz = tzFromPhone(ph); } catch (e) {} }
+      }
+      if (b.geo != null && (db.settings.agency.geos || []).includes(b.geo)) { lead.geo = b.geo; }
+      store.save();
+      return json(res, 200, { ok: true, phone: lead.phone, name: lead.name, geo: lead.geo });
+    }
 
     /* файлы в карточку лида: презентации, PDF, картинки, документы — полный менеджмент */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/attach$/)) && req.method === 'POST') {

@@ -4429,13 +4429,20 @@ async function openLeadModal(id) {
           ${coll('Файлы и голосовые', `<div id="lcFVWrap">${fvBody(l)}</div>`,
     { open: !!((l.attachments || []).length || (l.voiceNotes || []).length), icon: I.doc, count: ((l.attachments || []).length + (l.voiceNotes || []).length) || null })}
           ${coll('Контакты', `
-            <div id="lcContacts" style="margin-top:6px">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
+            <label class="lc-lbl">Основной телефон · звонок и WhatsApp</label>
+            <div class="lc-note-row" style="margin:4px 0 3px">
+              <input id="lcMainPhone" value="${esc(l.phone || '')}" placeholder="+971 50 123 4567" style="flex:1">
+              <button class="btn btn-sm btn-accent" id="lcMainPhoneSave">Сохранить</button>
+            </div>
+            <div class="muted" style="font-size:11px;margin:0 0 10px">Телефония набирает этот номер, и на него уходит WhatsApp.${l.channels && l.channels.wa === 'yes' ? ' <span style="color:var(--ok,#1E7A64);font-weight:600">✓ WhatsApp есть</span>' : (l.channels && l.channels.wa === 'no' ? ' <span style="color:var(--bad,#C0392B)">WhatsApp не найден</span>' : ' <span style="color:var(--ink-3)">WhatsApp: не проверен</span>')}</div>
+            <label class="lc-lbl">Дополнительные контакты</label>
+            <div id="lcContacts" style="margin-top:4px">${(l.contacts || []).map((c, i) => `<div class="lc-contact"><span class="badge">${contactKinds[c.kind] || c.kind}</span><span class="lc-cv">${esc(c.value)}</span><button class="btn-ghost lc-cx" data-i="${i}">${ic(I.x)}</button></div>`).join('')}</div>
             <div class="lc-note-row" style="margin:7px 0 4px">
               <select id="lcCKind" style="width:118px;flex:0 0 118px">${Object.entries(contactKinds).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
               <input id="lcCVal" placeholder="@ник / почта…">
               <button class="btn btn-sm" id="lcCAdd">${ic(I.plus)}</button>
             </div>`,
-    { open: false, icon: I.phone, count: (l.contacts || []).length || null })}
+    { open: !l.phone, icon: I.phone, count: (l.contacts || []).length || null })}
           ${coll('Встречи', `<div style="margin-top:6px">${(l.meetings || []).map(mt => `<div class="lc-meet"><b>${new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b> · ${kindRu[mt.kind]}${mt.link ? ` · <a class="link" href="${mt.link}" target="_blank">комната</a> <button class="btn-ghost lc-copy" data-link="${mt.link}" title="Скопировать ссылку">${ic(I.copy)}</button>` : ''}
             ${mt.status === 'scheduled' ? `<span class="lc-meet-acts"><button class="btn btn-sm" data-mtst="${mt.id}|done">Прошла</button><button class="btn btn-sm btn-danger" data-mtst="${mt.id}|no_show">Не пришёл</button></span>` : `<span class="badge" style="margin-left:6px">${{ done: 'прошла', no_show: 'не пришёл', canceled: 'отменена' }[mt.status] || mt.status}</span>`}</div>`).join('') || '<div class="muted" style="font-size:12px">Встреч нет</div>'}</div>`,
     { open: (l.meetings || []).some(mt => mt.status === 'scheduled'), icon: I.cal, count: (l.meetings || []).length || null })}
@@ -4683,6 +4690,12 @@ async function openLeadModal(id) {
     });
   }
   const saveContacts = async (contacts) => { await api.post(`/leads/${id}/contacts`, { contacts }); openLeadModal(id); };
+  $('#lcMainPhoneSave', bd)?.addEventListener('click', async () => {
+    const ph = $('#lcMainPhone', bd).value.trim();
+    try { await api.post(`/leads/${id}/update`, { phone: ph }); toast('Телефон сохранён', ph ? 'Теперь можно звонить и слать WhatsApp' : 'Номер очищен', true); openLeadModal(id); }
+    catch (e) { toast('Не сохранилось', e.message); }
+  });
+  $('#lcMainPhone', bd)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcMainPhoneSave', bd).click(); });
   $('#lcCAdd', bd).addEventListener('click', () => {
     const v = $('#lcCVal', bd).value.trim();
     if (!v) return;
