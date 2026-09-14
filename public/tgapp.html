@@ -386,6 +386,22 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
 </style>
 </head>
 <body>
+<script>/* ДИАГНОСТИКА серого экрана: ловим любую ошибку и показываем её на экране (вместо немого серого),
+   + вотчдог: если через 6с приложение не показало контент — выводим статус (есть ли Telegram/initData)
+   и кнопку «Открыть через бота». Так мы видим, ЧТО не грузится, даже без консоли телефона. */
+(function(){
+  function banner(html,color){ try{ var d=document.getElementById('tgDiag')||document.createElement('div'); d.id='tgDiag';
+    d.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:'+(color||'#7f1d1d')+';color:#fff;font:13px/1.4 -apple-system,system-ui,sans-serif;padding:12px 14px;white-space:pre-wrap;word-break:break-word';
+    d.innerHTML=html; (document.body||document.documentElement).appendChild(d);}catch(e){} }
+  window.addEventListener('error',function(ev){ banner('⚠️ Ошибка загрузки:\n'+(ev.message||ev.error||'unknown')+'\n'+((ev.filename||'')+':'+(ev.lineno||''))); });
+  window.addEventListener('unhandledrejection',function(ev){ banner('⚠️ Promise-ошибка:\n'+(ev.reason&&(ev.reason.message||ev.reason)||'unknown')); });
+  window.__tgWatch=setTimeout(function(){
+    var loaded=document.querySelector('#chats .conv, #chats .empty, #view-list .conv, #meets, #leads .lead'); if(loaded) return;
+    var tg=window.Telegram&&window.Telegram.WebApp; var info='TG SDK: '+(tg?'есть':'НЕТ')+' · initData: '+((tg&&tg.initData)?'есть ('+tg.initData.length+')':'НЕТ')+' · версия: '+((tg&&tg.version)||'—');
+    banner('Приложение долго грузится.\n'+info+'\n\nЕсли SDK «НЕТ» — открой через кнопку «Чаты» у бота. Нажми, чтобы скрыть.','#1f3a5f');
+    var d=document.getElementById('tgDiag'); if(d)d.onclick=function(){d.remove();};
+  },6000);
+})();</script>
 <div id="bgart"></div>
 <div id="app">
   <div id="view-list">
