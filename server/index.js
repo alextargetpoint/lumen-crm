@@ -4162,7 +4162,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/support' && req.method === 'GET') {
         const sb = reg.supportBot || {};
         const bindLink = sb.botUsername ? `https://t.me/${sb.botUsername}?start=${sb.founderBindCode}` : '';
-        return json(res, 200, { ok: true, tickets: (reg.supportTickets || []).slice(0, 100), config: { tokenSet: !!supportBotToken(), founderChat: sb.founderChat || '', botUsername: sb.botUsername || '', bindLink } });
+        return json(res, 200, { ok: true, tickets: (reg.supportTickets || []).slice(0, 100), config: { tokenSet: !!supportBotToken(), founderChat: sb.founderChat || '', botUsername: sb.botUsername || '', bindLink, bindCode: sb.founderBindCode || '' } });
       }
       if (p === '/api/admin/support/config' && req.method === 'POST') {
         const b = await readBody(req); reg.supportBot = reg.supportBot || {};

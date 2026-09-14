@@ -109,6 +109,7 @@
       bg: 'welcome', pad: true,
       html: `
         <div class="ob-center">
+          <div style="max-width:440px;margin:0 auto 22px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 70px -26px rgba(0,0,0,.7);animation:obFloat 8s ease-in-out infinite"><img src="/assets/ob-atelier-welcome.png" alt="" style="width:100%;display:block" loading="eager"></div>
           <div class="ob-badge">Церемония запуска</div>
           <h1 class="ob-h1">Добро пожаловать в <span class="ob-grad">Lumen</span></h1>
           <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
@@ -157,7 +158,7 @@
             </div>
             <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
           </div>
-          <div class="ob-theme-back">
+          <div class="ob-theme-back" data-grad="linear-gradient(140deg, ${t.sw[1]}, ${t.sw[0]})" style="background:linear-gradient(140deg, ${t.sw[1]}, ${t.sw[0]})">
             <img src="/assets/theme-${t.key}.png" alt="" loading="lazy" onerror="this.style.display='none'">
             <div class="ob-theme-back-lbl">Интерфейс · ${t.name}</div>
           </div>
@@ -374,8 +375,13 @@
       let zCard = null, zCd = 0;               // блок авто-переключения: пока не увёл курсор в сторону
       function openZoom(b) {
         const backImg = b.querySelector('.ob-theme-back img');
+        const grad = (b.querySelector('.ob-theme-back') || {}).getAttribute ? b.querySelector('.ob-theme-back').getAttribute('data-grad') : '';
+        const zc = zoom.querySelector('.ob-zoom-card');
         const name = (b.querySelector('.ob-theme-meta b') || {}).textContent || '';
-        if (backImg) { zImg.setAttribute('src', backImg.getAttribute('src')); zImg.style.filter = backImg.style.filter || 'none'; }
+        if (zc && grad) zc.style.background = grad;   /* фолбэк-фон в палитре темы (для тем без PNG, напр. Atelier) */
+        const imgOk = backImg && backImg.getAttribute('src') && backImg.style.display !== 'none' && backImg.complete && backImg.naturalWidth > 0;
+        if (imgOk) { zImg.style.display = ''; zImg.setAttribute('src', backImg.getAttribute('src')); zImg.style.filter = backImg.style.filter || 'none'; }
+        else { zImg.style.display = 'none'; }          /* нет картинки → показываем градиент карты, не пустоту/битую иконку */
         zLbl.textContent = 'Интерфейс · ' + name;
         zoom.classList.add('on'); zCard = b;
       }
@@ -384,7 +390,7 @@
         const v = b.querySelector('video');
         b.onmouseenter = () => { if (v) v.play().catch(() => {}); if (!zCard && Date.now() > zCd) openZoom(b); };
         b.onmouseleave = () => { if (v && S.theme !== b.dataset.theme) v.pause(); if (b === zCard) closeZoom(); };
-        b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };
+        b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme, { silent: true }); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };  /* silent: без полноэкранной церемонии — в онбординге своё превью */
       });
     }
     if (step.id === 'brand') {

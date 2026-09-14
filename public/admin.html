@@ -243,8 +243,11 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 async function loadSupport() {
   const r = await api('/api/admin/support');
   const c = r.config || {};
-  const bind = c.bindLink ? `<a href="${c.bindLink}" target="_blank" style="text-decoration:none;font-weight:600">📲 Привязать мой Telegram (в один тап)</a> — откроется бот, нажми «Запустить», твой chat_id запишется сам.` : (c.tokenSet ? 'Имя бота ещё не получено — нажми «Сохранить + вебхук».' : '');
-  $('#supCfg').innerHTML = `Токен бота: <b>${c.tokenSet?'задан ✓':'НЕ задан'}</b> · алерты идут в chat_id: <b>${c.founderChat||'не привязан'}</b>.<br>${bind}<br><span class="muted">Или вручную: напиши боту <code>/id</code> — он пришлёт твой chat_id, вставь его ниже.</span>`;
+  let bind;
+  if (c.bindLink) bind = `<a href="${c.bindLink}" target="_blank" style="text-decoration:none;font-weight:600">📲 Привязать мой Telegram (в один тап)</a> — откроется бот, нажми «Запустить», твой chat_id запишется сам.`;
+  else if (c.tokenSet) bind = `Открой своего бота поддержки в Telegram и отправь ему: <code>/start ${esc(c.bindCode||'')}</code> — chat_id для алертов привяжется сам. (кнопка-ссылка появится после «Сохранить + вебхук», когда подтянется @имя бота)`;
+  else bind = `Сначала задай токен бота ниже (или <code>SUPPORT_BOT_TOKEN</code> в Railway) и нажми «Сохранить + вебхук» — появится кнопка привязки. Код привязки: <code>/start ${esc(c.bindCode||'')}</code>`;
+  $('#supCfg').innerHTML = `Токен бота: <b>${c.tokenSet?'задан ✓':'НЕ задан'}</b> · алерты идут в chat_id: <b>${c.founderChat||'не привязан'}</b>.<br>${bind}<br><span class="muted">Также можно вручную: напиши боту <code>/id</code> — он пришлёт твой chat_id, вставь его в поле ниже.</span>`;
   if (c.founderChat) $('#supFounder').value = c.founderChat;
   const fmt = (ts)=>{try{return new Date(ts).toLocaleString('ru-RU')}catch(e){return''}};
   $('#supList').innerHTML = (r.tickets||[]).map(t=>`

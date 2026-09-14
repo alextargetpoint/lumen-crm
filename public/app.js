@@ -534,54 +534,57 @@ function enhanceControls(root) {
 
 const I_FEED = '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h7"/>';
 const NAV = {
-  overview:  { name: 'Обзор', icon: I.grid, sub: '' },
-  control:   { name: 'Контроль', icon: I.shield || I.spark, sub: 'риски и точки контроля · только для владельца' },
-  feed:      { name: 'Лента', icon: I_FEED, sub: '' },
-  funnel:    { name: 'Воронка', icon: I.funnel, sub: '' },
-  inbox:     { name: 'Диалоги', icon: I.chat, sub: '' },
-  properties: { name: 'Объекты', icon: I.building, sub: '' },
-  collections: { name: 'Подборки', icon: I.layers, sub: '' },
-  qualifier: { name: 'ИИ-квалификатор', icon: I.spark, sub: '' },
-  sequences: { name: 'Цепочки касаний', icon: I.chain, sub: '' },
-  wake:      { name: 'Реанимация базы', icon: I.wake, sub: '' },
-  meetings:  { name: 'Встречи', icon: I.cal, sub: '' },
-  tasks:     { name: 'Мои задачи', icon: I.task, sub: '' },
-  moodboard: { name: 'Карта желаний', icon: I.spark, sub: 'личная доска мотивации' },
-  automations: { name: 'Автоматизации', icon: I.bolt, sub: '' },
-  playbook: { name: 'Плейбук продаж', icon: I.flame, sub: '' },
-  academy:  { name: 'Академия продаж', icon: I.doc, sub: 'продажи + рынки Дубай/Пхукет/Бали' },
-  learn:    { name: 'Академия агентства', icon: I.doc, sub: 'свои уроки: видео + текст, доступ по паролю' },
-  studio:   { name: 'Видео-студия', icon: I.play, sub: 'запись презентаций: экран + камера + микрофон' },
-  callReview: { name: 'Оценка звонка', icon: I.phone, sub: 'ИИ-разбор звонка по методологии' },
-  ads:       { name: 'Атрибуция · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление' },
-  mediaplan: { name: 'Медиапланы', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование' },
-  adsAnalytics: { name: 'Реклама · подрядчики', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка' },
-  comments:  { name: 'Комментарии', icon: I.chat, sub: '' },
-  parlo:     { name: 'Переводчик звонков', icon: I.phone, sub: 'живой перевод вашим голосом + копилот продаж' },
-  social:    { name: 'Контент-цех', icon: I.layers, sub: '' },
-  numbers:   { name: 'Номера', icon: I.sim, sub: '' },
-  templates: { name: 'Шаблоны', icon: I.doc, sub: '' },
-  brokers:   { name: 'Брокеры', icon: I.users, sub: '' },
-  hr:        { name: 'HR · подбор', icon: I.users, sub: 'хантинг брокеров и сотрудников' },
-  analytics: { name: 'Лиды и продажи', icon: I.bars, sub: 'воронка · квалы · динамика' },
-  settings:  { name: 'Подключения', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим' },
-  roles:     { name: 'Роли и доступы', icon: I.users, sub: 'Кто из команды что видит · права на сервере' },
-  agency:    { name: 'Профиль агентства', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль' },
-  billing:   { name: 'Подписка и оплата', icon: I.card, sub: 'Тариф, места, счета, расходники по себестоимости' },
+  overview:  { name: 'Обзор', en: 'Overview', icon: I.grid, sub: '' },
+  control:   { name: 'Контроль', en: 'Control', icon: I.shield || I.spark, sub: 'риски и точки контроля · только для владельца', subEn: 'risks & control points · owner only' },
+  feed:      { name: 'Лента', en: 'Feed', icon: I_FEED, sub: '' },
+  funnel:    { name: 'Воронка', en: 'Pipeline', icon: I.funnel, sub: '' },
+  inbox:     { name: 'Диалоги', en: 'Inbox', icon: I.chat, sub: '' },
+  properties: { name: 'Объекты', en: 'Properties', icon: I.building, sub: '' },
+  collections: { name: 'Подборки', en: 'Collections', icon: I.layers, sub: '' },
+  qualifier: { name: 'ИИ-квалификатор', en: 'AI Qualifier', icon: I.spark, sub: '' },
+  sequences: { name: 'Цепочки касаний', en: 'Touch chains', icon: I.chain, sub: '' },
+  wake:      { name: 'Реанимация базы', en: 'Reactivation', icon: I.wake, sub: '' },
+  meetings:  { name: 'Встречи', en: 'Meetings', icon: I.cal, sub: '' },
+  tasks:     { name: 'Мои задачи', en: 'My tasks', icon: I.task, sub: '' },
+  moodboard: { name: 'Карта желаний', en: 'Vision board', icon: I.spark, sub: 'личная доска мотивации', subEn: 'personal motivation board' },
+  automations: { name: 'Автоматизации', en: 'Automations', icon: I.bolt, sub: '' },
+  playbook: { name: 'Плейбук продаж', en: 'Sales playbook', icon: I.flame, sub: '' },
+  academy:  { name: 'Академия продаж', en: 'Sales academy', icon: I.doc, sub: 'продажи + рынки Дубай/Пхукет/Бали', subEn: 'sales + Dubai/Phuket/Bali markets' },
+  learn:    { name: 'Академия агентства', en: 'Agency academy', icon: I.doc, sub: 'свои уроки: видео + текст, доступ по паролю', subEn: 'your lessons: video + text, password access' },
+  studio:   { name: 'Видео-студия', en: 'Video studio', icon: I.play, sub: 'запись презентаций: экран + камера + микрофон', subEn: 'record presentations: screen + camera + mic' },
+  callReview: { name: 'Оценка звонка', en: 'Call review', icon: I.phone, sub: 'ИИ-разбор звонка по методологии', subEn: 'AI call analysis by methodology' },
+  ads:       { name: 'Атрибуция · CAPI', en: 'Attribution · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление', subEn: 'Meta CAPI events · lead → ad' },
+  mediaplan: { name: 'Медиапланы', en: 'Media plans', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование', subEn: 'traffic contractors · plan/fact · approval' },
+  adsAnalytics: { name: 'Реклама · подрядчики', en: 'Ads · contractors', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка', subEn: 'plan/fact by contractor · CPL · funnel' },
+  comments:  { name: 'Комментарии', en: 'Comments', icon: I.chat, sub: '' },
+  parlo:     { name: 'Переводчик звонков', en: 'Call translator', icon: I.phone, sub: 'живой перевод вашим голосом + копилот продаж', subEn: 'live translation in your voice + sales copilot' },
+  social:    { name: 'Контент-цех', en: 'Content studio', icon: I.layers, sub: '' },
+  numbers:   { name: 'Номера', en: 'Numbers', icon: I.sim, sub: '' },
+  templates: { name: 'Шаблоны', en: 'Templates', icon: I.doc, sub: '' },
+  brokers:   { name: 'Брокеры', en: 'Brokers', icon: I.users, sub: '' },
+  hr:        { name: 'HR · подбор', en: 'HR · hiring', icon: I.users, sub: 'хантинг брокеров и сотрудников', subEn: 'hunting brokers & staff' },
+  analytics: { name: 'Лиды и продажи', en: 'Leads & sales', icon: I.bars, sub: 'воронка · квалы · динамика', subEn: 'funnel · quals · trends' },
+  settings:  { name: 'Подключения', en: 'Connections', icon: I.gear, sub: 'Каналы, телефония, голос, ИИ, демо-режим', subEn: 'Channels, telephony, voice, AI, demo' },
+  roles:     { name: 'Роли и доступы', en: 'Roles & access', icon: I.users, sub: 'Кто из команды что видит · права на сервере', subEn: 'who sees what · server-side rights' },
+  agency:    { name: 'Профиль агентства', en: 'Agency profile', icon: I.building, sub: 'Бренд, логотип, подпись менеджера, пароль', subEn: 'Brand, logo, manager signature, password' },
+  billing:   { name: 'Подписка и оплата', en: 'Subscription & billing', icon: I.card, sub: 'Тариф, места, счета, расходники по себестоимости', subEn: 'Plan, seats, invoices, consumables at cost' },
 };
+/* билингвальные имена/подписи разделов (LANG) — для сайдбара, вкладок, заголовка страницы */
+function navName(k) { const n = NAV[k] || {}; return t(n.name, n.en); }
+function navSub(k) { const n = NAV[k] || {}; return t(n.sub || '', n.subEn); }
 
 /* Рабочие пространства: родственные разделы схлопнуты в один пункт сайдбара
    с сегментным переключателем сверху. Роутинг не меняется — CUR остаётся
    реальной страницей (кнопки действий/счётчики/deep-links живут как прежде),
    меняется только группировка в меню. Минус ~9 пунктов из бокового меню. */
 const WORKSPACES = {
-  pipeline: { label: 'Воронка',       icon: I.funnel,   pages: ['funnel', 'wake'] },
-  dialogs:  { label: 'Диалоги',       icon: I.chat,     pages: ['inbox', 'comments', 'parlo'] },
-  base:   { label: 'База',           icon: I.building, pages: ['properties', 'collections'] },
-  ads:    { label: 'Реклама',         icon: I.target,   pages: ['mediaplan', 'ads'] },
-  analytics: { label: 'Аналитика',   icon: I.bars,     pages: ['analytics', 'adsAnalytics'] },
-  engine: { label: 'Автоматизация',  icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'learn', 'studio', 'callReview', 'automations', 'templates'] },
-  config: { label: 'Настройки',      icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
+  pipeline: { label: 'Воронка',       labelEn: 'Pipeline',   icon: I.funnel,   pages: ['funnel', 'wake'] },
+  dialogs:  { label: 'Диалоги',       labelEn: 'Inbox',      icon: I.chat,     pages: ['inbox', 'comments', 'parlo'] },
+  base:   { label: 'База',           labelEn: 'Base',       icon: I.building, pages: ['properties', 'collections'] },
+  ads:    { label: 'Реклама',         labelEn: 'Ads',        icon: I.target,   pages: ['mediaplan', 'ads'] },
+  analytics: { label: 'Аналитика',   labelEn: 'Analytics',  icon: I.bars,     pages: ['analytics', 'adsAnalytics'] },
+  engine: { label: 'Автоматизация',  labelEn: 'Automation', icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'learn', 'studio', 'callReview', 'automations', 'templates'] },
+  config: { label: 'Настройки',      labelEn: 'Settings',   icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
 const PARENT_OF = {};
 for (const [ws, def] of Object.entries(WORKSPACES)) for (const pk of def.pages) PARENT_OF[pk] = ws;
@@ -648,6 +651,59 @@ const api = {
 };
 
 /* ---------- экран входа (тёмный, по бренду) ---------- */
+/* ═══ i18n: инкрементальный слой. t(ru,en) — по месту вызова, без словаря ключей;
+   язык из localStorage (дефолт ru), переключатель RU/EN. Непереведённое (нет en) падает на ru. ═══ */
+let LANG = (function(){ try { return localStorage.getItem('lumen_lang') === 'en' ? 'en' : 'ru'; } catch(e){ return 'ru'; } })();
+function t(ru, en) { return (LANG === 'en' && en != null) ? en : ru; }
+window.t = t;
+window.setLang = function(l) {
+  LANG = (l === 'en') ? 'en' : 'ru';
+  try { localStorage.setItem('lumen_lang', LANG); } catch(e){}
+  try { document.documentElement.setAttribute('lang', LANG); } catch(e){}
+  const ls = document.getElementById('loginScreen');
+  if (ls) { ls.remove(); renderLogin(); }
+  else { location.reload(); }  /* в приложении: перезагрузка — весь UI (сайдбар/заголовки/страницы) подхватит язык из localStorage */
+};
+/* один делегированный обработчик на все тумблеры языка (логин, настройки) */
+document.addEventListener('click', (e) => { const b = e.target.closest('#langTgl [data-lang]'); if (b) { e.preventDefault(); e.stopPropagation(); window.setLang(b.dataset.lang); } });
+function langToggleHTML() {
+  return `<div id="langTgl" style="display:inline-flex;gap:2px;background:var(--blue-100,rgba(20,19,17,.05));border-radius:8px;padding:3px">
+    <button data-lang="ru" style="border:0;border-radius:6px;padding:3px 9px;font-size:11.5px;cursor:pointer;background:${LANG==='ru'?'var(--accent,#1a1815)':'transparent'};color:${LANG==='ru'?'var(--card,#faf9f5)':'var(--ink-3,#8b8983)'};font-weight:600">RU</button>
+    <button data-lang="en" style="border:0;border-radius:6px;padding:3px 9px;font-size:11.5px;cursor:pointer;background:${LANG==='en'?'var(--accent,#1a1815)':'transparent'};color:${LANG==='en'?'var(--card,#faf9f5)':'var(--ink-3,#8b8983)'};font-weight:600">EN</button>
+  </div>`;
+}
+/* ═══ Авто-перевод контента: словарь RU→EN + проход по text-нодам/плейсхолдерам/тайтлам.
+   Покрывает ВСЕ страницы одним механизмом (вызывается после каждого рендера при LANG='en'),
+   без правки тысяч мест. Совпадение — по ПОЛНОМУ тексту ноды (trim), поэтому «5 лидов» с числом
+   не тронется (такие смешанные строки добиваем через t() у источника). Идемпотентно. ═══ */
+const I18N_DICT = {
+  // топбар / общее
+  'Новый лид':'New lead','Поиск лида или номера…':'Search a lead or number…','Демо':'Demo','Обзор':'Overview',
+  // частые кнопки/действия
+  'Сохранить':'Save','Сохранить изменения':'Save changes','Отмена':'Cancel','Отменить':'Cancel','Удалить':'Delete','Закрыть':'Close','Добавить':'Add','Готово':'Done','Назад':'Back','Далее':'Next','Далее →':'Next →','Создать':'Create','Изменить':'Edit','Редактировать':'Edit','Применить':'Apply','Отправить':'Send','Отправить сейчас':'Send now','Импорт':'Import','Импортировать':'Import','Экспорт':'Export','Экспортировать':'Export','Обновить':'Refresh','Проверить':'Check','Подключить':'Connect','Настроить':'Configure','Настройки':'Settings','Выбрать':'Select','Загрузить':'Upload','Скачать':'Download','Копировать':'Copy','Скопировать':'Copy','Поделиться':'Share','Пропустить':'Skip','Понятно':'Got it','Продолжить':'Continue','Начать':'Start','Запустить':'Launch','Открыть':'Open','Показать':'Show','Скрыть':'Hide','Ещё':'More','Все':'All','Все объекты':'All properties','В подборку':'To collection','Взять в работу':'Take','Передать брокеру':'Hand over to broker','Назначить встречу':'Schedule meeting','Позвонить':'Call','Написать':'Message','Ответить':'Reply','Сохранить и проверить':'Save & check',
+  // статусы / пусто / загрузка
+  'Загрузка…':'Loading…','Загрузка':'Loading','Ничего не найдено':'Nothing found','Пусто':'Empty','пусто':'empty','Нет данных':'No data','нет сообщений':'no messages','Сообщений пока нет':'No messages yet','Выберите диалог слева':'Select a chat on the left','подключён':'connected','не подключён':'not connected','включён':'on','выключен':'off','активен':'active','Свободен':'Free','готово':'done','в работе':'in progress',
+  // воронка/лиды/каналы
+  'Все брокеры':'All brokers','Без брокера':'No broker','Ждут ответа':'Awaiting reply','Горячие':'Hot','Нужен человек':'Needs a human','ИИ ведёт':'AI-led','Спящие':'Sleeping','Имя или телефон':'Name or phone','Все направления':'All regions','ИИ ведёт диалог':'AI is leading the chat','ИИ выключен':'AI off','Взять диалог на себя':'Take over the chat','Вернуть ИИ':'Return AI',
+  // диктовка/голос
+  'Диктовать голосом — текст появляется сразу':'Dictate by voice — text appears live',
+  // тарифы/оплата общие
+  'Тариф':'Plan','Тариф и лимиты':'Plan & limits','Подписка':'Subscription','Оплатить':'Pay','Оплатить картой':'Pay by card',
+  // роли/доступы
+  'Роли и доступы':'Roles & access','агентство недвижимости':'real estate agency','Профиль агентства':'Agency profile','Выйти из аккаунта':'Log out',
+};
+function applyI18n(root) {
+  if (LANG !== 'en') return;
+  root = root || document.body;
+  try {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(n) { const p = n.parentNode; if (!p) return NodeFilter.FILTER_REJECT; const tg = p.nodeName; if (tg === 'SCRIPT' || tg === 'STYLE' || tg === 'TEXTAREA') return NodeFilter.FILTER_REJECT; return n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+    const nodes = []; let n; while (n = w.nextNode()) nodes.push(n);
+    for (const node of nodes) { const raw = node.nodeValue, key = raw.trim(), en = I18N_DICT[key]; if (en && en !== key) node.nodeValue = raw.replace(key, en); }
+    root.querySelectorAll('[placeholder]').forEach(e => { const en = I18N_DICT[(e.getAttribute('placeholder') || '').trim()]; if (en) e.setAttribute('placeholder', en); });
+    root.querySelectorAll('[title]').forEach(e => { const en = I18N_DICT[(e.getAttribute('title') || '').trim()]; if (en) e.setAttribute('title', en); });
+  } catch (e) {}
+}
+window.applyI18n = applyI18n;
 function renderLogin() {
   hidePreloader();
   if ($('#loginScreen')) return;
@@ -668,19 +724,20 @@ function renderLogin() {
       ${loginBrand}
       <svg class="pl-logo" viewBox="0 0 100 120" style="width:42px;height:50px;margin:0 auto 12px" aria-hidden="true"><defs><linearGradient id="lumenLg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="var(--logo-a)"/><stop offset="45%" stop-color="var(--logo-b)"/><stop offset="100%" stop-color="var(--logo-c)"/></linearGradient></defs><path fill="none" stroke="url(#lumenLg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
       <div style="font-family:'Cormorant',Georgia,serif;font-size:31px;font-weight:500;letter-spacing:.1em;color:var(--ink,#141311);line-height:1">LUMEN</div>
-      <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:7px 0 22px">Real Estate CRM</div>
+      <div style="font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin:7px 0 14px">Real Estate CRM</div>
+      <div style="display:flex;justify-content:center;margin-bottom:14px">${langToggleHTML()}</div>
       <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--blue-100,rgba(20,19,17,.05));border-radius:10px;padding:4px">
-        <button id="tabLogin" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:var(--accent,#1a1815);color:var(--card,#faf9f5);font-weight:600">Вход</button>
-        <button id="tabReg" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink-2,#57544e)">Регистрация</button>
+        <button id="tabLogin" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:var(--accent,#1a1815);color:var(--card,#faf9f5);font-weight:600">${t('Вход','Sign in')}</button>
+        <button id="tabReg" style="flex:1;height:34px;border:0;border-radius:8px;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink-2,#57544e)">${t('Регистрация','Sign up')}</button>
       </div>
-      <input id="regAgency" placeholder="Название агентства" style="display:none;width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
-      <input id="loginEmail" type="email" autocomplete="username" placeholder="E-mail" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
-      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;box-sizing:border-box;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
-      <label id="regConsent" style="display:none;font-size:11px;color:var(--ink-2,#57544e);margin-top:11px;text-align:left;gap:8px;align-items:flex-start;line-height:1.45"><input type="checkbox" id="agreeTerms" style="margin-top:2px;flex:0 0 auto;width:15px;height:15px"><span>Регистрируясь, я принимаю <a href="/terms.html" target="_blank" style="color:var(--accent,#1a1815)">Условия</a>, <a href="/privacy.html" target="_blank" style="color:var(--accent,#1a1815)">Политику конфиденциальности</a> и <a href="/dpa.html" target="_blank" style="color:var(--accent,#1a1815)">DPA</a>.</span></label>
+      <input id="regAgency" placeholder="${t('Название агентства','Agency name')}" style="display:none;width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="${t('E-mail','Email')}" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="${t('Пароль','Password')}" style="width:100%;box-sizing:border-box;background:var(--bg-2,rgba(255,255,255,.6));border:1px solid var(--stroke,rgba(20,19,17,.16));color:var(--ink,#141311);text-align:center;font-size:14px;padding:12px;border-radius:10px">
+      <label id="regConsent" style="display:none;font-size:11px;color:var(--ink-2,#57544e);margin-top:11px;text-align:left;gap:8px;align-items:flex-start;line-height:1.45"><input type="checkbox" id="agreeTerms" style="margin-top:2px;flex:0 0 auto;width:15px;height:15px"><span>${t('Регистрируясь, я принимаю','By signing up, I accept the')} <a href="/terms.html" target="_blank" style="color:var(--accent,#1a1815)">${t('Условия','Terms')}</a>, <a href="/privacy.html" target="_blank" style="color:var(--accent,#1a1815)">${t('Политику конфиденциальности','Privacy Policy')}</a> ${t('и','and')} <a href="/dpa.html" target="_blank" style="color:var(--accent,#1a1815)">DPA</a>.</span></label>
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:var(--bad,#a9564a)"></div>
-      <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:2px">Войти</button>
-      <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:12px">Вход владельца — по паролю или e-mail</div>
-      <div id="forgotLink" style="font-size:11px;color:var(--accent,#1a1815);margin-top:8px;cursor:pointer;text-decoration:underline">Забыли пароль?</div>
+      <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:2px">${t('Войти','Sign in')}</button>
+      <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:12px">${t('Вход владельца — по паролю или e-mail','Owner sign-in — by password or email')}</div>
+      <div id="forgotLink" style="font-size:11px;color:var(--accent,#1a1815);margin-top:8px;cursor:pointer;text-decoration:underline">${t('Забыли пароль?','Forgot password?')}</div>
     </div>
   </div>`);
   document.body.appendChild(s);
@@ -693,8 +750,8 @@ function renderLogin() {
     $('#tabReg').style.color = m === 'register' ? 'var(--card)' : 'var(--ink-2)';
     $('#regAgency').style.display = m === 'register' ? 'block' : 'none';
     $('#regConsent').style.display = m === 'register' ? 'flex' : 'none';
-    $('#loginBtn').textContent = m === 'register' ? 'Создать аккаунт' : 'Войти';
-    $('#loginHint').textContent = m === 'register' ? 'Новое агентство — отдельный изолированный аккаунт' : 'Вход владельца — по паролю или e-mail';
+    $('#loginBtn').textContent = m === 'register' ? t('Создать аккаунт', 'Create account') : t('Войти', 'Sign in');
+    $('#loginHint').textContent = m === 'register' ? t('Новое агентство — отдельный изолированный аккаунт', 'A new agency is a separate, isolated account') : t('Вход владельца — по паролю или e-mail', 'Owner sign-in — by password or email');
     $('#loginErr').textContent = '';
   };
   $('#tabLogin').addEventListener('click', () => setMode('login'));
@@ -759,6 +816,7 @@ function modal({ title, sub, body, actions, wide }) {
   enhanceControls(bd);
   wireAiWand(bd);
   wireDictate(bd);
+  applyI18n(bd);  /* авто-перевод диалога при LANG='en' */
   requestAnimationFrame(() => bd.classList.add('show'));
   return bd;
 }
@@ -1469,8 +1527,9 @@ function initNav() {
   $$('.nav-item').forEach(btn => {
     /* кнопка-пространство рисует свой лейбл/иконку; ведёт на дефолтную под-страницу */
     const ws = btn.dataset.ws ? WORKSPACES[btn.dataset.ws] : null;
-    const def = ws ? { icon: ws.icon, name: ws.label } : NAV[btn.dataset.page];
-    btn.innerHTML = `${ic(def.icon)}${def.name}${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
+    const def = ws ? { icon: ws.icon, name: t(ws.label, ws.labelEn) } : NAV[btn.dataset.page];
+    const defName = ws ? def.name : navName(btn.dataset.page);
+    btn.innerHTML = `${ic(def.icon)}${defName}${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
     btn.addEventListener('click', () => {
       /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */
       let target = btn.dataset.page;
@@ -1482,7 +1541,7 @@ function initNav() {
     });
     /* под кнопкой-пространством — раскрывающийся список его подстраниц (аккордеон в сайдбаре) */
     if (ws) {
-      const sub = el(`<div class="nav-sub" data-subws="${btn.dataset.ws}"><div class="nav-sub-inner">${ws.pages.map(pk => `<button class="nav-subitem" data-subpage="${pk}">${ic(NAV[pk].icon)}<span>${NAV[pk].name}</span></button>`).join('')}</div></div>`);
+      const sub = el(`<div class="nav-sub" data-subws="${btn.dataset.ws}"><div class="nav-sub-inner">${ws.pages.map(pk => `<button class="nav-subitem" data-subpage="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span></button>`).join('')}</div></div>`);
       sub.querySelectorAll('.nav-subitem').forEach(sb => sb.addEventListener('click', (e) => {
         e.stopPropagation(); const target = sb.dataset.subpage;
         if (target === 'properties') PAGE_STATE.propView = null;
@@ -1493,6 +1552,8 @@ function initNav() {
       btn.after(sub);
     }
   });
+  /* заголовки групп сайдбара (Работа/Рост/Итоги) — билингва по LANG */
+  if (LANG === 'en') { const GRP = { 'Работа': 'Work', 'Рост': 'Growth', 'Итоги': 'Results' }; $$('.nav-label').forEach(l => { const en = GRP[l.textContent.trim()]; if (en) l.textContent = en; }); }
   syncNavSub();
   initNavSearch();
 }
@@ -1503,11 +1564,11 @@ function initNavSearch() {
      любой z-index выпадашки заперт, и соседний .nav (тоже z:1, ниже в DOM) её перекрывает —
      клики уходили в меню под ней. В body фиксированная выпадашка с z:300 бьёт всё. */
   if (res.parentElement !== document.body) document.body.appendChild(res);
-  const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return def.label; return ''; };
+  const parentOf = (pk) => { for (const def of Object.values(WORKSPACES)) if (def.pages.includes(pk)) return t(def.label, def.labelEn); return ''; };
   const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
   const hidden = new Set(isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || []));
   if (me && me.canControl) hidden.delete('control');   /* делегат контроля видит раздел */
-  const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: v.name, sub: v.sub || '', parent: parentOf(k), icon: v.icon }));
+  const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: navName(k), sub: navSub(k), parent: parentOf(k), icon: v.icon }));
   const norm = (s) => String(s || '').toLowerCase();
   const goTo = (pk) => { go(pk); inp.value = ''; res.hidden = true; inp.blur(); };
   const place = () => { const r = inp.getBoundingClientRect(); res.style.left = r.left + 'px'; res.style.top = (r.bottom + 6) + 'px'; res.style.width = r.width + 'px'; };
@@ -1545,7 +1606,7 @@ function injectWorkspaceTabs(c0, page) {
   const parent = PARENT_OF[page];
   if (!parent) return;
   const ws = WORKSPACES[parent];
-  const bar = el(`<div class="ws-tabs">${ws.pages.map(pk => `<button class="ws-tab${pk === page ? ' on' : ''}" data-p="${pk}">${ic(NAV[pk].icon)}<span>${NAV[pk].name}</span></button>`).join('')}</div>`);
+  const bar = el(`<div class="ws-tabs">${ws.pages.map(pk => `<button class="ws-tab${pk === page ? ' on' : ''}" data-p="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span></button>`).join('')}</div>`);
   bar.querySelectorAll('.ws-tab').forEach(b => b.addEventListener('click', () => { if (b.dataset.p !== CUR) go(b.dataset.p); }));
   c0.insertBefore(bar, c0.firstChild);
 }
@@ -1569,8 +1630,8 @@ function go(page) {
   if (PARENT_OF[page]) PAGE_STATE['ws_' + PARENT_OF[page]] = page; /* запоминаем вкладку пространства */
   $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.ws ? WORKSPACES[b.dataset.ws].pages.includes(page) : b.dataset.page === page));
   syncNavSub();
-  $('#pageTitle').textContent = NAV[page].name;
-  $('#pageSub').textContent = NAV[page].sub;
+  $('#pageTitle').textContent = navName(page);
+  $('#pageSub').textContent = navSub(page);
   $('#pageEmblem').innerHTML = ic(NAV[page].icon, 1.8);
   syncTopAction();
   /* волна входа проигрывается ТОЛЬКО на НОВОМ содержимом (после fn), а не на старом во время фетча —
@@ -1622,6 +1683,7 @@ async function render() {
         wireDictate(c0);
         wireHeroArt(c0);
         mountHeroVideos(c0);
+        applyI18n(c0);  /* авто-перевод контента при LANG='en' (пер-нодовый, по словарю) */
         if (silent) {
           /* тихое обновление данных: DOM меняется мгновенно, скролл на месте, без fade — глазу незаметно */
           c0.scrollTop = prevScroll;
@@ -11388,11 +11450,12 @@ PAGES.settings = async (root) => {
 
     <div class="set-sec-h">${ic(I.gear)}Оформление и обучение</div>
     <div class="glass card">
-      <div class="card-title">${ic(I.gear)}Оформление<span class="sub">тема интерфейса и мастер настройки</span></div>
+      <div class="card-title">${ic(I.gear)}${t('Оформление','Appearance')}<span class="sub">${t('тема интерфейса и мастер настройки','interface theme and setup wizard')}</span></div>
+      <div class="set-row" style="margin-bottom:10px"><div class="sp"><div class="sl">${t('Язык интерфейса','Interface language')}</div><div class="sd">${t('Применяется ко всему интерфейсу','Applies to the whole interface')}</div></div>${langToggleHTML()}</div>
       <div class="theme-inline">
         ${THEME_PRESETS.map(p => `<button class="tm-item" onclick="window.setTheme('${p.k}')"><span class="tm-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="tm-tx"><b>${p.name}</b><small>${p.desc}</small></span></button>`).join('')}
       </div>
-      <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}Мастер настройки Lumen</button>
+      <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}${t('Мастер настройки Lumen','Lumen setup wizard')}</button>
     </div>
     ${linkCard('id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()"', I.doc, 'Инструкции и гайды', 'Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое')}
     ${coll(`${ic(I.eye)}Демо-режим`, demoForm, { open: false })}`;
@@ -11680,10 +11743,10 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
   const ex = document.getElementById('agencyMenu'); if (ex) { ex.remove(); return; }
   const r = e.currentTarget.getBoundingClientRect();
   const m = el(`<div id="agencyMenu" class="agency-menu">
-    <button data-am="profile">${ic(I.gear)}Профиль агентства</button>
-    <button data-am="settings">${ic(I.gear)}Настройки</button>
+    <button data-am="profile">${ic(I.gear)}${t('Профиль агентства','Agency profile')}</button>
+    <button data-am="settings">${ic(I.gear)}${t('Настройки','Settings')}</button>
     <div class="am-sep"></div>
-    <button data-am="logout" class="am-logout">${ic(I.x)}Выйти из аккаунта</button>
+    <button data-am="logout" class="am-logout">${ic(I.x)}${t('Выйти из аккаунта','Log out')}</button>
   </div>`);
   m.style.left = r.left + 'px'; m.style.bottom = (window.innerHeight - r.top + 8) + 'px'; m.style.width = r.width + 'px';
   document.body.appendChild(m);
@@ -11691,7 +11754,7 @@ document.getElementById('agencyMenuBtn')?.addEventListener('click', (e) => {
     const b = ev.target.closest('[data-am]'); if (!b) return; const act = b.dataset.am; m.remove();
     if (act === 'profile') go('agency');
     else if (act === 'settings') go('settings');
-    else if (act === 'logout') { const okc = window.uiConfirm ? await uiConfirm('Выйти из аккаунта?', 'Вы вернётесь на экран входа — оттуда можно войти в другой аккаунт.', { ok: 'Выйти', danger: true }) : confirm('Выйти?'); if (!okc) return; try { await fetch('/auth/logout', { method: 'POST' }); } catch (_) {} location.href = '/'; }
+    else if (act === 'logout') { const okc = window.uiConfirm ? await uiConfirm(t('Выйти из аккаунта?','Log out?'), t('Вы вернётесь на экран входа — оттуда можно войти в другой аккаунт.','You will return to the sign-in screen.'), { ok: t('Выйти','Log out'), danger: true }) : confirm('Выйти?'); if (!okc) return; try { await fetch('/auth/logout', { method: 'POST' }); } catch (_) {} location.href = '/'; }
   });
   setTimeout(() => document.addEventListener('click', function h(ev) { if (!ev.target.closest('#agencyMenu,#agencyMenuBtn')) { m.remove(); document.removeEventListener('click', h); } }), 0);
 });
@@ -11722,6 +11785,7 @@ window.addEventListener('hashchange', () => {
   }
   await go(startPage());   /* дождаться ПЕРВОЙ отрисовки, чтобы прелоадер не гас поверх дорисовки (мелькание иконок) */
   mountFab();
+  applyI18n(document.body);  /* перевод статичного chrome (топбар: «Новый лид», поиск) при LANG='en' */
   /* прелоадеру — минимум 900мс жизни (вихрь «дышит»), затем reveal после гарантированного paint (двойной rAF) */
   const reveal = () => requestAnimationFrame(() => requestAnimationFrame(hidePreloader));
   setTimeout(reveal, Math.max(0, 900 - (Date.now() - t0)));
