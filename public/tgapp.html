@@ -6,8 +6,12 @@
 <title>Lumen · Чаты</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>/* СРАЗУ снимаем серый splash Telegram: ready()/expand() до парсинга CSS/HTML.
-  Иначе при холодном запуске с домашнего экрана splash висел, пока не доходило до основного скрипта. */
-try{var _w=window.Telegram&&window.Telegram.WebApp;if(_w){_w.ready();try{_w.expand();}catch(e){}}}catch(e){}</script>
+  С РЕТРАЕМ — вдруг telegram-web-app.js на телефоне ещё не инициализировал window.Telegram.WebApp
+  к этому моменту (холодный запуск с домашнего экрана): дёргаем ready() каждые 100мс до 6с,
+  пока SDK не появится. Иначе серый splash висел, т.к. ready() ни разу не вызывался. */
+(function(){function r(){try{if(window.Telegram&&window.Telegram.WebApp){window.Telegram.WebApp.ready();try{window.Telegram.WebApp.expand();}catch(e){}return true;}}catch(e){}return false;}
+if(!r()){var n=0,i=setInterval(function(){if(r()||++n>60)clearInterval(i);},100);}
+document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r);})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
