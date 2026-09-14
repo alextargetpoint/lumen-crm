@@ -1735,7 +1735,7 @@ async function ideaSwipe(kind, ctx, repaint) {
 /* гео → смещение UTC (для мировых часов и намёков по времени клиента) */
 const GEO_TZ = { dubai: 4, bali: 8, phuket: 7, spain: 1, france: 1, moscow: 3, msk: 3, istanbul: 3, turkey: 3, cyprus: 2, georgia: 4, tbilisi: 4, montenegro: 1, thailand: 7, indonesia: 8, uae: 4, spain_bcn: 1, latam: -3, portugal: 0, greece: 2, egypt: 2, bangkok: 7 };
 /* ⭐ богатый дефолт-обзор: 13 виджетов (было 8) — пользователь видит всю систему сразу, остальные (нишевые) в «Настроить» */
-const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'leadsources', 'hotleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'brokers', 'numbers', 'chains', 'leaders'];
+const OV_DEFAULT = ['kpi', 'attention', 'clientreport', 'funnel', 'tasks', 'adbundles', 'leadsources', 'hotleads', 'goal', 'aivs', 'contenthub', 'activity', 'meetings', 'demos', 'brokers', 'numbers', 'chains', 'leaders'];
 const ovKey = () => { const me = STATE && STATE.me; return 'lumen_ov_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
 function ovGetLayout() { try { const v = JSON.parse(localStorage.getItem(ovKey())); if (Array.isArray(v) && v.length) return v.filter(k => OV_W[k]); } catch (_) {} return OV_DEFAULT.slice(); }
 function ovSetLayout(a) { try { localStorage.setItem(ovKey(), JSON.stringify(a)); } catch (_) {} }
@@ -1754,7 +1754,7 @@ const OV_VARIANT = {
   onboarding: 'cv-setup', worldclock: 'cv-inset',
 };
 /* span в 12-кол сетке (стаггер-высоты, но выровнено); full=12. Дефолт-порядок даёт чистые ряды 5+7 / 7+5 / 6+6 */
-const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, execsignals: 12 };
+const OV_SPAN = { funnel: 5, tasks: 7, hotleads: 7, goal: 5, meetings: 6, demos: 6, leaders: 6, numbers: 6, aivs: 7, chains: 5, activity: 6, recent: 5, brokers: 6, geo: 6, spark: 6, worldclock: 4, casebase: 6, ideas: 5, onboarding: 12, clientreport: 6, adbundles: 6, leadsources: 6, contenthub: 6, dealsmonth: 6, reengage: 5, teamperf: 6, trafficperf: 6, execsignals: 12 };
 /* категории для библиотеки виджетов */
 const OV_CAT = [
   ['Руководителю · штаб', ['execsignals', 'teamperf', 'trafficperf']],
@@ -2043,6 +2043,18 @@ const OV_W = {
     const ms = (tsk.meetings || []).slice(0, 6);
     const body = ms.length ? ms.map(mt => { const d = new Date(mt.at); const today = c.dstr2(mt.at) === tsk.today; return `<div class="ov2-meet" data-ovlead="${mt.leadId}"><div class="ov2-meet-tm"><b>${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</b><i>${today ? 'сегодня' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${esc(mt.leadName)}</div><div class="ov2-meet-k">${KIND[mt.kind] || mt.kind}</div></div>${mt.link ? `<a class="btn btn-sm" href="${esc(mt.link)}" target="_blank" onclick="event.stopPropagation()">${ic(I.phone)}</a>` : ''}</div>`; }).join('') : ovEmpty(I.cal, 'Встреч нет', 'Назначайте показы и созвоны из карточки лида');
     return `<div class="ov2-card-hd">${ic(I.cal)}Ближайшие встречи<span>${(tsk.meetings || []).length}</span><button class="btn btn-sm" data-ovgo="meetings">Календарь</button></div>${body}`;
+  } },
+  demos: { name: 'Заявки на демо', icon: () => I.cal, full: false, render: (c) => {
+    const all = c.consults || [], cs = all.slice(0, 6);
+    const hd = `<div class="ov2-card-hd">${ic(I.cal)}Заявки на демо<span>${all.length}</span></div>`;
+    if (!cs.length) return hd + ovEmpty(I.cal, 'Заявок пока нет', 'Записи на демо Lumen с лендинга появятся здесь');
+    const body = cs.map(x => {
+      const d = x.date ? new Date(x.date + 'T00:00:00') : null;
+      const dl = d && !isNaN(d) ? d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : esc(x.date || '');
+      const meta = [x.agency, x.tz].filter(Boolean).map(esc).join(' · ');
+      return `<div class="ov2-meet" data-consrow="${x.at}"><div class="ov2-meet-tm"><b>${esc(x.slot || '—')}</b><i>${dl}</i></div><div class="ov2-meet-b"><div class="ov2-meet-n">${esc(x.name || '—')}${meta ? ` · <span style="color:var(--ink3);font-weight:400">${meta}</span>` : ''}</div><div class="ov2-meet-k">${esc(x.contact || '')}${x.note ? ` — ${esc(x.note)}` : ''}</div></div><button class="btn btn-sm" data-consdismiss="${x.at}" title="Убрать заявку">${ic(I.x)}</button></div>`;
+    }).join('');
+    return hd + body;
   } },
   activity: { name: 'Активность', icon: () => I.bolt, full: false, render: (c) => {
     const evs = (c.events || []).slice(0, 8);
@@ -2808,12 +2820,12 @@ function ovMasonryWatch(root) {
   }
 }
 PAGES.overview = async (root) => {
-  const [an, events, leads, tsk, feedD, casesD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] })), api.get('/cases/list').catch(() => [])]);
+  const [an, events, leads, tsk, feedD, casesD, consD] = await Promise.all([api.get('/analytics'), api.get('/events'), api.get('/leads'), api.get('/tasks').catch(() => ({ tasks: [], meetings: [], stats: {}, suggestions: [] })), api.get('/feed').catch(() => ({ board: [] })), api.get('/cases/list').catch(() => []), api.get('/consults').catch(() => ({ consults: [] }))]);
   const ovBoard = (feedD.board || []).filter(b => b.deals > 0 || b.dealsMonth > 0);
   const dstr2 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const feedIcon = (t) => ({ lead_new: I.plus, msg_in: I.chat, comment: I.chat, qualified: I.spark, handover: I.handover, deal: I.flame, wake: I.wake, touch: I.chain, optout: I.moon, sleep: I.moon, number: I.sim, qual: I.check, stage: I.arrow, send_skip: I.shield, meeting: I.cal, merge: I.copy, ai_off: I.user, call: I.phone, view: I.eye }[t] || I.bolt);
   const feedCls = (t) => ({ deal: 'ok', qualified: 'ok', handover: 'ok', qual: 'ok', optout: 'warn', send_skip: 'warn', sleep: 'warn', ai_off: 'warn' }[t] || '');
-  const ctx = { an, events, leads, tsk, cases: casesD || [], f: an.funnel, dstr2, feedIcon, feedCls };
+  const ctx = { an, events, leads, tsk, cases: casesD || [], consults: (consD && consD.consults) || [], f: an.funnel, dstr2, feedIcon, feedCls };
   let layout = ovGetLayout();
 
   const paint = () => {
@@ -2837,6 +2849,7 @@ PAGES.overview = async (root) => {
       </div>`;
     /* переходы/действия */
     $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+    $$('[data-consdismiss]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); const at = Number(b.dataset.consdismiss); const row = b.closest('[data-consrow]'); if (row) row.classList.add('tk-cleared'); try { await api.post('/consults/dismiss', { at }); } catch (_) {} toast('Заявка убрана', null, true); }));
     $$('[data-ovlead]', root).forEach(b => b.addEventListener('click', (e) => { if (e.target.closest('a,button:not([data-ovlead])')) return; openLeadModal(b.dataset.ovlead); }));
     $$('[data-ovcase]', root).forEach(b => b.addEventListener('click', () => openCaseModal((ctx.cases || []).find(k => k.id === b.dataset.ovcase))));
     $$('[data-ovdone]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); celebrateCheck(b); const row = b.closest('.ov2-task'); if (row) { row.classList.add('tk-cleared'); } await api.patch('/tasks/' + b.dataset.ovdone, { status: 'done' }); toast('Задача выполнена', null, true); setTimeout(() => PAGES.overview(root), 520); }));

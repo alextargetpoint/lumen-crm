@@ -3421,6 +3421,21 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /* заявки на демо/консультацию с лендинга — видны в админке (Сводка) */
+    if (p === '/api/consults' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const list = (db.consults || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+      return json(res, 200, { consults: list });
+    }
+    if (p === '/api/consults/dismiss' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const at = Number(b && b.at);
+      db.consults = (db.consults || []).filter(c => c.at !== at);
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+
     /* ---------------- мост приёма КОММЕНТАРИЕВ под рекламой (интегратор/тест) ---------------- */
     if (p === '/hooks/comment' && req.method === 'POST') {
       if (!rateHit('hookcmt:' + clientIp(req), 60, 60000)) return json(res, 429, { error: 'rate limit' });

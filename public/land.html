@@ -583,6 +583,9 @@
   .modal .mav img{width:100%;height:100%;object-fit:cover}
   .modal h3{font-family:var(--serif);font-weight:300;font-size:clamp(23px,3vw,32px);line-height:1.05}
   .modal .msub{color:#a7a6a3;font-size:13px;font-weight:300;line-height:1.5;margin-top:5px}
+  .modal .mby{margin-top:9px;font-size:11.5px;letter-spacing:.02em;color:#8a8987;display:flex;align-items:center;gap:6px}
+  .modal .mby b{color:#cfcdc8;font-weight:500}
+  .modal .mby::before{content:"";width:5px;height:5px;border-radius:50%;background:#4ea1a1;box-shadow:0 0 0 3px rgba(78,161,161,.16)}
   .cal{margin-top:22px;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px}
   .cal .chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .cal .chd b{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:capitalize}
@@ -677,8 +680,8 @@
   <div class="wrap hero-in">
     <div class="kline">CRM, рождённая в недвижимости</div>
     <h1 data-r class="in lnw">
-      <span class="ln"><span>Порядок,</span></span>
-      <span class="ln"><span>которого <em>не было</em></span></span>
+      <span class="ln"><span>Каждый лид — ответ</span></span>
+      <span class="ln"><span>за <em>60 секунд</em></span></span>
     </h1>
     <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
     <div class="hero-cta">
@@ -1109,10 +1112,11 @@
     <button class="x" id="cClose" aria-label="Закрыть">✕</button>
     <div id="cBody">
       <div class="mhead">
-        <div class="mav" id="cAvatar">TP</div>
+        <div class="mav" id="cAvatar"><img src="/assets/founder.jpg" alt="Алексей — основатель TargetPoint" width="58" height="58" loading="lazy"></div>
         <div>
           <h3 id="cTitle">Живое демо <em>Lumen</em></h3>
           <div class="msub">20 минут, без слайдов. Покажем систему на вашем сценарии и ответим на вопросы. Выберите удобное время.</div>
+          <div class="mby">Проводит <b>Алексей</b> · основатель TargetPoint</div>
         </div>
       </div>
       <div class="cal" id="cal">
