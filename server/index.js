@@ -564,6 +564,13 @@ function secOnDeny(req, code, p) {
   } catch (e) {}
 }
 
+/* Бот техподдержки: токен ТОЛЬКО из env или реестра (data/, гитигнор) — НИКОГДА не в коде/git. */
+function supportBotToken() { const reg = store.getRegistry(); return process.env.SUPPORT_BOT_TOKEN || (reg.supportBot && reg.supportBot.token) || ''; }
+async function supportApi(token, method, body) {
+  try { const r = await fetch('https://api.telegram.org/bot' + token + '/' + method, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return await r.json().catch(() => ({})); }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
 /* SaaS: найти тенанта-владельца публичного ресурса (шаринг-ссылки без сессии).
    Ищем по всем тенантам — ids уникальны; при росте заменить на индекс в реестре. */
 function findTenant(pred) { for (const tid of store.listTenants()) { let ok = false; try { ok = store.runInTenant(tid, pred); } catch (e) {} if (ok) return tid; } return null; }
@@ -2884,6 +2891,34 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true }); // Telegram нужен только 200
     }
 
+    /* ---------------- Бот техподдержки (админский): агентства пишут → тикет + алерт основателю ---------------- */
+    if (p === '/support/webhook' && req.method === 'POST') {
+      const _reg = store.getRegistry();
+      const sec = _reg.supportBot && _reg.supportBot.secret;
+      const got = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+      if (!sec || got.length !== sec.length || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(sec))) { secOnDeny(req, 403, p); return json(res, 200, { ok: true }); }
+      const body = await readBody(req);
+      const msg = body.message || body.edited_message;
+      const tok = supportBotToken();
+      if (msg && msg.chat) {
+        const from = msg.from || {};
+        const text = msg.text || msg.caption || '[вложение]';
+        const name = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || '—';
+        if (/^\/start/.test(text)) { if (tok) await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: 'Здравствуйте! Это поддержка Lumen. Опишите вопрос одним сообщением — мы ответим здесь же.' }).catch(() => {}); }
+        else {
+          _reg.supportTickets.unshift({ at: Date.now(), chatId: msg.chat.id, name, username: from.username || '', text: String(text).slice(0, 2000), status: 'new' });
+          if (_reg.supportTickets.length > 500) _reg.supportTickets.length = 500;
+          store.saveRegistry();
+          if (tok) {
+            await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: 'Принято ✓ Мы получили обращение и ответим здесь же.' }).catch(() => {});
+            const fc = _reg.supportBot && _reg.supportBot.founderChat;
+            if (fc) await supportApi(tok, 'sendMessage', { chat_id: fc, text: `🎧 Поддержка · ${name}${from.username ? ' (@' + from.username + ')' : ''}:\n${text}` }).catch(() => {});
+          }
+        }
+      }
+      return json(res, 200, { ok: true });
+    }
+
     /* ---------------- юридические страницы (публичные, для App Review Meta) ---------------- */
     if ((p === '/privacy' || p === '/terms' || p === '/data-deletion') && req.method === 'GET') {
       const f = p === '/privacy' ? 'privacy.html' : p === '/terms' ? 'terms.html' : 'data-deletion.html';
@@ -4115,6 +4150,28 @@ const server = http.createServer(async (req, res) => {
         let liveVer = '';
         try { liveVer = ((fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8').match(/app\.js\?v=(\d+)/) || [])[1]) || ''; } catch (e) {}
         return json(res, 200, { ok: true, gate, liveVersion: liveVer, log: (reg.releaseLog || []).slice(0, 30) });
+      }
+      /* Техподдержка (бот): тикеты + ответ + конфиг */
+      if (p === '/api/admin/support' && req.method === 'GET') {
+        const botLink = ''; /* @username узнаём лениво ниже */
+        return json(res, 200, { ok: true, tickets: (reg.supportTickets || []).slice(0, 100), config: { tokenSet: !!supportBotToken(), founderChat: (reg.supportBot && reg.supportBot.founderChat) || '', botLink } });
+      }
+      if (p === '/api/admin/support/config' && req.method === 'POST') {
+        const b = await readBody(req); reg.supportBot = reg.supportBot || {};
+        if (b.founderChat !== undefined) reg.supportBot.founderChat = String(b.founderChat || '').trim().slice(0, 40);
+        if (b.token) reg.supportBot.token = String(b.token).trim().slice(0, 200);
+        store.saveRegistry();
+        /* при сохранении токена — сразу привязываем вебхук */
+        let hook = null; const tok = supportBotToken();
+        if (tok) { const base = (process.env.PUBLIC_BASE_URL || process.env.LUMEN_PROD_BASE || 'https://app.lumen247.com').replace(/\/$/, ''); try { hook = await supportApi(tok, 'setWebhook', { url: base + '/support/webhook', secret_token: reg.supportBot.secret, allowed_updates: ['message'] }); } catch (e) {} }
+        return json(res, 200, { ok: true, tokenSet: !!tok, webhook: hook });
+      }
+      if (p === '/api/admin/support/reply' && req.method === 'POST') {
+        const b = await readBody(req); const tok = supportBotToken();
+        if (!tok) return json(res, 400, { error: 'токен бота поддержки не задан' });
+        const r = await supportApi(tok, 'sendMessage', { chat_id: b.chatId, text: String(b.text || '').slice(0, 3000) });
+        const t = (reg.supportTickets || []).find(x => String(x.chatId) === String(b.chatId) && x.status === 'new'); if (t) { t.status = 'answered'; store.saveRegistry(); }
+        return json(res, r && r.ok ? 200 : 400, r && r.ok ? { ok: true } : { error: (r && r.description) || 'не отправилось' });
       }
       if (p === '/api/admin/release/log' && req.method === 'POST') {
         const b = await readBody(req); reg.releaseLog = reg.releaseLog || [];
@@ -9828,5 +9885,11 @@ server.listen(PORT, () => {
         });
       }
     }, 2500);
+    /* бот техподдержки: привязываем вебхук к _tgBase, если токен задан (env или реестр) */
+    setTimeout(async () => {
+      const sbTok = supportBotToken(); if (!sbTok) return;
+      try { const reg = store.getRegistry(); await supportApi(sbTok, 'setWebhook', { url: _tgBase + '/support/webhook', secret_token: reg.supportBot.secret, allowed_updates: ['message'] }); console.log('[support] webhook set →', _tgBase + '/support/webhook'); }
+      catch (e) { console.warn('[support] webhook fail', e.message); }
+    }, 2800);
   }
 });

@@ -68,6 +68,7 @@
     <button data-tab="email">✉️ Письма</button>
     <button data-tab="map">🗺 Карта</button>
     <button data-tab="release">🚀 Релиз</button>
+    <button data-tab="support">🎧 Поддержка</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -187,6 +188,23 @@
       <div id="relLog" style="margin-top:10px;font-size:13px"></div>
     </div>
   </div>
+
+  <div class="sect" id="sect-support">
+    <div class="card">
+      <b>Бот техподдержки</b>
+      <div id="supCfg" class="muted" style="font-size:12.5px;margin-top:8px"></div>
+      <div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+        <input id="supFounder" placeholder="Ваш chat_id в Telegram (для алертов)" style="flex:1;min-width:200px">
+        <input id="supToken" type="password" placeholder="токен бота (лучше SUPPORT_BOT_TOKEN в Railway)" style="flex:2;min-width:220px">
+        <button id="supSave">Сохранить + вебхук</button>
+      </div>
+      <div id="supCfgState" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><b>Обращения</b><button class="ghost" id="supReload">Обновить</button></div>
+      <div id="supList" style="margin-top:10px;font-size:13.5px"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -218,7 +236,34 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'email') loadEmail();
   if (b.dataset.tab === 'map') renderMap();
   if (b.dataset.tab === 'release') loadRelease();
+  if (b.dataset.tab === 'support') loadSupport();
 }));
+
+// ── Техподдержка ──
+async function loadSupport() {
+  const r = await api('/api/admin/support');
+  const c = r.config || {};
+  $('#supCfg').innerHTML = `Токен бота: <b>${c.tokenSet?'задан ✓':'НЕ задан'}</b> · алерты в chat_id: <b>${c.founderChat||'не задан'}</b>. Агентства пишут боту — обращения падают сюда, критичное дублируется вам в Telegram.`;
+  if (c.founderChat) $('#supFounder').value = c.founderChat;
+  const fmt = (ts)=>{try{return new Date(ts).toLocaleString('ru-RU')}catch(e){return''}};
+  $('#supList').innerHTML = (r.tickets||[]).map(t=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))">
+      <div class="row" style="justify-content:space-between"><b>${esc(t.name)}${t.username?' (@'+esc(t.username)+')':''}</b><span class="muted" style="font-size:12px">${fmt(t.at)} ${t.status==='answered'?'· ✅ отвечено':''}</span></div>
+      <div style="margin:4px 0 8px;white-space:pre-wrap">${esc(t.text)}</div>
+      <div class="row" style="gap:8px"><input class="sup-reply" data-chat="${esc(t.chatId)}" placeholder="Ответить…" style="flex:1"><button class="ghost sup-send" data-chat="${esc(t.chatId)}">Отправить</button></div>
+    </div>`).join('') || '<div class="muted">Обращений пока нет</div>';
+  document.querySelectorAll('.sup-send').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const inp=document.querySelector('.sup-reply[data-chat="'+btn.dataset.chat+'"]'); const text=inp.value.trim(); if(!text)return;
+    const rr=await api('/api/admin/support/reply',{method:'POST',body:JSON.stringify({chatId:btn.dataset.chat,text})});
+    if(rr.ok){inp.value='';loadSupport();}else alert(rr.error||'не отправилось');
+  }));
+}
+document.getElementById('supReload')?.addEventListener('click', loadSupport);
+document.getElementById('supSave')?.addEventListener('click', async ()=>{
+  const r=await api('/api/admin/support/config',{method:'POST',body:JSON.stringify({founderChat:$('#supFounder').value, token:$('#supToken').value})});
+  $('#supToken').value=''; $('#supCfgState').textContent = r.tokenSet ? ('Сохранено · токен есть ✓'+(r.webhook&&r.webhook.ok?' · вебхук привязан':'')) : 'Сохранено · токен не задан';
+  loadSupport();
+});
 
 // ── Гейт выката ──
 async function loadRelease() {
