@@ -969,6 +969,14 @@ window.openGrayManager = async function () {
     const [cls, tx] = map[st] || ['', st];
     return `<span class="badge ${cls}">${tx}${live && live.phone ? ' · ' + esc(live.phone) : ''}</span>`;
   };
+  /* готовность номера к рассылке: свежий номер сначала прогреть (≥3 дней активности), иначе риск бана */
+  const readyPill = (n) => {
+    if (!n.live || n.live.status !== 'connected') return '';
+    const ageDays = n.addedAt ? Math.floor((Date.now() - n.addedAt) / 864e5) : 0;
+    if (ageDays >= 3) return ` <span class="badge ok" style="font-size:10px">готов к рассылке</span>`;
+    const warming = data.warmup && data.warmup.running;
+    return ` <span class="badge ${warming ? 'warn' : ''}" style="font-size:10px">${warming ? `на прогреве · ${ageDays}/3 дн` : 'на прогрев не поставлен'}</span>`;
+  };
   async function refresh() { try { data = await api.get('/wa/gray/list'); } catch (e) {} renderMgr(); }
   function renderMgr() {
     stopPoll();
