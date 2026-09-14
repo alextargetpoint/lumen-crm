@@ -652,6 +652,37 @@
   .foot .fbar a:hover{color:var(--ink)}
   @media(max-width:760px){.foot .fcols{grid-template-columns:1fr 1fr}.foot .fbrand{grid-column:span 2}}
 
+  /* ─────────  МОБИЛЬНАЯ ШЛИФОВКА  ───────── */
+  @media(max-width:600px){
+    /* меньше «воздуха»: короче переходы между зонами и паддинги секций → меньше пустого скролла */
+    .tr{height:clamp(58px,13vw,104px)}
+    .sec{padding-block:clamp(48px,11vw,74px)}
+    .wrap{padding-inline:18px}
+    /* типографика компактнее и читаемее */
+    h2{font-size:clamp(29px,8.4vw,42px);line-height:1.05}
+    .lede{font-size:14.5px;line-height:1.55;max-width:100%}
+    .eyebrow{font-size:10px;letter-spacing:.3em}
+    .eyebrow::before{width:16px}
+    /* заголовки подблоков не гигантские */
+    .split .big{font-size:clamp(25px,7vw,38px)}
+    .tgshow h3,.voi-hd h3,.final h2{font-size:clamp(24px,6.6vw,34px)}
+    /* карточки-виджеты: плотнее рамки, воздух внутри */
+    .dcard{padding:17px;border-radius:15px}
+    .dgrid,.dgrid2,.dgrid3{gap:12px}
+    .prob-cell{padding:22px}
+    .feat{padding:23px}
+    .num{padding:20px 12px}
+    .fstep2{padding:20px 16px 18px}
+    /* CTA на всю ширину — удобнее пальцем */
+    .hero-cta{flex-direction:column;align-items:stretch;gap:11px}
+    .hero-cta .btn{width:100%;justify-content:center}
+    .btn{padding:14px 22px}
+  }
+  @media(max-width:380px){
+    .hero h1{font-size:clamp(37px,11vw,46px)}
+    .statline .big{font-size:clamp(44px,15vw,68px)}
+  }
+
   @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}#load .lmk,#load .lbar::after{animation:none}}
 </style>
 </head>
@@ -690,7 +721,7 @@
       <span class="ln"><span>Каждый лид — ответ</span></span>
       <span class="ln"><span>за <em>60 секунд</em></span></span>
     </h1>
-    <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
+    <p class="lede">Пока менеджер печатает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт увести базу.</p>
     <div class="hero-cta">
       <a class="btn primary" href="/soon.html">Занять место в бете</a>
       <a class="btn ghost" href="#thesis">Как это работает</a>
