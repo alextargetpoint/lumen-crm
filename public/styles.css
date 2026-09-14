@@ -5862,15 +5862,49 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
    и «прилипали» к соседним. Даём тот же зазор, что у .set-link — только на экране настроек. */
 :root[data-page="settings"] #content > .glass.card,
 :root[data-page="settings"] #content > .two-col { margin-bottom: 16px; }
-/* заголовок группы настроек — методология IA: раздел = категория, а не свалка карточек */
-.set-sec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 26px 2px 12px; }
-.set-sec-h:first-child { margin-top: 4px; }
+/* заголовок группы настроек — методология IA: раздел = категория, а не свалка карточек.
+   Разделитель-линия под заголовком + тёмный лейбл: на бежевом (Atelier) секции не сливаются. */
+.set-sec-h { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 30px 2px 14px; padding-bottom: 9px; border-bottom: 1.5px solid var(--stroke); }
+.set-sec-h:first-child { margin-top: 6px; }
 .set-sec-h svg { width: 15px; height: 15px; color: var(--accent); }
+/* карточки-ссылки и сворачиваемые блоки на бежевом фоне должны ЯВНО отделяться от фона:
+   более плотная рамка + мягкая тень (эффект «приподнятости» над кремовым полотном). */
+:root[data-page="settings"] #content > .set-link,
+:root[data-page="settings"] #content > .coll,
+:root[data-page="settings"] #content > .glass.card { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); }
 /* сворачиваемые интеграции на странице настроек: заголовок крупнее (как карточка-ссылка) */
-:root[data-page="settings"] #content > .coll { margin: 0 0 12px; }
+:root[data-page="settings"] #content > .coll { margin: 0 0 12px; background: var(--card); }
 :root[data-page="settings"] #content > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
 :root[data-page="settings"] #content > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
 :root[data-page="settings"] #content > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
+:root[data-page="settings"] #content > .coll.open { box-shadow: 0 2px 4px rgba(20,19,17,.05), 0 12px 30px rgba(20,19,17,.08); }
+
+/* ═══ Премиум-индикатор смены оформления («церемония» в палитре новой темы) ═══ */
+.theme-loader { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center; background: var(--bg); opacity: 0; transition: opacity .4s var(--ease-soft); }
+.theme-loader.on { opacity: 1; }
+.theme-loader.out { opacity: 0; }
+.tl-stage { display: flex; flex-direction: column; align-items: center; gap: 15px; opacity: 0; transform: translateY(8px) scale(.98); animation: tlIn .6s var(--ease-spring) forwards; }
+@keyframes tlIn { to { opacity: 1; transform: none; } }
+.tl-mark { width: 62px; height: 74px; overflow: visible; }
+.tl-mark path { stroke: var(--accent); stroke-width: 2.6; fill: none; stroke-linejoin: round; stroke-dasharray: 540; stroke-dashoffset: 540; animation: tlDraw 1.15s var(--ease-soft) forwards, tlGlow 1.7s ease-in-out .3s infinite; }
+@keyframes tlDraw { to { stroke-dashoffset: 0; } }
+@keyframes tlGlow { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 3px 14px color-mix(in srgb, var(--accent) 45%, transparent)); } }
+.tl-name { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: .01em; }
+.tl-phrase { font-size: 13px; color: var(--ink-3); transition: opacity .19s ease; min-height: 18px; text-align: center; }
+.tl-bar { width: 176px; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 14%, transparent); overflow: hidden; position: relative; }
+.tl-bar i { position: absolute; top: 0; bottom: 0; left: -42%; width: 42%; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: tlBar 1.05s var(--ease-spring) infinite; }
+@keyframes tlBar { to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .tl-mark path { animation: tlDraw .5s forwards; } .tl-bar i { animation: none; left: 0; width: 100%; opacity: .5; } }
+/* — фирменные флёры под тему — */
+:root[data-theme="atelier"] .tl-name { font-family: 'Cormorant', Georgia, serif; font-weight: 600; font-size: 30px; letter-spacing: .04em; }
+:root[data-theme="atelier"] .tl-phrase { font-style: italic; }
+:root[data-theme="atelier"] .theme-loader { background: radial-gradient(120% 120% at 50% 30%, #faf9f5, #f3f1ec); }
+:root[data-theme="mono"] .tl-name { text-transform: uppercase; letter-spacing: .16em; font-size: 18px; }
+:root[data-theme="frame"] .tl-stage { border: 1.5px solid var(--ink); border-radius: 6px; padding: 30px 42px; }
+:root[data-theme="frame"] .tl-name { text-transform: uppercase; letter-spacing: .1em; font-size: 18px; }
+:root[data-theme="emerald"] .theme-loader { background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3); }
+:root[data-theme="emerald"] .tl-stage { padding: 34px 46px; border-radius: 22px; background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 30px 70px -20px rgba(10,25,48,.35); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+:root[data-night] .tl-name { color: #fff; }
 .set-link-ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .set-link-ic svg { width: 20px; height: 20px; }
 .set-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -6968,6 +7002,9 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 :root[data-theme="frame"] .ov-launch-ic svg, :root[data-theme="frame"] .attn-ic svg, :root[data-theme="frame"] .kc-chip-ic svg { color: var(--ink) !important; }
 :root[data-theme="emerald"] .page-emblem svg, :root[data-theme="emerald"] .ovx-kc-ic svg, :root[data-theme="emerald"] .ov2-kpi-ic svg,
 :root[data-theme="emerald"] .ov-launch-ic svg, :root[data-theme="emerald"] .attn-ic svg, :root[data-theme="emerald"] .kc-chip-ic svg { color: var(--accent) !important; }
+/* .page-emblem в «Стекле» — ЗАЛИТЫЙ синий градиент (accent-2→navy-700), а не светлый frost как
+   остальные чипы. Синяя иконка на синем сливалась (баг) → на этой эмблеме иконка белая. */
+:root[data-theme="emerald"] .page-emblem svg { color: #fff !important; }
 :root[data-theme="mono"] .page-emblem svg, :root[data-theme="mono"] .ovx-kc-ic svg, :root[data-theme="mono"] .ov2-kpi-ic svg,
 :root[data-theme="mono"] .ov-launch-ic svg, :root[data-theme="mono"] .attn-ic svg, :root[data-theme="mono"] .kc-chip-ic svg { color: #fff !important; }
 

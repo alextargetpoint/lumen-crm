@@ -1050,6 +1050,37 @@ const THEME_PRESETS = [
   { k: 'emerald', name: 'Lumen Glass', desc: 'атмосферное стекло, premium-OS', sw: ['#397BFF', '#EEF5FF', '#0A1930'], dark: false },
   { k: 'atelier', name: 'Ателье', desc: 'тихая роскошь · крем + serif, тёмные акценты', sw: ['#1A1815', '#F3F1EC', '#141311'], dark: false },
 ];
+/* Премиум-индикатор смены оформления: короткая «церемония» в палитре НОВОЙ темы —
+   логотип рисуется штрихом, крутятся тёплые фразы, шиммер-бар. Не «на коленках»,
+   а как переход в дорогой ОС. Каждая тема — свои слова + свой стиль (см. CSS .theme-loader). */
+const THEME_LOADER_COPY = {
+  light:   { name: 'Кобальт',       phrases: ['Настраиваем кобальт…', 'Смешиваем синие тона…', 'Раскладываем мягкие тени'] },
+  dark:    { name: 'Ночь',          phrases: ['Приглушаем свет…', 'Зажигаем ночные акценты…', 'Опускаем шторы'] },
+  mono:    { name: 'Моно',          phrases: ['Обнуляем до чёрно-белого…', 'Убираем всё лишнее…', 'Оставляем суть'] },
+  warm:    { name: 'Lumen Burgundy', phrases: ['Разливаем бордо…', 'Согреваем интерфейс…', 'Добавляем благородства'] },
+  frame:   { name: 'Контур',        phrases: ['Чертим контуры…', 'Выравниваем по сетке…', 'Заостряем углы'] },
+  emerald: { name: 'Lumen Glass',   phrases: ['Полируем стекло…', 'Наводим блики…', 'Запотевает морозным'] },
+  atelier: { name: 'Ателье',        phrases: ['Готовим тихую роскошь…', 'Расставляем свет…', 'Кладём последний штрих'] },
+};
+const LUMEN_SPARK_PATH = 'M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z';
+window.showThemeLoader = (k, applyFn) => {
+  const copy = THEME_LOADER_COPY[k] || { name: '', phrases: ['Загружаем оформление…'] };
+  const old = document.getElementById('themeLoader'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.className = 'theme-loader'; ov.id = 'themeLoader';
+  ov.innerHTML = `<div class="tl-stage">
+    <svg class="tl-mark" viewBox="0 0 100 120" aria-hidden="true"><path d="${LUMEN_SPARK_PATH}"/></svg>
+    <div class="tl-name">${copy.name}</div>
+    <div class="tl-phrase">${copy.phrases[0]}</div>
+    <div class="tl-bar"><i></i></div>
+  </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('on'));
+  try { applyFn && applyFn(); } catch (_) {}   /* переключаем тему → оверлей сразу берёт НОВУЮ палитру */
+  const pEl = ov.querySelector('.tl-phrase'); let i = 0;
+  const rot = copy.phrases.length > 1 ? setInterval(() => { i = (i + 1) % copy.phrases.length; pEl.style.opacity = '0'; setTimeout(() => { pEl.textContent = copy.phrases[i]; pEl.style.opacity = '1'; }, 190); }, 520) : null;
+  setTimeout(() => { if (rot) clearInterval(rot); ov.classList.remove('on'); ov.classList.add('out'); setTimeout(() => ov.remove(), 460); }, 1180);
+};
 /* бесповоротные AI-видеофоны под тему (сгенерированы через Higgsfield);
    у кого своего нет — родной скайлайн + CSS-тинт под палитру */
 const THEME_VIDEO = {
@@ -1104,7 +1135,13 @@ function mountHeroVideos(root, theme) {
   let cur = localStorage.getItem('lumen_theme');
   if (!P[cur]) cur = localStorage.getItem('lumen_night') === '1' ? 'dark' : 'atelier';
   applyTheme(cur);
-  window.setTheme = (k) => { cur = P[k] ? k : 'atelier'; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
+  window.setTheme = (k, opts) => {
+    const nk = P[k] ? k : 'atelier';
+    const doApply = () => { cur = nk; localStorage.setItem('lumen_theme', cur); localStorage.setItem('lumen_night', P[cur].dark ? '1' : '0'); applyTheme(cur); };
+    /* смена оформления → премиум-«церемония» в палитре новой темы; первичная установка/тот же пресет — тихо */
+    if (nk !== cur && !(opts && opts.silent) && window.showThemeLoader) window.showThemeLoader(nk, doApply);
+    else doApply();
+  };
   document.addEventListener('click', (e) => {
     if (e.target.closest('#logoutBtn')) {
       e.preventDefault();

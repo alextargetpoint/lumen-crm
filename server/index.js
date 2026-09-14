@@ -869,7 +869,7 @@ const json = (res, code, data) => {
 const readBody = (req) => new Promise((resolve) => {
   let b = '';
   req.on('data', (c) => { b += c; if (b.length > 2e6) req.destroy(); });
-  req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } });
+  req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { try { resolve(Object.fromEntries(new URLSearchParams(b))); } catch { resolve({}); } } });   /* JSON, иначе form-urlencoded (вебхуки Twilio) */
 });
 
 /* подсказка «что делать дальше» — считается по фактам карточки */
@@ -2245,10 +2245,10 @@ function assetPathSafe(webPath) {
 }
 
 /* --- запись звонка → скачать → Whisper → транскрипт в карточку лида (общая для всех провайдеров) --- */
-function ingestCallRecording(db, lead, recUrl, label, durSec) {
+function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
   (async () => {
     try {
-      const r2 = await fetch(recUrl);
+      const r2 = await fetch(recUrl, authHeader ? { headers: { Authorization: authHeader } } : undefined);
       if (!r2.ok) throw new Error('запись недоступна: ' + r2.status);
       const buf = Buffer.from(await r2.arrayBuffer());
       if (buf.length > 24e6) throw new Error('запись больше 24МБ');
@@ -2334,6 +2334,62 @@ async function telnyxOnAnswered(db, payload, cs) {
   } else if (cs.stage === 'client' && cs.bridgeTo) {
     await telnyxApi(db, 'POST', `/calls/${ccid}/actions/bridge`, { call_control_id: cs.bridgeTo });
   }
+}
+
+/* --- Twilio Voice: click-to-call (звоним брокеру → TwiML соединяет с клиентом → запись → транскрипт) --- */
+const e164 = (p) => { const s = String(p || '').replace(/[^\d+]/g, ''); return s.startsWith('+') ? s : '+' + s; };
+/* ГЕО-ПОДБОР caller-ID (local presence): клиент видит номер своей страны → выше отклик.
+   Из списка своих Twilio-номеров берём тот, чей код страны совпадает с номером лида (самое длинное совпадение); иначе — дефолт. */
+function fromNumberList(t) {
+  const arr = Array.isArray(t.fromNumbers) ? t.fromNumbers.map(x => typeof x === 'string' ? x : (x && x.number)).filter(Boolean) : [];
+  if (t.fromNumber && !arr.includes(t.fromNumber)) arr.push(t.fromNumber);
+  return arr.map(e164);
+}
+function pickCallerId(t, leadPhone) {
+  const list = fromNumberList(t); if (!list.length) return e164(t.fromNumber || '');
+  const lp = e164(leadPhone); let best = null, bestLen = 0;
+  for (const fn of list) { let len = 0; const max = Math.min(lp.length, fn.length);
+    for (let i = 1; i < max; i++) { if (lp[i] === fn[i]) len++; else break; }   /* совпадение кода страны после «+» */
+    if (len > bestLen) { bestLen = len; best = fn; }
+  }
+  return (bestLen >= 1 ? best : null) || e164(t.fromNumber || list[0]);
+}
+function callBase(db) { return (process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || '').replace(/\/$/, ''); }
+function twilioAuthHeader(t) { return 'Basic ' + Buffer.from((t.key || '') + ':' + (t.secret || '')).toString('base64'); }
+/* Account SID (AC…) для пути REST. Ключ может быть API Key (SK…) — тогда Account SID берём из t.accountSid. */
+function twilioAcct(t) { return t.accountSid || (String(t.key || '').startsWith('AC') ? t.key : ''); }
+async function twilioApi(db, method, path, form) {
+  const t = db.settings.telephony || {};
+  const acct = twilioAcct(t);
+  if (!acct) throw new Error('нужен Account SID (AC…) из Twilio Console → Account Info');
+  const opt = { method, headers: { Authorization: twilioAuthHeader(t) } };
+  if (form) { opt.headers['Content-Type'] = 'application/x-www-form-urlencoded'; opt.body = new URLSearchParams(form).toString(); }
+  const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(acct)}${path}`, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('twilio ' + r.status + ': ' + (j.message || 'ошибка'));
+  return j;
+}
+async function twilioInitiateCall(db, lead, brokerPhone) {
+  const t = db.settings.telephony || {};
+  if (t.provider !== 'twilio' || !t.key || !t.secret || !t.fromNumber) throw new Error('Twilio не настроен: нужны Account SID, Auth Token/API Key и номер «От»');
+  if (!brokerPhone) throw new Error('нет номера брокера для звонка');
+  const base = callBase(db);
+  if (!base || /localhost|127\.0\.0\.1/.test(base)) throw new Error('нужен публичный адрес (туннель) для вебхуков Twilio');
+  const key = encodeURIComponent(db.settings.hooks.secret);
+  const from = pickCallerId(t, lead.phone);   /* гео-подбор: клиент видит номер своей страны */
+  return twilioApi(db, 'POST', '/Calls.json', {
+    To: e164(brokerPhone), From: from,
+    Url: `${base}/twilio/voice?leadId=${encodeURIComponent(lead.id)}&key=${key}`,
+    StatusCallback: `${base}/twilio/status?leadId=${encodeURIComponent(lead.id)}&key=${key}`,
+    StatusCallbackEvent: 'completed', Timeout: 30,
+  });
+}
+/* единая точка звонка — маршрутизирует по провайдеру */
+async function initiateCall(db, lead, brokerPhone) {
+  const t = db.settings.telephony || {};
+  if (t.provider === 'twilio') return twilioInitiateCall(db, lead, brokerPhone);
+  if (t.provider === 'telnyx') return telnyxInitiateCall(db, lead, brokerPhone);
+  throw new Error('телефония не подключена — Настройки → Подключения → Телефония');
 }
 
 /* --- Telegram Mini App: валидация initData (подпись Telegram bot-token'ом) --- */
@@ -2711,12 +2767,26 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------------- Telegram-мост: апдейты от бота (брокер отвечает клиенту) ---------------- */
     if (p === '/tg/webhook' && req.method === 'POST') {
-      const secret = db.settings.tgBridge && db.settings.tgBridge.secret;
-      /* Telegram шлёт секрет в заголовке — отсекаем чужие POST'ы в интернете */
+      /* МУЛЬТИТЕНАНТНОСТЬ: вебхук — общий URL /tg/webhook без cookie, поэтому НЕЛЬЗЯ брать
+         db из контекста запроса (там всегда primary). Каждый тенант зарегистрировал бота
+         в Telegram со СВОИМ secret_token (см. tgbridge.setupWebhook) → находим тенанта по
+         секрету из заголовка и обрабатываем апдейт строго в его контексте. Иначе ответы
+         брокеров одного агентства утекали бы в CRM другого. */
       const _tgGot = String(req.headers['x-telegram-bot-api-secret-token'] || '');
-      if (!secret || _tgGot.length !== secret.length || !crypto.timingSafeEqual(Buffer.from(_tgGot), Buffer.from(secret))) return json(res, 403, { error: 'bad token' }); /* SEC: constant-time */
+      const gotBuf = Buffer.from(_tgGot);
+      let matchTid = null;
+      if (_tgGot) for (const tid of store.listTenants()) {
+        let tdb; try { tdb = store.loadTenant(tid); } catch (_) { continue; }
+        const sec = tdb && tdb.settings && tdb.settings.tgBridge && tdb.settings.tgBridge.secret;
+        if (!sec || sec.length !== _tgGot.length) continue;
+        try { if (crypto.timingSafeEqual(gotBuf, Buffer.from(sec))) { matchTid = tid; break; } } catch (_) {}
+      }
+      if (!matchTid) return json(res, 403, { error: 'bad token' }); /* SEC: constant-time поиск по всем тенантам */
       const body = await readBody(req);
-      try { await tgbridge.handleUpdate(db, body); } catch (e) { console.error('[tg/webhook]', e); }
+      await store.runInTenant(matchTid, async () => {
+        const tdb = store.loadTenant(matchTid);
+        try { await tgbridge.handleUpdate(tdb, body); } catch (e) { console.error('[tg/webhook]', matchTid, e); }
+      });
       return json(res, 200, { ok: true }); // Telegram нужен только 200
     }
 
@@ -2948,7 +3018,7 @@ const server = http.createServer(async (req, res) => {
       }
       if ((tam = p.match(/^\/tgapp\/api\/chat\/([^/]+)\/call$/)) && req.method === 'POST') {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
-        try { await telnyxInitiateCall(db, lead, abroker.phone); return json(res, 200, { ok: true, from: abroker.phone }); }
+        try { await initiateCall(db, lead, abroker.phone); return json(res, 200, { ok: true, from: abroker.phone }); }
         catch (e) { return json(res, 400, { error: e.message }); }
       }
       /* ✨ усилить/переписать текст ИИ перед отправкой */
@@ -3400,6 +3470,52 @@ const server = http.createServer(async (req, res) => {
           if (lead && recUrl) ingestCallRecording(db, lead, recUrl, 'Звонок · Telnyx');
         }
       } catch (e) { console.error('[telnyx-hook]', e.message); }
+      return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- Twilio Voice: TwiML (брокер ответил → соединить с клиентом + запись) ---------------- */
+    if (p === '/twilio/voice' && (req.method === 'POST' || req.method === 'GET')) {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) { res.writeHead(403); res.end('bad key'); return; }
+      const t = db.settings.telephony || {};
+      const lead = db.leads.find(l => l.id === u.searchParams.get('leadId'));
+      const base = callBase(db), key = encodeURIComponent(db.settings.hooks.secret);
+      res.writeHead(200, { 'Content-Type': 'text/xml; charset=utf-8' });
+      if (!lead || !lead.phone) { res.end('<?xml version="1.0" encoding="UTF-8"?><Response><Say language="ru-RU">Клиент не найден</Say></Response>'); return; }
+      const recCb = `${base}/twilio/recording?leadId=${encodeURIComponent(lead.id)}&key=${key}`;
+      const callerId = pickCallerId(t, lead.phone);   /* гео-подбор caller-ID под страну клиента */
+      const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say language="ru-RU" voice="Polly.Tatyana">Соединяю с клиентом</Say><Dial callerId="${esc(callerId)}" record="record-from-answer-dual" recordingStatusCallback="${esc(recCb)}" recordingStatusCallbackEvent="completed" answerOnBridge="true"><Number>${esc(e164(lead.phone))}</Number></Dial></Response>`;
+      res.end(xml); return;
+    }
+    /* Twilio: запись готова → скачиваем (Basic Auth) → транскрипт в карточку */
+    if (p === '/twilio/recording' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const t = db.settings.telephony || {};
+      const lead = db.leads.find(l => l.id === u.searchParams.get('leadId'));
+      const recUrl = b.RecordingUrl ? (b.RecordingUrl + '.mp3') : null;
+      if (lead && recUrl) ingestCallRecording(db, lead, recUrl, 'Звонок · Twilio', +b.RecordingDuration || 0, twilioAuthHeader(t));
+      return json(res, 200, { ok: true });
+    }
+    /* Twilio: ВХОДЯЩИЙ звонок на купленный номер → приветствие + соединение с дежурным брокером */
+    if (p === '/twilio/inbound' && (req.method === 'POST' || req.method === 'GET')) {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) { res.writeHead(403); res.end('bad key'); return; }
+      const b = req.method === 'POST' ? await readBody(req) : {};
+      const from = String(b.From || u.searchParams.get('From') || '').replace(/[^\d]/g, '');
+      /* если звонит известный лид — попробуем соединить с его брокером, иначе с первым активным */
+      let broker = null;
+      if (from) { const lead = db.leads.find(l => (l.phone || '').replace(/\D/g, '').endsWith(from.slice(-9))); if (lead && lead.broker) broker = db.brokers.find(x => x.id === lead.broker); }
+      if (!broker) broker = db.brokers.find(x => x.active !== false && x.phone);
+      res.writeHead(200, { 'Content-Type': 'text/xml; charset=utf-8' });
+      if (broker && broker.phone) res.end(`<?xml version="1.0" encoding="UTF-8"?><Response><Say language="ru-RU" voice="Polly.Tatyana">Соединяю с менеджером</Say><Dial answerOnBridge="true"><Number>${esc(e164(broker.phone))}</Number></Dial></Response>`);
+      else res.end('<?xml version="1.0" encoding="UTF-8"?><Response><Say language="ru-RU" voice="Polly.Tatyana">Спасибо за звонок. Скоро с вами свяжутся.</Say></Response>');
+      return;
+    }
+    /* Twilio: статус звонка → событие в карточке */
+    if (p === '/twilio/status' && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const lead = db.leads.find(l => l.id === u.searchParams.get('leadId'));
+      if (lead && b.CallStatus === 'completed') { ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок Twilio завершён · ${b.CallDuration || 0}с` }); store.save(); }
       return json(res, 200, { ok: true });
     }
 
@@ -4230,7 +4346,7 @@ const server = http.createServer(async (req, res) => {
          НИКОГДА не из тела запроса — иначе любой авторизованный мог бы звонить на произвольный (premium-rate) номер за счёт агентства (toll fraud) */
       const brokerPhone = (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
       if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'нет валидного номера брокера для звонка' });
-      try { await telnyxInitiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone }); }
+      try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone }); }
       catch (e) { return json(res, 400, { error: e.message }); }
     }
 
@@ -4796,6 +4912,52 @@ const server = http.createServer(async (req, res) => {
       if (b.stopWords) db.settings.stopWords = b.stopWords;
       store.save();
       return json(res, 200, publicSettings(db));
+    }
+    /* ── ТЕЛЕФОНИЯ Twilio: проверка ключей + покупка номеров прямо в дашборде (SaaS) ── */
+    if (p === '/api/telephony/test' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера Twilio и сохраните ключи' });
+      try { const a = await twilioApi(db, 'GET', '.json'); return json(res, 200, { ok: true, account: a.friendly_name || a.sid, status: a.status }); }
+      catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
+    }
+    /* поиск доступных номеров по стране: /api/telephony/numbers/search?country=FR&type=local&contains= */
+    if (p === '/api/telephony/numbers/search' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const country = (u.searchParams.get('country') || 'US').toUpperCase().slice(0, 2);
+      const type = ['Local', 'Mobile', 'TollFree'].includes(u.searchParams.get('type')) ? u.searchParams.get('type') : 'Local';
+      const q = new URLSearchParams({ PageSize: '20', VoiceEnabled: 'true' });
+      if (u.searchParams.get('contains')) q.set('Contains', u.searchParams.get('contains').replace(/[^\d]/g, ''));
+      try {
+        const j = await twilioApi(db, 'GET', `/AvailablePhoneNumbers/${country}/${type}.json?${q.toString()}`);
+        const list = (j.available_phone_numbers || []).map(n => ({ number: n.phone_number, friendly: n.friendly_name, region: n.region || n.locality || '', country: n.iso_country, caps: n.capabilities }));
+        return json(res, 200, { list });
+      } catch (e) { return json(res, 200, { list: [], error: e.message }); }
+    }
+    /* купить номер (добавится в список исходящих для гео-подбора): /api/telephony/numbers/buy {number} */
+    if (p === '/api/telephony/numbers/buy' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const number = e164(b.number || '');
+      if (!/^\+\d{6,15}$/.test(number)) return json(res, 400, { error: 'неверный номер' });
+      const base = callBase(db); const key = encodeURIComponent(db.settings.hooks.secret);
+      const form = { PhoneNumber: number };
+      if (base && !/localhost/.test(base)) { form.VoiceUrl = `${base}/twilio/inbound?key=${key}`; form.VoiceMethod = 'POST'; }
+      try {
+        const j = await twilioApi(db, 'POST', '/IncomingPhoneNumbers.json', form);
+        const t = db.settings.telephony; t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers : [];
+        if (!t.fromNumbers.includes(number)) t.fromNumbers.push(number);
+        if (!t.fromNumber) t.fromNumber = number;
+        store.save();
+        return json(res, 200, { ok: true, number: j.phone_number || number, sid: j.sid });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* список моих номеров */
+    if (p === '/api/telephony/numbers' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'twilio') return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })) });
+      try { const j = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=50'); return json(res, 200, { list: (j.incoming_phone_numbers || []).map(n => ({ number: n.phone_number, friendly: n.friendly_name, sid: n.sid })) }); }
+      catch (e) { return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })), error: e.message }); }
     }
     /* CAPI: тестовое событие (проверка подключения к Meta) */
     if (p === '/api/capi/test' && req.method === 'POST') {
