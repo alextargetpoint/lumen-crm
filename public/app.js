@@ -11020,53 +11020,8 @@ function openWaWizard() {
 PAGES.settings = async (root) => {
   const s = STATE.settings;
   const teamN = (STATE.brokers || []).length;
-  root.innerHTML = `
-    <button class="glass card set-link" data-ovgo="roles">
-      <span class="set-link-ic">${ic(I.users)}</span>
-      <span class="set-link-main"><b>Роли и доступы</b><i>Кто из команды что видит и какие карточки лидов — права на сервере</i></span>
-      <span class="set-link-meta">${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}</span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <button class="glass card set-link" id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()">
-      <span class="set-link-ic">${ic(I.doc)}</span>
-      <span class="set-link-main"><b>Инструкции и гайды</b><i>Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <div class="glass card">
-      <div class="card-title">${ic(I.gear)}Оформление<span class="sub">тема интерфейса и мастер настройки</span></div>
-      <div class="theme-inline">
-        ${THEME_PRESETS.map(p => `<button class="tm-item" onclick="window.setTheme('${p.k}')"><span class="tm-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="tm-tx"><b>${p.name}</b><small>${p.desc}</small></span></button>`).join('')}
-      </div>
-      <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}Мастер настройки Lumen</button>
-    </div>
-    <button class="glass card set-link" onclick="window.openGrayManager&&window.openGrayManager()">
-      <span class="set-link-ic">${ic(I.chat)}</span>
-      <span class="set-link-main"><b>WhatsApp — серый способ (QR)</b><i>Подключение номеров по QR-коду и прогрев, без Meta. Через облачный воркер.</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <button class="glass card set-link" onclick="window.openPlanManager&&window.openPlanManager()">
-      <span class="set-link-ic">${ic(I.spark)}</span>
-      <span class="set-link-main"><b>Тариф и лимиты</b><i>Текущий план агентства: брокеры, лиды, номера WhatsApp</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <button class="glass card set-link" onclick="window.openHealthPanel&&window.openHealthPanel()">
-      <span class="set-link-ic">${ic(I.shield)}</span>
-      <span class="set-link-main"><b>Состояние системы</b><i>Реальный статус: Telegram-бот, WhatsApp, e-mail, ИИ, оплата — зелёный/красный</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <button class="glass card set-link" onclick="window.openBackups&&window.openBackups()">
-      <span class="set-link-ic">${ic(I.shield)}</span>
-      <span class="set-link-main"><b>Резервные копии</b><i>Авто-снимки базы каждые 6ч + перед подозрительным стиранием · восстановление одним кликом</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <button class="glass card set-link" onclick="window.openDataPrivacy&&window.openDataPrivacy()">
-      <span class="set-link-ic">${ic(I.doc)}</span>
-      <span class="set-link-main"><b>Данные и приватность</b><i>Экспорт всех данных · юр-документы · удаление аккаунта (GDPR)</i></span>
-      <span class="set-link-chev">${ic(I.chev)}</span>
-    </button>
-    <div class="two-col">
-      <div class="glass card">
-        <div class="card-title">${ic(I.chat)}WhatsApp Cloud API<span class="sub">официальный канал Meta</span></div>
+  /* формы вынесены в переменные → главный шаблон читаемый, тяжёлые интеграции сворачиваются */
+  const waCloudForm = `
         <button class="btn btn-accent" id="waWizard" style="width:100%;justify-content:center;margin-bottom:10px">${ic(I.spark)}Мастер подключения — шаг за шагом</button>
         <div class="set-row">
           <div class="sp"><div class="sl">Боевой режим</div><div class="sd">${s.wa.mode === 'mock' ? 'Выключен: сообщения пишутся только в CRM' : 'Включён: отправка через Cloud API'}</div></div>
@@ -11087,11 +11042,8 @@ PAGES.settings = async (root) => {
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div class="sl">Шаблоны первого касания</div><div style="display:flex;gap:6px"><button class="btn btn-sm" id="waSyncTpl">${ic(I.refresh || I.spark)}Синк</button><button class="btn btn-sm btn-accent" id="waCreateTpl">Создать стартовые</button></div></div>
           <div id="waTpl" class="muted" style="font-size:12px">${s.wa.templates && s.wa.templates.length ? tplListHtml(s.wa.templates) : 'Шаблоны нужны для холодного первого касания (вне 24-часового окна Meta пускает только их). Нажмите «Синк» после подключения токена или «Создать стартовые».'}</div>
           <div class="muted" style="font-size:11.2px;line-height:1.5;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">${ic(I.x || I.spark)} В стартовые шаблоны вшита кнопка <b>«Отписаться»</b>: недовольный жмёт её вместо «Report spam» — жалоба не уходит (это главный триггер бана номера). Нажатие ловится вебхуком: лид помечается «отписался», рассылки и цепочки ему останавливаются автоматически.</div>
-        </div>
-      </div>
-      <div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.spark)}Движок ИИ</div>
+        </div>`;
+  const aiForm = `
           <div class="set-row">
             <div class="sp"><div class="sl">LLM (${s.ai.llmModel || 'Gemini'})</div><div class="sd">${s.ai.llmAvailable ? 'Ключ найден — живые ответы включены. Оси квалификации всё равно клампятся цитатами клиента.' : 'Ключ не задан (GEMINI_API_KEY в .env) — работает детерминированное ядро.'}</div></div>
             <span class="badge ${s.ai.llmAvailable ? 'ok' : 'warn'}">${s.ai.llmAvailable ? 'подключён' : 'нет ключа'}</span>
@@ -11103,10 +11055,8 @@ PAGES.settings = async (root) => {
               <option value="llm" ${s.ai.provider === 'llm' ? 'selected' : ''}>Всегда LLM</option>
               <option value="core" ${s.ai.provider === 'core' ? 'selected' : ''}>Только ядро</option>
             </select>
-          </div>
-        </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.mic || I.phone)}Голос брокера · ElevenLabs<span class="sub">голосовые касания настоящим голосом</span></div>
+          </div>`;
+  const voiceForm = `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>API key (xi-api-key)</label><input id="vKey" type="password" placeholder="${(s.voice || {}).keySet ? '•••••• сохранён' : 'sk_…'}"></div>
             <div class="form-row"><label>Voice ID (клонированный голос)</label><input id="vId" value="${esc((s.voice || {}).voiceId || '')}" placeholder="из My Voices"></div>
@@ -11125,10 +11075,8 @@ PAGES.settings = async (root) => {
               <li>Готово: шаги цепочек с каналом «Голосовое» будут озвучиваться этим голосом и уходить клиенту как voice-сообщение.</li>
             </ol>
             <div class="muted" style="font-size:11.5px">Стоимость: ~$0.10-0.20 за минуту речи. Каждый брокер может иметь свой голос — при мультиброкерных голосовых добавим выбор голоса на брокера.</div>`,
-            { open: false, icon: I.doc })}
-        </div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.phone)}Телефония<span class="sub">звонки → авто-транскрибация в карточку</span></div>
+            { open: false, icon: I.doc })}`;
+  const telForm = `
           <div class="set-row"><div class="sp"><div class="sl">Провайдер</div><div class="sd">Zadarma — дешевле всего для старта (номер ОАЭ + записи + API); Twilio/Telnyx — глобальные</div></div>
             <select id="telProv" style="width:150px">
               <option value="none" ${(s.telephony || {}).provider === 'none' ? 'selected' : ''}>Не подключена</option>
@@ -11149,10 +11097,24 @@ PAGES.settings = async (root) => {
           <button class="btn" id="telSave" style="margin-top:10px">Сохранить</button> ${hint('telhow', 'Как работает телефония', [
             ['Вебхук после звонка', 'Провайдер шлёт номер клиента и ссылку на запись'],
             ['Лид находится по номеру', 'Запись скачивается и расшифровывается Whisper-ом'],
-            ['Транскрипт в карточку', 'Хронология + ИИ-сводка — руками ничего']])}
-        </div>
-        <div class="glass card">
-          <div class="card-title">${ic(I.eye)}Демо-режим</div>
+            ['Транскрипт в карточку', 'Хронология + ИИ-сводка — руками ничего']])}`;
+  const tgBridgeForm = `
+      <div class="muted" style="font-size:11.8px;margin:0 0 12px">Брокеру не нужно держать CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят брокеру в личный Telegram, он отвечает <b>reply</b> — и ответ уходит клиенту в WhatsApp с центрального номера. Номер один на всех, персона сохраняется, вся переписка логируется в CRM.</div>
+      <div class="set-row">
+        <div class="sp"><div class="sl">Мост включён</div><div class="sd">${s.tgBridge && s.tgBridge.tokenSet ? 'Токен бота сохранён' : 'Вставьте токен бота от @BotFather'}</div></div>
+        <label class="switch"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+      </div>
+      <div class="form-row" style="margin-top:6px"><label>Telegram Bot Token (отдельный бот моста, от @BotFather)</label><input id="tgbToken" type="password" placeholder="${s.tgBridge && s.tgBridge.tokenSet ? '•••••• сохранён' : '123456:AA… — можно тот же, что для отчётов'}"></div>
+      <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="tgbSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="tgbSetup" title="Прописать вебхук боту (нужен запущенный туннель)">${ic(I.link)}Настроить вебхук</button></div>
+      <div id="tgbBrokers" class="muted" style="font-size:12px">Загрузка кодов привязки…</div>
+      <div class="muted" style="font-size:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">👑 <b>Основатель</b> — аналитика агентства и пульт с телефона. Отправьте боту: <code class="pill" data-tgbcode="${esc(s.ownerTgCode || '')}" style="padding:6px 9px;cursor:pointer" title="Скопировать">/start ${esc(s.ownerTgCode || '—')}</code>${s.ownerTgChatId ? ' · <span class="badge ok">привязан</span>' : ''}</div>`;
+  const inventoryForm = `
+      <div class="muted" style="font-size:11.8px;margin:0 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» в разделе «База объектов»: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
+      ${Object.entries(s.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
+        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
+        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('') || '<div class="muted" style="font-size:12px">Порталы не заданы</div>'}
+      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>`;
+  const demoForm = `
           <div class="set-row">
             <div class="sp"><div class="sl">Ускорение времени</div><div class="sd">1 «день» цепочки = ${Math.round(s.demo.dayMs / 1000)} секунд — касания видно вживую</div></div>
             <label class="switch"><input type="checkbox" id="dAcc" ${s.demo.accelerate ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
@@ -11164,30 +11126,47 @@ PAGES.settings = async (root) => {
           <div class="set-row">
             <div class="sp"><div class="sl">Сбросить демо-данные</div><div class="sd">Вернуть базу к исходному состоянию витрины</div></div>
             <button class="btn btn-danger btn-sm" id="dReset">Сбросить</button>
-          </div>
-        </div>
+          </div>`;
+  const linkCard = (attr, icon, title, desc, meta) => `
+    <button class="glass card set-link" ${attr}>
+      <span class="set-link-ic">${ic(icon)}</span>
+      <span class="set-link-main"><b>${title}</b><i>${desc}</i></span>
+      ${meta ? `<span class="set-link-meta">${meta}</span>` : ''}
+      <span class="set-link-chev">${ic(I.chev)}</span>
+    </button>`;
+  root.innerHTML = `
+    <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
+    ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
+    ${linkCard('onclick="window.openPlanManager&&window.openPlanManager()"', I.spark, 'Тариф и лимиты', 'Текущий план агентства: брокеры, лиды, номера WhatsApp')}
+
+    <div class="set-sec-h">${ic(I.chat)}Каналы связи</div>
+    ${linkCard('onclick="window.openGrayManager&&window.openGrayManager()"', I.chat, 'WhatsApp — серый способ (QR)', 'Подключение номеров по QR-коду и прогрев, без Meta. Через облачный воркер.')}
+    ${coll(`${ic(I.chat)}WhatsApp Cloud API — официальный канал Meta`, waCloudForm, { open: false })}
+    ${coll(`${ic(I.send)}Мост Telegram — брокеры отвечают с телефона`, tgBridgeForm, { open: false })}
+    ${coll(`${ic(I.phone)}Телефония — звонки в карточку`, telForm, { open: false })}
+
+    <div class="set-sec-h">${ic(I.spark)}ИИ и автоматизация</div>
+    ${coll(`${ic(I.spark)}Движок ИИ`, aiForm, { open: false })}
+    ${coll(`${ic(I.mic || I.phone)}Голос брокера · ElevenLabs`, voiceForm, { open: false })}
+
+    <div class="set-sec-h">${ic(I.shield)}Данные и безопасность</div>
+    ${linkCard('onclick="window.openHealthPanel&&window.openHealthPanel()"', I.shield, 'Состояние системы', 'Реальный статус: Telegram-бот, WhatsApp, e-mail, ИИ, оплата — зелёный/красный')}
+    ${linkCard('onclick="window.openBackups&&window.openBackups()"', I.shield, 'Резервные копии', 'Авто-снимки базы каждые 6ч + перед подозрительным стиранием · восстановление одним кликом')}
+    ${linkCard('onclick="window.openDataPrivacy&&window.openDataPrivacy()"', I.doc, 'Данные и приватность', 'Экспорт всех данных · юр-документы · удаление аккаунта (GDPR)')}
+
+    <div class="set-sec-h">${ic(I.link)}Объекты и листинги</div>
+    ${coll(`${ic(I.link)}Источники инвентаря и листинги`, inventoryForm, { open: false })}
+
+    <div class="set-sec-h">${ic(I.gear)}Оформление и обучение</div>
+    <div class="glass card">
+      <div class="card-title">${ic(I.gear)}Оформление<span class="sub">тема интерфейса и мастер настройки</span></div>
+      <div class="theme-inline">
+        ${THEME_PRESETS.map(p => `<button class="tm-item" onclick="window.setTheme('${p.k}')"><span class="tm-sw">${p.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span><span class="tm-tx"><b>${p.name}</b><small>${p.desc}</small></span></button>`).join('')}
       </div>
+      <button class="btn" data-onboard style="width:100%;justify-content:center;margin-top:12px">${ic(I.spark)}Мастер настройки Lumen</button>
     </div>
-    <div class="glass card" style="margin-top:16px">
-      <div class="card-title">${ic(I.link)}Источники инвентаря и листинги<span class="sub">откуда тянутся объекты в базу</span></div>
-      <div class="muted" style="font-size:11.8px;margin:6px 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» в разделе «База объектов»: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
-      ${Object.entries(s.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
-        <input data-portal="${k}" type="password" placeholder="${pt.status === 'key_saved' ? '•••••• сохранён' : 'API key'}" style="width:180px">
-        <span class="badge ${pt.status === 'key_saved' ? 'ok' : ''}">${pt.status === 'key_saved' ? 'ключ есть' : 'выкл'}</span></div>`).join('') || '<div class="muted" style="font-size:12px">Порталы не заданы</div>'}
-      <button class="btn btn-sm" id="portalSave" style="margin-top:8px">Сохранить ключи</button>
-    </div>
-    <div class="glass card" style="margin-top:16px">
-      <div class="card-title">${ic(I.send)}Мост Telegram · брокеры отвечают с телефона<span class="sub">клиент в WhatsApp, брокер — из личного Telegram</span></div>
-      <div class="muted" style="font-size:11.8px;margin:6px 0 12px">Брокеру не нужно держать CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят брокеру в личный Telegram, он отвечает <b>reply</b> — и ответ уходит клиенту в WhatsApp с центрального номера. Номер один на всех, персона сохраняется, вся переписка логируется в CRM.</div>
-      <div class="set-row">
-        <div class="sp"><div class="sl">Мост включён</div><div class="sd">${s.tgBridge && s.tgBridge.tokenSet ? 'Токен бота сохранён' : 'Вставьте токен бота от @BotFather'}</div></div>
-        <label class="switch"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-      </div>
-      <div class="form-row" style="margin-top:6px"><label>Telegram Bot Token (отдельный бот моста, от @BotFather)</label><input id="tgbToken" type="password" placeholder="${s.tgBridge && s.tgBridge.tokenSet ? '•••••• сохранён' : '123456:AA… — можно тот же, что для отчётов'}"></div>
-      <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="tgbSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="tgbSetup" title="Прописать вебхук боту (нужен запущенный туннель)">${ic(I.link)}Настроить вебхук</button></div>
-      <div id="tgbBrokers" class="muted" style="font-size:12px">Загрузка кодов привязки…</div>
-      <div class="muted" style="font-size:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">👑 <b>Основатель</b> — аналитика агентства и пульт с телефона. Отправьте боту: <code class="pill" data-tgbcode="${esc(s.ownerTgCode || '')}" style="padding:6px 9px;cursor:pointer" title="Скопировать">/start ${esc(s.ownerTgCode || '—')}</code>${s.ownerTgChatId ? ' · <span class="badge ok">привязан</span>' : ''}</div>
-    </div>`;
+    ${linkCard('id="setGuides" onclick="window.openGuideCenter&&window.openGuideCenter()"', I.doc, 'Инструкции и гайды', 'Подключение Telegram-бота с экранами, воронка, WhatsApp-агент и другое')}
+    ${coll(`${ic(I.eye)}Демо-режим`, demoForm, { open: false })}`;
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
   $('#portalSave')?.addEventListener('click', async () => {
     const body = {};

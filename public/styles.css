@@ -5862,6 +5862,15 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
    и «прилипали» к соседним. Даём тот же зазор, что у .set-link — только на экране настроек. */
 :root[data-page="settings"] #content > .glass.card,
 :root[data-page="settings"] #content > .two-col { margin-bottom: 16px; }
+/* заголовок группы настроек — методология IA: раздел = категория, а не свалка карточек */
+.set-sec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin: 26px 2px 12px; }
+.set-sec-h:first-child { margin-top: 4px; }
+.set-sec-h svg { width: 15px; height: 15px; color: var(--accent); }
+/* сворачиваемые интеграции на странице настроек: заголовок крупнее (как карточка-ссылка) */
+:root[data-page="settings"] #content > .coll { margin: 0 0 12px; }
+:root[data-page="settings"] #content > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
+:root[data-page="settings"] #content > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
+:root[data-page="settings"] #content > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
 .set-link-ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .set-link-ic svg { width: 20px; height: 20px; }
 .set-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
