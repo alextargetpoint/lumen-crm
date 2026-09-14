@@ -4722,8 +4722,12 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       /* SEC: номер для дозвона берём ТОЛЬКО из серверных данных (назначенный брокер / сам член команды),
          НИКОГДА не из тела запроса — иначе любой авторизованный мог бы звонить на произвольный (premium-rate) номер за счёт агентства (toll fraud) */
-      const brokerPhone = (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
-      if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'Не указан ваш телефон. Впишите свой номер в профиль (Настройки → команда/профиль) — сначала звоним ВАМ на него, потом соединяем с клиентом.' });
+      /* кого набираем ПЕРВЫМ (плечо «оператора»): назначенный брокер → сам брокер-член → ВЛАДЕЛЕЦ (его телефон
+         из профиля: manager.phone / ownerPhone) — иначе у соло-владельца без брокеров звонить не с чего. */
+      const _ag = db.settings.agency || {};
+      const ownerPhone = (db.settings.auth && db.settings.auth.ownerPhone) || (_ag.manager && _ag.manager.phone) || _ag.ownerPhone || _ag.phone || '';
+      const brokerPhone = (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || ownerPhone || '';
+      if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'Не указан ВАШ телефон (на него звоним первым). Впишите номер в Профиль агентства → Менеджер → телефон (в формате +39…), затем повторите звонок.' });
       const norm = s => String(s || '').replace(/[\s()\-]/g, '').replace(/^\+/, '');
       if (lead.phone && norm(lead.phone) === norm(brokerPhone)) return json(res, 400, { error: 'Номер клиента в этом лиде совпадает с вашим — нельзя позвонить самому себе. Схема: звоним вам → потом клиенту. Укажите в лиде ДРУГОЙ номер (второй телефон/симку).' });
       try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone, to: lead.phone || '' }); }
