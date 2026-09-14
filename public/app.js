@@ -4610,8 +4610,8 @@ async function openLeadModal(id) {
   $('#lcDial', bd)?.addEventListener('click', async () => {
     const btn = $('#lcDial', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
     try { const r = await api.post('/leads/' + l.id + '/call', {});
-      toast('Звоним', 'Сначала звонок вам' + (r.from ? ' (' + r.from + ')' : '') + ', затем соединим с лидом', true);
-    } catch (e) { toast('Не вышло', e.message); }
+      toast('📞 Звоним ВАМ' + (r.from ? ' · ' + r.from : ''), 'Снимите трубку — затем соединим с клиентом' + (r.to ? ' (' + r.to + ')' : '') + '. Не звонит ~20 сек? Проверьте, что страна вашего номера включена в Telnyx → Outbound Voice Profile.', true);
+    } catch (e) { toast('Звонок не пошёл', e.message); }
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
   });
   $('#lcCallFile', bd).addEventListener('change', async (e) => {

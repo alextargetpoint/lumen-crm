@@ -4723,9 +4723,11 @@ const server = http.createServer(async (req, res) => {
       /* SEC: номер для дозвона берём ТОЛЬКО из серверных данных (назначенный брокер / сам член команды),
          НИКОГДА не из тела запроса — иначе любой авторизованный мог бы звонить на произвольный (premium-rate) номер за счёт агентства (toll fraud) */
       const brokerPhone = (db.brokers.find(x => x.id === lead.broker) || {}).phone || (MEMBER && MEMBER.phone) || '';
-      if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'нет валидного номера брокера для звонка' });
-      try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone }); }
-      catch (e) { return json(res, 400, { error: e.message }); }
+      if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'Не указан ваш телефон. Впишите свой номер в профиль (Настройки → команда/профиль) — сначала звоним ВАМ на него, потом соединяем с клиентом.' });
+      const norm = s => String(s || '').replace(/[\s()\-]/g, '').replace(/^\+/, '');
+      if (lead.phone && norm(lead.phone) === norm(brokerPhone)) return json(res, 400, { error: 'Номер клиента в этом лиде совпадает с вашим — нельзя позвонить самому себе. Схема: звоним вам → потом клиенту. Укажите в лиде ДРУГОЙ номер (второй телефон/симку).' });
+      try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone, to: lead.phone || '' }); }
+      catch (e) { let msg = e.message || 'ошибка звонка'; if (/not allowed|denied|blocked|destination|forbidden|10015|restrict/i.test(msg)) msg += ' — похоже, страна номера не разрешена: Telnyx → Voice → Outbound Voice Profiles → Default → включите нужную страну.'; return json(res, 400, { error: msg }); }
     }
 
     /* ИИ первое касание: разбор лида + готовое персональное сообщение */
