@@ -97,7 +97,8 @@ function loadRegistry() {
   registry.emailTemplates = registry.emailTemplates || {};  // key -> {subject_ru/en, body_ru/en} (оверрайды дефолтов из email.js)
   registry.email = registry.email || { key: '', from: '' };  // платформенный Resend (SaaS-письма)
   registry.releaseLog = registry.releaseLog || [];  // журнал выкатов (гейт релиза)
-  registry.supportBot = registry.supportBot || { token: '', secret: require('crypto').randomBytes(12).toString('hex'), founderChat: '' };  // бот техподдержки (токен — только тут/в env, НЕ в git)
+  registry.supportBot = registry.supportBot || { token: '', secret: require('crypto').randomBytes(12).toString('hex'), founderChat: '', founderBindCode: 'founder-' + require('crypto').randomBytes(4).toString('hex'), botUsername: '' };  // бот техподдержки (токен — только тут/в env, НЕ в git)
+  if (registry.supportBot && !registry.supportBot.founderBindCode) registry.supportBot.founderBindCode = 'founder-' + require('crypto').randomBytes(4).toString('hex');
   registry.supportTickets = registry.supportTickets || [];  // обращения в поддержку
   registry.adminAudit = registry.adminAudit || [];         // журнал действий супер-админа
   if (!registry.adminKey) registry.adminKey = require('crypto').randomBytes(20).toString('hex'); // фолбэк-ключ, если нет env PLATFORM_ADMIN_KEY

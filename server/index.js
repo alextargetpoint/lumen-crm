@@ -2904,7 +2904,14 @@ const server = http.createServer(async (req, res) => {
         const from = msg.from || {};
         const text = msg.text || msg.caption || '[вложение]';
         const name = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || '—';
-        if (/^\/start/.test(text)) { if (tok) await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: 'Здравствуйте! Это поддержка Lumen. Опишите вопрос одним сообщением — мы ответим здесь же.' }).catch(() => {}); }
+        const startArg = (text.match(/^\/start\s+(\S+)/) || [])[1];
+        if (startArg && _reg.supportBot && startArg === _reg.supportBot.founderBindCode) {
+          /* привязка основателя в один тап: сюда полетят алерты о новых обращениях */
+          _reg.supportBot.founderChat = String(msg.chat.id); store.saveRegistry();
+          if (tok) await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: '✅ Привязано. Сюда будут приходить уведомления о новых обращениях в поддержку.' }).catch(() => {});
+        } else if (/^\/id\b/.test(text)) {
+          if (tok) await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: 'Ваш chat_id: ' + msg.chat.id }).catch(() => {});
+        } else if (/^\/start/.test(text)) { if (tok) await supportApi(tok, 'sendMessage', { chat_id: msg.chat.id, text: 'Здравствуйте! Это поддержка Lumen. Опишите вопрос одним сообщением — мы ответим здесь же.' }).catch(() => {}); }
         else {
           _reg.supportTickets.unshift({ at: Date.now(), chatId: msg.chat.id, name, username: from.username || '', text: String(text).slice(0, 2000), status: 'new' });
           if (_reg.supportTickets.length > 500) _reg.supportTickets.length = 500;
@@ -4153,18 +4160,23 @@ const server = http.createServer(async (req, res) => {
       }
       /* Техподдержка (бот): тикеты + ответ + конфиг */
       if (p === '/api/admin/support' && req.method === 'GET') {
-        const botLink = ''; /* @username узнаём лениво ниже */
-        return json(res, 200, { ok: true, tickets: (reg.supportTickets || []).slice(0, 100), config: { tokenSet: !!supportBotToken(), founderChat: (reg.supportBot && reg.supportBot.founderChat) || '', botLink } });
+        const sb = reg.supportBot || {};
+        const bindLink = sb.botUsername ? `https://t.me/${sb.botUsername}?start=${sb.founderBindCode}` : '';
+        return json(res, 200, { ok: true, tickets: (reg.supportTickets || []).slice(0, 100), config: { tokenSet: !!supportBotToken(), founderChat: sb.founderChat || '', botUsername: sb.botUsername || '', bindLink } });
       }
       if (p === '/api/admin/support/config' && req.method === 'POST') {
         const b = await readBody(req); reg.supportBot = reg.supportBot || {};
         if (b.founderChat !== undefined) reg.supportBot.founderChat = String(b.founderChat || '').trim().slice(0, 40);
         if (b.token) reg.supportBot.token = String(b.token).trim().slice(0, 200);
         store.saveRegistry();
-        /* при сохранении токена — сразу привязываем вебхук */
         let hook = null; const tok = supportBotToken();
-        if (tok) { const base = (process.env.PUBLIC_BASE_URL || process.env.LUMEN_PROD_BASE || 'https://app.lumen247.com').replace(/\/$/, ''); try { hook = await supportApi(tok, 'setWebhook', { url: base + '/support/webhook', secret_token: reg.supportBot.secret, allowed_updates: ['message'] }); } catch (e) {} }
-        return json(res, 200, { ok: true, tokenSet: !!tok, webhook: hook });
+        if (tok) {
+          const base = (process.env.PUBLIC_BASE_URL || process.env.LUMEN_PROD_BASE || 'https://app.lumen247.com').replace(/\/$/, '');
+          try { hook = await supportApi(tok, 'setWebhook', { url: base + '/support/webhook', secret_token: reg.supportBot.secret, allowed_updates: ['message'] }); } catch (e) {}
+          try { const me = await supportApi(tok, 'getMe', {}); if (me && me.ok && me.result && me.result.username) { reg.supportBot.botUsername = me.result.username; store.saveRegistry(); } } catch (e) {}
+        }
+        const sb = reg.supportBot;
+        return json(res, 200, { ok: true, tokenSet: !!tok, webhook: hook, botUsername: sb.botUsername || '', bindLink: sb.botUsername ? `https://t.me/${sb.botUsername}?start=${sb.founderBindCode}` : '' });
       }
       if (p === '/api/admin/support/reply' && req.method === 'POST') {
         const b = await readBody(req); const tok = supportBotToken();
