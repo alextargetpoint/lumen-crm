@@ -702,6 +702,12 @@
     .feat .only{margin-top:9px;font-size:8px}
     .num{padding:20px 12px}
     .fstep2{padding:20px 16px 18px}
+    /* dkpi-тройка → горизонтальный стат-ряд, а не 3 текстовых строки */
+    .dkpis{flex-direction:row;gap:9px}
+    .dkpi{padding:13px 8px;text-align:center;align-items:center}
+    .dkpi b{font-size:clamp(23px,7vw,30px)}
+    .dkpi span{font-size:11px;margin-top:5px}
+    .dkpi em{font-size:9.5px;line-height:1.25}
     /* CTA на всю ширину — удобнее пальцем */
     .hero-cta{flex-direction:column;align-items:stretch;gap:11px}
     .hero-cta .btn{width:100%;justify-content:center}
@@ -801,10 +807,10 @@
       <a class="btn ghost" href="#product" style="margin-top:26px">Как это выглядит</a>
     </div>
     <div class="tlist d1" data-r>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном месте — WhatsApp, комментарии рекламы, телефония, формы. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку, бюджету и типу. Строит психо-портрет — на что давить, чего избегать, с чем заходить.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки касаний не бросают молчунов. Живые подборки объектов, встречи, разбор звонков — вся операционка без ручной рутины.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Собственник видит риски и слив базы, раздаёт роли и доступы, забирает контакты при оффбординге. База — агентства, а не брокера.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном окне. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку и бюджету — и строит психо-портрет клиента.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки будят молчунов. Подборки, встречи, разбор звонков — без ручной рутины.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Роли, доступы, оффбординг в клик. База — агентства, а не брокера.</span></div></div>
     </div>
   </div>
 </section>
