@@ -5905,6 +5905,28 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 :root[data-theme="emerald"] .theme-loader { background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3); }
 :root[data-theme="emerald"] .tl-stage { padding: 34px 46px; border-radius: 22px; background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 30px 70px -20px rgba(10,25,48,.35); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 :root[data-night] .tl-name { color: #fff; }
+
+/* ═══ Мастер миграции из другой CRM ═══ */
+.mig-steps { display: flex; gap: 8px; margin-bottom: 16px; }
+.mig-steps span { flex: 1; text-align: center; font-size: 11.5px; font-weight: 700; color: var(--ink-3); padding: 7px 4px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--stroke-soft); }
+.mig-steps span.on { color: #fff; background: var(--accent); border-color: transparent; }
+:root[data-theme="atelier"] .mig-steps span.on, :root[data-theme="mono"] .mig-steps span.on { color: #fff; }
+.mig-drop { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border: 1.5px dashed var(--accent-soft-bd, var(--stroke)); border-radius: 12px; cursor: pointer; background: color-mix(in srgb, var(--accent) 5%, transparent); transition: background .15s, border-color .15s; }
+.mig-drop:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); }
+.mig-drop svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
+.mig-drop span { font-weight: 600; font-size: 13px; color: var(--ink); }
+.mig-drop b { margin-left: auto; font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.mig-map { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-bottom: 6px; }
+.mig-row { display: flex; flex-direction: column; gap: 3px; }
+.mig-row label { font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.mig-row select { width: 100%; }
+.mig-row select.mig-req { border-color: var(--accent); }
+.mig-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.mig-foot .btn:only-child { margin-left: auto; }
+.mig-prev { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mig-prev th, .mig-prev td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--stroke-soft); }
+.mig-prev th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+@media (max-width: 620px) { .mig-map { grid-template-columns: 1fr; } }
 .set-link-ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .set-link-ic svg { width: 20px; height: 20px; }
 .set-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

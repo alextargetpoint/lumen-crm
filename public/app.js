@@ -769,6 +769,121 @@ window.openDataPrivacy = function () {
   });
 };
 
+/* ---------- Мастер миграции из другой CRM (amoCRM / Bitrix24 / HubSpot / Excel) ---------- */
+window.openMigration = function () {
+  const FIELDS = [
+    ['phone', 'Телефон', true], ['name', 'Имя'], ['email', 'E-mail'], ['stage', 'Стадия (как было)'],
+    ['source', 'Источник'], ['broker', 'Брокер (по имени)'], ['budget', 'Бюджет'],
+    ['geo', 'Направление'], ['created', 'Дата создания'], ['note', 'Комментарий'], ['tags', 'Теги'],
+  ];
+  const st = { csv: '', analysis: null, mapping: {}, step: 1 };
+  const geos = (STATE.settings.agency.geos || []);
+  const stages = (STAGES._all || STAGES).filter(x => x.id !== 'sleeping');
+  const bd = modal({ title: 'Миграция из другой CRM', sub: 'amoCRM · Bitrix24 · HubSpot · Excel — быстрый перенос базы с маппингом колонок', wide: true, body: '<div id="migWiz">Загрузка…</div>', actions: [{ label: 'Закрыть' }] });
+  const wiz = $('#migWiz', bd);
+  const err = (m) => { const e = $('#migErr', bd); if (e) e.textContent = m || ''; };
+
+  function renderStep1() {
+    st.step = 1;
+    wiz.innerHTML = `
+      <div class="mig-steps"><span class="on">1 · Файл</span><span>2 · Колонки</span><span>3 · Импорт</span></div>
+      <div class="lp-sec" style="margin-top:4px">Откуда переносим</div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:8px">Экспортируйте базу из вашей CRM в <b>CSV</b> (amoCRM: Списки → Экспорт · Bitrix24: CRM → экспорт в Excel → «Сохранить как CSV» · HubSpot/Excel/Google Sheets: Файл → CSV), затем загрузите файл или вставьте текст. Или подключите Bitrix24 напрямую по вебхуку.</div>
+      <label class="mig-drop" id="migDropLbl">
+        <input type="file" id="migFile" accept=".csv,.tsv,.txt" hidden>
+        ${ic(I.doc)}<span>Выбрать файл CSV/Excel-экспорт</span><b id="migFileName"></b>
+      </label>
+      <div class="muted" style="font-size:11px;margin:8px 0 4px">…или вставьте CSV вручную:</div>
+      <textarea id="migCsv" style="min-height:96px;font-family:Menlo,monospace;font-size:11.5px" placeholder="Имя;Телефон;Email;Статус;Комментарий
+Иван Петров;+79161234567;ivan@mail.ru;В работе;Интересовался студией">${esc(st.csv || '')}</textarea>
+      <div class="lp-sec">Bitrix24 напрямую (без файла)</div>
+      <div class="muted" style="font-size:11px;margin-bottom:6px">Bitrix24 → Разработчикам → Входящий вебхук (право crm) → вставьте URL</div>
+      <div style="display:flex;gap:8px"><input id="migB24" placeholder="https://company.bitrix24.ru/rest/1/abc123" style="flex:1"><button class="btn" id="migB24Go">Импорт из Bitrix24</button></div>
+      <div id="migErr" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:8px"></div>
+      <div class="mig-foot"><button class="btn btn-accent" id="migNext1">Далее — разметить колонки →</button></div>`;
+    const fileInp = $('#migFile', bd);
+    $('#migFile', bd).addEventListener('change', (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      $('#migFileName', bd).textContent = f.name;
+      const r = new FileReader(); r.onload = () => { st.csv = String(r.result || ''); $('#migCsv', bd).value = st.csv.slice(0, 20000); }; r.readAsText(f, 'utf-8');
+    });
+    $('#migCsv', bd).addEventListener('input', (e) => { st.csv = e.target.value; });
+    $('#migNext1', bd).addEventListener('click', analyze);
+    $('#migB24Go', bd).addEventListener('click', importBitrix);
+  }
+  async function analyze() {
+    err('');
+    st.csv = ($('#migCsv', bd).value || st.csv || '').trim();
+    if (!st.csv) { err('Загрузите файл или вставьте CSV'); return; }
+    let r; try { r = await api.post('/import/analyze', { csv: st.csv }); } catch (e) { err(e.message || 'Не удалось разобрать файл'); return; }
+    if (r.error) { err(r.error); return; }
+    st.analysis = r; st.mapping = Object.assign({}, r.guess);
+    renderStep2();
+  }
+  function renderStep2() {
+    st.step = 2;
+    const cols = st.analysis.columns;
+    const opt = (sel) => `<option value="-1" ${sel == null || sel < 0 ? 'selected' : ''}>— не импортировать —</option>` +
+      cols.map(c => `<option value="${c.idx}" ${+sel === c.idx ? 'selected' : ''}>${esc(c.header)}${c.samples[0] ? ' · «' + esc(c.samples[0]) + '»' : ''}</option>`).join('');
+    wiz.innerHTML = `
+      <div class="mig-steps"><span>1 · Файл</span><span class="on">2 · Колонки</span><span>3 · Импорт</span></div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:10px">Найдено строк: <b>${st.analysis.rowCount}</b>, колонок: <b>${cols.length}</b>. Сопоставьте поля Lumen с колонками файла (телефон обязателен, дубли по номеру обогащаются, не дублируются).</div>
+      <div class="mig-map">
+        ${FIELDS.map(([k, label, req]) => `<div class="mig-row"><label>${label}${req ? ' <b style="color:var(--bad)">*</b>' : ''}</label><select data-mf="${k}" class="${req ? 'mig-req' : ''}">${opt(st.mapping[k])}</select></div>`).join('')}
+      </div>
+      <div class="lp-sec">Куда сложить новые</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Направление</label><select id="migGeo">${geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Стадия</label><select id="migStage"><option value="sleeping">Спящие (рекомендуем)</option>${stages.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:6px">«Спящие» + ИИ выключен: база не получит внезапную рассылку, реанимация поднимет по скорингу.</div>
+      <div id="migErr" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:8px"></div>
+      <div class="mig-foot"><button class="btn" id="migBack2">← Назад</button><button class="btn btn-accent" id="migNext2">Далее — превью →</button></div>`;
+    $$('[data-mf]', bd).forEach(s => s.addEventListener('change', (e) => { st.mapping[e.target.dataset.mf] = +e.target.value; }));
+    $('#migBack2', bd).addEventListener('click', renderStep1);
+    $('#migNext2', bd).addEventListener('click', () => {
+      if ((st.mapping.phone == null || st.mapping.phone < 0)) { err('Укажите колонку с телефоном'); return; }
+      st.defaults = { geo: $('#migGeo', bd).value, stage: $('#migStage', bd).value };
+      renderStep3();
+    });
+  }
+  function renderStep3() {
+    st.step = 3;
+    const cols = st.analysis.columns;
+    const sample = (idx) => (idx != null && idx >= 0 && cols[idx]) ? cols[idx].samples : [];
+    const nameS = sample(st.mapping.name), phoneS = sample(st.mapping.phone), emailS = sample(st.mapping.email);
+    const rows = [0, 1, 2].filter(i => phoneS[i]).map(i => `<tr><td>${esc(nameS[i] || '—')}</td><td>${esc(phoneS[i] || '—')}</td><td>${esc(emailS[i] || '—')}</td></tr>`).join('');
+    wiz.innerHTML = `
+      <div class="mig-steps"><span>1 · Файл</span><span>2 · Колонки</span><span class="on">3 · Импорт</span></div>
+      <div class="muted" style="font-size:12px;margin-bottom:10px">К импорту: <b>${st.analysis.rowCount}</b> строк. Проверьте, что колонки распознаны верно:</div>
+      <table class="mig-prev"><thead><tr><th>Имя</th><th>Телефон</th><th>E-mail</th></tr></thead><tbody>${rows || '<tr><td colspan="3">нет строк с телефоном</td></tr>'}</tbody></table>
+      <div class="muted" style="font-size:11px;margin-top:10px">${ic(I.shield)} Перед импортом делается резервная копия базы (PRE-IMPORT) — откат одним кликом в «Настройки → Резервные копии».</div>
+      <div id="migErr" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:8px"></div>
+      <div class="mig-foot"><button class="btn" id="migBack3">← Назад</button><button class="btn btn-accent" id="migRun">Импортировать ${st.analysis.rowCount} →</button></div>`;
+    $('#migBack3', bd).addEventListener('click', renderStep2);
+    $('#migRun', bd).addEventListener('click', runImport);
+  }
+  async function runImport() {
+    err(''); const btn = $('#migRun', bd); if (btn) { btn.disabled = true; btn.textContent = 'Импорт…'; }
+    let r; try { r = await api.post('/import/csv', { csv: st.csv, mapping: st.mapping, defaults: st.defaults }); } catch (e) { err(e.message || 'Не удалось'); if (btn) { btn.disabled = false; btn.textContent = 'Повторить'; } return; }
+    if (r.error) { err(r.error); if (btn) { btn.disabled = false; btn.textContent = 'Повторить'; } return; }
+    closeModal();
+    toast(`Импортировано: ${r.created}`, `обогащено дублей: ${r.merged} · пропущено: ${r.skipped}${r.backup ? ' · снимок базы сделан' : ''}`, true);
+    if (typeof loadState === 'function') { await loadState(); }
+    render();
+  }
+  async function importBitrix() {
+    err(''); const url = ($('#migB24', bd).value || '').trim();
+    if (!url) { err('Вставьте вебхук Bitrix24'); return; }
+    const btn = $('#migB24Go', bd); if (btn) { btn.disabled = true; btn.textContent = 'Импорт…'; }
+    let r; try { r = await api.post('/import/bitrix', { webhookUrl: url, defaults: { geo: geos[0], stage: 'sleeping' } }); } catch (e) { err(e.message); if (btn) { btn.disabled = false; btn.textContent = 'Импорт из Bitrix24'; } return; }
+    if (r.error) { err(r.error); if (btn) { btn.disabled = false; btn.textContent = 'Импорт из Bitrix24'; } return; }
+    closeModal(); toast(`Импортировано из Bitrix24: ${r.created}`, `обогащено дублей: ${r.merged}`, true);
+    if (typeof loadState === 'function') await loadState(); render();
+  }
+  renderStep1();
+};
+
 /* ---------- Резервные копии агентства ---------- */
 window.openBackups = async function () {
   let list = [];
@@ -3298,40 +3413,7 @@ PAGES.funnel = async (root) => {
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
   $$('[data-sort]', root).forEach(h => h.addEventListener('click', () => setF('funnelSort', h.dataset.sort)));
   wireLeadSelect(root);
-  $('#importBtn').addEventListener('click', () => modal({
-    title: 'Импорт действующей базы',
-    sub: 'Из Bitrix24 / amoCRM / Excel. Дубли по номеру не создаются — карточки обогащаются. Импортированные попадают в «Спящие» с выключенным ИИ (их поднимет реанимация по скорингу) — база не получит внезапную рассылку.',
-    wide: true,
-    body: `
-      <div class="lp-sec" style="margin-top:0">Вариант 1 · CSV/Excel (универсальный: амо, Битрикс, таблица)</div>
-      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Вставьте CSV — колонки распознаются по заголовку (телефон обязателен).</div>
-      <textarea id="impCsv" style="min-height:120px;font-family:Menlo,monospace;font-size:11.5px" placeholder="Имя;Телефон;Email;Статус;Комментарий
-Иван Петров;+79161234567;ivan@mail.ru;В работе;Интересовался студией"></textarea>
-      <div class="lp-sec">Вариант 2 · Bitrix24 напрямую</div>
-      <div class="muted" style="font-size:11.5px;margin-bottom:6px">Bitrix24 → Разработчикам → Другое → Входящий вебхук (право crm) → вставьте URL вида https://домен.bitrix24.ru/rest/1/код</div>
-      <input id="impB24" placeholder="https://mycompany.bitrix24.ru/rest/1/abc123xyz" style="width:100%">
-      <div class="lp-sec">Куда сложить</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-row"><label>Направление</label><select id="impGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}">${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
-        <div class="form-row"><label>Стадия</label><select id="impStage"><option value="sleeping">Спящие (рекомендуем)</option>${(STAGES._all || STAGES).filter(x => x.id !== 'sleeping').map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
-      </div>
-      <div class="muted" style="font-size:11px">amoCRM: экспорт в CSV через Списки → Экспорт (прямое API-подключение добавим при необходимости).</div>`,
-    actions: [
-      { label: 'Импортировать', cls: 'btn-accent', onClick: async (bd) => {
-        const defaults = { geo: $('#impGeo', bd).value, stage: $('#impStage', bd).value };
-        const b24 = $('#impB24', bd).value.trim();
-        const csv = $('#impCsv', bd).value.trim();
-        if (!b24 && !csv) { toast('Вставьте CSV или вебхук Bitrix24'); return false; }
-        const r = b24
-          ? await api.post('/import/bitrix', { webhookUrl: b24, defaults })
-          : await api.post('/import/csv', { csv, defaults });
-        if (r.error) { toast('Импорт не прошёл', r.error); return false; }
-        toast(`Импортировано: ${r.created}`, `дублей обогащено: ${r.merged}${r.skipped != null ? ' · пропущено: ' + r.skipped : ''}`, true);
-        render();
-      } },
-      { label: 'Отмена' },
-    ],
-  }));
+  $('#importBtn').addEventListener('click', () => window.openMigration());
   const db = $('#dupesBtn');
   if (db) db.addEventListener('click', async () => openDupesModal(await api.get('/duplicates')));
   wireKanbanDrag(root);
@@ -11174,6 +11256,7 @@ PAGES.settings = async (root) => {
   root.innerHTML = `
     <div class="set-sec-h">${ic(I.users)}Аккаунт и команда</div>
     ${linkCard('data-ovgo="roles"', I.users, 'Роли и доступы', 'Кто из команды что видит и какие карточки лидов — права на сервере', `${teamN} ${plural(teamN, 'сотрудник', 'сотрудника', 'сотрудников')}`)}
+    ${linkCard('onclick="window.openMigration&&window.openMigration()"', I.doc, 'Миграция из другой CRM', 'Быстрый перенос базы из amoCRM · Bitrix24 · HubSpot · Excel с маппингом колонок')}
     ${linkCard('onclick="window.openPlanManager&&window.openPlanManager()"', I.spark, 'Тариф и лимиты', 'Текущий план агентства: брокеры, лиды, номера WhatsApp')}
 
     <div class="set-sec-h">${ic(I.chat)}Каналы связи</div>
