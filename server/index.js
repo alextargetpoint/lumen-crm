@@ -5723,30 +5723,72 @@ const server = http.createServer(async (req, res) => {
       try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
       catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
     }
-    /* поиск доступных номеров по стране: /api/telephony/numbers/search?country=FR&type=local&contains= */
+    /* ДИАГНОСТИКА ключа Telnyx: что реально доступно (баланс / поиск номеров / список номеров / мессенджинг) */
+    if (p === '/api/telephony/telnyx-probe' && (req.method === 'GET' || req.method === 'POST')) {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const out = { keySet: !!telnyxKey(db.settings.telephony || {}) };
+      const probe = async (label, m, path) => { try { const j = await telnyxApi(db, m, path); out[label] = { ok: true }; return j; } catch (e) { out[label] = { ok: false, error: e.message }; return null; } };
+      await probe('balance', 'GET', '/balance');
+      await probe('numberSearch', 'GET', '/available_phone_numbers?filter[country_code]=US&filter[limit]=1');
+      await probe('myNumbers', 'GET', '/phone_numbers?page[size]=1');
+      await probe('messagingProfiles', 'GET', '/messaging_profiles?page[size]=1');
+      await probe('outboundVoiceProfiles', 'GET', '/outbound_voice_profiles?page[size]=1');
+      return json(res, 200, out);
+    }
+    /* поиск доступных номеров: /api/telephony/numbers/search?country=FR&type=local&contains=&feature=voice */
     if (p === '/api/telephony/numbers/search' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const t = db.settings.telephony || {};
       const country = (u.searchParams.get('country') || 'US').toUpperCase().slice(0, 2);
+      const contains = (u.searchParams.get('contains') || '').replace(/[^\d]/g, '');
+      if (t.provider === 'telnyx') {
+        const tType = ({ Local: 'local', Mobile: 'mobile', TollFree: 'toll_free' })[u.searchParams.get('type')] || 'local';
+        const feature = u.searchParams.get('feature') === 'sms' ? 'sms' : 'voice';
+        const qp = [`filter[country_code]=${country}`, `filter[phone_number_type]=${tType}`, `filter[features][]=${feature}`, 'filter[limit]=25'];
+        if (contains) qp.push(`filter[national_destination_code]=${contains.slice(0, 3)}`);
+        try {
+          const j = await telnyxApi(db, 'GET', '/available_phone_numbers?' + qp.join('&'));
+          const list = (j.data || []).map(n => ({ number: n.phone_number, friendly: n.phone_number, region: (n.region_information || []).map(r => r.region_name).filter(Boolean).join(', '), country, cost: n.cost_information ? `${n.cost_information.monthly_cost} ${n.cost_information.currency}/мес` : '' }));
+          return json(res, 200, { list, provider: 'telnyx' });
+        } catch (e) { return json(res, 200, { list: [], error: e.message, provider: 'telnyx' }); }
+      }
       const type = ['Local', 'Mobile', 'TollFree'].includes(u.searchParams.get('type')) ? u.searchParams.get('type') : 'Local';
       const q = new URLSearchParams({ PageSize: '20', VoiceEnabled: 'true' });
-      if (u.searchParams.get('contains')) q.set('Contains', u.searchParams.get('contains').replace(/[^\d]/g, ''));
+      if (contains) q.set('Contains', contains);
       try {
         const j = await twilioApi(db, 'GET', `/AvailablePhoneNumbers/${country}/${type}.json?${q.toString()}`);
         const list = (j.available_phone_numbers || []).map(n => ({ number: n.phone_number, friendly: n.friendly_name, region: n.region || n.locality || '', country: n.iso_country, caps: n.capabilities }));
-        return json(res, 200, { list });
+        return json(res, 200, { list, provider: 'twilio' });
       } catch (e) { return json(res, 200, { list: [], error: e.message }); }
     }
-    /* купить номер (добавится в список исходящих для гео-подбора): /api/telephony/numbers/buy {number} */
+    /* купить номер (добавится в гео-пул исходящих): /api/telephony/numbers/buy {number} */
     if (p === '/api/telephony/numbers/buy' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const b = await readBody(req); const number = e164(b.number || '');
       if (!/^\+\d{6,15}$/.test(number)) return json(res, 400, { error: 'неверный номер' });
+      const t = db.settings.telephony || {};
+      if (t.provider === 'telnyx') {
+        try {
+          const order = await telnyxApi(db, 'POST', '/number_orders', { phone_numbers: [{ phone_number: number }] });
+          /* привязать к голосовому подключению (Call Control App) — best-effort, чтобы номер сразу звонил */
+          try {
+            const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number));
+            const pid = pn.data && pn.data[0] && pn.data[0].id;
+            if (pid && t.connId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { connection_id: t.connId });
+          } catch (_) {}
+          t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers : [];
+          if (!t.fromNumbers.includes(number)) t.fromNumbers.push(number);
+          if (!t.fromNumber) t.fromNumber = number;
+          store.save();
+          return json(res, 200, { ok: true, number, orderId: order.data && order.data.id, status: order.data && order.data.status });
+        } catch (e) { return json(res, 400, { error: e.message }); }
+      }
       const base = callBase(db); const key = encodeURIComponent(db.settings.hooks.secret);
       const form = { PhoneNumber: number };
       if (base && !/localhost/.test(base)) { form.VoiceUrl = `${base}/twilio/inbound?key=${key}`; form.VoiceMethod = 'POST'; }
       try {
         const j = await twilioApi(db, 'POST', '/IncomingPhoneNumbers.json', form);
-        const t = db.settings.telephony; t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers : [];
+        t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers : [];
         if (!t.fromNumbers.includes(number)) t.fromNumbers.push(number);
         if (!t.fromNumber) t.fromNumber = number;
         store.save();
@@ -5757,6 +5799,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/telephony/numbers' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
       const t = db.settings.telephony || {};
+      if (t.provider === 'telnyx') {
+        try { const j = await telnyxApi(db, 'GET', '/phone_numbers?page[size]=50'); return json(res, 200, { list: (j.data || []).map(n => ({ number: n.phone_number, friendly: n.phone_number, sid: n.id, status: n.status })), provider: 'telnyx' }); }
+        catch (e) { return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })), error: e.message, provider: 'telnyx' }); }
+      }
       if (t.provider !== 'twilio') return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })) });
       try { const j = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=50'); return json(res, 200, { list: (j.incoming_phone_numbers || []).map(n => ({ number: n.phone_number, friendly: n.friendly_name, sid: n.sid })) }); }
       catch (e) { return json(res, 200, { list: fromNumberList(t).map(n => ({ number: n })), error: e.message }); }
