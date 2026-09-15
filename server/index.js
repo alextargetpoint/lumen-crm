@@ -2312,11 +2312,18 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
       const buf = Buffer.from(await r2.arrayBuffer());
       if (buf.length > 24e6) throw new Error('запись больше 24МБ');
       const extM = String(recUrl).split('?')[0].match(/\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i);
-      const text = await llm.transcribe(buf, 'call.' + (extM ? extM[1].toLowerCase() : 'mp3'));
+      const ext = extM ? extM[1].toLowerCase() : 'mp3';
+      /* 1) сохраняем ПРОИГРЫВАЕМУЮ запись в карточку (голосовой) — раньше сохранялся только текст */
+      let audioUrl = null; try { const saved = tgbridge.saveMedia(buf, ext); audioUrl = saved && saved.url; } catch (e) {}
+      /* 2) транскрипт (Whisper, авто-детект языка) */
+      const text = String(await llm.transcribe(buf, 'call.' + ext) || '').trim();
       lead.transcripts = lead.transcripts || [];
-      lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: (label || 'Звонок') + (durSec ? ' · ' + durSec + 'с' : ''), text: String(text).slice(0, 20000) });
-      ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок расшифрован автоматически: ${lead.name} (${Math.round(String(text).length / 1000)}k символов)` });
+      lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: (label || 'Звонок') + (durSec ? ' · ' + durSec + 'с' : ''), text: text.slice(0, 20000), audio: audioUrl || null });
+      if (audioUrl) { lead.voiceNotes = lead.voiceNotes || []; lead.voiceNotes.unshift({ id: crypto.randomBytes(4).toString('hex'), url: audioUrl, dur: durSec || 0, transcript: text.slice(0, 4000), who: label || 'Звонок', at: Date.now() }); }
+      ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `Звонок записан и расшифрован (${text.length} симв.)` });
       store.save();
+      /* 3) АВТО-АНАЛИЗ: ИИ-сводка сразу по свежему транскрипту (раньше приходилось жать вручную) */
+      if (text && llm.available()) { try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); ai.pushEvent(db, { type: 'call', leadId: lead.id, text: 'ИИ обновил сводку по лиду после звонка' }); store.save(); } } catch (e) { console.error('[call-summary]', e.message); } }
     } catch (e) { console.error('[call-ingest]', e.message); }
   })();
 }
