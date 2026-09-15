@@ -1017,8 +1017,11 @@ function leadView(db, l) {
   });
 }
 
-function analytics(db) {
-  const leads = db.leads;
+function analytics(db, opts = {}) {
+  /* SEC: брокер (leads:'own') видит аналитику ТОЛЬКО по своим лидам; агентские срезы по коллегам (byBroker) скрыты.
+     Владелец и брокер с capability leads:'all' — полная аналитика (onlyBroker не передаётся). */
+  const onlyBroker = opts.onlyBroker || null;
+  const leads = onlyBroker ? db.leads.filter(l => l.broker === onlyBroker) : db.leads;
   const by = (st) => leads.filter(l => l.stage === st).length;
   const contacted = leads.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'out'));
   const replied = contacted.filter(l => db.messages.some(m => m.leadId === l.id && m.dir === 'in'));
@@ -1034,7 +1037,7 @@ function analytics(db) {
   }
 
   /* ── по брокерам: нагрузка → квалы → сделки ── */
-  const byBroker = (db.brokers || []).filter(b => b.active !== false).map(b => {
+  const byBroker = onlyBroker ? [] : (db.brokers || []).filter(b => b.active !== false).map(b => {
     const bl = leads.filter(l => l.broker === b.id);
     const inWork = bl.filter(l => ['handover', 'viewing'].includes(l.stage)).length;
     const q = bl.filter(isQ).length;
@@ -3508,7 +3511,7 @@ const server = http.createServer(async (req, res) => {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         const b = await readBody(req);
         const mt = {
-          id: store.nextId('mt'), leadId: lead.id, brokerId: abroker.id,
+          id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: abroker.id,
           at: +b.at || Date.now() + 24 * 3600e3, kind: ['call', 'video', 'tour'].includes(b.kind) ? b.kind : 'call',
           dur: Math.max(15, Math.min(240, +b.dur || 60)), note: String(b.note || '').slice(0, 400), status: 'scheduled', createdAt: Date.now(),
           link: b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null,
@@ -4762,7 +4765,7 @@ const server = http.createServer(async (req, res) => {
         /* цепочки: владелец видит все; брокер — агентские (base) + свои + расшаренные всем (agency) или лично ему */
         sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
-        analytics: analytics(db),
+        analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
         me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
     }
@@ -6703,7 +6706,7 @@ const server = http.createServer(async (req, res) => {
       /* solo-агентство без брокеров: встречу ведёт сам владелец → broker может быть null (страница это учитывает) */
       const broker = db.brokers.find(x => x.id === (b.brokerId || lead.broker)) || db.brokers.find(x => x.geo === lead.geo) || db.brokers[0] || null;
       const mt = {
-        id: store.nextId('mt'), leadId: lead.id, brokerId: broker ? broker.id : null,
+        id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: broker ? broker.id : null,
         at: +b.at || Date.now() + 24 * 3600e3, kind: b.kind || 'call',
         dur: Math.max(15, Math.min(240, +b.dur || 60)),
         note: b.note || '', status: 'scheduled', createdAt: Date.now(),
@@ -8428,11 +8431,15 @@ ${SCR}
 
     /* ---------------- подборки ---------------- */
     if (p === '/api/collections' && req.method === 'GET') {
-      return json(res, 200, db.collections.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: editKeyFor(req) })));
+      /* SEC: брокер видит подборки только своих лидов (+ бесхозные); подборки чужих клиентов скрыты */
+      const vis = IS_BROKER ? db.collections.filter(c => !c.leadId || canSeeLead(db.leads.find(l => l.id === c.leadId) || {})) : db.collections;
+      return json(res, 200, vis.map(c => Object.assign({}, c, { leadName: (db.leads.find(l => l.id === c.leadId) || {}).name || null, editKey: editKeyFor(req) })));
     }
     if (p === '/api/collections/bulk' && req.method === 'POST') {
       const b = await readBody(req);
-      const ids = Array.isArray(b.ids) ? b.ids : [];
+      let ids = Array.isArray(b.ids) ? b.ids : [];
+      /* SEC: брокер не может массово удалять/двигать подборки чужих клиентов — режем id по canSeeLead */
+      if (IS_BROKER) ids = ids.filter(id => { const c = db.collections.find(x => x.id === id); return c && (!c.leadId || canSeeLead(db.leads.find(l => l.id === c.leadId) || {})); });
       let done = 0;
       if (b.action === 'folder') { for (const c of db.collections) if (ids.includes(c.id)) { c.folderId = b.value || null; done++; } }
       else if (b.action === 'delete') { const before = db.collections.length; db.collections = db.collections.filter(c => !ids.includes(c.id)); done = before - db.collections.length; }
@@ -9069,8 +9076,8 @@ ${SCR}
     }
     if (p === '/api/call-reviews' && req.method === 'GET')
       return json(res, 200, (db.callReviews || []).slice(0, 60));
-    if (p === '/api/events' && req.method === 'GET') return json(res, 200, db.events.slice(0, 60));
-    if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db));
+    if (p === '/api/events' && req.method === 'GET') return json(res, 200, (IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})) : db.events).slice(0, 60));
+    if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
     if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
 
     /* ================= печатное расписание встреч недели: /meetings/print?w=N ================= */
@@ -9447,7 +9454,9 @@ h2{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy
 
     /* ================= публичная визитка брокера: /b/:id ================= */
     if ((m = p.match(/^\/b\/(br_[\w]+)$/)) && req.method === 'GET') {
-      const br = db.brokers.find(x => x.id === m[1]);
+      /* SEC: анти-харвест визиток брокеров (id последовательные и глобальны по всем тенантам) */
+      if (!rateHit('bcard:' + (clientIp(req) || 'x'), 30, 60000)) { res.writeHead(429); res.end('too many requests'); return; }
+      const br = db.brokers.find(x => x.id === m[1] || x.cardId === m[1]);
       if (!br) { res.writeHead(404); res.end('not found'); return; }
       const AG = db.settings.agency.name;
       const logo = db.settings.agency.logo;
@@ -9528,7 +9537,7 @@ body{font-family:${pf.body};min-height:100vh;background:var(--dark);color:var(--
       };
       db.leads.push(lead); br.load = (br.load || 0) + 1;
       const at = +b.at;
-      const mt = { id: store.nextId('mt'), leadId: lead.id, brokerId: br.id, at, kind: 'call', note: String(b.note || '').slice(0, 300), status: 'scheduled', createdAt: Date.now(), rem: {}, link: null };
+      const mt = { id: 'mt_' + crypto.randomBytes(8).toString('hex'), leadId: lead.id, brokerId: br.id, at, kind: 'call', note: String(b.note || '').slice(0, 300), status: 'scheduled', createdAt: Date.now(), rem: {}, link: null };
       db.meetings = db.meetings || []; db.meetings.push(mt);
       ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Запись с визитки: ${lead.name} → ${br.name} · ${new Date(at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` });
       store.save();
@@ -9637,6 +9646,8 @@ if(bk)bk.addEventListener('click',async()=>{
 
     /* ================= страница встречи для клиента: /m/:id ================= */
     if ((m = p.match(/^\/m\/(mt_[\w]+)$/)) && req.method === 'GET') {
+      /* SEC: анти-перебор публичной страницы встречи (id теперь случайные, но старые sequential-mt_ ещё живут) */
+      if (!rateHit('mpg:' + (clientIp(req) || 'x'), 30, 60000)) { res.writeHead(429); res.end('too many requests'); return; }
       const mt = (db.meetings || []).find(x => x.id === m[1]);
       if (!mt) { res.writeHead(404); res.end('not found'); return; }
       const lead = db.leads.find(l => l.id === mt.leadId) || {};
