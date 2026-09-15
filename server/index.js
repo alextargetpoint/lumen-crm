@@ -5930,6 +5930,24 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, number: bought });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* диагностика OTP-номера: привязан ли messaging-profile + верный ли webhook_url (почему не приходит SMS) */
+    if (p === '/api/telephony/otp/diag' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const num = e164(String(u.searchParams.get('number') || ''));
+      const t = db.settings.telephony || {};
+      const out = { number: num, want_webhook: telnyxSmsWebhook(db), msgProfileId: t.msgProfileId || null };
+      try {
+        const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(num));
+        const d = pn.data && pn.data[0];
+        out.phone = d ? { id: d.id, status: d.status, messaging_profile_id: d.messaging_profile_id || null, connection_id: d.connection_id || null } : null;
+      } catch (e) { out.phoneErr = e.message; }
+      /* профиль на самом номере (может отличаться от нашего сохранённого) */
+      const pid = (out.phone && out.phone.messaging_profile_id) || t.msgProfileId;
+      if (pid) { try { const mp = await telnyxApi(db, 'GET', '/messaging_profiles/' + pid); out.profile = mp.data ? { id: mp.data.id, name: mp.data.name, webhook_url: mp.data.webhook_url, enabled: mp.data.enabled } : null; } catch (e) { out.profileErr = e.message; } }
+      /* последние входящие сообщения по номеру (если Telnyx их отдаёт) */
+      try { const ms = await telnyxApi(db, 'GET', '/messages?filter[direction]=inbound&page[size]=5'); out.recentInbound = (ms.data || []).slice(0, 5).map(m => ({ to: m.to, from: m.from, text: (m.text || '').slice(0, 40), received_at: m.received_at })); } catch (e) { out.messagesErr = e.message; }
+      return json(res, 200, out);
+    }
     /* лента входящих SMS/OTP по OTP-номеру (авто-обновление в UI): /api/telephony/otp/sms?number= */
     if (p === '/api/telephony/otp/sms' && req.method === 'GET') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
