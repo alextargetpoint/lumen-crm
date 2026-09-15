@@ -6075,6 +6075,35 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, appId });
     }
     function metaAppId() { try { const r = store.getRegistry(); return process.env.META_APP_ID || (r.platformMetaApp && r.platformMetaApp.appId) || ''; } catch (_) { return process.env.META_APP_ID || ''; } }
+    /* список WhatsApp-номеров в Telnyx (чтобы выбрать отправитель `from`) */
+    if (p === '/api/whatsapp/telnyx-numbers' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const out = {};
+      for (const ep of ['/whatsapp/business_accounts', '/whatsapp/phone_numbers', '/whatsapp_business_accounts']) {
+        try { out[ep] = await telnyxApi(db, 'GET', ep + '?page[size]=20'); } catch (e) { out[ep] = { error: e.message }; }
+      }
+      return json(res, 200, out);
+    }
+    /* задать WhatsApp-отправитель (E.164) для официальных сообщений через Telnyx */
+    if (p === '/api/whatsapp/telnyx-from' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); db.settings.wa = db.settings.wa || {}; db.settings.wa.telnyxFrom = e164(String(b.from || '')); store.save();
+      return json(res, 200, { ok: true, from: db.settings.wa.telnyxFrom });
+    }
+    /* ТЕСТ официальной отправки WhatsApp через Telnyx: {to, text} или {to, template, lang} */
+    if (p === '/api/whatsapp/telnyx-send' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const from = e164(b.from || (db.settings.wa && db.settings.wa.telnyxFrom) || '');
+      const to = e164(b.to || '');
+      if (!from) return json(res, 400, { error: 'нет отправителя (from). Задай WhatsApp-номер.' });
+      if (!/^\+\d{7,15}$/.test(to)) return json(res, 400, { error: 'нужен номер получателя (to) в формате +…' });
+      const msg = b.template
+        ? { type: 'template', template: { name: String(b.template), language: { code: b.lang || 'en_US' } } }
+        : { type: 'text', text: { body: String(b.text || 'Тест из Lumen ✅') } };
+      try { const r = await telnyxApi(db, 'POST', '/messages/whatsapp', { from, to, whatsapp_message: msg }); return json(res, 200, { ok: true, id: (r.data && r.data.id) || null, result: r }); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
     /* агентство запускает подключение официального WhatsApp: Telnyx выдаёт hosted-signup ссылку */
     if (p === '/api/whatsapp/hosted-signup' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
