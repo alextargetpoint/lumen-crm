@@ -1974,13 +1974,20 @@ function hidePreloader() {
 }
 
 /* ---------- навигация ---------- */
+/* Страница «в доработке»: скрыта у обычных агентств (DEFAULT_HIDDEN_PAGES, не в enabledPages),
+   видна только в демо (betaAll). Бейдж «в доработке» ставим ИСКЛЮЧИТЕЛЬНО в betaAll-аккаунте. */
+function _isDevPage(pk) { const ag = (STATE && STATE.settings && STATE.settings.agency) || {}; const en = ag.enabledPages || []; return DEFAULT_HIDDEN_PAGES.includes(pk) && !en.includes(pk); }
+function _isBeta() { return !!(STATE && STATE.settings && STATE.settings.agency && STATE.settings.agency.betaAll); }
 function initNav() {
+  const beta = _isBeta();
+  const devBadge = '<span class="nav-dev" title="В доработке — виден только вам (демо-аккаунт), у зарегистрированных агентств скрыт">в доработке</span>';
   $$('.nav-item').forEach(btn => {
     /* кнопка-пространство рисует свой лейбл/иконку; ведёт на дефолтную под-страницу */
     const ws = btn.dataset.ws ? WORKSPACES[btn.dataset.ws] : null;
     const def = ws ? { icon: ws.icon, name: t(ws.label, ws.labelEn) } : NAV[btn.dataset.page];
     const defName = ws ? def.name : navName(btn.dataset.page);
     btn.innerHTML = `${ic(def.icon)}${defName}${ws ? '<span class="nav-caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>' : ''}<span class="cnt" data-cnt style="display:none"></span>`;
+    if (beta && btn.dataset.page && _isDevPage(btn.dataset.page)) btn.insertAdjacentHTML('beforeend', devBadge);
     btn.addEventListener('click', () => {
       /* пространство: если уже внутри него — не прыгаем на дефолт, остаёмся на текущей вкладке */
       let target = btn.dataset.page;
@@ -1992,7 +1999,7 @@ function initNav() {
     });
     /* под кнопкой-пространством — раскрывающийся список его подстраниц (аккордеон в сайдбаре) */
     if (ws) {
-      const sub = el(`<div class="nav-sub" data-subws="${btn.dataset.ws}"><div class="nav-sub-inner">${ws.pages.map(pk => `<button class="nav-subitem" data-subpage="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span></button>`).join('')}</div></div>`);
+      const sub = el(`<div class="nav-sub" data-subws="${btn.dataset.ws}"><div class="nav-sub-inner">${ws.pages.map(pk => `<button class="nav-subitem" data-subpage="${pk}">${ic(NAV[pk].icon)}<span>${navName(pk)}</span>${beta && _isDevPage(pk) ? devBadge : ''}</button>`).join('')}</div></div>`);
       sub.querySelectorAll('.nav-subitem').forEach(sb => sb.addEventListener('click', (e) => {
         e.stopPropagation(); const target = sb.dataset.subpage;
         if (target === 'properties') PAGE_STATE.propView = null;
@@ -2132,6 +2139,8 @@ async function render() {
         const prevScroll = c0.scrollTop;
         c0.classList.remove('anim', 'soft');              /* снимаем прошлые классы ДО замены DOM — старый контент не мигает */
         await fn(c0);
+        /* плашка «в доработке» на самой странице — только в demo/betaAll на скрытых-для-агентств разделах */
+        if (_isBeta() && _isDevPage(page)) { const rb = el(`<div class="dev-ribbon">${ic(I.spark)}<span>Раздел <b>в доработке</b> — виден только вам (демо-аккаунт). У зарегистрированных агентств он скрыт.</span></div>`); c0.insertBefore(rb, c0.firstChild); }
         injectWorkspaceTabs(c0, page);
         enhanceControls(c0);
         wireAiWand(c0);
