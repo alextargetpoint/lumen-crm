@@ -284,6 +284,12 @@ async function platformBotUsername() {
   const tok = platformToken(); if (!tok) return null;
   try { const me = await tgApiRaw(tok, 'getMe'); return me && me.result && me.result.username || null; } catch (_) { return null; }
 }
+/* getWebhookInfo центрального бота (для диагностики: url, last_error, pending) — токен не раскрываем */
+async function webhookInfo() {
+  const tok = platformToken(); if (!tok) return { error: 'нет токена центрального бота' };
+  const r = await tgApiRaw(tok, 'getWebhookInfo');
+  return (r && r.result) || r;
+}
 
 /* кнопка-меню бота, открывающая мессенджер-мини-апп (Telegram Web App) */
 async function setMenuButton(db, baseUrl) {
@@ -300,5 +306,5 @@ async function notify(db, chatId, text) {
 module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardHandover, bindBroker,
   setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
-  central, platformSecret, setupPlatformWebhook, platformBotUsername,
+  central, platformSecret, setupPlatformWebhook, platformBotUsername, webhookInfo,
 };

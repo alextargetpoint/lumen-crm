@@ -3860,6 +3860,18 @@ const server = http.createServer(async (req, res) => {
       let r = null; try { r = await tgbridge.setupPlatformWebhook(base); } catch (e) {}
       return json(res, 200, { ok: true, username: reg.platformBridge.username, webhook: base.replace(/\/$/, '') + '/tg/webhook', webhookOk: !!(r && r.ok) });
     }
+    /* ДИАГНОСТИКА + РЕМОНТ центрального вебхука: показывает getWebhookInfo и заново ставит вебхук с текущим секретом */
+    if (p === '/api/tgbridge/diag' && (req.method === 'GET' || req.method === 'POST')) {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const out = { central: tgbridge.central(), secretPrefix: (tgbridge.platformSecret() || '').slice(0, 6) };
+      const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || 'https://app.lumen247.com';
+      out.expectedWebhook = base.replace(/\/$/, '') + '/tg/webhook';
+      try { const reg = store.getRegistry(); out.tokenSource = process.env.LUMEN_TG_BRIDGE_TOKEN ? 'env' : ((reg.platformBridge && reg.platformBridge.token) ? 'registry' : 'none'); out.centralBot = reg.platformBridge && reg.platformBridge.username; } catch (_) {}
+      if (req.method === 'POST') { try { out.rehook = await tgbridge.setupPlatformWebhook(base); } catch (e) { out.rehookError = e.message; } }
+      /* getWebhookInfo через платформенный токен (сам токен не раскрываем) */
+      try { const info = await tgbridge.webhookInfo(); out.webhookInfo = info; } catch (e) { out.webhookInfoError = e.message; }
+      return json(res, 200, out);
+    }
     if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC */
