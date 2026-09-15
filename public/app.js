@@ -1862,6 +1862,17 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mcopy]');
   if (b) { navigator.clipboard.writeText(location.origin + '/m/' + b.dataset.mcopy); toast('Ссылка на страницу встречи скопирована', null, true); }
 });
+/* тест-звонок для проверки номера брокера (первое плечо click-to-call) */
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-phonetest]'); if (!b) return;
+  const inp = b.closest('.pd-fact') && b.closest('.pd-fact').querySelector('input[data-be="phone"]');
+  const phone = (inp && inp.value.trim()) || b.dataset.phonetest;
+  if (!phone) { toast('Впиши номер телефона'); return; }
+  b.disabled = true; const o = b.innerHTML; b.textContent = 'Звоню…';
+  try { const r = await api.post('/telephony/test-call', { phone }); toast(r.ok ? 'Тест-звонок пошёл' : 'Не вышло', r.ok ? ('Должен зазвонить ' + r.phone + '. Ответь — услышишь голос-подтверждение, значит номер верный.') : (r.error || ''), r.ok); }
+  catch (err) { toast('Ошибка', err.message); }
+  b.disabled = false; b.innerHTML = o;
+});
 
 /* ---------- глобальное состояние ---------- */
 let STATE = null;
@@ -11309,7 +11320,7 @@ PAGES.brokers = async (root) => {
             <button type="button" class="btn btn-sm" id="dtSameAll" style="margin-top:8px">${ic(I.copy)}Как в первом дне — во все</button>
             <div class="lc-lbl" style="margin-top:16px">Визитка брокера · публичная страница</div>
             <div class="pds-grid c2" style="margin-top:6px">
-              <div class="pd-fact"><label class="lc-lbl">Телефон / WhatsApp</label><input class="gi" data-be="phone" value="${esc(b.phone || '')}" placeholder="+971…"></div>
+              <div class="pd-fact"><label class="lc-lbl">Телефон / WhatsApp</label><input class="gi" data-be="phone" value="${esc(b.phone || '')}" placeholder="+971…"><div style="display:flex;align-items:center;gap:8px;margin-top:5px"><button type="button" class="btn btn-sm" data-phonetest="${esc(b.phone || '')}" title="Позвоним на этот номер — если телефон зазвонит, номер верный">${ic(I.phone || I.spark)}Тест-звонок</button><span class="muted" style="font-size:10.5px;line-height:1.35">⚠️ На этот номер идёт <b>первое плечо</b> click-to-call. Неверный номер → звонки не дойдут. Проверь.</span></div></div>
               <div class="pd-fact"><label class="lc-lbl">E-mail</label><input class="gi" data-be="email" value="${esc(b.email || '')}" placeholder="broker@agency.com"></div>
             </div>
             <div class="pd-fact" style="margin-top:10px"><label class="lc-lbl">Должность</label><input class="gi" data-be="title" value="${esc(b.title || '')}" placeholder="Эксперт по недвижимости ${st.geoNames[b.geo] || ''}"></div>

@@ -2575,6 +2575,12 @@ async function telnyxInitiateCall(db, lead, brokerPhone) {
 }
 async function telnyxOnAnswered(db, payload, cs) {
   const t = db.settings.telephony || {}; const ccid = payload.call_control_id;
+  if (cs.stage === 'test') {
+    /* тест-звонок для проверки номера: ответил → короткое голосовое → отбой */
+    try { await telnyxApi(db, 'POST', `/calls/${ccid}/actions/speak`, { payload: 'Это проверочный звонок Lumen. Ваш номер настроен верно. До связи.', voice: 'female', language: 'ru-RU' }); } catch (e) {}
+    setTimeout(() => { telnyxApi(db, 'POST', `/calls/${ccid}/actions/hangup`, {}).catch(() => {}); }, 6000);
+    return;
+  }
   if (cs.stage === 'broker') {
     try { await telnyxApi(db, 'POST', `/calls/${ccid}/actions/record_start`, { format: 'mp3', channels: 'single' }); } catch (e) { console.error('[telnyx rec]', e.message); }
     const cs2 = Buffer.from(JSON.stringify({ leadId: cs.leadId, clientPhone: cs.clientPhone, stage: 'client', bridgeTo: ccid })).toString('base64');
@@ -5903,6 +5909,28 @@ const server = http.createServer(async (req, res) => {
       if (t.provider !== 'twilio') return json(res, 400, { error: 'выберите провайдера (Twilio или Telnyx) и сохраните' });
       try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
       catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
+    }
+    /* ТЕСТ-ЗВОНОК для проверки номера брокера/менеджера: звоним на номер → если телефон зазвонил, номер верный.
+       Критично: первое плечо click-to-call идёт на этот номер; неверный номер = звонки молча не доходят.
+       SEC: звоним ТОЛЬКО на известные номера (брокеры / менеджер-владелец), не из произвольного тела (toll fraud). */
+    if (p === '/api/telephony/test-call' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const norm = s => String(s || '').replace(/[^0-9]/g, '');
+      const _ag = db.settings.agency || {};
+      const ownerPhone = (db.settings.auth && db.settings.auth.ownerPhone) || (_ag.manager && _ag.manager.phone) || _ag.ownerPhone || _ag.phone || '';
+      const known = new Set([ownerPhone, ...(db.brokers || []).map(x => x.phone)].map(norm).filter(Boolean));
+      let phone = norm(b.phone);
+      if (!phone) phone = norm((MEMBER && MEMBER.phone) || ownerPhone);   /* по умолчанию — свой номер */
+      if (!phone) return json(res, 400, { error: 'нет номера для проверки — впишите телефон в профиль, затем «Тест-звонок»' });
+      if (!known.has(phone)) return json(res, 403, { error: 'тест-звонок разрешён только на ВАШИ номера (брокера/менеджера)' });
+      const t2 = db.settings.telephony || {};
+      if (t2.provider !== 'telnyx' || !telnyxKey(t2) || !t2.connId) return json(res, 400, { error: 'Telnyx не настроен (ключ + Connection ID)' });
+      try {
+        const cs = Buffer.from(JSON.stringify({ stage: 'test' })).toString('base64');
+        await telnyxApi(db, 'POST', '/calls', { connection_id: t2.connId, to: e164('+' + phone), from: pickCallerId(t2, '+' + phone), client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+        return json(res, 200, { ok: true, phone: '+' + phone });
+      } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* ПЛАТФОРМА: задать общий Telnyx-ключ (все агентства покупают через наш аккаунт). Оператор (owner).
        {key} — задать напрямую; {promote:true} — взять рабочий ключ текущего аккаунта и сделать платформенным. */
