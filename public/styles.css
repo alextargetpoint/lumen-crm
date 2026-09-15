@@ -59,10 +59,10 @@
 
 /* ---------- оркестрированный вход раздела (класс anim вешает go(), одна волна) ---------- */
 @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
-.content.anim > * { opacity: 0; animation: reveal .38s var(--ease-soft) forwards; }
-.content.anim > *:nth-child(2) { animation-delay: .07s; }
-.content.anim > *:nth-child(3) { animation-delay: .14s; }
-.content.anim > *:nth-child(4) { animation-delay: .21s; }
+/* мягкий вход раздела: НЕ обнуляем opacity целиком (иначе на смене страницы миг «пустого» экрана — мигание),
+   стартуем с .55 и быстро доводим до 1 без стаггера верхних блоков */
+@keyframes sectIn { from { opacity: .55; } to { opacity: 1; } }
+.content.anim > * { animation: sectIn .2s var(--ease-soft) both; }
 .content.anim .kpis > .kpi { opacity: 0; animation: reveal .6s var(--ease-spring) forwards; }
 .content.anim .kpis > .kpi:nth-child(2) { animation-delay: .06s; }
 .content.anim .kpis > .kpi:nth-child(3) { animation-delay: .12s; }
