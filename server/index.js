@@ -2401,7 +2401,11 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
 /* --- Telnyx Call Control: click-to-call (звонок брокеру → соединение с клиентом → запись) --- */
 /* ключ Telnyx: сперва из настроек тенанта, иначе платформенный из env TELNYX_API_KEY (Railway).
    Так один аккаунт-менеджер обслуживает всех + позже — провижн Managed Accounts тем же ключом. */
-function telnyxKey(t) { return (t && t.key) || process.env.TELNYX_API_KEY || ''; }
+/* платформенный Telnyx-ключ (SaaS): все агентства покупают через ОДИН наш аккаунт, провайдер скрыт.
+   Приоритет: env → платформенный реестр → ключ тенанта (легаси). */
+function platformTelnyxKey() { try { const r = store.getRegistry(); return (r.platformTelnyx && r.platformTelnyx.key) || ''; } catch (_) { return ''; } }
+function telnyxKey(t) { return process.env.TELNYX_API_KEY || platformTelnyxKey() || (t && t.key) || ''; }
+const TELNYX_MARKUP = 2;   /* наценка платформы $/номер в мес (показываем клиенту цену УЖЕ с наценкой; себестоимость скрыта) */
 async function telnyxApi(db, method, pathx, body) {
   const t = db.settings.telephony || {};
   const r = await fetch('https://api.telnyx.com/v2' + pathx, { method, headers: { Authorization: 'Bearer ' + telnyxKey(t), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -5730,6 +5734,19 @@ const server = http.createServer(async (req, res) => {
       try { const a = await twilioApi(db, 'GET', '/IncomingPhoneNumbers.json?PageSize=1'); return json(res, 200, { ok: true, numbers: (a.incoming_phone_numbers || []).length, hint: 'ключи валидны' }); }
       catch (e) { return json(res, 200, { ok: false, reason: e.message }); }
     }
+    /* ПЛАТФОРМА: задать общий Telnyx-ключ (все агентства покупают через наш аккаунт). Оператор (owner).
+       {key} — задать напрямую; {promote:true} — взять рабочий ключ текущего аккаунта и сделать платформенным. */
+    if (p === '/api/telephony/platform-key' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      let key = String(b.key || '').trim();
+      if (b.promote && !key) key = (db.settings.telephony && db.settings.telephony.key) || '';
+      if (!key) return json(res, 400, { error: 'нет ключа (передайте key или promote при сохранённом ключе аккаунта)' });
+      /* валидируем ключ прямым запросом баланса */
+      try { const r = await fetch('https://api.telnyx.com/v2/balance', { headers: { Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(8000) }); if (!r.ok) return json(res, 400, { error: 'Telnyx отклонил ключ (' + r.status + ')' }); } catch (e) { return json(res, 400, { error: 'Telnyx недоступен: ' + e.message }); }
+      const reg = store.getRegistry(); reg.platformTelnyx = { key, at: Date.now() }; store.saveRegistry();
+      return json(res, 200, { ok: true });
+    }
     /* ДИАГНОСТИКА ключа Telnyx: что реально доступно (баланс / поиск номеров / список номеров / мессенджинг) */
     if (p === '/api/telephony/telnyx-probe' && (req.method === 'GET' || req.method === 'POST')) {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
@@ -5755,7 +5772,7 @@ const server = http.createServer(async (req, res) => {
         if (contains) qp.push(`filter[national_destination_code]=${contains.slice(0, 3)}`);
         try {
           const j = await telnyxApi(db, 'GET', '/available_phone_numbers?' + qp.join('&'));
-          const list = (j.data || []).map(n => ({ number: n.phone_number, friendly: n.phone_number, region: (n.region_information || []).map(r => r.region_name).filter(Boolean).join(', '), country, cost: n.cost_information ? `${n.cost_information.monthly_cost} ${n.cost_information.currency}/мес` : '' }));
+          const list = (j.data || []).map(n => { const raw = n.cost_information ? parseFloat(n.cost_information.monthly_cost) : 1; const shown = (isNaN(raw) ? 1 : raw) + TELNYX_MARKUP; return { number: n.phone_number, friendly: n.phone_number, region: (n.region_information || []).map(r => r.region_name).filter(Boolean).join(', '), country, cost: `$${shown.toFixed(2)}/мес` }; });
           return json(res, 200, { list, provider: 'telnyx' });
         } catch (e) { return json(res, 200, { list: [], error: e.message, provider: 'telnyx' }); }
       }
@@ -5800,6 +5817,33 @@ const server = http.createServer(async (req, res) => {
         if (!t.fromNumber) t.fromNumber = number;
         store.save();
         return json(res, 200, { ok: true, number: j.phone_number || number, sid: j.sid });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* КУПИТЬ ПО РЕКОМЕНДАЦИИ: сразу N номеров нужной страны в один клик (Telnyx) */
+    if (p === '/api/telephony/numbers/quickbuy' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const count = Math.max(1, Math.min(10, parseInt(b.count) || 1));
+      const country = String(b.country || 'US').toUpperCase().slice(0, 2);
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'telnyx') return json(res, 400, { error: 'быстрая покупка доступна для Telnyx' });
+      try {
+        const j = await telnyxApi(db, 'GET', `/available_phone_numbers?filter[country_code]=${country}&filter[phone_number_type]=local&filter[features][]=voice&filter[limit]=${count + 5}`);
+        const cand = (j.data || []).map(n => n.phone_number).slice(0, count);
+        if (!cand.length) return json(res, 400, { error: 'нет доступных номеров по стране ' + country });
+        const bought = [];
+        for (const number of cand) {
+          try {
+            await telnyxApi(db, 'POST', '/number_orders', { phone_numbers: [{ phone_number: number }] });
+            try { const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number)); const pid = pn.data && pn.data[0] && pn.data[0].id; if (pid && t.connId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { connection_id: t.connId }); } catch (_) {}
+            t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers : [];
+            if (!t.fromNumbers.includes(number)) t.fromNumbers.push(number);
+            if (!t.fromNumber) t.fromNumber = number;
+            bought.push(number);
+          } catch (e) { /* один не купился — продолжаем */ }
+        }
+        store.save();
+        return json(res, 200, { ok: bought.length > 0, bought, requested: count });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* список моих номеров */

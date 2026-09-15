@@ -11843,20 +11843,32 @@ PAGES.settings = async (root) => {
           </div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
-          ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? `
+          ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? (() => {
+            const brk = (STATE.brokers || []).filter(x => x.active !== false).length || 1;
+            const rec = Math.max(1, Math.min(10, Math.round(brk / 3)));   /* ~1 номер на 3 брокеров: 10 брокеров → 3 номера */
+            const geo0 = (s.agency.geos || [])[0] || 'dubai';
+            const GEO2C = { dubai: 'AE', oman: 'OM', phuket: 'TH', bali: 'ID', spain: 'ES', cyprus: 'CY', turkey: 'TR', greece: 'GR' };
+            const recC = GEO2C[geo0] || 'GB';
+            return `
           <div class="tel-numbers" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-            <div class="lc-lbl">Номера · покупка в дашборде${(s.telephony || {}).provider === 'telnyx' ? ' (Telnyx)' : ''}</div>
-            <div class="muted" style="font-size:11.5px;padding:4px 0 8px">Клиент видит номер своей страны (гео caller-ID). Покупай номера под свои рынки — они сразу попадут в пул подбора и привяжутся к твоему Call-Control.</div>
+            <div class="lc-lbl">Номера для звонков</div>
+            <div class="muted" style="font-size:11.5px;padding:4px 0 10px">Клиент видит номер своей страны (local presence → выше отклик). Номер сразу подключается и попадает в авто-подбор.</div>
+            <div class="tel-rec" style="background:color-mix(in srgb,var(--accent) 8%,var(--card));border:1px solid color-mix(in srgb,var(--accent) 26%,var(--stroke));border-radius:12px;padding:12px;margin-bottom:12px">
+              <div style="font-size:12.5px;font-weight:650;margin-bottom:3px">${ic(I.spark)}Рекомендация для вашей команды</div>
+              <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:9px">У вас <b>${brk}</b> ${plural(brk, 'брокер', 'брокера', 'брокеров')}. Оптимально — <b>${rec}</b> ${plural(rec, 'активный номер', 'активных номера', 'активных номеров')} (несколько линий = параллельные разговоры; больше не нужно — дорого и хуже для прогрева). Купим в вашем основном направлении.</div>
+              <button class="btn btn-accent btn-sm" id="telRecBuy" data-count="${rec}" data-country="${recC}">${ic(I.plus)}Купить по рекомендации (${rec})</button>
+            </div>
+            <div class="lc-lbl" style="font-size:11px;color:var(--muted);margin-bottom:5px">Или выбрать вручную</div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <select id="telCountry" class="lc-inp" style="width:150px">${['AE','ES','GB','US','FR','DE','NL','TR','SA','PL'].map(c => `<option value="${c}">${({ AE: 'ОАЭ', ES: 'Испания', GB: 'Британия', US: 'США', FR: 'Франция', DE: 'Германия', NL: 'Нидерланды', TR: 'Турция', SA: 'Сауд.Аравия', PL: 'Польша' })[c]} (${c})</option>`).join('')}</select>
+              <select id="telCountry" class="lc-inp" style="width:150px">${['AE','ES','GB','US','FR','DE','NL','TR','SA','PL','TH','ID'].map(c => `<option value="${c}" ${c === recC ? 'selected' : ''}>${({ AE: 'ОАЭ', ES: 'Испания', GB: 'Британия', US: 'США', FR: 'Франция', DE: 'Германия', NL: 'Нидерланды', TR: 'Турция', SA: 'Сауд.Аравия', PL: 'Польша', TH: 'Таиланд', ID: 'Индонезия' })[c]}</option>`).join('')}</select>
               <button class="btn btn-sm" id="telSearch" type="button">${ic(I.search || I.spark)}Найти</button>
             </div>
             <div class="tel-search-res" style="margin-top:8px"></div>
             <div class="lc-lbl" style="margin-top:12px">Мои номера</div>
             <div class="tel-my-numbers muted" style="font-size:12px;margin-top:4px">—</div>
-          </div>` : ''}
+          </div>`; })() : ''}
           ${hint('telhow', 'Как работает телефония', [
-            ['Click-to-call', 'Жмёшь «Позвонить» в карточке — Twilio соединяет тебя с лидом'],
+            ['Click-to-call', 'Жмёшь «Позвонить» в карточке — система соединяет тебя с лидом'],
             ['Гео caller-ID', 'Клиент видит номер своей страны → выше отклик'],
             ['Запись → транскрипт', 'Разговор пишется и расшифровывается в карточку автоматически']])}`;
   const tgbOn = !!(s.tgBridge && s.tgBridge.tokenSet);
@@ -12104,6 +12116,14 @@ PAGES.settings = async (root) => {
   const loadMyNumbers = async () => { const box = root.querySelector('.tel-my-numbers'); if (!box) return;
     try { const r = await api.get('/telephony/numbers'); box.innerHTML = (r.list || []).length ? r.list.map(n => `<span class="br-blk" style="margin:0 6px 6px 0">${esc(n.number)}</span>`).join('') : '<span class="muted">Пока нет — купи ниже</span>'; }
     catch (e) { box.innerHTML = '<span class="muted">' + esc(e.message) + '</span>'; } };
+  $('#telRecBuy')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const count = +btn.dataset.count, country = btn.dataset.country;
+    if (!await uiConfirm(`Купить ${count} ${plural(count, 'номер', 'номера', 'номеров')}?`, 'Спишется с баланса, номера сразу появятся в авто-подборе. Цена уже с учётом сервиса.', { ok: 'Купить' })) return;
+    btn.disabled = true; const orig = btn.innerHTML; btn.textContent = 'Покупаю…';
+    try { const r = await api.post('/telephony/numbers/quickbuy', { count, country }); toast(r.ok ? `Куплено номеров: ${r.bought.length}` : 'Не куплено', (r.bought || []).join(', ') || r.error || '', r.ok); if (root.querySelector('.tel-my-numbers')) loadMyNumbers(); }
+    catch (er) { toast('Ошибка', er.message); }
+    btn.disabled = false; btn.innerHTML = orig;
+  });
   $('#telSearch')?.addEventListener('click', async () => {
     const box = root.querySelector('.tel-search-res'); const country = $('#telCountry').value;
     box.innerHTML = '<span class="muted" style="font-size:12px">Ищу номера…</span>';
