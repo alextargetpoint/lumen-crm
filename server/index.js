@@ -5964,6 +5964,17 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, assigned, messaging_profile_id: profileId, already: !assigned });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* список купленных Cloud-API / OTP-номеров с их статусом (карточки на странице «Номера») */
+    if (p === '/api/telephony/otp/list' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const t = db.settings.telephony || {};
+      const nums = t.otpNumbers || {};
+      /* один запрос к Telnyx — статус номеров как WhatsApp-отправителей */
+      const waMap = {};
+      try { const w = await telnyxApi(db, 'GET', '/whatsapp/phone_numbers?page[size]=50'); (w.data || []).forEach(n => { waMap[String(n.phone_number).replace(/[^0-9]/g, '')] = { status: n.status, name: n.name_status, quality: n.quality_rating, id: n.phone_number_id }; }); } catch (_) {}
+      const list = Object.keys(nums).map(k => { const r = nums[k]; const sms = r.sms || []; const lastCode = (sms.find(m => m.code) || {}).code || ''; return { number: r.number || ('+' + k), key: k, at: r.at || null, smsCount: sms.length, lastCode, lastAt: (sms[0] || {}).at || null, wa: waMap[k] || null }; }).sort((a, b) => (b.at || 0) - (a.at || 0));
+      return json(res, 200, { ok: true, list, provider: t.provider, msgProfileSet: !!t.msgProfileId });
+    }
     /* очистить ленту OTP по номеру (убрать старые/тестовые коды) */
     if (p === '/api/telephony/otp/clear' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
@@ -6238,6 +6249,29 @@ const server = http.createServer(async (req, res) => {
         : { type: 'text', text: { body: String(b.text || 'Тест из Lumen ✅') } };
       try { const r = await telnyxApi(db, 'POST', '/messages/whatsapp', { from, to, whatsapp_message: msg }); return json(res, 200, { ok: true, id: (r.data && r.data.id) || null, result: r }); }
       catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* РЕГИСТРАЦИЯ номера в Cloud API (создать аккаунт номера + задать PIN) — своим Meta-токеном.
+       Именно это убирает ошибку «Account does not exist in Cloud API, use /register». PIN задаётся здесь, а не в UI. */
+    if (p === '/api/whatsapp/cloud-register' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const pnid = String(b.phoneNumberId || '').replace(/[^0-9]/g, '');
+      const token = String(b.token || '').trim();
+      const pin = String(b.pin || '').replace(/[^0-9]/g, '');
+      const wabaId = String(b.wabaId || '').replace(/[^0-9]/g, '');
+      if (!pnid || !token) return json(res, 400, { error: 'нужны Phone Number ID и Access Token из Meta' });
+      if (!/^\d{6}$/.test(pin)) return json(res, 400, { error: 'PIN — ровно 6 цифр' });
+      try {
+        const r = await fetch('https://graph.facebook.com/v21.0/' + pnid + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ messaging_product: 'whatsapp', pin }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return json(res, 400, { error: (j.error && j.error.message) || ('graph ' + r.status), detail: j.error || null });
+        /* успех → сохраняем креды для отправки через wa.js (боевой режим включит пользователь после теста) */
+        db.settings.wa = db.settings.wa || {};
+        db.settings.wa.token = token; db.settings.wa.phoneId = pnid; if (wabaId) db.settings.wa.wabaId = wabaId;
+        db.settings.wa.cloudRegisteredAt = Date.now();
+        store.save();
+        return json(res, 200, { ok: true, result: j });
+      } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* агентство запускает подключение официального WhatsApp: Telnyx выдаёт hosted-signup ссылку */
     if (p === '/api/whatsapp/hosted-signup' && req.method === 'POST') {

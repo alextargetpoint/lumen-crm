@@ -713,6 +713,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.8px; }
 /* ---------- номера ---------- */
 .num-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; }
 .num-card { padding: 18px; }
+.num-card.cloud-card { border-color: color-mix(in srgb, var(--accent-2, #7c5cff) 34%, var(--stroke)); background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2, #7c5cff) 5%, transparent), transparent); }
+.num-card.cloud-card .lb b { color: var(--accent-2, #7c5cff); }
 .num-head { display: flex; align-items: center; gap: 11px; }
 .num-head .ph { font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy-900); }
 .num-head .lb { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
