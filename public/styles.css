@@ -1514,8 +1514,7 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 
 /* ---------- брокер: инлайн-редактор не вылезает ---------- */
 .broker-card[data-bredit] { grid-column: 1 / -1; max-width: 560px; }
-.day-chip { padding: 4px 0; font-size: 10.5px; flex: 1; min-width: 0; border-radius: 7px; }
-.broker-card [style*="display:flex"] .day-chip { }
+.day-chip { padding: 7px 0; font-size: 10.5px; flex: 1; min-width: 0; border-radius: 7px; justify-content: center; text-align: center; line-height: 1; }
 .cal-now { position: absolute; left: 0; right: 0; height: 2px; background: var(--bad); z-index: 3; }
 .cal-now::before { content: ''; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 .cal-hot { background: var(--blue-100) !important; opacity: .7; }
