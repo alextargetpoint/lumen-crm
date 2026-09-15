@@ -503,6 +503,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
       <h1><span class="spark ic" data-ic="chat"></span><span id="h1t">Мои чаты</span><span class="hd-btn ic" id="settingsBtn" data-ic="palette" title="Оформление" style="margin-left:auto;color:var(--mut);background:var(--panel)"></span></h1>
       <div class="sub" id="sub">Загрузка…</div>
       <div class="viewseg" id="viewseg">
+        <button data-v="analytics" id="segAnalytics" style="display:none"><span class="ic" data-ic="spark"></span>Аналитика</button>
         <button data-v="chats" class="on"><span class="ic" data-ic="chat"></span>Чаты<span class="vbadge" id="vbChats"></span></button>
         <button data-v="leads"><span class="ic" data-ic="user"></span>Лиды<span class="vbadge" id="vbLeads"></span></button>
         <button data-v="tasks"><span class="ic" data-ic="check"></span>Задачи<span class="vbadge" id="vbTasks"></span></button>
@@ -716,19 +717,19 @@ function renderChats(){
 let MODE='chats', LEADS=[], LGRP_CLOSED={}, TASKS=[], TSTATS={}, MEETS=[];
 const STG={new:['Новые','#8b93a7'],first_touch:['Первое касание','#6b8cff'],ai_dialog:['В диалоге с ИИ','#7b5cff'],qualified:['Квалифицирован','#12b76a'],handover:['Передан брокеру','#0ea5a0'],viewing:['На показе','#f59e0b'],deal:['Сделка','#12b76a'],sleep:['Спящие','#8b93a7'],lost:['Закрыт','#ef4444']};
 const STG_ORDER=['new','first_touch','ai_dialog','qualified','handover','viewing','deal','sleep','lost'];
-const H1={chats:'Мои чаты',leads:'Мои лиды',tasks:'Мои задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний'};
-const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img'};
+const H1={chats:'Чаты',leads:'Лиды',tasks:'Задачи',meets:'Встречи',ideas:'Копилка идей',mood:'Карта желаний',analytics:'Аналитика'};
+const IC_MODE={chats:'chat',leads:'user',tasks:'check',meets:'cal',ideas:'spark',mood:'img',analytics:'spark'};
 function setSparkIcon(name){const sp=document.querySelector('.top h1 .spark');if(sp)sp.innerHTML=svg(name||'chat');}
 function setMode(m){MODE=m;
   document.querySelectorAll('#viewseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===m));
   $('#h1t').textContent=H1[m]||'Пульт';
   setSparkIcon(IC_MODE[m]);
-  ['chats','leads','tasks','meets','ideas','mood'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
+  ['chats','leads','tasks','meets','ideas','mood','analytics'].forEach(v=>$('#'+v).classList.toggle('hidden',v!==m));
   const cont=$('#'+m); if(cont){cont.classList.remove('viewshow');void cont.offsetWidth;cont.classList.add('viewshow');}   /* плавный вход раздела */
   $('#segflt').style.display=m==='chats'?'':'none';
-  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas'||m==='mood')?'none':'';
+  $('#q').closest('.search').style.display=(m==='meets'||m==='ideas'||m==='mood'||m==='analytics')?'none':'';
   $('#q').placeholder=m==='leads'?'Поиск лида или номера':m==='tasks'?'Поиск задачи':'Поиск';
-  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else if(m==='mood')loadMood();else renderChats();
+  if(m==='leads')loadLeads();else if(m==='tasks')loadTasks();else if(m==='meets')loadMeets();else if(m==='ideas')loadIdeas();else if(m==='mood')loadMood();else if(m==='analytics')loadAnalytics();else renderChats();
 }
 $('#viewseg')&&$('#viewseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{hap();setMode(b.dataset.v)});
 async function loadLeads(){try{LEADS=await jget('/tgapp/api/leads');renderLeads()}catch(e){
@@ -928,13 +929,9 @@ let ROLE='broker';
 async function applyRole(){
   try{const me=await jget('/tgapp/api/me');ROLE=me.role||'broker';}catch(e){ROLE='broker';}
   if(ROLE==='owner'){
-    document.querySelector('#viewseg').style.display='none';
-    document.querySelector('.search').style.display='none';
-    $('#segflt').style.display='none';
-    ['chats','leads','tasks','meets'].forEach(v=>$('#'+v).classList.add('hidden'));
-    $('#analytics').classList.remove('hidden');
-    $('#h1t').textContent='Аналитика';
-    loadAnalytics();
+    /* владелец видит ВСЁ: аналитику + все чаты/лиды/диалоги (надзор) + ведёт своих. Вкладка «Аналитика» появляется. */
+    const sa=$('#segAnalytics'); if(sa)sa.style.display='';
+    setMode('analytics');
   }
 }
 async function loadAnalytics(){try{const a=await jget('/tgapp/api/analytics');renderAnalytics(a)}catch(e){const stale=/no route|404/i.test(String(e.message));$('#analytics').innerHTML='<div class="empty">'+(stale?'Раздел разворачивается — обновите через минуту 🙌':'Не удалось загрузить.<br>'+esc(e.message))+'</div>'}}
@@ -1424,8 +1421,8 @@ if(TG&&TG.onEvent){TG.onEvent('homeScreenAdded',()=>{try{localStorage.setItem('l
 if(!INIT){$('#chats').innerHTML='<div class="empty">Откройте это приложение через кнопку «Чаты» в Telegram-боте.</div>';$('#sub').textContent='—'}
 else{
   fetch('/tgapp/api/prefs',{headers:H}).then(r=>r.json()).then(p=>{if(p&&(p.theme||p.accent)){PREFS=Object.assign(PREFS,p);try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}applyTheme()}}).catch(()=>{});
-  applyRole().then(()=>{ if(ROLE!=='owner'){ loadChats();prefetchLeadsBadge();prefetchDayBadges(); } });
-  setInterval(()=>{ if(ROLE==='owner'){ loadAnalytics(); } else if(!$('#conv').classList.contains('open')){ loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
+  applyRole().then(()=>{ loadChats();prefetchLeadsBadge();prefetchDayBadges(); });
+  setInterval(()=>{ if($('#conv').classList.contains('open'))return; if(MODE==='analytics'){ loadAnalytics(); } else { loadChats();prefetchLeadsBadge();prefetchDayBadges(); } },6000);
   initA2HS();
 }
 </script>

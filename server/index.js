@@ -3114,8 +3114,13 @@ const server = http.createServer(async (req, res) => {
       const db = store.loadTenant(_tgTid);
       const auser = tgAppUser(req, db);
       if (!auser) return json(res, 401, { error: 'нет привязки — откройте через кнопку бота' });
-      const abroker = auser.broker || null;   /* для основателя null → брокерские эндпоинты вернут пусто (canSee=false) */
-      const canSee = l => !!abroker && l && l.broker === abroker.id;
+      const isOwner = auser.role === 'owner';
+      /* владельцу — псевдо-профиль «Основатель» (id:'owner'), чтобы брокерские эндпоинты не падали;
+         его задачи/встречи/звонки скоупятся на 'owner', а лиды он видит ВСЕ (canSee ниже). */
+      const _ag0 = db.settings.agency || {};
+      const _ownerPhone = (db.settings.auth && db.settings.auth.ownerPhone) || (_ag0.manager && _ag0.manager.phone) || _ag0.ownerPhone || _ag0.phone || '';
+      const abroker = auser.broker || (isOwner ? { id: 'owner', name: 'Основатель', phone: _ownerPhone } : null);
+      const canSee = l => isOwner || (!!abroker && l && l.broker === abroker.id);   /* владелец видит все диалоги и карточки */
       let tam;
       /* кто я: роль + имя (бот строит навигацию по роли) */
       if (p === '/tgapp/api/me' && req.method === 'GET') {
