@@ -11694,16 +11694,42 @@ PAGES.settings = async (root) => {
             ['Click-to-call', 'Жмёшь «Позвонить» в карточке — Twilio соединяет тебя с лидом'],
             ['Гео caller-ID', 'Клиент видит номер своей страны → выше отклик'],
             ['Запись → транскрипт', 'Разговор пишется и расшифровывается в карточку автоматически']])}`;
+  const tgbOn = !!(s.tgBridge && s.tgBridge.tokenSet);
   const tgBridgeForm = `
-      <div class="muted" style="font-size:11.8px;margin:0 0 12px">Брокеру не нужно держать CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят брокеру в личный Telegram, он отвечает <b>reply</b> — и ответ уходит клиенту в WhatsApp с центрального номера. Номер один на всех, персона сохраняется, вся переписка логируется в CRM.</div>
-      <div class="set-row">
-        <div class="sp"><div class="sl">Мост включён</div><div class="sd">${s.tgBridge && s.tgBridge.tokenSet ? 'Токен бота сохранён' : 'Вставьте токен бота от @BotFather'}</div></div>
-        <label class="switch"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-      </div>
-      <div class="form-row" style="margin-top:6px"><label>Telegram Bot Token (отдельный бот моста, от @BotFather)</label><input id="tgbToken" type="password" placeholder="${s.tgBridge && s.tgBridge.tokenSet ? '•••••• сохранён' : '123456:AA… — можно тот же, что для отчётов'}"></div>
-      <div style="display:flex;gap:8px;margin:4px 0 12px"><button class="btn btn-accent" id="tgbSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="tgbSetup" title="Прописать вебхук боту (нужен запущенный туннель)">${ic(I.link)}Настроить вебхук</button></div>
-      <div id="tgbBrokers" class="muted" style="font-size:12px">Загрузка кодов привязки…</div>
-      <div class="muted" style="font-size:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">👑 <b>Основатель</b> — аналитика агентства и пульт с телефона. Отправьте боту: <code class="pill" data-tgbcode="${esc(s.ownerTgCode || '')}" style="padding:6px 9px;cursor:pointer" title="Скопировать">/start ${esc(s.ownerTgCode || '—')}</code>${s.ownerTgChatId ? ' · <span class="badge ok">привязан</span>' : ''}</div>`;
+      <div class="muted" style="font-size:11.8px;margin:0 0 14px">Брокер не держит CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят ему в личный Telegram — он отвечает <b>reply</b>, и ответ уходит клиенту в WhatsApp с его прогретого номера. Вся переписка логируется в CRM.</div>
+
+      <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
+        <b>Заведите бота агентства</b>
+        <i>Откройте <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> → <code class="pill">/newbot</code> → задайте имя (напр. «Агентство · Lumen») → скопируйте выданный токен. Это бот <b>вашего</b> агентства — ваш логотип, ваше имя.</i>
+        <div class="form-row" style="margin-top:8px"><input id="tgbToken" type="password" placeholder="${tgbOn ? '•••••• токен сохранён' : 'Вставьте сюда токен от @BotFather (123456:AA…)'}"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+          <button class="btn btn-accent btn-sm" id="tgbSave">${ic(I.check)}Сохранить токен</button>
+          <label class="switch" title="Включить/выключить мост"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
+          <span class="sd">${s.tgBridge && s.tgBridge.enabled ? 'мост включён' : 'мост выключен'}</span>
+        </div>
+      </div></div>
+
+      <div class="tgb-step"><span class="tgb-n">2</span><div class="tgb-b">
+        <b>Подключите бота к CRM</b>
+        <i>Один раз пропишите боту вебхук — после этого он общается с вашей CRM.</i>
+        <button class="btn btn-sm" id="tgbSetup" style="margin-top:8px" title="Прописать вебхук боту">${ic(I.link)}Настроить вебхук</button>
+      </div></div>
+
+      <div class="tgb-step"><span class="tgb-n">3</span><div class="tgb-b">
+        <b>Привяжите себя (основатель)</b>
+        <i>Откройте своего бота в Telegram и отправьте ему команду с <b>ключом агентства</b> — по нему бот понимает, что это вы и какое агентство:</i>
+        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда целиком">
+          ${ic(I.copy || I.doc)}<code>/start ${esc(s.ownerTgCode || '—')}</code>
+          ${s.ownerTgChatId ? '<span class="badge ok" style="margin-left:auto">вы привязаны</span>' : '<span class="badge" style="margin-left:auto">ещё не привязан</span>'}
+        </div>
+        <button class="btn-ghost btn-sm" id="tgbRegen" style="margin-top:6px;font-size:11px">${ic(I.refresh)}Сгенерировать новый ключ</button>
+      </div></div>
+
+      <div class="tgb-step"><span class="tgb-n">4</span><div class="tgb-b">
+        <b>Привяжите брокеров</b>
+        <i>У каждого брокера — свой ключ. Дайте брокеру его команду, он отправит её тому же боту — и все его лиды пойдут ему в личку.</i>
+        <div id="tgbBrokers" class="muted" style="font-size:12px;margin-top:8px">Загрузка ключей брокеров…</div>
+      </div></div>`;
   const inventoryForm = `
       <div class="muted" style="font-size:11.8px;margin:0 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» в разделе «База объектов»: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
       ${Object.entries(s.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
@@ -11800,6 +11826,12 @@ PAGES.settings = async (root) => {
   });
   $('#tgbSetup')?.addEventListener('click', async () => {
     try { const r = await api.post('/tgbridge/setup', {}); toast('Вебхук настроен', r.webhook, true); tgbRenderBrokers(); }
+    catch (e) { toast('Не вышло', e.message); }
+  });
+  $('.tgb-key[data-tgbcode]')?.addEventListener('click', function () { const c = this.dataset.tgbcode; if (!c) { toast('Ключ ещё не создан', 'Нажмите «Сгенерировать новый ключ»'); return; } navigator.clipboard.writeText('/start ' + c); toast('Скопировано', 'Откройте своего бота и вставьте команду', true); });
+  $('#tgbRegen')?.addEventListener('click', async () => {
+    if (!await uiConfirm('Новый ключ основателя?', 'Старая команда /start перестанет работать. Если вы уже привязаны — привязка сохранится.', { ok: 'Сгенерировать' })) return;
+    try { await api.post('/tgbridge/regen-owner', {}); toast('Новый ключ создан', null, true); await loadState(); PAGES.settings(root); }
     catch (e) { toast('Не вышло', e.message); }
   });
   $('#waWizard')?.addEventListener('click', openWaWizard);

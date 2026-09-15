@@ -3749,6 +3749,13 @@ const server = http.createServer(async (req, res) => {
       try { const r = await tgbridge.setupWebhook(db, base); let menu = null; try { menu = await tgbridge.setMenuButton(db, base); } catch (_) {} return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', miniApp: base.replace(/\/$/, '') + '/tgapp', result: r, menu: !!menu }); }
       catch (e) { return json(res, 400, { error: e.message }); }
     }
+    if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC */
+      db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex');
+      store.save();
+      return json(res, 200, { ok: true, ownerTgCode: db.settings.ownerTgCode });
+    }
     let tgm;
     if ((tgm = p.match(/^\/api\/brokers\/([^/]+)\/tg-unbind$/)) && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -4787,14 +4794,15 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       if (!lead.phone) return json(res, 400, { error: 'у лида нет номера' });
       const g = db.settings.waGray || {};
-      if (!g.url || !g.token) return json(res, 400, { error: 'WhatsApp по QR не подключён (Подключения → WhatsApp по QR)' });
-      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен' }); }
+      if (!g.url || !g.token) return json(res, 400, { error: 'WhatsApp по QR не подключён (Настройки → WhatsApp по QR)' });
+      if (!(g.numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Добавьте номер в Настройки → WhatsApp по QR и подключите по QR.' });
+      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен (проверьте URL/токен в Настройки → WhatsApp по QR)' }); }
       const sid = (g.numbers || []).map(n => waGraySid(n.phone)).find(s => live[s] && live[s].status === 'connected');
-      if (!sid) return json(res, 400, { error: 'нет подключённого WhatsApp-номера для проверки (подключите номер по QR)' });
+      if (!sid) return json(res, 400, { error: 'Проверять НЕЧЕМ: ни один ваш номер сейчас не на связи. Откройте Настройки → WhatsApp по QR и подключите номер по QR (после редеплоя воркера сессию нужно пере-сканировать).' });
       try {
         const r = await waGrayApi(db, 'POST', '/sessions/' + sid + '/check', { to: lead.phone });
         lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; store.save();
-        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa });
+        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa, checkedFrom: sid.split('__')[1] || null, tried: r.tried || null });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
 
