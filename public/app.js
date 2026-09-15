@@ -9785,6 +9785,14 @@ PAGES.numbers = async (root) => {
   const grayNums = grayData.numbers || [];
   const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
   const grayStatusBadge = (live) => { const s = live && live.status; return s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; };
+  const warmLiveHtml = (w) => {
+    if (!w || !w.running) return '<div class="muted" style="font-size:11.5px;margin-top:8px">Прогрев выключен. Включите тумблер выше — номера начнут аккуратную переписку между собой (нужно ≥2 на связи).</div>';
+    const log = w.log || [];
+    return `<div class="warm-live">
+      <div class="warm-ind"><span class="warm-pulse"></span><b>Прогрев идёт</b>${w._sent != null ? ` · сегодня <b>${w._sent}</b>` : ''}${w.total ? ` · всего ${w.total}` : ''}${w.lastAt ? ` · посл. ${tmm(w.lastAt)}` : ''}</div>
+      <div class="warm-log">${log.length ? log.slice(0, 14).map(e => `<div class="warm-msg"><b>${esc(e.from)}</b><span class="warm-arr">→</span><b>${esc(e.to)}</b><span class="warm-txt">${esc(e.text)}</span><i>${tmm(e.at)}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Первые сообщения появятся в ближайшие минуты — обмены идут с задержками, как живая переписка.</div>'}</div>
+    </div>`;
+  };
   const ring = (q) => {
     const r = 19, c = 2 * Math.PI * r;
     const col = q >= 80 ? 'var(--ok)' : q >= 55 ? 'var(--warn)' : 'var(--bad)';
@@ -9852,9 +9860,10 @@ PAGES.numbers = async (root) => {
     ${grayNums.length ? (() => { const w = grayData.warmup || {}; return `<div class="glass card mb">
       <div class="card-title">${ic(I.bolt)}Прогрев серых номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые серые номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
-      <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + журнал</div></div>
+      <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
         <label class="switch"><input type="checkbox" id="numWarm" ${w.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"></div>
+      <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
 
     ${st.numbers.length ? `<div class="lp-sec" style="margin:0 0 10px">Официальные Cloud-API номера · ${st.numbers.length}</div>
@@ -9888,8 +9897,15 @@ PAGES.numbers = async (root) => {
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
-  $('#numWarm', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', e.target.checked ? 'Номера начнут переписку между собой' : null, true); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
+  $('#numWarm', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', e.target.checked ? 'Номера начнут переписку между собой' : null, true); const box = $('#warmLive', root); if (box) box.innerHTML = warmLiveHtml({ ...(grayData.warmup || {}), running: e.target.checked }); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
   $('#numWarmPerDay', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); toast('Лимит прогрева обновлён', null, true); } catch (er) {} });
+  /* живой журнал прогрева: обновляем #warmLive раз в 6с, пока на странице и прогрев идёт */
+  if (window.NUM_WARM_POLL) { clearInterval(window.NUM_WARM_POLL); window.NUM_WARM_POLL = null; }
+  if (grayNums.length) window.NUM_WARM_POLL = setInterval(async () => {
+    const box = document.getElementById('warmLive');
+    if (!box || (typeof CUR !== 'undefined' && CUR !== 'numbers')) { clearInterval(window.NUM_WARM_POLL); window.NUM_WARM_POLL = null; return; }
+    try { const d = await api.get('/wa/gray/list'); box.innerHTML = warmLiveHtml(d.warmup || {}); } catch (_) {}
+  }, 6000);
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');

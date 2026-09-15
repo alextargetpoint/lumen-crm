@@ -2484,7 +2484,14 @@ async function warmupTick() {
         let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
         const from = conn[i], to = conn[k];
         const msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
-        try { await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg }); g.warmup._sent = (g.warmup._sent || 0) + 1; store.save(); } catch (e) {}
+        try {
+          await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg });
+          g.warmup._sent = (g.warmup._sent || 0) + 1;
+          g.warmup.total = (g.warmup.total || 0) + 1;
+          g.warmup.lastAt = Date.now();
+          g.warmup.log = [{ from: from.label || from.phone, to: to.label || to.phone, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+          store.save();
+        } catch (e) {}
       });
     }
   } finally { warmupBusy = false; }
