@@ -3025,7 +3025,7 @@ const server = http.createServer(async (req, res) => {
         const today = _ds(Date.now());
         const brief = lid => { const l = db.leads.find(x => x.id === lid); return l ? { id: l.id, name: l.name, stage: l.stage } : null; };
         const mine = (db.brokerTasks || []).filter(t => (t.brokerId || null) === abroker.id);
-        const list = mine.map(t => ({ id: t.id, title: t.title, priority: t.priority || 'normal', status: t.status, due: t.due || null, scheduled: t.scheduled || null, doneAt: t.doneAt || null, sphere: t.sphere || null, lead: t.leadId ? brief(t.leadId) : null }))
+        const list = mine.map(t => ({ id: t.id, title: t.title, priority: t.priority || 'normal', status: t.status, due: t.due || null, scheduled: t.scheduled || null, doneAt: t.doneAt || null, sphere: t.sphere || null, notes: t.notes || '', subtasks: (t.subtasks || []).map(s => ({ id: s.id, title: s.title, done: !!s.done })), lead: t.leadId ? brief(t.leadId) : null }))
           .sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0) || (a.due || a.scheduled || '9') > (b.due || b.scheduled || '9') ? 1 : -1);
         const stats = {
           open: list.filter(t => t.status !== 'done').length,
@@ -3044,9 +3044,64 @@ const server = http.createServer(async (req, res) => {
       if (p === '/tgapp/api/task' && req.method === 'POST') {
         const b = await readBody(req); const title = String(b.title || '').trim().slice(0, 200);
         if (!title) return json(res, 400, { error: 'пустая задача' });
-        const t = { id: crypto.randomBytes(5).toString('hex'), brokerId: abroker.id, title, priority: b.priority || 'normal', status: 'todo', due: b.due ? +b.due : null, scheduled: b.scheduled || _ds(Date.now()), leadId: b.leadId || null, meetingId: null, notes: '', createdAt: Date.now(), doneAt: null };
+        const subs = Array.isArray(b.subtasks) ? b.subtasks.map(s => ({ id: crypto.randomBytes(4).toString('hex'), title: String((s && s.title) || s || '').trim().slice(0, 200), done: !!(s && s.done) })).filter(s => s.title).slice(0, 40) : [];
+        const t = { id: crypto.randomBytes(5).toString('hex'), brokerId: abroker.id, title, priority: b.priority || 'normal', status: 'todo', due: b.due ? +b.due : null, scheduled: b.scheduled || _ds(Date.now()), leadId: b.leadId || null, meetingId: null, notes: String(b.notes || '').slice(0, 2000), sphere: b.sphere || null, subtasks: subs, createdAt: Date.now(), doneAt: null };
         db.brokerTasks = db.brokerTasks || []; db.brokerTasks.unshift(t);
         store.save(); return json(res, 200, t);
+      }
+      /* редактирование задачи (структурная форма: заголовок/приоритет/дата/заметка/подзадачи) */
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)$/)) && req.method === 'PATCH') {
+        const t = (db.brokerTasks || []).find(x => x.id === tam[1] && (x.brokerId || null) === abroker.id);
+        if (!t) return json(res, 404, { error: 'not found' });
+        const b = await readBody(req);
+        if (b.title !== undefined) { const tt = String(b.title || '').trim().slice(0, 200); if (tt) t.title = tt; }
+        if (b.priority !== undefined) t.priority = ['low', 'normal', 'high'].includes(b.priority) ? b.priority : t.priority;
+        if (b.due !== undefined) t.due = b.due ? +b.due : null;
+        if (b.scheduled !== undefined) t.scheduled = b.scheduled || null;
+        if (b.notes !== undefined) t.notes = String(b.notes || '').slice(0, 2000);
+        if (b.sphere !== undefined) t.sphere = b.sphere || null;
+        if (Array.isArray(b.subtasks)) t.subtasks = b.subtasks.map(s => ({ id: (s && s.id) || crypto.randomBytes(4).toString('hex'), title: String((s && s.title) || '').trim().slice(0, 200), done: !!(s && s.done) })).filter(s => s.title).slice(0, 40);
+        store.save(); return json(res, 200, { ok: true });
+      }
+      /* удалить задачу */
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)$/)) && req.method === 'DELETE') {
+        const before = (db.brokerTasks || []).length;
+        db.brokerTasks = (db.brokerTasks || []).filter(x => !(x.id === tam[1] && (x.brokerId || null) === abroker.id));
+        if (db.brokerTasks.length === before) return json(res, 404, { error: 'not found' });
+        store.save(); return json(res, 200, { ok: true });
+      }
+      /* добавить подзадачу */
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)\/subtask$/)) && req.method === 'POST') {
+        const t = (db.brokerTasks || []).find(x => x.id === tam[1] && (x.brokerId || null) === abroker.id);
+        if (!t) return json(res, 404, { error: 'not found' });
+        const b = await readBody(req); const title = String(b.title || '').trim().slice(0, 200);
+        if (!title) return json(res, 400, { error: 'пусто' });
+        t.subtasks = t.subtasks || []; const s = { id: crypto.randomBytes(4).toString('hex'), title, done: false };
+        t.subtasks.push(s); store.save(); return json(res, 200, s);
+      }
+      /* переключить/удалить подзадачу */
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)\/subtask\/([^/]+)\/toggle$/)) && req.method === 'POST') {
+        const t = (db.brokerTasks || []).find(x => x.id === tam[1] && (x.brokerId || null) === abroker.id);
+        const s = t && (t.subtasks || []).find(x => x.id === tam[2]); if (!s) return json(res, 404, { error: 'not found' });
+        s.done = !s.done; store.save(); return json(res, 200, { ok: true, done: s.done });
+      }
+      if ((tam = p.match(/^\/tgapp\/api\/task\/([^/]+)\/subtask\/([^/]+)$/)) && req.method === 'DELETE') {
+        const t = (db.brokerTasks || []).find(x => x.id === tam[1] && (x.brokerId || null) === abroker.id);
+        if (!t) return json(res, 404, { error: 'not found' });
+        t.subtasks = (t.subtasks || []).filter(x => x.id !== tam[2]); store.save(); return json(res, 200, { ok: true });
+      }
+      /* ИИ причёсывает надиктовку/пул в глобальную задачу + подзадачи */
+      if (p === '/tgapp/api/tasks/structure' && req.method === 'POST') {
+        const b = await readBody(req); const raw = String(b.text || '').trim().slice(0, 4000);
+        if (!raw) return json(res, 400, { error: 'пустой текст' });
+        if (!llm.available()) return json(res, 503, { error: 'ИИ не подключён' });
+        const prompt = `Ты помощник-планировщик. Пользователь надиктовал/накидал список дел одним куском. Причеши это в ОДНУ главную задачу и понятные подзадачи-шаги.\nВЕРНИ СТРОГО JSON без пояснений и без markdown: {"title":"краткая формулировка главной задачи (до 90 симв)","priority":"low|normal|high","notes":"важные детали одной строкой или пусто","subtasks":["конкретный шаг 1","шаг 2", "..."]}.\nПравила: подзадачи — короткие глаголы-действия, 2–12 штук, без нумерации и без воды, на языке пользователя. priority высокий если есть срочность/дедлайн.\nТЕКСТ ПОЛЬЗОВАТЕЛЯ:\n"""${raw}"""`;
+        let out; try { out = await llm.callGemini(prompt, 16000, 1200); } catch (e) { return json(res, 502, { error: 'ИИ недоступен: ' + e.message }); }
+        let parsed = null;
+        try { const txt = String((out && out.text) || '').replace(/```json|```/g, '').trim(); const m = txt.match(/\{[\s\S]*\}/); parsed = JSON.parse(m ? m[0] : txt); } catch (e) { parsed = null; }
+        if (!parsed || !parsed.title) return json(res, 502, { error: 'не удалось разобрать' });
+        const subtasks = Array.isArray(parsed.subtasks) ? parsed.subtasks.map(s => String(s || '').trim().slice(0, 200)).filter(Boolean).slice(0, 20) : [];
+        return json(res, 200, { title: String(parsed.title).slice(0, 200), priority: ['low', 'normal', 'high'].includes(parsed.priority) ? parsed.priority : 'normal', notes: String(parsed.notes || '').slice(0, 500), subtasks });
       }
       if (p === '/tgapp/api/meetings' && req.method === 'GET') {
         const now = Date.now();
