@@ -11827,10 +11827,10 @@ PAGES.settings = async (root) => {
           </div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
-          ${(s.telephony || {}).provider === 'twilio' ? `
+          ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? `
           <div class="tel-numbers" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-            <div class="lc-lbl">Номера · покупка в дашборде</div>
-            <div class="muted" style="font-size:11.5px;padding:4px 0 8px">Клиент видит номер своей страны (гео caller-ID). Покупай номера под свои рынки — они попадут в пул подбора.</div>
+            <div class="lc-lbl">Номера · покупка в дашборде${(s.telephony || {}).provider === 'telnyx' ? ' (Telnyx)' : ''}</div>
+            <div class="muted" style="font-size:11.5px;padding:4px 0 8px">Клиент видит номер своей страны (гео caller-ID). Покупай номера под свои рынки — они сразу попадут в пул подбора и привяжутся к твоему Call-Control.</div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <select id="telCountry" class="lc-inp" style="width:150px">${['AE','ES','GB','US','FR','DE','NL','TR','SA','PL'].map(c => `<option value="${c}">${({ AE: 'ОАЭ', ES: 'Испания', GB: 'Британия', US: 'США', FR: 'Франция', DE: 'Германия', NL: 'Нидерланды', TR: 'Турция', SA: 'Сауд.Аравия', PL: 'Польша' })[c]} (${c})</option>`).join('')}</select>
               <button class="btn btn-sm" id="telSearch" type="button">${ic(I.search || I.spark)}Найти</button>
