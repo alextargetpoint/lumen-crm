@@ -5977,6 +5977,24 @@ const server = http.createServer(async (req, res) => {
       let bal = null; try { bal = await yesimApi('get_balance'); } catch (e) { return json(res, 200, { ok: true, saved: true, warn: 'токен сохранён, но проверка баланса не прошла: ' + e.message }); }
       return json(res, 200, { ok: true, balance: bal });
     }
+    /* диагностика форматов авторизации Yesim (какой Basic принимается) */
+    if (p === '/api/gray/yesim/authtest' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const { user, token } = yesimCreds();
+      const forms = {
+        'user:token': 'Basic ' + Buffer.from(user + ':' + token).toString('base64'),
+        'token:token': 'Basic ' + Buffer.from(token + ':' + token).toString('base64'),
+        'token:empty': 'Basic ' + Buffer.from(token + ':').toString('base64'),
+        'raw-basic-token': 'Basic ' + token,
+        'bearer-token': 'Bearer ' + token,
+      };
+      const out = { serverIp: await serverPublicIp(), results: {} };
+      for (const [name, hdr] of Object.entries(forms)) {
+        try { const r = await fetch('https://vn.yesim.app/apiv1/index.php?action=get_balance', { headers: { Authorization: hdr }, signal: AbortSignal.timeout(10000) }); const t = await r.text(); out.results[name] = { status: r.status, body: t.slice(0, 160) }; }
+        catch (e) { out.results[name] = { error: e.message }; }
+      }
+      return json(res, 200, out);
+    }
     /* диагностика Yesim: публичный IP сервера (для whitelist) + проверка токена/баланса */
     if (p === '/api/gray/yesim/probe' && req.method === 'GET') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
