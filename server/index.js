@@ -5918,8 +5918,20 @@ const server = http.createServer(async (req, res) => {
         for (const number of cand) {
           try {
             await telnyxApi(db, 'POST', '/number_orders', { phone_numbers: [{ phone_number: number }] });
-            /* назначаем messaging-profile (для приёма SMS) + голосовое подключение (best-effort) */
-            try { const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number)); const pid = pn.data && pn.data[0] && pn.data[0].id; if (pid) { if (profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { messaging_profile_id: profileId }); if (t.connId) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { connection_id: t.connId }); } catch (_) {} } } } catch (_) {}
+            /* номер после заказа некоторое время в статусе provisioning — ждём active, иначе PATCH профиля падает.
+               Ждём до ~8с; если не успел — привяжется авто-починкой при открытии панели OTP. */
+            for (let i = 0; i < 4; i++) {
+              try {
+                const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number));
+                const d = pn.data && pn.data[0];
+                if (d && d.status === 'active') {
+                  if (profileId && d.messaging_profile_id !== profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { messaging_profile_id: profileId });
+                  if (t.connId && !d.connection_id) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: t.connId }); } catch (_) {} }
+                  break;
+                }
+              } catch (_) {}
+              await new Promise(r => setTimeout(r, 2000));
+            }
             bought = number; break;
           } catch (e) { /* следующий кандидат */ }
         }
@@ -5928,6 +5940,27 @@ const server = http.createServer(async (req, res) => {
         t.otpNumbers[bought.replace(/[^0-9]/g, '')] = { number: bought, at: Date.now(), sms: [] };
         store.save();
         return json(res, 200, { ok: true, number: bought });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* починка OTP-номера: привязать messaging-profile (для приёма SMS) + голосовое подключение. Идемпотентно. */
+    if (p === '/api/telephony/otp/repair' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const num = e164(String(b.number || ''));
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'telnyx') return json(res, 400, { error: 'только Telnyx' });
+      try {
+        const profileId = await ensureTelnyxMsgProfile(db);
+        const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(num));
+        const d = pn.data && pn.data[0];
+        if (!d) return json(res, 404, { error: 'номер не найден в Telnyx' });
+        if (d.status !== 'active') return json(res, 409, { error: 'номер ещё провижинится (' + d.status + '), попробуй через минуту' });
+        let assigned = false;
+        if (profileId && d.messaging_profile_id !== profileId) { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { messaging_profile_id: profileId }); assigned = true; }
+        if (t.connId && !d.connection_id) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: t.connId }); } catch (_) {} }
+        /* убедимся, что номер учтён в ленте OTP */
+        t.otpNumbers = t.otpNumbers || {}; const key = num.replace(/[^0-9]/g, '');
+        if (!t.otpNumbers[key]) { t.otpNumbers[key] = { number: num, at: Date.now(), sms: [] }; store.save(); }
+        return json(res, 200, { ok: true, assigned, messaging_profile_id: profileId, already: !assigned });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* диагностика OTP-номера: привязан ли messaging-profile + верный ли webhook_url (почему не приходит SMS) */

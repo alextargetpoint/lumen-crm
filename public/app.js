@@ -1355,6 +1355,8 @@ window.openTelnyxOtp = async function () {
   };
   /* подтянуть уже купленный OTP-номер, если есть */
   try { const r = await api.get('/telephony/otp/sms?number='); draw((r.numbers && r.numbers[0]) || ''); } catch (e) { draw(''); }
+  /* авто-починка: убедиться, что номер привязан к messaging-profile (иначе Telnyx не доставит OTP) */
+  if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} }
   loadSms();
   pollTimer = setInterval(loadSms, 5000);
 };
