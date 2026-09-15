@@ -888,6 +888,7 @@ function tunnelUrl() {
 
 function publicSettings(db) {
   const s = JSON.parse(JSON.stringify(db.settings));
+  s.ownerEmail = (db.settings.auth && db.settings.auth.ownerEmail) || ''; /* показать текущий e-mail входа (для смены в настройках); хэши/сессии не отдаём */
   delete s.auth;
   delete s.billing; // отдаётся отдельным computed-роутом /api/billing (с расчётом/расходниками)
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
@@ -4236,6 +4237,28 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true });
     }
+    /* смена e-mail входа агентства (владелец): пароль + уникальность нового адреса → обновляем реестр byEmail + мету + auth */
+    if (p === '/auth/email' && req.method === 'POST') {
+      const sid = getSession(req); if (!sid) return json(res, 401, { error: 'auth' });
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'сменить почту агентства может только владелец' });
+      const b = await readBody(req);
+      const newEmail = String(b.email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail)) return json(res, 400, { error: 'нужен корректный e-mail' });
+      if (!verifyPassword(String(b.password || ''), db.settings.auth.passHash)) return json(res, 400, { error: 'текущий пароль неверен' });
+      const reg = store.getRegistry();
+      const tid = store.currentTid();
+      const existing = reg.byEmail[newEmail];
+      if (existing && existing !== tid) return json(res, 409, { error: 'этот e-mail уже занят другим агентством' });
+      const oldEmail = (db.settings.auth.ownerEmail || (reg.tenants[tid] && reg.tenants[tid].ownerEmail) || '').toLowerCase();
+      if (oldEmail && reg.byEmail[oldEmail] === tid) delete reg.byEmail[oldEmail];
+      reg.byEmail[newEmail] = tid;
+      if (reg.tenants[tid]) reg.tenants[tid].ownerEmail = newEmail;
+      store.saveRegistry();
+      db.settings.auth.ownerEmail = newEmail;
+      store.save();
+      audit(db, req, 'смена e-mail агентства', { from: oldEmail, to: newEmail });
+      return json(res, 200, { ok: true, email: newEmail });
+    }
 
     /* ---------------- API (всё под сессией) ---------------- */
     /* ИИ-переписывание текста: доступно из приложения (сессия) и из конструктора (key) */
@@ -4475,7 +4498,9 @@ const server = http.createServer(async (req, res) => {
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
       json(res, 200, {
         settings: pubS, brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
-        templates: db.templates, sequences: db.sequences,
+        templates: db.templates,
+        /* цепочки: владелец видит все; брокер — агентские (base) + свои + расшаренные всем (agency) или лично ему */
+        sequences: IS_BROKER ? db.sequences.filter(sq => !sq.ownerId || sq.ownerId === ROLE.brokerId || sq.visibility === 'agency' || (sq.sharedWith || []).includes(ROLE.brokerId)) : db.sequences,
         events: IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})).slice(0, 40) : db.events.slice(0, 40),
         analytics: analytics(db),
         me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
@@ -4796,13 +4821,24 @@ const server = http.createServer(async (req, res) => {
       const g = db.settings.waGray || {};
       if (!g.url || !g.token) return json(res, 400, { error: 'WhatsApp по QR не подключён (Настройки → WhatsApp по QR)' });
       if (!(g.numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Добавьте номер в Настройки → WhatsApp по QR и подключите по QR.' });
-      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен (проверьте URL/токен в Настройки → WhatsApp по QR)' }); }
-      const sid = (g.numbers || []).map(n => waGraySid(n.phone)).find(s => live[s] && live[s].status === 'connected');
-      if (!sid) return json(res, 400, { error: 'Проверять НЕЧЕМ: ни один ваш номер сейчас не на связи. Откройте Настройки → WhatsApp по QR и подключите номер по QR (после редеплоя воркера сессию нужно пере-сканировать).' });
+      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен (проверьте URL/токен в разделе «Номера»)' }); }
+      /* РОТАЦИЯ + ЛИМИТ: массовая проверка onWhatsApp с ОДНОГО номера триггерит бан. Поэтому берём
+         подключённый номер с НАИМЕНЬШИМ числом проверок за сегодня (равномерная нагрузка на пул) и
+         держим дневной потолок на номер. Счётчик сбрасывается в новый день. */
+      const CHECK_CAP = (g.checkCapPerDay || 40);
+      const today = new Date().toISOString().slice(0, 10);
+      const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
+      if (!connected.length) return json(res, 400, { error: 'Проверять НЕЧЕМ: ни один ваш номер сейчас не на связи. Раздел «Номера» → «Подключить по QR» (после редеплоя воркера сессию нужно пере-сканировать).' });
+      for (const n of connected) { if (n._checkDay !== today) { n._checkDay = today; n._checksToday = 0; } }
+      connected.sort((a, b) => (a._checksToday || 0) - (b._checksToday || 0));
+      const pick = connected[0];
+      if ((pick._checksToday || 0) >= CHECK_CAP) return json(res, 429, { error: `Дневной лимит проверок исчерпан на всех номерах (${CHECK_CAP}/номер) — защита от бана. Подключите ещё номер по QR или повторите завтра.` });
+      const sid = waGraySid(pick.phone);
       try {
         const r = await waGrayApi(db, 'POST', '/sessions/' + sid + '/check', { to: lead.phone });
-        lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; store.save();
-        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa, checkedFrom: sid.split('__')[1] || null, tried: r.tried || null });
+        pick._checksToday = (pick._checksToday || 0) + 1;
+        lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; lead.channels.waCheckedAt = Date.now(); store.save();
+        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa, checkedFrom: pick.phone, checksLeft: Math.max(0, CHECK_CAP - pick._checksToday), tried: r.tried || null });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
 
@@ -5401,23 +5437,43 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/sequences' && req.method === 'POST') {
       const b = await readBody(req);
-      const seq = { id: store.nextId('seq'), name: String(b.name || 'Новая цепочка').slice(0, 80), geo: b.geo || 'all', active: false, steps: b.steps || [{ day: 0, channel: 'wa', mode: 'text', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {geo}. Подскажите, рассматриваете для жизни или как инвестицию?', label: 'Первое касание', active: true }] };
+      /* брокер создаёт ЛИЧНУЮ цепочку (ownerId=он, visibility=private); владелец — агентскую (base) */
+      const owned = IS_BROKER ? ROLE.brokerId : null;
+      const seq = { id: store.nextId('seq'), name: String(b.name || (IS_BROKER ? 'Моя цепочка' : 'Новая цепочка')).slice(0, 80), geo: b.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: b.steps || [{ day: 0, channel: 'wa', mode: 'text', text: 'Здравствуйте, {name}! Это {agency} — вы оставляли заявку по {geo}. Подскажите, рассматриваете для жизни или как инвестицию?', label: 'Первое касание', active: true }] };
       db.sequences.push(seq); store.save();
       return json(res, 200, seq);
     }
+    /* форк: скопировать видимую цепочку в свою личную (менеджмент задаёт базовую → брокер дорабатывает под себя) */
+    if ((m = p.match(/^\/api\/sequences\/([^/]+)\/fork$/)) && req.method === 'POST') {
+      const src = db.sequences.find(s => s.id === m[1]);
+      if (!src) return json(res, 404, { error: 'not found' });
+      if (IS_BROKER && src.ownerId && src.ownerId !== ROLE.brokerId && !(src.sharedWith || []).includes(ROLE.brokerId)) return json(res, 403, { error: 'нет доступа к этой цепочке' });
+      const owned = IS_BROKER ? ROLE.brokerId : null;
+      const copy = { id: store.nextId('seq'), name: (src.name + ' (моя копия)').slice(0, 80), geo: src.geo || 'all', active: false, ownerId: owned, visibility: owned ? 'private' : 'base', sharedWith: [], steps: JSON.parse(JSON.stringify(src.steps || [])) };
+      db.sequences.push(copy); store.save();
+      return json(res, 200, copy);
+    }
     if ((m = p.match(/^\/api\/sequences\/([^/]+)$/)) && req.method === 'DELETE') {
-      if (db.sequences.length <= 1) return json(res, 400, { error: 'нельзя удалить последнюю цепочку' });
+      const seq = db.sequences.find(s => s.id === m[1]);
+      if (!seq) return json(res, 404, { error: 'not found' });
+      if (IS_BROKER && seq.ownerId !== ROLE.brokerId) return json(res, 403, { error: 'можно удалять только свои цепочки' });
+      const scope = IS_BROKER ? db.sequences.filter(s => s.ownerId === ROLE.brokerId) : db.sequences.filter(s => !s.ownerId);
+      if (scope.length <= 1 && (IS_BROKER ? seq.ownerId === ROLE.brokerId : !seq.ownerId)) return json(res, 400, { error: 'нельзя удалить последнюю цепочку' });
       db.sequences = db.sequences.filter(s => s.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
     }
     if ((m = p.match(/^\/api\/sequences\/([^/]+)$/)) && req.method === 'PATCH') {
       const seq = db.sequences.find(s => s.id === m[1]);
       if (!seq) return json(res, 404, { error: 'not found' });
+      if (IS_BROKER && seq.ownerId !== ROLE.brokerId) return json(res, 403, { error: 'можно менять только свои цепочки (агентские редактирует руководитель — форкните её себе)' });
       const b = await readBody(req);
       if (b.steps) seq.steps = b.steps.slice(0, 30);
       if (b.active != null) seq.active = b.active;
       if (b.name) seq.name = String(b.name).slice(0, 80);
       if (b.geo) seq.geo = b.geo;
+      /* шаринг: владелец шарит агентские кому угодно; брокер — свои личные конкретным брокерам/всем */
+      if (b.visibility && ['base', 'private', 'shared', 'agency'].includes(b.visibility)) seq.visibility = b.visibility;
+      if (Array.isArray(b.sharedWith)) seq.sharedWith = b.sharedWith.filter(x => typeof x === 'string').slice(0, 200);
       store.save();
       return json(res, 200, seq);
     }

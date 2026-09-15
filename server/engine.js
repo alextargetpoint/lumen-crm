@@ -279,11 +279,15 @@ function tickChains(db) {
     if (!lead.ai.enabled) continue;
     if (lead.marketingOptOut) continue;                             // отписался от рассылки — касания не шлём
     if (!autoOn && !lead.ai.forced) continue;                       // авто off → только ручные
-    /* какую цепочку крутить: приоритет — принудительная (ручной запуск), затем дефолтная из настроек, затем по гео */
+    /* какую цепочку крутить (приоритет): принудительная (ручной запуск) → ЛИЧНАЯ цепочка закреплённого
+       брокера (по гео, затем «все») → дефолтная из настроек → агентская (base) по гео → агентская «все».
+       Личные цепочки (ownerId) применяются ТОЛЬКО к лидам своего брокера — чужим не протекают. */
     const seq = (lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq))
-      || (defaultSeqId && actives.find(s => s.id === defaultSeqId))
-      || actives.find(s => s.geo === lead.geo)
-      || actives.find(s => !s.geo || s.geo === 'all');
+      || (lead.broker && actives.find(s => s.ownerId === lead.broker && s.geo === lead.geo))
+      || (lead.broker && actives.find(s => s.ownerId === lead.broker && (!s.geo || s.geo === 'all')))
+      || (defaultSeqId && actives.find(s => s.id === defaultSeqId && !s.ownerId))
+      || actives.find(s => !s.ownerId && s.geo === lead.geo)
+      || actives.find(s => !s.ownerId && (!s.geo || s.geo === 'all'));
     if (!seq) continue;
     /* цепочка — только до первого ответа клиента; ответил → живой диалог,
        и обратно в «Спящие» из диалога цепочка лида не роняет */

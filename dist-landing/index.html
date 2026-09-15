@@ -150,13 +150,20 @@
   @media(max-width:760px){.split{grid-template-columns:1fr;gap:34px}}
 
   /* FLOW */
-  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:58px;position:relative}
-  .flow::before{content:"";position:absolute;top:19px;left:10%;right:10%;height:1px;background:var(--line)}
-  .fstep{text-align:center;padding:0 10px;position:relative;z-index:2}
-  .fstep .dot{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;background:var(--cell);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px;line-height:1;font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1;color:var(--ink2)}
-  .fstep h4{font-size:15.5px;font-weight:600;margin-bottom:7px}
-  .fstep p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
-  @media(max-width:760px){.flow{grid-template-columns:1fr;gap:24px}.flow::before{display:none}.fstep{display:flex;text-align:left;gap:16px;align-items:flex-start}.fstep .dot{margin:0}}
+  /* FLOW v2 — путь заявки с козырями */
+  .flow2{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:58px}
+  .fstep2{position:relative;background:rgba(255,255,255,.022);border:1px solid var(--line);border-radius:16px;padding:24px 18px 20px;display:flex;flex-direction:column;overflow:hidden;transition:transform .55s var(--ease),border-color .5s,background .5s}
+  .fstep2:hover{transform:translateY(-6px);border-color:rgba(214,199,168,.42);background:rgba(255,255,255,.05)}
+  .fstep2 .fs-num{position:absolute;top:6px;right:14px;font-family:var(--serif);font-size:48px;font-weight:300;line-height:1;color:rgba(255,255,255,.05);font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1}
+  .fstep2 .fs-ic{width:40px;height:40px;border-radius:11px;background:rgba(214,199,168,.09);border:1px solid rgba(214,199,168,.22);display:flex;align-items:center;justify-content:center;color:#d6c7a8;margin-bottom:16px;position:relative;z-index:1}
+  .fstep2 .fs-ic svg{width:20px;height:20px}
+  .fstep2 h4{font-size:16px;font-weight:600;color:var(--ink);margin:0 0 7px;letter-spacing:-.01em}
+  .fstep2 p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.55;margin:0 0 15px;flex:1}
+  .fstep2 .fs-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.01em;color:#e6dcc6;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.24);border-radius:999px;padding:5px 11px;font-weight:500;line-height:1.3}
+  .fstep2 .fs-chip::before{content:"";width:5px;height:5px;border-radius:50%;background:#d6c7a8;box-shadow:0 0 8px rgba(214,199,168,.75);flex:0 0 5px}
+  .fstep2:not(:last-child)::after{content:"";position:absolute;top:42px;right:-9px;width:14px;height:14px;border-top:1px solid var(--line);border-right:1px solid var(--line);transform:rotate(45deg);opacity:.55;z-index:2}
+  @media(max-width:900px){.flow2{grid-template-columns:repeat(2,1fr)}.fstep2::after{display:none}}
+  @media(max-width:560px){.flow2{grid-template-columns:1fr}}
 
   /* SCREENS */
   .screens{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
@@ -450,6 +457,15 @@
   .ctrl-list .ci{display:flex;gap:14px;align-items:flex-start;font-size:15px;color:var(--ink2);font-weight:300}
   .ctrl-list .ci svg{width:17px;height:17px;flex:0 0 17px;margin-top:2px;color:var(--ink)}
   @media(max-width:760px){.ctrl{grid-template-columns:1fr;gap:30px}}
+  /* CONTROL → 2×2 карточки с разными иконками (вместо одинаковых галочек) */
+  .ctrl-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cc{background:var(--cell);border:1px solid var(--line);border-radius:14px;padding:18px 16px;display:flex;flex-direction:column;transition:transform .5s var(--ease),border-color .5s}
+  .cc:hover{transform:translateY(-3px);border-color:var(--ink2)}
+  .cc .cc-ic{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink);margin-bottom:13px}
+  .cc .cc-ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .cc b{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:5px;line-height:1.15}
+  .cc span{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
+  @media(max-width:360px){.ctrl-cards{grid-template-columns:1fr}}
 
   /* PROOF numbers */
   .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
@@ -478,8 +494,20 @@
   .vcard .vkpi em{font-style:normal;font-size:12px;color:#c9c5be;letter-spacing:0}
   .vcard .vcap b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.1}
   .vcard .vcap>span{font-size:12px;color:#c9c5be}
-  @media(max-width:760px){.vids{grid-template-columns:1fr 1fr}}
-  @media(max-width:480px){.vids{grid-template-columns:1fr}}
+  /* CASES → компактные горизонтальные полоски (клик открывает видео). KPI — крупно, гео в угол */
+  .vids{grid-template-columns:1fr 1fr;gap:12px;margin-top:40px}
+  .vcard{aspect-ratio:auto;height:clamp(110px,12vw,128px);border-radius:14px}
+  .vcard .scrim{background:linear-gradient(90deg,rgba(9,8,7,.96),rgba(9,8,7,.8) 52%,rgba(9,8,7,.28) 82%,rgba(9,8,7,.06))}
+  .vcard .vtag{top:10px;right:10px;left:auto;font-size:9px;padding:4px 9px}
+  .vcard .vcap{position:absolute;inset:0;bottom:auto;height:100%;left:16px;right:56px;top:0;padding:0;display:flex;flex-direction:column;justify-content:center;gap:1px;background:none}
+  .vcard .vcap>.vkpi{font-size:clamp(25px,6.2vw,32px);color:#fff;line-height:1;margin:0 0 4px}
+  .vcard .vcap>.vkpi em{font-size:12px;color:#c9c5be;margin-left:2px}
+  .vcard .vcap b{font-size:15px;line-height:1.1}
+  .vcard .vcap>span:not(.vkpi){font-size:11px;color:#c9c5be;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+  .vcard .play{top:50%;left:auto;right:14px;transform:translate(0,-50%);width:38px;height:38px}
+  .vcard:hover .play{transform:translate(0,-50%) scale(1.08)}
+  .vcard .play svg{width:14px;height:14px;margin-left:2px}
+  @media(max-width:640px){.vids{grid-template-columns:1fr}.vcard{height:114px}}
   .cpop{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.86);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px}
   .cpop.on{display:flex}
   .cpop-card{position:relative;width:min(720px,94vw);max-height:88vh;background:#0f0f10;border:1px solid rgba(255,255,255,.12);border-radius:22px;overflow:hidden;display:grid;grid-template-columns:290px 1fr;box-shadow:0 40px 90px rgba(0,0,0,.5);transform:translateY(20px) scale(.98);transition:transform .5s var(--ease)}
@@ -645,6 +673,51 @@
   .foot .fbar a:hover{color:var(--ink)}
   @media(max-width:760px){.foot .fcols{grid-template-columns:1fr 1fr}.foot .fbrand{grid-column:span 2}}
 
+  /* ─────────  МОБИЛЬНАЯ ШЛИФОВКА  ───────── */
+  @media(max-width:600px){
+    /* меньше «воздуха»: короче переходы между зонами и паддинги секций → меньше пустого скролла */
+    .tr{height:clamp(58px,13vw,104px)}
+    .sec{padding-block:clamp(48px,11vw,74px)}
+    .wrap{padding-inline:18px}
+    /* типографика компактнее и читаемее */
+    h2{font-size:clamp(29px,8.4vw,42px);line-height:1.05}
+    .lede{font-size:14.5px;line-height:1.55;max-width:100%}
+    .eyebrow{font-size:10px;letter-spacing:.3em}
+    .eyebrow::before{width:16px}
+    /* заголовки подблоков не гигантские */
+    .split .big{font-size:clamp(25px,7vw,38px)}
+    .tgshow h3,.voi-hd h3,.final h2{font-size:clamp(24px,6.6vw,34px)}
+    /* карточки-виджеты: плотнее рамки, воздух внутри */
+    .dcard{padding:17px;border-radius:15px}
+    .dgrid,.dgrid2,.dgrid3{gap:12px}
+    .prob-cell{padding:22px}
+    /* feats: плотная 2-колоночная матрица вместо длинного одинакового столбца */
+    .feats{grid-template-columns:1fr 1fr}
+    .feat{padding:16px 14px}
+    .feat:last-child{grid-column:span 2}
+    .feat .fic{width:26px;height:26px}
+    .feat .fn{font-size:15px;margin:10px 0 6px;padding-right:20px;line-height:1.12}
+    .feat .fi{font-size:12px;top:14px;right:13px}
+    .feat p{font-size:11.5px;line-height:1.45}
+    .feat .only{margin-top:9px;font-size:8px}
+    .num{padding:20px 12px}
+    .fstep2{padding:20px 16px 18px}
+    /* dkpi-тройка → горизонтальный стат-ряд, а не 3 текстовых строки */
+    .dkpis{flex-direction:row;gap:9px}
+    .dkpi{padding:13px 8px;text-align:center;align-items:center}
+    .dkpi b{font-size:clamp(23px,7vw,30px)}
+    .dkpi span{font-size:11px;margin-top:5px}
+    .dkpi em{font-size:9.5px;line-height:1.25}
+    /* CTA на всю ширину — удобнее пальцем */
+    .hero-cta{flex-direction:column;align-items:stretch;gap:11px}
+    .hero-cta .btn{width:100%;justify-content:center}
+    .btn{padding:14px 22px}
+  }
+  @media(max-width:380px){
+    .hero h1{font-size:clamp(37px,11vw,46px)}
+    .statline .big{font-size:clamp(44px,15vw,68px)}
+  }
+
   @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}#load .lmk,#load .lbar::after{animation:none}}
 </style>
 </head>
@@ -683,7 +756,7 @@
       <span class="ln"><span>Каждый лид — ответ</span></span>
       <span class="ln"><span>за <em>60 секунд</em></span></span>
     </h1>
-    <p class="lede">Пока ваш менеджер набирает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт брокерам сливать и уводить базу. Не ещё одна CRM — среда, где работает всё агентство.</p>
+    <p class="lede">Пока менеджер печатает ответ, клиент уже написал троим конкурентам. Lumen отвечает за секунды, квалифицирует и не даёт увести базу.</p>
     <div class="hero-cta">
       <a class="btn primary" href="/soon.html">Занять место в бете</a>
       <a class="btn ghost" href="#thesis">Как это работает</a>
@@ -734,10 +807,10 @@
       <a class="btn ghost" href="#product" style="margin-top:26px">Как это выглядит</a>
     </div>
     <div class="tlist d1" data-r>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном месте — WhatsApp, комментарии рекламы, телефония, формы. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку, бюджету и типу. Строит психо-портрет — на что давить, чего избегать, с чем заходить.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки касаний не бросают молчунов. Живые подборки объектов, встречи, разбор звонков — вся операционка без ручной рутины.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Собственник видит риски и слив базы, раздаёт роли и доступы, забирает контакты при оффбординге. База — агентства, а не брокера.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Ловит первым</b><span>Все каналы в одном окне. Отвечает за секунды, круглосуточно, на языке клиента.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Понимает клиента</b><span>Квалифицирует по цели, сроку и бюджету — и строит психо-портрет клиента.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Дожимает до сделки</b><span>Цепочки будят молчунов. Подборки, встречи, разбор звонков — без ручной рутины.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Держит под контролем</b><span>Роли, доступы, оффбординг в клик. База — агентства, а не брокера.</span></div></div>
     </div>
   </div>
 </section>
@@ -747,12 +820,42 @@
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">Путь заявки</span>
       <h2 style="margin-top:22px">От клика <em>до сделки</em> — без ручных рук</h2></div>
-    <div class="flow d1" data-r>
-      <div class="fstep"><div class="dot">1</div><h4>Заявка влетает</h4><p>С любого канала — сразу в системе, с привязкой к рекламе.</p></div>
-      <div class="fstep"><div class="dot">2</div><h4>Ответ за секунды</h4><p>Первая линия отвечает раньше конкурентов, круглосуточно.</p></div>
-      <div class="fstep"><div class="dot">3</div><h4>Квалификация</h4><p>Цель, срок, бюджет, тип — и психо-портрет клиента.</p></div>
-      <div class="fstep"><div class="dot">4</div><h4>Тёплого — брокеру</h4><p>С историей, сценарием и задачей позвонить за 30 минут.</p></div>
-      <div class="fstep"><div class="dot">5</div><h4>Сделка под контролем</h4><p>Подборки, встречи, разбор звонков — до подписи.</p></div>
+    <div class="flow2 d1" data-r>
+      <article class="fstep2">
+        <span class="fs-num">01</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a2 2 0 002 2h12a2 2 0 002-2v-5"/><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M12 3v7m0 0l-2.5-2.5M12 10l2.5-2.5"/></svg></span>
+        <h4>Заявка влетает</h4>
+        <p>WhatsApp, Instagram, форма, звонок — всё в одном окне за секунду. И сразу видно, какое объявление её привело.</p>
+        <span class="fs-chip">ROI по каждому лиду</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">02</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg></span>
+        <h4>Отвечает за 60 секунд</h4>
+        <p>ИИ ведёт живой диалог, а не шлёт шаблон. Ночью, в выходные, без пауз — пока конкуренты спят.</p>
+        <span class="fs-chip">ИИ не отличить от человека</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">03</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+        <h4>Квалификация</h4>
+        <p>Цель, срок, бюджет, тип — и психо-портрет клиента: как с ним говорить, чтобы довести до сделки.</p>
+        <span class="fs-chip">Психо-портрет клиента</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">04</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg></span>
+        <h4>Тёплого — брокеру</h4>
+        <p>С историей, готовым сценарием и задачей позвонить за 30 минут. База закреплена — увести с собой нельзя.</p>
+        <span class="fs-chip">База не утечёт</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">05</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <h4>Сделка под контролем</h4>
+        <p>Подборки, встречи, ИИ-разбор каждого звонка и пульт основателя — всё видно до самой подписи.</p>
+        <span class="fs-chip">ИИ-разбор звонков</span>
+      </article>
     </div>
   </div>
 </section>
@@ -857,7 +960,7 @@
       <div>
         <span class="eyebrow">Единый мессенджер брокера</span>
         <h3>Все каналы стекаются <em>в один Telegram</em></h3>
-        <p>WhatsApp, Instagram Direct, комментарии рекламы, формы — всё падает брокеру в личный Telegram. Он отвечает из привычного окна, ИИ подхватывает, когда брокер занят, а вся переписка и база остаются в системе агентства.</p>
+        <p>WhatsApp, Instagram, комментарии рекламы, формы — всё в личный Telegram брокера. ИИ подхватывает, когда он занят, а переписка и база остаются у агентства.</p>
         <div class="tgflow">
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-7.7 13.7L3 21l4.5-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 8.8c-.2.5-.2 1.6.6 2.8.9 1.4 2.3 2.2 3 2.4.7.2 1.2 0 1.5-.4.2-.3.2-.6.1-.8l-1-.7c-.2-.1-.4 0-.6.1l-.4.4a3.8 3.8 0 0 1-1.8-1.8l.4-.4c.1-.2.2-.4.1-.6l-.6-1c-.2-.3-.6-.4-.9-.2z"/></svg></span><span>WhatsApp</span></div>
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.4"/><circle cx="16.7" cy="7.3" r=".6" fill="currentColor" stroke="none"/></svg></span><span>Instagram</span></div>
@@ -944,15 +1047,15 @@
     <div data-r><span class="eyebrow">Детали, которых нет у других</span>
       <h2 style="margin-top:22px;max-width:20ch">Не «есть CRM». <em>Есть то, чего нет ни у кого</em></h2></div>
     <div class="feats">
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">Психо-портрет клиента</div><p>ИИ читает переписку и строит профиль покупателя: тип личности, на что давить, чего избегать, с чем заходить. Брокер получает не «лид №47», а инструкцию, как его закрыть.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">ИИ, которого не отличить</div><p>Отвечает с паузами и статусом «печатает…», в живом человеческом темпе. Клиент уверен, что общается с менеджером — а не с автоответчиком, который выдаёт себя первой же секундой.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает клиенту прямо из личного Telegram — удобно и привычно. А вся переписка, медиа и история остаются в системе агентства. Уходит брокер — база остаётся.</p><span class="only">только в Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Живые подборки за минуту</div><p>ИИ собирает брендированную подборку объектов под конкретного клиента — с вашим лого и подписью. И показывает, что именно он открывал и сколько смотрел.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Лиды из комментариев рекламы</div><p>Ловим тех, кто написал под объявлением в Instagram, и уводим в личный диалог — автоматически, пока конкуренты вообще не читают комментарии.</p><span class="only">только в Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">Звонок в вашем голосе</div><p>Говорите по-русски — клиент слышит вас на своём языке и вашим голосом. По ходу разговора ИИ-суфлёр подсказывает, что ответить на возражение.</p><span class="only">только в Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">Разбор каждого звонка</div><p>ИИ слушает записи и оценивает по методологии продаж: что упустили, где не дожали, какой следующий шаг. Тренер для команды, который не спит.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Реанимация спящей базы</div><p>Молчуны — это уже оплаченные лиды. Цепочки касаний будят их по всем каналам, уважая тихие часы по поясу клиента, и останавливаются, как только человек ответил.</p></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">Академия рынка внутри</div><p>Встроенные знания по Дубаю, Пхукету, Бали: районы, ROI, планы оплаты, скрипты. Новый брокер выходит на сделки, не изучая рынок полгода.</p></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">Психо-портрет клиента</div><p>Тип личности, на что давить, чего избегать — готовая инструкция, как закрыть.</p><span class="only">только в Lumen</span></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">ИИ, которого не отличить</div><p>Отвечает с паузами и «печатает…» — клиент уверен, что пишет живой менеджер.</p><span class="only">только в Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">Мост Telegram ⇄ WhatsApp</div><p>Брокер отвечает из личного Telegram, а вся база остаётся у агентства.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Живые подборки за минуту</div><p>Брендированная подборка под клиента за минуту — и видно, что он смотрел.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Лиды из комментариев рекламы</div><p>Ловим тех, кто пишет под рекламой, и уводим в личный диалог автоматически.</p><span class="only">только в Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">Звонок в вашем голосе</div><p>Клиент слышит вас на своём языке, а ИИ-суфлёр подсказывает ответ на возражение.</p><span class="only">только в Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">Разбор каждого звонка</div><p>ИИ слушает записи и оценивает по методологии: где не дожали, что делать дальше.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Реанимация спящей базы</div><p>Цепочки будят молчунов по всем каналам, уважая тихие часы, и стоп по ответу.</p></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">Академия рынка внутри</div><p>Дубай, Пхукет, Бали: районы, ROI, планы оплаты, скрипты — встроены внутри.</p></div>
     </div>
   </div>
 </section>
@@ -963,13 +1066,13 @@
     <div data-r>
       <span class="eyebrow">Собственнику</span>
       <h2 style="margin-top:22px;max-width:16ch">База принадлежит <em>агентству</em></h2>
-      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — не офис и не сайт, а контакты. Lumen делает их вашими: брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
+      <p class="lede" style="margin-top:18px">Самый дорогой актив агентства — контакты. Брокер работает из телефона, но переписка, история и клиент остаются в системе. Уходит человек — база остаётся.</p>
     </div>
-    <div class="ctrl-list d1" data-r>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Пульт контроля: риски, тишина, спорные и «утекающие» лиды — на одном экране</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Роли и доступы: каждый видит только своё, ничего лишнего</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Оффбординг в один клик: забрать контакты и передать дела при уходе брокера</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Мост Telegram ⇄ WhatsApp: брокер отвечает из личного мессенджера, база — в системе</div>
+    <div class="ctrl-cards d1" data-r>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1.6"/><path d="M8 20h8M12 17v3"/></svg></span><b>Пульт контроля</b><span>Риски, тишина и «утекающие» лиды на одном экране.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16 8a3 3 0 0 1 0 6"/></svg></span><b>Роли и доступы</b><span>Каждый видит только своё, ничего лишнего.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12h8"/><path d="M13 9l3 3-3 3"/></svg></span><b>Оффбординг в клик</b><span>Забрать контакты при уходе брокера.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><b>Мост TG ⇄ WA</b><span>Брокер пишет из личного, база — в системе.</span></div>
     </div>
   </div>
 </section>

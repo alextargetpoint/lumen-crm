@@ -14,7 +14,7 @@
     --d-bg:#080808; --d-ink:#f4f3f1; --d-ink2:#a7a6a3; --d-ink3:#6b6a68; --d-line:rgba(255,255,255,.11); --d-line2:rgba(255,255,255,.055);
     --l-bg:#f3f1ec; --l-ink:#141311; --l-ink2:#54524d; --l-ink3:#8b8983; --l-line:rgba(0,0,0,.12); --l-line2:rgba(0,0,0,.06);
     --serif:'Cormorant',Georgia,serif; --sans:'Manrope',system-ui,sans-serif; --ease:cubic-bezier(.19,1,.22,1); --pad:clamp(20px,4vw,40px);
-    /* active tokens (dark by default) */
+    /* активные (тёмная по умолчанию) */
     --bg:var(--d-bg);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -26,24 +26,24 @@
   a{color:inherit;text-decoration:none}
   .wrap{max-width:1180px;margin:0 auto;padding-inline:var(--pad)}
 
-  /* ── sections: dark/light with local tokens ── */
+  /* ── секции: тёмная/светлая с локальными токенами ── */
   section,.band{position:relative;z-index:2}
   .dark{background:var(--d-bg);color:var(--d-ink);--ink:var(--d-ink);--ink2:var(--d-ink2);--ink3:var(--d-ink3);--line:var(--d-line);--line2:var(--d-line2);--cell:var(--d-bg)}
   .light{background:var(--l-bg);color:var(--l-ink);--ink:var(--l-ink);--ink2:var(--l-ink2);--ink3:var(--l-ink3);--line:var(--l-line);--line2:var(--l-line2);--cell:var(--l-bg)}
   .sec{padding-block:clamp(84px,12vw,168px)}
-  /* light-zone video background — live texture under a strong light veil (text stays readable) */
+  /* видеофон светлой зоны — живая текстура под сильной светлой вуалью (текст читаем) */
   .vidbg{position:relative;overflow:hidden}
   .vidbg>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg>.vwrap video{position:absolute;top:-14%;left:0;width:100%;height:128%;object-fit:cover;opacity:.55;filter:saturate(.9);will-change:transform}
   .vidbg>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--l-bg) 0%,rgba(243,241,236,.9) 12%,rgba(243,241,236,.78) 34%,rgba(243,241,236,.76) 50%,rgba(243,241,236,.78) 66%,rgba(243,241,236,.9) 88%,var(--l-bg) 100%)}
   .vidbg>.wrap{position:relative;z-index:1}
-  /* dark video background — abstraction under a dark veil */
+  /* тёмный видеофон — абстракция под тёмной вуалью */
   .vidbg-d{position:relative;overflow:hidden}
   .vidbg-d>.vwrap{position:absolute;inset:0;z-index:0;overflow:hidden}
   .vidbg-d>.vwrap video{position:absolute;top:-14%;left:0;width:100%;height:128%;object-fit:cover;opacity:.38;filter:grayscale(1) contrast(1.05);will-change:transform}
   .vidbg-d>.vwrap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#080808 0%,rgba(8,8,8,.84) 12%,rgba(8,8,8,.7) 34%,rgba(8,8,8,.66) 50%,rgba(8,8,8,.7) 66%,rgba(8,8,8,.84) 88%,#080808 100%)}
   .vidbg-d>.wrap{position:relative;z-index:1}
-  /* zone transitions: smoothstep gradient (zero slope at both ends → no hard edge) + grain dithering */
+  /* переходы зон: smoothstep-градиент (скорость 0 у обоих краёв → нет обрыва) + зернистость-дизеринг */
   .tr{height:clamp(190px,24vw,340px);position:relative;z-index:2}
   .tr::after{content:"";position:absolute;inset:0;opacity:.14;mix-blend-mode:overlay;pointer-events:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:180px}
@@ -57,7 +57,7 @@
   h2{font-size:clamp(32px,5.2vw,64px)}
   .lede{color:var(--ink2);font-weight:300;line-height:1.62;font-size:clamp(15px,1.5vw,18px);max-width:54ch}
   em{font-style:italic;font-weight:400}
-  /* ── premium highlight for key words: an ALWAYS-visible base color + a static metallic gradient where background-clip is supported (no animation — it broke repaints and made the word vanish) ── */
+  /* ── премиум-подсветка важных слов: ВСЕГДА видимый базовый цвет + статический металлик-градиент там, где поддержан background-clip (без анимации — она ломала перерисовку и слово пропадало) ── */
   .dark em,.dark .gld,.hero em{color:#cfccc6}
   .light em,.light .gld{color:#33302a}
   @supports ((-webkit-background-clip:text) or (background-clip:text)){
@@ -74,7 +74,7 @@
   [data-r].in .ln>span{transform:none}
   .lnw .ln:nth-child(2)>span{transition-delay:.1s}.lnw .ln:nth-child(3)>span{transition-delay:.2s}
 
-  /* reading progress */
+  /* прогресс чтения */
   .prog{position:fixed;top:0;left:0;height:2px;width:0;z-index:70;background:linear-gradient(90deg,#8a8885,#f4f3f1);pointer-events:none}
   /* nav */
   .nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .5s,backdrop-filter .5s,border-color .5s,color .4s;border-bottom:1px solid transparent;color:var(--d-ink)}
@@ -96,9 +96,11 @@
   @media(max-width:760px){.nlinks a{display:none}}
 
   /* HERO */
-  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;background:#050505}
+  .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
   .hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;filter:grayscale(1) contrast(1.05)}
-  .hero .veil{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 30%,rgba(8,8,8,.35),#060606 78%)}
+  .hero #heroFx{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:0;animation:fxin 2.2s var(--ease) .2s forwards}
+  @keyframes fxin{to{opacity:1}}
+  .hero .veil{position:absolute;inset:0;z-index:2;background:radial-gradient(120% 92% at 50% 34%,rgba(6,6,5,.14),rgba(6,6,5,.72) 82%)}
   .hero .halo{position:absolute;left:50%;top:42%;width:80vmax;height:80vmax;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(closest-side,rgba(255,255,255,.05),transparent 70%);animation:breathe 9s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.12)}}
   .hero-in{position:relative;z-index:3;text-align:center;width:100%}
@@ -119,7 +121,7 @@
   @keyframes up{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
   .hero .kline,.hero-cta{position:relative}
 
-  /* STAT rows (pain points with numbers) */
+  /* STAT-строки (боли с цифрами) */
   .statline{display:grid;grid-template-columns:auto 1fr;gap:clamp(22px,4vw,54px);align-items:baseline;padding:clamp(26px,3.4vw,42px) 0;border-top:1px solid var(--line)}
   .statline:last-child{border-bottom:1px solid var(--line)}
   .statline .big{font-family:var(--serif);font-weight:300;font-size:clamp(50px,8vw,112px);line-height:.9;letter-spacing:-.03em;white-space:nowrap}
@@ -148,13 +150,20 @@
   @media(max-width:760px){.split{grid-template-columns:1fr;gap:34px}}
 
   /* FLOW */
-  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:58px;position:relative}
-  .flow::before{content:"";position:absolute;top:19px;left:10%;right:10%;height:1px;background:var(--line)}
-  .fstep{text-align:center;padding:0 10px;position:relative;z-index:2}
-  .fstep .dot{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;background:var(--cell);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px;line-height:1;font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1;color:var(--ink2)}
-  .fstep h4{font-size:15.5px;font-weight:600;margin-bottom:7px}
-  .fstep p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
-  @media(max-width:760px){.flow{grid-template-columns:1fr;gap:24px}.flow::before{display:none}.fstep{display:flex;text-align:left;gap:16px;align-items:flex-start}.fstep .dot{margin:0}}
+  /* FLOW v2 — путь заявки с козырями */
+  .flow2{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:58px}
+  .fstep2{position:relative;background:rgba(255,255,255,.022);border:1px solid var(--line);border-radius:16px;padding:24px 18px 20px;display:flex;flex-direction:column;overflow:hidden;transition:transform .55s var(--ease),border-color .5s,background .5s}
+  .fstep2:hover{transform:translateY(-6px);border-color:rgba(214,199,168,.42);background:rgba(255,255,255,.05)}
+  .fstep2 .fs-num{position:absolute;top:6px;right:14px;font-family:var(--serif);font-size:48px;font-weight:300;line-height:1;color:rgba(255,255,255,.05);font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1,"tnum" 1}
+  .fstep2 .fs-ic{width:40px;height:40px;border-radius:11px;background:rgba(214,199,168,.09);border:1px solid rgba(214,199,168,.22);display:flex;align-items:center;justify-content:center;color:#d6c7a8;margin-bottom:16px;position:relative;z-index:1}
+  .fstep2 .fs-ic svg{width:20px;height:20px}
+  .fstep2 h4{font-size:16px;font-weight:600;color:var(--ink);margin:0 0 7px;letter-spacing:-.01em}
+  .fstep2 p{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.55;margin:0 0 15px;flex:1}
+  .fstep2 .fs-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.01em;color:#e6dcc6;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.24);border-radius:999px;padding:5px 11px;font-weight:500;line-height:1.3}
+  .fstep2 .fs-chip::before{content:"";width:5px;height:5px;border-radius:50%;background:#d6c7a8;box-shadow:0 0 8px rgba(214,199,168,.75);flex:0 0 5px}
+  .fstep2:not(:last-child)::after{content:"";position:absolute;top:42px;right:-9px;width:14px;height:14px;border-top:1px solid var(--line);border-right:1px solid var(--line);transform:rotate(45deg);opacity:.55;z-index:2}
+  @media(max-width:900px){.flow2{grid-template-columns:repeat(2,1fr)}.fstep2::after{display:none}}
+  @media(max-width:560px){.flow2{grid-template-columns:1fr}}
 
   /* SCREENS */
   .screens{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
@@ -167,7 +176,7 @@
   .shot .cap span{font-size:12px;color:#a7a6a3}
   @media(max-width:760px){.screens{grid-template-columns:1fr}.shot.wide{grid-column:span 1}}
 
-  /* ── native "Atelier" widgets (instead of screenshots) ── */
+  /* ── НАТИВНЫЕ ВИДЖЕТЫ «Ателье» (вместо скриншотов) ── */
   .dash{margin-top:50px}
   .dgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:15px;align-items:stretch}
   .dcard{background:#fffdfa;border:1px solid #e8e1d8;border-radius:18px;padding:22px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 26px 44px -30px rgba(20,19,17,.28)}
@@ -203,7 +212,7 @@
   .dtasks li .who{margin-left:auto;font-size:11px;color:#8b8983;white-space:nowrap}
   @media(max-width:860px){.dgrid{grid-template-columns:1fr 1fr}.dhero{grid-row:auto;grid-column:span 2}}
   @media(max-width:560px){.dgrid{grid-template-columns:1fr}.dhero{grid-column:span 1}}
-  /* animating the "Atelier" widgets */
+  /* оживление виджетов «Ателье» */
   .dcard,.dkpi{transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
   .dcard:hover,.dkpi:hover,.dhero:hover{transform:translateY(-4px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 34px 56px -28px rgba(20,19,17,.34)}
   .dh-bars i{transform:scaleY(0);transform-origin:bottom}
@@ -215,11 +224,11 @@
   @keyframes softpulse{0%,100%{opacity:1}50%{opacity:.5}}
   @media(prefers-reduced-motion:reduce){.dh-bars i{transform:none;animation:none}.ddonut .donut{transform:none;opacity:1}.dtasks li em{animation:none}}
 
-  /* ── extra interactive widgets ── */
+  /* ── доп. интерактивные виджеты ── */
   .dgrid2{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-top:15px}
   .dlive{display:inline-flex;align-items:center;gap:6px;font-size:10px!important;color:#b0563f!important;letter-spacing:.06em!important}
   .dlive::before{content:"";width:6px;height:6px;border-radius:50%;background:#b0563f;animation:softpulse 1.6s ease-in-out infinite}
-  /* live feed */
+  /* живая лента */
   .dfeed ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;overflow:hidden}
   .dfeed li{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid #efe9e2;font-size:12.5px;color:#141311;animation:feedIn .5s var(--ease)}
   .dfeed li:first-child{border-top:none}
@@ -227,7 +236,7 @@
   .dfeed li b{font-weight:600}
   .dfeed li span{color:#8b8983;margin-left:auto;font-size:11px;white-space:nowrap}
   @keyframes feedIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-  /* channels — interactive bars */
+  /* каналы — интерактивные бары */
   .dbars{display:grid;gap:12px}
   .dbar{cursor:default}
   .dbar .dbtop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
@@ -237,7 +246,7 @@
   .dash.in .dbar .dbtrack i{width:var(--v,50%)}
   .dbar:hover .dbtrack i{filter:brightness(1.15)}
   .dbar:hover .dbtop{color:#000}
-  /* AI autopilot — toggle */
+  /* автопилот ИИ — переключатель */
   .dai-row{display:flex;align-items:center;gap:14px}
   .dai-txt{flex:1}
   .dai-txt b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;color:#141311}
@@ -252,7 +261,7 @@
   .dai-typing .dt-dots i:nth-child(2){animation-delay:.18s}.dai-typing .dt-dots i:nth-child(3){animation-delay:.36s}
   .dai.off .dai-typing{opacity:.4}
   .dai.off .dai-typing .dt-dots i{animation:none;opacity:.4}
-  /* mini funnel */
+  /* мини-воронка */
   .dfunnel{display:grid;gap:11px}
   .dfstep .dftop{display:flex;justify-content:space-between;font-size:12px;color:#141311;margin-bottom:5px}
   .dfstep .dftop b{font-weight:600;font-variant-numeric:tabular-nums}
@@ -263,7 +272,7 @@
   @media(max-width:860px){.dgrid2{grid-template-columns:1fr 1fr}}
   @media(max-width:560px){.dgrid2{grid-template-columns:1fr}}
 
-  /* third row: speed gauge, markets, psychological profile */
+  /* третий ряд: гейдж скорости, рынки, психо-портрет */
   .dgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px}
   .dgauge{display:flex;align-items:center;gap:18px}
   .dgauge .garc{width:98px;height:98px;flex:none;position:relative}
@@ -284,7 +293,7 @@
   .dpsy .dpsy-note em{font-style:normal;color:#141311;font-weight:600}
   @media(max-width:860px){.dgrid3{grid-template-columns:1fr}.dgauge{max-width:none}}
 
-  /* fourth row: commission, lead journey, call review */
+  /* четвёртый ряд: комиссия, путь лида, разбор звонка */
   .dmoney .dtrend{color:#5f9e73!important;font-size:11px!important;letter-spacing:.02em!important}
   .dm-val{font-family:var(--serif);font-weight:300;font-size:clamp(38px,4.4vw,52px);line-height:1;letter-spacing:-.02em;color:#141311;margin:8px 0 14px}
   .dspark{width:100%;height:48px;display:block}
@@ -314,7 +323,7 @@
   .dcall .dc-note em{font-style:normal;color:#141311;font-weight:600}
   @media(prefers-reduced-motion:reduce){.dwave i{animation:none}.dp-step.now i{animation:none}}
 
-  /* broker's Telegram messenger (phone) */
+  /* Telegram-мессенджер брокера (телефон) */
   .tgshow{display:grid;grid-template-columns:1fr auto;gap:clamp(30px,5vw,72px);align-items:center;margin-top:clamp(52px,7vw,92px)}
   .tgshow .eyebrow{margin-bottom:20px}
   .tgshow h3{font-family:var(--serif);font-weight:300;font-size:clamp(26px,3.4vw,42px);line-height:1.08;letter-spacing:-.01em}
@@ -324,7 +333,7 @@
   .tgshow .tgb{margin-top:18px;display:grid;gap:11px}
   .tgshow .tgb div{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink2);font-weight:300}
   .tgshow .tgb svg{width:16px;height:16px;flex:0 0 16px;margin-top:2px;color:var(--ink)}
-  /* 3D iPhone mockup (titanium, angled tilt, cursor-reactive) */
+  /* 3D-макет iPhone (титан, наклон под углом, отклик на курсор) */
   .phone3d{justify-self:center;width:clamp(240px,27vw,300px);perspective:1700px;animation:phFloat 8s ease-in-out infinite}
   @keyframes phFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
   .phone{position:relative;width:100%;padding:11px;border-radius:clamp(48px,5vw,60px);transform-style:preserve-3d;
@@ -342,7 +351,7 @@
   .pbtn.l1{left:-2px;top:26%;height:26px}.pbtn.l2{left:-2px;top:calc(26% + 40px);height:50px}
   .pbtn.r1{right:-2px;left:auto;border-radius:2px 0 0 2px;top:30%;height:62px;background:linear-gradient(180deg,#bcb4a3,#7a7263)}
   @media(prefers-reduced-motion:reduce){.phone3d{animation:none}}
-  /* native "live" Atelier-style app inside the phone (video-background format) */
+  /* нативное «живое» приложение в стиле Ателье внутри телефона (видеофон-формат) */
   .appui{position:relative;height:clamp(440px,54vw,540px);display:flex;flex-direction:column;background:#f3f1ec;color:#141311;overflow:hidden}
   .ap-sb{height:32px;flex:none}
   .ap-hd{display:flex;align-items:center;gap:9px;padding:4px 13px 11px;border-bottom:1px solid #e6ded4;background:#f3f1ec}
@@ -370,7 +379,7 @@
   .ap-inp .ap-fld{flex:1;background:#fff;border:1px solid #e8e1d8;border-radius:999px;padding:8px 13px;color:#a9a49b;font-size:11px}
   .ap-inp .ap-mic{width:31px;height:31px;border-radius:50%;background:#1a1815;color:#f3f1ec;display:flex;align-items:center;justify-content:center;flex:none}
   .ap-inp .ap-mic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-  /* multi-screen — a tour of the app */
+  /* мультиэкранность — тур по приложению */
   .ap-scr{position:absolute;left:0;right:0;top:32px;bottom:0;display:flex;flex-direction:column;background:#f3f1ec;opacity:0;transform:translateX(18px) scale(.99);transition:opacity .5s var(--ease),transform .55s var(--ease);pointer-events:none}
   .ap-scr.on{opacity:1;transform:none;pointer-events:auto;z-index:1}
   .ap-htitle{flex:1;font-family:var(--serif);font-weight:500;font-size:14.5px;color:#141311;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -411,7 +420,7 @@
   .pl-info b{display:block;font-family:var(--serif);font-weight:500;font-size:13px;color:#141311}
   .pl-info span{font-size:10.5px;color:#8b8983}
 
-  /* channels → visual nodes flowing into the phone */
+  /* каналы → визуальные ноды, стекающиеся в телефон */
   .tgflow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:22px}
   .tgflow .chan{display:flex;flex-direction:column;align-items:center;gap:7px;width:62px}
   .tgflow .chan .ci{width:46px;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--cell);display:flex;align-items:center;justify-content:center;transition:.45s var(--ease);position:relative;overflow:hidden}
@@ -427,7 +436,7 @@
   @media(max-width:760px){.tgflow{justify-content:center}.tgflow .tgarrow{display:none}}
   @media(max-width:760px){.tgshow{grid-template-columns:1fr;text-align:center}.tgshow p,.tgshow .tgb{margin-inline:auto}.tgshow .tgchips{justify-content:center}.tgshow .tgb div{text-align:left}}
 
-  /* KILLER FEATURES — the "treats" */
+  /* KILLER FEATURES — «вкусняшки» */
   .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
   .feat{background:var(--cell);padding:clamp(26px,2.6vw,38px);position:relative;transition:background .5s var(--ease),transform .6s var(--ease)}
   .feat:hover{background:color-mix(in srgb,var(--ink) 4%,var(--cell))}
@@ -442,12 +451,21 @@
   @media(max-width:860px){.feats{grid-template-columns:1fr 1fr}}
   @media(max-width:560px){.feats{grid-template-columns:1fr}}
 
-  /* CONTROL (owner) */
+  /* CONTROL (владелец) */
   .ctrl{display:grid;grid-template-columns:1fr 1fr;gap:clamp(26px,5vw,64px);align-items:center;margin-top:10px}
   .ctrl-list{display:grid;gap:14px}
   .ctrl-list .ci{display:flex;gap:14px;align-items:flex-start;font-size:15px;color:var(--ink2);font-weight:300}
   .ctrl-list .ci svg{width:17px;height:17px;flex:0 0 17px;margin-top:2px;color:var(--ink)}
   @media(max-width:760px){.ctrl{grid-template-columns:1fr;gap:30px}}
+  /* CONTROL → 2×2 карточки с разными иконками (вместо одинаковых галочек) */
+  .ctrl-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cc{background:var(--cell);border:1px solid var(--line);border-radius:14px;padding:18px 16px;display:flex;flex-direction:column;transition:transform .5s var(--ease),border-color .5s}
+  .cc:hover{transform:translateY(-3px);border-color:var(--ink2)}
+  .cc .cc-ic{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink);margin-bottom:13px}
+  .cc .cc-ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .cc b{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:5px;line-height:1.15}
+  .cc span{font-size:12.5px;color:var(--ink3);font-weight:300;line-height:1.5}
+  @media(max-width:360px){.ctrl-cards{grid-template-columns:1fr}}
 
   /* PROOF numbers */
   .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);border:1px solid var(--line2);margin-top:50px}
@@ -457,7 +475,7 @@
   .num span{display:block;margin-top:9px;font-size:11.5px;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
   @media(max-width:620px){.nums{grid-template-columns:1fr 1fr}}
 
-  /* CASE STUDIES · VIDEO TESTIMONIALS */
+  /* КЕЙСЫ · ВИДЕООТЗЫВЫ */
   .vids{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
   .vcard{position:relative;aspect-ratio:4/5;border-radius:18px;overflow:hidden;border:1px solid var(--line);cursor:pointer;background:#1a1815;display:block;padding:0;font-family:inherit;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
   .vcard:hover{transform:translateY(-4px);box-shadow:0 30px 52px -28px rgba(20,19,17,.4)}
@@ -476,8 +494,20 @@
   .vcard .vkpi em{font-style:normal;font-size:12px;color:#c9c5be;letter-spacing:0}
   .vcard .vcap b{display:block;font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.1}
   .vcard .vcap>span{font-size:12px;color:#c9c5be}
-  @media(max-width:760px){.vids{grid-template-columns:1fr 1fr}}
-  @media(max-width:480px){.vids{grid-template-columns:1fr}}
+  /* CASES → компактные горизонтальные полоски (клик открывает видео). KPI — крупно, гео в угол */
+  .vids{grid-template-columns:1fr 1fr;gap:12px;margin-top:40px}
+  .vcard{aspect-ratio:auto;height:clamp(110px,12vw,128px);border-radius:14px}
+  .vcard .scrim{background:linear-gradient(90deg,rgba(9,8,7,.96),rgba(9,8,7,.8) 52%,rgba(9,8,7,.28) 82%,rgba(9,8,7,.06))}
+  .vcard .vtag{top:10px;right:10px;left:auto;font-size:9px;padding:4px 9px}
+  .vcard .vcap{position:absolute;inset:0;bottom:auto;height:100%;left:16px;right:56px;top:0;padding:0;display:flex;flex-direction:column;justify-content:center;gap:1px;background:none}
+  .vcard .vcap>.vkpi{font-size:clamp(25px,6.2vw,32px);color:#fff;line-height:1;margin:0 0 4px}
+  .vcard .vcap>.vkpi em{font-size:12px;color:#c9c5be;margin-left:2px}
+  .vcard .vcap b{font-size:15px;line-height:1.1}
+  .vcard .vcap>span:not(.vkpi){font-size:11px;color:#c9c5be;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+  .vcard .play{top:50%;left:auto;right:14px;transform:translate(0,-50%);width:38px;height:38px}
+  .vcard:hover .play{transform:translate(0,-50%) scale(1.08)}
+  .vcard .play svg{width:14px;height:14px;margin-left:2px}
+  @media(max-width:640px){.vids{grid-template-columns:1fr}.vcard{height:114px}}
   .cpop{position:fixed;inset:0;z-index:160;background:rgba(6,6,6,.86);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px}
   .cpop.on{display:flex}
   .cpop-card{position:relative;width:min(720px,94vw);max-height:88vh;background:#0f0f10;border:1px solid rgba(255,255,255,.12);border-radius:22px;overflow:hidden;display:grid;grid-template-columns:290px 1fr;box-shadow:0 40px 90px rgba(0,0,0,.5);transform:translateY(20px) scale(.98);transition:transform .5s var(--ease)}
@@ -496,7 +526,7 @@
   .cpop-x:hover{border-color:rgba(255,255,255,.4);transform:rotate(90deg)}
   @media(max-width:640px){.cpop-card{grid-template-columns:1fr;max-height:92vh;overflow:auto}.cpop-vid{aspect-ratio:5/4}}
 
-  /* client video-testimonial carousel */
+  /* карусель видеоотзывов клиентов */
   .voi{margin-top:clamp(52px,7vw,84px)}
   .voi-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
   .voi-hd h3{font-family:var(--serif);font-weight:300;font-size:clamp(24px,3vw,36px);letter-spacing:-.01em;line-height:1.05}
@@ -569,7 +599,7 @@
   #cook .cbtns button.acc{background:#f4f3f1;color:#0a0a0a;border-color:transparent}
   #cook .cbtns button:hover{transform:translateY(-2px)}
 
-  /* ── MODAL / CONSULTATION / CALENDAR ── */
+  /* ── MODAL / КОНСУЛЬТАЦИЯ / КАЛЕНДАРЬ ── */
   .ovl{position:fixed;inset:0;z-index:150;background:rgba(6,6,6,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s;display:flex;align-items:center;justify-content:center;padding:20px}
   .ovl.in{opacity:1;visibility:visible}
   .modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:#0e0e0f;color:#f4f3f1;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:clamp(24px,3.2vw,42px);transform:translateY(30px) scale(.98);transition:transform .6s var(--ease);position:relative}
@@ -581,6 +611,9 @@
   .modal .mav img{width:100%;height:100%;object-fit:cover}
   .modal h3{font-family:var(--serif);font-weight:300;font-size:clamp(23px,3vw,32px);line-height:1.05}
   .modal .msub{color:#a7a6a3;font-size:13px;font-weight:300;line-height:1.5;margin-top:5px}
+  .modal .mby{margin-top:9px;font-size:11.5px;letter-spacing:.02em;color:#8a8987;display:flex;align-items:center;gap:6px}
+  .modal .mby b{color:#cfcdc8;font-weight:500}
+  .modal .mby::before{content:"";width:5px;height:5px;border-radius:50%;background:#4ea1a1;box-shadow:0 0 0 3px rgba(78,161,161,.16)}
   .cal{margin-top:22px;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px}
   .cal .chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .cal .chd b{font-family:var(--serif);font-weight:500;font-size:18px;text-transform:capitalize}
@@ -626,7 +659,7 @@
   .faq .qa{padding:0 clamp(18px,2.4vw,28px) 24px;color:var(--ink2);font-size:14.5px;font-weight:300;line-height:1.65;max-width:66ch}
   .faq details[open]{background:color-mix(in srgb,var(--ink) 3%,var(--cell))}
 
-  /* ── FOOTER (legal) ── */
+  /* ── FOOTER (юр.) ── */
   .foot{border-top:1px solid var(--line2);padding-block:clamp(46px,6vw,70px)}
   .foot .fcols{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:clamp(26px,4vw,54px)}
   .foot .fbrand .brand{margin-bottom:15px}
@@ -639,6 +672,51 @@
   .foot .fbar .fbr-links{display:flex;gap:18px;flex-wrap:wrap}
   .foot .fbar a:hover{color:var(--ink)}
   @media(max-width:760px){.foot .fcols{grid-template-columns:1fr 1fr}.foot .fbrand{grid-column:span 2}}
+
+  /* ─────────  МОБИЛЬНАЯ ШЛИФОВКА  ───────── */
+  @media(max-width:600px){
+    /* меньше «воздуха»: короче переходы между зонами и паддинги секций → меньше пустого скролла */
+    .tr{height:clamp(58px,13vw,104px)}
+    .sec{padding-block:clamp(48px,11vw,74px)}
+    .wrap{padding-inline:18px}
+    /* типографика компактнее и читаемее */
+    h2{font-size:clamp(29px,8.4vw,42px);line-height:1.05}
+    .lede{font-size:14.5px;line-height:1.55;max-width:100%}
+    .eyebrow{font-size:10px;letter-spacing:.3em}
+    .eyebrow::before{width:16px}
+    /* заголовки подблоков не гигантские */
+    .split .big{font-size:clamp(25px,7vw,38px)}
+    .tgshow h3,.voi-hd h3,.final h2{font-size:clamp(24px,6.6vw,34px)}
+    /* карточки-виджеты: плотнее рамки, воздух внутри */
+    .dcard{padding:17px;border-radius:15px}
+    .dgrid,.dgrid2,.dgrid3{gap:12px}
+    .prob-cell{padding:22px}
+    /* feats: плотная 2-колоночная матрица вместо длинного одинакового столбца */
+    .feats{grid-template-columns:1fr 1fr}
+    .feat{padding:16px 14px}
+    .feat:last-child{grid-column:span 2}
+    .feat .fic{width:26px;height:26px}
+    .feat .fn{font-size:15px;margin:10px 0 6px;padding-right:20px;line-height:1.12}
+    .feat .fi{font-size:12px;top:14px;right:13px}
+    .feat p{font-size:11.5px;line-height:1.45}
+    .feat .only{margin-top:9px;font-size:8px}
+    .num{padding:20px 12px}
+    .fstep2{padding:20px 16px 18px}
+    /* dkpi-тройка → горизонтальный стат-ряд, а не 3 текстовых строки */
+    .dkpis{flex-direction:row;gap:9px}
+    .dkpi{padding:13px 8px;text-align:center;align-items:center}
+    .dkpi b{font-size:clamp(23px,7vw,30px)}
+    .dkpi span{font-size:11px;margin-top:5px}
+    .dkpi em{font-size:9.5px;line-height:1.25}
+    /* CTA на всю ширину — удобнее пальцем */
+    .hero-cta{flex-direction:column;align-items:stretch;gap:11px}
+    .hero-cta .btn{width:100%;justify-content:center}
+    .btn{padding:14px 22px}
+  }
+  @media(max-width:380px){
+    .hero h1{font-size:clamp(37px,11vw,46px)}
+    .statline .big{font-size:clamp(44px,15vw,68px)}
+  }
 
   @media(prefers-reduced-motion:reduce){.hero .halo,.scrollcue i,.hero video{animation:none}.lnw .ln>span{transform:none}#load .lmk,#load .lbar::after{animation:none}}
 </style>
@@ -670,15 +748,15 @@
 <span id="top"></span>
 <!-- HERO (dark) -->
 <header class="hero">
-  <video autoplay muted loop playsinline poster="/assets/land-hero-poster.jpg" id="heroVid"></video>
+  <canvas id="heroFx" aria-hidden="true"></canvas>
   <div class="veil"></div><div class="halo"></div>
   <div class="wrap hero-in">
     <div class="kline">A CRM born in real estate</div>
     <h1 data-r class="in lnw">
-      <span class="ln"><span>The order</span></span>
-      <span class="ln"><span>you <em>never had</em></span></span>
+      <span class="ln"><span>Every lead — answered</span></span>
+      <span class="ln"><span>in <em>60 seconds</em></span></span>
     </h1>
-    <p class="lede">While your manager is still typing a reply, the client has already messaged three competitors. Lumen answers in seconds, qualifies every lead and stops brokers from letting deals slip or walking off with your database. Not one more CRM: the environment your whole agency runs on.</p>
+    <p class="lede">While your manager is still typing, the client has already messaged three competitors. Lumen answers in seconds, qualifies, and won't let your database walk away.</p>
     <div class="hero-cta">
       <a class="btn primary" href="/soon.html">Claim your beta spot</a>
       <a class="btn ghost" href="#thesis">How it works</a>
@@ -729,10 +807,10 @@
       <a class="btn ghost" href="#product" style="margin-top:26px">See what it looks like</a>
     </div>
     <div class="tlist d1" data-r>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Catches the lead first</b><span>Every channel in one place: WhatsApp, ad comments, telephony, forms. It replies in seconds, around the clock, in the client's language.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Understands the client</b><span>Qualifies by goal, timeline, budget and property type. Builds a psychological profile: what to lean on, what to avoid, how to approach.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Closes the deal</b><span>Follow-up sequences never let the quiet ones slip. Live property shortlists, meetings, call reviews: the whole operation without the manual grind.</span></div></div>
-      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Keeps it under control</b><span>The owner sees the risks and any database leakage, assigns roles and access, and reclaims contacts at offboarding. The database belongs to the agency, not the broker.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></svg></span><div><b>Catches the lead first</b><span>Every channel in one window. Replies in seconds, around the clock, in the client's language.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg></span><div><b>Understands the client</b><span>Qualifies by goal, timeline and budget — and builds a psychological profile.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><b>Closes the deal</b><span>Sequences wake the quiet ones. Shortlists, meetings, call reviews — no manual grind.</span></div></div>
+      <div class="ti"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><div><b>Keeps it under control</b><span>Roles, access, offboarding. The database belongs to the agency, not the broker.</span></div></div>
     </div>
   </div>
 </section>
@@ -742,12 +820,42 @@
   <div class="wrap">
     <div data-r style="text-align:center"><span class="eyebrow c">The inquiry's journey</span>
       <h2 style="margin-top:22px">From click <em>to deal</em>, without lifting a finger</h2></div>
-    <div class="flow d1" data-r>
-      <div class="fstep"><div class="dot">1</div><h4>The inquiry lands</h4><p>From any channel, instantly in the system and tied to the ad it came from.</p></div>
-      <div class="fstep"><div class="dot">2</div><h4>A reply in seconds</h4><p>The front line answers ahead of competitors, around the clock.</p></div>
-      <div class="fstep"><div class="dot">3</div><h4>Qualification</h4><p>Goal, timeline, budget, type, plus a psychological profile of the client.</p></div>
-      <div class="fstep"><div class="dot">4</div><h4>Warm lead to the broker</h4><p>With full history, a playbook and a task to call within 30 minutes.</p></div>
-      <div class="fstep"><div class="dot">5</div><h4>The deal, under control</h4><p>Shortlists, meetings, call reviews, all the way to the signature.</p></div>
+    <div class="flow2 d1" data-r>
+      <article class="fstep2">
+        <span class="fs-num">01</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a2 2 0 002 2h12a2 2 0 002-2v-5"/><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M12 3v7m0 0l-2.5-2.5M12 10l2.5-2.5"/></svg></span>
+        <h4>The inquiry lands</h4>
+        <p>WhatsApp, Instagram, a form, a call — all in one window in a second, tied to the ad that brought it.</p>
+        <span class="fs-chip">ROI on every lead</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">02</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg></span>
+        <h4>Answered in 60 seconds</h4>
+        <p>The AI holds a real conversation, not a canned reply. Nights, weekends, no pauses — while competitors sleep.</p>
+        <span class="fs-chip">AI you can't tell from a human</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">03</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+        <h4>Qualification</h4>
+        <p>Goal, timeline, budget, type — plus a psychological profile: how to talk to this client to close.</p>
+        <span class="fs-chip">Client psycho-profile</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">04</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/></svg></span>
+        <h4>Warm lead to the broker</h4>
+        <p>With history, a ready script and a task to call within 30 minutes. The base is locked — no one walks off with it.</p>
+        <span class="fs-chip">The base can't walk away</span>
+      </article>
+      <article class="fstep2">
+        <span class="fs-num">05</span>
+        <span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <h4>The deal, under control</h4>
+        <p>Shortlists, meetings, AI review of every call and a founder's dashboard — all the way to the signature.</p>
+        <span class="fs-chip">AI call reviews</span>
+      </article>
     </div>
   </div>
 </section>
@@ -852,7 +960,7 @@
       <div>
         <span class="eyebrow">One inbox for the broker</span>
         <h3>Every channel flows <em>into one Telegram</em></h3>
-        <p>WhatsApp, Instagram Direct, ad comments, forms: it all lands in the broker's personal Telegram. They reply from a window they already know, the AI steps in when they're busy, and every message and contact stays in the agency's system.</p>
+        <p>WhatsApp, Instagram, ad comments, forms — all in the broker's personal Telegram. The AI steps in when they're busy, and every message and contact stays with the agency.</p>
         <div class="tgflow">
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-7.7 13.7L3 21l4.5-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 8.8c-.2.5-.2 1.6.6 2.8.9 1.4 2.3 2.2 3 2.4.7.2 1.2 0 1.5-.4.2-.3.2-.6.1-.8l-1-.7c-.2-.1-.4 0-.6.1l-.4.4a3.8 3.8 0 0 1-1.8-1.8l.4-.4c.1-.2.2-.4.1-.6l-.6-1c-.2-.3-.6-.4-.9-.2z"/></svg></span><span>WhatsApp</span></div>
           <div class="chan"><span class="ci"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.4"/><circle cx="16.7" cy="7.3" r=".6" fill="currentColor" stroke="none"/></svg></span><span>Instagram</span></div>
@@ -939,15 +1047,15 @@
     <div data-r><span class="eyebrow">Details no one else has</span>
       <h2 style="margin-top:22px;max-width:20ch">Not "we have a CRM". <em>We have what no one else does</em></h2></div>
     <div class="feats">
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">A psychological profile of the client</div><p>The AI reads the conversation and builds a buyer profile: personality type, what to lean on, what to avoid, how to approach. The broker gets not "lead #47" but a playbook for closing them.</p><span class="only">only in Lumen</span></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">AI you can't tell apart</div><p>It replies with pauses and a "typing…" status, at a natural human pace. The client is sure they're talking to a real manager, not an auto-responder that gives itself away in the first second.</p><span class="only">only in Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">A Telegram ⇄ WhatsApp bridge</div><p>The broker answers the client straight from their personal Telegram: familiar and convenient. Yet every message, media file and piece of history stays in the agency's system. When the broker leaves, the database stays.</p><span class="only">only in Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Live shortlists in a minute</div><p>The AI assembles a branded property shortlist for a specific client, with your logo and signature. And it shows exactly what they opened and how long they looked.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Leads from ad comments</div><p>We catch everyone who comments under an Instagram ad and pull them into a private conversation, automatically, while competitors don't even read their comments.</p><span class="only">only in Lumen</span></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">A call in your own voice</div><p>Speak your language, and the client hears you in theirs, in your voice. As the call unfolds, an AI prompter suggests how to handle each objection.</p><span class="only">only in Lumen</span></div>
-      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">A review of every call</div><p>The AI listens to the recordings and scores them against a sales methodology: what was missed, where it wasn't closed out, what the next step is. A coach for the team that never sleeps.</p></div>
-      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Reviving a dormant database</div><p>The quiet ones are leads you've already paid for. Follow-up sequences wake them across every channel, respecting quiet hours in the client's own time zone, and stop the moment they reply.</p></div>
-      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">A market academy built in</div><p>Built-in knowledge of Dubai, Phuket and Bali: neighborhoods, ROI, payment plans, scripts. A new broker starts closing deals without spending six months learning the market.</p></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.8 6.8 0 0 1 11-3.4"/><path d="M18 13.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span><div class="fi">01</div><div class="fn">A psychological profile of the client</div><p>Personality, what to lean on, what to avoid — a ready playbook to close.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/><path d="M12 8l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z"/></svg></span><div class="fi">02</div><div class="fn">AI you can't tell apart</div><p>Replies with pauses and a "typing…" — the client is sure it's a real manager.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><div class="fi">03</div><div class="fn">A Telegram ⇄ WhatsApp bridge</div><p>The broker writes from personal Telegram, the whole base stays with the agency.</p><span class="only">only in Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="12" height="11.5" rx="1.6"/><path d="M8 8.5V6.5A1.6 1.6 0 0 1 9.6 5H18a1.6 1.6 0 0 1 1.6 1.6V15A1.6 1.6 0 0 1 18 16.5h-2"/></svg></span><div class="fi">04</div><div class="fn">Live shortlists in a minute</div><p>A branded shortlist per client in a minute — and you see what they viewed.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v9H8.5L4 18z"/><path d="M11 10h5"/><path d="M13.8 7.8L16 10l-2.2 2.2"/></svg></span><div class="fi">05</div><div class="fn">Leads from ad comments</div><p>We catch commenters under your ads and pull them into a private chat automatically.</p><span class="only">only in Lumen</span></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4.5 4v-13L7 9.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg></span><div class="fi">06</div><div class="fn">A call in your own voice</div><p>The client hears you in their language, and an AI prompter handles objections.</p><span class="only">only in Lumen</span></div>
+      <div class="feat" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6.5 3.2 13 2.6-9 1.7 5H21"/></svg></span><div class="fi">07</div><div class="fn">A review of every call</div><p>AI scores calls against a sales methodology: where it wasn't closed, what's next.</p></div>
+      <div class="feat d1" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.5V9h-4.5"/></svg></span><div class="fi">08</div><div class="fn">Reviving a dormant database</div><p>Sequences wake the quiet ones across channels, respecting quiet hours, stop on reply.</p></div>
+      <div class="feat d2" data-r><span class="fic"><svg viewBox="0 0 24 24"><path d="M12 4.5l9 4-9 4-9-4z"/><path d="M6.5 10.5V15c0 1.5 2.6 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.5"/><path d="M21 8.5v4.5"/></svg></span><div class="fi">09</div><div class="fn">A market academy built in</div><p>Dubai, Phuket, Bali: neighborhoods, ROI, payment plans, scripts — built in.</p></div>
     </div>
   </div>
 </section>
@@ -958,13 +1066,13 @@
     <div data-r>
       <span class="eyebrow">For the owner</span>
       <h2 style="margin-top:22px;max-width:16ch">The database belongs to <em>the agency</em></h2>
-      <p class="lede" style="margin-top:18px">An agency's most valuable asset isn't the office or the website, it's the contacts. Lumen makes them yours: the broker works from their phone, but the conversation, the history and the client stay in the system. When someone leaves, the database stays.</p>
+      <p class="lede" style="margin-top:18px">An agency's most valuable asset is its contacts. The broker works from their phone, but the conversation, history and client stay in the system. When someone leaves, the database stays.</p>
     </div>
-    <div class="ctrl-list d1" data-r>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>A control panel: risks, silence, disputed and "leaking" leads, all on one screen</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Roles and access: everyone sees only their own, nothing extra</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>One-click offboarding: reclaim contacts and hand over deals when a broker leaves</div>
-      <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>A Telegram ⇄ WhatsApp bridge: the broker replies from their personal messenger, the database stays in the system</div>
+    <div class="ctrl-cards d1" data-r>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1.6"/><path d="M8 20h8M12 17v3"/></svg></span><b>Control panel</b><span>Risks, silence and "leaking" leads on one screen.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16 8a3 3 0 0 1 0 6"/></svg></span><b>Roles &amp; access</b><span>Everyone sees only their own, nothing extra.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 12h8"/><path d="M13 9l3 3-3 3"/></svg></span><b>1-click offboarding</b><span>Reclaim contacts when a broker leaves.</span></div>
+      <div class="cc"><span class="cc-ic"><svg viewBox="0 0 24 24"><path d="M4 9h13"/><path d="M14 6l3 3-3 3"/><path d="M20 15H7"/><path d="M10 12l-3 3 3 3"/></svg></span><b>TG ⇄ WA bridge</b><span>The broker writes from personal, the base stays in the system.</span></div>
     </div>
   </div>
 </section>
@@ -1107,10 +1215,11 @@
     <button class="x" id="cClose" aria-label="Close">✕</button>
     <div id="cBody">
       <div class="mhead">
-        <div class="mav" id="cAvatar">TP</div>
+        <div class="mav" id="cAvatar"><img src="/assets/founder.jpg" alt="Aleksei — founder of TargetPoint" width="58" height="58" loading="lazy"></div>
         <div>
           <h3 id="cTitle">A live <em>Lumen</em> demo</h3>
           <div class="msub">20 minutes, no slides. We'll show the system on your own scenario and answer your questions. Pick a time that works for you.</div>
+          <div class="mby">Hosted by <b>Aleksei</b> · founder of TargetPoint</div>
         </div>
       </div>
       <div class="cal" id="cal">
@@ -1190,7 +1299,58 @@
   document.querySelectorAll('.cu').forEach(function(el){cuIO.observe(el)});
 
   // hero video is swapped in when ready (Higgsfield); the poster holds the frame until then
-  (function(){var v=document.getElementById('heroVid');if(!v)return;var s=document.createElement('source');s.src='/assets/land-hero.mp4?v=1';s.type='video/mp4';v.appendChild(s);v.load&&v.load();v.play&&v.play().catch(function(){});})();
+  (function(){
+    var c=document.getElementById('heroFx'); if(!c) return;
+    var ctx=c.getContext('2d'); if(!ctx) return;
+    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var W=0,H=0,DPR=1,lines=[],shapes=[],raf=0,vis=true,INK='244,243,241';
+    function build(){
+      lines=[]; var n=Math.max(9,Math.round(W/96));
+      for(var i=0;i<n;i++){var f=n>1?i/(n-1):.5;
+        lines.push({x:f*W,a:.10+Math.random()*.09,sway:5+Math.random()*16,ph:Math.random()*6.28,sp:.12+Math.random()*.22});}
+      shapes=[
+        {t:'rect',x:W*.19,y:H*.34,s:Math.min(150,W*.14),r:.2,dr:.02,vx:.05,vy:-.028,a:.14},
+        {t:'circ',x:W*.8,y:H*.62,s:Math.min(120,W*.12),r:0,dr:-.014,vx:-.045,vy:.036,a:.12},
+        {t:'plus',x:W*.62,y:H*.2,s:Math.min(58,W*.05),r:.4,dr:.03,vx:.028,vy:.05,a:.16}
+      ];
+    }
+    function size(){DPR=Math.min(2,window.devicePixelRatio||1);W=c.clientWidth;H=c.clientHeight;c.width=W*DPR;c.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);build();if(reduce)draw(0);}
+    function draw(t){
+      ctx.clearRect(0,0,W,H);
+      var bp=(t*0.00003)%1.6-.3, bx=bp*W; // луч медленно проходит слева направо, с паузой за краем
+      // видимый мягкий световой столб (Lumen) — скользит вместе с лучом
+      var bw=W*0.18;
+      ctx.save();ctx.globalCompositeOperation='lighter';
+      var cg=ctx.createLinearGradient(bx-bw,0,bx+bw,0);
+      cg.addColorStop(0,'rgba('+INK+',0)');cg.addColorStop(.5,'rgba('+INK+',.08)');cg.addColorStop(1,'rgba('+INK+',0)');
+      ctx.fillStyle=cg;ctx.fillRect(bx-bw,0,bw*2,H);ctx.restore();
+      for(var i=0;i<lines.length;i++){var L=lines[i];
+        var x=L.x+Math.sin(t*0.0004*L.sp+L.ph)*L.sway;
+        var beam=Math.max(0,1-Math.abs(x-bx)/bw);
+        var al=L.a+beam*beam*.55;
+        var g=ctx.createLinearGradient(0,H*.06,0,H*.97);
+        g.addColorStop(0,'rgba('+INK+',0)');g.addColorStop(.5,'rgba('+INK+','+al.toFixed(3)+')');g.addColorStop(1,'rgba('+INK+',0)');
+        ctx.strokeStyle=g;ctx.lineWidth=1+beam*1.1;
+        ctx.beginPath();ctx.moveTo(x,H*.05);ctx.lineTo(x,H*.97);ctx.stroke();
+      }
+      for(var j=0;j<shapes.length;j++){var S=shapes[j];
+        if(!reduce){S.x+=S.vx;S.y+=S.vy;S.r+=S.dr*.01;}
+        if(S.x<-160)S.x=W+160;else if(S.x>W+160)S.x=-160;
+        if(S.y<-160)S.y=H+160;else if(S.y>H+160)S.y=-160;
+        ctx.save();ctx.translate(S.x,S.y);ctx.rotate(S.r);
+        ctx.strokeStyle='rgba('+INK+','+S.a+')';ctx.lineWidth=1;var h=S.s/2;
+        if(S.t==='rect')ctx.strokeRect(-h,-h,S.s,S.s);
+        else if(S.t==='circ'){ctx.beginPath();ctx.arc(0,0,h,0,6.2832);ctx.stroke();}
+        else{ctx.beginPath();ctx.moveTo(-h,0);ctx.lineTo(h,0);ctx.moveTo(0,-h);ctx.lineTo(0,h);ctx.stroke();}
+        ctx.restore();
+      }
+    }
+    function loop(t){if(vis)draw(t);raf=requestAnimationFrame(loop);}
+    window.addEventListener('resize',size,{passive:true});
+    document.addEventListener('visibilitychange',function(){vis=!document.hidden;});
+    size();
+    if(!reduce)raf=requestAnimationFrame(loop);
+  })();
 
   /* ── LOADER ── */
   (function(){var l=document.getElementById('load');if(!l)return;var done=false;function hide(){if(done)return;done=true;l.classList.add('gone');setTimeout(function(){l.parentNode&&l.remove()},900);}setTimeout(hide,900);addEventListener('load',function(){setTimeout(hide,300)});setTimeout(hide,4000);})();

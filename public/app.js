@@ -1555,7 +1555,8 @@ const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
-const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'sequences', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
+/* 'sequences' открыта брокеру: он видит агентские (read-only) + свои личные + расшаренные, форкает и делится */
+const BROKER_HIDDEN_PAGES = ['control', 'qualifier', 'wake', 'automations', 'ads', 'comments', 'numbers', 'templates', 'brokers', 'hr', 'analytics', 'settings', 'agency', 'billing'];
 /* СИНГЛ-БРОКЕР (edition:'solo') — личное пространство одного брокера. Убираем всё «командное/
    управленческое»: лента, HR-подбор, брокеры, роли и доступы, контроль, академия агентства,
    подрядчики трафика (медиапланы/план-факт), комментарии. Остаётся: воронка, реанимация базы,
@@ -5197,6 +5198,14 @@ PAGES.sequences = async (root) => {
   const seq = seqs.find(x => x.id === PAGE_STATE.seqSel);
   const editIx = PAGE_STATE.seqEdit;
   const tpls = STATE.templates;
+  const me = STATE.me || {};
+  const isBrokerUser = me.role === 'broker';
+  const canEdit = (sq) => !isBrokerUser || sq.ownerId === me.brokerId;                 /* брокер правит только свои */
+  const ownTag = (sq) => !sq.ownerId ? '<span class="seq-tag base">Агентская</span>'
+    : (sq.ownerId === me.brokerId ? '<span class="seq-tag mine">Моя</span>'
+      : `<span class="seq-tag shared">${(sq.sharedWith || []).includes(me.brokerId) ? 'Расшарена мне' : 'Брокера'}</span>`);
+  const editable = canEdit(seq);
+  const ro = (attr) => editable ? attr : (attr + ' disabled');
   const save = async (patch) => { await api.patch('/sequences/' + seq.id, patch || { steps: seq.steps }); };
   const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
   const dayLabel = (d) => d === 0 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + d;
@@ -5253,7 +5262,7 @@ PAGES.sequences = async (root) => {
     `, { v: 'left', hue: '#2563EB' })}
     <div class="fl-tabs">
       ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
-        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}<span>${geoName(sq.geo)}</span></button>`).join('')}
+        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 30 ? sq.name.slice(0, 28) + '…' : sq.name)}<span>${geoName(sq.geo)} · ${ownTag(sq)}</span></button>`).join('')}
       <button class="btn btn-sm" id="seqNew">${ic(I.plus)}Цепочка</button>
       ${hint('chains', 'Как работают цепочки', [
         ['Одна цепочка на гео', 'Лид получает цепочку своего направления; «Все гео» — запасная'],
@@ -5263,12 +5272,17 @@ PAGES.sequences = async (root) => {
     </div>
     <div class="two-col" style="grid-template-columns:1.5fr 1fr">
       <div>
+        ${!editable ? `<div class="lc-hint info" style="border-style:dashed;margin-bottom:10px">${ic(I.shield)}<span><b>Агентская цепочка</b> — её ведёт руководитель. Чтобы изменить под себя — <b>форкните</b> её в свою личную.</span></div>` : ''}
         <div class="glass card mb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input id="seqName" value="${esc(seq.name)}" style="flex:1;min-width:200px;font-weight:650">
-          <select id="seqGeo" style="width:140px"><option value="all" ${seq.geo === 'all' ? 'selected' : ''}>Все гео</option>${STATE.settings.agency.geos.map(g => `<option value="${g}" ${seq.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
+          <span class="seq-own">${ownTag(seq)}</span>
+          <input id="seqName" value="${esc(seq.name)}" style="flex:1;min-width:180px;font-weight:650" ${ro('')}>
+          <select id="seqGeo" style="width:140px" ${ro('')}><option value="all" ${seq.geo === 'all' ? 'selected' : ''}>Все гео</option>${STATE.settings.agency.geos.map(g => `<option value="${g}" ${seq.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
           <div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:12px">Активна</span>
-            <label class="switch"><input type="checkbox" id="seqActive" ${seq.active ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-          <button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>
+            <label class="switch"><input type="checkbox" id="seqActive" ${seq.active ? 'checked' : ''} ${ro('')}><span class="tr"></span><span class="th"></span></label></div>
+          <button class="btn btn-sm" id="seqFork" title="Скопировать в свою личную цепочку">${ic(I.copy || I.plus)}Форкнуть себе</button>
+          ${editable && seq.ownerId ? `<button class="btn btn-sm" id="seqShare" title="Поделиться с брокерами / руководителем">${ic(I.send)}Поделиться</button>` : ''}
+          ${editable && !isBrokerUser ? `<button class="btn btn-sm" id="seqShare" title="Раздать эту цепочку конкретным брокерам">${ic(I.send)}Раздать брокерам</button>` : ''}
+          ${editable ? `<button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>` : ''}
         </div>
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
@@ -5363,15 +5377,45 @@ PAGES.sequences = async (root) => {
   /* табы и шапка */
   $$('.fl-tab', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
   $('#seqNew').addEventListener('click', async () => { const nq = await api.post('/sequences', {}); await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = 0; render(); });
-  $('#seqName').addEventListener('change', (e) => save({ name: e.target.value }));
-  $('#seqGeo').addEventListener('change', (e) => { seq.geo = e.target.value; save({ geo: e.target.value }).then(() => render()); });
-  $('#seqActive').addEventListener('change', (e) => { seq.active = e.target.checked; save({ active: e.target.checked }); });
-  $('#seqDel').addEventListener('click', () => modal({
-    title: 'Удалить цепочку?', sub: seq.name,
-    actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/sequences/' + seq.id, { method: 'DELETE' }); await loadState(); PAGE_STATE.seqSel = null; render(); } }, { label: 'Отмена' }],
-  }));
+  $('#seqFork')?.addEventListener('click', async () => {
+    const nq = await api.post('/sequences/' + seq.id + '/fork', {});
+    await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = null;
+    toast('Скопировано в вашу цепочку', 'Теперь её можно менять под себя', true); render();
+  });
+  $('#seqShare')?.addEventListener('click', () => {
+    const brokers = (STATE.brokers || []).filter(b => b.id !== me.brokerId && b.active !== false);
+    const cur = new Set(seq.sharedWith || []);
+    modal({
+      title: 'Поделиться цепочкой', sub: seq.name, body: `
+        <label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${isBrokerUser ? 'Всем брокерам агентства' : 'Раздать всем брокерам'}</div><div class="sd">видят и могут форкнуть себе</div></div>
+          <input type="checkbox" id="shAll" ${seq.visibility === 'agency' ? 'checked' : ''}></label>
+        <div class="lp-sec" style="margin:10px 0 4px">Или конкретным брокерам</div>
+        <div id="shList" style="max-height:260px;overflow:auto">${brokers.map(b => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${esc(b.name)}</div></div><input type="checkbox" data-shb="${b.id}" ${cur.has(b.id) ? 'checked' : ''}></label>`).join('') || '<div class="muted" style="font-size:12.5px">Других брокеров нет</div>'}</div>`,
+      actions: [{ label: 'Сохранить доступ', cls: 'btn-accent', onClick: async () => {
+        const all = document.getElementById('shAll')?.checked;
+        const ids = all ? [] : $$('[data-shb]').filter(x => x.checked).map(x => x.dataset.shb);
+        const visibility = all ? 'agency' : (ids.length ? 'shared' : (seq.ownerId ? 'private' : 'base'));
+        await api.patch('/sequences/' + seq.id, { visibility, sharedWith: ids });
+        toast('Доступ обновлён', all ? 'Видят все брокеры' : ids.length ? `Открыто ${ids.length} брокер(ам)` : 'Снова только у вас', true);
+        await loadState(); render();
+      } }, { label: 'Отмена' }],
+    });
+  });
+  if (editable) {
+    $('#seqName')?.addEventListener('change', (e) => save({ name: e.target.value }));
+    $('#seqGeo')?.addEventListener('change', (e) => { seq.geo = e.target.value; save({ geo: e.target.value }).then(() => render()); });
+    $('#seqActive')?.addEventListener('change', (e) => { seq.active = e.target.checked; save({ active: e.target.checked }); });
+    $('#seqDel')?.addEventListener('click', () => modal({
+      title: 'Удалить цепочку?', sub: seq.name,
+      actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/sequences/' + seq.id, { method: 'DELETE' }); await loadState(); PAGE_STATE.seqSel = null; render(); } }, { label: 'Отмена' }],
+    }));
+  }
 
-  /* шаги */
+  /* шаги — редактирование только у своих цепочек */
+  if (!editable) {
+    $$('[data-stopclick]', root).forEach(x => x.addEventListener('click', (e) => e.stopPropagation()));
+    return; /* агентская/чужая цепочка: только просмотр + форк/шаринг выше */
+  }
   $$('[data-step]', root).forEach(sw => sw.addEventListener('change', async () => { seq.steps[+sw.dataset.step].active = sw.checked; await save(); }));
   $$('[data-stopclick]', root).forEach(x => x.addEventListener('click', (e) => e.stopPropagation()));
   $$('.fl-node[data-drag]', root).forEach(node => node.addEventListener('click', (e) => {
@@ -9705,6 +9749,11 @@ PAGES.numbers = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#23B383' })}
+    <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
+      <div class="card-title">${ic(I.chat)}Ваши WhatsApp-номера (по QR)<span class="sub">подключение по QR + прогрев — для серых касаний и проверки номеров</span></div>
+      <div class="muted" style="font-size:12px;margin:2px 0 12px;line-height:1.5">Здесь вы подключаете <b>свои</b> номера по QR (как WhatsApp Web). С них уходит первое касание/цепочка серым способом и проверяется наличие WhatsApp у лида. Каждый номер можно закрепить за брокером.</div>
+      <button class="btn btn-accent" id="openGrayBtn">${ic(I.link)}Подключить / управлять номерами по QR</button>
+    </div>
     <div class="glass card mb">
       <div class="card-title">${ic(I.shield)}Гигиена канала</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
@@ -9755,6 +9804,7 @@ PAGES.numbers = async (root) => {
     await api.patch('/numbers/' + id, { state: b.dataset.act });
     render();
   }));
+  $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
     modal({
@@ -11102,6 +11152,15 @@ PAGES.agency = async (root) => {
           </div>
           <button class="btn btn-accent" id="abSave">Сохранить</button>
         </div>
+        ${(STATE.me && STATE.me.role === 'owner') ? `<div class="glass card mb">
+          <div class="card-title">${ic(I.chat)}E-mail входа<span class="sub">текущий: ${esc(STATE.settings.ownerEmail || '—')}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Новый e-mail</label><input id="emNew" type="email" placeholder="you@gmail.com" value=""></div>
+            <div class="form-row"><label>Текущий пароль</label><input id="emPw" type="password" placeholder="для подтверждения"></div>
+          </div>
+          <button class="btn" id="emSave">Сменить e-mail</button>
+          <div class="muted" style="font-size:11.5px;margin-top:8px">На этот адрес вы будете входить. Можно указать вашу Google-почту — вход остаётся по e-mail + паролю (вход через кнопку Google добавим отдельно).</div>
+        </div>` : ''}
         <div class="glass card mb">
           <div class="card-title">${ic(I.shield)}Пароль входа</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -11239,6 +11298,14 @@ PAGES.agency = async (root) => {
     const r = await fetch('/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current: $('#pwCur').value, next: $('#pwNext').value }) });
     const j = await r.json();
     if (r.ok) { toast('Пароль изменён', 'Другие сессии разлогинены', true); $('#pwCur').value = $('#pwNext').value = ''; }
+    else toast('Не получилось', j.error || 'ошибка');
+  });
+  $('#emSave')?.addEventListener('click', async () => {
+    const email = $('#emNew').value.trim(); const password = $('#emPw').value;
+    if (!email || !password) { toast('Заполните новый e-mail и текущий пароль'); return; }
+    const r = await fetch('/auth/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { toast('E-mail изменён', 'Теперь входите по ' + j.email, true); await loadState(); PAGES.settings(root); }
     else toast('Не получилось', j.error || 'ошибка');
   });
 };

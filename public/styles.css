@@ -596,6 +596,12 @@ textarea { resize: vertical; min-height: 70px; }
 .lc-pin-body { font-size: 12px; line-height: 1.5; color: var(--text); white-space: pre-wrap; max-height: 160px; overflow-y: auto; }
 .lc-pin-empty { color: var(--muted); font-style: italic; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Бейджи владения цепочкой (агентская / моя / расшарена) */
+.seq-tag { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+.seq-tag.base { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.seq-tag.mine { background: color-mix(in srgb, #16a34a 16%, transparent); color: #22c55e; }
+.seq-tag.shared { background: color-mix(in srgb, #a855f7 16%, transparent); color: #c084fc; }
+.seq-own { display: inline-flex; align-items: center; }
 /* Мост Telegram — пошаговая инструкция */
 .tgb-step { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px dashed var(--line); }
 .tgb-step:last-child { border-bottom: none; }
