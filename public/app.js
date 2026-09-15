@@ -10176,16 +10176,13 @@ PAGES.numbers = async (root) => {
       ${need > 0 ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> ${pl(need)} до «1 на брокера». Докупи/подключи — закроешь всех брокеров и поднимешь дневной потолок новых лидов до ${ab * 5}.</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-accent btn-sm" id="grayRecBuy">${ic(I.plus)}Купить недостающие (${need})</button><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
     </div>`; })()}
-    <div class="glass card mb">
-      <div class="card-title">${ic(I.shield)}Гигиена канала</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+    <div class="glass card mb">${coll('Гигиена канала', `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:8px">
         ${[['Inbound-first', 'Первым в идеале пишет клиент: CTWA-реклама и Lead Form дают согласие на диалог'],
            ['Прогрев 2–3 недели', 'Новый номер: 10–20 контактов/день, рост ~20% в неделю до рабочего лимита'],
            ['Холодная инициация — только Cloud API', 'Массовые первые касания идут шаблонами через официальный канал, не с тёплых номеров'],
            ['Просадка качества → карантин', 'Доставляемость падает — номер отдыхает, трафик уходит на резерв']]
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
-      </div>
-    </div>
+      </div>`, { open: false, icon: I.shield })}</div>
 
     ${grayNums.length ? `<div class="lp-sec" style="margin:0 0 10px">Серые номера (QR) · ${grayNums.length}</div>
     <div class="num-grid" style="margin-bottom:18px">
