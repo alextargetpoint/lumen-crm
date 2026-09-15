@@ -34,6 +34,11 @@
     spark: _svg('<path d="M12 3l1.7 5.1a2 2 0 001.2 1.2L20 11l-5.1 1.7a2 2 0 00-1.2 1.2L12 19l-1.7-5.1a2 2 0 00-1.2-1.2L4 11l5.1-1.7a2 2 0 001.2-1.2z"/>'),
     check: _svg('<path d="M20 6L9 17l-5-5"/>', 2.4),
     x: _svg('<path d="M18 6L6 18M6 6l12 12"/>', 2),
+    globe: _svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>'),
+    users: _svg('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/><path d="M16 5.2a3.2 3.2 0 010 5.6M20.5 20a5.5 5.5 0 00-4-5.3"/>'),
+    grid: _svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>'),
+    shield: _svg('<path d="M12 3l7 3v5c0 4.4-3 8.2-7 10-4-1.8-7-5.6-7-10V6l7-3z"/><path d="M9.2 12l2 2 3.6-3.8"/>'),
+    star: _svg('<path d="M12 3l1.9 5.7L20 9l-4.6 3.5L17 19l-5-3.4L7 19l1.6-6.5L4 9l6.1-.3z"/>'),
   };
 
   // ---------- данные ----------
@@ -59,6 +64,8 @@
   ];
   // иллюстрации к шагам-фичам
   const SHOT = (n) => '/assets/site/cap-' + n + '.png';
+  // золотой эмблем-мотив на шапке каждого шага (в связке с обложками писем)
+  const EMBLEM = { edition: 'building', style: 'palette', brand: 'spark', geos: 'globe', team: 'users', tone: 'chat', whatsapp: 'chat', chains: 'bolt', listings: 'grid', control: 'shield', pricing: 'star', finish: 'check' };
 
   // ---------- состояние ----------
   let S = null;         // накопленный конфиг онбординга
@@ -336,7 +343,7 @@
     root.querySelector('.ob-stage').innerHTML = `
       <div class="ob-panel ${d.bg ? 'ob-panel-cine' : ''} ${shot ? 'ob-panel-split' : ''}" key="${step.id}">
         <div class="ob-body">
-          ${d.title ? `<div class="ob-step-n">Шаг ${idx} из ${total - 2}</div><h2 class="ob-h2">${d.title}</h2>${d.sub ? `<p class="ob-sub">${d.sub}</p>` : ''}` : ''}
+          ${d.title ? `<div class="ob-emblem">${IC[EMBLEM[step.id]] || IC.spark}</div><div class="ob-step-n">Шаг ${idx} из ${total - 2}</div><h2 class="ob-h2">${d.title}</h2>${d.sub ? `<p class="ob-sub">${d.sub}</p>` : ''}` : ''}
           <div class="ob-content">${d.html}</div>
         </div>
         ${shot}
@@ -556,7 +563,13 @@
     /* фон-«герой» как на сайте — тёмный радиал, никакого видео */
     .ob-bgvid{position:absolute;inset:0;display:block;z-index:0;overflow:hidden}
     .ob-bgvid video{width:100%;height:100%;object-fit:cover;opacity:.34;filter:grayscale(1) contrast(1.04)}
-    .ob-shader{display:none}
+    .ob-shader{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.9;transition:opacity .5s ease}
+    .ob-root.ob-cinematic .ob-shader{opacity:.4}
+    .ob-root.ob-pulse .ob-shader{opacity:1}
+    /* золотой эмблем-мотив на шапке шага */
+    .ob-emblem{width:48px;height:48px;border-radius:50%;border:1px solid rgba(214,199,168,.32);background:radial-gradient(120% 120% at 50% 30%,rgba(214,199,168,.12),rgba(214,199,168,.03));color:#d6c7a8;display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 0 26px -8px rgba(214,199,168,.5);animation:obEmblem 4.5s ease-in-out infinite}
+    .ob-emblem svg{width:23px;height:23px}
+    @keyframes obEmblem{0%,100%{box-shadow:0 0 20px -9px rgba(214,199,168,.4);transform:translateY(0)}50%{box-shadow:0 0 32px -4px rgba(214,199,168,.7);transform:translateY(-2px)}}
     .ob-veil{position:absolute;inset:0;z-index:1;background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
     .ob-root:not(.ob-cinematic) .ob-veil{background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
     .ob-root.ob-cinematic .ob-veil{background:radial-gradient(130% 100% at 50% 18%,rgba(13,12,11,.72),rgba(6,6,5,.86) 68%,rgba(4,4,3,.95))}
@@ -762,51 +775,46 @@
   }
 
   // ============================================================
-  //  WebGL-шейдер: живая кобальт-небула, реагирует на курсор
+  //  Золотой партикл-фон (2D canvas): дрейфующие золотые искры,
+  //  тонкие концентрические кольца справа (эхо ✦) + свечение за курсором.
+  //  В связке с золотыми обложками писем; надёжнее WebGL.
   // ============================================================
   let _raf = 0, _mouse = { x: .5, y: .5, tx: .5, ty: .5 };
   function startShader(canvas) {
     if (!canvas) return;
-    let gl; try { gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); } catch (e) {}
-    if (!gl) return;
-    const vs = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
-    const fs = [
-      'precision highp float;uniform vec2 r;uniform float t;uniform vec2 m;',
-      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
-      'float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}',
-      'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.03;a*=.5;}return v;}',
-      'void main(){vec2 uv=gl_FragCoord.xy/r.xy;vec2 q=uv;q.x*=r.x/r.y;float tt=t*.028;',
-      'vec2 fl=vec2(fbm(q*1.5+tt),fbm(q*1.5-tt+7.));',
-      'float f=fbm(q*2.3+fl*1.35+vec2(tt*1.4,-tt));',
-      'vec3 deep=vec3(.006,.018,.05),cob=vec3(.04,.13,.46),hi=vec3(.18,.30,.78);',
-      'vec3 col=mix(deep,cob,smoothstep(.30,.86,f));',
-      'col=mix(col,hi,smoothstep(.72,.99,f)*.38);',
-      'vec2 mp=m;mp.x*=r.x/r.y;float d=distance(q,mp);col+=vec3(.09,.22,.62)*exp(-d*3.9)*.42;',
-      'col*=1.-.62*smoothstep(.28,1.05,distance(uv,vec2(.5,.44)));',
-      'gl_FragColor=vec4(col,1.);}'
-    ].join('');
-    function sh(ty, src) { const s = gl.createShader(ty); gl.shaderSource(s, src); gl.compileShader(s); return s; }
-    const prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
-    gl.useProgram(prog);
-    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const pl = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(pl); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 0, 0);
-    const ur = gl.getUniformLocation(prog, 'r'), ut = gl.getUniformLocation(prog, 't'), um = gl.getUniformLocation(prog, 'm');
-    const start = performance.now();
-    function resize() { const dpr = Math.min(devicePixelRatio || 1, 1.5); canvas.width = Math.floor(innerWidth * dpr); canvas.height = Math.floor(innerHeight * dpr); gl.viewport(0, 0, canvas.width, canvas.height); }
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+    let W = 0, H = 0; const dpr = Math.min(devicePixelRatio || 1, 2);
+    function resize() { W = innerWidth; H = innerHeight; canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     resize(); canvas._resize = resize; addEventListener('resize', resize);
-    (function loop() {
-      _mouse.x += (_mouse.tx - _mouse.x) * .06; _mouse.y += (_mouse.ty - _mouse.y) * .06;
-      gl.uniform2f(ur, canvas.width, canvas.height);
-      gl.uniform1f(ut, (performance.now() - start) / 1000);
-      gl.uniform2f(um, _mouse.x, _mouse.y);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const N = Math.min(80, Math.round(W * H / 26000)); const P = [];
+    for (let i = 0; i < N; i++) P.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.7 + .35, vx: (Math.random() - .5) * .10, vy: -(Math.random() * .16 + .03), a: Math.random() * .5 + .12, tw: Math.random() * 6.28, ts: Math.random() * .02 + .008 });
+    const start = performance.now();
+    function loop() {
+      _mouse.x += (_mouse.tx - _mouse.x) * .05; _mouse.y += (_mouse.ty - _mouse.y) * .05;
+      const t = (performance.now() - start) / 1000;
+      ctx.clearRect(0, 0, W, H);
+      /* тонкие золотые концентрические кольца — центр справа-по-центру (как эмблема писем) */
+      const cx = W * 0.78, cy = H * 0.46;
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 7; k++) { const rr = 60 + k * 78 + Math.sin(t * .5 + k) * 6; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 6.2832); ctx.strokeStyle = 'rgba(201,168,106,' + (0.05 - k * 0.005) + ')'; ctx.stroke(); }
+      /* дрейфующие золотые искры */
+      for (const p of P) {
+        if (!reduce) { p.x += p.vx; p.y += p.vy; p.tw += p.ts; }
+        if (p.y < -12) { p.y = H + 12; p.x = Math.random() * W; }
+        if (p.x < -12) p.x = W + 12; else if (p.x > W + 12) p.x = -12;
+        const tw = Math.sin(p.tw) * .5 + .5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832);
+        ctx.fillStyle = 'rgba(214,199,168,' + (p.a * tw * .85) + ')'; ctx.fill();
+      }
+      /* мягкое золотое свечение за курсором */
+      const mx = _mouse.x * W, my = (1 - _mouse.y) * H;
+      const g = ctx.createRadialGradient(mx, my, 0, mx, my, 300);
+      g.addColorStop(0, 'rgba(201,168,106,.10)'); g.addColorStop(1, 'rgba(201,168,106,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       _raf = requestAnimationFrame(loop);
-    })();
+    }
+    loop();
   }
   function stopShader() { if (_raf) cancelAnimationFrame(_raf); _raf = 0; }
 
