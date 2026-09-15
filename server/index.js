@@ -6273,6 +6273,39 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, result: j });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* сохранить креды Cloud API (постоянный токен + Phone Number ID) БЕЗ повторного /register — для уже Connected номера */
+    if (p === '/api/whatsapp/cloud-save' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const pnid = String(b.phoneNumberId || '').replace(/[^0-9]/g, '');
+      const token = String(b.token || '').trim();
+      const wabaId = String(b.wabaId || '').replace(/[^0-9]/g, '');
+      if (!pnid || !token) return json(res, 400, { error: 'нужны Phone Number ID и Access Token' });
+      db.settings.wa = db.settings.wa || {};
+      db.settings.wa.token = token; db.settings.wa.phoneId = pnid; if (wabaId) db.settings.wa.wabaId = wabaId;
+      store.save();
+      /* проверим токен/номер сразу */
+      try { const v = await wa.verify(db); return json(res, 200, { ok: true, verify: v }); }
+      catch (e) { return json(res, 200, { ok: true, verifyError: e.message }); }
+    }
+    /* ТЕСТ официальной отправки через Meta Graph (wa.js): {to, template, lang} или {to, text} */
+    if (p === '/api/whatsapp/cloud-test' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const to = String(b.to || '').replace(/[^0-9]/g, '');
+      if (!to) return json(res, 400, { error: 'нужен номер получателя (to)' });
+      const wcfg = db.settings.wa || {};
+      if (!wcfg.token || !wcfg.phoneId) return json(res, 400, { error: 'сначала сохрани токен и Phone Number ID' });
+      const body = b.text
+        ? { messaging_product: 'whatsapp', to, type: 'text', text: { preview_url: false, body: String(b.text) } }
+        : { messaging_product: 'whatsapp', to, type: 'template', template: { name: String(b.template || 'hello_world'), language: { code: b.lang || 'en_US' } } };
+      try {
+        const r = await fetch('https://graph.facebook.com/v21.0/' + wcfg.phoneId + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + wcfg.token }, body: JSON.stringify(body) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return json(res, 400, { error: (j.error && j.error.message) || ('graph ' + r.status), detail: j.error || null });
+        return json(res, 200, { ok: true, result: j });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
     /* агентство запускает подключение официального WhatsApp: Telnyx выдаёт hosted-signup ссылку */
     if (p === '/api/whatsapp/hosted-signup' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

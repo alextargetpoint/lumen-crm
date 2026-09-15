@@ -1346,6 +1346,16 @@ window.openTelnyxOtp = async function (preselect) {
           <button class="btn btn-accent" id="txRegBtn" style="align-self:flex-end">${ic(I.shield)}Зарегистрировать номер</button>
         </div>
         <div id="txRegOut" class="muted" style="font-size:11.5px;margin-top:8px"></div>
+        <div style="border-top:1px dashed var(--stroke);margin-top:12px;padding-top:12px">
+          <b style="font-size:12.5px">Номер уже <span style="color:var(--ok)">Connected</span>? Сохрани постоянный токен и отправь тест</b>
+          <div class="muted" style="font-size:11px;line-height:1.45;margin:4px 0 8px">Вставь тот же <b>Phone Number ID</b> + <b>постоянный</b> токен (System User) в поля выше → «Сохранить токен». Регистрация не нужна.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <button class="btn btn-sm" id="txSaveBtn">${ic(I.check)}Сохранить токен</button>
+            <div class="form-row" style="margin:0"><label style="font-size:11px">Тест на номер (кому)</label><input id="txTestTo" placeholder="+3912345…" style="width:150px"></div>
+            <button class="btn btn-sm btn-accent" id="txTestBtn">${ic(I.send)}Отправить hello_world</button>
+          </div>
+          <div id="txSaveOut" class="muted" style="font-size:11.5px;margin-top:8px"></div>
+        </div>
       </div>`;
     const buyBtn = $('#txOtpBuy', bd);
     if (buyBtn) buyBtn.addEventListener('click', async () => {
@@ -1357,6 +1367,27 @@ window.openTelnyxOtp = async function (preselect) {
     const refB = $('#txOtpRefresh', bd); if (refB) refB.addEventListener('click', loadSms);
     const clrB = $('#txOtpClear', bd); if (clrB) clrB.addEventListener('click', async () => { if (!current) return; try { await api.post('/telephony/otp/clear', { number: current }); loadSms(); } catch (e) {} });
     const pickB = $('#txOtpPick', bd); if (pickB) pickB.addEventListener('change', async () => { draw('+' + pickB.value); if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} } loadSms(); });
+    const saveBtn = $('#txSaveBtn', bd);
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const phoneNumberId = ($('#txRegPnid', bd) || {}).value || '';
+      const token = ($('#txRegToken', bd) || {}).value || '';
+      const out = $('#txSaveOut', bd);
+      if (!phoneNumberId || !token) { out.innerHTML = '<span style="color:var(--bad)">Заполни Phone Number ID и Access Token выше.</span>'; return; }
+      saveBtn.disabled = true; const o = saveBtn.innerHTML; saveBtn.textContent = 'Сохраняю…';
+      try { const r = await api.post('/whatsapp/cloud-save', { phoneNumberId, token }); out.innerHTML = r.ok ? ('<span style="color:var(--ok)">✓ Сохранено' + (r.verify && r.verify.verified_name ? ' · ' + esc(r.verify.verified_name) : '') + '. Теперь можно слать тест.</span>') : ('<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'); if (r.ok) toast('Токен сохранён', 'Официальный канал готов', true); }
+      catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+      saveBtn.disabled = false; saveBtn.innerHTML = o;
+    });
+    const testBtn = $('#txTestBtn', bd);
+    if (testBtn) testBtn.addEventListener('click', async () => {
+      const to = ($('#txTestTo', bd) || {}).value || '';
+      const out = $('#txSaveOut', bd);
+      if (!to) { out.innerHTML = '<span style="color:var(--bad)">Укажи номер получателя.</span>'; return; }
+      testBtn.disabled = true; const o = testBtn.innerHTML; testBtn.textContent = 'Отправляю…';
+      try { const r = await api.post('/whatsapp/cloud-test', { to, template: 'hello_world', lang: 'en_US' }); out.innerHTML = r.ok ? '<span style="color:var(--ok)">✓ Отправлено! Проверь WhatsApp получателя.</span>' : ('<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'); if (r.ok) toast('Отправлено', 'hello_world ушёл', true); }
+      catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+      testBtn.disabled = false; testBtn.innerHTML = o;
+    });
     const regBtn = $('#txRegBtn', bd);
     if (regBtn) regBtn.addEventListener('click', async () => {
       const phoneNumberId = ($('#txRegPnid', bd) || {}).value || '';
