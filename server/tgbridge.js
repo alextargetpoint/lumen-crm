@@ -29,15 +29,20 @@ function setMediaDir(dir, urlBase) { MEDIA_DIR = dir; if (urlBase) MEDIA_URL_BAS
    Один бот Lumen на ВСЕ агентства: токен в env LUMEN_TG_BRIDGE_TOKEN (Railway). Когда задан — включается
    central-режим: агентства НЕ заводят свой бот, а привязка идёт по ключу агентства (/start <ключ>), роутинг —
    по глобальному индексу chatId→tid (registry.tgChatIndex). Не задан → прежняя модель «бот на агентство». */
-const PLATFORM_TOKEN = process.env.LUMEN_TG_BRIDGE_TOKEN || '';
-function central() { return !!PLATFORM_TOKEN; }
+/* токен центрального бота: env (LUMEN_TG_BRIDGE_TOKEN) ИЛИ платформенный из реестра (задаётся в CRM
+   владельцем платформы — чтобы не воевать с Railway-переменными и чтобы это было проверяемо). */
+function platformToken() {
+  if (process.env.LUMEN_TG_BRIDGE_TOKEN) return process.env.LUMEN_TG_BRIDGE_TOKEN;
+  try { const reg = store.getRegistry(); return (reg.platformBridge && reg.platformBridge.token) || ''; } catch (_) { return ''; }
+}
+function central() { return !!platformToken(); }
 /* секрет вебхука центрального бота: из env или детерминированно из токена (стабилен между рестартами) */
-function platformSecret() { return process.env.LUMEN_TG_BRIDGE_SECRET || (PLATFORM_TOKEN ? crypto.createHash('sha256').update('lumen-central:' + PLATFORM_TOKEN).digest('hex').slice(0, 24) : ''); }
+function platformSecret() { const t = platformToken(); return process.env.LUMEN_TG_BRIDGE_SECRET || (t ? crypto.createHash('sha256').update('lumen-central:' + t).digest('hex').slice(0, 24) : ''); }
 
 /* ---------- конфиг / готовность ---------- */
 function cfg(db) { return db.settings.tgBridge || {}; }
 /* в central-режиме исходящие идут через платформенный бот; иначе — бот агентства */
-function token(db) { return PLATFORM_TOKEN || cfg(db).botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken) || ''; }
+function token(db) { return platformToken() || cfg(db).botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken) || ''; }
 function ready(db) { return central() ? true : !!(cfg(db).enabled && token(db)); }
 
 function rt(db) {
@@ -265,18 +270,19 @@ async function tgApiRaw(tok, method, body) {
   return r.json().catch(() => ({}));
 }
 async function setupPlatformWebhook(baseUrl) {
-  if (!PLATFORM_TOKEN) return { ok: false, error: 'нет LUMEN_TG_BRIDGE_TOKEN' };
+  const tok = platformToken();
+  if (!tok) return { ok: false, error: 'нет токена центрального бота' };
   const base = baseUrl.replace(/\/$/, '');
-  const r = await tgApiRaw(PLATFORM_TOKEN, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
+  const r = await tgApiRaw(tok, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
   /* сохраняем мини-апп: кнопка-меню бота открывает мессенджер брокера (/tgapp) — иначе при переносе
      существующего бота (напр. Lumen Messenger) в мост пропала бы его кнопка «Чаты» */
-  try { await tgApiRaw(PLATFORM_TOKEN, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url: base + '/tgapp' } } }); } catch (_) {}
-  let me = null; try { me = await tgApiRaw(PLATFORM_TOKEN, 'getMe'); } catch (_) {}
+  try { await tgApiRaw(tok, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url: base + '/tgapp' } } }); } catch (_) {}
+  let me = null; try { me = await tgApiRaw(tok, 'getMe'); } catch (_) {}
   return { ok: !!r.ok, result: r, username: me && me.result && me.result.username || null };
 }
 async function platformBotUsername() {
-  if (!PLATFORM_TOKEN) return null;
-  try { const me = await tgApiRaw(PLATFORM_TOKEN, 'getMe'); return me && me.result && me.result.username || null; } catch (_) { return null; }
+  const tok = platformToken(); if (!tok) return null;
+  try { const me = await tgApiRaw(tok, 'getMe'); return me && me.result && me.result.username || null; } catch (_) { return null; }
 }
 
 /* кнопка-меню бота, открывающая мессенджер-мини-апп (Telegram Web App) */

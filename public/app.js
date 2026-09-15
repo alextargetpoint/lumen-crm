@@ -1134,11 +1134,13 @@ window.openGrayManager = async function () {
     const cfgOk = data.platform ? data.ready : (data.url && data.tokenSet);
     host().innerHTML = `
       ${data.platform
-        ? `<div class="lc-hint info" style="margin-bottom:14px">${ic(I.spark)}<span>Сервер подключён платформой Lumen — <b>ничего вводить не нужно</b>. Просто добавьте свой номер и отсканируйте QR.</span></div>`
-        : `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Воркер — это облачный сервис (на Railway), который держит WhatsApp-сессии ваших номеров. URL и токен (WORKER_TOKEN) — из переменных вашего Railway-проекта.</div>
+        ? `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер подключён платформой Lumen — <b>ничего вводить не нужно</b>. Просто добавьте свой номер и отсканируйте QR.</span></div>`
+        : `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Воркер — облачный сервис, который держит WhatsApp-сессии. URL уже подставлен по умолчанию — впишите только токен (значение <b>WORKER_TOKEN</b> с сервиса воркера в Railway) и сохраните. Либо задайте <b>LUMEN_WA_WORKER_TOKEN</b> на сервисе lumen-crm — тогда вводить не придётся.</div>
       <div class="form-row"><label>URL воркера</label><input id="gwUrl" value="${esc(data.url || '')}" placeholder="https://…up.railway.app"></div>
       <div class="form-row"><label>Токен воркера</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• сохранён' : 'WORKER_TOKEN'}"></div>
-      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:14px">Сохранить воркер</button>`}
+      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:8px">Сохранить воркер</button>`}
+      <button class="btn btn-sm" id="gwPing" style="width:100%;justify-content:center;margin-bottom:14px">${ic(I.shield)}Проверить связь с воркером</button>
+      <div id="gwPingRes" style="font-size:12px;margin-bottom:12px"></div>
       ${cfgOk ? `
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input id="gwPhone" placeholder="Номер (971501234567)" style="flex:1">
@@ -1172,6 +1174,15 @@ window.openGrayManager = async function () {
     $('#gwSave', bd)?.addEventListener('click', async () => {
       try { await api.post('/wa/gray/config', { url: $('#gwUrl', bd).value.trim(), token: $('#gwTok', bd).value.trim() || undefined }); toast('Воркер сохранён', '', true); await refresh(); }
       catch (e) { toast('Не вышло', e.message); }
+    });
+    $('#gwPing', bd)?.addEventListener('click', async () => {
+      const box = $('#gwPingRes', bd); if (box) box.innerHTML = '<span class="muted">Проверяю…</span>';
+      try {
+        const r = await api.get('/wa/gray/ping');
+        if (box) box.innerHTML = r.ok
+          ? `<span style="color:var(--ok,#3f7d4f)">✓ ${esc(r.msg)} ${r.platform ? '(платформенный воркер)' : ''} · сессий: ${r.sessions}</span>`
+          : `<span style="color:var(--bad,#c0392b)">✕ ${esc(r.msg)}</span>`;
+      } catch (e) { if (box) box.innerHTML = `<span style="color:var(--bad,#c0392b)">✕ ${esc(e.message)}</span>`; }
     });
     $('#gwAdd', bd)?.addEventListener('click', () => connectNumber($('#gwPhone', bd).value.trim(), $('#gwLabel', bd).value.trim()));
     $('#gwGuide', bd)?.addEventListener('click', (e) => { e.preventDefault(); openGuide('wanumbers'); });
@@ -11783,41 +11794,16 @@ PAGES.settings = async (root) => {
         <b>Привяжите брокеров</b>
         <i>У каждого брокера — свой ключ. Дайте брокеру его команду, он отправит её тому же боту ${esc(tgbBotHandle)} — и все его лиды пойдут ему в личку.</i>
         <div id="tgbBrokers" class="muted" style="font-size:12px;margin-top:8px">Загрузка ключей брокеров…</div>
-      </div></div>` : `
-      <div class="muted" style="font-size:11.8px;margin:0 0 14px">Брокер не держит CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят ему в личный Telegram — он отвечает <b>reply</b>, и ответ уходит клиенту в WhatsApp с его прогретого номера. Вся переписка логируется в CRM.</div>
-
+      </div></div>` : (s.isPrimary ? `
+      <div class="muted" style="font-size:11.8px;margin:0 0 14px">Один общий бот Lumen на все агентства (SaaS-модель). Подключите его <b>один раз</b> — дальше агентства и брокеры привязываются по ключу, без создания своих ботов.</div>
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
-        <b>Заведите бота агентства</b>
-        <i>Откройте <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> → <code class="pill">/newbot</code> → задайте имя (напр. «Агентство · Lumen») → скопируйте выданный токен. Это бот <b>вашего</b> агентства — ваш логотип, ваше имя.</i>
-        <div class="form-row" style="margin-top:8px"><input id="tgbToken" type="password" placeholder="${tgbOn ? '•••••• токен сохранён' : 'Вставьте сюда токен от @BotFather (123456:AA…)'}"></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-          <button class="btn btn-accent btn-sm" id="tgbSave">${ic(I.check)}Сохранить токен</button>
-          <label class="switch" title="Включить/выключить мост"><input type="checkbox" id="tgbEnabled" ${s.tgBridge && s.tgBridge.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
-          <span class="sd">${s.tgBridge && s.tgBridge.enabled ? 'мост включён' : 'мост выключен'}</span>
-        </div>
-      </div></div>
-
-      <div class="tgb-step"><span class="tgb-n">2</span><div class="tgb-b">
-        <b>Подключите бота к CRM</b>
-        <i>Один раз пропишите боту вебхук — после этого он общается с вашей CRM.</i>
-        <button class="btn btn-sm" id="tgbSetup" style="margin-top:8px" title="Прописать вебхук боту">${ic(I.link)}Настроить вебхук</button>
-      </div></div>
-
-      <div class="tgb-step"><span class="tgb-n">3</span><div class="tgb-b">
-        <b>Привяжите себя (основатель)</b>
-        <i>Откройте своего бота в Telegram и отправьте ему команду с <b>ключом агентства</b> — по нему бот понимает, что это вы и какое агентство:</i>
-        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда целиком">
-          ${ic(I.copy || I.doc)}<code>/start ${esc(s.ownerTgCode || '—')}</code>
-          ${s.ownerTgChatId ? '<span class="badge ok" style="margin-left:auto">вы привязаны</span>' : '<span class="badge" style="margin-left:auto">ещё не привязан</span>'}
-        </div>
-        <button class="btn-ghost btn-sm" id="tgbRegen" style="margin-top:6px;font-size:11px">${ic(I.refresh)}Сгенерировать новый ключ</button>
-      </div></div>
-
-      <div class="tgb-step"><span class="tgb-n">4</span><div class="tgb-b">
-        <b>Привяжите брокеров</b>
-        <i>У каждого брокера — свой ключ. Дайте брокеру его команду, он отправит её тому же боту — и все его лиды пойдут ему в личку.</i>
-        <div id="tgbBrokers" class="muted" style="font-size:12px;margin-top:8px">Загрузка ключей брокеров…</div>
-      </div></div>`;
+        <b>Подключить центральный бот платформы</b>
+        <i>Возьмите токен вашего бота (напр. <b>Lumen Messenger</b>) у <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> → бот → <b>API Token</b>, и вставьте сюда. Вебхук и мини-апп пропишутся автоматически.</i>
+        <div class="form-row" style="margin-top:8px"><input id="tgbPlatToken" type="password" placeholder="Токен центрального бота (123456:AA…)"></div>
+        <button class="btn btn-accent btn-sm" id="tgbPlatSave">${ic(I.check)}Подключить центральный бот</button>
+        ${s.tgBridge && s.tgBridge.centralEnvLocked ? '<div class="muted" style="font-size:11px;margin-top:6px">Токен задан переменной окружения (Railway) — меняйте его там.</div>' : '<div class="muted" style="font-size:11px;margin-top:6px">Либо задайте <b>LUMEN_TG_BRIDGE_TOKEN</b> на сервисе lumen-crm в Railway — тогда это поле не нужно.</div>'}
+      </div></div>` : `
+      <div class="lc-hint info">${ic(I.spark)}<span>Мост Telegram подключается оператором платформы Lumen. После подключения здесь появится ваш ключ для <code class="pill">/start</code>.</span></div>`);
   const inventoryForm = `
       <div class="muted" style="font-size:11.8px;margin:0 0 12px"><b>Новостройки (off-plan)</b> — через кнопку «Импорт» в разделе «База объектов»: Reelly, CSV/Excel или JSON. <b>Порталы ниже</b> — листинги вторички и аренды (Property Finder / Bayut / DLD): вставьте ключ, синк включится после проверки.</div>
       ${Object.entries(s.portals || {}).map(([k, pt]) => `<div class="set-row"><div class="sp"><div class="sl">${esc(pt.name)}</div><div class="sd">${pt.status === 'key_saved' ? 'ключ сохранён — готов к подключению' : 'нет ключа'}</div></div>
@@ -11917,6 +11903,16 @@ PAGES.settings = async (root) => {
     catch (e) { toast('Не вышло', e.message); }
   });
   $('.tgb-key[data-tgbcode]')?.addEventListener('click', function () { const c = this.dataset.tgbcode; if (!c) { toast('Ключ ещё не создан', 'Нажмите «Сгенерировать новый ключ»'); return; } navigator.clipboard.writeText('/start ' + c); toast('Скопировано', 'Откройте своего бота и вставьте команду', true); });
+  $('#tgbPlatSave')?.addEventListener('click', async () => {
+    const token = $('#tgbPlatToken')?.value.trim();
+    if (!token) { toast('Вставьте токен бота'); return; }
+    const btn = $('#tgbPlatSave'); btn.disabled = true; btn.textContent = 'Подключаю…';
+    try {
+      const r = await api.post('/tgbridge/platform', { token });
+      toast('Центральный бот подключён', r.username ? '@' + r.username + ' готов принимать /start' : 'вебхук установлен', true);
+      await loadState(); PAGES.settings(root);
+    } catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.textContent = 'Подключить центральный бот'; }
+  });
   $('#tgbRegen')?.addEventListener('click', async () => {
     if (!await uiConfirm('Новый ключ основателя?', 'Старая команда /start перестанет работать. Если вы уже привязаны — привязка сохранится.', { ok: 'Сгенерировать' })) return;
     try { await api.post('/tgbridge/regen-owner', {}); toast('Новый ключ создан', null, true); await loadState(); PAGES.settings(root); }

@@ -905,11 +905,13 @@ function publicSettings(db) {
   /* central-режим моста: один платформенный бот на всех — UI прячет заведение своего бота/вебхука */
   s.tgBridge = s.tgBridge || {};
   s.tgBridge.central = tgbridge.central();
+  s.tgBridge.centralEnvLocked = !!process.env.LUMEN_TG_BRIDGE_TOKEN; /* задан env → менять в Railway */
+  s.isPrimary = store.currentTid() === 'primary'; /* оператор платформы — ему настройка центрального бота */
   if (tgbridge.central()) { try { const reg = store.getRegistry(); s.tgBridge.centralBot = (reg.platformBridge && reg.platformBridge.username) || null; } catch (_) {} }
   /* SEC: токен серого WA-воркера — секрет, наружу только флаг. platform=true → воркер задан платформенным env */
   if (s.waGray) { if (s.waGray.token) { s.waGray.tokenSet = true; delete s.waGray.token; } delete s.waGray.inbox; }
   else s.waGray = { numbers: [] };
-  s.waGray.platform = !!(process.env.LUMEN_WA_WORKER_URL && process.env.LUMEN_WA_WORKER_TOKEN);
+  s.waGray.platform = waWorkerPlatform();
   if (s.waGray.platform) { s.waGray.url = ''; s.waGray.tokenSet = true; } /* платформенный воркер — не показываем/не просим URL+токен */
   /* SEC: hooks.secret — мастер-ключ вебхуков/интеграций; НИКОГДА не отдаём в общий /api/state.
      Владельцу он до-инжектится отдельно (owner-ветка в /api/state), брокеры его не видят. */
@@ -2367,11 +2369,14 @@ function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelU
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
 /* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
 const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').replace(/[^0-9]/g, '');
-/* URL/токен серого воркера: сперва платформенный env (один общий воркер на всех — агентству ничего вводить
-   не надо), затем — из настроек тенанта (легаси / своё). Так же, как central-бот. */
-function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || (db.settings.waGray && db.settings.waGray.url) || '').replace(/\/$/, ''); }
+/* URL/токен серого воркера: env → настройки тенанта → ИЗВЕСТНЫЙ дефолтный URL (он один и стабилен, чтобы
+   URL никогда не был блокером — достаточно задать ОДИН токен). */
+const DEFAULT_WA_WORKER = 'https://lumen-wa-worker-production.up.railway.app';
+function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || (db.settings.waGray && db.settings.waGray.url) || DEFAULT_WA_WORKER).replace(/\/$/, ''); }
 function waWorkerToken(db) { return process.env.LUMEN_WA_WORKER_TOKEN || (db.settings.waGray && db.settings.waGray.token) || ''; }
 function waWorkerReady(db) { return !!(waWorkerBase(db) && waWorkerToken(db)); }
+/* платформенный режим (агентству не вводить URL/токен) = задан платформенный токен в env */
+function waWorkerPlatform() { return !!process.env.LUMEN_WA_WORKER_TOKEN; }
 async function waGrayApi(db, method, pathx, body) {
   const base = waWorkerBase(db);
   if (!base) throw new Error('WA-воркер не настроен (укажи URL в Настройках)');
@@ -3789,6 +3794,25 @@ const server = http.createServer(async (req, res) => {
       if (!base || /localhost|127\.0\.0\.1/.test(base)) return json(res, 400, { error: 'нет публичного адреса (туннель не запущен) — Telegram не сможет достучаться до вебхука' });
       try { const r = await tgbridge.setupWebhook(db, base); let menu = null; try { menu = await tgbridge.setMenuButton(db, base); } catch (_) {} return json(res, 200, { ok: true, webhook: base.replace(/\/$/, '') + '/tg/webhook', miniApp: base.replace(/\/$/, '') + '/tgapp', result: r, menu: !!menu }); }
       catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* ПЛАТФОРМА: подключить/сменить ЦЕНТРАЛЬНЫЙ бот прямо из CRM (без Railway-переменных).
+       Токен хранится в реестре платформы. Только владелец primary-тенанта (оператор платформы). */
+    if (p === '/api/tgbridge/platform' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (store.currentTid() !== 'primary') return json(res, 403, { error: 'центральный бот настраивает оператор платформы (основной аккаунт)' });
+      if (process.env.LUMEN_TG_BRIDGE_TOKEN) return json(res, 400, { error: 'токен центрального бота задан переменной окружения — меняйте его в Railway' });
+      const b = await readBody(req);
+      const tok = String(b.token || '').trim();
+      const reg = store.getRegistry(); reg.platformBridge = reg.platformBridge || {};
+      if (b.clear) { reg.platformBridge.token = ''; reg.platformBridge.username = null; store.saveRegistry(); return json(res, 200, { ok: true, cleared: true }); }
+      if (!/^\d+:[\w-]{30,}$/.test(tok)) return json(res, 400, { error: 'похоже на неверный токен бота (формат 123456:AA…)' });
+      /* СНАЧАЛА валидируем токен у Telegram (getMe), только потом сохраняем — иначе битый токен «залипнет» и central сломается */
+      let me; try { const rr = await fetch('https://api.telegram.org/bot' + tok + '/getMe', { signal: AbortSignal.timeout(8000) }); me = await rr.json(); } catch (e) { return json(res, 400, { error: 'Telegram недоступен: ' + e.message }); }
+      if (!me || !me.ok) return json(res, 400, { error: 'Telegram отклонил токен (проверьте, что скопирован верно и целиком)' });
+      reg.platformBridge.token = tok; reg.platformBridge.username = (me.result && me.result.username) || null; store.saveRegistry();
+      const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || 'https://app.lumen247.com';
+      let r = null; try { r = await tgbridge.setupPlatformWebhook(base); } catch (e) {}
+      return json(res, 200, { ok: true, username: reg.platformBridge.username, webhook: base.replace(/\/$/, '') + '/tg/webhook', webhookOk: !!(r && r.ok) });
     }
     if (p === '/api/tgbridge/regen-owner' && req.method === 'POST') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
@@ -5692,8 +5716,18 @@ const server = http.createServer(async (req, res) => {
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
-      const platform = !!(process.env.LUMEN_WA_WORKER_URL && process.env.LUMEN_WA_WORKER_TOKEN);
-      return json(res, 200, { ok: true, url: platform ? '' : (g.url || ''), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+      const platform = waWorkerPlatform();
+      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+    }
+    /* диагностика связи CRM↔воркер: жив ли воркер и верен ли токен (401 = токен не совпал) */
+    if (p === '/api/wa/gray/ping' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const base = waWorkerBase(db);
+      const hasToken = !!waWorkerToken(db);
+      if (!hasToken) return json(res, 200, { ok: false, stage: 'token', base, platform: waWorkerPlatform(), msg: 'Токен воркера не задан (ни env LUMEN_WA_WORKER_TOKEN, ни в настройках).' });
+      let health = null; try { const r = await fetch(base + '/health', { signal: AbortSignal.timeout(8000) }); health = await r.json().catch(() => null); } catch (e) { return json(res, 200, { ok: false, stage: 'reach', base, msg: 'Воркер недоступен по URL: ' + e.message }); }
+      try { const r = await waGrayApi(db, 'GET', '/sessions'); return json(res, 200, { ok: true, base, platform: waWorkerPlatform(), sessions: Object.keys(r.sessions || {}).length, workerSessions: (health && health.sessions) || 0, msg: 'Связь есть, токен верный.' }); }
+      catch (e) { return json(res, 200, { ok: false, stage: 'auth', base, platform: waWorkerPlatform(), msg: 'Воркер отвечает, но ТОКЕН НЕВЕРНЫЙ (' + e.message + '). Значение LUMEN_WA_WORKER_TOKEN должно совпадать с WORKER_TOKEN на воркере.' }); }
     }
     /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
     if (p === '/api/wa/gray/connect' && req.method === 'POST') {
