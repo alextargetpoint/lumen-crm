@@ -1885,6 +1885,9 @@ function countUp(root) {
    раздел, на который пользователь уже перешёл (была гонка poll vs клик). */
 let renderBusy = false, renderQueued = false;
 async function render() {
+  /* защита от гонки: заход/перезагрузка прямо на #раздел до загрузки STATE → страница падала
+     («Раздел не загрузился», Cannot set properties of null). Сначала гарантируем данные. */
+  if (!STATE) { try { await loadState(); } catch (_) {} if (!STATE) return; }
   if (renderBusy) { renderQueued = true; return; }
   closePop(); /* перерисовка не должна оставлять поповер-сироту над мёртвым селектом */
   closeHint();
