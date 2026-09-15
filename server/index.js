@@ -3766,8 +3766,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/tgbridge' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const tb = db.settings.tgBridge || {};
+      /* гарантируем коды привязки (старые тенанты/брокеры могли их не иметь) */
+      { let _chg = false; if (!db.settings.ownerTgCode) { db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex'); _chg = true; } for (const _b of (db.brokers || [])) if (!_b.tgBindCode) { _b.tgBindCode = crypto.randomBytes(3).toString('hex'); _chg = true; } if (_chg) store.save(); }
       const base = global.LUMEN_BASE || tunnelUrl() || ('http://localhost:' + (process.env.PORT || 5077));
       return json(res, 200, {
+        ownerTgCode: db.settings.ownerTgCode,
         enabled: !!tb.enabled,
         tokenSet: !!(tb.botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken)),
         webhookUrl: base.replace(/\/$/, '') + '/tg/webhook',
@@ -4559,6 +4562,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 404, { error: 'unknown admin endpoint' });
     }
     if (p === '/api/state' && req.method === 'GET') {
+      /* гарантируем ключи привязки к боту (старые тенанты могли их не иметь → в мосте пустой /start) */
+      { let _chg = false;
+        if (!db.settings.ownerTgCode) { db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex'); _chg = true; }
+        for (const _b of (db.brokers || [])) if (!_b.tgBindCode) { _b.tgBindCode = crypto.randomBytes(3).toString('hex'); _chg = true; }
+        if (_chg) store.save(); }
       const pubS = publicSettings(db);
       if (!IS_BROKER) pubS.isPrimary = true; /* платформенную настройку (бот/воркер) даём любому владельцу — пока один оператор */
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
