@@ -11609,6 +11609,8 @@ PAGES.settings = async (root) => {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>${(s.telephony || {}).provider === 'twilio' ? 'Account SID (Twilio, AC…)' : 'Connection / App ID'}</label><input id="telConn" value="${esc((s.telephony || {}).provider === 'twilio' ? ((s.telephony || {}).accountSid || '') : ((s.telephony || {}).connId || ''))}" placeholder="${(s.telephony || {}).provider === 'twilio' ? 'AC… из Twilio Console → Account Info' : 'Call Control App ID'}"></div>
             <div class="form-row"><label>Номер «От» (дефолт)</label><input id="telFrom" value="${esc((s.telephony || {}).fromNumber || '')}" placeholder="+971 5X… — купленный номер"></div>
+            <div class="form-row"><label>Гео-пул номеров (авто-подбор)</label><textarea id="telPool" rows="3" placeholder="По одному номеру в строке: +39…, +971…, +66…\nСистема сама подставит номер СТРАНЫ клиента (local presence → выше отклик)">${esc(((s.telephony || {}).fromNumbers || []).map(x => typeof x === 'string' ? x : (x && x.number) || '').filter(Boolean).join('\n'))}</textarea></div>
+            <div class="muted" style="font-size:11px;margin:-4px 0 4px">При звонке клиенту подставляется номер, совпадающий по коду страны (напр. лид +39 → звонок с итальянского номера). Нет совпадения — берётся «От» по умолчанию.</div>
           </div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
@@ -11818,6 +11820,7 @@ PAGES.settings = async (root) => {
     if ($('#telKey').value.trim()) { t.key = $('#telKey').value.trim(); t.secret = $('#telSecret').value.trim(); }
     if ($('#telConn')) { if (prov === 'twilio') t.accountSid = $('#telConn').value.trim(); else t.connId = $('#telConn').value.trim(); }
     if ($('#telFrom')) t.fromNumber = $('#telFrom').value.trim();
+    if ($('#telPool')) t.fromNumbers = $('#telPool').value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 40);
     await api.patch('/settings', { telephony: t });
     toast('Телефония сохранена', prov === 'twilio' ? 'Нажми «Проверить», затем купи номер ниже' : (prov === 'none' ? undefined : 'Настрой вебхук у провайдера'), true);
     loadState();

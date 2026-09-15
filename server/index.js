@@ -2392,14 +2392,14 @@ async function telnyxInitiateCall(db, lead, brokerPhone) {
   if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key (в настройках или env TELNYX_API_KEY), Connection ID и номер «От»');
   if (!brokerPhone) throw new Error('нет номера брокера для звонка');
   const cs = Buffer.from(JSON.stringify({ leadId: lead.id, clientPhone: lead.phone, stage: 'broker' })).toString('base64');
-  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(brokerPhone), from: e164(t.fromNumber), client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });   /* E.164: Telnyx требует +<код><номер> без пробелов */
+  return telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(brokerPhone), from: pickCallerId(t, brokerPhone), client_state: cs, timeout_secs: 30, webhook_url: telnyxWebhook(db) });   /* E.164 + гео-подбор caller-ID под страну */
 }
 async function telnyxOnAnswered(db, payload, cs) {
   const t = db.settings.telephony || {}; const ccid = payload.call_control_id;
   if (cs.stage === 'broker') {
     try { await telnyxApi(db, 'POST', `/calls/${ccid}/actions/record_start`, { format: 'mp3', channels: 'single' }); } catch (e) { console.error('[telnyx rec]', e.message); }
     const cs2 = Buffer.from(JSON.stringify({ leadId: cs.leadId, clientPhone: cs.clientPhone, stage: 'client', bridgeTo: ccid })).toString('base64');
-    await telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(cs.clientPhone), from: e164(t.fromNumber), client_state: cs2, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+    await telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(cs.clientPhone), from: pickCallerId(t, cs.clientPhone), client_state: cs2, timeout_secs: 30, webhook_url: telnyxWebhook(db) });   /* гео-подбор: клиент видит номер СВОЕЙ страны (local presence) */
   } else if (cs.stage === 'client' && cs.bridgeTo) {
     await telnyxApi(db, 'POST', `/calls/${ccid}/actions/bridge`, { call_control_id: cs.bridgeTo });
   }
