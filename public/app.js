@@ -6605,6 +6605,7 @@ PAGES.automations = async (root) => {
             </div>`;
           }).join(''))()}</div>
           ${swRow('Второй круг на следующем канале', 'Цепочка исчерпана без ответа → каскад переключает канал и повторяет касания', sw('chSecond', s.channels?.secondRound))}
+          ${swRow('Переход по каналам через N касаний', 'Через сколько касаний БЕЗ ответа переключаться на следующий мессенджер (0 = только когда цепочка исчерпана). Напр. 3 — после 3 касаний в WhatsApp уйти в Telegram', `<input id="chCascadeN" type="number" min="0" max="10" style="width:70px" value="${+(s.channels?.cascadeAfterTouches || 0)}">`)}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
             <div class="form-row"><label>Telegram Bot Token</label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'от @BotFather'}"></div>
             <div class="form-row"><label>Resend API key (e-mail)</label><input id="chEm" type="password" placeholder="${s.channels?.email?.keySet ? '•••••• сохранён' : 're_…'}"></div>
@@ -6710,6 +6711,7 @@ PAGES.automations = async (root) => {
     if ($('#chVb').value.trim()) ch.viber = { token: $('#chVb').value.trim() };
     const sec = root.querySelector('[data-auto="chSecond"]');
     if (sec) ch.secondRound = sec.checked;
+    const casc = $('#chCascadeN'); if (casc) ch.cascadeAfterTouches = Math.max(0, Math.min(10, +casc.value || 0));
     await api.patch('/settings', { channels: ch });
     toast('Каскад сохранён', 'Порядок и каналы применены', true);
     loadState();
@@ -10098,6 +10100,7 @@ PAGES.numbers = async (root) => {
     ${grayNums.length ? (() => { const w = grayData.warmup || {}; return `<div class="glass card mb">
       <div class="card-title">${ic(I.bolt)}Прогрев серых номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые серые номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
+      ${(() => { const conn = grayNums.filter(n => n.live && n.live.status === 'connected').length; return conn >= 2 && !w.running ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.bolt)}На связи <b>${conn}</b> ${conn >= 2 && conn <= 4 ? 'номера' : 'номеров'} — <b>рекомендуем включить прогрев</b>, чтобы «отлежать» их перед боевой работой и снизить риск бана.</span></div>` : (conn < 2 ? `<div class="muted" style="font-size:11px;margin-bottom:8px">Для прогрева нужно ≥2 номера на связи (сейчас ${conn}). Подключи ещё — начнут переписываться между собой.</div>` : ''); })()}
       <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
         <label class="switch"><input type="checkbox" id="numWarm" ${w.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>

@@ -5811,6 +5811,7 @@ const server = http.createServer(async (req, res) => {
         if (b.channels.enabled) Object.assign(ch.enabled, b.channels.enabled);
         for (const k2 of ['tg', 'viber', 'email']) if (b.channels[k2]) Object.assign(ch[k2], b.channels[k2]);
         if (b.channels.secondRound != null) ch.secondRound = b.channels.secondRound;
+        if (b.channels.cascadeAfterTouches != null) ch.cascadeAfterTouches = Math.max(0, Math.min(10, +b.channels.cascadeAfterTouches || 0));
         delete b.channels;
       }
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }

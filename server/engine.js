@@ -302,6 +302,17 @@ function tickChains(db) {
     if (!['new', 'touch'].includes(lead.stage)) continue;
     if (lead.lastDir === 'in') continue;
     if (db.messages.some(m => m.leadId === lead.id && m.dir === 'in')) continue;
+    /* гибкий каскад: через N касаний без ответа в текущем канале → следующий мессенджер (settings.channels.cascadeAfterTouches; 0 = только после исчерпания цепочки) */
+    const cascadeAfter = +(db.settings.channels && db.settings.channels.cascadeAfterTouches || 0);
+    if (cascadeAfter > 0 && lead.ai.chainStep >= cascadeAfter) {
+      const prevCh = lead.activeChannel || 'wa';
+      const nx = nextChannel(db, lead);
+      if (nx && nx !== prevCh) {
+        lead.activeChannel = nx; lead.ai.chainStep = 0; lead.ai.nextTouchAt = nowT + 0.5 * dayMs(db);
+        ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: ${cascadeAfter} касаний без ответа в ${CH_NAMES[prevCh] || prevCh} — перехожу на ${CH_NAMES[nx]}` });
+        continue;
+      }
+    }
     const step = seq.steps.filter(s => s.active)[lead.ai.chainStep];
     if (!step) {
       /* цепочка исчерпана: омниканальный второй круг → следующий канал по приоритету */
