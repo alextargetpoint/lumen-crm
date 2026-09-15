@@ -2493,14 +2493,15 @@ async function warmupTick() {
       await store.runInTenant(tid, async () => {
         const db = store.get();
         const g = db.settings.waGray;
-        if (!g || !g.url || !g.warmup || !g.warmup.running) return;
+        if (!g || !g.warmup || !g.warmup.running) return;
+        if (!waWorkerReady(db)) return;   /* FIX: воркер платформенный (env) → g.url пустой; раньше здесь выходили и прогрев НИКОГДА не шёл */
         const today = new Date().toISOString().slice(0, 10);
         if (g.warmup._day !== today) { g.warmup._day = today; g.warmup._sent = 0; }
         const cap = (g.warmup.perDay || 16) * Math.max(1, (g.numbers || []).length);
         if ((g.warmup._sent || 0) >= cap) return;
         let live = {};
         try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
-        const conn = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
+        const conn = (g.numbers || []).filter(n => /^\d{7,15}$/.test(n.phone) && (() => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; })());   /* только реальные телефоны (без LID-артефактов) */
         if (conn.length < 2) return;
         const i = Math.floor(Math.random() * conn.length);
         let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
@@ -5956,6 +5957,24 @@ const server = http.createServer(async (req, res) => {
       try { const sr = await fetch(url + '/sessions', { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(8000) }); if (sr.status === 401) return json(res, 400, { error: 'токен воркера НЕВЕРНЫЙ (воркер вернул 401)' }); if (!sr.ok) throw new Error('sessions ' + sr.status); } catch (e) { return json(res, 400, { error: 'не удалось проверить токен: ' + e.message }); }
       reg.platformWorker = { url, token, at: Date.now() }; store.saveRegistry();
       return json(res, 200, { ok: true, url });
+    }
+    /* прогреть СЕЙЧАС: немедленный обмен между двумя подключёнными номерами (для теста, без ожидания 12 мин) */
+    if (p === '/api/wa/gray/warmup-now' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const g = db.settings.waGray || {};
+      if (!waWorkerReady(db)) return json(res, 400, { error: 'воркер не подключён' });
+      let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { return json(res, 400, { error: 'воркер недоступен' }); }
+      const conn = (g.numbers || []).filter(n => /^\d{7,15}$/.test(n.phone) && (() => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; })());
+      if (conn.length < 2) return json(res, 400, { error: `Нужно ≥2 подключённых реальных номера (сейчас ${conn.length}). Подключите ещё номер по QR.` });
+      const i = Math.floor(Math.random() * conn.length); let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
+      const from = conn[i], to = conn[k], msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
+      try {
+        await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg });
+        g.warmup = g.warmup || {}; g.warmup.total = (g.warmup.total || 0) + 1; g.warmup._sent = (g.warmup._sent || 0) + 1; g.warmup.lastAt = Date.now();
+        g.warmup.log = [{ from: from.label || from.phone, to: to.label || to.phone, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+        store.save();
+        return json(res, 200, { ok: true, from: from.phone, to: to.phone, text: msg });
+      } catch (e) { return json(res, 400, { error: 'отправка не прошла: ' + e.message }); }
     }
     /* диагностика связи CRM↔воркер: жив ли воркер и верен ли токен (401 = токен не совпал) */
     if (p === '/api/wa/gray/ping' && req.method === 'GET') {

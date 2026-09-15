@@ -9940,7 +9940,7 @@ PAGES.numbers = async (root) => {
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые серые номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
       <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
         <label class="switch"><input type="checkbox" id="numWarm" ${w.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-      <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"></div>
+      <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>
       <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
 
@@ -9978,6 +9978,12 @@ PAGES.numbers = async (root) => {
   $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
   $('#numWarm', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', e.target.checked ? 'Номера начнут переписку между собой' : null, true); const box = $('#warmLive', root); if (box) box.innerHTML = warmLiveHtml({ ...(grayData.warmup || {}), running: e.target.checked }); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
   $('#numWarmPerDay', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); toast('Лимит прогрева обновлён', null, true); } catch (er) {} });
+  $('#numWarmNow', root)?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; const o = btn.innerHTML; btn.textContent = 'Отправляю…';
+    try { const r = await api.post('/wa/gray/warmup-now', {}); toast('Обмен отправлен', `${r.from} → ${r.to}: ${r.text}`, true); const d = await api.get('/wa/gray/list'); const box = $('#warmLive', root); if (box) box.innerHTML = warmLiveHtml(d.warmup || {}); }
+    catch (er) { toast('Не вышло', er.message); }
+    btn.disabled = false; btn.innerHTML = o;
+  });
   /* живой журнал прогрева: обновляем #warmLive раз в 6с, пока на странице и прогрев идёт */
   if (window.NUM_WARM_POLL) { clearInterval(window.NUM_WARM_POLL); window.NUM_WARM_POLL = null; }
   if (grayNums.length) window.NUM_WARM_POLL = setInterval(async () => {
