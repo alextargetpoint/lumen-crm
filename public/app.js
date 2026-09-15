@@ -1301,6 +1301,63 @@ window.openYesimActivate = async function (phone) {
   loadSms();
   pollTimer = setInterval(loadSms, 5000);   /* живой приём OTP */
 };
+/* OTP-мастер для ОФИЦИАЛЬНОГО WhatsApp Cloud API: покупаем реальный SMS-номер Telnyx →
+   регистрируешь его в мастере Meta («Enter a new phone number») → код (OTP) прилетает СЮДА автоматически. */
+window.openTelnyxOtp = async function () {
+  let pollTimer = null, current = '';
+  const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+  const bd = modal({ title: 'Номер для Cloud API (OTP)', sub: 'Реальный SMS-номер Telnyx → регистрация в WhatsApp Business', wide: true, body: '<div id="txOtp"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
+  const host = () => $('#txOtp', bd);
+  const draw = (number) => {
+    current = String(number || '').replace(/[^0-9]/g, '');
+    host().innerHTML = `
+      <div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный канал Meta. В отличие от серых номеров, реальный <b>Telnyx</b>-номер WhatsApp принимает на регистрацию, и он же роутится для отправки. Код придёт в ленту ниже <b>автоматически</b>.</span></div>
+      ${current ? `<div class="lc-hint" style="margin-bottom:10px"><span>Твой OTP-номер: <b style="font-size:15px;letter-spacing:.5px">+${esc(current)}</b> — впиши его в мастере Meta.</span></div>` : `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <select id="txOtpCountry" class="inp" style="max-width:160px">
+          <option value="US">США (+1)</option><option value="GB">Великобритания (+44)</option>
+          <option value="NL">Нидерланды (+31)</option><option value="CA">Канада (+1)</option>
+          <option value="DE">Германия (+49)</option><option value="PL">Польша (+48)</option>
+        </select>
+        <button class="btn btn-accent" id="txOtpBuy">${ic(I.plus)}Купить SMS-номер</button>
+        <span class="muted" style="font-size:11px">~$1 + наценка/мес</span>
+      </div>`}
+      <b style="font-size:13px">Как подключить официальный номер:</b>
+      <div style="margin-top:8px">
+        ${[
+          ['Купи SMS-номер', current ? 'Готово: <b>+' + esc(current) + '</b>.' : 'Нажми «Купить SMS-номер» — берём реальный Telnyx-номер с поддержкой SMS.'],
+          ['Открой мастер Meta', 'WhatsApp Manager / Embedded Signup → «Add phone number» → <b>«Enter a new phone number»</b> (НЕ «virtual number / display name» — тот даёт тестовый 555).'],
+          ['Впиши номер', 'Вставь <b>' + (current ? '+' + esc(current) : 'купленный номер') + '</b>, выбери способ кода <b>SMS</b>.'],
+          ['Код придёт сюда', 'Meta пришлёт OTP на номер → он появится в ленте ниже. Введи его в мастере Meta → номер верифицирован.'],
+          ['Готово', 'Напиши мне номер — поставлю отправителем и прогоним официальную отправку.'],
+        ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><b style="font-size:13px">Входящие SMS / коды</b><span class="warm-pulse"></span><span class="muted" style="font-size:11px">живой приём</span><button class="btn-ghost btn-sm" id="txOtpRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
+      <div id="txOtpSms" class="warm-log"><div class="muted" style="font-size:11.5px;padding:8px">${current ? 'Ждём SMS… придёт, как Meta отправит код на +' + esc(current) + '.' : 'Сначала купи номер и запусти регистрацию в Meta.'}</div></div>`;
+    const buyBtn = $('#txOtpBuy', bd);
+    if (buyBtn) buyBtn.addEventListener('click', async () => {
+      const country = ($('#txOtpCountry', bd) || {}).value || 'US';
+      buyBtn.disabled = true; buyBtn.textContent = 'Покупаю…';
+      try { const r = await api.post('/telephony/otp/buy', { country }); if (r.ok) { toast('Номер куплен', r.number, true); draw(r.number); loadSms(); } else { toast('Не куплено', r.error || ''); buyBtn.disabled = false; buyBtn.textContent = 'Купить SMS-номер'; } }
+      catch (e) { toast('Ошибка', e.message); buyBtn.disabled = false; buyBtn.textContent = 'Купить SMS-номер'; }
+    });
+    const refB = $('#txOtpRefresh', bd); if (refB) refB.addEventListener('click', loadSms);
+  };
+  const loadSms = async () => {
+    const box = $('#txOtpSms', bd); if (!box || !document.body.contains(bd)) { stop(); return; }
+    if (!current) return;
+    try {
+      const r = await api.get('/telephony/otp/sms?number=' + encodeURIComponent(current));
+      const arr = (r.sms || []).filter(m => (m.text || '').trim());
+      box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:16px;letter-spacing:2px">${esc(m.code)}</b>` : ''}<i>${esc(new Date(m.at).toLocaleTimeString('ru-RU').slice(0, 5))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как Meta отправит код на +' + esc(current) + '.</div>';
+    } catch (e) {}
+  };
+  /* подтянуть уже купленный OTP-номер, если есть */
+  try { const r = await api.get('/telephony/otp/sms?number='); draw((r.numbers && r.numbers[0]) || ''); } catch (e) { draw(''); }
+  loadSms();
+  pollTimer = setInterval(loadSms, 5000);
+};
 /* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
 window.grayAddQR = function (phone, label) {
   phone = String(phone || '').replace(/[^0-9]/g, '');
@@ -9897,9 +9954,10 @@ PAGES.numbers = async (root) => {
         </div>
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
           <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Подключите свой WhatsApp Business в один вход.</div>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Нужен <b>реальный</b> номер (тестовый 555 не шлёт). Купи SMS-номер Telnyx — код прилетит прямо в CRM.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
+            <button class="btn btn-sm" id="txOtpBtn">${ic(I.sim)}Номер для Cloud API (OTP)</button>
             <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Вручную</button>
           </div>
         </div>
@@ -9993,6 +10051,7 @@ PAGES.numbers = async (root) => {
   }, 6000);
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#openYesimBtn')?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
+  $('#txOtpBtn')?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#waHostedBtn')?.addEventListener('click', async () => {
     const btn = $('#waHostedBtn', root); btn.disabled = true; const o = btn.innerHTML; btn.textContent = 'Готовлю…';
     try {

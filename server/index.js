@@ -2414,6 +2414,19 @@ async function telnyxApi(db, method, pathx, body) {
   return j;
 }
 function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
+/* URL для приёма ВХОДЯЩИХ SMS Telnyx (OTP при регистрации номера в WhatsApp Cloud API) */
+function telnyxSmsWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx-sms?key=' + encodeURIComponent(db.settings.hooks.secret) : ''; }
+/* Гарантируем messaging-profile у Telnyx с нашим inbound-вебхуком — иначе входящие SMS (OTP) некуда доставлять.
+   Профиль привязывается к номеру → SMS с этого номера летят к нам → OTP появляется в CRM. */
+async function ensureTelnyxMsgProfile(db) {
+  const t = db.settings.telephony || (db.settings.telephony = {});
+  const hook = telnyxSmsWebhook(db);
+  if (t.msgProfileId) { try { if (hook) await telnyxApi(db, 'PATCH', '/messaging_profiles/' + t.msgProfileId, { webhook_url: hook }); } catch (_) {} return t.msgProfileId; }
+  const nm = 'Lumen OTP ' + ((db.settings.agency && db.settings.agency.name) || '');
+  const j = await telnyxApi(db, 'POST', '/messaging_profiles', { name: nm.slice(0, 60), webhook_url: hook || undefined, whitelisted_destinations: ['US', 'GB', 'NL', 'CA', 'DE', 'FR', 'IL', 'UA', 'AE', 'PL', 'ES', 'IT'] });
+  t.msgProfileId = j.data && j.data.id; store.save();
+  return t.msgProfileId;
+}
 
 /* --- Yesim Virtual Numbers: покупка виртуальных номеров под СЕРЫЕ WhatsApp (номер ловит OTP по SMS) --- */
 /* Платформенный токен (SaaS): все агентства покупают серые номера через ОДИН наш Yesim-аккаунт. Basic-Auth
@@ -4022,6 +4035,28 @@ const server = http.createServer(async (req, res) => {
           if (lead && recUrl) ingestCallRecording(db, lead, recUrl, 'Звонок · Telnyx');
         }
       } catch (e) { console.error('[telnyx-hook]', e.message); }
+      return json(res, 200, { ok: true });
+    }
+
+    /* ---------------- Telnyx: ВХОДЯЩИЕ SMS (OTP для регистрации номера в WhatsApp Cloud API) ---------------- */
+    if (p === '/hooks/telnyx-sms' && req.method === 'POST') {
+      if (!rateHit('hooksms:' + clientIp(req), 120, 60000)) return json(res, 429, { error: 'rate limit' });
+      if (u.searchParams.get('key') !== db.settings.hooks.secret) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const ev = b.data || {}; const pl = ev.payload || {};
+      try {
+        if (ev.event_type === 'message.received' || pl.direction === 'inbound') {
+          const to = String((pl.to && pl.to[0] && pl.to[0].phone_number) || pl.to || '').replace(/[^0-9]/g, '');
+          const from = (pl.from && pl.from.phone_number) || pl.from || '';
+          const text = pl.text || '';
+          const code = ((text.match(/(\d[\d\- ]{2,7}\d)/) || [])[0] || '').replace(/[^0-9]/g, '');
+          const t = db.settings.telephony || (db.settings.telephony = {});
+          t.otpNumbers = t.otpNumbers || {};
+          const rec = t.otpNumbers[to] || (t.otpNumbers[to] = { number: '+' + to, at: Date.now(), sms: [] });
+          rec.sms = [{ from, text, code, at: Date.now() }].concat(rec.sms || []).slice(0, 30);
+          store.save();
+        }
+      } catch (e) { console.error('[telnyx-sms]', e.message); }
       return json(res, 200, { ok: true });
     }
 
@@ -5866,6 +5901,44 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: bought.length > 0, bought, requested: count });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* КУПИТЬ SMS-НОМЕР ПОД OTP: реальный Telnyx-номер с SMS → регистрируешь в WhatsApp Cloud API, код прилетает к нам.
+       /api/telephony/otp/buy {country} */
+    if (p === '/api/telephony/otp/buy' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const country = String(b.country || 'US').toUpperCase().slice(0, 2);
+      const t = db.settings.telephony || {};
+      if (t.provider !== 'telnyx') return json(res, 400, { error: 'OTP-номера доступны для Telnyx' });
+      try {
+        const profileId = await ensureTelnyxMsgProfile(db);
+        const j = await telnyxApi(db, 'GET', `/available_phone_numbers?filter[country_code]=${country}&filter[phone_number_type]=local&filter[features][]=sms&filter[limit]=8`);
+        const cand = (j.data || []).map(n => n.phone_number);
+        if (!cand.length) return json(res, 400, { error: 'нет SMS-номеров по стране ' + country });
+        let bought = null;
+        for (const number of cand) {
+          try {
+            await telnyxApi(db, 'POST', '/number_orders', { phone_numbers: [{ phone_number: number }] });
+            /* назначаем messaging-profile (для приёма SMS) + голосовое подключение (best-effort) */
+            try { const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number)); const pid = pn.data && pn.data[0] && pn.data[0].id; if (pid) { if (profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { messaging_profile_id: profileId }); if (t.connId) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + pid, { connection_id: t.connId }); } catch (_) {} } } } catch (_) {}
+            bought = number; break;
+          } catch (e) { /* следующий кандидат */ }
+        }
+        if (!bought) return json(res, 400, { error: 'не удалось купить SMS-номер (все кандидаты заняты)' });
+        t.otpNumbers = t.otpNumbers || {};
+        t.otpNumbers[bought.replace(/[^0-9]/g, '')] = { number: bought, at: Date.now(), sms: [] };
+        store.save();
+        return json(res, 200, { ok: true, number: bought });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* лента входящих SMS/OTP по OTP-номеру (авто-обновление в UI): /api/telephony/otp/sms?number= */
+    if (p === '/api/telephony/otp/sms' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const num = String(u.searchParams.get('number') || '').replace(/[^0-9]/g, '');
+      const t = db.settings.telephony || {};
+      const rec = (t.otpNumbers && t.otpNumbers[num]) || null;
+      return json(res, 200, { ok: true, sms: (rec && rec.sms) || [], numbers: Object.keys(t.otpNumbers || {}).map(k => (t.otpNumbers[k].number || ('+' + k))) });
+    }
+
     /* список моих номеров */
     if (p === '/api/telephony/numbers' && req.method === 'GET') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
