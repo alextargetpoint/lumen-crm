@@ -251,7 +251,7 @@ function emailWrap(title, bodyHtml, lang, opt) {
 /* ─── реестр писем ───────────────────────────────────────────────────────── */
 const DEFAULT_TEMPLATES = {
   verifyEmail: {
-    name: 'Подтверждение e-mail / Verify email', arch: 'ceremony', hero: 'hero.jpg', heroH: 250, titleSize: 33,
+    name: 'Подтверждение e-mail / Verify email', arch: 'ceremony', hero: 'hero.gif', heroH: 250, titleSize: 33,
     category: 'account', audience: 'all', essential: true,
     eyebrow_ru: 'Подтверждение e-mail', eyebrow_en: 'Confirm e-mail',
     headerNote_ru: 'больше<br>возможностей', headerNote_en: 'more<br>possibilities',
@@ -276,7 +276,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Нужна помощь на старте? Ответьте на это письмо — поможем настроить Lumen.', note_en: 'Need help getting started? Reply to this email — we’ll help.', noteIcon: 'chat',
   },
   trialStarted: {
-    name: 'Триал начался / Trial started', arch: 'ceremony', hero: 'hero.jpg', heroH: 240, titleSize: 31,
+    name: 'Триал начался / Trial started', arch: 'ceremony', hero: 'hero.gif', heroH: 240, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Ранний доступ открыт', eyebrow_en: 'Trial started',
     preheader_ru: 'Пробный период {{days}} дн. пошёл', preheader_en: 'Your {{days}}-day trial has started',
@@ -288,7 +288,7 @@ const DEFAULT_TEMPLATES = {
     features_en: [{ icon: 'chat', title: 'Connect WhatsApp', sub: 'AI starts replying to leads today.' }, { icon: 'doc', title: 'Import your base', sub: 'Old contacts count too.' }, { icon: 'users', title: 'Invite your team', sub: 'Access in a couple of clicks.' }],
   },
   referralReward: {
-    name: 'Партнёрская награда / Referral reward', arch: 'ceremony', hero: 'hero.jpg', heroH: 230, titleSize: 30,
+    name: 'Партнёрская награда / Referral reward', arch: 'ceremony', hero: 'hero.gif', heroH: 230, titleSize: 30,
     category: 'partner', audience: 'all', essential: false,
     eyebrow_ru: 'Партнёрская программа', eyebrow_en: 'Partner program',
     preheader_ru: 'Вам начислено вознаграждение', preheader_en: 'You earned a reward',
@@ -298,7 +298,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, the agency <b>{{agency}}</b> you referred just paid — your reward is in.</p>{{details}}{{button}}',
   },
   passwordReset: {
-    name: 'Сброс пароля / Password reset', arch: 'security', hero: 'shield.jpg', heroH: 220, titleSize: 30,
+    name: 'Сброс пароля / Password reset', arch: 'security', hero: 'shield.gif', heroH: 220, titleSize: 30,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Ссылка для нового пароля внутри', preheader_en: 'Your password reset link inside',
@@ -309,7 +309,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Не вы запрашивали сброс? Просто проигнорируйте письмо — пароль останется прежним.', note_en: 'Didn’t request this? Ignore the email — your password stays as it is.', noteIcon: 'lock',
   },
   passwordChanged: {
-    name: 'Пароль изменён / Password changed', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
+    name: 'Пароль изменён / Password changed', arch: 'security', hero: 'shield.gif', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Пароль вашего аккаунта Lumen обновлён', preheader_en: 'Your Lumen password was updated',
@@ -320,7 +320,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Восстановите доступ</a> немедленно и напишите нам.', note_en: 'Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access</a> right away.', noteIcon: 'alert',
   },
   emailChanged: {
-    name: 'E-mail изменён / Email changed', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
+    name: 'E-mail изменён / Email changed', arch: 'security', hero: 'shield.gif', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Адрес входа в Lumen обновлён', preheader_en: 'Your Lumen login email was updated',
@@ -331,7 +331,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Срочно верните доступ</a>.', note_en: 'Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access now</a>.', noteIcon: 'alert',
   },
   loginAlert: {
-    name: 'Вход с нового устройства / New sign-in', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
+    name: 'Вход с нового устройства / New sign-in', arch: 'security', hero: 'shield.gif', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Замечен вход в ваш аккаунт Lumen', preheader_en: 'A new sign-in to your Lumen account',
@@ -342,7 +342,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Это вы — можно не читать. Если нет — быстро <a href="{{link}}" style="color:#141311;font-weight:600">смените пароль</a>.', note_en: 'Was you — nothing to do. If not — <a href="{{link}}" style="color:#141311;font-weight:600">change your password</a>.', noteIcon: 'lock',
   },
   invite: {
-    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'nodes.jpg', heroH: 235, titleSize: 31,
+    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'nodes.gif', heroH: 235, titleSize: 31,
     category: 'team', audience: 'all', essential: true,
     eyebrow_ru: 'Приглашение в команду', eyebrow_en: 'Team invitation',
     preheader_ru: '{{inviter}} зовёт вас в Lumen', preheader_en: '{{inviter}} invites you to Lumen',
@@ -353,7 +353,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Создайте пароль — и присоединяйтесь к команде.', note_en: 'Set a password — and join the team.', noteIcon: 'lock',
   },
   teammateJoined: {
-    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'nodes.jpg', heroH: 210, titleSize: 29,
+    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'nodes.gif', heroH: 210, titleSize: 29,
     category: 'team', audience: 'owner', essential: false,
     eyebrow_ru: 'Команда', eyebrow_en: 'Team',
     preheader_ru: 'В {{agency}} новый человек', preheader_en: 'A new member joined {{agency}}',
@@ -363,7 +363,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi!</p>{{avatar}}<p><b>{{name}}</b> accepted the invite and is now on your <b>{{agency}}</b> team. Manage roles under “Connections → Roles &amp; access”.</p>{{button}}',
   },
   brokerAppInvite: {
-    name: 'Брокеру — вход в мини-апп / Broker app invite', arch: 'team', hero: 'nodes.jpg', heroH: 220, titleSize: 30,
+    name: 'Брокеру — вход в мини-апп / Broker app invite', arch: 'team', hero: 'nodes.gif', heroH: 220, titleSize: 30,
     category: 'team', audience: 'broker', essential: false,
     eyebrow_ru: 'Ваш кабинет', eyebrow_en: 'Your workspace',
     preheader_ru: 'Ваш рабочий кабинет брокера готов', preheader_en: 'Your broker workspace is ready',
@@ -373,7 +373,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, your broker workspace in <b>{{agency}}</b> is ready: live chats, tasks, calls and dictation — all in Telegram.</p>{{button}}',
   },
   paymentReceived: {
-    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'graph.jpg', heroH: 230, titleSize: 31,
+    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'graph.gif', heroH: 230, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Подтверждение оплаты', eyebrow_en: 'Payment confirmed',
     preheader_ru: 'Спасибо, оплата Lumen получена', preheader_en: 'Thanks, your Lumen payment is in',
@@ -384,7 +384,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Детали платежа — в вашем счёте.', note_en: 'Payment details are in your invoice.', noteIcon: 'doc',
   },
   paymentUpcoming: {
-    name: 'Скоро списание / Payment upcoming', arch: 'billing', hero: 'graph.jpg', heroH: 210, titleSize: 29,
+    name: 'Скоро списание / Payment upcoming', arch: 'billing', hero: 'graph.gif', heroH: 210, titleSize: 29,
     category: 'billing', audience: 'owner', essential: false,
     eyebrow_ru: 'Напоминание', eyebrow_en: 'Reminder',
     preheader_ru: 'Через {{days}} дн. спишем за подписку', preheader_en: 'We’ll charge in {{days}} days',
@@ -395,7 +395,7 @@ const DEFAULT_TEMPLATES = {
     receiptCaption_ru: 'К списанию', receiptCaption_en: 'Upcoming', receiptIcon: 'clock',
   },
   paymentFailed: {
-    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'graph.jpg', heroH: 220, titleSize: 30,
+    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'graph.gif', heroH: 220, titleSize: 30,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Требуется действие', eyebrow_en: 'Action needed',
     preheader_ru: 'Не удалось списать оплату — обновите карту', preheader_en: 'We couldn’t charge your card — update it',
@@ -407,7 +407,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Мы попробуем списать снова автоматически. Доступ сохраняется ещё несколько дней.', note_en: 'We’ll retry automatically. Access stays active for a few more days.', noteIcon: 'clock',
   },
   subscriptionRenewed: {
-    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'graph.jpg', heroH: 220, titleSize: 30,
+    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'graph.gif', heroH: 220, titleSize: 30,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Подписка продлена', eyebrow_en: 'Subscription renewed',
     preheader_ru: 'Подписка Lumen продлена', preheader_en: 'Your Lumen subscription renewed',
@@ -418,7 +418,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Детали платежа — в вашем счёте.', note_en: 'Payment details are in your invoice.', noteIcon: 'doc',
   },
   trialEnding: {
-    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'ring.jpg', heroH: 230, titleSize: 31,
+    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'ring.gif', heroH: 230, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Ранний доступ', eyebrow_en: 'Early access',
     preheader_ru: 'Осталось {{days}} дн. пробного периода', preheader_en: '{{days}} days left in your trial',
@@ -429,7 +429,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Условия беты закреплены за первыми агентствами — позже подписка будет дороже.', note_en: 'Beta terms are locked in for the first agencies — it gets pricier later.', noteIcon: 'clock',
   },
   newLead: {
-    name: 'Новый лид / New lead', arch: 'leads', hero: 'flow.jpg', heroH: 220, titleSize: 32,
+    name: 'Новый лид / New lead', arch: 'leads', hero: 'flow.gif', heroH: 220, titleSize: 32,
     category: 'leads', audience: 'broker', essential: false,
     eyebrow_ru: 'Новый лид', eyebrow_en: 'New lead',
     preheader_ru: 'ИИ уже ответил — загляните, пока горячо', preheader_en: 'AI already replied — jump in while it’s hot',
@@ -450,7 +450,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>{{leadName}} has been quiet for <b>{{silence}}</b>. Leads at this stage still come back — but the window is closing.</p>{{button}}',
   },
   meetingScheduled: {
-    name: 'Встреча назначена / Meeting scheduled', arch: 'digest', hero: 'calendar.jpg', heroH: 215, titleSize: 30,
+    name: 'Встреча назначена / Meeting scheduled', arch: 'digest', hero: 'calendar.gif', heroH: 215, titleSize: 30,
     category: 'meetings', audience: 'broker', essential: false,
     eyebrow_ru: 'Встреча назначена', eyebrow_en: 'Meeting scheduled',
     preheader_ru: '{{leadName}} — {{when}}', preheader_en: '{{leadName}} — {{when}}',
@@ -490,7 +490,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Due today:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">A couple of minutes and it’s done. Or reschedule in one tap.</p>{{button}}',
   },
   waConnected: {
-    name: 'WhatsApp подключён / WhatsApp connected', arch: 'digest', hero: 'inbox.jpg', heroH: 215, titleSize: 29,
+    name: 'WhatsApp подключён / WhatsApp connected', arch: 'digest', hero: 'inbox.gif', heroH: 215, titleSize: 29,
     category: 'channels', audience: 'owner', essential: false,
     eyebrow_ru: 'Канал на связи', eyebrow_en: 'Channel live',
     preheader_ru: 'Номер {{phone}} в работе', preheader_en: 'Number {{phone}} is live',
@@ -500,7 +500,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, number <b>{{phone}}</b> is connected to <b>{{agency}}</b> and ready to take leads. Warm-up is on schedule.</p>{{button}}',
   },
   waIssue: {
-    name: 'WhatsApp отвалился / WhatsApp issue', arch: 'security', hero: 'inbox.jpg', heroH: 200, titleSize: 29,
+    name: 'WhatsApp отвалился / WhatsApp issue', arch: 'security', hero: 'inbox.gif', heroH: 200, titleSize: 29,
     category: 'channels', audience: 'owner', essential: false,
     eyebrow_ru: 'Требуется действие', eyebrow_en: 'Action needed',
     preheader_ru: 'Номер {{phone}} отключился', preheader_en: 'Number {{phone}} went offline',
@@ -533,7 +533,7 @@ const DEFAULT_TEMPLATES = {
     stats_en: [{ n: '{{leads}}', label: 'new leads' }, { n: '{{replies}}', label: 'AI replies' }, { n: '{{meetings}}', label: 'meetings' }],
   },
   weeklyReport: {
-    name: 'Итоги недели / Weekly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.jpg', heroH: 230, titleSize: 31,
+    name: 'Итоги недели / Weekly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.gif', heroH: 230, titleSize: 31,
     category: 'reports', audience: 'owner', essential: false,
     eyebrow_ru: 'Итоги недели', eyebrow_en: 'Weekly report',
     preheader_ru: 'Неделя {{agency}} в цифрах', preheader_en: 'A week of {{agency}} in numbers',
@@ -545,7 +545,7 @@ const DEFAULT_TEMPLATES = {
     stats_en: [{ n: '{{leads}}', label: 'leads' }, { n: '{{qualified}}', label: 'qualified' }, { n: '{{meetings}}', label: 'meetings' }],
   },
   founderBrief: {
-    name: 'Сигналы руководителю / Founder brief', arch: 'reports', theme: 'dark', hero: 'ring.jpg', heroH: 230, titleSize: 30,
+    name: 'Сигналы руководителю / Founder brief', arch: 'reports', theme: 'dark', hero: 'ring.gif', heroH: 230, titleSize: 30,
     category: 'reports', audience: 'owner', essential: false,
     eyebrow_ru: 'Штаб · сигналы', eyebrow_en: 'HQ · signals',
     preheader_ru: 'То, на что стоит взглянуть лично', preheader_en: 'The things worth your personal look',
@@ -557,7 +557,7 @@ const DEFAULT_TEMPLATES = {
     features_en: [{ icon: 'alert', title: '2 big leads waiting', sub: 'Replying slower than your norm — worth a look.' }, { icon: 'chart', title: 'Conversion dipped', sub: 'One broker is below their usual numbers.' }, { icon: 'bell', title: 'Ad account on edge', sub: '1 ad payment is close to going into debt.' }],
   },
   academyTip: {
-    name: 'Приём недели / Academy tip', arch: 'digest', hero: 'nodes.jpg', heroH: 215, titleSize: 29,
+    name: 'Приём недели / Academy tip', arch: 'digest', hero: 'nodes.gif', heroH: 215, titleSize: 29,
     category: 'academy', audience: 'broker', essential: false,
     eyebrow_ru: 'Академия · приём недели', eyebrow_en: 'Academy · tip of the week',
     preheader_ru: 'Короткий приём, который поднимает конверсию', preheader_en: 'A short move that lifts conversion',
@@ -568,7 +568,7 @@ const DEFAULT_TEMPLATES = {
     panel_ru: '«{{tipBody}}»', panel_en: '“{{tipBody}}”',
   },
   productUpdate: {
-    name: 'Что нового / Product update', arch: 'product', theme: 'dark', hero: 'hero.jpg', heroH: 230, titleSize: 31,
+    name: 'Что нового / Product update', arch: 'product', theme: 'dark', hero: 'hero.gif', heroH: 230, titleSize: 31,
     category: 'product', audience: 'all', essential: false,
     eyebrow_ru: 'Что нового', eyebrow_en: 'What’s new',
     preheader_ru: 'Свежие апдейты Lumen', preheader_en: 'Fresh Lumen updates',
@@ -580,7 +580,7 @@ const DEFAULT_TEMPLATES = {
     features_en: [{ icon: 'bolt', title: 'One-tap task reschedule', sub: '“Tomorrow / next week / a specific day”.' }, { icon: 'chat', title: 'Zoom interpreter', sub: 'RU → EN/IT live right on the call.' }, { icon: 'chart', title: 'Per-broker summary', sub: 'A dedicated cut in the “HQ” section.' }],
   },
   winback: {
-    name: 'Возврат / Win-back', arch: 'marketing', theme: 'dark', hero: 'flow.jpg', heroH: 240, titleSize: 32,
+    name: 'Возврат / Win-back', arch: 'marketing', theme: 'dark', hero: 'flow.gif', heroH: 240, titleSize: 32,
     category: 'marketing', audience: 'owner', essential: false,
     eyebrow_ru: 'Скучаем', eyebrow_en: 'We miss you',
     preheader_ru: 'Ваш ИИ-отдел продаж скучает', preheader_en: 'Your AI sales desk misses you',
@@ -591,7 +591,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── ЛИДЫ (доп.) ── */
   hotLead: {
-    name: 'Горячий лид / Hot lead', arch: 'leads', hero: 'flow.jpg', heroH: 220, titleSize: 31,
+    name: 'Горячий лид / Hot lead', arch: 'leads', hero: 'flow.gif', heroH: 220, titleSize: 31,
     category: 'leads', audience: 'broker', essential: false,
     eyebrow_ru: 'Горячий лид', eyebrow_en: 'Hot lead',
     preheader_ru: 'ИИ квалифицировал — бюджет и намерение есть', preheader_en: 'AI qualified — budget and intent are there',
@@ -602,7 +602,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Позвоните первым — на горячей стадии выигрывает скорость.', note_en: 'Call first — at the hot stage, speed wins.', noteIcon: 'phone',
   },
   leadAssigned: {
-    name: 'Лид назначен вам / Lead assigned', arch: 'leads', hero: 'inbox.jpg', heroH: 210, titleSize: 30,
+    name: 'Лид назначен вам / Lead assigned', arch: 'leads', hero: 'inbox.gif', heroH: 210, titleSize: 30,
     category: 'leads', audience: 'broker', essential: false,
     eyebrow_ru: 'Ваш новый лид', eyebrow_en: 'Assigned to you',
     preheader_ru: '{{inviter}} передал вам лида', preheader_en: '{{inviter}} handed you a lead',
@@ -612,7 +612,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, <b>{{inviter}}</b> handed you this lead. The full chat history is already in the card.</p>{{lead}}{{button}}',
   },
   leadWon: {
-    name: 'Сделка закрыта / Deal won', arch: 'leads', hero: 'trophy.jpg', heroH: 235, titleSize: 32,
+    name: 'Сделка закрыта / Deal won', arch: 'leads', hero: 'trophy.gif', heroH: 235, titleSize: 32,
     category: 'leads', audience: 'all', essential: false,
     eyebrow_ru: 'Сделка закрыта', eyebrow_en: 'Deal won',
     preheader_ru: '{{leadName}} — сделка закрыта', preheader_en: '{{leadName}} — deal closed',
@@ -624,7 +624,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── ВСТРЕЧИ (доп.) ── */
   meetingCancelled: {
-    name: 'Встреча отменена / Meeting cancelled', arch: 'digest', hero: 'calendar.jpg', heroH: 210, titleSize: 29,
+    name: 'Встреча отменена / Meeting cancelled', arch: 'digest', hero: 'calendar.gif', heroH: 210, titleSize: 29,
     category: 'meetings', audience: 'broker', essential: false,
     eyebrow_ru: 'Встреча отменена', eyebrow_en: 'Meeting cancelled',
     preheader_ru: '{{leadName}} — встреча отменена', preheader_en: '{{leadName}} — meeting cancelled',
@@ -634,7 +634,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, the meeting with <b>{{leadName}}</b> ({{when}}) was cancelled. Don’t lose the lead — offer a new time while interest is warm.</p>{{button}}',
   },
   meetingSummary: {
-    name: 'Итоги встречи / Meeting summary', arch: 'digest', hero: 'calendar.jpg', heroH: 210, titleSize: 29,
+    name: 'Итоги встречи / Meeting summary', arch: 'digest', hero: 'calendar.gif', heroH: 210, titleSize: 29,
     category: 'meetings', audience: 'broker', essential: false,
     eyebrow_ru: 'После встречи', eyebrow_en: 'After the meeting',
     preheader_ru: 'ИИ собрал итоги и следующий шаг', preheader_en: 'AI collected the summary and next step',
@@ -646,7 +646,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── КАНАЛЫ (доп.) ── */
   callRecording: {
-    name: 'Запись звонка / Call recording', arch: 'digest', hero: 'phone.jpg', heroH: 210, titleSize: 29,
+    name: 'Запись звонка / Call recording', arch: 'digest', hero: 'phone.gif', heroH: 210, titleSize: 29,
     category: 'channels', audience: 'broker', essential: false,
     eyebrow_ru: 'Звонок обработан', eyebrow_en: 'Call processed',
     preheader_ru: 'Запись и краткое резюме готовы', preheader_en: 'Recording and quick summary are ready',
@@ -657,7 +657,7 @@ const DEFAULT_TEMPLATES = {
     panel_ru: '«{{summary}}»', panel_en: '“{{summary}}”',
   },
   warmupComplete: {
-    name: 'Прогрев завершён / Warm-up complete', arch: 'digest', hero: 'ring.jpg', heroH: 210, titleSize: 29,
+    name: 'Прогрев завершён / Warm-up complete', arch: 'digest', hero: 'ring.gif', heroH: 210, titleSize: 29,
     category: 'channels', audience: 'owner', essential: false,
     eyebrow_ru: 'Номер прогрет', eyebrow_en: 'Number is warm',
     preheader_ru: '{{phone}} готов к боевому трафику', preheader_en: '{{phone}} is ready for real traffic',
@@ -668,7 +668,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── ДОКУМЕНТЫ / DOCUMENTS ── */
   proposalViewed: {
-    name: 'КП открыто клиентом / Proposal viewed', arch: 'documents', hero: 'doc.jpg', heroH: 215, titleSize: 30,
+    name: 'КП открыто клиентом / Proposal viewed', arch: 'documents', hero: 'doc.gif', heroH: 215, titleSize: 30,
     category: 'documents', audience: 'broker', essential: false,
     eyebrow_ru: 'КП открыто', eyebrow_en: 'Proposal opened',
     preheader_ru: '{{leadName}} смотрит ваше предложение', preheader_en: '{{leadName}} is viewing your proposal',
@@ -679,7 +679,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Короткое «остались вопросы?» сейчас заходит лучше всего.', note_en: 'A short “any questions?” lands best right now.', noteIcon: 'chat',
   },
   documentSigned: {
-    name: 'Документ подписан / Document signed', arch: 'documents', hero: 'doc.jpg', heroH: 215, titleSize: 30,
+    name: 'Документ подписан / Document signed', arch: 'documents', hero: 'doc.gif', heroH: 215, titleSize: 30,
     category: 'documents', audience: 'all', essential: false,
     eyebrow_ru: 'Подписано', eyebrow_en: 'Signed',
     preheader_ru: '{{leadName}} подписал {{docTitle}}', preheader_en: '{{leadName}} signed {{docTitle}}',
@@ -689,7 +689,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, <b>{{leadName}}</b> signed “{{docTitle}}”. A copy is saved in the deal card.</p>{{details}}{{button}}',
   },
   invoiceSent: {
-    name: 'Счёт выставлен / Invoice sent', arch: 'documents', hero: 'doc.jpg', heroH: 200, titleSize: 29,
+    name: 'Счёт выставлен / Invoice sent', arch: 'documents', hero: 'doc.gif', heroH: 200, titleSize: 29,
     category: 'documents', audience: 'all', essential: false,
     eyebrow_ru: 'Счёт клиенту', eyebrow_en: 'Invoice to client',
     preheader_ru: 'Счёт для {{leadName}} отправлен', preheader_en: 'Invoice for {{leadName}} was sent',
@@ -712,7 +712,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── ОТЧЁТЫ (доп.) ── */
   monthlyReport: {
-    name: 'Итоги месяца / Monthly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.jpg', heroH: 235, titleSize: 31,
+    name: 'Итоги месяца / Monthly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.gif', heroH: 235, titleSize: 31,
     category: 'reports', audience: 'owner', essential: false,
     eyebrow_ru: 'Итоги месяца', eyebrow_en: 'Monthly report',
     preheader_ru: 'Месяц {{agency}} в цифрах', preheader_en: 'A month of {{agency}} in numbers',
@@ -725,7 +725,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── ОПЛАТА (доп.) ── */
   planLimit: {
-    name: 'Лимит тарифа / Plan limit', arch: 'billing', hero: 'graph.jpg', heroH: 210, titleSize: 29,
+    name: 'Лимит тарифа / Plan limit', arch: 'billing', hero: 'graph.gif', heroH: 210, titleSize: 29,
     category: 'billing', audience: 'owner', essential: false,
     eyebrow_ru: 'Пора расти', eyebrow_en: 'Time to grow',
     preheader_ru: 'Достигнут лимит тарифа', preheader_en: 'You’ve hit your plan limit',
@@ -737,7 +737,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── БЕЗОПАСНОСТЬ (доп.) ── */
   otpCode: {
-    name: 'Код подтверждения / One-time code', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
+    name: 'Код подтверждения / One-time code', arch: 'security', hero: 'shield.gif', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Код входа', eyebrow_en: 'Sign-in code',
     preheader_ru: 'Ваш одноразовый код Lumen', preheader_en: 'Your one-time Lumen code',
@@ -748,7 +748,7 @@ const DEFAULT_TEMPLATES = {
     note_ru: 'Никому не сообщайте код. Мы никогда не спросим его в переписке.', note_en: 'Never share this code. We’ll never ask for it in chat.', noteIcon: 'lock',
   },
   notification: {
-    name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.jpg', heroH: 200, titleSize: 28,
+    name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.gif', heroH: 200, titleSize: 28,
     category: 'account', audience: 'all', essential: false,
     subject_ru: 'Lumen: {{title}}', subject_en: 'Lumen: {{title}}',
     title_ru: '{{title}}', title_en: '{{title}}',

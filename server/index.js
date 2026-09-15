@@ -4207,7 +4207,8 @@ const server = http.createServer(async (req, res) => {
       if (reg.byEmail[email] && reg.byEmail[email] !== tid) return json(res, 409, { error: 'этот e-mail уже привязан к другому агентству' });
       let br = (db.brokers || []).find(x => x.email === email);
       if (!br) {
-        const lim = planOf(store.currentTid()).maxBrokers;
+        const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
+        const lim = _beta ? 9999 : planOf(store.currentTid()).maxBrokers;
         if ((db.brokers || []).filter(x => x.active !== false).length >= lim) return json(res, 402, { error: `Лимит брокеров на вашем тарифе — ${lim}. Обновите тариф, чтобы добавить больше.` });
         br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br);
       }

@@ -1108,7 +1108,7 @@ window.openPlanManager = async function () {
 };
 
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
-window.openGrayManager = async function () {
+window.openGrayManager = async function (jumpPhone) {
   let data = { url: '', tokenSet: false, numbers: [] };
   try { data = await api.get('/wa/gray/list'); } catch (e) {}
   let pollTimer = null;
@@ -1227,6 +1227,7 @@ window.openGrayManager = async function () {
     }, 1800);
   }
   renderMgr();
+  if (jumpPhone) { const clean = String(jumpPhone).replace(/[^0-9]/g, ''); if (clean) connectNumber(clean, ''); }
 };
 /* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
 window.grayAddQR = function (phone, label) {
@@ -9758,6 +9759,10 @@ PAGES.tasks = async (root) => {
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
+  let grayData = { numbers: [] }; try { grayData = await api.get('/wa/gray/list'); } catch (e) {}
+  const grayNums = grayData.numbers || [];
+  const brokerName = id => (STATE.brokers.find(b => b.id === id) || {}).name || '';
+  const grayStatusBadge = (live) => { const s = live && live.status; return s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'qr' ? '<span class="badge warn"><i></i>ждёт QR</span>' : s === 'connecting' ? '<span class="badge warn"><i></i>подключается</span>' : '<span class="badge bad"><i></i>не на связи</span>'; };
   const ring = (q) => {
     const r = 19, c = 2 * Math.PI * r;
     const col = q >= 80 ? 'var(--ok)' : q >= 55 ? 'var(--warn)' : 'var(--bad)';
@@ -9779,9 +9784,19 @@ PAGES.numbers = async (root) => {
       </div>`).join('')}
     `, { v: 'right', hue: '#23B383' })}
     <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
-      <div class="card-title">${ic(I.chat)}Ваши WhatsApp-номера (по QR)<span class="sub">подключение по QR + прогрев — для серых касаний и проверки номеров</span></div>
-      <div class="muted" style="font-size:12px;margin:2px 0 12px;line-height:1.5">Здесь вы подключаете <b>свои</b> номера по QR (как WhatsApp Web). С них уходит первое касание/цепочка серым способом и проверяется наличие WhatsApp у лида. Каждый номер можно закрепить за брокером.</div>
-      <button class="btn btn-accent" id="openGrayBtn">${ic(I.link)}Подключить / управлять номерами по QR</button>
+      <div class="card-title">${ic(I.plus)}Подключить номер<span class="sub">два канала работы с WhatsApp</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
+          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.chat)} Серый способ (по QR)</div>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">Свой номер по QR (как WhatsApp Web). С него идёт первое касание/цепочка и проверка WhatsApp у лида. Прогрев + закреп за брокером.</div>
+          <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить по QR</button>
+        </div>
+        <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
+          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Требует Meta-верификации (Настройки → Cloud API).</div>
+          <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Добавить Cloud-API номер</button>
+        </div>
+      </div>
     </div>
     <div class="glass card mb">
       <div class="card-title">${ic(I.shield)}Гигиена канала</div>
@@ -9793,10 +9808,27 @@ PAGES.numbers = async (root) => {
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
       </div>
     </div>
-    ${st.numbers.length ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="lp-sec" style="margin:0">Официальные Cloud-API номера · ${st.numbers.length}<span class="muted" style="font-size:11px;font-weight:400;margin-left:8px">добавляются в Настройки → WhatsApp Cloud API</span></div>
-    </div>` : ''}
-    <div class="num-grid" ${st.numbers.length ? '' : 'style="display:none"'}>
+
+    ${grayNums.length ? `<div class="lp-sec" style="margin:0 0 10px">Серые номера (QR) · ${grayNums.length}</div>
+    <div class="num-grid" style="margin-bottom:18px">
+      ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
+        <div class="num-head">
+          <div><div class="ph">${esc(n.phone)}</div><div class="lb">${esc(n.label || 'серый номер')} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
+          ${ring(risk)}
+        </div>
+        <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}</div>
+        <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
+          <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+        <div class="num-actions">
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span>`}
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
+        </div>
+      </div>`; }).join('')}
+    </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}
+
+    ${st.numbers.length ? `<div class="lp-sec" style="margin:0 0 10px">Официальные Cloud-API номера · ${st.numbers.length}</div>
+    <div class="num-grid">
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
         <div class="num-head">
           <div><div class="ph">${esc(n.phone)}</div><div class="lb">${esc(n.label)} ${n.channel === 'cloud_api' ? '· <b style="color:var(--accent-2)">официальный Cloud API</b>' : '· web-протокол'}</div></div>
@@ -9815,13 +9847,17 @@ PAGES.numbers = async (root) => {
           <button class="btn-ghost" data-act="del" title="Убрать номер">${ic(I.x)}</button>
         </div>
       </div>`).join('')}
-    </div>`;
+    </div>` : ''}`;
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
     if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
     await api.patch('/numbers/' + id, { state: b.dataset.act });
     render();
   }));
+  /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
+  $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
+  $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
+  $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
