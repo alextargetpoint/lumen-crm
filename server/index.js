@@ -5194,8 +5194,15 @@ const server = http.createServer(async (req, res) => {
       if (!/^\+?[0-9]{7,15}$/.test(String(brokerPhone).replace(/[\s()\-]/g, ''))) return json(res, 400, { error: 'Не указан ВАШ телефон (на него звоним первым). Впишите номер в Профиль агентства → Менеджер → телефон (в формате +39…), затем повторите звонок.' });
       const norm = s => String(s || '').replace(/[\s()\-]/g, '').replace(/^\+/, '');
       if (lead.phone && norm(lead.phone) === norm(brokerPhone)) return json(res, 400, { error: 'Номер клиента в этом лиде совпадает с вашим — нельзя позвонить самому себе. Схема: звоним вам → потом клиенту. Укажите в лиде ДРУГОЙ номер (второй телефон/симку).' });
+      /* ИДЕМПОТЕНТНОСТЬ: не запускать новый звонок, пока предыдущий «живой». Иначе двойной/тройной тап
+         кнопки (в т.ч. в TG-аппе) инициировал 3 параллельных дозвона — пользователь отклонял, а шли ещё. */
+      const ACTIVE_CALL = ['dialing', 'ringing', 'ringing_client', 'connecting', 'in_call'];
+      if (lead.call && ACTIVE_CALL.includes(lead.call.status) && (Date.now() - (lead.call.at || 0) < 90000)) {
+        return json(res, 200, { ok: false, busy: true, error: 'Звонок уже идёт (' + lead.call.status + '). Дождитесь завершения.' });
+      }
+      lead.call = { status: 'dialing', cause: null, at: Date.now() }; store.save();   /* помечаем СРАЗУ — окно для дабл-тапа закрыто до прихода вебхука */
       try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone, to: lead.phone || '' }); }
-      catch (e) { let msg = e.message || 'ошибка звонка'; if (/not allowed|denied|blocked|destination|forbidden|10015|restrict/i.test(msg)) msg += ' — похоже, страна номера не разрешена: Telnyx → Voice → Outbound Voice Profiles → Default → включите нужную страну.'; return json(res, 400, { error: msg }); }
+      catch (e) { lead.call = { status: 'ended', cause: 'failed', at: Date.now() }; store.save(); let msg = e.message || 'ошибка звонка'; if (/not allowed|denied|blocked|destination|forbidden|10015|restrict/i.test(msg)) msg += ' — похоже, страна номера не разрешена: Telnyx → Voice → Outbound Voice Profiles → Default → включите нужную страну.'; return json(res, 400, { error: msg }); }
     }
 
     /* ИИ первое касание: разбор лида + готовое персональное сообщение */
