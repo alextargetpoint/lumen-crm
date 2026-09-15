@@ -6006,11 +6006,16 @@ const server = http.createServer(async (req, res) => {
       if (out.tokenSet) { try { out.balance = await yesimApi('get_balance'); out.ok = true; } catch (e) { out.ok = false; out.error = e.message; } }
       return json(res, 200, out);
     }
-    /* каталог: страны + опции подписки (месяц/год) */
+    /* каталог: страны + опции подписки (месяц/год) — цены с наценкой платформы (себестоимость скрыта) */
     if (p === '/api/gray/yesim/catalog' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      try { const countries = await yesimApi('get_allowed_countries'); let options = null; try { options = await yesimApi('get_subscription_options'); } catch (_) {} return json(res, 200, { ok: true, countries, options }); }
-      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+      try {
+        const countries = await yesimApi('get_allowed_countries');
+        let options = null; try { options = await yesimApi('get_subscription_options'); } catch (_) {}
+        const clist = (countries && countries.data && countries.data.countries) || [];
+        const olist = ((options && options.data && options.data.options) || []).map(o => ({ name: o.name, price: (parseFloat(o.price) + TELNYX_MARKUP).toFixed(2), currency: o.currency || 'USD' }));
+        return json(res, 200, { ok: true, countries: clist, options: olist });   /* только маркетинговые данные с наценкой, raw-цены не отдаём */
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* купить серый номер: {country, subscriptionOption:'month'|'year', area?} */
     if (p === '/api/gray/yesim/buy' && req.method === 'POST') {

@@ -1233,6 +1233,41 @@ window.openGrayManager = async function (jumpPhone) {
   renderMgr();
   if (jumpPhone) { const clean = String(jumpPhone).replace(/[^0-9]/g, ''); if (clean) connectNumber(clean, ''); }
 };
+/* Покупка серого номера (Yesim): страна + тариф → покупка → OTP → регистрация WhatsApp + QR */
+window.openYesimBuy = async function () {
+  const bd = modal({ title: 'Купить номер для WhatsApp', sub: 'Виртуальный номер ловит OTP — регистрируете WhatsApp и подключаете', wide: true, body: '<div id="yBuy">Загрузка каталога…</div>', actions: [{ label: 'Закрыть' }] });
+  const host = () => $('#yBuy', bd);
+  let cat = { ok: false };
+  try { cat = await api.get('/gray/yesim/catalog'); } catch (e) { cat = { ok: false, error: e.message }; }
+  if (!cat.ok) { if (host()) host().innerHTML = `<div class="lc-hint warn">${ic(I.shield)}<span>Покупка номеров пока недоступна: ${esc(cat.error || 'сервис не настроен оператором')}.</span></div>`; return; }
+  const countries = cat.countries || [], options = cat.options || [];
+  const renderForm = () => { if (!host()) return; host().innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-row"><label>Страна номера</label><select id="yCountry">${countries.map(c => `<option value="${esc(c.code)}">${esc(c.country)} (${esc(c.code)})</option>`).join('')}</select></div>
+      <div class="form-row"><label>Тариф</label><select id="yOpt">${options.map(o => `<option value="${esc(o.name)}">${o.name === 'year' ? 'Год' : 'Месяц'} — $${esc(o.price)}${o.name === 'year' ? '/год' : '/мес'}</option>`).join('')}</select></div>
+    </div>
+    <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Номер поймает SMS с кодом (OTP). После покупки: зарегистрируйте WhatsApp на этот номер (по инструкции), затем подключите его по QR в «Подключить свой».</div>
+    <button class="btn btn-accent" id="yDoBuy" style="width:100%;justify-content:center">${ic(I.plus)}Купить номер</button>
+    <div id="yResult" style="margin-top:12px"></div>`;
+    $('#yDoBuy', bd).addEventListener('click', async () => {
+      const country = $('#yCountry', bd).value, subscriptionOption = $('#yOpt', bd).value;
+      const btn = $('#yDoBuy', bd); btn.disabled = true; btn.textContent = 'Покупаю…';
+      const box = $('#yResult', bd); box.innerHTML = '<span class="muted">Покупка…</span>';
+      try {
+        const r = await api.post('/gray/yesim/buy', { country, subscriptionOption });
+        if (!r.ok || !r.number) { box.innerHTML = `<span style="color:var(--bad)">Не куплено: ${esc(r.error || 'ошибка')}</span>`; btn.disabled = false; btn.textContent = 'Купить номер'; return; }
+        box.innerHTML = `<div class="lc-hint info">${ic(I.check)}<span>Номер <b>+${esc(r.number)}</b> куплен. Зарегистрируйте на него WhatsApp — код (OTP) появится ниже, как придёт.</span></div>
+          <div style="margin-top:8px"><b style="font-size:12.5px">Входящие SMS / коды</b> <button class="btn-ghost btn-sm" id="yRefreshSms">${ic(I.refresh)}Обновить</button></div>
+          <div id="ySms" class="warm-log" style="margin-top:6px"><div class="muted" style="font-size:11.5px;padding:8px">Ждём SMS…</div></div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Дальше: «Подключить свой (QR)» → введите +${esc(r.number)} → отсканируйте с телефона, где зарегистрирован WhatsApp этого номера.</div>`;
+        btn.textContent = '✓ куплен'; if (typeof CUR !== 'undefined' && CUR === 'numbers') render();
+        const loadSms = async () => { const sb = $('#ySms', bd); if (!sb) return; try { const s = await api.get('/gray/yesim/sms'); const arr = (s.sms && s.sms.sms) || s.sms || []; sb.innerHTML = (Array.isArray(arr) && arr.length) ? arr.slice(0, 10).map(m => `<div class="warm-msg"><b>${esc(m.sender || m.from || '')}</b><span class="warm-txt">${esc(m.text || m.message || m.sms || '')}</span><i>${esc((m.date || m.time || '').toString().slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт при регистрации WhatsApp.</div>'; } catch (e) {} };
+        $('#yRefreshSms', bd).addEventListener('click', loadSms); loadSms();
+      } catch (e) { box.innerHTML = `<span style="color:var(--bad)">Ошибка: ${esc(e.message)}</span>`; btn.disabled = false; btn.textContent = 'Купить номер'; }
+    });
+  };
+  renderForm();
+};
 /* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
 window.grayAddQR = function (phone, label) {
   phone = String(phone || '').replace(/[^0-9]/g, '');
@@ -9818,8 +9853,11 @@ PAGES.numbers = async (root) => {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
           <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.chat)} Серый способ (по QR)</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">Свой номер по QR (как WhatsApp Web). С него идёт первое касание/цепочка и проверка WhatsApp у лида. Прогрев + закреп за брокером.</div>
-          <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить по QR</button>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">Свой номер по QR (как WhatsApp Web). Или <b>купите виртуальный номер</b> — он поймает OTP, зарегистрируете WhatsApp и подключите. Прогрев + закреп за брокером.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
+            <button class="btn btn-sm" id="openYesimBtn">${ic(I.plus)}Купить номер</button>
+          </div>
         </div>
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
           <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
@@ -9907,6 +9945,7 @@ PAGES.numbers = async (root) => {
     try { const d = await api.get('/wa/gray/list'); box.innerHTML = warmLiveHtml(d.warmup || {}); } catch (_) {}
   }, 6000);
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
+  $('#openYesimBtn')?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
     modal({
