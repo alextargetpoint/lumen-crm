@@ -266,8 +266,11 @@ async function tgApiRaw(tok, method, body) {
 }
 async function setupPlatformWebhook(baseUrl) {
   if (!PLATFORM_TOKEN) return { ok: false, error: 'нет LUMEN_TG_BRIDGE_TOKEN' };
-  const url = baseUrl.replace(/\/$/, '') + '/tg/webhook';
-  const r = await tgApiRaw(PLATFORM_TOKEN, 'setWebhook', { url, secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
+  const base = baseUrl.replace(/\/$/, '');
+  const r = await tgApiRaw(PLATFORM_TOKEN, 'setWebhook', { url: base + '/tg/webhook', secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
+  /* сохраняем мини-апп: кнопка-меню бота открывает мессенджер брокера (/tgapp) — иначе при переносе
+     существующего бота (напр. Lumen Messenger) в мост пропала бы его кнопка «Чаты» */
+  try { await tgApiRaw(PLATFORM_TOKEN, 'setChatMenuButton', { menu_button: { type: 'web_app', text: '💬 Чаты', web_app: { url: base + '/tgapp' } } }); } catch (_) {}
   let me = null; try { me = await tgApiRaw(PLATFORM_TOKEN, 'getMe'); } catch (_) {}
   return { ok: !!r.ok, result: r, username: me && me.result && me.result.username || null };
 }
