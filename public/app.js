@@ -1135,10 +1135,11 @@ window.openGrayManager = async function () {
     host().innerHTML = `
       ${data.platform
         ? `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер подключён платформой Lumen — <b>ничего вводить не нужно</b>. Просто добавьте свой номер и отсканируйте QR.</span></div>`
-        : `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Воркер — облачный сервис, который держит WhatsApp-сессии. URL уже подставлен по умолчанию — впишите только токен (значение <b>WORKER_TOKEN</b> с сервиса воркера в Railway) и сохраните. Либо задайте <b>LUMEN_WA_WORKER_TOKEN</b> на сервисе lumen-crm — тогда вводить не придётся.</div>
-      <div class="form-row"><label>URL воркера</label><input id="gwUrl" value="${esc(data.url || '')}" placeholder="https://…up.railway.app"></div>
-      <div class="form-row"><label>Токен воркера</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• сохранён' : 'WORKER_TOKEN'}"></div>
-      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:8px">Сохранить воркер</button>`}
+        : (data.isPrimary
+          ? `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Задайте токен воркера <b>один раз для всей платформы</b> — новые агентства будут пользоваться им автоматически (ничего не вводя). Токен — это значение <b>WORKER_TOKEN</b> с сервиса воркера.</div>
+      <div class="form-row"><label>Токен воркера (общий для всех агентств)</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• задан' : 'WORKER_TOKEN'}"></div>
+      <button class="btn btn-accent" id="gwPlatSave" style="width:100%;justify-content:center;margin-bottom:8px">Подключить воркер для платформы</button>`
+          : `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер номеров подключается оператором платформы. Как только он это сделает — здесь появится добавление номера по QR.</span></div>`)}
       <button class="btn btn-sm" id="gwPing" style="width:100%;justify-content:center;margin-bottom:14px">${ic(I.shield)}Проверить связь с воркером</button>
       <div id="gwPingRes" style="font-size:12px;margin-bottom:12px"></div>
       ${cfgOk ? `
@@ -1174,6 +1175,13 @@ window.openGrayManager = async function () {
     $('#gwSave', bd)?.addEventListener('click', async () => {
       try { await api.post('/wa/gray/config', { url: $('#gwUrl', bd).value.trim(), token: $('#gwTok', bd).value.trim() || undefined }); toast('Воркер сохранён', '', true); await refresh(); }
       catch (e) { toast('Не вышло', e.message); }
+    });
+    $('#gwPlatSave', bd)?.addEventListener('click', async () => {
+      const token = $('#gwTok', bd)?.value.trim();
+      if (!token) { toast('Вставьте токен воркера'); return; }
+      const btn = $('#gwPlatSave', bd); btn.disabled = true; btn.textContent = 'Подключаю…';
+      try { const r = await api.post('/wa/gray/platform', { token }); toast('Воркер подключён для платформы', 'Агентствам вводить ничего не нужно', true); await refresh(); }
+      catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.textContent = 'Подключить воркер для платформы'; }
     });
     $('#gwPing', bd)?.addEventListener('click', async () => {
       const box = $('#gwPingRes', bd); if (box) box.innerHTML = '<span class="muted">Проверяю…</span>';

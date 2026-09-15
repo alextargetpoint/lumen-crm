@@ -2369,14 +2369,15 @@ function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelU
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
 /* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
 const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').replace(/[^0-9]/g, '');
-/* URL/токен серого воркера: env → настройки тенанта → ИЗВЕСТНЫЙ дефолтный URL (он один и стабилен, чтобы
-   URL никогда не был блокером — достаточно задать ОДИН токен). */
+/* URL/токен серого воркера: env → платформенный реестр (оператор задал ОДИН раз в CRM) → настройки тенанта →
+   дефолтный URL. Смысл SaaS: оператор настраивает воркер один раз, новые агентства НИЧЕГО не вводят. */
 const DEFAULT_WA_WORKER = 'https://lumen-wa-worker-production.up.railway.app';
-function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || (db.settings.waGray && db.settings.waGray.url) || DEFAULT_WA_WORKER).replace(/\/$/, ''); }
-function waWorkerToken(db) { return process.env.LUMEN_WA_WORKER_TOKEN || (db.settings.waGray && db.settings.waGray.token) || ''; }
+function _platWorker() { try { const r = store.getRegistry(); return r.platformWorker || {}; } catch (_) { return {}; } }
+function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || _platWorker().url || (db.settings.waGray && db.settings.waGray.url) || DEFAULT_WA_WORKER).replace(/\/$/, ''); }
+function waWorkerToken(db) { return process.env.LUMEN_WA_WORKER_TOKEN || _platWorker().token || (db.settings.waGray && db.settings.waGray.token) || ''; }
 function waWorkerReady(db) { return !!(waWorkerBase(db) && waWorkerToken(db)); }
-/* платформенный режим (агентству не вводить URL/токен) = задан платформенный токен в env */
-function waWorkerPlatform() { return !!process.env.LUMEN_WA_WORKER_TOKEN; }
+/* платформенный режим (агентству не вводить URL/токен) = задан платформенный токен (env или реестр) */
+function waWorkerPlatform() { return !!(process.env.LUMEN_WA_WORKER_TOKEN || _platWorker().token); }
 async function waGrayApi(db, method, pathx, body) {
   const base = waWorkerBase(db);
   if (!base) throw new Error('WA-воркер не настроен (укажи URL в Настройках)');
@@ -5717,7 +5718,26 @@ const server = http.createServer(async (req, res) => {
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
       const platform = waWorkerPlatform();
-      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+      const R2 = sessionRole(req);
+      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: store.currentTid() === 'primary' && R2 && R2.role === 'owner', envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+    }
+    /* ПЛАТФОРМА: задать токен (и опц. URL) серого воркера ОДИН раз для всех агентств — из CRM, без Railway.
+       Только владелец primary-тенанта. Новые агентства после этого ничего не вводят. */
+    if (p === '/api/wa/gray/platform' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (store.currentTid() !== 'primary') return json(res, 403, { error: 'воркер настраивает оператор платформы (основной аккаунт)' });
+      if (process.env.LUMEN_WA_WORKER_TOKEN) return json(res, 400, { error: 'токен воркера задан переменной окружения — меняйте в Railway' });
+      const b = await readBody(req);
+      const reg = store.getRegistry(); reg.platformWorker = reg.platformWorker || {};
+      if (b.clear) { reg.platformWorker = {}; store.saveRegistry(); return json(res, 200, { ok: true, cleared: true }); }
+      const token = String(b.token || '').trim();
+      const url = String(b.url || '').trim().replace(/\/$/, '') || DEFAULT_WA_WORKER;
+      if (!token) return json(res, 400, { error: 'нужен токен воркера (WORKER_TOKEN)' });
+      /* проверяем связь ДО сохранения: health + авторизованный /sessions */
+      try { const h = await fetch(url + '/health', { signal: AbortSignal.timeout(8000) }); if (!h.ok) throw new Error('health ' + h.status); } catch (e) { return json(res, 400, { error: 'воркер недоступен по URL: ' + e.message }); }
+      try { const sr = await fetch(url + '/sessions', { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(8000) }); if (sr.status === 401) return json(res, 400, { error: 'токен воркера НЕВЕРНЫЙ (воркер вернул 401)' }); if (!sr.ok) throw new Error('sessions ' + sr.status); } catch (e) { return json(res, 400, { error: 'не удалось проверить токен: ' + e.message }); }
+      reg.platformWorker = { url, token, at: Date.now() }; store.saveRegistry();
+      return json(res, 200, { ok: true, url });
     }
     /* диагностика связи CRM↔воркер: жив ли воркер и верен ли токен (401 = токен не совпал) */
     if (p === '/api/wa/gray/ping' && req.method === 'GET') {
