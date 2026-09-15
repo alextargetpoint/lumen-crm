@@ -2270,6 +2270,7 @@ const PAGES = {};
 
 /* ---------------- ОБЗОР (конструктор виджетов) ---------------- */
 let OV_EDIT = false;
+let AN_EDIT = false;   /* режим правки страницы «Аналитика» (те же виджеты drag/hide, что в Обзоре) */
 /* Тиндер идей: утренняя колода ИИ-идей — свайп «в работу / в копилку / пропустить».
    Колода живёт на уровне модуля, чтобы переживать перерисовку виджета. Генерация только по кнопке (cost-safe). */
 let IDEA_DECK = { cards: [], loaded: false, loading: false };
@@ -11580,26 +11581,32 @@ function isOnShift(b) {
 }
 
 /* ---------------- АНАЛИТИКА ---------------- */
-PAGES.analytics = async (root) => {
-  const an = await api.get('/analytics');
-  const cmpRows = [
-    { k: 'Скорость первого контакта', ai: an.compare.aiLine.firstContact, hum: an.compare.human.firstContact, pct: false },
-    { k: 'Конверсия в диалог', ai: an.compare.aiLine.dialogConv, hum: an.compare.human.dialogConv, pct: true },
-    { k: 'Лид → квалификация', ai: an.compare.aiLine.qualConv, hum: an.compare.human.qualConv, pct: true },
-    { k: 'Время на квалификацию', ai: an.compare.aiLine.qualTime, hum: an.compare.human.qualTime, pct: false },
-  ];
-  root.innerHTML = `
-    <div class="an-hero glass card mb">
+/* ─── Аналитика: те же перетаскиваемые/скрываемые виджеты, что и в Обзоре ───
+   Каждый блок — самостоятельный виджет (render(an) → полная карточка). Порядок и
+   скрытие сохраняются per-tenant в localStorage; правка — кнопкой «Настроить». */
+const AN_W = {
+  hero: {
+    name: 'Человек против ИИ', render: (an) => {
+      const cmpRows = [
+        { k: 'Скорость первого контакта', ai: an.compare.aiLine.firstContact, hum: an.compare.human.firstContact, pct: false },
+        { k: 'Конверсия в диалог', ai: an.compare.aiLine.dialogConv, hum: an.compare.human.dialogConv, pct: true },
+        { k: 'Лид → квалификация', ai: an.compare.aiLine.qualConv, hum: an.compare.human.qualConv, pct: true },
+        { k: 'Время на квалификацию', ai: an.compare.aiLine.qualTime, hum: an.compare.human.qualTime, pct: false },
+      ];
+      return `<div class="an-hero glass card">
       <div class="an-hero-hd">${ic(I.spark)}<div><b>Человек против ИИ</b><span>первая линия · живые цифры за 30 дней</span></div><span class="an-hero-tag">${ic(I.bolt)}Lumen AI ведёт</span></div>
       <div class="an-hero-rows">
         ${cmpRows.map(r => {
-          const bar = r.pct ? `<div class="anh-bars"><div class="anh-bar ai"><i style="width:${Math.min(100, r.ai)}%"></i><b>${r.ai}%</b></div><div class="anh-bar hu"><i style="width:${Math.min(100, r.hum)}%"></i><b>${r.hum}%</b></div></div>`
-            : `<div class="anh-vals"><span class="anh-v ai">${esc(String(r.ai))}<i>ИИ</i></span><span class="anh-v hu">${esc(String(r.hum))}<i>человек</i></span></div>`;
-          return `<div class="anh-row"><div class="anh-k">${esc(r.k)}</div>${bar}</div>`;
-        }).join('')}
+        const bar = r.pct ? `<div class="anh-bars"><div class="anh-bar ai"><i style="width:${Math.min(100, r.ai)}%"></i><b>${r.ai}%</b></div><div class="anh-bar hu"><i style="width:${Math.min(100, r.hum)}%"></i><b>${r.hum}%</b></div></div>`
+          : `<div class="anh-vals"><span class="anh-v ai">${esc(String(r.ai))}<i>ИИ</i></span><span class="anh-v hu">${esc(String(r.hum))}<i>человек</i></span></div>`;
+        return `<div class="anh-row"><div class="anh-k">${esc(r.k)}</div>${bar}</div>`;
+      }).join('')}
       </div>
-    </div>
-    <div class="glass card mb">
+    </div>`;
+    }
+  },
+  firstline: {
+    name: 'Показатели первой линии', render: (an) => `<div class="glass card">
       <div class="card-title">${ic(I.bars)}Показатели первой линии</div>
       <div class="vs">
         <div class="vs-col"><div class="hd">Ручная обработка</div>
@@ -11615,19 +11622,23 @@ PAGES.analytics = async (root) => {
           <div class="vs-row"><span class="k">Время на квалификацию</span><span class="v">${an.compare.aiLine.qualTime}</span></div>
         </div>
       </div>
-    </div>
-    ${(() => {
+    </div>`
+  },
+  trend: {
+    name: 'Динамика заявок · 14 дней', render: (an) => {
       const maxT = Math.max(1, ...an.trend.map(d => d.total));
       const bars = an.trend.map(d => `<div class="an-tbar" title="${d.d}.${d.month}: ${d.total} лид · ${d.qualified} квал">
         <div class="an-tstk"><i class="tot" style="height:${Math.round(d.total / maxT * 100)}%"></i><i class="qual" style="height:${Math.round(d.qualified / maxT * 100)}%"></i></div>
         <span>${d.d}</span></div>`).join('');
-      return `<div class="glass card mb">
+      return `<div class="glass card">
         <div class="card-title">${ic(I.bars)}Динамика заявок · 14 дней<span class="sub">новые лиды и из них дошли до квалификации</span>
           <span class="an-legend"><i class="l-tot"></i>новые <i class="l-qual"></i>квалы</span></div>
         <div class="an-trend">${bars}</div>
       </div>`;
-    })()}
-    <div class="two-col mb">
+    }
+  },
+  sources: {
+    name: 'Направления и источники', render: (an) => `<div class="two-col">
       <div class="glass card">
         <div class="card-title">${ic(I.funnel)}По направлениям<span class="sub">конверсия в квал + сделки</span></div>
         <div class="geo-bars">
@@ -11643,8 +11654,10 @@ PAGES.analytics = async (root) => {
           ${an.bySource.length ? an.bySource.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${s.total}</td><td>${s.qualified}</td><td><b>${s.conv}%</b></td></tr>`).join('') : '<tr><td colspan="4" class="empty">Нет данных</td></tr>'}
         </tbody></table>
       </div>
-    </div>
-    ${!an.solo ? `<div class="glass card mb">
+    </div>`
+  },
+  brokers: {
+    name: 'По брокерам', when: (an) => !an.solo, render: (an) => `<div class="glass card">
       <div class="card-title">${ic(I.team || I.user)}По брокерам<span class="sub">нагрузка → квалы → сделки</span><button class="btn btn-sm" data-ovgo="brokers" style="margin-left:auto">Команда</button></div>
       <table class="tbl an-tbl an-brokers"><thead><tr><th>Брокер</th><th>Лидов</th><th>В работе</th><th>Квалы</th><th>Сделки</th><th>Конв.</th></tr></thead><tbody>
         ${an.byBroker.length ? an.byBroker.map(b => `<tr>
@@ -11653,8 +11666,10 @@ PAGES.analytics = async (root) => {
           <td><div class="an-cvbar"><i style="width:${b.conv}%"></i></div><span>${b.conv}%</span></td>
         </tr>`).join('') : '<tr><td colspan="6" class="empty">Лиды ещё не распределены по брокерам</td></tr>'}
       </tbody></table>
-    </div>` : ''}
-    <div class="glass card mb">
+    </div>`
+  },
+  chains: {
+    name: 'Эффективность цепочек касаний', render: (an) => `<div class="glass card">
       <div class="card-title">${ic(I.bolt)}Эффективность цепочек касаний<span class="sub">вошло в цепочку → ответили → дошли до квала</span><button class="btn btn-sm" data-ovgo="qualifier" style="margin-left:auto">Настроить цепочки</button></div>
       ${an.byChain.length ? `<div class="an-chains">${an.byChain.map(c => `<div class="an-chain">
         <div class="an-chain-hd"><b>${esc(c.name)}</b><span>${esc(c.geo)} · ${c.steps} ${plural(c.steps, 'касание', 'касания', 'касаний')}</span></div>
@@ -11667,15 +11682,55 @@ PAGES.analytics = async (root) => {
         </div>
         <div class="an-chain-track"><i class="a" style="width:100%"></i><i class="b" style="width:${c.entered ? Math.round(c.replied / c.entered * 100) : 0}%"></i><i class="c" style="width:${c.entered ? Math.round(c.qualified / c.entered * 100) : 0}%"></i></div>
       </div>`).join('')}</div>` : '<div class="empty">Нет активных цепочек. Включите их в разделе «Движок».</div>'}
-    </div>
-    <div class="glass card">
+    </div>`
+  },
+  wa: {
+    name: 'Канал WhatsApp', render: (an) => `<div class="glass card">
       <div class="card-title">${ic(I.sim)}Канал WhatsApp<span class="sub">и текущая воронка</span></div>
       <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:0">
         <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Отправлено сегодня</div><div class="val">${an.wa.sentToday}</div></div>
         <div class="kpi" style="border:1px solid var(--stroke-soft);border-radius:var(--r-md)"><div class="lbl">Средн. качество номеров</div><div class="val">${an.wa.avgQuality}%</div></div>
       </div>
       <div class="an-funnel-chips">${Object.entries(an.funnel).filter(([k]) => !['lost'].includes(k)).map(([k, v]) => `<span class="afc"><b>${v}</b>${stageName(k)}</span>`).join('')}</div>
-    </div>`;
+    </div>`
+  },
+};
+const AN_DEFAULT = ['hero', 'firstline', 'trend', 'sources', 'brokers', 'chains', 'wa'];
+const anKey = () => { const me = STATE && STATE.me; return 'lumen_an_' + (me ? me.role : 'o') + '_' + ((me && me.brokerId) || 'own'); };
+function anGetLayout() { try { const v = JSON.parse(localStorage.getItem(anKey())); if (Array.isArray(v) && v.length) return v.filter(k => AN_W[k]); } catch (_) {} return AN_DEFAULT.slice(); }
+function anSetLayout(a) { try { localStorage.setItem(anKey(), JSON.stringify(a)); } catch (_) {} }
+
+PAGES.analytics = async (root) => {
+  const an = await api.get('/analytics');
+  let layout = anGetLayout();
+  const applicable = (k) => AN_W[k] && (!AN_W[k].when || AN_W[k].when(an));
+  const paint = () => {
+    const shown = layout.filter(applicable);
+    const hidden = Object.keys(AN_W).filter(k => applicable(k) && !shown.includes(k));
+    root.innerHTML = `
+      <div class="ov2-bar">
+        ${AN_EDIT ? '<span class="ov2-hint">Перетаскивай за ручку · скрывай ×</span>' : ''}
+        <button class="ov2-edit ${AN_EDIT ? 'on' : ''}" id="anEdit" title="${AN_EDIT ? 'Готово' : 'Настроить аналитику'}">${ic(AN_EDIT ? I.check : (I.edit || I.doc))}<span>${AN_EDIT ? 'Готово' : 'Настроить'}</span></button>
+      </div>
+      <div class="ov2-grid ${AN_EDIT ? 'editing' : ''}" id="anGrid">
+        ${shown.map(k => { const w = AN_W[k]; return `<div class="ov-w full" data-w="${k}">
+          ${AN_EDIT ? `<div class="ov-w-bar"><span class="ov-w-grip" data-grip>${ic(I.grip)}</span><b>${w.name}</b><button class="ov-w-rm" data-wrm title="Скрыть блок">${ic(I.x)}</button></div>` : ''}
+          ${w.render(an)}
+        </div>`; }).join('')}
+      </div>
+      ${(AN_EDIT && hidden.length) ? `<div class="chips-row" style="margin-top:12px;align-items:center"><span class="muted" style="font-size:12px">Скрытые блоки:</span>${hidden.map(k => `<button type="button" class="chip-t" data-anadd="${k}">${ic(I.plus)}${AN_W[k].name}</button>`).join('')}</div>` : ''}`;
+    $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
+    $('#anEdit', root).addEventListener('click', () => { AN_EDIT = !AN_EDIT; paint(); });
+    if (AN_EDIT) {
+      $$('[data-wrm]', root).forEach(b => b.addEventListener('click', () => { const key = b.closest('[data-w]').dataset.w; layout = layout.filter(k => k !== key); anSetLayout(layout); paint(); }));
+      $$('[data-anadd]', root).forEach(b => b.addEventListener('click', () => { layout = [...layout, b.dataset.anadd]; anSetLayout(layout); paint(); }));
+      ovWireReorder($('#anGrid', root), () => shown, (arr) => {
+        const rest = layout.filter(k => !shown.includes(k));   /* не теряем неактивные (напр. brokers в solo) */
+        layout = [...arr, ...rest]; anSetLayout(layout); paint();
+      });
+    }
+  };
+  paint();
 };
 
 /* ---------------- ПРОФИЛЬ АГЕНТСТВА (открывается из футера сайдбара) ---------------- */
