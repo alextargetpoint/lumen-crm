@@ -5972,7 +5972,7 @@ const server = http.createServer(async (req, res) => {
       /* один запрос к Telnyx — статус номеров как WhatsApp-отправителей */
       const waMap = {};
       try { const w = await telnyxApi(db, 'GET', '/whatsapp/phone_numbers?page[size]=50'); (w.data || []).forEach(n => { waMap[String(n.phone_number).replace(/[^0-9]/g, '')] = { status: n.status, name: n.name_status, quality: n.quality_rating, id: n.phone_number_id }; }); } catch (_) {}
-      const list = Object.keys(nums).map(k => { const r = nums[k]; const sms = r.sms || []; const lastCode = (sms.find(m => m.code) || {}).code || ''; return { number: r.number || ('+' + k), key: k, at: r.at || null, smsCount: sms.length, lastCode, lastAt: (sms[0] || {}).at || null, wa: waMap[k] || null }; }).sort((a, b) => (b.at || 0) - (a.at || 0));
+      const list = Object.keys(nums).map(k => { const r = nums[k]; const sms = r.sms || []; const lastCode = (sms.find(m => m.code) || {}).code || ''; const cloud = r.cloud || null; return { number: r.number || ('+' + k), key: k, at: r.at || null, smsCount: sms.length, lastCode, lastAt: (sms[0] || {}).at || null, wa: waMap[k] || null, cloud: cloud ? { phoneId: cloud.phoneId || '', wabaId: cloud.wabaId || '', hasToken: !!cloud.hasToken, connectedAt: cloud.connectedAt || null, verifiedName: cloud.verifiedName || '' } : null, connected: !!((waMap[k] && waMap[k].status === 'CONNECTED') || (cloud && cloud.connectedAt)) }; }).sort((a, b) => (b.at || 0) - (a.at || 0));
       return json(res, 200, { ok: true, list, provider: t.provider, msgProfileSet: !!t.msgProfileId });
     }
     /* очистить ленту OTP по номеру (убрать старые/тестовые коды) */
@@ -6269,6 +6269,9 @@ const server = http.createServer(async (req, res) => {
         db.settings.wa = db.settings.wa || {};
         db.settings.wa.token = token; db.settings.wa.phoneId = pnid; if (wabaId) db.settings.wa.wabaId = wabaId;
         db.settings.wa.cloudRegisteredAt = Date.now();
+        /* привязка креды к конкретному OTP-номеру (для статуса карточки и пред-заполнения формы) */
+        const ok2 = String(b.otpKey || '').replace(/[^0-9]/g, '');
+        if (ok2) { const t2 = db.settings.telephony || (db.settings.telephony = {}); t2.otpNumbers = t2.otpNumbers || {}; const rec2 = t2.otpNumbers[ok2] || (t2.otpNumbers[ok2] = { number: '+' + ok2, at: Date.now(), sms: [] }); rec2.cloud = { phoneId: pnid, wabaId: wabaId || (rec2.cloud && rec2.cloud.wabaId) || '', hasToken: true, connectedAt: Date.now() }; }
         store.save();
         return json(res, 200, { ok: true, result: j });
       } catch (e) { return json(res, 400, { error: e.message }); }
@@ -6283,10 +6286,14 @@ const server = http.createServer(async (req, res) => {
       if (!pnid || !token) return json(res, 400, { error: 'нужны Phone Number ID и Access Token' });
       db.settings.wa = db.settings.wa || {};
       db.settings.wa.token = token; db.settings.wa.phoneId = pnid; if (wabaId) db.settings.wa.wabaId = wabaId;
-      store.save();
       /* проверим токен/номер сразу */
-      try { const v = await wa.verify(db); return json(res, 200, { ok: true, verify: v }); }
-      catch (e) { return json(res, 200, { ok: true, verifyError: e.message }); }
+      let verify = null, verifyError = null;
+      try { verify = await wa.verify(db); } catch (e) { verifyError = e.message; }
+      /* привязка креды к OTP-номеру + пометка «подключён» */
+      const okk = String(b.otpKey || '').replace(/[^0-9]/g, '');
+      if (okk) { const t2 = db.settings.telephony || (db.settings.telephony = {}); t2.otpNumbers = t2.otpNumbers || {}; const rec2 = t2.otpNumbers[okk] || (t2.otpNumbers[okk] = { number: '+' + okk, at: Date.now(), sms: [] }); rec2.cloud = { phoneId: pnid, wabaId: wabaId || (rec2.cloud && rec2.cloud.wabaId) || '', hasToken: true, connectedAt: Date.now(), verifiedName: (verify && verify.verified_name) || (rec2.cloud && rec2.cloud.verifiedName) || '' }; }
+      store.save();
+      return json(res, 200, { ok: true, verify, verifyError });
     }
     /* ТЕСТ официальной отправки через Meta Graph (wa.js): {to, template, lang} или {to, text} */
     if (p === '/api/whatsapp/cloud-test' && req.method === 'POST') {

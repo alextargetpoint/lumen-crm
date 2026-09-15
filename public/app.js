@@ -1304,7 +1304,7 @@ window.openYesimActivate = async function (phone) {
 /* OTP-мастер для ОФИЦИАЛЬНОГО WhatsApp Cloud API: покупаем реальный SMS-номер Telnyx →
    регистрируешь его в мастере Meta («Enter a new phone number») → код (OTP) прилетает СЮДА автоматически. */
 window.openTelnyxOtp = async function (preselect) {
-  let pollTimer = null, current = '', allNums = [];
+  let pollTimer = null, current = '', allNums = [], cloudMap = {};
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
   const bd = modal({ title: 'Номер для Cloud API (OTP)', sub: 'Реальный SMS-номер Telnyx → регистрация в WhatsApp Business', wide: true, body: '<div id="txOtp"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
@@ -1374,7 +1374,7 @@ window.openTelnyxOtp = async function (preselect) {
       const out = $('#txSaveOut', bd);
       if (!phoneNumberId || !token) { out.innerHTML = '<span style="color:var(--bad)">Заполни Phone Number ID и Access Token выше.</span>'; return; }
       saveBtn.disabled = true; const o = saveBtn.innerHTML; saveBtn.textContent = 'Сохраняю…';
-      try { const r = await api.post('/whatsapp/cloud-save', { phoneNumberId, token }); out.innerHTML = r.ok ? ('<span style="color:var(--ok)">✓ Сохранено' + (r.verify && r.verify.verified_name ? ' · ' + esc(r.verify.verified_name) : '') + '. Теперь можно слать тест.</span>') : ('<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'); if (r.ok) toast('Токен сохранён', 'Официальный канал готов', true); }
+      try { const r = await api.post('/whatsapp/cloud-save', { phoneNumberId, token, otpKey: current }); if (r.ok) { cloudMap[current] = { phoneId: phoneNumberId, hasToken: true, connectedAt: Date.now(), verifiedName: (r.verify && r.verify.verified_name) || '' }; } out.innerHTML = r.ok ? ('<span style="color:var(--ok)">✓ Сохранено' + (r.verify && r.verify.verified_name ? ' · ' + esc(r.verify.verified_name) : '') + '. Теперь можно слать тест.</span>') : ('<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'); if (r.ok) toast('Токен сохранён', 'Официальный канал готов', true); }
       catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
       saveBtn.disabled = false; saveBtn.innerHTML = o;
     });
@@ -1398,12 +1398,15 @@ window.openTelnyxOtp = async function (preselect) {
       if (!/^\d{6}$/.test(pin)) { out.innerHTML = '<span style="color:var(--bad)">PIN — ровно 6 цифр.</span>'; return; }
       regBtn.disabled = true; const o = regBtn.innerHTML; regBtn.textContent = 'Регистрирую…';
       try {
-        const r = await api.post('/whatsapp/cloud-register', { phoneNumberId, token, pin });
-        if (r.ok) { out.innerHTML = '<span style="color:var(--ok)">✓ Номер зарегистрирован в Cloud API. Статус пойдёт в Connected. Токен и Phone Number ID сохранены — можно слать.</span>'; toast('Номер зарегистрирован', 'Cloud API активирован', true); }
+        const r = await api.post('/whatsapp/cloud-register', { phoneNumberId, token, pin, otpKey: current });
+        if (r.ok) { cloudMap[current] = { phoneId: phoneNumberId, hasToken: true, connectedAt: Date.now(), verifiedName: (cloudMap[current] && cloudMap[current].verifiedName) || '' }; out.innerHTML = '<span style="color:var(--ok)">✓ Номер зарегистрирован в Cloud API. Статус пойдёт в Connected. Токен и Phone Number ID сохранены — можно слать.</span>'; toast('Номер зарегистрирован', 'Cloud API активирован', true); }
         else out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'ошибка') + '</span>';
       } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
       regBtn.disabled = false; regBtn.innerHTML = o;
     });
+    /* пред-заполнение из сохранённого Cloud-креды для текущего номера */
+    const cd = cloudMap[current];
+    if (cd) { const pn = $('#txRegPnid', bd); if (pn && cd.phoneId) pn.value = cd.phoneId; const so = $('#txSaveOut', bd); if (so && (cd.connectedAt || cd.hasToken)) so.innerHTML = '<span style="color:var(--ok)">✓ Ранее сохранено' + (cd.verifiedName ? ' · ' + esc(cd.verifiedName) : '') + (cd.hasToken ? ' · токен есть' : '') + '. Токен для безопасности не показываем — при смене вставь новый.</span>'; }
     try { enhanceControls(host()); } catch (_) {}   /* кастомные Lumen-селекты вместо нативных (контролы вставлены после modal()) */
   };
   const loadSms = async () => {
@@ -1415,11 +1418,12 @@ window.openTelnyxOtp = async function (preselect) {
       box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:16px;letter-spacing:2px">${esc(m.code)}</b>` : ''}<i>${esc(new Date(m.at).toLocaleTimeString('ru-RU').slice(0, 5))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как Meta отправит код на +' + esc(current) + '.</div>';
     } catch (e) {}
   };
-  /* подтянуть купленные OTP-номера; по умолчанию — преселект (если задан) или новейший */
+  /* подтянуть купленные OTP-номера (+ cloud-статус) — статус, пред-заполнение формы; дефолт: преселект или новейший */
   try {
-    const r = await api.get('/telephony/otp/sms?number='); allNums = r.numbers || [];
+    const r = await api.get('/telephony/otp/list'); const lst = r.list || [];
+    allNums = lst.map(x => x.number); lst.forEach(x => { cloudMap[x.key] = x.cloud || null; });
     const pre = preselect && allNums.find(n => n.replace(/[^0-9]/g, '') === String(preselect).replace(/[^0-9]/g, ''));
-    draw(pre || (allNums.length ? allNums[allNums.length - 1] : ''));
+    draw(pre || (allNums.length ? allNums[0] : ''));
   } catch (e) { draw(''); }
   /* авто-починка: убедиться, что номер привязан к messaging-profile (иначе Telnyx не доставит OTP) */
   if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} }
@@ -10088,7 +10092,7 @@ PAGES.numbers = async (root) => {
       <button class="btn btn-sm btn-accent" id="cloudBuyBtn">${ic(I.plus)}Купить Cloud API номер</button>
     </div>
     ${otpNums.length ? `<div class="num-grid" style="margin-bottom:18px">
-      ${otpNums.map(n => { const wa = n.wa; const conn = wa && wa.status === 'CONNECTED'; const badge = conn ? '<span class="badge ok"><i></i>подключён к WhatsApp</span>' : (wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус тянется из Telnyx и обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»). После этого Meta одобряет до <b>1–2 ч</b>.'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
+      ${otpNums.map(n => { const conn = n.connected; const cn = n.cloud; const badge = conn ? ('<span class="badge ok"><i></i>подключён' + (cn && cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ' к WhatsApp') + '</span>') : (n.wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (n.wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»).'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.number)}</div><div class="lb">Cloud API · <b style="color:var(--accent-2)">Telnyx SMS</b></div></div>
         </div>
@@ -10097,7 +10101,7 @@ PAGES.numbers = async (root) => {
         <div class="num-meta">
           <div class="m"><div class="v">${n.smsCount}</div><div class="k">OTP-кодов</div></div>
           <div class="m"><div class="v" style="letter-spacing:1px">${n.lastCode ? esc(n.lastCode) : '—'}</div><div class="k">послед. код</div></div>
-          <div class="m otp-wa"><div class="v">${wa ? (conn ? '✓' : esc((wa.status || '—').toLowerCase())) : '—'}</div><div class="k">WhatsApp</div></div>
+          <div class="m otp-wa"><div class="v">${conn ? '✓' : (n.wa ? esc((n.wa.status || '—').toLowerCase()) : '—')}</div><div class="k">WhatsApp</div></div>
         </div>
         <div class="num-actions" style="margin-top:12px">
           <button class="btn btn-sm btn-accent" data-otpfeed="${esc(n.key)}">${ic(I.spark)}Коды / OTP + активация</button>
@@ -10157,10 +10161,10 @@ PAGES.numbers = async (root) => {
       const r = await api.get('/telephony/otp/list');
       (r.list || []).forEach(n => {
         const card = root.querySelector('[data-otp="' + n.key + '"]'); if (!card) return;
-        const wa = n.wa, conn = wa && wa.status === 'CONNECTED';
-        const badge = conn ? '<span class="badge ok"><i></i>подключён к WhatsApp</span>' : (wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>');
+        const conn = n.connected, cn = n.cloud;
+        const badge = conn ? ('<span class="badge ok"><i></i>подключён' + (cn && cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ' к WhatsApp') + '</span>') : (n.wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>');
         const bEl = card.querySelector('.otp-badge'); if (bEl) bEl.innerHTML = badge;
-        const wEl = card.querySelector('.otp-wa .v'); if (wEl) wEl.textContent = wa ? (conn ? '✓' : (wa.status || '—').toLowerCase()) : '—';
+        const wEl = card.querySelector('.otp-wa .v'); if (wEl) wEl.textContent = conn ? '✓' : (n.wa ? (n.wa.status || '—').toLowerCase() : '—');
         const hEl = card.querySelector('.otp-hint'); if (hEl && conn) hEl.remove();
       });
     } catch (_) {}
