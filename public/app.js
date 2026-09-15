@@ -1450,6 +1450,71 @@ window.grayAddQR = function (phone, label) {
     else box.innerHTML = '<div style="color:var(--ink-3)">Подключение…</div>';
   }, 1800);
 };
+/* ── Серый Telegram: подключение номера (логин), ввод кода из ленты Yesim, персона ── */
+window.openTgConnect = function () {
+  const bd = modal({ title: 'Подключить TG-номер (серый)', sub: 'Купи Yesim-номер → авторизуем Telegram → код прилетит в ленту', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.shield)}Схема как у серого WhatsApp: номер должен принимать SMS (Yesim). После «Начать» Telegram пришлёт код — введи его на след. шаге (можно взять в «Номера → Купить → Активация/коды»).</span></div>
+      <div class="form-row"><label>Номер телефона (с кодом страны)</label><input id="tgcPhone" placeholder="+1..."></div>
+      <div class="form-row"><label>Метка (необязательно)</label><input id="tgcLabel" placeholder="напр. Анна · Дубай"></div>
+      <div id="tgcOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>`,
+    actions: [{ label: 'Начать логин', cls: 'btn-accent', onClick: async (b) => {
+      const phone = ($('#tgcPhone', b) || {}).value || ''; const label = ($('#tgcLabel', b) || {}).value || '';
+      const out = $('#tgcOut', b); if (!phone) { out.textContent = 'Укажи номер'; return; }
+      out.textContent = 'Запускаю логин…';
+      try { const r = await api.post('/tg/gray/connect', { phone, label }); if (r.ok) { closeModal(); openTgCode(phone); } else { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'; } }
+      catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    } }, { label: 'Отмена' }] });
+  return bd;
+};
+window.openTgCode = function (phone) {
+  const clean = String(phone || '').replace(/[^0-9]/g, ''); let pollTimer = null;
+  const stop = () => { if (pollTimer) clearInterval(pollTimer); };
+  const bd = modal({ title: 'Код Telegram для +' + esc(clean), sub: 'Код прилетает в ленту автоматически', wide: true, body: '<div id="tgCodeBox"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
+  const host = () => $('#tgCodeBox', bd);
+  host().innerHTML = `
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+      <div class="form-row" style="margin:0"><label style="font-size:11px">Код из Telegram</label><input id="tgCode" inputmode="numeric" placeholder="12345" style="width:120px;letter-spacing:3px"></div>
+      <div class="form-row" style="margin:0"><label style="font-size:11px">2FA-пароль (если есть)</label><input id="tgPwd" type="password" placeholder="—" style="width:150px"></div>
+      <button class="btn btn-accent" id="tgCodeBtn">${ic(I.check)}Подтвердить</button>
+    </div>
+    <div id="tgCodeOut" class="muted" style="font-size:11.5px;margin-bottom:10px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin:6px 0"><b style="font-size:12px">Лента SMS/кодов (Yesim)</b><span class="warm-pulse"></span></div>
+    <div id="tgCodeFeed" class="warm-log"><div class="muted" style="font-size:11.5px;padding:8px">Ждём код от Telegram…</div></div>`;
+  const loadFeed = async () => {
+    const fb = $('#tgCodeFeed', bd); if (!fb || !document.body.contains(bd)) { stop(); return; }
+    try { const r = await api.get('/gray/yesim/sms?number=' + encodeURIComponent(clean)); const arr = (r.sms || []).filter(m => (m.text || '').trim());
+      fb.innerHTML = arr.length ? arr.slice(0, 8).map(m => `<div class="warm-msg"><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:15px;letter-spacing:2px">${esc(m.code)}</b>` : ''}</div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока пусто. Код придёт, как Telegram отправит SMS.</div>';
+      const code = (arr.find(m => m.code) || {}).code; if (code && !$('#tgCode', bd).value) $('#tgCode', bd).value = code;
+    } catch (_) {}
+  };
+  $('#tgCodeBtn', bd).addEventListener('click', async () => {
+    const code = ($('#tgCode', bd) || {}).value || ''; const password = ($('#tgPwd', bd) || {}).value || '';
+    const out = $('#tgCodeOut', bd); if (!code) { out.textContent = 'Введи код'; return; }
+    out.textContent = 'Проверяю…';
+    try { const r = await api.post('/tg/gray/submit-code', { phone: clean, code, password }); if (r.status === 'connected') { out.innerHTML = '<span style="color:var(--ok)">✓ Аккаунт подключён</span>'; toast('TG подключён', '+' + clean, true); stop(); setTimeout(() => { closeModal(); render(); }, 900); } else if (r.status === 'password_needed') { out.innerHTML = '<span style="color:var(--warn)">Нужен 2FA-пароль — впиши и подтверди снова</span>'; } else out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || r.status || '') + '</span>'; }
+    catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+  });
+  loadFeed(); pollTimer = setInterval(loadFeed, 5000);
+};
+window.openTgPersona = function (phone, n) {
+  const p = (n && n.persona) || {};
+  const brokerOpts = (STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${p.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+  modal({ title: 'Персона номера', sub: 'Кто «отвечает» лиду. Гибко под ваш формат', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Персона задаётся на НОМЕР, брокеры работают за ней. Уволился брокер → просто переназначаешь пул, лид ничего не замечает.</span></div>
+      <div class="form-row"><label>Имя (видит лид)</label><input id="tgpName" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
+      <div class="form-row"><label>Аватар (URL)</label><input id="tgpAvatar" value="${esc(p.avatar || '')}" placeholder="https://... (консистентное лицо, не фото уходящего брокера)"></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-row" style="flex:1"><label>Режим</label><select id="tgpMode">
+          <option value="qualifier" ${p.mode === 'qualifier' || !p.mode ? 'selected' : ''}>Квалификатор (нейтральная персона)</option>
+          <option value="broker" ${p.mode === 'broker' ? 'selected' : ''}>Брокер (закреплён)</option>
+          <option value="neutral" ${p.mode === 'neutral' ? 'selected' : ''}>Нейтрал (корпоративная)</option>
+        </select></div>
+        <div class="form-row" style="flex:1"><label>Брокер за персоной</label><select id="tgpBroker"><option value="">— пул</option>${brokerOpts}</select></div>
+      </div>`,
+    actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (b) => {
+      try { await api.post('/tg/gray/persona', { phone, name: ($('#tgpName', b) || {}).value, avatar: ($('#tgpAvatar', b) || {}).value, mode: ($('#tgpMode', b) || {}).value, brokerId: ($('#tgpBroker', b) || {}).value || null }); toast('Персона сохранена', null, true); closeModal(); render(); } catch (e) { toast('Не вышло', e.message); }
+    } }, { label: 'Отмена' }] });
+};
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
 function uiConfirm(title, sub, opts = {}) {
   return new Promise(res => {
@@ -10106,6 +10171,9 @@ PAGES.numbers = async (root) => {
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>
       <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
+
+    <div class="lp-sec" style="margin:20px 0 10px">${ic(I.send)}Telegram (серый) · точечные касания <span class="muted" style="font-weight:400;font-size:11px">— не рассылки</span></div>
+    <div id="tgGraySection" class="muted" style="font-size:12px">Загрузка…</div>
     </div>
 
     <div data-numpane="cloud" style="${NUMTAB === 'cloud' ? '' : 'display:none'}">
@@ -10220,6 +10288,41 @@ PAGES.numbers = async (root) => {
     } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
   }
   loadWaWebhook();
+  /* ── Серый Telegram: статус + подключение + карточки с персоной + прогрев ── */
+  async function loadTgGray() {
+    const box = $('#tgGraySection', root); if (!box) return;
+    let d = { numbers: [] }; try { d = await api.get('/tg/gray/list'); } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; return; }
+    if (!d.ready) {
+      box.innerHTML = `<div class="lc-hint info"><span>${ic(I.shield)}TG-воркер ещё не подключён. Это отдельный сервис <b>lumen-tg-worker</b> (GramJS): задеплой его на Railway и задай в CRM env <code>LUMEN_TG_WORKER_URL</code> + <code>LUMEN_TG_WORKER_TOKEN</code>. Схема как у серого WhatsApp: купить Yesim-номер → авторизовать TG → прогрев → точечные касания. Инструкция — в репозитории воркера.</span></div>`;
+      return;
+    }
+    const nums = d.numbers || [];
+    const persBadge = { qualifier: '<span class="badge">квалификатор</span>', broker: '<span class="badge ok">брокер</span>', neutral: '<span class="badge">нейтрал</span>' };
+    const stBadge = (s) => s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'code_sent' ? '<span class="badge warn"><i></i>ждёт код</span>' : s === 'password_needed' ? '<span class="badge warn"><i></i>нужен 2FA-пароль</span>' : '<span class="badge bad"><i></i>не на связи</span>';
+    box.innerHTML = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-accent btn-sm" id="tgConnBtn">${ic(I.link)}Подключить TG-номер</button>
+        <label class="switch" style="align-self:center;display:inline-flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span> прогрев</label>
+      </div>
+      ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card" data-tg="${esc(n.phone)}">
+        <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:var(--accent)">серый (MTProto)</b></div></div></div>
+        <div style="margin:10px 0 6px">${stBadge(n.live && n.live.status)}</div>
+        ${conn ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5} · рассылки ⛔</div>` : ''}
+        <div style="font-size:11px;margin:6px 0">Персона: <b>${esc(p.name || '—')}</b> ${persBadge[p.mode || 'qualifier']}</div>
+        <div class="num-actions">
+          <button class="btn btn-sm" data-tgpersona="${esc(n.phone)}">${ic(I.gear)}Персона</button>
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-tgcode="${esc(n.phone)}">${ic(I.spark)}Ввести код</button>` : ''}
+          <span class="tb-spacer"></span>
+          <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
+        </div>
+      </div>`; }).join('')}</div>` : '<div class="muted" style="font-size:12px">TG-номеров пока нет — «Подключить TG-номер» (купи Yesim-номер, код прилетит в ленту).</div>'}`;
+    $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
+    $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
+    $$('[data-tgpersona]', box).forEach(b => b.addEventListener('click', () => openTgPersona(b.dataset.tgpersona, nums.find(n => n.phone === b.dataset.tgpersona))));
+    $$('[data-tgcode]', box).forEach(b => b.addEventListener('click', () => openTgCode(b.dataset.tgcode)));
+    $$('[data-tgrm]', box).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать TG-номер?', 'Сессия выйдет из Telegram.', { ok: 'Убрать', danger: true })) return; try { await api.post('/tg/gray/remove', { phone: b.dataset.tgrm }); toast('Убран', null, true); loadTgGray(); } catch (e) { toast('Не вышло', e.message); } }));
+  }
+  loadTgGray();
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
     if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
