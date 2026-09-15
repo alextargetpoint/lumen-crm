@@ -84,17 +84,21 @@
   // ---------- определение шагов (data-driven + branch) ----------
   function buildSteps() {
     const solo = S.edition === 'solo';
+    /* методология: сначала кто-вы → облик → бренд → рынки; затем (для агентства) команда;
+       далее ИИ-первая-линия → каналы → база; для агентства ещё контроль; и запуск.
+       solo — лаконичный путь без команды/цепочек/контроля. */
     const all = [
       { id: 'welcome' },
       { id: 'edition' },
       { id: 'style' },
       { id: 'brand' },
       { id: 'geos' },
+      !solo && { id: 'team' },
       { id: 'tone' },
       { id: 'whatsapp' },
-      { id: 'chains' },
+      !solo && { id: 'chains' },
       { id: 'listings' },
-      !solo && { id: 'team' },
+      !solo && { id: 'control' },
       { id: 'pricing' },
       { id: 'finish' },
     ].filter(Boolean);
@@ -307,7 +311,8 @@
       case 'whatsapp': return stepGuide({ title: 'WhatsApp — сердце системы', sub: 'Главный канал. Через WhatsApp Cloud API Lumen отвечает клиентам с вашего номера.', shot: 'dialogs', action: 'wa', cta: 'Подключить WhatsApp', points: ['Ответы с вашего номера, а не с чужого', 'Первый ответ за секунды, круглосуточно', 'Шаблон первого касания под модерацию Meta', 'Мастер подключения — 7 понятных шагов'] });
       case 'chains': return stepGuide({ title: 'Цепочки касаний', sub: 'Не ответил сразу — Lumen мягко дожимает по расписанию и уважает тихие часы.', shot: 'sequences', action: 'chains', cta: 'Открыть цепочки', points: ['Готовая цепочка на 7 касаний / 18 дней', 'Переключение между каналами', 'Останавливается, как только клиент ответил', 'Реанимация «спящей» базы'] });
       case 'listings': return stepGuide({ title: 'База объектов', sub: 'Загрузите объекты — Lumen соберёт из них живые подборки под клиента.', shot: 'collections', action: 'listings', cta: 'Импортировать объекты', points: ['Импорт Reelly / CSV / Excel / JSON', 'Синк порталов (Property Finder, Bayut, DLD)', 'Подборки с вашим лого и подписью', 'Публичная страница с трекингом просмотров'] });
-      case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Пульт контроля и антислив базы', 'Мост Telegram ⇄ WhatsApp для брокеров'] });
+      case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Мост Telegram ⇄ WhatsApp для каждого брокера', 'Распределение заявок и SLA на ответ'] });
+      case 'control': return stepGuide({ title: 'Контроль и защита базы', sub: 'Ваша база — ваш актив. Lumen следит, чтобы лиды не утекали, а руководитель видел всё.', shot: 'leadcard', action: 'control', cta: 'Открыть Пульт контроля', points: ['Антислив: контакты клиента скрыты от брокера до нужного момента', 'Сигналы руководителю: кто тянет с ответом, где просела конверсия', 'Журнал действий и разграничение доступа по ролям', 'Мягкий оффбординг: уходит брокер — база и переписки остаются у вас'] });
       case 'pricing': return stepPricing();
       case 'finish': return stepFinish();
     }
@@ -320,9 +325,10 @@
     const step = STEPS[idx];
     const d = renderStepData(step);
     const total = STEPS.length;
-    // Видеофон для динамики: приглушённый ч/б skyline под вуалью на «киношных» шагах (welcome/success). В стиле Ателье.
-    root.querySelector('.ob-bgvid').innerHTML = d.bg ? '<video autoplay muted loop playsinline poster="/assets/skyline-mono-poster.jpg"><source src="/assets/skyline-mono.mp4" type="video/mp4"></video>' : '';
+    // Видеофон: кинематографичная ЗОЛОТАЯ заставка (сгенерирована Higgsfield: частицы → ✦) на «киношных» шагах.
+    root.querySelector('.ob-bgvid').innerHTML = d.bg ? '<video autoplay muted loop playsinline poster="/onb/intro-poster.jpg"><source src="/onb/intro.mp4" type="video/mp4"></video>' : '';
     root.classList.toggle('ob-cinematic', !!d.bg);
+    root.classList.toggle('ob-goldbg', !!d.bg);
 
     const stepsDots = STEPS.map((s, i) => `<i class="${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}"></i>`).join('');
     const shot = d.shot ? `<div class="ob-shot"><div class="ob-shot-bar"><i></i><i></i><i></i></div><img src="${SHOT(d.shot)}" alt="" loading="lazy"></div>` : '';
@@ -489,7 +495,7 @@
       try { const b = B(); if (b.go) b.go('overview'); } catch (e) {}
       /* открыть первый отложенный боевой визард, выбранный во время тура (WhatsApp/цепочки/база/команда) */
       const g = (S.pendingGuides || [])[0];
-      if (g) setTimeout(() => { try { const b = B(); ({ wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers') }[g] || (() => {}))(); } catch (e) {} }, 800);
+      if (g) setTimeout(() => { try { const b = B(); ({ wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers'), control: () => b.go && b.go('control') }[g] || (() => {}))(); } catch (e) {} }, 800);
     }, 900);
   }
 
@@ -554,6 +560,9 @@
     .ob-veil{position:absolute;inset:0;z-index:1;background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
     .ob-root:not(.ob-cinematic) .ob-veil{background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
     .ob-root.ob-cinematic .ob-veil{background:radial-gradient(130% 100% at 50% 18%,rgba(13,12,11,.72),rgba(6,6,5,.86) 68%,rgba(4,4,3,.95))}
+    /* золотая кинематографичная заставка (Higgsfield) — цветная, ярче, тёплая вуаль поверх */
+    .ob-goldbg .ob-bgvid video{opacity:.6;filter:none;transform:scale(1.06)}
+    .ob-root.ob-cinematic.ob-goldbg .ob-veil{background:radial-gradient(120% 100% at 50% 34%,rgba(12,10,7,.5),rgba(7,6,4,.8) 66%,rgba(4,3,2,.94))}
     /* почти невидимое тёплое зерно вместо светящихся орбов */
     .ob-orbs{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;opacity:.35}
     .ob-orbs i{display:none}
