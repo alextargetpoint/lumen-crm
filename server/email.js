@@ -9,7 +9,9 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&
 const C = { bg: '#efece5', card: '#fffdfa', ink: '#141311', ink2: '#57544e', ink3: '#8b8983', line: 'rgba(20,19,17,.10)', line2: 'rgba(20,19,17,.06)', gold: '#c9a86a', goldDeep: '#a9863f', panel: '#f5f1e9', panel2: '#faf7f0', ok: '#3f8f5b', danger: '#b4472e' };
 const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif";
 const SANS = "'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const ART = 'https://lumen247.com/emailart';
+/* арт писем раздаёт сам CRM из public/emailart — базовый URL = домен приложения (как и ссылки в письмах);
+   на Railway пиним PUBLIC_BASE_URL, иначе дефолт app.lumen247.com. Переопределяемо через EMAIL_ART_BASE. */
+const ART = (process.env.EMAIL_ART_BASE || process.env.PUBLIC_BASE_URL || 'https://app.lumen247.com').replace(/\/$/, '') + '/emailart';
 const FONTS = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap";
 
 /* ─── строительные блоки ──────────────────────────────────────────────────── */
@@ -171,7 +173,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── SECURITY ── */
   passwordReset: {
-    name: 'Сброс пароля / Password reset', arch: 'security', badge: 'key.jpg', titleSize: 25,
+    name: 'Сброс пароля / Password reset', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Ссылка для нового пароля внутри', preheader_en: 'Your password reset link inside',
     subject_ru: 'Новый пароль Lumen — в один клик', subject_en: 'Your new Lumen password — one click away',
@@ -181,7 +183,7 @@ const DEFAULT_TEMPLATES = {
     panel_en: 'Didn’t request this? Relax — ignore the email, your password stays as it is.',
   },
   passwordChanged: {
-    name: 'Пароль изменён / Password changed', arch: 'security', badge: 'key.jpg', titleSize: 25,
+    name: 'Пароль изменён / Password changed', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Пароль вашего аккаунта Lumen обновлён', preheader_en: 'Your Lumen password was updated',
     subject_ru: 'Пароль Lumen изменён', subject_en: 'Your Lumen password was changed',
@@ -189,7 +191,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, the password for your <b>{{agency}}</b> account was changed — logging it for the record:</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access</a> right away and contact us.</p>',
   },
   loginAlert: {
-    name: 'Вход с нового устройства / New sign-in', arch: 'security', badge: 'key.jpg', titleSize: 25,
+    name: 'Вход с нового устройства / New sign-in', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Замечен вход в ваш аккаунт Lumen', preheader_en: 'A new sign-in to your Lumen account',
     subject_ru: 'Новый вход в Lumen', subject_en: 'New sign-in to Lumen',
@@ -198,7 +200,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── TEAM ── */
   invite: {
-    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'rings.jpg', heroH: 150,
+    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'nodes.jpg', heroH: 150,
     eyebrow_ru: 'Приглашение', eyebrow_en: 'Invitation',
     preheader_ru: '{{inviter}} зовёт вас в Lumen', preheader_en: '{{inviter}} invites you to Lumen',
     subject_ru: '{{inviter}} зовёт вас в {{agency}} — Lumen', subject_en: '{{inviter}} invited you to {{agency}} on Lumen',
@@ -206,7 +208,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi!</p>{{avatar}}<p><b>{{inviter}}</b> is giving you access to <b>{{agency}}</b> on Lumen — where AI captures and nurtures leads while you close deals.</p>{{button}}<p style="color:#8b8983;font-size:13px;margin-top:16px">Set a password and you’re in. Takes two minutes.</p>',
   },
   teammateJoined: {
-    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'rings.jpg', heroH: 132,
+    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'nodes.jpg', heroH: 132,
     eyebrow_ru: 'Команда', eyebrow_en: 'Team',
     preheader_ru: 'В {{agency}} новый человек', preheader_en: 'A new member joined {{agency}}',
     subject_ru: '{{name}} теперь в команде {{agency}}', subject_en: '{{name}} joined {{agency}}',
@@ -215,7 +217,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── BILLING ── */
   paymentReceived: {
-    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'seal.jpg', heroH: 132,
+    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'graph.jpg', heroH: 124,
     eyebrow_ru: 'Оплата', eyebrow_en: 'Billing',
     preheader_ru: 'Спасибо, оплата Lumen получена', preheader_en: 'Thanks, your Lumen payment is in',
     subject_ru: 'Оплата получена — Lumen {{period}}', subject_en: 'Payment received — Lumen {{period}}',
@@ -223,7 +225,7 @@ const DEFAULT_TEMPLATES = {
     body_en: '<p>Hi {{name}}, thank you — your Lumen subscription payment for <b>{{agency}}</b> is received and sealed.</p>{{invoice}}{{button}}',
   },
   paymentFailed: {
-    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'coin.jpg', heroH: 132,
+    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'graph.jpg', heroH: 124,
     eyebrow_ru: 'Требуется действие', eyebrow_en: 'Action needed',
     preheader_ru: 'Не удалось списать оплату — обновите карту', preheader_en: 'We couldn’t charge your card — update it',
     subject_ru: 'Карта сказала «нет» — обновите её', subject_en: 'Your card said no — let’s fix it',
@@ -233,7 +235,7 @@ const DEFAULT_TEMPLATES = {
     panel_en: 'We’ll retry automatically. Access stays active for a few more days — nothing to panic about.',
   },
   subscriptionRenewed: {
-    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'seal.jpg', heroH: 132,
+    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'graph.jpg', heroH: 124,
     eyebrow_ru: 'Подписка', eyebrow_en: 'Subscription',
     preheader_ru: 'Подписка Lumen продлена', preheader_en: 'Your Lumen subscription renewed',
     subject_ru: 'Подписка Lumen продлена — {{period}}', subject_en: 'Your Lumen subscription renewed — {{period}}',
@@ -242,7 +244,7 @@ const DEFAULT_TEMPLATES = {
   },
   /* ── DIGEST ── */
   trialEnding: {
-    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'hourglass.jpg', heroH: 168,
+    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'ring.jpg', heroH: 156,
     eyebrow_ru: 'Ранний доступ', eyebrow_en: 'Early access',
     preheader_ru: 'Осталось {{days}} дн. пробного периода', preheader_en: '{{days}} days left in your trial',
     subject_ru: 'Триал тает — осталось {{days}} дн.', subject_en: 'Trial’s melting — {{days}} days left',
@@ -252,13 +254,13 @@ const DEFAULT_TEMPLATES = {
     panel_en: 'Beta terms are locked in for the first agencies — the subscription gets pricier later. You can still lock yours.',
   },
   notification: {
-    name: 'Уведомление / Notification', arch: 'digest', hero: 'arcs.jpg', heroH: 140,
+    name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.jpg', heroH: 132,
     subject_ru: 'Lumen: {{title}}', subject_en: 'Lumen: {{title}}',
     body_ru: '<p>Здравствуйте, {{name}}!</p><p>{{message}}</p>{{button}}',
     body_en: '<p>Hi {{name}},</p><p>{{message}}</p>{{button}}',
   },
   marketing: {
-    name: 'Маркетинг / Marketing', arch: 'digest', hero: 'arcs.gif', heroH: 180, titleSize: 29,
+    name: 'Маркетинг / Marketing', arch: 'digest', hero: 'flow.gif', heroH: 176, titleSize: 29,
     subject_ru: '{{subject}}', subject_en: '{{subject}}',
     body_ru: '<p>Здравствуйте, {{name}}!</p><p>{{message}}</p>{{button}}<p style="color:#8b8983;font-size:12px;margin-top:18px">Не хотите получать такие письма? <a href="{{unsubscribe}}" style="color:#8b8983;text-decoration:underline">Отписаться</a>.</p>',
     body_en: '<p>Hi {{name}},</p><p>{{message}}</p>{{button}}<p style="color:#8b8983;font-size:12px;margin-top:18px">Don’t want these emails? <a href="{{unsubscribe}}" style="color:#8b8983;text-decoration:underline">Unsubscribe</a>.</p>',
