@@ -1145,12 +1145,21 @@ window.openGrayManager = async function () {
         <div class="muted" style="font-size:12px;margin:-4px 0 12px">${ic(I.doc)} <a href="#" id="gwGuide" style="color:var(--accent);text-decoration:none">Как завести до 3 своих номеров и подключить по QR →</a></div>
         ${(data.numbers || []).map(n => `
           <div class="set-row">
-            <div class="sp"><div class="sl">${esc(n.label || n.phone)} · ${esc(n.phone)}</div><div class="sd">${badge(n.live)}</div></div>
+            <div class="sp"><div class="sl">${esc(n.label || n.phone)} · ${esc(n.phone)}</div><div class="sd">${badge(n.live)}</div>
+              <div class="gn-broker-row" style="margin-top:6px;display:flex;align-items:center;gap:7px">
+                <span class="muted" style="font-size:11px">Закреп за брокером:</span>
+                <select class="gn-broker" data-p="${esc(n.phone)}" style="max-width:200px">
+                  <option value="">— общий пул</option>
+                  ${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
             <div style="display:flex;gap:6px">
               ${(n.live && n.live.status) !== 'connected' ? `<button class="btn btn-sm gn-qr" data-p="${esc(n.phone)}">QR</button>` : ''}
               <button class="btn btn-sm gn-rm" data-p="${esc(n.phone)}">Убрать</button>
             </div>
           </div>`).join('') || '<div class="muted" style="font-size:13px">Номеров пока нет — добавьте выше.</div>'}
+        ${(data.numbers || []).length ? '<div class="muted" style="font-size:11.5px;margin:-4px 0 10px">С закреплённого номера уходит первое касание и вся цепочка переписки лидов этого брокера (серым способом). Ответы клиента зеркалятся брокеру в Telegram.</div>' : ''}
         <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">
           <div class="set-row"><div class="sp"><div class="sl">Прогрев номеров</div><div class="sd">Подключённые номера переписываются между собой, чтобы прогреть аккаунты (нужно ≥2 на связи)</div></div>
             <label class="switch"><input type="checkbox" id="gwWarm" ${data.warmup && data.warmup.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
@@ -1165,6 +1174,7 @@ window.openGrayManager = async function () {
     $('#gwGuide', bd)?.addEventListener('click', (e) => { e.preventDefault(); openGuide('wanumbers'); });
     $$('.gn-qr', bd).forEach(b => b.addEventListener('click', () => connectNumber(b.dataset.p, '')));
     $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); } catch (e) { toast('Не вышло', e.message); } }));
+    $$('.gn-broker', bd).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
     $('#gwWarm', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', '', true); } catch (er) { toast('Не вышло', er.message); } });
     $('#gwPerDay', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); } catch (er) {} });
   }

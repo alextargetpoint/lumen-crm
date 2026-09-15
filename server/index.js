@@ -2373,6 +2373,31 @@ async function waGrayApi(db, method, pathx, body) {
   return j;
 }
 
+/* Автоподбор серого номера для лида: залипание за лидом → номер закреплённого брокера → любой подключённый.
+   `live` — карта сессий из воркера (GET /sessions). Возвращает запись номера или null (нет подключённых). */
+function pickGrayNumber(db, lead, live) {
+  const g = db.settings.waGray || {};
+  const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false); });
+  if (!connected.length) return null;
+  if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s) return s; }          /* залипание: вся цепочка с одного номера */
+  if (lead.broker) { const b = connected.find(n => n.brokerId === lead.broker); if (b) return b; }             /* прогретый номер закреплённого брокера */
+  return connected[0];                                                                                          /* иначе — первый подключённый из пула */
+}
+
+/* Серый транспорт для engine.send: реальная отправка с прогретого номера брокера через Baileys-воркер.
+   Нет подключённого номера ИЛИ серый не настроен → тихий мок (поведение как раньше, ничего не ломаем). */
+engine.setGraySender(async (db, lead, m) => {
+  const g = db.settings.waGray || {};
+  if (!g.url || !g.token || !(g.numbers || []).length || !lead.phone) { m.status = 'delivered'; store.save(); return; }
+  let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) { m.status = 'delivered'; store.save(); return; }
+  const num = pickGrayNumber(db, lead, live);
+  if (!num) { m.status = 'delivered'; store.save(); return; }   /* нет подключённых прогретых — не ломаем поток */
+  await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', { to: lead.phone, text: m.text });
+  lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
+  m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'delivered';
+  store.save();
+});
+
 /* --- Серый прогрев: подключённые номера тенанта периодически переписываются между собой --- */
 const WARMUP_MSGS = ['Привет! Как дела?', 'Ты на созвоне сегодня?', 'Скинь потом отчёт', 'Ок, договорились 👍', 'Спасибо!', 'Доброе утро ☀️', 'Обедаем в час?', 'Готово, посмотри', 'Хорошего дня', 'Наберу чуть позже', 'Всё в силе?', 'Принял, спасибо'];
 let warmupBusy = false;
@@ -5602,6 +5627,17 @@ const server = http.createServer(async (req, res) => {
       const phone = String(b.phone || '').replace(/[^0-9]/g, '');
       try { const r = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/send', { to: b.to, text: b.text }); return json(res, 200, r); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* закрепить прогретый номер за брокером (без перезапуска сессии) — с него уходит первое касание и вся цепочка лидов брокера */
+    if (p === '/api/wa/gray/assign' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const rec = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден' });
+      rec.brokerId = b.brokerId || null;
+      store.save();
+      return json(res, 200, { ok: true, phone, brokerId: rec.brokerId });
     }
     /* выйти и убрать номер из пула */
     if (p === '/api/wa/gray/remove' && req.method === 'POST') {

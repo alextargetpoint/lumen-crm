@@ -43,6 +43,12 @@ function nextChannel(db, lead) {
 const CH_NAMES = { wa: 'WhatsApp', tg: 'Telegram', viber: 'Viber', email: 'E-mail' };
 
 /* ---------- выбор номера и отправка ---------- */
+/* Серый транспорт (Baileys-воркер) внедряется из index.js, где есть tenant-контекст и waGrayApi.
+   Когда у агентства есть ПОДКЛЮЧЁННЫЙ прогретый номер — исходящие уходят «серым способом» с номера
+   брокера (залипание за лидом), а не Cloud API/мок. Нет подключённого — поведение как раньше (мок). */
+let graySender = null;
+function setGraySender(fn) { graySender = fn; }
+
 function pickNumber(db, lead) {
   if (lead.numberId) {
     const n = db.numbers.find(x => x.id === lead.numberId);
@@ -142,6 +148,13 @@ function send(db, lead, text, via, opts = {}) {
         ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Cloud API отказал (${lead.name}): ${err.message}` });
         store.save();
       });
+  } else if (graySender) {
+    /* серый способ: реальная отправка с прогретого номера брокера (или мок, если нет подключённого) */
+    Promise.resolve(graySender(db, lead, m, opts)).catch(err => {
+      m.status = 'failed';
+      ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Серый номер отказал (${lead.name}): ${err.message}` });
+      store.save();
+    });
   } else {
     setTimeout(() => { if (m.status === 'sent') m.status = 'delivered'; store.save(); }, 1500); // mock-доставка
   }
@@ -825,4 +838,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut };
+module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender };
