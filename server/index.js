@@ -3769,9 +3769,12 @@ const server = http.createServer(async (req, res) => {
       /* гарантируем коды привязки (старые тенанты/брокеры могли их не иметь) */
       { let _chg = false; if (!db.settings.ownerTgCode) { db.settings.ownerTgCode = 'owner-' + crypto.randomBytes(3).toString('hex'); _chg = true; } for (const _b of (db.brokers || [])) if (!_b.tgBindCode) { _b.tgBindCode = crypto.randomBytes(3).toString('hex'); _chg = true; } if (_chg) store.save(); }
       const base = global.LUMEN_BASE || tunnelUrl() || ('http://localhost:' + (process.env.PORT || 5077));
+      let _cbot = null; if (tgbridge.central()) { try { const _rg = store.getRegistry(); _cbot = (_rg.platformBridge && _rg.platformBridge.username) || null; } catch (_) {} }
       return json(res, 200, {
         ownerTgCode: db.settings.ownerTgCode,
         enabled: !!tb.enabled,
+        central: tgbridge.central(),
+        centralBot: _cbot,
         tokenSet: !!(tb.botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken)),
         webhookUrl: base.replace(/\/$/, '') + '/tg/webhook',
         ready: tgbridge.ready(db),

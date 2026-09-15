@@ -11792,11 +11792,10 @@ PAGES.settings = async (root) => {
       <div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Бот уже подключён платформой — <b>заводить своего бота не нужно</b>. Просто привяжитесь по ключу ниже.</span></div>
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
         <b>Привяжите себя (основатель)</b>
-        <i>Откройте <a href="https://t.me/${(s.tgBridge && s.tgBridge.centralBot) ? esc(s.tgBridge.centralBot) : ''}" target="_blank" style="color:var(--accent)">${esc(tgbBotHandle)}</a> в Telegram и отправьте команду с вашим <b>ключом агентства</b>:</i>
-        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда">
-          ${ic(I.copy || I.doc)}<code>/start ${esc(s.ownerTgCode || '—')}</code>
-          ${s.ownerTgChatId ? '<span class="badge ok" style="margin-left:auto">вы привязаны</span>' : '<span class="badge" style="margin-left:auto">ещё не привязан</span>'}
-        </div>
+        ${s.ownerTgChatId ? '<div class="lc-hint info" style="margin-top:6px">' + ic(I.check) + '<span>Вы уже привязаны к боту.</span></div>' : `<i>Один клик — бот откроется и сам подставит вашу команду:</i>
+        ${(s.tgBridge && s.tgBridge.centralBot && s.ownerTgCode) ? `<a class="btn btn-accent" href="https://t.me/${esc(s.tgBridge.centralBot)}?start=${esc(s.ownerTgCode)}" target="_blank" style="margin-top:8px">${ic(I.send)}Привязать одним кликом в Telegram</a>` : '<div class="muted" style="font-size:11.5px;margin-top:6px">Ключ ещё не готов — нажмите «Сгенерировать новый ключ» ниже.</div>'}
+        <div class="muted" style="font-size:11px;margin-top:7px">Не открывается? Скопируйте команду и отправьте боту вручную:</div>
+        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда"><code>/start ${esc(s.ownerTgCode || '—')}</code><span class="badge" style="margin-left:auto">ещё не привязан</span></div>`}
         <button class="btn-ghost btn-sm" id="tgbRegen" style="margin-top:6px;font-size:11px">${ic(I.refresh)}Сгенерировать новый ключ</button>
       </div></div>
       <div class="tgb-step"><span class="tgb-n">2</span><div class="tgb-b">
@@ -11888,16 +11887,19 @@ PAGES.settings = async (root) => {
     const box = $('#tgbBrokers'); if (!box) return;
     try {
       const d = await api.get('/tgbridge');
-      const rows = (d.brokers || []).map(b => `<div class="set-row" style="padding:7px 0">
+      const deepLink = (code) => d.central && d.centralBot ? `https://t.me/${d.centralBot}?start=${code}` : null;
+      const rows = (d.brokers || []).map(b => { const dl = deepLink(b.code); return `<div class="set-row" style="padding:7px 0">
           <div class="sp"><div class="sl">${esc(b.name)}</div><div class="sd">${b.bound ? 'привязан к Telegram' : 'ещё не привязан'}</div></div>
+          ${dl ? `<button class="btn btn-sm" data-tgblink="${esc(dl)}" title="Скопировать ссылку-приглашение для брокера">${ic(I.link)}Ссылка</button>` : ''}
           <code class="pill" style="padding:6px 9px;cursor:pointer" data-tgbcode="${esc(b.code)}" title="Скопировать команду для брокера">/start ${esc(b.code)}</code>
           ${b.bound ? `<button class="btn btn-sm" data-tgbunbind="${b.id}" title="Отвязать">${ic(I.x)}</button>` : `<span class="badge">ждёт</span>`}
-        </div>`).join('');
+        </div>`; }).join('');
       box.innerHTML = `<div style="margin-bottom:8px">Вебхук: <code class="pill" style="padding:6px 9px">${esc(d.webhookUrl)}</code> ${d.ready ? '<span class="badge ok">готов</span>' : '<span class="badge warn">включите мост и настройте вебхук</span>'}</div>
         <div class="sl" style="margin:10px 0 4px">Коды привязки брокеров</div>
         <div class="muted" style="font-size:11.5px;margin-bottom:6px">Дайте брокеру его команду — он отправит её боту в Telegram и привяжется. После этого все его лиды приходят ему в личку.</div>
         ${rows || '<span class="muted">Нет активных брокеров</span>'}`;
       box.querySelectorAll('[data-tgbcode]').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText('/start ' + c.dataset.tgbcode); toast('Скопировано', 'Отправьте брокеру — пусть напишет это боту', true); }));
+      box.querySelectorAll('[data-tgblink]').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.tgblink); toast('Ссылка скопирована', 'Отправьте брокеру — он перейдёт и привяжется в один клик', true); }));
       box.querySelectorAll('[data-tgbunbind]').forEach(btn => btn.addEventListener('click', async () => { await api.post('/brokers/' + btn.dataset.tgbunbind + '/tg-unbind', {}); toast('Отвязан', null, true); tgbRenderBrokers(); }));
     } catch (e) { box.innerHTML = '<span class="badge warn">не удалось загрузить</span>'; }
   };
