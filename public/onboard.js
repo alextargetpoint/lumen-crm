@@ -111,7 +111,7 @@
         <div class="ob-center">
           <div style="margin:0 auto 26px;width:96px;height:110px;display:grid;place-items:center;animation:obFloat 8s ease-in-out infinite"><svg viewBox="0 0 100 120" width="72" height="86" fill="none" stroke="#c9a86a" stroke-width="1.6" stroke-linejoin="round"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg></div>
           <div class="ob-badge">Церемония запуска</div>
-          <h1 class="ob-h1">Добро пожаловать в <span class="ob-grad">Lumen</span></h1>
+          <h1 class="ob-h1">Добро пожаловать в&nbsp;<span class="ob-grad">Lumen</span></h1>
           <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
           <div class="ob-pills">
             <span class="ob-pill">${IC.palette}Настроим под ваш бренд</span>
@@ -319,8 +319,8 @@
     const step = STEPS[idx];
     const d = renderStepData(step);
     const total = STEPS.length;
-    // Ателье: никакого видео — тихий тёмный радиал даётся из CSS (.ob-veil). Слой .ob-bgvid оставлен пустым.
-    root.querySelector('.ob-bgvid').innerHTML = '';
+    // Видеофон для динамики: приглушённый ч/б skyline под вуалью на «киношных» шагах (welcome/success). В стиле Ателье.
+    root.querySelector('.ob-bgvid').innerHTML = d.bg ? '<video autoplay muted loop playsinline poster="/assets/skyline-mono-poster.jpg"><source src="/assets/skyline-mono.mp4" type="video/mp4"></video>' : '';
     root.classList.toggle('ob-cinematic', !!d.bg);
 
     const stepsDots = STEPS.map((s, i) => `<i class="${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}"></i>`).join('');
@@ -381,12 +381,14 @@
         zLbl.textContent = 'Интерфейс · ' + name;
         zoom.classList.add('on'); zCard = b;
       }
-      function closeZoom() { zoom.classList.remove('on'); zCard = null; zCd = Date.now() + 340; }
+      let zLastClosed = null;
+      function closeZoom() { zoom.classList.remove('on'); zLastClosed = zCard; zCard = null; zCd = Date.now() + 260; }
       qq('[data-theme]').forEach(b => {
         const v = b.querySelector('video');
-        b.onmouseenter = () => { if (v) v.play().catch(() => {}); if (!zCard && Date.now() > zCd) openZoom(b); };
+        /* фикс «первое наведение не всегда открывает»: кулдаун держим только для ТОЛЬКО ЧТО закрытой карточки, соседние открываются сразу */
+        b.onmouseenter = () => { if (v) v.play().catch(() => {}); if (!zCard && !(b === zLastClosed && Date.now() < zCd)) openZoom(b); };
         b.onmouseleave = () => { if (v && S.theme !== b.dataset.theme) v.pause(); if (b === zCard) closeZoom(); };
-        b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme, { silent: true }); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); };  /* silent: без полноэкранной церемонии — в онбординге своё превью */
+        b.onclick = () => { S.theme = b.dataset.theme; try { (B().setTheme || window.setTheme)(S.theme, { silent: true }); } catch (e) {} qq('[data-theme]').forEach(x => x.classList.toggle('on', x === b)); try { if (window.toast) window.toast('Стиль применён', (b.querySelector('.ob-theme-meta b') || {}).textContent || '', true); } catch (e) {} };  /* silent: без полноэкранной церемонии; тост+галочка = явный выбор */
       });
     }
     if (step.id === 'brand') {
@@ -546,10 +548,12 @@
     .ob-root.in{opacity:1}
     .ob-root.ob-launch{opacity:0;transform:scale(1.02);transition:opacity .8s ease,transform .8s ease}
     /* фон-«герой» как на сайте — тёмный радиал, никакого видео */
-    .ob-bgvid{position:absolute;inset:0;display:none}
+    .ob-bgvid{position:absolute;inset:0;display:block;z-index:0;overflow:hidden}
+    .ob-bgvid video{width:100%;height:100%;object-fit:cover;opacity:.34;filter:grayscale(1) contrast(1.04)}
     .ob-shader{display:none}
     .ob-veil{position:absolute;inset:0;z-index:1;background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
-    .ob-root:not(.ob-cinematic) .ob-veil,.ob-root.ob-cinematic .ob-veil{background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
+    .ob-root:not(.ob-cinematic) .ob-veil{background:radial-gradient(130% 100% at 50% 18%,#0d0c0b,#060605 68%,#040403)}
+    .ob-root.ob-cinematic .ob-veil{background:radial-gradient(130% 100% at 50% 18%,rgba(13,12,11,.72),rgba(6,6,5,.86) 68%,rgba(4,4,3,.95))}
     /* почти невидимое тёплое зерно вместо светящихся орбов */
     .ob-orbs{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;opacity:.35}
     .ob-orbs i{display:none}
@@ -565,7 +569,7 @@
     @keyframes obIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
     .ob-body{min-width:0}
     .ob-step-n{font-size:11px;font-weight:500;letter-spacing:.4em;text-transform:uppercase;color:#6b6a68}
-    .ob-h1{font-family:'Cormorant',Georgia,serif;font-size:clamp(42px,6vw,78px);font-weight:400;letter-spacing:-.005em;line-height:1.02;margin:8px 0 16px;color:#f4f3f1}
+    .ob-h1{font-family:'Cormorant',Georgia,serif;font-size:clamp(42px,6vw,78px);font-weight:400;letter-spacing:-.005em;line-height:1.02;margin:8px 0 16px;color:#f4f3f1;text-wrap:balance}
     .ob-h2{font-family:'Cormorant',Georgia,serif;font-size:clamp(30px,4vw,50px);font-weight:400;letter-spacing:-.005em;line-height:1.05;margin:10px 0 12px;color:#f4f3f1}
     .ob-grad{font-style:italic;color:#d6c7a8}
     .ob-lead{font-size:clamp(15px,1.5vw,18px);color:#a7a6a3;font-weight:300;line-height:1.62;max-width:56ch}
@@ -575,7 +579,7 @@
     .ob-badge::before{content:"";width:22px;height:1px;background:rgba(214,199,168,.5)}
     .ob-center .ob-badge{justify-content:center}
     .ob-pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:28px}
-    .ob-pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:300;letter-spacing:.02em;color:#a7a6a3;background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:9px 15px}
+    .ob-pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:300;letter-spacing:.02em;color:#a7a6a3;background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:9px 15px;white-space:nowrap}
     .ob-pill svg{width:15px;height:15px;flex:0 0 15px;color:#d6c7a8}
     .ob-note{font-size:13px;color:#6b6a68;font-weight:300;margin-top:16px;line-height:1.55}
     .ob-content{margin-top:6px}
@@ -615,7 +619,10 @@
     .ob-theme-meta{flex:1 1 auto;padding:13px 15px}
     .ob-theme-meta b{display:block;font-size:15.5px;font-weight:600;letter-spacing:-.01em;color:#f4f3f1}
     .ob-theme-meta span{display:block;font-size:12px;color:#6b6a68;font-weight:300;line-height:1.45;margin-top:3px}
-    .ob-theme.on .ob-theme-front,.ob-theme.on .ob-theme-back{border-color:rgba(214,199,168,.5)}
+    .ob-theme.on .ob-theme-front,.ob-theme.on .ob-theme-back{border-color:rgba(214,199,168,.75)}
+    .ob-theme.on{box-shadow:0 0 0 2px rgba(214,199,168,.6),0 16px 42px -14px rgba(214,199,168,.4)}
+    .ob-theme.on .ob-choice-check{opacity:1;transform:scale(1);background:#d6c7a8;color:#141311;border-color:#d6c7a8}
+    .ob-theme .ob-choice-check{position:absolute;top:14px;right:14px;z-index:3}
     /* ── форма (бренд/менеджер) ── */
     .ob-form{display:grid;gap:18px;max-width:620px}
     .ob-field{display:block}
