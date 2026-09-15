@@ -1333,7 +1333,7 @@ window.openTelnyxOtp = async function () {
           ['Готово', 'Напиши мне номер — поставлю отправителем и прогоним официальную отправку.'],
         ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><b style="font-size:13px">Входящие SMS / коды</b><span class="warm-pulse"></span><span class="muted" style="font-size:11px">живой приём</span><button class="btn-ghost btn-sm" id="txOtpRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><b style="font-size:13px">Входящие SMS / коды</b><span class="warm-pulse"></span><span class="muted" style="font-size:11px">живой приём</span><button class="btn-ghost btn-sm" id="txOtpClear" style="margin-left:auto">Очистить</button><button class="btn-ghost btn-sm" id="txOtpRefresh">${ic(I.refresh)}Обновить</button></div>
       <div id="txOtpSms" class="warm-log"><div class="muted" style="font-size:11.5px;padding:8px">${current ? 'Ждём SMS… придёт, как Meta отправит код на +' + esc(current) + '.' : 'Сначала купи номер и запусти регистрацию в Meta.'}</div></div>`;
     const buyBtn = $('#txOtpBuy', bd);
     if (buyBtn) buyBtn.addEventListener('click', async () => {
@@ -1343,6 +1343,7 @@ window.openTelnyxOtp = async function () {
       catch (e) { toast('Ошибка', e.message); buyBtn.disabled = false; buyBtn.textContent = 'Купить SMS-номер'; }
     });
     const refB = $('#txOtpRefresh', bd); if (refB) refB.addEventListener('click', loadSms);
+    const clrB = $('#txOtpClear', bd); if (clrB) clrB.addEventListener('click', async () => { if (!current) return; try { await api.post('/telephony/otp/clear', { number: current }); loadSms(); } catch (e) {} });
   };
   const loadSms = async () => {
     const box = $('#txOtpSms', bd); if (!box || !document.body.contains(bd)) { stop(); return; }

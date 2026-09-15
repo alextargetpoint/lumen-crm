@@ -5964,6 +5964,14 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, assigned, messaging_profile_id: profileId, already: !assigned });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* очистить ленту OTP по номеру (убрать старые/тестовые коды) */
+    if (p === '/api/telephony/otp/clear' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const key = String(b.number || '').replace(/[^0-9]/g, '');
+      const t = db.settings.telephony || {};
+      if (t.otpNumbers && t.otpNumbers[key]) { t.otpNumbers[key].sms = []; store.save(); }
+      return json(res, 200, { ok: true });
+    }
     /* диагностика OTP-номера: привязан ли messaging-profile + верный ли webhook_url (почему не приходит SMS) */
     if (p === '/api/telephony/otp/diag' && req.method === 'GET') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
