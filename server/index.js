@@ -6703,6 +6703,7 @@ const server = http.createServer(async (req, res) => {
         /* видео-встреча: своя комната из коробки (Jitsi, работает в браузере без аккаунтов);
            Zoom API подключается сюда же при наличии кредов */
         link: b.link || (b.kind === 'video' ? `https://meet.jit.si/Lumen-${crypto.randomBytes(4).toString('hex')}-${lead.id.slice(-4)}` : null),
+        hideJoin: !!b.hideJoin,   /* версия страницы БЕЗ кнопки «Подключиться» — брокер сам пришлёт ссылку в переписке */
       };
       db.meetings = db.meetings || [];
       db.meetings.push(mt);
@@ -9703,7 +9704,7 @@ h1{font-family:${pf.display};font-size:36px;font-weight:${pf.dispW};line-height:
   <div class="livebn" id="liveBn"><i></i>Встреча идёт прямо сейчас</div>
   <div class="cd" id="cd"><div><b id="cdD">–</b><span>дней</span></div><div><b id="cdH">–</b><span>часов</span></div><div><b id="cdM">–</b><span>минут</span></div></div>
   <div class="who">${broker.name ? 'Ваш эксперт — <b>' + esc(broker.name) + '</b>' : ''}${mt.note ? `<div class="note">${esc(mt.note)}</div>` : ''}</div>
-  ${mt.link ? `<a class="btn b-video" id="joinBtn" href="${esc(mt.link)}" target="_blank"><span class="ld"></span><span id="joinTx">Подключиться к видеовстрече</span></a>` : ''}
+  ${mt.link && !mt.hideJoin ? `<a class="btn b-video" id="joinBtn" href="${esc(mt.link)}" target="_blank"><span class="ld"></span><span id="joinTx">Подключиться к видеовстрече</span></a>` : (mt.hideJoin ? `<div class="note" style="margin-top:12px">Ссылку на подключение эксперт пришлёт вам в переписке перед встречей.</div>` : '')}
   <button class="btn b-ok ${mt.clientConfirmed ? 'done' : ''}" id="okBtn">${mt.clientConfirmed ? '✓ Вы подтвердили участие' : 'Подтвердить участие'}</button>
   <button class="btn b-ghost" id="moveBtn">Попросить перенос</button>
   <div class="cal-row">

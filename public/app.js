@@ -4532,11 +4532,12 @@ function openMeetingModal(lead, after) {
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
       <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>`,
+      <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>
+      <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>`,
     actions: [
       { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
         const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
-        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value });
+        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked });
         toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
         if (after) after();
       } },
