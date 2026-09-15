@@ -2482,12 +2482,13 @@ function pickGrayNumber(db, lead, live) {
   const connected = (g.numbers || []).filter(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected' && (!n.roles || n.roles.send !== false); });
   if (!connected.length) return null;
   if (lead.grayPhone) { const s = connected.find(n => n.phone === lead.grayPhone); if (s) return s; }          /* действующий диалог: вся цепочка с одного номера, без лимита */
-  /* НОВЫЙ лид (первое касание) → уважаем дневной потолок новых лидов на номер */
+  /* НОВЫЙ лид (первое касание): потолок новых лидов — МЯГКИЙ. Предпочитаем номер под лимитом,
+     но НЕ блокируем отправку (только френдли-предупреждение в graySender). Закреп за брокером в приоритете. */
   const cap = grayNewLeadCap(db);
+  if (lead.broker) { const b = connected.find(n => n.brokerId === lead.broker); if (b) return b; }             /* прогретый номер закреплённого брокера */
   const under = connected.filter(n => grayNewToday(n) < cap);
-  if (!under.length) return null;                                                                               /* все номера выбрали дневной лимит новых лидов → отложить */
-  if (lead.broker) { const b = under.find(n => n.brokerId === lead.broker); if (b) return b; }                 /* прогретый номер закреплённого брокера (если ещё под лимитом) */
-  return under.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];                                            /* иначе — наименее нагруженный новыми лидами */
+  const pool = under.length ? under : connected;                                                                /* под лимитом, иначе — все (мягко) */
+  return pool.sort((a, b) => grayNewToday(a) - grayNewToday(b))[0];                                             /* наименее нагруженный новыми лидами */
 }
 
 /* Серый транспорт для engine.send: реальная отправка с прогретого номера брокера через Baileys-воркер.
@@ -2498,19 +2499,18 @@ engine.setGraySender(async (db, lead, m) => {
   let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) { m.status = 'delivered'; store.save(); return; }
   const wasNew = !lead.grayPhone;
   const num = pickGrayNumber(db, lead, live);
-  if (!num) {
-    const anyConn = (g.numbers || []).some(n => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; });
-    if (wasNew && anyConn) {   /* новые лиды выбрали дневной потолок на всех номерах → откладываем, НЕ шлём */
-      m.status = 'failed';
-      lead.ai = lead.ai || {}; lead.ai.nextTouchAt = Date.now() + 12 * 3600e3;   /* повторим позже, когда лимит обновится */
-      ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Отложено: дневной лимит новых лидов на серых номерах исчерпан (${grayNewLeadCap(db)}/номер). ${lead.name} возьмём, как обновится лимит.` });
-      store.save(); return;
-    }
-    m.status = 'delivered'; store.save(); return;   /* нет подключённых — прежний мок, не ломаем поток */
-  }
+  if (!num) { m.status = 'delivered'; store.save(); return; }   /* нет подключённых — прежний мок, не ломаем поток */
   await waGrayApi(db, 'POST', '/sessions/' + waGraySid(num.phone) + '/send', { to: lead.phone, text: m.text });
   lead.grayPhone = num.phone;                    /* закрепляем номер за лидом — цепочка остаётся на нём */
-  if (wasNew) { const today = new Date().toISOString().slice(0, 10); if (num._newLeadDay !== today) { num._newLeadDay = today; num._newLeadsToday = 0; } num._newLeadsToday = (num._newLeadsToday || 0) + 1; }   /* учёт первого касания новому лиду */
+  if (wasNew) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (num._newLeadDay !== today) { num._newLeadDay = today; num._newLeadsToday = 0; }
+    num._newLeadsToday = (num._newLeadsToday || 0) + 1;   /* учёт первого касания новому лиду */
+    /* МЯГКИЙ потолок: шлём в любом случае, но если превысили — френдли-предупреждение (не блок) */
+    const cap = grayNewLeadCap(db);
+    if (num._newLeadsToday > cap && !num._capWarnedDay) { num._capWarnedDay = today; ai.pushEvent(db, { type: 'note', text: `⚠️ Осторожно: с номера +${num.realPhone || num.phone} сегодня уже ${num._newLeadsToday} первых касаний новым лидам (реком. ≤${cap}). Много первых касаний с одного серого номера повышает риск бана — распределите новых лидов на другие номера или добавьте номер.` }); }
+    else if (num._capWarnedDay !== today) { num._capWarnedDay = null; }
+  }
   m.numberId = num.phone; m.grayFrom = num.phone; m.status = 'delivered';
   store.save();
 });
