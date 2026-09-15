@@ -9920,7 +9920,7 @@ PAGES.numbers = async (root) => {
     <div class="num-grid" style="margin-bottom:18px">
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
-          <div><div class="ph">${esc(n.phone)}</div><div class="lb">${esc(n.label || 'серый номер')} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
+          <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'серый номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
           ${ring(risk)}
         </div>
         <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}</div>

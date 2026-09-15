@@ -2501,18 +2501,19 @@ async function warmupTick() {
         if ((g.warmup._sent || 0) >= cap) return;
         let live = {};
         try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
-        const conn = (g.numbers || []).filter(n => /^\d{7,15}$/.test(n.phone) && (() => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; })());   /* только реальные телефоны (без LID-артефактов) */
+        /* сессия адресуется ключом пула (n.phone), а РЕАЛЬНЫЙ номер-получатель берём из live.phone (воркер узнаёт его после коннекта) */
+        const conn = (g.numbers || []).map(n => ({ n, real: (live[waGraySid(n.phone)] || {}).phone, status: (live[waGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
         if (conn.length < 2) return;
         const i = Math.floor(Math.random() * conn.length);
         let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
         const from = conn[i], to = conn[k];
         const msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
         try {
-          await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg });
+          await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.n.phone) + '/send', { to: to.real, text: msg });
           g.warmup._sent = (g.warmup._sent || 0) + 1;
           g.warmup.total = (g.warmup.total || 0) + 1;
           g.warmup.lastAt = Date.now();
-          g.warmup.log = [{ from: from.label || from.phone, to: to.label || to.phone, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+          g.warmup.log = [{ from: from.n.label || from.real, to: to.n.label || to.real, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
           store.save();
         } catch (e) {}
       });
@@ -5934,7 +5935,7 @@ const server = http.createServer(async (req, res) => {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
-      const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
+      const numbers = (g.numbers || []).map(n => { const lv = live[waGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null }); });
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
       const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
@@ -5964,16 +5965,16 @@ const server = http.createServer(async (req, res) => {
       const g = db.settings.waGray || {};
       if (!waWorkerReady(db)) return json(res, 400, { error: 'воркер не подключён' });
       let live = {}; try { live = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { return json(res, 400, { error: 'воркер недоступен' }); }
-      const conn = (g.numbers || []).filter(n => /^\d{7,15}$/.test(n.phone) && (() => { const s = live[waGraySid(n.phone)]; return s && s.status === 'connected'; })());
+      const conn = (g.numbers || []).map(n => ({ n, real: (live[waGraySid(n.phone)] || {}).phone, status: (live[waGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
       if (conn.length < 2) return json(res, 400, { error: `Нужно ≥2 подключённых реальных номера (сейчас ${conn.length}). Подключите ещё номер по QR.` });
       const i = Math.floor(Math.random() * conn.length); let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
       const from = conn[i], to = conn[k], msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
       try {
-        await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.phone) + '/send', { to: to.phone, text: msg });
+        await waGrayApi(db, 'POST', '/sessions/' + waGraySid(from.n.phone) + '/send', { to: to.real, text: msg });
         g.warmup = g.warmup || {}; g.warmup.total = (g.warmup.total || 0) + 1; g.warmup._sent = (g.warmup._sent || 0) + 1; g.warmup.lastAt = Date.now();
-        g.warmup.log = [{ from: from.label || from.phone, to: to.label || to.phone, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+        g.warmup.log = [{ from: from.n.label || from.real, to: to.n.label || to.real, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
         store.save();
-        return json(res, 200, { ok: true, from: from.phone, to: to.phone, text: msg });
+        return json(res, 200, { ok: true, from: from.real, to: to.real, text: msg });
       } catch (e) { return json(res, 400, { error: 'отправка не прошла: ' + e.message }); }
     }
     /* диагностика связи CRM↔воркер: жив ли воркер и верен ли токен (401 = токен не совпал) */
