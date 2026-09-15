@@ -39,6 +39,10 @@
     grid: _svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>'),
     shield: _svg('<path d="M12 3l7 3v5c0 4.4-3 8.2-7 10-4-1.8-7-5.6-7-10V6l7-3z"/><path d="M9.2 12l2 2 3.6-3.8"/>'),
     star: _svg('<path d="M12 3l1.9 5.7L20 9l-4.6 3.5L17 19l-5-3.4L7 19l1.6-6.5L4 9l6.1-.3z"/>'),
+    phone: _svg('<path d="M6 3h3l1.6 5-2 1.2a11 11 0 005.2 5.2l1.2-2 5 1.6v3a2 2 0 01-2.2 2A16 16 0 014 5.2 2 2 0 016 3z"/>'),
+    layers: _svg('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 16l9 5 9-5"/>'),
+    chart: _svg('<path d="M4 20V4M4 20h16"/><path d="M8 16l3-4 3 2 4-6"/>'),
+    list: _svg('<path d="M9 6h12M9 12h12M9 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>', 2),
   };
 
   // ---------- данные ----------
@@ -65,7 +69,7 @@
   // иллюстрации к шагам-фичам
   const SHOT = (n) => '/assets/site/cap-' + n + '.png';
   // золотой эмблем-мотив на шапке каждого шага (в связке с обложками писем)
-  const EMBLEM = { edition: 'building', style: 'palette', brand: 'spark', geos: 'globe', team: 'users', tone: 'chat', whatsapp: 'chat', chains: 'bolt', listings: 'grid', control: 'shield', pricing: 'star', finish: 'check' };
+  const EMBLEM = { edition: 'building', style: 'palette', brand: 'spark', geos: 'globe', team: 'users', tone: 'chat', whatsapp: 'chat', chains: 'bolt', listings: 'grid', control: 'shield', more: 'star', pricing: 'star', finish: 'check' };
 
   // ---------- состояние ----------
   let S = null;         // накопленный конфиг онбординга
@@ -106,6 +110,7 @@
       !solo && { id: 'chains' },
       { id: 'listings' },
       !solo && { id: 'control' },
+      { id: 'more' },
       { id: 'pricing' },
       { id: 'finish' },
     ].filter(Boolean);
@@ -291,6 +296,22 @@
     };
   }
 
+  function stepMore() {
+    const caps = [
+      { ic: 'phone', t: 'Телефония', d: 'Звонки в один клик, запись и ИИ-резюме разговора прямо в карточке лида.' },
+      { ic: 'list', t: 'Задачи', d: 'Задачник в Telegram: подзадачи, перенос в один тап, ИИ раскладывает надиктовку.' },
+      { ic: 'layers', t: 'Контент-студия', d: 'Карусели, деки и посты в соцсети — с вашим брендом, собирает ИИ.' },
+      { ic: 'chart', t: 'Медиапланы', d: 'План-факт по рекламе, синк Meta, дерево кабинета и сигналы задолженностей.' },
+      { ic: 'star', t: 'Академия', d: 'Приёмы продаж на реальных диалогах — подсказка брокеру в нужный момент.' },
+      { ic: 'spark', t: 'Отчёты и Штаб', d: 'Сводки за день и неделю, сигналы руководителю: что просело и где.' },
+    ];
+    return {
+      title: 'И это ещё не всё',
+      sub: 'Пока вы настраивали основное — вот что Lumen умеет из коробки. Подключать ничего не нужно.',
+      html: `<div class="ob-caps">${caps.map(c => `<div class="ob-cap"><div class="ob-cap-ic">${IC[c.ic]}</div><div class="ob-cap-t">${c.t}</div><div class="ob-cap-d">${c.d}</div></div>`).join('')}</div>`,
+    };
+  }
+
   function stepFinish() {
     const solo = S.edition === 'solo';
     const name = S.name || (solo ? 'Ваш бренд' : 'Ваше агентство');
@@ -338,6 +359,7 @@
       case 'listings': return stepGuide({ title: 'База объектов', sub: 'Загрузите объекты — Lumen соберёт из них живые подборки под клиента.', shot: 'collections', action: 'listings', cta: 'Импортировать объекты', points: ['Импорт Reelly / CSV / Excel / JSON', 'Синк порталов (Property Finder, Bayut, DLD)', 'Подборки с вашим лого и подписью', 'Публичная страница с трекингом просмотров'] });
       case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Мост Telegram ⇄ WhatsApp для каждого брокера', 'Распределение заявок и SLA на ответ'] });
       case 'control': return stepGuide({ title: 'Контроль и защита базы', sub: 'Ваша база — ваш актив. Lumen следит, чтобы лиды не утекали, а руководитель видел всё.', shot: 'leadcard', action: 'control', cta: 'Открыть Пульт контроля', points: ['Антислив: контакты клиента скрыты от брокера до нужного момента', 'Сигналы руководителю: кто тянет с ответом, где просела конверсия', 'Журнал действий и разграничение доступа по ролям', 'Мягкий оффбординг: уходит брокер — база и переписки остаются у вас'] });
+      case 'more': return stepMore();
       case 'pricing': return stepPricing();
       case 'finish': return stepFinish();
     }
@@ -740,6 +762,15 @@
     .ob-plate-geos{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
     .ob-plate-geo{font-size:12px;color:#d6c7a8;border:1px solid rgba(214,199,168,.28);border-radius:999px;padding:5px 12px;background:rgba(214,199,168,.05)}
     .ob-finish .ob-recap{margin-top:24px}
+    /* ── витрина возможностей ── */
+    .ob-caps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    .ob-cap{padding:22px;border-radius:16px;border:1px solid rgba(214,199,168,.14);background:rgba(255,255,255,.02);transition:.4s cubic-bezier(.19,1,.22,1);animation:obCard .6s cubic-bezier(.19,1,.22,1) both}
+    .ob-cap:nth-child(2){animation-delay:.05s}.ob-cap:nth-child(3){animation-delay:.1s}.ob-cap:nth-child(4){animation-delay:.15s}.ob-cap:nth-child(5){animation-delay:.2s}.ob-cap:nth-child(6){animation-delay:.25s}
+    .ob-cap:hover{transform:translateY(-2px);border-color:rgba(214,199,168,.32)}
+    .ob-cap-ic{width:42px;height:42px;border-radius:12px;border:1px solid rgba(214,199,168,.26);background:rgba(214,199,168,.06);color:#d6c7a8;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+    .ob-cap-ic svg{width:21px;height:21px}
+    .ob-cap-t{font-family:'Cormorant',Georgia,serif;font-size:21px;font-weight:500;color:#f4f3f1;margin-bottom:6px}
+    .ob-cap-d{font-size:13px;color:#a7a6a3;font-weight:300;line-height:1.5}
     /* ── низ: прогресс + кнопки ── */
     .ob-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 30px 26px;position:relative;z-index:5}
     .ob-dots{display:flex;gap:7px;align-items:center}
@@ -801,7 +832,7 @@
     @keyframes obCard{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
     @media(max-width:820px){
       .ob-panel-split{grid-template-columns:1fr}.ob-shot{display:none}
-      .ob-choices{grid-template-columns:1fr}.ob-themes{grid-template-columns:1fr 1fr}.ob-tones{grid-template-columns:1fr}
+      .ob-choices{grid-template-columns:1fr}.ob-themes{grid-template-columns:1fr 1fr}.ob-tones{grid-template-columns:1fr}.ob-caps{grid-template-columns:1fr 1fr}
       .ob-row3{grid-template-columns:1fr}
       .ob-stage{padding:26px 16px 8px}.ob-foot{padding:14px 16px 20px}
       .ob-actions{flex:1;justify-content:flex-end}
