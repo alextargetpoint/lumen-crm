@@ -10052,6 +10052,18 @@ PAGES.numbers = async (root) => {
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
+    ${(() => { const ab = (STATE.brokers || []).filter(b => b.active !== false).length || 0; const have = grayNums.length; const need = Math.max(0, ab - have); const pl = (n) => n === 1 ? 'номер' : (n >= 2 && n <= 4 ? 'номера' : 'номеров'); return `<div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
+      <div class="card-title">${ic(I.users)}Рекомендация: 1 номер = 1 брокер<span class="sub">основная переписка с лидами — с серых</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Правило безопасности: <b>1 брокер → 1 серый номер</b>, и не более <b>5 новых лидов/день</b> на номер (действующие диалоги без лимита). Больше номеров = больше новых лидов в день без риска бана. Рассылки с серых <b>запрещены</b> — только Cloud API.</div>
+      <div class="num-meta">
+        <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
+        <div class="m"><div class="v">${have}</div><div class="k">серых номеров</div></div>
+        <div class="m"><div class="v">${have * 5}</div><div class="k">новых лидов/день сейчас</div></div>
+        <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">потолок при 1-на-1</div></div>
+      </div>
+      ${need > 0 ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> ${pl(need)} до «1 на брокера». Докупи/подключи — закроешь всех брокеров и поднимешь дневной потолок новых лидов до ${ab * 5}.</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-accent btn-sm" id="grayRecBuy">${ic(I.plus)}Купить недостающие (${need})</button><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
+    </div>`; })()}
     <div class="glass card mb">
       <div class="card-title">${ic(I.shield)}Гигиена канала</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
@@ -10233,6 +10245,8 @@ PAGES.numbers = async (root) => {
   }, 6000);
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#openYesimBtn')?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
+  $('#grayRecBuy', root)?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
+  $('#grayRecQR', root)?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#txOtpBtn')?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#waHostedBtn')?.addEventListener('click', async () => {
     const btn = $('#waHostedBtn', root); btn.disabled = true; const o = btn.innerHTML; btn.textContent = 'Готовлю…';
