@@ -2415,6 +2415,22 @@ async function telnyxApi(db, method, pathx, body) {
 }
 function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelUrl() || global.LUMEN_BASE || ''; return (base && !/localhost|127\.0\.0\.1/.test(base)) ? base.replace(/\/$/, '') + '/hooks/telnyx?key=' + encodeURIComponent(db.settings.hooks.secret) : undefined; }
 
+/* --- Yesim Virtual Numbers: покупка виртуальных номеров под СЕРЫЕ WhatsApp (номер ловит OTP по SMS) --- */
+/* Платформенный токен (SaaS): все агентства покупают серые номера через ОДИН наш Yesim-аккаунт. Basic-Auth
+   (username=token, password=token). ⚠️ Yesim требует whitelist IP сервера в их дашборде. */
+function yesimToken() { try { const r = store.getRegistry(); return process.env.YESIM_TOKEN || (r.platformYesim && r.platformYesim.token) || ''; } catch (_) { return process.env.YESIM_TOKEN || ''; } }
+async function yesimApi(action, params) {
+  const tok = yesimToken(); if (!tok) throw new Error('Yesim-токен не задан (оператор: задай в реестре platformYesim)');
+  const auth = 'Basic ' + Buffer.from(tok + ':' + tok).toString('base64');
+  const body = new URLSearchParams();
+  if (params) for (const k of Object.keys(params)) if (params[k] != null) body.set('params[' + k + ']', String(params[k]));
+  const r = await fetch('https://vn.yesim.app/apiv1/index.php?action=' + action, { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(), signal: AbortSignal.timeout(15000) });
+  const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch (_) { j = { raw: txt.slice(0, 300) }; }
+  if (!r.ok) throw new Error('yesim ' + r.status + ': ' + (j.error || j.message || j.raw || 'ошибка'));
+  return j;
+}
+async function serverPublicIp() { try { const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(6000) }); const j = await r.json(); return j.ip || ''; } catch (_) { return ''; } }
+
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
 /* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
 const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').replace(/[^0-9]/g, '');
@@ -5948,6 +5964,51 @@ const server = http.createServer(async (req, res) => {
       let health = null; try { const r = await fetch(base + '/health', { signal: AbortSignal.timeout(8000) }); health = await r.json().catch(() => null); } catch (e) { return json(res, 200, { ok: false, stage: 'reach', base, msg: 'Воркер недоступен по URL: ' + e.message }); }
       try { const r = await waGrayApi(db, 'GET', '/sessions'); return json(res, 200, { ok: true, base, platform: waWorkerPlatform(), sessions: Object.keys(r.sessions || {}).length, workerSessions: (health && health.sessions) || 0, msg: 'Связь есть, токен верный.' }); }
       catch (e) { return json(res, 200, { ok: false, stage: 'auth', base, platform: waWorkerPlatform(), msg: 'Воркер отвечает, но ТОКЕН НЕВЕРНЫЙ (' + e.message + '). Значение LUMEN_WA_WORKER_TOKEN должно совпадать с WORKER_TOKEN на воркере.' }); }
+    }
+    /* ===== Yesim Virtual Numbers: покупка серых номеров под WhatsApp (OTP по SMS) ===== */
+    /* оператор задаёт платформенный Yesim-токен (все агентства покупают через наш аккаунт) */
+    if (p === '/api/gray/yesim/token' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const token = String(b.token || '').trim();
+      if (!token) return json(res, 400, { error: 'нужен токен' });
+      const reg = store.getRegistry(); reg.platformYesim = { token, at: Date.now() }; store.saveRegistry();
+      let bal = null; try { bal = await yesimApi('get_balance'); } catch (e) { return json(res, 200, { ok: true, saved: true, warn: 'токен сохранён, но проверка баланса не прошла: ' + e.message }); }
+      return json(res, 200, { ok: true, balance: bal });
+    }
+    /* диагностика Yesim: публичный IP сервера (для whitelist) + проверка токена/баланса */
+    if (p === '/api/gray/yesim/probe' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const ip = await serverPublicIp();
+      const out = { serverIp: ip, tokenSet: !!yesimToken() };
+      if (out.tokenSet) { try { out.balance = await yesimApi('get_balance'); out.ok = true; } catch (e) { out.ok = false; out.error = e.message; } }
+      return json(res, 200, out);
+    }
+    /* каталог: страны + опции подписки (месяц/год) */
+    if (p === '/api/gray/yesim/catalog' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      try { const countries = await yesimApi('get_allowed_countries'); let options = null; try { options = await yesimApi('get_subscription_options'); } catch (_) {} return json(res, 200, { ok: true, countries, options }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* купить серый номер: {country, subscriptionOption:'month'|'year', area?} */
+    if (p === '/api/gray/yesim/buy' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const country = String(b.country || '').toUpperCase().slice(0, 2);
+      const subscriptionOption = ['month', 'year'].includes(b.subscriptionOption) ? b.subscriptionOption : 'month';
+      if (!country) return json(res, 400, { error: 'нужна страна' });
+      try {
+        const r = await yesimApi('purchase_number', { country, subscriptionOption, area: b.area || undefined });
+        const number = r.number || (r.data && r.data.number) || '';
+        /* сохраняем в пул серых номеров тенанта — под ручную регистрацию WhatsApp + подключение по QR */
+        if (number) { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, addedAt: Date.now() }); store.save(); }
+        return json(res, 200, { ok: true, number, result: r });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* входящие SMS (OTP) по купленным номерам: ?offset=0 */
+    if (p === '/api/gray/yesim/sms' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      try { const r = await yesimApi('get_sms', { offset: parseInt(u.searchParams.get('offset')) || 0 }); return json(res, 200, { ok: true, sms: r.sms || r.data || r || [] }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
     if (p === '/api/wa/gray/connect' && req.method === 'POST') {
