@@ -663,6 +663,45 @@ function editKeyFor(req) { const r = realRole(req); return (r && r.role === 'own
 /* SEC: супер-админ ПЛАТФОРМЫ (основатель) — отдельная авторизация НАД тенантами.
    Ключ из env PLATFORM_ADMIN_KEY (прод) либо авто-ключ registry.adminKey (виден в логах при старте). */
 function platformAdminKey() { return process.env.PLATFORM_ADMIN_KEY || (store.getRegistry().adminKey || ''); }
+/* ── Почта: единая точка отправки с гейтом подписок ──────────────────────────
+   sendMail(key, toEmail, vars, lang, recipient) — рендерит шаблон и шлёт через Resend.
+   recipient {isOwner, role, prefs} — для НЕобязательных писем проверяет подписку canReceive;
+   обязательные (essential: security/billing/verify/invite) шлются всегда. manageUrl вшивается в футер. */
+async function sendMail(key, toEmail, vars, lang, recipient) {
+  try {
+    const reg = store.getRegistry();
+    const plat = mailer.platformEmailCfg(reg);
+    if (!plat.key || !toEmail) return { ok: false, skipped: 'no-config' };
+    const meta = mailer.emailMeta(key);
+    if (meta && !meta.essential && recipient) {
+      if (!mailer.canReceive(key, recipient, recipient.prefs || {})) return { ok: false, skipped: 'unsubscribed' };
+    }
+    const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
+    const v = Object.assign({ manageUrl: base + '/email-preferences.html' }, vars || {});
+    if (v.link && String(v.link)[0] === '/') v.link = base + v.link;
+    const r = mailer.renderTemplate(reg, key, v, lang || 'ru');
+    return await mailer.sendViaResend(plat, toEmail, r.subject, r.html);
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+/* подписки на письма текущего пользователя (владелец → settings.emailPrefs; брокер → broker.emailPrefs) */
+function emailPrefsHolder(db, R) {
+  if (!R) return null;
+  if (R.role === 'broker' && R.brokerId) { const br = (db.brokers || []).find(b => b.id === R.brokerId); if (!br) return null; br.emailPrefs = br.emailPrefs || {}; return { get: () => br.emailPrefs, set: (v) => { br.emailPrefs = v; }, isOwner: false, role: 'broker', email: br.email || '' }; }
+  db.settings.emailPrefs = db.settings.emailPrefs || {}; return { get: () => db.settings.emailPrefs, set: (v) => { db.settings.emailPrefs = v; }, isOwner: true, role: 'owner', email: (db.settings.auth && db.settings.auth.email) || '' };
+}
+/* каталог писем, видимых данной роли, сгруппированный по категориям (для страницы подписок) */
+function emailPrefsView(isOwner) {
+  const cats = mailer.EMAIL_CATEGORIES; const catalog = mailer.emailCatalog();
+  const visible = (m) => m.audience === 'all' || isOwner || m.audience === 'broker';
+  const out = [];
+  for (const ckey of Object.keys(cats)) {
+    const types = catalog.filter(m => m.category === ckey && visible(m));
+    if (!types.length) continue;
+    const hasOptional = types.some(t => !t.essential);
+    out.push({ key: ckey, label: cats[ckey].ru, labelEn: cats[ckey].en, essentialOnly: !hasOptional, types: types.map(t => ({ key: t.key, name: t.name, essential: t.essential })) });
+  }
+  return out;
+}
 function isPlatformAdmin(req) { const m = (req.headers.cookie || '').match(/lumen_admin=([a-f0-9]{32})/); return !!(m && store.getRegistry().adminSessions[m[1]]); }
 function adminLog(action, extra) { const reg = store.getRegistry(); reg.adminAudit = reg.adminAudit || []; reg.adminAudit.unshift(Object.assign({ at: Date.now(), action }, extra || {})); if (reg.adminAudit.length > 500) reg.adminAudit.length = 500; store.saveRegistry(); }
 /* аудит-лог: кто что сделал (анти-увод базы + прозрачность) */
@@ -5578,6 +5617,25 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /* ── Подписки на письма: какие типы уведомлений получать на e-mail ──────
+       Владелец правит свои (settings.emailPrefs) + видит весь каталог; брокер — свои (broker.emailPrefs).
+       essentialOnly-категории (безопасность, обязательный биллинг) всегда включены — их не отписать. */
+    if (p === '/api/email-prefs' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const h = emailPrefsHolder(db, R); if (!h) return json(res, 404, { error: 'нет профиля' });
+      const categories = emailPrefsView(h.isOwner);
+      const prefs = h.get();
+      return json(res, 200, { role: h.role, email: h.email, categories, prefs, catalog: h.isOwner ? mailer.emailCatalog() : null });
+    }
+    if (p === '/api/email-prefs' && req.method === 'PUT') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const h = emailPrefsHolder(db, R); if (!h) return json(res, 404, { error: 'нет профиля' });
+      const bb = await readBody(req); const inc = (bb && bb.prefs) || {};
+      const valid = mailer.EMAIL_CATEGORIES; const cur = h.get() || {};
+      for (const [k, v] of Object.entries(inc)) if (valid[k]) cur[k] = !!v;
+      h.set(cur); store.save();
+      return json(res, 200, { ok: true, prefs: cur });
+    }
     if (p === '/api/settings' && req.method === 'PATCH') {
       const b = await readBody(req);
       if (b.agency && b.agency.about) { Object.assign(db.settings.agency.about, b.agency.about); delete b.agency.about; }

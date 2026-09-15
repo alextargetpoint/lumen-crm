@@ -1,0 +1,104 @@
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Письма и уведомления — Lumen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#efece5;--card:#fffdfa;--ink:#141311;--ink2:#57544e;--ink3:#8b8983;--line:rgba(20,19,17,.10);--line2:rgba(20,19,17,.06);--gold:#c9a86a;--goldDeep:#a9863f;--panel:#f5f1e9;--ok:#3f8f5b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding:clamp(26px,5vw,56px) clamp(16px,4vw,28px)}
+.bar{height:3px;background:linear-gradient(90deg,var(--gold),#e8d9b6 52%,var(--gold));border-radius:3px}
+.brand{display:flex;align-items:center;gap:9px;margin:22px 0 4px}
+.brand .st{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--gold);line-height:1}
+.brand .wm{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:.22em;line-height:1}
+.brand .sub{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3);margin-left:auto}
+h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:clamp(30px,6vw,44px);margin:20px 0 8px;letter-spacing:-.01em;line-height:1.05}
+.lead{color:var(--ink2);font-size:15px;line-height:1.6;max-width:60ch}
+.role{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--goldDeep);background:rgba(201,168,106,.14);border:1px solid var(--line);border-radius:999px;padding:5px 13px;margin-top:14px}
+.cards{margin-top:26px;display:flex;flex-direction:column;gap:12px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:16px}
+.row .txt{flex:1;min-width:0}
+.row .nm{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:20px;line-height:1.15}
+.row .ds{font-size:12.5px;color:var(--ink3);margin-top:3px;line-height:1.45}
+.row .types{font-size:11.5px;color:var(--ink3);margin-top:6px}
+.always{font-size:11px;font-weight:700;color:var(--goldDeep);white-space:nowrap;letter-spacing:.02em}
+/* кастомный тумблер */
+.sw{position:relative;width:50px;height:28px;flex:none;cursor:pointer}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.sw .tr{position:absolute;inset:0;background:#dcd7cc;border-radius:999px;transition:.2s;border:1px solid var(--line)}
+.sw .kn{position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.22)}
+.sw input:checked + .tr{background:linear-gradient(135deg,var(--gold),var(--goldDeep));border-color:transparent}
+.sw input:checked ~ .kn{left:25px}
+.note{margin-top:22px;font-size:12.5px;color:var(--ink3);line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#faf9f5;font-size:13px;font-weight:600;padding:11px 20px;border-radius:12px;opacity:0;transition:.25s;pointer-events:none;z-index:9}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+details.catalog{margin-top:26px;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+details.catalog>summary{list-style:none;cursor:pointer;padding:16px 20px;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+details.catalog>summary::-webkit-details-marker{display:none}
+details.catalog .cbody{padding:0 20px 16px}
+.cat{margin-top:14px}
+.cat h4{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:0 0 7px;font-weight:700}
+.cat ul{margin:0;padding:0;list-style:none}
+.cat li{font-size:13px;color:var(--ink2);padding:5px 0;border-top:1px solid var(--line2);display:flex;justify-content:space-between;gap:10px}
+.cat li .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.tag.e{background:#eae2d2;color:#7a6534}.tag.o{background:#e2ecdf;color:#3f6b4e}
+.foot{margin-top:30px;font-size:11px;color:#a8a6a0;text-align:center}
+.loading{color:var(--ink3);font-size:14px;padding:30px 0;text-align:center}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="bar"></div>
+  <div class="brand"><span class="st">&#10022;</span><span class="wm">LUMEN</span><span class="sub" id="sub">AI-CRM</span></div>
+  <h1>Письма и&nbsp;уведомления</h1>
+  <p class="lead">Выберите, о чём получать письма на почту. Транзакционные письма — вход, безопасность, оплата — приходят всегда: это ваша защита и чеки.</p>
+  <div class="role" id="role" style="display:none"></div>
+  <div id="cards" class="cards"><div class="loading">Загрузка…</div></div>
+  <div id="ownerCatalog"></div>
+  <p class="note">Изменения сохраняются сразу. Отписаться от обязательных писем нельзя — они нужны для работы аккаунта и по закону (чеки, безопасность).</p>
+  <div class="foot">&#10022; © 2026 Lumen · TargetPoint AY</div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+var DESC={account:'Подтверждения, служебные уведомления по аккаунту.',security:'Входы, смена пароля, доступы. Всегда включено.',billing:'Оплаты, продления, напоминания о списании.',leads:'Новые лиды и лиды, которые пора дожать.',meetings:'Назначенные встречи и напоминания перед звонком.',tasks:'Новые задачи и задачи к сроку.',team:'Приглашения и изменения в команде.',channels:'Статус WhatsApp-номеров, пропущенные звонки и сообщения.',reports:'Сводки за день, итоги недели, сигналы руководителю.',academy:'Приёмы недели и материалы Академии.',product:'Что нового в Lumen.',partner:'Партнёрские начисления и статусы.',marketing:'Предложения и рассылки.'};
+function toast(t){var el=document.getElementById('toast');el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('on')},1600)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+var STATE={prefs:{},role:'owner'};
+async function load(){
+  var r=await fetch('/api/email-prefs',{credentials:'same-origin'});
+  if(!r.ok){document.getElementById('cards').innerHTML='<div class="loading">Нужно войти в Lumen, чтобы настроить подписки.</div>';return}
+  var d=await r.json();STATE.prefs=d.prefs||{};STATE.role=d.role;
+  document.getElementById('sub').textContent=d.role==='owner'?'Владелец':'Брокер';
+  var rl=document.getElementById('role');rl.style.display='inline-flex';rl.innerHTML='&#10022;&nbsp; '+(d.role==='owner'?'Настройки владельца агентства':'Ваши личные уведомления')+(d.email?' · '+esc(d.email):'');
+  var host=document.getElementById('cards');host.innerHTML='';
+  d.categories.forEach(function(c){
+    var on=STATE.prefs[c.key]!==false;
+    var div=document.createElement('div');div.className='row';
+    var ctrl=c.essentialOnly
+      ? '<span class="always">&#10022; Всегда</span>'
+      : '<label class="sw"><input type="checkbox" data-cat="'+c.key+'" '+(on?'checked':'')+'><span class="tr"></span><span class="kn"></span></label>';
+    div.innerHTML='<div class="txt"><div class="nm">'+esc(c.label)+'</div><div class="ds">'+esc(DESC[c.key]||'')+'</div></div>'+ctrl;
+    host.appendChild(div);
+  });
+  host.querySelectorAll('input[data-cat]').forEach(function(inp){inp.addEventListener('change',function(){save(inp.dataset.cat,inp.checked)})});
+  if(d.catalog)renderCatalog(d.categories,d.catalog);
+}
+async function save(cat,val){
+  STATE.prefs[cat]=val;
+  var body={};body.prefs={};body.prefs[cat]=val;
+  var r=await fetch('/api/email-prefs',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  toast(r.ok?(val?'Включено':'Выключено'):'Не сохранилось');
+}
+function renderCatalog(categories,catalog){
+  var byCat={};catalog.forEach(function(m){(byCat[m.category]=byCat[m.category]||[]).push(m)});
+  var labels={};categories.forEach(function(c){labels[c.key]=c.label});
+  var html='<details class="catalog"><summary><span>Каталог всех типов писем</span><span style="color:var(--ink3);font-weight:600">'+catalog.length+' шт.</span></summary><div class="cbody">';
+  Object.keys(byCat).forEach(function(ck){
+    html+='<div class="cat"><h4>'+esc(labels[ck]||ck)+'</h4><ul>'+byCat[ck].map(function(m){return '<li><span>'+esc(m.name.split(' / ')[0])+'</span><span class="tag '+(m.essential?'e':'o')+'">'+(m.essential?'обязательное':'опционально')+'</span></li>'}).join('')+'</ul></div>';
+  });
+  html+='</div></details>';
+  document.getElementById('ownerCatalog').innerHTML=html;
+}
+load();
+</script>
+</body></html>
