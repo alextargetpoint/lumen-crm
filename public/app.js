@@ -4445,6 +4445,7 @@ async function openLeadModal(id) {
             <div class="lc-note-row" style="margin:4px 0 3px">
               <input id="lcMainPhone" value="${esc(l.phone || '')}" placeholder="+971 50 123 4567" style="flex:1">
               <button class="btn btn-sm btn-accent" id="lcMainPhoneSave">Сохранить</button>
+              ${l.phone ? `<button class="btn btn-sm" id="lcWaCheck" title="Проверить, есть ли у номера WhatsApp">${ic(I.chat)}WhatsApp?</button>` : ''}
             </div>
             <div class="muted" style="font-size:11px;margin:0 0 10px">Телефония набирает этот номер, и на него уходит WhatsApp.${l.channels && l.channels.wa === 'yes' ? ' <span style="color:var(--ok,#1E7A64);font-weight:600">✓ WhatsApp есть</span>' : (l.channels && l.channels.wa === 'no' ? ' <span style="color:var(--bad,#C0392B)">WhatsApp не найден</span>' : ' <span style="color:var(--ink-3)">WhatsApp: не проверен</span>')}</div>
             <label class="lc-lbl">Дополнительные контакты</label>
@@ -4709,6 +4710,11 @@ async function openLeadModal(id) {
     catch (e) { toast('Не сохранилось', e.message); }
   });
   $('#lcMainPhone', bd)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#lcMainPhoneSave', bd).click(); });
+  $('#lcWaCheck', bd)?.addEventListener('click', async () => {
+    const btn = $('#lcWaCheck', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Проверяю…';
+    try { const r = await api.post(`/leads/${id}/wa-check`, {}); toast(r.exists ? '✓ WhatsApp есть' : 'WhatsApp у номера не найден', null, true); openLeadModal(id); }
+    catch (e) { toast('Не проверилось', e.message); btn.disabled = false; btn.innerHTML = old; }
+  });
   $('#lcNameSave', bd)?.addEventListener('click', async () => {
     const nm = $('#lcName', bd).value.trim(); if (!nm) { toast('Имя не может быть пустым'); return; }
     try { await api.post(`/leads/${id}/update`, { name: nm }); toast('Имя сохранено', null, true); openLeadModal(id); } catch (e) { toast('Не сохранилось', e.message); }

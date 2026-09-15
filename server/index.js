@@ -4664,6 +4664,22 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true });
     }
+    /* WhatsApp-автодетект: есть ли у номера лида WhatsApp (через onWhatsApp на подключённом сером номере) */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/wa-check$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      if (!lead.phone) return json(res, 400, { error: 'у лида нет номера' });
+      const g = db.settings.waGray || {};
+      if (!g.url || !g.token) return json(res, 400, { error: 'WhatsApp по QR не подключён (Подключения → WhatsApp по QR)' });
+      let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен' }); }
+      const sid = (g.numbers || []).map(n => waGraySid(n.phone)).find(s => live[s] && live[s].status === 'connected');
+      if (!sid) return json(res, 400, { error: 'нет подключённого WhatsApp-номера для проверки (подключите номер по QR)' });
+      try {
+        const r = await waGrayApi(db, 'POST', '/sessions/' + sid + '/check', { to: lead.phone });
+        lead.channels = lead.channels || {}; lead.channels.wa = r.exists ? 'yes' : 'no'; store.save();
+        return json(res, 200, { exists: !!r.exists, wa: lead.channels.wa });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
 
     /* файлы в карточку лида: презентации, PDF, картинки, документы — полный менеджмент */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/attach$/)) && req.method === 'POST') {
