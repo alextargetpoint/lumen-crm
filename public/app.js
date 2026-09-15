@@ -10057,15 +10057,16 @@ PAGES.numbers = async (root) => {
       <button class="btn btn-sm btn-accent" id="cloudBuyBtn">${ic(I.plus)}Купить Cloud API номер</button>
     </div>
     ${otpNums.length ? `<div class="num-grid" style="margin-bottom:18px">
-      ${otpNums.map(n => { const wa = n.wa; const conn = wa && wa.status === 'CONNECTED'; const badge = conn ? '<span class="badge ok"><i></i>подключён к WhatsApp</span>' : (wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
+      ${otpNums.map(n => { const wa = n.wa; const conn = wa && wa.status === 'CONNECTED'; const badge = conn ? '<span class="badge ok"><i></i>подключён к WhatsApp</span>' : (wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус тянется из Telnyx и обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»). После этого Meta одобряет до <b>1–2 ч</b>.'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
         <div class="num-head">
           <div><div class="ph">${esc(n.number)}</div><div class="lb">Cloud API · <b style="color:var(--accent-2)">Telnyx SMS</b></div></div>
         </div>
-        <div style="margin:10px 0 6px">${badge}</div>
+        <div class="otp-badge" style="margin:10px 0 6px">${badge}</div>
+        ${hint ? `<div class="otp-hint muted" style="font-size:11px;line-height:1.45;margin:0 0 8px;display:flex;gap:6px"><span>⏳</span><span>${hint}</span></div>` : ''}
         <div class="num-meta">
           <div class="m"><div class="v">${n.smsCount}</div><div class="k">OTP-кодов</div></div>
           <div class="m"><div class="v" style="letter-spacing:1px">${n.lastCode ? esc(n.lastCode) : '—'}</div><div class="k">послед. код</div></div>
-          <div class="m"><div class="v">${wa ? (conn ? '✓' : esc((wa.status || '—').toLowerCase())) : '—'}</div><div class="k">WhatsApp</div></div>
+          <div class="m otp-wa"><div class="v">${wa ? (conn ? '✓' : esc((wa.status || '—').toLowerCase())) : '—'}</div><div class="k">WhatsApp</div></div>
         </div>
         <div class="num-actions" style="margin-top:12px">
           <button class="btn btn-sm btn-accent" data-otpfeed="${esc(n.key)}">${ic(I.spark)}Коды / OTP + активация</button>
@@ -10116,6 +10117,23 @@ PAGES.numbers = async (root) => {
   $$('[data-otpfeed]', root).forEach(b => b.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp('+' + b.dataset.otpfeed)));
   $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; try { const r = await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast(r.ok ? 'Привязка проверена' : 'Не вышло', r.ok ? (r.assigned ? 'Профиль привязан' : 'Уже привязан') : (r.error || ''), r.ok); } catch (e) { toast('Ошибка', e.message); } b.disabled = false; }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
+  /* авто-обновление статусов Cloud-API номеров из Telnyx (одобрение Meta занимает время) */
+  if (window.CLOUD_STATUS_POLL) { clearInterval(window.CLOUD_STATUS_POLL); window.CLOUD_STATUS_POLL = null; }
+  if (otpNums.length) window.CLOUD_STATUS_POLL = setInterval(async () => {
+    if (typeof CUR !== 'undefined' && CUR !== 'numbers') { clearInterval(window.CLOUD_STATUS_POLL); window.CLOUD_STATUS_POLL = null; return; }
+    const pane = root.querySelector('[data-numpane="cloud"]'); if (!pane || pane.style.display === 'none') return;
+    try {
+      const r = await api.get('/telephony/otp/list');
+      (r.list || []).forEach(n => {
+        const card = root.querySelector('[data-otp="' + n.key + '"]'); if (!card) return;
+        const wa = n.wa, conn = wa && wa.status === 'CONNECTED';
+        const badge = conn ? '<span class="badge ok"><i></i>подключён к WhatsApp</span>' : (wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>');
+        const bEl = card.querySelector('.otp-badge'); if (bEl) bEl.innerHTML = badge;
+        const wEl = card.querySelector('.otp-wa .v'); if (wEl) wEl.textContent = wa ? (conn ? '✓' : (wa.status || '—').toLowerCase()) : '—';
+        const hEl = card.querySelector('.otp-hint'); if (hEl && conn) hEl.remove();
+      });
+    } catch (_) {}
+  }, 30000);
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
     if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
