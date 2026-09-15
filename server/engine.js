@@ -129,6 +129,14 @@ function send(db, lead, text, via, opts = {}) {
   lead.lastMsgAt = m.at;
   lead.lastDir = 'out';
   if (lead.ai.silentSince == null) lead.ai.silentSince = m.at;
+  /* ⛔ ЖЁСТКОЕ ПРАВИЛО: рассылки (broadcast) идут ТОЛЬКО через официальный Cloud API.
+     Серые номера для массовых рассылок ЗАПРЕЩЕНЫ (мгновенный бан). Если Cloud не готов — не шлём вообще. */
+    if (opts.broadcast && !wa.ready(db)) {
+    m.status = 'failed';
+    ai.pushEvent(db, { type: 'send_skip', leadId: lead.id, text: `Рассылка не отправлена (${lead.name}): массовые рассылки идут ТОЛЬКО через официальный Cloud API. Серые номера для рассылок запрещены (риск мгновенного бана). Подключите официальный номер в «Номера → Cloud API».` });
+    store.save();
+    return m;
+  }
   if (wa.ready(db)) {
     const tpl = opts.templateId ? db.templates.find(t => t.id === opts.templateId) : null;
     let job;
@@ -586,7 +594,7 @@ function tickCampaigns(db) {
       }
       const tpl = db.templates.find(t => t.id === cmp.templateId);
       const text = tpl ? renderTemplate(db, tpl, lead) : (cmp.text || '');
-      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId });
+      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true });   /* рассылка = только Cloud API */
       if (m) {
         cmp.stats.sent += 1;
         lead.ai.enabled = true; // ответ подхватит квалификатор
