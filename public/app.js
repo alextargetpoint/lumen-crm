@@ -34,7 +34,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 /* width/height="1em" — дефолтный размер иконки (≈ размер текста). Любое CSS-правило `... svg{width:Npx}`
    перебивает атрибут, поэтому явно стилизованные иконки не меняются, а НЕ стилизованные больше НЕ раздуваются
    в гигантский дефолт (баг «огромный крест» в Подключениях и т.п.). */
-const ic = (p, sw) => `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="${sw || 1.7}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ic = (p, sw) => `<svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="${sw || 1.7}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 
 const I = {
   grid: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -6346,6 +6346,18 @@ PAGES.automations = async (root) => {
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
+        ${(() => { const r = a.rotation || {}; return `<div class="glass card mb">
+          <div class="card-title">${ic(I.refresh || I.spark)}Ротация непрожатых заявок<span class="sub">не ответил — уходит другому</span></div>
+          <div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Если клиент молчит после N касаний ИЛИ X часов — заявка автоматически переназначается на следующего (по загрузке или на квалификатора), цепочка стартует заново. Исчерпаны ротации → лид уходит в «Спящие».</div>
+          ${swRow('Включить авто-ротацию', 'Не даём «мёртвым» лидам застревать на одном человеке', `<label class="switch"><input type="checkbox" id="rotEnabled" ${r.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
+            <div class="form-row"><label>После касаний</label><input id="rotTouches" type="number" min="1" max="20" value="${r.afterTouches || 3}"></div>
+            <div class="form-row"><label>или через часов</label><input id="rotHours" type="number" min="1" max="336" value="${r.afterHours || 48}"></div>
+            <div class="form-row"><label>Макс. ротаций</label><input id="rotMax" type="number" min="1" max="10" value="${r.maxRotations || 2}"></div>
+          </div>
+          ${swRow('Сначала на квалификатора', 'Переназначать на роль «Квалификатор» (если есть), иначе — на брокеров по загрузке', `<label class="switch"><input type="checkbox" id="rotToQual" ${r.toQualifier ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}
+          <button class="btn btn-sm btn-accent" id="rotSave" style="margin-top:10px">Сохранить ротацию</button>
+        </div>`; })()}
         <div class="glass card mb" data-ag="reports">
           <div class="card-title">${ic(I.doc)}Отчёты и уведомления<span class="sub">сводки в Telegram владельцу</span></div>
           ${swRow('Ежедневная сводка', 'Лиды, квалы, встречи, горячие сигналы — каждый день в заданное время', `<select data-rep-sel="dailyAt" style="width:110px">${['08:00', '09:00', '10:00', '18:00', '20:00'].map(t => `<option ${((s.reports || {}).dailyAt || '09:00') === t ? 'selected' : ''}>${t}</option>`).join('')}</select>` + sw('rep_daily', (s.reports || {}).daily))}
@@ -6493,6 +6505,11 @@ PAGES.automations = async (root) => {
   });
   $$('[data-auto]', root).forEach(sw2 => sw2.addEventListener('change', () => { if (!['chSecond', 'rep_daily', 'rep_weekly', 'rep_monthly', 'rep_instant'].includes(sw2.dataset.auto)) saveAuto({ [sw2.dataset.auto]: sw2.checked }); }));
   $$('[data-auto-sel]', root).forEach(sel => sel.addEventListener('change', () => saveAuto({ [sel.dataset.autoSel]: isNaN(+sel.value) ? sel.value : +sel.value })));
+  $('#rotSave', root)?.addEventListener('click', async () => {
+    const rotation = { enabled: $('#rotEnabled', root).checked, afterTouches: +$('#rotTouches', root).value || 3, afterHours: +$('#rotHours', root).value || 48, maxRotations: +$('#rotMax', root).value || 2, toQualifier: $('#rotToQual', root).checked };
+    await saveAuto({ rotation });
+    toast('Ротация сохранена', rotation.enabled ? 'Включена' : 'Выключена', true);
+  });
   /* Solo: команда/распределение/SLA не нужны — прячем целыми карточками */
   if (IS_SOLO()) {
     [...$$('.card-title', root)].filter(t => t.textContent.includes('Распределение по брокерам')).forEach(t => { t.closest('.glass.card').style.display = 'none'; });
@@ -9862,24 +9879,20 @@ PAGES.numbers = async (root) => {
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
     modal({
-      title: 'Добавить номер в пул',
-      body: `<div class="form-row"><label>Номер телефона</label><input id="nnPhone" placeholder="+971 58 000 00 00"></div>
+      title: 'Добавить официальный Cloud-API номер',
+      body: `<div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный «белый» канал Meta. Номер должен быть подключён к WhatsApp Business Platform (Настройки → WhatsApp Cloud API). Серые номера по QR добавляются кнопкой «Подключить по QR».</span></div>
+        <div class="form-row"><label>Номер телефона</label><input id="nnPhone" placeholder="+971 58 000 00 00"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="form-row"><label>Направление</label><select id="nnGeo">${geoOpts}</select></div>
-          <div class="form-row"><label>Канал</label><select id="nnChannel"><option value="web">Web-протокол (тёплый номер)</option><option value="cloud_api">Официальный Cloud API</option></select></div>
+          <div class="form-row"><label>Название (необязательно)</label><input id="nnLabel" placeholder="напр. Дубай · основной"></div>
         </div>
-        <div class="form-row"><label>Название (необязательно)</label><input id="nnLabel" placeholder="напр. Дубай · основной"></div>
         <div class="form-row"><label>Стартовое состояние</label><select id="nnState"><option value="warming">На прогрев (рекомендуется для нового)</option><option value="active">Сразу активен</option></select></div>
-        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:2px">Новый номер лучше 2–3 недели держать на прогреве: 10–20 контактов/день, рост ~20% в неделю. Холодные первые касания — только официальным Cloud API шаблонами.</div>`,
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:2px">Новый номер лучше 2–3 недели держать на прогреве: 10–20 контактов/день, рост ~20% в неделю.</div>`,
       actions: [{ label: 'Добавить', cls: 'btn-accent', onClick: async (bd) => {
         const phone = $('#nnPhone', bd).value.trim();
         if (!phone) { toast('Укажите номер'); return false; }
-        const channel = $('#nnChannel', bd).value, label = $('#nnLabel', bd).value;
-        /* web-протокол (тёплый номер) → РЕАЛЬНОЕ подключение по QR через воркер, тут же */
-        if (channel === 'web') { window.grayAddQR(phone, label); return; }
-        /* официальный Cloud API → в пул */
-        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel, label, state: $('#nnState', bd).value });
-        toast('Номер добавлен', 'В пуле — можно вести к активации', true);
+        await api.post('/numbers', { phone, geo: $('#nnGeo', bd).value, channel: 'cloud_api', label: $('#nnLabel', bd).value, state: $('#nnState', bd).value });
+        toast('Cloud-API номер добавлен', 'В пуле — можно вести к активации', true);
         render();
       } }, { label: 'Отмена' }],
     });

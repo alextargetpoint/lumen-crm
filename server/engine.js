@@ -514,6 +514,48 @@ function tickSla(db) {
   }
 }
 
+/* РОТАЦИЯ непрожатых заявок: лид в new/touch, клиент НЕ ответил, но получил N касаний ИЛИ провисел X часов →
+   переназначаем на следующего (наименее загруженного или квалификатора), сбрасываем цепочку для свежей попытки.
+   Ограничено maxRotations — потом лид уходит в «Спящие», чтобы не крутиться вечно. */
+function tickRotation(db) {
+  const rot = (db.settings.automations || {}).rotation;
+  if (!rot || !rot.enabled) return;
+  const nowT = Date.now();
+  for (const l of db.leads) {
+    if (!['new', 'touch'].includes(l.stage)) continue;
+    if (l.marketingOptOut) continue;
+    if (l.lastDir === 'in') continue;                                         // клиент ответил — не ротируем
+    if (db.messages.some(m => m.leadId === l.id && m.dir === 'in')) continue;
+    if (!l.broker) continue;                                                  // некого снимать (лид в общем пуле — цепочка сама работает)
+    const touches = (l.ai && l.ai.chainStep) || 0;
+    const since = l.rotatedAt || l.handoverAt || l.createdAt || 0;
+    const ageH = (nowT - since) / 3600e3;
+    const byTouch = rot.afterTouches ? touches >= rot.afterTouches : false;
+    const byAge = rot.afterHours ? ageH >= rot.afterHours : false;
+    if (!byTouch && !byAge) continue;
+    const done = l.rotations || 0;
+    if (done >= (rot.maxRotations || 2)) {                                    // исчерпали ротации → в «Спящие»
+      const prev = db.brokers.find(b => b.id === l.broker); if (prev) prev.load = Math.max(0, (prev.load || 0) - 1);
+      l.stage = 'sleeping'; l.slaFlag = 'rotated_out';
+      ai.pushEvent(db, { type: 'ai_off', leadId: l.id, text: `🔄 Ротация исчерпана (${done}) — ${l.name} ушёл в «Спящие»` });
+      continue;
+    }
+    /* кандидаты: квалификатор (если включено и есть) → иначе брокеры по гео → любые */
+    let pool = [];
+    if (rot.toQualifier) pool = db.brokers.filter(b => b.roleType === 'qualifier' && b.id !== l.broker && b.active !== false);
+    if (!pool.length) pool = db.brokers.filter(b => b.id !== l.broker && b.active !== false && b.geo === l.geo);
+    if (!pool.length) pool = db.brokers.filter(b => b.id !== l.broker && b.active !== false);
+    const nb = pool.sort((a, b) => (a.load || 0) - (b.load || 0))[0];
+    if (!nb) continue;
+    const prev = db.brokers.find(b => b.id === l.broker); if (prev) prev.load = Math.max(0, (prev.load || 0) - 1);
+    control.recordOwner(db, l, nb.id, 'auto', `ротация: не прожат (${byTouch ? touches + ' касаний' : Math.round(ageH) + 'ч'})`);
+    l.broker = nb.id; nb.load = (nb.load || 0) + 1;
+    l.rotatedAt = nowT; l.rotations = done + 1;
+    l.ai = l.ai || {}; l.ai.chainStep = 0; l.ai.nextTouchAt = nowT + 30e3;    // новый начинает касания заново
+    ai.pushEvent(db, { type: 'handover', leadId: l.id, text: `🔄 Ротация: ${l.name} не прожат — переназначен на ${nb.name}${nb.roleType === 'qualifier' ? ' (квалификатор)' : ''}` });
+  }
+}
+
 function tickCampaigns(db) {
   const nowT = Date.now();
   for (const cmp of db.campaigns) {
@@ -834,6 +876,7 @@ function startLoop() {
       tickCampaigns(db);
       tickMeetings(db);
       tickSla(db);
+      tickRotation(db);
       tickReports(db);
       tickSimulator(db);
       tickControl(db);

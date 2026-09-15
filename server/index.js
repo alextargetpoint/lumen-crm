@@ -154,7 +154,10 @@ function ensureTenantDefaults(db) {
     meetingReminderHrs: 3,     // напоминание клиенту за N часов (0 = выкл)
     noShowMessage: true,       // «не пришёл» → мягкое сообщение + вернуть ИИ
     rrCursor: 0,
+    /* ротация непрожатых заявок: не ответил после N касаний ИЛИ X часов → переназначить на следующего */
+    rotation: { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false },
   };
+  if (db.settings.automations && !db.settings.automations.rotation) db.settings.automations.rotation = { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false };
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.stagesCfg) db.settings.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
@@ -719,6 +722,7 @@ const recordOwner = control.recordOwner;   /* цепочка владения �
    leads: 'own' (только свои) | 'all' (все диалоги). allow: доп. группы API поверх базового брокера. */
 const ROLE_CAPS = {
   broker: { name: 'Брокер', leads: 'own', allow: [] },
+  qualifier: { name: 'Квалификатор', leads: 'all', allow: ['reports'] },   /* прожимает входящие заявки до передачи брокеру; видит все диалоги */
   assistant: { name: 'Ассистент', leads: 'all', allow: ['reports', 'voice'] },
   marketer: { name: 'Маркетолог', leads: 'own', allow: ['ads', 'comments', 'campaigns', 'wake', 'reports'] },
   analyst: { name: 'Аналитик', leads: 'all', allow: ['ads', 'campaigns', 'reports'] },
@@ -727,6 +731,8 @@ const ROLE_CAPS = {
 /* дефолтное скрытие разделов под роль (владелец может переопределить hidePages у сотрудника) */
 const ROLE_DEFAULT_HIDE = {
   broker: [],
+  /* квалификатор: видит входящие/диалоги/воронку/встречи/задачи, прожимает заявки; всё остальное скрыто */
+  qualifier: ['ads', 'comments', 'social', 'analytics', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake', 'hr', 'studio', 'content', 'mediaplan'],
   assistant: ['ads', 'comments', 'social', 'analytics', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'wake'],
   marketer: ['inbox', 'funnel', 'meetings', 'qualifier', 'sequences', 'playbook', 'academy', 'callReview', 'automations', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'tasks', 'wake'],
   analyst: ['inbox', 'meetings', 'tasks', 'qualifier', 'sequences', 'wake', 'playbook', 'academy', 'callReview', 'automations', 'templates', 'brokers', 'settings', 'numbers', 'agency', 'billing', 'social', 'properties', 'collections'],

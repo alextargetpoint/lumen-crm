@@ -131,6 +131,8 @@ html[data-night] .auto-seg .seg-b:hover { color: var(--ink); background: rgba(14
 ::-webkit-scrollbar-thumb { background: #C5D0DF; border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 svg { display: block; }
+/* Иконки из ic() идут инлайн с текстом → держим их на одной строке (глобальный svg{display:block} иначе роняет на свою строку). Внутри flex-контейнеров это не мешает. */
+svg.ic { display: inline-block; vertical-align: -0.14em; flex: 0 0 auto; }
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 input, select, textarea {
   font-family: inherit; font-size: 13.5px; color: var(--ink);
