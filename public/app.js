@@ -1133,6 +1133,7 @@ window.openGrayManager = async function (jumpPhone) {
   async function refresh() { try { data = await api.get('/wa/gray/list'); } catch (e) {} renderMgr(); }
   function renderMgr() {
     stopPoll();
+    if (!document.body.contains(bd) || !host()) return;   /* модалку закрыли/ушли — не рендерим в неё */
     const cfgOk = data.platform ? data.ready : (data.url && data.tokenSet);
     host().innerHTML = `
       ${data.platform
@@ -1217,6 +1218,7 @@ window.openGrayManager = async function (jumpPhone) {
       <div class="muted" style="font-size:12.5px;margin-top:6px">WhatsApp → Связанные устройства → Привязать устройство → сканируйте</div></div>`;
     $('#gqBack', bd)?.addEventListener('click', () => { stopPoll(); refresh(); });
     pollTimer = setInterval(async () => {
+      if (!document.body.contains(bd)) { stopPoll(); return; }   /* модалку закрыли/ушли навигацией — гасим poll, чтобы не дёргал DOM */
       const box = $('#grayQr', bd); if (!box) { stopPoll(); return; }
       let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
       const st = r.session && r.session.status;
@@ -1807,6 +1809,7 @@ function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remov
 
 function go(page) {
   CUR = page;
+  closeModal();   /* FIX: навигация закрывает открытую модалку (иначе QR-подключение/др. попап висит поверх новой страницы = «глюк/мерцание») */
   document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
   navProgress();
   /* раздел живёт в hash: F5 возвращает туда же (replaceState — без спама в историю) */
