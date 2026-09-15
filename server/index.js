@@ -2418,10 +2418,12 @@ function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelU
 /* --- Yesim Virtual Numbers: покупка виртуальных номеров под СЕРЫЕ WhatsApp (номер ловит OTP по SMS) --- */
 /* Платформенный токен (SaaS): все агентства покупают серые номера через ОДИН наш Yesim-аккаунт. Basic-Auth
    (username=token, password=token). ⚠️ Yesim требует whitelist IP сервера в их дашборде. */
-function yesimToken() { try { const r = store.getRegistry(); return process.env.YESIM_TOKEN || (r.platformYesim && r.platformYesim.token) || ''; } catch (_) { return process.env.YESIM_TOKEN || ''; } }
+function yesimCreds() { try { const r = store.getRegistry(); const p = r.platformYesim || {}; return { user: process.env.YESIM_USER || p.user || '', token: process.env.YESIM_TOKEN || p.token || '' }; } catch (_) { return { user: process.env.YESIM_USER || '', token: process.env.YESIM_TOKEN || '' }; } }
+function yesimToken() { return yesimCreds().token; }
 async function yesimApi(action, params) {
-  const tok = yesimToken(); if (!tok) throw new Error('Yesim-токен не задан (оператор: задай в реестре platformYesim)');
-  const auth = 'Basic ' + Buffer.from(tok + ':' + tok).toString('base64');
+  const { user, token } = yesimCreds(); if (!token) throw new Error('Yesim-токен не задан (оператор: задай в реестре platformYesim)');
+  /* Basic-auth: username=API user, password=token (в дашборде это две колонки) */
+  const auth = 'Basic ' + Buffer.from((user || token) + ':' + token).toString('base64');
   const body = new URLSearchParams();
   if (params) for (const k of Object.keys(params)) if (params[k] != null) body.set('params[' + k + ']', String(params[k]));
   const r = await fetch('https://vn.yesim.app/apiv1/index.php?action=' + action, { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(), signal: AbortSignal.timeout(15000) });
@@ -5969,9 +5971,9 @@ const server = http.createServer(async (req, res) => {
     /* оператор задаёт платформенный Yesim-токен (все агентства покупают через наш аккаунт) */
     if (p === '/api/gray/yesim/token' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      const b = await readBody(req); const token = String(b.token || '').trim();
+      const b = await readBody(req); const token = String(b.token || '').trim(); const user = String(b.user || '').trim();
       if (!token) return json(res, 400, { error: 'нужен токен' });
-      const reg = store.getRegistry(); reg.platformYesim = { token, at: Date.now() }; store.saveRegistry();
+      const reg = store.getRegistry(); reg.platformYesim = { user, token, at: Date.now() }; store.saveRegistry();
       let bal = null; try { bal = await yesimApi('get_balance'); } catch (e) { return json(res, 200, { ok: true, saved: true, warn: 'токен сохранён, но проверка баланса не прошла: ' + e.message }); }
       return json(res, 200, { ok: true, balance: bal });
     }
