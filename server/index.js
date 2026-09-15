@@ -6288,7 +6288,7 @@ const server = http.createServer(async (req, res) => {
         store.save();
       }
       if (!db.settings.wa.webhookVerifyToken) { db.settings.wa.webhookVerifyToken = crypto.randomBytes(16).toString('hex'); store.save(); }
-      const base = (global.LUMEN_BASE || 'https://app.lumen247.com').replace(/\/$/, '');
+      const base = (process.env.PUBLIC_BASE_URL || 'https://app.lumen247.com').replace(/\/$/, '');   /* публичный домен, не внутренний Railway */
       /* проверим подписку приложения на WABA (нужна для доставки событий) */
       let subscribed = null;
       try { if (db.settings.wa.wabaId && db.settings.wa.token) { const r = await fetch('https://graph.facebook.com/v21.0/' + db.settings.wa.wabaId + '/subscribed_apps?access_token=' + encodeURIComponent(db.settings.wa.token)); const j = await r.json(); subscribed = Array.isArray(j.data) ? j.data.length > 0 : null; } } catch (_) {}
