@@ -1304,7 +1304,7 @@ window.openYesimActivate = async function (phone) {
 /* OTP-мастер для ОФИЦИАЛЬНОГО WhatsApp Cloud API: покупаем реальный SMS-номер Telnyx →
    регистрируешь его в мастере Meta («Enter a new phone number») → код (OTP) прилетает СЮДА автоматически. */
 window.openTelnyxOtp = async function () {
-  let pollTimer = null, current = '';
+  let pollTimer = null, current = '', allNums = [];
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
   const bd = modal({ title: 'Номер для Cloud API (OTP)', sub: 'Реальный SMS-номер Telnyx → регистрация в WhatsApp Business', wide: true, body: '<div id="txOtp"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
@@ -1313,6 +1313,7 @@ window.openTelnyxOtp = async function () {
     current = String(number || '').replace(/[^0-9]/g, '');
     host().innerHTML = `
       <div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный канал Meta. В отличие от серых номеров, реальный <b>Telnyx</b>-номер WhatsApp принимает на регистрацию, и он же роутится для отправки. Код придёт в ленту ниже <b>автоматически</b>.</span></div>
+      ${allNums.length > 1 ? `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><label style="font-size:12px">Номер:</label><select id="txOtpPick" class="inp" style="max-width:220px">${allNums.map(n => `<option value="${esc(n.replace(/[^0-9]/g, ''))}" ${n.replace(/[^0-9]/g, '') === current ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
       ${current ? `<div class="lc-hint" style="margin-bottom:10px"><span>Твой OTP-номер: <b style="font-size:15px;letter-spacing:.5px">+${esc(current)}</b> — впиши его в мастере Meta.</span></div>` : `
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
         <select id="txOtpCountry" class="inp" style="max-width:160px">
@@ -1344,6 +1345,7 @@ window.openTelnyxOtp = async function () {
     });
     const refB = $('#txOtpRefresh', bd); if (refB) refB.addEventListener('click', loadSms);
     const clrB = $('#txOtpClear', bd); if (clrB) clrB.addEventListener('click', async () => { if (!current) return; try { await api.post('/telephony/otp/clear', { number: current }); loadSms(); } catch (e) {} });
+    const pickB = $('#txOtpPick', bd); if (pickB) pickB.addEventListener('change', async () => { draw('+' + pickB.value); if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} } loadSms(); });
   };
   const loadSms = async () => {
     const box = $('#txOtpSms', bd); if (!box || !document.body.contains(bd)) { stop(); return; }
@@ -1354,8 +1356,8 @@ window.openTelnyxOtp = async function () {
       box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:16px;letter-spacing:2px">${esc(m.code)}</b>` : ''}<i>${esc(new Date(m.at).toLocaleTimeString('ru-RU').slice(0, 5))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как Meta отправит код на +' + esc(current) + '.</div>';
     } catch (e) {}
   };
-  /* подтянуть уже купленный OTP-номер, если есть */
-  try { const r = await api.get('/telephony/otp/sms?number='); draw((r.numbers && r.numbers[0]) || ''); } catch (e) { draw(''); }
+  /* подтянуть купленные OTP-номера; по умолчанию — новейший (последний в списке) */
+  try { const r = await api.get('/telephony/otp/sms?number='); allNums = r.numbers || []; draw(allNums.length ? allNums[allNums.length - 1] : ''); } catch (e) { draw(''); }
   /* авто-починка: убедиться, что номер привязан к messaging-profile (иначе Telnyx не доставит OTP) */
   if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} }
   loadSms();
