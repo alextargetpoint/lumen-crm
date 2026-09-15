@@ -10071,6 +10071,7 @@ PAGES.numbers = async (root) => {
           ${ring(risk)}
         </div>
         <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}</div>
+        ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0} / ${n.newCap || 5}</b> · <span title="Массовые рассылки с серых номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
           <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
         <div class="num-actions">
