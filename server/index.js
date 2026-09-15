@@ -4543,7 +4543,7 @@ const server = http.createServer(async (req, res) => {
        что и конструктор /p/:id/blocks — держатель editKey и так может редактировать блоки */
     const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Медиапланы: публичное утверждение/отклонение подрядчиком авторизуется тем же edit-ключом (?key=hooks.secret), что и /mp/:id */
-    const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
+    const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
@@ -7849,6 +7849,19 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, status: mp.status, approvedBy: mp.approvedBy, approvedAt: mp.approvedAt });
     }
 
+    /* подрядчик заполняет/меняет план по ссылке (self-fill) → строки подтягиваются в CRM агентства */
+    if ((m = p.match(/^\/api\/mediaplans\/([^/]+)\/contractor-fill$/)) && req.method === 'POST') {
+      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
+      const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      if (Array.isArray(b.lines)) mp.lines = mpSanitizeLines(b.lines);
+      mp.contractorFilledAt = Date.now();
+      mp.contractorFilledBy = String(b.name || 'Подрядчик').slice(0, 80);
+      if (mp.status === 'draft' || mp.status === 'sent') mp.status = 'sent';   /* заполнен подрядчиком, ждёт финального взгляда агентства */
+      store.save();
+      return json(res, 200, { ok: true, lines: mp.lines.length, totals: mpTotals(mp) });
+    }
+
     /* рендер публичного премиум-документа медиаплана (клиентский вид; ?key= добавляет кнопки утверждения) */
     function renderMpDoc(db, mp, opts) {
       const AG = db.settings.agency.name || 'Агентство';
@@ -7902,14 +7915,43 @@ const server = http.createServer(async (req, res) => {
         <div class="st-ic">${mp.status === 'approved' ? '✓' : '✕'}</div>
         <div><b>${mp.status === 'approved' ? 'Медиаплан утверждён' : 'Медиаплан отклонён'}</b><span>${esc(mp.approvedBy || '')}${mp.approvedAt ? ' · ' + new Date(mp.approvedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}</span>${mp.approvalComment ? `<div class="st-cm">«${esc(mp.approvalComment)}»</div>` : ''}</div>
       </div>` : '';
+      const fillRowHtml = (ln) => `<tr class="fr">
+        <td><input class="fi" data-f="channel" value="${esc((ln && ln.channel) || '')}" placeholder="Meta / Google…"></td>
+        <td><input class="fi" data-f="geo" value="${esc((ln && ln.geo) || '')}" placeholder="dubai / bali…"></td>
+        <td><input class="fi" data-f="bundle" value="${esc((ln && ln.bundle) || '')}" placeholder="связка/сегмент"></td>
+        <td><input class="fi num" data-f="budgetPlan" type="number" min="0" value="${(ln && ln.budgetPlan) || ''}" placeholder="бюджет"></td>
+        <td><input class="fi num" data-f="leadsPlan" type="number" min="0" value="${(ln && ln.leadsPlan) || ''}" placeholder="лидов"></td>
+        <td><button class="fr-del" title="Удалить строку">✕</button></td></tr>`;
+      const fillEditor = `<div id="fillBox" style="display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:18px">
+        <div class="a-lbl">Заполните план: каналы, гео, бюджет и план по лидам. Сохраните — план подтянется в CRM агентства.</div>
+        <div style="overflow-x:auto"><table id="fillTbl"><thead><tr><th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лидов</th><th></th></tr></thead>
+          <tbody>${((mp.lines && mp.lines.length ? mp.lines : [null])).map(fillRowHtml).join('')}</tbody></table></div>
+        <button id="fillAdd" class="ab" style="margin-top:10px;background:var(--soft);color:var(--ink)">+ строка</button>
+        <div class="a-btns" style="margin-top:14px"><button class="ab approve" id="fillSave">Сохранить и отправить агентству</button></div>
+      </div>`;
       const actions = opts.canEdit ? `<div class="acts" id="acts">
-        <div class="a-lbl">Ваше решение по медиаплану</div>
-        <textarea id="mpCm" placeholder="Комментарий (необязательно) — что скорректировать, вопросы…"></textarea>
+        <div class="a-lbl">Медиаплан: заполните/измените план и сохраните, либо утвердите присланный</div>
+        <div class="a-btns" style="margin-bottom:6px"><button class="ab" id="fillToggle" style="background:var(--accent);color:#fff">✎ Заполнить / изменить план</button></div>
+        ${fillEditor}
+        <textarea id="mpCm" placeholder="Комментарий (необязательно) — что скорректировать, вопросы…" style="margin-top:14px"></textarea>
         <div class="a-btns"><button class="ab approve" data-act="approve">✓ Утвердить план</button><button class="ab reject" data-act="reject">✕ Отклонить</button></div>
       </div>` : `<div class="ro-note">Документ только для просмотра. Решение по плану вносит подрядчик по своей ссылке.</div>`;
       const SCR = opts.canEdit ? `<script>
 (function(){
   var acts=document.getElementById('acts');
+  var fillBox=document.getElementById('fillBox');
+  var rowHtml=${JSON.stringify(fillRowHtml(null))};
+  document.getElementById('fillToggle').addEventListener('click',function(){ fillBox.style.display = fillBox.style.display==='none'?'':'none'; });
+  document.getElementById('fillAdd').addEventListener('click',function(){ var tb=document.querySelector('#fillTbl tbody'); var tr=document.createElement('tr'); tr.className='fr'; tr.innerHTML=rowHtml.replace(/^<tr class="fr">|<\\/tr>$/g,''); tb.appendChild(tr); });
+  document.querySelector('#fillTbl').addEventListener('click',function(e){ var d=e.target.closest('.fr-del'); if(d){ var rows=document.querySelectorAll('#fillTbl tbody tr'); if(rows.length>1) d.closest('tr').remove(); else d.closest('tr').querySelectorAll('input').forEach(function(i){i.value='';}); } });
+  document.getElementById('fillSave').addEventListener('click',async function(){
+    var lines=[].map.call(document.querySelectorAll('#fillTbl tbody tr'),function(tr){var o={};tr.querySelectorAll('.fi').forEach(function(i){o[i.dataset.f]=i.type==='number'?(+i.value||0):i.value.trim();});return o;}).filter(function(o){return o.channel||o.budgetPlan||o.leadsPlan;});
+    if(!lines.length){ alert('Заполните хотя бы одну строку'); return; }
+    var name=prompt('Ваше имя (кто заполняет план):',''); if(name===null) return;
+    var b=this; b.disabled=true; b.textContent='Сохраняю…';
+    try{ var r=await fetch('/api/mediaplans/${mp.id}/contractor-fill?key=${esc(opts.key)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lines:lines,name:name||'Подрядчик'})}); var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка'); location.reload(); }
+    catch(err){ alert('Не удалось: '+err.message); b.disabled=false; b.textContent='Сохранить и отправить агентству'; }
+  });
   acts.addEventListener('click',async function(e){
     var b=e.target.closest('[data-act]'); if(!b) return;
     var act=b.dataset.act; var cm=document.getElementById('mpCm').value.trim();
@@ -7989,6 +8031,9 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
 .ab.reject{background:#fff;border:1.5px solid #EDC5C0;color:var(--bad)}
 .ab:disabled{opacity:.6}
 .ro-note{margin-top:26px;font-size:12.5px;color:var(--mut);text-align:center}
+.fi{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;outline:none;color:var(--ink)}
+.fi:focus{border-color:var(--accent)} .fi.num{text-align:right}
+#fillTbl td{padding:6px 6px} .fr-del{border:none;background:none;color:var(--mut);cursor:pointer;font-size:15px;padding:4px 8px} .fr-del:hover{color:var(--bad)}
 .foot{padding:22px 40px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .tbl-wrap{overflow-x:auto}
 @media(max-width:640px){.hd,.meta,.body,.foot{padding-left:20px;padding-right:20px}.strip{grid-template-columns:1fr}.h1{font-size:24px}table{min-width:560px}}
