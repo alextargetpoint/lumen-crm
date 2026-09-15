@@ -6276,6 +6276,24 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, result: j });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
+    /* настройка вебхука официального WhatsApp: значения для вставки в Meta + сохранение App Secret.
+       Без этого номер только ШЛЁТ — не принимает ответы/статусы доставки/клики отписки. */
+    if (p === '/api/whatsapp/webhook-setup' && (req.method === 'GET' || req.method === 'POST')) {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      db.settings.wa = db.settings.wa || {};
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        if (b.appSecret) db.settings.wa.appSecret = String(b.appSecret).trim();
+        if (b.regenToken || !db.settings.wa.webhookVerifyToken) db.settings.wa.webhookVerifyToken = crypto.randomBytes(16).toString('hex');
+        store.save();
+      }
+      if (!db.settings.wa.webhookVerifyToken) { db.settings.wa.webhookVerifyToken = crypto.randomBytes(16).toString('hex'); store.save(); }
+      const base = (global.LUMEN_BASE || 'https://app.lumen247.com').replace(/\/$/, '');
+      /* проверим подписку приложения на WABA (нужна для доставки событий) */
+      let subscribed = null;
+      try { if (db.settings.wa.wabaId && db.settings.wa.token) { const r = await fetch('https://graph.facebook.com/v21.0/' + db.settings.wa.wabaId + '/subscribed_apps?access_token=' + encodeURIComponent(db.settings.wa.token)); const j = await r.json(); subscribed = Array.isArray(j.data) ? j.data.length > 0 : null; } } catch (_) {}
+      return json(res, 200, { ok: true, callbackUrl: base + '/wa/webhook', verifyToken: db.settings.wa.webhookVerifyToken, field: 'messages', appSecretSet: !!db.settings.wa.appSecret, subscribed });
+    }
     /* сохранить креды Cloud API (постоянный токен + Phone Number ID) БЕЗ повторного /register — для уже Connected номера */
     if (p === '/api/whatsapp/cloud-save' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

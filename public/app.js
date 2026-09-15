@@ -10110,6 +10110,12 @@ PAGES.numbers = async (root) => {
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Cloud-API-номеров пока нет — нажмите «Купить Cloud API номер», затем зарегистрируйте его в WhatsApp.</div>`}
 
+    <div class="glass card mb" id="waWebhookCard">
+      <div class="card-title">${ic(I.link)}Вебхук официального WhatsApp<span class="sub">входящие ответы · аналитика доставки · клики «Отписаться»</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Без вебхука номер только <b>шлёт</b> — не принимает ответы клиентов, статусы доставки (для аналитики рассылок) и клики «Отписаться». Настраивается один раз: вставь эти значения в <b>Meta → твоё приложение → WhatsApp → Configuration</b> и подпишись на поле <b>messages</b>.</div>
+      <div id="waWebhookBody" class="muted" style="font-size:12px">Загрузка…</div>
+    </div>
+
     ${st.numbers.length ? `<div class="lp-sec" style="margin:0 0 10px">Официальные Cloud-API номера · ${st.numbers.length}</div>
     <div class="num-grid">
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
@@ -10169,6 +10175,29 @@ PAGES.numbers = async (root) => {
       });
     } catch (_) {}
   }, 30000);
+  /* карточка настройки вебхука официального WhatsApp */
+  async function loadWaWebhook() {
+    const box = $('#waWebhookBody', root); if (!box) return;
+    try {
+      const r = await api.get('/whatsapp/webhook-setup');
+      const row = (k, v, id) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="min-width:100px;color:var(--ink-3);font-size:11px">${k}</span><code id="${id}" style="flex:1;min-width:180px;font-size:11.5px;background:var(--panel-2,#191a1e);border:1px solid var(--stroke);border-radius:6px;padding:4px 8px;overflow:auto">${esc(v)}</code><button class="btn-ghost btn-sm" data-copy="${id}">копировать</button></div>`;
+      box.innerHTML = `<div style="display:grid;gap:8px">
+          ${row('Callback URL', r.callbackUrl, 'whUrl')}
+          ${row('Verify token', r.verifyToken, 'whTok')}
+          <div style="display:flex;gap:8px;align-items:center"><span style="min-width:100px;color:var(--ink-3);font-size:11px">Webhook field</span><b style="font-size:12px">${esc(r.field)}</b></div>
+        </div>
+        <div class="form-row" style="margin-top:12px"><label style="font-size:11px">App Secret (Meta → App settings → Basic → Show)</label><input id="whSecret" placeholder="${r.appSecretSet ? '••••••• сохранён — вставь новый для замены' : 'вставь App Secret'}"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-sm btn-accent" id="whSave">${ic(I.check)}Сохранить App Secret</button>
+          <span class="chip-t ${r.appSecretSet ? 'ok' : ''}">${r.appSecretSet ? '✓ App Secret сохранён' : 'App Secret не задан'}</span>
+          ${r.subscribed === true ? '<span class="chip-t ok">✓ приложение подписано на WABA</span>' : (r.subscribed === false ? '<span class="chip-t">приложение не подписано на WABA</span>' : '')}
+        </div>
+        <div class="lc-hint info" style="margin-top:10px"><span>${ic(I.shield)}В Meta: <b>WhatsApp → Configuration → Webhook → Edit</b> → вставь Callback URL и Verify token → <b>Verify and save</b> → в «Webhook fields» включи <b>messages</b>. App Secret вставь сюда — им проверяется подпись входящих.</span></div>`;
+      box.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => { const el2 = $('#' + b.dataset.copy, box); if (el2) { try { navigator.clipboard.writeText(el2.textContent); toast('Скопировано', null, true); } catch (_) {} } }));
+      $('#whSave', box)?.addEventListener('click', async () => { const appSecret = ($('#whSecret', box) || {}).value || ''; if (!appSecret) { toast('Вставь App Secret'); return; } try { await api.post('/whatsapp/webhook-setup', { appSecret }); toast('App Secret сохранён', 'Вебхук готов принимать', true); loadWaWebhook(); } catch (e) { toast('Не вышло', e.message); } });
+    } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+  }
+  loadWaWebhook();
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
     if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
