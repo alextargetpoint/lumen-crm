@@ -292,13 +292,31 @@
   }
 
   function stepFinish() {
+    const solo = S.edition === 'solo';
+    const name = S.name || (solo ? 'Ваш бренд' : 'Ваше агентство');
+    const initial = esc(String(name).trim().charAt(0).toUpperCase() || 'L');
+    const geoChips = (S.geos || []).slice(0, 6).map(k => `<span class="ob-plate-geo">${esc((GEOS.find(g => g.k === k) || {}).l || k)}</span>`).join('');
+    const logo = S.logo ? `<img src="${esc(S.logo)}" alt="">` : `<span class="ob-plate-mono">${initial}</span>`;
+    /* персональная «обложка бренда» — скомпонована из их данных на анимированном золотом фоне (как hero-кавер писем) */
+    const plate = `
+      <div class="ob-plate">
+        <div class="ob-plate-art"><i></i><i></i><i></i><span class="ob-plate-star">&#10022;</span></div>
+        <div class="ob-plate-body">
+          <div class="ob-plate-logo">${logo}</div>
+          <div class="ob-plate-wm">&#10022;&nbsp;LUMEN</div>
+          <div class="ob-plate-name">${esc(name)}</div>
+          <div class="ob-plate-sub">AI-CRM для недвижимости · ${solo ? 'Соло-брокер' : 'Агентство'}</div>
+          ${geoChips ? `<div class="ob-plate-geos">${geoChips}</div>` : ''}
+        </div>
+      </div>`;
     return {
       bg: 'success', pad: true,
       html: `
-        <div class="ob-center">
+        <div class="ob-center ob-finish">
           <div class="ob-done-mark">${IC.check}</div>
           <h1 class="ob-h1">Пространство собрано</h1>
-          <p class="ob-lead">${S.name ? esc(S.name) + ' — ' : ''}всё готово. Lumen берёт первую линию: отвечает за секунды, квалифицирует и передаёт тёплых. Вы видите заявки, квалы и сделки в реальном времени.</p>
+          <p class="ob-lead">Всё готово. Lumen берёт первую линию: отвечает за секунды, квалифицирует и передаёт тёплых. Вы видите заявки, квалы и сделки в реальном времени.</p>
+          ${plate}
           <div class="ob-recap" id="obRecap"></div>
         </div>`,
       primary: 'Запустить Lumen →',
@@ -702,6 +720,26 @@
     .ob-recap-row{display:flex;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08)}
     .ob-recap-row span{font-size:13px;color:#6b6a68;font-weight:300}
     .ob-recap-row b{font-size:14px;color:#f4f3f1;font-weight:600}
+    /* ── персональная обложка бренда на финале ── */
+    .ob-plate{position:relative;max-width:560px;margin:28px auto 6px;border-radius:20px;overflow:hidden;border:1px solid rgba(214,199,168,.34);background:radial-gradient(120% 130% at 82% 42%,rgba(35,28,15,.9),rgba(10,9,7,.96));box-shadow:0 30px 70px -30px rgba(0,0,0,.7),0 0 0 1px rgba(214,199,168,.06);text-align:left;animation:obPlate .9s cubic-bezier(.19,1,.22,1) both .15s}
+    @keyframes obPlate{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+    .ob-plate-art{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+    .ob-plate-art i{position:absolute;top:50%;right:-4%;border:1px solid rgba(214,199,168,.16);border-radius:50%;transform:translateY(-50%);animation:obRing 9s ease-in-out infinite}
+    .ob-plate-art i:nth-child(1){width:230px;height:230px;margin:-115px -115px 0 0}
+    .ob-plate-art i:nth-child(2){width:340px;height:340px;margin:-170px -170px 0 0;opacity:.6;animation-delay:.6s}
+    .ob-plate-art i:nth-child(3){width:460px;height:460px;margin:-230px -230px 0 0;opacity:.35;animation-delay:1.2s}
+    @keyframes obRing{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.04)}}
+    .ob-plate-star{position:absolute;top:50%;right:12%;transform:translateY(-50%);font-family:'Cormorant',Georgia,serif;font-size:96px;color:rgba(214,199,168,.9);text-shadow:0 0 40px rgba(214,199,168,.5);line-height:1;animation:obEmblem 5s ease-in-out infinite}
+    .ob-plate-body{position:relative;z-index:1;padding:30px 32px}
+    .ob-plate-logo{width:56px;height:56px;border-radius:14px;overflow:hidden;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.28);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+    .ob-plate-logo img{max-width:82%;max-height:82%;object-fit:contain}
+    .ob-plate-mono{font-family:'Cormorant',Georgia,serif;font-size:30px;font-weight:500;color:#e6dcc6}
+    .ob-plate-wm{font-family:'Cormorant',Georgia,serif;font-size:13px;letter-spacing:.22em;color:rgba(214,199,168,.7);margin-bottom:6px}
+    .ob-plate-name{font-family:'Cormorant',Georgia,serif;font-size:clamp(30px,4.4vw,44px);font-weight:500;letter-spacing:-.01em;line-height:1.06;color:#f6f2ea;max-width:82%}
+    .ob-plate-sub{font-size:12px;letter-spacing:.04em;color:#8f8b80;margin-top:8px}
+    .ob-plate-geos{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+    .ob-plate-geo{font-size:12px;color:#d6c7a8;border:1px solid rgba(214,199,168,.28);border-radius:999px;padding:5px 12px;background:rgba(214,199,168,.05)}
+    .ob-finish .ob-recap{margin-top:24px}
     /* ── низ: прогресс + кнопки ── */
     .ob-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 30px 26px;position:relative;z-index:5}
     .ob-dots{display:flex;gap:7px;align-items:center}
