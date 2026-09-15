@@ -2994,14 +2994,21 @@ const server = http.createServer(async (req, res) => {
       /* Подпись Meta: HMAC-SHA256 сырого тела с App Secret. Без валидной подписи любой в интернете
          мог инжектить «входящие сообщения»/лидов прямо в ИИ-продавца. Нужен WA_APP_SECRET (env) или wa.appSecret. */
       const raw = await new Promise((resolve) => { const ch = []; req.on('data', c => ch.push(c)); req.on('end', () => resolve(Buffer.concat(ch))); req.on('close', () => resolve(Buffer.concat(ch))); });
-      const waSecret = process.env.WA_APP_SECRET || (db.settings.wa && db.settings.wa.appSecret) || '';
-      if (!waSecret) { console.warn('[wa/webhook] отклонён: не задан WA_APP_SECRET — подпись Meta проверить нельзя'); return json(res, 401, { error: 'webhook not configured' }); }
-      const sig = String(req.headers['x-hub-signature-256'] || '');
-      const expected = 'sha256=' + crypto.createHmac('sha256', waSecret).update(raw).digest('hex');
-      const okSig = sig.length === expected.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch (_) { return false; } })();
-      if (!okSig) { return json(res, 403, { error: 'bad signature' }); }
       let body; try { body = JSON.parse(raw.toString('utf8') || '{}'); } catch (_) { body = {}; }
-      try {
+      /* МУЛЬТИТЕНАНТ: один URL вебхука на всех агентств → находим тенанта по phone_number_id / waba_id из payload.
+         Иначе события НЕ-primary агентства (демо и др.) падали в PRIMARY, подпись проверялась чужим App Secret → дроп. */
+      const _pnid = body.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+      const _wabaId = body.entry?.[0]?.id;
+      const _wtid = findTenant(() => { const w = store.get().settings.wa || {}; return (_pnid && String(w.phoneId) === String(_pnid)) || (_wabaId && String(w.wabaId) === String(_wabaId)); }) || store.currentTid();
+      return await store.runInTenant(_wtid, async () => {
+        const db = store.get();
+        const waSecret = process.env.WA_APP_SECRET || (db.settings.wa && db.settings.wa.appSecret) || '';
+        if (!waSecret) { console.warn('[wa/webhook] отклонён: не задан App Secret для тенанта', _wtid); return json(res, 401, { error: 'webhook not configured' }); }
+        const sig = String(req.headers['x-hub-signature-256'] || '');
+        const expected = 'sha256=' + crypto.createHmac('sha256', waSecret).update(raw).digest('hex');
+        const okSig = sig.length === expected.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch (_) { return false; } })();
+        if (!okSig) { return json(res, 403, { error: 'bad signature' }); }
+        try {
         const field = body.entry?.[0]?.changes?.[0]?.field;
         const changes = body.entry?.[0]?.changes?.[0]?.value;
         /* комментарии под публикацией/рекламой (IG field 'comments', FB 'feed' item 'comment') */
@@ -3056,8 +3063,9 @@ const server = http.createServer(async (req, res) => {
           }
           if (text || media) engine.inbound(db, lead, text, media ? { media } : {});
         }
-      } catch (e) { console.error('[webhook]', e); }
-      json(res, 200, { ok: true }); return;
+        } catch (e) { console.error('[webhook]', e); }
+        json(res, 200, { ok: true });
+      });
     }
 
     /* ---------------- Telegram-мост: апдейты от бота (брокер отвечает клиенту) ---------------- */
