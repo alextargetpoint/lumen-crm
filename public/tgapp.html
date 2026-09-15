@@ -188,7 +188,9 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   /* sheet */
   .sheet-bd{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:40;opacity:0;transition:.2s;display:flex;align-items:flex-end}
   .sheet-bd.on{opacity:1}
-  .sheet{width:100%;max-width:680px;margin:0 auto;background:var(--panel2);border-radius:24px 24px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);transform:translateY(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);max-height:70vh;overflow-y:auto;border:1px solid var(--line);border-bottom:0}
+  .sheet{width:100%;max-width:680px;margin:0 auto;background:var(--panel2);border-radius:24px 24px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);transform:translateY(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);max-height:82vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;border:1px solid var(--line);border-bottom:0}
+  .sheet *{max-width:100%;box-sizing:border-box}
+  .sheet textarea{resize:none}
   .sheet-bd.on .sheet{transform:none}
   .sheet .grip{width:40px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px}
   .sheet h3{margin:0 0 12px;font-size:16px;font-weight:800;letter-spacing:-.3px}
@@ -484,7 +486,7 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
 <div id="app">
   <div id="view-list">
     <div class="top">
-      <h1><span class="spark ic" data-ic="chat"></span><span id="h1t">Мои чаты</span><span class="hd-btn ic" id="settingsBtn" data-ic="gear" style="margin-left:auto;color:var(--mut);background:var(--panel)"></span></h1>
+      <h1><span class="spark ic" data-ic="chat"></span><span id="h1t">Мои чаты</span><span class="hd-btn ic" id="settingsBtn" data-ic="palette" title="Оформление" style="margin-left:auto;color:var(--mut);background:var(--panel)"></span></h1>
       <div class="sub" id="sub">Загрузка…</div>
       <div class="viewseg" id="viewseg">
         <button data-v="chats" class="on"><span class="ic" data-ic="chat"></span>Чаты<span class="vbadge" id="vbChats"></span></button>
@@ -562,6 +564,7 @@ const IC={
   video:'<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3z"/>',
   doc:'<path d="M6 3h7l5 5v13H6z"/><path d="M13 3v5h5"/>',
   gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5l1.4 2.3 2.6-.5.5 2.6 2.3 1.4-1 2.4 1 2.4-2.3 1.4-.5 2.6-2.6-.5L12 21.5l-1.4-2.3-2.6.5-.5-2.6-2.3-1.4 1-2.4-1-2.4 2.3-1.4.5-2.6 2.6.5z"/>',
+  palette:'<path d="M12 3C7 3 3 6.6 3 11c0 3.9 3.1 7 7 7 .9 0 1.6-.4 2-1 .3-.4.4-1 .2-1.5-.2-.6 0-1.3.5-1.6.4-.3.9-.4 1.3-.4H18a3 3 0 003-3c0-4-4-7.5-9-7.5z"/><circle cx="7.6" cy="11.5" r=".6"/><circle cx="10" cy="7.6" r=".6"/><circle cx="14.4" cy="7.6" r=".6"/><circle cx="16.6" cy="11" r=".6"/>',
   sun:'<circle cx="12" cy="12" r="4.4"/><path d="M12 1.8v2.6M12 19.6v2.6M1.8 12h2.6M19.6 12h2.6M4.5 4.5l1.9 1.9M17.6 17.6l1.9 1.9M19.5 4.5l-1.9 1.9M6.4 17.6l-1.9 1.9"/>',
   moon:'<path d="M20.5 14.8A8.5 8.5 0 1 1 9.2 3.5a6.7 6.7 0 0 0 11.3 11.3z"/>',
   auto:'<circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2z" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="8.6"/>',
@@ -576,6 +579,15 @@ const IC={
   chev:'<path d="M6 9l6 6 6-6"/>',
 };
 const svg=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
+/* фирменные микро-саунды (Web Audio, без файлов) — вкл/выкл микрофона, ИИ-искорки, готово */
+let _actx;
+function sfx(type){try{_actx=_actx||new (window.AudioContext||window.webkitAudioContext)();const ctx=_actx;if(ctx.state==='suspended')ctx.resume();const now=ctx.currentTime;
+  const t=(f,t0,dur,vol,ft)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=ft||'sine';o.frequency.setValueAtTime(f,now+t0);g.gain.setValueAtTime(0,now+t0);g.gain.linearRampToValueAtTime(vol,now+t0+0.012);g.gain.exponentialRampToValueAtTime(0.0001,now+t0+dur);o.connect(g);g.connect(ctx.destination);o.start(now+t0);o.stop(now+t0+dur+0.02)};
+  if(type==='micon'){t(523,0,0.09,0.10);t(784,0.07,0.15,0.09)}
+  else if(type==='micoff'){t(659,0,0.10,0.09);t(392,0.08,0.17,0.08)}
+  else if(type==='ai'){t(880,0,0.07,0.06,'triangle');t(1175,0.06,0.07,0.06,'triangle');t(1568,0.12,0.13,0.06,'triangle')}
+  else if(type==='done'){t(784,0,0.09,0.09);t(1046,0.09,0.19,0.08)}
+}catch(e){}}
 function paintIcons(root){(root||document).querySelectorAll('[data-ic]').forEach(e=>{if(!e._p){e._p=1;e.innerHTML=svg(e.dataset.ic)}})}
 
 const TG=window.Telegram&&window.Telegram.WebApp; if(TG){TG.ready();TG.expand();try{TG.setHeaderColor('#080b12');TG.setBackgroundColor('#080b12')}catch(e){}}
@@ -764,12 +776,13 @@ function taskSheet(t){
   const isNew=!t||!t.id;t=t||{};let subs=(t.subtasks||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
   let pri=t.priority||'normal';
   const bd=document.createElement('div');bd.className='sheet-bd';
-  const dueVal=t.due?_dstr(t.due):(t.scheduled||'');
+  let dueMs=t.due||(t.scheduled?new Date(t.scheduled+'T09:00').getTime():null);
+  const dLabel=ms=>ms?(_dstr(ms)===_todayStr()?'Сегодня':new Date(ms).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})):'Выбрать дату';
   const pb=(v,l)=>`<button data-pri="${v}" class="${pri===v?'on':''}">${l}</button>`;
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>${isNew?'Новая задача':'Задача'}</h3>
-    <input class="tf-in" id="tfTitle" placeholder="Что нужно сделать" value="${esc(t.title||'')}">
+    <textarea class="tf-in" id="tfTitle" rows="2" placeholder="Что нужно сделать" style="min-height:52px;line-height:1.4">${esc(t.title||'')}</textarea>
     <div class="tf-lbl">Приоритет</div><div class="seg" id="tfPri">${pb('low','Низкий')}${pb('normal','Обычный')}${pb('high','Высокий')}</div>
-    <div class="tf-lbl">Дата</div><input class="tf-in" id="tfDue" type="date" value="${dueVal}">
+    <div class="tf-lbl">Дата</div><button type="button" class="tf-in" id="tfDue" style="text-align:left;cursor:pointer;color:var(--ink)">${dLabel(dueMs)}</button>
     <div class="tf-lbl">Подзадачи</div><div id="tfSubs"></div>
     <button class="tf-addsub" id="tfAddSub">＋ Подзадача</button>
     <button class="tf-ai" id="tfAI" style="margin-top:9px">✨ Причесать в подзадачи ИИ</button>
@@ -782,9 +795,11 @@ function taskSheet(t){
     box.querySelectorAll('.tf-sub').forEach(r=>{const i=+r.dataset.i;r.querySelector('[data-sck]').onclick=()=>{subs[i].done=!subs[i].done;paintSubs()};r.querySelector('[data-stitle]').oninput=e=>subs[i].title=e.target.value;r.querySelector('[data-srm]').onclick=()=>{subs.splice(i,1);paintSubs()}});};
   paintSubs();
   bd.querySelector('#tfAddSub').onclick=()=>{subs.push({title:'',done:false});paintSubs();const inps=bd.querySelectorAll('[data-stitle]');inps.length&&inps[inps.length-1].focus()};
-  bd.querySelector('#tfAI').onclick=async()=>{const raw=(bd.querySelector('#tfTitle').value+'. '+bd.querySelector('#tfNotes').value).trim();if(raw.replace(/[.\s]/g,'').length<6){toast('Впиши/надиктуй, что нужно сделать');return}hap('medium');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();if(r.title)bd.querySelector('#tfTitle').value=r.title;if(r.notes)bd.querySelector('#tfNotes').value=r.notes;if(r.priority){pri=r.priority;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x.dataset.pri===pri))}subs=(r.subtasks||[]).map(s=>({title:s,done:false}));paintSubs();hap();toast('Готово ✨')}catch(e){bz.close();toast(e.message)}};
+  bd.querySelector('#tfAI').onclick=async()=>{const raw=(bd.querySelector('#tfTitle').value+'. '+bd.querySelector('#tfNotes').value).trim();if(raw.replace(/[.\s]/g,'').length<6){toast('Впиши/надиктуй, что нужно сделать');return}hap('medium');sfx('ai');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();if(r.title)bd.querySelector('#tfTitle').value=r.title;if(r.notes)bd.querySelector('#tfNotes').value=r.notes;if(r.priority){pri=r.priority;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x.dataset.pri===pri))}subs=(r.subtasks||[]).map(s=>({title:s,done:false}));paintSubs();hap();sfx('done');toast('Готово ✨')}catch(e){bz.close();toast(e.message)}};
   if(!isNew)bd.querySelector('#tfDel').onclick=async()=>{hap('medium');try{await jdel('/tgapp/api/task/'+t.id);close();loadTasks();prefetchDayBadges&&prefetchDayBadges();toast('Удалено')}catch(e){toast(e.message)}};
-  bd.querySelector('#tfSave').onclick=async()=>{const title=bd.querySelector('#tfTitle').value.trim();if(!title){toast('Впиши задачу');return}const dv=bd.querySelector('#tfDue').value;const due=dv?new Date(dv+'T09:00').getTime():null;const notes=bd.querySelector('#tfNotes').value.trim();const st=subs.filter(s=>(s.title||'').trim());hap('medium');
+  const _ta=bd.querySelector('#tfTitle');const _grow=()=>{_ta.style.height='auto';_ta.style.height=Math.min(_ta.scrollHeight+2,170)+'px'};_ta.addEventListener('input',_grow);setTimeout(_grow,20);
+  bd.querySelector('#tfDue').onclick=()=>{hap();datePickSheet(dueMs,ms=>{dueMs=ms;bd.querySelector('#tfDue').textContent=dLabel(ms)})};
+  bd.querySelector('#tfSave').onclick=async()=>{const title=bd.querySelector('#tfTitle').value.trim();if(!title){toast('Впиши задачу');return}const due=dueMs;const notes=bd.querySelector('#tfNotes').value.trim();const st=subs.filter(s=>(s.title||'').trim());hap('medium');
     try{if(isNew)await jpost('/tgapp/api/task',{title,priority:pri,due,notes,subtasks:st});else await jpatch('/tgapp/api/task/'+t.id,{title,priority:pri,due,notes,subtasks:st});close();loadTasks();prefetchDayBadges&&prefetchDayBadges();toast(isNew?'Создано':'Сохранено')}catch(e){toast(e.message)}};
 }
 function taskAISheet(){
@@ -796,7 +811,29 @@ function taskAISheet(){
   document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>bd.classList.add('on'));
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
   bd.querySelector('#aiMic').onclick=()=>dictateInto(bd.querySelector('#aiRaw'),bd.querySelector('#aiMic'));
-  bd.querySelector('#aiGo').onclick=async()=>{const raw=bd.querySelector('#aiRaw').value.trim();if(raw.length<8){toast('Впиши/надиктуй список');return}hap('medium');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();close();taskSheet({title:r.title,priority:r.priority,notes:r.notes,subtasks:(r.subtasks||[]).map(s=>({title:s,done:false}))})}catch(e){bz.close();toast(e.message)}};
+  bd.querySelector('#aiGo').onclick=async()=>{const raw=bd.querySelector('#aiRaw').value.trim();if(raw.length<8){toast('Впиши/надиктуй список');return}hap('medium');sfx('ai');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();sfx('done');close();taskSheet({title:r.title,priority:r.priority,notes:r.notes,subtasks:(r.subtasks||[]).map(s=>({title:s,done:false}))})}catch(e){bz.close();toast(e.message)}};
+}
+function datePickSheet(curMs,onPick){
+  let mon=(()=>{const d=curMs?new Date(curMs):new Date();return new Date(d.getFullYear(),d.getMonth(),1).getTime()})();
+  const sel=curMs?_dstr(curMs):null;
+  const bd=document.createElement('div');bd.className='sheet-bd';
+  bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Дата задачи</h3><div id="dpBox"></div><button class="tf-addsub" id="dpClear" style="margin-top:10px">Без даты</button></div>`;
+  document.body.appendChild(bd);requestAnimationFrame(()=>bd.classList.add('on'));
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
+  bd.querySelector('#dpClear').onclick=()=>{hap();onPick(null);close()};
+  const paint=()=>{const cur=new Date(mon),y=cur.getFullYear(),m=cur.getMonth(),today=_todayStr();
+    const startDow=(new Date(y,m,1).getDay()+6)%7,daysIn=new Date(y,m+1,0).getDate(),cells=[];
+    for(let i=0;i<startDow;i++)cells.push(new Date(y,m,1-startDow+i));
+    for(let d=1;d<=daysIn;d++)cells.push(new Date(y,m,d));
+    while(cells.length%7)cells.push(new Date(y,m,daysIn+1+(cells.length-startDow-daysIn)));
+    const mName=cur.toLocaleDateString('ru-RU',{month:'long',year:'numeric'}),dow=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+    bd.querySelector('#dpBox').innerHTML=`<div class="tkcal" style="margin:0"><div class="tkcal-hd"><button type="button" data-nav="-1">‹</button><span style="text-transform:capitalize">${esc(mName)}</span><button type="button" data-nav="1">›</button></div>
+      <div class="tkcal-dow">${dow.map(d=>`<span>${d}</span>`).join('')}</div>
+      <div class="tkcal-grid">${cells.map(c=>{const ds=_dstr(c.getTime()),out=c.getMonth()!==m;return `<div class="tkcal-d ${out?'out':''} ${ds===today?'today':''} ${ds===sel?'sel':''}" data-ds="${ds}">${c.getDate()}</div>`}).join('')}</div></div>`;
+    bd.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{const d=new Date(mon);d.setMonth(d.getMonth()+ +b.dataset.nav);mon=d.getTime();paint()});
+    bd.querySelectorAll('.tkcal-d').forEach(el=>el.onclick=()=>{hap();onPick(new Date(el.dataset.ds+'T09:00').getTime());close()});
+  };
+  paint();
 }
 function renderTaskCalendar(){
   const wrap=$('#tkCalWrap');if(!wrap)return;
@@ -955,11 +992,11 @@ function mbGenSheet(){
   const bd=document.createElement('div');bd.className='sheet-bd';
   bd.innerHTML=`<div class="sheet"><div class="grip"></div><h3>Сгенерировать желание ИИ</h3>
     <textarea class="ish" id="mbP" rows="2" placeholder="Что вдохновляет? напр.: белоснежная вилла у моря в Дубае на закате"></textarea>
-    <div class="set-lbl">Стиль</div><div class="seg" id="mbStyle"><button data-s="photo" class="on">Фото</button><button data-s="sticker">Стикер</button></div>
+    <div class="set-lbl">Стиль</div><div class="seg" id="mbStyle"><button data-s="sticker" class="on">Стикер</button><button data-s="photo">Фото</button></div>
     <button class="ish-ok" id="mbGo">Сгенерировать</button></div>`;
   document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>bd.classList.add('on'));
   const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
-  let style='photo';bd.querySelectorAll('#mbStyle button').forEach(b=>b.onclick=()=>{hap();style=b.dataset.s;bd.querySelectorAll('#mbStyle button').forEach(x=>x.classList.toggle('on',x===b))});
+  let style='sticker';bd.querySelectorAll('#mbStyle button').forEach(b=>b.onclick=()=>{hap();style=b.dataset.s;bd.querySelectorAll('#mbStyle button').forEach(x=>x.classList.toggle('on',x===b))});
   bd.querySelector('#mbGo').onclick=async()=>{const prompt=bd.querySelector('#mbP').value.trim();if(!prompt){toast('Опишите желание');return}hap('medium');close();
     const stages=style==='sticker'?['Придумываю композицию…','Рисую стикер…','Вырезаю по контуру…','Почти готово…']:['Придумываю кадр…','Рисую изображение…','Почти готово…'];
     const bz=tgBusy(stages[0]);let si=0;const stp=setInterval(()=>{si=Math.min(si+1,stages.length-1);bz.update(stages[si])},6000);
@@ -1140,14 +1177,14 @@ function dictateInto(input,btn){
     if(rec){
       rec.lang='ru-RU';rec.continuous=true;rec.interimResults=true;
       const base=input.value||'';let finalTxt='';let ended=false;
-      const cleanup=()=>{if(ended)return;ended=true;busy(false);if(btn)btn._dictStop=null;
+      const cleanup=()=>{if(ended)return;ended=true;busy(false);sfx('micoff');if(btn)btn._dictStop=null;
         const raw=(finalTxt||'').trim();
         if(raw){ /* причёсываем надиктованное: пунктуация/абзацы, слова сохраняем (живой текст остаётся на экране, пока идёт) */
           const bz=tgBusy('Причёсываю текст…');
           jpost('/tgapp/api/dictate-clean',{text:raw}).then(r=>{const cl=((r&&r.text)||'').trim()||raw;input.value=_dcatAppend(base,cl);fire();}).catch(()=>{}).finally(()=>{bz.close();try{input.focus()}catch(e){}hap();});
         } else { try{input.focus()}catch(e){} }
       };
-      busy(true);hap('medium');toast('Говорите — текст появляется вживую…');
+      busy(true);hap('medium');sfx('micon');toast('Говорите — текст появляется вживую…');
       rec.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)finalTxt=_dcatAppend(finalTxt,r[0].transcript);else interim+=r[0].transcript}
         input.value=_dcatAppend(base,_dcatAppend(finalTxt,interim));fire()};
       rec.onerror=ev=>{if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){toast('Нет доступа к микрофону');cleanup()}else if(ev.error==='no-speech'){/* тишина — продолжаем */}else{cleanup()}};
