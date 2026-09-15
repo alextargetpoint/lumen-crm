@@ -5756,7 +5756,8 @@ const server = http.createServer(async (req, res) => {
       const tpl = db.templates.find(t => t.id === m[1]); if (!tpl) return json(res, 404, { error: 'not found' });
       if (!db.settings.wa || !db.settings.wa.wabaId || !db.settings.wa.token) return json(res, 400, { error: 'Сначала подключи официальный Cloud API номер (Номера → Cloud API)' });
       if (/\{[a-zа-я]+\}/i.test(tpl.body)) return json(res, 400, { error: 'Уберите переменные {name}/{geo}/… — шаблон рассылки в Meta должен быть со статичным текстом (персонализация — через серые касания).' });
-      const metaName = ((tpl.name || 'tpl').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || ('tpl_' + tpl.id);
+      const slug = ((tpl.name || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)) || 'tpl';
+      const metaName = tpl.metaName || (slug + '_' + String(tpl.id).replace(/[^a-z0-9]/gi, ''));   /* уникальность: + id шаблона; при переотправке имя сохраняем */
       const metaLang = tpl.lang === 'ru' ? 'ru' : 'en_US';
       const cat = tpl.category === 'marketing' ? 'MARKETING' : 'UTILITY';
       const components = [{ type: 'BODY', text: tpl.body }];
