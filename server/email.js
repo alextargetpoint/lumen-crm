@@ -589,6 +589,164 @@ const DEFAULT_TEMPLATES = {
     body_ru: '<p>Здравствуйте, {{name}}! Давно не виделись. Lumen подрос: быстрее отвечает, умнее квалифицирует, аккуратнее греет. <b>{{agency}}</b> ждёт — и первая неделя снова за наш счёт.</p>{{button}}',
     body_en: '<p>Hi {{name}}, long time. Lumen has grown: faster replies, sharper qualification. <b>{{agency}}</b> is waiting — first week on us again.</p>{{button}}',
   },
+  /* ── ЛИДЫ (доп.) ── */
+  hotLead: {
+    name: 'Горячий лид / Hot lead', arch: 'leads', hero: 'flow.jpg', heroH: 220, titleSize: 31,
+    category: 'leads', audience: 'broker', essential: false,
+    eyebrow_ru: 'Горячий лид', eyebrow_en: 'Hot lead',
+    preheader_ru: 'ИИ квалифицировал — бюджет и намерение есть', preheader_en: 'AI qualified — budget and intent are there',
+    subject_ru: 'Горячий лид: {{leadName}} готов говорить', subject_en: 'Hot lead: {{leadName}} is ready to talk',
+    title_ru: 'Горячий лид<br>уже квалифицирован', title_en: 'A hot lead,<br>already qualified',
+    body_ru: '<p>Здравствуйте, {{name}}! ИИ прогрел и квалифицировал заявку — бюджет и намерение подтверждены. Такие не ждут.</p>{{lead}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, AI warmed up and qualified this lead — budget and intent confirmed. These don’t wait.</p>{{lead}}{{button}}{{note}}',
+    note_ru: 'Позвоните первым — на горячей стадии выигрывает скорость.', note_en: 'Call first — at the hot stage, speed wins.', noteIcon: 'phone',
+  },
+  leadAssigned: {
+    name: 'Лид назначен вам / Lead assigned', arch: 'leads', hero: 'inbox.jpg', heroH: 210, titleSize: 30,
+    category: 'leads', audience: 'broker', essential: false,
+    eyebrow_ru: 'Ваш новый лид', eyebrow_en: 'Assigned to you',
+    preheader_ru: '{{inviter}} передал вам лида', preheader_en: '{{inviter}} handed you a lead',
+    subject_ru: 'Вам назначен лид: {{leadName}}', subject_en: 'A lead was assigned to you: {{leadName}}',
+    title_ru: 'Лид теперь ваш', title_en: 'This lead is yours now',
+    body_ru: '<p>Здравствуйте, {{name}}! <b>{{inviter}}</b> передал вам этого лида. Вся история переписки уже в карточке.</p>{{lead}}{{button}}',
+    body_en: '<p>Hi {{name}}, <b>{{inviter}}</b> handed you this lead. The full chat history is already in the card.</p>{{lead}}{{button}}',
+  },
+  leadWon: {
+    name: 'Сделка закрыта / Deal won', arch: 'leads', hero: 'trophy.jpg', heroH: 235, titleSize: 32,
+    category: 'leads', audience: 'all', essential: false,
+    eyebrow_ru: 'Сделка закрыта', eyebrow_en: 'Deal won',
+    preheader_ru: '{{leadName}} — сделка закрыта', preheader_en: '{{leadName}} — deal closed',
+    subject_ru: 'Есть сделка! {{leadName}} закрыт', subject_en: 'It’s a deal! {{leadName}} is closed',
+    title_ru: 'Есть сделка.<br>{{leadName}}', title_en: 'It’s a deal.<br>{{leadName}}',
+    body_ru: '<p>Поздравляем, {{name}}! Лид дошёл до сделки — это ваша работа и немного нашего ИИ, который держал темп.</p>{{lead}}{{button}}{{note}}',
+    body_en: '<p>Congrats, {{name}}! The lead went all the way — your work and a bit of our AI keeping the pace.</p>{{lead}}{{button}}{{note}}',
+    note_ru: 'Запишите, что сработало — Академия соберёт из этого приём для команды.', note_en: 'Note what worked — the Academy will turn it into a play for the team.', noteIcon: 'spark',
+  },
+  /* ── ВСТРЕЧИ (доп.) ── */
+  meetingCancelled: {
+    name: 'Встреча отменена / Meeting cancelled', arch: 'digest', hero: 'calendar.jpg', heroH: 210, titleSize: 29,
+    category: 'meetings', audience: 'broker', essential: false,
+    eyebrow_ru: 'Встреча отменена', eyebrow_en: 'Meeting cancelled',
+    preheader_ru: '{{leadName}} — встреча отменена', preheader_en: '{{leadName}} — meeting cancelled',
+    subject_ru: 'Встреча с {{leadName}} отменена', subject_en: 'Meeting with {{leadName}} was cancelled',
+    title_ru: 'Встреча отменена', title_en: 'Meeting cancelled',
+    body_ru: '<p>Здравствуйте, {{name}}! Встреча с <b>{{leadName}}</b> ({{when}}) отменена. Не теряем лида — предложите новое время, пока интерес не остыл.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, the meeting with <b>{{leadName}}</b> ({{when}}) was cancelled. Don’t lose the lead — offer a new time while interest is warm.</p>{{button}}',
+  },
+  meetingSummary: {
+    name: 'Итоги встречи / Meeting summary', arch: 'digest', hero: 'calendar.jpg', heroH: 210, titleSize: 29,
+    category: 'meetings', audience: 'broker', essential: false,
+    eyebrow_ru: 'После встречи', eyebrow_en: 'After the meeting',
+    preheader_ru: 'ИИ собрал итоги и следующий шаг', preheader_en: 'AI collected the summary and next step',
+    subject_ru: 'Итоги встречи с {{leadName}}', subject_en: 'Summary: meeting with {{leadName}}',
+    title_ru: 'Итоги встречи', title_en: 'Meeting summary',
+    body_ru: '<p>Здравствуйте, {{name}}! ИИ разобрал разговор с <b>{{leadName}}</b> и подсказал следующий шаг:</p>{{panel}}{{button}}',
+    body_en: '<p>Hi {{name}}, AI reviewed your call with <b>{{leadName}}</b> and suggested the next step:</p>{{panel}}{{button}}',
+    panel_ru: '«{{summary}}»', panel_en: '“{{summary}}”',
+  },
+  /* ── КАНАЛЫ (доп.) ── */
+  callRecording: {
+    name: 'Запись звонка / Call recording', arch: 'digest', hero: 'phone.jpg', heroH: 210, titleSize: 29,
+    category: 'channels', audience: 'broker', essential: false,
+    eyebrow_ru: 'Звонок обработан', eyebrow_en: 'Call processed',
+    preheader_ru: 'Запись и краткое резюме готовы', preheader_en: 'Recording and quick summary are ready',
+    subject_ru: 'Звонок с {{leadName}}: запись и резюме', subject_en: 'Call with {{leadName}}: recording & summary',
+    title_ru: 'Звонок разобран', title_en: 'Call, broken down',
+    body_ru: '<p>Здравствуйте, {{name}}! Разговор с <b>{{leadName}}</b> ({{duration}}) записан, ИИ выделил суть:</p>{{panel}}{{button}}',
+    body_en: '<p>Hi {{name}}, your call with <b>{{leadName}}</b> ({{duration}}) is recorded, AI pulled out the gist:</p>{{panel}}{{button}}',
+    panel_ru: '«{{summary}}»', panel_en: '“{{summary}}”',
+  },
+  warmupComplete: {
+    name: 'Прогрев завершён / Warm-up complete', arch: 'digest', hero: 'ring.jpg', heroH: 210, titleSize: 29,
+    category: 'channels', audience: 'owner', essential: false,
+    eyebrow_ru: 'Номер прогрет', eyebrow_en: 'Number is warm',
+    preheader_ru: '{{phone}} готов к боевому трафику', preheader_en: '{{phone}} is ready for real traffic',
+    subject_ru: '{{phone}} прогрет — можно давать трафик', subject_en: '{{phone}} is warm — you can send traffic',
+    title_ru: 'Номер прогрет<br>и готов', title_en: 'Number is warm<br>and ready',
+    body_ru: '<p>Здравствуйте, {{name}}! Прогрев номера <b>{{phone}}</b> завершён — репутация набрана, риск блокировки минимален. Можно направлять живой трафик лидов.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, warm-up for <b>{{phone}}</b> is complete — reputation built, block risk is minimal. You can route live lead traffic now.</p>{{button}}',
+  },
+  /* ── ДОКУМЕНТЫ / DOCUMENTS ── */
+  proposalViewed: {
+    name: 'КП открыто клиентом / Proposal viewed', arch: 'documents', hero: 'doc.jpg', heroH: 215, titleSize: 30,
+    category: 'documents', audience: 'broker', essential: false,
+    eyebrow_ru: 'КП открыто', eyebrow_en: 'Proposal opened',
+    preheader_ru: '{{leadName}} смотрит ваше предложение', preheader_en: '{{leadName}} is viewing your proposal',
+    subject_ru: '{{leadName}} открыл ваше КП', subject_en: '{{leadName}} opened your proposal',
+    title_ru: 'Клиент смотрит КП<br>прямо сейчас', title_en: 'Your client is viewing<br>the proposal now',
+    body_ru: '<p>Здравствуйте, {{name}}! <b>{{leadName}}</b> только что открыл предложение «{{docTitle}}». Лучший момент для касания — пока документ перед глазами.</p>{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, <b>{{leadName}}</b> just opened the proposal “{{docTitle}}”. Best moment to reach out — while it’s on their screen.</p>{{button}}{{note}}',
+    note_ru: 'Короткое «остались вопросы?» сейчас заходит лучше всего.', note_en: 'A short “any questions?” lands best right now.', noteIcon: 'chat',
+  },
+  documentSigned: {
+    name: 'Документ подписан / Document signed', arch: 'documents', hero: 'doc.jpg', heroH: 215, titleSize: 30,
+    category: 'documents', audience: 'all', essential: false,
+    eyebrow_ru: 'Подписано', eyebrow_en: 'Signed',
+    preheader_ru: '{{leadName}} подписал {{docTitle}}', preheader_en: '{{leadName}} signed {{docTitle}}',
+    subject_ru: '{{docTitle}} подписан клиентом {{leadName}}', subject_en: '{{docTitle}} signed by {{leadName}}',
+    title_ru: 'Документ подписан', title_en: 'Document signed',
+    body_ru: '<p>Здравствуйте, {{name}}! <b>{{leadName}}</b> подписал «{{docTitle}}». Копия сохранена в карточке сделки.</p>{{details}}{{button}}',
+    body_en: '<p>Hi {{name}}, <b>{{leadName}}</b> signed “{{docTitle}}”. A copy is saved in the deal card.</p>{{details}}{{button}}',
+  },
+  invoiceSent: {
+    name: 'Счёт выставлен / Invoice sent', arch: 'documents', hero: 'doc.jpg', heroH: 200, titleSize: 29,
+    category: 'documents', audience: 'all', essential: false,
+    eyebrow_ru: 'Счёт клиенту', eyebrow_en: 'Invoice to client',
+    preheader_ru: 'Счёт для {{leadName}} отправлен', preheader_en: 'Invoice for {{leadName}} was sent',
+    subject_ru: 'Счёт для {{leadName}} отправлен', subject_en: 'Invoice for {{leadName}} was sent',
+    title_ru: 'Счёт отправлен', title_en: 'Invoice sent',
+    body_ru: '<p>Здравствуйте, {{name}}! Счёт для <b>{{leadName}}</b> сформирован и отправлен. Отследить оплату можно в карточке.</p>{{receipt}}{{button}}',
+    body_en: '<p>Hi {{name}}, the invoice for <b>{{leadName}}</b> is created and sent. Track payment in the card.</p>{{receipt}}{{button}}',
+    receiptCaption_ru: 'К оплате', receiptCaption_en: 'Due', receiptIcon: 'doc',
+  },
+  /* ── ЗАДАЧИ (доп.) ── */
+  taskOverdue: {
+    name: 'Задача просрочена / Task overdue', arch: 'tasks', format: 'plain', titleSize: 27,
+    category: 'tasks', audience: 'broker', essential: false,
+    eyebrow_ru: 'Просрочено', eyebrow_en: 'Overdue',
+    preheader_ru: '{{taskTitle}} — срок прошёл', preheader_en: '{{taskTitle}} — past due',
+    subject_ru: 'Просрочено: {{taskTitle}}', subject_en: 'Overdue: {{taskTitle}}',
+    title_ru: 'Задача просрочена', title_en: 'Task overdue',
+    body_ru: '<p>Срок по задаче уже прошёл:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">«{{taskTitle}}»</p><p style="color:#8b8983;font-size:13px">Закройте её или перенесите на реальную дату — одним тапом.</p>{{button}}',
+    body_en: '<p>This task is past its due date:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">Close it or reschedule to a real date — one tap.</p>{{button}}',
+  },
+  /* ── ОТЧЁТЫ (доп.) ── */
+  monthlyReport: {
+    name: 'Итоги месяца / Monthly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.jpg', heroH: 235, titleSize: 31,
+    category: 'reports', audience: 'owner', essential: false,
+    eyebrow_ru: 'Итоги месяца', eyebrow_en: 'Monthly report',
+    preheader_ru: 'Месяц {{agency}} в цифрах', preheader_en: 'A month of {{agency}} in numbers',
+    subject_ru: 'Месяц {{agency}}: цифры и тренд', subject_en: 'A month of {{agency}}: numbers & trend',
+    title_ru: 'Месяц {{agency}}<br>в цифрах', title_en: 'A month of {{agency}}<br>in numbers',
+    body_ru: '<p>Здравствуйте, {{name}}! Месяц закрыт. Как Lumen отработал для <b>{{agency}}</b>:</p>{{stats}}<p>Рост к прошлому месяцу — {{growth}}. Полный разбор с динамикой — внутри.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, the month is closed. Here’s how Lumen performed for <b>{{agency}}</b>:</p>{{stats}}<p>Month-over-month growth — {{growth}}. Full breakdown inside.</p>{{button}}',
+    stats_ru: [{ n: '{{leads}}', label: 'лидов' }, { n: '{{deals}}', label: 'сделок' }, { n: '{{revenue}}', label: 'выручка' }],
+    stats_en: [{ n: '{{leads}}', label: 'leads' }, { n: '{{deals}}', label: 'deals' }, { n: '{{revenue}}', label: 'revenue' }],
+  },
+  /* ── ОПЛАТА (доп.) ── */
+  planLimit: {
+    name: 'Лимит тарифа / Plan limit', arch: 'billing', hero: 'graph.jpg', heroH: 210, titleSize: 29,
+    category: 'billing', audience: 'owner', essential: false,
+    eyebrow_ru: 'Пора расти', eyebrow_en: 'Time to grow',
+    preheader_ru: 'Достигнут лимит тарифа', preheader_en: 'You’ve hit your plan limit',
+    subject_ru: 'Вы упёрлись в лимит — это хороший знак', subject_en: 'You hit the limit — that’s a good sign',
+    title_ru: 'Уперлись в лимит<br>тарифа', title_en: 'You hit your<br>plan limit',
+    body_ru: '<p>Здравствуйте, {{name}}! Вы достигли лимита тарифа по <b>{{limitOf}}</b> ({{used}}/{{limit}}). Это значит, что растёте — а Lumen готов расти с вами.</p>{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, you’ve reached your plan limit on <b>{{limitOf}}</b> ({{used}}/{{limit}}). That means you’re growing — and Lumen is ready to grow with you.</p>{{button}}{{note}}',
+    note_ru: 'До апгрейда новые {{limitOf}} не добавляются. Обновление занимает минуту.', note_en: 'Until you upgrade, new {{limitOf}} won’t be added. Upgrading takes a minute.', noteIcon: 'alert',
+  },
+  /* ── БЕЗОПАСНОСТЬ (доп.) ── */
+  otpCode: {
+    name: 'Код подтверждения / One-time code', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
+    category: 'security', audience: 'all', essential: true,
+    eyebrow_ru: 'Код входа', eyebrow_en: 'Sign-in code',
+    preheader_ru: 'Ваш одноразовый код Lumen', preheader_en: 'Your one-time Lumen code',
+    subject_ru: 'Ваш код входа в Lumen: {{otp}}', subject_en: 'Your Lumen sign-in code: {{otp}}',
+    title_ru: 'Код подтверждения', title_en: 'Your one-time code',
+    body_ru: '<p>Здравствуйте, {{name}}! Введите код, чтобы подтвердить вход. Он действует несколько минут.</p>{{code}}{{note}}',
+    body_en: '<p>Hi {{name}}, enter this code to confirm your sign-in. It’s valid for a few minutes.</p>{{code}}{{note}}',
+    note_ru: 'Никому не сообщайте код. Мы никогда не спросим его в переписке.', note_en: 'Never share this code. We’ll never ask for it in chat.', noteIcon: 'lock',
+  },
   notification: {
     name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.jpg', heroH: 200, titleSize: 28,
     category: 'account', audience: 'all', essential: false,
@@ -618,7 +776,7 @@ const DEFAULT_TEMPLATES = {
 };
 
 const EMAIL_CATEGORIES = {
-  account: { ru: 'Аккаунт', en: 'Account' }, security: { ru: 'Безопасность', en: 'Security' }, billing: { ru: 'Оплата и подписка', en: 'Billing' }, leads: { ru: 'Лиды', en: 'Leads' }, meetings: { ru: 'Встречи', en: 'Meetings' }, tasks: { ru: 'Задачи', en: 'Tasks' }, team: { ru: 'Команда', en: 'Team' }, channels: { ru: 'Каналы (WhatsApp / звонки)', en: 'Channels (WhatsApp / calls)' }, reports: { ru: 'Отчёты и сводки', en: 'Reports & digests' }, academy: { ru: 'Академия', en: 'Academy' }, product: { ru: 'Обновления продукта', en: 'Product updates' }, partner: { ru: 'Партнёрская программа', en: 'Partner program' }, marketing: { ru: 'Рассылки и предложения', en: 'Newsletters & offers' },
+  account: { ru: 'Аккаунт', en: 'Account' }, security: { ru: 'Безопасность', en: 'Security' }, billing: { ru: 'Оплата и подписка', en: 'Billing' }, leads: { ru: 'Лиды', en: 'Leads' }, meetings: { ru: 'Встречи', en: 'Meetings' }, tasks: { ru: 'Задачи', en: 'Tasks' }, team: { ru: 'Команда', en: 'Team' }, channels: { ru: 'Каналы (WhatsApp / звонки)', en: 'Channels (WhatsApp / calls)' }, documents: { ru: 'Документы (КП, договоры, счета)', en: 'Documents (proposals, contracts, invoices)' }, reports: { ru: 'Отчёты и сводки', en: 'Reports & digests' }, academy: { ru: 'Академия', en: 'Academy' }, product: { ru: 'Обновления продукта', en: 'Product updates' }, partner: { ru: 'Партнёрская программа', en: 'Partner program' }, marketing: { ru: 'Рассылки и предложения', en: 'Newsletters & offers' },
 };
 
 function getTemplates(registry) {
@@ -653,12 +811,17 @@ function renderTemplate(registry, key, vars, lang) {
     if (v.detailRows) v.details = emailDetails(v.detailRows, T);
     else if (t.arch === 'security') v.details = emailDetails([[en ? 'Time' : 'Время', v.time || new Date().toLocaleString(en ? 'en-GB' : 'ru-RU')], [en ? 'Device' : 'Устройство', v.device || (en ? 'Browser · Chrome' : 'Браузер · Chrome')], [en ? 'Location' : 'Локация', v.location || '—'], ['IP', v.ip || '—']], T);
     else if (t.category === 'meetings') v.details = emailDetails([[en ? 'Lead' : 'Лид', v.leadName || '—'], [en ? 'When' : 'Когда', v.when || '—'], [en ? 'Format' : 'Формат', v.format2 || 'Zoom']], T);
+    else if (t.arch === 'documents') v.details = emailDetails([[en ? 'Document' : 'Документ', v.docTitle || '—'], [en ? 'Client' : 'Клиент', v.leadName || '—'], [en ? 'Date' : 'Дата', v.signedAt || new Date().toLocaleDateString(en ? 'en-GB' : 'ru-RU')]], T);
     else v.details = '';
   }
   if (v.code == null) v.code = v.otp ? emailCode(v.otp, T) : '';
   if (v.info == null) { v.info = (key === 'verifyEmail') ? emailInfoGrid([{ icon: 'mail', label: en ? 'Your e-mail' : 'Ваш e-mail', value: v.email || '—' }, { icon: 'user', label: en ? 'Account' : 'Аккаунт', value: v.agency || '—' }], T) : ''; }
   if (v.receipt == null || v.invoice == null) {
-    const rc = (t.arch === 'billing') ? emailReceipt({ T, amount: v.amount || '€99', caption: interpolate(t['receiptCaption_' + lang] || t.receiptCaption_ru || (en ? 'Paid' : 'Оплачено'), v), icon: t.receiptIcon || 'check', rows: v.invoiceRows || [[(en ? 'Plan' : 'Тариф'), v.plan || 'Lumen Pro'], [(en ? 'Period' : 'Период'), v.period || (en ? 'monthly' : 'месяц')], [(en ? 'Agency' : 'Агентство'), v.agency || '—']] }) : '';
+    const isBill = t.arch === 'billing'; const wantsReceipt = isBill || t.receiptCaption_ru || key === 'invoiceSent';
+    const rows = v.invoiceRows || (isBill
+      ? [[(en ? 'Plan' : 'Тариф'), v.plan || 'Lumen Pro'], [(en ? 'Period' : 'Период'), v.period || (en ? 'monthly' : 'месяц')], [(en ? 'Agency' : 'Агентство'), v.agency || '—']]
+      : [[(en ? 'Document' : 'Документ'), v.docTitle || (en ? 'Invoice' : 'Счёт')], [(en ? 'Client' : 'Клиент'), v.leadName || '—']]);
+    const rc = wantsReceipt ? emailReceipt({ T, amount: v.amount || '€99', caption: interpolate(t['receiptCaption_' + lang] || t.receiptCaption_ru || (en ? 'Paid' : 'Оплачено'), v), icon: t.receiptIcon || 'check', rows }) : '';
     if (v.receipt == null) v.receipt = rc; if (v.invoice == null) v.invoice = rc;
   }
   if (v.avatar == null) { v.avatar = (t.arch === 'team') ? emailAvatar({ name: v.inviter || v.name || 'Lumen', role: en ? 'invites you to the team' : 'приглашает в команду', workspaceLabel: en ? 'Workspace' : 'Рабочее пространство', workspace: v.agency || '' }, T) : ''; }

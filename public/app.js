@@ -642,7 +642,9 @@ async function apiReq(method, p, b) {
     body: method === 'GET' ? undefined : JSON.stringify(b || {}),
   });
   if (r.status === 401) { renderLogin(); throw new Error('auth'); }
-  return r.json();
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status)); /* 403/404/400/429/500 → бросаем с текстом сервера (иначе вызовы «висят», думая что ок) */
+  return j;
 }
 const api = {
   get: (p) => apiReq('GET', p),
@@ -1143,13 +1145,17 @@ window.openGrayManager = async function () {
           : `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер номеров подключается оператором платформы. Как только он это сделает — здесь появится добавление номера по QR.</span></div>`)}
       <button class="btn btn-sm" id="gwPing" style="width:100%;justify-content:center;margin-bottom:14px">${ic(I.shield)}Проверить связь с воркером</button>
       <div id="gwPingRes" style="font-size:12px;margin-bottom:12px"></div>
-      ${cfgOk ? `
-        <div style="display:flex;gap:8px;margin-bottom:12px">
+      ${cfgOk ? (() => {
+        const used = (data.numbers || []).length, lim = data.numLimit || 0, atLimit = !data.beta && used >= lim;
+        return `
+        ${!data.beta ? `<div class="lc-hint ${atLimit ? 'warn' : 'info'}" style="margin-bottom:12px">${ic(I.shield)}<span>Тариф «${esc(data.planName || '')}»: по QR можно подключить <b>${lim} ${lim === 1 ? 'номер' : 'номера'}</b> · подключено <b>${used}/${lim}</b>.${atLimit ? ' Лимит достигнут — освободите номер или перейдите на план выше.' : ''}</span></div>` : `<div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Аккаунт разработки — лимит номеров снят.</span></div>`}
+        ${atLimit ? '' : `<div style="display:flex;gap:8px;margin-bottom:12px">
           <input id="gwPhone" placeholder="Номер (971501234567)" style="flex:1">
           <input id="gwLabel" placeholder="Метка" style="width:110px">
           <button class="btn btn-accent" id="gwAdd">Подключить</button>
-        </div>
-        <div class="muted" style="font-size:12px;margin:-4px 0 12px">${ic(I.doc)} <a href="#" id="gwGuide" style="color:var(--accent);text-decoration:none">Как завести до 3 своих номеров и подключить по QR →</a></div>
+        </div>`}
+        <div class="muted" style="font-size:12px;margin:-4px 0 12px">${ic(I.doc)} <a href="#" id="gwGuide" style="color:var(--accent);text-decoration:none">Как подключить свой номер по QR →</a></div>`;
+      })() + `
         ${(data.numbers || []).map(n => `
           <div class="set-row">
             <div class="sp"><div class="sl">${esc(n.label || n.phone)} · ${esc(n.phone)}</div><div class="sd">${badge(n.live)}</div>
@@ -9787,21 +9793,10 @@ PAGES.numbers = async (root) => {
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
       </div>
     </div>
-    ${(() => { const w = STATE.settings.warmup || {}; return `<div class="glass card mb">
-      <div class="card-title">${ic(I.bolt)}Эмулятор прогрева (QR)<span class="sub">номера общаются между собой с делеями</span></div>
-      <div class="warmup-warn">${ic(I.shield)}<div><b>Неофициальный метод.</b> Номера подключаются по QR (протокол WhatsApp Web) и переписываются между собой, имитируя живую активность — это часто помогает прогреву, но <b>нарушает правила Meta</b> и несёт риск блокировки. Реальная отправка идёт через внешний мост; здесь — оркестрация и журнал.</div></div>
-      <div id="warmupState" style="margin-top:12px">
-        ${w.running
-          ? `<div class="warmup-live">${ic(I.spark)}<span>Прогрев идёт · обменов: <b id="wuCount">${w.count || 0}</b></span><span class="tb-spacer"></span><button class="btn btn-danger btn-sm" id="wuStop">Остановить</button></div>`
-          : `<button class="btn btn-accent" id="wuStart">${ic(I.bolt)}Запустить эмулятор прогрева</button>`}
-      </div>
-      <div class="warmup-log" id="warmupLog">${(w.log || []).slice(0, 12).map(e => `<div class="wu-msg"><b>${esc(e.from)}</b> → <b>${esc(e.to)}</b> <span>${esc(e.text)}</span><i>${tmm(e.at)}</i></div>`).join('') || '<div class="muted" style="font-size:12px;padding:8px">Журнал прогрева появится здесь</div>'}</div>
-    </div>`; })()}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="lp-sec" style="margin:0">Номера в пуле · ${st.numbers.length}</div>
-      <button class="btn btn-accent btn-sm" id="numAdd">${ic(I.plus)}Добавить номер</button>
-    </div>
-    <div class="num-grid">
+    ${st.numbers.length ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="lp-sec" style="margin:0">Официальные Cloud-API номера · ${st.numbers.length}<span class="muted" style="font-size:11px;font-weight:400;margin-left:8px">добавляются в Настройки → WhatsApp Cloud API</span></div>
+    </div>` : ''}
+    <div class="num-grid" ${st.numbers.length ? '' : 'style="display:none"'}>
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
         <div class="num-head">
           <div><div class="ph">${esc(n.phone)}</div><div class="lb">${esc(n.label)} ${n.channel === 'cloud_api' ? '· <b style="color:var(--accent-2)">официальный Cloud API</b>' : '· web-протокол'}</div></div>

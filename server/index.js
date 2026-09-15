@@ -5814,7 +5814,9 @@ const server = http.createServer(async (req, res) => {
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
-      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: !!(R2 && R2.role === 'owner'), envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+      const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
+      const _plan = planOf(store.currentTid());
+      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: !!(R2 && R2.role === 'owner'), envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numLimit: _beta ? 999 : (_plan.maxNumbers || 0), planName: _plan.name, beta: _beta, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
     }
     /* ПЛАТФОРМА: задать токен (и опц. URL) серого воркера ОДИН раз для всех агентств — из CRM, без Railway.
        Только владелец primary-тенанта. Новые агентства после этого ничего не вводят. */
@@ -5853,9 +5855,10 @@ const server = http.createServer(async (req, res) => {
       db.settings.waGray.numbers = db.settings.waGray.numbers || [];
       let rec = db.settings.waGray.numbers.find(n => n.phone === phone);
       if (!rec) {
-        /* лимит номеров по тарифу (Base = 3): свои номера подключаются по QR, но не больше квоты плана */
-        const lim = planOf(store.currentTid()).maxNumbers || 0;
-        if (db.settings.waGray.numbers.length >= lim) return json(res, 403, { error: `Достигнут лимит номеров вашего тарифа (${lim}). Освободите номер или перейдите на план выше.`, limit: lim });
+        /* лимит номеров по тарифу; аккаунт разработки (agency.betaAll) — без лимита для тестов */
+        const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
+        const lim = _beta ? 999 : (planOf(store.currentTid()).maxNumbers || 0);
+        if (db.settings.waGray.numbers.length >= lim) return json(res, 403, { error: `На тарифе «${planOf(store.currentTid()).name}» можно подключить по QR ${lim} ${lim === 1 ? 'номер' : 'номера'}. Освободите номер или перейдите на план выше.`, limit: lim });
         rec = { phone, label: String(b.label || '').slice(0, 60), roles: { send: true, call: false }, addedAt: Date.now() }; db.settings.waGray.numbers.push(rec);
       }
       if (b.label !== undefined) rec.label = String(b.label).slice(0, 60);
