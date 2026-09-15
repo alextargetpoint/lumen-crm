@@ -863,6 +863,33 @@ function ago(ts) {
 }
 function tmm(ts) { return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
+/* ---------- живой статус звонка в карточке лида (по вебхукам Telnyx) ---------- */
+function callStatusView(call) {
+  if (!call || !call.status) return null;
+  if (call.status === 'ended') {
+    const C = { completed: ['✓ Звонок завершён', 'ok'], declined: ['✗ Клиент отклонил', 'bad'], no_answer: ['Клиент не ответил', 'warn'], busy: ['Занято', 'warn'], canceled: ['Звонок отменён', 'warn'], invalid: ['Неверный номер', 'bad'], failed: ['Сбой звонка', 'bad'] };
+    const c = C[call.cause] || ['Звонок завершён', 'ok']; return [c[0], c[1], ''];
+  }
+  const M = { dialing: ['Звоним вам…', 'live', 'снимите трубку'], connecting: ['Соединяем с клиентом…', 'live', ''], ringing_client: ['Клиенту идёт звонок…', 'live', ''], in_call: ['🟢 Разговор идёт', 'live', ''] };
+  return M[call.status] || ['Звонок…', 'live', ''];
+}
+function startCallWatch(id) {
+  const body = document.querySelector('.modal-bd .m-body'); if (!body) return;
+  let strip = body.querySelector('#lcCallWatch');
+  if (!strip) { strip = el('<div class="lc-callwatch live" id="lcCallWatch"></div>'); body.prepend(strip); }
+  strip.innerHTML = '<span class="cw-dot live"></span><b>Звоним вам…</b><i>снимите трубку</i>';
+  const t0 = Date.now(); let stop = false;
+  const tick = async () => {
+    if (stop || !document.body.contains(strip)) return;
+    let call = null; try { const r = await api.get('/leads/' + id); call = r.call; } catch (e) {}
+    const v = callStatusView(call);
+    if (v) { const live = v[1] === 'live'; strip.className = 'lc-callwatch ' + v[1]; strip.innerHTML = `<span class="cw-dot ${live ? 'live' : ''}"></span><b>${esc(v[0])}</b>${v[2] ? `<i>${esc(v[2])}</i>` : ''}`; }
+    if (call && call.status === 'ended') { stop = true; setTimeout(() => { try { strip.remove(); } catch (e) {} }, 6000); return; }
+    if (Date.now() - t0 > 120000) { stop = true; try { strip.remove(); } catch (e) {} return; }
+    setTimeout(tick, 2000);
+  };
+  setTimeout(tick, 1500);
+}
 /* ---------- модалки/тосты ---------- */
 function modal({ title, sub, body, actions, wide }) {
   closeModal();
@@ -4632,9 +4659,11 @@ async function openLeadModal(id) {
     const btn = $('#lcDial', bd); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.phone) + 'Звоню…';
     try { const r = await api.post('/leads/' + l.id + '/call', {});
       toast('📞 Звоним ВАМ' + (r.from ? ' · ' + r.from : ''), 'Снимите трубку — затем соединим с клиентом' + (r.to ? ' (' + r.to + ')' : '') + '. Не звонит ~20 сек? Проверьте, что страна вашего номера включена в Telnyx → Outbound Voice Profile.', true);
+      startCallWatch(l.id);
     } catch (e) { toast('Звонок не пошёл', e.message); }
     setTimeout(() => { btn.disabled = false; btn.innerHTML = old; }, 2500);
   });
+  if (l.call && l.call.status && l.call.status !== 'ended' && (Date.now() - (l.call.at || 0)) < 120000) startCallWatch(l.id);   /* карточка открыта во время активного звонка → сразу показываем статус */
   $('#lcCallFile', bd).addEventListener('change', async (e) => {
     const f = e.target.files[0];
     if (!f) return;

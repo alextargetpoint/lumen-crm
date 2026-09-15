@@ -219,6 +219,16 @@ textarea { resize: vertical; min-height: 70px; }
 .topbar { display: flex; align-items: center; gap: 14px; padding: 18px 28px 14px; }
 /* раздел рисует свой крупный заголовок → прячем дубль-название в топбаре (эмблема/действия остаются) */
 .topbar.hide-title .page-title, .topbar.hide-title .page-sub { display: none; }
+/* живой статус звонка в карточке лида */
+.lc-callwatch { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; margin: 0 0 14px; font-size: 14px; font-weight: 650; background: var(--accent-soft, rgba(37,99,235,.1)); border: 1px solid var(--accent, #2563EB); color: var(--accent, #2563EB); animation: cwIn .3s cubic-bezier(.22,1,.36,1); }
+.lc-callwatch i { font-weight: 400; color: var(--ink-3, #667085); font-size: 12.5px; margin-left: auto; }
+.lc-callwatch.ok { background: rgba(30,122,100,.12); border-color: #1E7A64; color: #1E7A64; }
+.lc-callwatch.bad { background: rgba(192,57,43,.1); border-color: #C0392B; color: #C0392B; }
+.lc-callwatch.warn { background: rgba(154,107,30,.12); border-color: #9a6b1e; color: #9a6b1e; }
+.cw-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.cw-dot.live { animation: cwpulse 1.15s ease-in-out infinite; }
+@keyframes cwpulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 70% { box-shadow: 0 0 0 9px transparent; opacity: .7; } 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; } }
+@keyframes cwIn { from { opacity: 0; transform: translateY(-6px); } }
 .page-title { font-size: 20px; font-weight: 700; letter-spacing: -.2px; color: var(--navy-900); }
 .page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
 .tb-spacer { flex: 1; }

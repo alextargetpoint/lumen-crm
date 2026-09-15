@@ -2392,7 +2392,7 @@ async function telnyxOnAnswered(db, payload, cs) {
   if (cs.stage === 'broker') {
     try { await telnyxApi(db, 'POST', `/calls/${ccid}/actions/record_start`, { format: 'mp3', channels: 'single' }); } catch (e) { console.error('[telnyx rec]', e.message); }
     const cs2 = Buffer.from(JSON.stringify({ leadId: cs.leadId, clientPhone: cs.clientPhone, stage: 'client', bridgeTo: ccid })).toString('base64');
-    await telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: cs.clientPhone, from: t.fromNumber, client_state: cs2, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
+    await telnyxApi(db, 'POST', '/calls', { connection_id: t.connId, to: e164(cs.clientPhone), from: e164(t.fromNumber), client_state: cs2, timeout_secs: 30, webhook_url: telnyxWebhook(db) });
   } else if (cs.stage === 'client' && cs.bridgeTo) {
     await telnyxApi(db, 'POST', `/calls/${ccid}/actions/bridge`, { call_control_id: cs.bridgeTo });
   }
@@ -3770,8 +3770,17 @@ const server = http.createServer(async (req, res) => {
       const ev = b.data || {}; const et = ev.event_type; const pl = ev.payload || {};
       try {
         let cs = {}; try { cs = JSON.parse(Buffer.from(pl.client_state || '', 'base64').toString('utf8') || '{}'); } catch (_) {}
-        if (et === 'call.answered') {
+        /* живой статус звонка в карточке лида */
+        const setCall = (st, cause) => { if (!cs.leadId) return; const l = db.leads.find(x => x.id === cs.leadId); if (!l) return; l.call = { status: st, cause: cause || null, at: Date.now() }; store.save(); };
+        if (et === 'call.initiated') { if (cs.stage === 'broker') setCall('dialing'); }
+        else if (et === 'call.ringing') { setCall(cs.stage === 'client' ? 'ringing_client' : 'dialing'); }
+        else if (et === 'call.answered') {
+          setCall(cs.stage === 'broker' ? 'connecting' : 'in_call');
           await telnyxOnAnswered(db, pl, cs);
+        } else if (et === 'call.hangup') {
+          const c = String(pl.hangup_cause || '').toLowerCase();
+          const map = { normal_clearing: 'completed', call_rejected: 'declined', user_busy: 'busy', no_answer: 'no_answer', timeout: 'no_answer', originator_cancel: 'canceled', unallocated_number: 'invalid', unspecified: 'failed' };
+          setCall('ended', map[c] || c || 'ended');
         } else if (et === 'call.recording.saved') {
           const urls = pl.recording_urls || pl.public_recording_urls || {};
           const recUrl = urls.mp3 || urls.wav;
