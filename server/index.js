@@ -5981,14 +5981,17 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/gray/yesim/authtest' && req.method === 'GET') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const { user, token } = yesimCreds();
+      const mask = (s) => s ? `${s.slice(0, 6)}…${s.slice(-4)} (len ${s.length})` : '(пусто)';
       const forms = {
         'user:token': 'Basic ' + Buffer.from(user + ':' + token).toString('base64'),
+        'token:user': 'Basic ' + Buffer.from(token + ':' + user).toString('base64'),
         'token:token': 'Basic ' + Buffer.from(token + ':' + token).toString('base64'),
+        'user:user': 'Basic ' + Buffer.from(user + ':' + user).toString('base64'),
         'token:empty': 'Basic ' + Buffer.from(token + ':').toString('base64'),
+        'user:empty': 'Basic ' + Buffer.from(user + ':').toString('base64'),
         'raw-basic-token': 'Basic ' + token,
-        'bearer-token': 'Bearer ' + token,
       };
-      const out = { serverIp: await serverPublicIp(), results: {} };
+      const out = { serverIp: await serverPublicIp(), stored: { user: mask(user), token: mask(token) }, results: {} };
       for (const [name, hdr] of Object.entries(forms)) {
         try { const r = await fetch('https://vn.yesim.app/apiv1/index.php?action=get_balance', { headers: { Authorization: hdr }, signal: AbortSignal.timeout(10000) }); const t = await r.text(); out.results[name] = { status: r.status, body: t.slice(0, 160) }; }
         catch (e) { out.results[name] = { error: e.message }; }
