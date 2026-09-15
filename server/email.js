@@ -1,34 +1,46 @@
-/* Почтовая инфраструктура SaaS Lumen.
-   • Оформление — премиум-Ателье (инлайн-стили + таблицы = требование почтовиков), шрифты Cormorant + Manrope.
-   • НЕ один шаблон на всё: форматы вёрстки — ceremony / security / billing / team / digest (тёмная обложка на
-     кремовом теле) + dark (письмо целиком тёмное) + plain (без обложки, письмо-записка) + stat (крупные KPI).
-   • Обложки — тёмный SaaS-арт Higgsfield (public/emailart), 2 живых GIF.
-   • Каждый шаблон несёт метаданные: category / audience / essential — это backbone подписок: владелец в админке
-     и брокер в аккаунте выбирают, какие письма получать (essential — транзакционно-обязательные, отписки нет).
-   • Билингва RU/EN, редактируются в админке (registry.emailTemplates). Отправка — Resend. */
+/* Почтовая инфраструктура SaaS Lumen — ядро оформления «наложенный хедер» (референсы Email layout).
+   • Тёмная шапка с АРТОМ + wordmark/eyebrow/serif-заголовок ПОВЕРХ (email-safe: bgcolor + background-image,
+     слева арта — тёмное поле под текст). Тело — крем (или целиком тёмное при theme:'dark'). Плюс форматы
+     plain (без шапки, письмо-записка) и stat (крупные KPI).
+   • Богатые блоки: фичи-список с иконками, чек с галочкой+суммой, карточка лида, аватар-панель, инфо-грид,
+     сноска с иконкой, full-width кнопка, футер с тэглайном.
+   • Каждый шаблон несёт category/audience/essential — backbone подписок (canReceive + страница подписок).
+   • Билингва RU/EN, редактируется в админке (registry.emailTemplates). Отправка — Resend. */
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/* палитры: светлая (крем-Ателье) и тёмная (near-black) */
 const C = { bg: '#efece5', card: '#fffdfa', ink: '#141311', ink2: '#57544e', ink3: '#8b8983', line: 'rgba(20,19,17,.10)', line2: 'rgba(20,19,17,.06)', gold: '#c9a86a', goldDeep: '#a9863f', panel: '#f5f1e9', panel2: '#faf7f0', ok: '#3f8f5b', danger: '#b4472e', btnBg: '#141311', btnInk: '#faf9f5', dark: false };
 const D = { bg: '#0c0b09', card: '#151310', ink: '#f4f1ea', ink2: '#c7c1b4', ink3: '#8f8b80', line: 'rgba(255,255,255,.13)', line2: 'rgba(255,255,255,.07)', gold: '#d8bd86', goldDeep: '#c9a86a', panel: '#1d1a15', panel2: '#191611', ok: '#5cc48c', danger: '#e08a72', btnBg: '#efe7d5', btnInk: '#151310', dark: true };
 const pal = (theme) => theme === 'dark' ? D : C;
+/* цвета текста в тёмной шапке (шапка всегда тёмная, независимо от темы тела) */
+const H = { bg: '#0c0b09', gold: '#d8bd86', light: '#f6f3ec', mute: '#b7b1a4', line: 'rgba(255,255,255,.16)' };
 
 const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif";
 const SANS = "'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-/* арт писем раздаёт сам CRM из public/emailart — базовый URL = домен приложения; на Railway пиним PUBLIC_BASE_URL. */
 const ART = (process.env.EMAIL_ART_BASE || process.env.PUBLIC_BASE_URL || 'https://app.lumen247.com').replace(/\/$/, '') + '/emailart';
 const FONTS = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap";
 
-/* ─── строительные блоки (все принимают тему T = pal('light'|'dark')) ─────── */
+/* тонкие иконки-обводки (Apple/iOS Mail рендерят inline SVG; где вырезано — остаётся аккуратная золотая ячейка) */
+const ICONS = {
+  bolt: 'M13 2L4 14h6l-1 8 9-12h-6z', users: 'M16 20v-1a4 4 0 00-3-3.9M8 20v-1a4 4 0 013-3.9M12 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7z',
+  moon: 'M21 12.6A8.5 8.5 0 1111.4 3 6.6 6.6 0 0021 12.6z', home: 'M4 11l8-7 8 7M6 10v9h12v-9', mail: 'M3.5 6h17v12h-17zM3.5 7l8.5 5.5L20.5 7',
+  user: 'M19.5 20a7.5 7.5 0 00-15 0M12 11.5a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z', lock: 'M6 11h12v8H6zM8.5 11V8a3.5 3.5 0 017 0v3',
+  doc: 'M7 3h7l4.5 4.5V21H7zM14 3v5h5', chat: 'M4.5 5h15v10h-9l-4 4z', check: 'M5 12.5l4.5 4.5L20 6.5', calendar: 'M4.5 6h15v14.5h-15zM4.5 10.5h15M8.5 3.5v4M15.5 3.5v4',
+  alert: 'M12 3l9.5 17H2.5zM12 10v4.5M12 17.5h.01', clock: 'M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17zM12 7.5v5l3.2 3.2', bell: 'M6.5 10a5.5 5.5 0 1111 0c0 4.5 2 5.5 2 5.5H4.5s2-1 2-5.5zM10 19.5a2 2 0 004 0',
+  phone: 'M5 4h3.2l1.8 4.6-2 1.1a11.5 11.5 0 005.3 5.3l1.1-2 4.6 1.8V19a1.5 1.5 0 01-1.6 1.5A15.5 15.5 0 013.5 6.6 1.5 1.5 0 015 5z', chart: 'M4 19V5M4 19h16M8 15l3-4 3 2 4-6', gift: 'M4 11h16v9H4zM4 8h16v3H4zM12 8v12M12 8a2.5 2.5 0 10-2.5-2.5A2.5 2.5 0 0012 8a2.5 2.5 0 102.5-2.5A2.5 2.5 0 0012 8z', spark: 'M12 3l1.7 6.3L20 11l-6.3 1.7L12 19l-1.7-6.3L4 11l6.3-1.7z',
+};
+function svgIcon(key, color, size) { const d = ICONS[key] || ICONS.spark; size = size || 22; return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block">${d.split('M').filter(Boolean).map(s => '<path d="M' + s + '"/>').join('')}</svg>`; }
+/* золотая круглая ячейка-иконка */
+function iconChip(key, T, size) { size = size || 44; const ic = Math.round(size * 0.5); return `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="${size}" height="${size}" align="center" valign="middle" style="width:${size}px;height:${size}px;background:${T.dark ? 'rgba(216,189,134,.10)' : 'rgba(201,168,106,.12)'};border:1px solid ${T.line};border-radius:50%;">${svgIcon(key, T.goldDeep, ic)}</td></tr></table>`; }
 
+/* ─── строительные блоки ─────────────────────────────────────────────────── */
 function emailButton(url, label, opt) {
-  const o = opt || {}; const T = o.T || C;
+  const o = opt || {}; const T = o.T || C; const wide = o.wide !== false;
   const bg = o.ghost ? 'transparent' : T.btnBg; const col = o.ghost ? T.ink : T.btnInk;
-  const bd = o.ghost ? `border:1px solid ${T.line};` : '';
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 6px 0;"><tr><td style="border-radius:12px;background:${bg};${bd}">
-    <a href="${esc(url)}" style="display:inline-block;color:${col};text-decoration:none;font-weight:600;font-size:15px;font-family:${SANS};padding:15px 34px;border-radius:12px;letter-spacing:.01em;">${esc(label)}${o.ghost ? '' : ' &rarr;'}</a>
-  </td></tr></table>`;
+  const bd = o.ghost ? `border:1px solid ${T.line};` : `border:1px solid ${T.dark ? 'rgba(255,255,255,.14)' : 'rgba(201,168,106,.5)'};`;
+  const inner = `<a href="${esc(url)}" style="display:block;color:${col};text-decoration:none;font-family:${SERIF};font-weight:600;font-size:19px;letter-spacing:.01em;padding:17px 30px;border-radius:14px;text-align:center;">${esc(label)}${o.ghost ? '' : ' &nbsp;&rarr;'}</a>`;
+  if (wide) return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 8px 0;"><tr><td style="border-radius:14px;background:${bg};${bd}box-shadow:0 14px 30px -18px rgba(0,0,0,.5);">${inner}</td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 6px 0;"><tr><td style="border-radius:14px;background:${bg};${bd}"><a href="${esc(url)}" style="display:inline-block;color:${col};text-decoration:none;font-family:${SERIF};font-weight:600;font-size:18px;padding:15px 34px;border-radius:14px;">${esc(label)}${o.ghost ? '' : ' &rarr;'}</a></td></tr></table>`;
 }
 
 function emailPanel(html, accent, T) {
@@ -36,6 +48,19 @@ function emailPanel(html, accent, T) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;"><tr><td style="background:${T.panel};border:1px solid ${bd};border-radius:14px;padding:18px 22px;font-size:14px;line-height:1.6;color:${T.ink2};font-family:${SANS};">${html}</td></tr></table>`;
 }
 
+/* фичи-список: иконка + serif-заголовок + подпись (welcome/апдейты) */
+function emailFeatureList(items, T) {
+  T = T || C;
+  const rows = (items || []).map((it, i) => `<tr>
+    <td width="44" valign="top" style="padding:${i ? '16' : '4'}px 16px 4px 0;${i ? 'border-top:1px solid ' + T.line2 + ';' : ''}">${iconChip(it.icon || 'spark', T, 40)}</td>
+    <td valign="top" style="padding:${i ? '16' : '4'}px 0 4px 0;${i ? 'border-top:1px solid ' + T.line2 + ';' : ''}">
+      <div style="font-family:${SERIF};font-weight:600;font-size:19px;color:${T.ink};line-height:1.15;">${esc(it.title)}</div>
+      <div style="font-family:${SANS};font-size:13px;color:${T.ink3};margin-top:3px;line-height:1.45;">${esc(it.sub)}</div>
+    </td></tr>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel2};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:14px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>`;
+}
+
+/* простые ✦-буллеты (fallback для строковых списков) */
 function emailBullets(items, T) {
   T = T || C;
   const rows = (items || []).map(it => `<tr>
@@ -62,34 +87,76 @@ function emailDetails(rows, T) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;background:${T.panel};border:1px solid ${T.line};border-radius:14px;"><tr><td style="padding:6px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${body}</table></td></tr></table>`;
 }
 
-function emailInvoice(opt) {
-  const o = opt || {}; const T = o.T || C;
+/* чек: круг-галочка + крупная serif-сумма + статус, черта, строки (billing) */
+function emailReceipt(opt) {
+  const o = opt || {}; const T = o.T || C; const paid = o.icon !== 'alert';
+  const ring = paid ? T.goldDeep : T.danger;
   const rows = (o.rows || []).map(r => `<tr>
     <td style="padding:8px 0;font-size:14px;color:${T.ink2};font-family:${SANS};">${esc(r[0])}</td>
-    <td style="padding:8px 0;font-size:14px;color:${T.ink};text-align:right;font-weight:600;font-family:${SANS};">${esc(r[1])}</td>
-  </tr>`).join('');
-  const total = o.total ? `<tr><td colspan="2" style="padding:4px 0 0;"><div style="height:1px;background:${T.gold};opacity:.5;margin:6px 0;font-size:0;line-height:0;">&nbsp;</div></td></tr>
-    <tr><td style="padding:6px 0;font-size:14px;color:${T.ink};font-family:${SANS};font-weight:600;">${esc(o.totalLabel || 'Итого')}</td>
-    <td style="padding:6px 0;text-align:right;font-family:${SERIF};font-size:26px;color:${T.ink};font-weight:600;">${esc(o.total)}</td></tr>` : '';
-  const head = o.title ? `<tr><td colspan="2" style="padding:2px 0 8px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:${T.gold};font-family:${SANS};font-weight:700;border-bottom:1px solid ${T.line};">${esc(o.title)}</td></tr>` : '';
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel2};border:1px solid ${T.line};border-radius:14px;"><tr><td style="padding:14px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${head}${rows}${total}</table></td></tr></table>`;
+    <td style="padding:8px 0;font-size:14px;color:${T.ink};text-align:right;font-weight:600;font-family:${SANS};">${esc(r[1])}</td></tr>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:${T.panel2};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:24px 24px 18px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
+      <td valign="middle" style="padding-right:16px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="46" height="46" align="center" valign="middle" style="width:46px;height:46px;border:1.5px solid ${ring};border-radius:50%;">${svgIcon(paid ? 'check' : 'alert', ring, 22)}</td></tr></table></td>
+      <td valign="middle"><div style="font-family:${SERIF};font-size:40px;font-weight:600;color:${T.ink};line-height:1;">${esc(o.amount || '')}</div></td>
+    </tr></table>
+    <div align="center" style="text-align:center;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:${ring};font-family:${SANS};font-weight:700;margin-top:10px;">${esc(o.caption || (paid ? 'Оплачено' : 'Требует действия'))}</div>
+    <div style="height:1px;background:${T.line};margin:18px 0 8px;font-size:0;line-height:0;">&nbsp;</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+  </td></tr></table>`;
 }
 
-function emailAvatar(name, sub, T) {
+/* карточка лида: иконка-дом + ЗАПРОС + крупный serif-запрос + 2 колонки значений + статус */
+function emailLeadCard(opt, T) {
+  const o = opt || {}; T = T || C;
+  const cols = (o.cols || []).map((c, i) => `<td width="50%" valign="top" style="${i ? 'border-left:1px solid ' + T.line + ';padding-left:20px;' : 'padding-right:20px;'}">
+    <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:${T.ink3};font-family:${SANS};font-weight:700;">${esc(c[0])}</div>
+    <div style="font-family:${SERIF};font-size:24px;font-weight:600;color:${T.ink};line-height:1.1;margin-top:5px;">${esc(c[1])}</div></td>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:${T.panel2};border:1px solid ${T.line};border-radius:18px;"><tr><td style="padding:22px 24px;">
+    <div align="center" style="text-align:center;">${(function () { return `<table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td align="center">${iconChip(o.icon || 'home', T, 44)}</td></tr></table>`; })()}</div>
+    <div align="center" style="text-align:center;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:${T.ink3};font-family:${SANS};font-weight:700;margin-top:12px;">${esc(o.label || 'Запрос')}</div>
+    <div align="center" style="text-align:center;font-family:${SERIF};font-size:27px;font-weight:600;color:${T.ink};line-height:1.15;margin-top:4px;">${esc(o.name || '')}</div>
+    ${o.cols && o.cols.length ? `<div style="height:1px;background:${T.line};margin:18px 0;font-size:0;line-height:0;">&nbsp;</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${cols}</tr></table>` : ''}
+    ${o.status ? `<div style="height:1px;background:${T.line};margin:18px 0 14px;font-size:0;line-height:0;">&nbsp;</div><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="font-family:${SERIF};color:${T.gold};font-size:16px;padding-right:8px;">&#10022;</td><td style="font-family:${SANS};font-size:13px;color:${T.ink2};">${esc(o.status)}</td></tr></table>` : ''}
+  </td></tr></table>`;
+}
+
+/* аватар-панель: слева кружок+имя+роль, справа рабочее пространство (team) */
+function emailAvatar(opt, T) {
   T = T || C;
-  const initial = esc(String(name || '?').trim().charAt(0).toUpperCase() || '?');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;background:${T.panel};border:1px solid ${T.line};border-radius:14px;"><tr><td style="padding:14px 18px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
-    <td style="vertical-align:middle;padding-right:14px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="46" height="46" align="center" valign="middle" style="width:46px;height:46px;background:linear-gradient(135deg,${T.gold},${T.goldDeep});border-radius:50%;color:#fff;font-family:${SERIF};font-size:22px;font-weight:600;">${initial}</td></tr></table></td>
-    <td style="vertical-align:middle;"><div style="font-family:${SANS};font-size:15px;font-weight:700;color:${T.ink};">${esc(name || '')}</div><div style="font-family:${SANS};font-size:12.5px;color:${T.ink3};margin-top:2px;">${esc(sub || '')}</div></td>
+  if (typeof opt === 'string') opt = { name: opt, role: arguments[1] || '' }, T = arguments[2] || C; /* обратная совместимость */
+  const o = opt || {}; const initial = esc(String(o.name || '?').trim().charAt(0).toUpperCase() || '?');
+  const right = o.workspace ? `<td width="46%" valign="middle" style="border-left:1px solid ${T.line};padding-left:18px;">
+    <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:${T.ink3};font-family:${SANS};font-weight:700;">${esc(o.workspaceLabel || 'Рабочее пространство')}</div>
+    <div style="font-family:${SERIF};font-size:20px;font-weight:600;color:${T.ink};margin-top:3px;line-height:1.1;">${esc(o.workspace)}</div></td>` : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:16px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td valign="middle" style="padding-right:14px;width:56px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:linear-gradient(135deg,${T.gold},${T.goldDeep});border-radius:50%;color:#fff;font-family:${SERIF};font-size:25px;font-weight:600;">${initial}</td></tr></table></td>
+    <td valign="middle"><div style="font-family:${SERIF};font-size:20px;font-weight:600;color:${T.ink};line-height:1.1;">${esc(o.name || '')}</div><div style="font-family:${SANS};font-size:12.5px;color:${T.ink3};margin-top:2px;">${esc(o.role || o.sub || '')}</div></td>
+    ${right}
   </tr></table></td></tr></table>`;
 }
 
-/* сетка крупных KPI (формат stat / отчёты): [{n:'3',label:'новых лида'},...] — до 3 в ряд */
-function emailStatGrid(stats, T) {
+/* инфо-грид: 2 колонки иконка+подпись+значение (verify) */
+function emailInfoGrid(cols, T) {
   T = T || C;
-  const arr = (stats || []).slice(0, 3);
-  const w = Math.floor(100 / (arr.length || 1));
-  const cells = arr.map((s, i) => `<td width="${w}%" style="padding:0 ${i ? '6' : '0'}px 0 ${i ? '6' : '0'}px;vertical-align:top;">
+  const cells = (cols || []).map((c, i) => `<td width="50%" valign="top" style="${i ? 'border-left:1px solid ' + T.line + ';padding-left:22px;' : 'padding-right:22px;'}">
+    <div style="margin-bottom:12px;">${iconChip(c.icon || 'spark', T, 40)}</div>
+    <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:${T.ink3};font-family:${SANS};font-weight:700;">${esc(c.label)}</div>
+    <div style="font-family:${SANS};font-size:15px;font-weight:600;color:${T.ink};margin-top:4px;word-break:break-word;">${esc(c.value)}</div></td>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:20px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${cells}</tr></table></td></tr></table>`;
+}
+
+/* сноска под кнопкой: иконка + приглушённый текст */
+function emailFootnote(iconKey, text, T) {
+  T = T || C;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 2px;"><tr>
+    <td valign="middle" width="26" style="padding-right:10px;">${svgIcon(iconKey || 'spark', T.ink3, 18)}</td>
+    <td valign="middle" style="font-family:${SANS};font-size:12.5px;color:${T.ink3};line-height:1.45;">${text}</td></tr></table>`;
+}
+
+/* сетка KPI (stat/reports) */
+function emailStatGrid(stats, T) {
+  T = T || C; const arr = (stats || []).slice(0, 3); const w = Math.floor(100 / (arr.length || 1));
+  const cells = arr.map((s, i) => `<td width="${w}%" style="padding:0 ${i ? '6' : '0'}px;vertical-align:top;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${T.panel2};border:1px solid ${T.line};border-radius:14px;"><tr><td align="center" style="padding:18px 10px;">
       <div style="font-family:${SERIF};font-size:40px;font-weight:600;color:${T.ink};line-height:1;">${esc(s.n)}</div>
       <div style="font-family:${SANS};font-size:12px;color:${T.ink3};margin-top:7px;letter-spacing:.02em;">${esc(s.label)}</div>
@@ -97,559 +164,536 @@ function emailStatGrid(stats, T) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;"><tr>${cells}</tr></table>`;
 }
 
-/* карточка лида (leads): имя + источник + статус-пилюля + бюджет */
-function emailLeadCard(opt, T) {
-  const o = opt || {}; T = T || C;
-  const pill = o.status ? `<span style="display:inline-block;font-family:${SANS};font-size:11px;font-weight:700;color:${T.goldDeep};background:${T.dark ? 'rgba(216,189,134,.14)' : 'rgba(201,168,106,.16)'};border:1px solid ${T.line};border-radius:999px;padding:4px 11px;">${esc(o.status)}</span>` : '';
-  const rows = (o.rows || []).map(r => `<tr><td style="padding:4px 0;font-size:13px;color:${T.ink3};font-family:${SANS};">${esc(r[0])}</td><td style="padding:4px 0;font-size:13.5px;color:${T.ink};text-align:right;font-weight:600;font-family:${SANS};">${esc(r[1])}</td></tr>`).join('');
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel2};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:18px 22px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="vertical-align:middle;"><div style="font-family:${SERIF};font-size:22px;font-weight:600;color:${T.ink};line-height:1.1;">${esc(o.name || 'Новый лид')}</div></td>
-      <td style="vertical-align:middle;text-align:right;">${pill}</td>
-    </tr></table>
-    ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;border-top:1px solid ${T.line2};padding-top:6px;">${rows}</table>` : ''}
-  </td></tr></table>`;
-}
+function emailInvoice(opt) { /* совместимость: чек-стиль */ return emailReceipt(Object.assign({ amount: (opt && opt.total) || '', caption: (opt && opt.title) || 'Счёт', rows: (opt && opt.rows) || [] }, opt)); }
 
-/* ─── hero-визуалы ────────────────────────────────────────────────────────── */
-function heroBand(src, h, T) {
-  h = h || 190; T = T || C;
-  return `<tr><td style="padding:0;font-size:0;line-height:0;background:${T.panel};">
-    <img src="${src}" width="548" height="${h}" alt="" class="hband" style="display:block;width:100%;height:${h}px;max-height:${h}px;object-fit:cover;border:0;outline:none;">
-  </td></tr>`;
-}
-function heroBadge(src, T) {
-  T = T || C;
-  return `<tr><td align="center" style="padding:30px 44px 2px;">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="92" height="92" align="center" valign="middle" style="width:92px;height:92px;border-radius:50%;overflow:hidden;background:${T.panel};border:1px solid ${T.line};">
-      <img src="${src}" width="92" height="92" alt="" style="display:block;width:92px;height:92px;object-fit:cover;border:0;border-radius:50%;">
+/* ─── ядро: наложенный тёмный хедер ──────────────────────────────────────── */
+function overlayHeader(o) {
+  const H2 = o.hero.h || 250; const art = o.hero.src;
+  const spacer = Math.max(28, H2 - 156);
+  const side = o.headerNote ? `<td valign="bottom" align="right" style="font-family:${SANS};font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${H.mute};line-height:1.7;padding-left:16px;">${o.headerNote}</td>` : '';
+  return `<tr><td background="${art}" bgcolor="${H.bg}" valign="top" style="background-color:${H.bg};background-image:url('${art}');background-position:right center;background-size:cover;background-repeat:no-repeat;padding:0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="cardpad" style="padding:30px 44px 32px 44px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="font-family:${SERIF};font-size:22px;color:${H.gold};padding-right:9px;line-height:1;">&#10022;</td>
+        <td style="font-family:${SERIF};font-size:23px;letter-spacing:.22em;color:${H.light};line-height:1;">LUMEN</td>
+      </tr></table>
+      <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:${H.mute};margin-top:6px;font-family:${SANS};">${o.en ? 'Real estate AI-CRM' : 'AI-CRM для недвижимости'}</div>
+      <div style="height:${spacer}px;line-height:0;font-size:0;">&nbsp;</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="bottom">
+          ${o.eyebrow ? `<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:${H.gold};font-weight:700;margin:0 0 10px;font-family:${SANS};">${esc(o.eyebrow)}</div>` : ''}
+          <div style="font-family:${SERIF};font-weight:600;font-size:${o.titleSize || 30}px;line-height:1.12;color:${H.light};letter-spacing:-.005em;">${o.title}</div>
+        </td>${side}
+      </tr></table>
     </td></tr></table>
   </td></tr>`;
 }
 
-/* ─── обёртка письма ──────────────────────────────────────────────────────── */
+/* светлый хедер для plain (письмо-записка, без арта) */
+function plainHeader(o, T) {
+  return `<tr><td class="cardpad" align="center" style="padding:34px 44px 0;text-align:center;">
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
+      <td style="font-family:${SERIF};font-size:21px;color:${T.gold};padding-right:9px;line-height:1;">&#10022;</td>
+      <td style="font-family:${SERIF};font-size:22px;letter-spacing:.22em;color:${T.ink};line-height:1;">LUMEN</td>
+    </tr></table>
+    <div style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:${T.ink3};margin-top:6px;font-family:${SANS};">${o.en ? 'Real estate AI-CRM' : 'AI-CRM для недвижимости'}</div>
+    <div style="margin-top:16px;font-family:${SERIF};font-size:18px;color:${T.gold};">&#10022;</div>
+  </td></tr>`;
+}
+
+/* ─── обёртка письма ─────────────────────────────────────────────────────── */
 function emailWrap(title, bodyHtml, lang, opt) {
   const en = lang === 'en';
-  const o = opt || {};
+  const o = opt || {}; o.en = en; o.title = title;
   const T = o.theme === 'dark' ? D : C;
   const pre = o.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${T.card};font-size:1px;line-height:1px;">${esc(o.preheader)}${'&#847;&zwnj;&nbsp;'.repeat(24)}</div>` : '';
-  const eyebrow = o.eyebrow ? `<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:${T.gold};font-weight:700;margin:0 0 12px 0;font-family:${SANS};">${esc(o.eyebrow)}</div>` : '';
-  const titleAlign = o.badge ? 'text-align:center;' : '';
-  const heroRow = o.hero ? heroBand(o.hero.src, o.hero.h, T) : (o.badge ? heroBadge(o.badge, T) : '');
-  const titleSize = o.titleSize || 28;
-  const wordmark = o.badge ? '' : `<tr><td style="padding:${o.hero ? '30' : '34'}px 44px 0 44px;${o.plain ? 'text-align:center;' : ''}">
-      <table role="presentation" cellpadding="0" cellspacing="0" ${o.plain ? 'align="center"' : ''}><tr>
-        <td style="font-family:${SERIF};font-size:21px;color:${T.gold};padding-right:9px;line-height:1;">&#10022;</td>
-        <td style="font-family:${SERIF};font-size:22px;letter-spacing:.22em;color:${T.ink};line-height:1;">LUMEN</td>
-      </tr></table>
-      <div style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:${T.ink3};margin-top:6px;font-family:${SANS};">${en ? 'Real estate AI-CRM' : 'AI-CRM для недвижимости'}</div>
-    </td></tr>`;
-  const smallWordmark = o.badge ? `<tr><td align="center" style="padding:14px 44px 0;"><span style="font-family:${SERIF};font-size:16px;letter-spacing:.22em;color:${T.ink3};">&#10022;&nbsp;LUMEN</span></td></tr>` : '';
-  const divider = o.plain ? `<tr><td align="center" style="padding:16px 44px 0;"><span style="font-family:${SERIF};font-size:18px;color:${T.gold};">&#10022;</span></td></tr>` : '';
+  const header = o.hero ? overlayHeader(o) : plainHeader(o, T);
+  const showTitleInBody = !o.hero; /* при наложенном хедере заголовок уже в шапке */
+  const eyebrowBody = (!o.hero && o.eyebrow) ? `<div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:${T.gold};font-weight:700;margin:0 0 12px;font-family:${SANS};${o.plain ? 'text-align:center;' : ''}">${esc(o.eyebrow)}</div>` : '';
+  const titleBody = (showTitleInBody) ? `${eyebrowBody}<h1 style="font-family:${SERIF};font-weight:600;font-size:${o.titleSize || 28}px;line-height:1.16;color:${T.ink};margin:0 0 16px;letter-spacing:-.005em;${o.plain ? 'text-align:center;' : ''}">${title}</h1>` : '';
+  const tagline = en ? 'People · Properties · Possibilities' : 'Люди · Объекты · Возможности';
   return `<!doctype html><html lang="${en ? 'en' : 'ru'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="${FONTS}" rel="stylesheet">
-<style>@import url('${FONTS}');@media (max-width:560px){.cardpad{padding-left:26px!important;padding-right:26px!important}.hband{height:auto!important;max-height:none!important}}</style></head>
+<style>@import url('${FONTS}');@media (max-width:560px){.cardpad{padding-left:26px!important;padding-right:26px!important}}</style></head>
 <body style="margin:0;padding:0;background:${T.bg};-webkit-font-smoothing:antialiased;">${pre}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${T.bg};font-family:${SANS};">
  <tr><td align="center" style="padding:36px 16px;">
   <table role="presentation" width="548" cellpadding="0" cellspacing="0" style="max-width:548px;width:100%;background:${T.card};border:1px solid ${T.line};border-radius:20px;overflow:hidden;box-shadow:0 30px 60px -34px rgba(0,0,0,${T.dark ? '.6' : '.30'});">
     <tr><td style="height:3px;background:linear-gradient(90deg,${T.gold},#e8d9b6 52%,${T.gold});font-size:0;line-height:0;">&nbsp;</td></tr>
-    ${heroRow}
-    ${wordmark}${smallWordmark}${divider}
-    <tr><td class="cardpad" style="padding:26px 44px 6px 44px;${titleAlign}${o.plain ? 'text-align:center;' : ''}">
-      ${eyebrow}
-      <h1 style="font-family:${SERIF};font-weight:600;font-size:${titleSize}px;line-height:1.18;color:${T.ink};margin:0 0 16px 0;letter-spacing:-.005em;">${title}</h1>
+    ${header}
+    <tr><td class="cardpad" style="padding:${o.hero ? '28' : '22'}px 44px 6px 44px;${o.plain ? 'text-align:center;' : ''}">
+      ${titleBody}
       <div style="font-size:15px;line-height:1.7;color:${T.ink2};font-family:${SANS};text-align:${o.plain ? 'center' : 'left'};">${bodyHtml}</div>
     </td></tr>
-    <tr><td class="cardpad" style="padding:22px 44px 34px 44px;">
-      <div style="border-top:1px solid ${T.line};padding-top:18px;font-size:12px;line-height:1.65;color:${T.ink3};font-family:${SANS};${o.plain ? 'text-align:center;' : ''}">
-        ${o.footerNote || (en ? 'You received this email because you use Lumen.' : 'Вы получили это письмо, потому что пользуетесь Lumen.')}
-        ${o.manageNote ? `<br>${o.manageNote}` : ''}
-        <div style="margin-top:12px;">
-          <a href="https://lumen247.com/privacy.html" style="color:${T.ink3};text-decoration:underline;">${en ? 'Privacy' : 'Конфиденциальность'}</a>
-          &nbsp;·&nbsp;<a href="https://lumen247.com/terms.html" style="color:${T.ink3};text-decoration:underline;">${en ? 'Terms' : 'Условия'}</a>
-          &nbsp;·&nbsp;<a href="https://lumen247.com" style="color:${T.ink3};text-decoration:underline;">lumen247.com</a>
-        </div>
-      </div>
+    <tr><td class="cardpad" style="padding:14px 44px 30px 44px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${T.line};"><tr>
+        <td valign="top" style="padding-top:18px;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="font-family:${SERIF};font-size:18px;color:${T.gold};padding-right:7px;line-height:1;">&#10022;</td><td style="font-family:${SERIF};font-size:18px;letter-spacing:.2em;color:${T.ink};line-height:1;">LUMEN</td></tr></table>
+          <div style="font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:${T.ink3};margin-top:5px;font-family:${SANS};">${tagline}</div>
+        </td>
+        <td valign="top" align="right" style="padding-top:18px;font-family:${SANS};font-size:11.5px;line-height:1.6;color:${T.ink3};text-align:right;">
+          ${o.footerNote || (en ? 'You received this email because you use Lumen.' : 'Вы получили это письмо, потому что пользуетесь Lumen.')}
+          ${o.manageNote ? `<br>${o.manageNote}` : ''}
+          <div style="margin-top:9px;">
+            <a href="https://lumen247.com/privacy.html" style="color:${T.ink3};text-decoration:underline;">${en ? 'Privacy' : 'Конфиденциальность'}</a>
+            &nbsp;·&nbsp;<a href="https://lumen247.com/terms.html" style="color:${T.ink3};text-decoration:underline;">${en ? 'Terms' : 'Условия'}</a>
+            &nbsp;·&nbsp;<a href="https://lumen247.com" style="color:${T.ink3};text-decoration:underline;">lumen247.com</a>
+          </div>
+        </td>
+      </tr></table>
     </td></tr>
   </table>
-  <div style="font-size:11px;color:${T.dark ? '#5f5c54' : '#a8a6a0'};margin-top:18px;font-family:${SANS};letter-spacing:.02em;">&#10022;&nbsp; © 2026 Lumen · TargetPoint AY · Antwerpen</div>
+  <div style="font-size:11px;color:${T.dark ? '#5f5c54' : '#a8a6a0'};margin-top:16px;font-family:${SANS};letter-spacing:.02em;">© 2026 Lumen · TargetPoint AY · Antwerpen</div>
  </td></tr>
 </table></body></html>`;
 }
 
-/* ─── реестр писем ────────────────────────────────────────────────────────── */
-/* поля шаблона: name, arch, theme('dark'|undefined), format('plain'|'stat'|undefined), hero|badge, heroH, titleSize,
-   category, audience('owner'|'broker'|'all'), essential(bool — транзакционное, отписки нет),
-   subject_ru/en, body_ru/en, eyebrow_*, preheader_*, panel_*, bullets_*, stats (для stat).
-   body-токены: {{button}} {{panel}} {{details}} {{code}} {{invoice}} {{bullets}} {{avatar}} {{stats}} {{lead}}. */
+/* ─── реестр писем ───────────────────────────────────────────────────────── */
 const DEFAULT_TEMPLATES = {
-  /* ── АККАУНТ / CEREMONY ── */
   verifyEmail: {
-    name: 'Подтверждение e-mail / Verify email', arch: 'ceremony', hero: 'hero.jpg', heroH: 168,
+    name: 'Подтверждение e-mail / Verify email', arch: 'ceremony', hero: 'hero.jpg', heroH: 250, titleSize: 33,
     category: 'account', audience: 'all', essential: true,
-    eyebrow_ru: 'Один клик до старта', eyebrow_en: 'One click to launch',
+    eyebrow_ru: 'Подтверждение e-mail', eyebrow_en: 'Confirm e-mail',
+    headerNote_ru: 'больше<br>возможностей', headerNote_en: 'more<br>possibilities',
     preheader_ru: 'Подтвердите адрес — и Lumen начнёт ловить лидов', preheader_en: 'Confirm your email and Lumen starts catching leads',
-    subject_ru: 'Один клик — и Lumen начнёт ловить лидов', subject_en: 'One click and Lumen starts catching leads',
-    body_ru: '<p>Здравствуйте, {{name}}!</p><p>Остался один клик. Подтвердите <b>{{email}}</b> — и аккаунт <b>{{agency}}</b> оживёт: ИИ начнёт отвечать вашим лидам за 60 секунд, пока конкуренты ещё думают.</p>{{button}}{{panel}}',
-    body_en: '<p>Hi {{name}},</p><p>One click left. Confirm <b>{{email}}</b> and your <b>{{agency}}</b> account comes alive — AI starts replying to your leads in 60 seconds while competitors are still thinking.</p>{{button}}{{panel}}',
-    panel_ru: 'Ссылка живёт недолго. Не вы создавали аккаунт? Тогда письмо можно смело удалить — ничего не произойдёт.',
-    panel_en: 'The link is short-lived. Didn’t create an account? Just delete this — nothing happens.',
+    subject_ru: 'Один клик — и Lumen готов к работе', subject_en: 'One click and Lumen is ready',
+    title_ru: 'Один клик — и Lumen готов к работе', title_en: 'One click and Lumen is ready',
+    body_ru: '<p>Здравствуйте, {{name}}!</p><p>Подтвердите e-mail, чтобы начать работу с Lumen.</p>{{info}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}},</p><p>Confirm your e-mail to start with Lumen.</p>{{info}}{{button}}{{note}}',
+    note_ru: 'Если вы не создавали аккаунт — просто проигнорируйте это письмо.', note_en: 'If you didn’t create an account, just ignore this email.', noteIcon: 'lock',
   },
   welcome: {
-    name: 'Приветствие / Welcome', arch: 'ceremony', hero: 'hero.gif', heroH: 196, titleSize: 30,
+    name: 'Приветствие / Welcome', arch: 'ceremony', hero: 'hero.gif', heroH: 250, titleSize: 32,
     category: 'account', audience: 'all', essential: true,
     eyebrow_ru: 'Добро пожаловать', eyebrow_en: 'Welcome',
     preheader_ru: 'Ваш ИИ-отдел продаж уже ловит лидов', preheader_en: 'Your AI sales desk is already capturing leads',
     subject_ru: 'Вы в Lumen, {{name}}. Теперь лиды не убегут', subject_en: 'You’re in, {{name}}. Leads don’t get away now',
-    body_ru: '<p>Здравствуйте, {{name}}!</p><p>Готово. Пока вы читаете это письмо, <b>{{agency}}</b> уже под Lumen — и это меняет расстановку сил:</p>{{bullets}}{{button}}<p style="margin-top:18px">Застряли на старте? Ответьте на письмо — мы живые люди и поможем настроить.</p>',
-    body_en: '<p>Hi {{name}},</p><p>Done. While you read this, <b>{{agency}}</b> is already on Lumen — and that changes the game:</p>{{bullets}}{{button}}<p style="margin-top:18px">Stuck on setup? Reply to this email — real humans, we’ll help.</p>',
-    bullets_ru: ['Заявка приходит — ИИ отвечает за 60 секунд, а не «перезвоню завтра».', 'Каждый лид квалифицирован и разложен по стадиям — без ручной рутины.', 'Ни выходных, ни ночей: воронка греется, пока вы спите.'],
-    bullets_en: ['A lead comes in — AI replies in 60 seconds, not “I’ll call tomorrow”.', 'Every lead qualified and sorted by stage — no manual busywork.', 'No weekends, no nights off: the funnel stays warm while you sleep.'],
+    title_ru: 'Вы в Lumen, {{name}}. Теперь лиды не&nbsp;убегут.', title_en: 'You’re in, {{name}}. Leads don’t get away now.',
+    body_ru: '<p>Здравствуйте, {{name}}! Ваш аккаунт <b>{{agency}}</b> готов к работе.</p>{{features}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}! Your <b>{{agency}}</b> account is ready.</p>{{features}}{{button}}{{note}}',
+    features_ru: [{ icon: 'bolt', title: 'Ответ за 60 секунд', sub: 'ИИ отвечает на заявку, а не откладывает на завтра.' }, { icon: 'users', title: 'Квалификация без рутины', sub: 'Лиды квалифицированы и распределены по стадиям.' }, { icon: 'moon', title: 'Работа 24/7', sub: 'Воронка работает, пока вы отдыхаете.' }],
+    features_en: [{ icon: 'bolt', title: 'Reply in 60 seconds', sub: 'AI answers the lead instead of putting it off.' }, { icon: 'users', title: 'Qualification, no busywork', sub: 'Leads are qualified and sorted by stage.' }, { icon: 'moon', title: 'Runs 24/7', sub: 'The funnel works while you rest.' }],
+    note_ru: 'Нужна помощь на старте? Ответьте на это письмо — поможем настроить Lumen.', note_en: 'Need help getting started? Reply to this email — we’ll help.', noteIcon: 'chat',
   },
   trialStarted: {
-    name: 'Триал начался / Trial started', arch: 'ceremony', hero: 'hero.jpg', heroH: 168,
+    name: 'Триал начался / Trial started', arch: 'ceremony', hero: 'hero.jpg', heroH: 240, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Ранний доступ открыт', eyebrow_en: 'Trial started',
     preheader_ru: 'Пробный период {{days}} дн. пошёл', preheader_en: 'Your {{days}}-day trial has started',
-    subject_ru: 'Часы пошли: {{days}} дней Lumen — ваши', subject_en: 'The clock’s ticking: {{days}} days of Lumen are yours',
-    body_ru: '<p>Здравствуйте, {{name}}! Пробный период для <b>{{agency}}</b> активирован — {{days}} дней полного доступа, без карты и мелкого шрифта.</p>{{bullets}}{{button}}',
-    body_en: '<p>Hi {{name}}, the trial for <b>{{agency}}</b> is live — {{days}} days of full access, no card, no fine print.</p>{{bullets}}{{button}}',
-    bullets_ru: ['Подключите WhatsApp — ИИ начнёт отвечать лидам сегодня.', 'Импортируйте базу — старые контакты тоже в дело.', 'Позовите команду — доступы раздаются в пару кликов.'],
-    bullets_en: ['Connect WhatsApp — AI starts replying to leads today.', 'Import your base — old contacts count too.', 'Invite your team — access in a couple of clicks.'],
+    subject_ru: 'Часы пошли: {{days}} дней Lumen — ваши', subject_en: 'The clock’s ticking: {{days}} days of Lumen',
+    title_ru: 'Часы пошли: {{days}} дней Lumen — ваши', title_en: 'The clock’s ticking: {{days}} days',
+    body_ru: '<p>Здравствуйте, {{name}}! Пробный период для <b>{{agency}}</b> активирован — {{days}} дней полного доступа, без карты и мелкого шрифта.</p>{{features}}{{button}}',
+    body_en: '<p>Hi {{name}}, the trial for <b>{{agency}}</b> is live — {{days}} days of full access, no card, no fine print.</p>{{features}}{{button}}',
+    features_ru: [{ icon: 'chat', title: 'Подключите WhatsApp', sub: 'ИИ начнёт отвечать лидам уже сегодня.' }, { icon: 'doc', title: 'Импортируйте базу', sub: 'Старые контакты тоже пойдут в дело.' }, { icon: 'users', title: 'Позовите команду', sub: 'Доступы раздаются в пару кликов.' }],
+    features_en: [{ icon: 'chat', title: 'Connect WhatsApp', sub: 'AI starts replying to leads today.' }, { icon: 'doc', title: 'Import your base', sub: 'Old contacts count too.' }, { icon: 'users', title: 'Invite your team', sub: 'Access in a couple of clicks.' }],
   },
   referralReward: {
-    name: 'Партнёрская награда / Referral reward', arch: 'ceremony', hero: 'hero.jpg', heroH: 156,
+    name: 'Партнёрская награда / Referral reward', arch: 'ceremony', hero: 'hero.jpg', heroH: 230, titleSize: 30,
     category: 'partner', audience: 'all', essential: false,
-    eyebrow_ru: 'Партнёрка', eyebrow_en: 'Partner',
+    eyebrow_ru: 'Партнёрская программа', eyebrow_en: 'Partner program',
     preheader_ru: 'Вам начислено вознаграждение', preheader_en: 'You earned a reward',
     subject_ru: '{{amount}} ваших — спасибо за {{agency}}', subject_en: '{{amount}} is yours — thanks for {{agency}}',
-    body_ru: '<p>Здравствуйте, {{name}}! Агентство <b>{{agency}}</b>, которое вы привели, оплатило подписку — а значит, вам начислено вознаграждение.</p>{{details}}{{button}}',
-    body_en: '<p>Hi {{name}}, the agency <b>{{agency}}</b> you referred just paid — so your reward is in.</p>{{details}}{{button}}',
+    title_ru: '{{amount}} — ваше вознаграждение', title_en: '{{amount}} — your reward',
+    body_ru: '<p>Здравствуйте, {{name}}! Агентство <b>{{agency}}</b>, которое вы привели, оплатило подписку — вознаграждение начислено.</p>{{details}}{{button}}',
+    body_en: '<p>Hi {{name}}, the agency <b>{{agency}}</b> you referred just paid — your reward is in.</p>{{details}}{{button}}',
   },
-  /* ── БЕЗОПАСНОСТЬ / SECURITY ── */
   passwordReset: {
-    name: 'Сброс пароля / Password reset', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
+    name: 'Сброс пароля / Password reset', arch: 'security', hero: 'shield.jpg', heroH: 220, titleSize: 30,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Ссылка для нового пароля внутри', preheader_en: 'Your password reset link inside',
     subject_ru: 'Новый пароль Lumen — в один клик', subject_en: 'Your new Lumen password — one click away',
-    body_ru: '<p>Забыли пароль? С кем не бывает. Жмите кнопку — зададите новый за десять секунд. Ссылка скоро протухнет, так что не тяните.</p>{{button}}{{panel}}',
-    body_en: '<p>Forgot your password? Happens to the best. Hit the button — new one in ten seconds. The link expires soon, so don’t sit on it.</p>{{button}}{{panel}}',
-    panel_ru: 'Не вы запрашивали сброс? Спокойно — просто проигнорируйте письмо, пароль останется прежним.',
-    panel_en: 'Didn’t request this? Relax — ignore the email, your password stays as it is.',
+    title_ru: 'Новый пароль — в один клик', title_en: 'A new password — one click away',
+    body_ru: '<p>Забыли пароль? С кем не бывает. Жмите кнопку — зададите новый за десять секунд. Ссылка скоро протухнет, так что не тяните.</p>{{button}}{{note}}',
+    body_en: '<p>Forgot your password? Happens to the best. Hit the button — new one in ten seconds. The link expires soon.</p>{{button}}{{note}}',
+    note_ru: 'Не вы запрашивали сброс? Просто проигнорируйте письмо — пароль останется прежним.', note_en: 'Didn’t request this? Ignore the email — your password stays as it is.', noteIcon: 'lock',
   },
   passwordChanged: {
-    name: 'Пароль изменён / Password changed', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
+    name: 'Пароль изменён / Password changed', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Пароль вашего аккаунта Lumen обновлён', preheader_en: 'Your Lumen password was updated',
     subject_ru: 'Пароль Lumen изменён', subject_en: 'Your Lumen password was changed',
-    body_ru: '<p>Здравствуйте, {{name}}! Пароль аккаунта <b>{{agency}}</b> успешно изменён — фиксируем для истории:</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Восстановите доступ</a> немедленно и напишите нам.</p>',
-    body_en: '<p>Hi {{name}}, the password for your <b>{{agency}}</b> account was changed — logging it for the record:</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access</a> right away and contact us.</p>',
+    title_ru: 'Пароль изменён', title_en: 'Password changed',
+    body_ru: '<p>Здравствуйте, {{name}}! Пароль аккаунта <b>{{agency}}</b> успешно изменён — фиксируем для истории:</p>{{details}}{{note}}',
+    body_en: '<p>Hi {{name}}, the password for your <b>{{agency}}</b> account was changed — logging it for the record:</p>{{details}}{{note}}',
+    note_ru: 'Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Восстановите доступ</a> немедленно и напишите нам.', note_en: 'Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access</a> right away.', noteIcon: 'alert',
   },
   emailChanged: {
-    name: 'E-mail изменён / Email changed', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
+    name: 'E-mail изменён / Email changed', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Адрес входа в Lumen обновлён', preheader_en: 'Your Lumen login email was updated',
     subject_ru: 'Адрес входа в Lumen обновлён', subject_en: 'Your Lumen login email was updated',
-    body_ru: '<p>Здравствуйте, {{name}}! Адрес входа для <b>{{agency}}</b> теперь <b>{{email}}</b>. Старый больше не подойдёт.</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Срочно верните доступ</a>.</p>',
-    body_en: '<p>Hi {{name}}, the login email for <b>{{agency}}</b> is now <b>{{email}}</b>. The old one won’t work anymore.</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access now</a>.</p>',
+    title_ru: 'Адрес входа обновлён', title_en: 'Login email updated',
+    body_ru: '<p>Здравствуйте, {{name}}! Адрес входа для <b>{{agency}}</b> теперь <b>{{email}}</b>. Старый больше не подойдёт.</p>{{details}}{{note}}',
+    body_en: '<p>Hi {{name}}, the login email for <b>{{agency}}</b> is now <b>{{email}}</b>. The old one won’t work.</p>{{details}}{{note}}',
+    note_ru: 'Это были не вы? <a href="{{link}}" style="color:#141311;font-weight:600">Срочно верните доступ</a>.', note_en: 'Wasn’t you? <a href="{{link}}" style="color:#141311;font-weight:600">Recover access now</a>.', noteIcon: 'alert',
   },
   loginAlert: {
-    name: 'Вход с нового устройства / New sign-in', arch: 'security', hero: 'shield.jpg', heroH: 118, titleSize: 25,
+    name: 'Вход с нового устройства / New sign-in', arch: 'security', hero: 'shield.jpg', heroH: 200, titleSize: 29,
     category: 'security', audience: 'all', essential: true,
     eyebrow_ru: 'Безопасность', eyebrow_en: 'Security',
     preheader_ru: 'Замечен вход в ваш аккаунт Lumen', preheader_en: 'A new sign-in to your Lumen account',
     subject_ru: 'Новый вход в Lumen', subject_en: 'New sign-in to Lumen',
-    body_ru: '<p>Здравствуйте, {{name}}! Заметили вход в аккаунт <b>{{agency}}</b>. На всякий случай — детали:</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Это вы — отлично, дальше можно не читать. Если нет — быстро <a href="{{link}}" style="color:#141311;font-weight:600">смените пароль</a>, остальное прикроем.</p>',
-    body_en: '<p>Hi {{name}}, we noticed a sign-in to your <b>{{agency}}</b> account. Just in case — the details:</p>{{details}}<p style="color:#8b8983;font-size:13px;margin-top:4px">Was you — nothing to do. If not — <a href="{{link}}" style="color:#141311;font-weight:600">change your password</a>.</p>',
+    title_ru: 'Новый вход в Lumen', title_en: 'New sign-in to Lumen',
+    body_ru: '<p>Здравствуйте, {{name}}! Заметили вход в аккаунт <b>{{agency}}</b>. На всякий случай — детали:</p>{{details}}{{note}}',
+    body_en: '<p>Hi {{name}}, we noticed a sign-in to your <b>{{agency}}</b> account. Just in case — the details:</p>{{details}}{{note}}',
+    note_ru: 'Это вы — можно не читать. Если нет — быстро <a href="{{link}}" style="color:#141311;font-weight:600">смените пароль</a>.', note_en: 'Was you — nothing to do. If not — <a href="{{link}}" style="color:#141311;font-weight:600">change your password</a>.', noteIcon: 'lock',
   },
-  /* ── КОМАНДА / TEAM ── */
   invite: {
-    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'nodes.jpg', heroH: 150,
+    name: 'Приглашение в команду / Team invite', arch: 'team', hero: 'nodes.jpg', heroH: 235, titleSize: 31,
     category: 'team', audience: 'all', essential: true,
-    eyebrow_ru: 'Приглашение', eyebrow_en: 'Invitation',
+    eyebrow_ru: 'Приглашение в команду', eyebrow_en: 'Team invitation',
     preheader_ru: '{{inviter}} зовёт вас в Lumen', preheader_en: '{{inviter}} invites you to Lumen',
     subject_ru: '{{inviter}} зовёт вас в {{agency}} — Lumen', subject_en: '{{inviter}} invited you to {{agency}} on Lumen',
-    body_ru: '<p>Здравствуйте!</p>{{avatar}}<p><b>{{inviter}}</b> открывает вам доступ в <b>{{agency}}</b> на Lumen. Тут ИИ ловит и греет лидов, а вам достаётся самое приятное — закрывать сделки.</p>{{button}}<p style="color:#8b8983;font-size:13px;margin-top:16px">Придумаете пароль — и сразу внутри. Дело двух минут.</p>',
-    body_en: '<p>Hi!</p>{{avatar}}<p><b>{{inviter}}</b> is giving you access to <b>{{agency}}</b> on Lumen — where AI captures and nurtures leads while you close deals.</p>{{button}}<p style="color:#8b8983;font-size:13px;margin-top:16px">Set a password and you’re in. Takes two minutes.</p>',
+    title_ru: 'Вас приглашают в {{agency}}', title_en: 'You’re invited to {{agency}}',
+    body_ru: '<p>Здравствуйте! <b>{{inviter}}</b> приглашает вас в команду <b>{{agency}}</b> на Lumen.</p>{{avatar}}<p>Lumen берёт на себя работу с лидами, чтобы вы могли сосредоточиться на сделках.</p>{{button}}{{note}}',
+    body_en: '<p>Hi! <b>{{inviter}}</b> invites you to the <b>{{agency}}</b> team on Lumen.</p>{{avatar}}<p>Lumen handles the leads so you can focus on closing.</p>{{button}}{{note}}',
+    note_ru: 'Создайте пароль — и присоединяйтесь к команде.', note_en: 'Set a password — and join the team.', noteIcon: 'lock',
   },
   teammateJoined: {
-    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'nodes.jpg', heroH: 132,
+    name: 'Новый в команде / Teammate joined', arch: 'team', hero: 'nodes.jpg', heroH: 210, titleSize: 29,
     category: 'team', audience: 'owner', essential: false,
     eyebrow_ru: 'Команда', eyebrow_en: 'Team',
     preheader_ru: 'В {{agency}} новый человек', preheader_en: 'A new member joined {{agency}}',
     subject_ru: '{{name}} теперь в команде {{agency}}', subject_en: '{{name}} joined {{agency}}',
-    body_ru: '<p>Здравствуйте!</p>{{avatar}}<p><b>{{name}}</b> принял приглашение и теперь в вашей команде <b>{{agency}}</b>. Роли и доступы можно настроить в разделе «Подключения → Роли и доступы».</p>{{button}}',
-    body_en: '<p>Hi!</p>{{avatar}}<p><b>{{name}}</b> accepted the invite and is now on your <b>{{agency}}</b> team. Manage roles and access under “Connections → Roles &amp; access”.</p>{{button}}',
+    title_ru: '{{name}} теперь в команде', title_en: '{{name}} joined the team',
+    body_ru: '<p>Здравствуйте!</p>{{avatar}}<p><b>{{name}}</b> принял приглашение и теперь в вашей команде <b>{{agency}}</b>. Роли и доступы — в разделе «Подключения → Роли и доступы».</p>{{button}}',
+    body_en: '<p>Hi!</p>{{avatar}}<p><b>{{name}}</b> accepted the invite and is now on your <b>{{agency}}</b> team. Manage roles under “Connections → Roles &amp; access”.</p>{{button}}',
   },
   brokerAppInvite: {
-    name: 'Брокеру — вход в мини-апп / Broker app invite', arch: 'team', hero: 'nodes.jpg', heroH: 140,
+    name: 'Брокеру — вход в мини-апп / Broker app invite', arch: 'team', hero: 'nodes.jpg', heroH: 220, titleSize: 30,
     category: 'team', audience: 'broker', essential: false,
     eyebrow_ru: 'Ваш кабинет', eyebrow_en: 'Your workspace',
     preheader_ru: 'Ваш рабочий кабинет брокера готов', preheader_en: 'Your broker workspace is ready',
     subject_ru: 'Ваш кабинет в {{agency}} готов', subject_en: 'Your {{agency}} workspace is ready',
+    title_ru: 'Ваш кабинет готов', title_en: 'Your workspace is ready',
     body_ru: '<p>Здравствуйте, {{name}}! Ваш кабинет брокера в <b>{{agency}}</b> готов: живые чаты, задачи, звонки и диктовка — всё в Telegram, под рукой.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, your broker workspace in <b>{{agency}}</b> is ready: live chats, tasks, calls and dictation — all in Telegram, at your fingertips.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, your broker workspace in <b>{{agency}}</b> is ready: live chats, tasks, calls and dictation — all in Telegram.</p>{{button}}',
   },
-  /* ── ОПЛАТА / BILLING ── */
   paymentReceived: {
-    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'graph.jpg', heroH: 124,
+    name: 'Оплата получена / Payment received', arch: 'billing', hero: 'graph.jpg', heroH: 230, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
-    eyebrow_ru: 'Оплата', eyebrow_en: 'Billing',
+    eyebrow_ru: 'Подтверждение оплаты', eyebrow_en: 'Payment confirmed',
     preheader_ru: 'Спасибо, оплата Lumen получена', preheader_en: 'Thanks, your Lumen payment is in',
     subject_ru: 'Оплата получена — Lumen {{period}}', subject_en: 'Payment received — Lumen {{period}}',
-    body_ru: '<p>Здравствуйте, {{name}}! Спасибо — оплата подписки Lumen для <b>{{agency}}</b> получена и скреплена печатью.</p>{{invoice}}{{button}}',
-    body_en: '<p>Hi {{name}}, thank you — your Lumen subscription payment for <b>{{agency}}</b> is received and sealed.</p>{{invoice}}{{button}}',
+    title_ru: 'Оплата получена.<br>{{period}}', title_en: 'Payment received.<br>{{period}}',
+    body_ru: '<p>Здравствуйте, {{name}}! Спасибо — оплата подписки Lumen для <b>{{agency}}</b> успешно получена.</p>{{receipt}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, thank you — your Lumen subscription payment for <b>{{agency}}</b> is received.</p>{{receipt}}{{button}}{{note}}',
+    note_ru: 'Детали платежа — в вашем счёте.', note_en: 'Payment details are in your invoice.', noteIcon: 'doc',
   },
   paymentUpcoming: {
-    name: 'Скоро списание / Payment upcoming', arch: 'billing', hero: 'graph.jpg', heroH: 124,
+    name: 'Скоро списание / Payment upcoming', arch: 'billing', hero: 'graph.jpg', heroH: 210, titleSize: 29,
     category: 'billing', audience: 'owner', essential: false,
     eyebrow_ru: 'Напоминание', eyebrow_en: 'Reminder',
     preheader_ru: 'Через {{days}} дн. спишем за подписку', preheader_en: 'We’ll charge in {{days}} days',
     subject_ru: 'Через {{days}} дн. продлим Lumen — всё по плану', subject_en: 'Lumen renews in {{days}} days — all set',
-    body_ru: '<p>Здравствуйте, {{name}}! Через <b>{{days}} дн.</b> автоматически продлим подписку Lumen для <b>{{agency}}</b>. Ничего делать не нужно — это дружеское «чтобы без сюрпризов».</p>{{invoice}}{{button}}',
-    body_en: '<p>Hi {{name}}, in <b>{{days}} days</b> we’ll auto-renew Lumen for <b>{{agency}}</b>. Nothing to do — just a friendly “no surprises” heads-up.</p>{{invoice}}{{button}}',
+    title_ru: 'Продление через {{days}} дн.', title_en: 'Renewal in {{days}} days',
+    body_ru: '<p>Здравствуйте, {{name}}! Через <b>{{days}} дн.</b> автоматически продлим подписку Lumen для <b>{{agency}}</b>. Делать ничего не нужно — это чтобы без сюрпризов.</p>{{receipt}}{{button}}',
+    body_en: '<p>Hi {{name}}, in <b>{{days}} days</b> we’ll auto-renew Lumen for <b>{{agency}}</b>. Nothing to do — just a no-surprises heads-up.</p>{{receipt}}{{button}}',
+    receiptCaption_ru: 'К списанию', receiptCaption_en: 'Upcoming', receiptIcon: 'clock',
   },
   paymentFailed: {
-    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'graph.jpg', heroH: 124,
+    name: 'Оплата не прошла / Payment failed', arch: 'billing', hero: 'graph.jpg', heroH: 220, titleSize: 30,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Требуется действие', eyebrow_en: 'Action needed',
     preheader_ru: 'Не удалось списать оплату — обновите карту', preheader_en: 'We couldn’t charge your card — update it',
     subject_ru: 'Карта сказала «нет» — обновите её', subject_en: 'Your card said no — let’s fix it',
-    body_ru: '<p>Здравствуйте, {{name}}! Не удалось списать оплату для <b>{{agency}}</b>. Чтобы ИИ-отдел продаж не останавливался ни на секунду — обновите платёжные данные.</p>{{invoice}}{{button}}{{panel}}',
-    body_en: '<p>Hi {{name}}, we couldn’t charge the subscription for <b>{{agency}}</b>. To keep your AI sales desk running non-stop — update your payment details.</p>{{invoice}}{{button}}{{panel}}',
-    panel_ru: 'Мы попробуем списать снова автоматически. Доступ сохраняется ещё несколько дней — паниковать не о чем.',
-    panel_en: 'We’ll retry automatically. Access stays active for a few more days — nothing to panic about.',
+    title_ru: 'Карта сказала «нет»', title_en: 'Your card said no',
+    body_ru: '<p>Здравствуйте, {{name}}! Не удалось списать оплату для <b>{{agency}}</b>. Чтобы ИИ-отдел продаж не останавливался — обновите платёжные данные.</p>{{receipt}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, we couldn’t charge the subscription for <b>{{agency}}</b>. To keep your AI sales desk running — update your payment details.</p>{{receipt}}{{button}}{{note}}',
+    receiptCaption_ru: 'Не прошло', receiptCaption_en: 'Declined', receiptIcon: 'alert',
+    note_ru: 'Мы попробуем списать снова автоматически. Доступ сохраняется ещё несколько дней.', note_en: 'We’ll retry automatically. Access stays active for a few more days.', noteIcon: 'clock',
   },
   subscriptionRenewed: {
-    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'graph.jpg', heroH: 124,
+    name: 'Подписка продлена / Subscription renewed', arch: 'billing', hero: 'graph.jpg', heroH: 220, titleSize: 30,
     category: 'billing', audience: 'owner', essential: true,
-    eyebrow_ru: 'Подписка', eyebrow_en: 'Subscription',
+    eyebrow_ru: 'Подписка продлена', eyebrow_en: 'Subscription renewed',
     preheader_ru: 'Подписка Lumen продлена', preheader_en: 'Your Lumen subscription renewed',
     subject_ru: 'Подписка Lumen продлена — {{period}}', subject_en: 'Your Lumen subscription renewed — {{period}}',
-    body_ru: '<p>Здравствуйте, {{name}}! Подписка Lumen для <b>{{agency}}</b> продлена. Спасибо, что растёте вместе с нами — мы это ценим.</p>{{invoice}}{{button}}',
-    body_en: '<p>Hi {{name}}, your Lumen subscription for <b>{{agency}}</b> has renewed. Thank you for growing with us — it means a lot.</p>{{invoice}}{{button}}',
+    title_ru: 'Подписка продлена.<br>{{period}}', title_en: 'Subscription renewed.<br>{{period}}',
+    body_ru: '<p>Здравствуйте, {{name}}! Подписка Lumen для <b>{{agency}}</b> продлена. Спасибо, что растёте вместе с нами.</p>{{receipt}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, your Lumen subscription for <b>{{agency}}</b> has renewed. Thank you for growing with us.</p>{{receipt}}{{button}}{{note}}',
+    note_ru: 'Детали платежа — в вашем счёте.', note_en: 'Payment details are in your invoice.', noteIcon: 'doc',
   },
   trialEnding: {
-    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'ring.jpg', heroH: 156,
+    name: 'Триал заканчивается / Trial ending', arch: 'digest', hero: 'ring.jpg', heroH: 230, titleSize: 31,
     category: 'billing', audience: 'owner', essential: true,
     eyebrow_ru: 'Ранний доступ', eyebrow_en: 'Early access',
     preheader_ru: 'Осталось {{days}} дн. пробного периода', preheader_en: '{{days}} days left in your trial',
     subject_ru: 'Триал тает — осталось {{days}} дн.', subject_en: 'Trial’s melting — {{days}} days left',
-    body_ru: '<p>Здравствуйте, {{name}}! Пробный период <b>{{agency}}</b> заканчивается через <b>{{days}} дн.</b> Lumen уже наловил вам лидов и отвечал за секунды — обидно бросать на самом интересном.</p>{{button}}{{panel}}',
-    body_en: '<p>Hi {{name}}, your trial for <b>{{agency}}</b> ends in <b>{{days}} days</b>. Lumen has already been catching leads and replying in seconds — a shame to stop at the best part.</p>{{button}}{{panel}}',
-    panel_ru: 'Условия беты закреплены за первыми агентствами — позже подписка будет дороже. Успеваете зафиксировать.',
-    panel_en: 'Beta terms are locked in for the first agencies — the subscription gets pricier later.',
+    title_ru: 'Триал тает — осталось {{days}} дн.', title_en: 'Trial’s melting — {{days}} days left',
+    body_ru: '<p>Здравствуйте, {{name}}! Пробный период <b>{{agency}}</b> заканчивается через <b>{{days}} дн.</b> Lumen уже наловил вам лидов и отвечал за секунды — обидно бросать на самом интересном.</p>{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, your trial for <b>{{agency}}</b> ends in <b>{{days}} days</b>. Lumen has already been catching leads — a shame to stop at the best part.</p>{{button}}{{note}}',
+    note_ru: 'Условия беты закреплены за первыми агентствами — позже подписка будет дороже.', note_en: 'Beta terms are locked in for the first agencies — it gets pricier later.', noteIcon: 'clock',
   },
-  /* ── ЛИДЫ / LEADS (light stat/plain — намеренно НЕ тёмная обложка) ── */
   newLead: {
-    name: 'Новый лид / New lead', arch: 'leads', format: 'stat', titleSize: 26,
+    name: 'Новый лид / New lead', arch: 'leads', hero: 'flow.jpg', heroH: 220, titleSize: 32,
     category: 'leads', audience: 'broker', essential: false,
     eyebrow_ru: 'Новый лид', eyebrow_en: 'New lead',
     preheader_ru: 'ИИ уже ответил — загляните, пока горячо', preheader_en: 'AI already replied — jump in while it’s hot',
-    subject_ru: 'Новый лид: {{leadName}} — уже на связи', subject_en: 'New lead: {{leadName}} — already engaged',
-    body_ru: '<p>Здравствуйте, {{name}}! Пока вы читаете — ИИ уже поздоровался и уточняет детали. Дальше интереснее с вами:</p>{{lead}}{{button}}',
-    body_en: '<p>Hi {{name}}, while you read this — AI already said hello and is qualifying. It gets better with you in the loop:</p>{{lead}}{{button}}',
+    subject_ru: 'Новый лид в вашей воронке', subject_en: 'A new lead in your funnel',
+    title_ru: 'Новый лид<br>в вашей воронке', title_en: 'A new lead<br>in your funnel',
+    body_ru: '<p>Здравствуйте, {{name}}! Новая заявка уже в Lumen. ИИ ответил и уточняет детали.</p>{{lead}}{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, a new lead is already in Lumen. AI replied and is qualifying.</p>{{lead}}{{button}}{{note}}',
+    note_ru: 'Загляните в диалог, пока интерес к покупке свежий.', note_en: 'Jump into the chat while the buying intent is fresh.', noteIcon: 'chat',
   },
   leadCold: {
-    name: 'Лид остывает / Lead going cold', arch: 'leads', format: 'plain', titleSize: 26,
+    name: 'Лид остывает / Lead going cold', arch: 'leads', format: 'plain', titleSize: 27,
     category: 'leads', audience: 'broker', essential: false,
     eyebrow_ru: 'Пора дожать', eyebrow_en: 'Time to nudge',
     preheader_ru: '{{leadName}} молчит — момент подтолкнуть', preheader_en: '{{leadName}} went quiet — nudge time',
     subject_ru: '{{leadName}} остывает — один толчок и вернётся', subject_en: '{{leadName}} is cooling — one nudge brings them back',
+    title_ru: '{{leadName}} остывает — один толчок и вернётся', title_en: '{{leadName}} is cooling',
     body_ru: '<p>{{leadName}} не отвечает уже <b>{{silence}}</b>. Лиды на этой стадии ещё возвращаются — но окно закрывается. Один тёплый вопрос обычно решает.</p>{{button}}',
-    body_en: '<p>{{leadName}} has been quiet for <b>{{silence}}</b>. Leads at this stage still come back — but the window is closing. One warm question usually does it.</p>{{button}}',
+    body_en: '<p>{{leadName}} has been quiet for <b>{{silence}}</b>. Leads at this stage still come back — but the window is closing.</p>{{button}}',
   },
-  /* ── ВСТРЕЧИ / MEETINGS ── */
   meetingScheduled: {
-    name: 'Встреча назначена / Meeting scheduled', arch: 'digest', hero: 'calendar.jpg', heroH: 140,
+    name: 'Встреча назначена / Meeting scheduled', arch: 'digest', hero: 'calendar.jpg', heroH: 215, titleSize: 30,
     category: 'meetings', audience: 'broker', essential: false,
-    eyebrow_ru: 'Встреча', eyebrow_en: 'Meeting',
+    eyebrow_ru: 'Встреча назначена', eyebrow_en: 'Meeting scheduled',
     preheader_ru: '{{leadName}} — {{when}}', preheader_en: '{{leadName}} — {{when}}',
     subject_ru: 'Встреча с {{leadName}} — {{when}}', subject_en: 'Meeting with {{leadName}} — {{when}}',
+    title_ru: 'Встреча с {{leadName}}', title_en: 'Meeting with {{leadName}}',
     body_ru: '<p>Здравствуйте, {{name}}! Встреча подтверждена — детали ниже. Добавьте в календарь, чтобы не потерять.</p>{{details}}{{button}}',
-    body_en: '<p>Hi {{name}}, the meeting is confirmed — details below. Add it to your calendar so it doesn’t slip.</p>{{details}}{{button}}',
+    body_en: '<p>Hi {{name}}, the meeting is confirmed — details below. Add it to your calendar.</p>{{details}}{{button}}',
   },
   meetingReminder: {
-    name: 'Напоминание о встрече / Meeting reminder', arch: 'meetings', format: 'plain', titleSize: 26,
+    name: 'Напоминание о встрече / Meeting reminder', arch: 'meetings', format: 'plain', titleSize: 27,
     category: 'meetings', audience: 'broker', essential: false,
     eyebrow_ru: 'Через час', eyebrow_en: 'In an hour',
     preheader_ru: 'Встреча с {{leadName}} скоро', preheader_en: 'Your meeting with {{leadName}} is soon',
     subject_ru: 'Через час — {{leadName}}', subject_en: 'In an hour — {{leadName}}',
+    title_ru: 'Через час — {{leadName}}', title_en: 'In an hour — {{leadName}}',
     body_ru: '<p>Через <b>{{eta}}</b> — встреча с <b>{{leadName}}</b>. Быстрый разбор карточки перед звонком лишним не будет.</p>{{button}}',
-    body_en: '<p>In <b>{{eta}}</b> — your meeting with <b>{{leadName}}</b>. A quick card review before the call never hurts.</p>{{button}}',
+    body_en: '<p>In <b>{{eta}}</b> — your meeting with <b>{{leadName}}</b>. A quick card review never hurts.</p>{{button}}',
   },
-  /* ── ЗАДАЧИ / TASKS (plain) ── */
   taskAssigned: {
-    name: 'Задача назначена / Task assigned', arch: 'tasks', format: 'plain', titleSize: 26,
+    name: 'Задача назначена / Task assigned', arch: 'tasks', format: 'plain', titleSize: 27,
     category: 'tasks', audience: 'broker', essential: false,
     eyebrow_ru: 'Новая задача', eyebrow_en: 'New task',
     preheader_ru: '{{taskTitle}} — до {{due}}', preheader_en: '{{taskTitle}} — due {{due}}',
     subject_ru: 'Задача: {{taskTitle}}', subject_en: 'Task: {{taskTitle}}',
-    body_ru: '<p><b>{{inviter}}</b> поставил вам задачу:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;color:#141311">«{{taskTitle}}»</p><p style="color:#8b8983;font-size:13px">Срок — {{due}}. Открыть можно прямо в Telegram.</p>{{button}}',
-    body_en: '<p><b>{{inviter}}</b> assigned you a task:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">Due {{due}}. Open it right in Telegram.</p>{{button}}',
+    title_ru: 'Новая задача', title_en: 'New task',
+    body_ru: '<p><b>{{inviter}}</b> поставил вам задачу:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">«{{taskTitle}}»</p><p style="color:#8b8983;font-size:13px">Срок — {{due}}. Открыть можно прямо в Telegram.</p>{{button}}',
+    body_en: '<p><b>{{inviter}}</b> assigned you a task:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">Due {{due}}. Open it in Telegram.</p>{{button}}',
   },
   taskDue: {
-    name: 'Задача к сроку / Task due', arch: 'tasks', format: 'plain', titleSize: 26,
+    name: 'Задача к сроку / Task due', arch: 'tasks', format: 'plain', titleSize: 27,
     category: 'tasks', audience: 'broker', essential: false,
     eyebrow_ru: 'Сегодня', eyebrow_en: 'Today',
     preheader_ru: '{{taskTitle}} — срок сегодня', preheader_en: '{{taskTitle}} — due today',
     subject_ru: 'Сегодня к сроку: {{taskTitle}}', subject_en: 'Due today: {{taskTitle}}',
-    body_ru: '<p>Сегодня подходит срок:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;color:#141311">«{{taskTitle}}»</p><p style="color:#8b8983;font-size:13px">Пара минут — и с плеч. Или перенесите одним тапом.</p>{{button}}',
-    body_en: '<p>Due today:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:22px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">A couple of minutes and it’s off your plate. Or reschedule in one tap.</p>{{button}}',
+    title_ru: 'Сегодня к сроку', title_en: 'Due today',
+    body_ru: '<p>Сегодня подходит срок:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">«{{taskTitle}}»</p><p style="color:#8b8983;font-size:13px">Пара минут — и с плеч. Или перенесите одним тапом.</p>{{button}}',
+    body_en: '<p>Due today:</p><p style="font-family:\'Cormorant Garamond\',Georgia,serif;font-size:24px;color:#141311">“{{taskTitle}}”</p><p style="color:#8b8983;font-size:13px">A couple of minutes and it’s done. Or reschedule in one tap.</p>{{button}}',
   },
-  /* ── КАНАЛЫ / CHANNELS ── */
   waConnected: {
-    name: 'WhatsApp подключён / WhatsApp connected', arch: 'digest', hero: 'inbox.jpg', heroH: 140,
+    name: 'WhatsApp подключён / WhatsApp connected', arch: 'digest', hero: 'inbox.jpg', heroH: 215, titleSize: 29,
     category: 'channels', audience: 'owner', essential: false,
     eyebrow_ru: 'Канал на связи', eyebrow_en: 'Channel live',
     preheader_ru: 'Номер {{phone}} в работе', preheader_en: 'Number {{phone}} is live',
     subject_ru: 'WhatsApp {{phone}} подключён — ИИ на посту', subject_en: 'WhatsApp {{phone}} connected — AI on duty',
+    title_ru: 'WhatsApp подключён', title_en: 'WhatsApp connected',
     body_ru: '<p>Здравствуйте, {{name}}! Номер <b>{{phone}}</b> подключён к <b>{{agency}}</b> и уже готов принимать лидов. Прогрев идёт по плану — резкие рассылки не нужны.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, number <b>{{phone}}</b> is connected to <b>{{agency}}</b> and ready to take leads. Warm-up is on schedule — no need to blast.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, number <b>{{phone}}</b> is connected to <b>{{agency}}</b> and ready to take leads. Warm-up is on schedule.</p>{{button}}',
   },
   waIssue: {
-    name: 'WhatsApp отвалился / WhatsApp issue', arch: 'security', hero: 'inbox.jpg', heroH: 118, titleSize: 25,
+    name: 'WhatsApp отвалился / WhatsApp issue', arch: 'security', hero: 'inbox.jpg', heroH: 200, titleSize: 29,
     category: 'channels', audience: 'owner', essential: false,
     eyebrow_ru: 'Требуется действие', eyebrow_en: 'Action needed',
     preheader_ru: 'Номер {{phone}} отключился', preheader_en: 'Number {{phone}} went offline',
     subject_ru: 'WhatsApp {{phone}} отвалился — быстрый ре-коннект', subject_en: 'WhatsApp {{phone}} dropped — quick reconnect',
-    body_ru: '<p>Здравствуйте, {{name}}! Номер <b>{{phone}}</b> потерял связь — лиды в этот канал сейчас не идут. Обычно лечится повторным сканом QR за минуту.</p>{{button}}{{panel}}',
-    body_en: '<p>Hi {{name}}, number <b>{{phone}}</b> lost connection — leads aren’t reaching this channel right now. A quick QR re-scan usually fixes it in a minute.</p>{{button}}{{panel}}',
-    panel_ru: 'Пока номер офлайн, ИИ не отвечает по нему. Остальные каналы работают штатно.',
-    panel_en: 'While the number is offline, AI won’t reply there. Your other channels keep running.',
+    title_ru: 'WhatsApp {{phone}} отвалился', title_en: 'WhatsApp {{phone}} dropped',
+    body_ru: '<p>Здравствуйте, {{name}}! Номер <b>{{phone}}</b> потерял связь — лиды в этот канал сейчас не идут. Обычно лечится повторным сканом QR за минуту.</p>{{button}}{{note}}',
+    body_en: '<p>Hi {{name}}, number <b>{{phone}}</b> lost connection — leads aren’t reaching this channel. A quick QR re-scan usually fixes it.</p>{{button}}{{note}}',
+    note_ru: 'Пока номер офлайн, ИИ по нему не отвечает. Остальные каналы работают штатно.', note_en: 'While offline, AI won’t reply there. Your other channels keep running.', noteIcon: 'alert',
   },
   missedActivity: {
-    name: 'Пропущенное / Missed activity', arch: 'channels', format: 'plain', titleSize: 26,
+    name: 'Пропущенное / Missed activity', arch: 'channels', format: 'plain', titleSize: 27,
     category: 'channels', audience: 'broker', essential: false,
     eyebrow_ru: 'Не потеряйте', eyebrow_en: 'Don’t miss it',
     preheader_ru: '{{leadName}}: {{what}}', preheader_en: '{{leadName}}: {{what}}',
     subject_ru: '{{leadName}}: {{what}}', subject_en: '{{leadName}}: {{what}}',
+    title_ru: '{{leadName}}: {{what}}', title_en: '{{leadName}}: {{what}}',
     body_ru: '<p><b>{{leadName}}</b> — {{what}}. ИИ придержал разговор, но живой ответ сейчас стоит дороже всего.</p>{{button}}',
     body_en: '<p><b>{{leadName}}</b> — {{what}}. AI held the conversation, but a human reply right now is worth the most.</p>{{button}}',
   },
-  /* ── ОТЧЁТЫ / REPORTS (stat + dark) ── */
   dailyDigest: {
-    name: 'Сводка за день / Daily digest', arch: 'reports', format: 'stat', titleSize: 27,
+    name: 'Сводка за день / Daily digest', arch: 'reports', format: 'stat', titleSize: 28,
     category: 'reports', audience: 'all', essential: false,
     eyebrow_ru: 'Сводка за день', eyebrow_en: 'Daily digest',
     preheader_ru: 'Что случилось за сутки в {{agency}}', preheader_en: 'What happened today in {{agency}}',
     subject_ru: 'Ваш день в цифрах — {{agency}}', subject_en: 'Your day in numbers — {{agency}}',
+    title_ru: 'Ваш день в цифрах', title_en: 'Your day in numbers',
     body_ru: '<p>Здравствуйте, {{name}}! Пока вы занимались делом, Lumen считал. Вот сутки {{agency}} одним взглядом:</p>{{stats}}<p>Самое горячее ждёт внутри — стадии уже расставлены.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, while you were busy, Lumen was counting. Here’s {{agency}}’s day at a glance:</p>{{stats}}<p>The hottest ones are waiting inside — stages already sorted.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, while you were busy, Lumen was counting. Here’s {{agency}}’s day at a glance:</p>{{stats}}<p>The hottest ones are waiting inside.</p>{{button}}',
     stats_ru: [{ n: '{{leads}}', label: 'новых лида' }, { n: '{{replies}}', label: 'ответов ИИ' }, { n: '{{meetings}}', label: 'встречи' }],
     stats_en: [{ n: '{{leads}}', label: 'new leads' }, { n: '{{replies}}', label: 'AI replies' }, { n: '{{meetings}}', label: 'meetings' }],
   },
   weeklyReport: {
-    name: 'Итоги недели / Weekly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.jpg', heroH: 150, titleSize: 29,
+    name: 'Итоги недели / Weekly report', arch: 'reports', theme: 'dark', format: 'stat', hero: 'graph.jpg', heroH: 230, titleSize: 31,
     category: 'reports', audience: 'owner', essential: false,
     eyebrow_ru: 'Итоги недели', eyebrow_en: 'Weekly report',
     preheader_ru: 'Неделя {{agency}} в цифрах', preheader_en: 'A week of {{agency}} in numbers',
     subject_ru: 'Неделя {{agency}}: цифры, которые приятно смотреть', subject_en: 'A week of {{agency}}: numbers worth a look',
+    title_ru: 'Неделя {{agency}}<br>в цифрах', title_en: 'A week of {{agency}}<br>in numbers',
     body_ru: '<p>Здравствуйте, {{name}}! Неделя закрыта — вот как отработал Lumen для <b>{{agency}}</b>:</p>{{stats}}<p>Средний ответ ИИ — {{speed}}. Детальный разбор по брокерам и стадиям — внутри.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, the week’s in the books — here’s how Lumen performed for <b>{{agency}}</b>:</p>{{stats}}<p>Average AI reply — {{speed}}. Full breakdown by broker and stage inside.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, the week’s in the books — here’s how Lumen performed:</p>{{stats}}<p>Average AI reply — {{speed}}. Full breakdown inside.</p>{{button}}',
     stats_ru: [{ n: '{{leads}}', label: 'лидов' }, { n: '{{qualified}}', label: 'квалифицировано' }, { n: '{{meetings}}', label: 'встреч' }],
     stats_en: [{ n: '{{leads}}', label: 'leads' }, { n: '{{qualified}}', label: 'qualified' }, { n: '{{meetings}}', label: 'meetings' }],
   },
   founderBrief: {
-    name: 'Сигналы руководителю / Founder brief', arch: 'reports', theme: 'dark', hero: 'ring.jpg', heroH: 150, titleSize: 28,
+    name: 'Сигналы руководителю / Founder brief', arch: 'reports', theme: 'dark', hero: 'ring.jpg', heroH: 230, titleSize: 30,
     category: 'reports', audience: 'owner', essential: false,
     eyebrow_ru: 'Штаб · сигналы', eyebrow_en: 'HQ · signals',
     preheader_ru: 'То, на что стоит взглянуть лично', preheader_en: 'The things worth your personal look',
     subject_ru: 'Штаб: {{count}} сигнала, которые стоит увидеть', subject_en: 'HQ: {{count}} signals worth your eyes',
-    body_ru: '<p>Здравствуйте, {{name}}! Пульт собрал то, что обычно тонет в рутине — короткая сводка руководителю по <b>{{agency}}</b>:</p>{{bullets}}{{button}}',
-    body_en: '<p>Hi {{name}}, the control desk surfaced what usually drowns in routine — a short brief for <b>{{agency}}</b>:</p>{{bullets}}{{button}}',
-    bullets_ru: ['2 лида с крупным бюджетом ждут ответа дольше нормы.', 'У одного брокера конверсия просела — стоит заглянуть.', 'Задолженность по кабинету: 1 платёж на грани.'],
-    bullets_en: ['2 high-budget leads have waited longer than your norm.', 'One broker’s conversion dipped — worth a look.', 'Ad account debt: 1 payment on the edge.'],
+    title_ru: 'Штаб: {{count}} сигнала', title_en: 'HQ: {{count}} signals',
+    body_ru: '<p>Здравствуйте, {{name}}! Пульт собрал то, что обычно тонет в рутине — короткая сводка руководителю по <b>{{agency}}</b>:</p>{{features}}{{button}}',
+    body_en: '<p>Hi {{name}}, the control desk surfaced what usually drowns in routine:</p>{{features}}{{button}}',
+    features_ru: [{ icon: 'alert', title: '2 крупных лида ждут', sub: 'Отвечают дольше вашей нормы — стоит вмешаться.' }, { icon: 'chart', title: 'Конверсия просела', sub: 'У одного брокера показатели ниже обычного.' }, { icon: 'bell', title: 'Кабинет на грани', sub: '1 платёж по рекламе близок к задолженности.' }],
+    features_en: [{ icon: 'alert', title: '2 big leads waiting', sub: 'Replying slower than your norm — worth a look.' }, { icon: 'chart', title: 'Conversion dipped', sub: 'One broker is below their usual numbers.' }, { icon: 'bell', title: 'Ad account on edge', sub: '1 ad payment is close to going into debt.' }],
   },
-  /* ── АКАДЕМИЯ / ACADEMY ── */
   academyTip: {
-    name: 'Приём недели / Academy tip', arch: 'digest', hero: 'nodes.jpg', heroH: 140,
+    name: 'Приём недели / Academy tip', arch: 'digest', hero: 'nodes.jpg', heroH: 215, titleSize: 29,
     category: 'academy', audience: 'broker', essential: false,
     eyebrow_ru: 'Академия · приём недели', eyebrow_en: 'Academy · tip of the week',
     preheader_ru: 'Короткий приём, который поднимает конверсию', preheader_en: 'A short move that lifts conversion',
     subject_ru: 'Приём недели: {{tipTitle}}', subject_en: 'Tip of the week: {{tipTitle}}',
+    title_ru: 'Приём недели', title_en: 'Tip of the week',
     body_ru: '<p>Здравствуйте, {{name}}! Один приём из Академии, который реально двигает сделки:</p>{{panel}}<p>Разобрано на реальных диалогах — загляните, это две минуты.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, one move from the Academy that actually moves deals:</p>{{panel}}<p>Broken down on real dialogues — take a look, it’s two minutes.</p>{{button}}',
-    panel_ru: '«{{tipBody}}»',
-    panel_en: '“{{tipBody}}”',
+    body_en: '<p>Hi {{name}}, one move from the Academy that actually moves deals:</p>{{panel}}<p>Broken down on real dialogues — take a look.</p>{{button}}',
+    panel_ru: '«{{tipBody}}»', panel_en: '“{{tipBody}}”',
   },
-  /* ── ПРОДУКТ / PRODUCT (dark) ── */
   productUpdate: {
-    name: 'Что нового / Product update', arch: 'product', theme: 'dark', hero: 'hero.jpg', heroH: 168, titleSize: 29,
+    name: 'Что нового / Product update', arch: 'product', theme: 'dark', hero: 'hero.jpg', heroH: 230, titleSize: 31,
     category: 'product', audience: 'all', essential: false,
     eyebrow_ru: 'Что нового', eyebrow_en: 'What’s new',
     preheader_ru: 'Свежие апдейты Lumen', preheader_en: 'Fresh Lumen updates',
     subject_ru: '{{subject}}', subject_en: '{{subject}}',
-    body_ru: '<p>Здравствуйте, {{name}}! Пара свежих штук, которые уже работают в вашем Lumen:</p>{{bullets}}{{button}}<p style="color:#8f8b80;font-size:12px;margin-top:16px">Идея, чего не хватает? Просто ответьте на письмо.</p>',
-    body_en: '<p>Hi {{name}}, a couple of fresh things already live in your Lumen:</p>{{bullets}}{{button}}<p style="color:#8f8b80;font-size:12px;margin-top:16px">Got an idea for what’s missing? Just reply.</p>',
-    bullets_ru: ['Перенос задач в один тап — «завтра / через неделю / конкретный день».', 'Синхронный переводчик в Zoom: RU → EN/IT прямо на созвоне.', 'Сводка по каждому брокеру в разделе «Штаб».'],
-    bullets_en: ['One-tap task reschedule — “tomorrow / next week / a specific day”.', 'Live Zoom interpreter: RU → EN/IT right on the call.', 'Per-broker summary in the “HQ” section.'],
+    title_ru: '3 обновления,<br>которые уже у вас', title_en: '3 updates,<br>already live for you',
+    body_ru: '<p>Здравствуйте, {{name}}! Пара свежих штук, которые уже работают в вашем Lumen:</p>{{features}}{{button}}',
+    body_en: '<p>Hi {{name}}, a couple of fresh things already live in your Lumen:</p>{{features}}{{button}}',
+    features_ru: [{ icon: 'bolt', title: 'Перенос задач в один тап', sub: '«Завтра / через неделю / конкретный день».' }, { icon: 'chat', title: 'Переводчик в Zoom', sub: 'RU → EN/IT синхронно прямо на созвоне.' }, { icon: 'chart', title: 'Сводка по брокерам', sub: 'Отдельный разрез в разделе «Штаб».' }],
+    features_en: [{ icon: 'bolt', title: 'One-tap task reschedule', sub: '“Tomorrow / next week / a specific day”.' }, { icon: 'chat', title: 'Zoom interpreter', sub: 'RU → EN/IT live right on the call.' }, { icon: 'chart', title: 'Per-broker summary', sub: 'A dedicated cut in the “HQ” section.' }],
   },
   winback: {
-    name: 'Возврат / Win-back', arch: 'marketing', theme: 'dark', hero: 'flow.jpg', heroH: 168, titleSize: 30,
+    name: 'Возврат / Win-back', arch: 'marketing', theme: 'dark', hero: 'flow.jpg', heroH: 240, titleSize: 32,
     category: 'marketing', audience: 'owner', essential: false,
     eyebrow_ru: 'Скучаем', eyebrow_en: 'We miss you',
     preheader_ru: 'Ваш ИИ-отдел продаж скучает', preheader_en: 'Your AI sales desk misses you',
     subject_ru: 'Пока вас не было, лиды не ждали', subject_en: 'While you were away, leads didn’t wait',
-    body_ru: '<p>Здравствуйте, {{name}}! Давно не виделись. За это время Lumen подрос: быстрее отвечает, умнее квалифицирует, аккуратнее греет. <b>{{agency}}</b> ждёт — и первая неделя снова за наш счёт.</p>{{button}}',
-    body_en: '<p>Hi {{name}}, long time. Lumen has grown since: faster replies, sharper qualification, gentler nurture. <b>{{agency}}</b> is waiting — and the first week is on us again.</p>{{button}}',
+    title_ru: 'Пока вас не было,<br>лиды не ждали', title_en: 'While you were away,<br>leads didn’t wait',
+    body_ru: '<p>Здравствуйте, {{name}}! Давно не виделись. Lumen подрос: быстрее отвечает, умнее квалифицирует, аккуратнее греет. <b>{{agency}}</b> ждёт — и первая неделя снова за наш счёт.</p>{{button}}',
+    body_en: '<p>Hi {{name}}, long time. Lumen has grown: faster replies, sharper qualification. <b>{{agency}}</b> is waiting — first week on us again.</p>{{button}}',
   },
-  /* ── СЛУЖЕБНЫЕ / GENERIC ── */
   notification: {
-    name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.jpg', heroH: 132,
+    name: 'Уведомление / Notification', arch: 'digest', hero: 'flow.jpg', heroH: 200, titleSize: 28,
     category: 'account', audience: 'all', essential: false,
     subject_ru: 'Lumen: {{title}}', subject_en: 'Lumen: {{title}}',
+    title_ru: '{{title}}', title_en: '{{title}}',
     body_ru: '<p>Здравствуйте, {{name}}!</p><p>{{message}}</p>{{button}}',
     body_en: '<p>Hi {{name}},</p><p>{{message}}</p>{{button}}',
   },
   exportReady: {
-    name: 'Выгрузка готова / Export ready', arch: 'account', format: 'plain', titleSize: 26,
+    name: 'Выгрузка готова / Export ready', arch: 'account', format: 'plain', titleSize: 27,
     category: 'account', audience: 'all', essential: false,
     eyebrow_ru: 'Готово', eyebrow_en: 'Ready',
     preheader_ru: 'Ваш файл выгрузки готов', preheader_en: 'Your export file is ready',
     subject_ru: 'Ваша выгрузка готова к скачиванию', subject_en: 'Your export is ready to download',
+    title_ru: 'Выгрузка готова', title_en: 'Export ready',
     body_ru: '<p>Файл <b>{{fileName}}</b> собран и ждёт. Ссылка активна ограниченное время — сохраните файл к себе.</p>{{button}}',
-    body_en: '<p>Your file <b>{{fileName}}</b> is ready and waiting. The link is active for a limited time — save the file locally.</p>{{button}}',
+    body_en: '<p>Your file <b>{{fileName}}</b> is ready. The link is active for a limited time — save it locally.</p>{{button}}',
   },
   marketing: {
-    name: 'Маркетинг / Marketing', arch: 'digest', hero: 'flow.gif', heroH: 176, titleSize: 29,
+    name: 'Маркетинг / Marketing', arch: 'digest', hero: 'flow.gif', heroH: 235, titleSize: 31,
     category: 'marketing', audience: 'all', essential: false,
     subject_ru: '{{subject}}', subject_en: '{{subject}}',
+    title_ru: '{{subject}}', title_en: '{{subject}}',
     body_ru: '<p>Здравствуйте, {{name}}!</p><p>{{message}}</p>{{button}}<p style="color:#8b8983;font-size:12px;margin-top:18px">Не хотите получать такие письма? <a href="{{unsubscribe}}" style="color:#8b8983;text-decoration:underline">Отписаться</a>.</p>',
-    body_en: '<p>Hi {{name}},</p><p>{{message}}</p>{{button}}<p style="color:#8b8983;font-size:12px;margin-top:18px">Don’t want these emails? <a href="{{unsubscribe}}" style="color:#8b8983;text-decoration:underline">Unsubscribe</a>.</p>',
+    body_en: '<p>Hi {{name}},</p><p>{{message}}</p>{{button}}<p style="color:#8b8983;font-size:12px;margin-top:18px">Don’t want these? <a href="{{unsubscribe}}" style="color:#8b8983;text-decoration:underline">Unsubscribe</a>.</p>',
   },
 };
 
-/* категории для UI подписок (владелец в админке, брокер в аккаунте) */
 const EMAIL_CATEGORIES = {
-  account: { ru: 'Аккаунт', en: 'Account' },
-  security: { ru: 'Безопасность', en: 'Security' },
-  billing: { ru: 'Оплата и подписка', en: 'Billing' },
-  leads: { ru: 'Лиды', en: 'Leads' },
-  meetings: { ru: 'Встречи', en: 'Meetings' },
-  tasks: { ru: 'Задачи', en: 'Tasks' },
-  team: { ru: 'Команда', en: 'Team' },
-  channels: { ru: 'Каналы (WhatsApp / звонки)', en: 'Channels (WhatsApp / calls)' },
-  reports: { ru: 'Отчёты и сводки', en: 'Reports & digests' },
-  academy: { ru: 'Академия', en: 'Academy' },
-  product: { ru: 'Обновления продукта', en: 'Product updates' },
-  partner: { ru: 'Партнёрская программа', en: 'Partner program' },
-  marketing: { ru: 'Рассылки и предложения', en: 'Newsletters & offers' },
+  account: { ru: 'Аккаунт', en: 'Account' }, security: { ru: 'Безопасность', en: 'Security' }, billing: { ru: 'Оплата и подписка', en: 'Billing' }, leads: { ru: 'Лиды', en: 'Leads' }, meetings: { ru: 'Встречи', en: 'Meetings' }, tasks: { ru: 'Задачи', en: 'Tasks' }, team: { ru: 'Команда', en: 'Team' }, channels: { ru: 'Каналы (WhatsApp / звонки)', en: 'Channels (WhatsApp / calls)' }, reports: { ru: 'Отчёты и сводки', en: 'Reports & digests' }, academy: { ru: 'Академия', en: 'Academy' }, product: { ru: 'Обновления продукта', en: 'Product updates' }, partner: { ru: 'Партнёрская программа', en: 'Partner program' }, marketing: { ru: 'Рассылки и предложения', en: 'Newsletters & offers' },
 };
 
 function getTemplates(registry) {
   registry.emailTemplates = registry.emailTemplates || {};
-  const out = {};
-  for (const k of Object.keys(DEFAULT_TEMPLATES)) out[k] = Object.assign({}, DEFAULT_TEMPLATES[k], registry.emailTemplates[k] || {});
-  return out;
+  const out = {}; for (const k of Object.keys(DEFAULT_TEMPLATES)) out[k] = Object.assign({}, DEFAULT_TEMPLATES[k], registry.emailTemplates[k] || {}); return out;
 }
-
-/* метаданные типа письма (для реестра/подписок) */
-function emailMeta(key) {
-  const t = DEFAULT_TEMPLATES[key]; if (!t) return null;
-  return { key, name: t.name, category: t.category || 'account', audience: t.audience || 'all', essential: !!t.essential, arch: t.arch, theme: t.theme || 'light', format: t.format || t.arch };
-}
-/* весь каталог писем — для админки основателя */
+function emailMeta(key) { const t = DEFAULT_TEMPLATES[key]; if (!t) return null; return { key, name: t.name, category: t.category || 'account', audience: t.audience || 'all', essential: !!t.essential, arch: t.arch, theme: t.theme || 'light', format: t.format || t.arch }; }
 function emailCatalog() { return Object.keys(DEFAULT_TEMPLATES).map(emailMeta); }
-
-/* дефолтные подписки: все НЕобязательные категории включены; audience учитывается вызывающим */
-function defaultNotifyPrefs() {
-  const p = {}; for (const c of Object.keys(EMAIL_CATEGORIES)) p[c] = true; return p;
-}
-
-/* можно ли слать письмо key пользователю с ролью и его подписками.
-   user: {isOwner, role}. prefs: {категория: bool}. essential игнорирует prefs, но НЕ игнорирует аудиторию. */
+function defaultNotifyPrefs() { const p = {}; for (const c of Object.keys(EMAIL_CATEGORIES)) p[c] = true; return p; }
 function canReceive(key, user, prefs) {
   const m = emailMeta(key); if (!m) return false;
   user = user || {}; const isOwner = !!user.isOwner || user.role === 'owner' || user.role === 'master';
   if (m.audience === 'owner' && !isOwner) return false;
-  if (m.audience === 'broker' && isOwner && user.role !== 'broker') { /* владелец обычно тоже брокер — пускаем, если явно не только-владелец */ }
   if (m.essential) return true;
-  const p = prefs || {}; return p[m.category] !== false;
+  return (prefs || {})[m.category] !== false;
 }
+function interpolate(str, vars) { return String(str || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars && vars[k] != null) ? vars[k] : ''); }
 
-function interpolate(str, vars) {
-  return String(str || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars && vars[k] != null) ? vars[k] : '');
-}
-
-/* собрать письмо: {subject, html, meta}. Токены тянутся из vars, иначе — из дефолтов шаблона. */
 function renderTemplate(registry, key, vars, lang) {
   const t = getTemplates(registry)[key] || DEFAULT_TEMPLATES.notification;
-  lang = lang === 'en' ? 'en' : 'ru';
-  const en = lang === 'en';
-  const isDark = t.theme === 'dark';
-  const T = isDark ? D : C;
+  lang = lang === 'en' ? 'en' : 'ru'; const en = lang === 'en';
+  const isDark = t.theme === 'dark'; const T = isDark ? D : C;
   const v = Object.assign({}, vars);
 
-  if (v.button == null && v.link) v.button = emailButton(v.link, v.buttonLabel || (en ? 'Open Lumen' : 'Открыть Lumen'), { ghost: !!v.buttonGhost, T });
+  if (v.button == null && v.link) v.button = emailButton(v.link, v.buttonLabel || (en ? 'Open Lumen' : 'Открыть Lumen'), { ghost: !!v.buttonGhost, T, wide: v.buttonWide !== false });
   if (v.button == null) v.button = '';
+  if (v.note == null) { const nraw = t['note_' + lang] || t.note_ru; v.note = nraw ? emailFootnote(t.noteIcon || 'spark', interpolate(nraw, v), T) : ''; }
   if (v.panel == null) { const p = interpolate(t['panel_' + lang] || t.panel_ru || '', v); v.panel = p ? emailPanel(esc(p), false, T) : ''; }
+  if (v.features == null) { const f = t['features_' + lang] || t.features_ru; v.features = Array.isArray(f) ? emailFeatureList(f.map(x => ({ icon: x.icon, title: interpolate(x.title, v), sub: interpolate(x.sub, v) })), T) : ''; }
   if (v.bullets == null) { const b = t['bullets_' + lang] || t.bullets_ru; v.bullets = Array.isArray(b) ? emailBullets(b.map(x => interpolate(esc(x), v)), T) : ''; }
   if (v.details == null) {
     if (v.detailRows) v.details = emailDetails(v.detailRows, T);
     else if (t.arch === 'security') v.details = emailDetails([[en ? 'Time' : 'Время', v.time || new Date().toLocaleString(en ? 'en-GB' : 'ru-RU')], [en ? 'Device' : 'Устройство', v.device || (en ? 'Browser · Chrome' : 'Браузер · Chrome')], [en ? 'Location' : 'Локация', v.location || '—'], ['IP', v.ip || '—']], T);
-    else if (t.category === 'meetings') v.details = emailDetails([[en ? 'Lead' : 'Лид', v.leadName || '—'], [en ? 'When' : 'Когда', v.when || '—'], [en ? 'Format' : 'Формат', v.format2 || (en ? 'Zoom' : 'Zoom')]], T);
+    else if (t.category === 'meetings') v.details = emailDetails([[en ? 'Lead' : 'Лид', v.leadName || '—'], [en ? 'When' : 'Когда', v.when || '—'], [en ? 'Format' : 'Формат', v.format2 || 'Zoom']], T);
     else v.details = '';
   }
   if (v.code == null) v.code = v.otp ? emailCode(v.otp, T) : '';
-  if (v.invoice == null) {
-    if (v.invoiceRows || t.arch === 'billing') {
-      v.invoice = emailInvoice({ T, title: en ? 'Invoice' : 'Счёт', rows: v.invoiceRows || [[(en ? 'Plan' : 'Тариф'), v.plan || 'Lumen Pro'], [(en ? 'Period' : 'Период'), v.period || (en ? 'monthly' : 'месяц')], [(en ? 'Agency' : 'Агентство'), v.agency || '—']], totalLabel: en ? 'Total' : 'Итого', total: v.amount || '€99' });
-    } else v.invoice = '';
+  if (v.info == null) { v.info = (key === 'verifyEmail') ? emailInfoGrid([{ icon: 'mail', label: en ? 'Your e-mail' : 'Ваш e-mail', value: v.email || '—' }, { icon: 'user', label: en ? 'Account' : 'Аккаунт', value: v.agency || '—' }], T) : ''; }
+  if (v.receipt == null || v.invoice == null) {
+    const rc = (t.arch === 'billing') ? emailReceipt({ T, amount: v.amount || '€99', caption: interpolate(t['receiptCaption_' + lang] || t.receiptCaption_ru || (en ? 'Paid' : 'Оплачено'), v), icon: t.receiptIcon || 'check', rows: v.invoiceRows || [[(en ? 'Plan' : 'Тариф'), v.plan || 'Lumen Pro'], [(en ? 'Period' : 'Период'), v.period || (en ? 'monthly' : 'месяц')], [(en ? 'Agency' : 'Агентство'), v.agency || '—']] }) : '';
+    if (v.receipt == null) v.receipt = rc; if (v.invoice == null) v.invoice = rc;
   }
-  if (v.avatar == null) { v.avatar = (t.arch === 'team') ? emailAvatar(v.inviter || v.name || 'Lumen', en ? 'invites you to the team' : 'приглашает в команду', T) : ''; }
-  if (v.stats == null) {
-    const st = t['stats_' + lang] || t.stats_ru;
-    v.stats = Array.isArray(st) ? emailStatGrid(st.map(s => ({ n: interpolate(String(s.n), v) || '0', label: interpolate(String(s.label), v) })), T) : '';
-  }
-  if (v.lead == null) {
-    v.lead = (t.category === 'leads') ? emailLeadCard({ T, name: v.leadName || (en ? 'New lead' : 'Новый лид'), status: v.leadStatus || (en ? 'engaged' : 'на связи'), rows: v.leadRows || [[(en ? 'Source' : 'Источник'), v.leadSource || 'WhatsApp'], [(en ? 'Budget' : 'Бюджет'), v.leadBudget || '—'], [(en ? 'Request' : 'Запрос'), v.leadRequest || '—']] }, T) : '';
-  }
+  if (v.avatar == null) { v.avatar = (t.arch === 'team') ? emailAvatar({ name: v.inviter || v.name || 'Lumen', role: en ? 'invites you to the team' : 'приглашает в команду', workspaceLabel: en ? 'Workspace' : 'Рабочее пространство', workspace: v.agency || '' }, T) : ''; }
+  if (v.stats == null) { const st = t['stats_' + lang] || t.stats_ru; v.stats = Array.isArray(st) ? emailStatGrid(st.map(s => ({ n: interpolate(String(s.n), v) || '0', label: interpolate(String(s.label), v) })), T) : ''; }
+  if (v.lead == null) { v.lead = (t.category === 'leads' && t.arch === 'leads') ? emailLeadCard({ T, icon: 'home', label: en ? 'Request' : 'Запрос', name: v.leadRequest || v.leadName || (en ? 'New lead' : 'Новый лид'), cols: [[(en ? 'Budget' : 'Бюджет'), v.leadBudget || '—'], [(en ? 'Received' : 'Поступила'), v.leadWhen || (en ? 'just now' : 'только что')]], status: v.leadStatus || (en ? 'AI is qualifying' : 'ИИ уточняет детали') }, T) : ''; }
 
   const subject = interpolate(t['subject_' + lang] || t.subject_ru, v);
   const inner = interpolate(t['body_' + lang] || t.body_ru, v);
-  const title = interpolate(v.title || subject, v);
+  const rawTitle = t['title_' + lang] || t.title_ru || v.title || subject;
+  const title = interpolate(rawTitle, v); /* заголовок может содержать <br> — не эскейпим */
   const opt = {
-    theme: isDark ? 'dark' : 'light',
-    plain: t.format === 'plain',
+    theme: isDark ? 'dark' : 'light', plain: t.format === 'plain',
     eyebrow: interpolate(t['eyebrow_' + lang] || t.eyebrow_ru || '', v) || null,
     preheader: interpolate(t['preheader_' + lang] || t.preheader_ru || '', v) || null,
-    hero: t.hero ? { src: (t.hero.indexOf('://') > -1 ? t.hero : ART + '/' + t.hero), h: t.heroH || 190 } : null,
-    badge: t.badge ? (t.badge.indexOf('://') > -1 ? t.badge : ART + '/' + t.badge) : null,
+    headerNote: interpolate(t['headerNote_' + lang] || t.headerNote_ru || '', v) || null,
+    hero: (t.hero && t.format !== 'plain') ? { src: (t.hero.indexOf('://') > -1 ? t.hero : ART + '/' + t.hero), h: t.heroH || 230 } : null,
     titleSize: t.titleSize || null,
-    manageNote: (t.essential ? null : (v.manageUrl ? `<a href="${esc(v.manageUrl)}" style="color:${T.ink3};text-decoration:underline;">${en ? 'Manage email preferences' : 'Настроить, какие письма получать'}</a>` : null)),
+    manageNote: (t.essential ? null : (v.manageUrl ? `<a href="${esc(v.manageUrl)}" style="color:${T.ink3};text-decoration:underline;">${en ? 'Manage emails' : 'Настроить письма'}</a>` : null)),
   };
-  return { subject, html: emailWrap(esc(title), inner, lang, opt), meta: emailMeta(key) };
+  return { subject, html: emailWrap(title, inner, lang, opt), meta: emailMeta(key) };
 }
 
-/* платформенная конфигурация Resend */
-function platformEmailCfg(registry) {
-  return {
-    key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '',
-    from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <onboarding@resend.dev>',
-  };
-}
-
+function platformEmailCfg(registry) { return { key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '', from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <onboarding@resend.dev>' }; }
 async function sendViaResend(cfg, to, subject, html) {
   if (!cfg.key) return { ok: false, error: 'Resend не настроен (нет API-ключа)' };
   if (!to) return { ok: false, error: 'нет адреса получателя' };
   try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: cfg.from, to, subject, html }),
-    });
+    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: cfg.from, to, subject, html }) });
     if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, error: 'Resend ' + r.status + (t ? ': ' + t.slice(0, 160) : '') }; }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
 module.exports = {
-  emailWrap, emailButton, emailPanel, emailBullets, emailCode, emailDetails, emailInvoice, emailAvatar, emailStatGrid, emailLeadCard,
+  emailWrap, emailButton, emailPanel, emailBullets, emailFeatureList, emailCode, emailDetails, emailInvoice, emailReceipt, emailAvatar, emailInfoGrid, emailFootnote, emailStatGrid, emailLeadCard, svgIcon, iconChip,
   DEFAULT_TEMPLATES, EMAIL_CATEGORIES, getTemplates, emailMeta, emailCatalog, defaultNotifyPrefs, canReceive,
   renderTemplate, interpolate, platformEmailCfg, sendViaResend, ART, C, D, pal,
 };
