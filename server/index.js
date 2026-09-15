@@ -2471,6 +2471,19 @@ async function waGrayApi(db, method, pathx, body) {
   return j;
 }
 
+/* ── Серый TELEGRAM (MTProto user-accounts) — воркер lumen-tg-worker, аналог WA-воркера ── */
+function tgWorkerBase(db) { const r = store.getRegistry(); return String(process.env.LUMEN_TG_WORKER_URL || (r.platformTgWorker && r.platformTgWorker.url) || (db.settings.tgGray && db.settings.tgGray.url) || '').replace(/\/$/, ''); }
+function tgWorkerToken(db) { const r = store.getRegistry(); return process.env.LUMEN_TG_WORKER_TOKEN || (r.platformTgWorker && r.platformTgWorker.token) || (db.settings.tgGray && db.settings.tgGray.token) || ''; }
+function tgWorkerReady(db) { return !!(tgWorkerBase(db) && tgWorkerToken(db)); }
+function tgGraySid(phone) { return 'tg_' + String(phone).replace(/[^0-9]/g, ''); }
+async function tgGrayApi(db, method, pathx, body) {
+  const base = tgWorkerBase(db); if (!base) throw new Error('TG-воркер не настроен (LUMEN_TG_WORKER_URL / platformTgWorker)');
+  const r = await fetch(base + pathx, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tgWorkerToken(db) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('tg-worker ' + r.status + ': ' + (j.error || 'ошибка'));
+  return j;
+}
+
 /* Автоподбор серого номера для лида: залипание за лидом → номер закреплённого брокера → любой подключённый.
    `live` — карта сессий из воркера (GET /sessions). Возвращает запись номера или null (нет подключённых). */
 /* Потолок «первых касаний НОВЫМ лидам» на серый номер в сутки (защита от бана).
@@ -6486,6 +6499,65 @@ const server = http.createServer(async (req, res) => {
       db.settings.waGray.numbers = (db.settings.waGray.numbers || []).filter(n => n.phone !== phone);
       store.save();
       return json(res, 200, { ok: true });
+    }
+    /* ───────────── СЕРЫЙ TELEGRAM (lumen-tg-worker) ─────────────
+       Персона на номере (имя/аватар/режим) — гибко под каждое агентство. Только точечные касания, НЕ рассылки. */
+    if (p === '/api/tg/gray/list' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const g = db.settings.tgGray || { numbers: [] };
+      let live = {}; try { if (tgWorkerReady(db)) live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) {}
+      const R2 = sessionRole(req);
+      const numbers = (g.numbers || []).map(n => { const lv = live[tgGraySid(n.phone)] || { status: 'none' }; return Object.assign({}, n, { live: lv, realPhone: lv.phone || null, username: lv.username || null, newToday: grayNewToday(n), newCap: grayNewLeadCap(db) }); });
+      return json(res, 200, { ok: true, ready: tgWorkerReady(db), platform: !!(process.env.LUMEN_TG_WORKER_TOKEN || (store.getRegistry().platformTgWorker || {}).token), isPrimary: !!(R2 && R2.role === 'owner'), numbers, warmup: g.warmup || { running: false, perDay: 12 } });
+    }
+    /* старт логина TG на номер (TG шлёт код по SMS → ловим в ленте Yesim) */
+    if (p === '/api/tg/gray/connect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!tgWorkerReady(db)) return json(res, 400, { error: 'TG-воркер не подключён (задай LUMEN_TG_WORKER_URL/TOKEN)' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      if (!phone) return json(res, 400, { error: 'нужен номер' });
+      db.settings.tgGray = db.settings.tgGray || { numbers: [] };
+      let rec = db.settings.tgGray.numbers.find(n => n.phone === phone);
+      if (!rec) { rec = { phone, label: String(b.label || '').slice(0, 60), persona: { name: '', avatar: '', mode: 'qualifier', brokerId: null }, addedAt: Date.now() }; db.settings.tgGray.numbers.push(rec); }
+      store.save();
+      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/start', { phone }); return json(res, 200, { ok: true, status: r.status }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
+    }
+    /* подать код (и 2FA-пароль) → авторизация */
+    if (p === '/api/tg/gray/submit-code' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/code', { code: b.code, password: b.password || '' }); return json(res, 200, r); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* персона на номере (имя/аватар/режим/брокер) — гибкая настройка агентства */
+    if (p === '/api/tg/gray/persona' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const rec = (db.settings.tgGray && db.settings.tgGray.numbers || []).find(n => n.phone === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден' });
+      rec.persona = rec.persona || {};
+      if (b.name != null) rec.persona.name = String(b.name).slice(0, 60);
+      if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
+      if (b.mode != null) rec.persona.mode = ['qualifier', 'broker', 'neutral'].includes(b.mode) ? b.mode : 'qualifier';
+      if (b.brokerId !== undefined) rec.persona.brokerId = b.brokerId || null;
+      store.save(); return json(res, 200, { ok: true, persona: rec.persona });
+    }
+    /* удалить серый TG-номер */
+    if (p === '/api/tg/gray/remove' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      try { await tgGrayApi(db, 'DELETE', '/sessions/' + tgGraySid(phone)); } catch (_) {}
+      db.settings.tgGray.numbers = (db.settings.tgGray.numbers || []).filter(n => n.phone !== phone);
+      store.save(); return json(res, 200, { ok: true });
+    }
+    /* прогрев TG вкл/выкл + разовый обмен */
+    if (p === '/api/tg/gray/warmup' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); db.settings.tgGray = db.settings.tgGray || { numbers: [] }; db.settings.tgGray.warmup = db.settings.tgGray.warmup || { running: false, perDay: 12 };
+      if (b.running != null) db.settings.tgGray.warmup.running = !!b.running;
+      if (b.perDay != null) db.settings.tgGray.warmup.perDay = Math.max(2, Math.min(40, +b.perDay || 12));
+      store.save(); return json(res, 200, { ok: true, warmup: db.settings.tgGray.warmup });
     }
     /* прогрев: вкл/выкл + интенсивность */
     if (p === '/api/wa/gray/warmup' && req.method === 'POST') {
