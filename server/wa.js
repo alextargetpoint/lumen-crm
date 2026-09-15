@@ -119,15 +119,17 @@ async function sendText(db, lead, text) {
 /* Шаблон: имя в Meta = id шаблона в Lumen без префикса tpl_, параметры —
    подставленные значения {name}/{geo}/… в порядке появления в теле. */
 async function sendTemplate(db, lead, tpl, renderedText) {
+  const template = {
+    name: tpl.metaName || tpl.id.replace(/^tpl_/, ''),
+    language: { code: tpl.metaLang || (tpl.lang === 'ru' ? 'ru' : 'en_US') },
+  };
+  /* бес-параметровые шаблоны (статичная рассылка) шлются БЕЗ components — иначе Meta 132000 «param mismatch» */
+  if (!tpl.noParams) template.components = [{ type: 'body', parameters: [{ type: 'text', text: renderedText }] }];
   return post(db, `${db.settings.wa.phoneId}/messages`, {
     messaging_product: 'whatsapp',
     to: toWaPhone(lead.phone),
     type: 'template',
-    template: {
-      name: tpl.id.replace(/^tpl_/, ''),
-      language: { code: tpl.lang === 'ru' ? 'ru' : 'en' },
-      components: [{ type: 'body', parameters: [{ type: 'text', text: renderedText }] }],
-    },
+    template,
   });
 }
 

@@ -10322,7 +10322,7 @@ PAGES.templates = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'left', hue: '#64748B' })}
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px"><button class="btn btn-sm" id="syncTpl">${ic(I.refresh)}Синк статусов из Meta</button><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
     <div class="two-col">
       <div><div class="nav-label" style="padding-left:2px">Utility — сервисные (дешевле, быстрее модерация)</div>
         ${st.templates.filter(t => t.category === 'utility').map(t => tplCard(t, stBadge)).join('')}</div>
@@ -10334,11 +10334,15 @@ PAGES.templates = async (root) => {
     sub: 'Уйдёт на модерацию Meta (обычно минуты—часы). Переменные: {name}, {geo}, {agency}, {broker}',
     body: `
       <div class="form-row"><label>Название</label><input id="tName" value="${tpl ? esc(tpl.name) : ''}"></div>
-      <div class="form-row"><label>Категория</label><select id="tCat"><option value="utility" ${tpl && tpl.category === 'utility' ? 'selected' : ''}>Utility</option><option value="marketing" ${tpl && tpl.category === 'marketing' ? 'selected' : ''}>Marketing</option></select></div>
-      <div class="form-row"><label>Текст</label><textarea id="tBody" style="min-height:110px">${tpl ? esc(tpl.body) : ''}</textarea></div>`,
+      <div style="display:flex;gap:10px">
+        <div class="form-row" style="flex:1"><label>Категория</label><select id="tCat"><option value="utility" ${tpl && tpl.category === 'utility' ? 'selected' : ''}>Utility (сервисный, дешевле)</option><option value="marketing" ${tpl && tpl.category === 'marketing' ? 'selected' : ''}>Marketing (рассылка)</option></select></div>
+        <div class="form-row" style="flex:1"><label>Язык</label><select id="tLang"><option value="ru" ${!tpl || tpl.lang === 'ru' ? 'selected' : ''}>Русский</option><option value="en" ${tpl && tpl.lang === 'en' ? 'selected' : ''}>English</option></select></div>
+      </div>
+      <div class="form-row"><label>Текст</label><textarea id="tBody" style="min-height:110px" placeholder="Статичный текст рассылки. БЕЗ переменных {name}/{geo} — для рассылки Meta нужен фиксированный текст.">${tpl ? esc(tpl.body) : ''}</textarea></div>
+      <div class="lc-hint info" style="margin-top:4px"><span>${ic(I.shield)}Для <b>рассылок</b> (Marketing) кнопка <b>«Отписаться»</b> добавляется автоматически (обязательна — снижает жалобы и бан). Отправка в Meta — кнопкой на карточке шаблона после сохранения.</span></div>`,
     actions: [
-      { label: tpl ? 'Сохранить (на модерацию)' : 'Отправить на модерацию', cls: 'btn-accent', onClick: async (bd) => {
-        const payload = { name: $('#tName', bd).value, category: $('#tCat', bd).value, body: $('#tBody', bd).value };
+      { label: tpl ? 'Сохранить' : 'Создать', cls: 'btn-accent', onClick: async (bd) => {
+        const payload = { name: $('#tName', bd).value, category: $('#tCat', bd).value, lang: ($('#tLang', bd) || {}).value || 'ru', body: $('#tBody', bd).value };
         if (tpl) await api.patch('/templates/' + tpl.id, payload); else await api.post('/templates', payload);
         render();
       } },
@@ -10346,6 +10350,12 @@ PAGES.templates = async (root) => {
     ],
   });
   $('#newTpl').addEventListener('click', () => openTplModal(null));
+  $('#syncTpl', root)?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/templates/sync-meta', {}); toast(r.ok ? 'Статусы обновлены' : 'Не вышло', r.ok ? ('синхронизировано: ' + r.synced) : (r.error || ''), r.ok); render(); } catch (er) { toast('Ошибка', er.message); b.disabled = false; } });
+  $$('[data-tplmeta]', root).forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true; const o = b.innerHTML; b.textContent = 'Отправляю…';
+    try { const r = await api.post('/templates/' + b.dataset.tplmeta + '/submit-meta', {}); if (r.ok) { toast('Отправлено в Meta', 'на модерации: ' + r.metaName, true); render(); } else { toast('Не вышло', r.error || ''); b.disabled = false; b.innerHTML = o; } }
+    catch (e) { toast('Ошибка', e.message); b.disabled = false; b.innerHTML = o; }
+  }));
   $$('[data-tpledit]', root).forEach(b => b.addEventListener('click', () => { const tpl = (st.templates || []).find(t => t.id === b.dataset.tpledit); if (tpl) openTplModal(tpl); }));
   $$('[data-tpldel]', root).forEach(b => b.addEventListener('click', async () => {
     const tpl = (st.templates || []).find(t => t.id === b.dataset.tpldel);
@@ -10361,6 +10371,10 @@ function tplCard(t, stBadge) {
         <button class="btn-ghost" data-tpldel="${t.id}" title="Удалить">${ic(I.x)}</button>
       </span></div>
     <div class="tpl-body">${esc(t.body)}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm ${t.metaName ? '' : 'btn-accent'}" data-tplmeta="${t.id}">${ic(I.send)}${t.metaName ? 'Переотправить в Meta' : 'Отправить в Meta'}</button>
+      ${t.metaName ? `<span class="muted" style="font-size:10.5px">Meta: <code>${esc(t.metaName)}</code>${t.category === 'marketing' ? ' · +кнопка отписки' : ''}</span>` : ''}
+    </div>
   </div>`;
 }
 

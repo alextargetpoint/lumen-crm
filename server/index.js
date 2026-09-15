@@ -5750,6 +5750,37 @@ const server = http.createServer(async (req, res) => {
       db.templates = (db.templates || []).filter(t => t.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
     }
+    /* отправить шаблон в Meta на модерацию (с ОБЯЗАТЕЛЬНОЙ кнопкой отписки для marketing) */
+    if ((m = p.match(/^\/api\/templates\/([^/]+)\/submit-meta$/)) && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const tpl = db.templates.find(t => t.id === m[1]); if (!tpl) return json(res, 404, { error: 'not found' });
+      if (!db.settings.wa || !db.settings.wa.wabaId || !db.settings.wa.token) return json(res, 400, { error: 'Сначала подключи официальный Cloud API номер (Номера → Cloud API)' });
+      if (/\{[a-zа-я]+\}/i.test(tpl.body)) return json(res, 400, { error: 'Уберите переменные {name}/{geo}/… — шаблон рассылки в Meta должен быть со статичным текстом (персонализация — через серые касания).' });
+      const metaName = ((tpl.name || 'tpl').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || ('tpl_' + tpl.id);
+      const metaLang = tpl.lang === 'ru' ? 'ru' : 'en_US';
+      const cat = tpl.category === 'marketing' ? 'MARKETING' : 'UTILITY';
+      const components = [{ type: 'BODY', text: tpl.body }];
+      if (cat === 'MARKETING') components.push({ type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: tpl.lang === 'ru' ? OPTOUT_BUTTON.ru : OPTOUT_BUTTON.en }] });
+      try {
+        const r = await wa.createTemplate(db, { name: metaName, language: metaLang, category: cat, components });
+        tpl.metaName = metaName; tpl.metaLang = metaLang; tpl.noParams = true; tpl.status = 'pending'; tpl.metaId = (r && r.id) || null;
+        store.save();
+        return json(res, 200, { ok: true, metaName, status: (r && r.status) || 'PENDING' });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* синхронизировать статусы модерации шаблонов из Meta (approved/pending/rejected) */
+    if (p === '/api/templates/sync-meta' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!db.settings.wa || !db.settings.wa.wabaId || !db.settings.wa.token) return json(res, 400, { error: 'нет Cloud API' });
+      try {
+        const list = await wa.listTemplates(db);
+        const byName = {}; list.forEach(t => { byName[t.name + '|' + t.language] = t; if (!byName[t.name]) byName[t.name] = t; });
+        let synced = 0;
+        for (const tpl of db.templates) { if (!tpl.metaName) continue; const mt = byName[tpl.metaName + '|' + (tpl.metaLang || '')] || byName[tpl.metaName]; if (mt) { const st = (mt.status || '').toUpperCase(); tpl.status = st === 'APPROVED' ? 'approved' : st === 'REJECTED' ? 'rejected' : 'pending'; synced++; } }
+        store.save();
+        return json(res, 200, { ok: true, synced });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
 
     /* ── Подписки на письма: какие типы уведомлений получать на e-mail ──────
        Владелец правит свои (settings.emailPrefs) + видит весь каталог; брокер — свои (broker.emailPrefs).
