@@ -11515,10 +11515,15 @@ PAGES.billing = async (root) => {
               <div class="bc-line-l"><b>${it.label}</b><span>${it.qty.toLocaleString('ru-RU')} ${it.unit} × $${it.rate}</span></div>
               <div class="bc-line-c">${moneyC(it.cost)}</div>
             </div>`).join('')}
+            ${u.numbersCount ? `<div class="bc-line">
+              <div class="bc-line-l"><b>Аренда номеров</b><span>${u.numbersCount} ${plural(u.numbersCount, 'номер', 'номера', 'номеров')} × $${u.numberPrice}/мес</span></div>
+              <div class="bc-line-c">${moneyC(u.numbersMonthly)}<span class="muted" style="font-size:10px;display:block">в месяц</span></div>
+            </div>` : ''}
           </div>
           <div class="bc-sum">
-            <div class="bc-sum-row"><span>Накоплено за период (${u.elapsedDays} дн)</span><b>${moneyC(u.total)}</b></div>
-            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце месяца</span><b>${moneyC(u.forecast)}</b></div>
+            <div class="bc-sum-row"><span>Расходники за период (${u.elapsedDays} дн)</span><b>${moneyC(u.total)}</b></div>
+            ${u.numbersCount ? `<div class="bc-sum-row"><span>Аренда номеров (флэт/мес)</span><b>${moneyC(u.numbersMonthly)}</b></div>` : ''}
+            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце месяца</span><b>${moneyC(u.monthlyForecast != null ? u.monthlyForecast : u.forecast)}</b></div>
           </div>
           <div class="muted" style="font-size:11px;margin-top:10px">Расходники не входят в подписку и идут по себестоимости провайдеров: WhatsApp тарифицирует Meta, токены ИИ — провайдер модели, телефония — DIDWW. Списываются по факту в конце расчётного месяца, отдельно от подписки.</div>
           <div id="bcRatesBox" hidden class="bc-rates">

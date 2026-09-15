@@ -61,6 +61,9 @@ const RATE_DEFAULTS = {
   sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
 };
 function rates(db) { return { ...RATE_DEFAULTS, ...((db.settings.billing && db.settings.billing.rates) || {}) }; }
+/* аренда номера: себестоимость (Telnyx ~$1) + наценка платформы $2 → агентству $3/мес (синхронно с TELNYX_MARKUP) */
+const NUMBER_MARKUP = 2;
+const NUMBER_PRICE_SHOWN = 1 + NUMBER_MARKUP;
 
 /* ---- итемизированная оценка расходников за текущий период + прогноз на месяц ---- */
 function usageEstimate(db) {
@@ -86,10 +89,17 @@ function usageEstimate(db) {
   /* прогноз на 30 дней: линейная экстраполяция от того, что накопилось за прошедшую часть периода */
   const elapsedDays = Math.max(0.5, (now - from) / 86400e3);
   const forecast = +(total / elapsedDays * 30).toFixed(2);
+  /* аренда номеров — ФЛЭТ-месячный (не метрируется по дням): показываем агентству цену с наценкой,
+     себестоимость и провайдер скрыты; платформа зарабатывает NUMBER_MARKUP × количество. */
+  const numbersCount = ((db.settings.telephony && db.settings.telephony.fromNumbers) || []).filter(Boolean).length;
+  const numbersMonthly = +(numbersCount * NUMBER_PRICE_SHOWN).toFixed(2);           // что платит агентство
+  const numbersMargin = +(numbersCount * NUMBER_MARKUP).toFixed(2);                 // навар платформы
   return {
     items, total, forecast, rates: R,
     periodStart: from, elapsedDays: Math.round(elapsedDays * 10) / 10,
     outbound, inbound, telephonyMin, sttMin,
+    numbersCount, numberPrice: NUMBER_PRICE_SHOWN, numbersMonthly,                   // навар (numbersMargin) агентству НЕ отдаём — скрываем себестоимость
+    monthlyForecast: +(forecast + numbersMonthly).toFixed(2),                        // расходники (прогноз) + аренда номеров
     waCost: items[0].cost, aiCost: items[1].cost,   // обратная совместимость
   };
 }
