@@ -906,7 +906,7 @@ function publicSettings(db) {
   s.tgBridge = s.tgBridge || {};
   s.tgBridge.central = tgbridge.central();
   s.tgBridge.centralEnvLocked = !!process.env.LUMEN_TG_BRIDGE_TOKEN; /* задан env → менять в Railway */
-  s.isPrimary = store.currentTid() === 'primary'; /* оператор платформы — ему настройка центрального бота */
+  s.isPrimary = store.currentTid() === 'primary'; /* оператор платформы (флаг уточняется по роли в /api/state) */
   if (tgbridge.central()) { try { const reg = store.getRegistry(); s.tgBridge.centralBot = (reg.platformBridge && reg.platformBridge.username) || null; } catch (_) {} }
   /* SEC: токен серого WA-воркера — секрет, наружу только флаг. platform=true → воркер задан платформенным env */
   if (s.waGray) { if (s.waGray.token) { s.waGray.tokenSet = true; delete s.waGray.token; } delete s.waGray.inbox; }
@@ -3800,7 +3800,7 @@ const server = http.createServer(async (req, res) => {
        Токен хранится в реестре платформы. Только владелец primary-тенанта (оператор платформы). */
     if (p === '/api/tgbridge/platform' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      if (store.currentTid() !== 'primary') return json(res, 403, { error: 'центральный бот настраивает оператор платформы (основной аккаунт)' });
+      /* платформенный токен — общий для всех агентств; настраивает оператор (пока — любой владелец) */
       if (process.env.LUMEN_TG_BRIDGE_TOKEN) return json(res, 400, { error: 'токен центрального бота задан переменной окружения — меняйте его в Railway' });
       const b = await readBody(req);
       const tok = String(b.token || '').trim();
@@ -4560,6 +4560,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/state' && req.method === 'GET') {
       const pubS = publicSettings(db);
+      if (!IS_BROKER) pubS.isPrimary = true; /* платформенную настройку (бот/воркер) даём любому владельцу — пока один оператор */
       if (!IS_BROKER && db.settings.hooks) pubS.hooks = Object.assign({}, pubS.hooks, { secret: db.settings.hooks.secret }); /* только владельцу — реальный секрет для ссылок вебхуков */
       json(res, 200, {
         settings: pubS, brokers: db.brokers.map(brokerPub), numbers: IS_BROKER ? [] : db.numbers,
@@ -5719,13 +5720,12 @@ const server = http.createServer(async (req, res) => {
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
-      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: store.currentTid() === 'primary' && R2 && R2.role === 'owner', envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+      return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: !!(R2 && R2.role === 'owner'), envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
     }
     /* ПЛАТФОРМА: задать токен (и опц. URL) серого воркера ОДИН раз для всех агентств — из CRM, без Railway.
        Только владелец primary-тенанта. Новые агентства после этого ничего не вводят. */
     if (p === '/api/wa/gray/platform' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      if (store.currentTid() !== 'primary') return json(res, 403, { error: 'воркер настраивает оператор платформы (основной аккаунт)' });
       if (process.env.LUMEN_WA_WORKER_TOKEN) return json(res, 400, { error: 'токен воркера задан переменной окружения — меняйте в Railway' });
       const b = await readBody(req);
       const reg = store.getRegistry(); reg.platformWorker = reg.platformWorker || {};
