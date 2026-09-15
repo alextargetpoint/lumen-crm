@@ -5925,7 +5925,7 @@ const server = http.createServer(async (req, res) => {
                 const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(number));
                 const d = pn.data && pn.data[0];
                 if (d && d.status === 'active') {
-                  if (profileId && d.messaging_profile_id !== profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { messaging_profile_id: profileId });
+                  if (profileId) await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id + '/messaging', { messaging_profile_id: profileId });
                   if (t.connId && !d.connection_id) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: t.connId }); } catch (_) {} }
                   break;
                 }
@@ -5955,7 +5955,8 @@ const server = http.createServer(async (req, res) => {
         if (!d) return json(res, 404, { error: 'номер не найден в Telnyx' });
         if (d.status !== 'active') return json(res, 409, { error: 'номер ещё провижинится (' + d.status + '), попробуй через минуту' });
         let assigned = false;
-        if (profileId && d.messaging_profile_id !== profileId) { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { messaging_profile_id: profileId }); assigned = true; }
+        /* messaging_profile_id живёт на ПОД-ресурсе /messaging, не на базовом номере (иначе Telnyx 422) */
+        if (profileId) { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id + '/messaging', { messaging_profile_id: profileId }); assigned = true; }
         if (t.connId && !d.connection_id) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: t.connId }); } catch (_) {} }
         /* убедимся, что номер учтён в ленте OTP */
         t.otpNumbers = t.otpNumbers || {}; const key = num.replace(/[^0-9]/g, '');
@@ -5973,6 +5974,8 @@ const server = http.createServer(async (req, res) => {
         const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent(num));
         const d = pn.data && pn.data[0];
         out.phone = d ? { id: d.id, status: d.status, messaging_profile_id: d.messaging_profile_id || null, connection_id: d.connection_id || null } : null;
+        /* фактическая привязка messaging — на под-ресурсе /messaging */
+        if (d) { try { const ms = await telnyxApi(db, 'GET', '/phone_numbers/' + d.id + '/messaging'); out.messaging = ms.data ? { messaging_profile_id: ms.data.messaging_profile_id || null } : null; if (out.phone && ms.data) out.phone.messaging_profile_id = ms.data.messaging_profile_id || null; } catch (e) { out.messagingErr = e.message; } }
       } catch (e) { out.phoneErr = e.message; }
       /* профиль на самом номере (может отличаться от нашего сохранённого) */
       const pid = (out.phone && out.phone.messaging_profile_id) || t.msgProfileId;
