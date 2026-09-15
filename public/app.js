@@ -1136,7 +1136,8 @@ window.openGrayManager = async function () {
       ${data.platform
         ? `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер подключён платформой Lumen — <b>ничего вводить не нужно</b>. Просто добавьте свой номер и отсканируйте QR.</span></div>`
         : (data.isPrimary
-          ? `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Задайте токен воркера <b>один раз для всей платформы</b> — новые агентства будут пользоваться им автоматически (ничего не вводя). Токен — это значение <b>WORKER_TOKEN</b> с сервиса воркера.</div>
+          ? `<div class="lc-hint warn" style="margin-bottom:10px">${ic(I.shield)}<span><b>Настройка платформы (одноразовая).</b> Видите только вы. Агентства сразу получают готовый сервер — этих полей у них нет.</span></div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:10px">Задайте токен воркера <b>один раз для всей платформы</b> — новые агентства будут пользоваться им автоматически (ничего не вводя). Токен — это значение <b>WORKER_TOKEN</b> с сервиса воркера.</div>
       <div class="form-row"><label>Токен воркера (общий для всех агентств)</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• задан' : 'WORKER_TOKEN'}"></div>
       <button class="btn btn-accent" id="gwPlatSave" style="width:100%;justify-content:center;margin-bottom:8px">Подключить воркер для платформы</button>`
           : `<div class="lc-hint info" style="margin-bottom:10px">${ic(I.spark)}<span>Сервер номеров подключается оператором платформы. Как только он это сделает — здесь появится добавление номера по QR.</span></div>`)}
@@ -11803,6 +11804,7 @@ PAGES.settings = async (root) => {
         <i>У каждого брокера — свой ключ. Дайте брокеру его команду, он отправит её тому же боту ${esc(tgbBotHandle)} — и все его лиды пойдут ему в личку.</i>
         <div id="tgbBrokers" class="muted" style="font-size:12px;margin-top:8px">Загрузка ключей брокеров…</div>
       </div></div>` : (s.isPrimary ? `
+      <div class="lc-hint warn" style="margin-bottom:12px">${ic(I.shield)}<span><b>Настройка платформы (одноразовая).</b> Это видите только вы как оператор. Агентства этого экрана не видят — после подключения здесь у всех (и у вас) останется только «/start по ключу».</span></div>
       <div class="muted" style="font-size:11.8px;margin:0 0 14px">Один общий бот Lumen на все агентства (SaaS-модель). Подключите его <b>один раз</b> — дальше агентства и брокеры привязываются по ключу, без создания своих ботов.</div>
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
         <b>Подключить центральный бот платформы</b>
