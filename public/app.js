@@ -1466,6 +1466,26 @@ window.openTgConnect = function () {
     } }, { label: 'Отмена' }] });
   return bd;
 };
+window.openTgBuy = function () {
+  const bd = modal({ title: 'Купить номер для Telegram', sub: 'Yesim-номер → авторизация TG → код прилетит в ленту', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.send)}Купим виртуальный номер (Yesim) и сразу начнём авторизацию Telegram. Код придёт автоматически — введёшь на след. шаге. Дальше зададим персону и поставим в прогрев.</span></div>
+      <div class="form-row"><label>Страна номера</label><select id="tgBuyCountry" class="inp">
+        <option value="US">США (+1)</option><option value="GB">Великобритания (+44)</option><option value="NL">Нидерланды (+31)</option><option value="CA">Канада (+1)</option><option value="DE">Германия (+49)</option><option value="PL">Польша (+48)</option>
+      </select></div>
+      <div id="tgBuyOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>`,
+    actions: [{ label: 'Купить и подключить', cls: 'btn-accent', onClick: async (b) => {
+      const country = ($('#tgBuyCountry', b) || {}).value || 'US'; const out = $('#tgBuyOut', b);
+      out.textContent = 'Покупаю номер…';
+      try {
+        const r = await api.post('/gray/yesim/buy', { country, subscriptionOption: 'month' });
+        if (!r.ok || !r.number) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'не куплено') + '</span>'; return false; }
+        out.textContent = 'Куплен ' + r.number + '. Запускаю логин Telegram…';
+        await api.post('/tg/gray/connect', { phone: r.number });
+        closeModal(); openTgCode(String(r.number).replace(/[^0-9]/g, ''));
+      } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; return false; }
+    } }, { label: 'Отмена' }] });
+  return bd;
+};
 window.openTgCode = function (phone) {
   const clean = String(phone || '').replace(/[^0-9]/g, ''); let pollTimer = null;
   const stop = () => { if (pollTimer) clearInterval(pollTimer); };
@@ -10129,6 +10149,7 @@ PAGES.numbers = async (root) => {
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}Серые (QR) · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
+      <button class="seg-btn ${NUMTAB === 'tg' ? 'on' : ''}" data-numtab="tg">${ic(I.send)}Telegram (серый)</button>
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
@@ -10184,8 +10205,9 @@ PAGES.numbers = async (root) => {
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>
       <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
+    </div>
 
-    <div class="lp-sec" style="margin:20px 0 10px">${ic(I.send)}Telegram (серый) · точечные касания <span class="muted" style="font-weight:400;font-size:11px">— не рассылки</span></div>
+    <div data-numpane="tg" style="${NUMTAB === 'tg' ? '' : 'display:none'}">
     <div id="tgGraySection" class="muted" style="font-size:12px">Загрузка…</div>
     </div>
 
@@ -10305,36 +10327,47 @@ PAGES.numbers = async (root) => {
   async function loadTgGray() {
     const box = $('#tgGraySection', root); if (!box) return;
     let d = { numbers: [] }; try { d = await api.get('/tg/gray/list'); } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; return; }
-    if (!d.ready) {
-      box.innerHTML = `<div class="lc-hint info"><span>${ic(I.shield)}TG-воркер ещё не подключён. Это отдельный сервис <b>lumen-tg-worker</b> (GramJS): задеплой его на Railway и задай в CRM env <code>LUMEN_TG_WORKER_URL</code> + <code>LUMEN_TG_WORKER_TOKEN</code>. Схема как у серого WhatsApp: купить Yesim-номер → авторизовать TG → прогрев → точечные касания. Инструкция — в репозитории воркера.</span></div>`;
-      return;
-    }
     const nums = d.numbers || [];
-    const persBadge = { qualifier: '<span class="badge">квалификатор</span>', broker: '<span class="badge ok">брокер</span>', neutral: '<span class="badge">нейтрал</span>' };
+    const ab = (STATE.brokers || []).filter(b => b.active !== false).length || 0;
+    const persBadge = { qualifier: '<span class="badge">персона-квалификатор</span>', broker: '<span class="badge ok">закреплён за брокером</span>', neutral: '<span class="badge">нейтральная</span>' };
     const stBadge = (s) => s === 'connected' ? '<span class="badge ok"><i></i>на связи</span>' : s === 'code_sent' ? '<span class="badge warn"><i></i>ждёт код</span>' : s === 'password_needed' ? '<span class="badge warn"><i></i>нужен 2FA-пароль</span>' : '<span class="badge bad"><i></i>не на связи</span>';
+    const need = Math.max(0, ab - nums.length);
     box.innerHTML = `
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <button class="btn btn-accent btn-sm" id="tgConnBtn">${ic(I.link)}Подключить TG-номер</button>
-        <label class="switch" style="align-self:center;display:inline-flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span> прогрев</label>
+      <div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
+        <div class="card-title">${ic(I.send)}Telegram — серый способ<span class="sub">точечные касания 1-к-1 · НЕ рассылки</span></div>
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем номер (Yesim) → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания.</div>
+        <div class="num-meta" style="margin-bottom:12px">
+          <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
+          <div class="m"><div class="v">${nums.length}</div><div class="k">TG-номеров</div></div>
+          <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">новых/день при 1-на-1</div></div>
+        </div>
+        ${!d.ready ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}TG-воркер не подключён. Кнопки покупки/подключения активируются, когда задеплоишь <b>lumen-tg-worker</b> (Railway) и зададишь env <code>LUMEN_TG_WORKER_URL</code>+<code>LUMEN_TG_WORKER_TOKEN</code>.</span></div>` : (need > 0 ? `<div class="lc-hint" style="margin-bottom:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> TG-номеров до «1 на брокера». Купи недостающие — закроешь всех.</span></div>` : '')}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-accent btn-sm" id="tgBuyBtn" ${d.ready ? '' : 'disabled'}>${ic(I.plus)}Купить номер для Telegram</button>
+          <button class="btn btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
+          <label class="switch" style="align-self:center;display:inline-flex;gap:6px;align-items:center;font-size:12px;margin-left:auto"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span> прогрев между номерами</label>
+        </div>
       </div>
-      ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card" data-tg="${esc(n.phone)}">
-        <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:var(--accent)">серый (MTProto)</b></div></div></div>
+      ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
+        <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:#229ED9">серый (MTProto)</b></div></div></div>
         <div style="margin:10px 0 6px">${stBadge(n.live && n.live.status)}</div>
         ${conn ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5} · рассылки ⛔</div>` : ''}
-        <div style="font-size:11px;margin:6px 0">Персона: <b>${esc(p.name || '—')}</b> ${persBadge[p.mode || 'qualifier']}</div>
+        <div style="font-size:11px;margin:6px 0">Персона: <b>${esc(p.name || '— не задана')}</b><br>${persBadge[p.mode || 'qualifier']}</div>
         <div class="num-actions">
           <button class="btn btn-sm" data-tgpersona="${esc(n.phone)}">${ic(I.gear)}Персона</button>
           ${!conn ? `<button class="btn btn-sm btn-accent" data-tgcode="${esc(n.phone)}">${ic(I.spark)}Ввести код</button>` : ''}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
-      </div>`; }).join('')}</div>` : '<div class="muted" style="font-size:12px">TG-номеров пока нет — «Подключить TG-номер» (купи Yesim-номер, код прилетит в ленту).</div>'}`;
+      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет — нажми «Купить номер для Telegram»: купим Yesim-номер, авторизуем TG, код прилетит в ленту автоматически.</div>' : '')}`;
+    $('#tgBuyBtn', box)?.addEventListener('click', () => openTgBuy());
     $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
     $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
     $$('[data-tgpersona]', box).forEach(b => b.addEventListener('click', () => openTgPersona(b.dataset.tgpersona, nums.find(n => n.phone === b.dataset.tgpersona))));
     $$('[data-tgcode]', box).forEach(b => b.addEventListener('click', () => openTgCode(b.dataset.tgcode)));
     $$('[data-tgrm]', box).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать TG-номер?', 'Сессия выйдет из Telegram.', { ok: 'Убрать', danger: true })) return; try { await api.post('/tg/gray/remove', { phone: b.dataset.tgrm }); toast('Убран', null, true); loadTgGray(); } catch (e) { toast('Не вышло', e.message); } }));
   }
+  window.__reloadTgGray = loadTgGray;
   loadTgGray();
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
@@ -12823,6 +12856,7 @@ function mountFab() {
     { k: 'idea', ic: I.spark, label: 'Идея для соцсетей', page: 'social', run: () => quickIdeaModal() },
     { k: 'waiting', ic: I.chat, label: 'Ждут ответа', page: 'inbox', run: () => go('inbox') },
     { k: 'meet', ic: I.cal, label: 'Назначить встречу', page: 'meetings', run: () => go('meetings') },
+    { k: 'bug', ic: I.shield || I.spark, label: 'Сообщить о баге', hint: 'скрин/видео + что не так', run: () => quickBugModal() },
   ];
   const acts = ALL.filter(a => !a.page || canPage(a.page));
   const fab = el(`<div id="qfab" class="qfab">
@@ -12869,6 +12903,24 @@ function quickIdeaModal() {
     ],
   });
 }
+window.quickBugModal = function () {
+  const page = (typeof CUR !== 'undefined' && CUR) || (location.hash || '').replace('#', '') || '';
+  const bd = modal({ title: 'Сообщить о баге', sub: 'Опиши, что не так, и приложи скрин/видео — мы соберём и починим', wide: true,
+    body: `<div class="form-row"><label>Что не работает / что ожидал</label><textarea id="bugDesc" style="min-height:90px" placeholder="напр. на «Подключения» при переключении блоки на пару секунд сжимаются и мигают" autofocus></textarea></div>
+      <div class="form-row"><label>Скрин или видео (необязательно, до 25 МБ)</label><input id="bugFile" type="file" accept="image/*,video/*"></div>
+      <div class="muted" style="font-size:11px">Раздел: <b>${esc(page || '—')}</b> · захватим автоматически.</div>
+      <div id="bugOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>`,
+    actions: [{ label: 'Отправить', cls: 'btn-accent', onClick: async (b) => {
+      const description = ($('#bugDesc', b) || {}).value || ''; const out = $('#bugOut', b);
+      if (!description.trim()) { out.textContent = 'Опиши проблему'; return false; }
+      out.textContent = 'Отправляю…';
+      let media = null; const f = ($('#bugFile', b) || {}).files && $('#bugFile', b).files[0];
+      if (f) { if (f.size > 25 * 1024 * 1024) { out.textContent = 'Файл больше 25 МБ'; return false; } media = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(f); }); }
+      try { await api.post('/debug/report', { description, page, url: location.href, media }); toast('Спасибо! Баг-репорт отправлен', 'Починим и выкатим', true); closeModal(); }
+      catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    } }, { label: 'Отмена' }] });
+  return bd;
+};
 function quickTaskModal() {
   const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
   modal({

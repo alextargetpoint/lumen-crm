@@ -113,7 +113,7 @@ function ensureTenantDefaults(db) {
   if (!s.tgBridge) s.tgBridge = { enabled: false, botToken: '', secret: crypto.randomBytes(12).toString('hex') };
   if (!s.hooks) s.hooks = { secret: crypto.randomBytes(12).toString('hex') };
   /* все верхнеуровневые коллекции, которые код ждёт как массивы (seed даёт лишь часть) — чтобы новый тенант не падал ни на одной фиче */
-  for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates']) if (!Array.isArray(db[k])) db[k] = [];
+  for (const k of ['leads', 'brokers', 'numbers', 'messages', 'events', 'campaigns', 'properties', 'collections', 'meetings', 'mediaplans', 'mpContractors', 'carousels', 'decks', 'folders', 'socialContent', 'feed', 'brokerTasks', 'audit', 'seatLog', 'intakeLog', 'ads', 'adComments', 'callReviews', 'caseBase', 'consults', 'hrCandidates', 'ideaBank', 'learnLessons', 'waitlist', 'sequences', 'templates', 'debugReports']) if (!Array.isArray(db[k])) db[k] = [];
   return db;
 }
 {
@@ -5296,6 +5296,31 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, engine.wakePreview(db, filters));
     }
 
+    /* ── Дебаг-репорты: пользователь шлёт описание + скрин/видео → база → чиним ── */
+    if (p === '/api/debug/report' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      let mediaUrl = null;
+      try {
+        const dm = String(b.media || '').match(/^data:([^;]+);base64,(.+)$/s);
+        if (dm) { const mime = dm[1]; const ext = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' })[mime] || 'bin'; const buf = Buffer.from(dm[2], 'base64'); if (buf.length <= 25 * 1024 * 1024) { const saved = tgbridge.saveMedia(buf, ext); mediaUrl = saved && saved.url; } }
+      } catch (e) { /* медиа не критично */ }
+      const rec = { id: store.nextId('bug'), description: String(b.description || '').slice(0, 4000), page: String(b.page || '').slice(0, 60), url: String(b.url || '').slice(0, 300), mediaUrl, by: (R.name || R.email || R.role || 'user'), byRole: R.role, at: Date.now(), status: 'new', ua: String(req.headers['user-agent'] || '').slice(0, 200) };
+      db.debugReports.unshift(rec); db.debugReports = db.debugReports.slice(0, 500); store.save();
+      ai.pushEvent(db, { type: 'note', text: `🐞 Баг-репорт от ${rec.by}${rec.page ? ' (раздел ' + rec.page + ')' : ''}: ${rec.description.slice(0, 80)}` });
+      return json(res, 200, { ok: true, id: rec.id });
+    }
+    if (p === '/api/debug/reports' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      return json(res, 200, { ok: true, reports: (db.debugReports || []).slice(0, 100) });
+    }
+    if ((m = p.match(/^\/api\/debug\/reports\/([^/]+)$/)) && (req.method === 'PATCH' || req.method === 'DELETE')) {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (req.method === 'DELETE') { db.debugReports = (db.debugReports || []).filter(x => x.id !== m[1]); store.save(); return json(res, 200, { ok: true }); }
+      const rec = (db.debugReports || []).find(x => x.id === m[1]); if (!rec) return json(res, 404, { error: 'not found' });
+      const pb = await readBody(req); if (pb.status) rec.status = String(pb.status).slice(0, 20); store.save();
+      return json(res, 200, { ok: true, report: rec });
+    }
     if (p === '/api/campaigns' && req.method === 'GET') {
       /* воронка доставки по каждой кампании (из статусов сообщений: delivered/read приходят вебхуком Cloud API) */
       const out = db.campaigns.map(c => {
