@@ -1268,6 +1268,39 @@ window.openYesimBuy = async function () {
   };
   renderForm();
 };
+/* Активация купленного серого номера: гид (регистрация WhatsApp + клон-апп) + живой приём SMS/OTP */
+window.openYesimActivate = async function (phone) {
+  const clean = String(phone || '').replace(/[^0-9]/g, '');
+  let pollTimer = null;
+  const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+  const bd = modal({ title: 'Активация номера +' + esc(clean), sub: 'Регистрация WhatsApp + приём кода (OTP)', wide: true, body: '<div id="yAct"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
+  const host = () => $('#yAct', bd);
+  host().innerHTML = `
+    <div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Номер куплен. Зарегистрируйте на него WhatsApp — код (OTP) прилетит в ленту ниже <b>автоматически</b>, вводить SMS вручную на телефоне не нужно (номер виртуальный).</span></div>
+    <b style="font-size:13px">Как активировать (по шагам):</b>
+    <div style="margin-top:8px">
+      ${[
+        ['Откройте WhatsApp на Android', 'На телефоне: WhatsApp (или WhatsApp Business) → «Зарегистрировать» → введите номер <b>+' + esc(clean) + '</b>.'],
+        ['Код придёт сюда', 'WhatsApp отправит SMS с кодом — он появится в ленте ниже (ловим на виртуальный номер). Введите его в WhatsApp на телефоне.'],
+        ['Не хватает слотов? — клон', 'Если уже заняты 2 обычных + 2 Business на телефоне — поставьте <b>клон-приложение</b> (Dual Space / Parallel Space / встроенное «Клонирование приложений» на Xiaomi/Samsung) и запустите ещё один WhatsApp в клоне.'],
+        ['Подключите к CRM', 'После регистрации: «Номера» → «Подключить свой (QR)» → введите +' + esc(clean) + ' → отсканируйте QR из этого же WhatsApp (Связанные устройства).'],
+      ].map((s, i) => `<div class="tgb-step"><span class="tgb-n">${i + 1}</span><div class="tgb-b"><b>${s[0]}</b><i>${s[1]}</i></div></div>`).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px"><b style="font-size:13px">Входящие SMS / коды</b><span class="warm-pulse"></span><span class="muted" style="font-size:11px">живой приём</span><button class="btn-ghost btn-sm" id="yActRefresh" style="margin-left:auto">${ic(I.refresh)}Обновить</button></div>
+    <div id="yActSms" class="warm-log"><div class="muted" style="font-size:11.5px;padding:8px">Ждём SMS… придёт, как отправите код на этот номер.</div></div>`;
+  const loadSms = async () => {
+    const box = $('#yActSms', bd); if (!box || !document.body.contains(bd)) { stop(); return; }
+    try {
+      const r = await api.get('/gray/yesim/sms?number=' + encodeURIComponent(clean));
+      const arr = (r.sms || []).filter(m => (m.text || '').trim());
+      box.innerHTML = arr.length ? arr.slice(0, 12).map(m => `<div class="warm-msg"><b>${esc(m.from || 'SMS')}</b><span class="warm-txt">${esc(m.text)}</span>${m.code ? `<b style="color:var(--accent);font-size:14px;letter-spacing:1px">${esc(m.code)}</b>` : ''}<i>${esc(String(m.at).slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт, как WhatsApp отправит код на +' + esc(clean) + '.</div>';
+    } catch (e) {}
+  };
+  $('#yActRefresh', bd).addEventListener('click', loadSms);
+  loadSms();
+  pollTimer = setInterval(loadSms, 5000);   /* живой приём OTP */
+};
 /* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
 window.grayAddQR = function (phone, label) {
   phone = String(phone || '').replace(/[^0-9]/g, '');
@@ -9864,8 +9897,11 @@ PAGES.numbers = async (root) => {
         </div>
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
           <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Требует Meta-верификации (Настройки → Cloud API).</div>
-          <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Добавить Cloud-API номер</button>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Подключите свой WhatsApp Business в один вход.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
+            <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Вручную</button>
+          </div>
         </div>
       </div>
     </div>
@@ -9891,6 +9927,7 @@ PAGES.numbers = async (root) => {
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
           <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
         <div class="num-actions">
+          ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
           ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span>`}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
@@ -9936,6 +9973,7 @@ PAGES.numbers = async (root) => {
   }));
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
+  $$('[data-yact]', root).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.yact)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
   $('#numWarm', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', e.target.checked ? 'Номера начнут переписку между собой' : null, true); const box = $('#warmLive', root); if (box) box.innerHTML = warmLiveHtml({ ...(grayData.warmup || {}), running: e.target.checked }); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
@@ -9949,6 +9987,15 @@ PAGES.numbers = async (root) => {
   }, 6000);
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#openYesimBtn')?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
+  $('#waHostedBtn')?.addEventListener('click', async () => {
+    const btn = $('#waHostedBtn', root); btn.disabled = true; const o = btn.innerHTML; btn.textContent = 'Готовлю…';
+    try {
+      const r = await api.post('/whatsapp/hosted-signup', {});
+      if (r.url) { window.open(r.url, '_blank'); toast('Открыл подключение WhatsApp Business', 'Войдите своим Facebook и подтвердите номер', true); }
+      else toast('Не удалось', r.error || 'нет ссылки');
+    } catch (e) { toast('Официальный WhatsApp пока не настроен', e.message); }
+    btn.disabled = false; btn.innerHTML = o;
+  });
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
     modal({

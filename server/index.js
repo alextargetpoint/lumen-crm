@@ -6035,8 +6035,50 @@ const server = http.createServer(async (req, res) => {
     /* входящие SMS (OTP) по купленным номерам: ?offset=0 */
     if (p === '/api/gray/yesim/sms' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
-      try { const r = await yesimApi('get_sms', { offset: parseInt(u.searchParams.get('offset')) || 0 }); return json(res, 200, { ok: true, sms: r.sms || r.data || r || [] }); }
-      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+      try {
+        const r = await yesimApi('get_sms', { offset: parseInt(u.searchParams.get('offset')) || 0 });
+        let list = (r.data && r.data.sms) || r.sms || r.data || r || [];
+        if (!Array.isArray(list)) list = list.sms || [];
+        const num = (u.searchParams.get('number') || '').replace(/[^0-9]/g, '');
+        if (num) list = list.filter(m => { const to = String((m.recipient || m.to || m.number || '')).replace(/[^0-9]/g, ''); return to && (to.endsWith(num) || num.endsWith(to)); });
+        /* нормализуем поля для UI */
+        const norm = list.map(m => ({ from: m.sender || m.from || '', to: m.recipient || m.to || m.number || '', text: m.text || m.message || m.sms || m.body || '', at: m.date || m.time || m.timestamp || m.created_at || '', code: (String(m.text || m.message || m.body || '').match(/\b(\d{3}[- ]?\d{3})\b|\b(\d{4,8})\b/) || [])[0] || '' }));
+        return json(res, 200, { ok: true, sms: norm });
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* ===== Официальный WhatsApp Cloud API (Telnyx Tech Provider Hosted Signup) ===== */
+    /* оператор задаёт платформенный Meta App ID (Tech Provider) — один раз после App Review */
+    if (p === '/api/whatsapp/meta-app' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const appId = String(b.appId || '').trim();
+      const reg = store.getRegistry(); reg.platformMetaApp = { appId, at: Date.now() }; store.saveRegistry();
+      return json(res, 200, { ok: true, appId });
+    }
+    function metaAppId() { try { const r = store.getRegistry(); return process.env.META_APP_ID || (r.platformMetaApp && r.platformMetaApp.appId) || ''; } catch (_) { return process.env.META_APP_ID || ''; } }
+    /* агентство запускает подключение официального WhatsApp: Telnyx выдаёт hosted-signup ссылку */
+    if (p === '/api/whatsapp/hosted-signup' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const appId = metaAppId();
+      if (!appId) return json(res, 400, { error: 'Официальный WhatsApp ещё не настроен платформой (нет Meta App ID / не пройден App Review). Пока используйте серые номера.' });
+      try {
+        const r = await telnyxApi(db, 'POST', '/whatsapp/hosted_signups', { app_id: appId, customer_id: store.currentTid() });
+        const url = (r.data && (r.data.url || r.data.signup_url)) || r.url || '';
+        const sessionId = (r.data && (r.data.session_id || r.data.id)) || r.session_id || '';
+        if (sessionId) { db.settings.wa = db.settings.wa || {}; db.settings.wa.cloudSignup = { sessionId, at: Date.now() }; store.save(); }
+        return json(res, 200, { ok: true, url, sessionId });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* статус подключения официального WhatsApp: waba_id + phone_number_id → сохраняем на тенант */
+    if (p === '/api/whatsapp/signup-status' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const sid = u.searchParams.get('session') || ((db.settings.wa && db.settings.wa.cloudSignup && db.settings.wa.cloudSignup.sessionId));
+      if (!sid) return json(res, 200, { ok: false, error: 'нет сессии подписания' });
+      try {
+        const r = await telnyxApi(db, 'GET', '/whatsapp/signup/' + encodeURIComponent(sid) + '/status');
+        const d = r.data || r;
+        if (d && d.waba_id && d.phone_number_id) { db.settings.wa = db.settings.wa || {}; db.settings.wa.cloud = { wabaId: d.waba_id, phoneNumberId: d.phone_number_id, at: Date.now() }; store.save(); }
+        return json(res, 200, { ok: true, status: d && (d.status || d.state), wabaId: d && d.waba_id, phoneNumberId: d && d.phone_number_id, raw: d });
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
     if (p === '/api/wa/gray/connect' && req.method === 'POST') {
