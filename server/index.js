@@ -902,8 +902,15 @@ function publicSettings(db) {
     }
   }
   if (s.tgBridge) { if (s.tgBridge.botToken) { s.tgBridge.tokenSet = true; delete s.tgBridge.botToken; } delete s.tgBridge.secret; }
-  /* SEC: токен серого WA-воркера — секрет, наружу только флаг */
+  /* central-режим моста: один платформенный бот на всех — UI прячет заведение своего бота/вебхука */
+  s.tgBridge = s.tgBridge || {};
+  s.tgBridge.central = tgbridge.central();
+  if (tgbridge.central()) { try { const reg = store.getRegistry(); s.tgBridge.centralBot = (reg.platformBridge && reg.platformBridge.username) || null; } catch (_) {} }
+  /* SEC: токен серого WA-воркера — секрет, наружу только флаг. platform=true → воркер задан платформенным env */
   if (s.waGray) { if (s.waGray.token) { s.waGray.tokenSet = true; delete s.waGray.token; } delete s.waGray.inbox; }
+  else s.waGray = { numbers: [] };
+  s.waGray.platform = !!(process.env.LUMEN_WA_WORKER_URL && process.env.LUMEN_WA_WORKER_TOKEN);
+  if (s.waGray.platform) { s.waGray.url = ''; s.waGray.tokenSet = true; } /* платформенный воркер — не показываем/не просим URL+токен */
   /* SEC: hooks.secret — мастер-ключ вебхуков/интеграций; НИКОГДА не отдаём в общий /api/state.
      Владельцу он до-инжектится отдельно (owner-ветка в /api/state), брокеры его не видят. */
   if (s.hooks) { s.hooksSecretSet = !!s.hooks.secret; delete s.hooks.secret; }
@@ -2360,13 +2367,17 @@ function telnyxWebhook(db) { const base = process.env.PUBLIC_BASE_URL || tunnelU
 /* --- Серый WhatsApp: обращение к облачному воркеру (Baileys) --- */
 /* sessionId воркера тенант-скоупный: <tid>__<phone> — номера разных агентств не пересекаются */
 const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').replace(/[^0-9]/g, '');
+/* URL/токен серого воркера: сперва платформенный env (один общий воркер на всех — агентству ничего вводить
+   не надо), затем — из настроек тенанта (легаси / своё). Так же, как central-бот. */
+function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || (db.settings.waGray && db.settings.waGray.url) || '').replace(/\/$/, ''); }
+function waWorkerToken(db) { return process.env.LUMEN_WA_WORKER_TOKEN || (db.settings.waGray && db.settings.waGray.token) || ''; }
+function waWorkerReady(db) { return !!(waWorkerBase(db) && waWorkerToken(db)); }
 async function waGrayApi(db, method, pathx, body) {
-  const g = db.settings.waGray || {};
-  const base = String(g.url || '').replace(/\/$/, '');
+  const base = waWorkerBase(db);
   if (!base) throw new Error('WA-воркер не настроен (укажи URL в Настройках)');
   const r = await fetch(base + pathx, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (g.token || '') },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + waWorkerToken(db) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const j = await r.json().catch(() => ({}));
@@ -2930,6 +2941,35 @@ const server = http.createServer(async (req, res) => {
          секрету из заголовка и обрабатываем апдейт строго в его контексте. Иначе ответы
          брокеров одного агентства утекали бы в CRM другого. */
       const _tgGot = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+      /* ЦЕНТРАЛЬНЫЙ БОТ: один бот на всю платформу. Определяем агентство по ключу при /start
+         (ownerTgCode / broker.tgBindCode across all tenants) и запоминаем chatId→tid в реестре;
+         последующие апдейты роутим по этому индексу. Включено только если задан LUMEN_TG_BRIDGE_TOKEN. */
+      if (tgbridge.central() && _tgGot && _tgGot === tgbridge.platformSecret()) {
+        const body = await readBody(req);
+        const msg = (body && (body.message || body.edited_message)) || null;
+        if (!msg || !msg.chat) return json(res, 200, { ok: true });
+        const chatId = String(msg.chat.id);
+        const text = String(msg.text || msg.caption || '').trim();
+        const reg = store.getRegistry(); reg.tgChatIndex = reg.tgChatIndex || {};
+        let tid = null;
+        if (text.startsWith('/start')) {
+          const code = (text.split(/\s+/)[1] || '').trim().toLowerCase();
+          if (code) tid = findTenant(() => {
+            const d = store.get();
+            if (String((d.settings && d.settings.ownerTgCode) || '').toLowerCase() === code) return true;
+            return (d.brokers || []).some(b => String(b.tgBindCode || '').toLowerCase() === code);
+          });
+          if (tid) { reg.tgChatIndex[chatId] = tid; store.saveRegistry(); }
+        } else {
+          tid = reg.tgChatIndex[chatId] || null;
+        }
+        if (!tid) {
+          try { await tgbridge.notify({ settings: {} }, chatId, 'Здравствуйте! Отправьте свой ключ агентства: /start &lt;ключ&gt;\nКлюч — в CRM → Настройки → Мост Telegram.'); } catch (_) {}
+          return json(res, 200, { ok: true });
+        }
+        await store.runInTenant(tid, async () => { try { await tgbridge.handleUpdate(store.get(), body); } catch (e) { console.error('[tg/webhook central]', tid, e); } });
+        return json(res, 200, { ok: true });
+      }
       const gotBuf = Buffer.from(_tgGot);
       let matchTid = null;
       if (_tgGot) for (const tid of store.listTenants()) {
@@ -4819,8 +4859,8 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       if (!lead.phone) return json(res, 400, { error: 'у лида нет номера' });
       const g = db.settings.waGray || {};
-      if (!g.url || !g.token) return json(res, 400, { error: 'WhatsApp по QR не подключён (Настройки → WhatsApp по QR)' });
-      if (!(g.numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Добавьте номер в Настройки → WhatsApp по QR и подключите по QR.' });
+      if (!waWorkerReady(db)) return json(res, 400, { error: 'WhatsApp-воркер не подключён. Раздел «Номера» → «Подключить по QR».' });
+      if (!(g.numbers || []).length) return json(res, 400, { error: 'Нет ни одного своего номера. Раздел «Номера» → «Подключить по QR» → добавьте и отсканируйте.' });
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return json(res, 400, { error: 'WhatsApp-воркер недоступен (проверьте URL/токен в разделе «Номера»)' }); }
       /* РОТАЦИЯ + ЛИМИТ: массовая проверка onWhatsApp с ОДНОГО номера триггерит бан. Поэтому берём
          подключённый номер с НАИМЕНЬШИМ числом проверок за сегодня (равномерная нагрузка на пул) и
@@ -5652,7 +5692,8 @@ const server = http.createServer(async (req, res) => {
       const g = db.settings.waGray || { numbers: [] };
       let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) {}
       const numbers = (g.numbers || []).map(n => Object.assign({}, n, { live: live[waGraySid(n.phone)] || { status: 'none' } }));
-      return json(res, 200, { ok: true, url: g.url || '', tokenSet: !!g.token, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
+      const platform = !!(process.env.LUMEN_WA_WORKER_URL && process.env.LUMEN_WA_WORKER_TOKEN);
+      return json(res, 200, { ok: true, url: platform ? '' : (g.url || ''), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), numbers, warmup: g.warmup || { running: false, perDay: 16 } });
     }
     /* подключить номер: добавить в пул + старт сессии (QR появится в статусе) */
     if (p === '/api/wa/gray/connect' && req.method === 'POST') {
@@ -10265,5 +10306,10 @@ server.listen(PORT, () => {
       try { const reg = store.getRegistry(); await supportApi(sbTok, 'setWebhook', { url: _tgBase + '/support/webhook', secret_token: reg.supportBot.secret, allowed_updates: ['message'] }); console.log('[support] webhook set →', _tgBase + '/support/webhook'); }
       catch (e) { console.warn('[support] webhook fail', e.message); }
     }, 2800);
+    /* ЦЕНТРАЛЬНЫЙ мост Telegram: один платформенный бот на все агентства — вебхук ставится ОДИН раз при старте */
+    if (tgbridge.central()) setTimeout(async () => {
+      try { const r = await tgbridge.setupPlatformWebhook(_tgBase); const reg = store.getRegistry(); reg.platformBridge = reg.platformBridge || {}; if (r.username) reg.platformBridge.username = r.username; store.saveRegistry(); console.log('[tg-central] webhook set →', _tgBase + '/tg/webhook', 'bot @' + (r.username || '?')); }
+      catch (e) { console.warn('[tg-central] webhook fail', e.message); }
+    }, 3100);
   }
 });

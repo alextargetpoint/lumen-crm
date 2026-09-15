@@ -25,10 +25,20 @@ let MEDIA_DIR = path.join(__dirname, '..', 'public', 'assets', 'wa-media');
 let MEDIA_URL_BASE = '/assets/wa-media';
 function setMediaDir(dir, urlBase) { MEDIA_DIR = dir; if (urlBase) MEDIA_URL_BASE = urlBase; }
 
+/* ---------- ЦЕНТРАЛЬНЫЙ (платформенный) бот ----------
+   Один бот Lumen на ВСЕ агентства: токен в env LUMEN_TG_BRIDGE_TOKEN (Railway). Когда задан — включается
+   central-режим: агентства НЕ заводят свой бот, а привязка идёт по ключу агентства (/start <ключ>), роутинг —
+   по глобальному индексу chatId→tid (registry.tgChatIndex). Не задан → прежняя модель «бот на агентство». */
+const PLATFORM_TOKEN = process.env.LUMEN_TG_BRIDGE_TOKEN || '';
+function central() { return !!PLATFORM_TOKEN; }
+/* секрет вебхука центрального бота: из env или детерминированно из токена (стабилен между рестартами) */
+function platformSecret() { return process.env.LUMEN_TG_BRIDGE_SECRET || (PLATFORM_TOKEN ? crypto.createHash('sha256').update('lumen-central:' + PLATFORM_TOKEN).digest('hex').slice(0, 24) : ''); }
+
 /* ---------- конфиг / готовность ---------- */
 function cfg(db) { return db.settings.tgBridge || {}; }
-function token(db) { return cfg(db).botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken) || ''; }
-function ready(db) { return !!(cfg(db).enabled && token(db)); }
+/* в central-режиме исходящие идут через платформенный бот; иначе — бот агентства */
+function token(db) { return PLATFORM_TOKEN || cfg(db).botToken || (db.settings.channels && db.settings.channels.tg && db.settings.channels.tg.botToken) || ''; }
+function ready(db) { return central() ? true : !!(cfg(db).enabled && token(db)); }
 
 function rt(db) {
   if (!db.tgBridge) db.tgBridge = {};
@@ -249,6 +259,23 @@ async function setupWebhook(db, baseUrl) {
   });
 }
 
+/* ЦЕНТРАЛЬНЫЙ бот: один вебхук на всю платформу (ставится ОДИН раз при старте, если задан env-токен) */
+async function tgApiRaw(tok, method, body) {
+  const r = await fetch(`https://api.telegram.org/bot${tok}/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  return r.json().catch(() => ({}));
+}
+async function setupPlatformWebhook(baseUrl) {
+  if (!PLATFORM_TOKEN) return { ok: false, error: 'нет LUMEN_TG_BRIDGE_TOKEN' };
+  const url = baseUrl.replace(/\/$/, '') + '/tg/webhook';
+  const r = await tgApiRaw(PLATFORM_TOKEN, 'setWebhook', { url, secret_token: platformSecret(), allowed_updates: ['message', 'edited_message'], drop_pending_updates: true });
+  let me = null; try { me = await tgApiRaw(PLATFORM_TOKEN, 'getMe'); } catch (_) {}
+  return { ok: !!r.ok, result: r, username: me && me.result && me.result.username || null };
+}
+async function platformBotUsername() {
+  if (!PLATFORM_TOKEN) return null;
+  try { const me = await tgApiRaw(PLATFORM_TOKEN, 'getMe'); return me && me.result && me.result.username || null; } catch (_) { return null; }
+}
+
 /* кнопка-меню бота, открывающая мессенджер-мини-апп (Telegram Web App) */
 async function setMenuButton(db, baseUrl) {
   const url = baseUrl.replace(/\/$/, '') + '/tgapp';
@@ -264,4 +291,5 @@ async function notify(db, chatId, text) {
 module.exports = {
   ready, cfg, token, handleUpdate, forwardInbound, forwardHandover, bindBroker,
   setupWebhook, setMenuButton, setMediaDir, saveMedia, extractTgMedia, resolveLead, absUrl, notify,
+  central, platformSecret, setupPlatformWebhook, platformBotUsername,
 };

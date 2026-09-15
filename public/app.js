@@ -1131,11 +1131,14 @@ window.openGrayManager = async function () {
   async function refresh() { try { data = await api.get('/wa/gray/list'); } catch (e) {} renderMgr(); }
   function renderMgr() {
     stopPoll();
-    const cfgOk = data.url && data.tokenSet;
+    const cfgOk = data.platform ? data.ready : (data.url && data.tokenSet);
     host().innerHTML = `
+      ${data.platform
+        ? `<div class="lc-hint info" style="margin-bottom:14px">${ic(I.spark)}<span>Сервер подключён платформой Lumen — <b>ничего вводить не нужно</b>. Просто добавьте свой номер и отсканируйте QR.</span></div>`
+        : `<div class="muted" style="font-size:11.5px;margin-bottom:10px">Воркер — это облачный сервис (на Railway), который держит WhatsApp-сессии ваших номеров. URL и токен (WORKER_TOKEN) — из переменных вашего Railway-проекта.</div>
       <div class="form-row"><label>URL воркера</label><input id="gwUrl" value="${esc(data.url || '')}" placeholder="https://…up.railway.app"></div>
       <div class="form-row"><label>Токен воркера</label><input id="gwTok" type="password" placeholder="${data.tokenSet ? '•••••• сохранён' : 'WORKER_TOKEN'}"></div>
-      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:14px">Сохранить воркер</button>
+      <button class="btn btn-accent" id="gwSave" style="width:100%;justify-content:center;margin-bottom:14px">Сохранить воркер</button>`}
       ${cfgOk ? `
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input id="gwPhone" placeholder="Номер (971501234567)" style="flex:1">
@@ -11762,7 +11765,25 @@ PAGES.settings = async (root) => {
             ['Гео caller-ID', 'Клиент видит номер своей страны → выше отклик'],
             ['Запись → транскрипт', 'Разговор пишется и расшифровывается в карточку автоматически']])}`;
   const tgbOn = !!(s.tgBridge && s.tgBridge.tokenSet);
-  const tgBridgeForm = `
+  const tgbCentral = !!(s.tgBridge && s.tgBridge.central);
+  const tgbBotHandle = (s.tgBridge && s.tgBridge.centralBot) ? '@' + s.tgBridge.centralBot : 'бота Lumen';
+  const tgBridgeForm = tgbCentral ? `
+      <div class="muted" style="font-size:11.8px;margin:0 0 14px">Брокер не держит CRM открытой. Входящие клиента приходят ему в личный Telegram — он отвечает <b>reply</b>, ответ уходит клиенту в WhatsApp. Вся переписка логируется в CRM.</div>
+      <div class="lc-hint info" style="margin-bottom:12px">${ic(I.spark)}<span>Бот уже подключён платформой — <b>заводить своего бота не нужно</b>. Просто привяжитесь по ключу ниже.</span></div>
+      <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">
+        <b>Привяжите себя (основатель)</b>
+        <i>Откройте <a href="https://t.me/${(s.tgBridge && s.tgBridge.centralBot) ? esc(s.tgBridge.centralBot) : ''}" target="_blank" style="color:var(--accent)">${esc(tgbBotHandle)}</a> в Telegram и отправьте команду с вашим <b>ключом агентства</b>:</i>
+        <div class="tgb-key" data-tgbcode="${esc(s.ownerTgCode || '')}" title="Нажмите — скопируется команда">
+          ${ic(I.copy || I.doc)}<code>/start ${esc(s.ownerTgCode || '—')}</code>
+          ${s.ownerTgChatId ? '<span class="badge ok" style="margin-left:auto">вы привязаны</span>' : '<span class="badge" style="margin-left:auto">ещё не привязан</span>'}
+        </div>
+        <button class="btn-ghost btn-sm" id="tgbRegen" style="margin-top:6px;font-size:11px">${ic(I.refresh)}Сгенерировать новый ключ</button>
+      </div></div>
+      <div class="tgb-step"><span class="tgb-n">2</span><div class="tgb-b">
+        <b>Привяжите брокеров</b>
+        <i>У каждого брокера — свой ключ. Дайте брокеру его команду, он отправит её тому же боту ${esc(tgbBotHandle)} — и все его лиды пойдут ему в личку.</i>
+        <div id="tgbBrokers" class="muted" style="font-size:12px;margin-top:8px">Загрузка ключей брокеров…</div>
+      </div></div>` : `
       <div class="muted" style="font-size:11.8px;margin:0 0 14px">Брокер не держит CRM открытой. Входящие клиента (текст, фото, видео, файлы, голосовые) приходят ему в личный Telegram — он отвечает <b>reply</b>, и ответ уходит клиенту в WhatsApp с его прогретого номера. Вся переписка логируется в CRM.</div>
 
       <div class="tgb-step"><span class="tgb-n">1</span><div class="tgb-b">

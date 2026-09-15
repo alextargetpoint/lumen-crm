@@ -335,11 +335,25 @@ document.addEventListener('DOMContentLoaded',r);window.addEventListener('load',r
   .tf-in{width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px 14px;font-size:15px;outline:none;font-family:inherit}
   .tf-in:focus{border-color:var(--acc)}
   .tf-sub{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}
-  .tf-sub .ck{flex:none;width:22px;height:22px;border-radius:7px;border:2px solid var(--line);cursor:pointer;display:grid;place-items:center;color:transparent}
+  .tf-sub .ck{flex:none;width:22px;height:22px;border-radius:7px;border:2px solid var(--line);cursor:pointer;display:grid;place-items:center;color:transparent;transition:.15s}
+  .tf-sub .ck svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
   .tf-sub.done .ck{background:var(--ok);border-color:var(--ok);color:#fff}
   .tf-sub input{flex:1;border:none;background:transparent;color:var(--ink);font-size:14px;outline:none;font-family:inherit}
   .tf-sub.done input{text-decoration:line-through;color:var(--mut)}
   .tf-sub .rm{flex:none;color:var(--mut);cursor:pointer;font-size:15px;background:none;border:none}
+  /* быстрый перенос даты */
+  .tf-quick{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .tf-quick button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.12s}
+  .tf-quick button:active{transform:scale(.95)}
+  .tf-quick button.on{border-color:var(--acc);color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+  /* ghost-удаление: не сливается с красным, читается сразу */
+  .tf-del{flex:none;width:52px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);border-radius:13px;cursor:pointer;display:grid;place-items:center;font-family:inherit;transition:.12s}
+  .tf-del svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .tf-del:active{background:var(--danger);color:#fff}
+  .tf-2nd{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:13px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.12s}
+  .tf-2nd.done-on{border-color:var(--ok);color:var(--ok)}
+  .tf-saved{font-size:12px;color:var(--ok);font-weight:700;opacity:0;transition:.25s;text-align:center;margin-top:10px;height:15px;pointer-events:none}
+  .tf-saved.on{opacity:1}
   .tf-addsub{margin-top:8px;width:100%;border:1px dashed var(--line);background:transparent;color:var(--acc);border-radius:11px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
   .tf-ai{width:100%;border:1px solid var(--acc);background:transparent;color:var(--acc);border-radius:12px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px}
   /* микрофон диктовки в текстовых полях (задачи/идеи/шиты ввода) */
@@ -559,6 +573,7 @@ const IC={
   play:'<path d="M7 5l12 7-12 7z"/>',
   pause:'<rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/>',
   check:'<path d="M5 12.5l4.5 4.5L20 6.5"/>',
+  trash:'<path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m3 0v12a1 1 0 01-1 1H8a1 1 0 01-1-1V7z"/><path d="M10 11.5v5M14 11.5v5"/>',
   checks:'<path d="M1.5 12.5l4.5 4.5 8.5-10"/><path d="M9 15.5l1 1 8.5-10"/>',
   img:'<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="10" r="2"/><path d="M4 18l5-4.5 4 3 3.5-2.5L20 17"/>',
   video:'<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3z"/>',
@@ -773,8 +788,8 @@ function renderTasks(){
   updateTabBadges();
 }
 function taskSheet(t){
-  const isNew=!t||!t.id;t=t||{};let subs=(t.subtasks||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
-  let pri=t.priority||'normal';
+  let isNew=!t||!t.id;t=t||{};let subs=(t.subtasks||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
+  let pri=t.priority||'normal';let done=(t.status==='done');let tid=isNew?null:t.id;
   const bd=document.createElement('div');bd.className='sheet-bd';
   let dueMs=t.due||(t.scheduled?new Date(t.scheduled+'T09:00').getTime():null);
   const dLabel=ms=>ms?(_dstr(ms)===_todayStr()?'Сегодня':new Date(ms).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})):'Выбрать дату';
@@ -783,24 +798,52 @@ function taskSheet(t){
     <textarea class="tf-in" id="tfTitle" rows="2" placeholder="Что нужно сделать" style="min-height:52px;line-height:1.4">${esc(t.title||'')}</textarea>
     <div class="tf-lbl">Приоритет</div><div class="seg" id="tfPri">${pb('low','Низкий')}${pb('normal','Обычный')}${pb('high','Высокий')}</div>
     <div class="tf-lbl">Дата</div><button type="button" class="tf-in" id="tfDue" style="text-align:left;cursor:pointer;color:var(--ink)">${dLabel(dueMs)}</button>
+    <div class="tf-quick" id="tfQuick">
+      <button data-q="today">Сегодня</button><button data-q="tomorrow">Завтра</button><button data-q="d2">Послезавтра</button><button data-q="week">Через неделю</button><button data-q="mon">След. пн</button><button data-q="clear">Без даты</button></div>
     <div class="tf-lbl">Подзадачи</div><div id="tfSubs"></div>
     <button class="tf-addsub" id="tfAddSub">＋ Подзадача</button>
     <button class="tf-ai" id="tfAI" style="margin-top:9px">✨ Причесать в подзадачи ИИ</button>
     <div class="tf-lbl">Заметка</div><textarea class="tf-in" id="tfNotes" rows="2" placeholder="Детали (необязательно)">${esc(t.notes||'')}</textarea>
-    <div style="display:flex;gap:8px;margin-top:16px">${isNew?'':'<button class="ish-ok" id="tfDel" style="background:var(--danger);flex:none;width:52px">🗑</button>'}<button class="ish-ok" id="tfSave" style="flex:1">${isNew?'Создать':'Сохранить'}</button></div></div>`;
+    <div class="tf-saved" id="tfSaved">✓ Сохранено</div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="tf-del" id="tfDel" aria-label="Удалить" data-ic="trash" style="${isNew?'display:none':''}"></button>
+      <button class="tf-2nd${done?' done-on':''}" id="tfDone" style="${isNew?'display:none':''}">${done?'Вернуть в работу':'Выполнить ✓'}</button>
+      <button class="ish-ok" id="tfSave" style="flex:1">${isNew?'Создать':'Готово'}</button></div></div>`;
   document.body.appendChild(bd);paintIcons(bd);requestAnimationFrame(()=>bd.classList.add('on'));
-  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};bd.onclick=e=>{if(e.target===bd)close()};
-  bd.querySelectorAll('#tfPri button').forEach(b=>b.onclick=()=>{hap();pri=b.dataset.pri;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x===b))});
+  const _ta=bd.querySelector('#tfTitle');
+  const close=()=>{bd.classList.remove('on');setTimeout(()=>bd.remove(),260)};
+  /* автосохранение: кнопка «Сохранить» может уехать под клавиатуру — данные не теряем */
+  let saveTimer=null,busy=false,everSaved=false;
+  const flashSaved=()=>{const s=bd.querySelector('#tfSaved');if(!s)return;s.classList.add('on');clearTimeout(s._t);s._t=setTimeout(()=>s.classList.remove('on'),1500)};
+  const revealExisting=()=>{isNew=false;['#tfDel','#tfDone'].forEach(q=>{const el=bd.querySelector(q);if(el)el.style.display=''});const sv=bd.querySelector('#tfSave');if(sv)sv.textContent='Готово'};
+  async function commit(){
+    const title=_ta.value.trim();if(!title)return false;if(busy)return false;busy=true;
+    const notes=bd.querySelector('#tfNotes').value.trim();const st=subs.filter(s=>(s.title||'').trim()).map(s=>({id:s.id,title:(s.title||'').trim(),done:!!s.done}));
+    const payload={title,priority:pri,due:dueMs,notes,subtasks:st};
+    try{
+      if(!tid){const r=await jpost('/tgapp/api/task',payload);tid=r&&r.id;if(tid)revealExisting();}
+      else{await jpatch('/tgapp/api/task/'+tid,payload);}
+      everSaved=true;flashSaved();loadTasks();prefetchDayBadges&&prefetchDayBadges();busy=false;return true;
+    }catch(e){busy=false;return false}
+  }
+  const touch=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>commit(),700)};
+  bd.onclick=e=>{if(e.target===bd){clearTimeout(saveTimer);if(_ta.value.trim())commit();close()}};
+  bd.querySelectorAll('#tfPri button').forEach(b=>b.onclick=()=>{hap();pri=b.dataset.pri;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x===b));touch()});
   const paintSubs=()=>{const box=bd.querySelector('#tfSubs');box.innerHTML=subs.map((s,i)=>`<div class="tf-sub ${s.done?'done':''}" data-i="${i}"><div class="ck" data-sck>${svg('check')}</div><input value="${esc(s.title)}" data-stitle placeholder="Шаг…"><button class="rm" data-srm>✕</button></div>`).join('');paintIcons(box);
-    box.querySelectorAll('.tf-sub').forEach(r=>{const i=+r.dataset.i;r.querySelector('[data-sck]').onclick=()=>{subs[i].done=!subs[i].done;paintSubs()};r.querySelector('[data-stitle]').oninput=e=>subs[i].title=e.target.value;r.querySelector('[data-srm]').onclick=()=>{subs.splice(i,1);paintSubs()}});};
+    box.querySelectorAll('.tf-sub').forEach(r=>{const i=+r.dataset.i;r.querySelector('[data-sck]').onclick=()=>{subs[i].done=!subs[i].done;paintSubs();touch()};r.querySelector('[data-stitle]').oninput=e=>{subs[i].title=e.target.value;touch()};r.querySelector('[data-srm]').onclick=()=>{subs.splice(i,1);paintSubs();touch()}});};
   paintSubs();
   bd.querySelector('#tfAddSub').onclick=()=>{subs.push({title:'',done:false});paintSubs();const inps=bd.querySelectorAll('[data-stitle]');inps.length&&inps[inps.length-1].focus()};
-  bd.querySelector('#tfAI').onclick=async()=>{const raw=(bd.querySelector('#tfTitle').value+'. '+bd.querySelector('#tfNotes').value).trim();if(raw.replace(/[.\s]/g,'').length<6){toast('Впиши/надиктуй, что нужно сделать');return}hap('medium');sfx('ai');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();if(r.title)bd.querySelector('#tfTitle').value=r.title;if(r.notes)bd.querySelector('#tfNotes').value=r.notes;if(r.priority){pri=r.priority;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x.dataset.pri===pri))}subs=(r.subtasks||[]).map(s=>({title:s,done:false}));paintSubs();hap();sfx('done');toast('Готово ✨')}catch(e){bz.close();toast(e.message)}};
-  if(!isNew)bd.querySelector('#tfDel').onclick=async()=>{hap('medium');try{await jdel('/tgapp/api/task/'+t.id);close();loadTasks();prefetchDayBadges&&prefetchDayBadges();toast('Удалено')}catch(e){toast(e.message)}};
-  const _ta=bd.querySelector('#tfTitle');const _grow=()=>{_ta.style.height='auto';_ta.style.height=Math.min(_ta.scrollHeight+2,170)+'px'};_ta.addEventListener('input',_grow);setTimeout(_grow,20);
-  bd.querySelector('#tfDue').onclick=()=>{hap();datePickSheet(dueMs,ms=>{dueMs=ms;bd.querySelector('#tfDue').textContent=dLabel(ms)})};
-  bd.querySelector('#tfSave').onclick=async()=>{const title=bd.querySelector('#tfTitle').value.trim();if(!title){toast('Впиши задачу');return}const due=dueMs;const notes=bd.querySelector('#tfNotes').value.trim();const st=subs.filter(s=>(s.title||'').trim());hap('medium');
-    try{if(isNew)await jpost('/tgapp/api/task',{title,priority:pri,due,notes,subtasks:st});else await jpatch('/tgapp/api/task/'+t.id,{title,priority:pri,due,notes,subtasks:st});close();loadTasks();prefetchDayBadges&&prefetchDayBadges();toast(isNew?'Создано':'Сохранено')}catch(e){toast(e.message)}};
+  bd.querySelector('#tfAI').onclick=async()=>{const raw=(bd.querySelector('#tfTitle').value+'. '+bd.querySelector('#tfNotes').value).trim();if(raw.replace(/[.\s]/g,'').length<6){toast('Впиши/надиктуй, что нужно сделать');return}hap('medium');sfx('ai');const bz=tgBusy('ИИ раскладывает на шаги…');try{const r=await jpost('/tgapp/api/tasks/structure',{text:raw});bz.close();if(r.title){bd.querySelector('#tfTitle').value=r.title;_grow()}if(r.notes)bd.querySelector('#tfNotes').value=r.notes;if(r.priority){pri=r.priority;bd.querySelectorAll('#tfPri button').forEach(x=>x.classList.toggle('on',x.dataset.pri===pri))}subs=(r.subtasks||[]).map(s=>({title:s,done:false}));paintSubs();hap();sfx('done');toast('Готово ✨');touch()}catch(e){bz.close();toast(e.message)}};
+  bd.querySelector('#tfDel').onclick=async()=>{if(!tid){close();return}hap('medium');try{await jdel('/tgapp/api/task/'+tid);close();loadTasks();prefetchDayBadges&&prefetchDayBadges();toast('Удалено')}catch(e){toast(e.message)}};
+  bd.querySelector('#tfDone').onclick=async()=>{if(!tid){if(!await commit())return}hap('medium');try{await jpost('/tgapp/api/task/'+tid+'/toggle',{});done=!done;const b=bd.querySelector('#tfDone');b.textContent=done?'Вернуть в работу':'Выполнить ✓';b.classList.toggle('done-on',done);sfx(done?'done':'micoff');loadTasks();prefetchDayBadges&&prefetchDayBadges();toast(done?'Выполнено ✓':'В работе')}catch(e){toast(e.message)}};
+  const _grow=()=>{_ta.style.height='auto';_ta.style.height=Math.min(_ta.scrollHeight+2,170)+'px'};_ta.addEventListener('input',()=>{_grow();touch()});setTimeout(_grow,20);
+  bd.querySelector('#tfNotes').addEventListener('input',touch);
+  const setDue=ms=>{dueMs=ms;bd.querySelector('#tfDue').textContent=dLabel(ms);markQuick();touch()};
+  const markQuick=()=>{const cur=dueMs?_dstr(dueMs):null;bd.querySelectorAll('#tfQuick button').forEach(b=>{const q=b.dataset.q;b.classList.toggle('on',(q==='clear'&&!cur)||(!!cur&&_dstr(qDate(q)||0)===cur&&q!=='clear'))})};
+  function qDate(q){const d=new Date();d.setHours(9,0,0,0);if(q==='today')return d.getTime();if(q==='tomorrow'){d.setDate(d.getDate()+1);return d.getTime()}if(q==='d2'){d.setDate(d.getDate()+2);return d.getTime()}if(q==='week'){d.setDate(d.getDate()+7);return d.getTime()}if(q==='mon'){const add=((8-d.getDay())%7)||7;d.setDate(d.getDate()+add);return d.getTime()}return null}
+  bd.querySelectorAll('#tfQuick button').forEach(b=>b.onclick=()=>{hap();setDue(qDate(b.dataset.q))});markQuick();
+  bd.querySelector('#tfDue').onclick=()=>{hap();datePickSheet(dueMs,ms=>setDue(ms))};
+  bd.querySelector('#tfSave').onclick=async()=>{const title=_ta.value.trim();if(!title){toast('Впиши задачу');return}clearTimeout(saveTimer);hap('medium');const ok=await commit();if(ok){close();toast(everSaved&&!isNew?'Сохранено':'Готово')}};
 }
 function taskAISheet(){
   const bd=document.createElement('div');bd.className='sheet-bd';
