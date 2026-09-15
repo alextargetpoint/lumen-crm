@@ -510,6 +510,49 @@ ${draft ? 'ЧЕРНОВИК МЕНЕДЖЕРА (улучши, сохрани с�
   return { message: msg, variantB: clean(out.variantB), hook: String(out.hook || '').slice(0, 80), analysis: String(out.analysis || '').slice(0, 400), media: adMedia || null };
 }
 
+/* ПОСТ-ЗВОНКОВОЕ касание: после дозвона ИИ читает транскрипт + как человек общался (психо-паттерны)
+   и решает развилку — слать подборку сразу / мягко прогреть / просто закрепиться в мессенджере.
+   Возвращает готовое высококонверсионное первое сообщение в WhatsApp со ссылкой на разговор. */
+async function composePostCall(db, lead, agencyName) {
+  const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[lead.lang] || 'русском';
+  const trs = (lead.transcripts || []).slice(-2).map(t => `[${t.label || 'звонок'}] ${String(t.text || '').slice(0, 6000)}`).join('\n\n');
+  if (!trs.trim()) throw new Error('нет транскрипта звонка');
+  const qualLines = [];
+  const AXN = { purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' };
+  for (const a of Object.keys(AXN)) { const q = (lead.quals || {})[a]; if (q && q.value) qualLines.push(`${AXN[a]}: ${q.value}`); }
+  const prompt = `Ты — сильнейший брокер зарубежной недвижимости в агентстве «${String(agencyName || 'агентство').slice(0, 80)}». Ты ТОЛЬКО ЧТО созвонился с клиентом ${(lead.name || '').split(' ')[0] || ''} (направление ${geoName}). Ниже — транскрипт разговора. Задача: написать ПЕРВОЕ сообщение в WhatsApp сразу после звонка, которое бесшовно продолжит контакт и вытащит клиента в переписку.
+
+СНАЧАЛА проанализируй, КАК человек общался на звонке (психотип, темп, теплота, уровень доверия, готовность к покупке, возражения) — и ИСХОДЯ ИЗ ЭТОГО выбери РАЗВИЛКУ:
+- "selection" — клиент прогрет, знает чего хочет, просил/готов смотреть варианты → сообщение подводит к тому, что сейчас пришлёшь подборку под его запрос.
+- "warmup" — клиент тёплый, но не дожат / думает / есть сомнения → мягко навести контакт, снять возражение из звонка, договориться о следующем шаге, БЕЗ подборки сразу.
+- "connect" — клиент холодноват/занят/осторожен → просто по-человечески закрепиться: «только что созванивались, продолжу здесь, буду на связи и подберу под запрос по мере поступления».
+
+ПРАВИЛА СООБЩЕНИЯ:
+1. Сошлись на то, что ОБСУДИЛИ на звонке (конкретика из транскрипта — район, бюджет, что искал, о чём договорились), чтобы клиент почувствовал: его услышали.
+2. Тон = живой человек на ${LANG} языке, коротко (2-4 предложения), тепло и уверенно, без канцелярита и клише. Эмодзи — максимум один.
+3. Не выдумывай цифр/объектов, которых не было в разговоре. Один понятный следующий шаг.
+${qualLines.length ? 'Из квалификации: ' + qualLines.join('; ') : ''}
+${mentalityBlock(lead)}
+${LIVE_STYLE}
+
+ТРАНСКРИПТ ЗВОНКА:
+${trs}
+
+Верни строго JSON:
+{"approach":"selection|warmup|connect",
+ "message":"текст первого сообщения в WhatsApp (язык = ${LANG}; без плейсхолдеров в фигурных скобках)",
+ "sendSelection": true|false,
+ "reason":"1 короткая фраза менеджеру: почему именно эта развилка (по тому, как человек общался)"}`;
+  const out = await callGemini(prompt, 22000, 1100);
+  if (!out || typeof out.message !== 'string' || !out.message.trim()) throw new Error('bad post-call');
+  const clean = (s) => { s = humanize(String(s || '').trim()).slice(0, 900); return /\{[a-z_]+\}/i.test(s) ? '' : s; };
+  const msg = clean(out.message);
+  if (!msg) throw new Error('брак: плейсхолдер в тексте');
+  const approach = ['selection', 'warmup', 'connect'].includes(out.approach) ? out.approach : 'warmup';
+  return { message: msg, approach, sendSelection: approach === 'selection' || out.sendSelection === true, reason: String(out.reason || '').slice(0, 300) };
+}
+
 /* ИИ-заполнение блока «Об агентстве» для профиля/обложек подборок */
 async function composeAgencyAbout(name, geos) {
   const prompt = `Ты — маркетолог агентства недвижимости «${String(name || 'наше агентство').slice(0, 80)}». Направления работы: ${(Array.isArray(geos) ? geos.join(', ') : '') || 'зарубежная недвижимость'}.
@@ -1133,6 +1176,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

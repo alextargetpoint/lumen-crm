@@ -4386,6 +4386,25 @@ async function openLeadModal(id) {
       </div>
       <div class="lc-grid">
         <div class="lc-left">
+          <div class="lc-pin" id="lcPin">
+            <div class="lc-pin-hd">${ic(I.spark)}<b>Сводка по лиду</b>${l.summaryAt ? `<span class="lc-pin-at">${ago(l.summaryAt)}</span>` : ''}
+              <button class="btn-ghost lc-pin-ref" id="lcPinRefresh" title="Пересобрать сводку из переписки, звонков и квалификации">${ic(I.refresh || I.spark)}<span>Обновить</span></button></div>
+            <div class="lc-pin-status">
+              <span class="lc-pin-chip">${stageName(l.stage)}</span>
+              <span class="lc-pin-chip">Квал ${l.axesFilled}/4</span>
+              ${l.quals.budget ? `<span class="lc-pin-chip">${esc(l.quals.budget.value)}</span>` : ''}
+              <span class="lc-pin-chip">${esc(l.geoName)}</span>
+              ${l.lastMsgAt ? `<span class="lc-pin-chip muted">контакт ${ago(l.lastMsgAt)}</span>` : ''}
+              ${(l.nextAction && l.nextAction.text) ? `<span class="lc-pin-chip act">→ ${esc(l.nextAction.text)}</span>` : ''}
+            </div>
+            <div class="lc-pin-body" id="lcPinBody">${l.summary ? esc(l.summary) : '<i class="lc-pin-empty">Сводки ещё нет. Нажмите «Обновить» — ИИ соберёт: кто клиент, что хочет, на чём остановились.</i>'}</div>
+          </div>
+          ${(l.postCall && !l.postCall.sent) ? (() => { const ap = { selection: 'подборка сразу', warmup: 'мягкий прогрев', connect: 'закрепиться в мессенджере' }[l.postCall.approach] || l.postCall.approach; return `<div class="lc-postcall" id="lcPostCall">
+            <div class="lc-pc-hd">${ic(I.phone)}<b>Касание после звонка готово</b><span class="lc-pc-ap pc-${esc(l.postCall.approach)}">${esc(ap)}</span></div>
+            ${l.postCall.reason ? `<div class="lc-pc-why">${ic(I.spark)}${esc(l.postCall.reason)}</div>` : ''}
+            <div class="lc-pc-msg">${esc(l.postCall.message)}</div>
+            <div class="lc-pc-btns"><button class="btn btn-accent btn-sm" id="lcPcUse">${ic(I.send)}Вставить в первое касание</button><button class="btn-ghost btn-sm" id="lcPcDismiss">Скрыть</button></div>
+          </div>`; })() : ''}
           <div class="lc-note-row">
             <input id="lcNote" placeholder="Комментарий по лиду… (Enter — сохранить)">
             <button class="btn btn-accent btn-sm" id="lcNoteAdd">${ic(I.plus)}</button>
@@ -4447,7 +4466,6 @@ async function openLeadModal(id) {
           ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
           <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
-          ${l.summary ? coll(`Сводка ИИ${l.summaryAt ? ` · ${ago(l.summaryAt)}` : ''}`, `<div class="summary-box" style="margin-top:8px">${esc(l.summary)}</div>`, { open: false, icon: I.doc }) : ''}
           ${coll('Свои поля', `
             <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn-ghost" id="cfGear" title="Настроить поля">${ic(I.gear)}Настроить</button></div>
             <div id="cfEditor" style="display:none">
@@ -4514,12 +4532,22 @@ async function openLeadModal(id) {
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
   $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
   $('#lcAi', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { ai: { enabled: e.target.checked } }); openLeadModal(id); });
-  $('#lcSumBtn', bd).addEventListener('click', async () => {
-    const b = $('#lcSumBtn', bd);
-    b.disabled = true; b.textContent = 'Собираю сводку…';
-    await api.post(`/leads/${id}/summary`);
+  const rebuildSummary = async (btn) => {
+    const body = $('#lcPinBody', bd);
+    if (btn) { btn.disabled = true; btn.classList.add('busy'); }
+    if (body) body.innerHTML = '<i class="lc-pin-empty">Собираю сводку…</i>';
+    try { await api.post(`/leads/${id}/summary`); } catch (_) {}
     openLeadModal(id);
+  };
+  $('#lcSumBtn', bd)?.addEventListener('click', () => rebuildSummary($('#lcSumBtn', bd)));
+  $('#lcPinRefresh', bd)?.addEventListener('click', () => rebuildSummary($('#lcPinRefresh', bd)));
+  $('#lcPcUse', bd)?.addEventListener('click', () => {
+    const ta = $('#lcFtText', bd); if (ta && l.postCall) { ta.value = l.postCall.message; ta.dispatchEvent(new Event('input', { bubbles: true })); }
+    const sec = ta && ta.closest('.coll'); if (sec && !sec.classList.contains('open')) sec.querySelector('.coll-head')?.click();
+    ta?.scrollIntoView({ behavior: 'smooth', block: 'center' }); ta?.focus();
+    toast('Вставлено в «Первое касание»', 'Проверьте текст и отправьте с прогретого номера брокера', true);
   });
+  $('#lcPcDismiss', bd)?.addEventListener('click', async () => { $('#lcPostCall', bd)?.remove(); try { await api.patch('/leads/' + id, { postCallSent: true }); } catch (_) {} });
   $('#lcNaSave', bd).addEventListener('click', async () => {
     const dt = $('#lcNaDate', bd).value;
     await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });

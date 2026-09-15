@@ -2324,6 +2324,21 @@ function ingestCallRecording(db, lead, recUrl, label, durSec, authHeader) {
       store.save();
       /* 3) АВТО-АНАЛИЗ: ИИ-сводка сразу по свежему транскрипту (раньше приходилось жать вручную) */
       if (text && llm.available()) { try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); ai.pushEvent(db, { type: 'call', leadId: lead.id, text: 'ИИ обновил сводку по лиду после звонка' }); store.save(); } } catch (e) { console.error('[call-summary]', e.message); } }
+      /* 4) ПОСТ-ЗВОНКОВАЯ РАЗВИЛКА: транскрипт + психо-паттерны → готовое первое касание в WhatsApp
+         (дозвон = есть транскрипт). Кладём ЧЕРНОВИК в lead.postCall — брокер отправит его серым способом
+         со своего прогретого номера (кнопка в карточке), а не автослёт. Недозвон (нет записи) сюда не
+         попадает — там работает обычная текстовая цепочка касаний движка. */
+      if (text && text.length > 40 && llm.available()) {
+        try {
+          const pc = await llm.composePostCall(db, lead, db.settings.agency.name);
+          if (pc && pc.message) {
+            lead.postCall = { message: pc.message, approach: pc.approach, sendSelection: !!pc.sendSelection, reason: pc.reason, at: Date.now(), sent: false };
+            const apRu = { selection: 'подборка сразу', warmup: 'мягкий прогрев', connect: 'закрепиться в мессенджере' }[pc.approach] || pc.approach;
+            ai.pushEvent(db, { type: 'call', leadId: lead.id, text: `ИИ подготовил касание после звонка (${apRu}) — проверьте и отправьте` });
+            store.save();
+          }
+        } catch (e) { console.error('[post-call]', e.message); }
+      }
     } catch (e) { console.error('[call-ingest]', e.message); }
   })();
 }
@@ -4656,6 +4671,7 @@ const server = http.createServer(async (req, res) => {
         if (b.channels) Object.assign(lead.channels = lead.channels || {}, b.channels);
         if (b.avatarUrl !== undefined) lead.avatarUrl = b.avatarUrl || null;
         if (b.nextAction !== undefined) lead.nextAction = b.nextAction && b.nextAction.text ? { text: String(b.nextAction.text).slice(0, 200), at: +b.nextAction.at || null } : null;
+        if (b.postCallSent && lead.postCall) lead.postCall.sent = true; /* скрыли/отправили пост-звонковое касание */
         store.save();
         return json(res, 200, leadView(db, lead));
       }
