@@ -125,13 +125,12 @@ function emailAvatar(opt, T) {
   T = T || C;
   if (typeof opt === 'string') opt = { name: opt, role: arguments[1] || '' }, T = arguments[2] || C; /* обратная совместимость */
   const o = opt || {}; const initial = esc(String(o.name || '?').trim().charAt(0).toUpperCase() || '?');
-  const right = o.workspace ? `<td width="46%" valign="middle" style="border-left:1px solid ${T.line};padding-left:18px;">
-    <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:${T.ink3};font-family:${SANS};font-weight:700;">${esc(o.workspaceLabel || 'Рабочее пространство')}</div>
-    <div style="font-family:${SERIF};font-size:20px;font-weight:600;color:${T.ink};margin-top:3px;line-height:1.1;">${esc(o.workspace)}</div></td>` : '';
+  /* Рабочее пространство — отдельной строкой ПОД именем (а не 3-й колонкой): иначе на телефоне 390px строка не влезает
+     и сжимает круглый аватар в овал. Две ячейки (фикс-аватар + гибкая колонка) безопасны на любой ширине. */
+  const ws = o.workspace ? `<div style="margin-top:9px;padding-top:9px;border-top:1px solid ${T.line2};font-family:${SANS};font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${T.ink3};font-weight:700;">${esc(o.workspaceLabel || 'Рабочее пространство')} &nbsp;<span style="font-family:${SERIF};font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;color:${T.ink};">${esc(o.workspace)}</span></div>` : '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;background:${T.panel};border:1px solid ${T.line};border-radius:16px;"><tr><td style="padding:16px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td valign="middle" style="padding-right:14px;width:56px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:linear-gradient(135deg,${T.gold},${T.goldDeep});border-radius:50%;color:#fff;font-family:${SERIF};font-size:25px;font-weight:600;">${initial}</td></tr></table></td>
-    <td valign="middle"><div style="font-family:${SERIF};font-size:20px;font-weight:600;color:${T.ink};line-height:1.1;">${esc(o.name || '')}</div><div style="font-family:${SANS};font-size:12.5px;color:${T.ink3};margin-top:2px;">${esc(o.role || o.sub || '')}</div></td>
-    ${right}
+    <td valign="top" style="padding-right:14px;width:52px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;background:linear-gradient(135deg,${T.gold},${T.goldDeep});border-radius:50%;color:#fff;font-family:${SERIF};font-size:25px;font-weight:600;">${initial}</td></tr></table></td>
+    <td valign="top"><div style="font-family:${SERIF};font-size:20px;font-weight:600;color:${T.ink};line-height:1.15;padding-top:2px;">${esc(o.name || '')}</div><div style="font-family:${SANS};font-size:12.5px;color:${T.ink3};margin-top:2px;">${esc(o.role || o.sub || '')}</div>${ws}</td>
   </tr></table></td></tr></table>`;
 }
 

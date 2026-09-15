@@ -1113,8 +1113,10 @@ window.openGrayManager = async function (jumpPhone) {
   try { data = await api.get('/wa/gray/list'); } catch (e) {}
   let pollTimer = null;
   const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
-  const bd = modal({ title: 'WhatsApp — серый способ (QR)', sub: 'Подключение номеров по QR + прогрев, без Meta', wide: true, body: '<div id="grayMgr">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => { stopPoll(); } }] });
-  bd.addEventListener('mousedown', (e) => { if (e.target === bd) stopPoll(); });
+  /* обновить карточки на странице «Номера» за модалкой (чтобы не жать F5) */
+  const refreshNumbersPage = () => { try { if (typeof CUR !== 'undefined' && CUR === 'numbers' && typeof render === 'function') render(); } catch (_) {} };
+  const bd = modal({ title: 'WhatsApp — серый способ (QR)', sub: 'Подключение номеров по QR + прогрев, без Meta', wide: true, body: '<div id="grayMgr">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => { stopPoll(); refreshNumbersPage(); } }] });
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) { stopPoll(); refreshNumbersPage(); } });
   const host = () => $('#grayMgr', bd);
   const badge = (live) => {
     const st = (live && live.status) || 'none';
@@ -1203,7 +1205,7 @@ window.openGrayManager = async function (jumpPhone) {
     $('#gwAdd', bd)?.addEventListener('click', () => connectNumber($('#gwPhone', bd).value.trim(), $('#gwLabel', bd).value.trim()));
     $('#gwGuide', bd)?.addEventListener('click', (e) => { e.preventDefault(); openGuide('wanumbers'); });
     $$('.gn-qr', bd).forEach(b => b.addEventListener('click', () => connectNumber(b.dataset.p, '')));
-    $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); } catch (e) { toast('Не вышло', e.message); } }));
+    $$('.gn-rm', bd).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.p }); await refresh(); refreshNumbersPage(); } catch (e) { toast('Не вышло', e.message); } }));
     $$('.gn-broker', bd).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
     $('#gwWarm', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', '', true); } catch (er) { toast('Не вышло', er.message); } });
     $('#gwPerDay', bd)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); } catch (er) {} });
@@ -1223,7 +1225,7 @@ window.openGrayManager = async function (jumpPhone) {
       let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
       const st = r.session && r.session.status;
       if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" style="width:240px;height:240px;border-radius:10px;background:#fff;padding:8px">`;
-      else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--good,#4caf50)">✓ Номер подключён${r.session.phone ? ' · ' + esc(r.session.phone) : ''}</div>`; stopPoll(); setTimeout(refresh, 1400); }
+      else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--good,#4caf50)">✓ Номер подключён${r.session.phone ? ' · ' + esc(r.session.phone) : ''}</div>`; stopPoll(); setTimeout(() => { refresh(); refreshNumbersPage(); }, 1400); }
       else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта. Попробуйте заново.</div>'; stopPoll(); }
       else box.innerHTML = 'Подключение…';
     }, 1800);
@@ -9847,6 +9849,14 @@ PAGES.numbers = async (root) => {
       </div>`; }).join('')}
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}
 
+    ${grayNums.length ? (() => { const w = grayData.warmup || {}; return `<div class="glass card mb">
+      <div class="card-title">${ic(I.bolt)}Прогрев серых номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые серые номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
+      <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + журнал</div></div>
+        <label class="switch"><input type="checkbox" id="numWarm" ${w.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"></div>
+    </div>`; })() : ''}
+
     ${st.numbers.length ? `<div class="lp-sec" style="margin:0 0 10px">Официальные Cloud-API номера · ${st.numbers.length}</div>
     <div class="num-grid">
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
@@ -9878,6 +9888,8 @@ PAGES.numbers = async (root) => {
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
+  $('#numWarm', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев включён' : 'Прогрев выключен', e.target.checked ? 'Номера начнут переписку между собой' : null, true); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
+  $('#numWarmPerDay', root)?.addEventListener('change', async (e) => { try { await api.post('/wa/gray/warmup', { perDay: +e.target.value }); toast('Лимит прогрева обновлён', null, true); } catch (er) {} });
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#numAdd')?.addEventListener('click', () => {
     const geoOpts = STATE.settings.agency.geos.map(g => `<option value="${g}">${esc(STATE.settings.geoNames[g] || g)}</option>`).join('');
