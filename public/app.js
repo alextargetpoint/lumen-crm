@@ -6393,6 +6393,12 @@ function cmpCard(c) {
       <div class="cmp-stat"><div class="v">${c.stats.qualified}</div><div class="k">до квалификации</div></div>
       <div class="cmp-stat"><div class="v">${c.stats.skipped}</div><div class="k">пропуски</div></div>
     </div>
+    ${c.funnel && c.funnel.sent ? `<div class="cmp-stats" style="margin-top:8px;opacity:.95">
+      <div class="cmp-stat"><div class="v">${c.funnel.deliveredPct}%</div><div class="k">доставлено</div></div>
+      <div class="cmp-stat"><div class="v">${c.funnel.readPct}%</div><div class="k">прочитано</div></div>
+      <div class="cmp-stat"><div class="v" style="${c.funnel.failed ? 'color:var(--bad)' : ''}">${c.funnel.failed}</div><div class="k">ошибок</div></div>
+      <div class="cmp-stat"><div class="v" style="${c.funnel.optedOut ? 'color:var(--warn)' : ''}">${c.funnel.optedOut}</div><div class="k">отписок</div></div>
+    </div>${c.funnel.sent && !c.funnel.delivered ? `<div class="muted" style="font-size:10.5px;margin-top:4px">Статусы доставки/прочтения появятся после настройки вебхука (Номера → Cloud API → Вебхук официального WhatsApp).</div>` : ''}` : ''}
     ${total ? `<div class="progress"><i style="width:${total ? done / total * 100 : 0}%"></i></div><div class="muted" style="font-size:11px;margin-top:5px">${done} из ${total}</div>` : ''}
     <div style="display:flex;gap:8px;margin-top:12px">
       ${c.state === 'draft' ? `<button class="btn btn-accent btn-sm" data-act="start">${ic(I.play)}Запустить</button>` : ''}

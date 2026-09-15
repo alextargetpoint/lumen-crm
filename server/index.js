@@ -5256,7 +5256,24 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, engine.wakePreview(db, filters));
     }
 
-    if (p === '/api/campaigns' && req.method === 'GET') return json(res, 200, db.campaigns);
+    if (p === '/api/campaigns' && req.method === 'GET') {
+      /* воронка доставки по каждой кампании (из статусов сообщений: delivered/read приходят вебхуком Cloud API) */
+      const out = db.campaigns.map(c => {
+        const rec = new Set(c.recipients || []);
+        let sent = 0, delivered = 0, read = 0, failed = 0, optedOut = 0;
+        for (const m2 of db.messages) {
+          if (m2.dir !== 'out' || m2.campaignId !== c.id) continue;
+          sent++;
+          if (m2.status === 'read') { delivered++; read++; }
+          else if (m2.status === 'delivered') delivered++;
+          else if (m2.status === 'failed') failed++;
+        }
+        for (const id of rec) { const l = db.leads.find(x => x.id === id); if (l && l.marketingOptOut) optedOut++; }
+        const pct = (n) => sent ? Math.round(n / sent * 100) : 0;
+        return Object.assign({}, c, { funnel: { audience: rec.size, sent, delivered, read, failed, replied: c.stats.replied || 0, optedOut, deliveredPct: pct(delivered), readPct: pct(read), failedPct: pct(failed) } });
+      });
+      return json(res, 200, out);
+    }
     if (p === '/api/campaigns' && req.method === 'POST') {
       const b = await readBody(req);
       const startAt = b.startAt && +b.startAt > Date.now() + 30000 ? +b.startAt : null;
@@ -6304,6 +6321,8 @@ const server = http.createServer(async (req, res) => {
       if (!pnid || !token) return json(res, 400, { error: 'нужны Phone Number ID и Access Token' });
       db.settings.wa = db.settings.wa || {};
       db.settings.wa.token = token; db.settings.wa.phoneId = pnid; if (wabaId) db.settings.wa.wabaId = wabaId;
+      /* подтянуть messaging-тир WABA (лимит рассылок) для градации объёма */
+      try { const wid = wabaId || db.settings.wa.wabaId; if (wid) { const wr = await fetch('https://graph.facebook.com/v21.0/' + wid + '?fields=messaging_limit_tier&access_token=' + encodeURIComponent(token)); const wj = await wr.json().catch(() => ({})); if (wj.messaging_limit_tier) db.settings.wa.tier = wj.messaging_limit_tier; } } catch (_) {}
       /* проверим токен/номер сразу */
       let verify = null, verifyError = null;
       try { verify = await wa.verify(db); } catch (e) { verifyError = e.message; }

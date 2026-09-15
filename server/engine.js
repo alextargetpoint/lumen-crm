@@ -123,7 +123,7 @@ function send(db, lead, text, via, opts = {}) {
   lead.numberId = num.id;
   num.sentToday += 1;
   if (num.sentToday > num.dayLimit * 0.8) num.quality = Math.max(0, +(num.quality - 0.3).toFixed(1));
-  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, waId: null };
+  const m = { id: store.nextId('m'), leadId: lead.id, dir: 'out', via, channel: 'wa', text, at: Date.now(), status: 'sent', numberId: num.id, templateId: opts.templateId || null, campaignId: opts.campaignId || null, waId: null };
   if (opts.media && opts.media.url) m.media = { type: opts.media.type || 'image', url: String(opts.media.url).slice(0, 500) };
   db.messages.push(m);
   lead.lastMsgAt = m.at;
@@ -564,8 +564,23 @@ function tickRotation(db) {
   }
 }
 
+/* Дневной потолок рассылок: лимит из тира WABA × градация свежести номера (плавный рост).
+   Meta сама режет по тирам; это наша ПОДУШКА сверху, чтобы свежий номер не спалить объёмом. */
+function broadcastTierCap(db) {
+  const tier = (db.settings.wa && db.settings.wa.tier) || 'TIER_250';
+  const map = { TIER_50: 50, TIER_250: 250, TIER_1K: 1000, TIER_10K: 10000, TIER_100K: 100000, TIER_UNLIMITED: 1e9, UNLIMITED: 1e9 };
+  let cap = map[tier] || 250;
+  const reg = db.settings.wa && db.settings.wa.cloudRegisteredAt;
+  if (reg) { const days = (Date.now() - reg) / 864e5; if (days < 2) cap = Math.min(cap, 50); else if (days < 4) cap = Math.min(cap, 150); else if (days < 7) cap = Math.min(cap, 500); }
+  return cap;
+}
+
 function tickCampaigns(db) {
   const nowT = Date.now();
+  const bcastCap = broadcastTierCap(db);
+  const bDay = new Date(nowT).toISOString().slice(0, 10);
+  db.settings.wa = db.settings.wa || {};
+  if (db.settings.wa.bcastDay !== bDay) { db.settings.wa.bcastDay = bDay; db.settings.wa.bcastSent = 0; }
   for (const cmp of db.campaigns) {
     /* авто-старт запланированных кампаний, когда наступило время */
     if (cmp.state === 'scheduled' && cmp.startAt && nowT >= cmp.startAt) {
@@ -574,6 +589,13 @@ function tickCampaigns(db) {
     }
     if (cmp.state !== 'running') continue;
     if (cmp.nextBatchAt && nowT < cmp.nextBatchAt) continue;
+    /* дневной лимит рассылок достигнут — ждём обновления лимита (новый день/повышение тира) */
+    if ((db.settings.wa.bcastSent || 0) >= bcastCap) {
+      cmp.nextBatchAt = nowT + 3600e3;
+      if (!cmp._capLogged) { cmp.log.unshift({ at: nowT, text: `Дневной лимит рассылок достигнут (${bcastCap}/сут по тиру WABA + градация свежести). Продолжим, когда лимит обновится.` }); cmp._capLogged = true; }
+      continue;
+    }
+    cmp._capLogged = false;
     /* окно отправки по поясу клиента проверяется пер-лидно ниже */
     const batch = cmp.recipients.slice(cmp.cursor, cmp.cursor + cmp.batchSize);
     if (!batch.length) {
@@ -586,6 +608,7 @@ function tickCampaigns(db) {
       const lead = db.leads.find(l => l.id === id);
       if (!lead || !lead.phone) { cmp.stats.skipped += 1; continue; }
       if (lead.marketingOptOut) { cmp.stats.skipped += 1; continue; }   /* отписался в процессе кампании — пропускаем */
+      if ((db.settings.wa.bcastSent || 0) >= bcastCap) { cmp.recipients.push(id); cmp.stats.skipped += 1; continue; }   /* упёрлись в дневной лимит посреди пачки — остаток на завтра */
       const hour = new Date(nowT + (lead.tz || 0) * 3600e3).getUTCHours();
       if (!db.settings.demo.accelerate && (hour < cmp.window[0] || hour >= cmp.window[1])) {
         cmp.recipients.push(id); // вне окна клиента — в конец очереди
@@ -594,9 +617,10 @@ function tickCampaigns(db) {
       }
       const tpl = db.templates.find(t => t.id === cmp.templateId);
       const text = tpl ? renderTemplate(db, tpl, lead) : (cmp.text || '');
-      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true });   /* рассылка = только Cloud API */
-      if (m) {
+      const m = send(db, lead, text, 'wake', { templateId: cmp.templateId, broadcast: true, campaignId: cmp.id });   /* рассылка = только Cloud API */
+      if (m && m.status !== 'failed') {
         cmp.stats.sent += 1;
+        db.settings.wa.bcastSent = (db.settings.wa.bcastSent || 0) + 1;   /* учёт в дневном лимите рассылок */
         lead.ai.enabled = true; // ответ подхватит квалификатор
         lead.tags = [...new Set([...(lead.tags || []), 'реанимация'])];
       } else cmp.stats.skipped += 1;
