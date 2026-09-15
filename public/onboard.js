@@ -224,7 +224,8 @@
       shot: 'ai',
       html: `<div class="ob-tones">${TONES.map(card).join('')}</div>
         <label class="ob-toggle"><input type="checkbox" id="obAutopilot" ${S.autopilot ? 'checked' : ''}><span class="ob-tg"></span>
-          <div><b>Автопилот первой линии</b><small>Lumen сам отвечает и квалифицирует новые заявки. Можно включить позже.</small></div></label>`,
+          <div><b>Автопилот первой линии</b><small>Lumen сам отвечает и квалифицирует новые заявки. Можно включить позже.</small></div></label>
+        <div class="ob-note" style="margin-top:14px">${IC.spark || ''} Первая линия уже обучена на большой актуальной базе по недвижимости: техники продаж + рынки Дубая, Пхукета и Бали (районы, доходность, застройщики, отработка возражений). Дальше — <b>персонализация под вас</b>: дообучите ИИ на своих скриптах, фактах агентства и выигранных диалогах — в любой момент.</div>`,
     };
   }
 
@@ -418,16 +419,12 @@
   }
 
   function runGuide(action) {
-    // сохраняем прогресс, закрываем церемонию (не финализируя onboarded) и уводим в боевой поток
+    // НЕ закрываем онбординг (раньше close() выкидывал из тура) — запоминаем визард и идём дальше по шагам.
+    // Отложенные визарды откроются в конце, после «Запустить Lumen».
+    S.pendingGuides = S.pendingGuides || [];
+    if (action && !S.pendingGuides.includes(action)) S.pendingGuides.push(action);
     saveProgress(false);
-    close(true);
-    const b = B();
-    try {
-      if (action === 'wa') { b.openWa ? b.openWa() : b.go && b.go('settings'); }
-      else if (action === 'chains') { b.go && b.go('sequences'); }
-      else if (action === 'listings') { b.go && b.go('properties'); }
-      else if (action === 'team') { b.go && b.go('brokers'); }
-    } catch (e) {}
+    next(false);
   }
 
   function buildRecap() {
@@ -490,6 +487,9 @@
       close(false);
       try { const b = B(); if (b.refresh) await b.refresh(); } catch (e) {}
       try { const b = B(); if (b.go) b.go('overview'); } catch (e) {}
+      /* открыть первый отложенный боевой визард, выбранный во время тура (WhatsApp/цепочки/база/команда) */
+      const g = (S.pendingGuides || [])[0];
+      if (g) setTimeout(() => { try { const b = B(); ({ wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers') }[g] || (() => {}))(); } catch (e) {} }, 800);
     }, 900);
   }
 
