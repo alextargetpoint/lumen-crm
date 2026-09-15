@@ -3095,7 +3095,15 @@ const server = http.createServer(async (req, res) => {
          не-primary агентств получали бы 401, а данные искались бы в чужой базе. */
       const _initData = req.headers['x-tg-init-data'] || '';
       let _tgTid = null;
-      if (_initData) for (const tid of store.listTenants()) {
+      /* ЦЕНТРАЛЬНЫЙ бот: все тенанты используют ОДИН платформенный токен, поэтому определить агентство по
+         подписи нельзя (подойдёт первый попавшийся). Определяем по Telegram-id пользователя через глобальный
+         индекс привязки chatId→tid (его пишет мост при /start). */
+      if (_initData && tgbridge.central()) {
+        const u2 = tgValidateInitData(_initData, tgbridge.token({ settings: {} }));
+        if (u2 && u2.id) { try { const reg = store.getRegistry(); _tgTid = (reg.tgChatIndex || {})[String(u2.id)] || null; } catch (_) {} }
+      }
+      /* пер-агентский режим (или фолбэк): ищем тенанта, чей bot-токен валидирует подпись */
+      if (!_tgTid && _initData) for (const tid of store.listTenants()) {
         let tdb; try { tdb = store.loadTenant(tid); } catch (_) { continue; }
         const tok = tgbridge.token(tdb); if (!tok) continue;
         const u2 = tgValidateInitData(_initData, tok);
