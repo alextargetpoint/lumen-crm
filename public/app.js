@@ -1894,8 +1894,9 @@ function applyRoleUi() {
     if (btn.dataset.ws) { const w = WORKSPACES[btn.dataset.ws]; hide = !!w && wsAllHidden(w); }   /* пространство прячем, только если ВСЕ его страницы скрыты */
     else if (btn.dataset.page) hide = pageHiddenForUser(btn.dataset.page);
     btn.style.display = hide ? 'none' : '';
+    if (btn.dataset.page) _syncDevBadge(btn, btn.dataset.page);
   });
-  $$('.nav-subitem').forEach(sb => { sb.style.display = pageHiddenForUser(sb.dataset.subpage) ? 'none' : ''; });   /* под-пункты пространств */
+  $$('.nav-subitem').forEach(sb => { sb.style.display = pageHiddenForUser(sb.dataset.subpage) ? 'none' : ''; _syncDevBadge(sb, sb.dataset.subpage); });   /* под-пункты пространств */
   /* баннер «просмотр кабинета брокера» для владельца */
   const existing = document.getElementById('previewBanner');
   if (me && me.preview) {
@@ -1978,6 +1979,9 @@ function hidePreloader() {
    видна только в демо (betaAll). Бейдж «в доработке» ставим ИСКЛЮЧИТЕЛЬНО в betaAll-аккаунте. */
 function _isDevPage(pk) { const ag = (STATE && STATE.settings && STATE.settings.agency) || {}; const en = ag.enabledPages || []; return DEFAULT_HIDDEN_PAGES.includes(pk) && !en.includes(pk); }
 function _isBeta() { return !!(STATE && STATE.settings && STATE.settings.agency && STATE.settings.agency.betaAll); }
+const DEV_BADGE = '<span class="nav-dev" title="В доработке — виден только вам (демо-аккаунт), у зарегистрированных агентств скрыт">в доработке</span>';
+/* идемпотентно навесить/снять бейдж «в доработке» на элемент нава (только demo/betaAll) */
+function _syncDevBadge(el2, pk) { const want = _isBeta() && _isDevPage(pk); const has = el2.querySelector(':scope > .nav-dev'); if (want && !has) el2.insertAdjacentHTML('beforeend', DEV_BADGE); else if (!want && has) has.remove(); }
 function initNav() {
   const beta = _isBeta();
   const devBadge = '<span class="nav-dev" title="В доработке — виден только вам (демо-аккаунт), у зарегистрированных агентств скрыт">в доработке</span>';
