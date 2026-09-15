@@ -2769,7 +2769,12 @@ const server = http.createServer(async (req, res) => {
   const _reg = store.getRegistry();
   let _tid = (_sidM && _reg.sessions[_sidM[1]] && _reg.sessions[_sidM[1]].tid) || store.PRIMARY;
   /* SaaS: публичные шаринг-ссылки без сессии — найти тенанта-владельца ресурса, иначе всё резолвится в primary (404 у чужих агентств) */
-  if (!_sidM) { const _pt = publicTenantFor(p); if (_pt) _tid = _pt; }
+  if (!_sidM) {
+    const _pt = publicTenantFor(p); if (_pt) _tid = _pt;
+    /* вебхуки провайдеров (Telnyx/Twilio/…) приходят без cookie с ?key=hooks.secret тенанта.
+       Иначе всё падало в PRIMARY → у НЕ-primary агентств вебхук отклонялся (403) → второе плечо звонка/запись/статус не срабатывали. */
+    else if (p.startsWith('/hooks/') || p.startsWith('/twilio/')) { const _hk = u.searchParams.get('key'); if (_hk) { const _ht = findTenant(() => { const h = store.get().settings.hooks; return h && h.secret === _hk; }); if (_ht) _tid = _ht; } }
+  }
   store.enterTenant(_tid);
   const db = store.get();
   /* SaaS: приостановленный админом тенант — блок всех API-операций (кроме платформенного админа) */
