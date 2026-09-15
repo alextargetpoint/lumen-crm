@@ -151,6 +151,22 @@ function objectionHint(db, lead) {
     return 'ВОЗРАЖЕНИЕ КЛИЕНТА — как отвечают лучшие (методология Синенко; адаптируй под живой тон, НЕ цитируй дословно):\n' + hits.slice(0, 2).map(c => '- «' + (c.objection || c.title) + '» → ' + (c.response || c.tip || '')).join('\n');
   } catch (_) { return ''; }
 }
+/* Обучение ИИ под агентство: владелец вводит позиционирование, тон, разрешённые факты и доп-запреты (settings.ai.training) */
+function trainingBlock(db) {
+  const t = (db && db.settings && db.settings.ai && db.settings.ai.training) || {};
+  const parts = [];
+  if (t.about && t.about.trim()) parts.push('О НАС / ПОЗИЦИОНИРОВАНИЕ (говори об агентстве так):\n' + t.about.trim());
+  if (t.tone && t.tone.trim()) parts.push('ФИРМЕННЫЙ ТОН: ' + t.tone.trim());
+  if (t.facts && t.facts.trim()) parts.push('ПРОВЕРЕННЫЕ ФАКТЫ (владелец подтвердил — эти цифры/условия/объекты называть МОЖНО дословно; ничего сверх них не выдумывай):\n' + t.facts.trim());
+  if (t.forbidden && t.forbidden.trim()) parts.push('ДОП. ЗАПРЕТЫ АГЕНТСТВА (никогда не делай):\n' + t.forbidden.trim());
+  if (t.scripts && t.scripts.trim()) parts.push('ФИРМЕННЫЕ ФОРМУЛИРОВКИ (используй уместно, адаптируй под живой тон):\n' + t.scripts.trim());
+  if (!parts.length) return '';
+  return 'ЗНАНИЯ АГЕНТСТВА (обучил владелец — приоритетнее общих правил, кроме жёстких запретов ниже):\n' + parts.join('\n');
+}
+function hasTrainedFacts(db) {
+  const t = (db && db.settings && db.settings.ai && db.settings.ai.training) || {};
+  return !!(t.facts && t.facts.trim());
+}
 function buildPrompt(db, lead, history) {
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const allGeos = (db.settings.agency.geos || []).map(x => db.settings.geoNames[x] || x).join(', ');
@@ -172,8 +188,9 @@ function buildPrompt(db, lead, history) {
 ${mentalityBlock(lead)}
 ${LIVE_STYLE}
 ${objectionHint(db, lead)}
+${trainingBlock(db)}
 ЖЁСТКИЕ ЗАПРЕТЫ (нарушение = брак):
-- НЕ называй конкретные цены, доходности, скидки и сроки сдачи, которых НЕТ в этом промпте или в словах клиента. Нет данных — скажи «уточню у эксперта и вернусь с точной цифрой».
+- НЕ называй конкретные цены, доходности, скидки и сроки сдачи, которых НЕТ в этом промпте или в словах клиента${hasTrainedFacts(db) ? ' (блок «ПРОВЕРЕННЫЕ ФАКТЫ» выше — это подтверждённые данные, их называть МОЖНО)' : ''}. Нет данных — скажи «уточню у эксперта и вернусь с точной цифрой».
 - НЕ обещай («гарантирую», «точно вырастет»), не давай юридических/налоговых советов — только «этот вопрос разберёт эксперт на созвоне».
 - НЕ вставляй ссылки, плейсхолдеры в скобках, названия несуществующих объектов.
 - НЕ упоминай, что ты ИИ/бот/ассистент. НЕ извиняйся дважды. НЕ повторяй уже отправленное сообщение.

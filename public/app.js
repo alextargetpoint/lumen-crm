@@ -5093,7 +5093,33 @@ PAGES.qualifier = async (root) => {
         }).join('')}
         <button class="btn btn-accent" id="saveCrit" style="width:100%;justify-content:center">Сохранить критерии</button>
       </div>
+      ${(() => { const tr = (s.ai.training || {}); return `<div class="glass card" style="margin-top:16px">
+        <div class="card-title">${ic(I.spark)}Обучение ИИ под агентство ${hint('aitrain', 'Чему учится ваш ИИ', [
+          ['Позиционирование', 'Как ИИ рассказывает о вашем агентстве — УТП, чем вы лучше'],
+          ['Проверенные факты', 'Единственное место, где ИИ РАЗРЕШЕНО называть цены/условия/объекты дословно'],
+          ['Фирменный тон и запреты', 'Общая манера всех героев + чего ваш ИИ не делает никогда'],
+          ['Приоритет', 'Эти знания выше общих правил, но жёсткие запреты (не выдумывать) остаются']])}</div>
+        <div class="sd" style="margin-bottom:12px">Заполните — и первая линия начнёт говорить фактами вашего агентства, а не общими фразами. Пусто — ИИ работает на базовых правилах.</div>
+        <div class="form-row"><label>О нас / позиционирование</label><textarea id="trAbout" rows="3" placeholder="Кто вы, чем лучше конкурентов, для кого работаете. Пример: «Мы — бутиковое агентство по Дубаю, 8 лет, только проверенные застройщики, сопровождаем сделку под ключ.»">${esc(tr.about || '')}</textarea></div>
+        <div class="form-row"><label>Проверенные факты ✅ <span class="sd" style="display:inline">(эти цифры ИИ называть МОЖНО)</span></label><textarea id="trFacts" rows="4" placeholder="Реальные объекты, цены, условия, доходность — то, что подтверждено и что ИИ может озвучивать клиенту. Пример: «Studio в Downtown от 950k AED, рассрочка 40/60, сдача Q3 2027, доходность 7-8% годовых.»">${esc(tr.facts || '')}</textarea></div>
+        <div class="form-row"><label>Фирменный тон</label><input id="trTone" value="${esc(tr.tone || '')}" placeholder="Напр.: спокойный, уверенный, без давления; на «вы»"></div>
+        <div class="form-row"><label>Фирменные формулировки</label><textarea id="trScripts" rows="2" placeholder="Готовые фразы вашего агентства, которые ИИ вплетает уместно">${esc(tr.scripts || '')}</textarea></div>
+        <div class="form-row"><label>Доп. запреты</label><textarea id="trForbidden" rows="2" placeholder="Чего ИИ не делает никогда. Пример: «Не обсуждать конкретных застройщиков-конкурентов, не давать прогнозов курса валют.»">${esc(tr.forbidden || '')}</textarea></div>
+        <button class="btn btn-accent" id="saveTrain" style="width:100%;justify-content:center">Обучить ИИ</button>
+      </div>`; })()}
     </div>`;
+  $('#saveTrain')?.addEventListener('click', async () => {
+    const training = {
+      about: $('#trAbout', root).value.trim(), facts: $('#trFacts', root).value.trim(),
+      tone: $('#trTone', root).value.trim(), scripts: $('#trScripts', root).value.trim(),
+      forbidden: $('#trForbidden', root).value.trim()
+    };
+    const btn = $('#saveTrain', root); btn.disabled = true;
+    await api.patch('/settings', { ai: { training } });
+    const filled = Object.values(training).filter(Boolean).length;
+    toast('ИИ обучен', filled ? `Первая линия теперь говорит знаниями агентства (${filled}/5 блоков)` : 'Обучение очищено — базовые правила', true);
+    btn.disabled = false; await loadState();
+  });
   $('#autopilot').addEventListener('change', async (e) => { await api.patch('/settings', { ai: { autopilot: e.target.checked } }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', null, true); loadState(); });
   $$('.hero-card', root).forEach(card => card.addEventListener('click', async () => {
     if (card.classList.contains('on')) return;
