@@ -6714,6 +6714,14 @@ const server = http.createServer(async (req, res) => {
       try { const sync = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/profile', { firstName: pr.name || '', lastName: pr.lastName || '', about: pr.about || '', username: pr.username || '', photoUrl: pr.avatar || '' }); return json(res, 200, { ok: true, sync }); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
+    /* согласие на «серые» методы — клиент берёт полную ответственность (баны/потеря аккаунтов/издержки) */
+    if (p === '/api/gray/consent' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      db.settings.grayConsent = { accepted: !!b.accepted, version: Number(b.version) || 1, at: Date.now(), ip: clientIp(req) };
+      store.save();
+      return json(res, 200, { ok: true, grayConsent: db.settings.grayConsent });
+    }
     /* удалить серый TG-номер */
     if (p === '/api/tg/gray/remove' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

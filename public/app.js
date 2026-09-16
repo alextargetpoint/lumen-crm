@@ -1383,8 +1383,43 @@ window.openPlanManager = async function () {
     actions: [{ label: 'Закрыть' }] });
 };
 
+/* ---------- Согласие на «серые» методы (клиент берёт полную ответственность) ---------- */
+const GRAY_CONSENT_VERSION = 1;
+function grayConsentOk() { const c = STATE && STATE.settings && STATE.settings.grayConsent; return !!(c && c.accepted && (c.version || 0) >= GRAY_CONSENT_VERSION); }
+window.openGrayConsent = function (kind, cb) {
+  const svc = kind === 'tg' ? 'Telegram' : 'WhatsApp';
+  const items = [
+    `Понимаю, что «серые» подключения (${svc} по QR / неофициально, вне официальных API) нарушают правила ${svc} и аккаунт или номер могут быть <b>заблокированы либо удалены в любой момент</b> без предупреждения.`,
+    `Беру всю ответственность на себя. <b>TargetPoint / Lumen не несёт ответственности</b> за блокировки, потерю аккаунтов, номеров, переписки, данных и любые связанные издержки.`,
+    `Понимаю, что средства, потраченные на номера/аккаунты, <b>невозвратны при бане</b> — это технические издержки на моей стороне.`,
+    `Обязуюсь <b>не вести массовые рассылки</b> с этих номеров (мгновенный бан) — только точечные касания 1-к-1.`,
+    `Понимаю, что могу использовать как номера из магазина, так и <b>свои купленные аккаунты</b> — выбор источника и ответственность за него на мне.`,
+  ];
+  const bd = modal({
+    title: 'Серые подключения — условия и ответственность', sub: 'Отметьте все пункты, чтобы продолжить', wide: true,
+    body: `<div class="lc-hint warn" style="margin-bottom:12px"><span>${ic(I.shield)}«Серые» методы (${svc} по QR / неофициально) эффективны, но работают <b>вне официальных API и на ваш риск</b>. Подтвердите согласие — это разовое действие.</span></div>
+      <div id="gcList" style="display:flex;flex-direction:column;gap:11px">${items.map((t, i) => `<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.55;cursor:pointer"><input type="checkbox" class="gc-ck" data-i="${i}" style="margin-top:3px;flex:0 0 auto"><span>${t}</span></label>`).join('')}</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:16px">
+        <button class="btn btn-accent" id="gcGo" disabled>${ic(I.check)}Принять и продолжить</button>
+        <button class="btn" id="gcCancel">Отмена</button>
+        <span id="gcOut" class="muted" style="font-size:11.5px"></span>
+      </div>`,
+    actions: [],
+  });
+  const upd = () => { const all = [...$$('.gc-ck', bd)].every(c => c.checked); const go = $('#gcGo', bd); if (go) go.disabled = !all; };
+  $$('.gc-ck', bd).forEach(c => c.addEventListener('change', upd));
+  $('#gcCancel', bd)?.addEventListener('click', () => closeModal());
+  $('#gcGo', bd)?.addEventListener('click', async () => {
+    const o = $('#gcOut', bd); o.textContent = 'Сохраняю…';
+    try { const r = await api.post('/gray/consent', { accepted: true, version: GRAY_CONSENT_VERSION }); if (STATE && STATE.settings) STATE.settings.grayConsent = r.grayConsent || { accepted: true, version: GRAY_CONSENT_VERSION }; closeModal(); if (typeof cb === 'function') cb(); }
+    catch (e) { o.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+  });
+  return bd;
+};
+
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
 window.openGrayManager = async function (jumpPhone) {
+  if (!grayConsentOk()) return openGrayConsent('wa', () => window.openGrayManager(jumpPhone));
   let data = { url: '', tokenSet: false, numbers: [] };
   try { data = await api.get('/wa/gray/list'); } catch (e) {}
   let pollTimer = null;
@@ -1511,6 +1546,7 @@ window.openGrayManager = async function (jumpPhone) {
 };
 /* Покупка серого номера (Yesim): страна + тариф → покупка → OTP → регистрация WhatsApp + QR */
 window.openYesimBuy = async function () {
+  if (!grayConsentOk()) return openGrayConsent('wa', () => window.openYesimBuy());
   const bd = modal({ title: 'Купить номер для WhatsApp', sub: 'Виртуальный номер ловит OTP — регистрируете WhatsApp и подключаете', wide: true, body: '<div id="yBuy">Загрузка каталога…</div>', actions: [{ label: 'Закрыть' }] });
   const host = () => $('#yBuy', bd);
   let cat = { ok: false };
@@ -1767,6 +1803,7 @@ window.grayAddQR = function (phone, label) {
    Telegram при регистрации НОВОГО номера ставит забор (e-mail код → ~$0.99 → SMS). Его человек
    проходит один раз на телефоне, а Lumen цепляет аккаунт по QR (Настройки→Устройства) — без SMS. ── */
 window.openTgConnect = function () {
+  if (!grayConsentOk()) return openGrayConsent('tg', () => window.openTgConnect());
   let pollTimer = null, curPhone = '';
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
   const bd = modal({ title: 'Подключить Telegram по QR', sub: 'Аккаунт создаёшь на телефоне (1 раз) → цепляем по QR, как WhatsApp Web', wide: true, body: '<div id="tgqBox"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
@@ -1872,6 +1909,7 @@ window.openTgConnect = function () {
   return bd;
 };
 window.openTgBuy = function () {
+  if (!grayConsentOk()) return openGrayConsent('tg', () => window.openTgBuy());
   const bd = modal({ title: 'Купить номер для Telegram', sub: 'Yesim-номер → авторизация TG → код прилетит в ленту', wide: true,
     body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.send)}Купим виртуальный номер (Yesim) и сразу начнём авторизацию Telegram. Код придёт автоматически — введёшь на след. шаге. Дальше зададим персону и поставим в прогрев.</span></div>
       <div class="form-row"><label>Страна номера</label><select id="tgBuyCountry" class="inp">
