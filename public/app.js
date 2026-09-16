@@ -1790,7 +1790,7 @@ window.openTgBuy = function () {
       const country = ($('#tgBuyCountry', b) || {}).value || 'US'; const out = $('#tgBuyOut', b);
       out.textContent = 'Покупаю номер…';
       try {
-        const r = await api.post('/gray/yesim/buy', { country, subscriptionOption: 'month' });
+        const r = await api.post('/gray/yesim/buy', { country, subscriptionOption: 'month', for: 'tg' });
         if (!r.ok || !r.number) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'не куплено') + '</span>'; return false; }
         out.textContent = 'Куплен ' + r.number + '. Запускаю логин Telegram…';
         await api.post('/tg/gray/connect', { phone: r.number });

@@ -6344,12 +6344,14 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const country = String(b.country || '').toUpperCase().slice(0, 2);
       const subscriptionOption = ['month', 'year'].includes(b.subscriptionOption) ? b.subscriptionOption : 'month';
+      const forSvc = b.for === 'tg' ? 'tg' : 'wa';   /* для какого канала берём номер (TG-номер НЕ должен падать в WA-пул) */
       if (!country) return json(res, 400, { error: 'нужна страна' });
       try {
-        const r = await yesimApi('purchase_number', { country, subscriptionOption, area: b.area || undefined });
+        /* area: для приёма кодов мессенджеров номер должен быть мобильным (Yesim area='Mobile') */
+        const r = await yesimApi('purchase_number', { country, subscriptionOption, area: b.area || 'Mobile' });
         const number = r.number || (r.data && r.data.number) || '';
-        /* сохраняем в пул серых номеров тенанта — под ручную регистрацию WhatsApp + подключение по QR */
-        if (number) { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, addedAt: Date.now() }); store.save(); }
+        /* WA-номер сохраняем в пул серых WhatsApp; TG-номер — НЕ сюда (его добавит /tg/gray/connect в tgGray) */
+        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, addedAt: Date.now() }); store.save(); }
         return json(res, 200, { ok: true, number, result: r });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
