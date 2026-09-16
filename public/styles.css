@@ -244,7 +244,11 @@ textarea { resize: vertical; min-height: 70px; }
 /* scrollbar-gutter: место под вертикальный скроллбар зарезервировано ВСЕГДА →
    контент не «дёргается»/не сужается на ~10px при переключении вкладок, где высота
    пересекает границу вьюпорта (был баг «уменьшается в размере» на подстраницах «Номера»). */
-.content { flex: 1; overflow-y: auto; scrollbar-gutter: stable; padding: 6px 28px 30px; }
+/* overflow-y:scroll (не auto) + scrollbar-gutter:stable — трек скроллбара зарезервирован ВСЕГДА
+   во ВСЕХ браузерах (Safari до 18.2 не поддерживает scrollbar-gutter → нужен overflow:scroll).
+   Иначе при переключении подстраниц (разная высота) скроллбар появлялся/исчезал и контент
+   «дёргался»/сужался на ~10px. */
+.content { flex: 1; overflow-y: scroll; scrollbar-gutter: stable; padding: 6px 28px 30px; }
 
 /* ---------- поверхности ---------- */
 .glass {
