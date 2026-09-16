@@ -7406,3 +7406,16 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .notif-tx{ font-size:11.5px; color:var(--ink-2); line-height:1.45; margin-top:2px; }
 .notif-at{ font-size:10.5px; color:var(--ink-3); margin-top:3px; }
 .notif-empty{ padding:22px 12px; text-align:center; color:var(--ink-3); font-size:12px; }
+
+/* ===== Viber: пошаговый гид ===== */
+.viber-steps{ display:flex; flex-direction:column; gap:14px; margin-top:6px; }
+.viber-step{ display:flex; gap:12px; align-items:flex-start; }
+.vs-num{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:var(--accent,#c8a86a); color:#fff; font-weight:800; font-size:13px; display:grid; place-items:center; margin-top:1px; }
+.vs-body{ flex:1 1 auto; min-width:0; }
+.vs-t{ font-size:13px; font-weight:650; color:var(--ink); }
+.vs-d{ font-size:11.5px; line-height:1.5; color:var(--ink-2); margin-top:2px; }
+.vs-shot{ margin-top:8px; border:1px dashed var(--stroke); border-radius:10px; overflow:hidden; background:var(--bg-2); }
+.vs-shot img{ display:block; max-width:100%; height:auto; }
+.vs-shot-ph{ display:none; padding:14px; font-size:11.5px; color:var(--ink-3); text-align:center; }
+.vs-shot.vs-shot-empty{ }
+.vs-shot.vs-shot-empty .vs-shot-ph{ display:block; }

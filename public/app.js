@@ -10761,6 +10761,7 @@ PAGES.numbers = async (root) => {
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
       <button class="seg-btn ${NUMTAB === 'tg' ? 'on' : ''}" data-numtab="tg">${ic(I.send)}Telegram · QR</button>
+      <button class="seg-btn ${NUMTAB === 'viber' ? 'on' : ''}" data-numtab="viber">${ic(I.chat)}Viber</button>
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
@@ -10891,6 +10892,68 @@ PAGES.numbers = async (root) => {
     </div>` : ''}
     </div>
 
+    <div data-numpane="viber" style="${NUMTAB === 'viber' ? '' : 'display:none'}">
+    ${(() => {
+      const vb = (STATE.settings.channels || {}).viber || {};
+      const configured = !!(vb.keySet && vb.sender);
+      const webhook = location.origin + '/api/viber/inbound';
+      return `
+      <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
+        <div class="card-title">${ic(I.chat)}Viber · официальный канал (BSP)<span class="sub">персональные касания по номеру, как WA Cloud API</span>
+          <span style="margin-left:auto">${configured ? '<span class="badge ok"><i></i>настроен</span>' : '<span class="badge warn"><i></i>не настроен</span>'}</span></div>
+        <div class="muted" style="font-size:11.5px;line-height:1.6;margin:2px 0 0">
+          В Viber <b>нет «серого» режима</b> (как WhatsApp QR / Telegram) — userbot запрещён. Работаем только через <b>официального BSP-провайдера</b> (по умолчанию <b>Infobip</b>): одно <b>верифицированное имя-отправитель на всё агентство</b>, платные персональные сообщения по номеру телефона. ⛔ Массовые рассылки не делаем — только точечные касания 1-к-1 с согласием.
+        </div>
+      </div>
+
+      <div class="glass card mb">${coll('Как это работает в SaaS (один отправитель — много брокеров)', `
+        <div class="muted" style="font-size:12px;line-height:1.65;margin-top:6px">
+          <p style="margin:0 0 8px">У агентства <b>один Viber-sender</b> (напр. «TargetPoint»). Все исходящие Viber-касания идут от этого имени — отдельный номер на каждого брокера, как в WhatsApp, тут не нужен.</p>
+          <p style="margin:0 0 8px"><b>Входящие ответы</b> клиента прилетают на вебхук Lumen → мы находим лида по номеру и <b>маршрутизируем в карточку его брокера</b> (тот же лид, тот же ответственный). Брокер видит переписку в <b>CRM-инбоксе</b> и в <b>Telegram-мосте</b> — как любой другой канал каскада.</p>
+          <p style="margin:0"><b>Персонализация</b> — в тексте сообщения (имя брокера, подпись), а не в отправителе. Каскад сам выберет Viber, если это лучший канал для лида (см. приоритет каналов в Настройках).</p>
+        </div>`, { open: false, icon: I.users })}</div>
+
+      <div class="glass card mb">
+        <div class="card-title">${ic(I.link)}Подключение — по шагам</div>
+        <div class="viber-steps">
+          ${[
+            ['Аккаунт Infobip', 'Зарегистрируйтесь на infobip.com (или войдите). Это BSP — официальный посредник Viber Business.'],
+            ['API-ключ', 'Infobip → Developers → API Keys → Create. Скопируйте ключ и ваш Base URL (вида xxxxx.api.infobip.com).'],
+            ['Верификация отправителя', 'Infobip → Channels → Viber → запросите Viber Business sender (имя вашего бренда). Нужна бизнес-верификация — Infobip проверяет компанию (обычно 1–3 дня).'],
+            ['Вебхук входящих', 'В настройках Viber-канала Infobip укажите Inbound webhook на адрес ниже — тогда ответы клиентов попадут в CRM.'],
+            ['Заполнить поля', 'Внесите провайдера, API-ключ, Base URL и верифицированное имя-отправитель в форму ниже и сохраните.'],
+          ].map(([t, d], i) => `<div class="viber-step">
+            <div class="vs-num">${i + 1}</div>
+            <div class="vs-body"><div class="vs-t">${t}</div><div class="vs-d">${d}</div>
+              <div class="vs-shot vs-shot-empty" data-shot="${i + 1}"><span class="vs-shot-ph">📷 живой скриншот шага ${i + 1} — добавим из консоли Infobip</span></div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="glass card mb">
+        <div class="card-title">${ic(I.gear || I.shield)}Настройка Viber BSP</div>
+        <div class="form-row"><label>Адрес вебхука входящих (вставьте в Infobip)</label>
+          <div class="tc-copy" data-copy="${webhook}" style="cursor:pointer"><code style="word-break:break-all">${webhook}</code>${ic(I.copy || I.doc)}</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div class="form-row"><label>BSP-провайдер</label><select id="vbProv">
+            <option value="infobip" ${(vb.provider || 'infobip') === 'infobip' ? 'selected' : ''}>Infobip</option>
+            <option value="360dialog" ${vb.provider === '360dialog' ? 'selected' : ''}>360dialog</option>
+            <option value="vonage" ${vb.provider === 'vonage' ? 'selected' : ''}>Vonage</option>
+          </select></div>
+          <div class="form-row"><label>Имя-отправитель (верифиц.)</label><input id="vbSender" value="${esc(vb.sender || '')}" placeholder="напр. TargetPoint"></div>
+          <div class="form-row"><label>Base URL</label><input id="vbBase" value="${esc(vb.baseUrl || '')}" placeholder="xxxxx.api.infobip.com"></div>
+          <div class="form-row"><label>BSP API-ключ</label><input id="vbKey" type="password" placeholder="${vb.keySet ? '•••••• сохранён' : 'вставьте ключ Infobip'}"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <button class="btn btn-accent btn-sm" id="vbSave">${ic(I.check)}Сохранить и включить Viber</button>
+          <span id="vbOut" class="muted" style="font-size:11.5px"></span>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:8px">Платно (тарификация BSP за сообщение), нужна бизнес-верификация и согласие клиента на контакт. Стоимость — расходник, пойдёт с баланса.</div>
+      </div>
+    `; })()}
+    </div>
+
     <div data-numpane="tel" style="${NUMTAB === 'tel' ? '' : 'display:none'}">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
       <div class="lp-sec" style="margin:0">Номера телефонии (звонки) · ${telNums.length}</div>
@@ -10915,6 +10978,19 @@ PAGES.numbers = async (root) => {
   $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; try { const r = await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast(r.ok ? 'Привязка проверена' : 'Не вышло', r.ok ? (r.assigned ? 'Профиль привязан' : 'Уже привязан') : (r.error || ''), r.ok); } catch (e) { toast('Ошибка', e.message); } b.disabled = false; }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#telBuyBtn', root)?.addEventListener('click', () => window.openTelBuy && window.openTelBuy());
+  /* Viber: копирование адреса вебхука + сохранение BSP-настроек */
+  $$('[data-numpane="viber"] .tc-copy', root).forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.copy); toast('Скопировано', 'Вставьте в Inbound webhook Infobip', true); }));
+  $('#vbSave', root)?.addEventListener('click', async () => {
+    const out = $('#vbOut', root); const btn = $('#vbSave', root);
+    const sender = ($('#vbSender', root).value || '').trim();
+    if (!sender) { if (out) out.textContent = 'Укажите имя-отправитель'; return; }
+    btn.disabled = true; if (out) out.textContent = 'Сохраняю…';
+    const patch = { channels: { viber: { provider: $('#vbProv', root).value, sender, baseUrl: ($('#vbBase', root).value || '').trim(), mode: 'bsp' }, enabled: { viber: true } } };
+    const key = ($('#vbKey', root).value || '').trim(); if (key) patch.channels.viber.apiKey = key;
+    try { await api.patch('/settings', patch); toast('Viber подключён', 'Канал включён в каскад', true); if (out) out.textContent = '✓ сохранено'; if (STATE.settings.channels) { STATE.settings.channels.viber = Object.assign(STATE.settings.channels.viber || {}, { provider: patch.channels.viber.provider, sender, baseUrl: patch.channels.viber.baseUrl, keySet: !!key || (STATE.settings.channels.viber || {}).keySet }); } setTimeout(() => PAGES.numbers(root), 400); }
+    catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    btn.disabled = false;
+  });
   /* авто-обновление статусов Cloud-API номеров из Telnyx (одобрение Meta занимает время) */
   if (window.CLOUD_STATUS_POLL) { clearInterval(window.CLOUD_STATUS_POLL); window.CLOUD_STATUS_POLL = null; }
   if (otpNums.length) window.CLOUD_STATUS_POLL = setInterval(async () => {
