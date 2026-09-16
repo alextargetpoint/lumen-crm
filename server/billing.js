@@ -31,7 +31,20 @@ function defBilling() {
     invoices: [],
     usage: { periodStart: now, waTemplates: 0, aiRequests: 0 },
     addons: { interpreter: false },
+    balance: 0,                   // предоплаченный баланс РАСХОДНИКОВ (USD) — пополняется криптой
+    cryptoTopups: [],             // [{id, amountUsd, exactAmount, chain, address, status:'pending'|'confirmed'|'expired', txid, createdAt, confirmedAt}]
+    creditedTxids: [],            // txid уже зачисленных переводов — идемпотентность (не задваивать)
   };
+}
+/* зачислить подтверждённый крипто-перевод на баланс расходников (идемпотентно по txid) */
+function creditTopup(db, topup, txid) {
+  const b = db.settings.billing;
+  b.creditedTxids = b.creditedTxids || [];
+  if (txid && b.creditedTxids.includes(txid)) return false;   // уже зачислено
+  b.balance = +((b.balance || 0) + topup.amountUsd).toFixed(2);
+  topup.status = 'confirmed'; topup.txid = txid || topup.txid || null; topup.confirmedAt = Date.now();
+  if (txid) b.creditedTxids.push(txid);
+  return true;
 }
 
 /* ---- расчёт стоимости выбранной конфигурации ---- */
@@ -283,4 +296,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage };
+module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup };

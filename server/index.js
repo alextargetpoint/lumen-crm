@@ -2615,6 +2615,73 @@ async function tgWarmupTick() {
   } finally { tgWarmupBusy = false; }
 }
 setInterval(() => { tgWarmupTick().catch(() => {}); }, 14 * 60e3);   /* ~14 мин, вразнобой с WA-тиком */
+
+/* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
+   Приём ТОЛЬКО крипта. Один общий receive-адрес на сеть (адреса публичны on-chain — не секрет,
+   переопределяются env). Матч входящего перевода к топ-апу — по уникальному суб-цент маркеру
+   (exactAmount). Идемпотентность — по txid (creditedTxids). ERC20 требует Etherscan-ключ. */
+const CRYPTO_TRON = process.env.CRYPTO_TRON_ADDRESS || 'TKsspQfKNJvcREryLtMG1HsxUJz8zdQn4X';
+const CRYPTO_ETH  = process.env.CRYPTO_ETH_ADDRESS  || '0x6dc20b29ea59fd722e752e65cd0c0059ee5c3b25';
+const USDT_TRC20  = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   /* USDT (Tron) контракт */
+const USDT_ERC20  = '0xdac17f958d2ee523a2206206994597c13d831ec7'; /* USDT (Ethereum) контракт */
+let cryptoBusy = false;
+async function cryptoTick() {
+  if (cryptoBusy) return; cryptoBusy = true;
+  try {
+    /* один запрос on-chain на сеть — тянем последние входящие на общий адрес, матчим по всем тенантам */
+    let trcTx = null, ercTx = null;
+    /* соберём, есть ли вообще pending — чтобы не дёргать API вхолостую */
+    let anyTrc = false, anyErc = false;
+    for (const tid of store.listTenants()) {
+      store.runInTenant(tid, () => {
+        const bl = (store.get().settings || {}).billing; if (!bl || !bl.cryptoTopups) return;
+        for (const t of bl.cryptoTopups) { if (t.status === 'pending') { if (t.chain === 'erc20') anyErc = true; else anyTrc = true; } }
+      });
+    }
+    if (anyTrc) {
+      try {
+        const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=50&contract_address=${USDT_TRC20}`, { signal: AbortSignal.timeout(12000) });
+        const j = await r.json().catch(() => ({}));
+        trcTx = (j.data || []).map(tx => ({ txid: tx.transaction_id, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.block_timestamp || 0) })).filter(x => x.txid && x.amt > 0);
+      } catch (e) {}
+    }
+    if (anyErc) {
+      const ekey = process.env.ETHERSCAN_KEY || ((store.getRegistry().platformCrypto || {}).etherscanKey);
+      if (ekey) {
+        try {
+          const r = await fetch(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${USDT_ERC20}&address=${CRYPTO_ETH}&page=1&offset=50&sort=desc&apikey=${ekey}`, { signal: AbortSignal.timeout(12000) });
+          const j = await r.json().catch(() => ({}));
+          ercTx = (Array.isArray(j.result) ? j.result : []).filter(tx => (tx.to || '').toLowerCase() === CRYPTO_ETH.toLowerCase())
+            .map(tx => ({ txid: tx.hash, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.timeStamp || 0) * 1000 })).filter(x => x.txid && x.amt > 0);
+        } catch (e) {}
+      }
+    }
+    const now = Date.now();
+    for (const tid of store.listTenants()) {
+      store.runInTenant(tid, () => {
+        const db = store.get(); const bl = (db.settings || {}).billing; if (!bl || !bl.cryptoTopups) return;
+        let changed = false;
+        for (const t of bl.cryptoTopups) {
+          if (t.status !== 'pending') continue;
+          if (t.expiresAt && t.expiresAt < now) { t.status = 'expired'; changed = true; continue; }
+          const pool = t.chain === 'erc20' ? ercTx : trcTx;
+          if (!pool) continue;
+          /* матч: суб-цент маркер совпал (±0.0005) И txid ещё не зачтён нигде у этого тенанта */
+          const hit = pool.find(x => Math.abs(x.amt - t.exactAmount) < 0.0005 && !(bl.creditedTxids || []).includes(x.txid));
+          if (hit) {
+            if (billing.creditTopup(db, t, hit.txid)) {
+              changed = true;
+              try { ai.pushEvent(db, { type: 'note', text: `💰 Пополнение расходников: +$${t.amountUsd} (USDT ${t.chain.toUpperCase()} подтверждён on-chain)` }); } catch (e) {}
+            }
+          }
+        }
+        if (changed) store.save();
+      });
+    }
+  } finally { cryptoBusy = false; }
+}
+setInterval(() => { cryptoTick().catch(() => {}); }, 60e3);   /* раз в минуту — проверяем подтверждения */
+
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
   if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key (в настройках или env TELNYX_API_KEY), Connection ID и номер «От»');
@@ -4634,6 +4701,24 @@ const server = http.createServer(async (req, res) => {
         try { const r = await billing.stripeCheckout(db, global.LUMEN_BASE || ''); return json(res, 200, r); }
         catch (e) { return json(res, 400, { error: e.message }); }
       }
+      /* крипто-пополнение баланса РАСХОДНИКОВ (USDT TRC20/ERC20 → холодный кошелёк, авто-верификация) */
+      if (p === '/api/billing/topup/crypto' && req.method === 'POST') {
+        const b = await readBody(req);
+        const amountUsd = Math.round((+b.amountUsd || 0) * 100) / 100;
+        if (!(amountUsd >= 10)) return json(res, 400, { error: 'Минимальное пополнение — $10' });
+        if (amountUsd > 100000) return json(res, 400, { error: 'Слишком большая сумма' });
+        const chain = b.chain === 'erc20' ? 'erc20' : 'trc20';
+        const address = chain === 'erc20' ? CRYPTO_ETH : CRYPTO_TRON;
+        const bl = db.settings.billing; bl.cryptoTopups = bl.cryptoTopups || [];
+        /* уникальный суб-цент маркер (0.001–0.999) — по нему матчим входящий перевод к этому топ-апу */
+        let exactAmount = amountUsd;
+        for (let i = 0; i < 60; i++) { const marker = Math.floor(1 + Math.random() * 998) / 1000; const cand = +(amountUsd + marker).toFixed(3); if (!bl.cryptoTopups.some(t => t.status === 'pending' && t.exactAmount === cand)) { exactAmount = cand; break; } }
+        const topup = { id: 'tp_' + crypto.randomBytes(5).toString('hex'), amountUsd, exactAmount, chain, address, purpose: (b.purpose === 'subscription' ? 'subscription' : 'consumables'), status: 'pending', txid: null, createdAt: Date.now(), expiresAt: Date.now() + 60 * 60e3 };
+        bl.cryptoTopups.unshift(topup); if (bl.cryptoTopups.length > 60) bl.cryptoTopups.length = 60; store.save();
+        let qrImage = null; try { qrImage = await require('qrcode').toDataURL(address, { margin: 1, width: 320 }); } catch (e) {}
+        return json(res, 200, { ok: true, topup: { id: topup.id, amountUsd, exactAmount, chain, address, purpose: topup.purpose, expiresAt: topup.expiresAt }, qrImage });
+      }
+      if (p === '/api/billing/topups' && req.method === 'GET') { const bl = db.settings.billing; return json(res, 200, { balance: bl.balance || 0, topups: (bl.cryptoTopups || []).slice(0, 20) }); }
       return json(res, 404, { error: 'not found' });
     }
 

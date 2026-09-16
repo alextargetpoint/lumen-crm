@@ -12700,15 +12700,36 @@ PAGES.billing = async (root) => {
           <div class="bill-actions">
             ${q.custom
               ? `<a class="btn btn-accent" href="https://wa.me/?text=Здравствуйте!%20Интересует%20тариф%20Сеть%20в%20Lumen" target="_blank">${ic(I.chat)}Обсудить проект</a>`
-              : (B.stripeReady
-                ? `<button class="btn btn-accent" id="payStripe">${ic(I.card)}Оплатить картой</button>`
-                : `<button class="btn btn-accent" id="issueInv">${ic(I.doc)}Выставить счёт на ${money(q.billedNow)}</button>`)}
-            <span class="muted" style="font-size:11px">${B.stripeReady ? 'безопасная оплата через Stripe' : 'счёт на банковский перевод (проформа)'}</span>
+              : `${B.stripeReady
+                  ? `<button class="btn btn-accent" id="payStripe">${ic(I.card)}Оплатить картой</button>`
+                  : `<button class="btn btn-accent" id="issueInv">${ic(I.doc)}Выставить счёт на ${money(q.billedNow)}</button>`}
+                 <button class="btn" id="paySubCrypto" data-amt="${q.billedNow}">${ic(I.wallet || I.bolt)}Оплатить криптой</button>`}
+            <span class="muted" style="font-size:11px;flex-basis:100%">${q.custom ? '' : (B.stripeReady ? 'карта — через Stripe · крипта — USDT (TRC20/ERC20) на баланс' : 'счёт (проформа) · либо крипта USDT на баланс')}</span>
           </div>
         </div>
       </div>
 
       <div>
+        <!-- баланс расходников (предоплата криптой) -->
+        <div class="glass card mb bal-card">
+          <div class="card-title">${ic(I.wallet || I.card)}Баланс расходников<span class="sub">предоплата · пополнение только криптой (USDT)</span></div>
+          <div class="bal-hero">
+            <div class="bal-amt ${(B.balance || 0) > 0 ? 'pos' : ''}">${moneyC(B.balance || 0)}</div>
+            <button class="btn btn-accent" id="topupCrypto">${ic(I.plus || I.bolt)}Пополнить криптой</button>
+          </div>
+          ${(() => {
+            const fc = u.monthlyForecast != null ? u.monthlyForecast : u.forecast;
+            const cov = (B.balance || 0) - (fc || 0);
+            return cov >= 0
+              ? `<div class="bal-note ok">${ic(I.check || I.spark)}<span>Баланса хватает на прогноз месяца (${moneyC(fc)}). Остаток после списания — ${moneyC(cov)}.</span></div>`
+              : `<div class="bal-note warn">${ic(I.spark)}<span>Прогноз месяца — ${moneyC(fc)}. Не хватает ${moneyC(-cov)} — пополните заранее, иначе исходящие/ИИ приостановятся.</span></div>`;
+          })()}
+          ${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).length
+            ? `<div class="bal-tx">${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).map(t => `<div class="bal-tx-row"><span>+${moneyC(t.amountUsd)} · ${(t.chain || '').toUpperCase()}</span><span class="muted">${date(t.confirmedAt)}</span></div>`).join('')}</div>`
+            : ''}
+          <div class="muted" style="font-size:11px;margin-top:8px">С баланса списываются расходники (WhatsApp, ИИ, минуты, аренда номеров) и — по желанию — подписка. Пополнение приходит на холодный кошелёк и подтверждается автоматически on-chain.</div>
+        </div>
+
         <!-- расходники: калькулятор по факту -->
         <div class="glass card mb">
           <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">подписка отдельно · расходники — по факту месяца</span>
@@ -12805,7 +12826,93 @@ PAGES.billing = async (root) => {
     await api.post('/billing/method', { company: { legalName: $('#coName').value, vat: $('#coVat').value, email: $('#coEmail').value, address: $('#coAddr').value } });
     toast('Реквизиты сохранены', 'Появятся в счёте', true);
   });
+  const tuc = $('#topupCrypto', root); if (tuc) tuc.addEventListener('click', () => openTopupCrypto({ purpose: 'consumables', onDone: reload }));
+  const psc = $('#paySubCrypto', root); if (psc) psc.addEventListener('click', () => openTopupCrypto({ purpose: 'subscription', presetAmount: +psc.dataset.amt || 0, onDone: reload }));
 };
+
+/* ---------- Крипто-пополнение баланса (USDT TRC20/ERC20 → холодный кошелёк, авто-верификация) ---------- */
+function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } = {}) {
+  const isSub = purpose === 'subscription';
+  const presets = [50, 100, 250, 500, 1000];
+  const money2 = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const bd = modal({
+    title: isSub ? 'Оплата подписки криптой' : 'Пополнить баланс расходников',
+    sub: isSub ? 'USDT на баланс — с него спишется подписка' : 'Только крипта (USDT). Приходит на холодный кошелёк, подтверждается автоматически',
+    wide: true,
+    body: `
+      <div id="tcStep1">
+        <div class="tc-seg seg-toggle" style="margin-bottom:14px">
+          <button type="button" class="seg-btn on" data-chain="trc20">TRC20 · Tron<span class="seg-badge">быстро · дёшево</span></button>
+          <button type="button" class="seg-btn" data-chain="erc20">ERC20 · Ethereum</button>
+        </div>
+        <label class="lc-lbl">Сумма пополнения, USD</label>
+        <input id="tcAmt" type="number" min="10" step="1" value="${presetAmount ? Math.max(10, Math.ceil(presetAmount)) : 100}" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink);font-size:18px;font-weight:700">
+        <div class="tc-presets" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px">
+          ${presets.map(p => `<button type="button" class="btn btn-sm tc-preset" data-p="${p}">$${p}</button>`).join('')}
+        </div>
+        <div class="lc-hint info" style="margin-top:12px">${ic(I.spark)}<span>Минимум $10. Переводите USDT (не другой токен). Комиссию сети платит отправитель — на баланс зачислится ровно указанная сумма.</span></div>
+        <div class="lc-hint warn" id="tcErcWarn" hidden style="margin-top:8px">${ic(I.spark)}<span>Сеть ERC20 (Ethereum) дороже по комиссии и подтверждается медленнее. Для пополнений рекомендуем TRC20.</span></div>
+      </div>
+      <div id="tcStep2" hidden></div>`,
+    actions: [
+      { label: 'Отмена' },
+      { label: isSub ? 'Создать платёж' : 'Получить адрес', cls: 'btn-accent', onClick: async (bd) => { await tcCreate(bd); return false; } },
+    ],
+  });
+
+  let chain = 'trc20', pollTimer = null, activeId = null;
+  bd.querySelectorAll('[data-chain]').forEach(b => b.addEventListener('click', () => {
+    bd.querySelectorAll('[data-chain]').forEach(x => x.classList.toggle('on', x === b));
+    chain = b.dataset.chain;
+    const w = bd.querySelector('#tcErcWarn'); if (w) w.hidden = chain !== 'erc20';
+  }));
+  bd.querySelectorAll('.tc-preset').forEach(b => b.addEventListener('click', () => { const a = bd.querySelector('#tcAmt'); if (a) a.value = b.dataset.p; }));
+
+  async function tcCreate(bd) {
+    const amt = Math.round((+bd.querySelector('#tcAmt').value || 0) * 100) / 100;
+    if (!(amt >= 10)) { toast('Минимум $10', 'Укажите сумму от $10'); return; }
+    const btn = bd.querySelector('.m-actions .btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Создаю…'; }
+    const r = await api.post('/billing/topup/crypto', { amountUsd: amt, chain, purpose });
+    if (btn) { btn.disabled = false; btn.textContent = isSub ? 'Создать платёж' : 'Получить адрес'; }
+    if (!r || r.error || !r.topup) { toast('Не получилось', (r && r.error) || 'ошибка'); return; }
+    activeId = r.topup.id;
+    const t = r.topup;
+    bd.querySelector('#tcStep1').hidden = true;
+    const act = bd.querySelector('.m-actions'); if (act) act.innerHTML = '';
+    const s2 = bd.querySelector('#tcStep2'); s2.hidden = false;
+    s2.innerHTML = `
+      <div class="tc-pay">
+        <div class="tc-qr">${r.qrImage ? `<img src="${r.qrImage}" alt="QR" style="width:200px;height:200px;border-radius:12px;background:#fff;padding:8px">` : ''}</div>
+        <div class="tc-pay-info">
+          <div class="tc-amt-big">${money2(t.exactAmount)}</div>
+          <div class="muted" style="font-size:12px;margin-bottom:10px">Переведите <b>ровно эту сумму</b> USDT — по ней мы автоматически распознаём ваш платёж. ${(t.chain || '').toUpperCase()} · сеть ${t.chain === 'erc20' ? 'Ethereum' : 'Tron'}.</div>
+          <div class="tc-field"><span class="tc-flbl">Сумма (точно)</span><div class="tc-copy" data-copy="${t.exactAmount}"><code>${t.exactAmount}</code>${ic(I.copy || I.doc)}</div></div>
+          <div class="tc-field"><span class="tc-flbl">Адрес кошелька (${(t.chain || '').toUpperCase()})</span><div class="tc-copy" data-copy="${t.address}"><code style="word-break:break-all">${t.address}</code>${ic(I.copy || I.doc)}</div></div>
+          <div class="tc-status" id="tcStatus">${ic(I.spark)}<span>Ожидаю поступление… подтвердится автоматически (обычно 1–3 мин).</span></div>
+        </div>
+      </div>
+      <div class="lc-hint warn" style="margin-top:14px">${ic(I.spark)}<span>Отправляйте только <b>USDT</b> в сети <b>${t.chain === 'erc20' ? 'ERC20 (Ethereum)' : 'TRC20 (Tron)'}</b>. Перевод в другой сети или другого токена будет потерян. Заявка действует 60 минут.</span></div>`;
+    s2.querySelectorAll('.tc-copy').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.copy); toast('Скопировано', '', true); }));
+    /* поллинг подтверждения */
+    const poll = async () => {
+      if (!document.body.contains(bd)) { clearInterval(pollTimer); return; }
+      const list = await api.get('/billing/topups').catch(() => null);
+      if (!list || !list.topups) return;
+      const me = list.topups.find(x => x.id === activeId);
+      if (me && me.status === 'confirmed') {
+        clearInterval(pollTimer);
+        const st = bd.querySelector('#tcStatus');
+        if (st) { st.className = 'tc-status ok'; st.innerHTML = `${ic(I.check || I.spark)}<span>Платёж получен! Баланс пополнен на ${money2(me.amountUsd)}.</span>`; }
+        toast('Платёж подтверждён', `Баланс +${money2(me.amountUsd)}`, true);
+        setTimeout(() => { closeModal(); if (onDone) onDone(); }, 1800);
+      } else if (me && me.status === 'expired') {
+        clearInterval(pollTimer);
+        const st = bd.querySelector('#tcStatus'); if (st) { st.className = 'tc-status warn'; st.innerHTML = `${ic(I.spark)}<span>Срок заявки истёк. Создайте новую.</span>`; }
+      }
+    };
+    pollTimer = setInterval(poll, 8000);
+  }
+}
 
 /* ---------------- ПОДКЛЮЧЕНИЯ ---------------- */
 function waFmtDate(ms) { if (!ms) return ''; try { return new Date(ms).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (e) { return ''; } }
