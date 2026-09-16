@@ -12413,21 +12413,27 @@ PAGES.billing = async (root) => {
           <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">подписка отдельно · расходники — по факту месяца</span>
             <button class="btn btn-sm" id="bcRates" style="margin-left:auto">${ic(I.edit || I.doc)}Ставки</button></div>
           <div class="bc-lines">
+            <div style="font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 4px">По факту · метрируется</div>
             ${(u.items || []).map(it => `<div class="bc-line">
               <div class="bc-line-l"><b>${it.label}</b><span>${it.qty.toLocaleString('ru-RU')} ${it.unit} × $${it.rate}</span></div>
               <div class="bc-line-c">${moneyC(it.cost)}</div>
             </div>`).join('')}
-            ${u.numbersCount ? `<div class="bc-line">
-              <div class="bc-line-l"><b>Аренда номеров</b><span>${u.numbersCount} ${plural(u.numbersCount, 'номер', 'номера', 'номеров')} × $${u.numberPrice}/мес</span></div>
-              <div class="bc-line-c">${moneyC(u.numbersMonthly)}<span class="muted" style="font-size:10px;display:block">в месяц</span></div>
-            </div>` : ''}
+            ${(u.rentals && u.rentals.length) ? `<div style="font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 4px">Аренда номеров · флэт/мес</div>
+            ${u.rentals.map(r => `<div class="bc-line">
+              <div class="bc-line-l"><b>${r.label}</b><span>${r.count} ${plural(r.count, 'номер', 'номера', 'номеров')} × $${r.rate}/мес</span></div>
+              <div class="bc-line-c">${moneyC(r.cost)}<span class="muted" style="font-size:10px;display:block">в месяц</span></div>
+            </div>`).join('')}` : ''}
           </div>
           <div class="bc-sum">
             <div class="bc-sum-row"><span>Расходники за период (${u.elapsedDays} дн)</span><b>${moneyC(u.total)}</b></div>
-            ${u.numbersCount ? `<div class="bc-sum-row"><span>Аренда номеров (флэт/мес)</span><b>${moneyC(u.numbersMonthly)}</b></div>` : ''}
-            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце месяца</span><b>${moneyC(u.monthlyForecast != null ? u.monthlyForecast : u.forecast)}</b></div>
+            ${u.numbersCount ? `<div class="bc-sum-row"><span>Аренда номеров (${u.numbersCount} ${plural(u.numbersCount, 'номер', 'номера', 'номеров')} · флэт/мес)</span><b>${moneyC(u.numbersMonthly)}</b></div>` : ''}
+            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце периода</span><b>${moneyC(u.monthlyForecast != null ? u.monthlyForecast : u.forecast)}</b></div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--stroke-soft)">
+              <span class="badge warn"><i></i>не оплачено</span>
+              <span class="muted" style="font-size:11.5px">копится за период · спишется единым счётом ${date(u.periodEnd)}</span>
+            </div>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:10px">Расходники не входят в подписку и идут по себестоимости провайдеров: WhatsApp тарифицирует Meta, токены ИИ — провайдер модели, телефония — DIDWW. Списываются по факту в конце расчётного месяца, отдельно от подписки.</div>
+          <div class="muted" style="font-size:11px;margin-top:10px">Расходники не входят в подписку: WhatsApp-сообщения, обработка ИИ, минуты телефонии и записи, аренда номеров. Считаются по факту и списываются единым счётом в конце расчётного периода, отдельно от подписки.</div>
           <div id="bcRatesBox" hidden class="bc-rates">
             <div class="bc-rates-grid">
               <label>WhatsApp, $/сообщение<input class="bc-rate" data-rk="wa" type="number" step="0.001" value="${(u.rates || {}).wa}"></label>

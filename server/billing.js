@@ -59,6 +59,10 @@ const RATE_DEFAULTS = {
   aiMsg: 0.002,      // проход ИИ на входящее сообщение (flash-lite), $
   telephonyMin: 0.02,// минута телефонии (DIDWW + запись), $
   sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
+  numWaQr: 3,        // аренда виртуального номера WhatsApp (QR/серый), $/мес (агентству, с наценкой)
+  numTg: 3,          // аренда виртуального номера Telegram, $/мес
+  numCloud: 3,       // аренда номера WhatsApp Cloud API (OTP), $/мес
+  numTel: 3,         // аренда номера телефонии (звонки+запись), $/мес
 };
 function rates(db) { return { ...RATE_DEFAULTS, ...((db.settings.billing && db.settings.billing.rates) || {}) }; }
 /* аренда номера: себестоимость (Telnyx ~$1) + наценка платформы $2 → агентству $3/мес (синхронно с TELNYX_MARKUP) */
@@ -89,16 +93,30 @@ function usageEstimate(db) {
   /* прогноз на 30 дней: линейная экстраполяция от того, что накопилось за прошедшую часть периода */
   const elapsedDays = Math.max(0.5, (now - from) / 86400e3);
   const forecast = +(total / elapsedDays * 30).toFixed(2);
-  /* аренда номеров — ФЛЭТ-месячный (не метрируется по дням): показываем агентству цену с наценкой,
-     себестоимость и провайдер скрыты; платформа зарабатывает NUMBER_MARKUP × количество. */
-  const numbersCount = ((db.settings.telephony && db.settings.telephony.fromNumbers) || []).filter(Boolean).length;
-  const numbersMonthly = +(numbersCount * NUMBER_PRICE_SHOWN).toFixed(2);           // что платит агентство
-  const numbersMargin = +(numbersCount * NUMBER_MARKUP).toFixed(2);                 // навар платформы
+  /* аренда номеров — ФЛЭТ-месячная по ВСЕМ типам (WhatsApp QR / Telegram / Cloud API / телефония).
+     Считаем только реально арендованные (купленные виртуальные) номера — свой номер по QR не арендуется.
+     Себестоимость и провайдер СКРЫТЫ: агентству показываем цену с наценкой (per-type ставка, дефолт $3). */
+  const waQrCount  = (((db.settings.waGray  || {}).numbers) || []).filter(n => n && n.source === 'yesim').length;
+  const tgCount    = (((db.settings.tgGray  || {}).numbers) || []).length;
+  const cloudCount = Object.keys(db.otpNumbers || {}).length;
+  const telCount   = (((db.settings.telephony || {}).fromNumbers) || []).filter(Boolean).length;
+  const rentals = [
+    { key: 'wa_qr', label: 'Аренда номеров · WhatsApp (QR)',       count: waQrCount,  rate: R.numWaQr },
+    { key: 'tg',    label: 'Аренда номеров · Telegram',            count: tgCount,    rate: R.numTg },
+    { key: 'cloud', label: 'Аренда номеров · WhatsApp Cloud API',  count: cloudCount, rate: R.numCloud },
+    { key: 'tel',   label: 'Аренда номеров · телефония',           count: telCount,   rate: R.numTel },
+  ].filter(r => r.count > 0).map(r => ({ ...r, cost: +(r.count * r.rate).toFixed(2) }));
+  const numbersCount = rentals.reduce((s, r) => s + r.count, 0);
+  const numbersMonthly = +(rentals.reduce((s, r) => s + r.cost, 0)).toFixed(2);
+  /* статус: расходники и аренда — постоплата, копятся за период и списываются в конце (единым счётом).
+     periodEnd — конец расчётного периода подписки (или +30 дн от старта учёта). */
+  const periodEnd = (db.settings.billing.currentPeriodEnd) || (from ? from + 30 * 86400e3 : now + 30 * 86400e3);
   return {
     items, total, forecast, rates: R,
-    periodStart: from, elapsedDays: Math.round(elapsedDays * 10) / 10,
+    periodStart: from, periodEnd, elapsedDays: Math.round(elapsedDays * 10) / 10,
     outbound, inbound, telephonyMin, sttMin,
-    numbersCount, numberPrice: NUMBER_PRICE_SHOWN, numbersMonthly,                   // навар (numbersMargin) агентству НЕ отдаём — скрываем себестоимость
+    rentals, numbersCount, numberPrice: R.numTel, numbersMonthly,                    // per-type разбивка (rentals[]); себестоимость скрыта
+    billedAtPeriodEnd: true, consumablesStatus: 'accruing',                          // текущий период: копится, ещё не списано
     monthlyForecast: +(forecast + numbersMonthly).toFixed(2),                        // расходники (прогноз) + аренда номеров
     waCost: items[0].cost, aiCost: items[1].cost,   // обратная совместимость
   };
