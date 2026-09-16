@@ -13525,11 +13525,11 @@ $('#newLeadBtn').addEventListener('click', () => { const a = TOP_ACTIONS[CUR]; i
 (() => {
   const bell = $('#notifBell'), badge = $('#notifBadge'), panel = $('#notifPanel'), wrap = $('#notifWrap');
   if (!bell) return;
-  let notes = [], open = false;
+  let notes = [], open = false, firstOk = false;
   const ago = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); if (s < 60) return 'только что'; if (s < 3600) return Math.floor(s / 60) + ' мин назад'; if (s < 86400) return Math.floor(s / 3600) + ' ч назад'; return Math.floor(s / 86400) + ' дн назад'; };
   async function load() {
     if (typeof STATE === 'undefined' || !STATE || !STATE.settings) return;   /* не дёргаем до входа */
-    try { const r = await api.get('/notifications'); notes = r.notifications || []; if (badge) { badge.textContent = r.unread > 9 ? '9+' : String(r.unread); badge.hidden = !r.unread; } if (open) draw(); } catch (e) {}
+    try { const r = await api.get('/notifications'); notes = r.notifications || []; firstOk = true; if (badge) { badge.textContent = r.unread > 9 ? '9+' : String(r.unread); badge.hidden = !r.unread; } if (open) draw(); } catch (e) {}
   }
   function draw() {
     panel.innerHTML = `<div class="notif-h"><b>Уведомления</b>${notes.some(n => !n.read) ? `<button class="notif-readall" id="ntReadAll">Прочитать все</button>` : ''}</div>`
@@ -13541,6 +13541,8 @@ $('#newLeadBtn').addEventListener('click', () => { const a = TOP_ACTIONS[CUR]; i
     if (open) { draw(); if (notes.some(n => !n.read)) { try { await api.post('/notifications/read', { all: true }); } catch (_) {} setTimeout(load, 400); } }
   });
   document.addEventListener('click', (e) => { if (open && wrap && !wrap.contains(e.target)) { open = false; panel.hidden = true; } });
+  /* быстрый догоняющий поллинг до первого успешного ответа (STATE готовится после логина), затем спокойный 60с */
+  const fast = setInterval(() => { if (firstOk) { clearInterval(fast); return; } load(); }, 3000);
   load(); setInterval(load, 60000);
 })();
 function syncTopAction() {
