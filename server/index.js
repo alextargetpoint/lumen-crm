@@ -47,6 +47,7 @@ const shot = require('./shot'); /* серверный скриншот (chrome-h
 const playbook = require('./playbook');
 const academy = require('./academy'); /* Академия продаж (методология Ольги Синенко): курс + оценка звонка + советы */
 const billing = require('./billing');
+const invoicepdf = require('./invoicepdf');
 const { MARKET } = require('./marketdata');
 
 /* Стартовые WhatsApp-шаблоны первого касания. Тело = фикс-текст + {{1}},
@@ -2665,6 +2666,22 @@ function notify(db, opts) {
   } catch (e) { return null; }
 }
 
+/* Авто-инвойс: генерим PDF счёт-фактуры и шлём на почву клиента с вложением (карта/банк; крипта инвойсов не даёт). */
+async function emailInvoicePdf(db, inv) {
+  try {
+    const to = ((db.settings.billing.company || {}).email) || (db.settings.auth && db.settings.auth.ownerEmail);
+    if (!to) return { ok: false, error: 'нет email для счёта' };
+    const reg = store.getRegistry();
+    const cfg = mailer.platformEmailCfg(reg);
+    if (!cfg.key) return { ok: false, error: 'Resend не настроен' };
+    const pdf = await invoicepdf.buildInvoicePdf({ inv, company: inv.company || db.settings.billing.company, reg });
+    const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const body = mailer.emailPanel(`<div style="font-size:15px;font-weight:700;margin:0 0 6px">Счёт-фактура ${inv.id}</div><div style="font-size:14px;line-height:1.6">Подписка «${inv.planName}» · ${inv.period}. Сумма: <b>${money(inv.amount)}</b>.<br>PDF счёт-фактуры — во вложении. Копия доступна в кабинете → «Подписка и оплата» → «Счета».</div>`, '#c8a86a');
+    const html = mailer.emailWrap('Счёт-фактура ' + inv.id, body, 'ru', { preheader: 'Счёт ' + inv.id + ' на ' + money(inv.amount) });
+    return await mailer.sendViaResend(cfg, to, 'Счёт-фактура ' + inv.id + ' — Lumen', html, [{ filename: 'invoice-' + inv.id + '.pdf', content: pdf.toString('base64') }]);
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
 /* Предупреждение о низком балансе расходников. Без спама: один раз на «уровень» (ok→low→empty).
    Жёсткое уведомление (in-app + email + Telegram) через notify(). */
 function lowBalanceCheck(db) {
@@ -4772,7 +4789,26 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/billing/plan' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setPlan(db, b)); }
       if (p === '/api/billing/method' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setMethod(db, b)); }
       if (p === '/api/billing/rates' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setRates(db, b)); }
-      if (p === '/api/billing/invoice' && req.method === 'POST') { const b = await readBody(req); const r = billing.issueInvoice(db, b); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/billing/invoice' && req.method === 'POST') {
+        const b = await readBody(req); const r = billing.issueInvoice(db, b);
+        if (!r.error && r.invoice) {
+          const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          emailInvoicePdf(db, r.invoice).catch(() => {});   /* авто-инвойс PDF на почту (best-effort) */
+          notify(db, { type: 'invoice', level: 'success', title: 'Счёт-фактура ' + r.invoice.id, text: `Счёт на ${money(r.invoice.amount)} сформирован. PDF отправлен на почту и доступен в «Счета».`, email: false });
+        }
+        return json(res, r.error ? 400 : 200, r);
+      }
+      /* скачать/открыть PDF счёт-фактуры (генерится на лету из данных счёта) */
+      if (p.startsWith('/api/billing/invoice/') && p.endsWith('/pdf') && req.method === 'GET') {
+        const id = decodeURIComponent(p.slice('/api/billing/invoice/'.length, p.length - '/pdf'.length));
+        const inv = ((db.settings.billing || {}).invoices || []).find(i => i.id === id);
+        if (!inv) return json(res, 404, { error: 'счёт не найден' });
+        try {
+          const pdf = await invoicepdf.buildInvoicePdf({ inv, company: inv.company || (db.settings.billing || {}).company, reg: store.getRegistry() });
+          res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="invoice-${id}.pdf"`, 'Content-Length': pdf.length });
+          res.end(pdf); return;
+        } catch (e) { return json(res, 500, { error: e.message }); }
+      }
       if (p === '/api/billing/checkout' && req.method === 'POST') {
         try { const r = await billing.stripeCheckout(db, global.LUMEN_BASE || ''); return json(res, 200, r); }
         catch (e) { return json(res, 400, { error: e.message }); }

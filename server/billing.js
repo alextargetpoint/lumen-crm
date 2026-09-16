@@ -209,11 +209,18 @@ function issueInvoice(db, { method } = {}) {
   const isStripe = method === 'stripe';
   /* SEC(#3): НИКОГДА не помечаем 'paid' по клиентскому полю. Stripe → 'pending' до
      верифицированного вебхука (markInvoicePaid). Ручной/банк → 'issued' (владелец подтверждает оффлайн). */
+  /* позиции счёта (для PDF счёт-фактуры) — фиксируем на момент выставления */
+  const mult = q.cycle === 'yearly' ? 12 : 1;
+  const per = q.cycle === 'yearly' ? '/год' : '/мес';
+  /* строки должны в сумме давать billedNow (setup — разовый, в billedNow не входит → в счёт этого периода не кладём) */
+  const lines = [{ desc: `Подписка «${q.name}» · платформа${q.cycle === 'yearly' ? ' (годовая)' : ''}`, qty: 1, unit: +(q.base * mult).toFixed(2), amount: +(q.base * mult).toFixed(2) }];
+  if (q.extraSeats) lines.push({ desc: `Доп. места брокеров × ${q.extraSeats}`, qty: q.extraSeats, unit: +(q.seatPrice * mult).toFixed(2), amount: +(q.extraSeats * q.seatPrice * mult).toFixed(2) });
   const inv = {
     id: 'INV-' + String(now).slice(-8),
     at: now,
     plan: q.plan, planName: q.name, cycle: q.cycle, seats: q.seats,
-    amount: q.billedNow, currency: 'USD',
+    amount: q.billedNow, currency: 'USD', lines,
+    company: Object.assign({}, b.company || {}),   /* снимок реквизитов на момент счёта */
     period: q.cycle === 'yearly' ? '12 мес' : '1 мес',
     status: isStripe ? 'pending' : 'issued',
     method: method || b.payMode,

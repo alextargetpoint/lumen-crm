@@ -12809,8 +12809,10 @@ PAGES.billing = async (root) => {
               <div><b>${esc(iv.id)}</b><div class="muted" style="font-size:11px">${date(iv.at)} · ${esc(iv.planName)} · ${esc(iv.period)}</div></div>
               <div class="bi-amt">${money(iv.amount)}</div>
               <div class="bi-st bi-${iv.status}">${iv.status === 'paid' ? 'оплачен' : iv.status === 'issued' ? 'выставлен' : esc(iv.status)}</div>
-            </div>`).join('')}</div>`
-            : `<div class="muted" style="font-size:12.5px;padding:8px 0">Счетов пока нет — появятся после первой оплаты.</div>`}
+              <a class="btn-ghost btn-sm bi-pdf" href="/api/billing/invoice/${encodeURIComponent(iv.id)}/pdf" target="_blank" title="Счёт-фактура PDF">${ic(I.doc)}PDF</a>
+            </div>`).join('')}</div>
+            <div class="muted" style="font-size:11px;margin-top:8px">Счёт-фактуры формируются только по оплате картой/банком. Крипто-пополнения баланса счёт-фактурой не сопровождаются.</div>`
+            : `<div class="muted" style="font-size:12.5px;padding:8px 0">Счетов пока нет — появятся при оплате подписки картой/банком (крипта — без счёт-фактуры).</div>`}
         </div>
       </div>
     </div>`;

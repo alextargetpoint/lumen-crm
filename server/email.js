@@ -844,11 +844,14 @@ function renderTemplate(registry, key, vars, lang) {
 }
 
 function platformEmailCfg(registry) { return { key: (registry.email && registry.email.key) || process.env.RESEND_API_KEY || '', from: (registry.email && registry.email.from) || process.env.RESEND_FROM || 'Lumen <onboarding@resend.dev>' }; }
-async function sendViaResend(cfg, to, subject, html) {
+async function sendViaResend(cfg, to, subject, html, attachments) {
   if (!cfg.key) return { ok: false, error: 'Resend не настроен (нет API-ключа)' };
   if (!to) return { ok: false, error: 'нет адреса получателя' };
   try {
-    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: cfg.from, to, subject, html }) });
+    const payload = { from: cfg.from, to, subject, html };
+    /* вложения: [{filename, content: base64}] (Resend-формат) */
+    if (Array.isArray(attachments) && attachments.length) payload.attachments = attachments.map(a => ({ filename: a.filename, content: a.content }));
+    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, error: 'Resend ' + r.status + (t ? ': ' + t.slice(0, 160) : '') }; }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }

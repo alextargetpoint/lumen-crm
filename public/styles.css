@@ -2507,7 +2507,9 @@ html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke)
 .bu-c { font-size: 12px; font-weight: 650; color: var(--accent); margin-top: 5px; }
 
 .bill-inv { display: flex; flex-direction: column; gap: 2px; }
-.bi-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--stroke-soft); }
+.bi-row { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--stroke-soft); }
+.bi-pdf { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.bi-pdf .ic { width: 14px; height: 14px; }
 .bi-row:last-child { border-bottom: 0; }
 .bi-amt { font-weight: 700; color: var(--navy-900); font-size: 13.5px; }
 .bi-st { font-size: 10.5px; font-weight: 650; padding: 3px 9px; border-radius: 999px; }
