@@ -1421,8 +1421,17 @@ window.openGrayConsent = function (kind, cb) {
 window.openWaPersona = function (phone, n) {
   const p = (n && n.persona) || {};
   const conn = n && n.live && n.live.status === 'connected';
-  modal({ title: 'Профиль WhatsApp-номера', sub: 'Имя, описание, аватар — синкаются в реальный WhatsApp', wide: true,
-    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Профиль применяется к самому WhatsApp-аккаунту номера. Держи консистентное лицо/имя — не фото уходящего брокера.</span></div>
+  const inits = (String(p.name || '')).trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '👤';
+  const bd = modal({ title: 'Профиль WhatsApp-номера', sub: 'Как аккаунт увидят в WhatsApp — синкается в реальный профиль', wide: true,
+    body: `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:7px;margin:2px 0 18px">
+        <div id="wapAva" style="width:92px;height:92px;border-radius:50%;background:linear-gradient(135deg,#25D366,#128C7E);display:grid;place-items:center;color:#fff;font-size:32px;font-weight:700;overflow:hidden;box-shadow:0 10px 26px -10px rgba(18,140,126,.6);position:relative">${p.avatar ? `<img style="width:100%;height:100%;object-fit:cover" src="${esc(p.avatar)}">` : ''}<span id="wapAvaTx" style="position:absolute;${p.avatar ? 'display:none' : ''}">${esc(inits)}</span></div>
+        <div style="text-align:center;line-height:1.35">
+          <div id="wapNamePrev" style="font-size:16.5px;font-weight:700;color:var(--navy-900)">${esc(p.name || 'Имя')}</div>
+          <div id="wapAboutPrev" class="muted" style="font-size:12px;margin-top:2px">${esc(p.about || 'О себе — появится здесь')}</div>
+        </div>
+        <div class="muted" style="font-size:10.5px;display:inline-flex;align-items:center;gap:5px;opacity:.75">${ic(I.chat)}так профиль увидят в WhatsApp</div>
+      </div>
       ${conn ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер не на связи — профиль сохранится и применится после подключения по QR.</span></div>`}
       <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wapName" maxlength="25" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
       <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20"></div>
@@ -1438,6 +1447,14 @@ window.openWaPersona = function (phone, n) {
         closeModal(); render();
       } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     } }, { label: 'Отмена' }] });
+  const updWa = () => {
+    const nm = ($('#wapName', bd) || {}).value || '', ab = ($('#wapAbout', bd) || {}).value || '', av = ($('#wapAvatar', bd) || {}).value || '';
+    const np = $('#wapNamePrev', bd); if (np) np.textContent = nm || 'Имя';
+    const apr = $('#wapAboutPrev', bd); if (apr) apr.textContent = ab || 'О себе — появится здесь';
+    const ava = $('#wapAva', bd), tx = $('#wapAvaTx', bd);
+    if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); img.style.cssText = 'width:100%;height:100%;object-fit:cover'; ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
+  };
+  ['wapName', 'wapAbout', 'wapAvatar'].forEach(id => { const el = $('#' + id, bd); if (el) el.addEventListener('input', updWa); });
 };
 
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
@@ -2015,9 +2032,21 @@ window.openTgPersona = function (phone, n) {
   const p = (n && n.persona) || {};
   const brokerOpts = (STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${p.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
   const connected = n && n.live && n.live.status === 'connected';
-  modal({ title: 'Профиль и персона номера', sub: 'Аватар, имя, био — синкаются в реальный Telegram-профиль', wide: true,
-    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Профиль задаётся на НОМЕР и <b>применяется к самому Telegram-аккаунту</b>. Брокеры работают за персоной — уволился брокер, переназначаешь пул, лид ничего не замечает.</span></div>
-      ${connected ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер ещё не на связи — профиль сохранится и применится к Telegram автоматически после подключения по QR.</span></div>`}
+  const initials = (String(p.name || '') + ' ' + String(p.lastName || '')).trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '👤';
+  const avaInner = p.avatar ? `<img id="tgpAvaImg" src="${esc(p.avatar)}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.dataset.fallback='1'">` : '';
+  const bd = modal({ title: 'Профиль номера', sub: 'Как аккаунт увидят в Telegram — синкается в реальный профиль', wide: true,
+    body: `
+      <!-- превью профиля в стиле Telegram -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:7px;margin:2px 0 18px">
+        <div id="tgpAva" data-init="${esc(initials)}" style="width:92px;height:92px;border-radius:50%;background:linear-gradient(135deg,#2AABEE,#229ED9);display:grid;place-items:center;color:#fff;font-size:32px;font-weight:700;overflow:hidden;box-shadow:0 10px 26px -10px rgba(34,158,217,.65);position:relative">${avaInner}<span id="tgpAvaTx" style="position:absolute;${p.avatar ? 'display:none' : ''}">${esc(initials)}</span></div>
+        <div style="text-align:center;line-height:1.35">
+          <div id="tgpNamePrev" style="font-size:16.5px;font-weight:700;color:var(--navy-900)">${esc(((p.name || 'Имя') + ' ' + (p.lastName || '')).trim())}</div>
+          <div id="tgpUserPrev" class="muted" style="font-size:12.5px">${p.username ? '@' + esc(p.username) : '@username'}</div>
+          <div id="tgpAboutPrev" class="muted" style="font-size:11.5px;margin-top:2px;font-style:italic">${esc(p.about || 'био появится здесь')}</div>
+        </div>
+        <div class="muted" style="font-size:10.5px;display:inline-flex;align-items:center;gap:5px;opacity:.75">${ic(I.send)}так профиль увидят в Telegram</div>
+      </div>
+      ${connected ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер ещё не на связи — профиль сохранится и применится к Telegram после подключения по QR.</span></div>`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-row"><label>Имя (видит лид)</label><input id="tgpName" value="${esc(p.name || '')}" placeholder="напр. Анна"></div>
         <div class="form-row"><label>Фамилия (необязательно)</label><input id="tgpLast" value="${esc(p.lastName || '')}" placeholder="напр. Смирнова"></div>
@@ -2047,6 +2076,16 @@ window.openTgPersona = function (phone, n) {
         closeModal(); render();
       } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     } }, { label: 'Отмена' }] });
+  /* живое превью профиля (как в Telegram) — обновляется при вводе */
+  const updPrev = () => {
+    const nm = ($('#tgpName', bd) || {}).value || '', ln = ($('#tgpLast', bd) || {}).value || '', us = ($('#tgpUser', bd) || {}).value || '', ab = ($('#tgpAbout', bd) || {}).value || '', av = ($('#tgpAvatar', bd) || {}).value || '';
+    const np = $('#tgpNamePrev', bd); if (np) np.textContent = (nm + ' ' + ln).trim() || 'Имя';
+    const up = $('#tgpUserPrev', bd); if (up) up.textContent = us ? '@' + us.replace(/[^a-zA-Z0-9_]/g, '') : '@username';
+    const apr = $('#tgpAboutPrev', bd); if (apr) apr.textContent = ab || 'био появится здесь';
+    const ava = $('#tgpAva', bd), tx = $('#tgpAvaTx', bd);
+    if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); img.style.cssText = 'width:100%;height:100%;object-fit:cover'; ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
+  };
+  ['tgpName', 'tgpLast', 'tgpUser', 'tgpAbout', 'tgpAvatar'].forEach(id => { const el = $('#' + id, bd); if (el) el.addEventListener('input', updPrev); });
 };
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */
 function uiConfirm(title, sub, opts = {}) {
