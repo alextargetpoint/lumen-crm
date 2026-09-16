@@ -10756,28 +10756,7 @@ PAGES.numbers = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#23B383' })}
-    <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
-      <div class="card-title">${ic(I.plus)}Подключить номер<span class="sub">два канала работы с WhatsApp</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
-        <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
-          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.chat)} WhatsApp по QR</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">Свой номер по QR (как WhatsApp Web). Или <b>купите виртуальный номер</b> — он поймает OTP, зарегистрируете WhatsApp и подключите. Прогрев + закреп за брокером.</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
-            <button class="btn btn-sm" id="openYesimBtn">${ic(I.plus)}Купить номер</button>
-          </div>
-        </div>
-        <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
-          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Нужен <b>реальный</b> номер (тестовый 555 не шлёт). Купи виртуальный SMS-номер — код прилетит прямо в CRM.</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
-            <button class="btn btn-sm" id="txOtpBtn">${ic(I.sim)}Номер для Cloud API (OTP)</button>
-            <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Вручную</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="muted" style="font-size:12px;line-height:1.5;margin:2px 0 12px">Каждый канал — на своей вкладке ниже: подключение и покупка номеров живут <b>внутри вкладки</b> нужного канала.</div>
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
@@ -10785,6 +10764,14 @@ PAGES.numbers = async (root) => {
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
+    <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
+      <div class="card-title">${ic(I.chat)}WhatsApp по QR<span class="sub">свой номер по QR (как WhatsApp Web) или купить виртуальный</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Основная переписка с лидами — с личных номеров. Подключите свой по QR или купите виртуальный (поймает OTP → регистрируете WhatsApp → подключаете). Прогрев + закреп за брокером. Списывается с баланса расходников.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
+        <button class="btn btn-sm" id="openYesimBtn">${ic(I.plus)}Купить номер</button>
+      </div>
+    </div>
     ${(() => { const ab = (STATE.brokers || []).filter(b => b.active !== false).length || 0; const have = grayNums.length; const need = Math.max(0, ab - have); const pl = (n) => n === 1 ? 'номер' : (n >= 2 && n <= 4 ? 'номера' : 'номеров'); return `<div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
       <div class="card-title">${ic(I.users)}Рекомендация: 1 номер = 1 брокер<span class="sub">основная переписка с лидами — с личных номеров</span></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Правило безопасности: <b>1 брокер → 1 личный номер</b>, и не более <b>5 новых лидов/день</b> на номер (действующие диалоги без лимита). Больше номеров = больше новых лидов в день без риска бана. Рассылки с личных номеров <b>запрещены</b> — только Cloud API.</div>
@@ -10844,9 +10831,17 @@ PAGES.numbers = async (root) => {
     </div>
 
     <div data-numpane="cloud" style="${NUMTAB === 'cloud' ? '' : 'display:none'}">
+    <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
+      <div class="card-title">${ic(I.shield)}Официальный WhatsApp (Cloud API)<span class="sub">«белый» канал Meta для массовых шаблонов без риска бана</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Нужен <b>реальный</b> номер (тестовый 555 не шлёт). Купите виртуальный SMS-номер — код прилетит прямо в CRM, затем зарегистрируйте его в WhatsApp Business. <b>Сообщения Cloud API оплачивает Meta с вашей карты</b> (не с баланса) — подключите карту в Meta Business.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
+        <button class="btn btn-sm" id="cloudBuyBtn">${ic(I.sim)}Купить Cloud API номер</button>
+        <button class="btn btn-sm" id="numAdd">${ic(I.plus)}Добавить вручную</button>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
       <div class="lp-sec" style="margin:0">Купленные Cloud API номера · ${otpNums.length}</div>
-      <button class="btn btn-sm btn-accent" id="cloudBuyBtn">${ic(I.plus)}Купить Cloud API номер</button>
     </div>
     ${otpNums.length ? `<div class="num-grid" style="margin-bottom:18px">
       ${otpNums.map(n => { const conn = n.connected; const cn = n.cloud; const badge = conn ? ('<span class="badge ok"><i></i>подключён' + (cn && cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ' к WhatsApp') + '</span>') : (n.wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (n.wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»).'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
