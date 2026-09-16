@@ -2624,8 +2624,49 @@ const CRYPTO_TRON = process.env.CRYPTO_TRON_ADDRESS || 'TKsspQfKNJvcREryLtMG1Hsx
 const CRYPTO_ETH  = process.env.CRYPTO_ETH_ADDRESS  || '0x6dc20b29ea59fd722e752e65cd0c0059ee5c3b25';
 const USDT_TRC20  = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   /* USDT (Tron) контракт */
 const USDT_ERC20  = '0xdac17f958d2ee523a2206206994597c13d831ec7'; /* USDT (Ethereum) контракт */
+/* ============ СИСТЕМА УВЕДОМЛЕНИЙ ============
+   Единый notify(): кладёт в in-app центр (db.settings.notifications) + жёстко шлёт на почту владельцу
+   (branded email) + best-effort в Telegram владельца. Каналы можно выключить пер-вызов.
+   Уровни: info | success | warn | critical. Email по умолчанию для success/warn/critical. */
+function notify(db, opts) {
+  try {
+    const o = opts || {};
+    db.settings.notifications = db.settings.notifications || [];
+    const n = { id: 'nt_' + crypto.randomBytes(5).toString('hex'), type: o.type || 'system', level: o.level || 'info', title: o.title || '', text: o.text || '', url: o.url || '', at: Date.now(), read: false };
+    db.settings.notifications.unshift(n);
+    if (db.settings.notifications.length > 100) db.settings.notifications.length = 100;
+    store.save();
+    /* также в ленту событий (обратная совместимость с текущим фидом) */
+    try { ai.pushEvent(db, { type: 'note', text: (n.title ? n.title + ' — ' : '') + n.text }); } catch (e) {}
+    const wantEmail = o.email !== false && ['success', 'warn', 'critical'].includes(n.level);
+    const wantTg = o.telegram !== false;
+    /* fire-and-forget: не блокируем вызывающий (поллер/покупку) */
+    if (wantEmail) {
+      (async () => {
+        try {
+          const to = (db.settings.auth && db.settings.auth.ownerEmail) || ((db.settings.billing && db.settings.billing.company) || {}).email;
+          if (!to) return;
+          const cfg = mailer.platformEmailCfg(store.getRegistry());
+          if (!cfg.key) return;
+          const accent = n.level === 'critical' ? '#E0574A' : n.level === 'warn' ? '#E0A94A' : '#4ADE80';
+          const body = mailer.emailPanel(`<div style="font-size:16px;font-weight:700;margin:0 0 8px">${esc(n.title || 'Уведомление')}</div><div style="font-size:14px;line-height:1.6">${esc(n.text)}</div>`, accent)
+            + (o.url ? mailer.emailButton(o.url, o.buttonLabel || 'Открыть в CRM') : '');
+          const html = mailer.emailWrap(n.title || 'Уведомление Lumen', body, 'ru', { preheader: n.text.slice(0, 90) });
+          await mailer.sendViaResend(cfg, to, (n.level === 'critical' ? '🔴 ' : '') + (n.title || 'Уведомление Lumen'), html);
+        } catch (e) {}
+      })();
+    }
+    if (wantTg) {
+      (async () => {
+        try { const chat = db.settings.ownerTgChatId; if (chat && tgbridge.ready(db)) await tgbridge.notify(db, chat, `${n.title ? '*' + n.title + '*\n' : ''}${n.text}`); } catch (e) {}
+      })();
+    }
+    return n;
+  } catch (e) { return null; }
+}
+
 /* Предупреждение о низком балансе расходников. Без спама: один раз на «уровень» (ok→low→empty).
-   Слайс 2 добавит сюда email+Telegram-пуш и вкладку-центр уведомлений. */
+   Жёсткое уведомление (in-app + email + Telegram) через notify(). */
 function lowBalanceCheck(db) {
   try {
     const b = db.settings.billing; if (!b) return;
@@ -2633,19 +2674,22 @@ function lowBalanceCheck(db) {
     const bal = b.balance || 0;
     const monthly = u.balanceMonthlyForecast || 0;
     let level = 'ok';
-    if (bal <= 0.0001) level = 'empty';
-    else if (monthly > 0 && bal < monthly) level = 'low';
-    else if (monthly > 0 && bal < monthly * 2) level = 'warn';
+    /* если ничего не потребляет (нет номеров/расхода) — тревожить не о чем, даже при $0 */
+    if (monthly <= 0) level = 'ok';
+    else if (bal <= 0.0001) level = 'empty';
+    else if (bal < monthly) level = 'low';
+    else if (bal < monthly * 2) level = 'warn';
     if (level === (b._balLevel || 'ok')) return;   // уровень не изменился — не дублируем
     b._balLevel = level;
     if (level === 'ok') { store.save(); return; }
-    const msg = level === 'empty'
-      ? `🔴 Баланс расходников закончился ($0). Пополните криптой, иначе номера, аккаунты и все чаты будут приостановлены — доступ к переписке пропадёт.`
+    const nlevel = level === 'empty' ? 'critical' : level === 'low' ? 'warn' : 'info';
+    const title = level === 'empty' ? 'Баланс расходников закончился' : level === 'low' ? 'Низкий баланс расходников' : 'Баланс расходников на исходе';
+    const text = level === 'empty'
+      ? `Баланс $0. Пополните криптой немедленно — иначе номера, аккаунты и доступ ко всем чатам и переписке будут приостановлены.`
       : level === 'low'
-      ? `🟠 Баланса расходников ($${bal.toFixed(2)}) не хватает на месяц вперёд (прогноз $${monthly.toFixed(2)}). Пополните заранее — при обнулении номера и чаты приостановятся.`
-      : `🟡 Баланс расходников ниже двойного месячного прогноза. Рекомендуем пополнить заранее.`;
-    try { ai.pushEvent(db, { type: 'note', text: msg }); } catch (e) {}
-    store.save();
+      ? `На балансе $${bal.toFixed(2)} — не хватает на месяц вперёд (прогноз $${monthly.toFixed(2)}). Пополните заранее: при обнулении номера и чаты приостановятся.`
+      : `Баланс $${bal.toFixed(2)} — ниже двойного месячного прогноза ($${monthly.toFixed(2)}). Рекомендуем пополнить заранее.`;
+    notify(db, { type: 'balance', level: nlevel, title, text });
   } catch (e) {}
 }
 
@@ -2702,8 +2746,8 @@ async function cryptoTick() {
           if (hit) {
             if (billing.creditTopup(db, t, hit.txid, hit.amt)) {
               changed = true;
-              try { ai.pushEvent(db, { type: 'note', text: `💰 Пополнение расходников: +$${t.creditedAmount} (USDT ${t.chain.toUpperCase()} подтверждён on-chain)` }); } catch (e) {}
-              try { lowBalanceCheck(db); } catch (e) {}
+              try { notify(db, { type: 'payment', level: 'success', title: 'Баланс пополнен', text: `+$${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) — платёж подтверждён on-chain. Баланс расходников: $${(db.settings.billing.balance || 0).toFixed(2)}.` }); } catch (e) {}
+              try { bl._balLevel = null; lowBalanceCheck(db); } catch (e) {}
             }
           }
         }
@@ -4753,6 +4797,23 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, topup: { id: topup.id, amountUsd, exactAmount, chain, address, purpose: topup.purpose, expiresAt: topup.expiresAt }, qrImage });
       }
       if (p === '/api/billing/topups' && req.method === 'GET') { const bl = db.settings.billing; return json(res, 200, { balance: bl.balance || 0, topups: (bl.cryptoTopups || []).slice(0, 20) }); }
+      return json(res, 404, { error: 'not found' });
+    }
+
+    /* ---------------- Центр уведомлений системы ---------------- */
+    if (p.startsWith('/api/notifications')) {
+      if (!getSession(req)) return json(res, 401, { error: 'auth required' });
+      const list = db.settings.notifications || [];
+      if (p === '/api/notifications' && req.method === 'GET') {
+        return json(res, 200, { notifications: list.slice(0, 50), unread: list.filter(n => !n.read).length });
+      }
+      if (p === '/api/notifications/read' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (b.all) list.forEach(n => n.read = true);
+        else if (b.id) { const n = list.find(x => x.id === b.id); if (n) n.read = true; }
+        store.save();
+        return json(res, 200, { ok: true, unread: list.filter(n => !n.read).length });
+      }
       return json(res, 404, { error: 'not found' });
     }
 

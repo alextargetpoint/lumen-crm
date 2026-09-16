@@ -13520,6 +13520,29 @@ const TOP_ACTIONS = {
   brokers: { label: 'Брокер', run: () => $('#brAdd')?.click() },
 };
 $('#newLeadBtn').addEventListener('click', () => { const a = TOP_ACTIONS[CUR]; if (a) a.run(); });
+
+/* ---------- Центр уведомлений (колокол в шапке): баланс, платежи, истечение номеров ---------- */
+(() => {
+  const bell = $('#notifBell'), badge = $('#notifBadge'), panel = $('#notifPanel'), wrap = $('#notifWrap');
+  if (!bell) return;
+  let notes = [], open = false;
+  const ago = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); if (s < 60) return 'только что'; if (s < 3600) return Math.floor(s / 60) + ' мин назад'; if (s < 86400) return Math.floor(s / 3600) + ' ч назад'; return Math.floor(s / 86400) + ' дн назад'; };
+  async function load() {
+    if (typeof STATE === 'undefined' || !STATE || !STATE.settings) return;   /* не дёргаем до входа */
+    try { const r = await api.get('/notifications'); notes = r.notifications || []; if (badge) { badge.textContent = r.unread > 9 ? '9+' : String(r.unread); badge.hidden = !r.unread; } if (open) draw(); } catch (e) {}
+  }
+  function draw() {
+    panel.innerHTML = `<div class="notif-h"><b>Уведомления</b>${notes.some(n => !n.read) ? `<button class="notif-readall" id="ntReadAll">Прочитать все</button>` : ''}</div>`
+      + (notes.length ? notes.map(n => `<div class="notif-item ${n.read ? '' : 'unread'} lv-${esc(n.level || 'info')}"><span class="notif-dot"></span><div class="notif-body"><div class="notif-tt">${esc(n.title || '')}</div><div class="notif-tx">${esc(n.text || '')}</div><div class="notif-at">${ago(n.at)}</div></div></div>`).join('') : `<div class="notif-empty">Пока нет уведомлений</div>`);
+    const ra = $('#ntReadAll', panel); if (ra) ra.addEventListener('click', async () => { try { await api.post('/notifications/read', { all: true }); } catch (e) {} load(); });
+  }
+  bell.addEventListener('click', async (e) => {
+    e.stopPropagation(); open = !open; panel.hidden = !open;
+    if (open) { draw(); if (notes.some(n => !n.read)) { try { await api.post('/notifications/read', { all: true }); } catch (_) {} setTimeout(load, 400); } }
+  });
+  document.addEventListener('click', (e) => { if (open && wrap && !wrap.contains(e.target)) { open = false; panel.hidden = true; } });
+  load(); setInterval(load, 60000);
+})();
 function syncTopAction() {
   const btn = $('#newLeadBtn');
   const a = TOP_ACTIONS[CUR];
