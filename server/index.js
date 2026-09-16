@@ -6617,6 +6617,30 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, { ok: true, phone, brokerId: rec.brokerId });
     }
+    /* профиль серого WhatsApp-номера (имя/описание/аватар) → синк в РЕАЛЬНЫЙ WhatsApp */
+    if (p === '/api/wa/gray/persona' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const rec = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === phone);
+      if (!rec) return json(res, 404, { error: 'номер не найден' });
+      rec.persona = rec.persona || {};
+      if (b.name != null) rec.persona.name = String(b.name).slice(0, 25);       // лимит имени WA
+      if (b.about != null) rec.persona.about = String(b.about).slice(0, 139);    // «О себе» WA
+      if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
+      store.save();
+      let sync = null;
+      if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
+      return json(res, 200, { ok: true, persona: rec.persona, sync });
+    }
+    if (p === '/api/wa/gray/apply-profile' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const rec = ((db.settings.waGray || {}).numbers || []).find(n => n.phone === phone);
+      const pr = rec && rec.persona; if (!pr || !(pr.name || pr.about || pr.avatar)) return json(res, 200, { ok: true, skipped: true });
+      if (!waWorkerReady(db)) return json(res, 200, { ok: false, error: 'воркер не подключён' });
+      try { const sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: pr.name || '', about: pr.about || '', photoUrl: pr.avatar || '' }); return json(res, 200, { ok: true, sync }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
     /* выйти и убрать номер из пула */
     if (p === '/api/wa/gray/remove' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

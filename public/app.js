@@ -1417,6 +1417,29 @@ window.openGrayConsent = function (kind, cb) {
   return bd;
 };
 
+/* профиль серого WhatsApp-номера (имя/описание/аватар → синк в реальный WhatsApp) */
+window.openWaPersona = function (phone, n) {
+  const p = (n && n.persona) || {};
+  const conn = n && n.live && n.live.status === 'connected';
+  modal({ title: 'Профиль WhatsApp-номера', sub: 'Имя, описание, аватар — синкаются в реальный WhatsApp', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Профиль применяется к самому WhatsApp-аккаунту номера. Держи консистентное лицо/имя — не фото уходящего брокера.</span></div>
+      ${conn ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер не на связи — профиль сохранится и применится после подключения по QR.</span></div>`}
+      <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wapName" maxlength="25" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
+      <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wapAbout" maxlength="139" value="${esc(p.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10–20"></div>
+      <div class="form-row"><label>Аватар (URL картинки)</label><input id="wapAvatar" value="${esc(p.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+      <div id="wapOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>`,
+    actions: [{ label: 'Сохранить и применить', cls: 'btn-accent', onClick: async (b) => {
+      const out = $('#wapOut', b); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
+      try {
+        const r = await api.post('/wa/gray/persona', { phone, name: ($('#wapName', b) || {}).value, about: ($('#wapAbout', b) || {}).value, avatar: ($('#wapAvatar', b) || {}).value });
+        const sy = r.sync || {};
+        if (sy.error) toast('Сохранено', 'применится после подключения', true);
+        else toast('Профиль сохранён и применён к WhatsApp', null, true);
+        closeModal(); render();
+      } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    } }, { label: 'Отмена' }] });
+};
+
 /* ---------- WhatsApp «серый способ» (QR) — менеджер номеров через облачный воркер ---------- */
 window.openGrayManager = async function (jumpPhone) {
   if (!grayConsentOk()) return openGrayConsent('wa', () => window.openGrayManager(jumpPhone));
@@ -1794,7 +1817,7 @@ window.grayAddQR = function (phone, label) {
     let r; try { r = await api.get('/wa/gray/status?phone=' + encodeURIComponent(phone)); } catch (e) { return; }
     const st = r.session && r.session.status;
     if (st === 'qr' && r.session.qr) box.innerHTML = `<img src="${r.session.qr}" alt="QR" style="width:240px;height:240px;border-radius:10px;background:#fff;padding:8px">`;
-    else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--ok,#3f7d4f)">✓ Номер подключён${r.session.phone ? ' · +' + esc(r.session.phone) : ''}</div>`; clearInterval(pollTimer); if (typeof CUR !== 'undefined' && CUR === 'numbers' && PAGES.numbers) setTimeout(() => PAGES.numbers(document.getElementById('view') || document.querySelector('[data-view-root]') || document.body), 1200); }
+    else if (st === 'connected') { box.innerHTML = `<div style="font-size:15px;color:var(--ok,#3f7d4f)">✓ Номер подключён${r.session.phone ? ' · +' + esc(r.session.phone) : ''}</div>`; clearInterval(pollTimer); try { api.post('/wa/gray/apply-profile', { phone: String(phone).replace(/[^0-9]/g, '') }); } catch (_) {} if (typeof CUR !== 'undefined' && CUR === 'numbers' && PAGES.numbers) setTimeout(() => PAGES.numbers(document.getElementById('view') || document.querySelector('[data-view-root]') || document.body), 1200); }
     else if (st === 'logged_out') { box.innerHTML = '<div style="color:var(--bad)">Вышел из аккаунта. Попробуйте заново.</div>'; clearInterval(pollTimer); }
     else box.innerHTML = '<div style="color:var(--ink-3)">Подключение…</div>';
   }, 1800);
@@ -10662,6 +10685,7 @@ PAGES.numbers = async (root) => {
           <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
         <div class="num-actions">
           ${n.source === 'yesim' ? `<button class="btn btn-sm" data-yact="${esc(n.phone)}" title="Гид активации + приём SMS/OTP">${ic(I.spark)}Активация / коды</button>` : ''}
+          <button class="btn btn-sm" data-waprofile="${esc(n.phone)}" title="Аватар/имя/описание → синк в WhatsApp">${ic(I.gear)}Профиль</button>
           ${!conn ? `<button class="btn btn-sm btn-accent" data-grayqr="${esc(n.phone)}">${ic(I.link)}Показать QR</button>` : `<span class="muted" style="font-size:11.5px">${ic(I.check)}активен для касаний</span>`}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-grayrm="${esc(n.phone)}" title="Убрать номер">${ic(I.x)}</button>
@@ -10856,6 +10880,7 @@ PAGES.numbers = async (root) => {
   }));
   /* серые карточки: QR-переподключение, закреп за брокером, удаление — прямо со страницы */
   $$('[data-grayqr]', root).forEach(b => b.addEventListener('click', () => window.openGrayManager && window.openGrayManager(b.dataset.grayqr)));
+  $$('[data-waprofile]', root).forEach(b => b.addEventListener('click', () => window.openWaPersona && window.openWaPersona(b.dataset.waprofile, grayNums.find(n => n.phone === b.dataset.waprofile))));
   $$('[data-yact]', root).forEach(b => b.addEventListener('click', () => window.openYesimActivate && window.openYesimActivate(b.dataset.yact)));
   $$('.gn-broker2', root).forEach(s => s.addEventListener('change', async () => { try { await api.post('/wa/gray/assign', { phone: s.dataset.p, brokerId: s.value || null }); toast(s.value ? 'Номер закреплён за брокером' : 'Номер в общем пуле', null, true); } catch (e) { toast('Не вышло', e.message); } }));
   $$('[data-grayrm]', root).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать номер?', 'Серая сессия выйдет из WhatsApp.', { ok: 'Убрать', danger: true })) return; try { await api.post('/wa/gray/remove', { phone: b.dataset.grayrm }); toast('Номер убран', null, true); render(); } catch (e) { toast('Не вышло', e.message); } }));
