@@ -1774,7 +1774,7 @@ window.openTgConnect = function () {
   const host = () => $('#tgqBox', bd);
   const shots = [['01-add-email', 'Add Email — впиши e-mail'], ['02-email-code', 'Код с почты'], ['03-sms-fee', '~$0.99 (анти-спам)'], ['04-enter-code', 'SMS-код на номер']];
   const GUIDE = `<details class="tg-guide" style="margin-bottom:14px;border:1px solid var(--stroke);border-radius:12px;padding:11px 13px;background:var(--bg-2)">
-      <summary style="cursor:pointer;font-weight:650;font-size:13px;list-style:none">📘 Как создать Telegram-аккаунт на купленном номере (один раз, на телефоне)</summary>
+      <summary style="cursor:pointer;font-weight:650;font-size:13px;list-style:none">📘 Шаг 2 · Создать Telegram-аккаунт на купленном номере (один раз, на телефоне) — открыть инструкцию</summary>
       <div style="font-size:12px;line-height:1.65;color:var(--ink-2);margin-top:10px">
         Telegram при регистрации нового номера ставит защиту. Пройди её один раз на телефоне (лучше Android), потом вернись сюда и подключи аккаунт по QR.
         <ol style="margin:10px 0 0 18px;padding:0;display:flex;flex-direction:column;gap:5px">
@@ -1782,7 +1782,7 @@ window.openTgConnect = function () {
           <li>На телефоне открой Telegram → введи купленный номер.</li>
           <li><b>Add Email</b>: Telegram попросит e-mail для кода (впиши любой свой) или «Sign in with Apple».</li>
           <li><b>Check Your Email</b>: введи код из письма.</li>
-          <li><b>One-time SMS Fee</b>: иногда просит ~$0.99 (неделя Premium) как анти-спам. Оплати.</li>
+          <li><b>One-time SMS Fee</b>: <b>может появиться, а может нет</b> (зависит от номера/страны). Если Telegram показал оплату ~$0.99 (неделя Premium) — оплати; если не показал — сразу перейдёшь к вводу кода.</li>
           <li><b>Enter Code</b>: теперь придёт SMS на номер. Код возьми в CRM → «Номера» (кнопка «Активация / коды» на карточке номера). Введи его.</li>
           <li>Готово — аккаунт создан. Имя/фото и персону настроишь в CRM после подключения.</li>
         </ol>
@@ -1792,14 +1792,42 @@ window.openTgConnect = function () {
         <div class="muted" style="font-size:11px;margin-top:10px">Экраны Telegram могут отличаться по стране/устройству — порядок тот же: e-mail → (оплата) → SMS.</div>
       </div>
     </details>`;
+  const stepH = (n, t) => `<div style="font-weight:700;font-size:13px;color:var(--navy-900);margin:0 0 6px;display:flex;align-items:center;gap:8px"><span style="display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px">${n}</span>${t}</div>`;
   const drawForm = () => {
-    host().innerHTML = GUIDE + `
-      <div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.link)}Аккаунт уже создан на телефоне? Подключи его сюда по QR — как в WhatsApp Web, SMS больше не нужен.</span></div>
-      <div class="form-row"><label>Номер телефона (с кодом страны)</label><input id="tgqPhone" placeholder="+380…"></div>
-      <div class="form-row"><label>Метка (необязательно)</label><input id="tgqLabel" placeholder="напр. Анна · Дубай"></div>
-      <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>
-      <button class="btn btn-accent" id="tgqGo" style="margin-top:8px">${ic(I.spark)}Показать QR для подключения</button>`;
+    host().innerHTML = `
+      <div style="border:1px solid var(--stroke);border-radius:12px;padding:12px 13px;margin-bottom:12px">
+        ${stepH(1, 'Купить номер')}
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:8px">Нет номера? Купи виртуальный (<b>не-US</b> — US Telegram часто режет). Код придёт в CRM. Уже есть номер — переходи к шагу 2.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="tgwCountry" class="inp" style="max-width:180px"><option value="UA">Украина (+380)</option><option value="GB">Великобритания (+44)</option><option value="NL">Нидерланды (+31)</option><option value="CA">Канада (+1)</option><option value="DE">Германия (+49)</option><option value="PL">Польша (+48)</option><option value="US">США (+1)</option></select>
+          <button class="btn btn-sm btn-accent" id="tgwBuy">${ic(I.plus)}Купить номер</button>
+          <span id="tgwBuyOut" class="muted" style="font-size:11.5px"></span>
+        </div>
+      </div>
+      <div style="border:1px solid var(--stroke);border-radius:12px;padding:12px 13px;margin-bottom:12px">
+        ${stepH(2, 'Создать Telegram-аккаунт на телефоне')}
+        ${GUIDE}
+      </div>
+      <div style="border:1px solid var(--stroke);border-radius:12px;padding:12px 13px">
+        ${stepH(3, 'Подключить в Lumen по QR')}
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:8px">Аккаунт создан? Впиши номер и покажи QR — сканируешь в Telegram (Настройки → Устройства), как WhatsApp Web. SMS не нужен.</div>
+        <div class="form-row"><label>Номер телефона (с кодом страны)</label><input id="tgqPhone" placeholder="+380…"></div>
+        <div class="form-row"><label>Метка (необязательно)</label><input id="tgqLabel" placeholder="напр. Анна · Дубай"></div>
+        <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+        <button class="btn btn-accent" id="tgqGo" style="margin-top:8px">${ic(I.spark)}Показать QR для подключения</button>
+      </div>`;
     $('#tgqGo', bd).addEventListener('click', startQr);
+    try { enhanceControls(host()); } catch (_) {}
+    $('#tgwBuy', bd).addEventListener('click', async () => {
+      const country = ($('#tgwCountry', bd) || {}).value || 'UA'; const o = $('#tgwBuyOut', bd); const btn = $('#tgwBuy', bd);
+      btn.disabled = true; o.textContent = 'Покупаю…';
+      try {
+        const r = await api.post('/gray/yesim/buy', { country, subscriptionOption: 'month', for: 'tg' });
+        if (r.ok && r.number) { o.innerHTML = '<span style="color:var(--ok,#3f7d4f)">✓ Куплен +' + esc(r.number) + '</span>'; const pf = $('#tgqPhone', bd); if (pf) pf.value = '+' + String(r.number).replace(/[^0-9]/g, ''); }
+        else o.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'не куплено') + '</span>';
+      } catch (e) { o.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+      btn.disabled = false;
+    });
   };
   const startQr = async () => {
     const phone = ($('#tgqPhone', bd) || {}).value || ''; const label = ($('#tgqLabel', bd) || {}).value || '';
@@ -1835,7 +1863,7 @@ window.openTgConnect = function () {
   const poll = async () => {
     if (!document.body.contains(bd)) { stop(); return; }
     let r; try { r = await api.get('/tg/gray/qr-status?phone=' + encodeURIComponent(curPhone)); } catch (e) { return; }
-    if (r.status === 'connected') { stop(); host().innerHTML = `<div style="text-align:center;padding:22px;font-size:15px;color:var(--ok,#3f7d4f)">${ic(I.check)} Аккаунт подключён${r.username ? ' · @' + esc(r.username) : ''}</div>`; toast('Telegram подключён', '+' + curPhone, true); setTimeout(() => { closeModal(); if (window.__reloadTgGray) window.__reloadTgGray(); }, 1200); }
+    if (r.status === 'connected') { stop(); try { await api.post('/tg/gray/apply-profile', { phone: curPhone }); } catch (_) {} host().innerHTML = `<div style="text-align:center;padding:22px;font-size:15px;color:var(--ok,#3f7d4f)">${ic(I.check)} Аккаунт подключён${r.username ? ' · @' + esc(r.username) : ''}<div class="muted" style="font-size:12px;margin-top:8px;color:var(--ink-3)">Профиль (аватар/имя/био) применён. Дальше — задай персону на карточке номера.</div></div>`; toast('Telegram подключён', '+' + curPhone, true); setTimeout(() => { closeModal(); if (window.__reloadTgGray) window.__reloadTgGray(); }, 1400); }
     else if (r.status === 'password_needed') { if (!$('#tgqPwd', bd)) drawPwd(); }
     else if (r.status === 'qr_waiting' && r.qrImage) { const img = $('#tgqImg', bd); if (img && img.src !== r.qrImage) img.src = r.qrImage; }
     else if (r.status === 'error') { stop(); const out = $('#tgqOut', bd); if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'ошибка') + '</span>'; }
@@ -1896,10 +1924,19 @@ window.openTgCode = function (phone) {
 window.openTgPersona = function (phone, n) {
   const p = (n && n.persona) || {};
   const brokerOpts = (STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${p.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
-  modal({ title: 'Персона номера', sub: 'Кто «отвечает» лиду. Гибко под ваш формат', wide: true,
-    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Персона задаётся на НОМЕР, брокеры работают за ней. Уволился брокер → просто переназначаешь пул, лид ничего не замечает.</span></div>
-      <div class="form-row"><label>Имя (видит лид)</label><input id="tgpName" value="${esc(p.name || '')}" placeholder="напр. Анна · TargetPoint"></div>
-      <div class="form-row"><label>Аватар (URL)</label><input id="tgpAvatar" value="${esc(p.avatar || '')}" placeholder="https://... (консистентное лицо, не фото уходящего брокера)"></div>
+  const connected = n && n.live && n.live.status === 'connected';
+  modal({ title: 'Профиль и персона номера', sub: 'Аватар, имя, био — синкаются в реальный Telegram-профиль', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.spark)}Профиль задаётся на НОМЕР и <b>применяется к самому Telegram-аккаунту</b>. Брокеры работают за персоной — уволился брокер, переназначаешь пул, лид ничего не замечает.</span></div>
+      ${connected ? '' : `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}Номер ещё не на связи — профиль сохранится и применится к Telegram автоматически после подключения по QR.</span></div>`}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Имя (видит лид)</label><input id="tgpName" value="${esc(p.name || '')}" placeholder="напр. Анна"></div>
+        <div class="form-row"><label>Фамилия (необязательно)</label><input id="tgpLast" value="${esc(p.lastName || '')}" placeholder="напр. Смирнова"></div>
+      </div>
+      <div class="form-row"><label>Био / описание (до 70 симв.)</label><input id="tgpAbout" value="${esc(p.about || '')}" maxlength="70" placeholder="напр. Недвижимость Дубай · подберу под бюджет"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Username (@, необязательно)</label><input id="tgpUser" value="${esc(p.username || '')}" placeholder="anna_realty"></div>
+        <div class="form-row"><label>Аватар (URL картинки)</label><input id="tgpAvatar" value="${esc(p.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+      </div>
       <div style="display:flex;gap:10px">
         <div class="form-row" style="flex:1"><label>Режим</label><select id="tgpMode">
           <option value="qualifier" ${p.mode === 'qualifier' || !p.mode ? 'selected' : ''}>Квалификатор (нейтральная персона)</option>
@@ -1907,9 +1944,18 @@ window.openTgPersona = function (phone, n) {
           <option value="neutral" ${p.mode === 'neutral' ? 'selected' : ''}>Нейтрал (корпоративная)</option>
         </select></div>
         <div class="form-row" style="flex:1"><label>Брокер за персоной</label><select id="tgpBroker"><option value="">— пул</option>${brokerOpts}</select></div>
-      </div>`,
-    actions: [{ label: 'Сохранить', cls: 'btn-accent', onClick: async (b) => {
-      try { await api.post('/tg/gray/persona', { phone, name: ($('#tgpName', b) || {}).value, avatar: ($('#tgpAvatar', b) || {}).value, mode: ($('#tgpMode', b) || {}).value, brokerId: ($('#tgpBroker', b) || {}).value || null }); toast('Персона сохранена', null, true); closeModal(); render(); } catch (e) { toast('Не вышло', e.message); }
+      </div>
+      <div id="tgpOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>`,
+    actions: [{ label: 'Сохранить и применить', cls: 'btn-accent', onClick: async (b) => {
+      const out = $('#tgpOut', b); if (out) out.textContent = 'Сохраняю и синкаю в Telegram…';
+      try {
+        const r = await api.post('/tg/gray/persona', { phone, name: ($('#tgpName', b) || {}).value, lastName: ($('#tgpLast', b) || {}).value, about: ($('#tgpAbout', b) || {}).value, username: ($('#tgpUser', b) || {}).value, avatar: ($('#tgpAvatar', b) || {}).value, mode: ($('#tgpMode', b) || {}).value, brokerId: ($('#tgpBroker', b) || {}).value || null });
+        const sy = r.sync || {};
+        if (sy.usernameError) { toast('Профиль сохранён', 'username занят/короткий — остальное применено', true); }
+        else if (sy.error) { toast('Сохранено', 'применится после подключения', true); }
+        else toast('Профиль сохранён и применён к Telegram', null, true);
+        closeModal(); render();
+      } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     } }, { label: 'Отмена' }] });
 };
 /* Lumen-стилевой confirm вместо нативного window.confirm — все подтверждения в едином виде */

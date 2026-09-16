@@ -6645,10 +6645,30 @@ const server = http.createServer(async (req, res) => {
       if (!rec) return json(res, 404, { error: 'номер не найден' });
       rec.persona = rec.persona || {};
       if (b.name != null) rec.persona.name = String(b.name).slice(0, 60);
+      if (b.lastName != null) rec.persona.lastName = String(b.lastName).slice(0, 60);
+      if (b.about != null) rec.persona.about = String(b.about).slice(0, 70);      // био Telegram
+      if (b.username != null) rec.persona.username = String(b.username).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 32);
       if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
       if (b.mode != null) rec.persona.mode = ['qualifier', 'broker', 'neutral'].includes(b.mode) ? b.mode : 'qualifier';
       if (b.brokerId !== undefined) rec.persona.brokerId = b.brokerId || null;
-      store.save(); return json(res, 200, { ok: true, persona: rec.persona });
+      store.save();
+      /* СИНК в реальный Telegram-профиль (если номер на связи и есть воркер) */
+      let sync = null;
+      if (tgWorkerReady(db)) {
+        try { sync = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/profile', { firstName: rec.persona.name || '', lastName: rec.persona.lastName || '', about: rec.persona.about || '', username: rec.persona.username || '', photoUrl: rec.persona.avatar || '' }); }
+        catch (e) { sync = { error: e.message }; }
+      }
+      return json(res, 200, { ok: true, persona: rec.persona, sync });
+    }
+    /* применить СОХРАНЁННЫЙ профиль к реальному TG (вызывается после подключения по QR) */
+    if (p === '/api/tg/gray/apply-profile' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      const rec = (db.settings.tgGray && db.settings.tgGray.numbers || []).find(n => n.phone === phone);
+      const pr = rec && rec.persona; if (!pr || !(pr.name || pr.about || pr.username || pr.avatar || pr.lastName)) return json(res, 200, { ok: true, skipped: true });
+      if (!tgWorkerReady(db)) return json(res, 200, { ok: false, error: 'воркер не подключён' });
+      try { const sync = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/profile', { firstName: pr.name || '', lastName: pr.lastName || '', about: pr.about || '', username: pr.username || '', photoUrl: pr.avatar || '' }); return json(res, 200, { ok: true, sync }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* удалить серый TG-номер */
     if (p === '/api/tg/gray/remove' && req.method === 'POST') {
