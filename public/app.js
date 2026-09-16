@@ -1389,15 +1389,15 @@ function grayConsentOk() { const c = STATE && STATE.settings && STATE.settings.g
 window.openGrayConsent = function (kind, cb) {
   const svc = kind === 'tg' ? 'Telegram' : 'WhatsApp';
   const items = [
-    `Понимаю, что «серые» подключения (${svc} по QR / неофициально, вне официальных API) нарушают правила ${svc} и аккаунт или номер могут быть <b>заблокированы либо удалены в любой момент</b> без предупреждения.`,
+    `Понимаю, что прямое подключение (${svc} по QR / личный аккаунт, вне официального API) — <b>неофициальный метод</b>: он вне правил ${svc}, и аккаунт или номер могут быть <b>заблокированы либо удалены в любой момент</b> без предупреждения.`,
     `Беру всю ответственность на себя. <b>TargetPoint / Lumen не несёт ответственности</b> за блокировки, потерю аккаунтов, номеров, переписки, данных и любые связанные издержки.`,
     `Понимаю, что средства, потраченные на номера/аккаунты, <b>невозвратны при бане</b> — это технические издержки на моей стороне.`,
     `Обязуюсь <b>не вести массовые рассылки</b> с этих номеров (мгновенный бан) — только точечные касания 1-к-1.`,
     `Понимаю, что могу использовать как номера из магазина, так и <b>свои купленные аккаунты</b> — выбор источника и ответственность за него на мне.`,
   ];
   const bd = modal({
-    title: 'Серые подключения — условия и ответственность', sub: 'Отметьте все пункты, чтобы продолжить', wide: true,
-    body: `<div class="lc-hint warn" style="margin-bottom:12px"><span>${ic(I.shield)}«Серые» методы (${svc} по QR / неофициально) эффективны, но работают <b>вне официальных API и на ваш риск</b>. Подтвердите согласие — это разовое действие.</span></div>
+    title: 'Прямое подключение — условия и ответственность', sub: 'Отметьте все пункты, чтобы продолжить', wide: true,
+    body: `<div class="lc-hint warn" style="margin-bottom:12px"><span>${ic(I.shield)}Прямое подключение (${svc} по QR / личный аккаунт) эффективно, но это <b>неофициальный метод</b> — вне API мессенджера и на ваш риск. Подтвердите согласие — это разовое действие.</span></div>
       <div id="gcList" style="display:flex;flex-direction:column;gap:11px">${items.map((t, i) => `<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.55;cursor:pointer"><input type="checkbox" class="gc-ck" data-i="${i}" style="margin-top:3px;flex:0 0 auto"><span>${t}</span></label>`).join('')}</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:16px">
         <button class="btn btn-accent" id="gcGo" disabled>${ic(I.check)}Принять и продолжить</button>
@@ -1449,7 +1449,7 @@ window.openGrayManager = async function (jumpPhone) {
   const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
   /* обновить карточки на странице «Номера» за модалкой (чтобы не жать F5) */
   const refreshNumbersPage = () => { try { if (typeof CUR !== 'undefined' && CUR === 'numbers' && typeof render === 'function') render(); } catch (_) {} };
-  const bd = modal({ title: 'WhatsApp — серый способ (QR)', sub: 'Подключение номеров по QR + прогрев, без Meta', wide: true, body: '<div id="grayMgr">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => { stopPoll(); refreshNumbersPage(); } }] });
+  const bd = modal({ title: 'WhatsApp · подключение по QR', sub: 'Личный номер по QR + прогрев (без Meta Cloud API)', wide: true, body: '<div id="grayMgr">Загрузка…</div>', actions: [{ label: 'Закрыть', onClick: () => { stopPoll(); refreshNumbersPage(); } }] });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) { stopPoll(); refreshNumbersPage(); } });
   const host = () => $('#grayMgr', bd);
   const badge = (live) => {
@@ -10733,16 +10733,16 @@ PAGES.numbers = async (root) => {
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
-      <button class="seg-btn ${NUMTAB === 'tg' ? 'on' : ''}" data-numtab="tg">${ic(I.send)}Telegram (серый)</button>
+      <button class="seg-btn ${NUMTAB === 'tg' ? 'on' : ''}" data-numtab="tg">${ic(I.send)}Telegram · QR</button>
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
     ${(() => { const ab = (STATE.brokers || []).filter(b => b.active !== false).length || 0; const have = grayNums.length; const need = Math.max(0, ab - have); const pl = (n) => n === 1 ? 'номер' : (n >= 2 && n <= 4 ? 'номера' : 'номеров'); return `<div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
-      <div class="card-title">${ic(I.users)}Рекомендация: 1 номер = 1 брокер<span class="sub">основная переписка с лидами — с серых</span></div>
-      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Правило безопасности: <b>1 брокер → 1 серый номер</b>, и не более <b>5 новых лидов/день</b> на номер (действующие диалоги без лимита). Больше номеров = больше новых лидов в день без риска бана. Рассылки с серых <b>запрещены</b> — только Cloud API.</div>
+      <div class="card-title">${ic(I.users)}Рекомендация: 1 номер = 1 брокер<span class="sub">основная переписка с лидами — с личных номеров</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Правило безопасности: <b>1 брокер → 1 личный номер</b>, и не более <b>5 новых лидов/день</b> на номер (действующие диалоги без лимита). Больше номеров = больше новых лидов в день без риска бана. Рассылки с личных номеров <b>запрещены</b> — только Cloud API.</div>
       <div class="num-meta">
         <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
-        <div class="m"><div class="v">${have}</div><div class="k">серых номеров</div></div>
+        <div class="m"><div class="v">${have}</div><div class="k">личных номеров</div></div>
         <div class="m"><div class="v">${have * 5}</div><div class="k">новых лидов/день сейчас</div></div>
         <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">потолок при 1-на-1</div></div>
       </div>
@@ -10763,11 +10763,11 @@ PAGES.numbers = async (root) => {
     <div class="num-grid" style="margin-bottom:18px">
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
-          <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'серый номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
+          <div><div class="ph">${esc(n.realPhone ? '+' + n.realPhone : n.phone)}</div><div class="lb">${esc(n.label || 'личный номер')}${n.realPhone && n.realPhone !== n.phone ? ' · подключён' : ''} · <b style="color:var(--accent)">QR / web-протокол</b></div></div>
           ${ring(risk)}
         </div>
         <div style="margin:10px 0 6px">${grayStatusBadge(n.live)}</div>
-        ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5}${(n.newToday || 0) >= (n.newCap || 5) ? ' ⚠️' : ''} · <span title="Массовые рассылки с серых номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
+        ${n.live && n.live.status === 'connected' ? `<div class="muted" style="font-size:11px;margin:0 0 6px">Новых лидов сегодня: <b style="color:${(n.newToday || 0) >= (n.newCap || 5) ? 'var(--warn)' : 'var(--accent)'}">${n.newToday || 0}</b> · реком. ≤${n.newCap || 5}${(n.newToday || 0) >= (n.newCap || 5) ? ' ⚠️' : ''} · <span title="Массовые рассылки с личных номеров запрещены (риск бана) — только Cloud API">рассылки запрещены ⛔</span></div>` : ''}
         <div class="form-row" style="margin:2px 0 8px"><label style="font-size:11px">Закреп за брокером</label>
           <select class="gn-broker2" data-p="${esc(n.phone)}"><option value="">— общий пул</option>${(STATE.brokers || []).map(b => `<option value="${esc(b.id)}" ${n.brokerId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
         <div class="num-actions">
@@ -10781,8 +10781,8 @@ PAGES.numbers = async (root) => {
     </div>` : `<div class="muted" style="font-size:13px;margin-bottom:18px">Серых номеров пока нет — нажмите «Подключить по QR» выше.</div>`}
 
     ${grayNums.length ? (() => { const w = grayData.warmup || {}; return `<div class="glass card mb">
-      <div class="card-title">${ic(I.bolt)}Прогрев серых номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
-      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые серые номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
+      <div class="card-title">${ic(I.bolt)}Прогрев номеров<span class="sub">авто-переписка между номерами с задержками</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Подключённые личные номера аккуратно переписываются между собой (нужно <b>≥2 на связи</b>), имитируя живую активность — так номер «отлёживается» перед рассылками и реже улетает в бан. Неофициальный метод (протокол WhatsApp Web).</div>
       ${(() => { const conn = grayNums.filter(n => n.live && n.live.status === 'connected').length; return conn >= 2 && !w.running ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.bolt)}На связи <b>${conn}</b> ${conn >= 2 && conn <= 4 ? 'номера' : 'номеров'} — <b>рекомендуем включить прогрев</b>, чтобы «отлежать» их перед боевой работой и снизить риск бана.</span></div>` : (conn < 2 ? `<div class="muted" style="font-size:11px;margin-bottom:8px">Для прогрева нужно ≥2 номера на связи (сейчас ${conn}). Подключи ещё — начнут переписываться между собой.</div>` : ''); })()}
       <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
         <label class="switch"><input type="checkbox" id="numWarm" ${w.running ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
@@ -10923,7 +10923,7 @@ PAGES.numbers = async (root) => {
     const need = Math.max(0, ab - nums.length);
     box.innerHTML = `
       <div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
-        <div class="card-title">${ic(I.send)}Telegram — серый способ<span class="sub">точечные касания 1-к-1 · НЕ рассылки</span></div>
+        <div class="card-title">${ic(I.send)}Telegram · личный аккаунт<span class="sub">точечные касания 1-к-1 · НЕ рассылки</span></div>
         <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем виртуальный номер → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания.</div>
         <div class="num-meta" style="margin-bottom:12px">
           <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
@@ -10963,7 +10963,7 @@ PAGES.numbers = async (root) => {
   loadTgGray();
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
-    if (b.dataset.act === 'del') { await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
+    if (b.dataset.act === 'del') { if (!await uiConfirm('Убрать номер из пула?', 'Официальный Cloud-API номер перестанет использоваться для отправки. Это действие нельзя отменить.', { ok: 'Убрать', danger: true })) return; await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }
     await api.patch('/numbers/' + id, { state: b.dataset.act });
     render();
   }));
