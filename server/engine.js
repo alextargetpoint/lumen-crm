@@ -105,15 +105,32 @@ function send(db, lead, text, via, opts = {}) {
             body: JSON.stringify({ chat_id: lead.channels.tgChatId, text }),
           });
         }
-        /* Viber: официальный Public Account — можно писать только тем, кто ПЕРВЫМ написал PA
-           (их viberId ловится вебхуком). Как и TG-бот, это inbound-first канал, не холодный. */
-        if (channel === 'viber' && cfg.viber && cfg.viber.token && lead.channels?.viberId) {
-          const rv = await fetch('https://chatapi.viber.com/pa/send_message', {
-            method: 'POST', headers: { 'X-Viber-Auth-Token': cfg.viber.token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ receiver: lead.channels.viberId, type: 'text', text, sender: { name: (db.settings.agency && db.settings.agency.name) || 'Lumen' } }),
-          });
-          const jv = await rv.json().catch(() => ({}));
-          if (jv.status && jv.status !== 0) throw new Error('viber ' + (jv.status_message || jv.status));
+        /* Viber — два официальных режима:
+           • mode='bsp' (Infobip/др.): ХОЛОДНОЕ персональное касание по НОМЕРУ лида (Viber Business
+             Messages, аналог WA Cloud API). Платно, по consent, отправитель = верифиц. бренд.
+           • mode='pa' (Public Account): только тем, кто ПЕРВЫМ написал PA (viberId из вебхука). */
+        if (channel === 'viber' && cfg.viber) {
+          const vb = cfg.viber;
+          if (vb.mode === 'bsp' && vb.apiKey && vb.sender) {
+            const phone = String(lead.phone || '').replace(/\D/g, '');
+            if (!phone) throw new Error('нет номера лида для Viber BSP');
+            /* Infobip Viber Business Messages API v2 (провайдер по умолчанию; др. BSP — свой адаптер) */
+            const base = String(vb.baseUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+            if (!base) throw new Error('не задан baseUrl BSP (Viber)');
+            const rv = await fetch('https://' + base + '/viber/2/messages', {
+              method: 'POST', headers: { Authorization: 'App ' + vb.apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ messages: [{ sender: vb.sender, destinations: [{ to: phone }], content: { text, type: 'TEXT' } }] }),
+            });
+            const jb = await rv.json().catch(() => ({}));
+            if (!rv.ok) throw new Error('viber-bsp ' + rv.status + ': ' + (jb.requestError && jb.requestError.serviceException && jb.requestError.serviceException.text || rv.status));
+          } else if (vb.token && lead.channels?.viberId) {
+            const rv = await fetch('https://chatapi.viber.com/pa/send_message', {
+              method: 'POST', headers: { 'X-Viber-Auth-Token': vb.token, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ receiver: lead.channels.viberId, type: 'text', text, sender: { name: (db.settings.agency && db.settings.agency.name) || 'Lumen' } }),
+            });
+            const jv = await rv.json().catch(() => ({}));
+            if (jv.status && jv.status !== 0) throw new Error('viber ' + (jv.status_message || jv.status));
+          }
         }
         m0.status = 'delivered';
       } catch (err) {

@@ -7234,8 +7234,23 @@ PAGES.automations = async (root) => {
             <div class="form-row"><label>Telegram Bot Token</label><input id="chTg" type="password" placeholder="${s.channels?.tg?.keySet ? '•••••• сохранён' : 'от @BotFather'}"></div>
             <div class="form-row"><label>Resend API key (e-mail)</label><input id="chEm" type="password" placeholder="${s.channels?.email?.keySet ? '•••••• сохранён' : 're_…'}"></div>
             <div class="form-row"><label>E-mail отправителя</label><input id="chFrom" value="${esc(s.channels?.email?.from || '')}" placeholder="sales@agency.com"></div>
-            <div class="form-row"><label>Viber token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен паблик-аккаунта'}"></div>
+            <div class="form-row"><label>Viber · режим</label><select id="chVbMode">
+              <option value="pa" ${(s.channels?.viber?.mode || 'pa') === 'pa' ? 'selected' : ''}>Public Account (тёплые, кто написал)</option>
+              <option value="bsp" ${s.channels?.viber?.mode === 'bsp' ? 'selected' : ''}>Business Messages / BSP (холодные по номерам)</option>
+            </select></div>
+            <div class="form-row"><label>Viber PA token</label><input id="chVb" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'токен Public Account (режим PA)'}"></div>
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
+            <div class="form-row"><label>Viber BSP · провайдер</label><select id="chVbProv">
+              <option value="infobip" ${(s.channels?.viber?.provider || 'infobip') === 'infobip' ? 'selected' : ''}>Infobip</option>
+              <option value="360dialog" ${s.channels?.viber?.provider === '360dialog' ? 'selected' : ''}>360dialog</option>
+              <option value="vonage" ${s.channels?.viber?.provider === 'vonage' ? 'selected' : ''}>Vonage</option>
+            </select></div>
+            <div class="form-row"><label>BSP API key</label><input id="chVbKey" type="password" placeholder="${s.channels?.viber?.keySet ? '•••••• сохранён' : 'ключ BSP (режим BSP)'}"></div>
+            <div class="form-row"><label>BSP base URL</label><input id="chVbBase" value="${esc(s.channels?.viber?.baseUrl || '')}" placeholder="xxxxx.api.infobip.com"></div>
+            <div class="form-row" style="grid-column:1 / -1"><label>Viber sender (верифиц. имя отправителя)</label><input id="chVbSender" value="${esc(s.channels?.viber?.sender || '')}" placeholder="напр. TargetPoint"></div>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:6px">Viber BSP (Infobip/360dialog) = официальные холодные персональные касания по номерам (аналог WA Cloud API): платно, нужна бизнес-верификация и consent. ⛔ Рассылки не делаем. Серого Viber (как WA/TG) нет.</div>
           <button class="btn" id="chSave">Сохранить каскад</button>
         </div>
         <div class="glass card mb" data-ag="meet">
@@ -7332,7 +7347,13 @@ PAGES.automations = async (root) => {
     const ch = { priority, enabled, email: { from: $('#chFrom').value.trim() } };
     if ($('#chTg').value.trim()) ch.tg = { botToken: $('#chTg').value.trim() };
     if ($('#chEm').value.trim()) ch.email.key = $('#chEm').value.trim();
-    if ($('#chVb').value.trim()) ch.viber = { token: $('#chVb').value.trim() };
+    ch.viber = {};
+    const vbMode = ($('#chVbMode') || {}).value || 'pa'; ch.viber.mode = vbMode;
+    if ($('#chVb') && $('#chVb').value.trim()) ch.viber.token = $('#chVb').value.trim();
+    if ($('#chVbKey') && $('#chVbKey').value.trim()) ch.viber.apiKey = $('#chVbKey').value.trim();
+    if ($('#chVbBase')) ch.viber.baseUrl = $('#chVbBase').value.trim();
+    if ($('#chVbSender')) ch.viber.sender = $('#chVbSender').value.trim();
+    if ($('#chVbProv')) ch.viber.provider = $('#chVbProv').value;
     const sec = root.querySelector('[data-auto="chSecond"]');
     if (sec) ch.secondRound = sec.checked;
     const casc = $('#chCascadeN'); if (casc) ch.cascadeAfterTouches = Math.max(0, Math.min(10, +casc.value || 0));

@@ -943,7 +943,7 @@ function publicSettings(db) {
   if (s.channels) {
     for (const k of ['tg', 'viber', 'email']) {
       const c = s.channels[k];
-      if (c && (c.botToken || c.token || c.key)) { c.keySet = true; delete c.botToken; delete c.token; delete c.key; }
+      if (c && (c.botToken || c.token || c.key || c.apiKey)) { c.keySet = true; delete c.botToken; delete c.token; delete c.key; delete c.apiKey; }
     }
   }
   if (s.tgBridge) { if (s.tgBridge.botToken) { s.tgBridge.tokenSet = true; delete s.tgBridge.botToken; } delete s.tgBridge.secret; }
