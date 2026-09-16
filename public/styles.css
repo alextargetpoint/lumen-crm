@@ -7419,3 +7419,17 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .vs-shot-ph{ display:none; padding:14px; font-size:11.5px; color:var(--ink-3); text-align:center; }
 .vs-shot.vs-shot-empty{ }
 .vs-shot.vs-shot-empty .vs-shot-ph{ display:block; }
+
+/* ===== Эмулятор-калькулятор на команду ===== */
+.sim-card .sim-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:4px 0 10px; }
+.sim-card .sim-lbl{ font-size:12.5px; font-weight:600; color:var(--ink); }
+.sim-chans{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.sim-chan{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2); padding:9px 11px; border:1px solid var(--stroke); border-radius:10px; cursor:pointer; }
+.sim-chan input{ flex:0 0 auto; }
+.sim-out .bc-line{ display:flex; justify-content:space-between; padding:6px 0; }
+.sim-out .bc-line-l b{ font-size:12.5px; }
+.sim-out .bc-line-l span{ display:block; font-size:11px; color:var(--ink-3); }
+
+/* инбокс: композер не должен сжиматься флекс-родителем на первом рендере (Arc-first-paint) */
+.composer{ flex-shrink:0; }
+.composer textarea{ box-sizing:border-box; }

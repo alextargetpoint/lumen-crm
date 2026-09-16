@@ -10716,6 +10716,47 @@ PAGES.tasks = async (root) => {
   }
 };
 
+/* пошаговый гид канала (сворачиваемый, внизу панели) — единый вид для всех подключений */
+function chGuideCard(title, steps) {
+  const body = `<div class="viber-steps">${steps.map((s, i) => `<div class="viber-step">
+    <div class="vs-num">${i + 1}</div>
+    <div class="vs-body"><div class="vs-t">${s[0]}</div><div class="vs-d">${s[1]}</div></div>
+  </div>`).join('')}</div>`;
+  return `<div class="glass card mb">${coll(title, body, { open: false, icon: I.doc })}</div>`;
+}
+const CH_GUIDES = {
+  gray: ['Инструкция: WhatsApp по QR — по шагам', [
+    ['Выберите способ', 'Свой номер по QR (как WhatsApp Web) — быстрее всего. Или купите виртуальный номер, если отдельный рабочий номер под брокера.'],
+    ['Если покупаете номер', '«Купить номер» → страна → оплата спишется с баланса расходников ($9/мес = аренда). Номер начнёт ловить SMS-коды (OTP) прямо в CRM.'],
+    ['Зарегистрируйте WhatsApp', 'На телефоне/эмуляторе заведите WhatsApp на этот номер — код подтверждения придёт в ленту OTP в CRM, введите его в WhatsApp.'],
+    ['Подключите по QR', '«Подключить свой (QR)» → откроется QR → отсканируйте его в WhatsApp телефона (Настройки → Связанные устройства → Привязать устройство).'],
+    ['Настройте профиль', 'Кнопка «Профиль» на карточке номера — имя, аватар, био. Синхронизируется в реальный WhatsApp аккаунта.'],
+    ['Прогрев (обязательно для новых)', 'Включите тумблер прогрева: при ≥2 подключённых номерах они аккуратно переписываются между собой 2–3 недели, поднимая доверие. Резкий объём = бан.'],
+    ['Правила безопасности', '1 брокер = 1 личный номер, ≤5 новых лидов/день на номер (действующие диалоги без лимита). Массовые рассылки с личных номеров запрещены — только Cloud API.'],
+  ]],
+  cloud: ['Инструкция: WhatsApp Cloud API — по шагам', [
+    ['Способ подключения', '«Подключить WhatsApp Business» (вход через Facebook, Embedded Signup) — авто-путь. Либо «Купить Cloud API номер» и настроить вручную.'],
+    ['Реальный номер', 'Нужен настоящий номер (тестовый 555 не шлёт). Купите виртуальный SMS-номер — код придёт в CRM, зарегистрируйте номер в WhatsApp Business.'],
+    ['Phone Number ID + токен', 'Meta → ваше приложение → WhatsApp → API Setup: скопируйте Phone Number ID и Access Token, вставьте в карточке номера («Коды / OTP + активация»).'],
+    ['Вебхук', 'Meta → Configuration → вставьте адрес вебхука из карточки «Вебхук официального WhatsApp» и подпишитесь на поле messages — тогда придут ответы клиентов и статусы доставки.'],
+    ['Карта в Meta', 'Сообщения Cloud API тарифицирует Meta напрямую с карты, привязанной к вашему WhatsApp Business (не с баланса Lumen). Подключите карту в Meta Business Manager.'],
+    ['Тест', 'Отправьте тестовый шаблон — если дошёл, канал готов к массовым «белым» касаниям.'],
+  ]],
+  tg: ['Инструкция: Telegram — по шагам', [
+    ['Купите номер или свой', '«Купить номер для Telegram» (спишется с баланса) или «Подключить свой номер».'],
+    ['Регистрация аккаунта', 'На телефоне заведите Telegram на номер. Возможен двухслойный забор: код на email → иногда разовая плата ~$0.99 → SMS. На каждый номер — УНИКАЛЬНЫЙ email (повтор почты = код не придёт).'],
+    ['Подключите по QR', '«Подключить свой номер» → QR. В Telegram: Настройки → Устройства → Подключить устройство → отсканируйте. SMS при этом не нужен.'],
+    ['Профиль', 'Задайте имя, username, био (≤70), аватар — синхронизируется в реальный аккаунт.'],
+    ['Прогрев', 'Включите прогрев (≥2 номера) — аккуратная переписка между своими, чтобы аккаунт не «отлетел».'],
+  ]],
+  tel: ['Инструкция: Телефония — по шагам', [
+    ['Провайдер', 'В Настройках подключите провайдера телефонии (Telnyx): API-ключ, Connection ID, номер «От».'],
+    ['Купите номер', '«Купить номер» → страна/тип → оплата спишется с баланса ($9/мес). Номер встанет в авто-подбор для звонков.'],
+    ['Звонки из карточки', 'В карточке лида — звонок в один клик. Разговор записывается, ИИ делает резюме и кладёт в карточку.'],
+    ['Тарификация', 'Минуты звонков + запись + транскрибация считаются по факту и списываются с баланса расходников.'],
+  ]],
+};
+
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
@@ -10825,10 +10866,12 @@ PAGES.numbers = async (root) => {
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>
       <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
+    ${chGuideCard(CH_GUIDES.gray[0], CH_GUIDES.gray[1])}
     </div>
 
     <div data-numpane="tg" style="${NUMTAB === 'tg' ? '' : 'display:none'}">
     <div id="tgGraySection" class="muted" style="font-size:12px">Загрузка…</div>
+    ${chGuideCard(CH_GUIDES.tg[0], CH_GUIDES.tg[1])}
     </div>
 
     <div data-numpane="cloud" style="${NUMTAB === 'cloud' ? '' : 'display:none'}">
@@ -10890,6 +10933,7 @@ PAGES.numbers = async (root) => {
         </div>
       </div>`).join('')}
     </div>` : ''}
+    ${chGuideCard(CH_GUIDES.cloud[0], CH_GUIDES.cloud[1])}
     </div>
 
     <div data-numpane="viber" style="${NUMTAB === 'viber' ? '' : 'display:none'}">
@@ -10966,6 +11010,7 @@ PAGES.numbers = async (root) => {
         <div style="margin:10px 0 4px"><span class="badge ok"><i></i>${esc(n.status || 'active')}</span></div>
       </div>`).join('')}
     </div>` : `<div class="muted" style="font-size:13px">Номеров телефонии пока нет — нажмите «Купить номер».</div>`}
+    ${chGuideCard(CH_GUIDES.tel[0], CH_GUIDES.tel[1])}
     </div>`;
   /* вкладки страницы «Номера» */
   $$('#numTabs .seg-btn', root).forEach(b => b.addEventListener('click', () => {
@@ -12790,6 +12835,30 @@ PAGES.billing = async (root) => {
       </div>
 
       <div>
+        <!-- эмулятор-калькулятор: расчёт на команду по рекомендациям -->
+        ${(() => {
+          const rt = (u.rates || {});
+          const nWa = +rt.numWaQr || 9, nTg = +rt.numTg || 9, nCloud = +rt.numCloud || 9, nTel = +rt.numTel || 9;
+          const brokers = Math.max(1, (STATE.brokers || []).filter(x => x.active !== false).length || 1);
+          return `<div class="glass card mb sim-card" data-nwa="${nWa}" data-ntg="${nTg}" data-ncloud="${nCloud}" data-ntel="${nTel}">
+          <div class="card-title">${ic(I.bolt)}Калькулятор на команду<span class="sub">прикиньте расходники по нашим рекомендациям и пополните заранее</span></div>
+          <div class="sim-row">
+            <label class="sim-lbl">Брокеров</label>
+            <div class="stepper"><button type="button" class="btn btn-sm" id="simMinus">−</button><span id="simBrokers">${brokers}</span><button type="button" class="btn btn-sm" id="simPlus">+</button></div>
+            <span class="muted" style="font-size:11px">рекомендация: 1 номер на брокера в каждом канале</span>
+          </div>
+          <div class="sim-chans">
+            ${[['wa', 'WhatsApp (QR)', true], ['tg', 'Telegram', false], ['cloud', 'WhatsApp Cloud API', false], ['tel', 'Телефония', false]].map(([k, lbl, on]) => `<label class="sim-chan"><input type="checkbox" class="sim-ch" data-ch="${k}" ${on ? 'checked' : ''}><span>${lbl}</span></label>`).join('')}
+          </div>
+          <div class="sim-out" id="simOut"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn btn-accent btn-sm" id="simTopup">${ic(I.wallet || I.card)}Пополнить баланс под план</button>
+            <span class="muted" style="font-size:11px;align-self:center">затем купите номера во вкладках канала в «Номера»</span>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Аренда номера = покупка на месяц ($9/номер). Метрируемое (ИИ, минуты) — сверх этого, по факту. Точный расчёт — в калькуляторе ниже.</div>
+        </div>`;
+        })()}
+
         <!-- баланс расходников (предоплата криптой) -->
         <div class="glass card mb bal-card">
           <div class="card-title">${ic(I.wallet || I.card)}Баланс расходников<span class="sub">предоплата · пополнение только криптой (USDT)</span></div>
@@ -12890,6 +12959,25 @@ PAGES.billing = async (root) => {
 
   /* --- взаимодействие --- */
   const reload = async () => { await PAGES.billing(root); };
+  /* эмулятор-калькулятор на команду */
+  (() => {
+    const card = $('.sim-card', root); if (!card) return;
+    const rates = { wa: +card.dataset.nwa || 9, tg: +card.dataset.ntg || 9, cloud: +card.dataset.ncloud || 9, tel: +card.dataset.ntel || 9 };
+    const CHN = { wa: 'WhatsApp (QR)', tg: 'Telegram', cloud: 'Cloud API', tel: 'Телефония' };
+    let monthly = 0;
+    const recalc = () => {
+      const brokers = Math.max(1, +($('#simBrokers', root).textContent) || 1);
+      const rows = []; let numbers = 0; monthly = 0;
+      $$('.sim-ch', root).forEach(ck => { if (!ck.checked) return; const k = ck.dataset.ch; const cost = brokers * rates[k]; numbers += brokers; monthly += cost; rows.push(`<div class="bc-line"><div class="bc-line-l"><b>${CHN[k]}</b><span>${brokers} × $${rates[k]}/мес</span></div><div class="bc-line-c">${moneyC(cost)}</div></div>`); });
+      const out = $('#simOut', root);
+      out.innerHTML = rows.length ? `${rows.join('')}<div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда номеров / мес (${numbers} ${plural(numbers, 'номер', 'номера', 'номеров')})</span><b>${moneyC(monthly)}</b></div>` : `<div class="muted" style="font-size:12px;padding:8px 0">Выберите хотя бы один канал.</div>`;
+    };
+    $('#simMinus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = Math.max(1, (+s.textContent) - 1); recalc(); });
+    $('#simPlus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = (+s.textContent) + 1; recalc(); });
+    $$('.sim-ch', root).forEach(ck => ck.addEventListener('change', recalc));
+    $('#simTopup', root)?.addEventListener('click', () => { if (monthly < 5) { toast('Выберите каналы', 'План пустой или меньше $5'); return; } openTopupCrypto({ purpose: 'consumables', presetAmount: Math.ceil(monthly) }); });
+    recalc();
+  })();
   /* калькулятор расходников: показать/скрыть ставки + сохранить */
   const bcR = $('#bcRates', root); if (bcR) bcR.addEventListener('click', () => { const box = $('#bcRatesBox', root); if (box) box.hidden = !box.hidden; });
   const bcS = $('#bcRatesSave', root); if (bcS) bcS.addEventListener('click', async () => {
