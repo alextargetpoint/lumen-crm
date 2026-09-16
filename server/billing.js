@@ -37,11 +37,15 @@ function defBilling() {
   };
 }
 /* зачислить подтверждённый крипто-перевод на баланс расходников (идемпотентно по txid) */
-function creditTopup(db, topup, txid) {
+function creditTopup(db, topup, txid, actualAmount) {
   const b = db.settings.billing;
   b.creditedTxids = b.creditedTxids || [];
-  if (txid && b.creditedTxids.includes(txid)) return false;   // уже зачислено
-  b.balance = +((b.balance || 0) + topup.amountUsd).toFixed(2);
+  if (txid && b.creditedTxids.includes(txid)) return false;   // уже зачислено (идемпотентность по txid)
+  // зачисляем РОВНО столько, сколько реально пришло on-chain (маркер-«хвост» не теряется);
+  // если фактическая сумма не передана — фоллбэк на exactAmount, затем на базовую
+  const credited = +((actualAmount != null ? actualAmount : (topup.exactAmount != null ? topup.exactAmount : topup.amountUsd)) || 0).toFixed(2);
+  b.balance = +((b.balance || 0) + credited).toFixed(2);
+  topup.creditedAmount = credited;
   topup.status = 'confirmed'; topup.txid = txid || topup.txid || null; topup.confirmedAt = Date.now();
   if (txid) b.creditedTxids.push(txid);
   return true;

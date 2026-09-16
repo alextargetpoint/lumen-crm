@@ -2630,12 +2630,16 @@ async function cryptoTick() {
   try {
     /* один запрос on-chain на сеть — тянем последние входящие на общий адрес, матчим по всем тенантам */
     let trcTx = null, ercTx = null;
-    /* соберём, есть ли вообще pending — чтобы не дёргать API вхолостую */
+    /* матчим платежи в окне 24ч (даже по «протухшим» для UI заявкам — вывод с биржи может идти дольше 60 мин,
+       деньги не должны потеряться). Дёргаем API только если есть незачтённые заявки в этом окне. */
+    const MATCH_WINDOW = 24 * 3600e3;
+    const matchable = (t, now) => t.status !== 'confirmed' && t.createdAt && (now - t.createdAt < MATCH_WINDOW);
+    const now0 = Date.now();
     let anyTrc = false, anyErc = false;
     for (const tid of store.listTenants()) {
       store.runInTenant(tid, () => {
         const bl = (store.get().settings || {}).billing; if (!bl || !bl.cryptoTopups) return;
-        for (const t of bl.cryptoTopups) { if (t.status === 'pending') { if (t.chain === 'erc20') anyErc = true; else anyTrc = true; } }
+        for (const t of bl.cryptoTopups) { if (matchable(t, now0)) { if (t.chain === 'erc20') anyErc = true; else anyTrc = true; } }
       });
     }
     if (anyTrc) {
@@ -2662,16 +2666,18 @@ async function cryptoTick() {
         const db = store.get(); const bl = (db.settings || {}).billing; if (!bl || !bl.cryptoTopups) return;
         let changed = false;
         for (const t of bl.cryptoTopups) {
-          if (t.status !== 'pending') continue;
-          if (t.expiresAt && t.expiresAt < now) { t.status = 'expired'; changed = true; continue; }
+          if (t.status === 'confirmed') continue;
+          /* «протух» — только для UI-отображения; матчить продолжаем в окне 24ч (деньги не теряем) */
+          if (t.status === 'pending' && t.expiresAt && t.expiresAt < now) { t.status = 'expired'; changed = true; }
+          if (!matchable(t, now)) continue;
           const pool = t.chain === 'erc20' ? ercTx : trcTx;
           if (!pool) continue;
           /* матч: суб-цент маркер совпал (±0.0005) И txid ещё не зачтён нигде у этого тенанта */
           const hit = pool.find(x => Math.abs(x.amt - t.exactAmount) < 0.0005 && !(bl.creditedTxids || []).includes(x.txid));
           if (hit) {
-            if (billing.creditTopup(db, t, hit.txid)) {
+            if (billing.creditTopup(db, t, hit.txid, hit.amt)) {
               changed = true;
-              try { ai.pushEvent(db, { type: 'note', text: `💰 Пополнение расходников: +$${t.amountUsd} (USDT ${t.chain.toUpperCase()} подтверждён on-chain)` }); } catch (e) {}
+              try { ai.pushEvent(db, { type: 'note', text: `💰 Пополнение расходников: +$${t.creditedAmount} (USDT ${t.chain.toUpperCase()} подтверждён on-chain)` }); } catch (e) {}
             }
           }
         }
@@ -4710,9 +4716,11 @@ const server = http.createServer(async (req, res) => {
         const chain = b.chain === 'erc20' ? 'erc20' : 'trc20';
         const address = chain === 'erc20' ? CRYPTO_ETH : CRYPTO_TRON;
         const bl = db.settings.billing; bl.cryptoTopups = bl.cryptoTopups || [];
-        /* уникальный суб-цент маркер (0.001–0.999) — по нему матчим входящий перевод к этому топ-апу */
+        /* уникальный суб-цент маркер (0.001–0.999) — по нему матчим входящий перевод к этому топ-апу.
+           не переиспользуем сумму среди заявок последних 24ч (окно матчинга), иначе поздний платёж двусмыслен */
+        const recent24 = bl.cryptoTopups.filter(t => t.createdAt && (Date.now() - t.createdAt < 24 * 3600e3) && t.status !== 'confirmed');
         let exactAmount = amountUsd;
-        for (let i = 0; i < 60; i++) { const marker = Math.floor(1 + Math.random() * 998) / 1000; const cand = +(amountUsd + marker).toFixed(3); if (!bl.cryptoTopups.some(t => t.status === 'pending' && t.exactAmount === cand)) { exactAmount = cand; break; } }
+        for (let i = 0; i < 80; i++) { const marker = Math.floor(1 + Math.random() * 998) / 1000; const cand = +(amountUsd + marker).toFixed(3); if (!recent24.some(t => t.exactAmount === cand)) { exactAmount = cand; break; } }
         const topup = { id: 'tp_' + crypto.randomBytes(5).toString('hex'), amountUsd, exactAmount, chain, address, purpose: (b.purpose === 'subscription' ? 'subscription' : 'consumables'), status: 'pending', txid: null, createdAt: Date.now(), expiresAt: Date.now() + 60 * 60e3 };
         bl.cryptoTopups.unshift(topup); if (bl.cryptoTopups.length > 60) bl.cryptoTopups.length = 60; store.save();
         let qrImage = null; try { qrImage = await require('qrcode').toDataURL(address, { margin: 1, width: 320 }); } catch (e) {}

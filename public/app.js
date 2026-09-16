@@ -12725,7 +12725,7 @@ PAGES.billing = async (root) => {
               : `<div class="bal-note warn">${ic(I.spark)}<span>Прогноз месяца — ${moneyC(fc)}. Не хватает ${moneyC(-cov)} — пополните заранее, иначе исходящие/ИИ приостановятся.</span></div>`;
           })()}
           ${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).length
-            ? `<div class="bal-tx">${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).map(t => `<div class="bal-tx-row"><span>+${moneyC(t.amountUsd)} · ${(t.chain || '').toUpperCase()}</span><span class="muted">${date(t.confirmedAt)}</span></div>`).join('')}</div>`
+            ? `<div class="bal-tx">${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).map(t => `<div class="bal-tx-row"><span>+${moneyC(t.creditedAmount != null ? t.creditedAmount : t.amountUsd)} · ${(t.chain || '').toUpperCase()}</span><span class="muted">${date(t.confirmedAt)}</span></div>`).join('')}</div>`
             : ''}
           <div class="muted" style="font-size:11px;margin-top:8px">С баланса списываются расходники (WhatsApp, ИИ, минуты, аренда номеров) и — по желанию — подписка. Пополнение приходит на холодный кошелёк и подтверждается автоматически on-chain.</div>
         </div>
@@ -12883,7 +12883,7 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
           <div class="tc-status" id="tcStatus">${ic(I.spark)}<span>Ожидаю поступление… подтвердится автоматически (обычно 1–3 мин).</span></div>
         </div>
       </div>
-      <div class="lc-hint warn" style="margin-top:14px">${ic(I.spark)}<span>Отправляйте только <b>USDT</b> в сети <b>${t.chain === 'erc20' ? 'ERC20 (Ethereum)' : 'TRC20 (Tron)'}</b>. Перевод в другой сети или другого токена будет потерян. Заявка действует 60 минут.</span></div>`;
+      <div class="lc-hint warn" style="margin-top:14px">${ic(I.spark)}<span>Отправляйте только <b>USDT</b> в сети <b>${t.chain === 'erc20' ? 'ERC20 (Ethereum)' : 'TRC20 (Tron)'}</b>. Перевод в другой сети или другого токена будет потерян. Если перевод идёт дольше — окно можно закрыть: платёж зачтётся автоматически в течение суток, баланс обновится сам.</span></div>`;
     s2.querySelectorAll('.tc-copy').forEach(c => c.addEventListener('click', () => { navigator.clipboard.writeText(c.dataset.copy); toast('Скопировано', '', true); }));
     /* поллинг подтверждения */
     const poll = async () => {
@@ -12894,8 +12894,9 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
       if (me && me.status === 'confirmed') {
         clearInterval(pollTimer);
         const st = bd.querySelector('#tcStatus');
-        if (st) { st.className = 'tc-status ok'; st.innerHTML = `${ic(I.check || I.spark)}<span>Платёж получен! Баланс пополнен на ${money2(me.amountUsd)}.</span>`; }
-        toast('Платёж подтверждён', `Баланс +${money2(me.amountUsd)}`, true);
+        const credited = me.creditedAmount != null ? me.creditedAmount : me.amountUsd;
+        if (st) { st.className = 'tc-status ok'; st.innerHTML = `${ic(I.check || I.spark)}<span>Платёж получен! Баланс пополнен на ${money2(credited)}.</span>`; }
+        toast('Платёж подтверждён', `Баланс +${money2(credited)}`, true);
         setTimeout(() => { closeModal(); if (onDone) onDone(); }, 1800);
       } else if (me && me.status === 'expired') {
         clearInterval(pollTimer);
