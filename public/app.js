@@ -2574,22 +2574,59 @@ function initNavSearch() {
   const me = STATE && STATE.me; const isOwner = !me || me.role === 'owner' || me.role === 'master';
   const hidden = new Set((isOwner ? [] : (typeof BROKER_HIDDEN_PAGES !== 'undefined' ? BROKER_HIDDEN_PAGES : []).concat((me && me.hidePages) || [])).concat(IS_SOLO() ? SOLO_HIDDEN_PAGES : []));
   if (me && me.canControl) hidden.delete('control');   /* делегат контроля видит раздел */
-  const index = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: navName(k), sub: navSub(k), parent: parentOf(k), icon: v.icon }));
-  const norm = (s) => String(s || '').toLowerCase();
-  const goTo = (pk) => { go(pk); inp.value = ''; res.hidden = true; inp.blur(); };
+  const navIndex = Object.entries(NAV).filter(([k]) => PAGES[k] && !hidden.has(k)).map(([k, v]) => ({ page: k, name: navName(k), sub: navSub(k), parent: parentOf(k), icon: v.icon }));
+  /* ⭐ глубокий индекс: фичи/поля ВНУТРИ страниц + синонимы/транслит → прыжок в раздел (и к нужной карточке) */
+  const deepRaw = [
+    ['settings', 'Каскад каналов (переход по мессенджерам)', 'каскад cascade переход по каналам омниканал omnichannel следующий мессенджер второй круг переключение каналов', 'Переход по каналам'],
+    ['settings', 'Viber (Infobip / BSP)', 'viber вайбер вибер bsp infobip инфобип viber token sender вайбер токен', 'Viber'],
+    ['settings', 'Telegram Bot Token (уведомления/бот)', 'telegram bot телеграм бот bot token бот токен botfather', 'Telegram Bot Token'],
+    ['settings', 'E-mail отправки (Resend)', 'resend email key почта отправитель эл почта e-mail рассылка почта', 'Resend'],
+    ['settings', 'Тихие часы / SLA / напоминания встреч', 'тихие часы sla напоминания встречи quiet hours пояс', 'Встречи'],
+    ['settings', 'Резервные копии / экспорт / приватность', 'бэкап резервные копии backup экспорт удаление данных приватность gdpr', 'данн'],
+    ['numbers', 'Прогрев номеров', 'прогрев warmup разогрев отлежать warm прогреть', 'Прогрев'],
+    ['numbers', 'Купить / подключить номер', 'купить номер подключить номер серый whatsapp qr yesim виртуальный номер sim докупить', 'Подключить номер'],
+    ['numbers', 'Профиль / персона номера (аватар, био)', 'профиль номера персона аватар био имя отправителя username', 'WhatsApp'],
+    ['numbers', 'WhatsApp Cloud API / OTP', 'cloud api otp официальный whatsapp белый канал мета meta', 'Cloud API'],
+    ['numbers', 'Telegram (серый) — покупка/QR', 'telegram серый tg серый gray telegram mtproto телеграм номер купить telegram', 'Telegram'],
+    ['numbers', 'Телефония (номера для звонков)', 'телефония звонки telnyx номер для звонков', 'Телефония'],
+    ['billing', 'Подписка, оплата, тариф', 'подписка оплата тариф биллинг billing карта счёт инвойс стоимость цена', ''],
+    ['billing', 'Расходники / калькулятор', 'расходники калькулятор аренда номеров себестоимость расход', 'расходник'],
+    ['agency', 'Пароль и e-mail входа', 'пароль сменить пароль e-mail входа логин password доступ', 'Пароль'],
+    ['agency', 'Оформление / тема интерфейса', 'тема оформление цвет appearance theme кобальт ателье оформление интерфейса', 'Оформление'],
+    ['agency', 'Профиль агентства / бренд / направления', 'агентство бренд лого название направления гео позиционирование бейджи', ''],
+    ['qualifier', 'Цепочки касаний / движок ИИ', 'цепочки касания движок квалификация sequence дожим скрипты', ''],
+    ['brokers', 'Брокеры / команда / места', 'брокеры команда места seats сотрудники контроль доступа', ''],
+  ];
+  const deepIndex = deepRaw.filter(d => PAGES[d[0]] && !hidden.has(d[0])).map(d => ({ page: d[0], name: d[1], hay: d[2], scroll: d[3], icon: (NAV[d[0]] || {}).icon, parent: parentOf(d[0]), deep: true }));
+  const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е');
   const place = () => { const r = inp.getBoundingClientRect(); res.style.left = r.left + 'px'; res.style.top = (r.bottom + 6) + 'px'; res.style.width = r.width + 'px'; };
+  const goTo = (pk, scroll) => {
+    go(pk); inp.value = ''; res.hidden = true; inp.blur();
+    if (scroll) setTimeout(() => {
+      const root = document.getElementById('content'); if (!root) return;
+      const nq = norm(scroll);
+      const el = [...root.querySelectorAll('.card-title, .set-sec-h, .coll-head, label, .lp-sec, h2, h3, b')].find(e => norm(e.textContent).includes(nq));
+      const box = el && (el.closest('.coll, .glass, .card, [data-ag], .set-sec-h') || el);
+      if (box && box.scrollIntoView) { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); const o = box.style.boxShadow; box.style.transition = 'box-shadow .3s'; box.style.boxShadow = '0 0 0 3px var(--accent)'; setTimeout(() => { box.style.boxShadow = o || ''; }, 1800); }
+    }, 650);
+  };
   const render = (q) => {
     q = norm(q).trim(); if (!q) { res.hidden = true; res.innerHTML = ''; return; }
-    const hits = index.filter(it => norm(it.name).includes(q) || norm(it.sub).includes(q) || norm(it.parent).includes(q)).slice(0, 8);
-    res.innerHTML = hits.length ? hits.map((it, i) => `<button class="ns-item ${i === 0 ? 'sel' : ''}" data-nsgo="${it.page}">${ic(it.icon)}<span class="ns-nm">${esc(it.name)}${it.parent ? `<i>${esc(it.parent)}</i>` : ''}</span></button>`).join('') : '<div class="ns-empty">Ничего не найдено</div>';
+    const toks = q.split(/\s+/).filter(Boolean);
+    const match = (hay) => toks.every(tk => hay.includes(tk));
+    const navHits = navIndex.filter(it => match(norm(it.name + ' ' + it.sub + ' ' + it.parent))).map(it => ({ ...it, _rank: norm(it.name).startsWith(q) ? 0 : 1 }));
+    const deepHits = deepIndex.filter(it => match(norm(it.name + ' ' + it.hay))).map(it => ({ ...it, _rank: 2 }));
+    const seen = new Set(navHits.map(h => h.page));
+    const hits = [...navHits, ...deepHits.filter(h => !(seen.has(h.page) && !h.scroll))].sort((a, b) => a._rank - b._rank).slice(0, 9);
+    res.innerHTML = hits.length ? hits.map((it, i) => `<button class="ns-item ${i === 0 ? 'sel' : ''}" data-nsgo="${it.page}" data-nsscroll="${esc(it.scroll || '')}">${ic(it.icon)}<span class="ns-nm">${esc(it.name)}${it.parent ? `<i>${esc(it.deep ? navName(it.page) + ' · ' + it.parent : it.parent)}</i>` : ''}</span></button>`).join('') : '<div class="ns-empty">Ничего не найдено</div>';
     place(); res.hidden = false;
-    res.querySelectorAll('[data-nsgo]').forEach(b => b.addEventListener('mousedown', (e) => { e.preventDefault(); goTo(b.dataset.nsgo); }));
+    res.querySelectorAll('[data-nsgo]').forEach(b => b.addEventListener('mousedown', (e) => { e.preventDefault(); goTo(b.dataset.nsgo, b.dataset.nsscroll); }));
   };
   inp.addEventListener('input', () => render(inp.value));
   inp.addEventListener('focus', () => { if (inp.value) render(inp.value); });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { inp.value = ''; res.hidden = true; inp.blur(); }
-    else if (e.key === 'Enter') { const s = res.querySelector('.ns-item.sel') || res.querySelector('.ns-item'); if (s) goTo(s.dataset.nsgo); }
+    else if (e.key === 'Enter') { const s = res.querySelector('.ns-item.sel') || res.querySelector('.ns-item'); if (s) goTo(s.dataset.nsgo, s.dataset.nsscroll); }
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const items = [...res.querySelectorAll('.ns-item')]; if (!items.length) return; let i = items.findIndex(x => x.classList.contains('sel')); items.forEach(x => x.classList.remove('sel')); i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1); items[i].classList.add('sel'); }
   });
   document.addEventListener('click', (e) => { if (!e.target.closest('.navsearch') && !e.target.closest('#navSearchRes')) res.hidden = true; });
