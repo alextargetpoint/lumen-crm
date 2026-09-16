@@ -2571,6 +2571,50 @@ async function warmupTick() {
   } finally { warmupBusy = false; }
 }
 setInterval(() => { warmupTick().catch(() => {}); }, 12 * 60e3);   /* каждые ~12 мин, cost-safe */
+
+/* ── Прогрев серого TELEGRAM (по best-practice схеме, чтобы аккаунты не отлетали) ──
+   • Возрастной рамп лимита отправки на аккаунт: день0 ≈3 → +2/день → потолок (perDay|20).
+     Резкий скачок объёма = маркер спам-бота, поэтому наращиваем плавно ~5→20 за 2 недели.
+   • Новый аккаунт (age 0, низкий cap) в основном ПРИНИМАЕт, а не шлёт («receive first»).
+   • Рандомные from/to + джиттер интервала + вариативные тексты (не одинаковые) — имитация живого.
+   • Только МЕЖДУ своими номерами пула (≥2 на связи). ⛔ Не рассылки. */
+let tgWarmupBusy = false;
+async function tgWarmupTick() {
+  if (tgWarmupBusy) return; tgWarmupBusy = true;
+  try {
+    if (Math.random() < 0.25) return;   /* джиттер: иногда пропускаем тик → интервалы вразнобой */
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get();
+        const g = db.settings.tgGray;
+        if (!g || !g.warmup || !g.warmup.running) return;
+        if (!tgWorkerReady(db)) return;
+        const today = new Date().toISOString().slice(0, 10);
+        if (g.warmup._day !== today) { g.warmup._day = today; g.warmup._sent = 0; (g.numbers || []).forEach(n => { n._warmSentToday = 0; }); }
+        let live = {};
+        try { const r = await tgGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
+        const conn = (g.numbers || []).map(n => ({ n, real: (live[tgGraySid(n.phone)] || {}).phone, status: (live[tgGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
+        if (conn.length < 2) return;
+        const capFor = (n) => { const start = n._warmStart || n.connectedAt || n.addedAt || Date.now(); const age = Math.floor((Date.now() - start) / 86400e3); return Math.min(g.warmup.perDay || 20, 3 + age * 2); };
+        const eligible = conn.filter(x => (x.n._warmSentToday || 0) < capFor(x.n));
+        if (!eligible.length) return;
+        const from = eligible[Math.floor(Math.random() * eligible.length)];
+        const others = conn.filter(x => x.n.phone !== from.n.phone);
+        const to = others[Math.floor(Math.random() * others.length)];
+        const msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
+        try {
+          await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(from.n.phone) + '/warmup', { toPhone: to.real, message: msg });
+          if (!from.n._warmStart) from.n._warmStart = from.n.connectedAt || from.n.addedAt || Date.now();
+          from.n._warmSentToday = (from.n._warmSentToday || 0) + 1;
+          g.warmup._sent = (g.warmup._sent || 0) + 1; g.warmup.total = (g.warmup.total || 0) + 1; g.warmup.lastAt = Date.now();
+          g.warmup.log = [{ from: (from.n.persona && from.n.persona.name) || from.real, to: (to.n.persona && to.n.persona.name) || to.real, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+          store.save();
+        } catch (e) {}
+      });
+    }
+  } finally { tgWarmupBusy = false; }
+}
+setInterval(() => { tgWarmupTick().catch(() => {}); }, 14 * 60e3);   /* ~14 мин, вразнобой с WA-тиком */
 async function telnyxInitiateCall(db, lead, brokerPhone) {
   const t = db.settings.telephony || {};
   if (t.provider !== 'telnyx' || !telnyxKey(t) || !t.connId || !t.fromNumber) throw new Error('Telnyx не настроен: нужны API key (в настройках или env TELNYX_API_KEY), Connection ID и номер «От»');
