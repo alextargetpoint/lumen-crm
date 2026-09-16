@@ -6762,6 +6762,24 @@ const server = http.createServer(async (req, res) => {
       if (b.perDay != null) db.settings.tgGray.warmup.perDay = Math.max(2, Math.min(40, +b.perDay || 12));
       store.save(); return json(res, 200, { ok: true, warmup: db.settings.tgGray.warmup });
     }
+    /* прогрев TG сейчас (проверка/ручной обмен между своими номерами) */
+    if (p === '/api/tg/gray/warmup-now' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const g = db.settings.tgGray || {};
+      if (!tgWorkerReady(db)) return json(res, 400, { error: 'воркер не подключён' });
+      let live = {}; try { live = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (e) { return json(res, 400, { error: 'воркер недоступен' }); }
+      const conn = (g.numbers || []).map(n => ({ n, real: (live[tgGraySid(n.phone)] || {}).phone, status: (live[tgGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
+      if (conn.length < 2) return json(res, 400, { error: `Нужно ≥2 подключённых TG-номера (сейчас ${conn.length}).` });
+      const i = Math.floor(Math.random() * conn.length); let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
+      const from = conn[i], to = conn[k], msg = WARMUP_MSGS[Math.floor(Math.random() * WARMUP_MSGS.length)];
+      try {
+        await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(from.n.phone) + '/warmup', { toPhone: to.real, message: msg });
+        g.warmup = g.warmup || {}; g.warmup.total = (g.warmup.total || 0) + 1; g.warmup._sent = (g.warmup._sent || 0) + 1; g.warmup.lastAt = Date.now();
+        g.warmup.log = [{ from: (from.n.persona && from.n.persona.name) || from.real, to: (to.n.persona && to.n.persona.name) || to.real, text: msg, at: Date.now() }].concat(g.warmup.log || []).slice(0, 40);
+        store.save();
+        return json(res, 200, { ok: true, from: from.real, to: to.real, text: msg });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
     /* прогрев: вкл/выкл + интенсивность */
     if (p === '/api/wa/gray/warmup' && req.method === 'POST') {
       const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' }); if (R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

@@ -10877,8 +10877,9 @@ PAGES.numbers = async (root) => {
           <button class="btn btn-accent btn-sm" id="tgBuyBtn" ${d.ready ? '' : 'disabled'}>${ic(I.plus)}${nums.length ? 'Докупить номера' : 'Купить номер для Telegram'}</button>
           <button class="btn btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
         </div>
-        <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">Прогрев между номерами</div><div class="sd">Аккуратная авто-переписка между TG-номерами — «отлёживает» аккаунты перед касаниями</div></div>
+        <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">Прогрев между номерами</div><div class="sd">Плавный рамп (день0≈3 → +2/день до 20), рандом+джиттер, «сначала принимай» — чтобы аккаунты не отлетали. ⛔ Не рассылки.</div></div>
           <label class="switch"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span></label></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-sm" id="tgWarmNow" ${d.ready ? '' : 'disabled'} title="Отправить обмен между номерами прямо сейчас (проверка)">${ic(I.bolt)}Прогреть сейчас</button><span id="tgWarmNowOut" class="muted" style="font-size:11px"></span></div>
       </div>
       ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
         <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:#229ED9">серый (MTProto)</b></div></div></div>
@@ -10895,6 +10896,7 @@ PAGES.numbers = async (root) => {
     $('#tgBuyBtn', box)?.addEventListener('click', () => openTgBuy());
     $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
     $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
+    $('#tgWarmNow', box)?.addEventListener('click', async (e) => { const btn = e.currentTarget; const o = $('#tgWarmNowOut', box); btn.disabled = true; if (o) o.textContent = 'Отправляю…'; try { const r = await api.post('/tg/gray/warmup-now', {}); if (r.ok) { if (o) o.innerHTML = '<span style="color:var(--ok,#3f7d4f)">✓ ' + esc(r.from) + ' → ' + esc(r.to) + '</span>'; toast('Обмен отправлен', r.text, true); } else { if (o) o.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'; } } catch (er) { if (o) o.innerHTML = '<span style="color:var(--bad)">' + esc(er.message) + '</span>'; } btn.disabled = false; });
     $$('[data-tgpersona]', box).forEach(b => b.addEventListener('click', () => openTgPersona(b.dataset.tgpersona, nums.find(n => n.phone === b.dataset.tgpersona))));
     $$('[data-tgcode]', box).forEach(b => b.addEventListener('click', () => openTgCode(b.dataset.tgcode)));
     $$('[data-tgrm]', box).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать TG-номер?', 'Сессия выйдет из Telegram.', { ok: 'Убрать', danger: true })) return; try { await api.post('/tg/gray/remove', { phone: b.dataset.tgrm }); toast('Убран', null, true); loadTgGray(); } catch (e) { toast('Не вышло', e.message); } }));
