@@ -241,7 +241,10 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .demo-chip i { width: 6px; height: 6px; border-radius: 50%; background: #D9A514; animation: pulse 1.6s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
-.content { flex: 1; overflow-y: auto; padding: 6px 28px 30px; }
+/* scrollbar-gutter: место под вертикальный скроллбар зарезервировано ВСЕГДА →
+   контент не «дёргается»/не сужается на ~10px при переключении вкладок, где высота
+   пересекает границу вьюпорта (был баг «уменьшается в размере» на подстраницах «Номера»). */
+.content { flex: 1; overflow-y: auto; scrollbar-gutter: stable; padding: 6px 28px 30px; }
 
 /* ---------- поверхности ---------- */
 .glass {

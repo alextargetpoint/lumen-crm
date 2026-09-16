@@ -1582,28 +1582,29 @@ window.openYesimActivate = async function (phone) {
 window.openTelnyxOtp = async function (preselect) {
   let pollTimer = null, current = '', allNums = [], cloudMap = {};
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
-  const bd = modal({ title: 'Номер для Cloud API (OTP)', sub: 'Реальный SMS-номер Telnyx → регистрация в WhatsApp Business', wide: true, body: '<div id="txOtp"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
+  const bd = modal({ title: 'Номер для Cloud API (OTP)', sub: 'Реальный виртуальный SMS-номер → регистрация в WhatsApp Business', wide: true, body: '<div id="txOtp"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
   const host = () => $('#txOtp', bd);
   const draw = (number) => {
     current = String(number || '').replace(/[^0-9]/g, '');
     host().innerHTML = `
-      <div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный канал Meta. В отличие от серых номеров, реальный <b>Telnyx</b>-номер WhatsApp принимает на регистрацию, и он же роутится для отправки. Код придёт в ленту ниже <b>автоматически</b>.</span></div>
+      <div class="lc-hint info" style="margin-bottom:12px">${ic(I.shield)}<span>Официальный канал Meta. В отличие от серых номеров, реальный <b>виртуальный</b> номер WhatsApp принимает на регистрацию, и он же роутится для отправки. Код придёт в ленту ниже <b>автоматически</b>.</span></div>
       ${allNums.length > 1 ? `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><label style="font-size:12px">Номер:</label><select id="txOtpPick" class="inp" style="max-width:220px">${allNums.map(n => `<option value="${esc(n.replace(/[^0-9]/g, ''))}" ${n.replace(/[^0-9]/g, '') === current ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
-      ${current ? `<div class="lc-hint" style="margin-bottom:10px"><span>Твой OTP-номер: <b style="font-size:15px;letter-spacing:.5px">+${esc(current)}</b> — впиши его в мастере Meta.</span></div>` : `
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      ${current ? `<div class="lc-hint" style="margin-bottom:10px"><span>Твой OTP-номер: <b style="font-size:15px;letter-spacing:.5px">+${esc(current)}</b> — впиши его в мастере Meta.</span></div>` : ''}
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--ink-3)">${current ? 'Ещё номер:' : 'Страна:'}</label>
         <select id="txOtpCountry" class="inp" style="max-width:160px">
           <option value="US">США (+1)</option><option value="GB">Великобритания (+44)</option>
           <option value="NL">Нидерланды (+31)</option><option value="CA">Канада (+1)</option>
           <option value="DE">Германия (+49)</option><option value="PL">Польша (+48)</option>
         </select>
-        <button class="btn btn-accent" id="txOtpBuy">${ic(I.plus)}Купить SMS-номер</button>
-        <span class="muted" style="font-size:11px">~$1 + наценка/мес</span>
-      </div>`}
+        <button class="btn btn-accent" id="txOtpBuy">${ic(I.plus)}${current ? 'Купить ещё номер' : 'Купить SMS-номер'}</button>
+        <span class="muted" style="font-size:11px">виртуальный номер · аренда помесячно</span>
+      </div>
       <b style="font-size:13px">Как подключить официальный номер:</b>
       <div style="margin-top:8px">
         ${[
-          ['Купи SMS-номер', current ? 'Готово: <b>+' + esc(current) + '</b>.' : 'Нажми «Купить SMS-номер» — берём реальный Telnyx-номер с поддержкой SMS.'],
+          ['Купи SMS-номер', current ? 'Готово: <b>+' + esc(current) + '</b>.' : 'Нажми «Купить SMS-номер» — берём реальный виртуальный номер с поддержкой SMS.'],
           ['Открой мастер Meta', 'WhatsApp Manager / Embedded Signup → «Add phone number» → <b>«Enter a new phone number»</b> (НЕ «virtual number / display name» — тот даёт тестовый 555).'],
           ['Впиши номер', 'Вставь <b>' + (current ? '+' + esc(current) : 'купленный номер') + '</b>, выбери способ кода <b>SMS</b>.'],
           ['Код придёт сюда', 'Meta пришлёт OTP на номер → он появится в ленте ниже. Введи его в мастере Meta → номер верифицирован.'],
@@ -1705,6 +1706,42 @@ window.openTelnyxOtp = async function (preselect) {
   if (current) { try { await api.post('/telephony/otp/repair', { number: current }); } catch (e) {} }
   loadSms();
   pollTimer = setInterval(loadSms, 5000);
+};
+/* Покупка номеров ТЕЛЕФОНИИ (звонки+запись) прямо из раздела «Номера» → вкладка «Телефония» */
+window.openTelBuy = function () {
+  const bd = modal({
+    title: 'Купить номер для телефонии', sub: 'Виртуальный номер для исходящих звонков и записи разговоров', wide: true,
+    body: `<div class="lc-hint info" style="margin-bottom:12px">${ic(I.sim)}<span>Номер сразу попадёт в авто-подбор телефонии. Тарифицируется поминутно (звонки + запись) — расчёт в «Подписке и оплате».</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <label style="font-size:12px;color:var(--ink-3)">Страна:</label>
+        <select id="telBuyCountry" class="inp" style="max-width:170px">
+          <option value="US">США (+1)</option><option value="GB">Великобритания (+44)</option>
+          <option value="NL">Нидерланды (+31)</option><option value="CA">Канада (+1)</option>
+          <option value="DE">Германия (+49)</option><option value="PL">Польша (+48)</option>
+          <option value="AE">ОАЭ (+971)</option><option value="ES">Испания (+34)</option>
+        </select>
+        <button class="btn btn-accent" id="telBuySearch">${ic(I.spark)}Показать доступные</button>
+        <span class="muted" style="font-size:11px">виртуальный номер · аренда помесячно</span>
+      </div>
+      <div id="telBuyRes" class="warm-log" style="min-height:60px"><div class="muted" style="font-size:11.5px;padding:8px">Выбери страну и нажми «Показать доступные».</div></div>`,
+    actions: [{ label: 'Закрыть', onClick: () => {} }],
+  });
+  const reload = () => { if (typeof CUR !== 'undefined' && CUR === 'numbers' && PAGES.numbers) { window.__numTab = 'tel'; PAGES.numbers(document.getElementById('view') || document.body); } };
+  $('#telBuySearch', bd)?.addEventListener('click', async () => {
+    const country = ($('#telBuyCountry', bd) || {}).value || 'US';
+    const box = $('#telBuyRes', bd); box.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Ищу номера…</div>';
+    try {
+      const r = await api.get('/telephony/numbers/search?country=' + country + '&type=Local');
+      const list = r.list || [];
+      box.innerHTML = list.length ? list.slice(0, 10).map(n => `<div class="tel-num-row" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--stroke)"><span style="flex:1;font-weight:600">${esc(n.number)}</span><span class="muted" style="font-size:11px">${esc(n.region || '')}</span><button class="btn btn-sm btn-accent tel-buy1" data-num="${esc(n.number)}">Купить</button></div>`).join('') : `<div class="muted" style="font-size:12px;padding:8px">Нет доступных (${esc(r.error || 'по этой стране')}).</div>`;
+      box.querySelectorAll('.tel-buy1').forEach(b => b.addEventListener('click', async () => {
+        b.disabled = true; b.textContent = '…';
+        try { const rr = await api.post('/telephony/numbers/buy', { number: b.dataset.num }); if (rr.ok) { toast('Номер куплен', rr.number, true); b.textContent = '✓ куплен'; reload(); } else { toast('Не куплен', rr.error || ''); b.disabled = false; b.textContent = 'Купить'; } }
+        catch (e) { toast('Ошибка', e.message); b.disabled = false; b.textContent = 'Купить'; }
+      }));
+    } catch (e) { box.innerHTML = '<div class="muted" style="font-size:12px;padding:8px;color:var(--bad)">' + esc(e.message) + '</div>'; }
+  });
+  try { enhanceControls($('#telBuyRes', bd).parentElement); } catch (_) {}
 };
 /* Единый QR-подключатель WhatsApp-номера (реальный воркер) — вызывается прямо из раздела «Номера» */
 window.grayAddQR = function (phone, label) {
@@ -10417,7 +10454,7 @@ PAGES.numbers = async (root) => {
       <div class="card-title">${ic(I.plus)}Подключить номер<span class="sub">два канала работы с WhatsApp</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
-          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.chat)} Серый способ (по QR)</div>
+          <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.chat)} WhatsApp по QR</div>
           <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">Свой номер по QR (как WhatsApp Web). Или <b>купите виртуальный номер</b> — он поймает OTP, зарегистрируете WhatsApp и подключите. Прогрев + закреп за брокером.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
@@ -10426,7 +10463,7 @@ PAGES.numbers = async (root) => {
         </div>
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:13px">
           <div style="font-weight:650;font-size:13px;margin-bottom:4px">${ic(I.shield)} Официальный (Cloud API)</div>
-          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Нужен <b>реальный</b> номер (тестовый 555 не шлёт). Купи SMS-номер Telnyx — код прилетит прямо в CRM.</div>
+          <div class="muted" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">«Белый» канал Meta для массовых шаблонов без риска бана. Нужен <b>реальный</b> номер (тестовый 555 не шлёт). Купи виртуальный SMS-номер — код прилетит прямо в CRM.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-accent btn-sm" id="waHostedBtn">${ic(I.link)}Подключить WhatsApp Business</button>
             <button class="btn btn-sm" id="txOtpBtn">${ic(I.sim)}Номер для Cloud API (OTP)</button>
@@ -10436,7 +10473,7 @@ PAGES.numbers = async (root) => {
       </div>
     </div>
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
-      <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}Серые (QR) · ${grayNums.length}</button>
+      <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
       <button class="seg-btn ${NUMTAB === 'tg' ? 'on' : ''}" data-numtab="tg">${ic(I.send)}Telegram (серый)</button>
       <button class="seg-btn ${NUMTAB === 'tel' ? 'on' : ''}" data-numtab="tel">${ic(I.sim)}Телефония · ${telNums.length}</button>
@@ -10462,7 +10499,9 @@ PAGES.numbers = async (root) => {
           .map(([t, d]) => `<div><div style="font-size:12.5px;font-weight:650;margin-bottom:4px">${t}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${d}</div></div>`).join('')}
       </div>`, { open: false, icon: I.shield })}</div>
 
-    ${grayNums.length ? `<div class="lp-sec" style="margin:0 0 10px">Серые номера (QR) · ${grayNums.length}</div>
+    ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
+      <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div>
+      <button class="btn btn-sm btn-accent" id="grayListBuy">${ic(I.plus)}Докупить номера</button></div>
     <div class="num-grid" style="margin-bottom:18px">
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
@@ -10505,7 +10544,7 @@ PAGES.numbers = async (root) => {
     ${otpNums.length ? `<div class="num-grid" style="margin-bottom:18px">
       ${otpNums.map(n => { const conn = n.connected; const cn = n.cloud; const badge = conn ? ('<span class="badge ok"><i></i>подключён' + (cn && cn.verifiedName ? ' · ' + esc(cn.verifiedName) : ' к WhatsApp') + '</span>') : (n.wa ? '<span class="badge warn"><i></i>регистрируется в Meta</span>' : '<span class="badge">OTP-номер · не подключён</span>'); const hint = conn ? '' : (n.wa ? 'Meta проверяет номер — полное одобрение занимает обычно до <b>1–2 часов</b>. Статус обновляется сам.' : 'Номер куплен и ловит OTP. Чтобы стал отправителем — зарегистрируй его (кнопка «Коды / OTP + активация»).'); return `<div class="glass num-card cloud-card" data-otp="${esc(n.key)}">
         <div class="num-head">
-          <div><div class="ph">${esc(n.number)}</div><div class="lb">Cloud API · <b style="color:var(--accent-2)">Telnyx SMS</b></div></div>
+          <div><div class="ph">${esc(n.number)}</div><div class="lb">Cloud API · <b style="color:var(--accent-2)">WhatsApp (SMS)</b></div></div>
         </div>
         <div class="otp-badge" style="margin:10px 0 6px">${badge}</div>
         ${hint ? `<div class="otp-hint muted" style="font-size:11px;line-height:1.45;margin:0 0 8px;display:flex;gap:6px"><span>⏳</span><span>${hint}</span></div>` : ''}
@@ -10551,13 +10590,17 @@ PAGES.numbers = async (root) => {
     </div>
 
     <div data-numpane="tel" style="${NUMTAB === 'tel' ? '' : 'display:none'}">
-    <div class="lp-sec" style="margin:0 0 10px">Номера телефонии (звонки) · ${telNums.length}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
+      <div class="lp-sec" style="margin:0">Номера телефонии (звонки) · ${telNums.length}</div>
+      <button class="btn btn-sm btn-accent" id="telBuyBtn">${ic(I.plus)}${telNums.length ? 'Докупить номера' : 'Купить номер'}</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;line-height:1.5;margin:0 0 12px">Отдельные номера для исходящих звонков и записи разговоров. Тарифицируются поминутно (звонки + запись) — расчёт в «Подписке и оплате».</div>
     ${telNums.length ? `<div class="num-grid">
       ${telNums.map(n => `<div class="glass num-card">
-        <div class="num-head"><div><div class="ph">${esc(n.number)}</div><div class="lb">Telnyx · <b style="color:var(--accent)">телефония</b></div></div></div>
+        <div class="num-head"><div><div class="ph">${esc(n.number)}</div><div class="lb"><b style="color:var(--accent)">Телефония</b> · звонки и запись</div></div></div>
         <div style="margin:10px 0 4px"><span class="badge ok"><i></i>${esc(n.status || 'active')}</span></div>
       </div>`).join('')}
-    </div>` : `<div class="muted" style="font-size:13px">Номеров телефонии нет. Купить можно в «Автопилот → Телефония».</div>`}
+    </div>` : `<div class="muted" style="font-size:13px">Номеров телефонии пока нет — нажмите «Купить номер».</div>`}
     </div>`;
   /* вкладки страницы «Номера» */
   $$('#numTabs .seg-btn', root).forEach(b => b.addEventListener('click', () => {
@@ -10569,6 +10612,7 @@ PAGES.numbers = async (root) => {
   $$('[data-otpfeed]', root).forEach(b => b.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp('+' + b.dataset.otpfeed)));
   $$('[data-otprepair]', root).forEach(b => b.addEventListener('click', async () => { b.disabled = true; try { const r = await api.post('/telephony/otp/repair', { number: '+' + b.dataset.otprepair }); toast(r.ok ? 'Привязка проверена' : 'Не вышло', r.ok ? (r.assigned ? 'Профиль привязан' : 'Уже привязан') : (r.error || ''), r.ok); } catch (e) { toast('Ошибка', e.message); } b.disabled = false; }));
   $('#cloudBuyBtn', root)?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
+  $('#telBuyBtn', root)?.addEventListener('click', () => window.openTelBuy && window.openTelBuy());
   /* авто-обновление статусов Cloud-API номеров из Telnyx (одобрение Meta занимает время) */
   if (window.CLOUD_STATUS_POLL) { clearInterval(window.CLOUD_STATUS_POLL); window.CLOUD_STATUS_POLL = null; }
   if (otpNums.length) window.CLOUD_STATUS_POLL = setInterval(async () => {
@@ -10621,18 +10665,19 @@ PAGES.numbers = async (root) => {
     box.innerHTML = `
       <div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
         <div class="card-title">${ic(I.send)}Telegram — серый способ<span class="sub">точечные касания 1-к-1 · НЕ рассылки</span></div>
-        <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем номер (Yesim) → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания.</div>
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем виртуальный номер → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания.</div>
         <div class="num-meta" style="margin-bottom:12px">
           <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
           <div class="m"><div class="v">${nums.length}</div><div class="k">TG-номеров</div></div>
           <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">новых/день при 1-на-1</div></div>
         </div>
         ${!d.ready ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}TG-воркер не подключён. Кнопки покупки/подключения активируются, когда задеплоишь <b>lumen-tg-worker</b> (Railway) и зададишь env <code>LUMEN_TG_WORKER_URL</code>+<code>LUMEN_TG_WORKER_TOKEN</code>.</span></div>` : (need > 0 ? `<div class="lc-hint" style="margin-bottom:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> TG-номеров до «1 на брокера». Купи недостающие — закроешь всех.</span></div>` : '')}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-accent btn-sm" id="tgBuyBtn" ${d.ready ? '' : 'disabled'}>${ic(I.plus)}Купить номер для Telegram</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-accent btn-sm" id="tgBuyBtn" ${d.ready ? '' : 'disabled'}>${ic(I.plus)}${nums.length ? 'Докупить номера' : 'Купить номер для Telegram'}</button>
           <button class="btn btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
-          <label class="switch" style="align-self:center;display:inline-flex;gap:6px;align-items:center;font-size:12px;margin-left:auto"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span> прогрев между номерами</label>
         </div>
+        <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">Прогрев между номерами</div><div class="sd">Аккуратная авто-переписка между TG-номерами — «отлёживает» аккаунты перед касаниями</div></div>
+          <label class="switch"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span></label></div>
       </div>
       ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
         <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:#229ED9">серый (MTProto)</b></div></div></div>
@@ -10645,7 +10690,7 @@ PAGES.numbers = async (root) => {
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
-      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет — нажми «Купить номер для Telegram»: купим Yesim-номер, авторизуем TG, код прилетит в ленту автоматически.</div>' : '')}`;
+      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет — нажми «Купить номер для Telegram»: купим виртуальный номер, авторизуем TG, код прилетит в ленту автоматически.</div>' : '')}`;
     $('#tgBuyBtn', box)?.addEventListener('click', () => openTgBuy());
     $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
     $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
@@ -10684,6 +10729,7 @@ PAGES.numbers = async (root) => {
   $('#openGrayBtn')?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#openYesimBtn')?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
   $('#grayRecBuy', root)?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
+  $('#grayListBuy', root)?.addEventListener('click', () => window.openYesimBuy && window.openYesimBuy());
   $('#grayRecQR', root)?.addEventListener('click', () => window.openGrayManager && window.openGrayManager());
   $('#txOtpBtn')?.addEventListener('click', () => window.openTelnyxOtp && window.openTelnyxOtp());
   $('#waHostedBtn')?.addEventListener('click', async () => {
