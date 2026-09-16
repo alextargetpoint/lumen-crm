@@ -4828,6 +4828,34 @@ const server = http.createServer(async (req, res) => {
           res.end(pdf); return;
         } catch (e) { return json(res, 500, { error: e.message }); }
       }
+      /* банк-перевод: клиент прикрепляет квитанцию об оплате → счёт «на проверке» → уведомление АДМИНУ платформы */
+      if (p.startsWith('/api/billing/invoice/') && p.endsWith('/receipt') && req.method === 'POST') {
+        const id = decodeURIComponent(p.slice('/api/billing/invoice/'.length, p.length - '/receipt'.length));
+        const bl = db.settings.billing || {}; const inv = (bl.invoices || []).find(i => i.id === id);
+        if (!inv) return json(res, 404, { error: 'счёт не найден' });
+        if (inv.status === 'paid') return json(res, 400, { error: 'счёт уже оплачен' });
+        const b = await readBody(req);
+        const data = String(b.receipt || '');
+        if (!/^data:(image\/(png|jpe?g|webp)|application\/pdf);base64,/.test(data) || data.length > 8 * 1024 * 1024) return json(res, 400, { error: 'нужен файл квитанции (изображение или PDF, ≤6 МБ)' });
+        bl.invoiceReceipts = bl.invoiceReceipts || {};
+        bl.invoiceReceipts[id] = data;
+        const keys = Object.keys(bl.invoiceReceipts); if (keys.length > 40) delete bl.invoiceReceipts[keys[0]];
+        inv.status = 'pending_review'; inv.receiptAt = Date.now();
+        store.save();
+        /* уведомление владельцу агентства (в его кабинет) — что квитанция принята и уйдёт на проверку */
+        notify(db, { type: 'invoice', level: 'info', title: 'Квитанция получена', text: `Счёт ${id} — квитанция принята, отправлена на проверку. Подтвердим оплату в ближайшее время.`, email: false });
+        /* пометка платформе: pending-очередь читается супер-админом (см. /api/admin/invoices-pending) */
+        try { const reg = store.getRegistry(); reg.pendingInvoices = reg.pendingInvoices || {}; reg.pendingInvoices[store.currentTid() + ':' + id] = { tid: store.currentTid(), invId: id, amount: inv.amount, at: Date.now() }; store.saveRegistry(); } catch (e) {}
+        return json(res, 200, { ok: true, status: inv.status });
+      }
+      if (p.startsWith('/api/billing/invoice/') && p.endsWith('/receipt') && req.method === 'GET') {
+        const id = decodeURIComponent(p.slice('/api/billing/invoice/'.length, p.length - '/receipt'.length));
+        const data = ((db.settings.billing || {}).invoiceReceipts || {})[id];
+        if (!data) return json(res, 404, { error: 'квитанции нет' });
+        const m = data.match(/^data:([^;]+);base64,(.*)$/); if (!m) return json(res, 500, { error: 'битая квитанция' });
+        const buf = Buffer.from(m[2], 'base64');
+        res.writeHead(200, { 'Content-Type': m[1], 'Content-Length': buf.length }); res.end(buf); return;
+      }
       if (p === '/api/billing/checkout' && req.method === 'POST') {
         try { const r = await billing.stripeCheckout(db, global.LUMEN_BASE || ''); return json(res, 200, r); }
         catch (e) { return json(res, 400, { error: e.message }); }
@@ -4885,6 +4913,35 @@ const server = http.createServer(async (req, res) => {
         return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, onboarded: !!(d.settings.agency && d.settings.agency.onboarded), createdAt: meta.createdAt || 0, lastActivity, sleeping: lastActivity > 0 && (Date.now() - lastActivity) > 7 * 864e5, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length };
       });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
+      /* банк-перевод: очередь счетов «на проверке» (клиент прикрепил квитанцию) + подтверждение оплаты админом */
+      if (p === '/api/admin/invoices-pending' && req.method === 'GET') {
+        const out = [];
+        for (const tid of store.listTenants()) store.runInTenant(tid, () => {
+          const d = store.get(); const invs = ((d.settings.billing || {}).invoices || []).filter(i => i.status === 'pending_review');
+          for (const iv of invs) out.push({ tid, name: (d.settings.agency && d.settings.agency.name) || tid, invId: iv.id, amount: iv.amount, currency: iv.currency, receiptAt: iv.receiptAt || iv.at, company: iv.company || {} });
+        });
+        out.sort((a, b2) => (a.receiptAt || 0) - (b2.receiptAt || 0));
+        return json(res, 200, { ok: true, pending: out });
+      }
+      if (p === '/api/admin/invoice-receipt' && req.method === 'GET') {
+        const tid = u.searchParams.get('tid'), invId = u.searchParams.get('inv');
+        if (!store.listTenants().includes(tid)) return json(res, 404, { error: 'нет тенанта' });
+        let data = null; store.runInTenant(tid, () => { data = ((store.get().settings.billing || {}).invoiceReceipts || {})[invId] || null; });
+        if (!data) return json(res, 404, { error: 'квитанции нет' });
+        const m = data.match(/^data:([^;]+);base64,(.*)$/); if (!m) return json(res, 500, { error: 'битая' });
+        const buf = Buffer.from(m[2], 'base64'); res.writeHead(200, { 'Content-Type': m[1], 'Content-Length': buf.length }); res.end(buf); return;
+      }
+      if (p === '/api/admin/invoice-confirm' && req.method === 'POST') {
+        const b = await readBody(req); const tid = String(b.tid || ''), invId = String(b.invId || '');
+        if (!store.listTenants().includes(tid)) return json(res, 404, { error: 'нет тенанта' });
+        let r = null; store.runInTenant(tid, () => {
+          const d = store.get(); r = billing.markInvoicePaid(d, invId);
+          if (r && !r.error) { try { notify(d, { type: 'invoice', level: 'success', title: 'Оплата подтверждена', text: `Счёт ${invId} оплачен и подтверждён. Подписка активна.` }); } catch (e) {} }
+          try { const reg2 = store.getRegistry(); if (reg2.pendingInvoices) delete reg2.pendingInvoices[tid + ':' + invId]; store.saveRegistry(); } catch (e) {}
+        });
+        if (!r || r.error) return json(res, 400, { error: (r && r.error) || 'не удалось' });
+        return json(res, 200, { ok: true });
+      }
       if (p === '/api/admin/stats' && req.method === 'GET') {
         const ts = store.listTenants().map(tenantStat);
         return json(res, 200, { ok: true, tenants: ts.length, leads: ts.reduce((s, t) => s + t.leads, 0), brokers: ts.reduce((s, t) => s + t.brokers, 0), suspended: ts.filter(t => t.suspended).length, sleeping: ts.filter(t => t.sleeping).length, byPlan: ts.reduce((a, t) => (a[t.plan] = (a[t.plan] || 0) + 1, a), {}), mrr: ts.reduce((s, t) => s + ((PLANS[t.plan] || {}).price || 0), 0) });

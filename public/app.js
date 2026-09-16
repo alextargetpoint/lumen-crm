@@ -12948,10 +12948,13 @@ PAGES.billing = async (root) => {
             <div class="bi-row">
               <div><b>${esc(iv.id)}</b><div class="muted" style="font-size:11px">${date(iv.at)} · ${esc(iv.planName)} · ${esc(iv.period)}</div></div>
               <div class="bi-amt">${money(iv.amount)}</div>
-              <div class="bi-st bi-${iv.status}">${iv.status === 'paid' ? 'оплачен' : iv.status === 'issued' ? 'выставлен' : esc(iv.status)}</div>
-              <a class="btn-ghost btn-sm bi-pdf" href="/api/billing/invoice/${encodeURIComponent(iv.id)}/pdf" target="_blank" title="Счёт-фактура PDF">${ic(I.doc)}PDF</a>
+              <div class="bi-st bi-${iv.status}">${iv.status === 'paid' ? 'оплачен' : iv.status === 'issued' ? 'выставлен' : iv.status === 'pending_review' ? 'на проверке' : esc(iv.status)}</div>
+              <div class="bi-acts">
+                <a class="btn-ghost btn-sm bi-pdf" href="/api/billing/invoice/${encodeURIComponent(iv.id)}/pdf" target="_blank" title="Счёт-фактура PDF">${ic(I.doc)}PDF</a>
+                ${iv.status !== 'paid' ? `<button class="btn-ghost btn-sm bi-receipt" data-inv="${encodeURIComponent(iv.id)}" title="Прикрепить квитанцию об оплате">${ic(I.link)}${iv.status === 'pending_review' ? 'Квитанция ✓' : 'Квитанция'}</button>` : ''}
+              </div>
             </div>`).join('')}</div>
-            <div class="muted" style="font-size:11px;margin-top:8px">Счёт-фактуры формируются только по оплате картой/банком. Крипто-пополнения баланса счёт-фактурой не сопровождаются.</div>`
+            <div class="muted" style="font-size:11px;margin-top:8px">Оплата банком: оплатите по реквизитам из PDF и <b>прикрепите квитанцию</b> — счёт уйдёт «на проверку», мы подтвердим оплату. Счёт-фактуры — только по карте/банку; крипто-пополнения баланса счёт-фактурой не сопровождаются.</div>`
             : `<div class="muted" style="font-size:12.5px;padding:8px 0">Счетов пока нет — появятся при оплате подписки картой/банком (крипта — без счёт-фактуры).</div>`}
         </div>
       </div>
@@ -13015,6 +13018,18 @@ PAGES.billing = async (root) => {
     await api.post('/billing/method', { company: { legalName: $('#coName').value, vat: $('#coVat').value, email: $('#coEmail').value, address: $('#coAddr').value } });
     toast('Реквизиты сохранены', 'Появятся в счёте', true);
   });
+  /* банк-перевод: прикрепить квитанцию об оплате → счёт «на проверке» */
+  $$('.bi-receipt', root).forEach(btn => btn.addEventListener('click', () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,application/pdf';
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      if (f.size > 6 * 1024 * 1024) { toast('Слишком большой файл', 'до 6 МБ'); return; }
+      const rd = new FileReader();
+      rd.onload = async () => { try { await api.post(`/billing/invoice/${btn.dataset.inv}/receipt`, { receipt: rd.result }); toast('Квитанция отправлена', 'Счёт на проверке — подтвердим оплату', true); await reload(); } catch (e) { toast('Не вышло', e.message); } };
+      rd.readAsDataURL(f);
+    };
+    inp.click();
+  }));
   const tuc = $('#topupCrypto', root); if (tuc) tuc.addEventListener('click', () => openTopupCrypto({ purpose: 'consumables', onDone: reload }));
   const psc = $('#paySubCrypto', root); if (psc) psc.addEventListener('click', () => openTopupCrypto({ purpose: 'subscription', presetAmount: +psc.dataset.amt || 0, onDone: reload }));
 };

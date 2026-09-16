@@ -180,8 +180,9 @@ function usageEstimate(db) {
 function view(db) {
   const b = db.settings.billing;
   const q = quote(b.plan, b.cycle, b.seats);
+  const { invoiceReceipts, creditedTxids, ...pub } = b;   /* не отдаём фронту тяжёлые/внутренние поля (base64 квитанций, txid-журнал) */
   return {
-    ...b,
+    ...pub,
     quote: q,
     prices: PRICES,
     usageLive: usageEstimate(db),

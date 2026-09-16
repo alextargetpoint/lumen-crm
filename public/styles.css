@@ -7433,3 +7433,5 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* инбокс: композер не должен сжиматься флекс-родителем на первом рендере (Arc-first-paint) */
 .composer{ flex-shrink:0; }
 .composer textarea{ box-sizing:border-box; }
+.bi-acts{ display:inline-flex; gap:6px; align-items:center; }
+.bi-pending_review{ color:#E0A94A; }
