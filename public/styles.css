@@ -7373,3 +7373,5 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .tc-status.warn{ background:rgba(240,176,74,.1); border-color:rgba(240,176,74,.3); }
 .tc-status .ic{ flex:0 0 auto; }
 .tc-presets .tc-preset{ font-variant-numeric:tabular-nums; }
+.tc-net{ display:flex; align-items:flex-start; gap:9px; font-size:12.5px; line-height:1.45; color:var(--ink-2); padding:11px 13px; border-radius:11px; border:1px solid rgba(74,222,128,.28); background:rgba(74,222,128,.07); margin-bottom:16px; }
+.tc-net .ic{ flex:0 0 auto; margin-top:1px; color:#4ADE80; }

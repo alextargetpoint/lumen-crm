@@ -12841,17 +12841,13 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
     wide: true,
     body: `
       <div id="tcStep1">
-        <div class="tc-seg seg-toggle" style="margin-bottom:14px">
-          <button type="button" class="seg-btn on" data-chain="trc20">TRC20 · Tron<span class="seg-badge">быстро · дёшево</span></button>
-          <button type="button" class="seg-btn" data-chain="erc20">ERC20 · Ethereum</button>
-        </div>
+        <div class="tc-net">${ic(I.spark)}<span><b>USDT · сеть TRC20 (Tron)</b> — низкая комиссия, зачисление за 1–3 минуты. Отправляйте только USDT в сети TRC20.</span></div>
         <label class="lc-lbl">Сумма пополнения, USD</label>
         <input id="tcAmt" type="number" min="10" step="1" value="${presetAmount ? Math.max(10, Math.ceil(presetAmount)) : 100}" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink);font-size:18px;font-weight:700">
         <div class="tc-presets" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px">
           ${presets.map(p => `<button type="button" class="btn btn-sm tc-preset" data-p="${p}">$${p}</button>`).join('')}
         </div>
         <div class="lc-hint info" style="margin-top:12px">${ic(I.spark)}<span>Минимум $10. Переводите USDT (не другой токен). Комиссию сети платит отправитель — на баланс зачислится ровно указанная сумма.</span></div>
-        <div class="lc-hint warn" id="tcErcWarn" hidden style="margin-top:8px">${ic(I.spark)}<span>Сеть ERC20 (Ethereum) дороже по комиссии и подтверждается медленнее. Для пополнений рекомендуем TRC20.</span></div>
       </div>
       <div id="tcStep2" hidden></div>`,
     actions: [
@@ -12860,12 +12856,8 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
     ],
   });
 
-  let chain = 'trc20', pollTimer = null, activeId = null;
-  bd.querySelectorAll('[data-chain]').forEach(b => b.addEventListener('click', () => {
-    bd.querySelectorAll('[data-chain]').forEach(x => x.classList.toggle('on', x === b));
-    chain = b.dataset.chain;
-    const w = bd.querySelector('#tcErcWarn'); if (w) w.hidden = chain !== 'erc20';
-  }));
+  const chain = 'trc20';   /* пока принимаем только TRC20 (ERC20 включится после Etherscan-ключа) */
+  let pollTimer = null, activeId = null;
   bd.querySelectorAll('.tc-preset').forEach(b => b.addEventListener('click', () => { const a = bd.querySelector('#tcAmt'); if (a) a.value = b.dataset.p; }));
 
   async function tcCreate(bd) {
