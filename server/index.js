@@ -2624,6 +2624,31 @@ const CRYPTO_TRON = process.env.CRYPTO_TRON_ADDRESS || 'TKsspQfKNJvcREryLtMG1Hsx
 const CRYPTO_ETH  = process.env.CRYPTO_ETH_ADDRESS  || '0x6dc20b29ea59fd722e752e65cd0c0059ee5c3b25';
 const USDT_TRC20  = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   /* USDT (Tron) контракт */
 const USDT_ERC20  = '0xdac17f958d2ee523a2206206994597c13d831ec7'; /* USDT (Ethereum) контракт */
+/* Предупреждение о низком балансе расходников. Без спама: один раз на «уровень» (ok→low→empty).
+   Слайс 2 добавит сюда email+Telegram-пуш и вкладку-центр уведомлений. */
+function lowBalanceCheck(db) {
+  try {
+    const b = db.settings.billing; if (!b) return;
+    const u = billing.usageEstimate(db);
+    const bal = b.balance || 0;
+    const monthly = u.balanceMonthlyForecast || 0;
+    let level = 'ok';
+    if (bal <= 0.0001) level = 'empty';
+    else if (monthly > 0 && bal < monthly) level = 'low';
+    else if (monthly > 0 && bal < monthly * 2) level = 'warn';
+    if (level === (b._balLevel || 'ok')) return;   // уровень не изменился — не дублируем
+    b._balLevel = level;
+    if (level === 'ok') { store.save(); return; }
+    const msg = level === 'empty'
+      ? `🔴 Баланс расходников закончился ($0). Пополните криптой, иначе номера, аккаунты и все чаты будут приостановлены — доступ к переписке пропадёт.`
+      : level === 'low'
+      ? `🟠 Баланса расходников ($${bal.toFixed(2)}) не хватает на месяц вперёд (прогноз $${monthly.toFixed(2)}). Пополните заранее — при обнулении номера и чаты приостановятся.`
+      : `🟡 Баланс расходников ниже двойного месячного прогноза. Рекомендуем пополнить заранее.`;
+    try { ai.pushEvent(db, { type: 'note', text: msg }); } catch (e) {}
+    store.save();
+  } catch (e) {}
+}
+
 let cryptoBusy = false;
 async function cryptoTick() {
   if (cryptoBusy) return; cryptoBusy = true;
@@ -2678,6 +2703,7 @@ async function cryptoTick() {
             if (billing.creditTopup(db, t, hit.txid, hit.amt)) {
               changed = true;
               try { ai.pushEvent(db, { type: 'note', text: `💰 Пополнение расходников: +$${t.creditedAmount} (USDT ${t.chain.toUpperCase()} подтверждён on-chain)` }); } catch (e) {}
+              try { lowBalanceCheck(db); } catch (e) {}
             }
           }
         }
@@ -6202,6 +6228,11 @@ const server = http.createServer(async (req, res) => {
       const country = String(b.country || 'US').toUpperCase().slice(0, 2);
       const t = db.settings.telephony || {};
       if (t.provider !== 'telnyx') return json(res, 400, { error: 'OTP-номера доступны для Telnyx' });
+      if (!db.settings.billing) db.settings.billing = billing.defBilling();
+      const otpPrice = +(((db.settings.billing.rates || {}).numCloud) || 9);
+      if ((db.settings.billing.balance || 0) + 1e-9 < otpPrice) {
+        return json(res, 402, { error: `Недостаточно баланса расходников: нужно $${otpPrice.toFixed(2)}, на балансе $${(db.settings.billing.balance || 0).toFixed(2)}. Пополните баланс криптой.`, need: otpPrice, balance: db.settings.billing.balance || 0, code: 'insufficient_balance' });
+      }
       try {
         const profileId = await ensureTelnyxMsgProfile(db);
         const j = await telnyxApi(db, 'GET', `/available_phone_numbers?filter[country_code]=${country}&filter[phone_number_type]=local&filter[features][]=sms&filter[limit]=8`);
@@ -6230,9 +6261,11 @@ const server = http.createServer(async (req, res) => {
         }
         if (!bought) return json(res, 400, { error: 'не удалось купить SMS-номер (все кандидаты заняты)' });
         t.otpNumbers = t.otpNumbers || {};
-        t.otpNumbers[bought.replace(/[^0-9]/g, '')] = { number: bought, at: Date.now(), sms: [] };
+        t.otpNumbers[bought.replace(/[^0-9]/g, '')] = { number: bought, at: Date.now(), sms: [], priceUsd: otpPrice, renewsAt: Date.now() + 30 * 86400e3 };
+        const ch = billing.chargeBalance(db, otpPrice, `Аренда OTP-номера ${bought} (месяц)`);
         store.save();
-        return json(res, 200, { ok: true, number: bought });
+        lowBalanceCheck(db);
+        return json(res, 200, { ok: true, number: bought, balance: ch.balance, charged: otpPrice });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* починка OTP-номера: привязать messaging-profile (для приёма SMS) + голосовое подключение. Идемпотентно. */
@@ -6484,6 +6517,13 @@ const server = http.createServer(async (req, res) => {
       const subscriptionOption = ['month', 'year'].includes(b.subscriptionOption) ? b.subscriptionOption : 'month';
       const forSvc = b.for === 'tg' ? 'tg' : 'wa';   /* для какого канала берём номер (TG-номер НЕ должен падать в WA-пул) */
       if (!country) return json(res, 400, { error: 'нужна страна' });
+      /* БАЛАНС-ГЕЙТ: покупка номера = аренда на месяц, списывается с предоплаченного баланса (крипта).
+         Нельзя уйти в минус — при нехватке просим пополнить. Цена агентству (с наценкой) = ставка типа. */
+      if (!db.settings.billing) db.settings.billing = billing.defBilling();
+      const numPrice = +(((db.settings.billing.rates || {})[forSvc === 'tg' ? 'numTg' : 'numWaQr']) || 9);
+      if ((db.settings.billing.balance || 0) + 1e-9 < numPrice) {
+        return json(res, 402, { error: `Недостаточно баланса расходников: нужно $${numPrice.toFixed(2)}, на балансе $${(db.settings.billing.balance || 0).toFixed(2)}. Пополните баланс криптой.`, need: numPrice, balance: db.settings.billing.balance || 0, code: 'insufficient_balance' });
+      }
       try {
         /* area зависит от страны (у US есть 'Mobile', у UA — нет → 'Invalid area').
            Для приёма кодов мессенджеров нужен МОБИЛЬНЫЙ номер: спрашиваем реальные area страны и
@@ -6496,9 +6536,14 @@ const server = http.createServer(async (req, res) => {
         try { r = await yesimApi('purchase_number', area ? { country, subscriptionOption, area } : { country, subscriptionOption }); }
         catch (e1) { if (area && /invalid area/i.test(e1.message)) r = await yesimApi('purchase_number', { country, subscriptionOption }); else throw e1; }
         const number = r.number || (r.data && r.data.number) || '';
+        /* покупка удалась → списываем с баланса (аренда номера на месяц) + фиксируем цену на номере (для калькулятора «по факту») */
+        let ch = { ok: true, balance: db.settings.billing.balance || 0 };
+        if (number) { ch = billing.chargeBalance(db, numPrice, `Аренда номера ${forSvc === 'tg' ? 'Telegram' : 'WhatsApp'} +${number} (месяц)`); }
         /* WA-номер сохраняем в пул серых WhatsApp; TG-номер — НЕ сюда (его добавит /tg/gray/connect в tgGray) */
-        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, addedAt: Date.now() }); store.save(); }
-        return json(res, 200, { ok: true, number, result: r });
+        if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, priceUsd: numPrice, addedAt: Date.now(), renewsAt: Date.now() + 30 * 86400e3 }); }
+        store.save();
+        lowBalanceCheck(db);
+        return json(res, 200, { ok: true, number, result: r, balance: ch.balance, charged: numPrice });
       } catch (e) { return json(res, 400, { error: e.message }); }
     }
     /* входящие SMS (OTP) по купленным номерам: ?offset=0 */

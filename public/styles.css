@@ -7375,3 +7375,9 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .tc-presets .tc-preset{ font-variant-numeric:tabular-nums; }
 .tc-net{ display:flex; align-items:flex-start; gap:9px; font-size:12.5px; line-height:1.45; color:var(--ink-2); padding:11px 13px; border-radius:11px; border:1px solid rgba(74,222,128,.28); background:rgba(74,222,128,.07); margin-bottom:16px; }
 .tc-net .ic{ flex:0 0 auto; margin-top:1px; color:#4ADE80; }
+/* калькулятор: группы «баланс» / «карта Meta» */
+.bc-group{ border:1px solid var(--stroke-soft); border-radius:12px; padding:12px 13px; }
+.bc-group-h{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2); margin-bottom:8px; }
+.bc-group-h .ic{ flex:0 0 auto; color:var(--accent,#c8a86a); }
+.bc-group-h b{ color:var(--ink); }
+.bc-sub{ font-size:10.5px; font-weight:700; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em; margin:2px 0 4px; }

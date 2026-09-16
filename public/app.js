@@ -643,7 +643,7 @@ async function apiReq(method, p, b) {
   });
   if (r.status === 401) { renderLogin(); throw new Error('auth'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status)); /* 403/404/400/429/500 → бросаем с текстом сервера (иначе вызовы «висят», думая что ок) */
+  if (!r.ok) { const err = new Error((j && j.error) || ('HTTP ' + r.status)); err.status = r.status; err.code = j && j.code; err.body = j; throw err; } /* 403/404/400/402/429/500 → бросаем с текстом сервера + code/body */
   return j;
 }
 const api = {
@@ -1384,7 +1384,7 @@ window.openPlanManager = async function () {
 };
 
 /* ---------- Согласие на «серые» методы (клиент берёт полную ответственность) ---------- */
-const GRAY_CONSENT_VERSION = 1;
+const GRAY_CONSENT_VERSION = 2;
 function grayConsentOk() { const c = STATE && STATE.settings && STATE.settings.grayConsent; return !!(c && c.accepted && (c.version || 0) >= GRAY_CONSENT_VERSION); }
 window.openGrayConsent = function (kind, cb) {
   const svc = kind === 'tg' ? 'Telegram' : 'WhatsApp';
@@ -1394,6 +1394,8 @@ window.openGrayConsent = function (kind, cb) {
     `Понимаю, что средства, потраченные на номера/аккаунты, <b>невозвратны при бане</b> — это технические издержки на моей стороне.`,
     `Обязуюсь <b>не вести массовые рассылки</b> с этих номеров (мгновенный бан) — только точечные касания 1-к-1.`,
     `Понимаю, что могу использовать как номера из магазина, так и <b>свои купленные аккаунты</b> — выбор источника и ответственность за него на мне.`,
+    `Понимаю, что расходники (аренда номеров, ИИ, телефония) работают <b>только с предоплаченного баланса</b>. Если баланс закончится, номера, аккаунты и <b>доступ ко всем чатам и переписке приостанавливаются/теряются автоматически</b> — это следствие неоплаты, а не действие TargetPoint/Lumen.`,
+    `Обязуюсь <b>заранее держать на балансе достаточно средств</b>. Претензий по авто-потере номера, аккаунта или данных из-за недостатка баланса не имею — вся ответственность на мне.`,
   ];
   const bd = modal({
     title: 'Прямое подключение — условия и ответственность', sub: 'Отметьте все пункты, чтобы продолжить', wide: true,
@@ -1615,8 +1617,15 @@ window.openYesimBuy = async function () {
         btn.textContent = '✓ куплен'; if (typeof CUR !== 'undefined' && CUR === 'numbers') render();
         const loadSms = async () => { const sb = $('#ySms', bd); if (!sb) return; try { const s = await api.get('/gray/yesim/sms'); const arr = (s.sms && s.sms.sms) || s.sms || []; sb.innerHTML = (Array.isArray(arr) && arr.length) ? arr.slice(0, 10).map(m => `<div class="warm-msg"><b>${esc(m.sender || m.from || '')}</b><span class="warm-txt">${esc(m.text || m.message || m.sms || '')}</span><i>${esc((m.date || m.time || '').toString().slice(0, 16))}</i></div>`).join('') : '<div class="muted" style="font-size:11.5px;padding:8px">Пока нет SMS. Придёт при регистрации WhatsApp.</div>'; } catch (e) {} };
         $('#yRefreshSms', bd).addEventListener('click', loadSms); loadSms();
-      } catch (e) { box.innerHTML = `<span style="color:var(--bad)">Ошибка: ${esc(e.message)}</span>`; btn.disabled = false; btn.textContent = 'Купить номер'; }
+      } catch (e) {
+        /* нехватка баланса (402) — предлагаем пополнить криптой прямо отсюда */
+        const insuff = e && (e.code === 'insufficient_balance' || /баланс/i.test(e.message || ''));
+        box.innerHTML = `<div class="lc-hint warn">${ic(I.spark)}<span>${esc(e.message || 'Ошибка')}</span></div>${insuff ? `<button class="btn btn-accent btn-sm" id="yTopup" style="margin-top:8px">${ic(I.wallet || I.card)}Пополнить баланс криптой</button>` : ''}`;
+        const tu = $('#yTopup', bd); if (tu) tu.addEventListener('click', () => { closeModal(); openTopupCrypto({ purpose: 'consumables' }); });
+        btn.disabled = false; btn.textContent = 'Купить номер';
+      }
     });
+    enhanceControls(host());   /* селекты были добавлены асинхронно — стилизуем их сейчас, иначе остаются нативными */
   };
   renderForm();
 };
@@ -12732,30 +12741,42 @@ PAGES.billing = async (root) => {
 
         <!-- расходники: калькулятор по факту -->
         <div class="glass card mb">
-          <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">подписка отдельно · расходники — по факту месяца</span>
+          <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">что списывается с баланса · что платит ваша карта в Meta</span>
             <button class="btn btn-sm" id="bcRates" style="margin-left:auto">${ic(I.edit || I.doc)}Ставки</button></div>
-          <div class="bc-lines">
-            <div style="font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 4px">По факту · метрируется</div>
-            ${(u.items || []).map(it => `<div class="bc-line">
-              <div class="bc-line-l"><b>${it.label}</b><span>${it.qty.toLocaleString('ru-RU')} ${it.unit} × $${it.rate}</span></div>
-              <div class="bc-line-c">${moneyC(it.cost)}</div>
-            </div>`).join('')}
-            ${(u.rentals && u.rentals.length) ? `<div style="font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 4px">Аренда номеров · флэт/мес</div>
-            ${u.rentals.map(r => `<div class="bc-line">
-              <div class="bc-line-l"><b>${r.label}</b><span>${r.count} ${plural(r.count, 'номер', 'номера', 'номеров')} × $${r.rate}/мес</span></div>
-              <div class="bc-line-c">${moneyC(r.cost)}<span class="muted" style="font-size:10px;display:block">в месяц</span></div>
-            </div>`).join('')}` : ''}
-          </div>
-          <div class="bc-sum">
-            <div class="bc-sum-row"><span>Расходники за период (${u.elapsedDays} дн)</span><b>${moneyC(u.total)}</b></div>
-            ${u.numbersCount ? `<div class="bc-sum-row"><span>Аренда номеров (${u.numbersCount} ${plural(u.numbersCount, 'номер', 'номера', 'номеров')} · флэт/мес)</span><b>${moneyC(u.numbersMonthly)}</b></div>` : ''}
-            <div class="bc-sum-row bc-forecast"><span>Прогноз к оплате в конце периода</span><b>${moneyC(u.monthlyForecast != null ? u.monthlyForecast : u.forecast)}</b></div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--stroke-soft)">
-              <span class="badge warn"><i></i>не оплачено</span>
-              <span class="muted" style="font-size:11.5px">копится за период · спишется единым счётом ${date(u.periodEnd)}</span>
+
+          <!-- ГРУППА A: с баланса (крипта) -->
+          <div class="bc-group">
+            <div class="bc-group-h">${ic(I.wallet || I.card)}<span>Списывается с баланса <b>(предоплата криптой)</b></span></div>
+            <div class="bc-lines">
+              ${u.rentals && u.rentals.length ? `<div class="bc-sub">Номера · аренда = покупка (флэт/мес)</div>
+              ${u.rentals.map(r => `<div class="bc-line">
+                <div class="bc-line-l"><b>${r.label}</b><span>${r.count} × $${r.rate}/мес</span></div>
+                <div class="bc-line-c">${moneyC(r.cost)}<span class="muted" style="font-size:10px;display:block">в месяц</span></div>
+              </div>`).join('')}` : ''}
+              <div class="bc-sub" style="margin-top:${u.rentals && u.rentals.length ? '12px' : '2px'}">По факту · метрируется</div>
+              ${(u.balanceItems || []).map(it => `<div class="bc-line">
+                <div class="bc-line-l"><b>${it.label}</b><span>${it.qty.toLocaleString('ru-RU')} ${it.unit} × $${it.rate}</span></div>
+                <div class="bc-line-c">${moneyC(it.cost)}</div>
+              </div>`).join('')}
+            </div>
+            <div class="bc-sum">
+              ${u.numbersCount ? `<div class="bc-sum-row"><span>Аренда номеров (${u.numbersCount} ${plural(u.numbersCount, 'номер', 'номера', 'номеров')})</span><b>${moneyC(u.numbersMonthly)}</b></div>` : ''}
+              <div class="bc-sum-row"><span>Метрируемые за период (${u.elapsedDays} дн)</span><b>${moneyC(u.usageTotal != null ? u.usageTotal : u.total)}</b></div>
+              <div class="bc-sum-row bc-forecast"><span>Прогноз списания с баланса / мес</span><b>${moneyC(u.balanceMonthlyForecast != null ? u.balanceMonthlyForecast : u.monthlyForecast)}</b></div>
             </div>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:10px">Расходники не входят в подписку: WhatsApp-сообщения, обработка ИИ, минуты телефонии и записи, аренда номеров. Считаются по факту и списываются единым счётом в конце расчётного периода, отдельно от подписки.</div>
+
+          <!-- ГРУППА B: карта Meta (WhatsApp Cloud API) -->
+          <div class="bc-group" style="margin-top:14px">
+            <div class="bc-group-h">${ic(I.card)}<span>Оплачивается <b>вашей картой в Meta</b> (WhatsApp Cloud API)</span></div>
+            <div class="bc-line">
+              <div class="bc-line-l"><b>Сообщения WhatsApp Cloud API</b><span>тарифицирует Meta по разговорам</span></div>
+              <div class="bc-line-c muted">не с баланса</div>
+            </div>
+            <div class="lc-hint ${((u.cardMeta || {}).cloudConnected && !(u.cardMeta || {}).cardConnected) ? 'warn' : 'info'}" style="margin-top:8px">${ic(I.spark)}<span>${(u.cardMeta || {}).note || 'Официальный канал Meta тарифицируется напрямую на карту, привязанную к вашему WhatsApp Business.'}${(u.cardMeta || {}).cloudConnected ? ((u.cardMeta || {}).cardConnected ? ' Карта подключена ✓' : ' <b>Подключите карту в Meta Business Manager</b> — иначе отправка шаблонов остановится.') : ''}</span></div>
+          </div>
+
+          <div class="muted" style="font-size:11px;margin-top:12px">Баланс — предоплата криптой; с него идут аренда номеров, ИИ, минуты телефонии и записи. Сообщения WhatsApp Cloud API оплачиваются напрямую в Meta с вашей карты и на баланс не влияют.</div>
           <div id="bcRatesBox" hidden class="bc-rates">
             <div class="bc-rates-grid">
               <label>WhatsApp, $/сообщение<input class="bc-rate" data-rk="wa" type="number" step="0.001" value="${(u.rates || {}).wa}"></label>
@@ -12770,6 +12791,7 @@ PAGES.billing = async (root) => {
         <!-- реквизиты -->
         <div class="glass card mb">
           <div class="card-title">${ic(I.building)}Реквизиты для счёта</div>
+          <div class="lc-hint warn" style="margin-bottom:12px">${ic(I.spark)}<span><b>Крипта — без счёт-фактуры.</b> По платежам в USDT предоставить инвойс/выписку невозможно. Если нужны официальные счёт-фактуры (для бухгалтерии/возврата НДС) — оплачивайте <b>подписку картой</b> и заполните активные реквизиты ниже: тогда счёт-фактура сгенерируется автоматически и придёт на почту + в кабинет.</span></div>
           <div class="form-row"><label>Юр. название</label><input id="coName" value="${esc((B.company || {}).legalName || '')}"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>VAT / ИНН</label><input id="coVat" value="${esc((B.company || {}).vat || '')}"></div>

@@ -51,6 +51,20 @@ function creditTopup(db, topup, txid, actualAmount) {
   return true;
 }
 
+/* Списание с предоплаченного баланса расходников. НИКОГДА не уходим в минус.
+   Возвращает {ok, balance} — при нехватке ok:false и баланс не трогаем. Идёт журнал. */
+function chargeBalance(db, amountUsd, reason) {
+  const b = db.settings.billing;
+  const amt = +(+amountUsd || 0).toFixed(2);
+  if (!(amt > 0)) return { ok: true, balance: b.balance || 0, charged: 0 };
+  if ((b.balance || 0) + 1e-9 < amt) return { ok: false, error: 'insufficient_balance', balance: b.balance || 0, need: amt };
+  b.balance = +((b.balance || 0) - amt).toFixed(2);
+  b.charges = b.charges || [];
+  b.charges.unshift({ amount: amt, reason: reason || '', at: Date.now(), balanceAfter: b.balance });
+  if (b.charges.length > 200) b.charges.length = 200;
+  return { ok: true, balance: b.balance, charged: amt };
+}
+
 /* ---- расчёт стоимости выбранной конфигурации ---- */
 function quote(plan, cycle, seats) {
   const def = PRICES[plan] || PRICES.agency;
@@ -76,10 +90,10 @@ const RATE_DEFAULTS = {
   aiMsg: 0.002,      // проход ИИ на входящее сообщение (flash-lite), $
   telephonyMin: 0.02,// минута телефонии (DIDWW + запись), $
   sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
-  numWaQr: 3,        // аренда виртуального номера WhatsApp (QR/серый), $/мес (агентству, с наценкой)
-  numTg: 3,          // аренда виртуального номера Telegram, $/мес
-  numCloud: 3,       // аренда номера WhatsApp Cloud API (OTP), $/мес
-  numTel: 3,         // аренда номера телефонии (звонки+запись), $/мес
+  numWaQr: 9,        // номер WhatsApp (QR/серый): покупка = аренда на месяц, $/мес (реальная цена агентству)
+  numTg: 9,          // номер Telegram: покупка = аренда на месяц, $/мес
+  numCloud: 9,       // номер WhatsApp Cloud API (OTP): покупка = аренда на месяц, $/мес
+  numTel: 9,         // номер телефонии (звонки+запись): покупка = аренда на месяц, $/мес
 };
 function rates(db) { return { ...RATE_DEFAULTS, ...((db.settings.billing && db.settings.billing.rates) || {}) }; }
 /* аренда номера: себестоимость (Telnyx ~$1) + наценка платформы $2 → агентству $3/мес (синхронно с TELNYX_MARKUP) */
@@ -100,42 +114,65 @@ function usageEstimate(db) {
   /* минуты транскрибации — из разборов звонков/транскриптов за период */
   const sttMin = Math.round((b.usage && b.usage.sttMin) || (db.callReviews || []).filter(r => (r.at || 0) >= from).length * 6);
   const line = (key, label, unit, qty, rate) => ({ key, label, unit, qty, rate, cost: +(qty * rate).toFixed(2) });
-  const items = [
-    line('wa', 'WhatsApp-сообщения', 'сообщений', outbound, R.wa),
+  /* ── ГРУППА A: списывается с ПРЕДОПЛАЧЕННОГО баланса (крипта) — то, за что платим провайдерам МЫ ──
+     ИИ-обработка, минуты телефонии+запись, транскрибация. Сообщения WhatsApp Cloud API сюда НЕ входят
+     (их биллит Meta напрямую на карту клиента — см. группу B). Серый WhatsApp/Telegram не берут поштучную
+     плату за сообщение — там только аренда номера (ниже). */
+  const balanceItems = [
     line('ai', 'ИИ-обработка переписки', 'входящих', inbound, R.aiMsg),
     line('telephony', 'Телефония (звонки+запись)', 'минут', telephonyMin, R.telephonyMin),
     line('stt', 'Транскрибация звонков', 'минут', sttMin, R.sttMin),
   ];
-  const total = +(items.reduce((s, i) => s + i.cost, 0)).toFixed(2);
-  /* прогноз на 30 дней: линейная экстраполяция от того, что накопилось за прошедшую часть периода */
+  const usageTotal = +(balanceItems.reduce((s, i) => s + i.cost, 0)).toFixed(2);
+  /* прогноз на 30 дней: линейная экстраполяция от накопленного за прошедшую часть периода */
   const elapsedDays = Math.max(0.5, (now - from) / 86400e3);
-  const forecast = +(total / elapsedDays * 30).toFixed(2);
-  /* аренда номеров — ФЛЭТ-месячная по ВСЕМ типам (WhatsApp QR / Telegram / Cloud API / телефония).
-     Считаем только реально арендованные (купленные виртуальные) номера — свой номер по QR не арендуется.
-     Себестоимость и провайдер СКРЫТЫ: агентству показываем цену с наценкой (per-type ставка, дефолт $3). */
-  const waQrCount  = (((db.settings.waGray  || {}).numbers) || []).filter(n => n && n.source === 'yesim').length;
-  const tgCount    = (((db.settings.tgGray  || {}).numbers) || []).length;
-  const cloudCount = Object.keys(db.otpNumbers || {}).length;
-  const telCount   = (((db.settings.telephony || {}).fromNumbers) || []).filter(Boolean).length;
+  const usageForecast = +(usageTotal / elapsedDays * 30).toFixed(2);
+  /* аренда номеров = ПОКУПКА номера (номер даётся на 1 месяц; продление = списание с баланса ежемесячно).
+     По факту: берём реально уплаченную цену за номер (n.priceUsd), фоллбэк — ставка типа (дефолт $9/мес).
+     Считаем только купленные виртуальные номера (свой номер по QR не арендуется). Провайдер СКРЫТ. */
+  const waQrNums  = (((db.settings.waGray  || {}).numbers) || []).filter(n => n && n.source === 'yesim');
+  const tgNums    = (((db.settings.tgGray  || {}).numbers) || []).filter(Boolean);
+  const cloudNums = Object.values(((db.settings.telephony || {}).otpNumbers) || db.otpNumbers || {});
+  const telNums   = (((db.settings.telephony || {}).fromNumbers) || []).filter(Boolean).map(n => (typeof n === 'string' ? {} : n));
+  const sumPrice = (arr, fallback) => +arr.reduce((s, n) => s + (+((n && n.priceUsd) || fallback)), 0).toFixed(2);
   const rentals = [
-    { key: 'wa_qr', label: 'Аренда номеров · WhatsApp (QR)',       count: waQrCount,  rate: R.numWaQr },
-    { key: 'tg',    label: 'Аренда номеров · Telegram',            count: tgCount,    rate: R.numTg },
-    { key: 'cloud', label: 'Аренда номеров · WhatsApp Cloud API',  count: cloudCount, rate: R.numCloud },
-    { key: 'tel',   label: 'Аренда номеров · телефония',           count: telCount,   rate: R.numTel },
-  ].filter(r => r.count > 0).map(r => ({ ...r, cost: +(r.count * r.rate).toFixed(2) }));
+    { key: 'wa_qr', label: 'Номера WhatsApp (QR) · аренда=покупка', count: waQrNums.length,  rate: R.numWaQr, cost: sumPrice(waQrNums, R.numWaQr) },
+    { key: 'tg',    label: 'Номера Telegram · аренда=покупка',      count: tgNums.length,    rate: R.numTg,   cost: sumPrice(tgNums, R.numTg) },
+    { key: 'cloud', label: 'Номера WhatsApp Cloud API · аренда=покупка', count: cloudNums.length, rate: R.numCloud, cost: sumPrice(cloudNums, R.numCloud) },
+    { key: 'tel',   label: 'Номера телефонии · аренда=покупка',     count: telNums.length,   rate: R.numTel,  cost: sumPrice(telNums, R.numTel) },
+  ].filter(r => r.count > 0);
   const numbersCount = rentals.reduce((s, r) => s + r.count, 0);
   const numbersMonthly = +(rentals.reduce((s, r) => s + r.cost, 0)).toFixed(2);
-  /* статус: расходники и аренда — постоплата, копятся за период и списываются в конце (единым счётом).
-     periodEnd — конец расчётного периода подписки (или +30 дн от старта учёта). */
+  /* прогноз к списанию с БАЛАНСА за месяц = расходники (прогноз) + аренда всех номеров (флэт/мес) */
+  const balanceMonthlyForecast = +(usageForecast + numbersMonthly).toFixed(2);
+
+  /* ── ГРУППА B: WhatsApp Cloud API — сообщения биллит META напрямую на КАРТУ клиента (не наш баланс) ──
+     Мы это НЕ списываем; показываем справочно + требуем подключённую карту в Meta Business. */
+  const waSettings = (db.settings.channels && db.settings.channels.whatsapp) || db.settings.whatsapp || {};
+  const cloudConnected = !!(waSettings.token || waSettings.phoneNumberId || (waSettings.cloud && waSettings.cloud.token));
+  const cardMeta = {
+    conversations: outbound,                                   // отправленные (ориентир объёма)
+    estCost: +(outbound * R.wa).toFixed(2),                    // грубая справочная оценка (тарифицирует Meta)
+    cardConnected: !!(waSettings.cardConnected || waSettings.billingConnected),
+    cloudConnected,
+    note: 'Оплачивается напрямую в Meta с карты, привязанной к вашему WhatsApp Business (WABA). На баланс расходников не влияет.',
+  };
   const periodEnd = (db.settings.billing.currentPeriodEnd) || (from ? from + 30 * 86400e3 : now + 30 * 86400e3);
   return {
-    items, total, forecast, rates: R,
-    periodStart: from, periodEnd, elapsedDays: Math.round(elapsedDays * 10) / 10,
+    /* группа A (баланс/крипта) */
+    balanceItems, usageTotal, usageForecast, rentals, numbersCount, numbersMonthly,
+    balanceMonthlyForecast, balance: db.settings.billing.balance || 0,
+    /* группа B (карта Meta) */
+    cardMeta,
+    /* мета/совместимость */
+    rates: R, periodStart: from, periodEnd, elapsedDays: Math.round(elapsedDays * 10) / 10,
     outbound, inbound, telephonyMin, sttMin,
-    rentals, numbersCount, numberPrice: R.numTel, numbersMonthly,                    // per-type разбивка (rentals[]); себестоимость скрыта
-    billedAtPeriodEnd: true, consumablesStatus: 'accruing',                          // текущий период: копится, ещё не списано
-    monthlyForecast: +(forecast + numbersMonthly).toFixed(2),                        // расходники (прогноз) + аренда номеров
-    waCost: items[0].cost, aiCost: items[1].cost,   // обратная совместимость
+    billedAtPeriodEnd: false, consumablesStatus: 'prepaid',    // теперь: предоплата с баланса, не постоплата
+    numberPrice: R.numWaQr,
+    /* legacy-алиасы, чтобы не сломать старый фронт до перерисовки */
+    items: balanceItems, total: usageTotal, forecast: usageForecast,
+    monthlyForecast: balanceMonthlyForecast,
+    waCost: cardMeta.estCost, aiCost: balanceItems[0].cost,
   };
 }
 
@@ -300,4 +337,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup };
+module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup, chargeBalance };
