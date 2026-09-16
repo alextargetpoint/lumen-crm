@@ -6615,7 +6615,7 @@ const server = http.createServer(async (req, res) => {
       db.settings.tgGray = db.settings.tgGray || { numbers: [] };
       let rec = db.settings.tgGray.numbers.find(n => n.phone === phone);
       if (!rec) { rec = { phone, label: String(b.label || '').slice(0, 60), persona: { name: '', avatar: '', mode: 'qualifier', brokerId: null }, addedAt: Date.now() }; db.settings.tgGray.numbers.push(rec); store.save(); }
-      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/qr-start', {}); return json(res, 200, { ok: true, qr: r.qr, status: r.status }); }
+      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/qr-start', {}); return json(res, 200, Object.assign({ ok: true }, r)); }
       catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
     }
     if ((m = p.match(/^\/api\/tg\/gray\/qr-status$/)) && req.method === 'GET') {
