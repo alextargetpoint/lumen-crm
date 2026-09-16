@@ -2456,7 +2456,9 @@ const waGraySid = (phone) => store.currentTid() + '__' + String(phone || '').rep
    дефолтный URL. Смысл SaaS: оператор настраивает воркер один раз, новые агентства НИЧЕГО не вводят. */
 const DEFAULT_WA_WORKER = 'https://lumen-wa-worker-production.up.railway.app';
 function _platWorker() { try { const r = store.getRegistry(); return r.platformWorker || {}; } catch (_) { return {}; } }
-function waWorkerBase(db) { return String(process.env.LUMEN_WA_WORKER_URL || _platWorker().url || (db.settings.waGray && db.settings.waGray.url) || DEFAULT_WA_WORKER).replace(/\/$/, ''); }
+/* env-URL воркера часто задают без схемы (railway.app/...) → fetch() «Failed to parse URL». Нормализуем. */
+function normWorkerUrl(u) { u = String(u || '').trim().replace(/\/$/, ''); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
+function waWorkerBase(db) { return normWorkerUrl(process.env.LUMEN_WA_WORKER_URL || _platWorker().url || (db.settings.waGray && db.settings.waGray.url) || DEFAULT_WA_WORKER); }
 function waWorkerToken(db) { return process.env.LUMEN_WA_WORKER_TOKEN || _platWorker().token || (db.settings.waGray && db.settings.waGray.token) || ''; }
 function waWorkerReady(db) { return !!(waWorkerBase(db) && waWorkerToken(db)); }
 /* платформенный режим (агентству не вводить URL/токен) = задан платформенный токен (env или реестр) */
@@ -2475,7 +2477,7 @@ async function waGrayApi(db, method, pathx, body) {
 }
 
 /* ── Серый TELEGRAM (MTProto user-accounts) — воркер lumen-tg-worker, аналог WA-воркера ── */
-function tgWorkerBase(db) { const r = store.getRegistry(); return String(process.env.LUMEN_TG_WORKER_URL || (r.platformTgWorker && r.platformTgWorker.url) || (db.settings.tgGray && db.settings.tgGray.url) || '').replace(/\/$/, ''); }
+function tgWorkerBase(db) { const r = store.getRegistry(); return normWorkerUrl(process.env.LUMEN_TG_WORKER_URL || (r.platformTgWorker && r.platformTgWorker.url) || (db.settings.tgGray && db.settings.tgGray.url) || ''); }
 function tgWorkerToken(db) { const r = store.getRegistry(); return process.env.LUMEN_TG_WORKER_TOKEN || (r.platformTgWorker && r.platformTgWorker.token) || (db.settings.tgGray && db.settings.tgGray.token) || ''; }
 function tgWorkerReady(db) { return !!(tgWorkerBase(db) && tgWorkerToken(db)); }
 function tgGraySid(phone) { return 'tg_' + String(phone).replace(/[^0-9]/g, ''); }
@@ -4779,7 +4781,7 @@ const server = http.createServer(async (req, res) => {
       let tgLive = null;
       if (tgTok) { try { const r = await fetch('https://api.telegram.org/bot' + tgTok + '/getWebhookInfo'); const j = await r.json(); if (j.ok) tgLive = { url: j.result.url || '', pending: j.result.pending_update_count || 0, lastError: j.result.last_error_message || null }; } catch (e) {} }
       let grayLive = null;
-      if (gray.url && gray.token) { try { const r = await fetch(String(gray.url).replace(/\/$/, '') + '/health', { headers: { Authorization: 'Bearer ' + gray.token } }); grayLive = r.ok; } catch (e) { grayLive = false; } }
+      if (gray.url && gray.token) { try { const r = await fetch(normWorkerUrl(gray.url) + '/health', { headers: { Authorization: 'Bearer ' + gray.token } }); grayLive = r.ok; } catch (e) { grayLive = false; } }
       return json(res, 200, { ok: true, health: {
         publicBase: base || '',
         ai: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY },
