@@ -6606,6 +6606,30 @@ const server = http.createServer(async (req, res) => {
       try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/start', { phone }); return json(res, 200, { ok: true, status: r.status }); }
       catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
     }
+    /* QR-подключение (как WhatsApp Web): аккаунт уже создан человеком → цепляем по QR без SMS */
+    if (p === '/api/tg/gray/qr-start' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!tgWorkerReady(db)) return json(res, 400, { error: 'TG-воркер не подключён (задай LUMEN_TG_WORKER_URL/TOKEN)' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      if (!phone) return json(res, 400, { error: 'нужен номер' });
+      db.settings.tgGray = db.settings.tgGray || { numbers: [] };
+      let rec = db.settings.tgGray.numbers.find(n => n.phone === phone);
+      if (!rec) { rec = { phone, label: String(b.label || '').slice(0, 60), persona: { name: '', avatar: '', mode: 'qualifier', brokerId: null }, addedAt: Date.now() }; db.settings.tgGray.numbers.push(rec); store.save(); }
+      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/qr-start', {}); return json(res, 200, { ok: true, qr: r.qr, status: r.status }); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message, saved: true }); }
+    }
+    if ((m = p.match(/^\/api\/tg\/gray\/qr-status$/)) && req.method === 'GET') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const phone = String(u.searchParams.get('phone') || '').replace(/[^0-9]/g, '');
+      try { const r = await tgGrayApi(db, 'GET', '/sessions/' + tgGraySid(phone) + '/qr-status'); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { status: 'error', error: e.message }); }
+    }
+    if (p === '/api/tg/gray/qr-password' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const phone = String(b.phone || '').replace(/[^0-9]/g, '');
+      try { const r = await tgGrayApi(db, 'POST', '/sessions/' + tgGraySid(phone) + '/qr-password', { password: b.password || '' }); return json(res, 200, r); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
     /* подать код (и 2FA-пароль) → авторизация */
     if (p === '/api/tg/gray/submit-code' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

@@ -1763,20 +1763,84 @@ window.grayAddQR = function (phone, label) {
     else box.innerHTML = '<div style="color:var(--ink-3)">Подключение…</div>';
   }, 1800);
 };
-/* ── Серый Telegram: подключение номера (логин), ввод кода из ленты Yesim, персона ── */
+/* ── Серый Telegram: подключение по QR (как WhatsApp Web) + гид по разовой регистрации номера.
+   Telegram при регистрации НОВОГО номера ставит забор (e-mail код → ~$0.99 → SMS). Его человек
+   проходит один раз на телефоне, а Lumen цепляет аккаунт по QR (Настройки→Устройства) — без SMS. ── */
 window.openTgConnect = function () {
-  const bd = modal({ title: 'Подключить TG-номер (серый)', sub: 'Купи Yesim-номер → авторизуем Telegram → код прилетит в ленту', wide: true,
-    body: `<div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.shield)}Схема как у серого WhatsApp: номер должен принимать SMS (Yesim). После «Начать» Telegram пришлёт код — введи его на след. шаге (можно взять в «Номера → Купить → Активация/коды»).</span></div>
-      <div class="form-row"><label>Номер телефона (с кодом страны)</label><input id="tgcPhone" placeholder="+1..."></div>
-      <div class="form-row"><label>Метка (необязательно)</label><input id="tgcLabel" placeholder="напр. Анна · Дубай"></div>
-      <div id="tgcOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>`,
-    actions: [{ label: 'Начать логин', cls: 'btn-accent', onClick: async (b) => {
-      const phone = ($('#tgcPhone', b) || {}).value || ''; const label = ($('#tgcLabel', b) || {}).value || '';
-      const out = $('#tgcOut', b); if (!phone) { out.textContent = 'Укажи номер'; return; }
-      out.textContent = 'Запускаю логин…';
-      try { const r = await api.post('/tg/gray/connect', { phone, label }); if (r.ok) { closeModal(); openTgCode(phone); } else { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'; } }
-      catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
-    } }, { label: 'Отмена' }] });
+  let pollTimer = null, curPhone = '';
+  const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+  const bd = modal({ title: 'Подключить Telegram по QR', sub: 'Аккаунт создаёшь на телефоне (1 раз) → цепляем по QR, как WhatsApp Web', wide: true, body: '<div id="tgqBox"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) stop(); });
+  const host = () => $('#tgqBox', bd);
+  const shots = [['01-add-email', 'Add Email — впиши e-mail'], ['02-email-code', 'Код с почты'], ['03-sms-fee', '~$0.99 (анти-спам)'], ['04-enter-code', 'SMS-код на номер']];
+  const GUIDE = `<details class="tg-guide" style="margin-bottom:14px;border:1px solid var(--stroke);border-radius:12px;padding:11px 13px;background:var(--bg-2)">
+      <summary style="cursor:pointer;font-weight:650;font-size:13px;list-style:none">📘 Как создать Telegram-аккаунт на купленном номере (один раз, на телефоне)</summary>
+      <div style="font-size:12px;line-height:1.65;color:var(--ink-2);margin-top:10px">
+        Telegram при регистрации нового номера ставит защиту. Пройди её один раз на телефоне (лучше Android), потом вернись сюда и подключи аккаунт по QR.
+        <ol style="margin:10px 0 0 18px;padding:0;display:flex;flex-direction:column;gap:5px">
+          <li>Купи номер (вкладка «Купить номер для Telegram»). Бери <b>не-US</b> страну — US Telegram часто режет. Код придёт в ленту.</li>
+          <li>На телефоне открой Telegram → введи купленный номер.</li>
+          <li><b>Add Email</b>: Telegram попросит e-mail для кода (впиши любой свой) или «Sign in with Apple».</li>
+          <li><b>Check Your Email</b>: введи код из письма.</li>
+          <li><b>One-time SMS Fee</b>: иногда просит ~$0.99 (неделя Premium) как анти-спам. Оплати.</li>
+          <li><b>Enter Code</b>: теперь придёт SMS на номер. Код возьми в CRM → «Номера» (кнопка «Активация / коды» на карточке номера). Введи его.</li>
+          <li>Готово — аккаунт создан. Имя/фото и персону настроишь в CRM после подключения.</li>
+        </ol>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
+          ${shots.map(([f, cap]) => `<figure style="margin:0"><img src="assets/tg-guide/${f}.png?v=1" loading="lazy" style="width:100%;border:1px solid var(--stroke);border-radius:8px;display:block" alt="${esc(cap)}"><figcaption style="font-size:10px;color:var(--ink-3);text-align:center;margin-top:3px">${esc(cap)}</figcaption></figure>`).join('')}
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:10px">Экраны Telegram могут отличаться по стране/устройству — порядок тот же: e-mail → (оплата) → SMS.</div>
+      </div>
+    </details>`;
+  const drawForm = () => {
+    host().innerHTML = GUIDE + `
+      <div class="lc-hint info" style="margin-bottom:10px"><span>${ic(I.link)}Аккаунт уже создан на телефоне? Подключи его сюда по QR — как в WhatsApp Web, SMS больше не нужен.</span></div>
+      <div class="form-row"><label>Номер телефона (с кодом страны)</label><input id="tgqPhone" placeholder="+380…"></div>
+      <div class="form-row"><label>Метка (необязательно)</label><input id="tgqLabel" placeholder="напр. Анна · Дубай"></div>
+      <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+      <button class="btn btn-accent" id="tgqGo" style="margin-top:8px">${ic(I.spark)}Показать QR для подключения</button>`;
+    $('#tgqGo', bd).addEventListener('click', startQr);
+  };
+  const startQr = async () => {
+    const phone = ($('#tgqPhone', bd) || {}).value || ''; const label = ($('#tgqLabel', bd) || {}).value || '';
+    const out = $('#tgqOut', bd); if (!phone) { out.textContent = 'Укажи номер'; return; }
+    curPhone = phone.replace(/[^0-9]/g, ''); out.textContent = 'Готовлю QR…';
+    try {
+      const r = await api.post('/tg/gray/qr-start', { phone, label });
+      if (!r.ok || !r.qrImage) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'не удалось') + '</span>'; return; }
+      drawQr(r.qrImage); pollTimer = setInterval(poll, 2500);
+    } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+  };
+  const drawQr = (img) => {
+    host().innerHTML = `<div style="text-align:center">
+      <div style="font-weight:650;font-size:14px;margin-bottom:8px">Сканируй QR в Telegram</div>
+      <img id="tgqImg" src="${img}" style="width:240px;height:240px;border-radius:12px;background:#fff;padding:8px;border:1px solid var(--stroke)" alt="QR">
+      <div style="text-align:left;max-width:380px;margin:12px auto 0;font-size:12px;line-height:1.6;color:var(--ink-2)">
+        На телефоне, где создан аккаунт:<br><b>Telegram → Настройки → Устройства → Подключить устройство</b> → наведи камеру на этот QR.
+      </div>
+      <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:10px">Жду сканирования…</div>
+    </div>`;
+  };
+  const drawPwd = () => {
+    host().innerHTML = `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}На аккаунте включён облачный пароль (2FA). Введи его, чтобы завершить подключение.</span></div>
+      <div class="form-row"><label>Облачный пароль Telegram (2FA)</label><input id="tgqPwd" type="password" placeholder="пароль"></div>
+      <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:6px"></div>
+      <button class="btn btn-accent" id="tgqPwdGo" style="margin-top:8px">${ic(I.check)}Подтвердить</button>`;
+    $('#tgqPwdGo', bd).addEventListener('click', async () => {
+      const pwd = ($('#tgqPwd', bd) || {}).value || ''; const out = $('#tgqOut', bd); if (!pwd) { out.textContent = 'Введи пароль'; return; }
+      out.textContent = 'Проверяю…';
+      try { await api.post('/tg/gray/qr-password', { phone: curPhone, password: pwd }); out.textContent = 'Пароль принят, подключаю…'; } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    });
+  };
+  const poll = async () => {
+    if (!document.body.contains(bd)) { stop(); return; }
+    let r; try { r = await api.get('/tg/gray/qr-status?phone=' + encodeURIComponent(curPhone)); } catch (e) { return; }
+    if (r.status === 'connected') { stop(); host().innerHTML = `<div style="text-align:center;padding:22px;font-size:15px;color:var(--ok,#3f7d4f)">${ic(I.check)} Аккаунт подключён${r.username ? ' · @' + esc(r.username) : ''}</div>`; toast('Telegram подключён', '+' + curPhone, true); setTimeout(() => { closeModal(); if (window.__reloadTgGray) window.__reloadTgGray(); }, 1200); }
+    else if (r.status === 'password_needed') { if (!$('#tgqPwd', bd)) drawPwd(); }
+    else if (r.status === 'qr_waiting' && r.qrImage) { const img = $('#tgqImg', bd); if (img && img.src !== r.qrImage) img.src = r.qrImage; }
+    else if (r.status === 'error') { stop(); const out = $('#tgqOut', bd); if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'ошибка') + '</span>'; }
+  };
+  drawForm();
   return bd;
 };
 window.openTgBuy = function () {
