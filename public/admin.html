@@ -69,6 +69,7 @@
     <button data-tab="map">🗺 Карта</button>
     <button data-tab="release">🚀 Релиз</button>
     <button data-tab="support">🎧 Поддержка</button>
+    <button data-tab="invoices">🧾 Счета</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -205,6 +206,14 @@
       <div id="supList" style="margin-top:10px;font-size:13.5px"></div>
     </div>
   </div>
+
+  <div class="sect" id="sect-invoices">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Счета на проверке (банк-перевод)</b><button class="ghost" id="invReload">Обновить</button></div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Клиент оплатил по реквизитам и прикрепил квитанцию. Проверьте квитанцию и подтвердите — подписка активируется, клиент получит уведомление.</div>
+      <div id="invPending" style="margin-top:12px;font-size:13.5px"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -237,7 +246,31 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'map') renderMap();
   if (b.dataset.tab === 'release') loadRelease();
   if (b.dataset.tab === 'support') loadSupport();
+  if (b.dataset.tab === 'invoices') loadInvoices();
 }));
+
+// ── Счета на проверке (банк-перевод) ──
+async function loadInvoices() {
+  const host = $('#invPending'); host.innerHTML = '<span class="muted">Загрузка…</span>';
+  try {
+    const r = await api('/api/admin/invoices-pending');
+    const list = r.pending || [];
+    if (!list.length) { host.innerHTML = '<div class="muted" style="padding:10px 0">Нет счетов на проверке.</div>'; return; }
+    const fmt = (n) => (n && n.currency ? n.currency : 'USD') + ' ' + Number(n.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    host.innerHTML = list.map(iv => `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06));flex-wrap:wrap">
+      <div style="flex:1;min-width:180px"><b>${esc(iv.invId)}</b> · ${fmt(iv)}<div class="muted" style="font-size:12px">${esc(iv.name)} · ${esc((iv.company||{}).legalName||'')}${(iv.company||{}).vat?' · '+esc(iv.company.vat):''}</div></div>
+      <a class="ghost" style="text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px" href="/api/admin/invoice-receipt?tid=${encodeURIComponent(iv.tid)}&inv=${encodeURIComponent(iv.invId)}" target="_blank">Квитанция</a>
+      <button data-confirm="${esc(iv.tid)}|${esc(iv.invId)}">Подтвердить оплату</button>
+    </div>`).join('');
+    host.querySelectorAll('[data-confirm]').forEach(btn => btn.addEventListener('click', async () => {
+      const [tid, invId] = btn.dataset.confirm.split('|');
+      btn.disabled = true; btn.textContent = 'Подтверждаю…';
+      try { const rr = await api('/api/admin/invoice-confirm', { method: 'POST', body: JSON.stringify({ tid, invId }) }); if (rr.ok) loadInvoices(); else { btn.disabled = false; btn.textContent = 'Подтвердить оплату'; alert(rr.error || 'ошибка'); } }
+      catch (e) { btn.disabled = false; btn.textContent = 'Подтвердить оплату'; }
+    }));
+  } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
+}
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'invReload') loadInvoices(); });
 
 // ── Техподдержка ──
 async function loadSupport() {
