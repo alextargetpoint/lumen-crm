@@ -121,9 +121,13 @@ body {
 .auto-seg .seg-b:hover { color: var(--ink); background: var(--bg-2); }
 .auto-seg .seg-b.on { background: linear-gradient(180deg, var(--navy-700), var(--navy-900)); color: #fff; box-shadow: 0 6px 16px -6px rgba(16, 43, 92, .5); }
 .auto-seg .seg-b.on svg { opacity: 1; color: var(--blue-300); }
-.auto-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.auto-grid.solo { grid-template-columns: minmax(0, 760px); justify-content: start; }
-@media (max-width: 1000px) { .auto-grid, .auto-grid.solo { grid-template-columns: 1fr; } }
+/* масонри-колонки вместо grid: короткие карточки НЕ оставляют вертикальных провалов до высоты
+   соседней (была «странная высота между блоками» + скачки при переключении подвкладок). */
+.auto-grid { column-count: 2; column-gap: 16px; }
+.auto-grid > * { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; }
+.auto-grid > .card, .auto-grid > .glass { margin-bottom: 16px; display: block; width: 100%; }
+.auto-grid.solo { column-count: 1; max-width: 760px; }
+@media (max-width: 1000px) { .auto-grid, .auto-grid.solo { column-count: 1; } }
 html[data-night] .auto-seg { background: var(--card); border-color: var(--stroke); }
 html[data-night] .auto-seg .seg-b { color: var(--ink-3); }
 html[data-night] .auto-seg .seg-b:hover { color: var(--ink); background: rgba(140, 165, 230, .1); }
@@ -5966,14 +5970,16 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 /* карточки-ссылки и сворачиваемые блоки на бежевом фоне должны ЯВНО отделяться от фона:
    более плотная рамка + мягкая тень (эффект «приподнятости» над кремовым полотном). */
 :root[data-page="settings"] #content > .set-link,
-:root[data-page="settings"] #content > .coll,
 :root[data-page="settings"] #content > .glass.card { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); }
-/* сворачиваемые интеграции на странице настроек: заголовок крупнее (как карточка-ссылка) */
-:root[data-page="settings"] #content > .coll { margin: 0 0 12px; background: var(--card); }
-:root[data-page="settings"] #content > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
-:root[data-page="settings"] #content > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
-:root[data-page="settings"] #content > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
-:root[data-page="settings"] #content > .coll.open { box-shadow: 0 2px 4px rgba(20,19,17,.05), 0 12px 30px rgba(20,19,17,.08); }
+/* Сворачиваемые интеграции (Каналы связи, ИИ) — стили НЕ привязаны к data-page:
+   `.coll` как прямой потомок #content встречается только на настройках, а привязка к
+   data-page давала мигание-сжатие карточек при переключении подвкладок (data-page менялся
+   раньше, чем перерисовывался контент → карточки на кадр теряли оформление). */
+#content > .coll { border: 1px solid var(--stroke); box-shadow: 0 1px 2px rgba(20,19,17,.04), 0 6px 18px rgba(20,19,17,.05); margin: 0 0 12px; background: var(--card); }
+#content > .coll > .coll-head { padding: 15px 18px; font-size: 14.5px; font-weight: 700; }
+#content > .coll > .coll-head .ch-t { display: flex; align-items: center; gap: 12px; }
+#content > .coll > .coll-head .ch-t svg { width: 19px; height: 19px; color: var(--accent); }
+#content > .coll.open { box-shadow: 0 2px 4px rgba(20,19,17,.05), 0 12px 30px rgba(20,19,17,.08); }
 
 /* ═══ Премиум-индикатор смены оформления («церемония» в палитре новой темы) ═══ */
 .theme-loader { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center; background: var(--bg); opacity: 0; transition: opacity .4s var(--ease-soft); }
