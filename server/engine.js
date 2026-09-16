@@ -105,6 +105,16 @@ function send(db, lead, text, via, opts = {}) {
             body: JSON.stringify({ chat_id: lead.channels.tgChatId, text }),
           });
         }
+        /* Viber: официальный Public Account — можно писать только тем, кто ПЕРВЫМ написал PA
+           (их viberId ловится вебхуком). Как и TG-бот, это inbound-first канал, не холодный. */
+        if (channel === 'viber' && cfg.viber && cfg.viber.token && lead.channels?.viberId) {
+          const rv = await fetch('https://chatapi.viber.com/pa/send_message', {
+            method: 'POST', headers: { 'X-Viber-Auth-Token': cfg.viber.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiver: lead.channels.viberId, type: 'text', text, sender: { name: (db.settings.agency && db.settings.agency.name) || 'Lumen' } }),
+          });
+          const jv = await rv.json().catch(() => ({}));
+          if (jv.status && jv.status !== 0) throw new Error('viber ' + (jv.status_message || jv.status));
+        }
         m0.status = 'delivered';
       } catch (err) {
         m0.status = 'failed';
