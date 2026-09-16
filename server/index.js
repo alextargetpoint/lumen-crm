@@ -6347,8 +6347,16 @@ const server = http.createServer(async (req, res) => {
       const forSvc = b.for === 'tg' ? 'tg' : 'wa';   /* для какого канала берём номер (TG-номер НЕ должен падать в WA-пул) */
       if (!country) return json(res, 400, { error: 'нужна страна' });
       try {
-        /* area: для приёма кодов мессенджеров номер должен быть мобильным (Yesim area='Mobile') */
-        const r = await yesimApi('purchase_number', { country, subscriptionOption, area: b.area || 'Mobile' });
+        /* area зависит от страны (у US есть 'Mobile', у UA — нет → 'Invalid area').
+           Для приёма кодов мессенджеров нужен МОБИЛЬНЫЙ номер: спрашиваем реальные area страны и
+           выбираем мобильный; если явно задан b.area — берём его; фоллбэк — без area. */
+        let area = b.area || null;
+        if (!area) {
+          try { const ca = await yesimApi('get_country_areas', { country }); const list = (ca.data && (ca.data.areas || ca.data)) || ca.areas || ca.data || []; const arr = Array.isArray(list) ? list : (list.areas || []); const names = arr.map(x => (typeof x === 'string' ? x : (x.area || x.name || x.title || ''))).filter(Boolean); area = names.find(n => /mobile|cell|моб/i.test(n)) || null; } catch (_) {}
+        }
+        let r;
+        try { r = await yesimApi('purchase_number', area ? { country, subscriptionOption, area } : { country, subscriptionOption }); }
+        catch (e1) { if (area && /invalid area/i.test(e1.message)) r = await yesimApi('purchase_number', { country, subscriptionOption }); else throw e1; }
         const number = r.number || (r.data && r.data.number) || '';
         /* WA-номер сохраняем в пул серых WhatsApp; TG-номер — НЕ сюда (его добавит /tg/gray/connect в tgGray) */
         if (number && forSvc === 'wa') { db.settings.waGray = db.settings.waGray || { numbers: [] }; db.settings.waGray.numbers = db.settings.waGray.numbers || []; if (!db.settings.waGray.numbers.some(n => n.phone === String(number).replace(/[^0-9]/g, ''))) db.settings.waGray.numbers.push({ phone: String(number).replace(/[^0-9]/g, ''), label: 'Yesim ' + country, source: 'yesim', roles: { send: true, call: false }, addedAt: Date.now() }); store.save(); }
