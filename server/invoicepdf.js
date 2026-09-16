@@ -11,10 +11,12 @@ const FONT_B = path.join(__dirname, 'assets', 'fonts', 'DejaVuSans-Bold.ttf');
 function seller(reg) {
   const p = (reg && reg.platformInvoice) || {};
   return {
-    name: p.name || 'TargetPoint',
-    line1: p.line1 || p.address || 'Belgium',
-    line2: p.line2 || '',
-    vat: p.vat || '',
+    name: p.name || 'TargetPoint AY',
+    owner: p.owner || 'Aleksei Yazeuski',
+    line1: p.line1 || p.address || 'Via Montello 7/A, 31100 Treviso (TV)',
+    line2: p.line2 || 'Italia',
+    cf: p.cf || 'YZSLKS01E01Z139W',
+    vat: p.vat || '04986270231',
     email: p.email || 'billing@lumen247.com',
     iban: p.iban || '',
     bic: p.bic || '',
@@ -54,7 +56,7 @@ function buildInvoicePdf(opts) {
       doc.font('B').fontSize(20).fillColor(ink).text(S.name, M, y);
       doc.font('R').fontSize(9).fillColor(mut);
       let sy = y + 26;
-      [S.line1, S.line2, S.vat ? 'VAT/Tax ID: ' + S.vat : '', S.email].filter(Boolean).forEach(l => { doc.text(l, M, sy); sy += 13; });
+      [S.owner, S.line1, S.line2, S.cf ? 'C.F.: ' + S.cf : '', S.vat ? 'P.IVA / VAT: ' + S.vat : '', S.email].filter(Boolean).forEach(l => { doc.text(l, M, sy); sy += 13; });
 
       doc.font('B').fontSize(22).fillColor(accent).text('СЧЁТ-ФАКТУРА', M, y, { width: right - M, align: 'right' });
       doc.font('R').fontSize(9).fillColor(mut).text('INVOICE', M, y + 26, { width: right - M, align: 'right' });

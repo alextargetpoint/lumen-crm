@@ -4817,7 +4817,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/billing/topup/crypto' && req.method === 'POST') {
         const b = await readBody(req);
         const amountUsd = Math.round((+b.amountUsd || 0) * 100) / 100;
-        if (!(amountUsd >= 0.5)) return json(res, 400, { error: 'Минимальное пополнение — $0.50' });
+        if (!(amountUsd >= 5)) return json(res, 400, { error: 'Минимальное пополнение — $5' });
         if (amountUsd > 100000) return json(res, 400, { error: 'Слишком большая сумма' });
         const chain = b.chain === 'erc20' ? 'erc20' : 'trc20';
         const address = chain === 'erc20' ? CRYPTO_ETH : CRYPTO_TRON;
