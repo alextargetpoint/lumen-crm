@@ -4595,9 +4595,10 @@ const server = http.createServer(async (req, res) => {
     const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
+    const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !viberInboundOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -6820,6 +6821,45 @@ const server = http.createServer(async (req, res) => {
         store.save();
       });
       if (!okAuth) return json(res, 401, { error: 'unauthorized' });
+      return json(res, 200, { ok: true });
+    }
+
+    /* Viber (BSP/Infobip) входящие + статусы доставки → CRM-инбокс.
+       Тенант находим по sender (=channels.viber.sender, уникален на агентство). URL этого
+       вебхука вписывается в Infobip (Inbound configuration). Двусторонний Viber-канал. */
+    if (p === '/api/viber/inbound' && req.method === 'POST') {
+      const b = await readBody(req);
+      const results = (b && (b.results || b.messages)) || (Array.isArray(b) ? b : []);
+      for (const r of results) {
+        const to = String(r.to || r.destination || (r.sender) || '').trim();   // наш sender
+        const fromDigits = String(r.from || (r.sender && r.sender.number) || '').replace(/\D/g, '');
+        const text = (r.message && (r.message.text || r.message.body)) || r.text || '';
+        const isDLR = !!(r.status && !text && !(r.message && r.message.text));
+        if (!to) continue;
+        const tid = findTenant(() => { const v = ((store.get().settings.channels || {}).viber) || {}; return !!(v.sender && String(v.sender) === to); });
+        if (!tid) continue;
+        await store.runInTenant(tid, async () => {
+          const tdb = store.get();
+          if (isDLR) {
+            const mid = String(r.messageId || ''); if (!mid) return;
+            const msg = (tdb.messages || []).find(m => m.viberMsgId === mid);
+            if (msg) { const st = (r.status.groupName || r.status.name || '').toUpperCase(); msg.status = /DELIVERED|READ|SEEN/.test(st) ? 'delivered' : (/REJECT|UNDELIV|EXPIRED|FAIL/.test(st) ? 'failed' : msg.status); store.save(); }
+            return;
+          }
+          if (!fromDigits || !text) return;
+          const phone = '+' + fromDigits;
+          let lead = (tdb.leads || []).find(l => (l.phone || '').replace(/\D/g, '') === fromDigits);
+          if (!lead) {
+            const geo0 = ((tdb.settings.agency && tdb.settings.agency.geos) || ['dubai'])[0];
+            lead = { id: store.nextId('ld'), name: (r.contact && r.contact.name) || phone, phone, geo: geo0, lang: 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0, source: 'viber', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: true, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['Viber'], numberId: null, ads: null };
+            tdb.leads = tdb.leads || []; tdb.leads.push(lead);
+            ai.pushEvent(tdb, { type: 'lead_new', leadId: lead.id, text: `Входящий (Viber): ${lead.name}` });
+          }
+          lead.channels = lead.channels || {}; lead.channels.viber = 'yes'; lead.activeChannel = 'viber';
+          try { engine.inbound(tdb, lead, String(text).slice(0, 4000), { channel: 'viber' }); } catch (e) {}
+          store.save();
+        });
+      }
       return json(res, 200, { ok: true });
     }
 

@@ -123,6 +123,7 @@ function send(db, lead, text, via, opts = {}) {
             });
             const jb = await rv.json().catch(() => ({}));
             if (!rv.ok) throw new Error('viber-bsp ' + rv.status + ': ' + (jb.requestError && jb.requestError.serviceException && jb.requestError.serviceException.text || rv.status));
+            try { m0.viberMsgId = (jb.messages && jb.messages[0] && jb.messages[0].messageId) || null; } catch (_) {}
           } else if (vb.token && lead.channels?.viberId) {
             const rv = await fetch('https://chatapi.viber.com/pa/send_message', {
               method: 'POST', headers: { 'X-Viber-Auth-Token': vb.token, 'Content-Type': 'application/json' },
