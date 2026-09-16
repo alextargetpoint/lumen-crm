@@ -1920,10 +1920,39 @@ window.openTgConnect = function () {
       try { await api.post('/tg/gray/qr-password', { phone: curPhone, password: pwd }); out.textContent = 'Пароль принят, подключаю…'; } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
     });
   };
+  const drawProfileStep = (username) => {
+    host().innerHTML = `
+      <div style="text-align:center;font-size:14px;color:var(--ok,#3f7d4f);margin-bottom:12px">${ic(I.check)} Аккаунт подключён${username ? ' · @' + esc(username) : ''}</div>
+      <div style="font-weight:700;font-size:13px;color:var(--navy-900);margin:0 0 8px;display:flex;align-items:center;gap:8px"><span style="display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px">4</span>Профиль (применится к реальному Telegram)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Имя (видит лид)</label><input id="tgwpName" placeholder="Анна"></div>
+        <div class="form-row"><label>Фамилия</label><input id="tgwpLast" placeholder="необязательно"></div>
+      </div>
+      <div class="form-row"><label>Био / описание (до 70 симв.)</label><input id="tgwpAbout" maxlength="70" placeholder="Недвижимость Дубай · подберу под бюджет"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Username (@)</label><input id="tgwpUser" placeholder="anna_realty"></div>
+        <div class="form-row"><label>Аватар (URL картинки)</label><input id="tgwpAvatar" placeholder="https://…/photo.jpg"></div>
+      </div>
+      <div id="tgwpOut" class="muted" style="font-size:11.5px;margin-top:4px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-accent" id="tgwpSave">${ic(I.check)}Сохранить и применить</button>
+        <button class="btn" id="tgwpSkip">Пропустить (настрою позже)</button>
+      </div>`;
+    $('#tgwpSkip', bd).addEventListener('click', () => { closeModal(); if (window.__reloadTgGray) window.__reloadTgGray(); });
+    $('#tgwpSave', bd).addEventListener('click', async () => {
+      const o = $('#tgwpOut', bd); o.textContent = 'Применяю к Telegram…';
+      try {
+        const r = await api.post('/tg/gray/persona', { phone: curPhone, name: ($('#tgwpName', bd) || {}).value, lastName: ($('#tgwpLast', bd) || {}).value, about: ($('#tgwpAbout', bd) || {}).value, username: ($('#tgwpUser', bd) || {}).value, avatar: ($('#tgwpAvatar', bd) || {}).value, mode: 'qualifier' });
+        const sy = r.sync || {};
+        toast(sy.usernameError ? 'Профиль применён (username занят)' : 'Профиль применён к Telegram', null, true);
+        closeModal(); if (window.__reloadTgGray) window.__reloadTgGray();
+      } catch (e) { o.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    });
+  };
   const poll = async () => {
     if (!document.body.contains(bd)) { stop(); return; }
     let r; try { r = await api.get('/tg/gray/qr-status?phone=' + encodeURIComponent(curPhone)); } catch (e) { return; }
-    if (r.status === 'connected') { stop(); try { await api.post('/tg/gray/apply-profile', { phone: curPhone }); } catch (_) {} host().innerHTML = `<div style="text-align:center;padding:22px;font-size:15px;color:var(--ok,#3f7d4f)">${ic(I.check)} Аккаунт подключён${r.username ? ' · @' + esc(r.username) : ''}<div class="muted" style="font-size:12px;margin-top:8px;color:var(--ink-3)">Профиль (аватар/имя/био) применён. Дальше — задай персону на карточке номера.</div></div>`; toast('Telegram подключён', '+' + curPhone, true); setTimeout(() => { closeModal(); if (window.__reloadTgGray) window.__reloadTgGray(); }, 1400); }
+    if (r.status === 'connected') { stop(); try { await api.post('/tg/gray/apply-profile', { phone: curPhone }); } catch (_) {} toast('Telegram подключён', '+' + curPhone, true); drawProfileStep(r.username || ''); }
     else if (r.status === 'password_needed') { if (!$('#tgqPwd', bd)) drawPwd(); }
     else if (r.status === 'qr_waiting' && r.qrImage) { const img = $('#tgqImg', bd); if (img && img.src !== r.qrImage) img.src = r.qrImage; }
     else if (r.status === 'error') { stop(); const out = $('#tgqOut', bd); if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'ошибка') + '</span>'; }
