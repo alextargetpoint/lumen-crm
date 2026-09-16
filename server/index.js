@@ -508,7 +508,11 @@ function getSession(req) {
   const cookie = req.headers.cookie || '';
   const m = cookie.match(/lumen_sid=([a-f0-9]{32})/);
   if (!m) return null;
-  return store.get().settings.auth.sessions[m[1]] ? m[1] : null;
+  /* защита: cookie может указывать на удалённый/битый тенант → db.settings.auth отсутствует.
+     Не роняем запрос (500) — возвращаем null (покажется окно входа), инвариант логина сохранён. */
+  const d = store.get();
+  const sess = d && d.settings && d.settings.auth && d.settings.auth.sessions;
+  return (sess && sess[m[1]]) ? m[1] : null;
 }
 /* IP клиента (учитываем прокси Railway/Netlify) */
 function clientIp(req) {
@@ -2658,8 +2662,17 @@ function notify(db, opts) {
       })();
     }
     if (wantTg) {
+      /* ТОЛЬКО владельцу (ownerTgChatId). Брокерам системные/биллинговые уведомления НЕ шлём.
+         Формат — HTML (tgbridge.notify шлёт parse_mode:HTML), поэтому экранируем и используем <b>. */
       (async () => {
-        try { const chat = db.settings.ownerTgChatId; if (chat && tgbridge.ready(db)) await tgbridge.notify(db, chat, `${n.title ? '*' + n.title + '*\n' : ''}${n.text}`); } catch (e) {}
+        try {
+          const chat = db.settings.ownerTgChatId;
+          if (chat && tgbridge.ready(db)) {
+            const he = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const emo = n.level === 'critical' ? '🔴 ' : n.level === 'warn' ? '🟠 ' : n.level === 'success' ? '🟢 ' : '🔔 ';
+            await tgbridge.notify(db, chat, `${emo}<b>${he(n.title || 'Уведомление')}</b>\n${he(n.text)}`);
+          }
+        } catch (e) {}
       })();
     }
     return n;
@@ -4790,7 +4803,13 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/billing/method' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setMethod(db, b)); }
       if (p === '/api/billing/rates' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, billing.setRates(db, b)); }
       if (p === '/api/billing/invoice' && req.method === 'POST') {
-        const b = await readBody(req); const r = billing.issueInvoice(db, b);
+        const b = await readBody(req);
+        /* нельзя выставить счёт без реквизитов — иначе счёт-фактура пустая/невалидная */
+        const co = (db.settings.billing && db.settings.billing.company) || {};
+        if (!String(co.legalName || '').trim() || !String(co.email || '').trim()) {
+          return json(res, 400, { error: 'Сначала заполните реквизиты (юр. название и e-mail) — без них счёт-фактуру выставить нельзя.', code: 'no_requisites' });
+        }
+        const r = billing.issueInvoice(db, b);
         if (!r.error && r.invoice) {
           const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           emailInvoicePdf(db, r.invoice).catch(() => {});   /* авто-инвойс PDF на почту (best-effort) */

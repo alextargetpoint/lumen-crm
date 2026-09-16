@@ -12905,10 +12905,16 @@ PAGES.billing = async (root) => {
   }
   const inv = $('#issueInv');
   if (inv) inv.addEventListener('click', async () => {
-    const r = await api.post('/billing/invoice', {});
-    if (r.error) { toast('Не получилось', r.error); return; }
-    toast('Счёт выставлен', `${r.invoice.id} на ${money(r.invoice.amount)} — подписка активна`, true);
-    await reload();
+    try {
+      const r = await api.post('/billing/invoice', {});
+      if (r.error) { toast('Не получилось', r.error); return; }
+      toast('Счёт выставлен', `${r.invoice.id} на ${money(r.invoice.amount)} — PDF на почте`, true);
+      await reload();
+    } catch (e) {
+      /* нет реквизитов (400) — подсказываем заполнить и подсвечиваем поле */
+      toast('Сначала реквизиты', e.message);
+      if (e.code === 'no_requisites') { const f = $('#coName', root); if (f) { f.focus(); f.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+    }
   });
   const ps = $('#payStripe');
   if (ps) ps.addEventListener('click', async () => {
