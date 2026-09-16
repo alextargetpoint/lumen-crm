@@ -12843,11 +12843,11 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
       <div id="tcStep1">
         <div class="tc-net">${ic(I.spark)}<span><b>USDT · сеть TRC20 (Tron)</b> — низкая комиссия, зачисление за 1–3 минуты. Отправляйте только USDT в сети TRC20.</span></div>
         <label class="lc-lbl">Сумма пополнения, USD</label>
-        <input id="tcAmt" type="number" min="10" step="1" value="${presetAmount ? Math.max(10, Math.ceil(presetAmount)) : 100}" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink);font-size:18px;font-weight:700">
+        <input id="tcAmt" type="number" min="0.5" step="0.5" value="${presetAmount ? Math.max(0.5, Math.ceil(presetAmount)) : 100}" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid var(--stroke);background:var(--bg-2);color:var(--ink);font-size:18px;font-weight:700">
         <div class="tc-presets" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px">
           ${presets.map(p => `<button type="button" class="btn btn-sm tc-preset" data-p="${p}">$${p}</button>`).join('')}
         </div>
-        <div class="lc-hint info" style="margin-top:12px">${ic(I.spark)}<span>Минимум $10. Переводите USDT (не другой токен). Комиссию сети платит отправитель — на баланс зачислится ровно указанная сумма.</span></div>
+        <div class="lc-hint info" style="margin-top:12px">${ic(I.spark)}<span>Минимум $0.50 (для теста). Переводите USDT (не другой токен). Комиссию сети платит отправитель — на баланс зачислится ровно указанная сумма.</span></div>
       </div>
       <div id="tcStep2" hidden></div>`,
     actions: [
@@ -12862,7 +12862,7 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
 
   async function tcCreate(bd) {
     const amt = Math.round((+bd.querySelector('#tcAmt').value || 0) * 100) / 100;
-    if (!(amt >= 10)) { toast('Минимум $10', 'Укажите сумму от $10'); return; }
+    if (!(amt >= 0.5)) { toast('Минимум $0.50', 'Укажите сумму от $0.50'); return; }
     const btn = bd.querySelector('.m-actions .btn-accent'); if (btn) { btn.disabled = true; btn.textContent = 'Создаю…'; }
     const r = await api.post('/billing/topup/crypto', { amountUsd: amt, chain, purpose });
     if (btn) { btn.disabled = false; btn.textContent = isSub ? 'Создать платёж' : 'Получить адрес'; }
