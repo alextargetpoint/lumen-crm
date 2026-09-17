@@ -7435,3 +7435,11 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .composer textarea{ box-sizing:border-box; }
 .bi-acts{ display:inline-flex; gap:6px; align-items:center; }
 .bi-pending_review{ color:#E0A94A; }
+
+/* ===== Превью «Причесать» — разбор наговора на задачи ===== */
+.tt-list{ display:flex; flex-direction:column; gap:8px; max-height:56vh; overflow-y:auto; }
+.tt-row{ display:grid; grid-template-columns:1fr 120px 150px 34px; gap:8px; align-items:center; }
+.tt-row .tt-title{ padding:9px 11px; border:1px solid var(--stroke); border-radius:9px; background:var(--bg-2); color:var(--ink); font-size:13px; }
+.tt-row .tt-pri, .tt-row .tt-date{ padding:8px 9px; border:1px solid var(--stroke); border-radius:9px; background:var(--bg-2); color:var(--ink); font-size:12.5px; }
+.tt-row .tt-del{ display:grid; place-items:center; width:34px; height:34px; }
+@media (max-width:560px){ .tt-row{ grid-template-columns:1fr 34px; } .tt-row .tt-pri,.tt-row .tt-date{ grid-column:1; } }

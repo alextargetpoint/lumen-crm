@@ -10593,7 +10593,8 @@ PAGES.tasks = async (root) => {
       <div class="tk-cap glass">
         <div class="tk-cap-row">
           <button class="tk-mic" id="tkMic" title="Надиктовать — ИИ поймёт срок">${ic(I.mic)}</button>
-          <input id="tkNew" class="tk-cap-in" placeholder="Задача текстом или голосом — «завтра позвонить в 15:00»…  ⏎">
+          <input id="tkNew" class="tk-cap-in" placeholder="Задача или наговорите список дел 🎤 — «Причешу» разложу на задачи…  ⏎">
+          <button class="btn" id="tkTidy" title="Наговорили много дел? ИИ разложит на отдельные задачи — покажу превью">${ic(I.spark)}Причесать</button>
           <button class="btn btn-accent" id="tkAdd">${ic(I.plus)}Добавить</button>
         </div>
         <div class="tk-cap-row tk-cap-meta">
@@ -10628,6 +10629,41 @@ PAGES.tasks = async (root) => {
   }
   const addTask = async () => { const inp = $('#tkNew', root); const title = inp.value.trim(); if (!title) { toast('Пустая задача'); return; } try { await api.post('/tasks', { title, priority: TASK_NEWPRI, sphere: TASK_NEWSPHERE || null, repeat: TASK_NEWREPEAT, scheduled: (TASK_NEWREPEAT || TASK_VIEW === 'inbox') ? null : today }); inp.value = ''; TASK_NEWREPEAT = null; render(); } catch (e) { toast('Не вышло', e.message); } };
   $('#tkAdd', root).addEventListener('click', addTask);
+  /* «Причесать»: наговор кучи дел → ИИ дробит на задачи → превью с правкой/удалением → создать все */
+  const PRI_OPTS = [['p1', 'Срочно'], ['p2', 'Высокий'], ['p3', 'Обычный'], ['p4', 'Низкий']];
+  const tidyTasks = async () => {
+    const inp = $('#tkNew', root); const text = (inp.value || '').trim();
+    if (!text) { toast('Пусто', 'Наговорите или впишите список дел, потом «Причесать»'); return; }
+    const btn = $('#tkTidy', root); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = ic(I.spark) + 'Причёсываю…';
+    let rows;
+    try { const r = await api.post('/tasks/bulk-parse', { text }); rows = (r.tasks || []).map(t => ({ ...t })); }
+    catch (e) { toast('Не вышло', e.message); btn.disabled = false; btn.innerHTML = old; return; }
+    btn.disabled = false; btn.innerHTML = old;
+    if (!rows.length) { toast('Не разобралось', 'Попробуйте сформулировать иначе'); return; }
+    const rowHtml = (t, i) => `<div class="tt-row" data-i="${i}">
+      <input class="tt-title" data-i="${i}" value="${esc(t.title)}">
+      <select class="tt-pri" data-i="${i}">${PRI_OPTS.map(([v, n]) => `<option value="${v}" ${t.priority === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <input class="tt-date" data-i="${i}" type="date" value="${esc(t.date || '')}" title="срок (необязательно)">
+      <button class="tt-del btn-ghost" data-i="${i}" title="Убрать">${ic(I.x)}</button>
+    </div>`;
+    const bd = modal({
+      title: 'Проверьте задачи', sub: `ИИ разложил на ${rows.length} ${plural(rows.length, 'задачу', 'задачи', 'задач')} — поправьте, удалите лишнее и создайте`, wide: true,
+      body: `<div class="tt-list" id="ttList">${rows.map(rowHtml).join('')}</div>`,
+      actions: [{ label: 'Отмена' }, { label: 'Создать задачи', cls: 'btn-accent', onClick: async () => {
+        /* собрать актуальные значения */
+        const items = [];
+        $$('#ttList .tt-row', bd).forEach(r => { const i = +r.dataset.i; if (rows[i] === null) return; const title = $('.tt-title', r).value.trim(); if (!title) return; const priority = $('.tt-pri', r).value; const date = $('.tt-date', r).value || ''; items.push({ title, priority, date }); });
+        if (!items.length) { toast('Пусто', 'Нет задач для создания'); return false; }
+        let ok = 0;
+        for (const it of items) { try { const due = it.date ? new Date(it.date + 'T09:00:00').getTime() : null; await api.post('/tasks', { title: it.title, priority: it.priority, scheduled: it.date || today, due, sphere: TASK_NEWSPHERE || null }); ok++; } catch (e) {} }
+        toast('Создано', `${ok} ${plural(ok, 'задача', 'задачи', 'задач')} добавлено`, true);
+        inp.value = ''; render();
+      } }],
+    });
+    /* удаление строки из превью */
+    $$('#ttList .tt-del', bd).forEach(b => b.addEventListener('click', () => { const i = +b.dataset.i; rows[i] = null; const rowEl = b.closest('.tt-row'); if (rowEl) rowEl.remove(); if (!$$('#ttList .tt-row', bd).length) { const l = $('#ttList', bd); if (l) l.innerHTML = '<div class="muted" style="padding:12px">Все убраны — закройте окно.</div>'; } }));
+  };
+  $('#tkTidy', root)?.addEventListener('click', tidyTasks);
   /* ⭐ сфера жизни */
   $$('#tkSpherePick .tk-sphere-chip', root).forEach(b => b.addEventListener('click', () => { TASK_NEWSPHERE = (TASK_NEWSPHERE === b.dataset.sp) ? '' : b.dataset.sp; $$('#tkSpherePick .tk-sphere-chip', root).forEach(x => x.classList.toggle('on', x.dataset.sp === TASK_NEWSPHERE)); }));
   /* ⭐ повтор: ИНЛАЙН-панель (без попапа) — выезжает снизу капчи, живое обновление */

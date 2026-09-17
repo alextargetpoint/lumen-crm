@@ -3565,9 +3565,10 @@ const server = http.createServer(async (req, res) => {
         if (!raw) return json(res, 400, { error: 'пустой текст' });
         if (!llm.available()) return json(res, 503, { error: 'ИИ не подключён' });
         const prompt = `Ты помощник-планировщик. Пользователь надиктовал/накидал список дел одним куском. Причеши это в ОДНУ главную задачу и понятные подзадачи-шаги.\nВЕРНИ СТРОГО JSON без пояснений и без markdown: {"title":"краткая формулировка главной задачи (до 90 симв)","priority":"low|normal|high","notes":"важные детали одной строкой или пусто","subtasks":["конкретный шаг 1","шаг 2", "..."]}.\nПравила: подзадачи — короткие глаголы-действия, 2–12 штук, без нумерации и без воды, на языке пользователя. priority высокий если есть срочность/дедлайн.\nТЕКСТ ПОЛЬЗОВАТЕЛЯ:\n"""${raw}"""`;
-        let out; try { out = await llm.callGemini(prompt, 16000, 1200); } catch (e) { return json(res, 502, { error: 'ИИ недоступен: ' + e.message }); }
-        let parsed = null;
-        try { const txt = String((out && out.text) || '').replace(/```json|```/g, '').trim(); const m = txt.match(/\{[\s\S]*\}/); parsed = JSON.parse(m ? m[0] : txt); } catch (e) { parsed = null; }
+        /* callGemini/callOpenAi возвращают УЖЕ распарсенный JSON-объект (responseMimeType:application/json),
+           поэтому берём его напрямую (баг: раньше лезли в out.text → всегда «не удалось разобрать»). */
+        let parsed = null; try { parsed = await llm.callGemini(prompt, 16000, 1200); } catch (e) { return json(res, 502, { error: 'ИИ недоступен: ' + e.message }); }
+        if (parsed && typeof parsed.text === 'string' && !parsed.title) { try { const t = parsed.text.replace(/```json|```/g, '').trim(); const mm = t.match(/\{[\s\S]*\}/); parsed = JSON.parse(mm ? mm[0] : t); } catch (e) {} }
         if (!parsed || !parsed.title) return json(res, 502, { error: 'не удалось разобрать' });
         const subtasks = Array.isArray(parsed.subtasks) ? parsed.subtasks.map(s => String(s || '').trim().slice(0, 200)).filter(Boolean).slice(0, 20) : [];
         return json(res, 200, { title: String(parsed.title).slice(0, 200), priority: ['low', 'normal', 'high'].includes(parsed.priority) ? parsed.priority : 'normal', notes: String(parsed.notes || '').slice(0, 500), subtasks });
@@ -8127,6 +8128,21 @@ const server = http.createServer(async (req, res) => {
           db.brokerTasks.unshift(t); db.brokerTasks = db.brokerTasks.slice(0, 1000); store.save();
           return json(res, 200, { task: t, parsed: pt });
         } catch (e) { return json(res, 500, { error: e.message }); }
+      }
+      /* массовый разбор: наговорил КУЧУ дел одним куском → ИИ дробит на отдельные задачи (превью, без создания) */
+      if (p === '/api/tasks/bulk-parse' && req.method === 'POST') {
+        if (!llm.available()) return json(res, 400, { error: 'ИИ не подключён' });
+        const b = await readBody(req); const raw = String(b.text || '').trim().slice(0, 4000);
+        if (!raw) return json(res, 400, { error: 'пустой текст' });
+        const _d = new Date(); const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+        const dowRu = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][_d.getDay()];
+        const prompt = `Сегодня ${today} (${dowRu}). Пользователь надиктовал/накидал СПИСОК дел одним куском. Разбей на ОТДЕЛЬНЫЕ задачи: каждое самостоятельное дело = своя задача. Для каждой извлеки срок из естественной речи («завтра», «в пятницу к 15:00», «до конца недели»).\nВЕРНИ СТРОГО JSON без markdown: {"tasks":[{"title":"суть задачи без слов о сроке","priority":"p1|p2|p3|p4","date":"YYYY-MM-DD или пусто","time":"HH:MM или пусто"}]}\nПравила: 1–20 задач; title — короткое действие-глагол, без нумерации и воды; priority p1 если срочно/дедлайн/сегодня, иначе p3; на языке пользователя.\nТЕКСТ:\n"""${raw}"""`;
+        let out; try { out = await llm.callGemini(prompt, 20000, 1600); } catch (e) { return json(res, 502, { error: 'ИИ недоступен: ' + e.message }); }
+        const arr = Array.isArray(out && out.tasks) ? out.tasks : (Array.isArray(out) ? out : []);
+        const dre = /^\d{4}-\d{2}-\d{2}$/, tre = /^\d{1,2}:\d{2}$/;
+        const tasks = arr.map(x => ({ title: String((x && x.title) || '').replace(/<[^>]*>/g, '').trim().slice(0, 200), priority: ['p1', 'p2', 'p3', 'p4'].includes(x && x.priority) ? x.priority : 'p3', date: dre.test(String((x && x.date) || '')) ? x.date : '', time: tre.test(String((x && x.time) || '')) ? x.time : '' })).filter(t => t.title).slice(0, 20);
+        if (!tasks.length) return json(res, 502, { error: 'не удалось разобрать' });
+        return json(res, 200, { tasks });
       }
       if ((m = p.match(/^\/api\/tasks\/([a-f0-9]+)$/)) && req.method === 'PATCH') {
         const t = db.brokerTasks.find(x => x.id === m[1]); if (!t) return json(res, 404, { error: 'not found' });
