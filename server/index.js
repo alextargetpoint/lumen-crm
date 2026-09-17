@@ -9595,7 +9595,36 @@ ${SCR}
       return json(res, 200, (db.callReviews || []).slice(0, 60));
     if (p === '/api/events' && req.method === 'GET') return json(res, 200, (IS_BROKER ? db.events.filter(e => !e.leadId || canSeeLead(db.leads.find(l => l.id === e.leadId) || {})) : db.events).slice(0, 60));
     if (p === '/api/analytics' && req.method === 'GET') return json(res, 200, analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}));
-    if (p === '/api/demo/reset' && req.method === 'POST') { store.reset(seed); return json(res, 200, { ok: true }); }
+    if (p === '/api/demo/reset' && req.method === 'POST') {
+      if (!getSession(req) || (ROLE && ROLE.role === 'broker')) return json(res, 403, { error: 'только владелец' });
+      /* НЕ теряем доступ и деньги: сохраняем вход/секреты/биллинг/бренд/betaAll, наполняем демо-данными остальное */
+      const keep = {
+        auth: db.settings.auth,
+        hooks: db.settings.hooks,
+        ownerTgChatId: db.settings.ownerTgChatId,
+        ownerTgCode: db.settings.ownerTgCode,
+        billing: db.settings.billing,
+        channels: db.settings.channels,
+        grayConsent: db.settings.grayConsent,
+        notifications: db.settings.notifications,
+        agencyKeep: { name: (db.settings.agency || {}).name, logo: (db.settings.agency || {}).logo, edition: (db.settings.agency || {}).edition, betaAll: (db.settings.agency || {}).betaAll, manager: (db.settings.agency || {}).manager, about: (db.settings.agency || {}).about },
+      };
+      store.reset(seed);
+      const nd = store.get();
+      ensureTenantDefaults(nd);   /* seed даёт лишь часть коллекций — добиваем недостающие массивы (mpContractors/adComments/folders…), иначе разделы падают */
+      nd.settings.auth = keep.auth;
+      if (keep.hooks) nd.settings.hooks = keep.hooks;
+      if (keep.ownerTgChatId) nd.settings.ownerTgChatId = keep.ownerTgChatId;
+      if (keep.ownerTgCode) nd.settings.ownerTgCode = keep.ownerTgCode;
+      if (keep.billing) nd.settings.billing = keep.billing;
+      if (keep.channels) nd.settings.channels = keep.channels;
+      if (keep.grayConsent) nd.settings.grayConsent = keep.grayConsent;
+      if (keep.notifications) nd.settings.notifications = keep.notifications;
+      nd.settings.agency = nd.settings.agency || {};
+      for (const [k, v] of Object.entries(keep.agencyKeep)) { if (v != null) nd.settings.agency[k] = v; }
+      store.saveNow();
+      return json(res, 200, { ok: true });
+    }
 
     /* ================= печатное расписание встреч недели: /meetings/print?w=N ================= */
     if (p === '/meetings/print' && req.method === 'GET') {

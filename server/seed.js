@@ -219,6 +219,29 @@ function seed() {
     { at: now - 2 * DAY, type: 'deal', leadId: l6.id, text: 'Депозит: Тимур Ахмедов · 1BR JVC · $238k — 7 дней от заявки' },
   ];
 
+  /* ---- Реклама (объявления со spend) + привязка лидов по гео → ненулевая статистика раздела «Реклама» ---- */
+  const ads = [
+    { adId: '120211478921230508', name: 'Дубай · Мортгейдж 0% · видео-тур JVC', priceFrom: 190000, adsetName: 'RU 30-55 инвесторы', campaignName: 'DXB Lead Forms · Сентябрь', geo: 'dubai', spend: 2840 },
+    { adId: '120211478921230742', name: 'Дубай · Marina от $180k · карусель', priceFrom: 180000, adsetName: 'RU широкая', campaignName: 'DXB Lead Forms · Сентябрь', geo: 'dubai', spend: 1960 },
+    { adId: '120209934110255019', name: 'Бали · виллы под сдачу · рилс', adsetName: 'RU номады', campaignName: 'Bali CTWA · Август', geo: 'bali', spend: 1180 },
+    { adId: '120209934110255777', name: 'Пхукет · апартаменты у моря · видео', adsetName: 'RU/EN отдых', campaignName: 'Phuket Lead Forms', geo: 'phuket', spend: 860 },
+  ];
+  L.forEach(l => { if (l.source === 'meta_form' || l.source === 'ctwa') { const a = ads.find(x => x.geo === l.geo) || ads[0]; if (a) l.ads = { adId: a.adId, adName: a.name, adsetName: a.adsetName, campaignName: a.campaignName, matched: true }; } });
+
+  /* ---- Медиаплан (план-факт по каналам) ---- */
+  const mediaplans = [
+    { id: 'mp_demo', contractorId: null, title: 'Дубай + Бали · Сентябрь 2026', period: { from: '2026-09-01', to: '2026-09-30' }, currency: 'USD', status: 'active',
+      lines: [
+        { id: 'mpl_d1', channel: 'Meta', geo: 'dubai', bundle: 'Видео-тур JVC → лид-форма', budgetPlan: 3000, leadsPlan: 120, budgetFact: 2840, leadsFact: 108, note: 'Идёт с опережением по CPL' },
+        { id: 'mpl_d2', channel: 'Meta', geo: 'dubai', bundle: 'Marina карусель → CTWA', budgetPlan: 2000, leadsPlan: 70, budgetFact: 1960, leadsFact: 61, note: '' },
+        { id: 'mpl_d3', channel: 'Google', geo: 'dubai', bundle: 'Search «купить квартиру Дубай»', budgetPlan: 1500, leadsPlan: 40, budgetFact: 1180, leadsFact: 29, note: 'Дорогой клик, но тёплый трафик' },
+        { id: 'mpl_b1', channel: 'Meta', geo: 'bali', bundle: 'Виллы под сдачу → рилс', budgetPlan: 1200, leadsPlan: 55, budgetFact: 1180, leadsFact: 52, note: '' },
+        { id: 'mpl_p1', channel: 'Meta', geo: 'phuket', bundle: 'Апартаменты у моря → видео', budgetPlan: 900, leadsPlan: 40, budgetFact: 860, leadsFact: 37, note: '' },
+      ],
+      note: 'Демо-медиаплан: план и факт по каналам за месяц. Факт вносится вручную или синком из кабинета. Поделитесь /mp/:id?key= — подрядчик утвердит.',
+      createdAt: now - 20 * DAY, sentAt: now - 19 * DAY, approvedAt: now - 18 * DAY, approvedBy: 'Подрядчик (демо)' },
+  ];
+
   return {
     settings: {
       agency: { name: 'One Agency', geos: ['dubai', 'bali', 'phuket', 'spain'] },
@@ -236,7 +259,7 @@ function seed() {
       billing: require('./billing').defBilling(),
     },
     brokers, numbers, templates, sequences,
-    leads: L, messages: M, events,
+    leads: L, messages: M, events, meetings, ads, mediaplans,
     campaigns: [
       {
         id: 'cmp_demo', name: 'Спящие Дубай · сентябрьские запуски', state: 'draft',
