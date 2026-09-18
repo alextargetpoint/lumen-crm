@@ -389,7 +389,7 @@
     const total = STEPS.length;
     // Видеофон: кинематографичная ЗОЛОТАЯ заставка (сгенерирована Higgsfield: частицы → ✦) на «киношных» шагах.
     const _bgv = d.bg === 'success' ? 'final' : 'intro';   /* финал — тёплый золотой фон, первый экран — кобальт (оба абстрактные, Higgsfield) */
-    root.querySelector('.ob-bgvid').innerHTML = d.bg ? `<video autoplay muted loop playsinline poster="/onb/${_bgv}-poster.jpg"><source src="/onb/${_bgv}.mp4" type="video/mp4"></video>` : '';
+    root.querySelector('.ob-bgvid').innerHTML = d.bg ? `<video autoplay muted loop playsinline poster="/onb/${_bgv}-poster.jpg?v=2"><source src="/onb/${_bgv}.mp4?v=2" type="video/mp4"></video>` : '';
     root.classList.toggle('ob-cinematic', !!d.bg);
     root.classList.toggle('ob-goldbg', !!d.bg);
 

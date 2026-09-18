@@ -5,88 +5,141 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lumen — анкета подключения</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#070A12; --panel:#0e1526; --panel2:#111a30; --ink:#f4f3f1; --mut:#9aa3b8; --mut2:#6b7488;
-    --acc:#4C7DFF; --acc2:#2563EB; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.06); --ok:#4ADE80; --r:14px; }
+  :root{
+    --paper:#F4F1EA; --paper2:#EFEBE1; --card:#FBF9F4; --ink:#1A1815; --ink2:#6C665C; --ink3:#9C958A;
+    --gold:#A98748; --gold-soft:#C9A86A; --line:rgba(26,24,21,.12); --line2:rgba(26,24,21,.07);
+    --ok:#5E7D54; --bad:#A6543F; --r:14px;
+  }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  html,body{ margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
   body{ background:
-    radial-gradient(1100px 700px at 15% -5%, rgba(37,99,235,.18), transparent),
-    radial-gradient(900px 600px at 95% 5%, rgba(76,125,255,.12), transparent), var(--bg); min-height:100vh; }
-  .wrap{ max-width:640px; margin:0 auto; padding:28px 18px 60px; }
-  .head{ text-align:center; margin-bottom:22px; }
-  .spark{ width:44px; height:52px; margin:0 auto 12px; display:block; }
-  .h1{ font-size:24px; font-weight:800; letter-spacing:-.02em; margin:0 0 6px; }
-  .sub{ font-size:13.5px; color:var(--mut); line-height:1.5; max-width:460px; margin:0 auto; }
-  .saved{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ok); margin-top:12px; opacity:0; transition:opacity .3s; }
+    radial-gradient(1200px 700px at 50% -8%, rgba(201,168,106,.10), transparent 60%),
+    linear-gradient(180deg, var(--paper), var(--paper2)); min-height:100vh; }
+  .serif{ font-family:'Cormorant',Georgia,serif; }
+  .wrap{ max-width:660px; margin:0 auto; padding:38px 20px 72px; }
+
+  /* — Шапка — */
+  .head{ text-align:center; margin-bottom:30px; }
+  .spark{ width:40px; height:48px; margin:0 auto 16px; display:block; }
+  .eyebrow{ font-size:11px; letter-spacing:.32em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:14px; }
+  .h1{ font-family:'Cormorant',Georgia,serif; font-weight:500; font-size:clamp(38px,8vw,58px); line-height:1.02; letter-spacing:-.01em; margin:0 0 14px; }
+  .h1 em{ font-style:italic; color:var(--gold); }
+  .lead{ font-size:14.5px; line-height:1.65; color:var(--ink2); max-width:470px; margin:0 auto; }
+  .rule{ width:56px; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:26px auto 0; }
+  .saved{ display:inline-flex; align-items:center; gap:7px; font-size:11.5px; letter-spacing:.03em; color:var(--ok); margin-top:18px; opacity:0; transition:opacity .3s; }
   .saved.on{ opacity:1; }
-  .saved i{ width:6px; height:6px; border-radius:50%; background:var(--ok); }
-  .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:var(--r); padding:18px 16px; margin-bottom:14px; }
-  .card-h{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-  .card-n{ flex:0 0 auto; width:26px; height:26px; border-radius:8px; background:rgba(76,125,255,.16); color:#9db9ff; font-weight:800; font-size:13px; display:grid; place-items:center; }
-  .card-t{ font-size:15px; font-weight:700; }
-  .card-t .opt{ font-size:11px; font-weight:500; color:var(--mut2); margin-left:6px; }
-  label.fl{ display:block; margin-bottom:12px; }
-  label.fl > span{ display:block; font-size:12.5px; color:var(--mut); margin-bottom:6px; }
-  label.fl > span b{ color:#ff8a8a; font-weight:700; }
+  .saved i{ width:5px; height:5px; border-radius:50%; background:var(--ok); }
+
+  /* — Секции — */
+  .card{ background:var(--card); border:1px solid var(--line2); border-radius:var(--r); padding:22px 20px; margin-bottom:16px;
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 30px -24px rgba(26,24,21,.4); }
+  .card-h{ display:flex; align-items:baseline; gap:12px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--line2); }
+  .card-n{ flex:0 0 auto; width:30px; height:30px; border-radius:50%; border:1px solid var(--gold); color:var(--gold);
+    font-family:'Cormorant',Georgia,serif; font-size:19px; font-weight:600; display:grid; place-items:center; }
+  .card-t{ font-family:'Cormorant',Georgia,serif; font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.1; }
+  .card-t .opt{ font-family:'Manrope',sans-serif; font-size:11px; font-weight:500; color:var(--ink3); margin-left:8px; letter-spacing:.02em; }
+
+  label.fl{ display:block; margin-bottom:15px; }
+  label.fl:last-child{ margin-bottom:0; }
+  label.fl > span{ display:block; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3); font-weight:600; margin-bottom:7px; }
+  label.fl > span b{ color:var(--bad); font-weight:700; }
   input[type=text], input[type=tel], input[type=email], input[type=url], textarea, select{
-    width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:11px; background:#0a1020; color:var(--ink);
-    font-size:15px; font-family:inherit; outline:none; transition:border-color .15s, background .15s; }
-  input:focus, textarea:focus, select:focus{ border-color:var(--acc); background:#0c1426; }
-  textarea{ resize:vertical; min-height:84px; line-height:1.5; }
-  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:11px; background:#fff; color:var(--ink);
+    font-size:15px; font-family:inherit; outline:none; transition:border-color .18s, box-shadow .18s; }
+  input:focus, textarea:focus, select:focus{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,168,106,.16); }
+  input::placeholder, textarea::placeholder{ color:var(--ink3); }
+  textarea{ resize:vertical; min-height:88px; line-height:1.55; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   @media (max-width:520px){ .row2{ grid-template-columns:1fr; } }
+
   .chips{ display:flex; flex-wrap:wrap; gap:8px; }
-  .chip{ padding:9px 13px; border:1px solid var(--line); border-radius:999px; font-size:13px; color:var(--mut); cursor:pointer; user-select:none; transition:all .15s; background:#0a1020; }
-  .chip.on{ background:rgba(76,125,255,.18); border-color:var(--acc); color:#cdddff; }
-  .brk{ border:1px solid var(--line2); border-radius:12px; padding:12px; margin-bottom:10px; position:relative; background:rgba(255,255,255,.015); }
-  .brk .brk-del{ position:absolute; top:8px; right:8px; width:26px; height:26px; border:0; background:rgba(255,255,255,.05); color:var(--mut); border-radius:7px; cursor:pointer; font-size:15px; }
-  .brk .brk-del:hover{ color:#ff8a8a; }
-  .addbtn{ width:100%; padding:11px; border:1px dashed var(--line); border-radius:11px; background:transparent; color:var(--acc); font-size:13.5px; font-weight:600; cursor:pointer; }
-  .addbtn:hover{ border-color:var(--acc); background:rgba(76,125,255,.06); }
-  .radio{ display:flex; flex-direction:column; gap:8px; }
-  .radio label{ display:flex; gap:10px; align-items:flex-start; font-size:13.5px; line-height:1.45; color:var(--ink); padding:11px 12px; border:1px solid var(--line); border-radius:11px; cursor:pointer; background:#0a1020; }
-  .radio label.on{ border-color:var(--acc); background:rgba(76,125,255,.08); }
-  .radio input{ margin-top:2px; flex:0 0 auto; }
-  .hint{ font-size:11.5px; color:var(--mut2); line-height:1.5; margin-top:6px; }
-  .up{ display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
-  .up-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; width:84px; height:84px; border:1px dashed var(--line); border-radius:12px; color:var(--mut); font-size:11px; cursor:pointer; background:#0a1020; text-align:center; }
-  .up-btn:hover{ border-color:var(--acc); color:var(--acc); }
+  .chip{ padding:9px 14px; border:1px solid var(--line); border-radius:999px; font-size:13px; color:var(--ink2); cursor:pointer;
+    user-select:none; transition:all .18s; background:#fff; }
+  .chip.on{ background:var(--ink); border-color:var(--ink); color:var(--paper); }
+
+  .brk{ border:1px solid var(--line2); border-radius:12px; padding:14px; margin-bottom:11px; position:relative; background:#fff; }
+  .brk .brk-del{ position:absolute; top:9px; right:9px; width:26px; height:26px; border:0; background:transparent; color:var(--ink3);
+    border-radius:7px; cursor:pointer; font-size:17px; line-height:1; }
+  .brk .brk-del:hover{ color:var(--bad); }
+  .addbtn{ width:100%; padding:12px; border:1px dashed var(--gold); border-radius:11px; background:transparent; color:var(--gold);
+    font-size:13.5px; font-weight:600; cursor:pointer; letter-spacing:.02em; transition:.18s; }
+  .addbtn:hover{ background:rgba(201,168,106,.08); }
+
+  .radio{ display:flex; flex-direction:column; gap:9px; }
+  .radio label{ display:flex; gap:11px; align-items:flex-start; font-size:13.5px; line-height:1.5; color:var(--ink);
+    padding:12px 13px; border:1px solid var(--line); border-radius:11px; cursor:pointer; background:#fff; transition:.18s; }
+  .radio label.on{ border-color:var(--gold); background:rgba(201,168,106,.07); }
+  .radio input{ margin-top:2px; flex:0 0 auto; accent-color:var(--gold); }
+  .hint{ font-size:11.5px; color:var(--ink3); line-height:1.55; margin-top:7px; }
+
+  .up{ display:flex; flex-wrap:wrap; gap:11px; margin-top:4px; }
+  .up-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; width:88px; height:88px;
+    border:1px dashed var(--line); border-radius:12px; color:var(--ink3); font-size:11px; cursor:pointer; background:#fff; text-align:center; transition:.18s; }
+  .up-btn:hover{ border-color:var(--gold); color:var(--gold); }
   .up-btn svg{ width:20px; height:20px; }
-  .thumb{ width:84px; height:84px; border-radius:12px; object-fit:cover; position:relative; border:1px solid var(--line); }
-  .thumb-wrap{ position:relative; width:84px; height:84px; }
-  .thumb-wrap .rm{ position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#e0574a; color:#fff; border:2px solid var(--bg); cursor:pointer; font-size:13px; line-height:1; display:grid; place-items:center; }
-  .up-load{ font-size:11px; color:var(--acc); }
+  .thumb-wrap{ position:relative; width:88px; height:88px; }
+  .thumb{ width:88px; height:88px; border-radius:12px; object-fit:cover; border:1px solid var(--line); }
+  .thumb-wrap .rm{ position:absolute; top:-7px; right:-7px; width:22px; height:22px; border-radius:50%; background:var(--bad);
+    color:#fff; border:2px solid var(--paper); cursor:pointer; font-size:13px; line-height:1; display:grid; place-items:center; }
+  .up-load{ font-size:11px; color:var(--gold); }
+
   .colorrow{ display:flex; align-items:center; gap:12px; }
-  .colorrow input[type=color]{ width:52px; height:44px; border:1px solid var(--line); border-radius:11px; background:#0a1020; padding:4px; cursor:pointer; }
-  .submit{ width:100%; padding:16px; border:0; border-radius:13px; background:linear-gradient(180deg,var(--acc),var(--acc2)); color:#fff; font-size:16px; font-weight:800; cursor:pointer; margin-top:6px; box-shadow:0 12px 30px -12px rgba(37,99,235,.7); }
-  .submit:disabled{ opacity:.6; cursor:default; }
-  .footnote{ text-align:center; font-size:11.5px; color:var(--mut2); margin-top:16px; line-height:1.5; }
-  .done{ text-align:center; padding:50px 20px; }
-  .done .ok{ width:72px; height:72px; border-radius:50%; background:rgba(74,222,128,.14); display:grid; place-items:center; margin:0 auto 18px; }
-  .done .ok svg{ width:36px; height:36px; stroke:var(--ok); }
-  .done h2{ font-size:22px; font-weight:800; margin:0 0 8px; }
-  .done p{ color:var(--mut); font-size:14px; line-height:1.6; max-width:420px; margin:0 auto; }
-  .err{ color:#ff8a8a; font-size:13px; text-align:center; margin-top:10px; min-height:16px; }
+  .colorrow input[type=color]{ width:52px; height:44px; border:1px solid var(--line); border-radius:11px; background:#fff; padding:4px; cursor:pointer; }
+
+  /* кастомная выпадашка «Ателье» (нативные select запрещены — свой стиль) */
+  .csel{ position:relative; }
+  .csel-btn{ width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:11px; background:#fff; color:var(--ink);
+    font-size:15px; font-family:inherit; text-align:left; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:border-color .18s, box-shadow .18s; }
+  .csel-btn:hover{ border-color:var(--gold-soft); }
+  .csel.open .csel-btn{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,168,106,.16); }
+  .csel-btn.placeholder .csel-val{ color:var(--ink3); }
+  .csel-btn svg{ width:15px; height:15px; color:var(--ink3); transition:transform .2s; flex:0 0 auto; }
+  .csel.open .csel-btn svg{ transform:rotate(180deg); }
+  .csel-list{ position:absolute; left:0; right:0; top:calc(100% + 6px); background:#FBF9F4; border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 20px 46px -18px rgba(26,24,21,.5); padding:6px; z-index:50; max-height:260px; overflow-y:auto; display:none; }
+  .csel.open .csel-list{ display:block; }
+  .csel-opt{ padding:10px 12px; border-radius:8px; font-size:14px; color:var(--ink); cursor:pointer; transition:background .12s; }
+  .csel-opt:hover{ background:rgba(201,168,106,.13); }
+  .csel-opt.sel{ color:var(--gold); font-weight:600; }
+
+  .submit{ width:100%; padding:17px; border:0; border-radius:13px; background:var(--ink); color:var(--paper);
+    font-family:'Cormorant',Georgia,serif; font-size:20px; font-weight:600; letter-spacing:.01em; cursor:pointer; margin-top:8px;
+    box-shadow:0 14px 34px -16px rgba(26,24,21,.7); transition:.2s; }
+  .submit:hover{ background:#000; }
+  .submit:disabled{ opacity:.55; cursor:default; }
+  .footnote{ text-align:center; font-size:11.5px; color:var(--ink3); margin-top:18px; line-height:1.6; }
+  .err{ color:var(--bad); font-size:13px; text-align:center; margin-top:11px; min-height:16px; }
+
+  .done{ text-align:center; padding:64px 22px; }
+  .done .ok{ width:76px; height:76px; border-radius:50%; border:1px solid var(--gold); display:grid; place-items:center; margin:0 auto 22px; }
+  .done .ok svg{ width:34px; height:34px; stroke:var(--gold); }
+  .done h2{ font-family:'Cormorant',Georgia,serif; font-size:34px; font-weight:600; margin:0 0 10px; letter-spacing:-.01em; }
+  .done p{ color:var(--ink2); font-size:14.5px; line-height:1.65; max-width:430px; margin:0 auto; }
 </style>
 </head>
 <body>
 <div class="wrap" id="wrap">
   <div class="head">
-    <svg class="spark" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="lg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#8fb0ff"/><stop offset="55%" stop-color="#4C7DFF"/><stop offset="100%" stop-color="#2563EB"/></linearGradient></defs><path fill="none" stroke="url(#lg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
-    <div class="h1">Анкета подключения</div>
-    <div class="sub">Заполните — и мы настроим Lumen CRM под ваше агентство: подключим WhatsApp, заведём брокеров, соберём каскады под ваш стиль. Анкета сохраняется сама на каждом шаге.</div>
+    <svg class="spark" viewBox="0 0 100 120" aria-hidden="true"><path fill="none" stroke="#A98748" stroke-width="2.2" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
+    <div class="eyebrow">Lumen · Real Estate CRM</div>
+    <h1 class="h1">Анкета <em>подключения</em></h1>
+    <div class="lead">Заполните — и мы соберём Lumen под ваше агентство: подключим WhatsApp, заведём брокеров, настроим каскады под ваш стиль. Анкета сохраняется сама на каждом шаге.</div>
+    <div class="rule"></div>
     <div class="saved" id="savedTag"><i></i>Черновик сохранён</div>
   </div>
 
   <form id="form" autocomplete="on">
-    <!-- 1. Агентство -->
     <div class="card">
       <div class="card-h"><div class="card-n">1</div><div class="card-t">Агентство</div></div>
       <label class="fl"><span>Название (как показывать клиентам) <b>*</b></span><input type="text" name="agencyName" required placeholder="напр. One Agency"></label>
-      <label class="fl"><span>Направления / рынки</span>
+      <label class="fl"><span>Направления · рынки</span>
         <div class="chips" id="geoChips"></div>
-        <input type="text" name="geoOther" placeholder="ещё направления через запятую" style="margin-top:8px">
+        <input type="text" name="geoOther" placeholder="ещё направления через запятую" style="margin-top:9px">
       </label>
       <div class="row2">
         <label class="fl"><span>Основатель — имя <b>*</b></span><input type="text" name="founderName" required placeholder="Имя Фамилия"></label>
@@ -94,80 +147,71 @@
       </div>
     </div>
 
-    <!-- 2. Брокеры -->
     <div class="card">
-      <div class="card-h"><div class="card-n">2</div><div class="card-t">Брокеры <span class="opt">под них заведём под-аккаунты</span></div></div>
+      <div class="card-h"><div class="card-n">2</div><div class="card-t">Брокеры<span class="opt">заведём под-аккаунты</span></div></div>
       <div id="brokers"></div>
       <button type="button" class="addbtn" id="addBroker">+ Добавить брокера</button>
     </div>
 
-    <!-- 3. Каналы -->
     <div class="card">
-      <div class="card-h"><div class="card-n">3</div><div class="card-t">Каналы связи</div></div>
-      <label class="fl"><span>Номер для официального WhatsApp (не тестовый)</span><input type="tel" name="waNumber" placeholder="+971 …"></label>
-      <label class="fl"><span>Доступ к Meta / Business Manager (для WhatsApp API, Lead Ads, комментариев)</span>
+      <div class="card-h"><div class="card-n">3</div><div class="card-t">Доступы для подключения</div></div>
+      <div class="hint" style="margin:-4px 0 14px">Нужно, чтобы подключить рекламный кабинет через API (лид-формы, комментарии) и официальный «белый» WhatsApp (Cloud API). Пароли в анкете указывать не нужно — доступы передаются отдельным защищённым каналом.</div>
+      <label class="fl"><span>Доступ к Meta / Business Manager (рекламный кабинет)</span>
         <div class="radio" id="metaAccess">
-          <label><input type="radio" name="metaAccess" value="partner"><span>Добавлю вас партнёром-админом в Business Manager (пришлёте ваш Business ID) — <b style="color:var(--ok)">безопаснее</b></span></label>
+          <label><input type="radio" name="metaAccess" value="partner"><span>Добавлю вас партнёром-админом в Business Manager (пришлёте ваш Business&nbsp;ID) — <b style="color:var(--ok)">безопаснее</b></span></label>
           <label><input type="radio" name="metaAccess" value="later"><span>Передам доступ отдельно (напишем в личке защищённо)</span></label>
         </div>
-        <div class="hint">Пароли в анкете не указывайте — доступы передаются отдельным защищённым каналом.</div>
       </label>
+      <label class="fl"><span>Номер для официального WhatsApp (Cloud API, не тестовый)</span><input type="tel" name="waNumber" placeholder="+971 …"></label>
       <label class="fl"><span>Instagram (рабочий, @username)</span><input type="text" name="instagram" placeholder="@youragency"></label>
     </div>
 
-    <!-- 4. Бренд -->
     <div class="card">
       <div class="card-h"><div class="card-n">4</div><div class="card-t">Бренд</div></div>
-      <label class="fl"><span>Логотип (PNG/JPG)</span>
-        <div class="up" id="logoUp"></div>
-      </label>
-      <label class="fl"><span>Фирменный цвет</span>
-        <div class="colorrow"><input type="color" name="brandColor" value="#2563EB"><input type="text" name="brandColorHex" placeholder="#2563EB" style="max-width:140px"></div>
-      </label>
+      <label class="fl"><span>Логотип (PNG / JPG)</span><div class="up" id="logoUp"></div><div class="hint">Оформление возьмём наше фирменное (стиль «Ателье») — понадобится только логотип и подпись менеджера.</div></label>
       <div class="row2">
         <label class="fl"><span>Менеджер для подборок — имя</span><input type="text" name="managerName" placeholder="Имя"></label>
         <label class="fl"><span>Телефон менеджера</span><input type="tel" name="managerPhone" placeholder="+…"></label>
       </div>
     </div>
 
-    <!-- 5. Тон и скрипты -->
     <div class="card">
       <div class="card-h"><div class="card-n">5</div><div class="card-t">Тон и скрипты</div></div>
-      <label class="fl"><span>Как брокеры пишут клиентам — 1-2 реальных примера (чтобы ИИ звучал как вы, а не шаблонно)</span><textarea name="tone" placeholder="Вставьте пару типичных сообщений…"></textarea></label>
-      <label class="fl"><span>Или приложите скриншоты переписки</span>
-        <div class="up" id="scriptsUp"></div>
-      </label>
+      <label class="fl"><span>Как брокеры пишут клиентам — 1–2 реальных примера</span><textarea name="tone" placeholder="Вставьте пару типичных сообщений — чтобы ИИ звучал как вы, а не шаблонно…"></textarea></label>
+      <label class="fl"><span>Или приложите скриншоты переписки</span><div class="up" id="scriptsUp"></div></label>
     </div>
 
-    <!-- 6. Объекты -->
     <div class="card">
-      <div class="card-h"><div class="card-n">6</div><div class="card-t">Объекты <span class="opt">если нужны подборки</span></div></div>
-      <label class="fl"><span>Reelly-ключ / ссылка на список объектов / CSV</span><input type="text" name="inventory" placeholder="ключ, ссылка или «пришлю файлом»"></label>
-      <label class="fl"><span>Фото объектов / материалы (необязательно)</span>
-        <div class="up" id="objUp"></div>
-      </label>
+      <div class="card-h"><div class="card-n">6</div><div class="card-t">Объекты<span class="opt">если нужны подборки</span></div></div>
+      <label class="fl"><span>Reelly-ключ · ссылка на список · CSV</span><input type="text" name="inventory" placeholder="ключ, ссылка или «пришлю файлом»"></label>
+      <label class="fl"><span>Портал-агрегатор, где вы держите объекты (название / ссылка)</span><input type="text" name="portal" placeholder="напр. Reelly / свой сайт / название портала"><div class="hint">Доступ (логин/пароль) к порталу передадите отдельно защищённым каналом — подтянем ваши объекты автоматически.</div></label>
     </div>
 
-    <!-- 7. Прочее -->
     <div class="card">
-      <div class="card-h"><div class="card-n">7</div><div class="card-t">Прочее <span class="opt">необязательно</span></div></div>
+      <div class="card-h"><div class="card-n">7</div><div class="card-t">Инфраструктура и доступы<span class="opt">важно для настройки</span></div></div>
       <div class="row2">
         <label class="fl"><span>Нужна телефония (звонки+запись)?</span><select name="telephony"><option value="">—</option><option>Да</option><option>Нет</option><option>Позже</option></select></label>
         <label class="fl"><span>Текущая CRM (для переноса базы)</span><select name="crm"><option value="">—</option><option>amoCRM</option><option>Bitrix24</option><option>Таблицы</option><option>Нет</option><option>Другое</option></select></label>
       </div>
-      <label class="fl"><span>Комментарий / что важно</span><textarea name="comment" placeholder="Любые пожелания…"></textarea></label>
+      <div class="hint" style="margin:-6px 0 14px">Если есть текущая CRM — доступ (логин/пароль) для переноса базы передадите отдельно защищённым каналом.</div>
+      <div class="row2">
+        <label class="fl"><span>Есть действующие аккаунты? (телефония / Telegram / WhatsApp)</span><select name="existingAccounts"><option value="">—</option><option>Да — есть, предоставлю номера</option><option>Нет</option></select></label>
+        <label class="fl"><span>Android-устройство</span><select name="android"><option value="">—</option><option>Есть</option><option>Могу купить</option><option>Нет</option></select></label>
+      </div>
+      <div class="hint" style="margin:-6px 0 14px">Android-устройство нужно для <b>централизованного управления</b> всеми подключёнными аккаунтами (WhatsApp / Telegram) на стороне собственника. Если действующих аккаунтов нет — заведём и подключим сами.</div>
+      <label class="fl"><span>Комментарий · что важно</span><textarea name="comment" placeholder="Любые пожелания…"></textarea></label>
     </div>
 
     <button type="submit" class="submit" id="submitBtn">Отправить анкету</button>
     <div class="err" id="err"></div>
-    <div class="footnote">Данные уходят только команде Lumen для настройки вашего аккаунта. Пароли/доступы передаются отдельно.</div>
+    <div class="footnote">Данные уходят только команде Lumen для настройки вашего аккаунта. Доступы и пароли — отдельно.</div>
   </form>
 </div>
 
 <div class="wrap done" id="doneView" style="display:none">
-  <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-  <h2>Анкета отправлена!</h2>
-  <p>Спасибо. Мы всё получили и свяжемся, чтобы настроить ваш аккаунт Lumen CRM и завести брокеров. Обычно это занимает 1 рабочий день.</p>
+  <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+  <h2 class="serif">Анкета отправлена</h2>
+  <p>Благодарим. Мы всё получили и свяжемся, чтобы настроить ваш аккаунт Lumen CRM и завести брокеров. Обычно это занимает один рабочий день.</p>
 </div>
 
 <script>
@@ -184,32 +228,32 @@
   function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } }
   var saveT;
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} clearTimeout(saveT); savedTag.classList.add('on'); saveT=setTimeout(function(){ savedTag.classList.remove('on'); },1400); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-  /* --- гео-чипы --- */
+  /* гео-чипы */
   var geoBox=document.getElementById('geoChips');
   GEOS.forEach(function(g){ var c=document.createElement('div'); c.className='chip'+(state.geos.indexOf(g)>=0?' on':''); c.textContent=g;
     c.onclick=function(){ var i=state.geos.indexOf(g); if(i>=0)state.geos.splice(i,1); else state.geos.push(g); c.classList.toggle('on'); save(); }; geoBox.appendChild(c); });
 
-  /* --- восстановление обычных полей --- */
+  /* восстановление полей + автосейв */
   Array.prototype.forEach.call(form.elements, function(el){
     if(!el.name || el.type==='radio' || el.type==='file') return;
     if(state[el.name]!=null) el.value=state[el.name];
     el.addEventListener('input', function(){ state[el.name]=el.value; if(el.name==='brandColor'){ var hx=form.brandColorHex; if(hx&&!state.brandColorHex){hx.value=el.value; state.brandColorHex=el.value;} } save(); });
   });
-  /* meta radio */
   if(state.metaAccess){ var r=form.querySelector('input[name=metaAccess][value="'+state.metaAccess+'"]'); if(r){ r.checked=true; r.closest('label').classList.add('on'); } }
   form.querySelectorAll('input[name=metaAccess]').forEach(function(r){ r.addEventListener('change', function(){ state.metaAccess=r.value; form.querySelectorAll('#metaAccess label').forEach(function(l){l.classList.remove('on');}); r.closest('label').classList.add('on'); save(); }); });
 
-  /* --- брокеры --- */
+  /* брокеры */
   var brokersBox=document.getElementById('brokers');
   function renderBrokers(){
     brokersBox.innerHTML='';
     state.brokers.forEach(function(b,i){
       var d=document.createElement('div'); d.className='brk';
-      d.innerHTML='<button type="button" class="brk-del" title="Убрать">×</button>'+
+      d.innerHTML='<button type="button" class="brk-del" title="Убрать">&times;</button>'+
         '<label class="fl"><span>Имя брокера '+(i+1)+'</span><input type="text" data-bk="name" value="'+esc(b.name||'')+'" placeholder="Имя Фамилия"></label>'+
         '<div class="row2"><label class="fl"><span>Телефон</span><input type="tel" data-bk="phone" value="'+esc(b.phone||'')+'" placeholder="+…"></label>'+
-        '<label class="fl" style="margin-bottom:0"><span>E-mail</span><input type="email" data-bk="email" value="'+esc(b.email||'')+'" placeholder="broker@…"></label></div>';
+        '<label class="fl"><span>E-mail</span><input type="email" data-bk="email" value="'+esc(b.email||'')+'" placeholder="broker@…"></label></div>';
       d.querySelectorAll('[data-bk]').forEach(function(inp){ inp.addEventListener('input', function(){ state.brokers[i][inp.dataset.bk]=inp.value; save(); }); });
       d.querySelector('.brk-del').onclick=function(){ if(state.brokers.length<=1){ state.brokers=[{}]; } else { state.brokers.splice(i,1); } renderBrokers(); save(); };
       brokersBox.appendChild(d);
@@ -218,21 +262,20 @@
   document.getElementById('addBroker').onclick=function(){ state.brokers.push({}); renderBrokers(); save(); };
   renderBrokers();
 
-  /* --- загрузка фото (логотип / скрипты / объекты) --- */
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  /* загрузка фото */
   function setupUp(boxId, key, multi){
     var box=document.getElementById(boxId);
     function draw(){
       box.innerHTML='';
       (state.photos[key]||[]).forEach(function(url,idx){
         var w=document.createElement('div'); w.className='thumb-wrap';
-        w.innerHTML='<img class="thumb" src="'+esc(url)+'"><button type="button" class="rm">×</button>';
+        w.innerHTML='<img class="thumb" src="'+esc(url)+'"><button type="button" class="rm">&times;</button>';
         w.querySelector('.rm').onclick=function(){ state.photos[key].splice(idx,1); draw(); save(); };
         box.appendChild(w);
       });
       if(multi || !(state.photos[key]||[]).length){
         var btn=document.createElement('div'); btn.className='up-btn';
-        btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Фото</span>';
+        btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Фото</span>';
         btn.onclick=function(){ pick(key, multi, draw); }; box.appendChild(btn);
       }
     }
@@ -261,16 +304,33 @@
   }
   setupUp('logoUp','logo',false);
   setupUp('scriptsUp','scripts',true);
-  setupUp('objUp','obj',true);
 
-  /* --- отправка --- */
+  /* кастомные выпадашки в стиле Ателье (нативный select — хранитель значения, скрыт) */
+  function enhanceSelects(){
+    form.querySelectorAll('select').forEach(function(sel){
+      if(sel.dataset.enh) return; sel.dataset.enh='1';
+      var wrap=document.createElement('div'); wrap.className='csel';
+      sel.parentNode.insertBefore(wrap, sel); wrap.appendChild(sel); sel.style.display='none';
+      var btn=document.createElement('button'); btn.type='button'; btn.className='csel-btn';
+      btn.innerHTML='<span class="csel-val"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+      var list=document.createElement('div'); list.className='csel-list';
+      wrap.appendChild(btn); wrap.appendChild(list);
+      function sync(){ var o=sel.selectedOptions[0]; btn.querySelector('.csel-val').textContent = (o&&o.value)?o.textContent.trim():'—'; btn.classList.toggle('placeholder', !sel.value); }
+      function build(){ list.innerHTML=''; Array.prototype.forEach.call(sel.options,function(o){ var d=document.createElement('div'); d.className='csel-opt'+(o.selected?' sel':''); d.textContent=o.value?o.textContent.trim():'— не выбрано'; d.onclick=function(){ sel.value=o.value; sel.dispatchEvent(new Event('input',{bubbles:true})); sel.dispatchEvent(new Event('change',{bubbles:true})); sync(); wrap.classList.remove('open'); }; list.appendChild(d); }); }
+      btn.onclick=function(e){ e.stopPropagation(); var was=wrap.classList.contains('open'); document.querySelectorAll('.csel.open').forEach(function(x){x.classList.remove('open');}); if(!was){ build(); wrap.classList.add('open'); } };
+      sync();
+    });
+  }
+  document.addEventListener('click', function(){ document.querySelectorAll('.csel.open').forEach(function(x){x.classList.remove('open');}); });
+  enhanceSelects();
+
+  /* отправка */
   form.addEventListener('submit', function(e){
     e.preventDefault();
     var err=document.getElementById('err'); err.textContent='';
-    if(!state.agencyName || !state.founderName || !state.founderContact){ err.textContent='Заполните обязательные поля (название агентства, основатель, контакт).'; window.scrollTo({top:0,behavior:'smooth'}); return; }
-    var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.textContent='Отправляю…';
-    var payload=Object.assign({}, state);
-    fetch('/api/brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    if(!state.agencyName || !state.founderName || !state.founderContact){ err.textContent='Заполните обязательные поля: название агентства, основатель, контакт.'; window.scrollTo({top:0,behavior:'smooth'}); return; }
+    var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.textContent='Отправляем…';
+    fetch('/api/brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({}, state))})
       .then(function(r){return r.json();}).then(function(j){
         if(j&&j.ok){ try{localStorage.removeItem(KEY);}catch(e){} document.getElementById('wrap').style.display='none'; document.getElementById('doneView').style.display='block'; window.scrollTo(0,0); }
         else { err.textContent=(j&&j.error)||'Не отправилось, попробуйте ещё раз.'; btn.disabled=false; btn.textContent='Отправить анкету'; }

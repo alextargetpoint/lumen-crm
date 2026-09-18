@@ -4013,7 +4013,8 @@ const server = http.createServer(async (req, res) => {
         brokers: (Array.isArray(b.brokers) ? b.brokers : []).slice(0, 50).map(x => ({ name: clip(x && x.name, 120), phone: clip(x && x.phone, 40), email: clip(x && x.email, 120) })).filter(x => x.name || x.phone || x.email),
         waNumber: clip(b.waNumber, 40), metaAccess: clip(b.metaAccess, 20), instagram: clip(b.instagram, 80),
         brandColor: clip(b.brandColorHex || b.brandColor, 20), managerName: clip(b.managerName, 120), managerPhone: clip(b.managerPhone, 40),
-        tone: clip(b.tone, 4000), inventory: clip(b.inventory, 300), telephony: clip(b.telephony, 20), crm: clip(b.crm, 40), comment: clip(b.comment, 4000),
+        tone: clip(b.tone, 4000), inventory: clip(b.inventory, 300), portal: clip(b.portal, 200),
+        telephony: clip(b.telephony, 20), crm: clip(b.crm, 40), existingAccounts: clip(b.existingAccounts, 60), android: clip(b.android, 30), comment: clip(b.comment, 4000),
         photos: { logo: photoArr(b.photos && b.photos.logo), scripts: photoArr(b.photos && b.photos.scripts), obj: photoArr(b.photos && b.photos.obj) },
       };
       const reg = store.getRegistry(); reg.briefs = reg.briefs || []; reg.briefs.unshift(rec); if (reg.briefs.length > 200) reg.briefs.length = 200; store.saveRegistry();

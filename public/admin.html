@@ -281,7 +281,9 @@ async function loadBriefs() {
         <div><b>Бренд:</b> цвет ${esc(b.brandColor||'—')} · менеджер ${esc(b.managerName||'—')} ${esc(b.managerPhone||'')}</div>
         ${b.tone?`<div><b>Тон/скрипты:</b> ${esc(b.tone)}</div>`:''}
         ${b.inventory?`<div><b>Объекты:</b> ${esc(b.inventory)}</div>`:''}
+        ${b.portal?`<div><b>Портал-агрегатор:</b> ${esc(b.portal)}</div>`:''}
         <div><b>Телефония:</b> ${esc(b.telephony||'—')} · <b>CRM:</b> ${esc(b.crm||'—')}</div>
+        <div><b>Действующие аккаунты:</b> ${esc(b.existingAccounts||'—')} · <b>Android:</b> ${esc(b.android||'—')}</div>
         ${b.comment?`<div><b>Комментарий:</b> ${esc(b.comment)}</div>`:''}
         ${(b.photos&&(b.photos.logo.length||b.photos.scripts.length||b.photos.obj.length))?`<div style="margin-top:8px">${b.photos.logo.length?'<div><b>Логотип:</b><br>'+photos(b.photos.logo)+'</div>':''}${b.photos.scripts.length?'<div><b>Скрипты:</b><br>'+photos(b.photos.scripts)+'</div>':''}${b.photos.obj.length?'<div><b>Объекты:</b><br>'+photos(b.photos.obj)+'</div>':''}</div>`:''}
         <div class="row" style="gap:8px;margin-top:12px">
