@@ -2729,9 +2729,9 @@ async function cryptoTick() {
   try {
     /* один запрос on-chain на сеть — тянем последние входящие на общий адрес, матчим по всем тенантам */
     let trcTx = null, ercTx = null;
-    /* матчим платежи в окне 24ч (даже по «протухшим» для UI заявкам — вывод с биржи может идти дольше 60 мин,
+    /* матчим платежи в окне 7 суток (даже по «протухшим» для UI заявкам — вывод с биржи может идти сутками,
        деньги не должны потеряться). Дёргаем API только если есть незачтённые заявки в этом окне. */
-    const MATCH_WINDOW = 24 * 3600e3;
+    const MATCH_WINDOW = 7 * 24 * 3600e3;
     const matchable = (t, now) => t.status !== 'confirmed' && t.createdAt && (now - t.createdAt < MATCH_WINDOW);
     const now0 = Date.now();
     let anyTrc = false, anyErc = false;
@@ -4965,6 +4965,69 @@ const server = http.createServer(async (req, res) => {
         return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, onboarded: !!(d.settings.agency && d.settings.agency.onboarded), createdAt: meta.createdAt || 0, lastActivity, sleeping: lastActivity > 0 && (Date.now() - lastActivity) > 7 * 864e5, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length };
       });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
+      /* СВЕРКА КРИПТО-ПЛАТЕЖЕЙ вручную: тянем ончейн (TRC20+ERC20) и зачисляем ЛЮБУЮ незачтённую заявку,
+         совпавшую по точной сумме, ИГНОРИРУЯ окно 24ч (вывод с биржи может идти сутками). Идемпотентно по txid.
+         Плюс ручной режим: {manual:{tid, amountUsd, chain, txid, purpose}} — если заявки в системе уже нет. */
+      if (p === '/api/admin/crypto-reconcile' && req.method === 'POST') {
+        const body = await readBody(req).catch(() => ({}));
+        const out = { credited: [], pending: [], scanned: { trc: 0, erc: 0 }, onchain: { trc: [], erc: [] } };
+        // ── ончейн-выборка ──
+        let trcTx = [], ercTx = [];
+        try {
+          const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=100&contract_address=${USDT_TRC20}`, { signal: AbortSignal.timeout(15000) });
+          const j = await r.json().catch(() => ({}));
+          trcTx = (j.data || []).map(tx => ({ txid: tx.transaction_id, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.block_timestamp || 0) })).filter(x => x.txid && x.amt > 0);
+        } catch (e) { out.trcError = e.message; }
+        const ekey = process.env.ETHERSCAN_KEY || ((store.getRegistry().platformCrypto || {}).etherscanKey);
+        if (ekey) {
+          try {
+            const r = await fetch(`https://api.etherscan.io/api?module=account&action=tokentx&contractaddress=${USDT_ERC20}&address=${CRYPTO_ETH}&page=1&offset=100&sort=desc&apikey=${ekey}`, { signal: AbortSignal.timeout(15000) });
+            const j = await r.json().catch(() => ({}));
+            ercTx = (Array.isArray(j.result) ? j.result : []).filter(tx => (tx.to || '').toLowerCase() === CRYPTO_ETH.toLowerCase()).map(tx => ({ txid: tx.hash, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.timeStamp || 0) * 1000 })).filter(x => x.txid && x.amt > 0);
+          } catch (e) { out.ercError = e.message; }
+        } else out.ercNote = 'ERC20 не сканируется: не задан ETHERSCAN_KEY';
+        out.scanned = { trc: trcTx.length, erc: ercTx.length };
+        out.onchain = { trc: trcTx.slice(0, 12), erc: ercTx.slice(0, 12) };
+        // ── ручной режим ──
+        if (body.manual && body.manual.tid && store.listTenants().includes(body.manual.tid)) {
+          const m = body.manual;
+          store.runInTenant(m.tid, () => {
+            const d2 = store.get(); const bl = d2.settings.billing = d2.settings.billing || billing.defBilling(); bl.cryptoTopups = bl.cryptoTopups || [];
+            const t = { id: 'tp_man_' + crypto.randomBytes(4).toString('hex'), amountUsd: +m.amountUsd || 0, exactAmount: +m.amountUsd || 0, chain: m.chain === 'erc20' ? 'erc20' : 'trc20', address: m.chain === 'erc20' ? CRYPTO_ETH : CRYPTO_TRON, purpose: m.purpose === 'subscription' ? 'subscription' : 'consumables', status: 'pending', txid: m.txid || null, createdAt: Date.now(), manual: true };
+            bl.cryptoTopups.unshift(t);
+            const isSub = t.purpose === 'subscription';
+            const done = isSub ? billing.confirmSubscriptionCrypto(d2, t, m.txid || ('manual_' + t.id), +m.amountUsd || 0) : billing.creditTopup(d2, t, m.txid || ('manual_' + t.id), +m.amountUsd || 0);
+            if (done) { try { notify(d2, { type: 'payment', level: 'success', title: isSub ? 'Подписка оплачена' : 'Баланс пополнен', text: `Платёж $${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) зачтён оператором вручную.` }); } catch (e) {} store.save(); }
+            out.credited.push({ tid: m.tid, manual: true, amount: t.creditedAmount, txid: t.txid, appliedTo: isSub ? 'subscription' : 'balance', ok: done });
+          });
+          return json(res, 200, out);
+        }
+        // ── авто-сверка по всем тенантам (в обход окна 24ч) ──
+        for (const tid of store.listTenants()) {
+          store.runInTenant(tid, () => {
+            const d2 = store.get(); const bl = (d2.settings || {}).billing; if (!bl || !bl.cryptoTopups) return;
+            let changed = false;
+            for (const t of bl.cryptoTopups) {
+              if (t.status === 'confirmed') continue;
+              const pool = t.chain === 'erc20' ? ercTx : trcTx;
+              const hit = pool.find(x => Math.abs(x.amt - t.exactAmount) < 0.0005 && !(bl.creditedTxids || []).includes(x.txid));
+              if (hit) {
+                const isSub = t.purpose === 'subscription';
+                const done = isSub ? billing.confirmSubscriptionCrypto(d2, t, hit.txid, hit.amt) : billing.creditTopup(d2, t, hit.txid, hit.amt);
+                if (done) {
+                  changed = true;
+                  out.credited.push({ tid, topupId: t.id, exactAmount: t.exactAmount, amount: t.creditedAmount, chain: t.chain, purpose: t.purpose, txid: hit.txid, appliedTo: isSub ? 'subscription' : 'balance' });
+                  try { notify(d2, { type: 'payment', level: 'success', title: isSub ? 'Подписка оплачена' : 'Баланс пополнен', text: `Платёж $${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) зачтён (ручная сверка оператором).` }); } catch (e) {}
+                }
+              } else {
+                out.pending.push({ tid, topupId: t.id, exactAmount: t.exactAmount, chain: t.chain, purpose: t.purpose || 'consumables', status: t.status, ageH: Math.round((Date.now() - (t.createdAt || 0)) / 3600e3) });
+              }
+            }
+            if (changed) store.save();
+          });
+        }
+        return json(res, 200, out);
+      }
       /* банк-перевод: очередь счетов «на проверке» (клиент прикрепил квитанцию) + подтверждение оплаты админом */
       /* анкеты подключения агентств (публичная форма /brief) */
       if (p === '/api/admin/briefs' && req.method === 'GET') { return json(res, 200, { ok: true, briefs: (reg.briefs || []).slice(0, 100) }); }

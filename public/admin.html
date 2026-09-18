@@ -222,6 +222,11 @@
       <div class="muted" style="font-size:12.5px;margin-top:6px">Клиент оплатил по реквизитам и прикрепил квитанцию. Проверьте квитанцию и подтвердите — подписка активируется, клиент получит уведомление.</div>
       <div id="invPending" style="margin-top:12px;font-size:13.5px"></div>
     </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><b>Крипто-платежи · ручная сверка</b><button class="ghost" id="cryReconcile">Сверить сейчас</button></div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Если клиент оплатил криптой (USDT), а зачисление не пришло — нажмите. Система тянет входящие ончейн (TRC20/ERC20) и зачисляет любую совпавшую заявку по точной сумме, в обход окна ожидания. Идемпотентно — повторные нажатия безопасны.</div>
+      <div id="cryOut" style="margin-top:12px;font-size:13px"></div>
+    </div>
   </div>
 </div>
 
@@ -327,6 +332,28 @@ async function loadInvoices() {
   } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
 }
 document.addEventListener('click', (e) => { if (e.target && e.target.id === 'invReload') loadInvoices(); });
+
+// ── Крипто-платежи: ручная сверка ──
+async function cryptoReconcile() {
+  const out = $('#cryOut'); const btn = $('#cryReconcile');
+  out.innerHTML = '<span class="muted">Тяну ончейн и сверяю…</span>'; if (btn) { btn.disabled = true; btn.textContent = 'Сверяю…'; }
+  try {
+    const r = await api('/api/admin/crypto-reconcile', { method: 'POST', body: JSON.stringify({}) });
+    const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '';
+    if (r.credited && r.credited.length) {
+      html += `<div style="color:var(--good,#3f9d5a);font-weight:600;margin-bottom:8px">✓ Зачислено платежей: ${r.credited.length}</div>`;
+      html += r.credited.map(c => `<div style="padding:6px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))"><b>${money(c.amount)}</b> · ${esc((c.chain||'').toUpperCase())} · ${c.appliedTo === 'subscription' ? 'подписка' : 'баланс'} · тенант <code>${esc(c.tid)}</code><div class="muted" style="font-size:11.5px">tx ${esc(String(c.txid||'').slice(0,24))}…</div></div>`).join('');
+    } else {
+      html += '<div class="muted">Новых совпадений нет (всё уже зачислено или платёж ещё не в блокчейне).</div>';
+    }
+    html += `<div class="muted" style="font-size:11.5px;margin-top:10px">Ончейн просканировано: TRC20 — ${(r.scanned||{}).trc||0} тр., ERC20 — ${(r.scanned||{}).erc||0} тр.${r.ercNote ? ' · '+esc(r.ercNote) : ''}</div>`;
+    if (r.pending && r.pending.length) html += `<div class="muted" style="font-size:11.5px;margin-top:4px">Ожидают оплаты (не найдены ончейн): ${r.pending.length} — ${r.pending.slice(0,6).map(p => money(p.exactAmount)+'/'+(p.chain||'').toUpperCase()).join(', ')}</div>`;
+    out.innerHTML = html;
+  } catch (e) { out.innerHTML = '<span style="color:var(--bad,#d66)">Ошибка: ' + esc(e.message) + '</span>'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Сверить сейчас'; }
+}
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'cryReconcile') cryptoReconcile(); });
 
 // ── Техподдержка ──
 async function loadSupport() {
