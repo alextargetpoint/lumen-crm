@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lumen — анкета подключения</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<style>
+  :root{ --bg:#070A12; --panel:#0e1526; --panel2:#111a30; --ink:#f4f3f1; --mut:#9aa3b8; --mut2:#6b7488;
+    --acc:#4C7DFF; --acc2:#2563EB; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.06); --ok:#4ADE80; --r:14px; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  body{ background:
+    radial-gradient(1100px 700px at 15% -5%, rgba(37,99,235,.18), transparent),
+    radial-gradient(900px 600px at 95% 5%, rgba(76,125,255,.12), transparent), var(--bg); min-height:100vh; }
+  .wrap{ max-width:640px; margin:0 auto; padding:28px 18px 60px; }
+  .head{ text-align:center; margin-bottom:22px; }
+  .spark{ width:44px; height:52px; margin:0 auto 12px; display:block; }
+  .h1{ font-size:24px; font-weight:800; letter-spacing:-.02em; margin:0 0 6px; }
+  .sub{ font-size:13.5px; color:var(--mut); line-height:1.5; max-width:460px; margin:0 auto; }
+  .saved{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ok); margin-top:12px; opacity:0; transition:opacity .3s; }
+  .saved.on{ opacity:1; }
+  .saved i{ width:6px; height:6px; border-radius:50%; background:var(--ok); }
+  .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:var(--r); padding:18px 16px; margin-bottom:14px; }
+  .card-h{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .card-n{ flex:0 0 auto; width:26px; height:26px; border-radius:8px; background:rgba(76,125,255,.16); color:#9db9ff; font-weight:800; font-size:13px; display:grid; place-items:center; }
+  .card-t{ font-size:15px; font-weight:700; }
+  .card-t .opt{ font-size:11px; font-weight:500; color:var(--mut2); margin-left:6px; }
+  label.fl{ display:block; margin-bottom:12px; }
+  label.fl > span{ display:block; font-size:12.5px; color:var(--mut); margin-bottom:6px; }
+  label.fl > span b{ color:#ff8a8a; font-weight:700; }
+  input[type=text], input[type=tel], input[type=email], input[type=url], textarea, select{
+    width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:11px; background:#0a1020; color:var(--ink);
+    font-size:15px; font-family:inherit; outline:none; transition:border-color .15s, background .15s; }
+  input:focus, textarea:focus, select:focus{ border-color:var(--acc); background:#0c1426; }
+  textarea{ resize:vertical; min-height:84px; line-height:1.5; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:520px){ .row2{ grid-template-columns:1fr; } }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ padding:9px 13px; border:1px solid var(--line); border-radius:999px; font-size:13px; color:var(--mut); cursor:pointer; user-select:none; transition:all .15s; background:#0a1020; }
+  .chip.on{ background:rgba(76,125,255,.18); border-color:var(--acc); color:#cdddff; }
+  .brk{ border:1px solid var(--line2); border-radius:12px; padding:12px; margin-bottom:10px; position:relative; background:rgba(255,255,255,.015); }
+  .brk .brk-del{ position:absolute; top:8px; right:8px; width:26px; height:26px; border:0; background:rgba(255,255,255,.05); color:var(--mut); border-radius:7px; cursor:pointer; font-size:15px; }
+  .brk .brk-del:hover{ color:#ff8a8a; }
+  .addbtn{ width:100%; padding:11px; border:1px dashed var(--line); border-radius:11px; background:transparent; color:var(--acc); font-size:13.5px; font-weight:600; cursor:pointer; }
+  .addbtn:hover{ border-color:var(--acc); background:rgba(76,125,255,.06); }
+  .radio{ display:flex; flex-direction:column; gap:8px; }
+  .radio label{ display:flex; gap:10px; align-items:flex-start; font-size:13.5px; line-height:1.45; color:var(--ink); padding:11px 12px; border:1px solid var(--line); border-radius:11px; cursor:pointer; background:#0a1020; }
+  .radio label.on{ border-color:var(--acc); background:rgba(76,125,255,.08); }
+  .radio input{ margin-top:2px; flex:0 0 auto; }
+  .hint{ font-size:11.5px; color:var(--mut2); line-height:1.5; margin-top:6px; }
+  .up{ display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
+  .up-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; width:84px; height:84px; border:1px dashed var(--line); border-radius:12px; color:var(--mut); font-size:11px; cursor:pointer; background:#0a1020; text-align:center; }
+  .up-btn:hover{ border-color:var(--acc); color:var(--acc); }
+  .up-btn svg{ width:20px; height:20px; }
+  .thumb{ width:84px; height:84px; border-radius:12px; object-fit:cover; position:relative; border:1px solid var(--line); }
+  .thumb-wrap{ position:relative; width:84px; height:84px; }
+  .thumb-wrap .rm{ position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:#e0574a; color:#fff; border:2px solid var(--bg); cursor:pointer; font-size:13px; line-height:1; display:grid; place-items:center; }
+  .up-load{ font-size:11px; color:var(--acc); }
+  .colorrow{ display:flex; align-items:center; gap:12px; }
+  .colorrow input[type=color]{ width:52px; height:44px; border:1px solid var(--line); border-radius:11px; background:#0a1020; padding:4px; cursor:pointer; }
+  .submit{ width:100%; padding:16px; border:0; border-radius:13px; background:linear-gradient(180deg,var(--acc),var(--acc2)); color:#fff; font-size:16px; font-weight:800; cursor:pointer; margin-top:6px; box-shadow:0 12px 30px -12px rgba(37,99,235,.7); }
+  .submit:disabled{ opacity:.6; cursor:default; }
+  .footnote{ text-align:center; font-size:11.5px; color:var(--mut2); margin-top:16px; line-height:1.5; }
+  .done{ text-align:center; padding:50px 20px; }
+  .done .ok{ width:72px; height:72px; border-radius:50%; background:rgba(74,222,128,.14); display:grid; place-items:center; margin:0 auto 18px; }
+  .done .ok svg{ width:36px; height:36px; stroke:var(--ok); }
+  .done h2{ font-size:22px; font-weight:800; margin:0 0 8px; }
+  .done p{ color:var(--mut); font-size:14px; line-height:1.6; max-width:420px; margin:0 auto; }
+  .err{ color:#ff8a8a; font-size:13px; text-align:center; margin-top:10px; min-height:16px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="head">
+    <svg class="spark" viewBox="0 0 100 120" aria-hidden="true"><defs><linearGradient id="lg" x1="20%" y1="8%" x2="80%" y2="95%"><stop offset="0%" stop-color="#8fb0ff"/><stop offset="55%" stop-color="#4C7DFF"/><stop offset="100%" stop-color="#2563EB"/></linearGradient></defs><path fill="none" stroke="url(#lg)" stroke-width="2.6" stroke-linejoin="round" d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg>
+    <div class="h1">Анкета подключения</div>
+    <div class="sub">Заполните — и мы настроим Lumen CRM под ваше агентство: подключим WhatsApp, заведём брокеров, соберём каскады под ваш стиль. Анкета сохраняется сама на каждом шаге.</div>
+    <div class="saved" id="savedTag"><i></i>Черновик сохранён</div>
+  </div>
+
+  <form id="form" autocomplete="on">
+    <!-- 1. Агентство -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">1</div><div class="card-t">Агентство</div></div>
+      <label class="fl"><span>Название (как показывать клиентам) <b>*</b></span><input type="text" name="agencyName" required placeholder="напр. One Agency"></label>
+      <label class="fl"><span>Направления / рынки</span>
+        <div class="chips" id="geoChips"></div>
+        <input type="text" name="geoOther" placeholder="ещё направления через запятую" style="margin-top:8px">
+      </label>
+      <div class="row2">
+        <label class="fl"><span>Основатель — имя <b>*</b></span><input type="text" name="founderName" required placeholder="Имя Фамилия"></label>
+        <label class="fl"><span>Контакт основателя <b>*</b></span><input type="text" name="founderContact" required placeholder="Telegram / телефон"></label>
+      </div>
+    </div>
+
+    <!-- 2. Брокеры -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">2</div><div class="card-t">Брокеры <span class="opt">под них заведём под-аккаунты</span></div></div>
+      <div id="brokers"></div>
+      <button type="button" class="addbtn" id="addBroker">+ Добавить брокера</button>
+    </div>
+
+    <!-- 3. Каналы -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">3</div><div class="card-t">Каналы связи</div></div>
+      <label class="fl"><span>Номер для официального WhatsApp (не тестовый)</span><input type="tel" name="waNumber" placeholder="+971 …"></label>
+      <label class="fl"><span>Доступ к Meta / Business Manager (для WhatsApp API, Lead Ads, комментариев)</span>
+        <div class="radio" id="metaAccess">
+          <label><input type="radio" name="metaAccess" value="partner"><span>Добавлю вас партнёром-админом в Business Manager (пришлёте ваш Business ID) — <b style="color:var(--ok)">безопаснее</b></span></label>
+          <label><input type="radio" name="metaAccess" value="later"><span>Передам доступ отдельно (напишем в личке защищённо)</span></label>
+        </div>
+        <div class="hint">Пароли в анкете не указывайте — доступы передаются отдельным защищённым каналом.</div>
+      </label>
+      <label class="fl"><span>Instagram (рабочий, @username)</span><input type="text" name="instagram" placeholder="@youragency"></label>
+    </div>
+
+    <!-- 4. Бренд -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">4</div><div class="card-t">Бренд</div></div>
+      <label class="fl"><span>Логотип (PNG/JPG)</span>
+        <div class="up" id="logoUp"></div>
+      </label>
+      <label class="fl"><span>Фирменный цвет</span>
+        <div class="colorrow"><input type="color" name="brandColor" value="#2563EB"><input type="text" name="brandColorHex" placeholder="#2563EB" style="max-width:140px"></div>
+      </label>
+      <div class="row2">
+        <label class="fl"><span>Менеджер для подборок — имя</span><input type="text" name="managerName" placeholder="Имя"></label>
+        <label class="fl"><span>Телефон менеджера</span><input type="tel" name="managerPhone" placeholder="+…"></label>
+      </div>
+    </div>
+
+    <!-- 5. Тон и скрипты -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">5</div><div class="card-t">Тон и скрипты</div></div>
+      <label class="fl"><span>Как брокеры пишут клиентам — 1-2 реальных примера (чтобы ИИ звучал как вы, а не шаблонно)</span><textarea name="tone" placeholder="Вставьте пару типичных сообщений…"></textarea></label>
+      <label class="fl"><span>Или приложите скриншоты переписки</span>
+        <div class="up" id="scriptsUp"></div>
+      </label>
+    </div>
+
+    <!-- 6. Объекты -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">6</div><div class="card-t">Объекты <span class="opt">если нужны подборки</span></div></div>
+      <label class="fl"><span>Reelly-ключ / ссылка на список объектов / CSV</span><input type="text" name="inventory" placeholder="ключ, ссылка или «пришлю файлом»"></label>
+      <label class="fl"><span>Фото объектов / материалы (необязательно)</span>
+        <div class="up" id="objUp"></div>
+      </label>
+    </div>
+
+    <!-- 7. Прочее -->
+    <div class="card">
+      <div class="card-h"><div class="card-n">7</div><div class="card-t">Прочее <span class="opt">необязательно</span></div></div>
+      <div class="row2">
+        <label class="fl"><span>Нужна телефония (звонки+запись)?</span><select name="telephony"><option value="">—</option><option>Да</option><option>Нет</option><option>Позже</option></select></label>
+        <label class="fl"><span>Текущая CRM (для переноса базы)</span><select name="crm"><option value="">—</option><option>amoCRM</option><option>Bitrix24</option><option>Таблицы</option><option>Нет</option><option>Другое</option></select></label>
+      </div>
+      <label class="fl"><span>Комментарий / что важно</span><textarea name="comment" placeholder="Любые пожелания…"></textarea></label>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn">Отправить анкету</button>
+    <div class="err" id="err"></div>
+    <div class="footnote">Данные уходят только команде Lumen для настройки вашего аккаунта. Пароли/доступы передаются отдельно.</div>
+  </form>
+</div>
+
+<div class="wrap done" id="doneView" style="display:none">
+  <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+  <h2>Анкета отправлена!</h2>
+  <p>Спасибо. Мы всё получили и свяжемся, чтобы настроить ваш аккаунт Lumen CRM и завести брокеров. Обычно это занимает 1 рабочий день.</p>
+</div>
+
+<script>
+(function(){
+  var KEY='lumen_brief_v1';
+  var form=document.getElementById('form');
+  var savedTag=document.getElementById('savedTag');
+  var GEOS=['Дубай','Абу-Даби','Бали','Пхукет','Испания','Таиланд','Оман','Турция','Черногория'];
+  var state=load()||{ geos:[], brokers:[{}], photos:{logo:[],scripts:[],obj:[]} };
+  if(!state.photos) state.photos={logo:[],scripts:[],obj:[]};
+  if(!state.brokers||!state.brokers.length) state.brokers=[{}];
+  if(!state.geos) state.geos=[];
+
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } }
+  var saveT;
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} clearTimeout(saveT); savedTag.classList.add('on'); saveT=setTimeout(function(){ savedTag.classList.remove('on'); },1400); }
+
+  /* --- гео-чипы --- */
+  var geoBox=document.getElementById('geoChips');
+  GEOS.forEach(function(g){ var c=document.createElement('div'); c.className='chip'+(state.geos.indexOf(g)>=0?' on':''); c.textContent=g;
+    c.onclick=function(){ var i=state.geos.indexOf(g); if(i>=0)state.geos.splice(i,1); else state.geos.push(g); c.classList.toggle('on'); save(); }; geoBox.appendChild(c); });
+
+  /* --- восстановление обычных полей --- */
+  Array.prototype.forEach.call(form.elements, function(el){
+    if(!el.name || el.type==='radio' || el.type==='file') return;
+    if(state[el.name]!=null) el.value=state[el.name];
+    el.addEventListener('input', function(){ state[el.name]=el.value; if(el.name==='brandColor'){ var hx=form.brandColorHex; if(hx&&!state.brandColorHex){hx.value=el.value; state.brandColorHex=el.value;} } save(); });
+  });
+  /* meta radio */
+  if(state.metaAccess){ var r=form.querySelector('input[name=metaAccess][value="'+state.metaAccess+'"]'); if(r){ r.checked=true; r.closest('label').classList.add('on'); } }
+  form.querySelectorAll('input[name=metaAccess]').forEach(function(r){ r.addEventListener('change', function(){ state.metaAccess=r.value; form.querySelectorAll('#metaAccess label').forEach(function(l){l.classList.remove('on');}); r.closest('label').classList.add('on'); save(); }); });
+
+  /* --- брокеры --- */
+  var brokersBox=document.getElementById('brokers');
+  function renderBrokers(){
+    brokersBox.innerHTML='';
+    state.brokers.forEach(function(b,i){
+      var d=document.createElement('div'); d.className='brk';
+      d.innerHTML='<button type="button" class="brk-del" title="Убрать">×</button>'+
+        '<label class="fl"><span>Имя брокера '+(i+1)+'</span><input type="text" data-bk="name" value="'+esc(b.name||'')+'" placeholder="Имя Фамилия"></label>'+
+        '<div class="row2"><label class="fl"><span>Телефон</span><input type="tel" data-bk="phone" value="'+esc(b.phone||'')+'" placeholder="+…"></label>'+
+        '<label class="fl" style="margin-bottom:0"><span>E-mail</span><input type="email" data-bk="email" value="'+esc(b.email||'')+'" placeholder="broker@…"></label></div>';
+      d.querySelectorAll('[data-bk]').forEach(function(inp){ inp.addEventListener('input', function(){ state.brokers[i][inp.dataset.bk]=inp.value; save(); }); });
+      d.querySelector('.brk-del').onclick=function(){ if(state.brokers.length<=1){ state.brokers=[{}]; } else { state.brokers.splice(i,1); } renderBrokers(); save(); };
+      brokersBox.appendChild(d);
+    });
+  }
+  document.getElementById('addBroker').onclick=function(){ state.brokers.push({}); renderBrokers(); save(); };
+  renderBrokers();
+
+  /* --- загрузка фото (логотип / скрипты / объекты) --- */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function setupUp(boxId, key, multi){
+    var box=document.getElementById(boxId);
+    function draw(){
+      box.innerHTML='';
+      (state.photos[key]||[]).forEach(function(url,idx){
+        var w=document.createElement('div'); w.className='thumb-wrap';
+        w.innerHTML='<img class="thumb" src="'+esc(url)+'"><button type="button" class="rm">×</button>';
+        w.querySelector('.rm').onclick=function(){ state.photos[key].splice(idx,1); draw(); save(); };
+        box.appendChild(w);
+      });
+      if(multi || !(state.photos[key]||[]).length){
+        var btn=document.createElement('div'); btn.className='up-btn';
+        btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Фото</span>';
+        btn.onclick=function(){ pick(key, multi, draw); }; box.appendChild(btn);
+      }
+    }
+    draw();
+  }
+  function pick(key, multi, draw){
+    var inp=document.createElement('input'); inp.type='file'; inp.accept='image/png,image/jpeg,image/webp'; if(multi) inp.multiple=true;
+    inp.onchange=function(){
+      var files=Array.prototype.slice.call(inp.files||[]); if(!files.length) return;
+      var box=document.getElementById(key==='logo'?'logoUp':key==='scripts'?'scriptsUp':'objUp');
+      files.forEach(function(f){
+        if(f.size>10*1024*1024){ alert('Файл до 10 МБ: '+f.name); return; }
+        var ld=document.createElement('div'); ld.className='up-btn'; ld.innerHTML='<span class="up-load">загрузка…</span>'; box.appendChild(ld);
+        var rd=new FileReader();
+        rd.onload=function(){
+          fetch('/api/brief/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.name,data:rd.result})})
+            .then(function(r){return r.json();}).then(function(j){
+              if(j&&j.url){ if(!multi) state.photos[key]=[]; state.photos[key].push(j.url); save(); draw(); }
+              else { alert('Не загрузилось: '+((j&&j.error)||'')); draw(); }
+            }).catch(function(){ alert('Ошибка загрузки'); draw(); });
+        };
+        rd.readAsDataURL(f);
+      });
+    };
+    inp.click();
+  }
+  setupUp('logoUp','logo',false);
+  setupUp('scriptsUp','scripts',true);
+  setupUp('objUp','obj',true);
+
+  /* --- отправка --- */
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var err=document.getElementById('err'); err.textContent='';
+    if(!state.agencyName || !state.founderName || !state.founderContact){ err.textContent='Заполните обязательные поля (название агентства, основатель, контакт).'; window.scrollTo({top:0,behavior:'smooth'}); return; }
+    var btn=document.getElementById('submitBtn'); btn.disabled=true; btn.textContent='Отправляю…';
+    var payload=Object.assign({}, state);
+    fetch('/api/brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j&&j.ok){ try{localStorage.removeItem(KEY);}catch(e){} document.getElementById('wrap').style.display='none'; document.getElementById('doneView').style.display='block'; window.scrollTo(0,0); }
+        else { err.textContent=(j&&j.error)||'Не отправилось, попробуйте ещё раз.'; btn.disabled=false; btn.textContent='Отправить анкету'; }
+      }).catch(function(){ err.textContent='Нет связи. Попробуйте ещё раз.'; btn.disabled=false; btn.textContent='Отправить анкету'; });
+  });
+})();
+</script>
+</body>
+</html>

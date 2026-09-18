@@ -70,6 +70,7 @@
     <button data-tab="release">🚀 Релиз</button>
     <button data-tab="support">🎧 Поддержка</button>
     <button data-tab="invoices">🧾 Счета</button>
+    <button data-tab="briefs">📋 Анкеты</button>
   </div>
 
   <div class="sect on" id="sect-tenants">
@@ -207,6 +208,14 @@
     </div>
   </div>
 
+  <div class="sect" id="sect-briefs">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Анкеты подключения агентств</b><button class="ghost" id="brReload">Обновить</button></div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Заявки с публичной формы <code>/brief</code>. Открывайте, настраивайте аккаунт агентства, отмечайте статус.</div>
+      <div id="brList" style="margin-top:12px;font-size:13.5px"></div>
+    </div>
+  </div>
+
   <div class="sect" id="sect-invoices">
     <div class="card">
       <div class="row" style="justify-content:space-between"><b>Счета на проверке (банк-перевод)</b><button class="ghost" id="invReload">Обновить</button></div>
@@ -247,7 +256,47 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'release') loadRelease();
   if (b.dataset.tab === 'support') loadSupport();
   if (b.dataset.tab === 'invoices') loadInvoices();
+  if (b.dataset.tab === 'briefs') loadBriefs();
 }));
+
+// ── Анкеты подключения агентств ──
+async function loadBriefs() {
+  const host = $('#brList'); host.innerHTML = '<span class="muted">Загрузка…</span>';
+  try {
+    const r = await api('/api/admin/briefs');
+    const list = r.briefs || [];
+    if (!list.length) { host.innerHTML = '<div class="muted" style="padding:10px 0">Анкет пока нет. Ссылка на форму: <code>' + location.origin + '/brief</code></div>'; return; }
+    const fmt = (ts) => { try { return new Date(ts).toLocaleString('ru-RU'); } catch (e) { return ''; } };
+    const stLbl = { new: 'новая', progress: 'в работе', done: 'готово' };
+    const photos = (arr) => (arr || []).map(u => '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" style="width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--line);margin:3px"></a>').join('');
+    host.innerHTML = list.map(b => `<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:10px;padding:0 12px">
+      <summary style="cursor:pointer;padding:12px 0;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <span><b>${esc(b.agencyName)}</b> · ${esc(b.founderName)} <span class="muted" style="font-size:12px">(${esc(b.founderContact)})</span></span>
+        <span class="muted" style="font-size:11.5px">${(b.brokers||[]).length} брок. · ${esc((b.geos||[]).join(', ')||'—')} · ${fmt(b.at)} · <b>${stLbl[b.status]||b.status}</b></span>
+      </summary>
+      <div style="padding:4px 0 14px;font-size:13px;line-height:1.6">
+        ${b.geoOther?`<div><b>Ещё рынки:</b> ${esc(b.geoOther)}</div>`:''}
+        <div><b>Брокеры:</b> ${(b.brokers||[]).map(x=>esc(x.name)+(x.phone?' '+esc(x.phone):'')+(x.email?' · '+esc(x.email):'')).join('<br>')||'—'}</div>
+        <div><b>WhatsApp:</b> ${esc(b.waNumber||'—')} · <b>Meta:</b> ${esc(b.metaAccess||'—')} · <b>Instagram:</b> ${esc(b.instagram||'—')}</div>
+        <div><b>Бренд:</b> цвет ${esc(b.brandColor||'—')} · менеджер ${esc(b.managerName||'—')} ${esc(b.managerPhone||'')}</div>
+        ${b.tone?`<div><b>Тон/скрипты:</b> ${esc(b.tone)}</div>`:''}
+        ${b.inventory?`<div><b>Объекты:</b> ${esc(b.inventory)}</div>`:''}
+        <div><b>Телефония:</b> ${esc(b.telephony||'—')} · <b>CRM:</b> ${esc(b.crm||'—')}</div>
+        ${b.comment?`<div><b>Комментарий:</b> ${esc(b.comment)}</div>`:''}
+        ${(b.photos&&(b.photos.logo.length||b.photos.scripts.length||b.photos.obj.length))?`<div style="margin-top:8px">${b.photos.logo.length?'<div><b>Логотип:</b><br>'+photos(b.photos.logo)+'</div>':''}${b.photos.scripts.length?'<div><b>Скрипты:</b><br>'+photos(b.photos.scripts)+'</div>':''}${b.photos.obj.length?'<div><b>Объекты:</b><br>'+photos(b.photos.obj)+'</div>':''}</div>`:''}
+        <div class="row" style="gap:8px;margin-top:12px">
+          <button data-brst="${esc(b.id)}|progress">В работу</button>
+          <button data-brst="${esc(b.id)}|done">Готово</button>
+        </div>
+      </div>
+    </details>`).join('');
+    host.querySelectorAll('[data-brst]').forEach(btn => btn.addEventListener('click', async () => {
+      const [id, status] = btn.dataset.brst.split('|');
+      await api('/api/admin/brief-status', { method: 'POST', body: JSON.stringify({ id, status }) }); loadBriefs();
+    }));
+  } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
+}
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'brReload') loadBriefs(); });
 
 // ── Счета на проверке (банк-перевод) ──
 async function loadInvoices() {

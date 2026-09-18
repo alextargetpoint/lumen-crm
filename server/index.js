@@ -3385,6 +3385,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /* публичная анкета подключения агентства (чистый URL /brief) */
+    if ((p === '/brief' || p === '/onboard') && req.method === 'GET') {
+      try { const html = fs.readFileSync(path.join(PUBLIC, 'brief.html'), 'utf8'); res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(html); }
+      catch (e) { res.writeHead(404); res.end('not found'); }
+      return;
+    }
     /* ---------------- юридические страницы (публичные, для App Review Meta) ---------------- */
     if ((p === '/privacy' || p === '/terms' || p === '/data-deletion') && req.method === 'GET') {
       const f = p === '/privacy' ? 'privacy.html' : p === '/terms' ? 'terms.html' : 'data-deletion.html';
@@ -3978,6 +3984,41 @@ const server = http.createServer(async (req, res) => {
     /* ---------------- лист ожидания (предрегистрация, публично) ---------------- */
     if (p === '/api/waitlist/count' && req.method === 'GET') {
       return json(res, 200, { count: (db.waitlist || []).length });
+    }
+    /* ── Публичная анкета подключения агентства (бета-онбординг) → реестр платформы + бот поддержки ── */
+    if (p === '/api/brief/upload' && req.method === 'POST') {
+      if (!rateHit('brup:' + (clientIp(req) || 'x'), 50, 60000)) return json(res, 429, { error: 'слишком часто' });
+      const b = await readBody(req);
+      const mm = String((b && b.data) || '').match(/^data:image\/(png|jpe?g|webp);base64,(.*)$/);
+      if (!mm) return json(res, 400, { error: 'нужен PNG/JPG/WebP' });
+      const buf = Buffer.from(mm[2], 'base64');
+      if (!buf.length || buf.length > 10 * 1024 * 1024) return json(res, 400, { error: 'файл до 10 МБ' });
+      const ext = mm[1] === 'jpeg' ? 'jpg' : mm[1];
+      const dir = path.join(PUBLIC, 'assets', 'briefs'); try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      const fn = 'b_' + Date.now().toString(36) + crypto.randomBytes(4).toString('hex') + '.' + ext;
+      try { fs.writeFileSync(path.join(dir, fn), buf); } catch (e) { return json(res, 500, { error: 'не сохранилось' }); }
+      return json(res, 200, { url: '/assets/briefs/' + fn });
+    }
+    if (p === '/api/brief' && req.method === 'POST') {
+      if (!rateHit('brief:' + (clientIp(req) || 'x'), 6, 60000)) return json(res, 429, { error: 'слишком часто' });
+      const b = await readBody(req);
+      if (b && String(b.company || '').trim()) return json(res, 200, { ok: true }); // honeypot
+      if (!String((b && b.agencyName) || '').trim()) return json(res, 400, { error: 'нужно название агентства' });
+      const clip = (s, n) => String(s == null ? '' : s).slice(0, n);
+      const photoArr = (a) => Array.isArray(a) ? a.map(x => String(x)).filter(x => /^\/assets\/briefs\/[a-z0-9_.]+$/i.test(x)).slice(0, 20) : [];
+      const rec = {
+        id: 'brf_' + crypto.randomBytes(5).toString('hex'), at: Date.now(), status: 'new', ip: clientIp(req),
+        agencyName: clip(b.agencyName, 160), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => clip(x, 40)).slice(0, 20), geoOther: clip(b.geoOther, 200),
+        founderName: clip(b.founderName, 120), founderContact: clip(b.founderContact, 120),
+        brokers: (Array.isArray(b.brokers) ? b.brokers : []).slice(0, 50).map(x => ({ name: clip(x && x.name, 120), phone: clip(x && x.phone, 40), email: clip(x && x.email, 120) })).filter(x => x.name || x.phone || x.email),
+        waNumber: clip(b.waNumber, 40), metaAccess: clip(b.metaAccess, 20), instagram: clip(b.instagram, 80),
+        brandColor: clip(b.brandColorHex || b.brandColor, 20), managerName: clip(b.managerName, 120), managerPhone: clip(b.managerPhone, 40),
+        tone: clip(b.tone, 4000), inventory: clip(b.inventory, 300), telephony: clip(b.telephony, 20), crm: clip(b.crm, 40), comment: clip(b.comment, 4000),
+        photos: { logo: photoArr(b.photos && b.photos.logo), scripts: photoArr(b.photos && b.photos.scripts), obj: photoArr(b.photos && b.photos.obj) },
+      };
+      const reg = store.getRegistry(); reg.briefs = reg.briefs || []; reg.briefs.unshift(rec); if (reg.briefs.length > 200) reg.briefs.length = 200; store.saveRegistry();
+      try { const tok = supportBotToken(); const chat = reg.supportBot && reg.supportBot.founderChat; if (tok && chat) fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: '📋 Новая анкета подключения\n' + rec.agencyName + ' · ' + rec.founderName + ' (' + rec.founderContact + ')\nБрокеров: ' + rec.brokers.length + ' · рынки: ' + (rec.geos.join(', ') || '—') }) }).catch(() => {}); } catch (e) {}
+      return json(res, 200, { ok: true });
     }
     if (p === '/api/waitlist' && req.method === 'POST') {
       if (!rateHit('wl:' + (clientIp(req) || 'x'), 8, 60000)) return json(res, 429, { error: 'слишком часто' });
@@ -4915,6 +4956,9 @@ const server = http.createServer(async (req, res) => {
       });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
       /* банк-перевод: очередь счетов «на проверке» (клиент прикрепил квитанцию) + подтверждение оплаты админом */
+      /* анкеты подключения агентств (публичная форма /brief) */
+      if (p === '/api/admin/briefs' && req.method === 'GET') { return json(res, 200, { ok: true, briefs: (reg.briefs || []).slice(0, 100) }); }
+      if (p === '/api/admin/brief-status' && req.method === 'POST') { const b = await readBody(req); const br = (reg.briefs || []).find(x => x.id === b.id); if (br) { br.status = ['new', 'progress', 'done'].includes(b.status) ? b.status : br.status; store.saveRegistry(); } return json(res, 200, { ok: true }); }
       if (p === '/api/admin/invoices-pending' && req.method === 'GET') {
         const out = [];
         for (const tid of store.listTenants()) store.runInTenant(tid, () => {
