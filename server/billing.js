@@ -10,7 +10,7 @@ const store = require('./store');
 
 /* ---- прайс (per-month $, зеркалит landing.html) ---- */
 const PRICES = {
-  broker:  { name: 'Брокер',   monthly: 49,  yearly: 39,  seatsIncluded: 1, seat: 0,  seatYearly: 0,  leadCap: 400 },
+  broker:  { name: 'Брокер',   monthly: 80,  yearly: 64,  seatsIncluded: 1, seat: 0,  seatYearly: 0,  leadCap: 400 },
   /* синхронно с публичным сайтом (land.html): $200/мес за команду 5 брокеров + руководитель, внедрение $200 разово */
   agency:  { name: 'Агентство', monthly: 200, yearly: 160, seatsIncluded: 6, seat: 25, seatYearly: 20, leadCap: null, setup: 200 },
   network: { name: 'Сеть',     custom: true },

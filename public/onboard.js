@@ -261,7 +261,7 @@
 
   function stepPricing() {
     const solo = S.edition === 'solo';
-    const base = solo ? 99 : 200;                 // включено: solo 1 место / агентство 6 мест
+    const base = solo ? 80 : 200;                 // включено: solo 1 место / агентство 6 мест
     const seatsIncl = solo ? 1 : 6, seatPrice = 25;
     const seats = Math.max(seatsIncl, +S._seats || seatsIncl);
     const extra = Math.max(0, seats - seatsIncl);
