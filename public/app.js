@@ -12788,6 +12788,34 @@ PAGES.billing = async (root) => {
   const q = B.quote;
   const u = B.usageLive;
 
+  // кастомные стрелки ±  для number-инпутов (без нативных браузерных спиннеров)
+  const CHV_UP = '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 5l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CHV_DN = '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const numField = inputHtml => `<div class="numf">${inputHtml}<span class="numf-spin"><button type="button" class="numf-up" tabindex="-1" aria-label="Больше">${CHV_UP}</button><button type="button" class="numf-down" tabindex="-1" aria-label="Меньше">${CHV_DN}</button></span></div>`;
+
+  // ПРАВАЯ карточка пары «факт ↔ прогноз»: симулятор расходников по объёму + рост когорт
+  const sim2Card = (() => {
+    const rt = (u.rates || {});
+    const rAi = +rt.aiMsg || 0.002, rTel = +rt.telephonyMin || 0.02, rStt = +rt.sttMin || 0.006, rWa = +rt.wa || 0.04;
+    const F2 = [
+      { id: 'sim2Leads', lbl: 'Лидов в месяц',            val: 350, min: 1, step: 10 },
+      { id: 'sim2Sleep', lbl: 'Спящая база, %',           val: 50,  min: 0, max: 100, step: 5 },
+      { id: 'sim2Call',  lbl: 'Успешных звонков, % лидов', val: 22,  min: 0, max: 100, step: 1 },
+      { id: 'sim2Min',   lbl: 'Минут на звонок',          val: 3,   min: 1, step: 1 },
+      { id: 'sim2In',    lbl: 'Входящих ИИ на лида',      val: 6,   min: 1, step: 1 },
+      { id: 'sim2Wake',  lbl: 'Касаний по спящему / мес', val: 3,   min: 0, step: 1 },
+    ];
+    const numf = f => `<label>${f.lbl}${numField(`<input type="number" id="${f.id}" value="${f.val}" min="${f.min}"${f.max != null ? ` max="${f.max}"` : ''} step="${f.step}">`)}</label>`;
+    return `<div class="glass card cons-card cons-sim sim2-card" data-rai="${rAi}" data-rtel="${rTel}" data-rstt="${rStt}" data-rwa="${rWa}">
+      <div class="card-title">${ic(I.chart || I.bolt)}Симулятор · прогноз<span class="cons-badge sim">что если</span></div>
+      <div class="cons-sub">Прикиньте будущие расходники по объёму лидов — <b>это гипотеза, не списание</b>.</div>
+      <div class="sim2-grid">${F2.map(numf).join('')}</div>
+      <div class="sim2-out" id="sim2Out"></div>
+      <div class="sim2-proj" id="sim2Proj"></div>
+      <div class="muted" style="font-size:11px;margin-top:10px">Меняйте цифры под свою модель. Сообщения WhatsApp Cloud API тарифицирует Meta с вашей карты — в баланс не входят. Аренда номеров — в «Калькуляторе на команду» выше.</div>
+    </div>`;
+  })();
+
   const planCard = (key) => {
     const def = B.prices[key];
     const on = B.plan === key;
@@ -12908,25 +12936,6 @@ PAGES.billing = async (root) => {
         </div>`;
         })()}
 
-        <!-- симулятор метрируемых расходников по объёму лидов -->
-        ${(() => {
-          const rt = (u.rates || {});
-          const rAi = +rt.aiMsg || 0.002, rTel = +rt.telephonyMin || 0.02, rStt = +rt.sttMin || 0.006, rWa = +rt.wa || 0.04;
-          return `<div class="glass card mb sim2-card" data-rai="${rAi}" data-rtel="${rTel}" data-rstt="${rStt}" data-rwa="${rWa}">
-          <div class="card-title">${ic(I.chart || I.bolt)}Симулятор расходников по объёму<span class="sub">во сколько примерно обойдётся ИИ, телефония, транскрибация</span></div>
-          <div class="sim2-grid">
-            <label>Лидов в месяц<input type="number" id="sim2Leads" value="350" min="1" step="10"></label>
-            <label>Спящая база, %<input type="number" id="sim2Sleep" value="50" min="0" max="100" step="5"></label>
-            <label>Успешных звонков, % лидов<input type="number" id="sim2Call" value="22" min="0" max="100" step="1"></label>
-            <label>Минут на звонок<input type="number" id="sim2Min" value="3" min="1" step="1"></label>
-            <label>Входящих ИИ на лида<input type="number" id="sim2In" value="6" min="1" step="1"></label>
-            <label>Касаний по спящему<input type="number" id="sim2Wake" value="3" min="0" step="1"></label>
-          </div>
-          <div class="sim2-out" id="sim2Out"></div>
-          <div class="muted" style="font-size:11px;margin-top:8px">Прикидка по вашим допущениям (меняйте цифры). Сообщения WhatsApp Cloud API тарифицирует Meta с вашей карты — в баланс не входят. Аренда номеров — в калькуляторе на команду выше.</div>
-        </div>`;
-        })()}
-
         <!-- баланс расходников (предоплата криптой) -->
         <div class="glass card mb bal-card">
           <div class="card-title">${ic(I.wallet || I.card)}Баланс расходников<span class="sub">предоплата · пополнение только криптой (USDT)</span></div>
@@ -12947,10 +12956,16 @@ PAGES.billing = async (root) => {
           <div class="muted" style="font-size:11px;margin-top:8px">С баланса списываются расходники (WhatsApp, ИИ, минуты, аренда номеров) и — по желанию — подписка. Пополнение приходит на холодный кошелёк и подтверждается автоматически on-chain.</div>
         </div>
 
-        <!-- расходники: калькулятор по факту -->
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.bolt)}Калькулятор расходников<span class="sub">что списывается с баланса · что платит ваша карта в Meta</span>
+        <!-- пара «факт ↔ прогноз»: слева реальные списания, справа симулятор -->
+        <div class="cons-split">
+        <div class="glass card cons-card cons-fact">
+          <div class="card-title">${ic(I.wallet || I.card)}Расходники · факт<span class="cons-badge fact">списано</span>
             <button class="btn btn-sm" id="bcRates" style="margin-left:auto">${ic(I.edit || I.doc)}Ставки</button></div>
+          <div class="cons-sub">Реально израсходовано с баланса — <b>это уже списанные деньги</b>.</div>
+          <div class="cons-fact-hero">
+            <div class="cff-cell"><div class="cff-k">Списано за период</div><div class="cff-v">${moneyC(u.usageTotal != null ? u.usageTotal : u.total)}</div><div class="cff-s">${u.elapsedDays} дн · по факту использования</div></div>
+            <div class="cff-cell"><div class="cff-k">Прогноз / мес</div><div class="cff-v accent">${moneyC(u.balanceMonthlyForecast != null ? u.balanceMonthlyForecast : u.monthlyForecast)}</div><div class="cff-s">метрируемое + аренда номеров</div></div>
+          </div>
 
           <!-- ГРУППА A: с баланса (крипта) -->
           <div class="bc-group">
@@ -12987,13 +13002,15 @@ PAGES.billing = async (root) => {
           <div class="muted" style="font-size:11px;margin-top:12px">Баланс — предоплата криптой; с него идут аренда номеров, ИИ, минуты телефонии и записи. Сообщения WhatsApp Cloud API оплачиваются напрямую в Meta с вашей карты и на баланс не влияют.</div>
           <div id="bcRatesBox" hidden class="bc-rates">
             <div class="bc-rates-grid">
-              <label>WhatsApp, $/сообщение<input class="bc-rate" data-rk="wa" type="number" step="0.001" value="${(u.rates || {}).wa}"></label>
-              <label>ИИ, $/входящее<input class="bc-rate" data-rk="aiMsg" type="number" step="0.001" value="${(u.rates || {}).aiMsg}"></label>
-              <label>Телефония, $/мин<input class="bc-rate" data-rk="telephonyMin" type="number" step="0.001" value="${(u.rates || {}).telephonyMin}"></label>
-              <label>Транскрибация, $/мин<input class="bc-rate" data-rk="sttMin" type="number" step="0.001" value="${(u.rates || {}).sttMin}"></label>
+              <label>WhatsApp, $/сообщение${numField(`<input class="bc-rate" data-rk="wa" type="number" step="0.001" value="${(u.rates || {}).wa}">`)}</label>
+              <label>ИИ, $/входящее${numField(`<input class="bc-rate" data-rk="aiMsg" type="number" step="0.001" value="${(u.rates || {}).aiMsg}">`)}</label>
+              <label>Телефония, $/мин${numField(`<input class="bc-rate" data-rk="telephonyMin" type="number" step="0.001" value="${(u.rates || {}).telephonyMin}">`)}</label>
+              <label>Транскрибация, $/мин${numField(`<input class="bc-rate" data-rk="sttMin" type="number" step="0.001" value="${(u.rates || {}).sttMin}">`)}</label>
             </div>
             <div style="display:flex;margin-top:8px"><span class="tb-spacer"></span><button class="btn btn-sm btn-accent" id="bcRatesSave">Сохранить ставки</button></div>
           </div>
+        </div>
+        ${sim2Card}
         </div>
 
         <!-- реквизиты -->
@@ -13081,12 +13098,43 @@ PAGES.billing = async (root) => {
         line('Телефония (звонки+запись)', `${calls} звонков × ${callMin} мин = ${callMinTotal} мин × $${rTel}`, cTel) +
         line('Транскрибация звонков', `${callMinTotal} мин × $${rStt}`, cStt) +
         `<div class="bc-sum-row" style="margin-top:6px"><span>Спящая база (для рассылок): ${sleeping} лидов</span><span></span></div>` +
-        `<div class="bc-sum-row bc-forecast" style="margin-top:6px"><span>Метрируемые расходники / мес</span><b>${moneyC(total)}</b></div>` +
+        `<div class="bc-sum-row bc-forecast" style="margin-top:6px"><span>Метрируемые расходники / мес (месяц 1)</span><b>${moneyC(total)}</b></div>` +
         `<div class="muted" style="font-size:11px;margin-top:4px">+ аренда номеров из калькулятора выше. Итого баланс/мес = аренда + это.</div>`;
+
+      /* ── проекция роста: спящая база копится месяц к месяцу → растёт дообработка ИИ ── */
+      const freshMonthly = leads * inLead * rAi + cTel + cStt;   /* ~постоянная часть (свежие лиды) */
+      const sleepAdd = leads * sleepP / 100;                     /* прибавка спящих в базу / мес */
+      const MO = 12; const series = []; let cum = 0;
+      for (let m = 1; m <= MO; m++) { const acc = sleepAdd * m; const maint = acc * wake * rAi; const mc = freshMonthly + maint; cum += mc; series.push({ m, mc, cum, acc }); }
+      const maxc = Math.max(...series.map(s => s.mc)) || 1;
+      const bars = series.map(s => { const h = Math.round(16 + (s.mc / maxc) * 76); const hi = (s.m === 1 || s.m === 6 || s.m === 12); return `<div class="pj-bar${hi ? ' hi' : ''}" style="height:${h}px" title="Мес ${s.m}: ${moneyC(s.mc)}/мес · накоплено ~${Math.round(s.acc)} спящих"></div>`; }).join('');
+      const g = m => series[m - 1];
+      $('#sim2Proj', root).innerHTML =
+        `<div class="pj-h">Рост расходников по мере накопления базы<span class="muted">спящая база копится → дообработка дорожает</span></div>` +
+        `<div class="pj-bars">${bars}</div>` +
+        `<div class="pj-x"><span>мес 1</span><span>6</span><span>12</span></div>` +
+        `<div class="pj-key">` +
+          `<div><span>Месяц 1</span><b>${moneyC(g(1).mc)}</b></div>` +
+          `<div><span>Месяц 6</span><b>${moneyC(g(6).mc)}</b></div>` +
+          `<div><span>Месяц 12</span><b class="accent">${moneyC(g(12).mc)}</b></div>` +
+          `<div><span>За 12 мес суммарно</span><b>${moneyC(g(12).cum)}</b></div>` +
+        `</div>` +
+        `<div class="muted" style="font-size:11px;margin-top:6px">Свежие лиды дают почти постоянную часть; накопленная спящая база (+${Math.round(sleepAdd)}/мес) требует растущей дообработки ИИ. Разовые реактивации сверх модели.</div>`;
     };
     $$('.sim2-grid input', root).forEach(i => i.addEventListener('input', recalc2));
     recalc2();
   })();
+  /* кастомные стрелки ± для number-инпутов (симулятор, ставки) */
+  $$('.numf-up, .numf-down', root).forEach(b => b.addEventListener('click', () => {
+    const inp = b.closest('.numf') && b.closest('.numf').querySelector('input'); if (!inp) return;
+    const st = +inp.step || 1, dir = b.classList.contains('numf-up') ? 1 : -1;
+    const lo = inp.min !== '' ? +inp.min : -Infinity, hi = inp.max !== '' ? +inp.max : Infinity;
+    const dec = (String(st).split('.')[1] || '').length;
+    let v = (+inp.value || 0) + dir * st;
+    v = Math.min(hi, Math.max(lo, v));
+    inp.value = dec ? v.toFixed(dec) : String(v);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }));
   /* калькулятор расходников: показать/скрыть ставки + сохранить */
   const bcR = $('#bcRates', root); if (bcR) bcR.addEventListener('click', () => { const box = $('#bcRatesBox', root); if (box) box.hidden = !box.hidden; });
   const bcS = $('#bcRatesSave', root); if (bcS) bcS.addEventListener('click', async () => {
