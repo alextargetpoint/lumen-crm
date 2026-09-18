@@ -98,18 +98,17 @@
     /* методология: сначала кто-вы → облик → бренд → рынки; затем (для агентства) команда;
        далее ИИ-первая-линия → каналы → база; для агентства ещё контроль; и запуск.
        solo — лаконичный путь без команды/цепочек/контроля. */
+    /* ТОЛЬКО шаги, где можно реально что-то сделать/выбрать (правки юзера по видео):
+       welcome → кто-вы → облик → бренд → рынки → тон → инфо о разделах → подписка(рабочая) → финиш.
+       Экраны-гиды с мёртвыми кнопками (WhatsApp/цепочки/база/контроль/команда) убраны — знакомство с разделами
+       делаем интерактивным туром уже ВНУТРИ CRM, а не пустыми шагами. */
     const all = [
       { id: 'welcome' },
       { id: 'edition' },
       { id: 'style' },
       { id: 'brand' },
       { id: 'geos' },
-      !solo && { id: 'team' },
       { id: 'tone' },
-      { id: 'whatsapp' },
-      !solo && { id: 'chains' },
-      { id: 'listings' },
-      !solo && { id: 'control' },
       { id: 'more' },
       { id: 'pricing' },
       { id: 'finish' },
@@ -126,14 +125,13 @@
       html: `
         <div class="ob-center">
           <div style="margin:0 auto 26px;width:96px;height:110px;display:grid;place-items:center;animation:obFloat 8s ease-in-out infinite"><svg viewBox="0 0 100 120" width="72" height="86" fill="none" stroke="#c9a86a" stroke-width="1.6" stroke-linejoin="round"><path d="M50 6 C54 41 64 53 91 60 C64 67 54 79 50 114 C46 79 36 67 9 60 C36 53 46 41 50 6 Z"/></svg></div>
-          <div class="ob-badge">Церемония запуска</div>
+          <div class="ob-badge">Настройка · 5 минут</div>
           <h1 class="ob-h1">Добро пожаловать в&nbsp;<span class="ob-grad">Lumen</span></h1>
-          <p class="ob-lead">Соберём ваше пространство под вас за несколько минут: стиль, бренд, направления, тон первой линии и подключение WhatsApp. Дальше Lumen берёт заявки на себя.</p>
+          <p class="ob-lead">Соберём ваше пространство под вас: стиль, бренд, направления и тон первой линии. Каналы и брокеров подключим вместе — а дальше Lumen берёт заявки на себя.</p>
           <div class="ob-pills">
-            <span class="ob-pill">${IC.palette}Настроим под ваш бренд</span>
-            <span class="ob-pill">${IC.building}Для агентства и для соло</span>
-            <span class="ob-pill">${IC.chat}WhatsApp подключим сразу</span>
-            <span class="ob-pill">${IC.bolt}Работает через неделю</span>
+            <span class="ob-pill">${IC.palette}Под ваш бренд</span>
+            <span class="ob-pill">${IC.building}Агентство и соло</span>
+            <span class="ob-pill">${IC.chat}Каналы подключим</span>
           </div>
         </div>`,
       primary: 'Начать настройку →',
@@ -261,37 +259,41 @@
   }
 
   function stepPricing() {
-    const b = _billing || {};
-    let trialDays = b.trialEndsAt ? Math.ceil((b.trialEndsAt - Date.now()) / 86400000) : 14;
-    if (!(trialDays >= 3)) trialDays = 14; // свежий онбординг = полный триал
     const solo = S.edition === 'solo';
-    const price = solo ? 99 : 200, was = solo ? 149 : 300;
-    const seats = solo ? '1 рабочее место' : '5 брокеров + руководитель';
+    const base = solo ? 99 : 200;                 // включено: solo 1 место / агентство 6 мест
+    const seatsIncl = solo ? 1 : 6, seatPrice = 25;
+    const seats = Math.max(seatsIncl, +S._seats || seatsIncl);
+    const extra = Math.max(0, seats - seatsIncl);
+    const total = base + extra * seatPrice;
     return {
-      title: 'Запуск и подписка',
-      sub: `Всё настроено. Первые ${trialDays} дней — бесплатно, без карты. Дальше — фиксированная подписка, без оплаты за лида.`,
+      title: 'Подписка и активация',
+      sub: 'Всё настроено. Выберите число мест, посмотрите цену и переходите к оплате — активируем аккаунт под вас.',
       html: `
         <div class="ob-price">
           <div class="ob-price-card">
-            <div class="ob-price-beta">Бета · первым 10 агентствам</div>
+            <div class="ob-price-beta">Бета · настройка «под ключ»</div>
             <div class="ob-price-name">${solo ? 'Соло-брокер' : 'Агентство'}</div>
-            <div class="ob-price-val"><s>$${was}</s><b>$${price}</b><span>/мес</span></div>
-            <div class="ob-price-seats">${seats}</div>
+            <div class="ob-price-val"><b id="obTotal">$${total}</b><span>/мес</span></div>
+            ${solo ? `<div class="ob-price-seats">1 рабочее место</div>` : `
+            <div class="ob-seats-row">
+              <span>Мест (брокеров)</span>
+              <div class="ob-stepper"><button type="button" class="ob-sminus" data-seat="-1">−</button><b id="obSeats">${seats}</b><button type="button" class="ob-splus" data-seat="1">+</button></div>
+            </div>
+            <div class="ob-price-seats">${seatsIncl} мест включено · далее $${seatPrice}/место</div>`}
             <ul class="ob-price-list">
-              <li>${IC.check}Запуск за неделю, а не за полгода — и без своей IT-команды</li>
-              <li>${IC.check}WhatsApp, Instagram, комментарии рекламы и звонки подключаем за вас</li>
-              <li>${IC.check}ИИ сам отвечает лидам за 60 секунд, квалифицирует и собирает подборки объектов</li>
-              <li>${IC.check}Обновления, интеграции и поддержка — на нас, ничего настраивать не нужно</li>
+              <li>${IC.check}Настройку и подключение каналов делаем за вас</li>
+              <li>${IC.check}ИИ отвечает лидам за 60 секунд, квалифицирует, собирает подборки</li>
+              <li>${IC.check}Обновления, интеграции и поддержка — на нас</li>
             </ul>
-            <button class="ob-do ob-do-pay" data-do="pay">Активировать подписку →</button>
-            <div class="ob-price-rr">${IC.check}Без карты для старта · отмена в один клик</div>
+            <button class="ob-do ob-do-pay" data-do="pay">Перейти к оплате →</button>
+            <div class="ob-price-rr">${IC.check}Оплата картой или криптой · далее откроется раздел «Подписка и оплата»</div>
           </div>
           <div class="ob-price-side">
-            <div class="ob-price-badge">${trialDays}<span>дней<br>бесплатно</span></div>
-            <div class="ob-price-why"><b>Почему активировать сейчас?</b><span>Вы уже собрали пространство под себя. Одна кнопка — и Lumen берёт первую линию с этой минуты, а заявки перестают остывать по ночам.</span></div>
+            <div class="ob-price-why"><b>Что дальше?</b><span>Нажмите «Перейти к оплате» — откроется раздел с калькулятором, тарифами и способами оплаты (карта / крипта). Там же — расходники и баланс.</span></div>
           </div>
         </div>`,
-      primary: `Продолжить бесплатно ${trialDays} дн. →`,
+      primary: `Перейти к оплате →`,
+      primaryDo: 'pay',
       hideSkip: true,
     };
   }
@@ -415,7 +417,7 @@
       const a = b.dataset.act;
       if (a === 'back') return back();
       if (a === 'skip') return next(true);
-      if (a === 'next') { if (b.classList.contains('dis')) return; next(false); }
+      if (a === 'next') { if (b.classList.contains('dis')) return; if (step.primaryDo) return runGuide(step.primaryDo); next(false); }
     });
 
     // per-step
@@ -469,6 +471,16 @@
     if (step.id === 'tone') {
       qq('[data-tone]').forEach(b => b.onclick = () => { S.tone = b.dataset.tone; qq('[data-tone]').forEach(x => x.classList.toggle('on', x === b)); });
       q('#obAutopilot').onchange = e => S.autopilot = e.target.checked;
+    }
+    if (step.id === 'pricing') {
+      qq('[data-seat]').forEach(b => b.onclick = () => {
+        if (S.edition === 'solo') return;
+        const seatsIncl = 6, base = 200, seatPrice = 25;
+        S._seats = Math.max(seatsIncl, (+S._seats || seatsIncl) + (+b.dataset.seat));
+        const total = base + Math.max(0, S._seats - seatsIncl) * seatPrice;
+        const se = q('#obSeats'); if (se) se.textContent = S._seats;
+        const to = q('#obTotal'); if (to) to.textContent = '$' + total;
+      });
     }
     qq('[data-do]').forEach(btn => { btn.onclick = () => runGuide(btn.dataset.do); });
   }
@@ -544,7 +556,7 @@
       try { const b = B(); if (b.go) b.go('overview'); } catch (e) {}
       /* открыть первый отложенный боевой визард, выбранный во время тура (WhatsApp/цепочки/база/команда) */
       const g = (S.pendingGuides || [])[0];
-      if (g) setTimeout(() => { try { const b = B(); ({ wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers'), control: () => b.go && b.go('control') }[g] || (() => {}))(); } catch (e) {} }, 800);
+      if (g) setTimeout(() => { try { const b = B(); ({ pay: () => b.go && b.go('billing'), wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers'), control: () => b.go && b.go('control') }[g] || (() => {}))(); } catch (e) {} }, 800);
     }, 900);
   }
 
@@ -805,6 +817,11 @@
     .ob-do-pay{width:100%;justify-content:center;display:flex;align-items:center}
     .ob-price-rr{display:flex;align-items:center;gap:7px;font-size:12px;color:#6b6a68;font-weight:300;margin-top:14px;justify-content:center}
     .ob-price-rr svg{width:13px;height:13px;flex:0 0 13px;color:#d6c7a8}
+    .ob-seats-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 4px;font-size:13px;color:#a7a6a3}
+    .ob-stepper{display:inline-flex;align-items:center;gap:12px}
+    .ob-stepper button{width:32px;height:32px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#f4f3f1;font-size:18px;cursor:pointer;line-height:1}
+    .ob-stepper button:hover{border-color:#c9a86a;color:#c9a86a}
+    .ob-stepper b{font-family:'Cormorant',Georgia,serif;font-size:22px;font-weight:400;min-width:24px;text-align:center;color:#f4f3f1}
     .ob-price-side{display:flex;flex-direction:column;gap:16px;justify-content:center}
     .ob-price-badge{text-align:center;padding:24px;border-radius:18px;background:rgba(255,255,255,.02);border:1px solid rgba(214,199,168,.18);font-family:'Cormorant',Georgia,serif;font-weight:400;font-size:56px;letter-spacing:-.01em;color:#f4f3f1;line-height:.9}
     .ob-price-badge span{display:block;font-family:'Manrope',system-ui,sans-serif;font-size:13px;font-weight:300;color:#6b6a68;letter-spacing:.04em;margin-top:10px;line-height:1.3}
