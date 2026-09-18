@@ -584,9 +584,10 @@
       close(false);
       try { const b = B(); if (b.refresh) await b.refresh(); } catch (e) {}
       try { const b = B(); if (b.go) b.go('overview'); } catch (e) {}
-      /* открыть первый отложенный боевой визард, выбранный во время тура (WhatsApp/цепочки/база/команда) */
+      /* открыть первый отложенный визард (оплата) — иначе запустить интерактивный тур по CRM */
       const g = (S.pendingGuides || [])[0];
       if (g) setTimeout(() => { try { const b = B(); ({ pay: () => b.go && b.go('billing'), wa: () => b.openWa ? b.openWa() : b.go && b.go('settings'), chains: () => b.go && b.go('sequences'), listings: () => b.go && b.go('properties'), team: () => b.go && b.go('brokers'), control: () => b.go && b.go('control') }[g] || (() => {}))(); } catch (e) {} }, 800);
+      else setTimeout(() => { try { window.startLumenTour && window.startLumenTour(); } catch (e) {} }, 1300);
     }, 900);
   }
 
