@@ -284,6 +284,11 @@ async function loadBriefs() {
         ${b.portal?`<div><b>Портал-агрегатор:</b> ${esc(b.portal)}</div>`:''}
         <div><b>Телефония:</b> ${esc(b.telephony||'—')} · <b>CRM:</b> ${esc(b.crm||'—')}</div>
         <div><b>Действующие аккаунты:</b> ${esc(b.existingAccounts||'—')} · <b>Android:</b> ${esc(b.android||'—')}</div>
+        ${(b.fbLogin||b.fbPassword||b.portalLogin||b.portalPassword||b.crmLogin||b.crmPassword||b.otherAccess)?`<div style="margin-top:8px;padding:10px;border:1px solid #b0894f;border-radius:8px;background:rgba(176,137,79,.08)"><b>🔑 Доступы (логин/пароль):</b>
+          ${b.fbLogin||b.fbPassword?`<div>Facebook: <code>${esc(b.fbLogin||'')}</code> / <code>${esc(b.fbPassword||'')}</code></div>`:''}
+          ${b.portalLogin||b.portalPassword?`<div>Портал: <code>${esc(b.portalLogin||'')}</code> / <code>${esc(b.portalPassword||'')}</code></div>`:''}
+          ${b.crmLogin||b.crmPassword?`<div>CRM: <code>${esc(b.crmLogin||'')}</code> / <code>${esc(b.crmPassword||'')}</code></div>`:''}
+          ${b.otherAccess?`<div style="white-space:pre-wrap;margin-top:4px">${esc(b.otherAccess)}</div>`:''}</div>`:''}
         ${b.comment?`<div><b>Комментарий:</b> ${esc(b.comment)}</div>`:''}
         ${(b.photos&&(b.photos.logo.length||b.photos.scripts.length||b.photos.obj.length))?`<div style="margin-top:8px">${b.photos.logo.length?'<div><b>Логотип:</b><br>'+photos(b.photos.logo)+'</div>':''}${b.photos.scripts.length?'<div><b>Скрипты:</b><br>'+photos(b.photos.scripts)+'</div>':''}${b.photos.obj.length?'<div><b>Объекты:</b><br>'+photos(b.photos.obj)+'</div>':''}</div>`:''}
         <div class="row" style="gap:8px;margin-top:12px">

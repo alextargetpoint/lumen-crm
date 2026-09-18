@@ -12874,24 +12874,56 @@ PAGES.billing = async (root) => {
         <!-- эмулятор-калькулятор: расчёт на команду по рекомендациям -->
         ${(() => {
           const rt = (u.rates || {});
-          const nWa = +rt.numWaQr || 9, nTg = +rt.numTg || 9, nCloud = +rt.numCloud || 9, nTel = +rt.numTel || 9;
+          const nWa = +rt.numWaQr || 9, nTg = +rt.numTg || 9, nCloud = +rt.numCloud || 3, nTel = +rt.numTel || 3;
           const brokers = Math.max(1, (STATE.brokers || []).filter(x => x.active !== false).length || 1);
-          return `<div class="glass card mb sim-card" data-nwa="${nWa}" data-ntg="${nTg}" data-ncloud="${nCloud}" data-ntel="${nTel}">
-          <div class="card-title">${ic(I.bolt)}Калькулятор на команду<span class="sub">прикиньте расходники по нашим рекомендациям и пополните заранее</span></div>
+          /* WA QR и телефония — жёстко 1 номер/брокер; Telegram и Cloud API — своё количество (дефолт 3 и 2) */
+          const CHANS = [
+            { k: 'wa', lbl: 'WhatsApp (QR)', rate: nWa, mode: 'perBroker', on: true },
+            { k: 'tel', lbl: 'Телефония', rate: nTel, mode: 'perBroker', on: false },
+            { k: 'tg', lbl: 'Telegram', rate: nTg, mode: 'custom', def: 3, on: false },
+            { k: 'cloud', lbl: 'WhatsApp Cloud API', rate: nCloud, mode: 'custom', def: 2, on: false },
+          ];
+          return `<div class="glass card mb sim-card">
+          <div class="card-title">${ic(I.bolt)}Калькулятор на команду<span class="sub">прикиньте расходники по рекомендациям и пополните заранее</span></div>
           <div class="sim-row">
             <label class="sim-lbl">Брокеров</label>
             <div class="stepper"><button type="button" class="btn btn-sm" id="simMinus">−</button><span id="simBrokers">${brokers}</span><button type="button" class="btn btn-sm" id="simPlus">+</button></div>
-            <span class="muted" style="font-size:11px">рекомендация: 1 номер на брокера в каждом канале</span>
+            <span class="muted" style="font-size:11px">WhatsApp QR и телефония — 1 номер на брокера</span>
           </div>
           <div class="sim-chans">
-            ${[['wa', 'WhatsApp (QR)', true], ['tg', 'Telegram', false], ['cloud', 'WhatsApp Cloud API', false], ['tel', 'Телефония', false]].map(([k, lbl, on]) => `<label class="sim-chan"><input type="checkbox" class="sim-ch" data-ch="${k}" ${on ? 'checked' : ''}><span>${lbl}</span></label>`).join('')}
+            ${CHANS.map(c => `<div class="sim-chan-row" data-ch="${c.k}" data-rate="${c.rate}" data-mode="${c.mode}">
+              <label class="sim-chk"><input type="checkbox" class="sim-ch" ${c.on ? 'checked' : ''}><span>${c.lbl}</span></label>
+              <div class="sim-qty">${c.mode === 'perBroker'
+                ? `<span class="sim-qlock">= <b class="sim-q">${brokers}</b> · $${c.rate}/мес</span>`
+                : `<div class="stepper sim-step"><button type="button" class="sim-qm btn btn-sm">−</button><b class="sim-q">${c.def}</b><button type="button" class="sim-qp btn btn-sm">+</button></div><span class="muted" style="font-size:11px">× $${c.rate}/мес</span>`}</div>
+              <div class="sim-c"></div>
+            </div>`).join('')}
           </div>
           <div class="sim-out" id="simOut"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
             <button class="btn btn-accent btn-sm" id="simTopup">${ic(I.wallet || I.card)}Пополнить баланс под план</button>
             <span class="muted" style="font-size:11px;align-self:center">затем купите номера во вкладках канала в «Номера»</span>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:8px">Аренда номера = покупка на месяц ($9/номер). Метрируемое (ИИ, минуты) — сверх этого, по факту. Точный расчёт — в калькуляторе ниже.</div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Аренда номера = покупка на месяц. WhatsApp QR / Telegram — $9, Cloud API / телефония — $3. Метрируемое (ИИ, минуты) — сверх, по факту.</div>
+        </div>`;
+        })()}
+
+        <!-- симулятор метрируемых расходников по объёму лидов -->
+        ${(() => {
+          const rt = (u.rates || {});
+          const rAi = +rt.aiMsg || 0.002, rTel = +rt.telephonyMin || 0.02, rStt = +rt.sttMin || 0.006, rWa = +rt.wa || 0.04;
+          return `<div class="glass card mb sim2-card" data-rai="${rAi}" data-rtel="${rTel}" data-rstt="${rStt}" data-rwa="${rWa}">
+          <div class="card-title">${ic(I.chart || I.bolt)}Симулятор расходников по объёму<span class="sub">во сколько примерно обойдётся ИИ, телефония, транскрибация</span></div>
+          <div class="sim2-grid">
+            <label>Лидов в месяц<input type="number" id="sim2Leads" value="350" min="1" step="10"></label>
+            <label>Спящая база, %<input type="number" id="sim2Sleep" value="50" min="0" max="100" step="5"></label>
+            <label>Успешных звонков, % лидов<input type="number" id="sim2Call" value="22" min="0" max="100" step="1"></label>
+            <label>Минут на звонок<input type="number" id="sim2Min" value="3" min="1" step="1"></label>
+            <label>Входящих ИИ на лида<input type="number" id="sim2In" value="6" min="1" step="1"></label>
+            <label>Касаний по спящему<input type="number" id="sim2Wake" value="3" min="0" step="1"></label>
+          </div>
+          <div class="sim2-out" id="sim2Out"></div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Прикидка по вашим допущениям (меняйте цифры). Сообщения WhatsApp Cloud API тарифицирует Meta с вашей карты — в баланс не входят. Аренда номеров — в калькуляторе на команду выше.</div>
         </div>`;
         })()}
 
@@ -12998,24 +13030,62 @@ PAGES.billing = async (root) => {
 
   /* --- взаимодействие --- */
   const reload = async () => { await PAGES.billing(root); };
-  /* эмулятор-калькулятор на команду */
+  /* эмулятор-калькулятор на команду: WA QR + телефония = 1/брокер; Telegram + Cloud API = своё количество */
   (() => {
     const card = $('.sim-card', root); if (!card) return;
-    const rates = { wa: +card.dataset.nwa || 9, tg: +card.dataset.ntg || 9, cloud: +card.dataset.ncloud || 9, tel: +card.dataset.ntel || 9 };
-    const CHN = { wa: 'WhatsApp (QR)', tg: 'Telegram', cloud: 'Cloud API', tel: 'Телефония' };
+    const CHN = { wa: 'WhatsApp (QR)', tg: 'Telegram', cloud: 'WhatsApp Cloud API', tel: 'Телефония' };
     let monthly = 0;
+    const brokersNow = () => Math.max(1, +($('#simBrokers', root).textContent) || 1);
     const recalc = () => {
-      const brokers = Math.max(1, +($('#simBrokers', root).textContent) || 1);
+      const brokers = brokersNow();
       const rows = []; let numbers = 0; monthly = 0;
-      $$('.sim-ch', root).forEach(ck => { if (!ck.checked) return; const k = ck.dataset.ch; const cost = brokers * rates[k]; numbers += brokers; monthly += cost; rows.push(`<div class="bc-line"><div class="bc-line-l"><b>${CHN[k]}</b><span>${brokers} × $${rates[k]}/мес</span></div><div class="bc-line-c">${moneyC(cost)}</div></div>`); });
+      $$('.sim-chan-row', root).forEach(row => {
+        const ck = row.querySelector('.sim-ch'); const rate = +row.dataset.rate; const mode = row.dataset.mode; const k = row.dataset.ch;
+        const qEl = row.querySelector('.sim-q');
+        let qty = mode === 'perBroker' ? brokers : Math.max(1, +qEl.textContent || 1);
+        if (mode === 'perBroker' && qEl) qEl.textContent = brokers;   /* синк с брокерами */
+        const cEl = row.querySelector('.sim-c');
+        if (!ck.checked) { if (cEl) cEl.textContent = ''; return; }
+        const cost = qty * rate; numbers += qty; monthly += cost;
+        if (cEl) cEl.textContent = moneyC(cost);
+        rows.push(`<div class="bc-line"><div class="bc-line-l"><b>${CHN[k]}</b><span>${qty} × $${rate}/мес</span></div><div class="bc-line-c">${moneyC(cost)}</div></div>`);
+      });
       const out = $('#simOut', root);
-      out.innerHTML = rows.length ? `${rows.join('')}<div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда номеров / мес (${numbers} ${plural(numbers, 'номер', 'номера', 'номеров')})</span><b>${moneyC(monthly)}</b></div>` : `<div class="muted" style="font-size:12px;padding:8px 0">Выберите хотя бы один канал.</div>`;
+      out.innerHTML = rows.length ? `${rows.join('')}<div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда номеров / мес (${numbers} ${plural(numbers, 'номер', 'номера', 'номеров')})</span><b>${moneyC(monthly)}</b></div>` : `<div class="muted" style="font-size:12px;padding:8px 0">Отметьте хотя бы один канал.</div>`;
     };
     $('#simMinus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = Math.max(1, (+s.textContent) - 1); recalc(); });
     $('#simPlus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = (+s.textContent) + 1; recalc(); });
     $$('.sim-ch', root).forEach(ck => ck.addEventListener('change', recalc));
-    $('#simTopup', root)?.addEventListener('click', () => { if (monthly < 5) { toast('Выберите каналы', 'План пустой или меньше $5'); return; } openTopupCrypto({ purpose: 'consumables', presetAmount: Math.ceil(monthly) }); });
+    /* счётчики количества для настраиваемых каналов (Telegram / Cloud API) */
+    $$('.sim-chan-row [data-mode="custom"] .sim-qm, .sim-chan-row .sim-qm', root).forEach(b => b.addEventListener('click', () => { const q = b.parentElement.querySelector('.sim-q'); q.textContent = Math.max(1, (+q.textContent) - 1); recalc(); }));
+    $$('.sim-chan-row .sim-qp', root).forEach(b => b.addEventListener('click', () => { const q = b.parentElement.querySelector('.sim-q'); q.textContent = (+q.textContent) + 1; recalc(); }));
+    $('#simTopup', root)?.addEventListener('click', () => { if (monthly < 5) { toast('Отметьте каналы', 'План пустой или меньше $5'); return; } openTopupCrypto({ purpose: 'consumables', presetAmount: Math.ceil(monthly) }); });
     recalc();
+  })();
+  /* симулятор метрируемых расходников по объёму лидов */
+  (() => {
+    const c = $('.sim2-card', root); if (!c) return;
+    const rAi = +c.dataset.rai || 0.002, rTel = +c.dataset.rtel || 0.02, rStt = +c.dataset.rstt || 0.006;
+    const num = (id, d) => Math.max(0, +($('#' + id, root) || {}).value || d);
+    const recalc2 = () => {
+      const leads = num('sim2Leads', 350), sleepP = num('sim2Sleep', 50), callP = num('sim2Call', 22), callMin = num('sim2Min', 3), inLead = num('sim2In', 6), wake = num('sim2Wake', 3);
+      const sleeping = Math.round(leads * sleepP / 100);
+      const calls = Math.round(leads * callP / 100);
+      const callMinTotal = calls * callMin;
+      const aiPasses = Math.round(leads * inLead + sleeping * wake);   /* обработка входящих активных + ответы разбуженных */
+      const cAi = aiPasses * rAi, cTel = callMinTotal * rTel, cStt = callMinTotal * rStt;
+      const total = cAi + cTel + cStt;
+      const line = (t, sub, val) => `<div class="bc-line"><div class="bc-line-l"><b>${t}</b><span>${sub}</span></div><div class="bc-line-c">${moneyC(val)}</div></div>`;
+      $('#sim2Out', root).innerHTML =
+        line('ИИ-обработка переписки', `${aiPasses.toLocaleString('ru-RU')} проходов × $${rAi}`, cAi) +
+        line('Телефония (звонки+запись)', `${calls} звонков × ${callMin} мин = ${callMinTotal} мин × $${rTel}`, cTel) +
+        line('Транскрибация звонков', `${callMinTotal} мин × $${rStt}`, cStt) +
+        `<div class="bc-sum-row" style="margin-top:6px"><span>Спящая база (для рассылок): ${sleeping} лидов</span><span></span></div>` +
+        `<div class="bc-sum-row bc-forecast" style="margin-top:6px"><span>Метрируемые расходники / мес</span><b>${moneyC(total)}</b></div>` +
+        `<div class="muted" style="font-size:11px;margin-top:4px">+ аренда номеров из калькулятора выше. Итого баланс/мес = аренда + это.</div>`;
+    };
+    $$('.sim2-grid input', root).forEach(i => i.addEventListener('input', recalc2));
+    recalc2();
   })();
   /* калькулятор расходников: показать/скрыть ставки + сохранить */
   const bcR = $('#bcRates', root); if (bcR) bcR.addEventListener('click', () => { const box = $('#bcRatesBox', root); if (box) box.hidden = !box.hidden; });

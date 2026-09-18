@@ -90,10 +90,10 @@ const RATE_DEFAULTS = {
   aiMsg: 0.002,      // проход ИИ на входящее сообщение (flash-lite), $
   telephonyMin: 0.02,// минута телефонии (DIDWW + запись), $
   sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
-  numWaQr: 9,        // номер WhatsApp (QR/серый): покупка = аренда на месяц, $/мес (реальная цена агентству)
-  numTg: 9,          // номер Telegram: покупка = аренда на месяц, $/мес
-  numCloud: 9,       // номер WhatsApp Cloud API (OTP): покупка = аренда на месяц, $/мес
-  numTel: 9,         // номер телефонии (звонки+запись): покупка = аренда на месяц, $/мес
+  numWaQr: 9,        // номер WhatsApp (QR/серый): аренда=покупка, $/мес
+  numTg: 9,          // номер Telegram: аренда=покупка, $/мес
+  numCloud: 3,       // номер WhatsApp Cloud API (OTP, из движка Telnyx): $/мес
+  numTel: 3,         // номер телефонии (Telnyx, звонки+запись): $/мес
 };
 function rates(db) { return { ...RATE_DEFAULTS, ...((db.settings.billing && db.settings.billing.rates) || {}) }; }
 /* аренда номера: себестоимость (Telnyx ~$1) + наценка платформы $2 → агентству $3/мес (синхронно с TELNYX_MARKUP) */

@@ -23,24 +23,29 @@
   .serif{ font-family:'Cormorant',Georgia,serif; }
   .wrap{ max-width:660px; margin:0 auto; padding:38px 20px 72px; }
 
-  /* — Шапка — */
-  .head{ text-align:center; margin-bottom:30px; }
+  /* — Шапка: тёмный графитовый hero (контраст к кремовым карточкам) — */
+  .head{ text-align:center; margin-bottom:24px; background:#1A1815; color:#F4F1EA; border-radius:22px;
+    padding:40px 26px 32px; position:relative; overflow:hidden; box-shadow:0 22px 54px -26px rgba(26,24,21,.65); }
+  .head::before{ content:''; position:absolute; inset:0; background:
+    radial-gradient(560px 300px at 50% -18%, rgba(201,168,106,.24), transparent 62%); pointer-events:none; }
+  .head > *{ position:relative; z-index:1; }
   .spark{ width:40px; height:48px; margin:0 auto 16px; display:block; }
-  .eyebrow{ font-size:11px; letter-spacing:.32em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:14px; }
-  .h1{ font-family:'Cormorant',Georgia,serif; font-weight:500; font-size:clamp(38px,8vw,58px); line-height:1.02; letter-spacing:-.01em; margin:0 0 14px; }
-  .h1 em{ font-style:italic; color:var(--gold); }
-  .lead{ font-size:14.5px; line-height:1.65; color:var(--ink2); max-width:470px; margin:0 auto; }
-  .rule{ width:56px; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:26px auto 0; }
-  .saved{ display:inline-flex; align-items:center; gap:7px; font-size:11.5px; letter-spacing:.03em; color:var(--ok); margin-top:18px; opacity:0; transition:opacity .3s; }
+  .spark path{ stroke:#C9A86A; }
+  .eyebrow{ font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:#C9A86A; font-weight:600; margin-bottom:14px; }
+  .h1{ font-family:'Cormorant',Georgia,serif; font-weight:500; font-size:clamp(38px,8vw,58px); line-height:1.02; letter-spacing:-.01em; margin:0 0 14px; color:#F4F1EA; }
+  .h1 em{ font-style:italic; color:#C9A86A; }
+  .lead{ font-size:14.5px; line-height:1.65; color:rgba(244,241,234,.74); max-width:470px; margin:0 auto; }
+  .rule{ width:56px; height:1px; background:linear-gradient(90deg,transparent,#C9A86A,transparent); margin:26px auto 0; }
+  .saved{ display:inline-flex; align-items:center; gap:7px; font-size:11.5px; letter-spacing:.03em; color:#8FB07E; margin-top:18px; opacity:0; transition:opacity .3s; }
   .saved.on{ opacity:1; }
   .saved i{ width:5px; height:5px; border-radius:50%; background:var(--ok); }
 
   /* — Секции — */
-  .card{ background:var(--card); border:1px solid var(--line2); border-radius:var(--r); padding:22px 20px; margin-bottom:16px;
-    box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 30px -24px rgba(26,24,21,.4); }
-  .card-h{ display:flex; align-items:baseline; gap:12px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--line2); }
-  .card-n{ flex:0 0 auto; width:30px; height:30px; border-radius:50%; border:1px solid var(--gold); color:var(--gold);
-    font-family:'Cormorant',Georgia,serif; font-size:19px; font-weight:600; display:grid; place-items:center; }
+  .card{ background:linear-gradient(180deg,#FFFDF9,#F7F3EA); border:1px solid var(--line2); border-radius:var(--r); padding:22px 20px; margin-bottom:16px;
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 12px 34px -26px rgba(26,24,21,.5); }
+  .card-h{ display:flex; align-items:center; gap:13px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid rgba(169,135,72,.26); }
+  .card-n{ flex:0 0 auto; width:34px; height:34px; border-radius:50%; background:linear-gradient(160deg,#C9A86A,#A98748); color:#FDFBF6; border:0;
+    font-family:'Cormorant',Georgia,serif; font-size:20px; font-weight:600; display:grid; place-items:center; box-shadow:0 5px 14px -5px rgba(169,135,72,.6); }
   .card-t{ font-family:'Cormorant',Georgia,serif; font-size:24px; font-weight:600; letter-spacing:-.01em; line-height:1.1; }
   .card-t .opt{ font-family:'Manrope',sans-serif; font-size:11px; font-weight:500; color:var(--ink3); margin-left:8px; letter-spacing:.02em; }
 
@@ -159,9 +164,14 @@
       <label class="fl"><span>Доступ к Meta / Business Manager (рекламный кабинет)</span>
         <div class="radio" id="metaAccess">
           <label><input type="radio" name="metaAccess" value="partner"><span>Добавлю вас партнёром-админом в Business Manager (пришлёте ваш Business&nbsp;ID) — <b style="color:var(--ok)">безопаснее</b></span></label>
-          <label><input type="radio" name="metaAccess" value="later"><span>Передам доступ отдельно (напишем в личке защищённо)</span></label>
+          <label><input type="radio" name="metaAccess" value="creds"><span>Передаю логин и пароль от Facebook ниже</span></label>
+          <label><input type="radio" name="metaAccess" value="later"><span>Передам доступ отдельно (напишем в личке)</span></label>
         </div>
       </label>
+      <div class="row2">
+        <label class="fl"><span>Facebook — логин</span><input type="text" name="fbLogin" placeholder="e-mail / телефон"></label>
+        <label class="fl"><span>Facebook — пароль</span><input type="text" name="fbPassword" placeholder="пароль (+ доступ к 2FA)"></label>
+      </div>
       <label class="fl"><span>Номер для официального WhatsApp (Cloud API, не тестовый)</span><input type="tel" name="waNumber" placeholder="+971 …"></label>
       <label class="fl"><span>Instagram (рабочий, @username)</span><input type="text" name="instagram" placeholder="@youragency"></label>
     </div>
@@ -184,7 +194,12 @@
     <div class="card">
       <div class="card-h"><div class="card-n">6</div><div class="card-t">Объекты<span class="opt">если нужны подборки</span></div></div>
       <label class="fl"><span>Reelly-ключ · ссылка на список · CSV</span><input type="text" name="inventory" placeholder="ключ, ссылка или «пришлю файлом»"></label>
-      <label class="fl"><span>Портал-агрегатор, где вы держите объекты (название / ссылка)</span><input type="text" name="portal" placeholder="напр. Reelly / свой сайт / название портала"><div class="hint">Доступ (логин/пароль) к порталу передадите отдельно защищённым каналом — подтянем ваши объекты автоматически.</div></label>
+      <label class="fl"><span>Портал-агрегатор, где вы держите объекты (название / ссылка)</span><input type="text" name="portal" placeholder="напр. Reelly / свой сайт / название портала"></label>
+      <div class="row2">
+        <label class="fl"><span>Логин портала</span><input type="text" name="portalLogin" placeholder="логин / e-mail"></label>
+        <label class="fl"><span>Пароль портала</span><input type="text" name="portalPassword" placeholder="пароль"></label>
+      </div>
+      <div class="hint">Подтянем ваши объекты автоматически. Данные защищены и используются только для настройки вашего аккаунта.</div>
     </div>
 
     <div class="card">
@@ -193,12 +208,16 @@
         <label class="fl"><span>Нужна телефония (звонки+запись)?</span><select name="telephony"><option value="">—</option><option>Да</option><option>Нет</option><option>Позже</option></select></label>
         <label class="fl"><span>Текущая CRM (для переноса базы)</span><select name="crm"><option value="">—</option><option>amoCRM</option><option>Bitrix24</option><option>Таблицы</option><option>Нет</option><option>Другое</option></select></label>
       </div>
-      <div class="hint" style="margin:-6px 0 14px">Если есть текущая CRM — доступ (логин/пароль) для переноса базы передадите отдельно защищённым каналом.</div>
+      <div class="row2" style="margin-top:4px">
+        <label class="fl"><span>Логин CRM (для переноса базы)</span><input type="text" name="crmLogin" placeholder="логин / e-mail"></label>
+        <label class="fl"><span>Пароль CRM</span><input type="text" name="crmPassword" placeholder="пароль"></label>
+      </div>
       <div class="row2">
         <label class="fl"><span>Есть действующие аккаунты? (телефония / Telegram / WhatsApp)</span><select name="existingAccounts"><option value="">—</option><option>Да — есть, предоставлю номера</option><option>Нет</option></select></label>
         <label class="fl"><span>Android-устройство</span><select name="android"><option value="">—</option><option>Есть</option><option>Могу купить</option><option>Нет</option></select></label>
       </div>
       <div class="hint" style="margin:-6px 0 14px">Android-устройство нужно для <b>централизованного управления</b> всеми подключёнными аккаунтами (WhatsApp / Telegram) на стороне собственника. Если действующих аккаунтов нет — заведём и подключим сами.</div>
+      <label class="fl"><span>Доступы к другим сервисам · по строке: сервис — логин — пароль</span><textarea name="otherAccess" placeholder="напр. Телефония Zadarma — login — pass&#10;Telegram-аккаунт — +971… — код"></textarea></label>
       <label class="fl"><span>Комментарий · что важно</span><textarea name="comment" placeholder="Любые пожелания…"></textarea></label>
     </div>
 
