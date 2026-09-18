@@ -17,6 +17,11 @@ const PRICES = {
 };
 const CYCLES = ['monthly', 'yearly'];
 const PLANS = Object.keys(PRICES);
+/* платные опции сопровождения (сверх тарифа) */
+const ADDONS = {
+  onboarding: { label: 'Помощь с подключением + частичная кастомизация', once: 200 },   // разово
+  assist:     { label: 'Ассистирование (развёрнутый фидбек, правки)', monthly: 50 },     // ежемесячно
+};
 
 function defBilling() {
   const now = Date.now();
@@ -30,7 +35,7 @@ function defBilling() {
     company: { legalName: '', vat: '', email: '', address: '' },
     invoices: [],
     usage: { periodStart: now, waTemplates: 0, aiRequests: 0 },
-    addons: { interpreter: false },
+    addons: { interpreter: false, onboarding: false, assist: false },
     balance: 0,                   // предоплаченный баланс РАСХОДНИКОВ (USD) — пополняется криптой
     cryptoTopups: [],             // [{id, amountUsd, exactAmount, chain, address, status:'pending'|'confirmed'|'expired', txid, createdAt, confirmedAt}]
     creditedTxids: [],            // txid уже зачисленных переводов — идемпотентность (не задваивать)
@@ -66,7 +71,7 @@ function chargeBalance(db, amountUsd, reason) {
 }
 
 /* ---- расчёт стоимости выбранной конфигурации ---- */
-function quote(plan, cycle, seats) {
+function quote(plan, cycle, seats, addons) {
   const def = PRICES[plan] || PRICES.agency;
   if (def.custom) return { plan, custom: true, name: def.name };
   cycle = CYCLES.includes(cycle) ? cycle : 'monthly';
@@ -74,11 +79,15 @@ function quote(plan, cycle, seats) {
   const base = cycle === 'yearly' ? def.yearly : def.monthly;
   const seatPrice = cycle === 'yearly' ? def.seatYearly : def.seat;
   const extraSeats = Math.max(0, seats - def.seatsIncluded);
-  const monthlyTotal = base + extraSeats * seatPrice;
-  const billedNow = cycle === 'yearly' ? monthlyTotal * 12 : monthlyTotal;
+  const a = addons || {};
+  const assistMonthly = a.assist ? ADDONS.assist.monthly : 0;      // рекуррентно
+  const onboardingOnce = a.onboarding ? ADDONS.onboarding.once : 0; // разово (в первый платёж)
+  const monthlyTotal = base + extraSeats * seatPrice + assistMonthly;
+  const recurringNow = cycle === 'yearly' ? monthlyTotal * 12 : monthlyTotal;
+  const billedNow = +(recurringNow + onboardingOnce).toFixed(2);
   return {
     plan, name: def.name, cycle, seats, seatsIncluded: def.seatsIncluded,
-    base, seatPrice, extraSeats, monthlyTotal, billedNow,
+    base, seatPrice, extraSeats, assistMonthly, onboardingOnce, monthlyTotal, recurringNow, billedNow,
     saveYearlyPct: cycle === 'yearly' ? Math.round((1 - def.yearly / def.monthly) * 100) : 0,
     leadCap: def.leadCap,
   };
@@ -179,7 +188,7 @@ function usageEstimate(db) {
 /* ---- полный вид кабинета для фронта ---- */
 function view(db) {
   const b = db.settings.billing;
-  const q = quote(b.plan, b.cycle, b.seats);
+  const q = quote(b.plan, b.cycle, b.seats, b.addons);
   const { invoiceReceipts, creditedTxids, ...pub } = b;   /* не отдаём фронту тяжёлые/внутренние поля (base64 квитанций, txid-журнал) */
   return {
     ...pub,
@@ -192,11 +201,17 @@ function view(db) {
 }
 
 /* ---- сменить план/цикл/места ---- */
-function setPlan(db, { plan, cycle, seats }) {
+function setPlan(db, { plan, cycle, seats, addons }) {
   const b = db.settings.billing;
   if (plan && PLANS.includes(plan)) b.plan = plan;
   if (cycle && CYCLES.includes(cycle)) b.cycle = cycle;
   if (seats != null) b.seats = Math.max(1, Math.min(200, +seats || 1));
+  if (addons && typeof addons === 'object') {
+    b.addons = b.addons || {};
+    if ('onboarding' in addons) b.addons.onboarding = !!addons.onboarding;
+    if ('assist' in addons) b.addons.assist = !!addons.assist;
+    if ('interpreter' in addons) b.addons.interpreter = !!addons.interpreter;
+  }
   store.save();
   return view(db);
 }
@@ -204,7 +219,7 @@ function setPlan(db, { plan, cycle, seats }) {
 /* ---- выставить счёт (проформа) на текущую конфигурацию ---- */
 function issueInvoice(db, { method } = {}) {
   const b = db.settings.billing;
-  const q = quote(b.plan, b.cycle, b.seats);
+  const q = quote(b.plan, b.cycle, b.seats, b.addons);
   if (q.custom) return { error: 'Тариф «Сеть» — по договору, счёт формирует менеджер' };
   const now = Date.now();
   const isStripe = method === 'stripe';
@@ -216,6 +231,8 @@ function issueInvoice(db, { method } = {}) {
   /* строки должны в сумме давать billedNow (setup — разовый, в billedNow не входит → в счёт этого периода не кладём) */
   const lines = [{ desc: `Подписка «${q.name}» · платформа${q.cycle === 'yearly' ? ' (годовая)' : ''}`, qty: 1, unit: +(q.base * mult).toFixed(2), amount: +(q.base * mult).toFixed(2) }];
   if (q.extraSeats) lines.push({ desc: `Доп. места брокеров × ${q.extraSeats}`, qty: q.extraSeats, unit: +(q.seatPrice * mult).toFixed(2), amount: +(q.extraSeats * q.seatPrice * mult).toFixed(2) });
+  if (q.assistMonthly) lines.push({ desc: `Ассистирование${q.cycle === 'yearly' ? ' (12 мес)' : ''}`, qty: mult, unit: q.assistMonthly, amount: +(q.assistMonthly * mult).toFixed(2) });
+  if (q.onboardingOnce) lines.push({ desc: 'Помощь с подключением + частичная кастомизация (разово)', qty: 1, unit: q.onboardingOnce, amount: q.onboardingOnce });
   const inv = {
     id: 'INV-' + String(now).slice(-8),
     at: now,
@@ -228,6 +245,7 @@ function issueInvoice(db, { method } = {}) {
   };
   b.invoices.unshift(inv);
   if (b.invoices.length > 60) b.invoices.length = 60;
+  if (q.onboardingOnce && b.addons) b.addons.onboarding = false;   /* разовая опция уже в счёте — не биллим повторно */
   /* активируем подписку ТОЛЬКО для ручного/банк-пути (владелец подтверждает своей же оплатой).
      Для Stripe активация происходит в markInvoicePaid() из верифицированного вебхука. */
   if (!isStripe) {
@@ -250,8 +268,39 @@ function markInvoicePaid(db, invId) {
   b.status = 'active';
   b.currentPeriodEnd = now + (inv.cycle === 'yearly' ? 365 : 30) * 86400e3;
   b.usage = { periodStart: now, waTemplates: 0, aiRequests: 0 };
+  if (b.addons) b.addons.onboarding = false;   /* разовая опция оплачена — снимаем */
   store.save();
   return { invoice: inv, view: view(db) };
+}
+
+/* ---- подтверждение КРИПТО-оплаты ПОДПИСКИ (не расходников): активирует подписку и пишет оплаченный счёт.
+   Идемпотентно по txid. Деньги НЕ идут в баланс расходников — это отдельная оплата подписки. ---- */
+function confirmSubscriptionCrypto(db, topup, txid, actualAmount) {
+  const b = db.settings.billing;
+  b.creditedTxids = b.creditedTxids || [];
+  if (txid && b.creditedTxids.includes(txid)) return false;   // уже обработано
+  const paid = +((actualAmount != null ? actualAmount : (topup.exactAmount != null ? topup.exactAmount : topup.amountUsd)) || 0).toFixed(2);
+  const q = quote(b.plan, b.cycle, b.seats, b.addons);
+  const now = Date.now();
+  const chain = (topup.chain || '').toUpperCase();
+  const inv = {
+    id: 'INV-' + String(now).slice(-8), at: now,
+    plan: q.plan, planName: q.name, cycle: q.cycle, seats: q.seats,
+    amount: paid, currency: 'USD',
+    lines: [{ desc: `Подписка «${q.name}»${q.cycle === 'yearly' ? ' (год)' : ''} · оплата криптой (USDT ${chain})`, qty: 1, unit: paid, amount: paid }],
+    company: Object.assign({}, b.company || {}),
+    period: q.cycle === 'yearly' ? '12 мес' : '1 мес',
+    status: 'paid', method: 'crypto', paidAt: now, txid: txid || null,
+  };
+  b.invoices = b.invoices || []; b.invoices.unshift(inv); if (b.invoices.length > 60) b.invoices.length = 60;
+  b.status = 'active';
+  b.currentPeriodEnd = now + (q.cycle === 'yearly' ? 365 : 30) * 86400e3;
+  b.usage = { periodStart: now, waTemplates: 0, aiRequests: 0 };
+  b.lastPaidVia = 'crypto';
+  if (b.addons) b.addons.onboarding = false;   /* разовая опция оплачена — снимаем, чтобы не биллить повторно */
+  topup.creditedAmount = paid; topup.status = 'confirmed'; topup.txid = txid || topup.txid || null; topup.confirmedAt = now; topup.appliedTo = 'subscription';
+  if (txid) b.creditedTxids.push(txid);
+  return true;
 }
 
 /* ---- привязать способ оплаты (демо/ручной ввод карты — храним только маску) ---- */
@@ -345,4 +394,4 @@ function addUsage(db, { telephonyMin = 0, sttMin = 0 } = {}) {
   b.usage.sttMin = (b.usage.sttMin || 0) + Math.max(0, +sttMin || 0);
   store.save();
 }
-module.exports = { PRICES, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup, chargeBalance };
+module.exports = { PRICES, ADDONS, defBilling, quote, view, setPlan, issueInvoice, markInvoicePaid, setMethod, stripeCheckout, usageEstimate, setRates, addUsage, creditTopup, chargeBalance, confirmSubscriptionCrypto };

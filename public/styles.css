@@ -2497,6 +2497,23 @@ html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke)
 .bt-year b { color: var(--accent); }
 .bt-sum { font-size: 20px; font-weight: 700; color: var(--navy-900); }
 
+/* сопровождение (платные опции сверх тарифа) */
+.bill-addons { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ba-h { font-size: 12.5px; font-weight: 650; color: var(--ink); }
+.ba-h .muted { font-weight: 400; font-size: 11px; }
+.bill-addon { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--bg-2); cursor: pointer; transition: border-color .15s, background .15s; }
+.bill-addon.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke)); background: color-mix(in srgb, var(--accent) 7%, var(--bg-2)); }
+.bill-addon .ba-ck { position: absolute; opacity: 0; pointer-events: none; }
+.ba-box { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--stroke); display: grid; place-items: center; color: transparent; background: var(--bg-1, #fff); transition: all .15s; }
+.ba-box svg { width: 13px; height: 13px; }
+.bill-addon.on .ba-box { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ba-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ba-tx b { font-size: 13px; color: var(--ink); font-weight: 600; }
+.ba-tx i { font-size: 11px; color: var(--ink-3); font-style: normal; line-height: 1.35; }
+.ba-price { flex: 0 0 auto; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.ba-price small { display: block; font-size: 10px; font-weight: 500; color: var(--ink-3); }
+.bill-addon.on .ba-price { color: var(--accent); }
+
 .bill-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 
 .bill-usage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }

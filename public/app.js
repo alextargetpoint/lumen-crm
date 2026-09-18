@@ -12841,6 +12841,24 @@ PAGES.billing = async (root) => {
       <span class="muted" style="font-size:11px">${q.seatsIncluded} включено, далее ${money(q.seatPrice)}/мес за место</span>
     </div>` : '';
 
+  const A = B.addons || {};
+  const addonsBlock = q.custom ? '' : `
+    <div class="bill-addons">
+      <div class="ba-h">Сопровождение <span class="muted">по желанию</span></div>
+      <label class="bill-addon ${A.onboarding ? 'on' : ''}">
+        <input type="checkbox" class="ba-ck" data-addon="onboarding" ${A.onboarding ? 'checked' : ''}>
+        <span class="ba-box">${ic(I.check || I.spark)}</span>
+        <span class="ba-tx"><b>Помощь с подключением + частичная кастомизация</b><i>Настроим под вас и поможем со стартом · оплачивается один раз</i></span>
+        <span class="ba-price">$200<small>разово</small></span>
+      </label>
+      <label class="bill-addon ${A.assist ? 'on' : ''}">
+        <input type="checkbox" class="ba-ck" data-addon="assist" ${A.assist ? 'checked' : ''}>
+        <span class="ba-box">${ic(I.check || I.spark)}</span>
+        <span class="ba-tx"><b>Ассистирование</b><i>Каждый месяц: развёрнутый фидбек и правки под вас</i></span>
+        <span class="ba-price">$50<small>/мес</small></span>
+      </label>
+    </div>`;
+
   const totalBlock = q.custom ? `
     <div class="bill-total">
       <div class="bt-sum">по договору</div>
@@ -12849,9 +12867,11 @@ PAGES.billing = async (root) => {
     <div class="bill-total">
       <div class="bt-line"><span>Платформа «${q.name}»</span><b>${money(q.base)}/мес</b></div>
       ${q.extraSeats ? `<div class="bt-line"><span>Доп. места × ${q.extraSeats}</span><b>${money(q.extraSeats * q.seatPrice)}/мес</b></div>` : ''}
-      ${(B.prices[q.plan] && B.prices[q.plan].setup) ? `<div class="bt-line"><span>Внедрение (разово)</span><b>${money(B.prices[q.plan].setup)}</b></div>` : ''}
+      ${q.assistMonthly ? `<div class="bt-line"><span>Ассистирование</span><b>${money(q.assistMonthly)}/мес</b></div>` : ''}
+      ${q.onboardingOnce ? `<div class="bt-line"><span>Подключение + кастомизация (разово)</span><b>${money(q.onboardingOnce)}</b></div>` : ''}
       <div class="bt-line bt-grand"><span>Итого${q.cycle === 'yearly' ? ' в месяц' : ''}</span><b>${money(q.monthlyTotal)}/мес</b></div>
-      ${q.cycle === 'yearly' ? `<div class="bt-line bt-year"><span>К оплате за год (−${q.saveYearlyPct}%)</span><b>${money(q.billedNow)}</b></div>` : ''}
+      ${q.cycle === 'yearly' ? `<div class="bt-line bt-year"><span>К оплате за год (−${q.saveYearlyPct}%)${q.onboardingOnce ? ' + разовое' : ''}</span><b>${money(q.billedNow)}</b></div>`
+        : (q.onboardingOnce ? `<div class="bt-line bt-year"><span>К оплате сейчас (с разовым)</span><b>${money(q.billedNow)}</b></div>` : '')}
     </div>`;
 
   root.innerHTML = `
@@ -12885,6 +12905,7 @@ PAGES.billing = async (root) => {
           </div>
           <div class="bill-plans">${['broker', 'agency', 'network'].map(planCard).join('')}</div>
           ${seatsRow}
+          ${addonsBlock}
           ${totalBlock}
           <div class="bill-actions">
             ${q.custom
@@ -12950,10 +12971,10 @@ PAGES.billing = async (root) => {
               ? `<div class="bal-note ok">${ic(I.check || I.spark)}<span>Баланса хватает на прогноз месяца (${moneyC(fc)}). Остаток после списания — ${moneyC(cov)}.</span></div>`
               : `<div class="bal-note warn">${ic(I.spark)}<span>Прогноз месяца — ${moneyC(fc)}. Не хватает ${moneyC(-cov)} — пополните заранее, иначе исходящие/ИИ приостановятся.</span></div>`;
           })()}
-          ${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).length
-            ? `<div class="bal-tx">${(B.cryptoTopups || []).filter(t => t.status === 'confirmed').slice(0, 3).map(t => `<div class="bal-tx-row"><span>+${moneyC(t.creditedAmount != null ? t.creditedAmount : t.amountUsd)} · ${(t.chain || '').toUpperCase()}</span><span class="muted">${date(t.confirmedAt)}</span></div>`).join('')}</div>`
+          ${(B.cryptoTopups || []).filter(t => t.status === 'confirmed' && t.appliedTo !== 'subscription').slice(0, 3).length
+            ? `<div class="bal-tx">${(B.cryptoTopups || []).filter(t => t.status === 'confirmed' && t.appliedTo !== 'subscription').slice(0, 3).map(t => `<div class="bal-tx-row"><span>+${moneyC(t.creditedAmount != null ? t.creditedAmount : t.amountUsd)} · ${(t.chain || '').toUpperCase()}</span><span class="muted">${date(t.confirmedAt)}</span></div>`).join('')}</div>`
             : ''}
-          <div class="muted" style="font-size:11px;margin-top:8px">С баланса списываются расходники (WhatsApp, ИИ, минуты, аренда номеров) и — по желанию — подписка. Пополнение приходит на холодный кошелёк и подтверждается автоматически on-chain.</div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Баланс — только расходники (WhatsApp, ИИ, минуты, аренда номеров). Подписка оплачивается отдельно (в разделе «Тариф») и на этот баланс не влияет. Пополнение приходит на холодный кошелёк и подтверждается автоматически on-chain.</div>
         </div>
 
         <!-- пара «факт ↔ прогноз»: слева реальные списания, справа симулятор -->
@@ -13186,6 +13207,7 @@ PAGES.billing = async (root) => {
   }));
   const tuc = $('#topupCrypto', root); if (tuc) tuc.addEventListener('click', () => openTopupCrypto({ purpose: 'consumables', onDone: reload }));
   const psc = $('#paySubCrypto', root); if (psc) psc.addEventListener('click', () => openTopupCrypto({ purpose: 'subscription', presetAmount: +psc.dataset.amt || 0, onDone: reload }));
+  $$('.ba-ck', root).forEach(ck => ck.addEventListener('change', async () => { await api.post('/billing/plan', { addons: { [ck.dataset.addon]: ck.checked } }); await reload(); }));
 };
 
 /* ---------- Крипто-пополнение баланса (USDT TRC20/ERC20 → холодный кошелёк, авто-верификация) ---------- */
@@ -13195,7 +13217,7 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
   const money2 = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const bd = modal({
     title: isSub ? 'Оплата подписки криптой' : 'Пополнить баланс расходников',
-    sub: isSub ? 'USDT на баланс — с него спишется подписка' : 'Только крипта (USDT). Приходит на холодный кошелёк, подтверждается автоматически',
+    sub: isSub ? 'USDT · подписка активируется автоматически после подтверждения перевода' : 'Только крипта (USDT). Приходит на холодный кошелёк, подтверждается автоматически',
     wide: true,
     body: `
       <div id="tcStep1">
@@ -13253,8 +13275,8 @@ function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } =
         clearInterval(pollTimer);
         const st = bd.querySelector('#tcStatus');
         const credited = me.creditedAmount != null ? me.creditedAmount : me.amountUsd;
-        if (st) { st.className = 'tc-status ok'; st.innerHTML = `${ic(I.check || I.spark)}<span>Платёж получен! Баланс пополнен на ${money2(credited)}.</span>`; }
-        toast('Платёж подтверждён', `Баланс +${money2(credited)}`, true);
+        if (st) { st.className = 'tc-status ok'; st.innerHTML = isSub ? `${ic(I.check || I.spark)}<span>Оплата ${money2(credited)} получена! Подписка активирована — счёт помечен оплаченным.</span>` : `${ic(I.check || I.spark)}<span>Платёж получен! Баланс пополнен на ${money2(credited)}.</span>`; }
+        toast(isSub ? 'Подписка оплачена' : 'Платёж подтверждён', isSub ? 'Подписка активна' : `Баланс +${money2(credited)}`, true);
         setTimeout(() => { closeModal(); if (onDone) onDone(); }, 1800);
       } else if (me && me.status === 'expired') {
         clearInterval(pollTimer);

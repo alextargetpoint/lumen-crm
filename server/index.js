@@ -2774,10 +2774,16 @@ async function cryptoTick() {
           /* матч: суб-цент маркер совпал (±0.0005) И txid ещё не зачтён нигде у этого тенанта */
           const hit = pool.find(x => Math.abs(x.amt - t.exactAmount) < 0.0005 && !(bl.creditedTxids || []).includes(x.txid));
           if (hit) {
-            if (billing.creditTopup(db, t, hit.txid, hit.amt)) {
+            const isSub = t.purpose === 'subscription';
+            const done = isSub ? billing.confirmSubscriptionCrypto(db, t, hit.txid, hit.amt) : billing.creditTopup(db, t, hit.txid, hit.amt);
+            if (done) {
               changed = true;
-              try { notify(db, { type: 'payment', level: 'success', title: 'Баланс пополнен', text: `+$${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) — платёж подтверждён on-chain. Баланс расходников: $${(db.settings.billing.balance || 0).toFixed(2)}.` }); } catch (e) {}
-              try { bl._balLevel = null; lowBalanceCheck(db); } catch (e) {}
+              if (isSub) {
+                try { notify(db, { type: 'payment', level: 'success', title: 'Подписка оплачена', text: `Платёж $${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) подтверждён on-chain. Подписка активна до ${new Date(db.settings.billing.currentPeriodEnd).toLocaleDateString('ru-RU')}.` }); } catch (e) {}
+              } else {
+                try { notify(db, { type: 'payment', level: 'success', title: 'Баланс пополнен', text: `+$${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) — платёж подтверждён on-chain. Баланс расходников: $${(db.settings.billing.balance || 0).toFixed(2)}.` }); } catch (e) {}
+                try { bl._balLevel = null; lowBalanceCheck(db); } catch (e) {}
+              }
             }
           }
         }
