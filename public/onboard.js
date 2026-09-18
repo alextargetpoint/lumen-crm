@@ -108,6 +108,7 @@
       { id: 'style' },
       { id: 'brand' },
       { id: 'geos' },
+      !solo && { id: 'team' },
       { id: 'tone' },
       { id: 'more' },
       { id: 'pricing' },
@@ -298,6 +299,16 @@
     };
   }
 
+  function stepTeam() {
+    S.brokers = (S.brokers && S.brokers.length) ? S.brokers : [{}];
+    return {
+      title: 'Ваши брокеры',
+      sub: 'Добавьте брокеров прямо сейчас — заведём им под-аккаунты (личный вход по PIN, каждый видит только своих лидов). Можно оставить пусто и добавить позже в разделе «Брокеры».',
+      html: `<div class="ob-team" id="obTeam"></div>
+        <button type="button" class="ob-addbrk" id="obAddBrk">+ Добавить брокера</button>`,
+    };
+  }
+
   function stepMore() {
     const caps = [
       { ic: 'phone', t: 'Телефония', d: 'Звонки в один клик, запись и ИИ-резюме разговора прямо в карточке лида.' },
@@ -361,7 +372,7 @@
       case 'whatsapp': return stepGuide({ title: 'WhatsApp — сердце системы', sub: 'Главный канал. Через WhatsApp Cloud API Lumen отвечает клиентам с вашего номера.', shot: 'dialogs', action: 'wa', cta: 'Подключить WhatsApp', points: ['Ответы с вашего номера, а не с чужого', 'Первый ответ за секунды, круглосуточно', 'Шаблон первого касания под модерацию Meta', 'Мастер подключения — 7 понятных шагов'] });
       case 'chains': return stepGuide({ title: 'Цепочки касаний', sub: 'Не ответил сразу — Lumen мягко дожимает по расписанию и уважает тихие часы.', shot: 'sequences', action: 'chains', cta: 'Открыть цепочки', points: ['Готовая цепочка на 7 касаний / 18 дней', 'Переключение между каналами', 'Останавливается, как только клиент ответил', 'Реанимация «спящей» базы'] });
       case 'listings': return stepGuide({ title: 'База объектов', sub: 'Загрузите объекты — Lumen соберёт из них живые подборки под клиента.', shot: 'collections', action: 'listings', cta: 'Импортировать объекты', points: ['Импорт Reelly / CSV / Excel / JSON', 'Синк порталов (Property Finder, Bayut, DLD)', 'Подборки с вашим лого и подписью', 'Публичная страница с трекингом просмотров'] });
-      case 'team': return stepGuide({ title: 'Команда и роли', sub: 'Добавьте брокеров, раздайте роли и настройте видимость лидов.', shot: 'leadcard', action: 'team', cta: 'Добавить брокеров', points: ['Роли: брокер, ассистент, маркетолог, аналитик, руководитель', 'Фильтр лидов по источнику/тегу или «только свои»', 'Мост Telegram ⇄ WhatsApp для каждого брокера', 'Распределение заявок и SLA на ответ'] });
+      case 'team': return stepTeam();
       case 'control': return stepGuide({ title: 'Контроль и защита базы', sub: 'Ваша база — ваш актив. Lumen следит, чтобы лиды не утекали, а руководитель видел всё.', shot: 'leadcard', action: 'control', cta: 'Открыть Пульт контроля', points: ['Антислив: контакты клиента скрыты от брокера до нужного момента', 'Сигналы руководителю: кто тянет с ответом, где просела конверсия', 'Журнал действий и разграничение доступа по ролям', 'Мягкий оффбординг: уходит брокер — база и переписки остаются у вас'] });
       case 'more': return stepMore();
       case 'pricing': return stepPricing();
@@ -472,6 +483,21 @@
       qq('[data-tone]').forEach(b => b.onclick = () => { S.tone = b.dataset.tone; qq('[data-tone]').forEach(x => x.classList.toggle('on', x === b)); });
       q('#obAutopilot').onchange = e => S.autopilot = e.target.checked;
     }
+    if (step.id === 'team') {
+      const box = q('#obTeam');
+      const drawTeam = () => {
+        box.innerHTML = (S.brokers || []).map((b, i) => `<div class="ob-brk" data-i="${i}">
+          <input class="ob-bk" data-k="name" placeholder="Имя брокера" value="${esc(b.name || '')}">
+          <input class="ob-bk" data-k="phone" placeholder="Телефон" value="${esc(b.phone || '')}">
+          <input class="ob-bk" data-k="email" placeholder="E-mail (для входа)" value="${esc(b.email || '')}">
+          <button type="button" class="ob-bk-del" data-del="${i}" title="Убрать">×</button>
+        </div>`).join('');
+        box.querySelectorAll('.ob-bk').forEach(inp => inp.oninput = () => { const i = +inp.closest('[data-i]').dataset.i; S.brokers[i][inp.dataset.k] = inp.value; });
+        box.querySelectorAll('[data-del]').forEach(btn => btn.onclick = () => { const i = +btn.dataset.del; if (S.brokers.length <= 1) S.brokers = [{}]; else S.brokers.splice(i, 1); drawTeam(); });
+      };
+      drawTeam();
+      const ab = q('#obAddBrk'); if (ab) ab.onclick = () => { S.brokers.push({}); drawTeam(); };
+    }
     if (step.id === 'pricing') {
       qq('[data-seat]').forEach(b => b.onclick = () => {
         if (S.edition === 'solo') return;
@@ -549,6 +575,9 @@
   async function finish() {
     const fin = root.querySelector('[data-act="next"]'); if (fin) { fin.classList.add('dis'); fin.textContent = 'Запускаем…'; }
     await saveProgress(true);
+    /* заводим брокеров, добавленных в шаге «Команда» (синк с аккаунтом) */
+    const brs = (S.brokers || []).filter(b => b && String(b.name || '').trim());
+    for (const b of brs) { try { await api('POST', '/brokers', { name: b.name, phone: b.phone || '', email: b.email || '' }); } catch (e) {} }
     root.classList.add('ob-launch');
     setTimeout(async () => {
       close(false);
@@ -817,6 +846,15 @@
     .ob-do-pay{width:100%;justify-content:center;display:flex;align-items:center}
     .ob-price-rr{display:flex;align-items:center;gap:7px;font-size:12px;color:#6b6a68;font-weight:300;margin-top:14px;justify-content:center}
     .ob-price-rr svg{width:13px;height:13px;flex:0 0 13px;color:#d6c7a8}
+    .ob-team{display:flex;flex-direction:column;gap:10px;max-width:560px;margin:0 auto}
+    .ob-brk{display:grid;grid-template-columns:1.3fr 1fr 1.3fr 34px;gap:8px;align-items:center}
+    .ob-brk .ob-bk{padding:11px 12px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.03);color:#f4f3f1;font-size:14px;font-family:inherit;outline:none}
+    .ob-brk .ob-bk:focus{border-color:#c9a86a;background:rgba(255,255,255,.05)}
+    .ob-brk .ob-bk-del{width:34px;height:38px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(255,255,255,.03);color:#a7a6a3;cursor:pointer;font-size:17px}
+    .ob-brk .ob-bk-del:hover{color:#ff8a8a;border-color:rgba(255,138,138,.4)}
+    .ob-addbrk{display:block;margin:14px auto 0;max-width:560px;width:100%;padding:12px;border:1px dashed rgba(201,168,106,.4);border-radius:11px;background:transparent;color:#c9a86a;font-size:14px;font-weight:600;cursor:pointer}
+    .ob-addbrk:hover{background:rgba(201,168,106,.07)}
+    @media (max-width:560px){ .ob-brk{grid-template-columns:1fr 34px} .ob-brk .ob-bk[data-k="phone"],.ob-brk .ob-bk[data-k="email"]{grid-column:1} }
     .ob-seats-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 4px;font-size:13px;color:#a7a6a3}
     .ob-stepper{display:inline-flex;align-items:center;gap:12px}
     .ob-stepper button{width:32px;height:32px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#f4f3f1;font-size:18px;cursor:pointer;line-height:1}

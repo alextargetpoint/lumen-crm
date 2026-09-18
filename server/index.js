@@ -5783,6 +5783,8 @@ const server = http.createServer(async (req, res) => {
         schedule: { days: [1, 2, 3, 4, 5, 6], from: '09:00', to: '20:00' },
       };
       if (b.roleType && ROLE_CAPS[b.roleType]) br.roleType = b.roleType;   /* RBAC: создать сотрудника сразу с ролью */
+      if (b.phone) br.phone = String(b.phone).slice(0, 40);
+      if (b.email) br.email = String(b.email).slice(0, 120);
       db.brokers.push(br); store.save();
       return json(res, 200, br);
     }
