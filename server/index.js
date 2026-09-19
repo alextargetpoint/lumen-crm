@@ -936,9 +936,19 @@ function tunnelUrl() {
   } catch { return null; }
 }
 
+/* аккаунт разработки (основатель/демо): может видеть скрытые движки и включать «Все разделы».
+   Клиентские аккаунты — НЕ могут. Признак: уже включённый betaAll (грандфазер демо) или e-mail в FOUNDER_EMAILS. */
+function isDevTenant(db) {
+  try {
+    const founders = (process.env.FOUNDER_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+    const oe = ((db.settings.auth && db.settings.auth.ownerEmail) || '').toLowerCase();
+    return !!(db.settings.agency && db.settings.agency.betaAll) || (!!oe && founders.includes(oe));
+  } catch (e) { return false; }
+}
 function publicSettings(db) {
   const s = JSON.parse(JSON.stringify(db.settings));
   s.ownerEmail = (db.settings.auth && db.settings.auth.ownerEmail) || ''; /* показать текущий e-mail входа (для смены в настройках); хэши/сессии не отдаём */
+  s.devAllowed = isDevTenant(db);   /* можно ли аккаунту включать «Все разделы · разработка» (только основатель/демо) */
   delete s.auth;
   delete s.billing; // отдаётся отдельным computed-роутом /api/billing (с расчётом/расходниками)
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
@@ -6376,6 +6386,8 @@ const server = http.createServer(async (req, res) => {
         delete b.channels;
       }
       if (b.reports) { const rp = db.settings.reports; if (b.reports.instant) { Object.assign(rp.instant, b.reports.instant); delete b.reports.instant; } Object.assign(rp, b.reports); delete b.reports; }
+      /* SEC: «Все разделы · разработка» может включать только аккаунт основателя/демо, не клиент */
+      if (b.agency && ('betaAll' in b.agency) && !isDevTenant(db)) delete b.agency.betaAll;
       for (const k of ['agency', 'wa', 'ai', 'demo', 'automations', 'telephony', 'voice', 'comments']) if (b[k]) Object.assign(db.settings[k], b[k]);
       /* направления (гео): добавить новое / переименовать (пробел: раньше geoNames был неизменяем через UI) */
       if (b.geoNames && typeof b.geoNames === 'object') { db.settings.geoNames = db.settings.geoNames || {}; for (const [gk, gv] of Object.entries(b.geoNames)) { const key = String(gk).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24); const nm = String(gv || '').trim().slice(0, 60); if (key && nm) db.settings.geoNames[key] = nm; } }

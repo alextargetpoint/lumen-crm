@@ -12557,13 +12557,13 @@ PAGES.agency = async (root) => {
             </div>
             <div class="muted" style="font-size:11px;margin-top:6px">Solo прячет команду, распределение и SLA — все лиды ведёте вы, «передача» становится «взять в работу»</div>
           </div>
-          <div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Версия функционала</label>
+          ${s.devAllowed ? `<div class="pd-fact" style="margin-bottom:14px"><label class="lc-lbl">Версия функционала</label>
             <div class="chips-row">
               <button type="button" class="chip-t ${!s.agency.betaAll ? 'on' : ''}" data-betaall="0">${ic(I.check)}Публичная · сокращённая</button>
               <button type="button" class="chip-t ${s.agency.betaAll ? 'on' : ''}" data-betaall="1">${ic(I.spark)}Все разделы · разработка</button>
             </div>
             <div class="muted" style="font-size:11px;margin-top:6px">В публичной версии скрыты недоработанные движки (Контент-цех, Академия, Видео-студия, HR). Включите «Все разделы», чтобы видеть и дорабатывать их в своём аккаунте — публичным агентствам они по-прежнему не видны.</div>
-          </div>
+          </div>` : ''}
           <div class="form-row"><label>Название агентства</label><input id="agName" value="${esc(s.agency.name)}"></div>
           <div style="display:flex;gap:8px;margin-top:4px">
             <button class="btn btn-sm" id="agLogoBtn">${ic(I.plus)}Загрузить логотип</button>
