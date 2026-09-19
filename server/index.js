@@ -4874,6 +4874,8 @@ const server = http.createServer(async (req, res) => {
         const id = decodeURIComponent(p.slice('/api/billing/invoice/'.length, p.length - '/pdf'.length));
         const inv = ((db.settings.billing || {}).invoices || []).find(i => i.id === id);
         if (!inv) return json(res, 404, { error: 'счёт не найден' });
+        /* крипто-оплата — это квитанция, НЕ счёт-фактура на юр.лицо: PDF не генерим */
+        if (inv.receipt || inv.method === 'crypto') return json(res, 400, { error: 'Крипто-оплата: счёт-фактура не выставляется. Доступна квитанция об оплате в кабинете.', code: 'crypto_no_invoice' });
         try {
           const pdf = await invoicepdf.buildInvoicePdf({ inv, company: inv.company || (db.settings.billing || {}).company, reg: store.getRegistry() });
           res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="invoice-${id}.pdf"`, 'Content-Length': pdf.length });
@@ -5030,6 +5032,44 @@ const server = http.createServer(async (req, res) => {
       }
       /* банк-перевод: очередь счетов «на проверке» (клиент прикрепил квитанцию) + подтверждение оплаты админом */
       /* анкеты подключения агентств (публичная форма /brief) */
+      /* список НЕзачтённых крипто-заявок по всем тенантам (из БД, без ончейна) — для ручного зачисления оператором */
+      if (p === '/api/admin/crypto-topups' && req.method === 'GET') {
+        const rows = [];
+        for (const tid of store.listTenants()) store.runInTenant(tid, () => {
+          const d = store.get(); const bl = (d.settings || {}).billing; if (!bl) return;
+          const name = (d.settings.agency && d.settings.agency.name) || (reg.tenants[tid] || {}).name || tid;
+          for (const t of (bl.cryptoTopups || [])) {
+            if (t.status === 'confirmed') continue;
+            rows.push({ tid, name, topupId: t.id, amountUsd: t.amountUsd, exactAmount: t.exactAmount, chain: t.chain, purpose: t.purpose || 'consumables', status: t.status, ageH: Math.round((Date.now() - (t.createdAt || 0)) / 3600e3) });
+          }
+        });
+        rows.sort((a, b2) => (b2.ageH || 0) - (a.ageH || 0));
+        return json(res, 200, { ok: true, topups: rows });
+      }
+      /* ручное зачисление конкретной заявки (оператор сам сверил ончейн) — идемпотентно; либо ручное создание+зачисление */
+      if (p === '/api/admin/crypto-credit' && req.method === 'POST') {
+        const b = await readBody(req).catch(() => ({}));
+        const tid = String(b.tid || '');
+        if (!store.listTenants().includes(tid)) return json(res, 404, { error: 'нет тенанта' });
+        let out = { ok: false };
+        store.runInTenant(tid, () => {
+          const d = store.get(); const bl = d.settings.billing = d.settings.billing || billing.defBilling(); bl.cryptoTopups = bl.cryptoTopups || [];
+          let t = null;
+          if (b.topupId) t = bl.cryptoTopups.find(x => x.id === b.topupId);
+          if (!t && b.manual) { t = { id: 'tp_man_' + crypto.randomBytes(4).toString('hex'), amountUsd: +b.manual.amountUsd || 0, exactAmount: +b.manual.amountUsd || 0, chain: b.manual.chain === 'erc20' ? 'erc20' : 'trc20', address: b.manual.chain === 'erc20' ? CRYPTO_ETH : CRYPTO_TRON, purpose: b.manual.purpose === 'subscription' ? 'subscription' : 'consumables', status: 'pending', txid: b.manual.txid || null, createdAt: Date.now(), manual: true }; bl.cryptoTopups.unshift(t); }
+          if (!t) { out = { error: 'заявка не найдена' }; return; }
+          const txid = t.txid || b.txid || ('manual_' + t.id);
+          const isSub = t.purpose === 'subscription';
+          const done = isSub ? billing.confirmSubscriptionCrypto(d, t, txid, t.exactAmount || t.amountUsd) : billing.creditTopup(d, t, txid, t.exactAmount || t.amountUsd);
+          if (done) {
+            try { notify(d, { type: 'payment', level: 'success', title: isSub ? 'Подписка оплачена' : 'Баланс пополнен', text: `Платёж $${t.creditedAmount} (USDT ${(t.chain || '').toUpperCase()}) зачтён оператором.` }); } catch (e) {}
+            try { bl._balLevel = null; lowBalanceCheck(d); } catch (e) {}
+            store.save();
+            out = { ok: true, appliedTo: isSub ? 'subscription' : 'balance', amount: t.creditedAmount, balance: d.settings.billing.balance || 0, status: d.settings.billing.status };
+          } else out = { ok: false, error: 'уже зачтено (идемпотентность)' };
+        });
+        return json(res, 200, out);
+      }
       if (p === '/api/admin/briefs' && req.method === 'GET') { return json(res, 200, { ok: true, briefs: (reg.briefs || []).slice(0, 100) }); }
       if (p === '/api/admin/brief-status' && req.method === 'POST') { const b = await readBody(req); const br = (reg.briefs || []).find(x => x.id === b.id); if (br) { br.status = ['new', 'progress', 'done'].includes(b.status) ? b.status : br.status; store.saveRegistry(); } return json(res, 200, { ok: true }); }
       if (p === '/api/admin/invoices-pending' && req.method === 'GET') {

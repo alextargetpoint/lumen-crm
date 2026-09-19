@@ -283,21 +283,31 @@ function confirmSubscriptionCrypto(db, topup, txid, actualAmount) {
   const q = quote(b.plan, b.cycle, b.seats, b.addons);
   const now = Date.now();
   const chain = (topup.chain || '').toUpperCase();
+  const mult = q.cycle === 'yearly' ? 12 : 1;
+  /* итемизируем: платформа + доп.места + ассистирование + разовое подключение — чтобы клиент видел, за что заплатил */
+  const lines = [{ desc: `Подписка «${q.name}»${q.cycle === 'yearly' ? ' (год)' : ''} · платформа`, qty: 1, unit: +(q.base * mult).toFixed(2), amount: +(q.base * mult).toFixed(2) }];
+  if (q.extraSeats) lines.push({ desc: `Доп. места брокеров × ${q.extraSeats}`, qty: q.extraSeats, unit: +(q.seatPrice * mult).toFixed(2), amount: +(q.extraSeats * q.seatPrice * mult).toFixed(2) });
+  if (q.assistMonthly) lines.push({ desc: `Ассистирование${q.cycle === 'yearly' ? ' (12 мес)' : ''}`, qty: mult, unit: q.assistMonthly, amount: +(q.assistMonthly * mult).toFixed(2) });
+  if (q.onboardingOnce) lines.push({ desc: 'Помощь с подключением + частичная кастомизация (разово)', qty: 1, unit: q.onboardingOnce, amount: q.onboardingOnce });
   const inv = {
-    id: 'INV-' + String(now).slice(-8), at: now,
+    id: 'RCP-' + String(now).slice(-8), at: now,   /* RCP = квитанция (крипта), не счёт-фактура */
     plan: q.plan, planName: q.name, cycle: q.cycle, seats: q.seats,
-    amount: paid, currency: 'USD',
-    lines: [{ desc: `Подписка «${q.name}»${q.cycle === 'yearly' ? ' (год)' : ''} · оплата криптой (USDT ${chain})`, qty: 1, unit: paid, amount: paid }],
-    company: Object.assign({}, b.company || {}),
+    amount: paid, currency: 'USD', lines,
+    company: {},                                    /* крипта — БЕЗ юр. реквизитов: это квитанция, не счёт-фактура */
     period: q.cycle === 'yearly' ? '12 мес' : '1 мес',
-    status: 'paid', method: 'crypto', paidAt: now, txid: txid || null,
+    status: 'paid', method: 'crypto', receipt: true, paidAt: now, txid: txid || null,
   };
   b.invoices = b.invoices || []; b.invoices.unshift(inv); if (b.invoices.length > 60) b.invoices.length = 60;
   b.status = 'active';
   b.currentPeriodEnd = now + (q.cycle === 'yearly' ? 365 : 30) * 86400e3;
   b.usage = { periodStart: now, waTemplates: 0, aiRequests: 0 };
   b.lastPaidVia = 'crypto';
-  if (b.addons) b.addons.onboarding = false;   /* разовая опция оплачена — снимаем, чтобы не биллить повторно */
+  /* фиксируем оплаченное разовое сопровождение как ВИДИМУЮ услугу (не просто гасим тумблер) */
+  if (b.addons && b.addons.onboarding) {
+    b.services = b.services || [];
+    b.services.unshift({ key: 'onboarding', label: 'Помощь с подключением + частичная кастомизация', amount: ADDONS.onboarding.once, at: now, status: 'active', via: 'crypto' });
+    b.addons.onboarding = false;   /* разовая опция оплачена — снимаем тумблер, чтобы не биллить повторно */
+  }
   topup.creditedAmount = paid; topup.status = 'confirmed'; topup.txid = txid || topup.txid || null; topup.confirmedAt = now; topup.appliedTo = 'subscription';
   if (txid) b.creditedTxids.push(txid);
   return true;

@@ -2497,6 +2497,11 @@ html[data-night] .ad-tile { background: var(--card); border-color: var(--stroke)
 .bt-year b { color: var(--accent); }
 .bt-sum { font-size: 20px; font-weight: 700; color: var(--navy-900); }
 
+/* оплаченные услуги / активное сопровождение в карточке подписки */
+.bill-services { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+.bill-svc { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--ink-2); }
+.bill-svc svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--accent); }
+.bill-svc b { color: var(--ink); font-weight: 600; }
 /* сопровождение (платные опции сверх тарифа) */
 .bill-addons { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .ba-h { font-size: 12.5px; font-weight: 650; color: var(--ink); }

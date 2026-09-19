@@ -223,8 +223,18 @@
       <div id="invPending" style="margin-top:12px;font-size:13.5px"></div>
     </div>
     <div class="card" style="margin-top:14px">
-      <div class="row" style="justify-content:space-between"><b>Крипто-платежи · ручная сверка</b><button class="ghost" id="cryReconcile">Сверить сейчас</button></div>
-      <div class="muted" style="font-size:12.5px;margin-top:6px">Если клиент оплатил криптой (USDT), а зачисление не пришло — нажмите. Система тянет входящие ончейн (TRC20/ERC20) и зачисляет любую совпавшую заявку по точной сумме, в обход окна ожидания. Идемпотентно — повторные нажатия безопасны.</div>
+      <div class="row" style="justify-content:space-between"><b>Крипто-платежи</b><span><button class="ghost" id="cryTopups">Обновить</button> <button class="ghost" id="cryReconcile">Сверить ончейн</button></span></div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Незачтённые заявки клиентов. «Зачислить» — если клиент реально оплатил (сверь сумму/txid в блокчейне): подписку активирует, расходники кладёт на баланс. Идемпотентно. «Сверить ончейн» — авто-поиск платежа по сумме (если Railway достаёт TronGrid/Etherscan).</div>
+      <div id="cryTopupList" style="margin-top:12px;font-size:13px"></div>
+      <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Ручное зачисление (если заявки нет в списке)</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <label class="muted" style="font-size:12px">Тенант (id)<input id="mcTid" placeholder="tid из списка агентств" style="width:100%"></label>
+          <label class="muted" style="font-size:12px">Сумма USD<input id="mcAmt" type="number" step="0.01" placeholder="400" style="width:100%"></label>
+          <label class="muted" style="font-size:12px">Назначение<select id="mcPurpose" style="width:100%"><option value="subscription">Подписка</option><option value="consumables">Расходники (баланс)</option></select></label>
+          <label class="muted" style="font-size:12px">Сеть / txid<input id="mcTx" placeholder="txid (необязательно)" style="width:100%"></label>
+        </div>
+        <button id="mcCredit" style="margin-top:10px">Зачислить вручную</button>
+      </details>
       <div id="cryOut" style="margin-top:12px;font-size:13px"></div>
     </div>
   </div>
@@ -260,7 +270,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'map') renderMap();
   if (b.dataset.tab === 'release') loadRelease();
   if (b.dataset.tab === 'support') loadSupport();
-  if (b.dataset.tab === 'invoices') loadInvoices();
+  if (b.dataset.tab === 'invoices') { loadInvoices(); loadCryptoTopups(); }
   if (b.dataset.tab === 'briefs') loadBriefs();
 }));
 
@@ -333,7 +343,48 @@ async function loadInvoices() {
 }
 document.addEventListener('click', (e) => { if (e.target && e.target.id === 'invReload') loadInvoices(); });
 
-// ── Крипто-платежи: ручная сверка ──
+// ── Крипто-платежи: список незачтённых заявок + ручное зачисление ──
+const cryMoney = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+async function loadCryptoTopups() {
+  const host = $('#cryTopupList'); if (!host) return;
+  host.innerHTML = '<span class="muted">Загрузка…</span>';
+  try {
+    const r = await api('/api/admin/crypto-topups');
+    const list = r.topups || [];
+    if (!list.length) { host.innerHTML = '<div class="muted" style="padding:8px 0">Незачтённых заявок нет.</div>'; return; }
+    host.innerHTML = list.map(t => `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06));flex-wrap:wrap">
+      <div style="flex:1;min-width:200px"><b>${cryMoney(t.exactAmount || t.amountUsd)}</b> · ${esc((t.chain||'').toUpperCase())} · ${t.purpose === 'subscription' ? 'подписка' : 'расходники'}
+        <div class="muted" style="font-size:12px">${esc(t.name)} · <code>${esc(t.tid)}</code> · заявке ${t.ageH}ч · ${esc(t.status)}</div></div>
+      <button data-credit="${esc(t.tid)}|${esc(t.topupId)}" data-amt="${t.exactAmount||t.amountUsd}">Зачислить</button>
+    </div>`).join('');
+    host.querySelectorAll('[data-credit]').forEach(btn => btn.addEventListener('click', async () => {
+      const [tid, topupId] = btn.dataset.credit.split('|');
+      if (!confirm('Зачислить ' + cryMoney(btn.dataset.amt) + '? Убедись, что платёж реально в блокчейне.')) return;
+      btn.disabled = true; btn.textContent = 'Зачисляю…';
+      try {
+        const rr = await api('/api/admin/crypto-credit', { method: 'POST', body: JSON.stringify({ tid, topupId }) });
+        if (rr.ok) { $('#cryOut').innerHTML = `<div style="color:var(--good,#3f9d5a)">✓ Зачислено ${cryMoney(rr.amount)} → ${rr.appliedTo === 'subscription' ? 'подписка активна' : 'баланс: ' + cryMoney(rr.balance)}</div>`; loadCryptoTopups(); }
+        else { btn.disabled = false; btn.textContent = 'Зачислить'; alert(rr.error || 'ошибка'); }
+      } catch (e) { btn.disabled = false; btn.textContent = 'Зачислить'; alert(e.message); }
+    }));
+  } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
+}
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'cryTopups') loadCryptoTopups(); });
+document.addEventListener('click', async (e) => {
+  if (!e.target || e.target.id !== 'mcCredit') return;
+  const tid = $('#mcTid').value.trim(), amountUsd = +$('#mcAmt').value || 0, purpose = $('#mcPurpose').value, txid = $('#mcTx').value.trim();
+  if (!tid || !(amountUsd > 0)) { alert('Укажи тенант и сумму'); return; }
+  if (!confirm('Зачислить ' + cryMoney(amountUsd) + ' тенанту ' + tid + '?')) return;
+  e.target.disabled = true; e.target.textContent = 'Зачисляю…';
+  try {
+    const rr = await api('/api/admin/crypto-credit', { method: 'POST', body: JSON.stringify({ tid, manual: { amountUsd, purpose, txid } }) });
+    if (rr.ok) { $('#cryOut').innerHTML = `<div style="color:var(--good,#3f9d5a)">✓ Зачислено ${cryMoney(rr.amount)} → ${rr.appliedTo === 'subscription' ? 'подписка активна' : 'баланс: ' + cryMoney(rr.balance)}</div>`; loadCryptoTopups(); }
+    else alert(rr.error || 'ошибка');
+  } catch (err) { alert(err.message); }
+  e.target.disabled = false; e.target.textContent = 'Зачислить вручную';
+});
+
+// ── Крипто-платежи: авто-сверка ончейн ──
 async function cryptoReconcile() {
   const out = $('#cryOut'); const btn = $('#cryReconcile');
   out.innerHTML = '<span class="muted">Тяну ончейн и сверяю…</span>'; if (btn) { btn.disabled = true; btn.textContent = 'Сверяю…'; }

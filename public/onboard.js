@@ -518,6 +518,7 @@
     S.pendingGuides = S.pendingGuides || [];
     if (action && !S.pendingGuides.includes(action)) S.pendingGuides.push(action);
     saveProgress(false);
+    if (action === 'pay') { finish(); return; }   /* «Перейти к оплате» — сразу завершаем онбординг и уходим в раздел «Подписка и оплата» */
     next(false);
   }
 
@@ -669,7 +670,7 @@
     .ob-close:hover{border-color:rgba(255,255,255,.4);color:#f4f3f1}
     .ob-close svg{width:15px;height:15px}
     .ob-wrap{position:absolute;inset:0;display:flex;flex-direction:column;z-index:5}
-    .ob-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 26px 12px;overflow:auto;transition:opacity .2s ease,transform .2s ease,filter .2s ease}
+    .ob-stage{flex:1;display:flex;align-items:safe center;justify-content:center;padding:56px 26px 32px;overflow:auto;transition:opacity .2s ease,transform .2s ease,filter .2s ease}
     .ob-stage.ob-leaving{opacity:0;transform:translateY(-12px);filter:blur(4px)}
     .ob-panel{width:100%;max-width:980px;animation:obIn .7s cubic-bezier(.19,1,.22,1)}
     .ob-panel-split{max-width:1080px;display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center}
@@ -689,6 +690,7 @@
     .ob-pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:300;letter-spacing:.02em;color:#a7a6a3;background:transparent;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:9px 15px;white-space:nowrap}
     .ob-pill svg{width:15px;height:15px;flex:0 0 15px;color:#d6c7a8}
     .ob-note{font-size:13px;color:#6b6a68;font-weight:300;margin-top:16px;line-height:1.55}
+    .ob-note svg{width:15px;height:15px;vertical-align:-3px;margin-right:5px;flex:0 0 auto}
     .ob-content{margin-top:6px}
     /* ── выбор редакции ── */
     .ob-choices{display:grid;grid-template-columns:1fr 1fr;gap:16px}

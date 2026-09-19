@@ -12893,7 +12893,13 @@ PAGES.billing = async (root) => {
             </div>
           </div>
           ${B.method ? `<div class="bill-method">${ic(I.card)} ${esc(B.method.brand)} ···· ${esc(B.method.last4)}${B.method.exp ? ' · ' + esc(B.method.exp) : ''}</div>`
-            : `<div class="bill-method muted">Способ оплаты не привязан — ${B.payMode === 'stripe' ? 'картой через Stripe' : 'оплата по счёту'}</div>`}
+            : B.lastPaidVia === 'crypto'
+              ? `<div class="bill-method">${ic(I.wallet || I.check)} Оплачено криптой (USDT) · квитанции в «Счета»</div>`
+              : `<div class="bill-method muted">Способ оплаты не привязан — ${B.payMode === 'stripe' ? 'картой через Stripe' : 'оплата по счёту'}</div>`}
+          ${((B.services || []).filter(s => s.status === 'active').length || (B.addons && B.addons.assist)) ? `<div class="bill-services">
+            ${(B.services || []).filter(s => s.status === 'active').map(s => `<div class="bill-svc">${ic(I.check)}<span><b>${esc(s.label)}</b> · оплачено${s.at ? ' ' + date(s.at) : ''}</span></div>`).join('')}
+            ${(B.addons && B.addons.assist) ? `<div class="bill-svc">${ic(I.check)}<span><b>Ассистирование</b> · ${money(50)}/мес · активно</span></div>` : ''}
+          </div>` : ''}
         </div>
 
         <!-- выбор тарифа -->
