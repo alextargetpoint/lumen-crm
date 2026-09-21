@@ -2795,7 +2795,8 @@ async function cryptoTick() {
               if (isSub) {
                 try { notify(db, { type: 'payment', level: 'success', title: 'Подписка оплачена', text: `Платёж $${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) подтверждён on-chain. Подписка активна до ${new Date(db.settings.billing.currentPeriodEnd).toLocaleDateString('ru-RU')}.` }); } catch (e) {}
               } else {
-                try { notify(db, { type: 'payment', level: 'success', title: 'Баланс пополнен', text: `+$${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) — платёж подтверждён on-chain. Баланс расходников: $${(db.settings.billing.balance || 0).toFixed(2)}.` }); } catch (e) {}
+                /* пополнение баланса расходников самим клиентом — ТОЛЬКО в кабинете (без email/Telegram клиенту) */
+                try { notify(db, { type: 'payment', level: 'success', title: 'Баланс пополнен', text: `+$${t.creditedAmount} (USDT ${t.chain.toUpperCase()}) — платёж подтверждён on-chain. Баланс расходников: $${(db.settings.billing.balance || 0).toFixed(2)}.`, email: false, telegram: false }); } catch (e) {}
                 try { bl._balLevel = null; lowBalanceCheck(db); } catch (e) {}
               }
             }
@@ -5083,6 +5084,26 @@ const server = http.createServer(async (req, res) => {
           } else out = { ok: false, error: 'уже зачтено (идемпотентность)' };
         });
         return json(res, 200, out);
+      }
+      /* инспектор биллинга тенанта: баланс, статус подписки, услуги, счета/квитанции, крипто-заявки (для разбора «оплатил, а не видно») */
+      if (p === '/api/admin/tenant-billing' && req.method === 'GET') {
+        let tid = u.searchParams.get('tid') || '';
+        const q = (u.searchParams.get('q') || '').toLowerCase().trim();
+        if (!tid && q) {
+          for (const t of store.listTenants()) { const nm = ((reg.tenants[t] || {}).name || '').toLowerCase(); let an = ''; store.runInTenant(t, () => { an = ((store.get().settings.agency || {}).name || '').toLowerCase(); }); if (nm.includes(q) || an.includes(q) || t.toLowerCase().includes(q)) { tid = t; break; } }
+        }
+        if (!store.listTenants().includes(tid)) return json(res, 404, { error: 'тенант не найден (проверь id/имя)' });
+        let out = null;
+        store.runInTenant(tid, () => {
+          const d = store.get(); const b = d.settings.billing || {};
+          out = { tid, name: (d.settings.agency && d.settings.agency.name) || (reg.tenants[tid] || {}).name || tid,
+            ownerEmail: (d.settings.auth && d.settings.auth.ownerEmail) || '',
+            balance: b.balance || 0, status: b.status, plan: b.plan, cycle: b.cycle, seats: b.seats,
+            addons: b.addons || {}, services: b.services || [], currentPeriodEnd: b.currentPeriodEnd || null, lastPaidVia: b.lastPaidVia || '',
+            invoices: (b.invoices || []).slice(0, 12).map(i => ({ id: i.id, amount: i.amount, status: i.status, method: i.method || '', receipt: !!i.receipt, at: i.at })),
+            topups: (b.cryptoTopups || []).slice(0, 20).map(t => ({ amountUsd: t.amountUsd, exactAmount: t.exactAmount, chain: t.chain, purpose: t.purpose || 'consumables', status: t.status, creditedAmount: t.creditedAmount, appliedTo: t.appliedTo, txid: t.txid, ageH: Math.round((Date.now() - (t.createdAt || 0)) / 3600e3) })) };
+        });
+        return json(res, 200, { ok: true, billing: out });
       }
       /* ключи для авто-верификации крипты (TronGrid обязателен на Railway; Etherscan — для ERC20). Хранятся в реестре, без редеплоя. */
       if (p === '/api/admin/crypto-keys' && req.method === 'GET') {

@@ -238,6 +238,15 @@
       </details>
       <div id="cryOut" style="margin-top:12px;font-size:13px"></div>
     </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><b>Инспектор биллинга тенанта</b></div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Разобрать «клиент оплатил, а не видно»: баланс, статус подписки, оплаченные услуги, счета/квитанции и все крипто-заявки с txid.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <input id="tbQ" placeholder="имя агентства или tid (напр. Trust Phuket)" style="flex:1;min-width:220px">
+        <button id="tbGo">Показать</button>
+      </div>
+      <div id="tbOut" style="margin-top:12px;font-size:13px"></div>
+    </div>
   </div>
 </div>
 
@@ -408,6 +417,36 @@ document.addEventListener('click', async (e) => {
   } catch (err) { alert(err.message); }
   e.target.disabled = false; e.target.textContent = 'Зачислить вручную';
 });
+
+// ── Инспектор биллинга тенанта ──
+async function tenantBilling() {
+  const q = $('#tbQ').value.trim(); const out = $('#tbOut');
+  if (!q) { out.innerHTML = '<span class="muted">Введите имя или tid.</span>'; return; }
+  out.innerHTML = '<span class="muted">Ищу…</span>';
+  try {
+    const r = await api('/api/admin/tenant-billing?q=' + encodeURIComponent(q));
+    if (!r.ok) { out.innerHTML = '<span style="color:var(--bad,#d66)">' + esc(r.error || 'не найдено') + '</span>'; return; }
+    const b = r.billing;
+    const stColor = b.status === 'active' ? 'var(--good,#3f9d5a)' : 'var(--bad,#d66)';
+    const inv = (b.invoices || []).map(i => `<div style="padding:4px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))"><b>${esc(i.id)}</b> · ${cryMoney(i.amount)} · <b style="color:${i.status === 'paid' ? 'var(--good,#3f9d5a)' : 'inherit'}">${esc(i.status)}</b> · ${esc(i.method || '—')}${i.receipt ? ' · квитанция' : ''}</div>`).join('') || '<span class="muted">нет</span>';
+    const tps = (b.topups || []).map(t => `<div style="padding:4px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))">${cryMoney(t.exactAmount || t.amountUsd)} · ${esc((t.chain || '').toUpperCase())} · ${t.purpose} · <b style="color:${t.status === 'confirmed' ? 'var(--good,#3f9d5a)' : '#c9a86a'}">${esc(t.status)}</b>${t.creditedAmount != null ? ' · зачтено ' + cryMoney(t.creditedAmount) + (t.appliedTo ? ' → ' + t.appliedTo : '') : ''}${t.txid ? '<div class="muted" style="font-size:11px">tx ' + esc(String(t.txid).slice(0, 26)) + '…</div>' : ''}</div>`).join('') || '<span class="muted">нет заявок</span>';
+    const svc = (b.services || []).map(s => `${esc(s.label)} (${cryMoney(s.amount)}, ${esc(s.status)})`).join(', ') || '—';
+    out.innerHTML = `<div style="border:1px solid var(--line);border-radius:10px;padding:12px">
+      <div style="font-size:15px;font-weight:700">${esc(b.name)} <span class="muted" style="font-weight:400;font-size:12px">${esc(b.tid)}</span></div>
+      <div class="muted" style="font-size:12px;margin:2px 0 10px">${esc(b.ownerEmail || '')}</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">
+        <div>Подписка: <b style="color:${stColor}">${esc(b.status || '—')}</b> · ${esc(b.plan || '')}/${esc(b.cycle || '')} · мест ${b.seats || '—'}</div>
+        <div>Баланс расходников: <b>${cryMoney(b.balance)}</b></div>
+        <div>Оплата: ${esc(b.lastPaidVia || '—')}</div>
+      </div>
+      <div style="margin-bottom:6px"><b>Услуги:</b> ${svc}</div>
+      <div style="margin-bottom:6px"><b>Услуги-тумблеры:</b> onboarding=${b.addons.onboarding ? 'on' : 'off'}, assist=${b.addons.assist ? 'on' : 'off'}</div>
+      <div style="margin-top:10px"><b>Счета / квитанции:</b>${inv}</div>
+      <div style="margin-top:10px"><b>Крипто-заявки:</b>${tps}</div>
+    </div>`;
+  } catch (e) { out.innerHTML = '<span style="color:var(--bad,#d66)">' + esc(e.message) + '</span>'; }
+}
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'tbGo') tenantBilling(); });
 
 // ── Крипто-платежи: авто-сверка ончейн ──
 async function cryptoReconcile() {
