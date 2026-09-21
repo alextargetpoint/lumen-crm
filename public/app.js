@@ -8468,7 +8468,9 @@ PAGES.ads = async (root) => {
       </span>`;
       const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark(a.m.daily)}${metrics(a.m, [a.adId], a.name || a.adId)}</div>`;
       const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark(s.m.daily)}${metrics(s.m, s.ads.map(x => x.adId), s.name)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
-      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark(c.m.daily)}${metrics(c.m, c.adsets.flatMap(a => a.ads.map(x => x.adId)), c.name)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
+      const CT_TYPE = { lead: ['Лиды', 'ct-t-lead'], messaging: ['Переписки', 'ct-t-msg'], traffic: ['Трафик', 'ct-t-traf'], reach: ['Охват', 'ct-t-reach'], engagement: ['Вовлечение', 'ct-t-eng'] };
+      const ctTypeBadge = (t) => { const x = CT_TYPE[t]; return x ? `<span class="cta-badge ct-type ${x[1]}" title="Тип кампании (Meta objective)">${x[0]}</span>` : ''; };
+      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span>${ctTypeBadge(c.campaignType)}<span class="cta-name">${esc(c.name)}</span>${spark(c.m.daily)}${metrics(c.m, c.adsets.flatMap(a => a.ads.map(x => x.adId)), c.name)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
       /* сигналы оптимизации: CPL сильно выше среднего, CTR<0.5%, квалов 0 при заметном расходе */
       const T = treeD.totals || { spend: 0, leads: 0 }; const avgCpl = T.leads ? T.spend / T.leads : 0;
       const signals = [];
@@ -9135,6 +9137,9 @@ PAGES.mediaplan = async (root) => {
   const adLangOf = (a) => campLangMap[a.campaignName] || detectAdLang(a.campaignName) || detectAdLang(a.adsetName) || '';
   /* канал факта: всё, что синкнуто из кабинета Meta (есть adAccountId / meta_api / platform=meta) — это Meta */
   const adChannelOf = (a) => (a.platform === 'meta' || a.spendSource === 'meta_api' || a.adAccountId) ? 'Meta' : (a.platform || '');
+  /* тип кампании (лиды/трафик/переписка/охват/вовлечение) — из синка Meta objective; отдельная ось от направления */
+  const TYPE_LABEL = { lead: '🎯 Лиды', messaging: '💬 Переписки', traffic: '🔗 Трафик', reach: '📣 Охват', engagement: '👍 Вовлечение' };
+  const adTypeOf = (a) => a.campaignType || 'lead';
   const srcCur = (S.metaAds && S.metaAds.sourceCurrency) || (S.metaAds && S.metaAds.accounts && S.metaAds.accounts[0] && S.metaAds.accounts[0].currency) || 'AED';
   const dispCur = (S.metaAds && S.metaAds.displayCurrency) || srcCur;
   const conv = (n) => fxConv(n, srcCur, dispCur);   /* база = валюта кабинета, по живым курсам */
@@ -9155,6 +9160,7 @@ PAGES.mediaplan = async (root) => {
     if (mpdGroup === 'channel') return [ln.channel || OTHER, ln.channel ? chLabel(ln.channel) : '— без канала'];
     if (mpdGroup === 'language') return [ln.language || OTHER, ln.language ? langLabel(ln.language) : '— без языка'];
     if (mpdGroup === 'contractor') return [mp.contractorId || OTHER, ctName(mp.contractorId) || mp.contractorName || '— без подрядчика'];
+    if (mpdGroup === 'camptype') return [ln.campType || 'lead', TYPE_LABEL[ln.campType || 'lead'] || 'Лиды'];   /* у строки плана можно задать тип; по умолчанию лиды */
     return [ln.direction || OTHER, ln.direction ? dirName(ln.direction) : '— без направления'];
   };
   for (const mp of plans) {
@@ -9166,6 +9172,7 @@ PAGES.mediaplan = async (root) => {
     if (mpdGroup === 'channel') { const nm = adChannelOf(a); return nm ? [nm, chLabel(nm)] : [OTHER, 'Прочее (вне плана)']; }
     if (mpdGroup === 'contractor') { const cid = acctToCt[a.adAccountId]; return cid ? [cid, ctName(cid)] : [OTHER, 'Прочее (вне плана)']; }
     if (mpdGroup === 'language') { const lk = adLangOf(a); return lk ? [lk, langLabel(lk)] : ['__nolang', 'Факт (язык не размечен)']; }
+    if (mpdGroup === 'camptype') { const tk = adTypeOf(a); return [tk, TYPE_LABEL[tk] || tk]; }
     const dk = campMap[a.campaignName]; return dk ? [dk, dirName(dk)] : [OTHER, 'Прочее (вне плана)'];
   };
   for (const a of (adData.ads || [])) {
@@ -9218,8 +9225,8 @@ PAGES.mediaplan = async (root) => {
   const totDiv = totFact.leadsMeta > 0 && Math.abs(totFact.leadsMeta - totFact.leadsCRM) / totFact.leadsMeta > 0.15;
   const taxBtn = `<button class="btn btn-sm ${taxOn ? 'on' : ''}" id="mpdTax" data-team title="Показывать расход с налогом/сборами">${taxOn ? `✓ +налог ${taxPct}%` : '+ налог'}</button>`;
   const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${taxBtn}<button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
-  const GRP = { direction: ['направлениям', 'Направление'], channel: ['каналам', 'Канал'], contractor: ['подрядчикам', 'Подрядчик'], language: ['языкам', 'Язык'] }[mpdGroup] || ['направлениям', 'Направление'];
-  const groupSeg = `<span class="mpd-grp">${[['direction', 'Направление'], ['channel', 'Канал'], ['contractor', 'Подрядчик'], ['language', 'Язык']].map(([k, n]) => `<button class="mpd-grp-b ${mpdGroup === k ? 'on' : ''}" data-mpdgroup="${k}">${n}</button>`).join('')}</span>`;
+  const GRP = { direction: ['направлениям', 'Направление'], channel: ['каналам', 'Канал'], contractor: ['подрядчикам', 'Подрядчик'], language: ['языкам', 'Язык'], camptype: ['типам кампаний', 'Тип'] }[mpdGroup] || ['направлениям', 'Направление'];
+  const groupSeg = `<span class="mpd-grp">${[['direction', 'Направление'], ['channel', 'Канал'], ['contractor', 'Подрядчик'], ['language', 'Язык'], ['camptype', 'Тип']].map(([k, n]) => `<button class="mpd-grp-b ${mpdGroup === k ? 'on' : ''}" data-mpdgroup="${k}">${n}</button>`).join('')}</span>`;
   const ctFilter = contractors.length ? `<select id="mpdCtSel" data-mpdct><option value="">Все подрядчики</option>${contractors.map(c => `<option value="${c.id}" ${mpdCt === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : '';
   const rangeSeg = `<span class="mpd-grp">${[['plan', 'Период плана'], ['month', 'Тек. месяц'], ['custom', 'Свой']].map(([k, n]) => `<button class="mpd-grp-b ${mpdRange.preset === k ? 'on' : ''}" data-mpdrange="${k}">${n}</button>`).join('')}</span>${mpdRange.preset === 'custom' ? `<span class="mpd-custom"><input type="date" id="mpdFrom" value="${esc(factFrom || '')}"><span class="muted">—</span><input type="date" id="mpdTo" value="${esc(factTo || '')}"><button class="btn btn-sm btn-accent" id="mpdApply">ОК</button></span>` : ''}`;
   const grpBar = `<div class="mpd-grpbar"><span class="mpd-grpbar-l">Дробить по:</span>${groupSeg}${ctFilter ? `<span class="mpd-grpbar-l" style="margin-left:6px">Подрядчик:</span>${ctFilter}` : ''}</div>

@@ -80,7 +80,7 @@ async function syncInsights(db, deps, { acct, days } = {}) {
   /* time_increment:1 → строка на объявление НА КАЖДЫЙ ДЕНЬ: даёт посуточную динамику (спарклайн, факт/дн) */
   const ins = await graphPaged(`${id}/insights`, token, {
     level: 'ad', time_range: JSON.stringify({ since: ymd(since), until: ymd(until) }), time_increment: '1', limit: '400',
-    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions',
+    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions,objective',
   }, 10);
   res.capped = ins.capped;
   db.ads = db.ads || [];
@@ -95,14 +95,29 @@ async function syncInsights(db, deps, { acct, days } = {}) {
     const leadish = arr.filter(a => /(^|[._])lead/i.test(a.action_type || '')).map(a => parseInt(a.value, 10) || 0);
     return leadish.length ? Math.max(...leadish) : 0;   /* fallback: максимум, НЕ сумма (избегаем дублей) */
   };
+  /* ПЕРЕПИСКИ (для messaging/CTWA-кампаний — их «результат», не лиды) */
+  const msgOf = (acts) => { const arr = Array.isArray(acts) ? acts : []; const t = arr.find(a => /messaging_conversation_started|onsite_conversion\.messaging_first_reply/i.test(a.action_type || '')); return t ? (parseInt(t.value, 10) || 0) : 0; };
+  /* ТИП КАМПАНИИ по Meta objective (+переписки/нейминг). Направление и тип — ДВЕ независимые оси. */
+  const campaignTypeOf = (objective, camp, msgVal) => {
+    const O = String(objective || '').toUpperCase().trim();
+    const nameMsg = /whatsapp|messenger|telegram|\bdm\b|\bmsg\b|ctwa|чат|переписк|сообщен/i.test(String(camp || '').toLowerCase());
+    if (O === 'MESSAGES' || O === 'OUTCOME_MESSAGES') return 'messaging';
+    if (['REACH', 'BRAND_AWARENESS', 'OUTCOME_AWARENESS'].includes(O)) return 'reach';
+    if (['LINK_CLICKS', 'TRAFFIC', 'OUTCOME_TRAFFIC'].includes(O)) return 'traffic';
+    if (['POST_ENGAGEMENT', 'PAGE_LIKES', 'EVENT_RESPONSES', 'OUTCOME_ENGAGEMENT'].includes(O)) return (msgVal > 0 || nameMsg) ? 'messaging' : 'engagement';
+    if (['OUTCOME_LEADS', 'LEAD_GENERATION', 'CONVERSIONS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC'].includes(O)) return 'lead';
+    if (msgVal > 0 || nameMsg) return 'messaging';
+    return 'lead';   /* дефолт — лидовая (objective нет/неизвестен) */
+  };
   /* собираем по объявлению: тотал + дневной ряд */
-  const agg = {};   /* adId → {name, adset, camp, spend, impr, clicks, leads, daily:{date:{spend,leads,clicks,impr}}} */
+  const agg = {};   /* adId → {name, adset, camp, objective, spend, impr, clicks, leads, msg, daily:{...}} */
   for (const row of ins.data) {
     if (!row.ad_id) continue;
     const k = String(row.ad_id);
-    const A = agg[k] = agg[k] || { name: row.ad_name, adset: row.adset_name, camp: row.campaign_name, spend: 0, impr: 0, clicks: 0, leads: 0, daily: {} };
-    const sp = parseFloat(row.spend) || 0, im = parseInt(row.impressions, 10) || 0, cl = parseInt(row.clicks, 10) || 0, ld = leadsOf(row.actions);
-    A.spend += sp; A.impr += im; A.clicks += cl; A.leads += ld;
+    const A = agg[k] = agg[k] || { name: row.ad_name, adset: row.adset_name, camp: row.campaign_name, objective: row.objective || '', spend: 0, impr: 0, clicks: 0, leads: 0, msg: 0, daily: {} };
+    if (row.objective && !A.objective) A.objective = row.objective;
+    const sp = parseFloat(row.spend) || 0, im = parseInt(row.impressions, 10) || 0, cl = parseInt(row.clicks, 10) || 0, ld = leadsOf(row.actions), mg = msgOf(row.actions);
+    A.spend += sp; A.impr += im; A.clicks += cl; A.leads += ld; A.msg += mg;
     const d = row.date_start || row.date_stop; if (d) { const x = A.daily[d] = A.daily[d] || { spend: 0, leads: 0, clicks: 0, impr: 0 }; x.spend += sp; x.leads += ld; x.clicks += cl; x.impr += im; }
   }
   for (const k of Object.keys(agg)) {
@@ -114,6 +129,7 @@ async function syncInsights(db, deps, { acct, days } = {}) {
     ad.adsetName = A.adset || ad.adsetName;
     ad.campaignName = A.camp || ad.campaignName;
     ad.spend = Math.round(A.spend); ad.impressions = A.impr; ad.clicks = A.clicks; ad.leadsMeta = A.leads;
+    ad.messaging = A.msg; if (A.objective) ad.objective = A.objective; ad.campaignType = campaignTypeOf(A.objective, A.camp, A.msg);
     ad.daily = Object.entries(A.daily).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, v]) => ({ d, spend: +(+v.spend).toFixed(2), leads: v.leads, clicks: v.clicks, impr: v.impr })).slice(-30);
     ad.spendSource = 'meta_api'; ad.adAccountId = id; ad.syncedAt = Date.now();
   }

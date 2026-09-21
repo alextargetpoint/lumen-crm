@@ -9198,7 +9198,7 @@ ${SCR}
         const am = { spend: rm.spend, leads: rm.leadsMeta, leadsCRM, quals, clicks: rm.clicks, impr: rm.impr, daily: dR, dailyR: dR };
         const cn = ad.campaignName || '— без кампании';
         const an = ad.adsetName || '— без адсета';
-        camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, m: mk() };
+        camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), campaignType: ad.campaignType || 'lead', adsets: {}, m: mk() };
         camps[cn].adsets[an] = camps[cn].adsets[an] || { name: an, ads: [], m: mk() };
         camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], m: am, leads: am.leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
         add(camps[cn].adsets[an].m, am); add(camps[cn].m, am);

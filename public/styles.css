@@ -7799,7 +7799,13 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* панель дробления План/Факт */
 .mpd-grpbar{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
 .mpd-grpbar-l{ font-size:11px; color:var(--muted); }
-.mpd-grp{ display:inline-flex; border:1px solid var(--stroke); border-radius:8px; overflow:hidden; }
+.mpd-grp{ display:inline-flex; flex-wrap:wrap; border:1px solid var(--stroke); border-radius:8px; overflow:hidden; }
+.cta-badge.ct-type{ font-size:9px; padding:1px 6px; border-radius:8px; }
+.ct-t-lead{ background:color-mix(in srgb,#10B981 15%,transparent); color:#0b7a55; }
+.ct-t-msg{ background:color-mix(in srgb,#2FA98C 16%,transparent); color:#1f7d67; }
+.ct-t-traf{ background:color-mix(in srgb,#3B82F6 15%,transparent); color:#2563eb; }
+.ct-t-reach{ background:color-mix(in srgb,#8B5CF6 15%,transparent); color:#6d28d9; }
+.ct-t-eng{ background:color-mix(in srgb,#F59E0B 18%,transparent); color:#b45309; }
 .mpd-grp-b{ font-size:11.5px; padding:5px 11px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
 .mpd-grp-b+.mpd-grp-b{ border-left:1px solid var(--stroke); }
 .mpd-grp-b.on{ background:var(--accent); color:#fff; }
