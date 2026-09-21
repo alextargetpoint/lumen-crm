@@ -5605,7 +5605,7 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 .mp-lbl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; margin: 16px 0 9px; }
 .mp-lbl .muted { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 11px; }
 .mp-tbl-wrap { overflow-x: auto; border: 1px solid var(--stroke); border-radius: var(--r-md); }
-.mp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1160px; }
+.mp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1320px; }
 .mp-tbl input.li:not(.num) { min-width: 92px; }
 .mp-tbl select.li { width: 100%; min-width: 120px; border: 1px solid transparent; background: transparent; padding: 6px 6px; font-size: 12px; border-radius: 7px; }
 .mp-tbl select.li:hover { border-color: var(--stroke); }

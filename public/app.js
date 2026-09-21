@@ -9218,15 +9218,20 @@ function openMpBuilder(mp, contractors) {
   const langSel = (v) => `<select class="li" data-k="language" data-prev="${esc(v || '')}"><option value="">— язык</option>${adLangs().map(l => `<option value="${esc(l.key)}" ${l.key === v ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}<option value="__cfg">настроить языки…</option></select>`;
   const lineRow = (ln) => {
     ln = ln || {};
+    /* Гибкие (вводимые) значения плана: CPL и Квал%. Производные (авто): Лиды = бюджет/CPL, Квал = лиды×%, CPQL = бюджет/квал. */
+    const cplInit = (ln.cplPlan != null && ln.cplPlan !== '') ? ln.cplPlan : (ln.leadsPlan ? Math.round((ln.budgetPlan || 0) / ln.leadsPlan) : '');
+    const pctInit = (ln.qualPctPlan != null && ln.qualPctPlan !== '') ? ln.qualPctPlan : (ln.leadsPlan && ln.qualPlan ? Math.round(ln.qualPlan / ln.leadsPlan * 100) : '');
     return `<tr data-lrow data-lid="${esc(ln.id || '')}" data-note="${esc(ln.note || '')}">
       <td>${chSel(ln.channel || '')}</td>
       <td>${langSel(ln.language || '')}</td>
       <td><input class="li" data-k="geo" value="${esc(ln.geo || '')}" placeholder="dubai"></td>
       <td>${dirSel(ln.direction || '')}</td>
       <td><input class="li num" data-k="budgetPlan" type="number" min="0" value="${ln.budgetPlan || ''}" placeholder="0"></td>
-      <td><input class="li num" data-k="leadsPlan" type="number" min="0" value="${ln.leadsPlan || ''}" placeholder="0"></td>
-      <td><input class="li num" data-k="qualPlan" type="number" min="0" value="${ln.qualPlan || ''}" placeholder="0"></td>
-      <td class="mp-cpl" data-cpl>—</td>
+      <td><input class="li num" data-k="cplPlan" type="number" min="0" value="${cplInit}" placeholder="CPL"></td>
+      <td class="mp-cpl" data-leadscalc>—</td>
+      <td><input class="li num" data-k="qualPctPlan" type="number" min="0" max="100" value="${pctInit}" placeholder="%"></td>
+      <td class="mp-cpl" data-qualcalc>—</td>
+      <td class="mp-cpl" data-cpql>—</td>
       <td><input class="li num fct" data-k="budgetFact" type="number" min="0" value="${ln.budgetFact || ''}" placeholder="0"></td>
       <td><input class="li num fct" data-k="leadsFact" type="number" min="0" value="${ln.leadsFact || ''}" placeholder="0"></td>
       <td class="mp-cpl" data-cplf>—</td>
@@ -9251,14 +9256,14 @@ function openMpBuilder(mp, contractors) {
         <select id="mpStatus">${Object.entries(MP_STATUS).map(([k, v]) => `<option value="${k}" ${k === mp.status ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
       </div>
     </div>
-    <div class="mp-lbl">Строки плана <span class="muted">· канал · язык · гео · направление · бюджет/лиды/квал план → CPL, и факт (вручную) → CPL факт</span></div>
+    <div class="mp-lbl">Строки плана <span class="muted">· задаёте <b>бюджет · CPL · квал %</b> — лиды, квал и CPQL считаются автоматически; факт (вручную) → CPL факт</span></div>
     <div class="mp-tbl-wrap"><table class="mp-tbl"><thead><tr>
-      <th>Канал</th><th>Язык</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
+      <th>Канал</th><th>Язык</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">CPL</th><th class="num">Лиды</th><th class="num">Квал&nbsp;%</th><th class="num">Квал</th><th class="num">CPQL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
     </tr></thead>
     <tbody id="mpRows">${(mp.lines || []).map(lineRow).join('') || lineRow()}</tbody>
     <tfoot><tr class="mp-tot">
       <td colspan="4">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
-      <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTqP">—</td><td class="num" id="mpTcP">—</td>
+      <td class="num" id="mpTbP">—</td><td class="num" id="mpTcP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTpctP">—</td><td class="num" id="mpTqP">—</td><td class="num" id="mpTqlP">—</td>
       <td class="num fct" id="mpTbF">—</td><td class="num fct" id="mpTlF">—</td><td class="num" id="mpTcF">—</td><td></td>
     </tr></tfoot></table></div>
     <div class="form-row" style="margin-top:14px"><label>Заметка к плану (видна подрядчику в документе)</label><textarea id="mpNote" style="min-height:60px" placeholder="Условия, комментарии, что нужно согласовать…">${esc(mp.note || '')}</textarea></div>
@@ -9276,6 +9281,9 @@ function openMpBuilder(mp, contractors) {
     { label: 'Закрыть' },
   ] });
 
+  /* гибкие=вводимые (CPL, квал%) → производные=авто (лиды, квал, CPQL) */
+  const mpCalc = (budget, cpl, pct) => { const leads = cpl > 0 ? Math.round(budget / cpl) : 0; const p = Math.max(0, Math.min(100, pct || 0)); const quals = Math.round(leads * p / 100); const cpql = quals > 0 ? Math.round(budget / quals) : 0; return { leads, quals, cpql, pct: p }; };
+
   const collect = (root2) => {
     const title = $('#mpTitle', root2).value.trim();
     if (!title) { toast('Укажите название плана'); return null; }
@@ -9283,27 +9291,35 @@ function openMpBuilder(mp, contractors) {
     const lines = $$('[data-lrow]', root2).map(tr => {
       const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); return el2 ? el2.value : ''; };
       const ch = g('channel'); const lang = g('language');
-      return { id: tr.dataset.lid || undefined, channel: (ch === '__cfg' ? '' : ch).trim(), language: (lang === '__cfg' ? '' : lang).trim(), geo: g('geo').trim(), direction: (g('direction') === '__new' ? '' : g('direction')).trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
-    }).filter(l => l.channel || l.language || l.geo || l.direction || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
+      const budget = +g('budgetPlan') || 0, cpl = +g('cplPlan') || 0, pctRaw = +g('qualPctPlan') || 0;
+      const c = mpCalc(budget, cpl, pctRaw);
+      return { id: tr.dataset.lid || undefined, channel: (ch === '__cfg' ? '' : ch).trim(), language: (lang === '__cfg' ? '' : lang).trim(), geo: g('geo').trim(), direction: (g('direction') === '__new' ? '' : g('direction')).trim(), budgetPlan: budget, cplPlan: cpl, leadsPlan: c.leads, qualPctPlan: c.pct, qualPlan: c.quals, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    }).filter(l => l.channel || l.language || l.geo || l.direction || l.budgetPlan || l.cplPlan || l.qualPctPlan || l.budgetFact || l.leadsFact);
     return { title, contractorId: ctVal === '__new' ? null : ctVal, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
   };
 
   const recalc = () => {
     const cur = $('#mpCur', bd).value;
-    let bp = 0, lp = 0, bf = 0, lf = 0;
+    let bp = 0, lp = 0, qp = 0, bf = 0, lf = 0;
     $$('[data-lrow]', bd).forEach(tr => {
       const g = (k) => +(tr.querySelector(`[data-k="${k}"]`) || {}).value || 0;
-      const bpv = g('budgetPlan'), lpv = g('leadsPlan'), bfv = g('budgetFact'), lfv = g('leadsFact');
-      bp += bpv; lp += lpv; bf += bfv; lf += lfv;
-      const cplp = lpv ? Math.round(bpv / lpv) : 0, cplf = lfv ? Math.round(bfv / lfv) : 0;
-      tr.querySelector('[data-cpl]').textContent = cplp ? mpMoney(cplp, cur) : '—';
+      const budget = g('budgetPlan'), cpl = g('cplPlan'), c = mpCalc(budget, cpl, g('qualPctPlan'));
+      const bfv = g('budgetFact'), lfv = g('leadsFact');
+      bp += budget; lp += c.leads; qp += c.quals; bf += bfv; lf += lfv;
+      tr.querySelector('[data-leadscalc]').textContent = c.leads || '—';
+      tr.querySelector('[data-qualcalc]').textContent = c.quals || '—';
+      tr.querySelector('[data-cpql]').textContent = c.cpql ? mpMoney(c.cpql, cur) : '—';
+      const cplf = lfv ? Math.round(bfv / lfv) : 0;
       const cf = tr.querySelector('[data-cplf]');
       cf.textContent = cplf ? mpMoney(cplf, cur) : '—';
-      cf.className = 'mp-cpl ' + (cplf && cplp ? (cplf <= cplp ? 'mp-good' : 'mp-bad') : '');
+      cf.className = 'mp-cpl ' + (cplf && cpl ? (cplf <= cpl ? 'mp-good' : 'mp-bad') : '');
     });
     $('#mpTbP', bd).textContent = mpMoney(bp, cur);
-    $('#mpTlP', bd).textContent = lp;
     $('#mpTcP', bd).textContent = lp ? mpMoney(Math.round(bp / lp), cur) : '—';
+    $('#mpTlP', bd).textContent = lp || '—';
+    $('#mpTpctP', bd).textContent = lp ? Math.round(qp / lp * 100) + '%' : '—';
+    $('#mpTqP', bd).textContent = qp || '—';
+    $('#mpTqlP', bd).textContent = qp ? mpMoney(Math.round(bp / qp), cur) : '—';
     $('#mpTbF', bd).textContent = bf ? mpMoney(bf, cur) : '—';
     $('#mpTlF', bd).textContent = lf || '—';
     $('#mpTcF', bd).textContent = lf ? mpMoney(Math.round(bf / lf), cur) : '—';
@@ -9313,7 +9329,8 @@ function openMpBuilder(mp, contractors) {
   const collectDraft = (root2) => {
     const lines = $$('[data-lrow]', root2).map(tr => {
       const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); if (!el2) return ''; let v = el2.value; if (v === '__new' || v === '__cfg') v = el2.dataset.prev || ''; return v; };
-      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), language: g('language').trim(), geo: g('geo').trim(), direction: g('direction').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+      const budget = +g('budgetPlan') || 0, cpl = +g('cplPlan') || 0, c = mpCalc(budget, cpl, +g('qualPctPlan') || 0);
+      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), language: g('language').trim(), geo: g('geo').trim(), direction: g('direction').trim(), budgetPlan: budget, cplPlan: cpl, leadsPlan: c.leads, qualPctPlan: c.pct, qualPlan: c.quals, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
     });
     const ctV = $('#mpCt', root2).value;
     return { id: mp.id, title: $('#mpTitle', root2).value, contractorId: ctV === '__new' ? mp.contractorId : ctV, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
@@ -9494,11 +9511,11 @@ function openTaxCfg(kind, onDone) {
   const isCh = kind === 'channels';
   let items = (isCh ? adChannels() : adLangs()).map(x => ({ key: x.key, name: x.name, emoji: x.emoji || '' }));
   const title = isCh ? 'Каналы трафика' : 'Языки';
-  const sub = isCh ? 'эмодзи-стикер + название · прослеживается в аналитике' : 'эмодзи-флаг + язык · привязывается к строкам плана';
-  const intro = isCh ? 'Настройте список каналов (Meta, TikTok, Google, Яндекс, Авито…). Эмодзи — «стикер» канала, виден в плане и аналитике.' : 'Русский и английский — по умолчанию. Добавьте любой язык и присвойте ему флаг-эмодзи — он привяжется к строкам медиаплана.';
+  const sub = isCh ? 'название канала · прослеживается в аналитике' : 'флаг-стикер + язык · привязывается к строкам плана';
+  const intro = isCh ? 'Настройте список каналов (Meta, TikTok, Google, Яндекс, Авито…) — добавьте свои или уберите лишние.' : 'Русский и английский — по умолчанию. Добавьте любой язык и присвойте ему флаг-стикер — он привяжется к строкам медиаплана.';
   const body = `<div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">${intro}</div>
     <div id="txList" class="tax-list"></div>
-    <div style="display:flex;gap:6px;margin-top:10px"><input id="txEmoji" class="tax-emoji" placeholder="${isCh ? '🟦' : '🇩🇪'}" maxlength="4"><input id="txName" placeholder="${isCh ? 'Новый канал' : 'Deutsch'}" style="flex:1"><button class="btn btn-sm btn-accent" id="txAdd">${ic(I.plus)}Добавить</button></div>`;
+    <div style="display:flex;gap:6px;margin-top:10px">${isCh ? '' : `<input id="txEmoji" class="tax-emoji" placeholder="🇩🇪" maxlength="4">`}<input id="txName" placeholder="${isCh ? 'Новый канал' : 'Deutsch'}" style="flex:1"><button class="btn btn-sm btn-accent" id="txAdd">${ic(I.plus)}Добавить</button></div>`;
   const bd = modal({ title, sub, wide: true, body, actions: [
     { label: 'Сохранить', cls: 'btn-accent', onClick: async () => {
       syncFromDom();
@@ -9509,13 +9526,13 @@ function openTaxCfg(kind, onDone) {
     } },
     { label: 'Отмена' },
   ] });
-  const syncFromDom = () => { const rows = $$('[data-txrow]', bd); if (rows.length) items = rows.map(r => ({ key: r.dataset.key, name: $('.tx-nm', r).value.trim(), emoji: $('.tx-em', r).value.trim() })).filter(x => x.name); };
+  const syncFromDom = () => { const rows = $$('[data-txrow]', bd); if (rows.length) items = rows.map(r => { const em = $('.tx-em', r); return { key: r.dataset.key, name: $('.tx-nm', r).value.trim(), emoji: em ? em.value.trim() : '' }; }).filter(x => x.name); };
   const paint = () => {
-    $('#txList', bd).innerHTML = items.length ? items.map(x => `<div class="tax-row" data-txrow data-key="${esc(x.key)}"><input class="tx-em tax-emoji" value="${esc(x.emoji)}" maxlength="4"><input class="tx-nm" value="${esc(x.name)}" style="flex:1"><button class="btn btn-sm btn-danger" data-txdel="${esc(x.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:12px">Пусто — добавьте ниже.</div>';
+    $('#txList', bd).innerHTML = items.length ? items.map(x => `<div class="tax-row" data-txrow data-key="${esc(x.key)}">${isCh ? '' : `<input class="tx-em tax-emoji" value="${esc(x.emoji)}" maxlength="4">`}<input class="tx-nm" value="${esc(x.name)}" style="flex:1"><button class="btn btn-sm btn-danger" data-txdel="${esc(x.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:12px">Пусто — добавьте ниже.</div>';
     $$('[data-txdel]', bd).forEach(b => b.addEventListener('click', () => { syncFromDom(); items = items.filter(x => x.key !== b.dataset.txdel); paint(); }));
   };
   paint();
-  const add = () => { const nm = $('#txName', bd).value.trim(); if (!nm) return; syncFromDom(); const em = $('#txEmoji', bd).value.trim(); const key = isCh ? nm : langSlug(nm); if (items.some(x => x.key === key)) { toast('Уже есть'); return; } items.push({ key, name: nm, emoji: em }); $('#txName', bd).value = ''; $('#txEmoji', bd).value = ''; paint(); };
+  const add = () => { const nm = $('#txName', bd).value.trim(); if (!nm) return; syncFromDom(); const emEl = $('#txEmoji', bd); const em = emEl ? emEl.value.trim() : ''; const key = isCh ? nm : langSlug(nm); if (items.some(x => x.key === key)) { toast('Уже есть'); return; } items.push({ key, name: nm, emoji: em }); $('#txName', bd).value = ''; if (emEl) emEl.value = ''; paint(); };
   $('#txAdd', bd).addEventListener('click', add);
   $('#txName', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
 }
