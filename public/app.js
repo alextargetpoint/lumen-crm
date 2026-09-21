@@ -178,11 +178,26 @@ function openGuideCenter() {
   const cats = (window.LUMEN_HELP && window.LUMEN_HELP.CATEGORIES) || null;
   const order = cats ? cats.reduce((a, c) => a.concat(c.guides), []) : ['tgsetup', 'botpanel', 'wanumbers', 'wacloud', 'tgchannel', 'telephony', 'waagent', 'leads', 'chains', 'calendar', 'mediaplan', 'docs'];
   const cards = order.filter(k => GUIDES[k]).map(k => { const g = GUIDES[k];
-    return `<button class="gdc-card" data-guide="${k}"><span class="gdc-ic">${ic(I[g.icon] || I.doc)}</span><span class="gdc-tx"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span><span class="gdc-go">${ic(I.arrow, 2)}</span></button>`;
+    return `<div class="gdc-card" data-guide="${k}" role="button" tabindex="0">
+      <span class="gdc-ic">${ic(I[g.icon] || I.doc)}</span>
+      <span class="gdc-tx"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span>
+      <button type="button" class="gdc-link" data-copy="${k}" title="Скопировать публичную ссылку — отправьте клиенту" aria-label="Скопировать ссылку">${ic(I.link, 1.9)}</button>
+      <span class="gdc-go">${ic(I.arrow, 2)}</span>
+    </div>`;
   }).join('');
-  const body = `<div class="gdc-top"><span>Эти инструкции доступны публично — отправьте клиенту или брокеру ссылкой.</span><a class="gdc-pub" href="/help" target="_blank" rel="noopener">Открыть справочник ${ic(I.arrow, 2)}</a></div><div class="gdc-grid">${cards}</div>`;
+  const body = `<div class="gdc-top"><span>Эти инструкции доступны публично — жмите ${ic(I.link, 1.7)} на карточке, чтобы скопировать ссылку и отправить клиенту.</span><a class="gdc-pub" href="/help" target="_blank" rel="noopener">Открыть справочник ${ic(I.arrow, 2)}</a></div><div class="gdc-grid">${cards}</div>`;
   const m = modal({ title: 'Инструкции', sub: 'Пошаговые гайды по функциям Lumen', body, wide: true, actions: [{ label: 'Закрыть' }] });
-  (m || document).querySelectorAll('.gdc-card').forEach(b => b.addEventListener('click', () => openGuide(b.dataset.guide)));
+  const root = m || document;
+  root.querySelectorAll('.gdc-card').forEach(b => {
+    b.addEventListener('click', () => openGuide(b.dataset.guide));
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGuide(b.dataset.guide); } });
+  });
+  root.querySelectorAll('.gdc-link').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const url = location.origin + '/help/' + btn.dataset.copy;
+    const ok = () => { btn.classList.add('ok'); setTimeout(() => btn.classList.remove('ok'), 1500); try { if (window.toast) window.toast('Ссылка скопирована', url, true); } catch (_) {} };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, () => prompt('Скопируйте ссылку:', url)); else prompt('Скопируйте ссылку:', url);
+  }));
 }
 window.openGuideCenter = openGuideCenter;
 function openGuide(id) {
@@ -8579,9 +8594,11 @@ PAGES.ads = async (root) => {
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   /* под-вкладки аналитики + вид клиента + копия отчёта */
-  $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render(); }));
-  $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render(); }));
-  $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render(); });
+  /* переключение диапазона/под-вкладок — ТИХО (render._silent): данные подменяются мгновенно
+     после fetch, без fade всего #content → экран не мигает (старый контент держится до новых данных). */
+  $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render._silent = true; render(); }));
+  $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render._silent = true; render(); }));
+  $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
   $$('[data-revlead]', root).forEach(r => r.addEventListener('click', () => { const id = r.dataset.revlead; if (id) openLeadModal(id); }));
   /* дерево кабинета: переключение режима + сворачивание узлов */
@@ -8649,7 +8666,7 @@ PAGES.ads = async (root) => {
   /* --- Прямое подключение рекламных кабинетов Meta (Marketing API) --- */
   const maAccounts = () => $$('[data-acctrow]', root).map(rw => ({ id: (rw.querySelector('[data-acc="id"]').value || '').trim(), name: (rw.querySelector('[data-acc="name"]').value || '').trim(), currency: rw.querySelector('[data-acc="currency"]').value || '' })).filter(a => a.id);
   const maPatch = () => { const p = { accounts: maAccounts(), mode: 'both', syncDays: +($('#maSyncDays')?.value) || 60, pullInsights: true, pullLeads: false, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
-  const maSyncProgress = (on, txt) => { const el2 = $('#maSyncStatus', root); if (!el2) return; el2.hidden = !on; if (on) el2.innerHTML = `<span class="ma-spin"></span><span>${esc(txt || 'Синхронизирую…')}</span>`; };
+  const maSyncProgress = (on, txt) => { const el2 = $('#maSyncStatus', root); if (!el2) return; el2.hidden = !on; el2.innerHTML = on ? `<span class="ma-spin"></span><span>${esc(txt || 'Синхронизирую…')}</span>` : ''; };
   const maAddAcctRow = () => { const box = $('#maAccts', root); if (!box) return; const rw = el(`<div class="ma-acct" data-acctrow><span class="ma-acct-dot"></span><input data-acc="id" placeholder="act_1234567890" style="flex:1.4"><input data-acc="name" placeholder="название" style="flex:1.4"><select data-acc="currency" style="flex:0 0 90px"><option value="">валюта</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}">${c}</option>`).join('')}</select><button class="btn btn-sm" data-acctdel>${ic(I.x)}</button></div>`); box.appendChild(rw); try { enhanceControls(rw); } catch (_) {} rw.querySelector('[data-acctdel]').addEventListener('click', () => rw.remove()); };
   $$('[data-acctdel]', root).forEach(b => b.addEventListener('click', () => b.closest('[data-acctrow]').remove()));
   $('#maAddAcct', root)?.addEventListener('click', maAddAcctRow);
@@ -8713,6 +8730,26 @@ PAGES.ads = async (root) => {
 
 /* ---------------- МЕДИАПЛАНЫ (подрядчики трафика · план/факт · согласование) ---------------- */
 const MP_CHANNELS = ['Meta', 'Google', 'TikTok', 'YouTube', 'Yandex', 'Telegram Ads', 'Influencers', 'Другое'];
+/* Каналы и языки — настраиваемые справочники (эмодзи-стикер + имя), хранятся в settings.
+   Значение канала = имя (совместимо со старыми строками 'Meta'); значение языка = ключ (ru/en/…). */
+const DEFAULT_CHANNELS = [
+  { key: 'Meta', name: 'Meta', emoji: '🟦' },
+  { key: 'TikTok', name: 'TikTok', emoji: '🎵' },
+  { key: 'Google', name: 'Google', emoji: '🔍' },
+  { key: 'Яндекс', name: 'Яндекс', emoji: '🅨' },
+  { key: 'Авито', name: 'Авито', emoji: '🟢' },
+];
+const DEFAULT_LANGS = [
+  { key: 'ru', name: 'Русский', emoji: '🇷🇺' },
+  { key: 'en', name: 'English', emoji: '🇬🇧' },
+];
+const adChannels = () => { const c = (STATE.settings && STATE.settings.adChannels); return (Array.isArray(c) && c.length) ? c : DEFAULT_CHANNELS; };
+const adLangs = () => { const l = (STATE.settings && STATE.settings.adLangs); return (Array.isArray(l) && l.length) ? l : DEFAULT_LANGS; };
+const chMeta = (nameOrKey) => adChannels().find(c => c.key === nameOrKey || c.name === nameOrKey) || null;
+const chLabel = (v) => { const c = chMeta(v); return c ? (c.emoji ? c.emoji + ' ' : '') + c.name : (v || ''); };
+const langMeta = (k) => adLangs().find(l => l.key === k) || null;
+const langLabel = (k) => { const l = langMeta(k); return l ? (l.emoji ? l.emoji + ' ' : '') + l.name : (k || ''); };
+const langSlug = (s) => String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').replace(/^_|_$/g, '').slice(0, 16) || ('l' + Math.random().toString(36).slice(2, 5));
 const MP_STATUS = {
   draft: { name: 'Черновик', cls: 'warn' },
   sent: { name: 'Отправлен', cls: 'acc' },
@@ -9171,12 +9208,15 @@ PAGES.mediaplan = async (root) => {
 function openMpBuilder(mp, contractors) {
   const isNew = !mp;
   mp = mp || { id: null, contractorId: (contractors[0] || {}).id || null, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
-  const DIRS = STATE.settings.adDirections || [];
-  const dirSel = (v) => `<select class="li" data-k="direction"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`;
+  let DIRS = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
+  const dirSel = (v) => `<select class="li" data-k="direction"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="__new">＋ создать направление…</option></select>`;
+  const chSel = (v) => `<select class="li" data-k="channel"><option value="">— канал</option>${adChannels().map(c => `<option value="${esc(c.name)}" ${c.name === v ? 'selected' : ''}>${esc((c.emoji ? c.emoji + ' ' : '') + c.name)}</option>`).join('')}${v && !chMeta(v) ? `<option value="${esc(v)}" selected>${esc(v)}</option>` : ''}<option value="__cfg">⚙ каналы…</option></select>`;
+  const langSel = (v) => `<select class="li" data-k="language"><option value="">— язык</option>${adLangs().map(l => `<option value="${esc(l.key)}" ${l.key === v ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}<option value="__cfg">⚙ языки…</option></select>`;
   const lineRow = (ln) => {
     ln = ln || {};
     return `<tr data-lrow data-lid="${esc(ln.id || '')}" data-note="${esc(ln.note || '')}">
-      <td><input class="li" data-k="channel" list="mpChList" value="${esc(ln.channel || '')}" placeholder="Meta"></td>
+      <td>${chSel(ln.channel || '')}</td>
+      <td>${langSel(ln.language || '')}</td>
       <td><input class="li" data-k="geo" value="${esc(ln.geo || '')}" placeholder="dubai"></td>
       <td>${dirSel(ln.direction || '')}</td>
       <td><input class="li num" data-k="budgetPlan" type="number" min="0" value="${ln.budgetPlan || ''}" placeholder="0"></td>
@@ -9207,13 +9247,13 @@ function openMpBuilder(mp, contractors) {
         <select id="mpStatus">${Object.entries(MP_STATUS).map(([k, v]) => `<option value="${k}" ${k === mp.status ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
       </div>
     </div>
-    <div class="mp-lbl">Строки плана <span class="muted">· канал · гео · направление · бюджет/лиды/квал план → CPL, и факт (вручную) → CPL факт</span></div>
+    <div class="mp-lbl">Строки плана <span class="muted">· канал · язык · гео · направление · бюджет/лиды/квал план → CPL, и факт (вручную) → CPL факт</span></div>
     <div class="mp-tbl-wrap"><table class="mp-tbl"><thead><tr>
-      <th>Канал</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
+      <th>Канал</th><th>Язык</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
     </tr></thead>
     <tbody id="mpRows">${(mp.lines || []).map(lineRow).join('') || lineRow()}</tbody>
     <tfoot><tr class="mp-tot">
-      <td colspan="3">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
+      <td colspan="4">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
       <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTqP">—</td><td class="num" id="mpTcP">—</td>
       <td class="num fct" id="mpTbF">—</td><td class="num fct" id="mpTlF">—</td><td class="num" id="mpTcF">—</td><td></td>
     </tr></tfoot></table></div>

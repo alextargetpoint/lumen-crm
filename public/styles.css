@@ -7327,6 +7327,14 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .gd-share { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--accent-soft-bd, var(--stroke)); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; transition: background .14s; }
 .gd-share:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .gd-share svg { width: 15px; height: 15px; }
+.gdc-top > span svg { width: 14px; height: 14px; vertical-align: -3px; color: var(--accent); margin: 0 1px; }
+/* иконка «скопировать ссылку» на карточке гайда */
+.gdc-card { position: relative; }
+.gdc-link { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; border: 1px solid var(--stroke); background: var(--bg-2); color: var(--ink-3); cursor: pointer; transition: color .14s, border-color .14s, background .14s, transform .14s; }
+.gdc-link svg { width: 17px; height: 17px; }
+.gdc-link:hover { color: var(--accent); border-color: var(--accent-soft-bd, var(--stroke)); background: color-mix(in srgb, var(--accent) 12%, transparent); transform: translateY(-1px); }
+.gdc-link.ok { color: #fff; background: #2e9e57; border-color: transparent; transform: none; }
+.gdc-card:hover .gdc-go { transform: translateX(2px); color: var(--accent); }
 
 /* Персональные окна занятости брокера (busyBlocks) */
 .br-blk-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
@@ -7881,6 +7889,7 @@ body.client-view [data-team]{ display:none !important; }
 
 /* индикатор синка не должен показываться пустым (hidden перебивался display:flex) */
 .ma-sync-status[hidden]{ display:none !important; }
+.ma-sync-status:empty{ display:none !important; }   /* нет спиннера/текста → нет бежевой полоски ни в каком состоянии */
 
 /* провал в лиды из дерева */
 .cta-m-leads{ background:none; border:none; padding:0; cursor:pointer; text-align:right; min-width:44px; font:inherit; }
