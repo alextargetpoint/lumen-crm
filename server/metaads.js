@@ -84,7 +84,17 @@ async function syncInsights(db, deps, { acct, days } = {}) {
   }, 10);
   res.capped = ins.capped;
   db.ads = db.ads || [];
-  const leadsOf = (acts) => (Array.isArray(acts) ? acts : []).filter(a => /lead/i.test(a.action_type || '')).reduce((s, a) => s + (parseInt(a.value, 10) || 0), 0);
+  /* ЛИДЫ: Meta отдаёт несколько «lead»-типов на ОДНО событие (lead, onsite_conversion.lead_grouped,
+     leadgen_grouped, offsite_conversion.fb_pixel_lead…). Суммировать их = двойной-тройной счёт (был баг:
+     320 лидов/$3.5 вместо реальных). Берём ОДНУ дедуплицированную метрику — как «Результаты» в кабинете:
+     приоритет lead_grouped → lead → прочие; при неоднозначности — максимум одного типа, не сумма. */
+  const LEAD_PRIORITY = ['onsite_conversion.lead_grouped', 'leadgen_grouped', 'lead', 'leadgen.other', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead'];
+  const leadsOf = (acts) => {
+    const arr = Array.isArray(acts) ? acts : [];
+    for (const t of LEAD_PRIORITY) { const a = arr.find(x => x.action_type === t); if (a) { const v = parseInt(a.value, 10) || 0; if (v) return v; } }
+    const leadish = arr.filter(a => /(^|[._])lead/i.test(a.action_type || '')).map(a => parseInt(a.value, 10) || 0);
+    return leadish.length ? Math.max(...leadish) : 0;   /* fallback: максимум, НЕ сумма (избегаем дублей) */
+  };
   /* собираем по объявлению: тотал + дневной ряд */
   const agg = {};   /* adId → {name, adset, camp, spend, impr, clicks, leads, daily:{date:{spend,leads,clicks,impr}}} */
   for (const row of ins.data) {
