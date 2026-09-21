@@ -65,14 +65,17 @@ async function verify(conf) {
 
 /* Insights: расход/показы/клики + названия кампании/адсета на уровне объявления → апсертим db.ads.
    acct — конкретный кабинет (act_…); при мультикабинете sync() вызывает по каждому. */
-async function syncInsights(db, deps, { datePreset = 'last_30d', acct } = {}) {
+async function syncInsights(db, deps, { acct, days } = {}) {
   const c = cfg(db); const token = c.token; const id = acct ? acctId(acct) : (accountsOf(db)[0] || {}).id;
   const res = { updated: 0, added: 0, capped: false };
   if (!id) return res;
+  const win = Math.max(1, days || 14);
+  const until = new Date(); const since = new Date(until.getTime() - win * 864e5);
+  const ymd = (d) => d.toISOString().slice(0, 10);
   const ins = await graphPaged(`${id}/insights`, token, {
-    level: 'ad', date_preset: c.datePreset || datePreset, limit: '200',
-    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks',
-  }, 5);
+    level: 'ad', time_range: JSON.stringify({ since: ymd(since), until: ymd(until) }), limit: '200',
+    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions',
+  }, 6);
   res.capped = ins.capped;
   db.ads = db.ads || [];
   for (const row of ins.data) {
@@ -86,6 +89,9 @@ async function syncInsights(db, deps, { datePreset = 'last_30d', acct } = {}) {
     ad.spend = Math.round((parseFloat(row.spend) || 0));
     ad.impressions = parseInt(row.impressions, 10) || 0;
     ad.clicks = parseInt(row.clicks, 10) || 0;
+    /* лиды Meta из actions (лид-формы): leadgen.other_optins / lead / onsite_conversion.lead* */
+    const acts = Array.isArray(row.actions) ? row.actions : [];
+    ad.leadsMeta = acts.filter(a => /lead/i.test(a.action_type || '')).reduce((s, a) => s + (parseInt(a.value, 10) || 0), 0);
     ad.spendSource = 'meta_api';
     ad.adAccountId = id;   /* из какого кабинета — для привязки факта к подрядчику */
     ad.syncedAt = Date.now();
@@ -198,8 +204,9 @@ async function sync(db, deps, opts = {}) {
   const started = Date.now();
   const out = { at: started, insights: { updated: 0, added: 0, capped: false }, leads: { created: 0, repeat: 0, scannedAds: 0, capped: false }, accounts: accts.length };
   try {
+    const win = opts.backfill ? (c.syncDays || 60) : Math.min(c.syncDays || 60, 14);   /* обычный синк — хвост, backfill — всё окно */
     for (const a of accts) {
-      if (c.pullInsights !== false) { const r = await syncInsights(db, deps, { acct: a.id }); out.insights.updated += r.updated; out.insights.added += r.added; out.insights.capped = out.insights.capped || r.capped; }
+      if (c.pullInsights !== false) { const r = await syncInsights(db, deps, { acct: a.id, days: win }); out.insights.updated += r.updated; out.insights.added += r.added; out.insights.capped = out.insights.capped || r.capped; }
       if (c.pullLeads !== false) { const r = await syncLeads(db, deps, { acct: a.id }); out.leads.created += r.created; out.leads.repeat += r.repeat; out.leads.scannedAds += r.scannedAds; out.leads.capped = out.leads.capped || r.capped; if (r.error) out.leads.error = r.error; }
     }
     if (out.insights.added + out.insights.updated > 0) dropSeedDemo(db);

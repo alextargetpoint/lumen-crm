@@ -6907,9 +6907,18 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/metaads/sync' && req.method === 'POST') {
       const c = db.settings.metaAds || {};
       if (!c.token || !(c.adAccountId || (Array.isArray(c.accounts) && c.accounts.length))) return json(res, 400, { error: 'добавьте кабинет (act_…) + токен и нажмите «Сохранить»' });
-      const r = await metaads.sync(db, metaDeps(), { force: true });
+      const b = await readBody(req).catch(() => ({}));
+      const r = await metaads.sync(db, metaDeps(), { force: true, backfill: !!b.backfill });
       store.save();
       return json(res, 200, r);
+    }
+    /* полный сброс данных, подтянутых из кабинета (объявления из синка) */
+    if (p === '/api/metaads/reset' && req.method === 'POST') {
+      const before = (db.ads || []).length;
+      db.ads = (db.ads || []).filter(a => a.spendSource !== 'meta_api' && !a.syncedAt);
+      const c = db.settings.metaAds; if (c) { c.lastSyncAt = null; c.stats = { syncs: 0, leads: 0 }; c.log = []; }
+      store.save();
+      return json(res, 200, { ok: true, removed: before - db.ads.length });
     }
 
     /* ---------------- WhatsApp Cloud: живая проверка / шаблоны ---------------- */

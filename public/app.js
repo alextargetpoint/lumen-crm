@@ -8375,16 +8375,20 @@ PAGES.ads = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
-    ${(() => { const t = d.totals || {}; const money = n => '$' + Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+    ${(() => {
+      const S2 = STATE.settings.metaAds || {}; const dc = S2.displayCurrency || 'AED'; const fx2 = +S2.fxRate || 3.6725;
+      const cv = (a) => dc === 'USD' ? a / fx2 : a; const cm = (n) => (dc === 'USD' ? '$' : 'dh ') + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const md = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leadsMeta += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.clicks += x.clicks || 0; a.impr += x.impressions || 0; a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
       const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
       return `<div class="ad-kpis">
-        ${tile('Лидов с рекламы', t.leads || 0, `${t.ads || 0} объявлений`)}
-        ${tile('Диалоги', t.dialogs || 0, `${t.dialogRate || 0}% от лидов`)}
-        ${tile('Квалы', t.qualified || 0, `${t.qualRate || 0}% квал-рейт`)}
-        ${tile('Сделки', t.deals || 0, `${t.dealRate || 0}% от лидов`)}
-        ${tile('Расход', money(t.spend), 'по всем объявлениям')}
-        ${tile('CPL', money(t.cpl), 'цена лида', true)}
-        ${tile('CPA', money(t.cpa), 'цена сделки', true)}
+        ${tile('Потрачено', cm(md.spend), `${(d.ads || []).length} объявл`)}
+        ${tile('Лиды (Meta)', md.leadsMeta.toLocaleString('ru-RU'), 'из лид-форм')}
+        ${tile('CPL средний', cm(md.leadsMeta ? md.spend / md.leadsMeta : 0), 'цена лида', true)}
+        ${tile('CPC', cm(md.clicks ? md.spend / md.clicks : 0), `${md.clicks.toLocaleString('ru-RU')} кликов`)}
+        ${tile('Клики', md.clicks.toLocaleString('ru-RU'), md.impr ? `CTR ${(md.clicks / md.impr * 100).toFixed(2)}%` : '')}
+        ${tile('Квал. лиды', md.quals, `${md.quals} / ${md.leadsMeta}`)}
+        ${tile('CPQL', cm(md.quals ? md.spend / md.quals : 0), 'цена квала', true)}
+        ${tile('Конв. в квал.', `${md.leadsMeta ? Math.round(md.quals / md.leadsMeta * 100) : 0}%`, 'лид → квал')}
       </div>`; })()}
     ${(() => {
       const PL = { meta: ['Meta', '#2F6BFF'], google: ['Google', '#E0603B'], tiktok: ['TikTok', '#111'], other: ['Другое', '#888'] };
@@ -8463,17 +8467,29 @@ PAGES.ads = async (root) => {
           </div>
           ${(cp.log || []).length ? coll('Журнал отправок в Meta', (cp.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (cp.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
-        ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'integrator'; return `<div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Продвинутое: прямое подключение по API<span class="sub">по желанию — требует App Review / прав Страницы</span>
-            <label class="switch" style="margin-left:auto"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Необязательно. Прямое чтение кабинета по Marketing API (лиды из Lead Ads + расход/кампании из Insights) даёт синк без интегратора, <b>но</b> требует постоянного токена с правами Страницы и, для чужих бизнесов, <b>App Review</b>. Проще и надёжнее сейчас — приём <b>через Albato</b> (карточка выше). Эти поля — для продвинутых, когда будет доступ.</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Ad account ID</label><input id="maAcct" value="${esc(ma.adAccountId || '')}" placeholder="act_1234567890"></div>
-            <div class="form-row"><label>Access token (System User)</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
-          </div>
+        ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'integrator';
+          const accts = (ma.accounts && ma.accounts.length) ? ma.accounts : (ma.adAccountId ? [{ id: ma.adAccountId, name: '', currency: '' }] : [{ id: '', name: '', currency: '' }]);
+          const okCount = accts.filter(a => a.id).length; const syncDays = ma.syncDays || 60;
+          const acctRow = (a) => `<div class="ma-acct" data-acctrow>
+            <span class="ma-acct-dot ${ma.lastSyncAt && a.id ? 'on' : ''}"></span>
+            <input data-acc="id" value="${esc(a.id || '')}" placeholder="act_1234567890" style="flex:1.4">
+            <input data-acc="name" value="${esc(a.name || '')}" placeholder="название (напр. Trust Phuket)" style="flex:1.4">
+            <select data-acc="currency" style="flex:0 0 90px"><option value="">валюта</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}" ${a.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+            <button class="btn btn-sm" data-acctdel title="Убрать кабинет">${ic(I.x)}</button>
+          </div>`;
+          return `<div class="glass card mb">
+          <div class="card-title">${ic(I.target)}Рекламные кабинеты (Meta API)<span class="sub">прямое чтение расхода/лидов из кабинетов</span>
+            <span class="ma-status">${okCount ? `${ic(I.check)}${okCount} ${plural(okCount, 'кабинет', 'кабинета', 'кабинетов')}${ma.lastSyncAt ? ' · синк ' + tmm(ma.lastSyncAt) : ''}` : 'нет кабинетов'}</span>
+            <label class="switch" style="margin-left:10px"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите один или несколько кабинетов Meta — данные (расход/кампании/лиды) сведутся в аналитику и «План/Факт по направлениям». Требует постоянного токена System User (для лидов — права Страницы; см. гайд в приёме лидов).</div>
+          <div class="ma-accts" id="maAccts">${accts.map(acctRow).join('')}</div>
+          <button class="btn btn-sm" id="maAddAcct" style="margin:2px 0 10px">${ic(I.plus)}Добавить кабинет</button>
+          <div class="form-row"><label>Access token (System User) — один на все кабинеты бизнеса</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
           <div class="ma-mode-row">
             <div class="form-row" style="margin:0"><label>Приём лидов</label>
               <select id="maMode"><option value="api" ${mode === 'api' ? 'selected' : ''}>Напрямую через API</option><option value="integrator" ${mode === 'integrator' ? 'selected' : ''}>Через интегратор (Albato/Zapier)</option><option value="both" ${mode === 'both' ? 'selected' : ''}>Оба: API + интегратор</option></select></div>
+            <div class="form-row" style="margin:0"><label>Окно синка</label>
+              <select id="maSyncDays">${[30, 60, 90, 180].map(d => `<option value="${d}" ${syncDays === d ? 'selected' : ''}>${d} дн</option>`).join('')}</select></div>
             <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maInsights" ${ma.pullInsights !== false ? 'checked' : ''}> Расход/кампании</label>
             <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maLeads" ${ma.pullLeads !== false ? 'checked' : ''}> Лиды</label>
           </div>
@@ -8481,9 +8497,11 @@ PAGES.ads = async (root) => {
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
             <button class="btn btn-accent btn-sm" id="maSave">Сохранить</button>
             <button class="btn btn-sm" id="maVerifyBtn">${ic(I.spark)}Проверить</button>
-            <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}Синхронизировать сейчас</button>
-            ${ma.lastSyncAt ? `<span class="muted" style="font-size:11.5px">посл. синк ${tmm(ma.lastSyncAt)}${ma.stats ? ` · лидов ${ma.stats.leads || 0}` : ''}</span>` : ''}
+            <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}Обновить (синк)</button>
+            <button class="btn btn-sm" id="maBackfill" title="Подтянуть весь период (окно синка), частями">${ic(I.doc)}Догрузить историю</button>
+            <button class="btn btn-sm btn-danger" id="maReset" title="Удалить все данные, подтянутые из кабинета">${ic(I.x)}Полный сброс</button>
           </div>
+          <div class="muted" style="font-size:10.5px;margin-top:6px">Авто-долив каждые ~30 мин (окно синка). «Обновить» — лёгкий долив сейчас. «Догрузить историю» — весь период. «Полный сброс» — удалить данные кабинета.</div>
           ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
         <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
@@ -8630,11 +8648,17 @@ PAGES.ads = async (root) => {
   rebuildMap();
   $('#mapCopyJson', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapJson', root).textContent); toast('JSON скопирован', 'Вставьте в тело запроса (Webhook) интегратора', true); });
   $('#mapCopyCurl', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapCurl', root).textContent); toast('cURL скопирован', 'Вставьте в терминал — придёт тест-лид в CRM', true); });
-  /* --- Прямое подключение рекламного кабинета Meta (Marketing API) --- */
-  const maPatch = () => { const p = { adAccountId: ($('#maAcct')?.value || '').trim(), mode: $('#maMode')?.value || 'api', pullInsights: !!$('#maInsights')?.checked, pullLeads: !!$('#maLeads')?.checked, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
-  $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинет Meta включён' : 'Кабинет Meta выключен', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
-  $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Реквизиты кабинета применены', true); await loadState(); render(); });
-  $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; try { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: ($('#maAcct')?.value || '').trim() }); out.innerHTML = r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || 'кабинет')} · ${esc(r.currency || '')} · ${esc(r.status || '')}</span>` : `<span style="color:var(--bad)">${esc(r.error || 'не прошло')}</span>`; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
+  /* --- Прямое подключение рекламных кабинетов Meta (Marketing API) --- */
+  const maAccounts = () => $$('[data-acctrow]', root).map(rw => ({ id: (rw.querySelector('[data-acc="id"]').value || '').trim(), name: (rw.querySelector('[data-acc="name"]').value || '').trim(), currency: rw.querySelector('[data-acc="currency"]').value || '' })).filter(a => a.id);
+  const maPatch = () => { const p = { accounts: maAccounts(), mode: $('#maMode')?.value || 'api', syncDays: +($('#maSyncDays')?.value) || 60, pullInsights: !!$('#maInsights')?.checked, pullLeads: !!$('#maLeads')?.checked, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
+  const maAddAcctRow = () => { const box = $('#maAccts', root); if (!box) return; const rw = el(`<div class="ma-acct" data-acctrow><span class="ma-acct-dot"></span><input data-acc="id" placeholder="act_1234567890" style="flex:1.4"><input data-acc="name" placeholder="название" style="flex:1.4"><select data-acc="currency" style="flex:0 0 90px"><option value="">валюта</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}">${c}</option>`).join('')}</select><button class="btn btn-sm" data-acctdel>${ic(I.x)}</button></div>`); box.appendChild(rw); try { enhanceControls(rw); } catch (_) {} rw.querySelector('[data-acctdel]').addEventListener('click', () => rw.remove()); };
+  $$('[data-acctdel]', root).forEach(b => b.addEventListener('click', () => b.closest('[data-acctrow]').remove()));
+  $('#maAddAcct', root)?.addEventListener('click', maAddAcctRow);
+  $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинеты Meta включены' : 'Кабинеты Meta выключены', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
+  $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Кабинеты и настройки применены', true); await loadState(); render(); });
+  $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; const accs = maAccounts(); try { const results = []; for (const a of accs.slice(0, 8)) { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: a.id }); results.push(r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || a.id)} · ${esc(r.currency || '')}</span>` : `<span style="color:var(--bad)">✕ ${esc(a.id)}: ${esc(r.error || '')}</span>`); } out.innerHTML = results.join('<br>') || 'нет кабинетов'; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
+  $('#maBackfill', root)?.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; const o = btn.textContent; btn.textContent = 'Догружаю историю…'; try { await api.patch('/settings', { metaAds: maPatch() }); const r = await api.post('/metaads/sync', { backfill: true }); toast(r.ok ? 'История догружена' : 'Ошибка', r.ok ? `Объявлений: ${(r.insights ? r.insights.updated + r.insights.added : 0)} · лидов: ${(r.leads && r.leads.created) || 0}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { toast('Не удалось', er.message); btn.disabled = false; btn.textContent = o; } });
+  $('#maReset', root)?.addEventListener('click', () => { modal({ title: 'Полный сброс данных кабинета?', sub: 'Удалятся все объявления/расход, подтянутые из Meta', body: '<div class="muted">Медиапланы, направления и привязки кабинетов останутся. Действие необратимо.</div>', actions: [{ label: 'Сбросить', cls: 'btn-danger', onClick: async () => { const r = await api.post('/metaads/reset', {}); toast('Сброшено', `Удалено объявлений: ${r.removed || 0}`, true); await loadState(); render(); } }, { label: 'Отмена' }] }); });
   $('#maSyncBtn')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Синхронизирую… (может занять до минуты)';
     try {
