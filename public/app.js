@@ -8303,10 +8303,12 @@ PAGES.ads = async (root) => {
       const campMap = STATE.settings.adCampaignMap || {}; const dirs = STATE.settings.adDirections || [];
       const dirName = (k) => (dirs.find(d2 => d2.key === k) || {}).name || k || '— вне плана';
       const sub = PAGE_STATE.anaSub || 'geo';
-      /* агрегаты по гео и по направлению из d.ads */
+      /* агрегаты по гео и по направлению из d.ads. Гео: ad.geo → ручная привязка → авто-детект по неймингу */
+      const geoMap = STATE.settings.adCampaignGeoMap || {};
+      const geoOf = (a) => a.geo || geoMap[a.campaignName] || detectAdGeo(a.campaignName) || detectAdGeo(a.adsetName) || '—';
       const byGeo = {}, byDir = {};
       for (const a of (d.ads || [])) {
-        const gk = a.geo || '—'; const g = byGeo[gk] = byGeo[gk] || { spend: 0, leads: 0, quals: 0 };
+        const gk = geoOf(a); const g = byGeo[gk] = byGeo[gk] || { spend: 0, leads: 0, quals: 0 };
         const lm = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0); const q = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
         g.spend += a.spend || 0; g.leads += lm; g.quals += q;
         const dk = campMap[a.campaignName] || '__none'; const dd = byDir[dk] = byDir[dk] || { spend: 0, leads: 0, quals: 0 };
@@ -8774,6 +8776,15 @@ function detectAdLang(name) {
   }
   return '';
 }
+/* Авто-детект гео по неймингу кампании/адсета: сначала настроенные geoNames, потом словарь алиасов. */
+const GEO_ALIASES = { dubai: ['dubai', 'дубай', 'дубае', 'uae', 'оаэ', 'эмираты', 'emirates'], abudhabi: ['abudhabi', 'абудаби', 'абу-даби'], bali: ['bali', 'бали', 'индонезия', 'indonesia'], phuket: ['phuket', 'пхукет', 'таиланд', 'тайланд', 'thailand'], bangkok: ['bangkok', 'бангкок'], moscow: ['moscow', 'москва', 'мск', 'msk'], spb: ['spb', 'спб', 'питер', 'петербург'], cyprus: ['cyprus', 'кипр'], turkey: ['turkey', 'турция', 'antalya', 'анталия', 'istanbul', 'стамбул'], georgia: ['georgia', 'грузия', 'тбилиси', 'batumi', 'батуми'], spain: ['spain', 'испания', 'barcelona', 'барселона', 'madrid'] };
+function detectAdGeo(name) {
+  const s = ' ' + String(name || '').toLowerCase().replace(/[|_/\\.,()\-–—:]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+  const geoNames = (STATE.settings && STATE.settings.geoNames) || {};
+  for (const key of Object.keys(geoNames)) { const kk = key.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (new RegExp('(^| )' + kk + '( |$)').test(s)) return key; const nm = String(geoNames[key] || '').toLowerCase(); if (nm && s.includes(' ' + nm + ' ')) return key; }
+  for (const [key, aliases] of Object.entries(GEO_ALIASES)) { for (const a of aliases) { if (new RegExp('(^| )' + a + '( |$)').test(s)) return key; } }
+  return '';
+}
 const MP_STATUS = {
   draft: { name: 'Черновик', cls: 'warn' },
   sent: { name: 'Отправлен', cls: 'acc' },
@@ -9043,6 +9054,7 @@ PAGES.mediaplan = async (root) => {
         <div class="mp-m"><span>План бюджета</span><b>${mpMoney(t.budgetPlan, cur)}</b></div>
         <div class="mp-m"><span>План лидов</span><b>${t.leadsPlan || 0}</b></div>
         <div class="mp-m"><span>CPL план</span><b class="accent">${t.cplPlan ? mpMoney(t.cplPlan, cur) : '—'}</b></div>
+        ${(() => { const pq = (mp.lines || []).reduce((s, ln) => s + (+ln.qualPlan || 0), 0); const cpql = pq ? Math.round(t.budgetPlan / pq) : 0; return pq ? `<div class="mp-m"><span>План квал.</span><b>${pq}</b></div><div class="mp-m"><span>CPQL план</span><b class="accent">${mpMoney(cpql, cur)}</b></div>` : ''; })()}
       </div>
       ${factBar}
       ${breakdown}
@@ -9542,15 +9554,18 @@ async function openDirMap(onDone) {
   let dirs = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
   const map = Object.assign({}, STATE.settings.adCampaignMap || {});
   const langMap = Object.assign({}, STATE.settings.adCampaignLangMap || {});
+  const geoMap = Object.assign({}, STATE.settings.adCampaignGeoMap || {});
+  const geoKeys = [...new Set([...Object.keys(STATE.settings.geoNames || {}), ...Object.keys(GEO_ALIASES)])];
+  const geoLabel = (k) => (STATE.settings.geoNames && STATE.settings.geoNames[k]) || (k ? k.charAt(0).toUpperCase() + k.slice(1) : '');
   const slug = dirSlug;
   /* авто-детект направления: имя кампании содержит имя направления как токен */
   const detectDir = (cn) => { const s = ' ' + cn.toLowerCase() + ' '; const hit = dirs.find(d => d.name && s.includes(' ' + d.name.toLowerCase() + ' ') || cn.toLowerCase().includes((d.name || '').toLowerCase()) && (d.name || '').length >= 4); return hit ? hit.key : ''; };
   const body = `<div id="dmBox">
-    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — «проекты»/стратегии плана. Свяжите кампанию с направлением и языком, чтобы факт из кабинета сводился по плану. «Автоопределить» проставит язык (RU/EN/…) и направление по неймингу. Не размеченное → «Прочее».</div>
+    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — «проекты»/стратегии плана. Свяжите кампанию с направлением, языком и гео, чтобы факт из кабинета сводился по плану и разбивкам. «Автоопределить» проставит язык (RU/EN/…) и гео (Дубай/Пхукет/…) по неймингу. Не размеченное → «Прочее».</div>
     <div class="lp-sec" style="margin:0 0 6px">Направления и стратегии</div>
     <div id="dmDirs"></div>
     <div style="display:flex;gap:6px;margin:8px 0 14px"><input id="dmNewDir" placeholder="Новое направление (напр. Leadgeneration)" style="flex:1"><button class="btn btn-sm btn-accent" id="dmAddDir">${ic(I.plus)}Добавить</button></div>
-    <div class="lp-sec dm-camps-lbl" style="margin:0 0 6px;display:flex;align-items:center;gap:8px">Кампании из кабинета → направление · язык <span class="muted" style="font-weight:400">· ${campaigns.length}</span>${campaigns.length ? `<button class="btn btn-sm" id="dmAuto" style="margin-left:auto">${ic(I.spark)}Автоопределить</button>` : ''}</div>
+    <div class="lp-sec dm-camps-lbl" style="margin:0 0 6px;display:flex;align-items:center;gap:8px">Кампании → направление · язык · гео <span class="muted" style="font-weight:400">· ${campaigns.length}</span>${campaigns.length ? `<button class="btn btn-sm" id="dmAuto" style="margin-left:auto">${ic(I.spark)}Автоопределить</button>` : ''}</div>
     <div id="dmCamps" style="max-height:40vh;overflow-y:auto">${campaigns.length ? '' : '<div class="muted" style="font-size:12px;padding:10px">Кампаний пока нет — сначала синхронизируйте кабинет («Настройки рекламы» → «Синхронизировать сейчас»).</div>'}</div>
   </div>`;
   const syncDirsFromDom = () => { $$('[data-dk]', bd).forEach(r => { const d = dirs.find(x => x.key === r.dataset.dk); if (!d) return; const nm = $('.dm-dir-nm', r); const st = $('.dm-dir-st', r); if (nm) d.name = nm.value.trim() || d.name; if (st) d.strategy = st.value.trim(); }); };
@@ -9559,15 +9574,17 @@ async function openDirMap(onDone) {
       syncDirsFromDom();
       $$('[data-campmap]', bdEl).forEach(s => { const cn = s.dataset.campmap; if (s.value) map[cn] = s.value; else delete map[cn]; });
       $$('[data-camplang]', bdEl).forEach(s => { const cn = s.dataset.camplang; if (s.value) langMap[cn] = s.value; else delete langMap[cn]; });
-      await api.patch('/settings', { adDirections: dirs, adCampaignMap: map, adCampaignLangMap: langMap });
+      $$('[data-campgeo]', bdEl).forEach(s => { const cn = s.dataset.campgeo; if (s.value) geoMap[cn] = s.value; else delete geoMap[cn]; });
+      await api.patch('/settings', { adDirections: dirs, adCampaignMap: map, adCampaignLangMap: langMap, adCampaignGeoMap: geoMap });
       await loadState();
-      toast('Сохранено', 'Направления, язык и сопоставление применены', true);
+      toast('Сохранено', 'Направления, язык, гео и сопоставление применены', true);
       if (onDone) onDone();
     } },
     { label: 'Отмена' },
   ] });
   const dirOpts = () => `<option value="">— Прочее (вне плана)</option>` + dirs.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join('');
   const langOpts = () => `<option value="">— язык (авто)</option>` + adLangs().map(l => `<option value="${esc(l.key)}">${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('');
+  const geoOpts = () => `<option value="">— гео (авто)</option>` + geoKeys.map(k => `<option value="${esc(k)}">${esc(geoLabel(k))}</option>`).join('');
   const paintDirs = () => {
     const el2 = $('#dmDirs', bd);
     el2.innerHTML = dirs.length ? dirs.map(d => `<div class="dm-dir" data-dk="${esc(d.key)}"><input class="dm-dir-nm" value="${esc(d.name)}" placeholder="Название"><input class="dm-dir-st" value="${esc(d.strategy || '')}" placeholder="Стратегия (оффер · аудитории · KPI)"><button class="btn btn-sm btn-danger" data-deldir="${esc(d.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:11.5px">Пока нет направлений — добавьте ниже (или подтянутся из направлений плана).</div>';
@@ -9576,9 +9593,10 @@ async function openDirMap(onDone) {
   const paintCampSelects = () => { $$('[data-campmap]', bd).forEach(s => { const cur = s.value; s.innerHTML = dirOpts(); s.value = dirs.some(d => d.key === cur) ? cur : ''; }); };
   const paintCamps = () => {
     const el2 = $('#dmCamps', bd); if (!campaigns.length) return;
-    el2.innerHTML = campaigns.map(cn => { const autoLang = detectAdLang(cn) || detectAdLang(campAdset[cn]); return `<div class="dm-camp"><span class="dm-camp-nm" title="${esc(cn)}">${esc(cn)}${autoLang && !langMap[cn] ? `<span class="dm-auto-hint" title="Авто-детект языка">${esc(langLabel(autoLang))}</span>` : ''}</span><select data-campmap="${esc(cn)}">${dirOpts()}</select><select data-camplang="${esc(cn)}">${langOpts()}</select></div>`; }).join('');
+    el2.innerHTML = campaigns.map(cn => { const autoLang = detectAdLang(cn) || detectAdLang(campAdset[cn]); const autoGeo = detectAdGeo(cn) || detectAdGeo(campAdset[cn]); const hints = [autoLang && !langMap[cn] ? langLabel(autoLang) : '', autoGeo && !geoMap[cn] ? geoLabel(autoGeo) : ''].filter(Boolean).join(' · '); return `<div class="dm-camp"><span class="dm-camp-nm" title="${esc(cn)}">${esc(cn)}${hints ? `<span class="dm-auto-hint" title="Авто-детект">${esc(hints)}</span>` : ''}</span><select data-campmap="${esc(cn)}">${dirOpts()}</select><select data-camplang="${esc(cn)}">${langOpts()}</select><select data-campgeo="${esc(cn)}">${geoOpts()}</select></div>`; }).join('');
     $$('[data-campmap]', el2).forEach(s => { s.value = map[s.dataset.campmap] || ''; });
     $$('[data-camplang]', el2).forEach(s => { s.value = langMap[s.dataset.camplang] || ''; });
+    $$('[data-campgeo]', el2).forEach(s => { s.value = geoMap[s.dataset.campgeo] || ''; });
     try { enhanceControls(el2); } catch (_) {}
   };
   paintDirs(); paintCamps();
@@ -9588,6 +9606,7 @@ async function openDirMap(onDone) {
   if (dmAuto) dmAuto.addEventListener('click', () => {
     let n = 0;
     $$('[data-camplang]', bd).forEach(s => { const cn = s.dataset.camplang; if (!s.value) { const lk = detectAdLang(cn) || detectAdLang(campAdset[cn]); if (lk && adLangs().some(l => l.key === lk)) { s.value = lk; langMap[cn] = lk; n++; } } });
+    $$('[data-campgeo]', bd).forEach(s => { const cn = s.dataset.campgeo; if (!s.value) { const gk = detectAdGeo(cn) || detectAdGeo(campAdset[cn]); if (gk) { s.value = gk; geoMap[cn] = gk; n++; } } });
     $$('[data-campmap]', bd).forEach(s => { const cn = s.dataset.campmap; if (!s.value) { const dk = detectDir(cn); if (dk) { s.value = dk; map[cn] = dk; n++; } } });
     toast(n ? 'Автоопределение готово' : 'Нечего определять', n ? `Проставлено ${n} · проверьте и сохраните` : 'Всё уже размечено или нет совпадений', true);
   });
