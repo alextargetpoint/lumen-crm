@@ -1,5 +1,6 @@
-/* Сид демо-данных «Trust Phuket» в дев-тенант — чтобы вживую увидеть аналитику Meta / план-факт.
-   Числа подогнаны под реальный скрин клиента (dh = AED). Идемпотентно (метка seedTag).
+/* Сид демо-данных в дев-тенант — чтобы вживую увидеть аналитику Meta / план-факт.
+   ⚠️ Это ДЕМО-ДАННЫЕ (не живой кабинет — локально нет токена). Числа взяты с реального
+   скрина Ads Manager клиента (последние 30 дней, USD). Идемпотентно (метка seedTag).
    Запуск: node tools/seed-ads-demo.mjs   (сервер :5080 должен быть ОСТАНОВЛЕН). */
 import fs from 'fs';
 import os from 'os';
@@ -15,19 +16,20 @@ const SEED = 'trust-phuket-demo';
 const ACC = 'act_1000000001';
 const now = Date.now();
 
-/* ── кабинет ── */
+/* ── кабинет (валюта USD, как в реальном аккаунте) ── */
 db.settings.metaAds = Object.assign({}, db.settings.metaAds, {
-  accounts: [{ id: ACC, name: 'Trust Phuket · Meta', currency: 'AED' }],
+  accounts: [{ id: ACC, name: 'Trust Phuket · Meta', currency: 'USD' }],
   enabled: false, mode: 'api', pullInsights: true, pullLeads: true,
-  displayCurrency: 'AED', fxRate: 3.6725, lastSyncAt: now,
-  stats: { syncs: 1, leads: 1114 },
+  displayCurrency: 'USD', sourceCurrency: 'USD', fxRate: 3.6725, syncDays: 30, lastSyncAt: now,
+  stats: { syncs: 1, leads: 142 },
 });
 
-/* ── направления + сопоставление кампаний ── */
+/* ── направления + сопоставление кампаний (все TP/Leads → Leadgeneration) ── */
 db.settings.adDirections = [{ key: 'leadgen', name: 'Leadgeneration' }];
 db.settings.adCampaignMap = {
-  'TP / Leads | EN': 'leadgen', 'TP / Leads | RU': 'leadgen', 'TP / Leads | RU 1.1': 'leadgen',
+  'TP / Leads | RU': 'leadgen', 'TP / Leads | EN': 'leadgen', 'TP / Leads | RU 1.1': 'leadgen',
   'TP / Leads | RU 1.2': 'leadgen', 'TP / Leads | RU 1.3': 'leadgen', 'TP / Leads | EN 1.3': 'leadgen',
+  'TP / Leads | EN 1.1': 'leadgen', 'TP / Leads | EN 1.2': 'leadgen',
 };
 
 /* ── подрядчик, привязанный к кабинету ── */
@@ -35,48 +37,41 @@ db.mpContractors = (db.mpContractors || []).filter(c => c.seedTag !== SEED);
 const ctId = 'ct_trustphuket';
 db.mpContractors.unshift({ id: ctId, name: 'Leadgeneration · Trust Phuket', channels: ['Meta'], geos: ['phuket'], adAccounts: [ACC], contact: '@trustphuket', note: 'Демо-подрядчик (сид)', seedTag: SEED, createdAt: now });
 
-/* ── объявления (факт из «кабинета»): mapped=Leadgeneration, unmapped=Прочее ── */
+/* ── объявления = РЕАЛЬНЫЕ строки со скрина Ads Manager (Last 30d, USD) ──
+   [campaign, spend$, leads(Results Form), impressions] — clicks/quals неизвестны со скрина → 0 */
 db.ads = (db.ads || []).filter(a => a.seedTag !== SEED);
-const mk = (campaignName, adsetName, name, spend, leadsMeta, qualsFact, clicks, impr) => ({
-  adId: 'seed_' + Math.random().toString(36).slice(2, 11), name, campaignName, adsetName, geo: 'phuket',
-  platform: 'meta', spend, leadsMeta, qualsFact, clicks, impressions: impr, cpl: leadsMeta ? +(spend / leadsMeta).toFixed(2) : 0,
-  spendSource: 'meta_api', adAccountId: ACC, syncedAt: now, seedTag: SEED, media: null, points: [],
-});
-/* Leadgeneration: сумма spend 34339, leads 1014, quals 299 (7 строк) */
-const leadgen = [
-  ['TP / Leads | EN', 'Video | worldwide | logic time - 1', 'Evgenia Laya Resort', 6800, 214, 66, 2180, 78000],
-  ['TP / Leads | EN', 'Video | Euro area | logic time - 3', 'Evgenia Above Element', 5200, 150, 44, 1670, 61000],
-  ['TP / Leads | RU', 'Video | worldwide | type + messenger - 1', 'Evgenia Laya Resort sub', 5900, 176, 51, 1890, 66000],
-  ['TP / Leads | RU', 'Video | Baltic + Europe | type + messenger', 'Evgenia 4bdr villa', 4300, 132, 38, 1420, 49000],
-  ['TP / Leads | RU 1.1', 'Video | EUR + UAE | type + messenger', 'Evgenia Above Element sub', 4600, 138, 41, 1510, 52000],
-  ['TP / Leads | RU 1.3', 'Video | worldwide | type + messenger', 'Evgenia Laya Resort', 3800, 118, 33, 1240, 43000],
-  ['TP / Leads | EN 1.3', 'Video | worldwide + GCC | logic time', 'Evgenia 4bdr villa', 3739, 86, 26, 1090, 38000],
+const rows = [
+  ['TP / Leads | RU', 1212.83, 59, 101425],
+  ['TP / Leads | EN', 611.44, 57, 19390],
+  ['TP / Leads | RU 1.1', 187.66, 10, 10821],
+  ['TP / Leads | RU 1.3', 184.35, 7, 13249],
+  ['TP / Leads | EN 1.3', 45.07, 6, 1722],
+  ['TP / Leads | RU 1.2', 43.86, 3, 4588],
 ];
-/* Прочее (вне плана): 3442, 100, 23 */
-const other = [
-  ['Leads - DE 3.1', 'DE broad', 'DE creative A', 1900, 55, 13, 640, 21000],
-  ['Mashriq - Leads ES - 1.1', 'ES broad', 'ES creative A', 1542, 45, 10, 520, 17000],
-];
-for (const r of [...leadgen, ...other]) db.ads.push(mk(...r));
+for (const [campaign, spend, leads, impr] of rows) {
+  db.ads.push({
+    adId: 'seed_' + Math.random().toString(36).slice(2, 11), name: campaign, campaignName: campaign, adsetName: campaign + ' · adset',
+    geo: 'phuket', platform: 'meta', spend, leadsMeta: leads, qualsFact: 0, clicks: 0, impressions: impr,
+    cpl: leads ? +(spend / leads).toFixed(2) : 0, spendSource: 'meta_api', adAccountId: ACC, syncedAt: now, seedTag: SEED, media: null, points: [],
+  });
+}
 
-/* ── медиаплан подрядчика (план на сентябрь) ── план 40025 / 661 лид / 240 квал ── */
+/* ── медиаплан (демо-план в USD; факт тянется из кабинета) ── */
 db.mediaplans = (db.mediaplans || []).filter(m => m.seedTag !== SEED);
 db.mediaplans.unshift({
   id: 'mp_trustphuket', contractorId: ctId, title: 'Пхукет · Сентябрь · Leadgeneration', period: { from: '2026-09-01', to: '2026-09-30' },
-  currency: 'AED', status: 'approved', seedTag: SEED, createdAt: now, sentAt: now, approvedAt: now, approvedBy: 'Trust Phuket',
+  currency: 'USD', status: 'approved', seedTag: SEED, createdAt: now, sentAt: now, approvedAt: now, approvedBy: 'Trust Phuket',
   lines: [
-    { id: 'l1', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'Video · worldwide', budgetPlan: 12000, leadsPlan: 200, qualPlan: 72, budgetFact: 0, leadsFact: 0, note: '' },
-    { id: 'l2', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'Video · Euro area', budgetPlan: 9000, leadsPlan: 150, qualPlan: 54, budgetFact: 0, leadsFact: 0, note: '' },
-    { id: 'l3', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'Video · type+messenger', budgetPlan: 10025, leadsPlan: 171, qualPlan: 62, budgetFact: 0, leadsFact: 0, note: '' },
-    { id: 'l4', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'Video · GCC', budgetPlan: 9000, leadsPlan: 140, qualPlan: 52, budgetFact: 0, leadsFact: 0, note: '' },
+    { id: 'l1', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'TP / Leads · RU', budgetPlan: 2000, leadsPlan: 100, qualPlan: 30, budgetFact: 0, leadsFact: 0, note: '' },
+    { id: 'l2', channel: 'Meta', geo: 'phuket', direction: 'leadgen', bundle: 'TP / Leads · EN', budgetPlan: 1000, leadsPlan: 60, qualPlan: 18, budgetFact: 0, leadsFact: 0, note: '' },
   ],
   note: 'Демо-медиаплан (сид). Факт тянется из привязанного кабинета Meta.',
 });
 
 fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
-const spend = [...leadgen, ...other].reduce((s, r) => s + r[3], 0);
-const leads = [...leadgen, ...other].reduce((s, r) => s + r[4], 0);
-const quals = [...leadgen, ...other].reduce((s, r) => s + r[5], 0);
-console.log(`✓ Сид записан в ${dbPath}`);
-console.log(`  Кабинет ${ACC} (AED) · подрядчик Leadgeneration · медиаплан 40025 dh / 661 лид / 240 квал`);
-console.log(`  Объявлений: ${db.ads.filter(a => a.seedTag === SEED).length} · Факт: ${spend} dh · ${leads} лид · ${quals} квал`);
+const spend = rows.reduce((s, r) => s + r[1], 0);
+const leads = rows.reduce((s, r) => s + r[2], 0);
+const impr = rows.reduce((s, r) => s + r[3], 0);
+console.log(`✓ Сид (РЕАЛЬНЫЕ числа со скрина) в ${dbPath}`);
+console.log(`  Кабинет ${ACC} (USD) · объявлений: ${rows.length}`);
+console.log(`  Факт: $${spend.toFixed(2)} · ${leads} лид · ${impr.toLocaleString()} показов  (= скрин: $2 285.21 / 142 / 151 195)`);

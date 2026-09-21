@@ -104,6 +104,15 @@ document.addEventListener('click', (e) => {
   if (h) h.parentElement.classList.toggle('open');
 });
 
+/* конвертация валют (source→display). fxRate — курс AED за 1 USD; остальные — дефолты. */
+const FX_PER_USD = { USD: 1, AED: 3.6725, EUR: 0.92, THB: 36, RUB: 92 };
+function fxConv(amount, from, to, aedRate) {
+  from = from || 'USD'; to = to || from; if (from === to) return amount || 0;
+  const per = Object.assign({}, FX_PER_USD); if (aedRate) per.AED = aedRate;
+  const rf = per[from] || 1, rt = per[to] || 1; return (amount || 0) / rf * rt;
+}
+function curSym(c) { return ({ USD: '$', AED: 'dh ', EUR: '€', THB: '฿', RUB: '₽' })[c] || (c + ' '); }
+
 /* ---------- «?»-подсказки: объяснялки не занимают экран, живут в поповере ---------- */
 const HINTS = {};
 function hint(id, title, items) {
@@ -8376,8 +8385,8 @@ PAGES.ads = async (root) => {
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
     ${(() => {
-      const S2 = STATE.settings.metaAds || {}; const dc = S2.displayCurrency || 'AED'; const fx2 = +S2.fxRate || 3.6725;
-      const cv = (a) => dc === 'USD' ? a / fx2 : a; const cm = (n) => (dc === 'USD' ? '$' : 'dh ') + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2; const fx2 = +S2.fxRate || 3.6725;
+      const cv = (a) => fxConv(a, src2, dc, fx2); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
       const md = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leadsMeta += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.clicks += x.clicks || 0; a.impr += x.impressions || 0; a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
       const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
       return `<div class="ad-kpis">
@@ -8975,10 +8984,11 @@ PAGES.mediaplan = async (root) => {
   const S = STATE.settings || {};
   const dirList = S.adDirections || [];
   const campMap = S.adCampaignMap || {};
-  const dispCur = (S.metaAds && S.metaAds.displayCurrency) || 'AED';
+  const srcCur = (S.metaAds && S.metaAds.sourceCurrency) || (S.metaAds && S.metaAds.accounts && S.metaAds.accounts[0] && S.metaAds.accounts[0].currency) || 'AED';
+  const dispCur = (S.metaAds && S.metaAds.displayCurrency) || srcCur;
   const fx = (S.metaAds && +S.metaAds.fxRate) || 3.6725;   /* AED за 1 USD */
-  const conv = (aed) => dispCur === 'USD' ? (aed / fx) : aed;   /* база кабинета — AED */
-  const cur = (n) => (dispCur === 'USD' ? '$' : 'dh ') + Math.round(conv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
+  const conv = (n) => fxConv(n, srcCur, dispCur, fx);   /* база = валюта кабинета */
+  const cur = (n) => curSym(dispCur) + Math.round(conv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
   const dirName = (k) => (dirList.find(d => d.key === k) || {}).name || k;
   const dirFact = {}; const other = { spend: 0, leads: 0, quals: 0, camps: new Set() };
   for (const a of (adData.ads || [])) {

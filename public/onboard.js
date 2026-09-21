@@ -849,7 +849,7 @@
     .ob-wrap{position:absolute;inset:0;display:flex;flex-direction:column;z-index:5}
     .ob-stage{flex:1;display:flex;align-items:safe center;justify-content:center;padding:56px 26px 32px;overflow:auto;transition:opacity .2s ease,transform .2s ease,filter .2s ease}
     .ob-stage.ob-leaving{opacity:0;transform:translateY(-12px);filter:blur(4px)}
-    .ob-panel{width:100%;max-width:980px;animation:obIn .7s cubic-bezier(.19,1,.22,1)}
+    .ob-panel{position:relative;width:100%;max-width:980px;animation:obIn .7s cubic-bezier(.19,1,.22,1)}
     .ob-panel-split{max-width:1080px;display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center}
     @keyframes obIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
     .ob-body{min-width:0}
@@ -1252,7 +1252,7 @@
     .ob-plate-geos{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;max-width:68%}
     .ob-plate-geo-more{color:#8f8b80}
     .ob-plate-geo{font-size:12px;color:#d6c7a8;border:1px solid rgba(214,199,168,.28);border-radius:999px;padding:5px 12px;background:rgba(214,199,168,.05)}
-    .ob-finish .ob-recap{margin-top:24px}
+    .ob-finish .ob-recap{margin-top:0}
     /* ── витрина возможностей ── */
     .ob-panel-wide{max-width:1160px}
     .ob-caps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
