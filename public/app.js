@@ -6118,6 +6118,7 @@ PAGES.sequences = async (root) => {
   const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
   const dayLabel = (d) => d === 0 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + d;
   const VARS = ['{name}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
+  const creaThumb = (cr) => cr && cr.url ? (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`) : '';
 
   const stepNode = (st, i) => {
     const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст' }[st.mode] || st.mode;
@@ -6139,6 +6140,15 @@ PAGES.sequences = async (root) => {
           <textarea data-se="text" style="width:100%;min-height:130px" placeholder="Текст сообщения…">${esc(st.text || '')}</textarea>
           <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}<span class="muted" style="font-size:10.5px;margin-left:4px">клик — вставить · {ad} = название объявления из атрибуции</span></div>
         </div>
+        <div class="se-crea">
+          <div class="lc-lbl" style="margin:0 0 6px">Креатив к касанию <span class="muted" style="font-weight:400">— видео/картинка из дерева креативов; уйдёт медиа+подписью</span></div>
+          <div class="se-crea-row">
+            <div class="se-crea-prev" id="seCreaPrev">${st.creative && st.creative.url ? creaThumb(st.creative) : '<span class="muted" style="font-size:11px">нет</span>'}</div>
+            <button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.image)}Из библиотеки</button>
+            <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка на .mp4 / .jpg / Reels" style="flex:1">
+            <button type="button" class="btn btn-sm ${st.creative && st.creative.url ? '' : 'hidden'}" id="seCreaClear" title="Убрать креатив">${ic(I.x)}</button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
           <button class="btn btn-sm" data-secancel>Отмена</button>
@@ -6150,7 +6160,7 @@ PAGES.sequences = async (root) => {
       <div class="fl-node ${st.active ? '' : 'off'}" data-i="${i}" data-drag="${i}">
         <div class="fl-day">${ic(I.clock)}${dayLabel(st.day)}</div>
         <div class="fl-body">
-          <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : ''}">${modeName}</span></div>
+          <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : ''}">${modeName}</span>${st.creative && st.creative.url ? `<span class="mini-badge crea">${ic(I.image)}креатив</span>` : ''}</div>
           <div class="fl-prev">${esc(preview.slice(0, 150))}${preview.length > 150 ? '…' : ''}</div>
         </div>
         <div class="fl-side">
@@ -6366,9 +6376,17 @@ PAGES.sequences = async (root) => {
       st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
       st.prompt = eb.querySelector('[data-se="prompt"]').value;
       st.text = ta.value;
+      const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
+      st.creative = crUrl ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : null;
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
+    /* креатив: подставить из библиотеки дерева креативов или очистить */
+    const seCreaUrl = eb.querySelector('#seCreaUrl'), seCreaPrev = eb.querySelector('#seCreaPrev'), seCreaClear = eb.querySelector('#seCreaClear');
+    const setCrea = (cr) => { seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; seCreaPrev.innerHTML = cr ? creaThumb(cr) : '<span class="muted" style="font-size:11px">нет</span>'; seCreaClear.classList.toggle('hidden', !cr); };
+    eb.querySelector('#seCreaLib').addEventListener('click', () => openCreativePicker((cr) => setCrea(cr)));
+    seCreaClear.addEventListener('click', () => setCrea(null));
+    seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : '<span class="muted" style="font-size:11px">нет</span>'; seCreaClear.classList.toggle('hidden', !u); });
     eb.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
     eb.querySelector('[data-sedel]').addEventListener('click', async (e) => {
       seq.steps.splice(+e.currentTarget.dataset.sedel, 1);
@@ -9506,6 +9524,21 @@ async function openContractorsModal() {
   }));
 }
 /* создать/редактировать одного подрядчика; onDone(savedCt) */
+/* Библиотека креативов (из дерева креативов) — выбрать медиа для шага цепочки касаний. onPick({url,type,name}). */
+async function openCreativePicker(onPick) {
+  const bd = modal({ title: 'Библиотека креативов', sub: 'из дерева креативов — видео/картинки на объявлениях', wide: true, body: '<div id="crpBox" class="muted" style="padding:14px">Загрузка…</div>', actions: [{ label: 'Закрыть' }] });
+  let ads = [];
+  try { const d = await api.get('/ads'); ads = d.ads || []; } catch (_) {}
+  const byName = {};
+  for (const a of ads) { const n = a.name || a.adId; if (a.media && a.media.url && !byName[n]) byName[n] = { name: n, url: a.media.url, type: a.media.type || (/\.(mp4|webm|mov)(\?|$)/i.test(a.media.url) ? 'video' : 'image') }; }
+  const items = Object.values(byName);
+  const box = $('#crpBox', bd); if (!box) return;
+  box.classList.remove('muted'); box.style.padding = '0';
+  if (!items.length) { box.innerHTML = '<div class="empty" style="padding:26px;text-align:center">В дереве креативов ещё нет загруженных медиа.<br><span class="muted" style="font-size:11px">Загрузите видео/картинки в «Аналитика рекламы → Креативы».</span></div>'; return; }
+  box.innerHTML = `<div class="crp-grid">${items.map((c, i) => `<button type="button" class="crp-card" data-crp="${i}">${c.type === 'video' ? `<video src="${esc(c.url)}" muted class="crp-th"></video>` : `<img src="${esc(c.url)}" class="crp-th">`}<span class="crp-nm">${esc(c.name)}</span></button>`).join('')}</div>`;
+  $$('[data-crp]', bd).forEach(b => b.addEventListener('click', () => { const c = items[+b.dataset.crp]; if (typeof closeModal === 'function') closeModal(); if (onPick) onPick(c); }));
+}
+
 /* Провал в лиды по узлу дерева: список пришедших на связку/адсет/кампанию лидов + статусы + % разбивка. */
 async function openNodeLeads(ids, title) {
   const extra = adRangeQS(); const qs = '?adIds=' + encodeURIComponent(ids) + (extra ? '&' + extra.slice(1) : '');

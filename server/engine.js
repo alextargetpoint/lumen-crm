@@ -380,24 +380,29 @@ function tickChains(db) {
     } else {
       text = chainAiText(db, lead, step);
     }
-    if (text) {
-      if (sendOpts.channel === 'email') {
+    /* креатив, прикреплённый к шагу вручную (из дерева креативов) — уходит на ЛЮБОМ шаге как медиа+подпись */
+    const stepCreative = (step.creative && step.creative.url && sendOpts.channel !== 'email')
+      ? { type: step.creative.type || (/\.(mp4|webm|mov)(\?|$)/i.test(step.creative.url) ? 'video' : 'image'), url: String(step.creative.url).slice(0, 500), name: step.creative.name || '' }
+      : null;
+    if (text || stepCreative) {
+      if (text && sendOpts.channel === 'email') {
         /* официальный тон для e-mail */
         text = 'Здравствуйте' + (lead.name && !/^[+\d]/.test(lead.name) ? ', ' + lead.name.split(' ')[0] : '') + '!\n\n' + text.replace(/^\{?name\}?,?\s*/i, '').replace(/😉|👌|🤝|🙏|\)\)/g, '') + '\n\nС уважением,\n' + (db.settings.agency.manager?.name || db.settings.agency.name) + '\n' + db.settings.agency.name;
-      } else if (llm.humanize) {
+      } else if (text && llm.humanize) {
         text = llm.humanize(text);   /* чистим AI-почерк (длинные тире и т.п.) в WhatsApp/мессенджер-касаниях */
       }
       /* ДЕРЕВО КРЕАТИВОВ: на ПЕРВОМ касании в мессенджере сначала уходит сам креатив (видео/картинка),
          на который человек среагировал, а затем — текстовое касание. */
-      if (lead.ai.chainStep === 0 && sendOpts.channel !== 'email') {
+      if (lead.ai.chainStep === 0 && sendOpts.channel !== 'email' && !stepCreative) {
         const adRec = lead.ads && lead.ads.adId ? (db.ads || []).find(a => String(a.adId) === String(lead.ads.adId)) : null;
         const media = (adRec && adRec.media && adRec.media.url) ? adRec.media
           : (lead.creativeUrl ? { type: /\.(mp4|webm|mov)(\?|$)/i.test(lead.creativeUrl) ? 'video' : 'image', url: lead.creativeUrl } : null);
         if (media) send(db, lead, '', 'chain', { media });
       }
-      send(db, lead, text, 'chain', sendOpts);
+      if (stepCreative) send(db, lead, text || '', 'chain', { ...sendOpts, media: stepCreative });   /* медиа+подпись одним сообщением */
+      else send(db, lead, text, 'chain', sendOpts);
       if (lead.stage === 'new') lead.stage = 'touch';
-      ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `Касание ${lead.ai.chainStep + 1}/${seq.steps.length}: ${lead.name} — ${step.label}` });
+      ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `Касание ${lead.ai.chainStep + 1}/${seq.steps.length}: ${lead.name} — ${step.label}${stepCreative ? ' · +креатив' : ''}` });
     }
     lead.ai.chainStep += 1;
     const next = seq.steps.filter(s => s.active)[lead.ai.chainStep];
