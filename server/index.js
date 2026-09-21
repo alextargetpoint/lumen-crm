@@ -6879,10 +6879,12 @@ const server = http.createServer(async (req, res) => {
       const r = await metaads.verify(conf);
       return json(res, 200, r);
     }
-    /* ручной запуск синка кабинета (Insights + Lead Ads) */
+    /* ручной запуск синка кабинета (Insights + Lead Ads) — работает по сохранённым реквизитам,
+       в обход тумблера/режима (кнопка «Синхронизировать сейчас» = «сделай прямо сейчас»). */
     if (p === '/api/metaads/sync' && req.method === 'POST') {
-      if (!metaads.ready(db)) return json(res, 400, { error: 'заполните Ad account ID + токен и включите интеграцию' });
-      const r = await metaads.sync(db, metaDeps());
+      const c = db.settings.metaAds || {};
+      if (!c.token || !c.adAccountId) return json(res, 400, { error: 'вставьте Ad account ID + токен и нажмите «Сохранить»' });
+      const r = await metaads.sync(db, metaDeps(), { force: true });
       store.save();
       return json(res, 200, r);
     }

@@ -8343,7 +8343,7 @@ function restructureAdsTabs(root) {
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
   put(kpis, 'analytics'); put(eff, 'analytics');
   put(tree, 'creatives');
-  put(metaCab, 'intake'); put(most, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
+  put(most, 'intake'); put(metaCab, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
   put(capi, 'capi');
   const hero = root.firstElementChild;   /* heroArt-блок */
   hero.after(bar); bar.after(panels.analytics); panels.analytics.after(panels.creatives); panels.creatives.after(panels.intake); panels.intake.after(panels.capi);
@@ -8460,11 +8460,10 @@ PAGES.ads = async (root) => {
           </div>
           ${(cp.log || []).length ? coll('Журнал отправок в Meta', (cp.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (cp.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
-        ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'api'; return `<div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Рекламный кабинет (Meta API)<span class="sub">прямое подключение — лиды и расход без интегратора</span>
+        ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'integrator'; return `<div class="glass card mb">
+          <div class="card-title">${ic(I.target)}Продвинутое: прямое подключение по API<span class="sub">по желанию — требует App Review / прав Страницы</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет <b>напрямую</b> по Marketing API: лиды тянутся из лид-форм (Lead Ads), а <b>расход / кампании / креативы</b> — из Insights. Ручной ввод spend и загрузка CSV больше не нужны. Не хотите API — оставьте приём «через интегратор» (карточка «Мост приёма лидов» ниже, Albato / Make / Zapier). Можно <b>совмещать</b>.</div>
-          ${coll('📘 Полный гайд: приложение Meta, токен и Ad account ID — с нуля, со скриншотами', metaCabGuide(), { open: false, count: 0, icon: I.doc })}
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Необязательно. Прямое чтение кабинета по Marketing API (лиды из Lead Ads + расход/кампании из Insights) даёт синк без интегратора, <b>но</b> требует постоянного токена с правами Страницы и, для чужих бизнесов, <b>App Review</b>. Проще и надёжнее сейчас — приём <b>через Albato</b> (карточка выше). Эти поля — для продвинутых, когда будет доступ.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Ad account ID</label><input id="maAcct" value="${esc(ma.adAccountId || '')}" placeholder="act_1234567890"></div>
             <div class="form-row"><label>Access token (System User)</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
@@ -8484,9 +8483,11 @@ PAGES.ads = async (root) => {
           </div>
           ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.link)}Мост приёма лидов<span class="sub">Albato / Make / любой интегратор</span></div>
-          <div class="form-row"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
+        <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
+          <div class="card-title">${ic(I.link)}Приём лидов через интегратор (Albato)<span class="sub">рекомендуемый способ · Meta Lead Form → Albato → CRM</span></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Лиды из лид-форм Meta попадают в CRM через интегратор (Albato / Make / Zapier) — <b>без App Review и сложных прав</b>. Ниже — подробный гайд со скриншотами; сам адрес приёма — в поле после него.</div>
+          ${coll('📘 Как настроить приём через Albato — по шагам, со скриншотами', albatoGuide(hookUrl), { open: false, count: 0, icon: I.doc })}
+          <div class="form-row" style="margin-top:12px"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
             <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${hookUrl}</code>
             <button class="btn btn-sm" id="copyHook">${ic(I.copy)}</button></div></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin:4px 0 12px">
@@ -8571,7 +8572,20 @@ PAGES.ads = async (root) => {
   $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинет Meta включён' : 'Кабинет Meta выключен', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
   $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Реквизиты кабинета применены', true); await loadState(); render(); });
   $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; try { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: ($('#maAcct')?.value || '').trim() }); out.innerHTML = r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || 'кабинет')} · ${esc(r.currency || '')} · ${esc(r.status || '')}</span>` : `<span style="color:var(--bad)">${esc(r.error || 'не прошло')}</span>`; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
-  $('#maSyncBtn')?.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Синхронизирую…'; try { const r = await api.post('/metaads/sync', {}); if (r.skipped) toast('Не запущено', 'Сначала сохраните токен + Ad account ID и включите тумблер', false); else toast(r.ok ? 'Синк готов' : 'Синк с ошибкой', r.ok ? `Новых лидов: ${(r.leads && r.leads.created) || 0} · объявлений: ${(r.insights ? (r.insights.updated + r.insights.added) : 0)}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { toast('Не удалось', er.message); btn.disabled = false; btn.textContent = 'Синхронизировать сейчас'; } });
+  $('#maSyncBtn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Синхронизирую… (может занять до минуты)';
+    try {
+      await api.patch('/settings', { metaAds: maPatch() });   /* сначала сохраняем то, что в полях, чтобы синк точно работал */
+      const r = await api.post('/metaads/sync', {});
+      if (r.skipped) toast('Не запущено', 'Сначала вставьте токен + Ad account ID, нажмите «Сохранить» и включите тумблер вверху карточки', false);
+      else if (!r.ok) toast('Синк с ошибкой', r.error || 'Meta вернула ошибку', false);
+      else { const nl = (r.leads && r.leads.created) || 0; const ni = r.insights ? (r.insights.updated + r.insights.added) : 0; toast('Синк готов', `Новых лидов: ${nl} · объявлений обновлено: ${ni}${nl === 0 && r.leads ? ' · лидов 0 — проверьте права Страницы (см. гайд)' : ''}`, true); }
+      await loadState(); render();
+    } catch (er) {
+      toast('Не удалось', er.message || 'ошибка сети', false);
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
   $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });
   $('#importAds')?.addEventListener('click', async () => {
@@ -11341,102 +11355,93 @@ function telGuideRich() {
   return `<div class="glass card mb">${coll('Инструкция: Телефония — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
 }
 
-/* ── Полный гайд «Рекламный кабинет Meta»: с нуля (приложение, портфолио, рекламный
-   аккаунт, страница, System User токен, Ad account ID) — со «скриншот-мокапами». ── */
-function metaCabGuide() {
+/* ── Подробный гайд «Приём лидов через интегратор (Albato)»: Meta Lead Form →
+   Albato ловит лид → шлёт на вебхук Lumen → карточка в CRM. Со «скриншот-мокапами». ── */
+function albatoGuide(hookUrl) {
   const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
   const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
   const brw = (crumb, rowsHtml) => `<div class="wag-win"><div class="wag-win-bar wag-brw"><span class="wag-win-dots"><i></i><i></i><i></i></span><span class="wag-crumb">${crumb}</span></div><div class="wag-win-body">${rowsHtml}</div></div>`;
   const mf = (label, val, hl, btn) => `<div class="wag-mf ${hl ? 'hl' : ''}"><span class="wag-mflabel">${label}</span><span class="wag-mfval">${val}</span>${btn ? `<span class="wag-copychip">${btn}</span>` : ''}</div>`;
+  const shortUrl = (hookUrl || 'https://ваш-lumen.app/hooks/lead?key=•••').replace(/(key=)[^&]+/, '$1••••••');
 
-  const portfolioWin = brw('business.facebook.com › Создать бизнес-портфолио', `
-    ${mf('Название компании', 'Ваше агентство недвижимости', true)}
-    ${mf('Ваше имя', 'Имя Фамилия', false)}
-    ${mf('Рабочая почта', 'you@agency.com', false)}
-    <div class="wag-winbtns"><span class="wag-buybtn">Создать</span></div>`);
+  const flow = `<div class="wag-flow">
+    <div class="wag-fstep"><span class="wag-fic">📢</span><b>Meta Lead Form</b><span>клиент оставил заявку</span></div>
+    <span class="wag-farr">→</span>
+    <div class="wag-fstep"><span class="wag-fic">🔗</span><b>Albato</b><span>поймал новый лид</span></div>
+    <span class="wag-farr">→</span>
+    <div class="wag-fstep"><span class="wag-fic">📥</span><b>Lumen</b><span>карточка лида в CRM</span></div>
+  </div>`;
 
-  const acctWin = brw('Business Settings › Аккаунты › Рекламные аккаунты', `
-    ${mf('Название', 'Agency Ads', false)}
-    ${mf('Валюта', 'USD / EUR — потом НЕ сменить', true)}
-    ${mf('Часовой пояс', 'Asia/Dubai — потом НЕ сменить', true)}
-    ${mf('ID рекламного аккаунта', 'act_1234567890', true, '⧉')}`);
+  const metaFormWin = brw('Meta Ads › Мгновенная форма (Instant Form)', `
+    ${mf('Цель кампании', 'Лид-формы (Instant Forms)', true)}
+    ${mf('Страница', 'Страница вашего агентства', false)}
+    ${mf('Поля формы', 'Имя · Телефон · E-mail', true)}
+    <div class="wag-shopnote">Телефон в форме обязателен — по нему Lumen заводит карточку и не плодит дубли.</div>`);
 
-  const appWin = brw('developers.facebook.com › My Apps › Create App', `
-    ${mf('Тип приложения', 'Business (Бизнес)', true)}
-    ${mf('Название приложения', 'Agency CRM', false)}
-    ${mf('App ID', '9876543210', false)}
-    <div class="wag-shopnote">В приложение добавьте продукт <b>Marketing API</b> (и WhatsApp — если нужен Cloud API).</div>`);
+  const trigWin = brw('Albato › Связка › Шаг 1 · Триггер', `
+    ${mf('Приложение', 'Facebook Lead Ads', true)}
+    ${mf('Событие', 'Новый лид (New Lead)', true)}
+    ${mf('Аккаунт', 'подключить Facebook (вход)', false)}
+    ${mf('Страница', 'Страница агентства', false)}
+    ${mf('Форма', 'ваша лид-форма', false)}`);
 
-  const sysWin = brw('Business Settings › Пользователи › System Users › Generate token', `
-    ${mf('System User', 'agency-integration · Admin', false)}
-    ${mf('Приложение', 'Agency CRM', false)}
-    ${mf('Assets', 'приложение + рекламный аккаунт + Страница (Full control)', true)}
-    ${mf('Срок токена (expiration)', 'Never — бессрочный', true)}
-    ${mf('Права (расход/кампании)', 'ads_read', false)}
-    ${mf('Права (лиды из форм)', 'ads_management · leads_retrieval · pages_show_list · pages_read_engagement · pages_manage_ads', true)}
-    <div class="wag-winbtns"><span class="wag-buybtn">Generate token</span></div>`);
-
-  const idWin = brw('Meta Ads Manager › выбор аккаунта', `
-    ${mf('Agency Ads', 'act_1234567890', true, '⧉')}
-    <div class="wag-shopnote">ID виден в выпадающем списке аккаунтов и в адресной строке Ads Manager (<code>…?act=1234567890</code>).</div>`);
+  const actWin = brw('Albato › Связка › Шаг 2 · Действие', `
+    ${mf('Приложение', 'Webhook (HTTP-запрос)', true)}
+    ${mf('Метод', 'POST', false)}
+    ${mf('URL', shortUrl, true, '⧉ из Lumen')}
+    ${mf('Формат тела', 'JSON', false)}
+    <div class="wag-maplbl">Сопоставление полей (JSON ← поле формы):</div>
+    ${mf('name', '← Полное имя', false)}
+    ${mf('phone', '← Телефон · ОБЯЗАТЕЛЬНО', true)}
+    ${mf('email', '← E-mail', false)}
+    ${mf('ad_id', '← ID объявления', false)}
+    ${mf('adset_id / campaign_id / form_name', '← соответствующие поля', false)}`);
 
   const faq = [
-    ['Нужно ли проходить App Review в Meta?', 'Для чтения <b>в пределах своего</b> бизнеса — нет: <b>leads_retrieval</b> и page-права доступны администраторам/разработчикам/тестировщикам приложения без ревью (роль в App → Roles). <b>App Review</b> (Advanced Access) нужен, если приложение будет тянуть лиды для <b>чужих</b> бизнесов/клиентов.'],
-    ['Лиды не тянутся, а расход тянется', 'Расходу хватает <b>ads_read</b>. Лидам нужен полный набор: <b>ads_management · leads_retrieval · pages_show_list · pages_read_engagement · pages_manage_ads</b>, плюс <b>Страница</b> назначена System User (Add assets → Pages → Full control) и выпустивший токен имеет на Странице задачу <b>ADVERTISE</b>. Если чего-то нет — Meta молча вернёт пусто.'],
-    ['«Invalid OAuth access token»', 'Токен временный (из API Setup, живёт 24 ч) или с недостающими правами. Сгенерируйте <b>постоянный</b> токен System User (expiration Never) с нужными правами и вставьте заново.'],
-    ['Где взять сам Ad account ID', 'Meta Ads Manager → выпадающий список аккаунтов, либо Business Settings → Рекламные аккаунты. Вид <code>act_1234567890</code>. В Lumen можно вставить и просто цифры — префикс <code>act_</code> подставится сам.'],
-    ['Карта обязательна?', 'Для чтения данных (расход/лиды) — нет. Но чтобы кампании реально крутились и был расход, к рекламному аккаунту должна быть привязана карта (Business Settings → Billing / Payment methods).'],
+    ['Лид не пришёл в CRM', 'Проверьте: связка в Albato <b>включена</b>; в действии метод <b>POST</b> и правильный URL из Lumen; в маппинге заполнен <b>phone</b> (без него лид отклоняется). Отправьте тест-лид из Albato и смотрите «Журнал приёма» ниже.'],
+    ['Поля в форме называются иначе', 'Не страшно — Lumen понимает синонимы: name/full_name/first_name, phone/phone_number, email/e-mail. Главное — чтобы значение телефона попало в поле <b>phone</b>.'],
+    ['Можно ли без Albato — Make или Zapier?', 'Да, принцип тот же: триггер «Facebook Lead Ads → New Lead» → действие <b>Webhook / HTTP POST</b> на этот же URL Lumen с теми же полями.'],
+    ['Что даёт ad_id', 'Если передать <b>ad_id</b>, лид автоматически привяжется к объявлению — и в «Дереве креативов»/«Эффективности» будет видно, какой креатив принёс заявку.'],
+    ['Безопасность ссылки', 'URL содержит секретный ключ — не публикуйте его. При утечке нажмите <b>«Сменить секрет»</b> и обновите адрес в Albato.'],
   ];
 
   return `<div class="wag" style="gap:16px">
-    <div class="wag-lead">Полный путь для агентства недвижимости — с нуля до подключения. Если бизнес-аккаунт Meta уже есть, пропустите шаги 1–4 и идите к токену (шаг 5).</div>
+    <div class="wag-lead">Приём лидов из Meta <b>без программирования</b> — через интегратор. Берём Albato (так же работают Make/Zapier). Схема простая:</div>
+    ${flow}
 
     <div class="wag-sec" style="border-top:none;padding-top:0">
-      ${secH('1', 'Бизнес-портфолио Meta (Business Manager)', 'Юр-контейнер для рекламы. Если уже есть — пропустите.')}
-      <p class="wag-p">Откройте <b>business.facebook.com</b> → «Создать бизнес-портфолио» → название агентства, ваше имя, рабочая почта → подтвердите почту.</p>
-      ${portfolioWin}
+      ${secH('1', 'Meta: кампания с лид-формой', 'Нужна цель «Лид-формы» и сама форма на вашей Странице.')}
+      <p class="wag-p">В Ads Manager запустите кампанию с целью <b>«Лид-формы» (Instant Forms)</b> на Странице агентства. В форме — поля <b>Имя</b>, <b>Телефон</b> (обязательно), <b>E-mail</b>.</p>
+      ${metaFormWin}
     </div>
 
     <div class="wag-sec">
-      ${secH('2', 'Рекламный аккаунт + карта', 'Здесь живут кампании и расход, отсюда берём Ad account ID.')}
-      <p class="wag-p">Business Settings → <b>Аккаунты → Рекламные аккаунты</b> → «Добавить» (или создать новый). Задайте валюту и часовой пояс. Привяжите карту в <b>Billing / Payment methods</b>.</p>
-      ${acctWin}
-      ${call('warn', 'Валюта и часовой пояс — навсегда', 'После создания аккаунта их <b>нельзя</b> поменять. Ставьте сразу правильные (обычно валюта расчётов и пояс вашего рынка).')}
+      ${secH('2', 'Albato: триггер «Новый лид»', 'Albato будет ловить каждую новую заявку из формы.')}
+      <p class="wag-p">Зарегистрируйтесь на Albato → создайте <b>связку (Bundle)</b>. Первый шаг (триггер): приложение <b>Facebook Lead Ads</b>, событие <b>«Новый лид»</b>. Подключите аккаунт Facebook, выберите <b>Страницу</b> и <b>Форму</b>.</p>
+      ${trigWin}
     </div>
 
     <div class="wag-sec">
-      ${secH('3', 'Страница Facebook агентства', 'Нужна для лид-форм (Lead Ads) — без неё лиды не тянутся.')}
-      <p class="wag-p">Business Settings → <b>Аккаунты → Страницы</b> → добавьте существующую или создайте страницу агентства. Лид-формы принадлежат именно <b>Странице</b>. Человек, который выпустит токен, должен иметь на Странице задачу <b>ADVERTISE</b> (роль администратора/рекламодателя), иначе Meta не отдаст лиды.</p>
+      ${secH('3', 'Скопируйте вебхук Lumen', 'Это адрес, куда Albato будет слать лиды.')}
+      <p class="wag-p">В карточке ниже нажмите кнопку копирования у поля <b>«Webhook приёма»</b>. Адрес содержит секретный ключ — не публикуйте его.</p>
+      ${mf('Webhook приёма (Lumen)', shortUrl, true, '⧉ кнопка ниже')}
     </div>
 
     <div class="wag-sec">
-      ${secH('4', 'Приложение Meta (App)', 'Технический «ключ» для API. Делается один раз.')}
-      <p class="wag-p"><b>developers.facebook.com</b> → My Apps → <b>Create App</b> → тип <b>Business</b> → название → создать. Внутри добавьте продукт <b>Marketing API</b> (и WhatsApp, если нужен Cloud API).</p>
-      ${appWin}
+      ${secH('4', 'Albato: действие «Webhook (POST)»', 'Второй шаг связки — отправка лида в Lumen.')}
+      <p class="wag-p">Добавьте действие <b>Webhook / HTTP-запрос</b>: метод <b>POST</b>, URL — вебхук Lumen, тело <b>JSON</b>. Сопоставьте поля формы с полями Lumen.</p>
+      ${actWin}
+      ${call('info', 'Какие поля принимает Lumen', '<b>name</b>, <b>phone</b> (обязательно), <b>email</b>, <b>geo</b>, <b>source</b>, <b>ad_id</b>, <b>adset_id</b>, <b>campaign_id</b>, <b>form_name</b>. Маппинг гибкий — понимает синонимы (full_name, phone_number, e-mail…).')}
     </div>
 
     <div class="wag-sec">
-      ${secH('5', 'Системный пользователь и постоянный токен', 'Главный шаг. Токен = связка приложение + рекламный аккаунт + Страница.')}
-      <p class="wag-p">Business Settings → <b>Пользователи → System Users</b> → создайте юзера (роль Admin) → <b>Add assets</b>: приложение + рекламный аккаунт + <b>Страница</b>, все с <b>Full control</b>. Затем <b>Generate token</b> и отметьте права.</p>
-      ${sysWin}
-      ${call('danger', 'Права — по документации Meta (2025)', 'Для <b>расхода/кампаний</b> достаточно <b>ads_read</b>. Для <b>лидов из лид-форм</b> нужен полный набор: <b>ads_management</b>, <b>leads_retrieval</b>, <b>pages_show_list</b>, <b>pages_read_engagement</b>, <b>pages_manage_ads</b> (+ <b>pages_manage_metadata</b>, если используете вебхуки). Срок — <b>Never</b>. Токен показывается <b>один раз</b>.')}
-      ${call('warn', 'Не видите «leads_retrieval» в списке прав?', 'Это разрешение появляется в диалоге токена, только если у приложения есть к нему доступ. В пределах <b>своего</b> бизнеса оно доступно администраторам/разработчикам/тестировщикам приложения без App Review. Если права нет — либо добавьте себя в роли приложения (developers.facebook.com → App → Roles), либо оформите <b>App Review</b> (Advanced Access) на <b>leads_retrieval</b> + <b>pages_manage_ads</b>. Как запасной путь — используйте <b>Page access token</b> от админа Страницы с задачей ADVERTISE (у Page-токена лучше лимиты).')}
-    </div>
-
-    <div class="wag-sec">
-      ${secH('6', 'Ad account ID', 'Второе значение, которое вставляем в Lumen.')}
-      <p class="wag-p">Meta Ads Manager → выпадающий список аккаунтов, либо Business Settings → Рекламные аккаунты. Вид <code class="pill">act_1234567890</code>.</p>
-      ${idWin}
-    </div>
-
-    <div class="wag-sec">
-      ${secH('7', 'Подключить в Lumen', 'Финал.')}
+      ${secH('5', 'Включите и протестируйте', 'Проверка за минуту.')}
       <ol class="wag-ol">
-        <li>Вставьте <b>Ad account ID</b> и <b>токен</b> в поля ниже → <b>«Сохранить»</b>.</li>
-        <li>Нажмите <b>«Проверить»</b> — Lumen покажет имя кабинета и валюту.</li>
-        <li><b>«Синхронизировать сейчас»</b> — подтянутся расход и лиды. Дальше синк идёт сам ~раз в 6 часов.</li>
+        <li>Включите связку в Albato.</li>
+        <li>Отправьте <b>тест-лид</b> (в Albato есть тестовая отправка, либо заполните форму сами).</li>
+        <li>Проверьте <b>«Журнал приёма»</b> ниже и карточку нового лида в разделе «Лиды».</li>
       </ol>
-      ${call('info', 'Приватность', 'Токен хранится как секрет и в интерфейс не возвращается. Отправка обратных сигналов качества в Meta (квал/сделка) — соседняя карточка «Meta CAPI».')}
+      ${call('tip', 'Правила, чтобы не было сюрпризов', '• <b>phone обязателен</b> — без него лид не создаётся.<br>• <b>Дубли по телефону не плодятся</b> — повторная заявка обогащает существующую карточку.<br>• <b>ad_id</b> → авто-привязка к объявлению (аналитика по креативам).<br>• Обратный мост (по желанию): квал/сделка из Lumen → POST на ваш URL (в поле «Исходящий мост» ниже) → Albato разнесёт в любую CRM клиента.')}
     </div>
 
     <div class="wag-sec">

@@ -158,7 +158,8 @@ async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50 } = {}) {
 
 /* оркестратор: тянем что настроено, пишем журнал/статистику/время */
 async function sync(db, deps, opts = {}) {
-  if (!apiEnabled(db)) return { skipped: true };
+  if (!opts.force && !apiEnabled(db)) return { skipped: true };   /* force = ручной запуск кнопкой (в обход тумблера/режима) */
+  { const c = db.settings.metaAds || {}; if (!c.token || !c.adAccountId) return { skipped: true, error: 'нет токена или Ad account ID' }; }
   const c = db.settings.metaAds;
   const started = Date.now();
   const out = { at: started };
