@@ -11047,6 +11047,269 @@ function waQrGuideRich() {
   return `<div class="glass card mb">${coll('Инструкция: WhatsApp по QR — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
 }
 
+/* ── Полная иллюстрированная инструкция «Telegram по QR» ──────────────────────
+   Реальные скриншоты регистрации (assets/tg-guide/*.png) + мокапы экранов,
+   разбор ВАРИАТИВНОГО «забора» Telegram (email-код / ~$0.99 / SMS, зависит от
+   страны и репутации номера), 2FA-пароль, прогрев, FAQ. Заменяет короткий гид tg. */
+function tgQrGuideRich() {
+  const TGBLUE = '#2AABEE';
+  const phone = (title, rows, foot) => `<div class="wag-phone">
+    <div class="wag-ph-bar"><span>9:41</span><span class="wag-ph-sig">▪▪▪ ▪ ▮</span></div>
+    <div class="wag-ph-hd" style="background:${TGBLUE}"><span class="wag-ph-back">‹</span>${title}</div>
+    <div class="wag-ph-body">${rows.map(r => `<div class="wag-mrow ${r.hl ? 'hl' : ''}">
+      <span class="wag-mic">${r.ic || ''}</span>
+      <span class="wag-mtx"><b>${r.t}</b>${r.d ? `<i>${r.d}</i>` : ''}</span>
+      ${r.hl ? '<span class="wag-mgo">→</span>' : ''}
+    </div>`).join('')}</div>
+    ${foot ? `<div class="wag-ph-foot">${foot}</div>` : ''}
+  </div>`;
+  const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
+  const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn" style="background:${TGBLUE}">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
+
+  /* реальные скриншоты забора */
+  const shots = [
+    ['01-add-email', 'Add Email — впиши e-mail', 'Telegram просит почту, куда придёт код'],
+    ['02-email-code', 'Код с почты', 'Введи код из письма (не из SMS)'],
+    ['03-sms-fee', '~$0.99 — анти-спам', 'Появляется НЕ всегда (неделя Premium)'],
+    ['04-enter-code', 'SMS-код на номер', 'Код возьми в ленте OTP в CRM'],
+  ];
+  const realShots = `<div class="wag-realshots">${shots.map(s => `<figure class="wag-fig">
+    <img src="assets/tg-guide/${s[0]}.png?v=1" loading="lazy" alt="${esc(s[1])}">
+    <figcaption><b>${s[1]}</b><span>${s[2]}</span></figcaption>
+  </figure>`).join('')}</div>`;
+
+  /* путь подключения по QR */
+  const pathQR = `<div class="wag-shots">
+    ${phone('Настройки', [
+      { ic: '👤', t: 'Мой профиль', d: 'имя, username, фото' },
+      { ic: '💻', t: 'Устройства', d: 'активные сессии и подключения', hl: true },
+      { ic: '🔒', t: 'Конфиденциальность', d: 'в т.ч. облачный пароль (2FA)' },
+    ])}
+    ${phone('Устройства', [
+      { ic: '➕', t: 'Подключить устройство', d: 'откроется сканер QR', hl: true },
+      { ic: '📱', t: 'Этот телефон', d: 'основная сессия' },
+    ], 'Linked-сессия живёт, пока сам не выйдешь. Телефон держать онлайн НЕ нужно (в отличие от WhatsApp).')}
+    ${phone('Сканер', [
+      { ic: '🎯', t: 'Наведите на QR-код', d: 'QR показан в Lumen', hl: true },
+    ], 'Если на аккаунте включён облачный пароль — Lumen попросит ввести его.')}
+  </div>
+  <div class="wag-cap">Путь: <b>Telegram → Настройки → Устройства → Подключить устройство</b> → навести на QR из Lumen. SMS при подключении не нужен.</div>`;
+
+  const faq = [
+    ['Код не приходит совсем (особенно на номер США)', 'US-номера Telegram почти не обслуживает: подключение говорит «код отправлен», а SMS не доходит. Берите <b>не-US</b> страну (Украина, Британия, Нидерланды, Польша, Германия, Канада) — там забор мягче. Это самая частая причина «не приходит код».'],
+    ['Вместо SMS пришёл код на e-mail', 'Это нормальный новый путь Telegram для части номеров. Введите код из <b>письма</b>, а не из SMS. Дальше может быть ещё и SMS-шаг — код для него берите в ленте OTP в CRM.'],
+    ['Telegram требует оплату ~$0.99', 'Это One-time SMS Fee (неделя Premium) как анти-спам. Появляется <b>не всегда</b> — зависит от номера и страны. Если показал — оплатите картой и продолжите; если не показал — сразу перейдёте к вводу кода.'],
+    ['Один e-mail на два номера — код не пришёл', 'Повтор одной почты на разные номера Telegram режет (анти-абьюз). На <b>каждый номер — уникальный e-mail</b>. Не обязательно покупать ящики: заведите <b>catch-all домен</b> (любой адрес @вашдомен → один ящик) или Gmail-алиасы (<i>имя+1@gmail.com</i>, <i>имя+2@…</i>). Этот e-mail станет почтой аккаунта для будущих кодов — держите к нему доступ.'],
+    ['При сканировании QR просит пароль', 'На аккаунте включена двухэтапная аутентификация (облачный пароль Telegram). Введите этот пароль в Lumen — подключение завершится. Забыли — сбросьте 2FA в Telegram на телефоне.'],
+    ['Аккаунт «разлогинился» / слетел', 'Свежий номер с резким объёмом Telegram может выкинуть как подозрительный. Лечение: прогрев 2–3 недели перед работой, резидентный прокси страны номера, полный профиль (имя+фото+био) ещё до первого трафика, никаких рассылок.'],
+    ['Нужно ли держать телефон онлайн?', 'Нет. В отличие от WhatsApp, Telegram-сессия Lumen живёт самостоятельно, пока вы сами её не завершите. После создания аккаунта и скана QR телефон/эмулятор можно выключить.'],
+  ];
+
+  const body = `<div class="wag">
+    <div class="wag-lead">Telegram изначально многоустройственный — Lumen цепляется к аккаунту по QR как ещё одно устройство (как WhatsApp Web). Главная возня — <b>разовая регистрация номера</b>: у Telegram есть анти-спам «забор», и он у всех разный. Ниже — как пройти его без сюрпризов.</div>
+
+    <div class="wag-paths">
+      <div class="wag-path">
+        <div class="wag-ptag" style="color:${TGBLUE}">Путь A · быстрый</div>
+        <div class="wag-pt">Свой аккаунт по QR</div>
+        <div class="wag-pd">У вас уже есть Telegram на этот номер. Просто сканируете QR — 1 минута.</div>
+        <div class="wag-pmeta">Бесплатно · забор проходить не нужно</div>
+      </div>
+      <div class="wag-path">
+        <div class="wag-ptag alt">Путь B · рабочий номер</div>
+        <div class="wag-pt">Виртуальный номер + регистрация</div>
+        <div class="wag-pd">Отдельный рабочий номер под брокера. Один раз проходите забор Telegram на телефоне/эмуляторе, потом цепляете по QR.</div>
+        <div class="wag-pmeta">≈ $9/мес аренда номера · нужен телефон/эмулятор на этап регистрации</div>
+      </div>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('A', 'Свой аккаунт по QR', 'Если рабочий Telegram уже на вашем номере — это всё, что нужно.')}
+      <ol class="wag-ol">
+        <li>В CRM: вкладка «Telegram» → <b>«Подключить свой номер»</b> → введите номер → появится QR.</li>
+        <li>В Telegram: <b>Настройки → Устройства → Подключить устройство</b>.</li>
+        <li>Наведите камеру на QR в Lumen. Если включён облачный пароль (2FA) — введите его. Готово.</li>
+      </ol>
+      ${pathQR}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('B', 'Регистрация нового номера — «забор» Telegram', 'Самый важный раздел. Набор шагов зависит от страны и репутации номера — разберём все ветки.')}
+      <p class="wag-p">Купите виртуальный номер в CRM (<b>«Купить номер для Telegram»</b>, оплата с баланса). Затем на телефоне (лучше Android) или в эмуляторе заведите Telegram на этот номер. Что попросит Telegram — <b>зависит от страны + репутации номера + оператора</b>, поэтому вариантов несколько:</p>
+      <div class="wag-branches">
+        <div class="wag-branch"><div class="wag-bn">1</div><div class="wag-bb"><b>Повезло: сразу SMS</b><span>Telegram шлёт код прямо в SMS на номер → код прилетает в ленту OTP в CRM → вводите → готово.</span></div></div>
+        <div class="wag-branch"><div class="wag-bn">2</div><div class="wag-bb"><b>Часто у виртуальных: код на e-mail</b><span>Экран <b>Add Email</b> → код приходит <b>на почту</b> (а не в SMS). Вводите код из письма. ⚠️ На каждый номер — уникальный e-mail.</span></div></div>
+        <div class="wag-branch"><div class="wag-bn">3</div><div class="wag-bb"><b>Иногда: разовая плата ~$0.99</b><span>Экран <b>One-time SMS Fee</b> (неделя Premium, анти-спам). Появляется не всегда. Оплатите картой → затем код.</span></div></div>
+        <div class="wag-branch alt"><div class="wag-bn">↯</div><div class="wag-bb"><b>Комбинация</b><span>Часто это связка: <b>e-mail → (иногда $0.99) → SMS</b>. Порядок один и тот же, просто часть шагов может отсутствовать.</span></div></div>
+      </div>
+      <div class="wag-sub">Как это выглядит на экранах</div>
+      ${realShots}
+      <div class="wag-cap">Экраны Telegram могут отличаться по стране/устройству — логика та же: <b>e-mail → (оплата) → SMS</b>.</div>
+      ${call('danger', 'Не берите номер США', 'US-номера Telegram почти не обслуживает — код «отправлен», но SMS не доходит. Берите <b>не-US</b>: Украина, Британия, Нидерланды, Польша, Германия, Канада — там забор мягче.')}
+      ${call('warn', 'Уникальный e-mail на каждый номер', 'Повтор одной почты на разные номера = код не придёт (анти-абьюз). Решение без покупки ящиков: <b>catch-all домен</b> (любой адрес @вашдомен → один ящик) или <b>Gmail-алиасы</b> (имя+1@gmail.com, имя+2@…). Держите доступ к этой почте — на неё будут приходить будущие коды входа.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('C', 'Подключение по QR + облачный пароль (2FA)', 'После регистрации аккаунт цепляется к Lumen как связанное устройство.')}
+      <p class="wag-p">В CRM: <b>«Подключить свой номер»</b> → введите номер → QR. В Telegram, где создан аккаунт: <b>Настройки → Устройства → Подключить устройство</b> → наведите на QR.</p>
+      ${call('info', 'Если попросит пароль', 'Когда на аккаунте включена двухэтапная аутентификация (облачный пароль), Lumen после скана QR попросит ввести его — это нормально. Введите пароль, и подключение завершится.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('D', 'Сколько аккаунтов на одном устройстве', 'У Telegram с этим проще, чем у WhatsApp.')}
+      <p class="wag-p">Telegram штатно держит <b>несколько аккаунтов в одном приложении</b>: Настройки → стрелка у имени → <b>«Добавить аккаунт»</b>. Обычно до 3, с Telegram Premium — до 4. Дальше — клонирование приложения (Samsung Dual Messenger, Xiaomi «Клонирование приложений» и т.п.) или отдельные <b>инстансы эмулятора</b> — те же BlueStacks / LDPlayer / NoxPlayer, что и для WhatsApp (см. инструкцию WhatsApp по QR → раздел про эмуляторы и клонирование).</p>
+      ${call('tip', 'Важное отличие от WhatsApp', 'Устройство/эмулятор нужен только на <b>этап регистрации</b>. После скана QR linked-сессия Lumen живёт сама — телефон можно выключить. Держать ферму устройств онлайн, как для WhatsApp, не нужно.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('E', 'Профиль аккаунта', 'Оформите до первого трафика — живой профиль снижает риск блокировки.')}
+      <p class="wag-p">Кнопка <b>«Профиль»</b> на карточке номера: имя, фамилия, <b>username</b>, био (≤70 симв.), аватар. Всё синхронизируется в реальный Telegram-аккаунт.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('F', 'Прогрев (обязательно для новых)', 'Свежий аккаунт нельзя сразу грузить объёмом — резкий скачок = маркер бота.')}
+      <p class="wag-p">Включите прогрев (нужно <b>≥2 подключённых номера</b>) — они аккуратно переписываются между собой с задержками и вариативными текстами.</p>
+      <div class="wag-ramp">
+        <div class="wag-rc"><b>День 0</b><span>≈3 сообщения</span></div>
+        <div class="wag-rc"><b>+ каждый день</b><span>+~2 к лимиту</span></div>
+        <div class="wag-rc"><b>~2 недели</b><span>потолок ≈20/день</span></div>
+      </div>
+      ${call('info', 'Best-practice против бана', 'Консистентная гео/сессия + резидентный прокси страны номера, полный профиль ещё до трафика, вариативные тексты. Новый аккаунт в основном <b>принимает</b> (низкий cap на отправку) — это нормально.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('G', 'Правила безопасности', 'Коротко — чтобы аккаунты жили.')}
+      <ul class="wag-rules">
+        <li><b>Не-US номер</b> — US почти не регистрируется.</li>
+        <li><b>Уникальный e-mail на каждый номер</b> и доступ к нему (будущие коды входа).</li>
+        <li><b>Прогрев 2–3 недели</b> перед работой, полный профиль до трафика.</li>
+        <li><b>Рассылки с серых аккаунтов — нет.</b> Массовые касания — официальными средствами.</li>
+      </ul>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('?', 'Частые проблемы', 'Всё, что чаще всего идёт не так при регистрации Telegram.')}
+      <div class="wag-faq">${faq.map(f => `<details class="wag-fq"><summary>${f[0]}</summary><div class="wag-fa">${f[1]}</div></details>`).join('')}</div>
+    </div>
+  </div>`;
+
+  return `<div class="glass card mb">${coll('Инструкция: Telegram по QR — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
+}
+
+/* ── Полная иллюстрированная инструкция «Телефония» ───────────────────────────
+   Два формата: (A) покупка номера в нашем магазине (внутри церемонии) и
+   (B) подключение своей телефонии (Telnyx/Twilio/Zadarma) — с мокапами формы,
+   вебхука, портала провайдера и разбором частых проблем. Заменяет короткий tel. */
+function telGuideRich() {
+  const ACC = 'var(--accent)';
+  const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
+  const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
+  const win = (title, bodyHtml) => `<div class="wag-win"><div class="wag-win-bar"><span class="wag-win-dots"><i></i><i></i><i></i></span>${title}</div><div class="wag-win-body">${bodyHtml}</div></div>`;
+  const field = (label, val, ph) => `<div class="wag-field"><span class="wag-flabel">${label}</span><span class="wag-finput ${val ? '' : 'ph'}">${val || ph || ''}</span></div>`;
+
+  /* мокап: магазин покупки номера */
+  const shopWin = win('Номера · Телефония · Купить номер', `
+    <div class="wag-field"><span class="wag-flabel">Страна</span><span class="wag-finput">🇦🇪 ОАЭ (+971) ▾</span></div>
+    <div class="wag-shoplist">
+      <div class="wag-shoprow"><b>+971 5X XXX 01</b><i>Local · запись, звонки</i><span class="wag-buybtn">Купить</span></div>
+      <div class="wag-shoprow"><b>+971 5X XXX 02</b><i>Local · запись, звонки</i><span class="wag-buybtn">Купить</span></div>
+      <div class="wag-shoprow"><b>+971 5X XXX 03</b><i>Local · запись, звонки</i><span class="wag-buybtn">Купить</span></div>
+    </div>
+    <div class="wag-shopnote">Оплата ≈ $9/мес спишется с баланса расходников. Номер сразу в авто-подборе.</div>`);
+
+  /* мокап: настройки своей телефонии */
+  const settingsWin = win('Настройки · Телефония', `
+    ${field('Провайдер', 'Telnyx ▾')}
+    <div class="wag-field2">
+      ${field('API key', '', 'KEY01ABC… (Telnyx V2)')}
+      ${field('Connection / App ID', '', 'Call Control App ID')}
+    </div>
+    <div class="wag-field2">
+      ${field('Номер «От» (дефолт)', '', '+971 5X…')}
+      ${field('Гео-пул (авто-подбор)', '+39…, +971…, +66…', '')}
+    </div>
+    <div class="wag-winbtns"><span class="wag-buybtn">Сохранить</span><span class="wag-ghostbtn">✦ Проверить</span></div>`);
+
+  /* мокап: вебхук */
+  const webhookWin = win('Вебхук для провайдера', `
+    <div class="wag-copy"><code>https://ваш-lumen.app/api/telephony/webhook/telnyx</code><span class="wag-copychip">⧉ Копировать</span></div>
+    <div class="wag-shopnote">Вставьте этот адрес в Telnyx → Voice App (Call Control App) → <b>Webhook URL</b>. Без него не придут статусы звонка и запись.</div>`);
+
+  const faq = [
+    ['Звоню — тишина ~20 секунд и не соединяет', 'Чаще всего в кабинете провайдера не включена страна назначения. Telnyx: <b>Outbound Voice Profile</b> → добавьте страны, куда звоните (и страну номера «От»). Без этого звонок молча не проходит.'],
+    ['Не приходит запись и статусы звонка', 'Не настроен вебхук. Скопируйте Webhook URL из карточки и вставьте в <b>Telnyx → Voice App → Webhook URL</b> (у Twilio — в настройках номера/приложения). Запись и транскрипт кладутся в карточку только через вебхук.'],
+    ['Где взять ключи Telnyx', 'portal.telnyx.com → <b>API Keys</b> — создайте ключ <b>V2</b> (начинается с KEY…). Затем <b>Call Control → Applications</b> — создайте приложение и возьмите его <b>App ID</b> (это и есть Connection / App ID). Секрет для Telnyx не нужен.'],
+    ['Где взять данные Twilio', 'console.twilio.com → Account Info: <b>Account SID</b> (AC…) и Auth Token / API key. Вебхук указывается в настройках номера или TwiML App.'],
+    ['Какого провайдера выбрать', '<b>Zadarma</b> — дешевле всего для старта (номер ОАЭ + записи + API). <b>Telnyx / Twilio</b> — глобальные, удобны когда звоните в разные страны. Начать проще с Zadarma.'],
+    ['Клиент видит иностранный номер', 'Добавьте номер страны клиента в <b>гео-пул</b>. При звонке подставится номер, совпадающий по коду страны (лид +39 → звонок с итальянского номера, local presence → выше отклик). Нет совпадения — берётся «От» по умолчанию.'],
+    ['Сколько номеров нужно команде', 'Ориентир ~<b>1 активный номер на 3 брокеров</b> (несколько линий = параллельные разговоры). Больше не нужно — дороже и хуже для репутации. В настройках есть кнопка «Купить по рекомендации».'],
+  ];
+
+  const body = `<div class="wag">
+    <div class="wag-lead">Телефония — это звонок клиенту <b>в один клик из карточки лида</b>: разговор записывается, ИИ делает резюме и кладёт его в карточку. Клиенту показываем номер его страны (local presence → выше отклик). Подключить можно двумя способами.</div>
+
+    <div class="wag-paths">
+      <div class="wag-path">
+        <div class="wag-ptag">Способ 1 · проще</div>
+        <div class="wag-pt">Купить номер в нашем магазине</div>
+        <div class="wag-pd">Всё уже настроено. Выбираете страну — номер сразу готов к звонкам. Ничего не подключаете.</div>
+        <div class="wag-pmeta">≈ $9/мес аренда · минуты с баланса</div>
+      </div>
+      <div class="wag-path">
+        <div class="wag-ptag alt">Способ 2 · своё</div>
+        <div class="wag-pt">Подключить свою телефонию</div>
+        <div class="wag-pd">Уже есть Telnyx / Twilio / Zadarma — вводите ключи, вебхук, и звоните через свой аккаунт провайдера.</div>
+        <div class="wag-pmeta">Тариф провайдера напрямую · нужен API-ключ</div>
+      </div>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('1', 'Купить номер в магазине', 'Самый быстрый путь — ничего настраивать не нужно.')}
+      <ol class="wag-ol">
+        <li>Раздел <b>«Номера» → вкладка «Телефония» → «Купить номер»</b>.</li>
+        <li>Выберите <b>страну и тип</b> (Local — местный номер) → нажмите «Купить». Оплата ≈ $9/мес спишется с баланса расходников.</li>
+        <li>Номер сразу встаёт в <b>авто-подбор</b>: клиенту звоним с номера его страны автоматически.</li>
+        <li>Звоните <b>из карточки лида</b> в один клик — запись + транскрипт + ИИ-резюме попадают в карточку.</li>
+      </ol>
+      ${shopWin}
+      ${call('tip', 'Совет по количеству', 'Ориентир — примерно 1 номер на 3 брокеров: несколько линий дают параллельные разговоры. Больше обычно не нужно.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('2', 'Подключить свою телефонию', 'Если у вас уже есть аккаунт провайдера. Нужны ключ, App ID и вебхук.')}
+      <div class="wag-sub">Шаг 1. Выберите провайдера и введите ключи</div>
+      <p class="wag-p">Настройки → <b>Телефония</b> → выберите провайдера: <b>Zadarma</b> (дешевле для ОАЭ), <b>Twilio</b> или <b>Telnyx</b> (глобальные).</p>
+      ${settingsWin}
+      <div class="wag-clones">
+        <div class="wag-clone"><b>Telnyx</b><span>API key <b>V2</b> (KEY…) из portal.telnyx.com → API Keys. <b>Connection / App ID</b> = App ID из Call Control → Applications. Секрет не нужен.</span></div>
+        <div class="wag-clone"><b>Twilio</b><span>API key + <b>Account SID</b> (AC…) из console.twilio.com → Account Info.</span></div>
+        <div class="wag-clone"><b>Zadarma</b><span>API key + API secret из личного кабинета Zadarma → Настройки → API.</span></div>
+        <div class="wag-clone"><b>Номер «От» + гео-пул</b><span>Укажите дефолтный номер и пул (по одному в строке) — система подставит номер страны клиента.</span></div>
+      </div>
+
+      <div class="wag-sub">Шаг 2. Пропишите вебхук</div>
+      <p class="wag-p">Скопируйте адрес вебхука из карточки и вставьте его в кабинете провайдера — без этого не придут статусы звонка и запись.</p>
+      ${webhookWin}
+
+      <div class="wag-sub">Шаг 3. Включите страны и проверьте</div>
+      <p class="wag-p">В кабинете провайдера включите направления, куда будете звонить, затем нажмите <b>«Проверить»</b> — придёт тестовый звонок. Прошёл — сохраняйте. Тут же можно купить номера у провайдера (есть кнопка «Купить по рекомендации»).</p>
+      ${call('danger', 'Главная причина «звоню — тишина»', 'В Telnyx <b>Outbound Voice Profile</b> должны быть включены страны назначения и страна номера «От». Если направление выключено — звонок молча не проходит ~20 секунд. Это ловушка №1 при своей телефонии.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('$', 'Тарификация', 'Что и как считается.')}
+      <p class="wag-p">Минуты разговора + запись + транскрибация считаются по факту. В магазине — списываются с баланса расходников (аренда номера ≈ $9/мес). При своей телефонии минуты платятся провайдеру напрямую (≈ $0.10–0.20 за минуту речи), а Lumen считает только ИИ-резюме/транскрибацию.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('?', 'Частые проблемы', 'Быстрые ответы по подключению и звонкам.')}
+      <div class="wag-faq">${faq.map(f => `<details class="wag-fq"><summary>${f[0]}</summary><div class="wag-fa">${f[1]}</div></details>`).join('')}</div>
+    </div>
+  </div>`;
+
+  return `<div class="glass card mb">${coll('Инструкция: Телефония — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
+}
+
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
@@ -11161,7 +11424,7 @@ PAGES.numbers = async (root) => {
 
     <div data-numpane="tg" style="${NUMTAB === 'tg' ? '' : 'display:none'}">
     <div id="tgGraySection" class="muted" style="font-size:12px">Загрузка…</div>
-    ${chGuideCard(CH_GUIDES.tg[0], CH_GUIDES.tg[1])}
+    ${tgQrGuideRich()}
     </div>
 
     <div data-numpane="cloud" style="${NUMTAB === 'cloud' ? '' : 'display:none'}">
@@ -11303,7 +11566,7 @@ PAGES.numbers = async (root) => {
         <div style="margin:10px 0 4px"><span class="badge ok"><i></i>${esc(n.status || 'active')}</span></div>
       </div>`).join('')}
     </div>` : `<div class="muted" style="font-size:13px">Номеров телефонии пока нет — нажмите «Купить номер».</div>`}
-    ${chGuideCard(CH_GUIDES.tel[0], CH_GUIDES.tel[1])}
+    ${telGuideRich()}
     </div>`;
   /* вкладки страницы «Номера» */
   $$('#numTabs .seg-btn', root).forEach(b => b.addEventListener('click', () => {

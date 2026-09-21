@@ -7661,3 +7661,49 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
   .wag-etr>span::before{ content:attr(data-l) ': '; font-weight:700; color:var(--ink); }
   .wag-eth>span::before{ content:none; }
 }
+
+/* ===== Доп. компоненты для гидов Telegram / Телефония (wag-*) ===== */
+/* реальные скриншоты (Telegram-забор) */
+.wag-realshots{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:10px 0; }
+.wag-fig{ margin:0; border:1px solid var(--stroke); border-radius:12px; overflow:hidden; background:var(--card); }
+.wag-fig img{ width:100%; display:block; border-bottom:1px solid var(--stroke); background:var(--bg-2); }
+.wag-fig figcaption{ padding:7px 9px; }
+.wag-fig figcaption b{ display:block; font-size:11.5px; color:var(--ink); }
+.wag-fig figcaption span{ display:block; font-size:10.5px; color:var(--muted); line-height:1.4; margin-top:1px; }
+
+/* ветки забора Telegram */
+.wag-branches{ display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+.wag-branch{ display:flex; gap:12px; align-items:stretch; border:1px solid var(--stroke); border-radius:11px; padding:10px 12px; background:var(--bg-2); }
+.wag-branch.alt{ border-color:color-mix(in srgb,var(--accent) 34%,var(--stroke)); background:color-mix(in srgb,var(--accent) 6%,var(--bg-2)); }
+.wag-bn{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:#2AABEE; color:#fff; font-weight:800; font-size:13px; display:grid; place-items:center; }
+.wag-branch.alt .wag-bn{ background:var(--accent); }
+.wag-bb{ display:flex; flex-direction:column; }
+.wag-bb b{ font-size:12.5px; color:var(--ink); }
+.wag-bb span{ font-size:11.5px; line-height:1.55; color:var(--ink-2); margin-top:2px; }
+
+/* мокап формы/полей (телефония) */
+.wag-field{ display:flex; flex-direction:column; gap:4px; margin:7px 0; }
+.wag-field2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.wag-flabel{ font-size:10.5px; font-weight:650; color:var(--ink-2); text-transform:uppercase; letter-spacing:.03em; }
+.wag-finput{ font-size:12px; color:var(--ink); padding:8px 10px; border:1px solid var(--stroke); border-radius:8px; background:var(--card); }
+.wag-finput.ph{ color:var(--muted); }
+.wag-winbtns{ display:flex; gap:8px; margin-top:10px; }
+.wag-buybtn{ font-size:11.5px; font-weight:650; color:#fff; background:var(--accent); border-radius:8px; padding:7px 14px; display:inline-block; }
+.wag-ghostbtn{ font-size:11.5px; font-weight:600; color:var(--ink-2); border:1px solid var(--stroke); border-radius:8px; padding:7px 14px; display:inline-block; background:var(--card); }
+
+/* мокап магазина номеров */
+.wag-shoplist{ display:flex; flex-direction:column; gap:6px; margin:8px 0 4px; }
+.wag-shoprow{ display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--stroke); border-radius:9px; background:var(--card); }
+.wag-shoprow b{ font-size:12.5px; color:var(--ink); font-weight:650; }
+.wag-shoprow i{ font-style:normal; font-size:11px; color:var(--muted); flex:1; }
+.wag-shopnote{ font-size:11px; line-height:1.5; color:var(--muted); margin-top:8px; }
+
+/* мокап вебхука */
+.wag-copy{ display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--stroke); border-radius:9px; background:var(--card); flex-wrap:wrap; }
+.wag-copy code{ font-size:11.5px; color:var(--ink); word-break:break-all; flex:1; min-width:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.wag-copychip{ font-size:11px; font-weight:600; color:var(--accent); border:1px solid color-mix(in srgb,var(--accent) 34%,var(--stroke)); border-radius:7px; padding:5px 10px; white-space:nowrap; }
+
+@media (max-width:720px){
+  .wag-realshots{ grid-template-columns:repeat(2,1fr); }
+  .wag-field2{ grid-template-columns:1fr; }
+}
