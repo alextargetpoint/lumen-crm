@@ -8608,10 +8608,24 @@ PAGES.ads = async (root) => {
     $$('[data-mapf]', root).forEach(c => on[c.dataset.mapf] = c.checked);
     const obj = {}, sample = {};
     MAP_ORDER.forEach(k => { if (on[k]) { obj[k] = MAP_TOK[k]; sample[k] = MAP_VALS[k]; } });
+    /* кастомные поля из конструктора: custom_<имя> ← {{значение}} */
+    $$('[data-custrow]', root).forEach(rw => {
+      const key = (rw.querySelector('[data-custkey]').value || '').trim().replace(/[^a-zA-Z0-9_]+/g, '_');
+      const val = (rw.querySelector('[data-custval]').value || '').trim();
+      if (key) { obj['custom_' + key] = val ? `{{${val}}}` : ''; sample['custom_' + key] = val || 'значение'; }
+    });
     const jEl = $('#mapJson', root), cEl = $('#mapCurl', root);
     if (jEl) jEl.textContent = JSON.stringify(obj, null, 2);
     if (cEl) cEl.textContent = `curl -X POST '${hookUrl}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(sample)}'`;
   };
+  const addCustomRow = (k, v) => {
+    const box = $('#mapCustomRows', root); if (!box) return;
+    const rw = el(`<div class="map-crow" data-custrow><input data-custkey placeholder="имя поля (budget)" value="${esc(k || '')}"><span class="map-carrow">←</span><input data-custval placeholder="значение из формы (Бюджет)" value="${esc(v || '')}"><button class="btn btn-sm" data-custdel title="Убрать">${ic(I.x)}</button></div>`);
+    box.appendChild(rw);
+    rw.querySelectorAll('input').forEach(i => i.addEventListener('input', rebuildMap));
+    rw.querySelector('[data-custdel]').addEventListener('click', () => { rw.remove(); rebuildMap(); });
+  };
+  $('#mapAddCustom', root)?.addEventListener('click', () => addCustomRow());
   $$('[data-mapf]', root).forEach(c => c.addEventListener('change', rebuildMap));
   rebuildMap();
   $('#mapCopyJson', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapJson', root).textContent); toast('JSON скопирован', 'Вставьте в тело запроса (Webhook) интегратора', true); });
