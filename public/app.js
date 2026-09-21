@@ -566,7 +566,7 @@ const NAV = {
   learn:    { name: 'Академия агентства', en: 'Agency academy', icon: I.doc, sub: 'свои уроки: видео + текст, доступ по паролю', subEn: 'your lessons: video + text, password access' },
   studio:   { name: 'Видео-студия', en: 'Video studio', icon: I.play, sub: 'запись презентаций: экран + камера + микрофон', subEn: 'record presentations: screen + camera + mic' },
   callReview: { name: 'Оценка звонка', en: 'Call review', icon: I.phone, sub: 'ИИ-разбор звонка по методологии', subEn: 'AI call analysis by methodology' },
-  ads:       { name: 'Атрибуция · CAPI', en: 'Attribution · CAPI', icon: I.target, sub: 'события Meta CAPI · лид → объявление', subEn: 'Meta CAPI events · lead → ad' },
+  ads:       { name: 'Аналитика рекламы', en: 'Ad analytics', icon: I.bars, sub: 'факт из кабинетов · дерево креативов · настройки', subEn: 'cabinet facts · creatives · settings' },
   mediaplan: { name: 'Медиапланы', en: 'Media plans', icon: I.bars, sub: 'подрядчики трафика · план/факт · согласование', subEn: 'traffic contractors · plan/fact · approval' },
   adsAnalytics: { name: 'Реклама · подрядчики', en: 'Ads · contractors', icon: I.bars, sub: 'план/факт по подрядчикам · CPL · воронка', subEn: 'plan/fact by contractor · CPL · funnel' },
   comments:  { name: 'Комментарии', en: 'Comments', icon: I.chat, sub: '' },
@@ -8380,7 +8380,7 @@ PAGES.ads = async (root) => {
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
-      <div class="ha-title">${ic(I.target || I.bolt)}Атрибуция · Meta CAPI<span class="sub">события рекламы · лид → объявление</span></div>
+      <div class="ha-title">${ic(I.bars)}Аналитика рекламы<span class="sub">факт из кабинетов Meta · дерево креативов · настройки</span></div>
       ${[
         ['Объявлений в базе', d.ads.length, 'связаны с лидами по ad_id'],
         ['Лидов с рекламы', adLeads, 'через мост и CTWA'],
@@ -9060,9 +9060,8 @@ PAGES.mediaplan = async (root) => {
         ['Плановый бюджет', mpMoney(sumBudget, 'USD'), `${sumLeads} лидов · CPL ${avgCpl ? mpMoney(avgCpl, 'USD') : '—'}`],
       ].map(([k, v, sub]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
     `, { v: 'right', hue: '#3E7BE0' })}
-    ${seg}
     ${cabFactCard}
-    ${MP_VIEW === 'analytics' ? mpAnalyticsHtml(anData, contractors, plans) : `
+    ${`
     <div class="mp-toolbar">
       <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
       <button class="btn" id="mpContractors">${ic(I.users)}Подрядчики <span class="muted">· ${contractors.length}</span></button>
