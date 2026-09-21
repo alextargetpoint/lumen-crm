@@ -6573,7 +6573,7 @@ const server = http.createServer(async (req, res) => {
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
-      if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); delete b.metaAds; }
+      if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (Array.isArray(x.accounts)) c.accounts = x.accounts.map(a => ({ id: metaads.acctId(a && a.id != null ? a.id : a), name: String((a && a.name) || '').slice(0, 60), currency: String((a && a.currency) || '').slice(0, 8) })).filter(a => a.id).slice(0, 20); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); if (x.displayCurrency != null) c.displayCurrency = String(x.displayCurrency).slice(0, 8); if (x.fxRate != null) c.fxRate = +x.fxRate || 0; delete b.metaAds; }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -6900,7 +6900,7 @@ const server = http.createServer(async (req, res) => {
        в обход тумблера/режима (кнопка «Синхронизировать сейчас» = «сделай прямо сейчас»). */
     if (p === '/api/metaads/sync' && req.method === 'POST') {
       const c = db.settings.metaAds || {};
-      if (!c.token || !c.adAccountId) return json(res, 400, { error: 'вставьте Ad account ID + токен и нажмите «Сохранить»' });
+      if (!c.token || !(c.adAccountId || (Array.isArray(c.accounts) && c.accounts.length))) return json(res, 400, { error: 'добавьте кабинет (act_…) + токен и нажмите «Сохранить»' });
       const r = await metaads.sync(db, metaDeps(), { force: true });
       store.save();
       return json(res, 200, r);

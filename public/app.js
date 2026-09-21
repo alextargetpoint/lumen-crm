@@ -8928,31 +8928,70 @@ PAGES.mediaplan = async (root) => {
     </div>`;
   };
 
-  /* ── ФАКТ ИЗ КАБИНЕТОВ по подрядчику (план vs факт из синка Meta) ── */
-  const cabRows = contractors.filter(ct => (ct.adAccounts || []).length).map(ct => {
-    const f = (ct.adAccounts || []).reduce((a, acc) => { const x = accFact[acc]; if (x) { a.spend += x.spend; a.leads += x.leads; a.qualified += x.qualified; a.deals += x.deals; } return a; }, { spend: 0, leads: 0, qualified: 0, deals: 0 });
-    const mps = byCt[ct.id] || [];
-    const plan = mps.reduce((a, mp) => { const t = mp.totals || {}; a.bp += t.budgetPlan || 0; a.lp += t.leadsPlan || 0; return a; }, { bp: 0, lp: 0 });
-    const cur = (mps[0] && mps[0].currency) || 'USD';
-    return { ct, f, plan, cur, cpl: f.leads ? Math.round(f.spend / f.leads) : 0, budgetPace: plan.bp ? Math.round(f.spend / plan.bp * 100) : null, leadsPace: plan.lp ? Math.round(f.leads / plan.lp * 100) : null };
-  });
-  const cabFactCard = (cabRows.length || unboundAccts.length) ? `<div class="glass card mb">
-      <div class="card-title">${ic(I.target)}Факт из рекламных кабинетов<span class="sub">расход и лиды из подключённых кабинетов Meta — сведено по подрядчику</span></div>
-      ${cabRows.length ? `<table class="tbl mp-cmp"><thead><tr><th>Подрядчик</th><th>Кабинет(ы)</th><th>Расход факт</th><th>Лиды факт</th><th>Квалы</th><th>CPL факт</th><th>Темп бюджета</th><th>Темп лидов</th></tr></thead><tbody>
-        ${cabRows.map(r => `<tr>
-          <td><b>${esc(r.ct.name)}</b></td>
-          <td class="muted" style="font-size:11px">${(r.ct.adAccounts || []).map(esc).join(', ')}</td>
-          <td>${mpMoney(r.f.spend, r.cur)}${r.plan.bp ? `<span class="muted" style="font-size:10px"> / ${mpMoney(r.plan.bp, r.cur)}</span>` : ''}</td>
-          <td>${r.f.leads}${r.plan.lp ? `<span class="muted" style="font-size:10px"> / ${r.plan.lp}</span>` : ''}</td>
-          <td>${r.f.qualified}</td>
-          <td><b class="accent">${r.cpl ? mpMoney(r.cpl, r.cur) : '—'}</b></td>
-          <td>${r.budgetPace != null ? `<b class="${r.budgetPace <= 100 ? 'mp-good' : 'mp-bad'}">${r.budgetPace}%</b>` : '<span class="muted">нет плана</span>'}</td>
-          <td>${r.leadsPace != null ? `<b class="${r.leadsPace >= 100 ? 'mp-good' : (r.leadsPace >= 60 ? '' : 'mp-bad')}">${r.leadsPace}%</b>` : '<span class="muted">нет плана</span>'}</td>
-        </tr>`).join('')}
-      </tbody></table>` : ''}
-      ${unboundAccts.length ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Есть данные кабинета(ов) <b>${unboundAccts.map(esc).join(', ')}</b>, не привязанных к подрядчику. Откройте «Подрядчики» → карточка нужного подрядчика → поле «Рекламные кабинеты» и впишите этот act_… — факт сведётся сюда и сравнится с планом.</span></div>` : ''}
-    </div>` : (contractors.length ? `<div class="glass card mb"><div class="card-title">${ic(I.target)}Факт из рекламных кабинетов<span class="sub">план vs факт из синка Meta</span></div>
-      <div class="muted" style="font-size:12px;line-height:1.6">Подключите кабинет (раздел «Реклама» → «Настройки рекламы» → «Рекламный кабинет (Meta API)») и привяжите его к подрядчику (карточка подрядчика → «Рекламные кабинеты», act_…). Тогда расход и лиды из кабинета автоматически сведутся здесь и сравнятся с планом — с темпом по бюджету и лидам.</div></div>` : '');
+  /* ── ПЛАН / ФАКТ ПО НАПРАВЛЕНИЯМ (факт из синка Meta; формулы как в TargetPoint) ── */
+  const S = STATE.settings || {};
+  const dirList = S.adDirections || [];
+  const campMap = S.adCampaignMap || {};
+  const dispCur = (S.metaAds && S.metaAds.displayCurrency) || 'AED';
+  const fx = (S.metaAds && +S.metaAds.fxRate) || 3.6725;   /* AED за 1 USD */
+  const conv = (aed) => dispCur === 'USD' ? (aed / fx) : aed;   /* база кабинета — AED */
+  const cur = (n) => (dispCur === 'USD' ? '$' : 'dh ') + Math.round(conv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
+  const dirName = (k) => (dirList.find(d => d.key === k) || {}).name || k;
+  const dirFact = {}; const other = { spend: 0, leads: 0, quals: 0, camps: new Set() };
+  for (const a of (adData.ads || [])) {
+    const dk = campMap[a.campaignName]; const spend = a.spend || 0, leads = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0), quals = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
+    if (!spend && !leads && !quals) continue;
+    if (dk) { const f = dirFact[dk] = dirFact[dk] || { spend: 0, leads: 0, quals: 0 }; f.spend += spend; f.leads += leads; f.quals += quals; }
+    else { other.spend += spend; other.leads += leads; other.quals += quals; if (a.campaignName) other.camps.add(a.campaignName); }
+  }
+  const dirPlan = {};
+  for (const mp of plans) for (const ln of (mp.lines || [])) { const dk = ln.direction; if (!dk) continue; const p = dirPlan[dk] = dirPlan[dk] || { budget: 0, leads: 0, quals: 0 }; p.budget += +ln.budgetPlan || 0; p.leads += +ln.leadsPlan || 0; p.quals += +ln.qualPlan || 0; }
+  const plannedDirs = Object.keys(dirPlan);
+  const _now = new Date(); const y = _now.getFullYear(), mo = _now.getMonth();
+  const daysTotal = Math.round((new Date(y, mo + 1, 1) - new Date(y, mo, 1)) / 864e5); const daysPassed = Math.min(daysTotal, _now.getDate()); const daysLeft = Math.max(0, daysTotal - daysPassed);
+  const periodLabel = `01.${String(mo + 1).padStart(2, '0')}–${daysTotal}.${String(mo + 1).padStart(2, '0')}.${y} · прошло ${daysPassed} из ${daysTotal} дн · осталось ${daysLeft}`;
+  const paceCell = (planBudget, factSpend) => {
+    const need = daysLeft > 0 ? (planBudget - factSpend) / daysLeft : planBudget / daysTotal;
+    const perDay = factSpend / Math.max(1, daysPassed);   /* нет посуточных данных → среднесуточный (прокси) */
+    const ratio = need > 0 ? perDay / need : (factSpend > planBudget ? 2 : 0);
+    const cls = ratio > 1.1 ? 'mp-bad' : ratio < 0.9 ? '' : 'mp-good';
+    const tag = ratio > 1.1 ? '🔴 перекрут' : ratio < 0.9 ? '🟡 недокрут' : '🟢 в графике';
+    return `<div><b class="${cls}">${tag}</b></div><div class="muted" style="font-size:10px">нужно ${cur(Math.max(0, need))}/дн · факт ${cur(perDay)}/дн</div>`;
+  };
+  const dRow = (label, plan, fact, isOther) => {
+    const tempo = plan.quals ? Math.round(fact.quals / plan.quals * 100) : null;
+    const tCls = tempo == null ? '' : (tempo < 80 || tempo > 110) ? 'mp-bad' : 'mp-good';
+    return `<tr class="${isOther ? 'mpd-other' : ''}">
+      <td><b>${esc(label)}</b>${isOther && other.camps.size ? `<div class="muted" style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc([...other.camps].join(', '))}">${esc([...other.camps].slice(0, 4).join(', '))}${other.camps.size > 4 ? '…' : ''}</div>` : ''}</td>
+      <td>${plan.budget ? cur(plan.budget) : '—'}</td><td><b>${cur(fact.spend)}</b></td>
+      <td>${plan.leads || '—'}</td><td><b>${fact.leads}</b></td>
+      <td>${plan.quals || '—'}</td><td><b>${fact.quals}</b></td>
+      <td>${tempo != null ? `<b class="${tCls}">${tempo}%</b>` : '<span class="muted">—</span>'}</td>
+      <td>${plan.budget ? paceCell(plan.budget, fact.spend) : '<span class="muted">—</span>'}</td>
+    </tr>`;
+  };
+  const totPlan = { budget: 0, leads: 0, quals: 0 }, totFact = { spend: 0, leads: 0, quals: 0 };
+  const planRowsHtml = plannedDirs.map(dk => {
+    const plan = dirPlan[dk], fact = dirFact[dk] || { spend: 0, leads: 0, quals: 0 };
+    totPlan.budget += plan.budget; totPlan.leads += plan.leads; totPlan.quals += plan.quals;
+    totFact.spend += fact.spend; totFact.leads += fact.leads; totFact.quals += fact.quals;
+    return dRow(dirName(dk), plan, fact, false);
+  }).join('');
+  const otherRow = (other.spend || other.leads) ? dRow('Прочее (вне плана)', { budget: 0, leads: 0, quals: 0 }, other, true) : '';
+  totFact.spend += other.spend; totFact.leads += other.leads; totFact.quals += other.quals;
+  const hasAny = plannedDirs.length || other.spend || other.leads;
+  const totTempo = totPlan.quals ? Math.round(totFact.quals / totPlan.quals * 100) : null;
+  const curSwitch = `<span class="mpd-cur">${['AED', 'USD'].map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${c === 'AED' ? 'dh AED' : '$ USD'}</button>`).join('')}</span>`;
+  const cabFactCard = hasAny ? `<div class="glass card mb">
+      <div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
+      <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b> · курс 1 USD = ${fx} AED</div>
+      <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>Направление</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды</th><th>План квал.</th><th>Факт квал.</th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
+        ${planRowsHtml}${otherRow}
+        <tr class="mpd-total"><td><b>Итого</b></td><td><b>${cur(totPlan.budget)}</b></td><td><b>${cur(totFact.spend)}</b></td><td><b>${totPlan.leads || '—'}</b></td><td><b>${totFact.leads}</b></td><td><b>${totPlan.quals || '—'}</b></td><td><b>${totFact.quals}</b></td><td>${totTempo != null ? `<b class="${totTempo < 80 || totTempo > 110 ? 'mp-bad' : 'mp-good'}">${totTempo}%</b>` : '—'}</td><td></td></tr>
+      </tbody></table></div>
+      ${unboundAccts.length ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Кабинет(ы) <b>${unboundAccts.map(esc).join(', ')}</b> есть в данных. Кампании без сопоставления с направлением попадают в «Прочее» — сопоставление настраивается в медиаплане (поле «направление» у строк).</span></div>` : ''}
+    </div>` : (contractors.length ? `<div class="glass card mb"><div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из синка Meta</span></div>
+      <div class="muted" style="font-size:12px;line-height:1.6">Подключите кабинет («Реклама» → «Настройки рекламы» → «Рекламный кабинет (Meta API)»), затем в медиаплане у строк укажите «направление». Факт из кабинета сведётся по направлениям — с темпом и «перекрутом».</div></div>` : '');
 
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
@@ -9001,6 +9040,9 @@ PAGES.mediaplan = async (root) => {
 
   /* сегмент Планы | Аналитика — маршрутизирует между под-страницами хаба «Реклама»,
      чтобы боковое меню и ws-вкладки оставались синхронными (MP_VIEW ведётся от CUR) */
+  $$('[data-dispcur]', root).forEach(b => b.addEventListener('click', async () => {
+    try { await api.patch('/settings', { metaAds: { displayCurrency: b.dataset.dispcur } }); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); }
+  }));
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;
     const targetPage = v === 'analytics' ? 'adsAnalytics' : 'mediaplan';
