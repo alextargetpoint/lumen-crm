@@ -1190,6 +1190,18 @@ function openCodeWindow(email, opts) {
   ins[0].focus();
 }
 
+/* лайтбокс: клик по превью-скриншоту (гайд Viber и др.) → полноразмер */
+window.lumenZoom = function (img) {
+  if (!img || !img.src) return;
+  const ov = document.createElement('div');
+  ov.className = 'lz-ov';
+  const full = document.createElement('img'); full.src = img.src; full.alt = img.alt || '';
+  ov.appendChild(full);
+  ov.addEventListener('click', () => ov.remove());
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { ov.remove(); document.removeEventListener('keydown', esc); } });
+  document.body.appendChild(ov);
+};
+
 /* ---------- время ---------- */
 function ago(ts) {
   if (!ts) return '—';
@@ -11066,7 +11078,7 @@ PAGES.numbers = async (root) => {
             <div class="vs-num">${i + 1}</div>
             <div class="vs-body"><div class="vs-t">${t}</div><div class="vs-d">${d}</div>
               <div class="vs-shot vs-shot-empty" data-shot="${i + 1}">
-                <img src="/assets/infobip/step-${i + 1}-${(localStorage.getItem('lumen_lang') || 'ru')}.png?v=1" alt="Шаг ${i + 1}" loading="lazy" onload="this.closest('.vs-shot').classList.remove('vs-shot-empty')" onerror="this.remove()">
+                <img src="/assets/infobip/step-${i + 1}-${(localStorage.getItem('lumen_lang') || 'ru')}.png?v=2" alt="Шаг ${i + 1}" loading="lazy" onclick="lumenZoom(this)" onload="this.closest('.vs-shot').classList.remove('vs-shot-empty')" onerror="this.remove()">
                 <span class="vs-shot-ph">📷 скриншот шага ${i + 1} появится после подключения консоли Infobip</span>
               </div>
             </div>
