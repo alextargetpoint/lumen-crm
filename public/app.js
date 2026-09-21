@@ -118,16 +118,16 @@ function fxConv(amount, from, to) {
 function curSym(c) { return ({ USD: '$', EUR: '€', AED: 'dh ', THB: '฿', IDR: 'Rp ', RUB: '₽', GBP: '£', TRY: '₺' })[c] || (c + ' '); }
 
 /* диапазон дат аналитики рекламы (пресеты + свой период) → {from,to} и query-string */
-const AD_RANGE_PRESETS = [['all', 'Всё'], ['today', 'Сегодня'], ['yesterday', 'Вчера'], ['7d', '7 дней'], ['14d', '14 дней'], ['month', 'Этот месяц']];
+const AD_RANGE_PRESETS = [['today', 'Сегодня'], ['yesterday', 'Вчера'], ['7d', '7 дней'], ['30d', '30 дней'], ['month', 'Этот месяц'], ['all', 'Всё']];
 function adRangeDates() {
-  const r = PAGE_STATE.adRange || { preset: 'all' };
+  const r = PAGE_STATE.adRange || { preset: '30d' };   /* дефолт — последние 30 дней (посуточно, как в кабинете) */
   const ymd = (dt) => dt.toISOString().slice(0, 10);
   const today = new Date(); const t = ymd(today); const daysAgo = (n) => ymd(new Date(Date.now() - n * 864e5));
   switch (r.preset) {
     case 'today': return { from: t, to: t };
     case 'yesterday': return { from: daysAgo(1), to: daysAgo(1) };
     case '7d': return { from: daysAgo(6), to: t };
-    case '14d': return { from: daysAgo(13), to: t };
+    case '30d': return { from: daysAgo(29), to: t };
     case 'month': return { from: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), to: t };
     case 'custom': return { from: r.from || '', to: r.to || '' };
     default: return { from: '', to: '' };
@@ -8408,7 +8408,7 @@ PAGES.ads = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
-    ${(() => { const r = PAGE_STATE.adRange || { preset: 'all' }; const dd = adRangeDates();
+    ${(() => { const r = PAGE_STATE.adRange || { preset: '30d' }; const dd = adRangeDates();
       return `<div class="glass card mb" id="adRangeBar">
         <div class="ad-range">
           <div class="ad-range-presets">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${r.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</div>

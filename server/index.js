@@ -518,11 +518,13 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
-/* метрики объявления за диапазон дат [from..to] из посуточного ряда ad.daily; без диапазона/ряда — тоталы */
+/* метрики объявления за диапазон дат [from..to].
+   С диапазоном — СТРОГО из посуточного ряда ad.daily (без ряда объявление в период не попадает,
+   иначе стейл-тоталы старых объявлений задваивались бы в каждом периоде). Без диапазона — тоталы. */
 function adRangeMetrics(ad, from, to) {
-  if ((from || to) && Array.isArray(ad.daily) && ad.daily.length) {
+  if (from || to) {
     const m = { spend: 0, leadsMeta: 0, clicks: 0, impr: 0 };
-    for (const p of ad.daily) { if (from && p.d < from) continue; if (to && p.d > to) continue; m.spend += p.spend || 0; m.leadsMeta += p.leads || 0; m.clicks += p.clicks || 0; m.impr += p.impr || 0; }
+    for (const p of (Array.isArray(ad.daily) ? ad.daily : [])) { if (from && p.d < from) continue; if (to && p.d > to) continue; m.spend += p.spend || 0; m.leadsMeta += p.leads || 0; m.clicks += p.clicks || 0; m.impr += p.impr || 0; }
     return { spend: Math.round(m.spend), leadsMeta: m.leadsMeta, clicks: m.clicks, impr: m.impr };
   }
   return { spend: Math.round(ad.spend || 0), leadsMeta: (ad.leadsMeta != null ? ad.leadsMeta : 0), clicks: ad.clicks || 0, impr: ad.impressions || 0 };
