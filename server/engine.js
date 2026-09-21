@@ -417,7 +417,7 @@ function tickChains(db) {
     const next = seq.steps.filter(s => s.active)[lead.ai.chainStep];
     /* авто-delay: базовый интервал шага + человеческий джиттер (±25%, минимум пара минут),
        чтобы касания не уходили роботизированно в одну и ту же секунду */
-    const baseGap = next ? Math.max(0.1, next.day - step.day) * dayMs(db) : dayMs(db);
+    const baseGap = next ? Math.max(0, next.day - step.day) * dayMs(db) : dayMs(db);   /* 0 = «сразу после предыдущего» (пол ниже — 2 мин) */
     const jitter = baseGap * (0.75 + (lead.id.charCodeAt(lead.id.length - 1) % 50) / 100);   /* детерминированный по лиду разброс 0.75–1.25× */
     lead.ai.nextTouchAt = nowT + Math.max(120e3, jitter);
   }

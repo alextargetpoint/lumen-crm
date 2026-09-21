@@ -6120,14 +6120,30 @@ PAGES.sequences = async (root) => {
   const VARS = ['{name}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
   const creaThumb = (cr) => cr && cr.url ? (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`) : '';
 
+  /* задержка шага «через X после предыдущего» в мин/ч/дн; в модели храним кумулятивный day (для движка) + delayVal/delayUnit */
+  const stepDelayParts = (st, i) => {
+    const prevA = seq.steps.slice(0, i).filter(s => s.active).pop();
+    const prevDay = prevA ? (+prevA.day || 0) : 0;
+    if (st.delayVal != null && st.delayUnit) return { val: st.delayVal, unit: st.delayUnit, prevDay };
+    const dd = Math.max(0, (+st.day || 0) - prevDay);
+    if (dd === 0) return { val: 0, unit: 'hour', prevDay };
+    if (dd < 1 / 24) return { val: Math.round(dd * 1440), unit: 'min', prevDay };
+    if (dd < 1) return { val: Math.round(dd * 24), unit: 'hour', prevDay };
+    return { val: +dd.toFixed(dd % 1 ? 1 : 0), unit: 'day', prevDay };
+  };
+  const delayLabel = (st, i) => { const d = stepDelayParts(st, i); return d.val === 0 ? 'сразу' : `через ${d.val} ${d.unit === 'min' ? 'мин' : d.unit === 'hour' ? 'ч' : 'дн'}`; };
   const stepNode = (st, i) => {
     const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы' }[st.mode] || st.mode;
     const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
+    const _d = stepDelayParts(st, i);
     if (editIx === i) return `
       <div class="fl-node fl-edit" data-i="${i}">
-        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
-          <span class="lc-lbl" style="margin:0">Задержка, дней</span><input data-se="day" type="number" step="0.05" value="${st.day}" style="width:86px">
-          <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага" style="flex:1">
+        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <span class="lc-lbl" style="margin:0">Через</span>
+          <input data-se="delayval" type="number" min="0" step="1" value="${_d.val}" style="width:64px">
+          <select data-se="delayunit" style="width:104px"><option value="min" ${_d.unit === 'min' ? 'selected' : ''}>минут</option><option value="hour" ${_d.unit === 'hour' ? 'selected' : ''}>часов</option><option value="day" ${_d.unit === 'day' ? 'selected' : ''}>дней</option></select>
+          <span class="muted" style="font-size:10.5px">после предыдущего · 0 = сразу</span>
+          <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага" style="flex:1;min-width:140px">
           <select data-se="channel" style="width:130px"><option value="wa" ${!['voice', 'email'].includes(st.channel) ? 'selected' : ''}>Авто (каскад)</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option><option value="email" ${st.channel === 'email' ? 'selected' : ''}>E-mail</option></select>
           ${st.channel === 'email' ? `<input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" style="flex:1">` : ''}
         </div>
@@ -6159,7 +6175,7 @@ PAGES.sequences = async (root) => {
       </div>`;
     return `
       <div class="fl-node ${st.active ? '' : 'off'}" data-i="${i}" data-drag="${i}">
-        <div class="fl-day">${ic(I.clock)}${dayLabel(st.day)}</div>
+        <div class="fl-day">${ic(I.clock)}${delayLabel(st, i)}</div>
         <div class="fl-body">
           <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : st.mode === 'creative' ? 'crea' : ''}">${st.mode === 'creative' ? ic(I.image) + modeName : modeName}</span></div>
           <div class="fl-prev">${esc(preview.slice(0, 150))}${preview.length > 150 ? '…' : ''}</div>
@@ -6344,7 +6360,7 @@ PAGES.sequences = async (root) => {
   $$('.fl-add', root).forEach(b => b.addEventListener('click', async () => {
     const at = +b.dataset.addat;
     const prev = seq.steps[at - 1];
-    seq.steps.splice(at, 0, { day: prev ? +(prev.day + 1).toFixed(2) : 0, channel: 'wa', mode: 'text', text: '', label: 'Новое касание', active: true });
+    seq.steps.splice(at, 0, { day: prev ? +(prev.day + 1).toFixed(2) : 0, delayVal: prev ? 1 : 0, delayUnit: prev ? 'day' : 'hour', channel: 'wa', mode: 'text', text: '', label: 'Новое касание', active: true });
     PAGE_STATE.seqEdit = at;
     await save(); render();
   }));
@@ -6372,7 +6388,10 @@ PAGES.sequences = async (root) => {
     eb.querySelector('[data-sesave]').addEventListener('click', async (e) => {
       const i = +e.currentTarget.dataset.sesave;
       const st = seq.steps[i];
-      st.day = +eb.querySelector('[data-se="day"]').value || 0;
+      /* задержка: сохраняем val/unit шага; кумулятивный day пересчитываем по всем шагам из их дельт (для движка) */
+      st.delayVal = Math.max(0, +eb.querySelector('[data-se="delayval"]').value || 0);
+      st.delayUnit = eb.querySelector('[data-se="delayunit"]').value || 'day';
+      { let prev = 0, cum = 0; seq.steps.forEach(s => { if (s.delayVal == null || !s.delayUnit) { const dd = Math.max(0, (+s.day || 0) - prev); s.delayUnit = dd === 0 ? 'hour' : dd < 1 / 24 ? 'min' : dd < 1 ? 'hour' : 'day'; s.delayVal = s.delayUnit === 'min' ? Math.round(dd * 1440) : s.delayUnit === 'hour' ? Math.round(dd * 24) : +dd.toFixed(2); } prev = +s.day || 0; }); seq.steps.forEach(s => { const n = Math.max(0, +s.delayVal || 0), u = s.delayUnit || 'day'; const d = u === 'min' ? n / 1440 : u === 'hour' ? n / 24 : n; cum += d; s.day = +cum.toFixed(4); }); }
       st.label = eb.querySelector('[data-se="label"]').value || 'Касание';
       st.channel = eb.querySelector('[data-se="channel"]').value;
       const subj = eb.querySelector('[data-se="subject"]');
