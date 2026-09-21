@@ -12269,9 +12269,10 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     fs.readFile(full, (err, buf) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       const ext = path.extname(full);
-      /* код всегда свежий (иначе браузер держит старый app.js), медиа кэшируются */
-      const cache = ['.js', '.css', '.html'].includes(ext) ? 'no-cache' : 'public, max-age=86400';
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache });
+      /* HTML НИКОГДА не кэшируем (no-store) — иначе агрессивные браузеры (Arc и др.) держат старый index.html,
+         который ссылается на старый app.js?v=. JS/CSS — no-cache (ревалидация; они и так версионированы ?v=). Медиа — кэш. */
+      const cache = ext === '.html' ? 'no-store, no-cache, must-revalidate' : (['.js', '.css'].includes(ext) ? 'no-cache' : 'public, max-age=86400');
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache, ...(ext === '.html' ? { 'Pragma': 'no-cache', 'Expires': '0' } : {}) });
       res.end(buf);
     });
   } catch (e) {
