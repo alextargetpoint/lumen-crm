@@ -22,6 +22,7 @@ const { seed } = require('./seed');
 const ai = require('./ai');
 const engine = require('./engine');
 const capi = require('./capi');
+const metaads = require('./metaads');
 const control = require('./control');
 
 const PORT = process.env.PORT || 5077;
@@ -1027,6 +1028,7 @@ function publicSettings(db) {
   if (s.social) { for (const k of ['ig', 'fb']) { const c = s.social[k]; if (c && c.token) { c.tokenSet = true; delete c.token; } } }
   if (s.inventorySources && s.inventorySources.reelly && s.inventorySources.reelly.key) { s.inventorySources.reelly.keySet = true; delete s.inventorySources.reelly.key; }
   if (s.capi) { if (s.capi.token) { s.capi.tokenSet = true; delete s.capi.token; } delete s.capi.fired; if (s.capi.log) s.capi.log = s.capi.log.slice(0, 12); }
+  if (s.metaAds) { if (s.metaAds.token) { s.metaAds.tokenSet = true; delete s.metaAds.token; } if (s.metaAds.log) s.metaAds.log = s.metaAds.log.slice(0, 12); }
   s.ai.llmAvailable = llm.available();
   s.ai.llmModel = llm.MODEL;
   s.tunnelUrl = tunnelUrl();
@@ -2678,6 +2680,27 @@ async function tgWarmupTick() {
   } finally { tgWarmupBusy = false; }
 }
 setInterval(() => { tgWarmupTick().catch(() => {}); }, 14 * 60e3);   /* ~14 мин, вразнобой с WA-тиком */
+
+/* ── Авто-синк рекламного кабинета Meta (Marketing API): расход/кампании + лиды из лид-форм ──
+   Marketing API у Meta бесплатный (нет платы за вызовы) — cost-safe тут про rate-limit и compute:
+   тик раз в ~30 мин, но для тенанта реально дёргаем не чаще интервала (по умолчанию 6 ч). */
+let metaAdsBusy = false;
+async function metaAdsTick() {
+  if (metaAdsBusy) return; metaAdsBusy = true;
+  try {
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get();
+        if (!metaads.apiEnabled(db)) return;
+        const c = db.settings.metaAds;
+        const everyMs = Math.max(1, (c.syncEveryHours || 6)) * 3600e3;
+        if (c.lastSyncAt && (Date.now() - c.lastSyncAt) < everyMs) return;
+        try { await metaads.sync(db, { matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save() }); } catch (e) {}
+      });
+    }
+  } finally { metaAdsBusy = false; }
+}
+setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
    Приём ТОЛЬКО крипта. Один общий receive-адрес на сеть (адреса публичны on-chain — не секрет,
@@ -6533,6 +6556,7 @@ const server = http.createServer(async (req, res) => {
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
+      if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); delete b.metaAds; }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -6842,6 +6866,25 @@ const server = http.createServer(async (req, res) => {
       const r0 = await capi.sendEvent(db, lead, 'Lead');
       store.save();
       return json(res, 200, Object.assign({ lead: lead.name }, r0));
+    }
+
+    /* ---- Прямое подключение рекламного кабинета Meta (Marketing API) ---- */
+    const metaDeps = () => ({ matchAd, nextId: store.nextId, pushEvent: ai.pushEvent, save: () => store.save() });
+    /* проверка токена + доступа к кабинету (использует переданный токен, иначе сохранённый) */
+    if (p === '/api/metaads/verify' && req.method === 'POST') {
+      const b = await readBody(req);
+      const c = db.settings.metaAds || {};
+      const conf = { token: (b.token && String(b.token).trim()) || c.token, adAccountId: b.adAccountId != null ? b.adAccountId : c.adAccountId };
+      if (!conf.token) return json(res, 400, { error: 'нужен access token (вставьте в поле выше и сохраните, либо передайте для проверки)' });
+      const r = await metaads.verify(conf);
+      return json(res, 200, r);
+    }
+    /* ручной запуск синка кабинета (Insights + Lead Ads) */
+    if (p === '/api/metaads/sync' && req.method === 'POST') {
+      if (!metaads.ready(db)) return json(res, 400, { error: 'заполните Ad account ID + токен и включите интеграцию' });
+      const r = await metaads.sync(db, metaDeps());
+      store.save();
+      return json(res, 200, r);
     }
 
     /* ---------------- WhatsApp Cloud: живая проверка / шаблоны ---------------- */

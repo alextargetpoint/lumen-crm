@@ -8328,6 +8328,7 @@ function restructureAdsTabs(root) {
   const kpis = root.querySelector('.ad-kpis');
   const tree = root.querySelector('.ct-wrap');
   const capi = cardOf('#capiOn');
+  const metaCab = cardOf('#metaAdsOn');
   const most = cardOf('#copyHook');
   const imp = cardOf('#adsCsv');
   const eff = cardOf('.ad-tbl');
@@ -8342,7 +8343,7 @@ function restructureAdsTabs(root) {
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
   put(kpis, 'analytics'); put(eff, 'analytics');
   put(tree, 'creatives');
-  put(most, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
+  put(metaCab, 'intake'); put(most, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
   put(capi, 'capi');
   const hero = root.firstElementChild;   /* heroArt-блок */
   hero.after(bar); bar.after(panels.analytics); panels.analytics.after(panels.creatives); panels.creatives.after(panels.intake); panels.intake.after(panels.capi);
@@ -8459,6 +8460,36 @@ PAGES.ads = async (root) => {
           </div>
           ${(cp.log || []).length ? coll('Журнал отправок в Meta', (cp.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} ${esc(e.event)} · ${esc(e.lead || '')}</div><div class="sd">${tmm(e.at)}${e.err ? ' · ' + esc(e.err) : e.received ? ' · принято Meta: ' + e.received : ''}</div></div></div>`).join(''), { open: false, count: (cp.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
+        ${(() => { const ma = (STATE.settings && STATE.settings.metaAds) || {}; const mode = ma.mode || 'api'; return `<div class="glass card mb">
+          <div class="card-title">${ic(I.target)}Рекламный кабинет (Meta API)<span class="sub">прямое подключение — лиды и расход без интегратора</span>
+            <label class="switch" style="margin-left:auto"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет <b>напрямую</b> по Marketing API: лиды тянутся из лид-форм (Lead Ads), а <b>расход / кампании / креативы</b> — из Insights. Ручной ввод spend и загрузка CSV больше не нужны. Не хотите API — оставьте приём «через интегратор» (карточка «Мост приёма лидов» ниже, Albato / Make / Zapier). Можно <b>совмещать</b>.</div>
+          ${coll('📘 Где взять токен и Ad account ID', `
+            <div class="capi-guide">
+              <div class="cg-step"><span class="cg-n">1</span><div><b>Ad account ID.</b> Meta Ads Manager → выпадающий список аккаунтов, ID вида <code class="pill">act_1234567890</code> (или просто цифры).</div></div>
+              <div class="cg-step"><span class="cg-n">2</span><div><b>Постоянный токен.</b> Business Settings → System Users → создайте юзера → Add assets (приложение + рекламный аккаунт, Full control) → Generate token с правами <b>ads_read</b> и <b>leads_retrieval</b>, expiration <b>Never</b>.</div></div>
+              <div class="cg-step"><span class="cg-n">3</span><div><b>Проверьте и синхронизируйте.</b> Вставьте оба значения → «Проверить» → «Синхронизировать сейчас». Дальше синк идёт сам раз в ~6 часов.</div></div>
+              <div class="cg-loop">🔒 Токен хранится как секрет (в интерфейс не возвращается). Для отправки обратных сигналов качества в Meta — см. «Meta CAPI» рядом.</div>
+            </div>`, { open: !ma.tokenSet, count: 0, icon: I.doc })}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-row"><label>Ad account ID</label><input id="maAcct" value="${esc(ma.adAccountId || '')}" placeholder="act_1234567890"></div>
+            <div class="form-row"><label>Access token (System User)</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
+          </div>
+          <div class="ma-mode-row">
+            <div class="form-row" style="margin:0"><label>Приём лидов</label>
+              <select id="maMode"><option value="api" ${mode === 'api' ? 'selected' : ''}>Напрямую через API</option><option value="integrator" ${mode === 'integrator' ? 'selected' : ''}>Через интегратор (Albato/Zapier)</option><option value="both" ${mode === 'both' ? 'selected' : ''}>Оба: API + интегратор</option></select></div>
+            <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maInsights" ${ma.pullInsights !== false ? 'checked' : ''}> Расход/кампании</label>
+            <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maLeads" ${ma.pullLeads !== false ? 'checked' : ''}> Лиды</label>
+          </div>
+          <div id="maVerify" class="muted" style="font-size:11.5px;margin-top:6px;min-height:0"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+            <button class="btn btn-accent btn-sm" id="maSave">Сохранить</button>
+            <button class="btn btn-sm" id="maVerifyBtn">${ic(I.spark)}Проверить</button>
+            <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}Синхронизировать сейчас</button>
+            ${ma.lastSyncAt ? `<span class="muted" style="font-size:11.5px">посл. синк ${tmm(ma.lastSyncAt)}${ma.stats ? ` · лидов ${ma.stats.leads || 0}` : ''}</span>` : ''}
+          </div>
+          ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
+        </div>`; })()}
         <div class="glass card mb">
           <div class="card-title">${ic(I.link)}Мост приёма лидов<span class="sub">Albato / Make / любой интегратор</span></div>
           <div class="form-row"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
@@ -8541,6 +8572,12 @@ PAGES.ads = async (root) => {
     } catch (e) { st.textContent = ''; toast('Не загрузилось', e.message); }
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
+  /* --- Прямое подключение рекламного кабинета Meta (Marketing API) --- */
+  const maPatch = () => { const p = { adAccountId: ($('#maAcct')?.value || '').trim(), mode: $('#maMode')?.value || 'api', pullInsights: !!$('#maInsights')?.checked, pullLeads: !!$('#maLeads')?.checked, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
+  $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинет Meta включён' : 'Кабинет Meta выключен', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
+  $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Реквизиты кабинета применены', true); await loadState(); render(); });
+  $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; try { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: ($('#maAcct')?.value || '').trim() }); out.innerHTML = r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || 'кабинет')} · ${esc(r.currency || '')} · ${esc(r.status || '')}</span>` : `<span style="color:var(--bad)">${esc(r.error || 'не прошло')}</span>`; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
+  $('#maSyncBtn')?.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Синхронизирую…'; try { const r = await api.post('/metaads/sync', {}); if (r.skipped) toast('Не запущено', 'Сначала сохраните токен + Ad account ID и включите тумблер', false); else toast(r.ok ? 'Синк готов' : 'Синк с ошибкой', r.ok ? `Новых лидов: ${(r.leads && r.leads.created) || 0} · объявлений: ${(r.insights ? (r.insights.updated + r.insights.added) : 0)}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { toast('Не удалось', er.message); btn.disabled = false; btn.textContent = 'Синхронизировать сейчас'; } });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
   $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });
   $('#importAds')?.addEventListener('click', async () => {
