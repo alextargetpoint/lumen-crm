@@ -104,14 +104,18 @@ document.addEventListener('click', (e) => {
   if (h) h.parentElement.classList.toggle('open');
 });
 
-/* конвертация валют (source→display). fxRate — курс AED за 1 USD; остальные — дефолты. */
-const FX_PER_USD = { USD: 1, AED: 3.6725, EUR: 0.92, THB: 36, RUB: 92 };
-function fxConv(amount, from, to, aedRate) {
+/* конвертация валют (source→display) по живым курсам (open.er-api.com, per USD). */
+const FX_PER_USD = { USD: 1, EUR: 0.92, AED: 3.6725, THB: 36, IDR: 16300, RUB: 92, GBP: 0.79, TRY: 34 };
+let FXRATES = null;   /* {CCY: units per 1 USD} — подтягивается из /api/fx, кэш на сервере 24ч */
+async function ensureFx() { if (FXRATES) return; try { const r = await api.get('/fx'); if (r && r.rates) FXRATES = r.rates; } catch (_) {} }
+const CUR_LIST = ['USD', 'EUR', 'AED', 'THB', 'IDR', 'RUB'];   /* валюты недвижки: доллар/евро/дирхам/бат/рупия(Бали)/рубль */
+function fxConv(amount, from, to) {
   from = from || 'USD'; to = to || from; if (from === to) return amount || 0;
-  const per = Object.assign({}, FX_PER_USD); if (aedRate) per.AED = aedRate;
-  const rf = per[from] || 1, rt = per[to] || 1; return (amount || 0) / rf * rt;
+  const per = FXRATES || FX_PER_USD;
+  const rf = per[from] || FX_PER_USD[from] || 1, rt = per[to] || FX_PER_USD[to] || 1;
+  return (amount || 0) / rf * rt;
 }
-function curSym(c) { return ({ USD: '$', AED: 'dh ', EUR: '€', THB: '฿', RUB: '₽' })[c] || (c + ' '); }
+function curSym(c) { return ({ USD: '$', EUR: '€', AED: 'dh ', THB: '฿', IDR: 'Rp ', RUB: '₽', GBP: '£', TRY: '₺' })[c] || (c + ' '); }
 
 /* ---------- «?»-подсказки: объяснялки не занимают экран, живут в поповере ---------- */
 const HINTS = {};
@@ -8368,6 +8372,7 @@ function restructureAdsTabs(root) {
 }
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
+  await ensureFx();
   const d = await api.get('/ads');
   const treeD = await api.get('/ads/tree').catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
@@ -8385,8 +8390,8 @@ PAGES.ads = async (root) => {
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
     ${(() => {
-      const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2; const fx2 = +S2.fxRate || 3.6725;
-      const cv = (a) => fxConv(a, src2, dc, fx2); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;
+      const cv = (a) => fxConv(a, src2, dc); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
       const md = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leadsMeta += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.clicks += x.clicks || 0; a.impr += x.impressions || 0; a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
       const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
       return `<div class="ad-kpis">
@@ -8889,6 +8894,7 @@ PAGES.mediaplan = async (root) => {
   /* вкладка «Аналитика» рекламного хаба — та же страница, но с активной аналитикой.
      Источник правды — CUR: /mediaplan → Планы, /adsAnalytics → Аналитика. */
   MP_VIEW = (CUR === 'adsAnalytics') ? 'analytics' : 'plans';
+  await ensureFx();
   const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
   /* факт из подключённых рекламных кабинетов (Meta API) — для сведения план-факт по подрядчику */
   let adData = { ads: [] }; try { adData = await api.get('/ads'); } catch (_) {}
@@ -8986,8 +8992,7 @@ PAGES.mediaplan = async (root) => {
   const campMap = S.adCampaignMap || {};
   const srcCur = (S.metaAds && S.metaAds.sourceCurrency) || (S.metaAds && S.metaAds.accounts && S.metaAds.accounts[0] && S.metaAds.accounts[0].currency) || 'AED';
   const dispCur = (S.metaAds && S.metaAds.displayCurrency) || srcCur;
-  const fx = (S.metaAds && +S.metaAds.fxRate) || 3.6725;   /* AED за 1 USD */
-  const conv = (n) => fxConv(n, srcCur, dispCur, fx);   /* база = валюта кабинета */
+  const conv = (n) => fxConv(n, srcCur, dispCur);   /* база = валюта кабинета, по живым курсам */
   const cur = (n) => curSym(dispCur) + Math.round(conv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
   const dirName = (k) => (dirList.find(d => d.key === k) || {}).name || k;
   const dirFact = {}; const other = { spend: 0, leads: 0, quals: 0, camps: new Set() };
@@ -9034,10 +9039,10 @@ PAGES.mediaplan = async (root) => {
   totFact.spend += other.spend; totFact.leads += other.leads; totFact.quals += other.quals;
   const hasAny = plannedDirs.length || other.spend || other.leads;
   const totTempo = totPlan.quals ? Math.round(totFact.quals / totPlan.quals * 100) : null;
-  const curSwitch = `<span class="mpd-cur">${['AED', 'USD'].map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${c === 'AED' ? 'dh AED' : '$ USD'}</button>`).join('')}</span>`;
+  const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center"><button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
   const cabFactCard = hasAny ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
-      <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b> · курс 1 USD = ${fx} AED</div>
+      <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b>${srcCur !== dispCur ? ` · пересчёт ${srcCur}→${dispCur} по курсу` : ''}${FXRATES ? '' : ' <span title="курсы по дефолту, живые ещё не подтянулись">·</span>'}</div>
       <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>Направление</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды</th><th>План квал.</th><th>Факт квал.</th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
         ${planRowsHtml}${otherRow}
         <tr class="mpd-total"><td><b>Итого</b></td><td><b>${cur(totPlan.budget)}</b></td><td><b>${cur(totFact.spend)}</b></td><td><b>${totPlan.leads || '—'}</b></td><td><b>${totFact.leads}</b></td><td><b>${totPlan.quals || '—'}</b></td><td><b>${totFact.quals}</b></td><td>${totTempo != null ? `<b class="${totTempo < 80 || totTempo > 110 ? 'mp-bad' : 'mp-good'}">${totTempo}%</b>` : '—'}</td><td></td></tr>
@@ -9097,6 +9102,7 @@ PAGES.mediaplan = async (root) => {
   $$('[data-dispcur]', root).forEach(b => b.addEventListener('click', async () => {
     try { await api.patch('/settings', { metaAds: { displayCurrency: b.dataset.dispcur } }); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); }
   }));
+  $('#mpdQualCfg', root) && $('#mpdQualCfg', root).addEventListener('click', () => openQualStages(() => render()));
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;
     const targetPage = v === 'analytics' ? 'adsAnalytics' : 'mediaplan';
@@ -9294,6 +9300,24 @@ async function openContractorsModal() {
   }));
 }
 /* создать/редактировать одного подрядчика; onDone(savedCt) */
+/* Настройка: какие стадии CRM считать «квалифицированным лидом» (аналитика Факт квал берёт отсюда). */
+function openQualStages(onDone) {
+  const stages = (STAGES._all || STAGES || []).filter(s => s && s.id);
+  const cur = new Set((STATE.settings.qualStages && STATE.settings.qualStages.length) ? STATE.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal']);
+  const body = `<div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px">Lumen — полноценная CRM, поэтому «Факт квал» берётся из <b>стадий воронки</b>. Отметьте, какие стадии считать квалифицированным лидом — так считаются квалы, CPQL и конверсия в квал по всей аналитике.</div>
+    <div class="qs-list">${stages.map(s => `<label class="qs-row"><input type="checkbox" data-qs="${esc(s.id)}" ${cur.has(s.id) ? 'checked' : ''}><span class="qs-dot" style="background:${STAGE_COLORS[s.id] || 'var(--accent)'}"></span>${esc(s.name || s.id)}</label>`).join('')}</div>`;
+  modal({ title: 'Какие стадии считать квалом', sub: 'Из воронки CRM агентства', wide: true, body, actions: [
+    { label: 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
+      const picked = $$('[data-qs]', bd).filter(c => c.checked).map(c => c.dataset.qs);
+      await api.patch('/settings', { qualStages: picked });
+      await loadState();
+      toast('Сохранено', `Квал = ${picked.length} ${plural(picked.length, 'стадия', 'стадии', 'стадий')}`, true);
+      if (onDone) onDone();
+    } },
+    { label: 'Отмена' },
+  ] });
+}
+
 /* Сопоставление кампаний с направлениями + управление направлениями (для План/Факт по направлениям).
    Кампании берём из синка кабинета (db.ads), направления — settings.adDirections, карта — settings.adCampaignMap. */
 async function openDirMap(onDone) {

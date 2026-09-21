@@ -210,6 +210,7 @@ function ensureTenantDefaults(db) {
   if (db.settings.automations && !db.settings.automations.rotation) db.settings.automations.rotation = { enabled: false, afterTouches: 3, afterHours: 48, maxRotations: 2, toQualifier: false };
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.stagesCfg) db.settings.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
+  if (!db.settings.qualStages) db.settings.qualStages = ['qualified', 'handover', 'viewing', 'deal'];   /* какие стадии CRM считаем квалом (настраивается) */
   if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
   if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
   if (!db.settings.reports) db.settings.reports = {
@@ -6580,6 +6581,7 @@ const server = http.createServer(async (req, res) => {
       /* направления рекламы + сопоставление кампаний (для План/Факт по направлениям) */
       if (Array.isArray(b.adDirections)) db.settings.adDirections = b.adDirections.map(d => ({ key: String((d && d.key) || '').slice(0, 40) || ('dir_' + Math.random().toString(36).slice(2, 7)), name: String((d && d.name) || '').slice(0, 60) })).filter(d => d.name).slice(0, 60);
       if (b.adCampaignMap && typeof b.adCampaignMap === 'object') { const m = {}; for (const k of Object.keys(b.adCampaignMap).slice(0, 500)) { const v = b.adCampaignMap[k]; if (v) m[String(k).slice(0, 200)] = String(v).slice(0, 40); } db.settings.adCampaignMap = m; }
+      if (Array.isArray(b.qualStages)) db.settings.qualStages = b.qualStages.map(String).slice(0, 30);
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -6911,6 +6913,18 @@ const server = http.createServer(async (req, res) => {
       const r = await metaads.sync(db, metaDeps(), { force: true, backfill: !!b.backfill });
       store.save();
       return json(res, 200, r);
+    }
+    /* живые курсы валют (open.er-api.com), кэш 24ч на процесс — для конвертации бюджетов/расхода */
+    if (p === '/api/fx' && req.method === 'GET') {
+      try {
+        if (!global.__FX || (Date.now() - global.__FX.at) > 24 * 3600e3) {
+          const r = await fetch('https://open.er-api.com/v6/latest/USD');
+          const j = await r.json().catch(() => ({}));
+          if (j && j.rates) global.__FX = { base: 'USD', rates: j.rates, at: Date.now() };
+        }
+      } catch (e) {}
+      const fallback = { USD: 1, EUR: 0.92, AED: 3.6725, THB: 36, IDR: 16300, RUB: 92, GBP: 0.79, TRY: 34 };
+      return json(res, 200, global.__FX || { base: 'USD', rates: fallback, at: Date.now(), stale: true });
     }
     /* полный сброс данных, подтянутых из кабинета (объявления из синка) */
     if (p === '/api/metaads/reset' && req.method === 'POST') {
@@ -9028,7 +9042,7 @@ ${SCR}
 
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
     if (p === '/api/ads' && req.method === 'GET') {
-      const QUAL = ['qualified', 'handover', 'viewing', 'deal'];
+      const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const stats = db.ads.map(ad => {
