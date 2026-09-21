@@ -359,7 +359,6 @@
     return {
       title: 'Как Lumen общается с клиентами',
       sub: 'Выберите тон общения и посмотрите пример ответа в WhatsApp.',
-      splitTop: true,
       ambient: 'bubbles',
       rightHtml: chat,
       html: `<div class="ob-tonerows">${TONES.map(row).join('')}</div>
@@ -488,7 +487,7 @@
     /* персональная «обложка бренда» — скомпонована из их данных на анимированном золотом фоне (как hero-кавер писем) */
     const plate = `
       <div class="ob-plate">
-        <div class="ob-plate-art"><i></i><i></i><i></i><span class="ob-plate-star">&#10022;</span></div>
+        <div class="ob-plate-art"><i></i><i></i><i></i><span class="ob-plate-star"><svg viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 6 C55 40 60 45 94 50 C60 55 55 60 50 94 C45 60 40 55 6 50 C40 45 45 40 50 6 Z" fill="#e7d5a6"/></svg></span></div>
         <div class="ob-plate-body">
           <div class="ob-plate-logo">${logo}</div>
           <div class="ob-plate-wm">&#10022;&nbsp;LUMEN</div>
@@ -1054,7 +1053,8 @@
     .ob-geo-tag:hover{background:rgba(201,162,90,.22)}
     /* Финал: 2 колонки (обложка бренда + сводка) + ссылка «Изменить» */
     .ob-fin-sub{font-size:16px;color:#9e968b;font-weight:300;margin:6px 0 24px}
-    .ob-fin-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:840px;margin:0 auto;text-align:left;align-items:start}
+    .ob-fin-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:840px;margin:0 auto;text-align:left;align-items:stretch}
+    .ob-fin-cols>*{height:100%}
     .ob-fin-cols .ob-plate{max-width:none;margin:0}
     .ob-fin-cols .ob-recap{grid-template-columns:1fr;max-width:none;margin:0;padding:8px 22px 20px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(24,21,17,.4);align-content:start}
     .ob-recap-h{font-family:'Cormorant',Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.01em;color:#f4f3f1;padding:14px 0 6px;text-align:left}
@@ -1239,7 +1239,9 @@
     .ob-plate-art i:nth-child(2){width:340px;height:340px;margin:-170px -170px 0 0;opacity:.6;animation-delay:.6s}
     .ob-plate-art i:nth-child(3){width:460px;height:460px;margin:-230px -230px 0 0;opacity:.35;animation-delay:1.2s}
     @keyframes obRing{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.04)}}
-    .ob-plate-star{position:absolute;top:34%;right:8%;transform:translateY(-50%);font-family:'Cormorant',Georgia,serif;font-size:88px;color:rgba(214,199,168,.55);text-shadow:0 0 44px rgba(214,199,168,.4);line-height:1;animation:obEmblem 5s ease-in-out infinite}
+    .ob-plate-star{position:absolute;top:34%;right:9%;transform:translateY(-50%);width:92px;height:92px;filter:drop-shadow(0 0 30px rgba(214,199,168,.4));animation:obStarPulse 5s ease-in-out infinite}
+    .ob-plate-star svg{width:100%;height:100%;display:block}
+    @keyframes obStarPulse{0%,100%{opacity:.5}50%{opacity:.72}}
     .ob-plate-body{position:relative;z-index:1;padding:30px 32px}
     .ob-plate-logo{width:56px;height:56px;border-radius:14px;overflow:hidden;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.28);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
     .ob-plate-logo img{max-width:82%;max-height:82%;object-fit:contain}
