@@ -63,10 +63,12 @@ async function verify(conf) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
-/* Insights: расход/показы/клики + названия кампании/адсета на уровне объявления → апсертим db.ads */
-async function syncInsights(db, deps, { datePreset = 'last_30d' } = {}) {
-  const c = cfg(db); const token = c.token; const id = acctId(c.adAccountId);
+/* Insights: расход/показы/клики + названия кампании/адсета на уровне объявления → апсертим db.ads.
+   acct — конкретный кабинет (act_…); при мультикабинете sync() вызывает по каждому. */
+async function syncInsights(db, deps, { datePreset = 'last_30d', acct } = {}) {
+  const c = cfg(db); const token = c.token; const id = acct ? acctId(acct) : (accountsOf(db)[0] || {}).id;
   const res = { updated: 0, added: 0, capped: false };
+  if (!id) return res;
   const ins = await graphPaged(`${id}/insights`, token, {
     level: 'ad', date_preset: c.datePreset || datePreset, limit: '200',
     fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks',
@@ -99,14 +101,13 @@ async function syncInsights(db, deps, { datePreset = 'last_30d' } = {}) {
       }
     }
   } catch (e) { /* креативы — не критично */ }
-  /* пришли реальные данные → убрать демо-«шаблоны» (хардкод-сид), которые никогда не синкались */
-  if (res.added + res.updated > 0) {
-    const SEED_DEMO = ['120211478921230508', '120211478921230742', '120209934110255019'];
-    db.ads = db.ads.filter(a => !(SEED_DEMO.includes(String(a.adId)) && !a.syncedAt));
-  }
-  /* дедуп по имени: одинаковые названия объявлений в разных адсетах/кампаниях делят один креатив/тезисы */
-  dedupeByName(db);
   return res;
+}
+
+/* убрать демо-«шаблоны» (хардкод-сид), которые никогда не синкались (после реального синка) */
+function dropSeedDemo(db) {
+  const SEED_DEMO = ['120211478921230508', '120211478921230742', '120209934110255019'];
+  db.ads = (db.ads || []).filter(a => !(SEED_DEMO.includes(String(a.adId)) && !a.syncedAt));
 }
 
 /* Раздать креатив/тезисы всем объявлениям с ОДИНАКОВЫМ именем (заполняем пустые из непустого одноимённого).
@@ -127,9 +128,10 @@ function dedupeByName(db) {
 
 /* Lead Ads: тянем лиды из лид-форм через edge объявления /{ad_id}/leads.
    Дедуп по meta.leadId. Жёсткие потолки на число объявлений/лидов (cost + rate-safe). */
-async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50 } = {}) {
-  const c = cfg(db); const token = c.token; const id = acctId(c.adAccountId);
+async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50, acct } = {}) {
+  const c = cfg(db); const token = c.token; const id = acct ? acctId(acct) : (accountsOf(db)[0] || {}).id;
   const res = { created: 0, repeat: 0, scannedAds: 0, capped: false, error: null };
+  if (!id) return res;
   const norm = (ph) => String(ph || '').replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
   const seen = new Set((db.leads || []).map(l => (l.meta && l.meta.leadId) ? String(l.meta.leadId) : null).filter(Boolean));
 
@@ -187,16 +189,21 @@ async function syncLeads(db, deps, { maxAds = 40, maxLeadsPerAd = 50 } = {}) {
   return res;
 }
 
-/* оркестратор: тянем что настроено, пишем журнал/статистику/время */
+/* оркестратор: по КАЖДОМУ подключённому кабинету тянем insights+leads, потом чистим сид и дедупим. */
 async function sync(db, deps, opts = {}) {
   if (!opts.force && !apiEnabled(db)) return { skipped: true };   /* force = ручной запуск кнопкой (в обход тумблера/режима) */
-  { const c = db.settings.metaAds || {}; if (!c.token || !c.adAccountId) return { skipped: true, error: 'нет токена или Ad account ID' }; }
+  const accts = accountsOf(db);
+  { const c = db.settings.metaAds || {}; if (!c.token || !accts.length) return { skipped: true, error: 'нет токена или рекламных кабинетов' }; }
   const c = db.settings.metaAds;
   const started = Date.now();
-  const out = { at: started };
+  const out = { at: started, insights: { updated: 0, added: 0, capped: false }, leads: { created: 0, repeat: 0, scannedAds: 0, capped: false }, accounts: accts.length };
   try {
-    if (c.pullInsights !== false) { const r = await syncInsights(db, deps); out.insights = r; }
-    if (c.pullLeads !== false) { const r = await syncLeads(db, deps); out.leads = r; }
+    for (const a of accts) {
+      if (c.pullInsights !== false) { const r = await syncInsights(db, deps, { acct: a.id }); out.insights.updated += r.updated; out.insights.added += r.added; out.insights.capped = out.insights.capped || r.capped; }
+      if (c.pullLeads !== false) { const r = await syncLeads(db, deps, { acct: a.id }); out.leads.created += r.created; out.leads.repeat += r.repeat; out.leads.scannedAds += r.scannedAds; out.leads.capped = out.leads.capped || r.capped; if (r.error) out.leads.error = r.error; }
+    }
+    if (out.insights.added + out.insights.updated > 0) dropSeedDemo(db);
+    dedupeByName(db);
     out.ok = true;
   } catch (e) { out.ok = false; out.error = e.message; }
   out.ms = Date.now() - started;
