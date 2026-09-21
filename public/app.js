@@ -8490,9 +8490,33 @@ PAGES.ads = async (root) => {
           <div class="form-row" style="margin-top:12px"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
             <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${hookUrl}</code>
             <button class="btn btn-sm" id="copyHook">${ic(I.copy)}</button></div></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin:4px 0 12px">
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin:4px 0 10px">
             Поля (гибкий маппинг): <b>name</b>, <b>phone</b> (обязательно), geo, source, <b>ad_id</b>, adset_id, campaign_id, form_name.
             Дубли по телефону не создаются — карточка обогащается. Лид с ad_id мэтчится на базу объявлений автоматически.
+          </div>
+          <div class="map-gen">
+            <div class="map-gen-hd">${ic(I.spark)}Генератор маппинга<span>отметь поля → скопируй в интегратор</span></div>
+            <div class="muted" style="font-size:11px;margin:2px 0 8px">Собирает готовое тело запроса (JSON) и тест-команду. <b>name</b> и <b>phone</b> — всегда.</div>
+            <div class="map-fields">
+              <label class="map-chip locked"><input type="checkbox" checked disabled> name</label>
+              <label class="map-chip locked"><input type="checkbox" checked disabled> phone</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="email" checked> email</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="ad_id" checked> ad_id</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="adset_id"> adset_id</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="campaign_id"> campaign_id</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="form_name"> form_name</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="source" checked> source</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="geo"> geo</label>
+            </div>
+            <div class="map-block">
+              <div class="map-block-hd"><span>Тело запроса (JSON) — вставить в действие Webhook интегратора</span><button class="btn btn-sm" id="mapCopyJson">${ic(I.copy)}Копировать</button></div>
+              <pre class="map-code" id="mapJson"></pre>
+            </div>
+            <div class="map-block">
+              <div class="map-block-hd"><span>Тест-команда (cURL) — проверить приём прямо сейчас</span><button class="btn btn-sm" id="mapCopyCurl">${ic(I.copy)}Копировать</button></div>
+              <pre class="map-code" id="mapCurl"></pre>
+            </div>
+            <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.5">Значения в фигурных скобках <code>{{…}}</code> — стандартные поля Meta Lead Ads. В <b>Make/Zapier</b> вставьте JSON в тело и подставьте переменные вместо них; в <b>Albato</b> сопоставьте поля в UI по этому списку.</div>
           </div>
           <div class="form-row"><label>Исходящий мост: квал/передача → POST на URL (в Albato → любая CRM клиента)</label>
             <input id="outUrl" placeholder="https://h.albato.ru/wh/…" value="${esc(d.hooks.outboundUrl || '')}"></div>
@@ -8567,6 +8591,23 @@ PAGES.ads = async (root) => {
     } catch (e) { st.textContent = ''; toast('Не загрузилось', e.message); }
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
+  /* --- Генератор маппинга для интегратора (JSON тело + cURL) --- */
+  const MAP_TOK = { name: '{{full_name}}', phone: '{{phone_number}}', email: '{{email}}', ad_id: '{{ad_id}}', adset_id: '{{adset_id}}', campaign_id: '{{campaign_id}}', form_name: '{{form_name}}', source: 'meta_form', geo: '' };
+  const MAP_VALS = { name: 'Тест Тестов', phone: '+79001234567', email: 'test@example.com', ad_id: '120210000000000000', adset_id: '6100000000000', campaign_id: '2380000000000', form_name: 'Заявка · сайт', source: 'meta_form', geo: 'dubai' };
+  const MAP_ORDER = ['name', 'phone', 'email', 'ad_id', 'adset_id', 'campaign_id', 'form_name', 'source', 'geo'];
+  const rebuildMap = () => {
+    const on = { name: true, phone: true };
+    $$('[data-mapf]', root).forEach(c => on[c.dataset.mapf] = c.checked);
+    const obj = {}, sample = {};
+    MAP_ORDER.forEach(k => { if (on[k]) { obj[k] = MAP_TOK[k]; sample[k] = MAP_VALS[k]; } });
+    const jEl = $('#mapJson', root), cEl = $('#mapCurl', root);
+    if (jEl) jEl.textContent = JSON.stringify(obj, null, 2);
+    if (cEl) cEl.textContent = `curl -X POST '${hookUrl}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(sample)}'`;
+  };
+  $$('[data-mapf]', root).forEach(c => c.addEventListener('change', rebuildMap));
+  rebuildMap();
+  $('#mapCopyJson', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapJson', root).textContent); toast('JSON скопирован', 'Вставьте в тело запроса (Webhook) интегратора', true); });
+  $('#mapCopyCurl', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapCurl', root).textContent); toast('cURL скопирован', 'Вставьте в терминал — придёт тест-лид в CRM', true); });
   /* --- Прямое подключение рекламного кабинета Meta (Marketing API) --- */
   const maPatch = () => { const p = { adAccountId: ($('#maAcct')?.value || '').trim(), mode: $('#maMode')?.value || 'api', pullInsights: !!$('#maInsights')?.checked, pullLeads: !!$('#maLeads')?.checked, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
   $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинет Meta включён' : 'Кабинет Meta выключен', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });

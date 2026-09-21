@@ -7736,3 +7736,16 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .wag-farr{ align-self:center; color:var(--accent); font-weight:800; font-size:16px; }
 .wag-maplbl{ font-size:10.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase; letter-spacing:.03em; margin:8px 0 4px; }
 @media (max-width:600px){ .wag-flow{ flex-direction:column; } .wag-farr{ transform:rotate(90deg); } }
+
+/* Генератор маппинга для интегратора (карточка приёма лидов) */
+.map-gen{ border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke)); border-radius:12px; padding:12px; background:var(--bg-2); margin:6px 0 12px; }
+.map-gen-hd{ display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--ink); }
+.map-gen-hd span{ font-weight:500; font-size:11px; color:var(--muted); }
+.map-fields{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.map-chip{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; padding:5px 10px; border:1px solid var(--stroke); border-radius:20px; background:var(--card); cursor:pointer; color:var(--ink-2); user-select:none; }
+.map-chip:has(input:checked){ border-color:var(--accent); color:var(--ink); background:color-mix(in srgb,var(--accent) 8%,var(--card)); }
+.map-chip.locked{ opacity:.7; cursor:default; }
+.map-chip input{ margin:0; accent-color:var(--accent); }
+.map-block{ margin-top:8px; }
+.map-block-hd{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:var(--ink-2); margin-bottom:4px; }
+.map-code{ margin:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; line-height:1.5; color:var(--ink); background:var(--card); border:1px solid var(--stroke); border-radius:9px; padding:10px; overflow-x:auto; white-space:pre; }
