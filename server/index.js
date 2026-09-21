@@ -8629,22 +8629,29 @@ const server = http.createServer(async (req, res) => {
       }
       return { budgetPlan: bp, leadsPlan: lp, cplPlan: lp ? Math.round(bp / lp) : 0, budgetFact: bf, leadsFact: lf, cplFact: lf ? Math.round(bf / lf) : 0, hasFact, budgetPct: bp ? Math.round(bf / bp * 100) : 0, leadsPct: lp ? Math.round(lf / lp * 100) : 0 };
     }
-    const mpSanitizeLines = (arr) => (Array.isArray(arr) ? arr : []).slice(0, 60).map(ln => ({
-      id: (ln && ln.id) || store.nextId('mpl'),
-      channel: String((ln && ln.channel) || '').slice(0, 40),
-      language: String((ln && ln.language) || '').slice(0, 24),
-      geo: String((ln && ln.geo) || '').slice(0, 40),
-      direction: String((ln && ln.direction) || '').slice(0, 40),
-      bundle: String((ln && ln.bundle) || '').slice(0, 160),
-      budgetPlan: Math.max(0, +(ln && ln.budgetPlan) || 0),
-      cplPlan: Math.max(0, +(ln && ln.cplPlan) || 0),
-      leadsPlan: Math.max(0, Math.round(+(ln && ln.leadsPlan) || 0)),
-      qualPctPlan: Math.max(0, Math.min(100, +(ln && ln.qualPctPlan) || 0)),
-      qualPlan: Math.max(0, Math.round(+(ln && ln.qualPlan) || 0)),
-      budgetFact: Math.max(0, +(ln && ln.budgetFact) || 0),
-      leadsFact: Math.max(0, Math.round(+(ln && ln.leadsFact) || 0)),
-      note: String((ln && ln.note) || '').slice(0, 300),
-    }));
+    const mpSanitizeLines = (arr) => (Array.isArray(arr) ? arr : []).slice(0, 60).map(ln => {
+      /* Гибкие=вводимые: budgetPlan, cplPlan, qualPctPlan. Производные считаем ТУТ (единый источник для любого пути:
+         билдер приложения, заполнение подрядчиком по ссылке, прямой API) — leadsPlan=бюджет/CPL, qualPlan=лиды×%. */
+      const budgetPlan = Math.max(0, +(ln && ln.budgetPlan) || 0);
+      const cplPlan = Math.max(0, +(ln && ln.cplPlan) || 0);
+      const qualPctPlan = Math.max(0, Math.min(100, +(ln && ln.qualPctPlan) || 0));
+      let leadsPlan = Math.max(0, Math.round(+(ln && ln.leadsPlan) || 0));
+      if (!leadsPlan && cplPlan > 0 && budgetPlan > 0) leadsPlan = Math.round(budgetPlan / cplPlan);
+      let qualPlan = Math.max(0, Math.round(+(ln && ln.qualPlan) || 0));
+      if (!qualPlan && qualPctPlan > 0 && leadsPlan > 0) qualPlan = Math.round(leadsPlan * qualPctPlan / 100);
+      return {
+        id: (ln && ln.id) || store.nextId('mpl'),
+        channel: String((ln && ln.channel) || '').slice(0, 40),
+        language: String((ln && ln.language) || '').slice(0, 24),
+        geo: String((ln && ln.geo) || '').slice(0, 40),
+        direction: String((ln && ln.direction) || '').slice(0, 40),
+        bundle: String((ln && ln.bundle) || '').slice(0, 160),
+        budgetPlan, cplPlan, leadsPlan, qualPctPlan, qualPlan,
+        budgetFact: Math.max(0, +(ln && ln.budgetFact) || 0),
+        leadsFact: Math.max(0, Math.round(+(ln && ln.leadsFact) || 0)),
+        note: String((ln && ln.note) || '').slice(0, 300),
+      };
+    });
 
     /* — подрядчики трафика — */
     if (p === '/api/contractors' && req.method === 'GET') return json(res, 200, db.mpContractors);
@@ -8844,31 +8851,48 @@ const server = http.createServer(async (req, res) => {
       const brand = logo ? `<img src="${esc(logo)}" style="max-height:46px;max-width:190px;object-fit:contain">` : `<span style="font-family:Fraunces,serif;font-size:25px;font-weight:600;letter-spacing:-.01em">${esc(AG)}</span>`;
       const hasFact = T.hasFact;
       const geoRu = (g) => geoNames[g] || (g ? g.charAt(0).toUpperCase() + g.slice(1) : '—');
+      const _langs = (db.settings.adLangs && db.settings.adLangs.length) ? db.settings.adLangs : [{ key: 'ru', name: 'Русский', emoji: '🇷🇺' }, { key: 'en', name: 'English', emoji: '🇬🇧' }];
+      const langLbl = (k) => { if (!k) return '—'; const l = _langs.find(x => x.key === k); return l ? ((l.emoji ? l.emoji + ' ' : '') + l.name) : k; };
+      const _dirs = db.settings.adDirections || [];
+      const dirLbl = (k) => { if (!k) return '—'; const d = _dirs.find(x => x.key === k); return d ? d.name : k; };
       const deltaCell = (ln) => {
-        const cp = ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0;
+        const cp = ln.cplPlan || (ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0);
         const cf = ln.leadsFact ? Math.round(ln.budgetFact / ln.leadsFact) : 0;
         if (!cf || !cp) return '<td class="num mut">—</td>';
         const d = cf - cp; const cls = d <= 0 ? 'good' : 'bad'; const sign = d > 0 ? '+' : '';
         return `<td class="num ${cls}">${sign}${money(d)}</td>`;
       };
       const rows = (mp.lines || []).map(ln => {
-        const cp = ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0;
+        const cp = ln.cplPlan || (ln.leadsPlan ? Math.round(ln.budgetPlan / ln.leadsPlan) : 0);
+        const quals = +ln.qualPlan || 0;
+        const pct = ln.qualPctPlan || (ln.leadsPlan && quals ? Math.round(quals / ln.leadsPlan * 100) : 0);
+        const cpql = quals ? Math.round(ln.budgetPlan / quals) : 0;
         const cf = ln.leadsFact ? Math.round(ln.budgetFact / ln.leadsFact) : 0;
         return `<tr>
-          <td><b>${esc(ln.channel || '—')}</b></td>
+          <td><b>${esc(ln.channel || '—')}</b>${ln.note ? `<span class="ln-note">${esc(ln.note)}</span>` : ''}</td>
+          <td>${esc(langLbl(ln.language))}</td>
           <td>${esc(geoRu(ln.geo))}</td>
-          <td class="bundle">${esc(ln.bundle || '')}${ln.note ? `<span class="ln-note">${esc(ln.note)}</span>` : ''}</td>
+          <td>${esc(dirLbl(ln.direction))}</td>
           <td class="num">${money(ln.budgetPlan)}</td>
-          <td class="num">${ln.leadsPlan || 0}</td>
           <td class="num accent">${cp ? money(cp) : '—'}</td>
+          <td class="num">${ln.leadsPlan || 0}</td>
+          <td class="num">${pct ? pct + '%' : '—'}</td>
+          <td class="num">${quals || '—'}</td>
+          <td class="num accent">${cpql ? money(cpql) : '—'}</td>
           ${hasFact ? `<td class="num fact">${ln.budgetFact ? money(ln.budgetFact) : '—'}</td><td class="num fact">${ln.leadsFact || '—'}</td><td class="num fact accent">${cf ? money(cf) : '—'}</td>${deltaCell(ln)}` : ''}
         </tr>`;
       }).join('');
+      const totQuals = (mp.lines || []).reduce((s, ln) => s + (+ln.qualPlan || 0), 0);
+      const totPct = T.leadsPlan ? Math.round(totQuals / T.leadsPlan * 100) : 0;
+      const totCpql = totQuals ? Math.round(T.budgetPlan / totQuals) : 0;
       const totalRow = `<tr class="tot">
-        <td colspan="3">Итого</td>
+        <td colspan="4">Итого</td>
         <td class="num">${money(T.budgetPlan)}</td>
-        <td class="num">${T.leadsPlan}</td>
         <td class="num accent">${T.cplPlan ? money(T.cplPlan) : '—'}</td>
+        <td class="num">${T.leadsPlan}</td>
+        <td class="num">${totPct ? totPct + '%' : '—'}</td>
+        <td class="num">${totQuals || '—'}</td>
+        <td class="num accent">${totCpql ? money(totCpql) : '—'}</td>
         ${hasFact ? `<td class="num fact">${money(T.budgetFact)}</td><td class="num fact">${T.leadsFact}</td><td class="num fact accent">${T.cplFact ? money(T.cplFact) : '—'}</td><td class="num">${T.cplFact && T.cplPlan ? ((T.cplFact - T.cplPlan) <= 0 ? '<span class="good">' : '<span class="bad">') + ((T.cplFact - T.cplPlan) > 0 ? '+' : '') + money(T.cplFact - T.cplPlan) + '</span>' : '—'}</td>` : ''}
       </tr>`;
       const factStrip = hasFact ? `<div class="strip">
@@ -8881,16 +8905,19 @@ const server = http.createServer(async (req, res) => {
         <div class="st-ic">${mp.status === 'approved' ? '✓' : '✕'}</div>
         <div><b>${mp.status === 'approved' ? 'Медиаплан утверждён' : 'Медиаплан отклонён'}</b><span>${esc(mp.approvedBy || '')}${mp.approvedAt ? ' · ' + new Date(mp.approvedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : ''}</span>${mp.approvalComment ? `<div class="st-cm">«${esc(mp.approvalComment)}»</div>` : ''}</div>
       </div>` : '';
+      const _chList = (db.settings.adChannels && db.settings.adChannels.length) ? db.settings.adChannels : [{ name: 'Meta' }, { name: 'TikTok' }, { name: 'Google' }, { name: 'Яндекс' }, { name: 'Авито' }];
       const fillRowHtml = (ln) => `<tr class="fr">
-        <td><input class="fi" data-f="channel" value="${esc((ln && ln.channel) || '')}" placeholder="Meta / Google…"></td>
+        <td><input class="fi" data-f="channel" list="dlCh" value="${esc((ln && ln.channel) || '')}" placeholder="Meta / Google…"></td>
+        <td><select class="fi" data-f="language"><option value="">— язык</option>${_langs.map(l => `<option value="${esc(l.key)}" ${ln && ln.language === l.key ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}</select></td>
         <td><input class="fi" data-f="geo" value="${esc((ln && ln.geo) || '')}" placeholder="dubai / bali…"></td>
-        <td><input class="fi" data-f="bundle" value="${esc((ln && ln.bundle) || '')}" placeholder="связка/сегмент"></td>
         <td><input class="fi num" data-f="budgetPlan" type="number" min="0" value="${(ln && ln.budgetPlan) || ''}" placeholder="бюджет"></td>
-        <td><input class="fi num" data-f="leadsPlan" type="number" min="0" value="${(ln && ln.leadsPlan) || ''}" placeholder="лидов"></td>
+        <td><input class="fi num" data-f="cplPlan" type="number" min="0" value="${(ln && ln.cplPlan) || ''}" placeholder="CPL"></td>
+        <td><input class="fi num" data-f="qualPctPlan" type="number" min="0" max="100" value="${(ln && ln.qualPctPlan) || ''}" placeholder="квал %"></td>
         <td><button class="fr-del" title="Удалить строку">✕</button></td></tr>`;
       const fillEditor = `<div id="fillBox" style="display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:18px">
-        <div class="a-lbl">Заполните план: каналы, гео, бюджет и план по лидам. Сохраните — план подтянется в CRM агентства.</div>
-        <div style="overflow-x:auto"><table id="fillTbl"><thead><tr><th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лидов</th><th></th></tr></thead>
+        <div class="a-lbl">Заполните план: канал, язык, гео, бюджет, целевой CPL и % квалифицированных. Лиды и квал посчитаются автоматически. Сохраните — план подтянется в CRM агентства.</div>
+        <datalist id="dlCh">${_chList.map(c => `<option value="${esc(c.name)}">`).join('')}</datalist>
+        <div style="overflow-x:auto"><table id="fillTbl"><thead><tr><th>Канал</th><th>Язык</th><th>Гео</th><th class="num">Бюджет</th><th class="num">CPL</th><th class="num">Квал&nbsp;%</th><th></th></tr></thead>
           <tbody>${((mp.lines && mp.lines.length ? mp.lines : [null])).map(fillRowHtml).join('')}</tbody></table></div>
         <button id="fillAdd" class="ab" style="margin-top:10px;background:var(--soft);color:var(--ink)">+ строка</button>
         <div class="a-btns" style="margin-top:14px"><button class="ab approve" id="fillSave">Сохранить и отправить агентству</button></div>
@@ -8911,7 +8938,7 @@ const server = http.createServer(async (req, res) => {
   document.getElementById('fillAdd').addEventListener('click',function(){ var tb=document.querySelector('#fillTbl tbody'); var tr=document.createElement('tr'); tr.className='fr'; tr.innerHTML=rowHtml.replace(/^<tr class="fr">|<\\/tr>$/g,''); tb.appendChild(tr); });
   document.querySelector('#fillTbl').addEventListener('click',function(e){ var d=e.target.closest('.fr-del'); if(d){ var rows=document.querySelectorAll('#fillTbl tbody tr'); if(rows.length>1) d.closest('tr').remove(); else d.closest('tr').querySelectorAll('input').forEach(function(i){i.value='';}); } });
   document.getElementById('fillSave').addEventListener('click',async function(){
-    var lines=[].map.call(document.querySelectorAll('#fillTbl tbody tr'),function(tr){var o={};tr.querySelectorAll('.fi').forEach(function(i){o[i.dataset.f]=i.type==='number'?(+i.value||0):i.value.trim();});return o;}).filter(function(o){return o.channel||o.budgetPlan||o.leadsPlan;});
+    var lines=[].map.call(document.querySelectorAll('#fillTbl tbody tr'),function(tr){var o={};tr.querySelectorAll('.fi').forEach(function(i){o[i.dataset.f]=i.type==='number'?(+i.value||0):i.value.trim();});return o;}).filter(function(o){return o.channel||o.budgetPlan||o.cplPlan;});
     if(!lines.length){ alert('Заполните хотя бы одну строку'); return; }
     var name=prompt('Ваше имя (кто заполняет план):',''); if(name===null) return;
     var b=this; b.disabled=true; b.textContent='Сохраняю…';
@@ -9023,13 +9050,13 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
     <div class="m"><span class="l">План лидов</span><span class="v">${T.leadsPlan} · CPL ${T.cplPlan ? money(T.cplPlan) : '—'}</span></div>
   </div>
   <div class="body">
-    <div class="sec-l">Разбивка по каналам и связкам</div>
+    <div class="sec-l">Разбивка по каналам и направлениям</div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">CPL</th>
+        <th>Канал</th><th>Язык</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">CPL</th><th class="num">Лиды</th><th class="num">Квал&nbsp;%</th><th class="num">Квал</th><th class="num">CPQL</th>
         ${hasFact ? '<th class="num">Факт&nbsp;бюджет</th><th class="num">Факт&nbsp;лиды</th><th class="num">Факт&nbsp;CPL</th><th class="num">Δ&nbsp;CPL</th>' : ''}
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="' + (hasFact ? 10 : 6) + '" style="color:#7A8AA6;padding:24px;text-align:center">В плане пока нет строк</td></tr>'}${mp.lines && mp.lines.length ? totalRow : ''}</tbody>
+      <tbody>${rows || '<tr><td colspan="' + (hasFact ? 14 : 10) + '" style="color:#7A8AA6;padding:24px;text-align:center">В плане пока нет строк</td></tr>'}${mp.lines && mp.lines.length ? totalRow : ''}</tbody>
     </table></div>
     <div class="sec-l">План vs факт</div>
     ${factStrip}

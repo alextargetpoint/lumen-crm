@@ -8437,7 +8437,10 @@ PAGES.ads = async (root) => {
         if (m.impr > 3000 && (m.clicks / m.impr) < 0.005) signals.push(`«${c.name}»: CTR ${(m.clicks / m.impr * 100).toFixed(2)}% — низкий`);
         if (m.spend > (T.spend / Math.max(1, treeD.tree.length)) && !m.quals) signals.push(`«${c.name}»: расход ${cm(m.spend)} без квалов`);
       }
-      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · <span class="mp-good">сходится со сводкой ✓</span></span><button class="btn btn-sm" id="ctaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>`;
+      const _tr = PAGE_STATE.adRange || { preset: '30d' };
+      const treeRange = `<span class="cta-range">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${_tr.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</span>`;
+      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · <span class="mp-good">сходится со сводкой ✓</span></span><button class="btn btn-sm" id="ctaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>
+      <div class="cta-rangebar">${treeRange}</div>`;
       const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}" data-team>${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
       const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}Кабинет</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}Креативы</button></span>`;
 
@@ -8746,7 +8749,7 @@ const DEFAULT_LANGS = [
 const adChannels = () => { const c = (STATE.settings && STATE.settings.adChannels); return (Array.isArray(c) && c.length) ? c : DEFAULT_CHANNELS; };
 const adLangs = () => { const l = (STATE.settings && STATE.settings.adLangs); return (Array.isArray(l) && l.length) ? l : DEFAULT_LANGS; };
 const chMeta = (nameOrKey) => adChannels().find(c => c.key === nameOrKey || c.name === nameOrKey) || null;
-const chLabel = (v) => { const c = chMeta(v); return c ? c.name : (v || ''); };   /* каналы — без эмодзи, только имя */
+const chLabel = (v) => { const c = chMeta(v); return c ? ((c.emoji ? c.emoji + ' ' : '') + c.name) : (v || ''); };   /* эмодзи опционально (по умолчанию каналы без него — чисто имя) */
 const langMeta = (k) => adLangs().find(l => l.key === k) || null;
 const langLabel = (k) => { const l = langMeta(k); return l ? (l.emoji ? l.emoji + ' ' : '') + l.name : (k || ''); };
 const langSlug = (s) => String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').replace(/^_|_$/g, '').slice(0, 16) || ('l' + Math.random().toString(36).slice(2, 5));
@@ -8955,9 +8958,20 @@ PAGES.mediaplan = async (root) => {
     return { name: ct ? ct.name : (mps[0] && mps[0].contractorName) || 'Без подрядчика', plans: mps.length, cur, cplPlan: agg.lp ? Math.round(agg.bp / agg.lp) : 0, cplFact: agg.lf ? Math.round(agg.bf / agg.lf) : 0, ...agg };
   }).sort((a, b) => b.bp - a.bp);
 
-  /* группы планов по подрядчику */
-  const groups = contractors.map(ct => ({ ct, mps: plans.filter(mp => mp.contractorId === ct.id) }));
-  const orphan = plans.filter(mp => !contractors.some(c => c.id === mp.contractorId));
+  /* фильтр по месяцу: чтобы при десятках планов не было хаоса — показываем текущий/прошлый месяц, остальное в архиве */
+  const _now2 = new Date(); const curKey = `${_now2.getFullYear()}-${String(_now2.getMonth() + 1).padStart(2, '0')}`;
+  const _pm = new Date(_now2.getFullYear(), _now2.getMonth() - 1, 1); const prevKey = `${_pm.getFullYear()}-${String(_pm.getMonth() + 1).padStart(2, '0')}`;
+  const MONTHS_RU = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+  const monthLabel = (key) => { const [y, m] = key.split('-'); return (MONTHS_RU[(+m) - 1] || key) + ' ' + y; };
+  const mpMonthKey = (mp) => { if (mp.period && mp.period.from) return String(mp.period.from).slice(0, 7); if (mp.createdAt) { const d = new Date(mp.createdAt); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); } return ''; };
+  const mpFilter = PAGE_STATE.mpFilter || 'current';
+  const inFilter = (mp) => { if (mpFilter === 'all') return true; const k = mpMonthKey(mp); if (mpFilter === 'current') return k === curKey; if (mpFilter === 'prev') return k === prevKey; return true; };
+  const visiblePlans = plans.filter(inFilter);
+  const archivedPlans = mpFilter === 'all' ? [] : plans.filter(mp => !inFilter(mp));
+
+  /* группы планов по подрядчику (только видимые по фильтру месяца) */
+  const groups = contractors.map(ct => ({ ct, mps: visiblePlans.filter(mp => mp.contractorId === ct.id) }));
+  const orphan = visiblePlans.filter(mp => !contractors.some(c => c.id === mp.contractorId));
   if (orphan.length) groups.push({ ct: null, mps: orphan });
 
   const planCard = (mp) => {
@@ -9020,22 +9034,42 @@ PAGES.mediaplan = async (root) => {
   const dirName = (k) => (dirList.find(d => d.key === k) || {}).name || k;
   const taxOn = !!(S.metaAds && S.metaAds.taxOn); const taxPct = +(S.metaAds && S.metaAds.taxPct) || 0; const taxF = taxOn ? (1 + taxPct / 100) : 1;
   const mk0 = () => ({ spend: 0, leadsMeta: 0, leadsCRM: 0, quals: 0 });
-  const dirFact = {}; const other = Object.assign(mk0(), { camps: new Set() });
-  for (const a of (adData.ads || [])) {
-    const dk = campMap[a.campaignName];
-    const spend = (a.spend || 0) * taxF;
-    const leadsMeta = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0);
-    const leadsCRM = a.leads || 0;
-    const quals = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
-    if (!spend && !leadsMeta && !leadsCRM && !quals) continue;
-    const tgt = dk ? (dirFact[dk] = dirFact[dk] || mk0()) : other;
-    tgt.spend += spend; tgt.leadsMeta += leadsMeta; tgt.leadsCRM += leadsCRM; tgt.quals += quals;
-    if (!dk && a.campaignName) other.camps.add(a.campaignName);
-  }
   const divFlag = (m, c) => (m > 0 && Math.abs(m - c) / m > 0.3) ? `<span class="mpd-div" title="Расхождение Meta/CRM">⚠</span>` : '';
-  const dirPlan = {};
-  for (const mp of plans) for (const ln of (mp.lines || [])) { const dk = ln.direction; if (!dk) continue; const p = dirPlan[dk] = dirPlan[dk] || { budget: 0, leads: 0, quals: 0 }; p.budget += +ln.budgetPlan || 0; p.leads += +ln.leadsPlan || 0; p.quals += +ln.qualPlan || 0; }
-  const plannedDirs = Object.keys(dirPlan);
+  /* ── Гибкая сводка План/Факт: группировка по направлению / каналу / подрядчику / языку + фильтр по подрядчику ── */
+  const mpdGroup = PAGE_STATE.mpdGroup || 'direction';
+  const mpdCt = PAGE_STATE.mpdCt || '';
+  const acctToCt = {}; for (const c of contractors) for (const acc of (c.adAccounts || [])) acctToCt[acc] = c.id;
+  const ctName = (id) => { const c = contractors.find(x => x.id === id); return c ? c.name : null; };
+  const OTHER = '__other';
+  const MPG = {};
+  const mpgEnsure = (k, label) => { const g = MPG[k] = MPG[k] || { label, plan: { budget: 0, leads: 0, quals: 0 }, fact: mk0(), camps: new Set() }; if (label && (g.label == null || g.label === k)) g.label = label; return g; };
+  const planKey = (mp, ln) => {
+    if (mpdGroup === 'channel') return [ln.channel || OTHER, ln.channel ? chLabel(ln.channel) : '— без канала'];
+    if (mpdGroup === 'language') return [ln.language || OTHER, ln.language ? langLabel(ln.language) : '— без языка'];
+    if (mpdGroup === 'contractor') return [mp.contractorId || OTHER, ctName(mp.contractorId) || mp.contractorName || '— без подрядчика'];
+    return [ln.direction || OTHER, ln.direction ? dirName(ln.direction) : '— без направления'];
+  };
+  for (const mp of plans) {
+    if (mpdCt && mp.contractorId !== mpdCt) continue;
+    for (const ln of (mp.lines || [])) { const [k, label] = planKey(mp, ln); const g = mpgEnsure(k, label); g.plan.budget += +ln.budgetPlan || 0; g.plan.leads += +ln.leadsPlan || 0; g.plan.quals += +ln.qualPlan || 0; }
+  }
+  const ctAccts = mpdCt ? new Set((contractors.find(c => c.id === mpdCt) || {}).adAccounts || []) : null;
+  const factKey = (a) => {
+    if (mpdGroup === 'channel') { const nm = a.platform === 'meta' ? 'Meta' : (a.platform || ''); return nm ? [nm, chLabel(nm)] : [OTHER, 'Прочее (вне плана)']; }
+    if (mpdGroup === 'contractor') { const cid = acctToCt[a.adAccountId]; return cid ? [cid, ctName(cid)] : [OTHER, 'Прочее (вне плана)']; }
+    if (mpdGroup === 'language') return ['__nolang', 'Факт (язык не размечен)'];
+    const dk = campMap[a.campaignName]; return dk ? [dk, dirName(dk)] : [OTHER, 'Прочее (вне плана)'];
+  };
+  for (const a of (adData.ads || [])) {
+    if (ctAccts && !ctAccts.has(a.adAccountId)) continue;
+    const spend = (a.spend || 0) * taxF; const leadsMeta = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0); const leadsCRM = a.leads || 0; const quals = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
+    if (!spend && !leadsMeta && !leadsCRM && !quals) continue;
+    const [k, label] = factKey(a); const g = mpgEnsure(k, label);
+    g.fact.spend += spend; g.fact.leadsMeta += leadsMeta; g.fact.leadsCRM += leadsCRM; g.fact.quals += quals;
+    if ((k === OTHER || k === '__nolang') && a.campaignName) g.camps.add(a.campaignName);
+  }
+  const mpgKeys = Object.keys(MPG).filter(k => k !== OTHER && k !== '__nolang').sort((x, y) => (MPG[y].plan.budget + MPG[y].fact.spend) - (MPG[x].plan.budget + MPG[x].fact.spend));
+  const tailKeys = [OTHER, '__nolang'].filter(k => MPG[k]);
   const _now = new Date(); const y = _now.getFullYear(), mo = _now.getMonth();
   const daysTotal = Math.round((new Date(y, mo + 1, 1) - new Date(y, mo, 1)) / 864e5); const daysPassed = Math.min(daysTotal, _now.getDate()); const daysLeft = Math.max(0, daysTotal - daysPassed);
   const periodLabel = `01.${String(mo + 1).padStart(2, '0')}–${daysTotal}.${String(mo + 1).padStart(2, '0')}.${y} · прошло ${daysPassed} из ${daysTotal} дн · осталось ${daysLeft}`;
@@ -9047,12 +9081,13 @@ PAGES.mediaplan = async (root) => {
     const tag = ratio > 1.1 ? '🔴 перекрут' : ratio < 0.9 ? '🟡 недокрут' : '🟢 в графике';
     return `<div><b class="${cls}">${tag}</b></div><div class="muted" style="font-size:10px">нужно ${cur(Math.max(0, need))}/дн · факт ${cur(perDay)}/дн</div>`;
   };
-  const dRow = (label, plan, fact, isOther) => {
+  const dRow = (label, plan, fact, camps) => {
+    const isOther = !!camps;
     const tempo = plan.quals ? Math.round(fact.quals / plan.quals * 100) : null;
     const tCls = tempo == null ? '' : (tempo < 80 || tempo > 110) ? 'mp-bad' : 'mp-good';
     const crmSub = fact.leadsCRM !== fact.leadsMeta ? `<div class="muted" style="font-size:10px">CRM ${fact.leadsCRM} ${divFlag(fact.leadsMeta, fact.leadsCRM)}</div>` : '';
     return `<tr class="${isOther ? 'mpd-other' : ''}">
-      <td><b>${esc(label)}</b>${isOther && other.camps.size ? `<div class="muted" style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc([...other.camps].join(', '))}">${esc([...other.camps].slice(0, 4).join(', '))}${other.camps.size > 4 ? '…' : ''}</div>` : ''}</td>
+      <td><b>${esc(label)}</b>${isOther && camps.size ? `<div class="muted" style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc([...camps].join(', '))}">${esc([...camps].slice(0, 4).join(', '))}${camps.size > 4 ? '…' : ''}</div>` : ''}</td>
       <td>${plan.budget ? cur(plan.budget) : '—'}</td><td><b>${cur(fact.spend)}</b></td>
       <td>${plan.leads || '—'}</td><td><b>${fact.leadsMeta}</b>${crmSub}</td>
       <td>${plan.quals || '—'}</td><td><b>${fact.quals}</b></td>
@@ -9061,24 +9096,26 @@ PAGES.mediaplan = async (root) => {
     </tr>`;
   };
   const totPlan = { budget: 0, leads: 0, quals: 0 }, totFact = mk0();
-  const planRowsHtml = plannedDirs.map(dk => {
-    const plan = dirPlan[dk], fact = dirFact[dk] || mk0();
-    totPlan.budget += plan.budget; totPlan.leads += plan.leads; totPlan.quals += plan.quals;
-    totFact.spend += fact.spend; totFact.leadsMeta += fact.leadsMeta; totFact.leadsCRM += fact.leadsCRM; totFact.quals += fact.quals;
-    return dRow(dirName(dk), plan, fact, false);
-  }).join('');
-  const otherRow = (other.spend || other.leadsMeta) ? dRow('Прочее (вне плана)', { budget: 0, leads: 0, quals: 0 }, other, true) : '';
-  totFact.spend += other.spend; totFact.leadsMeta += other.leadsMeta; totFact.leadsCRM += other.leadsCRM; totFact.quals += other.quals;
-  const hasAny = plannedDirs.length || other.spend || other.leadsMeta;
+  const mpgAcc = (g) => { totPlan.budget += g.plan.budget; totPlan.leads += g.plan.leads; totPlan.quals += g.plan.quals; totFact.spend += g.fact.spend; totFact.leadsMeta += g.fact.leadsMeta; totFact.leadsCRM += g.fact.leadsCRM; totFact.quals += g.fact.quals; };
+  const planRowsHtml = mpgKeys.map(k => { const g = MPG[k]; mpgAcc(g); return dRow(g.label, g.plan, g.fact, null); }).join('');
+  const otherRow = tailKeys.map(k => { const g = MPG[k]; mpgAcc(g); return dRow(g.label, g.plan, g.fact, g.camps); }).join('');
+  const hasAny = mpgKeys.length || tailKeys.length;
   const totTempo = totPlan.quals ? Math.round(totFact.quals / totPlan.quals * 100) : null;
   const totDiv = totFact.leadsMeta > 0 && Math.abs(totFact.leadsMeta - totFact.leadsCRM) / totFact.leadsMeta > 0.15;
   const taxBtn = `<button class="btn btn-sm ${taxOn ? 'on' : ''}" id="mpdTax" data-team title="Показывать расход с налогом/сборами">${taxOn ? `✓ +налог ${taxPct}%` : '+ налог'}</button>`;
   const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${taxBtn}<button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
+  const GRP = { direction: ['направлениям', 'Направление'], channel: ['каналам', 'Канал'], contractor: ['подрядчикам', 'Подрядчик'], language: ['языкам', 'Язык'] }[mpdGroup] || ['направлениям', 'Направление'];
+  const groupSeg = `<span class="mpd-grp">${[['direction', 'Направление'], ['channel', 'Канал'], ['contractor', 'Подрядчик'], ['language', 'Язык']].map(([k, n]) => `<button class="mpd-grp-b ${mpdGroup === k ? 'on' : ''}" data-mpdgroup="${k}">${n}</button>`).join('')}</span>`;
+  const ctFilter = contractors.length ? `<select id="mpdCtSel" data-mpdct><option value="">Все подрядчики</option>${contractors.map(c => `<option value="${c.id}" ${mpdCt === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : '';
+  const grpBar = `<div class="mpd-grpbar"><span class="mpd-grpbar-l">Дробить по:</span>${groupSeg}${ctFilter ? `<span class="mpd-grpbar-l" style="margin-left:6px">Подрядчик:</span>${ctFilter}` : ''}</div>`;
+  const langNote = mpdGroup === 'language' ? `<div class="muted" style="font-size:10.5px;margin:-2px 0 8px">План размечен по языку; факт из Meta по языку не разбивается — общий факт в строке «Факт (язык не размечен)».</div>` : '';
   const cabFactCard = hasAny ? `<div class="glass card mb">
-      <div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
+      <div class="card-title">${ic(I.bars)}План / Факт по ${GRP[0]}<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
+      ${grpBar}
       <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b>${srcCur !== dispCur ? ` · пересчёт ${srcCur}→${dispCur} по курсу` : ''}${taxOn ? ` · расход с налогом +${taxPct}%` : ''}</div>
+      ${langNote}
       ${totDiv ? `<div class="lc-hint warn" style="margin-bottom:8px"><span>${ic(I.spark)}Расхождение <b>Meta ${totFact.leadsMeta}</b> ↔ <b>CRM ${totFact.leadsCRM}</b> лидов. Причины: не все лиды долетели в CRM (проверьте приём/вебхук) или разные окна атрибуции. «Факт квал» считается по CRM-стадиям.</span></div>` : ''}
-      <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>Направление</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды<br><span class="muted" style="font-weight:400;font-size:9px">Meta / CRM</span></th><th>План квал.</th><th>Факт квал.<br><span class="muted" style="font-weight:400;font-size:9px">CRM</span></th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
+      <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>${GRP[1]}</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды<br><span class="muted" style="font-weight:400;font-size:9px">Meta / CRM</span></th><th>План квал.</th><th>Факт квал.<br><span class="muted" style="font-weight:400;font-size:9px">CRM</span></th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
         ${planRowsHtml}${otherRow}
         <tr class="mpd-total"><td><b>Итого</b></td><td><b>${cur(totPlan.budget)}</b></td><td><b>${cur(totFact.spend)}</b></td><td><b>${totPlan.leads || '—'}</b></td><td><b>${totFact.leadsMeta}</b>${totFact.leadsCRM !== totFact.leadsMeta ? `<div class="muted" style="font-size:10px">CRM ${totFact.leadsCRM}</div>` : ''}</td><td><b>${totPlan.quals || '—'}</b></td><td><b>${totFact.quals}</b></td><td>${totTempo != null ? `<b class="${totTempo < 80 || totTempo > 110 ? 'mp-bad' : 'mp-good'}">${totTempo}%</b>` : '—'}</td><td></td></tr>
       </tbody></table></div>
@@ -9103,6 +9140,7 @@ PAGES.mediaplan = async (root) => {
       <button class="btn" id="mpDirMap">${ic(I.target)}Направления <span class="muted">· ${dirList.length}</span></button>
       <button class="btn" id="mpChannels">${ic(I.bars)}Каналы <span class="muted">· ${adChannels().length}</span></button>
       <button class="btn" id="mpLangs">${ic(I.chat)}Языки <span class="muted">· ${adLangs().length}</span></button>
+      <span class="mp-period-seg">${[['current', 'Текущий месяц'], ['prev', 'Прошлый'], ['all', 'Все']].map(([k, n]) => `<button class="mp-period-b ${mpFilter === k ? 'on' : ''}" data-mpfilter="${k}">${n}${k === 'all' ? ` <i>· ${plans.length}</i>` : ''}</button>`).join('')}</span>
       <div class="mp-hint muted">${ic(I.spark)}Каналы · языки · направления настраиваются здесь и в самом плане. Факт из кабинета сводится по направлениям.</div>
     </div>
     ${cmpRows.length > 1 ? `<div class="glass card mb">
@@ -9120,16 +9158,24 @@ PAGES.mediaplan = async (root) => {
         </tr>`).join('')}
       </tbody></table>
     </div>` : ''}
-    ${plans.length ? groups.filter(g => g.mps.length).map(g => `
+    ${!plans.length
+      ? `<div class="glass card"><div class="empty" style="padding:36px;text-align:center">
+        <div style="font-size:15px;font-weight:650;margin-bottom:6px">Медиапланов пока нет</div>
+        <div class="muted" style="margin-bottom:16px">Создайте первый медиаплан под подрядчика трафика — с планом по каналам, гео и связкам.</div>
+        <button class="btn btn-accent" id="mpNew2">${ic(I.plus)}Новый медиаплан</button>
+      </div></div>`
+      : (visiblePlans.length ? groups.filter(g => g.mps.length).map(g => `
       <div class="mp-group">
         <div class="mp-group-hd">${ic(I.target)}<b>${esc(g.ct ? g.ct.name : 'Без подрядчика')}</b>${g.ct && (g.ct.channels || []).length ? `<span class="muted">· ${g.ct.channels.map(esc).join(', ')}</span>` : ''}${g.ct && (g.ct.geos || []).length ? `<span class="muted">· ${g.ct.geos.map(mpGeoName).map(esc).join(', ')}</span>` : ''}</div>
         <div class="mp-grid">${g.mps.map(planCard).join('')}</div>
       </div>`).join('')
-    : `<div class="glass card"><div class="empty" style="padding:36px;text-align:center">
-        <div style="font-size:15px;font-weight:650;margin-bottom:6px">Медиапланов пока нет</div>
-        <div class="muted" style="margin-bottom:16px">Создайте первый медиаплан под подрядчика трафика — с планом по каналам, гео и связкам.</div>
-        <button class="btn btn-accent" id="mpNew2">${ic(I.plus)}Новый медиаплан</button>
-      </div></div>`}
+      : `<div class="glass card"><div class="empty" style="padding:28px;text-align:center"><div class="muted">За ${mpFilter === 'current' ? 'текущий месяц' : 'прошлый месяц'} планов нет.${archivedPlans.length ? ' Загляните в архив ниже или переключите на «Все».' : ''}</div></div></div>`)}
+    ${archivedPlans.length ? (() => {
+      const byMonth = {}; archivedPlans.forEach(mp => { const k = mpMonthKey(mp) || '—'; (byMonth[k] = byMonth[k] || []).push(mp); });
+      const monthsSorted = Object.keys(byMonth).sort().reverse();
+      const inner = monthsSorted.map(k => `<div class="mp-arch-month"><div class="mp-arch-mh">${esc(monthLabel(k))} <span class="muted">· ${byMonth[k].length}</span></div><div class="mp-grid">${byMonth[k].map(planCard).join('')}</div></div>`).join('');
+      return coll(`Архив планов`, inner, { open: false, count: archivedPlans.length, icon: I.doc });
+    })() : ''}
   `}
   `;
 
@@ -9138,6 +9184,9 @@ PAGES.mediaplan = async (root) => {
   $$('[data-dispcur]', root).forEach(b => b.addEventListener('click', async () => {
     try { await api.patch('/settings', { metaAds: { displayCurrency: b.dataset.dispcur } }); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); }
   }));
+  $$('[data-mpfilter]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.mpFilter = b.dataset.mpfilter; render._silent = true; render(); }));
+  $$('[data-mpdgroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.mpdGroup = b.dataset.mpdgroup; render._silent = true; render(); }));
+  $('#mpdCtSel', root) && $('#mpdCtSel', root).addEventListener('change', (e) => { PAGE_STATE.mpdCt = e.target.value; render._silent = true; render(); });
   $('#mpdQualCfg', root) && $('#mpdQualCfg', root).addEventListener('click', () => openQualStages(() => render()));
   $('#mpdTax', root) && $('#mpdTax', root).addEventListener('click', async () => {
     const ma = STATE.settings.metaAds || {};
@@ -9214,7 +9263,7 @@ function openMpBuilder(mp, contractors) {
   mp = mp || { id: null, contractorId: (contractors[0] || {}).id || null, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
   let DIRS = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
   const dirSel = (v) => `<select class="li" data-k="direction" data-prev="${esc(v || '')}"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="__new">＋ создать направление…</option></select>`;
-  const chSel = (v) => `<select class="li" data-k="channel" data-prev="${esc(v || '')}"><option value="">— канал</option>${adChannels().map(c => `<option value="${esc(c.name)}" ${c.name === v ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}${v && !chMeta(v) ? `<option value="${esc(v)}" selected>${esc(v)}</option>` : ''}<option value="__cfg">настроить каналы…</option></select>`;
+  const chSel = (v) => `<select class="li" data-k="channel" data-prev="${esc(v || '')}"><option value="">— канал</option>${adChannels().map(c => `<option value="${esc(c.name)}" ${c.name === v ? 'selected' : ''}>${esc((c.emoji ? c.emoji + ' ' : '') + c.name)}</option>`).join('')}${v && !chMeta(v) ? `<option value="${esc(v)}" selected>${esc(v)}</option>` : ''}<option value="__cfg">настроить каналы…</option></select>`;
   const langSel = (v) => `<select class="li" data-k="language" data-prev="${esc(v || '')}"><option value="">— язык</option>${adLangs().map(l => `<option value="${esc(l.key)}" ${l.key === v ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}<option value="__cfg">настроить языки…</option></select>`;
   const lineRow = (ln) => {
     ln = ln || {};
@@ -9507,15 +9556,22 @@ function openInlineDirection(onCreate) {
 /* Справочники каналов/языков — эмодзи-стикер + название; хранятся в settings.adChannels / settings.adLangs. */
 function openChannelsCfg(onDone) { openTaxCfg('channels', onDone); }
 function openLangsCfg(onDone) { openTaxCfg('langs', onDone); }
+/* тематические палитры для быстрого выбора «стикера» */
+const TAX_EMOJI = {
+  channels: ['📣', '📢', '🎯', '🚀', '📈', '📊', '💡', '🔥', '⭐', '🎬', '📱', '🖥️', '🔍', '▶️', '💬', '🛒', '🏷️', '🔵', '🟣', '🟢', '🔴', '🟡'],
+  langs: ['🇷🇺', '🇬🇧', '🇺🇸', '🇪🇸', '🇩🇪', '🇫🇷', '🇮🇹', '🇵🇹', '🇨🇳', '🇯🇵', '🇰🇷', '🇸🇦', '🇦🇪', '🇹🇭', '🇮🇩', '🇮🇳', '🇹🇷', '🇧🇷', '🇺🇦', '🌐'],
+};
 function openTaxCfg(kind, onDone) {
   const isCh = kind === 'channels';
   let items = (isCh ? adChannels() : adLangs()).map(x => ({ key: x.key, name: x.name, emoji: x.emoji || '' }));
   const title = isCh ? 'Каналы трафика' : 'Языки';
-  const sub = isCh ? 'название канала · прослеживается в аналитике' : 'флаг-стикер + язык · привязывается к строкам плана';
-  const intro = isCh ? 'Настройте список каналов (Meta, TikTok, Google, Яндекс, Авито…) — добавьте свои или уберите лишние.' : 'Русский и английский — по умолчанию. Добавьте любой язык и присвойте ему флаг-стикер — он привяжется к строкам медиаплана.';
+  const sub = isCh ? 'название + необязательный стикер · прослеживается в аналитике' : 'флаг-стикер + язык · привязывается к строкам плана';
+  const intro = isCh ? 'Настройте список каналов (Meta, TikTok, Google, Яндекс, Авито…). Стикер — по желанию: по умолчанию каналы без эмодзи. Выберите из палитры или впишите свой.' : 'Русский и английский — по умолчанию. Добавьте любой язык и присвойте ему флаг-стикер из палитры.';
+  const palette = `<div class="tax-pal" id="txPal">${(TAX_EMOJI[kind] || []).map(e => `<button type="button" class="tax-pal-b" data-emoji="${e}">${e}</button>`).join('')}</div>`;
   const body = `<div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">${intro}</div>
     <div id="txList" class="tax-list"></div>
-    <div style="display:flex;gap:6px;margin-top:10px">${isCh ? '' : `<input id="txEmoji" class="tax-emoji" placeholder="🇩🇪" maxlength="4">`}<input id="txName" placeholder="${isCh ? 'Новый канал' : 'Deutsch'}" style="flex:1"><button class="btn btn-sm btn-accent" id="txAdd">${ic(I.plus)}Добавить</button></div>`;
+    <div style="display:flex;gap:6px;margin-top:10px"><input id="txEmoji" class="tax-emoji" placeholder="${isCh ? '📣' : '🇩🇪'}" maxlength="4"><input id="txName" placeholder="${isCh ? 'Новый канал' : 'Deutsch'}" style="flex:1"><button class="btn btn-sm btn-accent" id="txAdd">${ic(I.plus)}Добавить</button></div>
+    <div class="tax-pal-lbl muted">Быстрый стикер <span style="font-size:10.5px">· клик по строке/полю выберет цель</span></div>${palette}`;
   const bd = modal({ title, sub, wide: true, body, actions: [
     { label: 'Сохранить', cls: 'btn-accent', onClick: async () => {
       syncFromDom();
@@ -9526,12 +9582,15 @@ function openTaxCfg(kind, onDone) {
     } },
     { label: 'Отмена' },
   ] });
+  let emojiTarget = null;   /* последнее сфокусированное эмодзи-поле; палитра пишет в него (или в add-row) */
+  bd.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('tax-emoji')) emojiTarget = e.target; });
   const syncFromDom = () => { const rows = $$('[data-txrow]', bd); if (rows.length) items = rows.map(r => { const em = $('.tx-em', r); return { key: r.dataset.key, name: $('.tx-nm', r).value.trim(), emoji: em ? em.value.trim() : '' }; }).filter(x => x.name); };
   const paint = () => {
-    $('#txList', bd).innerHTML = items.length ? items.map(x => `<div class="tax-row" data-txrow data-key="${esc(x.key)}">${isCh ? '' : `<input class="tx-em tax-emoji" value="${esc(x.emoji)}" maxlength="4">`}<input class="tx-nm" value="${esc(x.name)}" style="flex:1"><button class="btn btn-sm btn-danger" data-txdel="${esc(x.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:12px">Пусто — добавьте ниже.</div>';
+    $('#txList', bd).innerHTML = items.length ? items.map(x => `<div class="tax-row" data-txrow data-key="${esc(x.key)}"><input class="tx-em tax-emoji" value="${esc(x.emoji)}" maxlength="4" placeholder="${isCh ? '—' : '🏳️'}"><input class="tx-nm" value="${esc(x.name)}" style="flex:1"><button class="btn btn-sm btn-danger" data-txdel="${esc(x.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:12px">Пусто — добавьте ниже.</div>';
     $$('[data-txdel]', bd).forEach(b => b.addEventListener('click', () => { syncFromDom(); items = items.filter(x => x.key !== b.dataset.txdel); paint(); }));
   };
   paint();
+  $('#txPal', bd).addEventListener('click', (e) => { const b = e.target.closest('[data-emoji]'); if (!b) return; const tgt = (emojiTarget && bd.contains(emojiTarget)) ? emojiTarget : $('#txEmoji', bd); tgt.value = b.dataset.emoji; tgt.focus(); });
   const add = () => { const nm = $('#txName', bd).value.trim(); if (!nm) return; syncFromDom(); const emEl = $('#txEmoji', bd); const em = emEl ? emEl.value.trim() : ''; const key = isCh ? nm : langSlug(nm); if (items.some(x => x.key === key)) { toast('Уже есть'); return; } items.push({ key, name: nm, emoji: em }); $('#txName', bd).value = ''; if (emEl) emEl.value = ''; paint(); };
   $('#txAdd', bd).addEventListener('click', add);
   $('#txName', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });

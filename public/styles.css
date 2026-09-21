@@ -7783,6 +7783,22 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .mpd-cur { margin-left: auto; display: inline-flex; gap: 2px; border: 1px solid var(--stroke); border-radius: 8px; overflow: hidden; }
 .mpd-cur-b { font-size: 11px; padding: 4px 9px; background: var(--card); color: var(--ink-2); border: none; cursor: pointer; }
 .mpd-cur-b.on { background: var(--accent); color: #fff; }
+/* панель дробления План/Факт */
+.mpd-grpbar{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
+.mpd-grpbar-l{ font-size:11px; color:var(--muted); }
+.mpd-grp{ display:inline-flex; border:1px solid var(--stroke); border-radius:8px; overflow:hidden; }
+.mpd-grp-b{ font-size:11.5px; padding:5px 11px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
+.mpd-grp-b+.mpd-grp-b{ border-left:1px solid var(--stroke); }
+.mpd-grp-b.on{ background:var(--accent); color:#fff; }
+#mpdCtSel{ font-size:11.5px; padding:5px 9px; border:1px solid var(--stroke); border-radius:8px; background:var(--card); color:var(--ink); }
+/* быстрые фильтры месяца + архив */
+.mp-period-seg{ display:inline-flex; border:1px solid var(--stroke); border-radius:9px; overflow:hidden; }
+.mp-period-b{ font-size:11.5px; padding:6px 12px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
+.mp-period-b+.mp-period-b{ border-left:1px solid var(--stroke); }
+.mp-period-b.on{ background:var(--accent); color:#fff; }
+.mp-period-b i{ font-style:normal; opacity:.7; }
+.mp-arch-month{ margin-bottom:14px; }
+.mp-arch-mh{ font-size:12px; font-weight:650; color:var(--ink-2); text-transform:capitalize; margin:4px 0 8px; }
 
 /* Генератор маппинга — кастомные поля */
 .map-custom{ margin-top:8px; }
@@ -7798,6 +7814,10 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .tax-row{ display:flex; align-items:center; gap:8px; }
 .tax-emoji{ flex:0 0 56px; width:56px; text-align:center; border:1px solid var(--stroke); background:var(--card); border-radius:8px; padding:8px 4px; font-size:16px; }
 .tax-row .tx-nm{ border:1px solid var(--stroke); background:var(--card); border-radius:8px; padding:8px 10px; font-size:13px; color:var(--ink); }
+.tax-pal-lbl{ font-size:11.5px; margin:12px 0 6px; display:flex; gap:6px; align-items:baseline; }
+.tax-pal{ display:flex; flex-wrap:wrap; gap:5px; }
+.tax-pal-b{ width:34px; height:34px; display:grid; place-items:center; font-size:17px; border:1px solid var(--stroke); background:var(--card); border-radius:8px; cursor:pointer; line-height:1; padding:0; }
+.tax-pal-b:hover{ background:var(--bg-2); border-color:color-mix(in srgb,var(--accent) 40%,var(--stroke)); }
 .dm-camp{ display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--stroke); }
 .dm-camp:last-child{ border-bottom:none; }
 .dm-camp-nm{ flex:1; min-width:0; font-size:12px; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -7827,7 +7847,10 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .ct-modeseg{ margin-left:auto; display:inline-flex; gap:2px; border:1px solid var(--stroke); border-radius:8px; overflow:hidden; }
 .ct-mode-b{ font-size:11.5px; padding:5px 11px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
 .ct-mode-b.on{ background:var(--accent); color:#fff; }
+.ct-mode-b.on .ic, .ct-mode-b.on svg{ color:#fff !important; stroke:#fff !important; }   /* иконка не должна сливаться с тёмным фоном активной кнопки */
 .cta-hdr{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px 0 6px; }
+.cta-rangebar{ margin:0 0 10px; }
+.cta-range{ display:inline-flex; flex-wrap:wrap; gap:3px; border:1px solid var(--stroke); border-radius:9px; padding:3px; background:var(--bg-2); }
 .cta-hdr b{ font-size:13px; color:var(--ink); display:inline-flex; align-items:center; gap:6px; }
 .cta-sum{ font-size:11.5px; color:var(--ink-2); letter-spacing:.01em; }
 .cta-signals{ font-size:11.5px; color:var(--muted); padding:7px 10px; border-radius:9px; background:var(--bg-2); margin-bottom:10px; line-height:1.5; }
