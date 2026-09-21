@@ -2639,6 +2639,10 @@ const CRYPTO_TRON = process.env.CRYPTO_TRON_ADDRESS || 'TKsspQfKNJvcREryLtMG1Hsx
 const CRYPTO_ETH  = process.env.CRYPTO_ETH_ADDRESS  || '0x6dc20b29ea59fd722e752e65cd0c0059ee5c3b25';
 const USDT_TRC20  = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   /* USDT (Tron) контракт */
 const USDT_ERC20  = '0xdac17f958d2ee523a2206206994597c13d831ec7'; /* USDT (Ethereum) контракт */
+/* TronGrid с датацентр-IP (Railway) без ключа режется рейт-лимитом → пустой ответ → авто-зачисление не срабатывает.
+   Бесплатный ключ trongrid.io передаём заголовком TRON-PRO-API-KEY. Ключ из env или реестра (задаётся в админке). */
+function tronApiKey() { try { return process.env.TRON_API_KEY || process.env.TRONGRID_API_KEY || ((store.getRegistry().platformCrypto || {}).tronKey) || ''; } catch (e) { return ''; } }
+function tronFetchOpts(ms) { const k = tronApiKey(); return { signal: AbortSignal.timeout(ms || 12000), headers: k ? { 'TRON-PRO-API-KEY': k } : {} }; }
 /* ============ СИСТЕМА УВЕДОМЛЕНИЙ ============
    Единый notify(): кладёт в in-app центр (db.settings.notifications) + жёстко шлёт на почту владельцу
    (branded email) + best-effort в Telegram владельца. Каналы можно выключить пер-вызов.
@@ -2753,7 +2757,7 @@ async function cryptoTick() {
     }
     if (anyTrc) {
       try {
-        const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=50&contract_address=${USDT_TRC20}`, { signal: AbortSignal.timeout(12000) });
+        const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=50&contract_address=${USDT_TRC20}`, tronFetchOpts(12000));
         const j = await r.json().catch(() => ({}));
         trcTx = (j.data || []).map(tx => ({ txid: tx.transaction_id, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.block_timestamp || 0) })).filter(x => x.txid && x.amt > 0);
       } catch (e) {}
@@ -4986,7 +4990,7 @@ const server = http.createServer(async (req, res) => {
         // ── ончейн-выборка ──
         let trcTx = [], ercTx = [];
         try {
-          const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=100&contract_address=${USDT_TRC20}`, { signal: AbortSignal.timeout(15000) });
+          const r = await fetch(`https://api.trongrid.io/v1/accounts/${CRYPTO_TRON}/transactions/trc20?only_to=true&limit=100&contract_address=${USDT_TRC20}`, tronFetchOpts(15000));
           const j = await r.json().catch(() => ({}));
           trcTx = (j.data || []).map(tx => ({ txid: tx.transaction_id, amt: Number(tx.value || 0) / 1e6, ts: Number(tx.block_timestamp || 0) })).filter(x => x.txid && x.amt > 0);
         } catch (e) { out.trcError = e.message; }
@@ -5079,6 +5083,21 @@ const server = http.createServer(async (req, res) => {
           } else out = { ok: false, error: 'уже зачтено (идемпотентность)' };
         });
         return json(res, 200, out);
+      }
+      /* ключи для авто-верификации крипты (TronGrid обязателен на Railway; Etherscan — для ERC20). Хранятся в реестре, без редеплоя. */
+      if (p === '/api/admin/crypto-keys' && req.method === 'GET') {
+        const pc = store.getRegistry().platformCrypto || {};
+        return json(res, 200, { ok: true,
+          tronKeySet: !!(process.env.TRON_API_KEY || process.env.TRONGRID_API_KEY || pc.tronKey), tronViaEnv: !!(process.env.TRON_API_KEY || process.env.TRONGRID_API_KEY),
+          etherscanKeySet: !!(process.env.ETHERSCAN_KEY || pc.etherscanKey), etherscanViaEnv: !!process.env.ETHERSCAN_KEY });
+      }
+      if (p === '/api/admin/crypto-keys' && req.method === 'POST') {
+        const b = await readBody(req).catch(() => ({}));
+        const reg2 = store.getRegistry(); reg2.platformCrypto = reg2.platformCrypto || {};
+        if (typeof b.tronKey === 'string') reg2.platformCrypto.tronKey = b.tronKey.trim();
+        if (typeof b.etherscanKey === 'string') reg2.platformCrypto.etherscanKey = b.etherscanKey.trim();
+        store.saveRegistry();
+        return json(res, 200, { ok: true });
       }
       if (p === '/api/admin/briefs' && req.method === 'GET') { return json(res, 200, { ok: true, briefs: (reg.briefs || []).slice(0, 100) }); }
       if (p === '/api/admin/brief-status' && req.method === 'POST') { const b = await readBody(req); const br = (reg.briefs || []).find(x => x.id === b.id); if (br) { br.status = ['new', 'progress', 'done'].includes(b.status) ? b.status : br.status; store.saveRegistry(); } return json(res, 200, { ok: true }); }

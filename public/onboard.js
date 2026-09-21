@@ -67,7 +67,7 @@
     { k: 'concise', name: 'Короткая и деловая', ex: '«Принял. Бюджет и цель покупки? Пришлю 3 варианта под вас в течение часа.»', tone: 'короткая, деловая, без воды; быстрые чёткие сообщения' },
   ];
   // иллюстрации к шагам-фичам
-  const SHOT = (n) => '/assets/site/cap-' + n + '.png';
+  const SHOT = (n) => '/assets/site/cap-' + n + '.png?v=atl';   /* ?v — кэш-бас после пересъёмки в теме Ателье */
   // золотой эмблем-мотив на шапке каждого шага (в связке с обложками писем)
   const EMBLEM = { edition: 'building', style: 'palette', brand: 'spark', geos: 'globe', team: 'users', tone: 'chat', whatsapp: 'chat', chains: 'bolt', listings: 'grid', control: 'shield', more: 'star', pricing: 'star', finish: 'check' };
 
@@ -174,7 +174,7 @@
             <div class="ob-theme-meta"><b>${t.name}</b><span>${t.desc}</span></div>
           </div>
           <div class="ob-theme-back" data-grad="linear-gradient(140deg, ${t.sw[1]}, ${t.sw[0]})" style="background:linear-gradient(140deg, ${t.sw[1]}, ${t.sw[0]})">
-            <img src="/assets/theme-${t.key}.png" alt="" loading="lazy" onerror="this.style.display='none'">
+            <img src="/assets/theme-${t.key}.png?v=atl" alt="" loading="lazy" onerror="this.style.display='none'">
             <div class="ob-theme-back-lbl">Интерфейс · ${t.name}</div>
           </div>
         </div>

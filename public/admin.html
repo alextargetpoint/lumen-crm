@@ -224,7 +224,8 @@
     </div>
     <div class="card" style="margin-top:14px">
       <div class="row" style="justify-content:space-between"><b>Крипто-платежи</b><span><button class="ghost" id="cryTopups">Обновить</button> <button class="ghost" id="cryReconcile">Сверить ончейн</button></span></div>
-      <div class="muted" style="font-size:12.5px;margin-top:6px">Незачтённые заявки клиентов. «Зачислить» — если клиент реально оплатил (сверь сумму/txid в блокчейне): подписку активирует, расходники кладёт на баланс. Идемпотентно. «Сверить ончейн» — авто-поиск платежа по сумме (если Railway достаёт TronGrid/Etherscan).</div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Авто-зачисление раз в минуту. Для работы на проде нужен ключ TronGrid (без него Railway режется рейт-лимитом). Клиент оплатил → зачислится само.</div>
+      <div id="cryKeys" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
       <div id="cryTopupList" style="margin-top:12px;font-size:13px"></div>
       <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Ручное зачисление (если заявки нет в списке)</summary>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
@@ -270,7 +271,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'map') renderMap();
   if (b.dataset.tab === 'release') loadRelease();
   if (b.dataset.tab === 'support') loadSupport();
-  if (b.dataset.tab === 'invoices') { loadInvoices(); loadCryptoTopups(); }
+  if (b.dataset.tab === 'invoices') { loadInvoices(); loadCryptoTopups(); loadCryptoKeys(); }
   if (b.dataset.tab === 'briefs') loadBriefs();
 }));
 
@@ -342,6 +343,30 @@ async function loadInvoices() {
   } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
 }
 document.addEventListener('click', (e) => { if (e.target && e.target.id === 'invReload') loadInvoices(); });
+
+// ── Крипто: ключи авто-верификации ──
+async function loadCryptoKeys() {
+  const host = $('#cryKeys'); if (!host) return;
+  try {
+    const r = await api('/api/admin/crypto-keys');
+    const dot = (on) => `<b style="color:${on ? 'var(--good,#3f9d5a)' : 'var(--bad,#d66)'}">${on ? '✓ задан' : '✗ нет'}</b>`;
+    host.innerHTML = `<div style="margin-bottom:8px">TronGrid (TRC20): ${dot(r.tronKeySet)}${r.tronViaEnv ? ' <span class="muted">(env)</span>' : ''} · Etherscan (ERC20): ${dot(r.etherscanKeySet)}${r.etherscanViaEnv ? ' <span class="muted">(env)</span>' : ''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="ckTron" placeholder="TronGrid API key (trongrid.io — бесплатно)" style="flex:1;min-width:180px">
+        <input id="ckEth" placeholder="Etherscan API key (для ERC20)" style="flex:1;min-width:180px">
+        <button id="ckSave">Сохранить ключи</button>
+      </div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">Получить TronGrid-ключ: trongrid.io → Sign up → API Keys → Create. Вставь сюда — авто-зачисление заработает сразу, без редеплоя.</div>`;
+  } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки ключей</span>'; }
+}
+document.addEventListener('click', async (e) => {
+  if (!e.target || e.target.id !== 'ckSave') return;
+  const tronKey = $('#ckTron').value.trim(), etherscanKey = $('#ckEth').value.trim();
+  e.target.disabled = true; e.target.textContent = 'Сохраняю…';
+  try { await api('/api/admin/crypto-keys', { method: 'POST', body: JSON.stringify({ ...(tronKey ? { tronKey } : {}), ...(etherscanKey ? { etherscanKey } : {}) }) }); loadCryptoKeys(); }
+  catch (err) { alert(err.message); }
+  e.target.disabled = false; e.target.textContent = 'Сохранить ключи';
+});
 
 // ── Крипто-платежи: список незачтённых заявок + ручное зачисление ──
 const cryMoney = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
