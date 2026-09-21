@@ -9101,7 +9101,9 @@ PAGES.mediaplan = async (root) => {
       <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
       <button class="btn" id="mpContractors">${ic(I.users)}Подрядчики <span class="muted">· ${contractors.length}</span></button>
       <button class="btn" id="mpDirMap">${ic(I.target)}Направления <span class="muted">· ${dirList.length}</span></button>
-      <div class="mp-hint muted">${ic(I.spark)}Факт из кабинета Meta сводится по направлениям. Сопоставьте кампании кнопкой «Направления».</div>
+      <button class="btn" id="mpChannels">${ic(I.bars)}Каналы <span class="muted">· ${adChannels().length}</span></button>
+      <button class="btn" id="mpLangs">🌐 Языки <span class="muted">· ${adLangs().length}</span></button>
+      <div class="mp-hint muted">${ic(I.spark)}Каналы · языки · направления настраиваются здесь и в самом плане. Факт из кабинета сводится по направлениям.</div>
     </div>
     ${cmpRows.length > 1 ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}Сравнение подрядчиков<span class="sub">план vs факт · CPL</span></div>
@@ -9175,6 +9177,8 @@ PAGES.mediaplan = async (root) => {
   $('#mpNew2', root) && $('#mpNew2', root).addEventListener('click', openNew);
   $('#mpContractors', root).addEventListener('click', () => openContractorsModal());
   $('#mpDirMap', root) && $('#mpDirMap', root).addEventListener('click', () => openDirMap(() => render()));
+  $('#mpChannels', root) && $('#mpChannels', root).addEventListener('click', () => openChannelsCfg(() => render()));
+  $('#mpLangs', root) && $('#mpLangs', root).addEventListener('click', () => openLangsCfg(() => render()));
 
   $$('[data-mpopen]', root).forEach(b => b.addEventListener('click', () => openMpBuilder(plans.find(x => x.id === b.dataset.mpopen), contractors)));
   $$('[data-mpshare]', root).forEach(b => b.addEventListener('click', () => {
@@ -9206,12 +9210,12 @@ PAGES.mediaplan = async (root) => {
 
 /* ---- билдер медиаплана (модалка): шапка + строки план/факт + живые итоги ---- */
 function openMpBuilder(mp, contractors) {
-  const isNew = !mp;
+  const isNew = !mp || !mp.id;   /* черновик без id (в т.ч. пере-открытый после конфига) = новый план → POST, не PATCH */
   mp = mp || { id: null, contractorId: (contractors[0] || {}).id || null, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
   let DIRS = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
-  const dirSel = (v) => `<select class="li" data-k="direction"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="__new">＋ создать направление…</option></select>`;
-  const chSel = (v) => `<select class="li" data-k="channel"><option value="">— канал</option>${adChannels().map(c => `<option value="${esc(c.name)}" ${c.name === v ? 'selected' : ''}>${esc((c.emoji ? c.emoji + ' ' : '') + c.name)}</option>`).join('')}${v && !chMeta(v) ? `<option value="${esc(v)}" selected>${esc(v)}</option>` : ''}<option value="__cfg">⚙ каналы…</option></select>`;
-  const langSel = (v) => `<select class="li" data-k="language"><option value="">— язык</option>${adLangs().map(l => `<option value="${esc(l.key)}" ${l.key === v ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}<option value="__cfg">⚙ языки…</option></select>`;
+  const dirSel = (v) => `<select class="li" data-k="direction" data-prev="${esc(v || '')}"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}<option value="__new">＋ создать направление…</option></select>`;
+  const chSel = (v) => `<select class="li" data-k="channel" data-prev="${esc(v || '')}"><option value="">— канал</option>${adChannels().map(c => `<option value="${esc(c.name)}" ${c.name === v ? 'selected' : ''}>${esc((c.emoji ? c.emoji + ' ' : '') + c.name)}</option>`).join('')}${v && !chMeta(v) ? `<option value="${esc(v)}" selected>${esc(v)}</option>` : ''}<option value="__cfg">⚙ каналы…</option></select>`;
+  const langSel = (v) => `<select class="li" data-k="language" data-prev="${esc(v || '')}"><option value="">— язык</option>${adLangs().map(l => `<option value="${esc(l.key)}" ${l.key === v ? 'selected' : ''}>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('')}<option value="__cfg">⚙ языки…</option></select>`;
   const lineRow = (ln) => {
     ln = ln || {};
     return `<tr data-lrow data-lid="${esc(ln.id || '')}" data-note="${esc(ln.note || '')}">
@@ -9278,8 +9282,9 @@ function openMpBuilder(mp, contractors) {
     const ctVal = $('#mpCt', root2).value;
     const lines = $$('[data-lrow]', root2).map(tr => {
       const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); return el2 ? el2.value : ''; };
-      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), direction: g('direction').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
-    }).filter(l => l.channel || l.geo || l.direction || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
+      const ch = g('channel'); const lang = g('language');
+      return { id: tr.dataset.lid || undefined, channel: (ch === '__cfg' ? '' : ch).trim(), language: (lang === '__cfg' ? '' : lang).trim(), geo: g('geo').trim(), direction: (g('direction') === '__new' ? '' : g('direction')).trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    }).filter(l => l.channel || l.language || l.geo || l.direction || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
     return { title, contractorId: ctVal === '__new' ? null : ctVal, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
   };
 
@@ -9304,14 +9309,43 @@ function openMpBuilder(mp, contractors) {
     $('#mpTcF', bd).textContent = lf ? mpMoney(Math.round(bf / lf), cur) : '—';
   };
 
+  /* снять черновик текущего билдера (без фильтрации строк, sentinel→prev) — чтобы пере-открыть после конфига/создания */
+  const collectDraft = (root2) => {
+    const lines = $$('[data-lrow]', root2).map(tr => {
+      const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); if (!el2) return ''; let v = el2.value; if (v === '__new' || v === '__cfg') v = el2.dataset.prev || ''; return v; };
+      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), language: g('language').trim(), geo: g('geo').trim(), direction: g('direction').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    });
+    const ctV = $('#mpCt', root2).value;
+    return { id: mp.id, title: $('#mpTitle', root2).value, contractorId: ctV === '__new' ? mp.contractorId : ctV, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
+  };
   bd.addEventListener('input', (e) => { if (e.target.closest('[data-lrow]') || e.target.id === 'mpCur') recalc(); });
   bd.addEventListener('change', (e) => {
     if (e.target.id === 'mpCur') recalc();
-    if (e.target.id === 'mpCt' && e.target.value === '__new') { openContractorEdit(null, (nc) => { closeModal(); reopenBuilder(mp, isNew, nc); }); }
+    if (e.target.id === 'mpCt' && e.target.value === '__new') { const draft = collectDraft(bd); draft.contractorId = null; openContractorEdit(null, (nc) => { if (nc) draft.contractorId = nc.id; reopenBuilderDraft(draft); }); return; }
+    const nat = (e.target.matches && e.target.matches('select[data-k]')) ? e.target : null;
+    if (!nat) return;
+    const k = nat.dataset.k, v = nat.value;
+    if (k === 'direction' && v === '__new') {
+      const draft = collectDraft(bd); const idx = $$('[data-lrow]', bd).indexOf(nat.closest('[data-lrow]'));
+      openInlineDirection((dir) => { if (draft.lines[idx]) draft.lines[idx].direction = dir.key; reopenBuilderDraft(draft); });
+      return;
+    }
+    if ((k === 'channel' || k === 'language') && v === '__cfg') {
+      const draft = collectDraft(bd); const cfg = k === 'channel' ? openChannelsCfg : openLangsCfg;
+      cfg(() => reopenBuilderDraft(draft));
+      return;
+    }
+    nat.dataset.prev = v;   /* запомнить последнее реальное значение для отката sentinel */
   });
   $('#mpAddRow', bd).addEventListener('click', () => { $('#mpRows', bd).insertAdjacentHTML('beforeend', lineRow()); recalc(); });
   bd.addEventListener('click', (e) => { const d = e.target.closest('[data-delrow]'); if (d) { const tr = d.closest('[data-lrow]'); if ($$('[data-lrow]', bd).length > 1) tr.remove(); else tr.querySelectorAll('input').forEach(i => i.value = ''); recalc(); } });
   recalc();
+}
+/* пере-открыть билдер с сохранённым черновиком (после конфига каналов/языков/создания направления/подрядчика).
+   async-фетч подрядчиков откладывает открытие ПОСЛЕ синхронного closeModal() диалога-действия — иначе новый билдер сразу закрылся бы. */
+async function reopenBuilderDraft(draft) {
+  const contractors = await api.get('/contractors');
+  openMpBuilder(draft, contractors);
 }
 /* пере-открыть билдер с обновлённым списком подрядчиков (после создания нового) */
 async function reopenBuilder(mp, isNew, newCt) {
@@ -9390,19 +9424,21 @@ function openQualStages(onDone) {
 async function openDirMap(onDone) {
   let ad = { ads: [] }; try { ad = await api.get('/ads'); } catch (_) {}
   const campaigns = [...new Set((ad.ads || []).map(a => a.campaignName).filter(Boolean))].sort();
-  let dirs = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name }));
+  let dirs = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
   const map = Object.assign({}, STATE.settings.adCampaignMap || {});
-  const slug = (s) => 'dir_' + String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').slice(0, 24) + Math.random().toString(36).slice(2, 5);
+  const slug = dirSlug;
   const body = `<div id="dmBox">
-    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — это как «проекты» из плана. Свяжите каждую рекламную кампанию с направлением, чтобы факт из кабинета сводился по плану. Кампании без направления попадут в «Прочее (вне плана)».</div>
-    <div class="lp-sec" style="margin:0 0 6px">Направления</div>
+    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — это как «проекты»/стратегии из плана. Свяжите каждую рекламную кампанию с направлением, чтобы факт из кабинета сводился по плану. Кампании без направления попадут в «Прочее (вне плана)».</div>
+    <div class="lp-sec" style="margin:0 0 6px">Направления и стратегии</div>
     <div id="dmDirs"></div>
     <div style="display:flex;gap:6px;margin:8px 0 14px"><input id="dmNewDir" placeholder="Новое направление (напр. Leadgeneration)" style="flex:1"><button class="btn btn-sm btn-accent" id="dmAddDir">${ic(I.plus)}Добавить</button></div>
     <div class="lp-sec" style="margin:0 0 6px">Кампании из кабинета → направление <span class="muted" style="font-weight:400">· ${campaigns.length}</span></div>
-    <div id="dmCamps" style="max-height:46vh;overflow-y:auto">${campaigns.length ? '' : '<div class="muted" style="font-size:12px;padding:10px">Кампаний пока нет — сначала синхронизируйте кабинет («Настройки рекламы» → «Синхронизировать сейчас»).</div>'}</div>
+    <div id="dmCamps" style="max-height:40vh;overflow-y:auto">${campaigns.length ? '' : '<div class="muted" style="font-size:12px;padding:10px">Кампаний пока нет — сначала синхронизируйте кабинет («Настройки рекламы» → «Синхронизировать сейчас»).</div>'}</div>
   </div>`;
-  const bd = modal({ title: 'Направления и сопоставление кампаний', sub: 'Свяжите кампании Meta с направлениями плана', wide: true, body, actions: [
+  const syncDirsFromDom = () => { $$('[data-dk]', bd).forEach(r => { const d = dirs.find(x => x.key === r.dataset.dk); if (!d) return; const nm = $('.dm-dir-nm', r); const st = $('.dm-dir-st', r); if (nm) d.name = nm.value.trim() || d.name; if (st) d.strategy = st.value.trim(); }); };
+  const bd = modal({ title: 'Направления и сопоставление кампаний', sub: 'Направления/стратегии · привязка кампаний Meta', wide: true, body, actions: [
     { label: 'Сохранить', cls: 'btn-accent', onClick: async (bdEl) => {
+      syncDirsFromDom();
       $$('[data-campmap]', bdEl).forEach(s => { const cn = s.dataset.campmap; if (s.value) map[cn] = s.value; else delete map[cn]; });
       await api.patch('/settings', { adDirections: dirs, adCampaignMap: map });
       await loadState();
@@ -9414,8 +9450,8 @@ async function openDirMap(onDone) {
   const dirOpts = () => `<option value="">— Прочее (вне плана)</option>` + dirs.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join('');
   const paintDirs = () => {
     const el2 = $('#dmDirs', bd);
-    el2.innerHTML = dirs.length ? dirs.map(d => `<div class="dm-dir" data-dk="${esc(d.key)}"><span>${esc(d.name)}</span><button class="btn btn-sm" data-deldir="${esc(d.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:11.5px">Пока нет направлений — добавьте ниже (или подтянутся из направлений плана).</div>';
-    $$('[data-deldir]', el2).forEach(b => b.addEventListener('click', () => { dirs = dirs.filter(x => x.key !== b.dataset.deldir); paintDirs(); paintCampSelects(); }));
+    el2.innerHTML = dirs.length ? dirs.map(d => `<div class="dm-dir" data-dk="${esc(d.key)}"><input class="dm-dir-nm" value="${esc(d.name)}" placeholder="Название"><input class="dm-dir-st" value="${esc(d.strategy || '')}" placeholder="Стратегия (оффер · аудитории · KPI)"><button class="btn btn-sm btn-danger" data-deldir="${esc(d.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:11.5px">Пока нет направлений — добавьте ниже (или подтянутся из направлений плана).</div>';
+    $$('[data-deldir]', el2).forEach(b => b.addEventListener('click', () => { syncDirsFromDom(); dirs = dirs.filter(x => x.key !== b.dataset.deldir); paintDirs(); paintCampSelects(); }));
   };
   const paintCampSelects = () => { $$('[data-campmap]', bd).forEach(s => { const cur = s.value; s.innerHTML = dirOpts(); s.value = dirs.some(d => d.key === cur) ? cur : ''; }); };
   const paintCamps = () => {
@@ -9425,8 +9461,63 @@ async function openDirMap(onDone) {
     try { enhanceControls(el2); } catch (_) {}
   };
   paintDirs(); paintCamps();
-  $('#dmAddDir', bd).addEventListener('click', () => { const v = $('#dmNewDir', bd).value.trim(); if (!v) return; dirs.push({ key: slug(v), name: v }); $('#dmNewDir', bd).value = ''; paintDirs(); paintCampSelects(); });
+  $('#dmAddDir', bd).addEventListener('click', () => { const v = $('#dmNewDir', bd).value.trim(); if (!v) return; syncDirsFromDom(); dirs.push({ key: slug(v), name: v, strategy: '' }); $('#dmNewDir', bd).value = ''; paintDirs(); paintCampSelects(); });
   $('#dmNewDir', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#dmAddDir', bd).click(); } });
+}
+
+const dirSlug = (s) => 'dir_' + String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').slice(0, 24) + Math.random().toString(36).slice(2, 5);
+
+/* Быстрое создание направления (стратегии) прямо из строки медиаплана — сохраняет в settings и отдаёт объект. */
+function openInlineDirection(onCreate) {
+  modal({ title: 'Новое направление', sub: 'стратегия/проект для сведения план-факт', wide: false,
+    body: `<div class="form-row"><label>Название направления</label><input id="idName" placeholder="Leadgeneration · вторичка"></div>
+      <div class="form-row"><label>Стратегия <span class="muted">(необязательно)</span></label><textarea id="idStrat" style="min-height:64px" placeholder="Кратко: оффер · аудитории · посадочная · KPI…"></textarea></div>`,
+    actions: [
+      { label: 'Создать', cls: 'btn-accent', onClick: async (bd) => {
+        const name = $('#idName', bd).value.trim(); if (!name) { toast('Укажите название'); return false; }
+        const strategy = $('#idStrat', bd).value.trim();
+        const dir = { key: dirSlug(name), name, strategy };
+        const cur = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
+        cur.push(dir);
+        await api.patch('/settings', { adDirections: cur }); await loadState();
+        toast('Направление создано', name, true);
+        if (onCreate) onCreate(dir);
+      } },
+      { label: 'Отмена' },
+    ] });
+}
+
+/* Справочники каналов/языков — эмодзи-стикер + название; хранятся в settings.adChannels / settings.adLangs. */
+function openChannelsCfg(onDone) { openTaxCfg('channels', onDone); }
+function openLangsCfg(onDone) { openTaxCfg('langs', onDone); }
+function openTaxCfg(kind, onDone) {
+  const isCh = kind === 'channels';
+  let items = (isCh ? adChannels() : adLangs()).map(x => ({ key: x.key, name: x.name, emoji: x.emoji || '' }));
+  const title = isCh ? 'Каналы трафика' : 'Языки';
+  const sub = isCh ? 'эмодзи-стикер + название · прослеживается в аналитике' : 'эмодзи-флаг + язык · привязывается к строкам плана';
+  const intro = isCh ? 'Настройте список каналов (Meta, TikTok, Google, Яндекс, Авито…). Эмодзи — «стикер» канала, виден в плане и аналитике.' : 'Русский и английский — по умолчанию. Добавьте любой язык и присвойте ему флаг-эмодзи — он привяжется к строкам медиаплана.';
+  const body = `<div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">${intro}</div>
+    <div id="txList" class="tax-list"></div>
+    <div style="display:flex;gap:6px;margin-top:10px"><input id="txEmoji" class="tax-emoji" placeholder="${isCh ? '🟦' : '🇩🇪'}" maxlength="4"><input id="txName" placeholder="${isCh ? 'Новый канал' : 'Deutsch'}" style="flex:1"><button class="btn btn-sm btn-accent" id="txAdd">${ic(I.plus)}Добавить</button></div>`;
+  const bd = modal({ title, sub, wide: true, body, actions: [
+    { label: 'Сохранить', cls: 'btn-accent', onClick: async () => {
+      syncFromDom();
+      const out = items.filter(x => x.name);
+      await api.patch('/settings', isCh ? { adChannels: out } : { adLangs: out }); await loadState();
+      toast('Сохранено', `${out.length} ${isCh ? 'канал(ов)' : 'язык(ов)'}`, true);
+      if (onDone) onDone();
+    } },
+    { label: 'Отмена' },
+  ] });
+  const syncFromDom = () => { const rows = $$('[data-txrow]', bd); if (rows.length) items = rows.map(r => ({ key: r.dataset.key, name: $('.tx-nm', r).value.trim(), emoji: $('.tx-em', r).value.trim() })).filter(x => x.name); };
+  const paint = () => {
+    $('#txList', bd).innerHTML = items.length ? items.map(x => `<div class="tax-row" data-txrow data-key="${esc(x.key)}"><input class="tx-em tax-emoji" value="${esc(x.emoji)}" maxlength="4"><input class="tx-nm" value="${esc(x.name)}" style="flex:1"><button class="btn btn-sm btn-danger" data-txdel="${esc(x.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:12px">Пусто — добавьте ниже.</div>';
+    $$('[data-txdel]', bd).forEach(b => b.addEventListener('click', () => { syncFromDom(); items = items.filter(x => x.key !== b.dataset.txdel); paint(); }));
+  };
+  paint();
+  const add = () => { const nm = $('#txName', bd).value.trim(); if (!nm) return; syncFromDom(); const em = $('#txEmoji', bd).value.trim(); const key = isCh ? nm : langSlug(nm); if (items.some(x => x.key === key)) { toast('Уже есть'); return; } items.push({ key, name: nm, emoji: em }); $('#txName', bd).value = ''; $('#txEmoji', bd).value = ''; paint(); };
+  $('#txAdd', bd).addEventListener('click', add);
+  $('#txName', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
 }
 
 function openContractorEdit(ct, onDone) {
