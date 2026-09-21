@@ -8329,7 +8329,7 @@ PAGES.ads = async (root) => {
       const gname = (g) => ((STATE.settings.geoNames || {})[g] || g);
       const campMap = STATE.settings.adCampaignMap || {}; const dirs = STATE.settings.adDirections || [];
       const dirName = (k) => (dirs.find(d2 => d2.key === k) || {}).name || k || '— вне плана';
-      const sub = PAGE_STATE.anaSub || 'geo';
+      const sub = ['geo', 'quality'].includes(PAGE_STATE.anaSub) ? PAGE_STATE.anaSub : 'geo';
       /* агрегаты по гео и по направлению из d.ads. Гео: ad.geo → ручная привязка → авто-детект по неймингу */
       const geoMap = STATE.settings.adCampaignGeoMap || {};
       const geoOf = (a) => a.geo || geoMap[a.campaignName] || detectAdGeo(a.campaignName) || detectAdGeo(a.adsetName) || '—';
@@ -8341,8 +8341,8 @@ PAGES.ads = async (root) => {
         const dk = campMap[a.campaignName] || '__none'; const dd = byDir[dk] = byDir[dk] || { spend: 0, leads: 0, quals: 0 };
         dd.spend += a.spend || 0; dd.leads += lm; dd.quals += q;
       }
-      const SUBNAMES = { geo: 'Гео', quality: 'Качество лидов', review: 'Пересмотр лидов', report: 'Отчёт' };
-      const seg = ['geo', 'quality', 'review', 'report'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${SUBNAMES[k]}</button>`).join('');
+      const SUBNAMES = { geo: 'Гео', quality: 'Качество лидов' };
+      const seg = ['geo', 'quality'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${SUBNAMES[k]}</button>`).join('');
       const geoTbl = `<table class="tbl mp-cmp"><thead><tr><th>Направление / гео</th><th>Расход</th><th>Лиды</th><th>Квал</th><th>CPL</th><th>Конв. в квал</th></tr></thead><tbody>
         ${Object.entries(byGeo).filter(([, g]) => g.spend || g.leads).sort((a, b) => b[1].spend - a[1].spend).map(([gk, g]) => `<tr><td><b>${esc(gname(gk))}</b></td><td>${cm2(g.spend)}</td><td>${g.leads}</td><td>${g.quals}</td><td><b class="accent">${g.leads ? cm2(g.spend / g.leads) : '—'}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td></tr>`).join('')}
       </tbody></table>`;
@@ -8364,7 +8364,7 @@ PAGES.ads = async (root) => {
       return `<div class="glass card mb" id="anaExtra">
         <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео · качество лидов · пересмотр · отчёт</span></div>
         <div class="ana-sub">${seg}</div>
-        <div style="overflow-x:auto">${sub === 'geo' ? geoTbl : sub === 'quality' ? qualTbl : sub === 'review' ? reviewView : reportView}</div>
+        <div style="overflow-x:auto">${sub === 'quality' ? qualTbl : geoTbl}</div>
       </div>`;
     })()}
     ${(() => {
