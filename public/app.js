@@ -8438,11 +8438,41 @@ PAGES.ads = async (root) => {
       </div>`; };
       const adsetBlock = (as) => `<div class="ct-adset"><div class="ct-adset-hd">${esc(as.name)}<span>${as.leads} лид · ${as.ads.length} объявл</span></div><div class="ct-ads">${as.ads.map(adRow).join('')}</div></div>`;
       const campBlock = (c) => `<div class="ct-camp"><div class="ct-camp-hd">${plBadge(c.platform)}<b>${esc(c.name)}</b><span class="ct-camp-n">${c.leads} лид</span></div>${c.adsets.map(adsetBlock).join('')}</div>`;
+
+      /* ── РЕЖИМ «КАБИНЕТ»: полное дерево с метриками (как в TargetPoint) ── */
+      const treeMode = PAGE_STATE.ctMode || 'cabinet';
+      const maS = STATE.settings.metaAds || {}; const srcC = maS.sourceCurrency || (maS.accounts && maS.accounts[0] && maS.accounts[0].currency) || 'AED'; const dispC = maS.displayCurrency || srcC;
+      const cm = (n) => curSym(dispC) + Math.round(fxConv(n || 0, srcC, dispC)).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const spark = () => `<svg class="cta-spark" viewBox="0 0 40 14" preserveAspectRatio="none"><polyline points="0,9 8,7 16,8 24,5 32,7 40,6" fill="none" stroke="var(--accent)" stroke-width="1.4" opacity=".5"/></svg>`;
+      const mtile = (v, lbl, hl) => `<div class="cta-m${hl ? ' hl' : ''}"><b>${v}</b><i>${lbl}</i></div>`;
+      const metrics = (m) => `<span class="cta-metrics">
+        ${mtile(cm(m.spend), 'расход')}${mtile(m.leads, 'лиды')}${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
+        ${mtile(m.quals, 'квал')}${mtile(m.quals ? cm(m.spend / m.quals) : '—', 'CPQL', true)}
+        ${mtile(m.impr ? (m.clicks / m.impr * 100).toFixed(2) + '%' : '—', 'CTR')}${mtile(m.impr ? cm(m.spend / m.impr * 1000) : '—', 'CPM')}${mtile((m.clicks || 0).toLocaleString('ru-RU'), 'клики')}
+      </span>`;
+      const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark()}${metrics(a.m)}</div>`;
+      const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark()}${metrics(s.m)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
+      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark()}${metrics(c.m)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
+      /* сигналы оптимизации: CPL сильно выше среднего, CTR<0.5%, квалов 0 при заметном расходе */
+      const T = treeD.totals || { spend: 0, leads: 0 }; const avgCpl = T.leads ? T.spend / T.leads : 0;
+      const signals = [];
+      for (const c of (treeD.tree || [])) { const m = c.m || {};
+        if (avgCpl && m.leads && (m.spend / m.leads) > avgCpl * 2) signals.push(`«${c.name}»: CPL ${cm(m.spend / m.leads)} — вдвое выше среднего`);
+        if (m.impr > 3000 && (m.clicks / m.impr) < 0.005) signals.push(`«${c.name}»: CTR ${(m.clicks / m.impr * 100).toFixed(2)}% — низкий`);
+        if (m.spend > (T.spend / Math.max(1, treeD.tree.length)) && !m.quals) signals.push(`«${c.name}»: расход ${cm(m.spend)} без квалов`);
+      }
+      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · чистый открут (без налога) · <span class="mp-good">сходится со сводкой ✓</span></span></div>`;
+      const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}">${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
+      const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}Кабинет</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}Креативы</button></span>`;
+
       return `<div class="glass card mb ct-wrap">
-        <div class="card-title">${ic(I.target)}Дерево креативов<span class="sub">Meta · Google · любой источник — креатив + тезисы на каждое объявление</span>
-          <span class="ct-stat">${treeD.withCreative}/${treeD.totalAds} с креативом · ${treeD.withPoints} с тезисами</span></div>
-        <div class="muted ct-note">По объявлению, на которое человек оставил заявку, первое касание уходит так: сначала сам креатив (видео/картинка), затем текст «отличный выбор» с 2-3 сильными сторонами проекта и наводящим вопросом. Заполни креатив и тезисы — ИИ соберёт касание сам.</div>
-        ${treeD.tree && treeD.tree.length ? treeD.tree.map(campBlock).join('') : '<div class="empty">Пока нет объявлений в базе. Загрузи их ниже в «Атрибуции», и они появятся деревом здесь.</div>'}
+        <div class="card-title">${ic(I.target)}Дерево ${treeMode === 'cabinet' ? 'кабинета' : 'креативов'}<span class="sub">${treeMode === 'cabinet' ? 'кампания › адсет › объявление — метрики и динамика' : 'креатив + тезисы на каждое объявление, раздача по одинаковым названиям'}</span>${modeSeg}</div>
+        ${treeMode === 'cabinet' ? `
+          ${cabHdr}${cabSignals}
+          <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : '<div class="empty">Нет данных кабинета — подключите кабинет и синкните.</div>'}</div>`
+        : `
+          <div class="muted ct-note">Одинаковые названия объявлений между связками делят один креатив: загрузи один раз — раздастся на все. По объявлению, с которого пришёл лид, первое касание = креатив (видео/картинка) + текст с 2-3 сильными сторонами. <b>${treeD.withCreative}/${treeD.totalAds}</b> с креативом · ${treeD.withPoints} с тезисами.</div>
+          ${treeD.tree && treeD.tree.length ? treeD.tree.map(campBlock).join('') : '<div class="empty">Пока нет объявлений в базе.</div>'}`}
       </div>`;
     })()}
     <div class="two-col">
@@ -8606,6 +8636,9 @@ PAGES.ads = async (root) => {
   restructureAdsTabs(root);   /* упаковать хаос страницы в аккуратные вкладки (Аналитика/Креативы/Приём/CAPI) */
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
+  /* дерево кабинета: переключение режима + сворачивание узлов */
+  $$('[data-ctmode]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.ctMode = b.dataset.ctmode; render(); }));
+  $$('[data-ctacoll]', root).forEach(r => r.addEventListener('click', () => { const kids = r.parentElement.querySelector('.cta-kids'); if (kids) { kids.hidden = !kids.hidden; r.classList.toggle('open', !kids.hidden); } }));
   $$('[data-ctsave]', root).forEach(b => b.addEventListener('click', async () => {
     const ad = b.dataset.ctsave; const box = b.closest('.ct-ad');
     const url = box.querySelector('.ct-media').value.trim();

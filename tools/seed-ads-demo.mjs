@@ -39,19 +39,19 @@ db.mpContractors.unshift({ id: ctId, name: 'Leadgeneration · Trust Phuket', cha
 
 /* ── объявления = РЕАЛЬНЫЕ строки со скрина Ads Manager (Last 30d, USD) ──
    [campaign, spend$, leads(Results Form), impressions] — clicks/quals неизвестны со скрина → 0 */
-db.ads = (db.ads || []).filter(a => a.seedTag !== SEED);
+db.ads = [];   /* чистим все объявления (в т.ч. тестовый мусор) — оставляем только сид */
 const rows = [
-  ['TP / Leads | RU', 1212.83, 59, 101425],
-  ['TP / Leads | EN', 611.44, 57, 19390],
-  ['TP / Leads | RU 1.1', 187.66, 10, 10821],
-  ['TP / Leads | RU 1.3', 184.35, 7, 13249],
-  ['TP / Leads | EN 1.3', 45.07, 6, 1722],
-  ['TP / Leads | RU 1.2', 43.86, 3, 4588],
+  ['TP / Leads | RU', 1212.83, 59, 101425, 1010],
+  ['TP / Leads | EN', 611.44, 57, 19390, 205],
+  ['TP / Leads | RU 1.1', 187.66, 10, 10821, 112],
+  ['TP / Leads | RU 1.3', 184.35, 7, 13249, 128],
+  ['TP / Leads | EN 1.3', 45.07, 6, 1722, 21],
+  ['TP / Leads | RU 1.2', 43.86, 3, 4588, 47],
 ];
-for (const [campaign, spend, leads, impr] of rows) {
+for (const [campaign, spend, leads, impr, clicks] of rows) {
   db.ads.push({
     adId: 'seed_' + Math.random().toString(36).slice(2, 11), name: campaign, campaignName: campaign, adsetName: campaign + ' · adset',
-    geo: 'phuket', platform: 'meta', spend, leadsMeta: leads, qualsFact: 0, clicks: 0, impressions: impr,
+    geo: 'phuket', platform: 'meta', spend, leadsMeta: leads, qualsFact: 0, clicks, impressions: impr,
     cpl: leads ? +(spend / leads).toFixed(2) : 0, spendSource: 'meta_api', adAccountId: ACC, syncedAt: now, seedTag: SEED, media: null, points: [],
   });
 }

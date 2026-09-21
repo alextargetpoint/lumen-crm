@@ -9115,21 +9115,28 @@ ${SCR}
       store.save();
       return json(res, 200, { url: ad.media.url, type: ad.media.type });
     }
-    /* дерево: кампании → адсеты → объявления, с креативом и статой лидов (источник-агностик) */
+    /* дерево: кампании → адсеты → объявления, с креативом, лидами И МЕТРИКАМИ кабинета (Расход/CPL/Квал/CTR/CPM/клики) */
     if (p === '/api/ads/tree' && req.method === 'GET') {
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
+      const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+      const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0 });
+      const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; };
       const camps = {};
       for (const ad of db.ads) {
-        const leads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId)).length;
+        const crmLeads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
+        const leadsCRM = crmLeads.length;
+        const quals = (ad.qualsFact != null) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
+        const am = { spend: Math.round(ad.spend || 0), leads: (ad.leadsMeta != null ? ad.leadsMeta : leadsCRM), leadsCRM, quals, clicks: ad.clicks || 0, impr: ad.impressions || 0 };
         const cn = ad.campaignName || '— без кампании';
         const an = ad.adsetName || '— без адсета';
-        camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, leads: 0 };
-        camps[cn].adsets[an] = camps[cn].adsets[an] || { name: an, ads: [], leads: 0 };
-        camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
-        camps[cn].adsets[an].leads += leads; camps[cn].leads += leads;
+        camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, m: mk() };
+        camps[cn].adsets[an] = camps[cn].adsets[an] || { name: an, ads: [], m: mk() };
+        camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], m: am, leads: am.leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
+        add(camps[cn].adsets[an].m, am); add(camps[cn].m, am);
       }
-      const tree = Object.values(camps).map(c => ({ ...c, adsets: Object.values(c.adsets) }));
-      return json(res, 200, { tree, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
+      const tree = Object.values(camps).map(c => ({ ...c, adsets: Object.values(c.adsets), leads: c.m.leads })).sort((a, b) => b.m.spend - a.m.spend);
+      const totals = mk(); for (const c of tree) add(totals, c.m);
+      return json(res, 200, { tree, totals, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);
