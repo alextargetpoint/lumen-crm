@@ -8464,13 +8464,7 @@ PAGES.ads = async (root) => {
           <div class="card-title">${ic(I.target)}Рекламный кабинет (Meta API)<span class="sub">прямое подключение — лиды и расход без интегратора</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет <b>напрямую</b> по Marketing API: лиды тянутся из лид-форм (Lead Ads), а <b>расход / кампании / креативы</b> — из Insights. Ручной ввод spend и загрузка CSV больше не нужны. Не хотите API — оставьте приём «через интегратор» (карточка «Мост приёма лидов» ниже, Albato / Make / Zapier). Можно <b>совмещать</b>.</div>
-          ${coll('📘 Где взять токен и Ad account ID', `
-            <div class="capi-guide">
-              <div class="cg-step"><span class="cg-n">1</span><div><b>Ad account ID.</b> Meta Ads Manager → выпадающий список аккаунтов, ID вида <code class="pill">act_1234567890</code> (или просто цифры).</div></div>
-              <div class="cg-step"><span class="cg-n">2</span><div><b>Постоянный токен.</b> Business Settings → System Users → создайте юзера → Add assets (приложение + рекламный аккаунт, Full control) → Generate token с правами <b>ads_read</b> и <b>leads_retrieval</b>, expiration <b>Never</b>.</div></div>
-              <div class="cg-step"><span class="cg-n">3</span><div><b>Проверьте и синхронизируйте.</b> Вставьте оба значения → «Проверить» → «Синхронизировать сейчас». Дальше синк идёт сам раз в ~6 часов.</div></div>
-              <div class="cg-loop">🔒 Токен хранится как секрет (в интерфейс не возвращается). Для отправки обратных сигналов качества в Meta — см. «Meta CAPI» рядом.</div>
-            </div>`, { open: !ma.tokenSet, count: 0, icon: I.doc })}
+          ${coll('📘 Полный гайд: приложение Meta, токен и Ad account ID — с нуля, со скриншотами', metaCabGuide(), { open: !ma.tokenSet, count: 0, icon: I.doc })}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Ad account ID</label><input id="maAcct" value="${esc(ma.adAccountId || '')}" placeholder="act_1234567890"></div>
             <div class="form-row"><label>Access token (System User)</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
@@ -11345,6 +11339,109 @@ function telGuideRich() {
   </div>`;
 
   return `<div class="glass card mb">${coll('Инструкция: Телефония — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
+}
+
+/* ── Полный гайд «Рекламный кабинет Meta»: с нуля (приложение, портфолио, рекламный
+   аккаунт, страница, System User токен, Ad account ID) — со «скриншот-мокапами». ── */
+function metaCabGuide() {
+  const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
+  const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
+  const brw = (crumb, rowsHtml) => `<div class="wag-win"><div class="wag-win-bar wag-brw"><span class="wag-win-dots"><i></i><i></i><i></i></span><span class="wag-crumb">${crumb}</span></div><div class="wag-win-body">${rowsHtml}</div></div>`;
+  const mf = (label, val, hl, btn) => `<div class="wag-mf ${hl ? 'hl' : ''}"><span class="wag-mflabel">${label}</span><span class="wag-mfval">${val}</span>${btn ? `<span class="wag-copychip">${btn}</span>` : ''}</div>`;
+
+  const portfolioWin = brw('business.facebook.com › Создать бизнес-портфолио', `
+    ${mf('Название компании', 'Ваше агентство недвижимости', true)}
+    ${mf('Ваше имя', 'Имя Фамилия', false)}
+    ${mf('Рабочая почта', 'you@agency.com', false)}
+    <div class="wag-winbtns"><span class="wag-buybtn">Создать</span></div>`);
+
+  const acctWin = brw('Business Settings › Аккаунты › Рекламные аккаунты', `
+    ${mf('Название', 'Agency Ads', false)}
+    ${mf('Валюта', 'USD / EUR — потом НЕ сменить', true)}
+    ${mf('Часовой пояс', 'Asia/Dubai — потом НЕ сменить', true)}
+    ${mf('ID рекламного аккаунта', 'act_1234567890', true, '⧉')}`);
+
+  const appWin = brw('developers.facebook.com › My Apps › Create App', `
+    ${mf('Тип приложения', 'Business (Бизнес)', true)}
+    ${mf('Название приложения', 'Agency CRM', false)}
+    ${mf('App ID', '9876543210', false)}
+    <div class="wag-shopnote">В приложение добавьте продукт <b>Marketing API</b> (и WhatsApp — если нужен Cloud API).</div>`);
+
+  const sysWin = brw('Business Settings › Пользователи › System Users › Generate token', `
+    ${mf('System User', 'agency-integration · Admin', false)}
+    ${mf('Приложение', 'Agency CRM', false)}
+    ${mf('Срок токена (expiration)', 'Never — бессрочный', true)}
+    ${mf('Права', 'ads_read · leads_retrieval', true)}
+    ${mf('+ для лид-форм', 'pages_read_engagement · pages_manage_ads', false)}
+    <div class="wag-winbtns"><span class="wag-buybtn">Generate token</span></div>`);
+
+  const idWin = brw('Meta Ads Manager › выбор аккаунта', `
+    ${mf('Agency Ads', 'act_1234567890', true, '⧉')}
+    <div class="wag-shopnote">ID виден в выпадающем списке аккаунтов и в адресной строке Ads Manager (<code>…?act=1234567890</code>).</div>`);
+
+  const faq = [
+    ['Нужно ли проходить App Review в Meta?', 'Для System User токена, который работает <b>в пределах вашего же бизнеса</b> (ваш рекламный аккаунт + ваша страница), права ads_read / leads_retrieval обычно доступны как <b>Advanced Access</b> без ревью. Ревью нужен, только если приложение обслуживает чужие бизнесы.'],
+    ['Лиды не тянутся, а расход тянется', 'Расходу хватает <b>ads_read</b>, а лидам нужны <b>leads_retrieval</b> + доступ к <b>Странице</b> формы. Проверьте: System User добавлен на Страницу (Add assets → Pages → Full control) и у токена есть pages_read_engagement.'],
+    ['«Invalid OAuth access token»', 'Токен временный (из API Setup, живёт 24 ч) или с недостающими правами. Сгенерируйте <b>постоянный</b> токен System User (expiration Never) с нужными правами и вставьте заново.'],
+    ['Где взять сам Ad account ID', 'Meta Ads Manager → выпадающий список аккаунтов, либо Business Settings → Рекламные аккаунты. Вид <code>act_1234567890</code>. В Lumen можно вставить и просто цифры — префикс <code>act_</code> подставится сам.'],
+    ['Карта обязательна?', 'Для чтения данных (расход/лиды) — нет. Но чтобы кампании реально крутились и был расход, к рекламному аккаунту должна быть привязана карта (Business Settings → Billing / Payment methods).'],
+  ];
+
+  return `<div class="wag" style="gap:16px">
+    <div class="wag-lead">Полный путь для агентства недвижимости — с нуля до подключения. Если бизнес-аккаунт Meta уже есть, пропустите шаги 1–4 и идите к токену (шаг 5).</div>
+
+    <div class="wag-sec" style="border-top:none;padding-top:0">
+      ${secH('1', 'Бизнес-портфолио Meta (Business Manager)', 'Юр-контейнер для рекламы. Если уже есть — пропустите.')}
+      <p class="wag-p">Откройте <b>business.facebook.com</b> → «Создать бизнес-портфолио» → название агентства, ваше имя, рабочая почта → подтвердите почту.</p>
+      ${portfolioWin}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('2', 'Рекламный аккаунт + карта', 'Здесь живут кампании и расход, отсюда берём Ad account ID.')}
+      <p class="wag-p">Business Settings → <b>Аккаунты → Рекламные аккаунты</b> → «Добавить» (или создать новый). Задайте валюту и часовой пояс. Привяжите карту в <b>Billing / Payment methods</b>.</p>
+      ${acctWin}
+      ${call('warn', 'Валюта и часовой пояс — навсегда', 'После создания аккаунта их <b>нельзя</b> поменять. Ставьте сразу правильные (обычно валюта расчётов и пояс вашего рынка).')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('3', 'Страница Facebook агентства', 'Нужна для лид-форм (Lead Ads) — без неё лиды не тянутся.')}
+      <p class="wag-p">Business Settings → <b>Аккаунты → Страницы</b> → добавьте существующую или создайте страницу агентства. Лид-формы принадлежат именно Странице, и токену нужен доступ к ней.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('4', 'Приложение Meta (App)', 'Технический «ключ» для API. Делается один раз.')}
+      <p class="wag-p"><b>developers.facebook.com</b> → My Apps → <b>Create App</b> → тип <b>Business</b> → название → создать. Внутри добавьте продукт <b>Marketing API</b> (и WhatsApp, если нужен Cloud API).</p>
+      ${appWin}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('5', 'Системный пользователь и постоянный токен', 'Главный шаг. Токен = связка приложение + аккаунт + страница.')}
+      <p class="wag-p">Business Settings → <b>Пользователи → System Users</b> → создайте юзера (роль Admin) → <b>Add assets</b>: приложение + рекламный аккаунт + Страница, все с <b>Full control</b>. Затем <b>Generate token</b>.</p>
+      ${sysWin}
+      ${call('danger', 'Права и срок — критично', 'Обязательно: <b>ads_read</b> (расход/кампании) и <b>leads_retrieval</b> (лиды), для лид-форм ещё <b>pages_read_engagement</b>, <b>pages_manage_ads</b>. Срок — <b>Never</b>. Токен показывается <b>один раз</b> — скопируйте сразу.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('6', 'Ad account ID', 'Второе значение, которое вставляем в Lumen.')}
+      <p class="wag-p">Meta Ads Manager → выпадающий список аккаунтов, либо Business Settings → Рекламные аккаунты. Вид <code class="pill">act_1234567890</code>.</p>
+      ${idWin}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('7', 'Подключить в Lumen', 'Финал.')}
+      <ol class="wag-ol">
+        <li>Вставьте <b>Ad account ID</b> и <b>токен</b> в поля ниже → <b>«Сохранить»</b>.</li>
+        <li>Нажмите <b>«Проверить»</b> — Lumen покажет имя кабинета и валюту.</li>
+        <li><b>«Синхронизировать сейчас»</b> — подтянутся расход и лиды. Дальше синк идёт сам ~раз в 6 часов.</li>
+      </ol>
+      ${call('info', 'Приватность', 'Токен хранится как секрет и в интерфейс не возвращается. Отправка обратных сигналов качества в Meta (квал/сделка) — соседняя карточка «Meta CAPI».')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('?', 'Частые вопросы', '')}
+      <div class="wag-faq">${faq.map(f => `<details class="wag-fq"><summary>${f[0]}</summary><div class="wag-fa">${f[1]}</div></details>`).join('')}</div>
+    </div>
+  </div>`;
 }
 
 /* ── Полная иллюстрированная инструкция «WhatsApp Cloud API» ──────────────────
