@@ -517,6 +517,23 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
+/* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
+   Explicit-save → перезаписываем одноимённые (пользователь задал креатив для этого названия). */
+function propagateAdByName(db, ad) {
+  const n = String(ad.name || '').trim().toLowerCase();
+  if (!n) return 0;
+  let c = 0;
+  for (const o of (db.ads || [])) {
+    if (o === ad) continue;
+    if (String(o.name || '').trim().toLowerCase() !== n) continue;
+    o.media = ad.media || null;
+    o.points = (ad.points || []).slice();
+    if (ad.platform) o.platform = ad.platform;
+    c++;
+  }
+  return c;
+}
+
 /* исходящий мост: квал/передача → POST наружу (Albato примет и разнесёт дальше) */
 function notifyOutbound(db, lead, event) {
   const url = db.settings.hooks.outboundUrl;
@@ -9042,8 +9059,10 @@ ${SCR}
       } else if (b.media === null) ad.media = null;
       if (Array.isArray(b.points)) ad.points = b.points.map(x => String(x || '').slice(0, 200)).filter(Boolean).slice(0, 6);
       if (b.platform) ad.platform = ['meta', 'google', 'tiktok', 'other'].includes(b.platform) ? b.platform : ad.platform;
+      /* раздать этот креатив/тезисы всем объявлениям с ТАКИМ ЖЕ именем (по всем адсетам/кампаниям) */
+      const propagated = propagateAdByName(db, ad);
       store.save();
-      return json(res, 200, { ok: true, ad: { adId: ad.adId, media: ad.media || null, points: ad.points || [], platform: ad.platform || null } });
+      return json(res, 200, { ok: true, propagated, ad: { adId: ad.adId, media: ad.media || null, points: ad.points || [], platform: ad.platform || null } });
     }
     /* загрузка исходника креатива с ПК на объявление (видео/картинка) — как в TargetPoint */
     if ((m = p.match(/^\/api\/ads\/([^/]+)\/creative-upload$/)) && req.method === 'POST') {
@@ -9059,6 +9078,7 @@ ${SCR}
       const ext = extM[1].toLowerCase(); const fname = `creatives/ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
       fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
       ad.media = { type: /^(mp4|webm|mov)$/.test(ext) ? 'video' : 'image', url: '/assets/' + fname };
+      propagateAdByName(db, ad);   /* тот же креатив — на все одноимённые объявления */
       store.save();
       return json(res, 200, { url: ad.media.url, type: ad.media.type });
     }
@@ -9115,6 +9135,15 @@ ${SCR}
       db.ads = db.ads.filter(a => String(a.adId) !== m[1]);
       store.save();
       return json(res, 200, { ok: true });
+    }
+    /* очистить демо-примеры: объявления без синка из API, без своего креатива и без лидов */
+    if (p === '/api/ads/clear-demo' && req.method === 'POST') {
+      const hasLead = (adId) => db.leads.some(l => l.ads && String(l.ads.adId) === String(adId));
+      const before = db.ads.length;
+      db.ads = db.ads.filter(a => a.syncedAt || (a.media && a.media.url) || (a.points && a.points.length) || a.spend || hasLead(a.adId));
+      const removed = before - db.ads.length;
+      store.save();
+      return json(res, 200, { ok: true, removed, total: db.ads.length });
     }
     if (p === '/api/hooks' && req.method === 'PATCH') {
       if (IS_BROKER) return json(res, 403, { error: 'только владелец' }); /* SEC: раньше любой брокер мог прочитать/ротировать мастер-секрет вебхуков */

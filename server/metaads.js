@@ -91,7 +91,30 @@ async function syncInsights(db, deps, { datePreset = 'last_30d' } = {}) {
       }
     }
   } catch (e) { /* креативы — не критично */ }
+  /* пришли реальные данные → убрать демо-«шаблоны» (хардкод-сид), которые никогда не синкались */
+  if (res.added + res.updated > 0) {
+    const SEED_DEMO = ['120211478921230508', '120211478921230742', '120209934110255019'];
+    db.ads = db.ads.filter(a => !(SEED_DEMO.includes(String(a.adId)) && !a.syncedAt));
+  }
+  /* дедуп по имени: одинаковые названия объявлений в разных адсетах/кампаниях делят один креатив/тезисы */
+  dedupeByName(db);
   return res;
+}
+
+/* Раздать креатив/тезисы всем объявлениям с ОДИНАКОВЫМ именем (заполняем пустые из непустого одноимённого).
+   Так один загруженный креатив автоматически подхватывается на все повторяющиеся названия по всем связкам. */
+function dedupeByName(db) {
+  const byName = {};
+  for (const a of (db.ads || [])) { const n = String(a.name || '').trim().toLowerCase(); if (!n) continue; (byName[n] = byName[n] || []).push(a); }
+  for (const n in byName) {
+    const grp = byName[n];
+    const withMedia = grp.find(a => a.media && a.media.url);
+    const withPoints = grp.find(a => a.points && a.points.length);
+    for (const a of grp) {
+      if (withMedia && !(a.media && a.media.url)) a.media = withMedia.media;
+      if (withPoints && !(a.points && a.points.length)) a.points = withPoints.points.slice();
+    }
+  }
 }
 
 /* Lead Ads: тянем лиды из лид-форм через edge объявления /{ad_id}/leads.
@@ -185,4 +208,4 @@ async function sync(db, deps, opts = {}) {
   return out;
 }
 
-module.exports = { ready, apiEnabled, verify, sync, syncInsights, syncLeads, acctId, cfg };
+module.exports = { ready, apiEnabled, verify, sync, syncInsights, syncLeads, acctId, cfg, dedupeByName };

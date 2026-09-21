@@ -8526,8 +8526,8 @@ PAGES.ads = async (root) => {
           </div>
         </div>
         <div class="glass card">
-          <div class="card-title">${ic(I.doc)}Каталог объявлений</div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Объявления появляются здесь <b>сами</b>, когда с них приходит заявка (по <code class="pill">ad_id</code> из моста приёма). Добавлять руками нужно, только если хочешь <b>заранее</b> завести объявление и привязать креатив/тезисы до первого лида.</div>
+          <div class="card-title">${ic(I.doc)}Каталог объявлений<button class="btn btn-sm" id="adsClearDemo" style="margin-left:auto" title="Удалить демо-примеры: объявления без синка из API, без своего креатива и без лидов">${ic(I.x)}Очистить демо</button></div>
+          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Объявления появляются здесь <b>сами</b>, когда с них приходит заявка (по <code class="pill">ad_id</code> из моста приёма) или из синка кабинета. Одинаковые названия в разных адсетах/кампаниях <b>делят один креатив</b> — задаёшь на одном, раздаётся на все одноимённые. «Очистить демо» убирает пустые примеры.</div>
           <div class="adadd-row">
             <input class="adadd" data-k="ad_id" placeholder="ad_id (обязательно)">
             <input class="adadd" data-k="name" placeholder="Название">
@@ -8570,7 +8570,7 @@ PAGES.ads = async (root) => {
     const url = box.querySelector('.ct-media').value.trim();
     const points = box.querySelector('.ct-points').value.split('\n').map(x => x.trim()).filter(Boolean);
     b.disabled = true; b.textContent = 'Сохраняю…';
-    try { await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); toast('Сохранено', 'Креатив и тезисы привязаны к объявлению', true); render(); }
+    try { const r = await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); toast('Сохранено', r && r.propagated ? `Креатив привязан + раздан на ${r.propagated} одноимённых объявл.` : 'Креатив и тезисы привязаны к объявлению', true); render(); }
     catch (e) { toast('Не сохранилось', e.message); b.disabled = false; b.textContent = 'Сохранить'; }
   }));
   /* загрузка исходника креатива с ПК */
@@ -8632,6 +8632,11 @@ PAGES.ads = async (root) => {
   $('#importAds')?.addEventListener('click', async () => {
     const r = await api.post('/ads/import', { csv: $('#adsCsv').value });
     toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
+    render();
+  });
+  $('#adsClearDemo')?.addEventListener('click', async () => {
+    const r = await api.post('/ads/clear-demo', {});
+    toast(r.removed ? `Убрано демо-объявлений: ${r.removed}` : 'Демо-примеров не найдено', r.removed ? `Осталось объявлений: ${r.total}` : 'Пустых примеров нет', true);
     render();
   });
   $('#adAddOne')?.addEventListener('click', async () => {
