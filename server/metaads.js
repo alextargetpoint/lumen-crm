@@ -72,29 +72,35 @@ async function syncInsights(db, deps, { acct, days } = {}) {
   const win = Math.max(1, days || 14);
   const until = new Date(); const since = new Date(until.getTime() - win * 864e5);
   const ymd = (d) => d.toISOString().slice(0, 10);
+  /* time_increment:1 → строка на объявление НА КАЖДЫЙ ДЕНЬ: даёт посуточную динамику (спарклайн, факт/дн) */
   const ins = await graphPaged(`${id}/insights`, token, {
-    level: 'ad', time_range: JSON.stringify({ since: ymd(since), until: ymd(until) }), limit: '200',
+    level: 'ad', time_range: JSON.stringify({ since: ymd(since), until: ymd(until) }), time_increment: '1', limit: '400',
     fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions',
-  }, 6);
+  }, 10);
   res.capped = ins.capped;
   db.ads = db.ads || [];
+  const leadsOf = (acts) => (Array.isArray(acts) ? acts : []).filter(a => /lead/i.test(a.action_type || '')).reduce((s, a) => s + (parseInt(a.value, 10) || 0), 0);
+  /* собираем по объявлению: тотал + дневной ряд */
+  const agg = {};   /* adId → {name, adset, camp, spend, impr, clicks, leads, daily:{date:{spend,leads,clicks,impr}}} */
   for (const row of ins.data) {
     if (!row.ad_id) continue;
-    let ad = db.ads.find(a => String(a.adId) === String(row.ad_id));
-    if (!ad) { ad = { adId: String(row.ad_id) }; db.ads.push(ad); res.added++; } else res.updated++;
-    if (row.ad_name) ad.name = ad.name && ad.name !== ad.adId ? ad.name : row.ad_name;   /* не затираем ручное имя, если оно уже осмысленное */
-    if (!ad.name) ad.name = row.ad_name || ad.adId;
-    ad.adsetName = row.adset_name || ad.adsetName;
-    ad.campaignName = row.campaign_name || ad.campaignName;
-    ad.spend = Math.round((parseFloat(row.spend) || 0));
-    ad.impressions = parseInt(row.impressions, 10) || 0;
-    ad.clicks = parseInt(row.clicks, 10) || 0;
-    /* лиды Meta из actions (лид-формы): leadgen.other_optins / lead / onsite_conversion.lead* */
-    const acts = Array.isArray(row.actions) ? row.actions : [];
-    ad.leadsMeta = acts.filter(a => /lead/i.test(a.action_type || '')).reduce((s, a) => s + (parseInt(a.value, 10) || 0), 0);
-    ad.spendSource = 'meta_api';
-    ad.adAccountId = id;   /* из какого кабинета — для привязки факта к подрядчику */
-    ad.syncedAt = Date.now();
+    const k = String(row.ad_id);
+    const A = agg[k] = agg[k] || { name: row.ad_name, adset: row.adset_name, camp: row.campaign_name, spend: 0, impr: 0, clicks: 0, leads: 0, daily: {} };
+    const sp = parseFloat(row.spend) || 0, im = parseInt(row.impressions, 10) || 0, cl = parseInt(row.clicks, 10) || 0, ld = leadsOf(row.actions);
+    A.spend += sp; A.impr += im; A.clicks += cl; A.leads += ld;
+    const d = row.date_start || row.date_stop; if (d) { const x = A.daily[d] = A.daily[d] || { spend: 0, leads: 0, clicks: 0, impr: 0 }; x.spend += sp; x.leads += ld; x.clicks += cl; x.impr += im; }
+  }
+  for (const k of Object.keys(agg)) {
+    const A = agg[k];
+    let ad = db.ads.find(a => String(a.adId) === k);
+    if (!ad) { ad = { adId: k }; db.ads.push(ad); res.added++; } else res.updated++;
+    if (A.name) ad.name = ad.name && ad.name !== ad.adId ? ad.name : A.name;
+    if (!ad.name) ad.name = A.name || ad.adId;
+    ad.adsetName = A.adset || ad.adsetName;
+    ad.campaignName = A.camp || ad.campaignName;
+    ad.spend = Math.round(A.spend); ad.impressions = A.impr; ad.clicks = A.clicks; ad.leadsMeta = A.leads;
+    ad.daily = Object.entries(A.daily).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, v]) => ({ d, spend: Math.round(v.spend), leads: v.leads, clicks: v.clicks, impr: v.impr })).slice(-30);
+    ad.spendSource = 'meta_api'; ad.adAccountId = id; ad.syncedAt = Date.now();
   }
   /* креативы (превью) — одним запросом; заполняем media только если у объявления его ещё нет */
   try {

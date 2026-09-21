@@ -8422,7 +8422,8 @@ PAGES.ads = async (root) => {
         const dk = campMap[a.campaignName] || '__none'; const dd = byDir[dk] = byDir[dk] || { spend: 0, leads: 0, quals: 0 };
         dd.spend += a.spend || 0; dd.leads += lm; dd.quals += q;
       }
-      const seg = ['geo', 'quality', 'report'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${k === 'geo' ? 'Гео' : k === 'quality' ? 'Качество лидов' : 'Отчёт'}</button>`).join('');
+      const SUBNAMES = { geo: 'Гео', quality: 'Качество лидов', review: 'Пересмотр лидов', report: 'Отчёт' };
+      const seg = ['geo', 'quality', 'review', 'report'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${SUBNAMES[k]}</button>`).join('');
       const geoTbl = `<table class="tbl mp-cmp"><thead><tr><th>Направление / гео</th><th>Расход</th><th>Лиды</th><th>Квал</th><th>CPL</th><th>Конв. в квал</th></tr></thead><tbody>
         ${Object.entries(byGeo).filter(([, g]) => g.spend || g.leads).sort((a, b) => b[1].spend - a[1].spend).map(([gk, g]) => `<tr><td><b>${esc(gname(gk))}</b></td><td>${cm2(g.spend)}</td><td>${g.leads}</td><td>${g.quals}</td><td><b class="accent">${g.leads ? cm2(g.spend / g.leads) : '—'}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td></tr>`).join('')}
       </tbody></table>`;
@@ -8437,11 +8438,14 @@ PAGES.ads = async (root) => {
       const reportView = `<div class="muted" style="font-size:11.5px;margin-bottom:8px">Готовый текст-отчёт за период — скопируйте клиенту/в чат.</div>
         <pre class="map-code" id="anaReport">${esc(reportTxt)}</pre>
         <button class="btn btn-sm" id="anaReportCopy" style="margin-top:8px">${ic(I.copy)}Копировать отчёт</button>`;
+      const log = (d.intakeLog || []);
+      const reviewView = log.length ? `<div class="muted" style="font-size:11.5px;margin-bottom:8px">Недавно принятые лиды с рекламы — открой карточку и переставь стадию, если квал недооценён.</div>
+        <div class="rev-list">${log.slice(0, 40).map(e => `<div class="rev-row" data-revlead="${esc(e.leadId || '')}"><b>${esc(e.name || '—')}</b><span class="muted">${esc(e.phone || '')}${e.adId ? ' · ad ' + esc(String(e.adId).slice(-6)) : ''}</span><i>${tmm(e.at)}</i><span class="rev-res ${e.result === 'created' ? '' : 'rep'}">${e.result === 'created' ? 'новый' : 'повтор'}</span></div>`).join('')}</div>`
+        : '<div class="empty" style="padding:24px;text-align:center">Пока нет принятых лидов с рекламы. Подключите приём (Albato) или синк кабинета.</div>';
       return `<div class="glass card mb" id="anaExtra">
-        <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео · качество лидов · отчёт</span>
-          <button class="btn btn-sm" id="anaClientView" style="margin-left:auto" title="Скрыть внутренние блоки — как видит клиент">${ic(I.eye)}Вид клиента</button></div>
+        <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео · качество лидов · пересмотр · отчёт</span></div>
         <div class="ana-sub">${seg}</div>
-        <div style="overflow-x:auto">${sub === 'geo' ? geoTbl : sub === 'quality' ? qualTbl : reportView}</div>
+        <div style="overflow-x:auto">${sub === 'geo' ? geoTbl : sub === 'quality' ? qualTbl : sub === 'review' ? reviewView : reportView}</div>
       </div>`;
     })()}
     ${(() => {
@@ -8483,16 +8487,23 @@ PAGES.ads = async (root) => {
       const treeMode = PAGE_STATE.ctMode || 'cabinet';
       const maS = STATE.settings.metaAds || {}; const srcC = maS.sourceCurrency || (maS.accounts && maS.accounts[0] && maS.accounts[0].currency) || 'AED'; const dispC = maS.displayCurrency || srcC;
       const cm = (n) => curSym(dispC) + Math.round(fxConv(n || 0, srcC, dispC)).toLocaleString('ru-RU').replace(/,/g, ' ');
-      const spark = () => `<svg class="cta-spark" viewBox="0 0 40 14" preserveAspectRatio="none"><polyline points="0,9 8,7 16,8 24,5 32,7 40,6" fill="none" stroke="var(--accent)" stroke-width="1.4" opacity=".5"/></svg>`;
+      const spark = (daily) => {
+        const arr = (daily || []).map(x => x.spend || 0);
+        if (arr.length < 2) return `<svg class="cta-spark" viewBox="0 0 40 14"><polyline points="0,7 40,7" fill="none" stroke="var(--muted)" stroke-width="1.2" opacity=".35"/></svg>`;
+        const max = Math.max(...arr), min = Math.min(...arr);
+        const pts = arr.map((v, i) => `${(i / (arr.length - 1) * 40).toFixed(1)},${(12 - (max === min ? 6 : (v - min) / (max - min) * 10)).toFixed(1)}`).join(' ');
+        const up = arr[arr.length - 1] >= arr[0];
+        return `<svg class="cta-spark" viewBox="0 0 40 14" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? 'var(--ok)' : 'var(--bad)'}" stroke-width="1.4" opacity=".6"/></svg>`;
+      };
       const mtile = (v, lbl, hl) => `<div class="cta-m${hl ? ' hl' : ''}"><b>${v}</b><i>${lbl}</i></div>`;
       const metrics = (m) => `<span class="cta-metrics">
         ${mtile(cm(m.spend), 'расход')}${mtile(m.leads, 'лиды')}${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
         ${mtile(m.quals, 'квал')}${mtile(m.quals ? cm(m.spend / m.quals) : '—', 'CPQL', true)}
         ${mtile(m.impr ? (m.clicks / m.impr * 100).toFixed(2) + '%' : '—', 'CTR')}${mtile(m.impr ? cm(m.spend / m.impr * 1000) : '—', 'CPM')}${mtile((m.clicks || 0).toLocaleString('ru-RU'), 'клики')}
       </span>`;
-      const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark()}${metrics(a.m)}</div>`;
-      const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark()}${metrics(s.m)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
-      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark()}${metrics(c.m)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
+      const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark(a.m.daily)}${metrics(a.m)}</div>`;
+      const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark(s.m.daily)}${metrics(s.m)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
+      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark(c.m.daily)}${metrics(c.m)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
       /* сигналы оптимизации: CPL сильно выше среднего, CTR<0.5%, квалов 0 при заметном расходе */
       const T = treeD.totals || { spend: 0, leads: 0 }; const avgCpl = T.leads ? T.spend / T.leads : 0;
       const signals = [];
@@ -8678,8 +8689,8 @@ PAGES.ads = async (root) => {
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   /* под-вкладки аналитики + вид клиента + копия отчёта */
   $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render(); }));
-  $('#anaClientView', root) && $('#anaClientView', root).addEventListener('click', () => { document.body.classList.toggle('client-view'); const on = document.body.classList.contains('client-view'); toast(on ? 'Вид клиента' : 'Полный вид', on ? 'Внутренние блоки скрыты' : null, true); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
+  $$('[data-revlead]', root).forEach(r => r.addEventListener('click', () => { const id = r.dataset.revlead; if (id) openLeadModal(id); }));
   /* дерево кабинета: переключение режима + сворачивание узлов */
   $$('[data-ctmode]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.ctMode = b.dataset.ctmode; render(); }));
   $$('[data-ctacoll]', root).forEach(r => r.addEventListener('click', () => { const kids = r.parentElement.querySelector('.cta-kids'); if (kids) { kids.hidden = !kids.hidden; r.classList.toggle('open', !kids.hidden); } }));
@@ -9195,10 +9206,12 @@ PAGES.mediaplan = async (root) => {
   $('#mpdTax', root) && $('#mpdTax', root).addEventListener('click', async () => {
     const ma = STATE.settings.metaAds || {};
     if (ma.taxOn) { await api.patch('/settings', { metaAds: { taxOn: false } }); await loadState(); render(); return; }
-    const v = prompt('Налог/сборы на расход, % (напр. 5 — VAT ОАЭ):', String(ma.taxPct || 5));
-    if (v == null) return;
-    await api.patch('/settings', { metaAds: { taxOn: true, taxPct: Math.max(0, Math.min(50, +v || 0)) } });
-    await loadState(); render();
+    modal({ title: 'Расход с налогом и сборами', sub: 'Множитель к расходу для всех метрик (CPL/CPQL/темп)', wide: false,
+      body: `<div class="form-row"><label>Ставка налога/сборов, %</label><input id="taxPctInp" type="number" min="0" max="50" step="0.5" value="${ma.taxPct || 5}" placeholder="напр. 5 — VAT ОАЭ"></div><div class="muted" style="font-size:11px;line-height:1.5">Meta выставляет VAT на сумму расхода (+ гео-сборы). Ставка применится к расходу везде в аналитике; выключить — снова нажать кнопку «налог».</div>`,
+      actions: [
+        { label: 'Включить', cls: 'btn-accent', onClick: async (bd) => { const v = Math.max(0, Math.min(50, +$('#taxPctInp', bd).value || 0)); await api.patch('/settings', { metaAds: { taxOn: true, taxPct: v } }); await loadState(); toast('Налог включён', `Расход +${v}%`, true); render(); } },
+        { label: 'Отмена' },
+      ] });
   });
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;

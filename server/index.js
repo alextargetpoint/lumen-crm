@@ -9119,14 +9119,14 @@ ${SCR}
     if (p === '/api/ads/tree' && req.method === 'GET') {
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
-      const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0 });
-      const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; };
+      const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0, dmap: {} });
+      const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.daily || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
       const camps = {};
       for (const ad of db.ads) {
         const crmLeads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
         const leadsCRM = crmLeads.length;
         const quals = (ad.qualsFact != null) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
-        const am = { spend: Math.round(ad.spend || 0), leads: (ad.leadsMeta != null ? ad.leadsMeta : leadsCRM), leadsCRM, quals, clicks: ad.clicks || 0, impr: ad.impressions || 0 };
+        const am = { spend: Math.round(ad.spend || 0), leads: (ad.leadsMeta != null ? ad.leadsMeta : leadsCRM), leadsCRM, quals, clicks: ad.clicks || 0, impr: ad.impressions || 0, daily: ad.daily || [] };
         const cn = ad.campaignName || '— без кампании';
         const an = ad.adsetName || '— без адсета';
         camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, m: mk() };
@@ -9134,8 +9134,12 @@ ${SCR}
         camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], m: am, leads: am.leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
         add(camps[cn].adsets[an].m, am); add(camps[cn].m, am);
       }
+      /* dmap → sorted daily spend array + factPerDay (последний полный день = вчера) */
+      const finish = (m) => { const arr = Object.entries(m.dmap).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, s]) => ({ d, spend: Math.round(s) })); m.daily = arr; const yd = new Date(Date.now() - 864e5).toISOString().slice(0, 10); const last = arr.filter(x => x.d <= yd).slice(-1)[0]; m.factPerDay = last ? last.spend : (arr.slice(-1)[0] || {}).spend || 0; delete m.dmap; };
+      for (const c of Object.values(camps)) { for (const a of Object.values(c.adsets)) { finish(a.m); a.ads.forEach(ad => { ad.m.daily = ad.m.daily || []; }); } finish(c.m); }
       const tree = Object.values(camps).map(c => ({ ...c, adsets: Object.values(c.adsets), leads: c.m.leads })).sort((a, b) => b.m.spend - a.m.spend);
-      const totals = mk(); for (const c of tree) add(totals, c.m);
+      const totals = mk(); for (const c of tree) { totals.spend += c.m.spend; totals.leads += c.m.leads; totals.leadsCRM += c.m.leadsCRM; totals.quals += c.m.quals; totals.clicks += c.m.clicks; totals.impr += c.m.impr; for (const p of (c.m.daily || [])) totals.dmap[p.d] = (totals.dmap[p.d] || 0) + p.spend; }
+      finish(totals);
       return json(res, 200, { tree, totals, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
