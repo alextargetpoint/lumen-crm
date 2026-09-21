@@ -104,7 +104,7 @@ async function syncInsights(db, deps, { acct, days } = {}) {
     ad.adsetName = A.adset || ad.adsetName;
     ad.campaignName = A.camp || ad.campaignName;
     ad.spend = Math.round(A.spend); ad.impressions = A.impr; ad.clicks = A.clicks; ad.leadsMeta = A.leads;
-    ad.daily = Object.entries(A.daily).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, v]) => ({ d, spend: Math.round(v.spend), leads: v.leads, clicks: v.clicks, impr: v.impr })).slice(-30);
+    ad.daily = Object.entries(A.daily).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, v]) => ({ d, spend: +(+v.spend).toFixed(2), leads: v.leads, clicks: v.clicks, impr: v.impr })).slice(-30);
     ad.spendSource = 'meta_api'; ad.adAccountId = id; ad.syncedAt = Date.now();
   }
   /* креативы (превью) — одним запросом; заполняем media только если у объявления его ещё нет */

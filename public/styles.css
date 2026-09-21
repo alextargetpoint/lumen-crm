@@ -7866,3 +7866,6 @@ body.client-view [data-team]{ display:none !important; }
 .ad-kpis .ad-tile:nth-child(6){ animation-delay:.20s } .ad-kpis .ad-tile:nth-child(7){ animation-delay:.24s } .ad-kpis .ad-tile:nth-child(8){ animation-delay:.28s }
 .cta-tree .cta-node{ animation:adFadeUp .34s ease both; }
 .mpd-tbl tbody tr, #anaExtra .mp-cmp tbody tr{ animation:adFadeUp .3s ease both; }
+
+/* индикатор синка не должен показываться пустым (hidden перебивался display:flex) */
+.ma-sync-status[hidden]{ display:none !important; }
