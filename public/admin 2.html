@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Lumen · Панель основателя</title>
+<style>
+  :root { --bg:#060d1c; --card:rgba(14,28,54,.6); --line:rgba(255,255,255,.12); --ink:#eef2fb; --mut:rgba(238,242,251,.6); --acc:#c8a86a; --good:#4caf7d; --bad:#e0685f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,'Segoe UI',Roboto,sans-serif; background:radial-gradient(1200px 700px at 20% -10%,#0d2144,transparent),var(--bg); color:var(--ink); min-height:100vh; }
+  a { color:var(--acc); }
+  .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+  .center { min-height:100vh; display:grid; place-items:center; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; backdrop-filter:blur(18px); }
+  input,select,textarea,button { font:inherit; color:var(--ink); }
+  input,select,textarea { width:100%; background:rgba(6,17,38,.6); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:6px; }
+  textarea { min-height:120px; resize:vertical; }
+  button { cursor:pointer; border:0; border-radius:10px; padding:10px 16px; background:var(--acc); color:#0a1833; font-weight:600; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  button.danger { background:transparent; border:1px solid var(--bad); color:var(--bad); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:20px; letter-spacing:.14em; margin:0; } h1 span { color:var(--acc); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:18px 0; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .stat b { font-size:26px; display:block; } .stat i { color:var(--mut); font-size:12px; font-style:normal; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px; }
+  th,td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; font-size:12px; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid var(--line); }
+  .badge.ok { color:var(--good); border-color:rgba(76,175,125,.4); }
+  .badge.bad { color:var(--bad); border-color:rgba(224,104,95,.4); }
+  select.mini { width:auto; padding:5px 8px; margin:0; }
+  .tabs { display:flex; gap:8px; margin:18px 0 12px; }
+  .tabs button { background:transparent; border:1px solid var(--line); color:var(--mut); }
+  .tabs button.on { background:var(--acc); color:#0a1833; border-color:var(--acc); }
+  .err { color:var(--bad); min-height:18px; font-size:13px; margin-top:8px; }
+  .muted { color:var(--mut); font-size:12.5px; }
+  .sect { display:none; } .sect.on { display:block; }
+  #campOut { margin-top:10px; font-size:12.5px; max-height:200px; overflow:auto; }
+</style>
+</head>
+<body>
+<!-- ВХОД -->
+<div class="center" id="loginView">
+  <div class="card" style="width:360px;max-width:calc(100vw - 32px);text-align:center">
+    <h1>LUMEN <span>ADMIN</span></h1>
+    <div class="muted" style="margin:6px 0 18px">Панель основателя платформы</div>
+    <input id="key" type="password" placeholder="Ключ супер-админа" autocomplete="off">
+    <div class="err" id="loginErr"></div>
+    <button id="loginBtn" style="width:100%">Войти</button>
+    <div class="muted" style="margin-top:12px">Ключ — из переменной PLATFORM_ADMIN_KEY (или лог сервера при старте)</div>
+  </div>
+</div>
+
+<!-- ПАНЕЛЬ -->
+<div class="wrap" id="appView" style="display:none">
+  <div class="row" style="justify-content:space-between">
+    <h1>LUMEN <span>ADMIN</span> · панель основателя</h1>
+    <button class="ghost" id="logoutBtn">Выйти</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="tabs">
+    <button class="on" data-tab="tenants">Аккаунты</button>
+    <button data-tab="campaign">Рассылки</button>
+    <button data-tab="audit">Журнал</button>
+    <button data-tab="security">🛡 Безопасность</button>
+    <button data-tab="email">✉️ Письма</button>
+    <button data-tab="map">🗺 Карта</button>
+    <button data-tab="release">🚀 Релиз</button>
+    <button data-tab="support">🎧 Поддержка</button>
+  </div>
+
+  <div class="sect on" id="sect-tenants">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Агентства на платформе</b><button class="ghost" id="reload">Обновить</button></div>
+      <div style="overflow:auto"><table id="tbl"><thead><tr>
+        <th>Агентство</th><th>E-mail владельца</th><th>Тариф</th><th>Лиды</th><th>Брокеры</th><th>Номера</th><th>Статус</th><th></th>
+      </tr></thead><tbody id="tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-campaign">
+    <div class="card">
+      <b>Рассылка кейсов и касаний</b>
+      <div class="row" style="margin-top:10px">
+        <label class="row" style="gap:6px"><input type="radio" name="ch" value="email" checked style="width:auto;margin:0"> E-mail владельцам</label>
+        <label class="row" style="gap:6px"><input type="radio" name="ch" value="wa" style="width:auto;margin:0"> WhatsApp на список номеров</label>
+      </div>
+      <div id="emailFields">
+        <label class="muted">Кому</label>
+        <select id="campTargets"><option value="all">Всем агентствам</option></select>
+        <label class="muted">Тема</label><input id="campSubject" placeholder="Например: Кейс — как агентство X закрыло 12 сделок">
+      </div>
+      <div id="waFields" style="display:none">
+        <label class="muted">Номера через запятую (напр. 971501234567, 79991112233)</label><input id="campPhones" placeholder="список получателей">
+      </div>
+      <label class="muted">Сообщение (переменные: {agency}, {email})</label>
+      <textarea id="campBody" placeholder="Здравствуйте, {agency}! Хотим поделиться свежим кейсом…"></textarea>
+      <div class="row" style="margin-top:10px"><button id="campSend">Отправить</button><span class="muted">Email — если у агентства настроен Resend; WhatsApp — через ваш серый воркер.</span></div>
+      <div id="campOut"></div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-audit">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Журнал действий супер-админа</b><button class="ghost" id="reloadAudit">Обновить</button></div>
+      <div id="auditList" style="margin-top:10px;font-size:13px"></div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-security">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><b>Детектор аномалий безопасности</b><span class="row" style="gap:8px"><button class="ghost" id="reloadSec">Обновить</button><button class="ghost" id="clearSec">Очистить журнал</button></span></div>
+      <div id="secSummary" class="stats" style="margin-top:10px"></div>
+      <div style="overflow:auto;margin-top:10px"><table id="secTbl"><thead><tr>
+        <th>Когда</th><th>Сигнал</th><th>Уровень</th><th>IP</th><th>Что</th>
+      </tr></thead><tbody id="secBody"></tbody></table></div>
+      <div class="muted" style="margin-top:10px;font-size:12px">Ловит: всплески отказов авторизации (скан/перебор), зондирование доступа (403), брутфорс ключа супер-админа, чужой secret на TG-вебхуке, экспорт/удаление аккаунтов. Критичные события дублируются алертом в ваш Telegram (если привязан). Внешний anti-fraud/WAF добавим при росте нагрузки.</div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-email">
+    <div class="card">
+      <b>Отправитель (Resend)</b>
+      <div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+        <input id="emFrom" placeholder="Lumen &lt;hello@lumen247.com&gt;" style="flex:2;min-width:220px">
+        <input id="emKey" type="password" placeholder="Resend API-ключ (re_…) — оставь пустым, если не менять" style="flex:2;min-width:220px">
+        <button id="emCfgSave" style="flex:none">Сохранить</button>
+      </div>
+      <div id="emCfgState" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <b>Конструктор писем</b>
+        <select id="emTpl" style="width:auto;min-width:200px"></select>
+      </div>
+      <div class="row" style="margin-top:12px;gap:18px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:300px">
+          <div class="muted" style="font-size:11.5px;margin:2px 0 8px">Переменные: <code>{{name}}</code> <code>{{agency}}</code> <code>{{message}}</code> <code>{{title}}</code> <code>{{subject}}</code> <code>{{link}}</code> · <code>{{button}}</code> = кнопка со ссылкой {{link}}.</div>
+          <div class="row" style="gap:8px;margin-bottom:8px"><b style="font-size:12px;color:var(--mut)">🇷🇺 Русский</b></div>
+          <label class="muted" style="font-size:12px">Тема</label><input id="emSubjRu" style="width:100%">
+          <label class="muted" style="font-size:12px;margin-top:8px;display:block">Тело (HTML)</label><textarea id="emBodyRu" style="width:100%;min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px"></textarea>
+          <div class="row" style="gap:8px;margin:14px 0 8px"><b style="font-size:12px;color:var(--mut)">🇬🇧 English</b></div>
+          <label class="muted" style="font-size:12px">Subject</label><input id="emSubjEn" style="width:100%">
+          <label class="muted" style="font-size:12px;margin-top:8px;display:block">Body (HTML)</label><textarea id="emBodyEn" style="width:100%;min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px"></textarea>
+          <div class="row" style="margin-top:12px;gap:10px;flex-wrap:wrap">
+            <button id="emSave">Сохранить шаблон</button>
+            <input id="emTestTo" placeholder="e-mail для теста" style="flex:1;min-width:160px">
+            <button class="ghost" id="emTest">Отправить тест</button>
+          </div>
+          <div id="emState" class="muted" style="font-size:12px;margin-top:6px"></div>
+        </div>
+        <div style="flex:1;min-width:300px">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="font-size:12px;color:var(--mut)">Превью</b>
+            <span class="tabs" style="margin:0"><button class="on" id="emPvRu" style="padding:4px 12px;font-size:12px">RU</button><button id="emPvEn" style="padding:4px 12px;font-size:12px">EN</button></span></div>
+          <div id="emPvSubj" class="muted" style="font-size:12.5px;margin-bottom:6px"></div>
+          <iframe id="emPreview" style="width:100%;height:520px;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-map">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <b>Все ссылки платформы</b>
+        <span class="muted" style="font-size:12.5px">Домен: <code id="mapOrigin"></code></span>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:6px">Всё живёт на одном домене, на разных путях. Нажми «Открыть» или «⧉» чтобы скопировать ссылку.</div>
+      <div id="mapBody" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-release">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><b>Готовность к выкату</b><button class="ghost" id="relReload">Обновить</button></div>
+      <div id="relGate" style="margin-top:12px"></div>
+      <div class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6">
+        <b>Правило выката (SaaS-дисциплина):</b> обновление НЕ уходит в прод, пока гейт не «PASS».<br>
+        Процесс: <b>1.</b> правки локально → <b>2.</b> <code>node test/release-gate.mjs "что меняли"</code> (изоляция+антивзлом) → <b>3.</b> локальная проверка в браузере → <b>4.</b> при PASS — <code>git push</code> (Railway выкатит) → <b>5.</b> сверить версию на проде. Полный регламент — <code>docs/RELEASE-PROCESS.md</code>.
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><b>Журнал выкатов</b>
+        <span class="row" style="gap:8px"><input id="relNote" placeholder="что выкатили" style="width:auto;min-width:180px"><button id="relLogAdd" class="ghost">Записать выкат</button></span></div>
+      <div id="relLog" style="margin-top:10px;font-size:13px"></div>
+    </div>
+  </div>
+
+  <div class="sect" id="sect-support">
+    <div class="card">
+      <b>Бот техподдержки</b>
+      <div id="supCfg" class="muted" style="font-size:12.5px;margin-top:8px"></div>
+      <div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+        <input id="supFounder" placeholder="Ваш chat_id в Telegram (для алертов)" style="flex:1;min-width:200px">
+        <input id="supToken" type="password" placeholder="токен бота (лучше SUPPORT_BOT_TOKEN в Railway)" style="flex:2;min-width:220px">
+        <button id="supSave">Сохранить + вебхук</button>
+      </div>
+      <div id="supCfgState" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><b>Обращения</b><button class="ghost" id="supReload">Обновить</button></div>
+      <div id="supList" style="margin-top:10px;font-size:13.5px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+  if (r.status === 403 || r.status === 401) { show('login'); throw new Error('auth'); }
+  return r.json();
+}
+function show(v) { $('#loginView').style.display = v === 'login' ? 'grid' : 'none'; $('#appView').style.display = v === 'app' ? 'block' : 'none'; }
+
+// вход
+async function doLogin() {
+  $('#loginErr').textContent = '';
+  const r = await fetch('/auth/admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#key').value }) });
+  if (r.ok) { show('app'); load(); } else $('#loginErr').textContent = 'Неверный ключ';
+}
+$('#loginBtn').addEventListener('click', doLogin);
+$('#key').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('#logoutBtn').addEventListener('click', async () => { await fetch('/auth/admin-logout', { method: 'POST' }); show('login'); });
+
+// вкладки
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  document.querySelectorAll('.sect').forEach(s => s.classList.remove('on')); $('#sect-' + b.dataset.tab).classList.add('on');
+  if (b.dataset.tab === 'audit') loadAudit();
+  if (b.dataset.tab === 'security') loadSecurity();
+  if (b.dataset.tab === 'email') loadEmail();
+  if (b.dataset.tab === 'map') renderMap();
+  if (b.dataset.tab === 'release') loadRelease();
+  if (b.dataset.tab === 'support') loadSupport();
+}));
+
+// ── Техподдержка ──
+async function loadSupport() {
+  const r = await api('/api/admin/support');
+  const c = r.config || {};
+  $('#supCfg').innerHTML = `Токен бота: <b>${c.tokenSet?'задан ✓':'НЕ задан'}</b> · алерты в chat_id: <b>${c.founderChat||'не задан'}</b>. Агентства пишут боту — обращения падают сюда, критичное дублируется вам в Telegram.`;
+  if (c.founderChat) $('#supFounder').value = c.founderChat;
+  const fmt = (ts)=>{try{return new Date(ts).toLocaleString('ru-RU')}catch(e){return''}};
+  $('#supList').innerHTML = (r.tickets||[]).map(t=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))">
+      <div class="row" style="justify-content:space-between"><b>${esc(t.name)}${t.username?' (@'+esc(t.username)+')':''}</b><span class="muted" style="font-size:12px">${fmt(t.at)} ${t.status==='answered'?'· ✅ отвечено':''}</span></div>
+      <div style="margin:4px 0 8px;white-space:pre-wrap">${esc(t.text)}</div>
+      <div class="row" style="gap:8px"><input class="sup-reply" data-chat="${esc(t.chatId)}" placeholder="Ответить…" style="flex:1"><button class="ghost sup-send" data-chat="${esc(t.chatId)}">Отправить</button></div>
+    </div>`).join('') || '<div class="muted">Обращений пока нет</div>';
+  document.querySelectorAll('.sup-send').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const inp=document.querySelector('.sup-reply[data-chat="'+btn.dataset.chat+'"]'); const text=inp.value.trim(); if(!text)return;
+    const rr=await api('/api/admin/support/reply',{method:'POST',body:JSON.stringify({chatId:btn.dataset.chat,text})});
+    if(rr.ok){inp.value='';loadSupport();}else alert(rr.error||'не отправилось');
+  }));
+}
+document.getElementById('supReload')?.addEventListener('click', loadSupport);
+document.getElementById('supSave')?.addEventListener('click', async ()=>{
+  const r=await api('/api/admin/support/config',{method:'POST',body:JSON.stringify({founderChat:$('#supFounder').value, token:$('#supToken').value})});
+  $('#supToken').value=''; $('#supCfgState').textContent = r.tokenSet ? ('Сохранено · токен есть ✓'+(r.webhook&&r.webhook.ok?' · вебхук привязан':'')) : 'Сохранено · токен не задан';
+  loadSupport();
+});
+
+// ── Гейт выката ──
+async function loadRelease() {
+  const r = await api('/api/admin/release');
+  const g = r.gate;
+  const fmt = (ts) => { try { return new Date(ts).toLocaleString('ru-RU'); } catch(e){ return ''; } };
+  if (!g) {
+    $('#relGate').innerHTML = `<div class="muted">Гейт ещё не запускался. Выполни <code>node test/release-gate.mjs</code> перед выкатом.</div>`;
+  } else {
+    const ok = g.passed;
+    const verMatch = g.appVersion && r.liveVersion && g.appVersion === r.liveVersion;
+    $('#relGate').innerHTML = `
+      <div style="display:inline-flex;align-items:center;gap:10px;padding:12px 18px;border-radius:12px;font-weight:700;font-size:15px;background:${ok?'rgba(31,122,84,.18)':'rgba(200,60,60,.18)'};color:${ok?'#5FCF9C':'#ff8080'}">
+        ${ok?'✅ PASS — можно выкатывать':'⛔ FAIL — выкат запрещён'}</div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><b>${esc(g.appVersion||'—')}</b><span>версия в гейте</span></div>
+        <div class="stat"><b>${esc(r.liveVersion||'—')}</b><span>версия на проде ${verMatch?'✓':'(отличается)'}</span></div>
+        <div class="stat"><b>${esc((g.git||'').split(' ')[0]||'—')}</b><span>коммит</span></div>
+      </div>
+      <div style="margin-top:12px;font-size:13.5px">${Object.values(g.suites||{}).map(s=>`<div class="row" style="gap:8px;padding:6px 0"><span>${s.passed?'✅':'❌'}</span><b>${esc(s.name)}</b><span class="muted">${esc(s.summary)}</span></div>`).join('')}</div>
+      <div class="muted" style="font-size:12px;margin-top:8px">Последний прогон: ${fmt(g.at)}${g.note?' · '+esc(g.note):''}</div>`;
+  }
+  $('#relLog').innerHTML = (r.log||[]).map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))"><span class="muted">${fmt(e.at)}</span> — ${e.passed?'✅':'⚠️'} <b>${esc(e.version||'')}</b> ${esc(e.note||'')}</div>`).join('') || '<div class="muted">Пусто</div>';
+}
+document.getElementById('relReload')?.addEventListener('click', loadRelease);
+document.getElementById('relLogAdd')?.addEventListener('click', async () => {
+  const note = $('#relNote').value.trim(); const g = (await api('/api/admin/release')).gate || {};
+  await api('/api/admin/release/log', { method:'POST', body: JSON.stringify({ note, version: g.appVersion||'', passed: !!g.passed }) });
+  $('#relNote').value=''; loadRelease();
+});
+
+// ── Карта ссылок ──
+const MAP = [
+  ['CRM — рабочее приложение', [
+    ['/', 'CRM', 'Лиды, диалоги, воронка, встречи — основной интерфейс агентства', 1],
+  ]],
+  ['Лендинги (публичные)', [
+    ['/land.html', 'Лендинг RU', 'Главная посадочная (русский)', 1],
+    ['/land-en.html', 'Landing EN', 'Посадочная на английском', 1],
+    ['/site.html', 'Премиум-лендинг', 'Тёмный dark-premium вариант', 1],
+    ['/scenarios.html', 'Сценарии', 'Страница сценариев использования', 1],
+    ['/soon.html', 'Coming soon', 'Заглушка «скоро»', 1],
+  ]],
+  ['Клиентам / заявки', [
+    ['/waitlist.html', 'Лист ожидания', 'Заявки на демо + рассылка приветствий', 1],
+  ]],
+  ['Управление (для тебя)', [
+    ['/admin.html', 'Админка основателя', 'Эта панель: аккаунты, тарифы, безопасность, письма', 1],
+    ['/tgapp', 'Мини-апп брокера', 'Открывается из Telegram-бота (по кнопке), тут — для проверки', 1],
+  ]],
+  ['Юридические', [
+    ['/privacy.html', 'Конфиденциальность', 'GDPR + PDPL, субпроцессоры', 1],
+    ['/terms.html', 'Условия', 'Пользовательское соглашение', 1],
+    ['/dpa.html', 'DPA', 'Обработка данных (Art. 28)', 1],
+    ['/acceptable-use.html', 'Допустимое использование', '', 1],
+    ['/cookies.html', 'Cookie', '', 1],
+    ['/data-deletion.html', 'Удаление данных', 'Право на забвение', 1],
+    ['/partner-agreement.html', 'Партнёрский договор', 'Аффилиат/реферал', 1],
+    ['/service-agreement.html', 'Договор услуг', '', 1],
+  ]],
+  ['Публичные по ссылке-токену (нужен id/токен)', [
+    ['/m/&lt;id&gt;', 'Страница встречи', 'Клиенту: подтверждение + подключение (live)', 0],
+    ['/b/&lt;id&gt;', 'Визитка брокера', '', 0],
+    ['/p/&lt;id&gt;', 'Подборка объектов', 'Клиенту по ссылке', 0],
+    ['/mp/&lt;id&gt;', 'Медиаплан', 'Подрядчику/клиенту', 0],
+    ['/reset?token=…', 'Сброс пароля', 'Из письма', 0],
+    ['/invite?token=…', 'Приглашение брокера', 'Из письма-инвайта', 0],
+  ]],
+];
+function renderMap() {
+  const O = location.origin;
+  $('#mapOrigin').textContent = O;
+  $('#mapBody').innerHTML = MAP.map(([group, items]) => `
+    <div style="margin-bottom:18px">
+      <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px">${group}</div>
+      ${items.map(([path, name, desc, live]) => {
+        const url = O + path.replace(/&lt;.*?&gt;/,'').replace(/\?.*$/,'');
+        return `<div class="row" style="justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2,rgba(255,255,255,.06))">
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:600;font-size:14px">${name}</div>
+            <div class="muted" style="font-size:12px">${desc||''}</div>
+            <code style="font-size:11.5px;color:var(--mut);word-break:break-all">${O}${path}</code>
+          </div>
+          <div class="row" style="gap:6px;flex:none">
+            ${live ? `<a class="ghost" style="text-decoration:none;padding:6px 12px;font-size:12.5px" href="${O}${path}" target="_blank">Открыть</a>` : ''}
+            <button class="ghost mapcopy" data-u="${O}${path}" style="padding:6px 10px;font-size:12.5px" title="Скопировать">⧉</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  document.querySelectorAll('.mapcopy').forEach(b => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.u); b.textContent='✓'; setTimeout(()=>b.textContent='⧉',1200); } catch(e){}
+  }));
+}
+
+// ── Конструктор писем ──
+let EMAIL = { templates: {}, keys: [], cur: null, pvLang: 'ru' };
+async function loadEmail() {
+  const r = await api('/api/admin/email');
+  EMAIL.templates = r.templates || {}; EMAIL.keys = r.keys || [];
+  $('#emFrom').value = (r.config && r.config.from) || '';
+  $('#emCfgState').textContent = (r.config && r.config.keySet) ? 'Ключ Resend сохранён ✓' : 'Ключ Resend не задан — письма не отправятся';
+  const sel = $('#emTpl');
+  sel.innerHTML = EMAIL.keys.map(k => `<option value="${k}">${esc((EMAIL.templates[k]||{}).name || k)}</option>`).join('');
+  EMAIL.cur = EMAIL.keys[0];
+  fillTpl();
+}
+function fillTpl() {
+  const t = EMAIL.templates[EMAIL.cur] || {};
+  $('#emSubjRu').value = t.subject_ru || ''; $('#emBodyRu').value = t.body_ru || '';
+  $('#emSubjEn').value = t.subject_en || ''; $('#emBodyEn').value = t.body_en || '';
+  refreshPreview();
+}
+async function refreshPreview() {
+  // сохраняем черновик в объект (не на сервер) для превью
+  const t = EMAIL.templates[EMAIL.cur] || (EMAIL.templates[EMAIL.cur] = {});
+  t.subject_ru = $('#emSubjRu').value; t.body_ru = $('#emBodyRu').value;
+  t.subject_en = $('#emSubjEn').value; t.body_en = $('#emBodyEn').value;
+  try {
+    const r = await api('/api/admin/email/preview', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, lang: EMAIL.pvLang, vars: {} }) });
+    $('#emPvSubj').textContent = (EMAIL.pvLang==='en'?'Subject: ':'Тема: ') + (r.subject||'');
+    $('#emPreview').srcdoc = r.html || '';
+  } catch(e) {}
+}
+$('#emTpl').addEventListener('change', e => { EMAIL.cur = e.target.value; fillTpl(); });
+['emSubjRu','emBodyRu','emSubjEn','emBodyEn'].forEach(id => { let d; $('#'+id).addEventListener('input', () => { clearTimeout(d); d = setTimeout(refreshPreview, 350); }); });
+$('#emPvRu').addEventListener('click', () => { EMAIL.pvLang='ru'; $('#emPvRu').classList.add('on'); $('#emPvEn').classList.remove('on'); refreshPreview(); });
+$('#emPvEn').addEventListener('click', () => { EMAIL.pvLang='en'; $('#emPvEn').classList.add('on'); $('#emPvRu').classList.remove('on'); refreshPreview(); });
+$('#emSave').addEventListener('click', async () => {
+  const t = EMAIL.templates[EMAIL.cur] || {};
+  const r = await api('/api/admin/email/template', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, subject_ru:t.subject_ru, subject_en:t.subject_en, body_ru:t.body_ru, body_en:t.body_en }) });
+  $('#emState').textContent = r.ok ? 'Шаблон сохранён ✓' : ('Ошибка: ' + (r.error||''));
+});
+$('#emCfgSave').addEventListener('click', async () => {
+  const r = await api('/api/admin/email/config', { method:'POST', body: JSON.stringify({ from: $('#emFrom').value, key: $('#emKey').value }) });
+  $('#emKey').value = ''; $('#emCfgState').textContent = (r.config && r.config.keySet) ? 'Сохранено · ключ есть ✓' : 'Сохранено · ключ не задан';
+});
+$('#emTest').addEventListener('click', async () => {
+  const to = $('#emTestTo').value.trim(); if (!to) { $('#emState').textContent = 'Введите e-mail для теста'; return; }
+  $('#emState').textContent = 'Отправляю…';
+  const r = await api('/api/admin/email/test', { method:'POST', body: JSON.stringify({ key: EMAIL.cur, lang: EMAIL.pvLang, to }) });
+  $('#emState').textContent = r.ok ? ('Тест отправлен на ' + to + ' ✓') : ('Не отправилось: ' + (r.error||''));
+});
+const SEV = { crit: ['🔴 критично', '#ff5252'], warn: ['🟡 внимание', '#e0a800'], info: ['⚪ инфо', '#7d8aa0'] };
+const KIND_RU = { auth_scan: 'Скан авторизации (401)', access_probe: 'Зондирование доступа (403)', admin_bruteforce: 'Брутфорс ключа админа', admin_api_denied: 'Доступ к admin-API без прав', tg_bad_secret: 'Чужой secret на TG-вебхуке', data_export: 'Экспорт базы', account_delete: 'Удаление аккаунта' };
+async function loadSecurity() {
+  const r = await api('/api/admin/security');
+  const fmt = (ts) => new Date(ts).toLocaleString('ru-RU');
+  const s = r.summary || {};
+  $('#secSummary').innerHTML = [
+    ['Сигналов за 24ч', s.total24 || 0], ['Критичных', s.crit24 || 0],
+    ['Топ-IP', (s.topIp && s.topIp[0]) ? (s.topIp[0].ip + ' ×' + s.topIp[0].n) : '—'],
+  ].map(([k, v]) => `<div class="stat"><b>${esc(v)}</b><span>${k}</span></div>`).join('');
+  $('#secBody').innerHTML = (r.log || []).map(e => {
+    const sev = SEV[e.severity] || ['—', '#888'];
+    return `<tr><td class="muted" style="white-space:nowrap">${fmt(e.at)}</td><td>${esc(KIND_RU[e.kind] || e.kind)}</td><td style="color:${sev[1]};white-space:nowrap">${sev[0]}</td><td class="muted">${esc(e.ip || '—')}</td><td>${esc(e.msg || '')}${e.path ? ' <span class="muted">· ' + esc(e.path) + '</span>' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="muted">Тихо — сигналов нет</td></tr>';
+}
+document.getElementById('reloadSec')?.addEventListener('click', loadSecurity);
+document.getElementById('clearSec')?.addEventListener('click', async () => { if (confirm('Очистить журнал сигналов безопасности?')) { await api('/api/admin/security/clear', { method: 'POST' }); loadSecurity(); } });
+async function loadAudit() {
+  const r = await api('/api/admin/audit');
+  const fmt = (ts) => new Date(ts).toLocaleString('ru-RU');
+  $('#auditList').innerHTML = (r.audit || []).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="muted">${fmt(a.at)}</span> — <b>${esc(a.action)}</b> ${esc(a.name || a.tid || a.channel || '')}${a.plan ? ' → ' + esc(a.plan) : ''}${a.suspended != null ? ' (' + (a.suspended ? 'приостановлен' : 'включён') + ')' : ''}${a.count != null ? ' · отправлено ' + a.count : ''}</div>`).join('') || '<div class="muted">Пусто</div>';
+}
+document.getElementById('reloadAudit')?.addEventListener('click', loadAudit);
+// переключение полей рассылки
+document.querySelectorAll('input[name=ch]').forEach(r => r.addEventListener('change', () => {
+  const wa = document.querySelector('input[name=ch]:checked').value === 'wa';
+  $('#waFields').style.display = wa ? 'block' : 'none'; $('#emailFields').style.display = wa ? 'none' : 'block';
+}));
+
+let TENANTS = [];
+async function load() {
+  const [st, list] = await Promise.all([api('/api/admin/stats'), api('/api/admin/tenants')]);
+  const plansN = list.plans || {};
+  $('#stats').innerHTML = [
+    ['Агентств', st.tenants], ['Лидов всего', st.leads], ['Брокеров', st.brokers],
+    ['Спящих (>7д)', st.sleeping || 0], ['Приостановлено', st.suspended], ['MRR (оценка)', '$' + (st.mrr || 0)],
+  ].map(([k, v]) => `<div class="stat"><b>${v}</b><i>${k}</i></div>`).join('');
+  TENANTS = list.tenants || [];
+  const planOpts = (cur) => Object.keys(plansN).map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(plansN[k].name)} ($${plansN[k].price})</option>`).join('');
+  $('#tbody').innerHTML = TENANTS.map(t => `<tr data-tid="${esc(t.tid)}">
+    <td><b>${esc(t.name)}</b>${t.verified ? '' : ' <span class="badge">не подтв.</span>'}</td>
+    <td class="muted">${esc(t.ownerEmail || '—')}</td>
+    <td><select class="mini plan">${planOpts(t.plan)}</select></td>
+    <td>${t.leads}</td><td>${t.brokers}</td><td>${t.numbers}</td>
+    <td>${t.suspended ? '<span class="badge bad">приостановлен</span>' : (t.sleeping ? '<span class="badge">спит &gt;7д</span>' : '<span class="badge ok">активен</span>')}${t.onboarded ? '' : ' <span class="badge" title="не прошёл онбординг">новый</span>'}</td>
+    <td class="row" style="gap:6px">
+      <button class="ghost imp">Войти как</button>
+      <button class="ghost susp">${t.suspended ? 'Включить' : 'Приостановить'}</button>
+      ${t.tid === 'primary' ? '' : '<button class="danger del">Удалить</button>'}
+    </td></tr>`).join('') || '<tr><td colspan="8" class="muted">Пока нет агентств</td></tr>';
+  // цели рассылки
+  $('#campTargets').innerHTML = '<option value="all">Всем агентствам (' + TENANTS.length + ')</option>' + TENANTS.map(t => `<option value="${esc(t.tid)}">${esc(t.name)} · ${esc(t.ownerEmail || '')}</option>`).join('');
+  wireRows();
+}
+function wireRows() {
+  document.querySelectorAll('#tbody tr').forEach(tr => {
+    const tid = tr.dataset.tid; if (!tid) return;
+    tr.querySelector('.plan')?.addEventListener('change', async (e) => { await api('/api/admin/tenant/' + tid + '/plan', { method: 'POST', body: JSON.stringify({ plan: e.target.value }) }); load(); });
+    tr.querySelector('.susp')?.addEventListener('click', async () => { const t = TENANTS.find(x => x.tid === tid); await api('/api/admin/tenant/' + tid + '/suspend', { method: 'POST', body: JSON.stringify({ suspended: !t.suspended }) }); load(); });
+    tr.querySelector('.del')?.addEventListener('click', async () => { if (!confirm('Удалить агентство из платформы? Данные (файл БД) останутся на диске как бэкап.')) return; await api('/api/admin/tenant/' + tid, { method: 'DELETE' }); load(); });
+    tr.querySelector('.imp')?.addEventListener('click', async () => { if (!confirm('Войти в кабинет этого агентства под супер-админом? (для поддержки/дебага). Выход — обычная кнопка «Выйти» в кабинете.')) return; await api('/api/admin/tenant/' + tid + '/impersonate', { method: 'POST' }); location.href = '/'; });
+  });
+}
+$('#reload').addEventListener('click', load);
+
+// рассылка
+$('#campSend').addEventListener('click', async () => {
+  const channel = document.querySelector('input[name=ch]:checked').value;
+  const body = $('#campBody').value.trim(); if (!body) { $('#campOut').innerHTML = '<span style="color:var(--bad)">Введите сообщение</span>'; return; }
+  $('#campOut').textContent = 'Отправка…';
+  let payload = { channel, body };
+  if (channel === 'wa') { payload.phones = $('#campPhones').value.split(',').map(s => s.trim()).filter(Boolean); }
+  else { payload.subject = $('#campSubject').value; const tg = $('#campTargets').value; if (tg !== 'all') payload.tenantIds = [tg]; }
+  const r = await api('/api/admin/campaign', { method: 'POST', body: JSON.stringify(payload) });
+  const okN = (r.sent || []).filter(s => s.ok).length;
+  $('#campOut').innerHTML = `<b>Отправлено: ${okN} / ${(r.sent || []).length}</b><br>` + (r.sent || []).map(s => `${esc(s.to || s.email || s.tid)} — ${s.ok ? '<span style="color:var(--good)">ok</span>' : '<span style="color:var(--bad)">' + esc(s.err || 'ошибка') + '</span>'}`).join('<br>');
+});
+
+// автологин если сессия есть
+(async () => { try { await api('/api/admin/stats'); show('app'); load(); } catch (e) { show('login'); } })();
+</script>
+</body>
+</html>

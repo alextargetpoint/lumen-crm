@@ -7315,6 +7315,18 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .gdc-tx i { font-size: 11.5px; font-style: normal; color: var(--ink-3); line-height: 1.4; }
 .gdc-go { flex: none; color: var(--ink-3); opacity: .55; }
 .gdc-go svg { width: 16px; height: 16px; }
+/* публичный справочник: шапка центра + кнопка «поделиться» в гайде */
+.gdc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--accent-soft-bd, var(--stroke)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 6%, var(--bg-2)); font-size: 12.5px; color: var(--ink-2); }
+.gdc-top > span { flex: 1; min-width: 180px; }
+.gdc-pub { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.gdc-pub svg { width: 15px; height: 15px; }
+.gdc-pub:hover { text-decoration: underline; }
+.gd-sharebar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 11px 14px; border: 1px solid var(--stroke); border-radius: 13px; background: var(--bg-2); }
+.gd-sharebar > span { flex: 1; min-width: 160px; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); }
+.gd-sharebar > span svg { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+.gd-share { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--accent-soft-bd, var(--stroke)); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; transition: background .14s; }
+.gd-share:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.gd-share svg { width: 15px; height: 15px; }
 
 /* Персональные окна занятости брокера (busyBlocks) */
 .br-blk-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
@@ -7869,3 +7881,27 @@ body.client-view [data-team]{ display:none !important; }
 
 /* индикатор синка не должен показываться пустым (hidden перебивался display:flex) */
 .ma-sync-status[hidden]{ display:none !important; }
+
+/* провал в лиды из дерева */
+.cta-m-leads{ background:none; border:none; padding:0; cursor:pointer; text-align:right; min-width:44px; font:inherit; }
+.cta-m-leads b{ display:block; font-size:12px; color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums; }
+.cta-m-leads i{ display:block; font-size:8.5px; font-style:normal; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-top:1px; }
+.cta-m-leads:hover b{ text-decoration:underline; }
+.nl-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.nl-stat{ border:1px solid var(--stroke); border-radius:11px; padding:12px; text-align:center; background:var(--bg-2); }
+.nl-stat b{ display:block; font-size:20px; color:var(--ink); }
+.nl-stat span{ font-size:11px; color:var(--muted); }
+.nl-bd{ display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
+.nl-bd-row{ display:flex; align-items:center; gap:9px; font-size:12px; }
+.nl-bd-row span{ flex:0 0 130px; color:var(--ink-2); }
+.nl-bar{ flex:1; height:8px; background:var(--bg-2); border-radius:5px; overflow:hidden; }
+.nl-bar span{ display:block; height:100%; border-radius:5px; }
+.nl-bd-row b{ flex:0 0 auto; font-size:11.5px; color:var(--ink); }
+.nl-list{ display:flex; flex-direction:column; gap:5px; max-height:46vh; overflow-y:auto; }
+.nl-lead{ display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--stroke); border-radius:9px; background:var(--card); cursor:pointer; font-size:12.5px; }
+.nl-lead:hover{ background:var(--bg-2); }
+.nl-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+.nl-lead b{ color:var(--ink); }
+.nl-ph{ flex:1; font-size:11px; }
+.nl-stage{ font-size:10.5px; padding:2px 8px; border-radius:10px; background:var(--bg-2); color:var(--ink-2); }
+.nl-lead i{ font-style:normal; font-size:10.5px; color:var(--muted); }

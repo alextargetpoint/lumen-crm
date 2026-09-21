@@ -171,195 +171,41 @@ window.addEventListener('scroll', (e) => { if (!e.target.closest?.('.hint-pop'))
 /* ═══ ГАЙД-ЦЕНТР: красивые пошаговые инструкции под каждый функционал ═══
    Расширяемо: добавляй ключ в GUIDES и вызывай openGuide('ключ'). Рендерится премиум-модалкой. */
 /* Telegram-гайд: живые телефон-мокапы (рендерятся как чёткие «скриншоты» флоу) */
-const TG_DIAGRAM = `<div class="tgdiag">
-  <div class="tgdiag-node"><div class="ic2">💬</div><b>Клиент</b><small>пишет в WhatsApp</small></div>
-  <div class="tgdiag-arr">⇄</div>
-  <div class="tgdiag-node mid"><div class="ic2">✦</div><b>Lumen</b><small>ИИ + CRM</small></div>
-  <div class="tgdiag-arr">⇄</div>
-  <div class="tgdiag-node"><div class="ic2">📲</div><b>Брокер</b><small>отвечает в Telegram</small></div>
-</div>`;
-const TG_SHOT_FIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot · @lumenmessengerbot</small></div></div><div class="tgph-body"><div class="tg-day">сегодня</div><div class="tg-bub in">Привет! Я мобильный пульт Lumen. Отправьте код брокера, чтобы подключиться.</div><div class="tg-menu">▶ Запустить</div></div></div>`;
-const TG_SHOT_BIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub out"><span class="cmd">/start 4F2K9</span></div><div class="tg-bub in"><span class="ok">✓ Готово.</span> Вы на связи как <b>Алексей</b>. Открываю пульт.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div></div></div>`;
-const TG_SHOT_MENU = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub in">Пульт готов. Нажмите кнопку меню внизу — откроются чаты, лиды и задачи.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div><div class="tg-menu">💬 Чаты</div></div></div>`;
-const TG_SHOT_APP = `<div class="tgph"><div class="tgph-hd"><div class="av">💬</div><div><b>Чаты</b><small>мини-приложение Lumen</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a"></span><span class="m"><b>Марина К.</b><i>Актуальна 2-к в Marina?</i></span><span class="badge2">2</span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Иван С.</b><i>Спасибо, подумаю</i></span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Дмитрий А.</b><i>Пришлите рассрочку</i></span><span class="badge2">1</span></div></div></div>`;
-const GUIDES = {
-  tgsetup: {
-    icon: 'chat', title: 'Telegram-бот: подключение', tagline: 'Пошагово, с экранами — за 3 минуты',
-    intro: 'Telegram-бот <b>@lumenmessengerbot</b> — это карманный пульт брокера: чаты клиентов, лиды, задачи и встречи прямо в телефоне. Ответ брокера из Telegram уходит клиенту в WhatsApp, а входящие клиента появляются у брокера в Telegram. Всё синхронно с десктопом.',
-    diagram: TG_DIAGRAM,
-    sections: [
-      { badge: '1 · Найдите бота', shot: TG_SHOT_FIND, steps: [
-        ['Откройте бота', 'В Telegram найдите <b>@lumenmessengerbot</b> и нажмите «Запустить».'],
-        ['Возьмите код брокера', 'В CRM: <b>Настройки → Мост Telegram</b> — там персональный код каждого брокера.'],
-      ] },
-      { badge: '2 · Привяжите брокера', shot: TG_SHOT_BIND, steps: [
-        ['Отправьте код', 'Брокер пишет боту <code>/start ВАШ_КОД</code>.'],
-        ['Готово', 'Бот подтверждает привязку — брокер на связи, чат Telegram склеен с его лидами.'],
-      ] },
-      { badge: '3 · Откройте пульт', shot: TG_SHOT_MENU, steps: [
-        ['Кнопка меню', 'Синяя кнопка <b>«💬 Чаты»</b> внизу бота открывает мини-приложение.'],
-        ['Мини-апп', 'Это полноценный интерфейс: чаты, лиды, задачи, встречи.'],
-      ] },
-      { badge: '4 · Работа и синхронизация', shot: TG_SHOT_APP, steps: [
-        ['Чаты', 'Живая переписка с клиентами; ответ брокера уходит клиенту в WhatsApp автоматически.'],
-        ['Синхрон с CRM', 'Стадии, заметки, задачи — те же, что на десктопе, в реальном времени.'],
-      ] },
-    ],
-    outro: 'Если брокер отвечает сам — ИИ по этому лиду отключается автоматически, чтобы не было двух голосов. Оформление бота наследует тему из Настройки → Оформление.',
-  },
-  wanumbers: {
-    icon: 'chat', title: 'WhatsApp-номера: свои, по QR', tagline: 'Базовый тариф — до 3 номеров, подключаете сами за 5 минут',
-    intro: 'На базовом тарифе вы используете <b>свои номера</b> — до <b>3 активных</b>. Номера вы заводите и держите на своём телефоне, а к Lumen подключаете по <b>QR-коду</b> (как WhatsApp Web) и ставите на <b>прогрев</b> перед рассылками. Покупка номеров через нас — на старших тарифах; здесь всё в ваших руках.',
-    sections: [
-      { badge: '1 · Где взять 3 активных номера', steps: [
-        ['Android — клон приложения', 'Купите SIM/eSIM нужной страны. В Android включите <b>Dual Apps / Клонирование приложений</b> (или Parallel Space) — получите второй и третий WhatsApp с разными номерами на одном телефоне.'],
-        ['iPhone — 2 аккаунта + Business', 'В самом WhatsApp можно добавить <b>второй аккаунт</b> (Настройки → переключение аккаунтов), плюс отдельно поставить <b>WhatsApp Business</b>. Итого до <b>3 активных</b> аккаунтов на одном iPhone.'],
-        ['Отдельные номера', 'Каждому аккаунту — свой номер (SIM/eSIM/виртуальный, который принимает SMS для регистрации). Один номер = один аккаунт.'],
-      ] },
-      { badge: '2 · Подключение по QR', steps: [
-        ['Откройте в Lumen', '<b>Настройки → WhatsApp (серый способ)</b> → «Добавить номер» → введите номер и метку.'],
-        ['Появится QR-код', 'В телефоне откройте нужный аккаунт WhatsApp → <b>Настройки → Связанные устройства → Привязка устройства</b> → наведите на QR в Lumen.'],
-        ['Готово', 'Номер подключён и виден в списке со статусом «на связи». Так же добавьте второй и третий.'],
-      ] },
-      { badge: '3 · Прогрев перед рассылкой', steps: [
-        ['Поставьте на прогрев', 'Свежий номер сразу в массовую рассылку — прямой путь к бану. Включите <b>прогрев</b>: номера постепенно переписываются между собой, растёт «живая» активность.'],
-        ['Дайте отлежаться', 'Несколько дней прогрева — и номер готов к рассылкам с минимальным риском блокировки.'],
-      ] },
-    ],
-    outro: 'Лимит базового тарифа — <b>3 номера</b>. Нужно больше номеров, официальная «белая» рассылка через WhatsApp Cloud API или покупка номеров прямо в дашборде — это старшие тарифы. Внимание: не рассылайте «в холодную» без прогрева и без согласия — это главный триггер бана номера.',
-  },
-  calendar: {
-    icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
-    intro: 'Lumen сам подбирает клиенту свободное время — но только если знает, когда брокер занят. Дайте системе <b>публичную ICS-ссылку</b> личного календаря (Apple или Google), и занятые часы автоматически исчезнут из предложений. Настраивается один раз за 2 минуты.',
-    sections: [
-      { badge: '🍎 Apple Calendar (iCloud)', steps: [
-        ['Откройте iCloud.com → «Календарь»', 'На компьютере в браузере войдите на <b>icloud.com</b> и откройте раздел «Календарь».'],
-        ['Нажмите «Поделиться» у нужного календаря', 'Наведите на календарь слева → появится значок человечка (общий доступ) → кликните.'],
-        ['Включите «Открытый календарь»', 'Поставьте галочку <b>Public Calendar / Открытый календарь</b>. Появится ссылка вида <code>webcal://…</code>.'],
-        ['Скопируйте ссылку и замените webcal:// на https://', 'Скопируйте ссылку, вставьте в Lumen и в начале поменяйте <code>webcal://</code> на <code>https://</code>.'],
-      ] },
-      { badge: '🗓️ Google Календарь', steps: [
-        ['Откройте настройки нужного календаря', 'В браузере на <b>calendar.google.com</b> наведите на календарь слева → «⋮» → <b>«Настройки и общий доступ»</b>.'],
-        ['Найдите «Интеграция календаря»', 'Прокрутите вниз до раздела <b>«Интеграция календаря»</b>.'],
-        ['Скопируйте «Секретный адрес в формате iCal»', 'Это приватная ссылка (её видите только вы), заканчивается на <code>/basic.ics</code>. Календарь публичным делать НЕ нужно.'],
-        ['Вставьте ссылку в Lumen', 'Вставьте её в поле «Личный календарь» в карточке брокера.'],
-      ] },
-    ],
-    outro: 'После вставки нажмите <b>«Проверить»</b> — Lumen загрузит календарь и покажет, сколько занятых окон нашёл и ближайшее из них. Если видите «✓ нашли N событий» — всё работает, занятое время больше не предложат клиенту.',
-    img: 'assets/guides/cal-field.png',
-  },
-  leads: {
-    icon: 'user', title: 'Лиды и карточка лида', tagline: 'Где живёт клиент и как с ним работать',
-    intro: 'Каждый лид — это карточка со всей историей: переписка, квалификация, задачи, встречи. ИИ ведёт диалог и квалифицирует автоматически, а брокер подключается, когда нужно живое общение.',
-    sections: [
-      { badge: '📋 Воронка', steps: [
-        ['Колонки = стадии', 'Лиды двигаются по стадиям: Новый → Касание → Диалог с ИИ → Квалифицирован → Передан → Показ → Сделка. Перетащите карточку, чтобы сменить стадию.'],
-        ['Фильтры сверху', 'Быстро отберите горячих, просроченных, «ждут менеджера» или по направлению/источнику/брокеру.'],
-        ['Клик по карточке', 'Открывает полную карточку лида.'],
-      ] },
-      { badge: '👤 Карточка лида', steps: [
-        ['Квалификация', 'Цель, сроки, бюджет, тип — ИИ заполняет из переписки, можно поправить вручную.'],
-        ['ИИ вкл/выкл', 'Тумблер «ИИ ведёт диалог»: включён — бот отвечает клиенту сам; выключен — отвечаете вы.'],
-        ['Действия', 'Заметка, назначить встречу, звонок, ИИ-сводка — всё в один тап.'],
-        ['Передать брокеру', 'Смена стадии на «Передан» уведомит брокера и отдаст ему лид.'],
-      ] },
-    ],
-    outro: 'Тот же лид виден в мобильном пульте брокера (Telegram-бот → «Лиды») — данные синхронны с десктопом.',
-  },
-  chains: {
-    icon: 'chain', title: 'Цепочки касаний', tagline: 'Автодожим лидов по расписанию',
-    intro: 'Цепочка — это серия сообщений, которые уходят лиду сами: первое касание, представление брокера, дожимы. Настраивается один раз под направление/гео, дальше работает автоматически.',
-    sections: [
-      { badge: '⚙️ Как настроить', steps: [
-        ['Создайте цепочку', 'Раздел «Цепочки» → новая → выберите гео/направление (или «Все»).'],
-        ['Шаги и тайминги', 'Каждый шаг — сообщение + через сколько после предыдущего отправить (напр. 1-е сразу, 2-е через 3 часа с визиткой брокера).'],
-        ['Активируйте', 'Тумблер «Активна». Лиды по этому направлению будут входить в цепочку автоматически.'],
-      ] },
-      { badge: '▶️ Ручной запуск', steps: [
-        ['Из воронки', 'Выделите лидов → «Запустить цепочку» → по направлению (авто) или конкретную.'],
-        ['Первое касание — сразу', 'Первое сообщение уйдёт в ближайшую минуту, дальше по таймингам.'],
-      ] },
-    ],
-    outro: 'Если лид ответил — ИИ подхватывает диалог, а цепычка-дожим для него останавливается автоматически.',
-  },
-  waagent: {
-    icon: 'chat', title: 'WhatsApp-агент', tagline: 'ИИ отвечает клиентам в WhatsApp от лица агентства',
-    intro: 'Агент читает входящие в WhatsApp, отвечает по вашим скриптам, квалифицирует лида и передаёт брокеру, когда клиент готов. Работает через официальный WhatsApp Cloud API (Meta).',
-    sections: [
-      { badge: '🔌 Подключение (в Настройках)', steps: [
-        ['Мастер подключения', 'Настройки → WhatsApp Cloud API → «Мастер подключения — шаг за шагом».'],
-        ['Данные из Meta', 'Phone Number ID, WABA ID, постоянный System-User токен, App Secret — из Meta Business → WhatsApp → API Setup.'],
-        ['Webhook', 'Вставьте наш webhook-URL и verify-token в Meta → WhatsApp → Configuration, поле подписки: messages.'],
-        ['Боевой режим', 'Включите тумблер — сообщения пойдут через Cloud API (до этого пишутся только в CRM).'],
-      ] },
-    ],
-    outro: 'Каждый диалог виден в «Диалогах» и в карточке лида. Брокер может забрать диалог на себя тумблером «ИИ вкл/выкл».',
-  },
-  mediaplan: {
-    icon: 'chart', title: 'Медиапланы и подрядчики', tagline: 'План/факт по трафику, согласование с подрядчиком',
-    intro: 'Ведите подрядчиков трафика и их медиапланы: план по бюджету/лидам/CPL и факт. Подрядчик по ссылке (без доступа в CRM) сам заполняет или утверждает план — данные автоматически подтягиваются к вам. Позже факт будет подтягиваться из рекламного кабинета Meta автоматически.',
-    sections: [
-      { badge: '🧩 Как вести', steps: [
-        ['Добавьте подрядчика', 'Раздел «Медиапланы» → подрядчик (каналы, гео, контакт).'],
-        ['Создайте медиаплан', 'Период, валюта, план по бюджету/лидам; CPL считается сам.'],
-        ['Ссылка подрядчику', 'Скопируйте ссылку /mp/:id?key= — подрядчик по ней САМ заполнит план (каналы/бюджет/лиды) или утвердит/отклонит. Всё подтянется в CRM.'],
-        ['Факт', 'Вносите факт вручную (или дождитесь авто-синка из Meta — см. дорожную карту).'],
-      ] },
-    ],
-    outro: 'Аналитика по подрядчикам покажет, кто приводит лиды дешевле и качественнее.',
-  },
-  docs: {
-    icon: 'doc', title: 'Документы и КП', tagline: 'Договоры, инвойсы, коммерческие — по ссылке с PIN',
-    intro: 'Собирайте документы из блоков: договор, инвойс, требование оплаты, коммерческое предложение. Клиент открывает по защищённой ссылке с PIN, есть A4-превью и серверный PDF.',
-    sections: [
-      { badge: '📄 Как собрать', steps: [
-        ['Выберите тип', 'Конструктор документов → тип (Договор / Инвойс / Требование оплаты).'],
-        ['Заполните блоки', 'Реквизиты, суммы, строки. Для банк-перевода подставляются нужные реквизиты и Tax ID клиента.'],
-        ['Отправьте клиенту', 'Публичная ссылка + PIN. Клиент видит документ и может скачать PDF.'],
-      ] },
-    ],
-    outro: 'КП собирается так же — из палитры блоков под нишу, с вариантами и ИИ-подсказками.',
-  },
-  botpanel: {
-    icon: 'chat', title: 'Пульт брокера в Telegram', tagline: 'Вся работа с телефона, синхронно с CRM',
-    intro: 'Мини-приложение в Telegram-боте — карманная версия CRM для брокера: чаты клиентов, лиды, задачи и встречи. Всё синхронно с десктопом.',
-    sections: [
-      { badge: '🔗 Подключение', steps: [
-        ['Возьмите код', 'В CRM → Подключения → Мост Telegram — там код брокера.'],
-        ['Напишите боту', 'Брокер отправляет боту «/start ВАШ_КОД» — привязка готова.'],
-        ['Откройте приложение', 'Кнопка «Чаты» у бота открывает мини-приложение.'],
-      ] },
-      { badge: '📱 Разделы', steps: [
-        ['Чаты', 'Живая переписка с клиентами (ответы уходят в WhatsApp), фильтры по стадии/гео/статусу.'],
-        ['Лиды', 'Все ваши лиды по стадиям, тап → полная карточка.'],
-        ['Задачи и Встречи', 'Личные задачи с чек-боксами и расписание встреч по дням; «Подключиться» для видео.'],
-      ] },
-    ],
-    outro: 'Оформление бота — те же фирменные стили, что и на десктопе (Настройки → Оформление).',
-  },
-};
+const GUIDES = (typeof window !== 'undefined' && window.LUMEN_GUIDES) ? window.LUMEN_GUIDES : {};  /* данные гайдов вынесены в guides-data.js — единый источник для in-CRM и публичного /help */
 /* Центр инструкций: грид всех гайдов. Вызов: openGuideCenter() */
 function openGuideCenter() {
-  const order = ['tgsetup', 'wanumbers', 'botpanel', 'leads', 'chains', 'waagent', 'calendar', 'mediaplan', 'docs'];
+  /* порядок = категории публичного справочника (window.LUMEN_HELP), с фолбэком */
+  const cats = (window.LUMEN_HELP && window.LUMEN_HELP.CATEGORIES) || null;
+  const order = cats ? cats.reduce((a, c) => a.concat(c.guides), []) : ['tgsetup', 'botpanel', 'wanumbers', 'wacloud', 'tgchannel', 'telephony', 'waagent', 'leads', 'chains', 'calendar', 'mediaplan', 'docs'];
   const cards = order.filter(k => GUIDES[k]).map(k => { const g = GUIDES[k];
     return `<button class="gdc-card" data-guide="${k}"><span class="gdc-ic">${ic(I[g.icon] || I.doc)}</span><span class="gdc-tx"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span><span class="gdc-go">${ic(I.arrow, 2)}</span></button>`;
   }).join('');
-  const m = modal({ title: 'Инструкции', sub: 'Пошаговые гайды по функциям Lumen', body: `<div class="gdc-grid">${cards}</div>`, wide: true, actions: [{ label: 'Закрыть' }] });
+  const body = `<div class="gdc-top"><span>Эти инструкции доступны публично — отправьте клиенту или брокеру ссылкой.</span><a class="gdc-pub" href="/help" target="_blank" rel="noopener">Открыть справочник ${ic(I.arrow, 2)}</a></div><div class="gdc-grid">${cards}</div>`;
+  const m = modal({ title: 'Инструкции', sub: 'Пошаговые гайды по функциям Lumen', body, wide: true, actions: [{ label: 'Закрыть' }] });
   (m || document).querySelectorAll('.gdc-card').forEach(b => b.addEventListener('click', () => openGuide(b.dataset.guide)));
 }
 window.openGuideCenter = openGuideCenter;
 function openGuide(id) {
   const g = GUIDES[id]; if (!g) return;
+  const pubUrl = location.origin + '/help/' + id;
   const stepCard = (s, i) => `<div class="gd-step"><span class="gd-n">${i + 1}</span><div class="gd-tx"><b>${s[0]}</b><span>${s[1]}</span></div></div>`;
   const secBlock = (sec) => `<div class="gd-sec"><div class="gd-sec-h">${esc(sec.badge)}</div>${sec.steps.map(stepCard).join('')}${sec.shot ? `<div class="gd-shot2">${sec.shot}</div>` : ''}</div>`;
   const body = `<div class="gd">
+    <div class="gd-sharebar"><span>${ic(I.doc, 1.8)}Публичная ссылка на эту инструкцию</span><button type="button" class="gd-share" data-url="${esc(pubUrl)}">${ic(I.copy || I.link || I.doc, 1.8)}<b>Скопировать ссылку</b></button></div>
     <div class="gd-intro">${g.intro}</div>
     ${g.diagram || ''}
     ${(g.sections || []).map(secBlock).join('')}
     ${g.img ? `<div class="gd-shot"><img src="${g.img}" alt="" onerror="this.parentNode.style.display='none'"><span>Поле для ссылки — в карточке брокера</span></div>` : ''}
     ${g.outro ? `<div class="gd-outro">${ic(I.spark, 2)}<span>${g.outro}</span></div>` : ''}
   </div>`;
-  modal({ title: g.title, sub: g.tagline, body, wide: true, actions: [{ label: 'Понятно' }] });
+  const m = modal({ title: g.title, sub: g.tagline, body, wide: true, actions: [{ label: 'Понятно' }] });
+  const sb = (m || document).querySelector('.gd-share');
+  if (sb) sb.addEventListener('click', () => {
+    const u = sb.dataset.url, lbl = sb.querySelector('b');
+    const done = () => { if (lbl) { lbl.textContent = 'Ссылка скопирована ✓'; setTimeout(() => { lbl.textContent = 'Скопировать ссылку'; }, 1800); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(done, () => prompt('Скопируйте ссылку:', u));
+    else prompt('Скопируйте ссылку:', u);
+  });
 }
 window.openGuide = openGuide;
 
@@ -8560,14 +8406,14 @@ PAGES.ads = async (root) => {
         return `<svg class="cta-spark" viewBox="0 0 40 14" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? 'var(--ok)' : 'var(--bad)'}" stroke-width="1.4" opacity=".6"/></svg>`;
       };
       const mtile = (v, lbl, hl) => `<div class="cta-m${hl ? ' hl' : ''}"><b>${v}</b><i>${lbl}</i></div>`;
-      const metrics = (m) => `<span class="cta-metrics">
-        ${mtile(cm(m.spend), 'расход')}${mtile(m.leads, 'лиды')}${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
+      const metrics = (m, ids, title) => `<span class="cta-metrics">
+        ${mtile(cm(m.spend), 'расход')}<button class="cta-m cta-m-leads" data-nodeleads="${(ids || []).join(',')}" data-nodetitle="${esc(title || '')}" title="Показать лиды CRM и их статусы"><b>${m.leads} ↗</b><i>лиды</i></button>${mtile(m.leads ? cm(m.spend / m.leads) : '—', 'CPL', true)}
         ${mtile(m.quals, 'квал')}${mtile(m.quals ? cm(m.spend / m.quals) : '—', 'CPQL', true)}
         ${mtile(m.impr ? (m.clicks / m.impr * 100).toFixed(2) + '%' : '—', 'CTR')}${mtile(m.impr ? cm(m.spend / m.impr * 1000) : '—', 'CPM')}${mtile((m.clicks || 0).toLocaleString('ru-RU'), 'клики')}
       </span>`;
-      const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark(a.m.daily)}${metrics(a.m)}</div>`;
-      const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark(s.m.daily)}${metrics(s.m)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
-      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark(c.m.daily)}${metrics(c.m)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
+      const aRow = (a) => `<div class="cta-row lvl-ad"><span class="cta-caret dim">·</span><span class="cta-name">${esc(a.name || a.adId)}${a.hasCreative ? ' <span class="ct-dot ok" title="креатив"></span>' : ''}</span>${spark(a.m.daily)}${metrics(a.m, [a.adId], a.name || a.adId)}</div>`;
+      const sRow = (s) => `<div class="cta-node"><div class="cta-row lvl-set" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge set">Адсет</span><span class="cta-name">${esc(s.name)}</span>${spark(s.m.daily)}${metrics(s.m, s.ads.map(x => x.adId), s.name)}</div><div class="cta-kids" hidden>${s.ads.map(aRow).join('')}</div></div>`;
+      const cRow = (c) => `<div class="cta-node"><div class="cta-row lvl-camp" data-ctacoll><span class="cta-caret">▸</span><span class="cta-badge camp">Кампания</span><span class="cta-name">${esc(c.name)}</span>${spark(c.m.daily)}${metrics(c.m, c.adsets.flatMap(a => a.ads.map(x => x.adId)), c.name)}</div><div class="cta-kids" hidden>${c.adsets.map(sRow).join('')}</div></div>`;
       /* сигналы оптимизации: CPL сильно выше среднего, CTR<0.5%, квалов 0 при заметном расходе */
       const T = treeD.totals || { spend: 0, leads: 0 }; const avgCpl = T.leads ? T.spend / T.leads : 0;
       const signals = [];
@@ -8576,7 +8422,7 @@ PAGES.ads = async (root) => {
         if (m.impr > 3000 && (m.clicks / m.impr) < 0.005) signals.push(`«${c.name}»: CTR ${(m.clicks / m.impr * 100).toFixed(2)}% — низкий`);
         if (m.spend > (T.spend / Math.max(1, treeD.tree.length)) && !m.quals) signals.push(`«${c.name}»: расход ${cm(m.spend)} без квалов`);
       }
-      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · чистый открут (без налога) · <span class="mp-good">сходится со сводкой ✓</span></span></div>`;
+      const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · <span class="mp-good">сходится со сводкой ✓</span></span><button class="btn btn-sm" id="ctaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>`;
       const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}" data-team>${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
       const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}Кабинет</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}Креативы</button></span>`;
 
@@ -8741,6 +8587,8 @@ PAGES.ads = async (root) => {
   /* дерево кабинета: переключение режима + сворачивание узлов */
   $$('[data-ctmode]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.ctMode = b.dataset.ctmode; render(); }));
   $$('[data-ctacoll]', root).forEach(r => r.addEventListener('click', () => { const kids = r.parentElement.querySelector('.cta-kids'); if (kids) { kids.hidden = !kids.hidden; r.classList.toggle('open', !kids.hidden); } }));
+  $$('[data-nodeleads]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openNodeLeads(b.dataset.nodeleads || '', b.dataset.nodetitle || ''); }));
+  $('#ctaCollapseAll', root) && $('#ctaCollapseAll', root).addEventListener('click', () => { const exp = $$('.cta-kids:not([hidden])', root).length > 0; $$('.cta-kids', root).forEach(k => k.hidden = exp); $$('[data-ctacoll]', root).forEach(r => r.classList.toggle('open', !exp)); $('#ctaCollapseAll', root).textContent = exp ? 'Развернуть всё' : 'Свернуть всё'; });
   $$('[data-ctsave]', root).forEach(b => b.addEventListener('click', async () => {
     const ad = b.dataset.ctsave; const box = b.closest('.ct-ad');
     const url = box.querySelector('.ct-media').value.trim();
@@ -9458,6 +9306,27 @@ async function openContractorsModal() {
   }));
 }
 /* создать/редактировать одного подрядчика; onDone(savedCt) */
+/* Провал в лиды по узлу дерева: список пришедших на связку/адсет/кампанию лидов + статусы + % разбивка. */
+async function openNodeLeads(ids, title) {
+  const extra = adRangeQS(); const qs = '?adIds=' + encodeURIComponent(ids) + (extra ? '&' + extra.slice(1) : '');
+  const bd = modal({ title: 'Лиды: ' + (title || 'связка'), sub: 'кто пришёл и на какой стадии', wide: true, body: '<div id="nlBox" class="muted" style="padding:14px">Загрузка…</div>', actions: [{ label: 'Закрыть' }] });
+  let d = { leads: [], breakdown: {}, total: 0, quals: 0, stageNames: {} };
+  try { d = await api.get('/ads/leads' + qs); } catch (e) {}
+  const box = $('#nlBox', bd); if (!box) return;
+  const conv = d.total ? Math.round(d.quals / d.total * 100) : 0;
+  const stName = (s) => (d.stageNames && d.stageNames[s]) || stageName(s) || s;
+  const stCol = (s) => STAGE_COLORS[s] || 'var(--accent)';
+  const bdHtml = Object.entries(d.breakdown || {}).sort((a, b) => b[1] - a[1]).map(([s, n]) => `<div class="nl-bd-row"><span>${esc(stName(s))}</span><i class="nl-bar"><span style="width:${d.total ? Math.round(n / d.total * 100) : 0}%;background:${stCol(s)}"></span></i><b>${n} · ${d.total ? Math.round(n / d.total * 100) : 0}%</b></div>`).join('');
+  const listHtml = (d.leads || []).map(l => `<div class="nl-lead" data-nlid="${esc(l.id)}"><span class="nl-dot" style="background:${stCol(l.stage)}"></span><b>${esc(l.name)}</b><span class="muted nl-ph">${esc(l.phone || '')}</span><span class="nl-stage">${esc(stName(l.stage))}</span><i>${l.createdAt ? tmm(l.createdAt) : ''}</i></div>`).join('')
+    || '<div class="empty" style="padding:22px;text-align:center">Лидов по этой связке в CRM пока нет.<br><span class="muted" style="font-size:11px">Лиды CRM приходят через приём (Albato). Число «лиды» в дереве — из кабинета Meta (лид-формы), это не то же самое, что карточки CRM.</span></div>';
+  box.classList.remove('muted'); box.style.padding = '0';
+  box.innerHTML = `<div class="nl-stats"><div class="nl-stat"><b>${d.total}</b><span>лидов CRM</span></div><div class="nl-stat"><b>${d.quals}</b><span>квал</span></div><div class="nl-stat"><b class="accent">${conv}%</b><span>конв. в квал</span></div></div>
+    ${bdHtml ? `<div class="nl-bd">${bdHtml}</div>` : ''}
+    <div class="lp-sec" style="margin:12px 0 6px">Список лидов${d.total ? ` · ${d.total}` : ''}</div>
+    <div class="nl-list">${listHtml}</div>`;
+  $$('[data-nlid]', bd).forEach(r => r.addEventListener('click', () => { closeModal && closeModal(); openLeadModal(r.dataset.nlid); }));
+}
+
 /* Настройка: какие стадии CRM считать «квалифицированным лидом» (аналитика Факт квал берёт отсюда). */
 function openQualStages(onDone) {
   const stages = (STAGES._all || STAGES || []).filter(s => s && s.id);

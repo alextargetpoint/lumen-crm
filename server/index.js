@@ -49,6 +49,7 @@ const playbook = require('./playbook');
 const academy = require('./academy'); /* Академия продаж (методология Ольги Синенко): курс + оценка звонка + советы */
 const billing = require('./billing');
 const invoicepdf = require('./invoicepdf');
+const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
 
 /* Стартовые WhatsApp-шаблоны первого касания. Тело = фикс-текст + {{1}},
@@ -3520,6 +3521,21 @@ const server = http.createServer(async (req, res) => {
       catch (e) { res.writeHead(404); res.end('not found'); }
       return;
     }
+    /* ---------------- публичный справочник (help center), без авторизации ---------------- */
+    if ((p === '/help' || p.startsWith('/help/')) && req.method === 'GET') {
+      const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0] || ((req.headers.host || '').includes('localhost') ? 'http' : 'https');
+      const base = (process.env.PUBLIC_BASE_URL || (proto + '://' + (req.headers.host || 'app.lumen247.com'))).replace(/\/$/, '');
+      let html = null;
+      try {
+        if (p === '/help' || p === '/help/') html = helpcenter.renderLanding(base);
+        else if (p.startsWith('/help/c/')) html = helpcenter.renderCategory(decodeURIComponent(p.slice('/help/c/'.length).replace(/\/$/, '')), base);
+        else { const slug = decodeURIComponent(p.slice('/help/'.length).replace(/\/$/, '')); if (slug && !slug.includes('/')) html = helpcenter.renderArticle(slug, base); }
+      } catch (e) { html = null; }
+      if (html) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' }); res.end(html); return; }
+      /* неизвестная статья/категория → лендинг справочника (200, чтобы битая ссылка не давала пустоту) */
+      res.writeHead(302, { Location: '/help' }); res.end(); return;
+    }
+
     /* data deletion callback (Meta signed_request) — авто-обработка запроса на удаление */
     if ((p === '/data-deletion' && req.method === 'POST') || p === '/data-deletion/callback') {
       const b = await readBody(req).catch(() => ({}));
@@ -9160,6 +9176,21 @@ ${SCR}
       const totals = mk(); for (const c of tree) { totals.spend += c.m.spend; totals.leads += c.m.leads; totals.leadsCRM += c.m.leadsCRM; totals.quals += c.m.quals; totals.clicks += c.m.clicks; totals.impr += c.m.impr; for (const p of (c.m.daily || [])) totals.dmap[p.d] = (totals.dmap[p.d] || 0) + p.spend; }
       finish(totals);
       return json(res, 200, { tree, totals, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
+    }
+    /* лиды CRM по узлу дерева (объявление/адсет/кампания) — для провала «сколько лидов → кто они + статусы» */
+    if (p === '/api/ads/leads' && req.method === 'GET') {
+      const ids = (u.searchParams.get('adIds') || '').split(',').map(s => s.trim()).filter(Boolean);
+      const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
+      const idset = new Set(ids.map(String));
+      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
+      const namesCfg = (db.settings.stagesCfg && db.settings.stagesCfg.names) || {};
+      const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+      const leads = db.leads.filter(l => l.ads && idset.has(String(l.ads.adId)) && inR(l))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .map(l => ({ id: l.id, name: l.name, phone: l.phone, stage: l.stage, geo: l.geo, createdAt: l.createdAt, broker: l.broker }));
+      const breakdown = {}; for (const l of leads) breakdown[l.stage] = (breakdown[l.stage] || 0) + 1;
+      const quals = leads.filter(l => QUAL.includes(l.stage)).length;
+      return json(res, 200, { leads, total: leads.length, quals, breakdown, stageNames: namesCfg, qualStages: QUAL });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);
