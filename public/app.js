@@ -10865,6 +10865,188 @@ const CH_GUIDES = {
   ]],
 };
 
+/* ── Полная иллюстрированная инструкция «WhatsApp по QR» ──────────────────────
+   Со «скриншот-подобными» мокапами экранов (точные формулировки меню, тема-aware,
+   без внешних PNG), разбором Android-эмуляторов и их клонированием, антибан-
+   правилами и разделом частых проблем. Заменяет короткий chGuideCard для канала gray. */
+function waQrGuideRich() {
+  /* мокап экрана телефона: список строк меню (hl — подсвеченная) */
+  const phone = (title, rows, foot) => `<div class="wag-phone">
+    <div class="wag-ph-bar"><span>9:41</span><span class="wag-ph-sig">▪▪▪ ▪ ▮</span></div>
+    <div class="wag-ph-hd"><span class="wag-ph-back">‹</span>${title}</div>
+    <div class="wag-ph-body">${rows.map(r => `<div class="wag-mrow ${r.hl ? 'hl' : ''}">
+      <span class="wag-mic">${r.ic || ''}</span>
+      <span class="wag-mtx"><b>${r.t}</b>${r.d ? `<i>${r.d}</i>` : ''}</span>
+      ${r.hl ? '<span class="wag-mgo">→</span>' : ''}
+    </div>`).join('')}</div>
+    ${foot ? `<div class="wag-ph-foot">${foot}</div>` : ''}
+  </div>`;
+  /* мокап окна эмулятора / менеджера инстансов */
+  const win = (title, bodyHtml) => `<div class="wag-win">
+    <div class="wag-win-bar"><span class="wag-win-dots"><i></i><i></i><i></i></span>${title}</div>
+    <div class="wag-win-body">${bodyHtml}</div>
+  </div>`;
+  const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
+  const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
+
+  /* ── три экрана пути «свой номер по QR» ── */
+  const pathQR = `<div class="wag-shots">
+    ${phone('Настройки', [
+      { ic: '👤', t: 'Аккаунт', d: 'приватность, безопасность' },
+      { ic: '🔗', t: 'Связанные устройства', d: 'WhatsApp Web / компьютер', hl: true },
+      { ic: '💬', t: 'Чаты', d: 'тема, обои, история' },
+      { ic: '🔔', t: 'Уведомления' },
+    ])}
+    ${phone('Связанные устройства', [
+      { ic: '➕', t: 'Привязка устройства', d: 'откроется сканер QR', hl: true },
+      { ic: '💻', t: 'Устройств пока нет', d: 'здесь появятся сессии' },
+    ], 'Сессия живёт ~14 дней без телефона — заходите с телефона хотя бы раз в 2 недели.')}
+    ${phone('Сканер', [
+      { ic: '🎯', t: 'Наведите камеру на QR', d: 'QR-код показан в Lumen', hl: true },
+    ], 'Готово — номер «на связи», переписка идёт через Lumen.')}
+  </div>
+  <div class="wag-cap">Путь в приложении: <b>WhatsApp → ⋮ / Настройки → Связанные устройства → Привязка устройства</b> → навести на QR из Lumen.</div>`;
+
+  /* ── таблица эмуляторов ── */
+  const emus = [
+    ['BlueStacks 5', 'Windows / macOS', 'Самый популярный, лёгкий старт. Multi-Instance Manager из коробки, поддержка виртуальной камеры (подать QR картинкой).', 'Multi-Instance Manager (Ctrl+Shift+8)'],
+    ['LDPlayer 9', 'Windows', 'Быстрый, «Мультиплеер» + синхронизатор действий на все окна. Хорош, когда номеров много.', 'LD Multi-Player → «Новый» / «Клонировать»'],
+    ['NoxPlayer', 'Windows / macOS', 'Стабильный, есть Multi-Drive для клонов. Встроенная эмуляция GPS/гео.', 'Multi-Drive → Add / Clone'],
+    ['MEmu Play', 'Windows', 'Лёгкий по ресурсам, простой Multiple Instance Manager.', 'Multiple Instance Manager → New / Clone'],
+    ['Genymotion', 'Windows / macOS / Linux', 'Профессиональный (для разработчиков), тонкая настройка версии Android, IMEI, гео. Платный для бизнеса.', 'Каждый «virtual device» = отдельный инстанс'],
+  ];
+  const emuTable = `<div class="wag-emutbl">
+    <div class="wag-etr wag-eth"><span>Эмулятор</span><span>ОС</span><span>Чем хорош</span><span>Клонирование</span></div>
+    ${emus.map(e => `<div class="wag-etr"><span data-l="Эмулятор"><b>${e[0]}</b></span><span data-l="ОС">${e[1]}</span><span data-l="Чем хорош">${e[2]}</span><span data-l="Клонирование">${e[3]}</span></div>`).join('')}
+  </div>`;
+
+  /* ── мокап менеджера инстансов ── */
+  const cloneWin = win('BlueStacks · Multi-Instance Manager', `
+    <div class="wag-inst"><span class="wag-idot on"></span><b>Broker 1</b><i>WhatsApp · +34 6•• •• •• 01</i><span class="wag-ibadge">запущен</span></div>
+    <div class="wag-inst"><span class="wag-idot on"></span><b>Broker 2</b><i>WhatsApp · +34 6•• •• •• 02</i><span class="wag-ibadge">запущен</span></div>
+    <div class="wag-inst"><span class="wag-idot"></span><b>Broker 3</b><i>WhatsApp · +971 5•• •• •• 03</i><span class="wag-ibadge off">остановлен</span></div>
+    <div class="wag-inst wag-iaction"><span class="wag-iplus">＋</span>Новый инстанс&nbsp;&nbsp;·&nbsp;&nbsp;⧉ Клонировать выбранный</div>`);
+
+  const faq = [
+    ['QR не сканируется в эмуляторе — где взять камеру?', 'Сохраните QR из Lumen как картинку (правый клик → «Сохранить изображение»). В эмуляторе при сканировании выберите «виртуальная камера» и подгрузите файл: BlueStacks — Настройки → Камера → выбрать изображение; LDPlayer/Nox — включить виртуальную камеру и указать картинку. Либо откройте QR на втором экране/телефоне и наведите реальную веб-камеру.'],
+    ['Пишет «Устройство отключилось»', 'Linked-сессия живёт ~14 дней без основного WhatsApp. Телефон или эмулятор, где номер зарегистрирован как основной, должен периодически (раз в 1–2 недели) выходить онлайн. Держите инстанс запущенным или заходите вручную.'],
+    ['Код (OTP) не пришёл в ленту', 'Проверьте вкладку «Активация / коды» на карточке номера. Если пусто 2–3 минуты — запросите код повторно в WhatsApp, попробуйте «Позвонить» вместо SMS. Виртуальные номера некоторых стран капризны — при повторных неудачах смените страну номера.'],
+    ['Номер сразу забанили / «нет на связи»', 'Свежий номер нельзя грузить объёмом. Сначала прогрев 2–3 недели (тумблер выше, ≥2 номера), затем ≤5 новых лидов/день. Массовые первые касания — только Cloud API. Забаненный номер уходит в карантин, трафик — на резерв.'],
+    ['Один эмулятор — два WhatsApp?', 'В одном инстансе можно держать обычный WhatsApp + WhatsApp Business (два номера). Больше — только через отдельные инстансы (клоны). Для чистоты и антибана: 1 инстанс = 1 рабочий номер.'],
+    ['Нужен ли отдельный IP/прокси на номер?', 'Желательно для новых виртуальных: 10 номеров с одного домашнего IP = маркер фермы. Ставьте на инстанс резидентный прокси страны номера, согласованный часовой пояс и язык интерфейса. Свой личный номер по QR в прокси не нуждается.'],
+  ];
+
+  const body = `<div class="wag">
+    <div class="wag-lead">Два способа подключить WhatsApp к Lumen. Выберите по ситуации — оба ведут к одному: переписка с лидами идёт из CRM, а сообщения физически уходят с реального WhatsApp-аккаунта.</div>
+
+    <div class="wag-paths">
+      <div class="wag-path">
+        <div class="wag-ptag">Путь A · быстрый</div>
+        <div class="wag-pt">Свой номер по QR</div>
+        <div class="wag-pd">Как WhatsApp Web. Ничего не покупаете, телефон уже с вами. 2 минуты.</div>
+        <div class="wag-pmeta">Бесплатно · нужен телефон с этим WhatsApp</div>
+      </div>
+      <div class="wag-path">
+        <div class="wag-ptag alt">Путь B · на телефоне</div>
+        <div class="wag-pt">Несколько номеров на одном Android</div>
+        <div class="wag-pd">До 4 рабочих номеров на одном телефоне без сторонних приложений, дальше — через клонирование WhatsApp.</div>
+        <div class="wag-pmeta">Нужен Android-телефон · номера свои или виртуальные</div>
+      </div>
+      <div class="wag-path">
+        <div class="wag-ptag alt">Путь C · на ПК</div>
+        <div class="wag-pt">Виртуальный номер + эмулятор</div>
+        <div class="wag-pd">Рабочие номера в Android-эмуляторе на компьютере — личный телефон свободен, десятки инстансов.</div>
+        <div class="wag-pmeta">≈ $9/мес аренда номера · нужен эмулятор на ПК</div>
+      </div>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('A', 'Свой номер по QR — как WhatsApp Web', 'Самый быстрый путь. Подходит, если рабочая переписка идёт с вашего личного номера.')}
+      <ol class="wag-ol">
+        <li>В CRM нажмите <b>«Подключить свой (QR)»</b> — откроется QR-код.</li>
+        <li>На телефоне: <b>WhatsApp → ⋮ (Меню) / Настройки → Связанные устройства → Привязка устройства</b>.</li>
+        <li>Наведите камеру телефона на QR-код в Lumen. Через пару секунд номер станет <b>«на связи»</b>.</li>
+      </ol>
+      ${pathQR}
+      ${call('tip', 'Совет', 'Один WhatsApp-аккаунт живёт на одном устройстве. Нужно несколько рабочих номеров на одном телефоне — путь B. Не хотите занимать телефон вовсе — путь C (эмулятор на ПК).')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('B', 'Сколько номеров помещается на один Android', 'Развилка по количеству. До 4 номеров — штатными приложениями, после 4-го — через клонирование WhatsApp.')}
+      <p class="wag-p">В каждом официальном приложении WhatsApp можно держать <b>два аккаунта</b>. Приложений два — обычный WhatsApp и WhatsApp Business — значит <b>до 4 номеров на одном телефоне без сторонних приложений</b>. Пятый и дальше — только через клонирование.</p>
+      <div class="wag-ladder">
+        <div class="wag-lstep"><div class="wag-lnum">1–2</div><div class="wag-lbody"><b>Один WhatsApp</b><span>Обычный WhatsApp: <b>Настройки → нажать на своё имя вверху / стрелку → «Добавить аккаунт»</b>. Два номера в одном приложении.</span></div></div>
+        <div class="wag-lstep"><div class="wag-lnum">3–4</div><div class="wag-lbody"><b>+ WhatsApp Business</b><span>Поставьте ещё и WhatsApp Business — в нём тоже <b>2 аккаунта</b>. Итого 2 + 2 = <b>4 номера</b> на одном телефоне, всё официально, без риска.</span></div></div>
+        <div class="wag-lstep alt"><div class="wag-lnum">5+</div><div class="wag-lbody"><b>Клонирование WhatsApp</b><span>Для 5-го и дальше нужен клон приложения — отдельная копия WhatsApp со своим номером.</span></div></div>
+      </div>
+      ${call('info', 'Чем клонировать WhatsApp (5-й номер и дальше)', '<b>Встроенное клонирование телефона</b> (бесплатно, надёжнее всего): Samsung — Настройки → «Дополнительные функции → <b>Dual Messenger</b>»; Xiaomi/Redmi — «Приложения → <b>Клонирование приложений</b>»; OnePlus/Oppo/Realme — «<b>Parallel Apps / Клонирование приложений</b>»; Huawei — «<b>Приложение-двойник</b>». Если встроенного нет — сторонние: <b>Island</b>, <b>App Cloner</b>, <b>Parallel Space</b>, <b>Dual Space</b>. ⚠️ Каждый клон = ещё один WhatsApp: держите <b>1 клон = 1 номер</b> и не набивайте телефон десятками — для объёма надёжнее эмулятор на ПК (путь C).')}
+      ${call('warn', 'Ограничение', 'Клоны и мультиаккаунт съедают память и батарею телефона; при 6–8 номерах телефон начинает тормозить и WhatsApp-и вылетают. Нужно много номеров под команду брокеров — переходите на эмулятор с инстансами (путь C).')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('C', 'Виртуальный номер + Android-эмулятор (на ПК)', 'Рабочие номера под брокеров без личного телефона. WhatsApp регистрируем в эмуляторе Android на компьютере — десятки изолированных инстансов.')}
+      <div class="wag-sub">Шаг 1. Купите виртуальный номер</div>
+      <p class="wag-p">В CRM: <b>«Купить номер»</b> → выберите страну → оплата спишется с баланса расходников (аренда ≈ $9/мес). Номер сразу начинает ловить SMS-коды (OTP) прямо в ленту CRM — вкладка <b>«Активация / коды»</b> на карточке номера.</p>
+
+      <div class="wag-sub">Шаг 2. Установите WhatsApp через Android-эмулятор</div>
+      <p class="wag-p">WhatsApp «живёт» на одном устройстве. Чтобы не держать рабочий номер на личном телефоне, ставим WhatsApp в <b>эмуляторе Android на ПК</b> — это виртуальный телефон в окне. Он принимает OTP и становится «основным» устройством номера, а Lumen цепляется к нему по QR как связанное устройство.</p>
+      ${emuTable}
+      ${call('info', 'Что выбрать', '<b>BlueStacks 5</b> — если делаете это впервые (проще всего, есть виртуальная камера для QR). <b>LDPlayer 9</b> — если номеров много и нужна лёгкая работа с десятком окон.')}
+
+      <div class="wag-sub">Шаг 3. Клонирование: несколько номеров = несколько инстансов</div>
+      <p class="wag-p">Каждый рабочий номер = <b>отдельный инстанс</b> (клон) эмулятора со своим WhatsApp. Один инстанс на один номер — так аккаунты не пересекаются и меньше риск бана.</p>
+      ${cloneWin}
+      <div class="wag-clones">
+        <div class="wag-clone"><b>BlueStacks 5</b><span>Откройте <span class="wag-kbd">Ctrl</span>+<span class="wag-kbd">Shift</span>+<span class="wag-kbd">8</span> (Multi-Instance Manager) → <b>«Новый инстанс»</b> (Fresh, напр. Android 11/Pie) или <b>«Клонировать»</b> готовый. Каждое окно — отдельный телефон с отдельным WhatsApp.</span></div>
+        <div class="wag-clone"><b>LDPlayer 9</b><span>Иконка <b>«LD Multi-Player»</b> на рабочем столе → <b>«Новый эмулятор»</b> или <b>«Клонировать»</b>. Есть синхронизатор — но для WhatsApp работайте в каждом окне отдельно.</span></div>
+        <div class="wag-clone"><b>NoxPlayer</b><span><b>Multi-Drive</b> (в меню инструментов) → <b>«Add emulator»</b> / <b>«Clone»</b>. Встроенная эмуляция GPS помогает совместить гео с номером.</span></div>
+        <div class="wag-clone"><b>MEmu Play</b><span><b>Multiple Instance Manager</b> → <b>«New»</b> / <b>«Clone»</b>. Лёгкий по ресурсам — тянет несколько окон на среднем ПК.</span></div>
+      </div>
+      ${call('warn', 'Изоляция и антибан для клонов', '<b>1 инстанс = 1 номер.</b> Для новых виртуальных номеров: на каждый инстанс — <b>резидентный прокси страны номера</b>, согласованный <b>часовой пояс и язык</b> интерфейса. 10 номеров с одного домашнего IP = маркер фермы аккаунтов → бан. Личный номер по пути A прокси не требует.')}
+
+      <div class="wag-sub">Шаг 4. Зарегистрируйте WhatsApp на номер</div>
+      <p class="wag-p">В инстансе эмулятора установите WhatsApp (Play Market или APK), введите купленный номер. Код подтверждения придёт <b>в ленту OTP в CRM</b> («Активация / коды») — введите его в WhatsApp внутри эмулятора. Аккаунт готов.</p>
+
+      <div class="wag-sub">Шаг 5. Подключите номер к Lumen по QR</div>
+      <p class="wag-p">В CRM нажмите <b>«Подключить свой (QR)»</b> → введите этот номер → появится QR. В WhatsApp эмулятора: <b>Настройки → Связанные устройства → Привязка устройства</b> → отсканируйте QR.</p>
+      ${call('tip', 'Как навести «камеру» эмулятора на QR', 'В эмуляторе нет реальной камеры. Сохраните QR из Lumen картинкой и подайте её как <b>виртуальную камеру</b>: BlueStacks — Настройки → Камера → выбрать изображение; LDPlayer/Nox — включить виртуальную камеру и указать файл. Либо откройте QR на телефоне/втором мониторе и наведите веб-камеру.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('D', 'Профиль номера', 'Оформите аккаунт до начала переписки — так он выглядит живым.')}
+      <p class="wag-p">Кнопка <b>«Профиль»</b> на карточке номера: имя (≤25 симв.), описание/статус, аватар. Всё синхронизируется в реальный WhatsApp-аккаунт. Полный профиль <b>до</b> первого трафика снижает риск бана.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('E', 'Прогрев (обязательно для новых номеров)', 'Свежий номер нельзя сразу грузить объёмом — это главный маркер бота.')}
+      <p class="wag-p">Включите тумблер <b>прогрева</b> выше (нужно <b>≥2 подключённых номера</b>). Они начинают аккуратно переписываться между собой с задержками, как живые люди, поднимая доверие 2–3 недели.</p>
+      <div class="wag-ramp">
+        <div class="wag-rc"><b>Дни 1–3</b><span>~3–5 контактов/день</span></div>
+        <div class="wag-rc"><b>Неделя 1–2</b><span>+~20% в неделю</span></div>
+        <div class="wag-rc"><b>После прогрева</b><span>рабочий лимит ≤5 новых лидов/день</span></div>
+      </div>
+      ${call('danger', 'Резкий объём = бан', 'Не начинайте с рассылок и десятков первых сообщений на новом номере. Рост должен быть плавным.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('F', 'Правила безопасности', 'Соблюдайте — иначе номера отлетают в бан.')}
+      <ul class="wag-rules">
+        <li><b>1 брокер = 1 личный номер.</b> Больше номеров = больше новых лидов в день без риска.</li>
+        <li><b>≤5 новых лидов/день на номер.</b> Действующие диалоги — без лимита.</li>
+        <li><b>Массовые рассылки с личных номеров запрещены.</b> Холодные первые касания — только через <b>Cloud API</b> (официальный канал, шаблоны).</li>
+        <li><b>Inbound-first:</b> в идеале первым пишет клиент (реклама CTWA / Lead Form дают согласие на диалог).</li>
+      </ul>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('?', 'Частые проблемы', 'Быстрые ответы на то, что чаще всего идёт не так.')}
+      <div class="wag-faq">${faq.map(f => `<details class="wag-fq"><summary>${f[0]}</summary><div class="wag-fa">${f[1]}</div></details>`).join('')}</div>
+    </div>
+  </div>`;
+
+  return `<div class="glass card mb">${coll('Инструкция: WhatsApp по QR — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
+}
+
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
@@ -10974,7 +11156,7 @@ PAGES.numbers = async (root) => {
       <div class="form-row" style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="margin:0">Сообщений в день на номер</label><input id="numWarmPerDay" type="number" min="2" max="60" value="${w.perDay || 16}" style="width:90px"><button class="btn btn-sm" id="numWarmNow" title="Отправить обмен прямо сейчас (для проверки)">${ic(I.bolt)}Прогреть сейчас</button></div>
       <div id="warmLive">${warmLiveHtml(w)}</div>
     </div>`; })() : ''}
-    ${chGuideCard(CH_GUIDES.gray[0], CH_GUIDES.gray[1])}
+    ${waQrGuideRich()}
     </div>
 
     <div data-numpane="tg" style="${NUMTAB === 'tg' ? '' : 'display:none'}">
