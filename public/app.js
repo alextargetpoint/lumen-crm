@@ -8544,9 +8544,10 @@ PAGES.ads = async (root) => {
               <label class="map-chip"><input type="checkbox" data-mapf="geo"> geo</label>
             </div>
             <div class="map-custom">
-              <div class="map-block-hd"><span>Кастомные поля (своё имя → значение из формы)</span><button class="btn btn-sm" id="mapAddCustom">${ic(I.plus)}Добавить поле</button></div>
+              <div class="map-block-hd"><span>Кастомные поля (поле карточки лида ← значение из формы)</span><button class="btn btn-sm" id="mapAddCustom">${ic(I.plus)}Добавить поле</button></div>
+              <datalist id="mapCfList">${(STATE.settings.customFields || []).map(f => `<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('')}</datalist>
               <div id="mapCustomRows"></div>
-              <div class="muted" style="font-size:10px;margin-top:3px">Например: <code>budget</code> ← «Бюджет», <code>utm_source</code> ← «UTM». Попадёт в карточку лида (доп. поля). В JSON уходит как <code>custom_имя</code>.</div>
+              <div class="muted" style="font-size:10px;margin-top:3px">Слева — <b>поле карточки лида</b> (выберите из ваших доп-полей или впишите новое), справа — как оно называется в форме Meta. Данные лягут в это поле карточки. Доп-поля настраиваются в карточке лида / Настройках.</div>
             </div>
             <div class="map-block">
               <div class="map-block-hd"><span>Тело запроса (JSON) — вставить в действие Webhook интегратора</span><button class="btn btn-sm" id="mapCopyJson">${ic(I.copy)}Копировать</button></div>
@@ -8652,7 +8653,7 @@ PAGES.ads = async (root) => {
   };
   const addCustomRow = (k, v) => {
     const box = $('#mapCustomRows', root); if (!box) return;
-    const rw = el(`<div class="map-crow" data-custrow><input data-custkey placeholder="имя поля (budget)" value="${esc(k || '')}"><span class="map-carrow">←</span><input data-custval placeholder="значение из формы (Бюджет)" value="${esc(v || '')}"><button class="btn btn-sm" data-custdel title="Убрать">${ic(I.x)}</button></div>`);
+    const rw = el(`<div class="map-crow" data-custrow><input data-custkey list="mapCfList" placeholder="поле карточки (budget)" value="${esc(k || '')}"><span class="map-carrow">←</span><input data-custval placeholder="значение из формы (Бюджет)" value="${esc(v || '')}"><button class="btn btn-sm" data-custdel title="Убрать">${ic(I.x)}</button></div>`);
     box.appendChild(rw);
     rw.querySelectorAll('input').forEach(i => i.addEventListener('input', rebuildMap));
     rw.querySelector('[data-custdel]').addEventListener('click', () => { rw.remove(); rebuildMap(); });
