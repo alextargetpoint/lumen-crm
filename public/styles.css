@@ -7407,6 +7407,8 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .bc-sub{ font-size:10.5px; font-weight:700; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em; margin:2px 0 4px; }
 
 /* ===== Центр уведомлений (колокол в шапке) ===== */
+.tb-theme{ display:grid; place-items:center; width:38px; height:38px; border-radius:10px; border:1px solid var(--stroke); background:var(--card,transparent); color:var(--ink-2); cursor:pointer; font-size:17px; line-height:1; transition:border-color .15s, color .15s, background .15s; }
+.tb-theme:hover{ color:var(--accent,#c8a86a); border-color:var(--accent,#c8a86a); }
 .tb-bell-wrap{ position:relative; }
 .tb-bell{ position:relative; display:grid; place-items:center; width:38px; height:38px; border-radius:10px; border:1px solid var(--stroke); background:var(--card,transparent); color:var(--ink-2); cursor:pointer; transition:border-color .15s, color .15s, background .15s; }
 .tb-bell:hover{ color:var(--ink); border-color:var(--accent,#c8a86a); }

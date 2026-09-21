@@ -88,6 +88,54 @@ function verifyPassword(pw, stored) {
     return sha(String(pw)) === stored; /* legacy SHA256 */
   } catch (e) { return false; }
 }
+/* ===== Вход/активация по КОДУ из письма (6 цифр) — безопасно =====
+   Код: 6 цифр, хранится ТОЛЬКО как sha256(email|code|salt) в реестре, одноразовый, TTL 10 мин, ≤5 попыток.
+   Никогда не логируем и не отдаём код клиенту (только письмом). Анти-enumeration — на уровне эндпоинта. */
+function _emailCodeHash(email, code) { return crypto.createHash('sha256').update(String(email) + '|' + String(code) + '|' + (process.env.CODE_SALT || 'lumen-code-salt-v1')).digest('hex'); }
+function issueEmailCode(reg, email) {
+  reg.emailCodes = reg.emailCodes || {};
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  reg.emailCodes[email] = { hash: _emailCodeHash(email, code), exp: Date.now() + 10 * 60e3, tries: 0, at: Date.now() };
+  store.saveRegistry();
+  return code;
+}
+function checkEmailCode(reg, email, code) {
+  reg.emailCodes = reg.emailCodes || {};
+  const rec = reg.emailCodes[email];
+  if (!rec) return { ok: false, error: 'Код не запрошен или уже использован' };
+  if (Date.now() > rec.exp) { delete reg.emailCodes[email]; store.saveRegistry(); return { ok: false, error: 'Код истёк — запросите новый' }; }
+  if ((rec.tries || 0) >= 5) { delete reg.emailCodes[email]; store.saveRegistry(); return { ok: false, error: 'Слишком много попыток — запросите новый код' }; }
+  rec.tries = (rec.tries || 0) + 1; store.saveRegistry();
+  const want = Buffer.from(rec.hash), got = Buffer.from(_emailCodeHash(email, String(code || '').trim()));
+  const ok = want.length === got.length && crypto.timingSafeEqual(want, got);
+  if (!ok) return { ok: false, error: 'Неверный код' };
+  delete reg.emailCodes[email]; store.saveRegistry();   /* одноразовый */
+  return { ok: true };
+}
+/* найти аккаунт по e-mail: владелец (byEmail) или брокер (скан тенантов). Возвращает {tid, role, brokerId} | null */
+function resolveEmailAccount(reg, email) {
+  const otid = reg.byEmail[email];
+  if (otid && store.listTenants().includes(otid)) return { tid: otid, role: 'owner', brokerId: null };
+  for (const tid of store.listTenants()) {
+    let hit = null;
+    store.runInTenant(tid, () => { const br = (store.get().brokers || []).find(x => x.email && x.email.toLowerCase() === email && x.active !== false); if (br) hit = { tid, role: 'broker', brokerId: br.id }; });
+    if (hit) return hit;
+  }
+  return null;
+}
+/* создать сессию для аккаунта (owner/broker) в тенанте + реестре; вернуть sid */
+function mkTenantSession(reg, acct, req) {
+  const sid = crypto.randomBytes(16).toString('hex');
+  store.runInTenant(acct.tid, () => {
+    const tdb = store.get();
+    tdb.settings.auth = tdb.settings.auth || {}; tdb.settings.auth.sessions = tdb.settings.auth.sessions || {};
+    tdb.settings.auth.sessions[sid] = { at: Date.now(), role: acct.role, brokerId: acct.brokerId || undefined, ip: clientIp(req), ua: req.headers['user-agent'] || '', lastSeen: Date.now() };
+    const keys = Object.keys(tdb.settings.auth.sessions); if (keys.length > 20) delete tdb.settings.auth.sessions[keys[0]];
+    store.saveNow();
+  });
+  reg.sessions[sid] = { tid: acct.tid, at: Date.now() }; store.saveRegistry();
+  return sid;
+}
 /* SaaS: тарифные планы (лимиты работают без Stripe; оплата подключится позже) */
 const PLANS = {
   trial: { name: 'Триал', maxBrokers: 3, maxLeads: 300, maxNumbers: 1, price: 0 },
@@ -4442,6 +4490,50 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---------------- auth ---------------- */
+    /* запросить код на почту (вход или активация). Анти-enumeration: ответ всегда одинаковый. */
+    if (p === '/auth/code/request' && req.method === 'POST') {
+      const b = await readBody(req);
+      const email = String(b.email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(res, 400, { error: 'нужен корректный e-mail' });
+      const ip = clientIp(req);
+      if (rateLimited('codereq-ip:' + ip, 12, 3600e3)) { await new Promise(r => setTimeout(r, 500)); return json(res, 429, { error: 'слишком много запросов, подождите' }); }
+      if (rateLimited('codereq-em:' + email, 1, 55e3)) return json(res, 429, { error: 'код уже отправлен — подождите минуту' });
+      const reg = store.getRegistry();
+      const acct = resolveEmailAccount(reg, email);
+      let _devCode = null;
+      if (acct) {
+        const code = issueEmailCode(reg, email);
+        if (process.env.DEV_SHOW_CODE === '1') _devCode = code;   /* ТОЛЬКО для локальных тестов; в проде env не задан */
+        try {
+          let sendCfg = null; const plat = mailer.platformEmailCfg(reg); if (plat && plat.key) sendCfg = plat;
+          if (!sendCfg) store.runInTenant(acct.tid, () => { const ec = (store.get().settings.channels && store.get().settings.channels.email) || {}; if (ec.key && ec.from) sendCfg = { key: ec.key, from: ec.from }; });
+          if (sendCfg) {
+            const panel = mailer.emailPanel(`<div style="font-size:15px;font-weight:700;margin:0 0 8px">Код для входа в Lumen</div><div style="font-size:34px;font-weight:800;letter-spacing:.18em;font-family:ui-monospace,monospace;color:#1A1815;margin:8px 0">${code}</div><div style="font-size:13px;color:#6C665C">Код действует 10 минут и подходит один раз. Если вы не запрашивали вход — просто проигнорируйте это письмо.</div>`, '#A98748');
+            const html = mailer.emailWrap('Код входа', panel, 'ru', { preheader: 'Ваш код: ' + code });
+            await mailer.sendViaResend(sendCfg, email, 'Код входа в Lumen', html);
+          }
+        } catch (e) {}
+      }
+      return json(res, 200, _devCode ? { ok: true, devCode: _devCode } : { ok: true });   /* всегда одинаково — не раскрываем, есть ли аккаунт (devCode только при DEV_SHOW_CODE) */
+    }
+    /* проверить код → создать сессию (вход) + пометить e-mail подтверждённым (активация) */
+    if (p === '/auth/code/verify' && req.method === 'POST') {
+      const b = await readBody(req);
+      const email = String(b.email || '').trim().toLowerCase();
+      const code = String(b.code || '').trim();
+      const ip = clientIp(req);
+      if (rateLimited('codever:' + ip + ':' + email, 15, 15 * 60e3)) { await new Promise(r => setTimeout(r, 800)); return json(res, 429, { error: 'слишком много попыток, подождите' }); }
+      const reg = store.getRegistry();
+      const chk = checkEmailCode(reg, email, code);
+      if (!chk.ok) { await new Promise(r => setTimeout(r, 400)); return json(res, 401, { error: chk.error }); }
+      const acct = resolveEmailAccount(reg, email);
+      if (!acct) { await new Promise(r => setTimeout(r, 400)); return json(res, 401, { error: 'аккаунт не найден' }); }
+      if (acct.role === 'owner' && reg.tenants[acct.tid]) { reg.tenants[acct.tid].verified = true; store.saveRegistry(); }
+      const sid = mkTenantSession(reg, acct, req);
+      const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
+      res.end(JSON.stringify({ ok: true })); return;
+    }
     if (p === '/auth/login' && req.method === 'POST') {
       const b = await readBody(req);
       /* SaaS: вход по e-mail → резолвим тенанта по реестру, проверяем пароль в ЕГО контексте */
@@ -4578,21 +4670,28 @@ const server = http.createServer(async (req, res) => {
       reg.verifs[vtok] = { tid, email, at: Date.now() };
       reg.sessions[sid] = { tid, at: Date.now() };
       store.saveRegistry();
-      /* welcome-письмо в Atelier-шаблоне (платформенный Resend) — best-effort; кнопка = подтвердить e-mail + войти */
+      /* АКТИВАЦИЯ по КОДУ (6 цифр). Если письмо ушло — сессию НЕ выдаём: клиент вводит код (double opt-in).
+         Если почта не настроена (нет платформенного/тенантского Resend) — фолбэк на авто-вход, чтобы НЕ запереть аккаунт. */
+      let codeSent = false;
       try {
-        const plat = mailer.platformEmailCfg(reg);
-        if (plat.key) {
-          const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, '');
-          const wl = mailer.renderTemplate(reg, 'welcome', { name: agencyName || 'коллега', agency: agencyName || 'ваше агентство', link: base + '/auth/verify?token=' + vtok, buttonLabel: 'Подтвердить e-mail и войти' }, 'ru');
-          await mailer.sendViaResend(plat, email, wl.subject, wl.html);
-        } else {
-          /* фолбэк: если платформенный ключ не задан, а у тенанта есть свой Resend — плейн-подтверждение */
-          await store.runInTenant(tid, async () => { const tdb = store.get(); const ec = (tdb.settings.channels && tdb.settings.channels.email) || {}; if (ec.key && ec.from) { const base = (global.LUMEN_BASE || ('http://localhost:' + (process.env.PORT || 5077))).replace(/\/$/, ''); await mailer.sendViaResend({ key: ec.key, from: ec.from }, email, 'Подтвердите e-mail — Lumen', `<p>Подтвердите адрес, чтобы активировать аккаунт:</p><p><a href="${base}/auth/verify?token=${vtok}">Подтвердить e-mail</a></p>`); } });
+        let sendCfg = null; const plat = mailer.platformEmailCfg(reg); if (plat && plat.key) sendCfg = plat;
+        if (sendCfg) {
+          const code = issueEmailCode(reg, email);
+          const panel = mailer.emailPanel(`<div style="font-size:16px;font-weight:700;margin:0 0 6px">Добро пожаловать в Lumen${agencyName ? ', ' + esc(agencyName) : ''}</div><div style="font-size:13px;color:#6C665C;margin-bottom:10px">Введите этот код, чтобы активировать аккаунт и продолжить настройку:</div><div style="font-size:34px;font-weight:800;letter-spacing:.18em;font-family:ui-monospace,monospace;color:#1A1815;margin:6px 0">${code}</div><div style="font-size:12px;color:#9C958A;margin-top:8px">Код действует 10 минут.</div>`, '#A98748');
+          const html = mailer.emailWrap('Активация аккаунта', panel, 'ru', { preheader: 'Код активации: ' + code });
+          await mailer.sendViaResend(sendCfg, email, 'Активация аккаунта Lumen', html);
+          codeSent = true;
         }
-      } catch (e) {}
+      } catch (e) { codeSent = false; }
       const secure = /https/.test(req.headers['x-forwarded-proto'] || '') ? '; Secure' : '';
+      if (codeSent) {
+        /* ждём подтверждения кодом — сессию выдаст /auth/code/verify */
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, needsCode: true, email, tid })); return;
+      }
+      /* фолбэк: почта не настроена → авто-вход (без запирания аккаунта) */
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `lumen_sid=${sid}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax${secure}` });
-      res.end(JSON.stringify({ ok: true, tid })); return;
+      res.end(JSON.stringify({ ok: true, tid, needsCode: false })); return;
     }
     /* подтверждение e-mail по ссылке из письма */
     if (p === '/auth/verify' && req.method === 'GET') {

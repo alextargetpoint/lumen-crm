@@ -1080,7 +1080,8 @@ function renderLogin() {
       <label id="regConsent" style="display:none;font-size:11px;color:var(--ink-2,#57544e);margin-top:11px;text-align:left;gap:8px;align-items:flex-start;line-height:1.45"><input type="checkbox" id="agreeTerms" style="margin-top:2px;flex:0 0 auto;width:15px;height:15px"><span>${t('Регистрируясь, я принимаю','By signing up, I accept the')} <a href="/terms.html" target="_blank" style="color:var(--accent,#1a1815)">${t('Условия','Terms')}</a>, <a href="/privacy.html" target="_blank" style="color:var(--accent,#1a1815)">${t('Политику конфиденциальности','Privacy Policy')}</a> ${t('и','and')} <a href="/dpa.html" target="_blank" style="color:var(--accent,#1a1815)">DPA</a>.</span></label>
       <div id="loginErr" style="font-size:12px;min-height:18px;margin-top:8px;color:var(--bad,#a9564a)"></div>
       <button id="loginBtn" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:2px">${t('Войти','Sign in')}</button>
-      <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:12px">${t('Вход владельца — по паролю или e-mail','Owner sign-in — by password or email')}</div>
+      <div id="codeLoginLink" style="font-size:12.5px;color:var(--accent,#1a1815);margin-top:14px;cursor:pointer;font-weight:600">${t('Войти по коду из почты','Sign in with an email code')}</div>
+      <div id="loginHint" style="font-size:11px;color:var(--ink-3,#8b8983);margin-top:10px">${t('Вход владельца — по паролю или e-mail','Owner sign-in — by password or email')}</div>
       <div id="forgotLink" style="font-size:11px;color:var(--accent,#1a1815);margin-top:8px;cursor:pointer;text-decoration:underline">${t('Забыли пароль?','Forgot password?')}</div>
     </div>
   </div>`);
@@ -1094,6 +1095,7 @@ function renderLogin() {
     $('#tabReg').style.color = m === 'register' ? 'var(--card)' : 'var(--ink-2)';
     $('#regAgency').style.display = m === 'register' ? 'block' : 'none';
     $('#regConsent').style.display = m === 'register' ? 'flex' : 'none';
+    { const cl = $('#codeLoginLink'), fl = $('#forgotLink'); if (cl) cl.style.display = m === 'login' ? 'block' : 'none'; if (fl) fl.style.display = m === 'login' ? 'block' : 'none'; }
     $('#loginBtn').textContent = m === 'register' ? t('Создать аккаунт', 'Create account') : t('Войти', 'Sign in');
     $('#loginHint').textContent = m === 'register' ? t('Новое агентство — отдельный изолированный аккаунт', 'A new agency is a separate, isolated account') : t('Вход владельца — по паролю или e-mail', 'Owner sign-in — by password or email');
     $('#loginErr').textContent = '';
@@ -1113,7 +1115,8 @@ function renderLogin() {
         if (!$('#agreeTerms') || !$('#agreeTerms').checked) return void ($('#loginErr').textContent = 'Примите Условия и Политику конфиденциальности');
         const r = await fetch('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, agency, consent: true }) });
         const j = await r.json().catch(() => ({}));
-        if (r.ok) location.reload(); else $('#loginErr').textContent = j.error || 'Не удалось зарегистрировать';
+        if (r.ok) { if (j.needsCode) openCodeWindow(email, { title: t('Активируйте аккаунт', 'Activate your account'), sub: t('Мы отправили код активации на', 'We sent an activation code to') }); else location.reload(); }
+        else $('#loginErr').textContent = j.error || 'Не удалось зарегистрировать';
       } else {
         const r = await fetch('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(email ? { email, password } : { password }) });
         if (r.ok) location.reload(); else $('#loginErr').textContent = 'Неверный e-mail или пароль';
@@ -1127,7 +1130,64 @@ function renderLogin() {
     if (!email) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = 'Впишите e-mail выше, затем «Забыли пароль?»'; return; }
     try { await fetch('/auth/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); $('#loginErr').style.color = '#8fd39a'; $('#loginErr').textContent = 'Если такой e-mail есть — ссылка для сброса отправлена на почту.'; } catch (e) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = 'Сеть недоступна'; }
   });
+  $('#codeLoginLink')?.addEventListener('click', async () => {
+    const email = $('#loginEmail').value.trim();
+    if (!email) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = t('Впишите e-mail выше — пришлём код', 'Enter your e-mail above — we\'ll send a code'); return; }
+    const link = $('#codeLoginLink'); const old = link.textContent; link.textContent = t('Отправляем…', 'Sending…'); link.style.pointerEvents = 'none';
+    try { await fetch('/auth/code/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); openCodeWindow(email, { title: t('Вход по коду', 'Sign in with a code'), sub: t('Если аккаунт есть, код отправлен на', 'If an account exists, a code was sent to') }); }
+    catch (e) { $('#loginErr').style.color = '#f28b8b'; $('#loginErr').textContent = t('Сеть недоступна', 'Network error'); }
+    link.textContent = old; link.style.pointerEvents = '';
+  });
   $('#loginPass').focus();
+}
+
+/* Кастомное окно ввода 6-значного кода (вход/активация) — стиль Ателье, авто-переход между полями, вставка, ресенд */
+function openCodeWindow(email, opts) {
+  opts = opts || {};
+  const prev = document.getElementById('codeWin'); if (prev) prev.remove();
+  const box = el(`<div id="codeWin" style="position:fixed;inset:0;z-index:400;display:grid;place-items:center;background:rgba(20,19,17,.55);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)">
+    <div style="position:relative;width:410px;max-width:calc(100vw - 40px);padding:38px 32px;border-radius:20px;background:var(--card,#faf9f5);border:1px solid var(--stroke,rgba(20,19,17,.13));box-shadow:0 40px 90px -24px rgba(53,50,44,.42);text-align:center;animation:reveal .55s var(--ease-spring,ease) both">
+      <div style="width:54px;height:54px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent,#a98748) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent,#a98748) 42%,transparent);color:var(--accent,#a98748)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+      <div style="font-family:'Cormorant',Georgia,serif;font-size:27px;font-weight:600;color:var(--ink,#141311);line-height:1.1">${opts.title || t('Проверьте почту', 'Check your email')}</div>
+      <div style="font-size:13px;color:var(--ink-2,#57544e);margin:8px 0 22px;line-height:1.5">${opts.sub || t('Мы отправили 6-значный код на', 'We sent a 6-digit code to')} <b style="color:var(--ink,#141311)">${esc(email)}</b></div>
+      <div id="codeInputs" style="display:flex;gap:8px;justify-content:center;margin-bottom:4px">
+        ${Array.from({ length: 6 }).map((_, i) => `<input class="code-d" data-i="${i}" maxlength="1" inputmode="numeric" autocomplete="${i === 0 ? 'one-time-code' : 'off'}" style="width:44px;height:56px;text-align:center;font-size:24px;font-weight:700;border:1px solid var(--stroke,rgba(20,19,17,.16));border-radius:12px;background:var(--bg-2,rgba(255,255,255,.6));color:var(--ink,#141311);outline:none;transition:border-color .15s">`).join('')}
+      </div>
+      <div id="codeErr" style="font-size:12px;min-height:18px;margin-top:8px;color:var(--bad,#a9564a)"></div>
+      <button id="codeSubmit" class="btn btn-accent" style="width:100%;justify-content:center;height:46px;font-size:14px;margin-top:8px">${t('Подтвердить', 'Confirm')}</button>
+      <div style="font-size:11.5px;color:var(--ink-3,#8b8983);margin-top:16px">${t('Не пришёл код?', 'No code?')} <span id="codeResend" style="color:var(--accent,#1a1815);cursor:pointer;text-decoration:underline">${t('Отправить ещё раз', 'Resend')}</span> · <span id="codeBack" style="color:var(--ink-3,#8b8983);cursor:pointer">${t('назад', 'back')}</span></div>
+    </div></div>`);
+  document.body.appendChild(box);
+  const ins = [...box.querySelectorAll('.code-d')];
+  const cErr = box.querySelector('#codeErr'), cBtn = box.querySelector('#codeSubmit');
+  const getCode = () => ins.map(i => i.value).join('');
+  let busy = false;
+  const submit = async () => {
+    if (busy) return; const code = getCode();
+    if (code.length !== 6) { cErr.style.color = 'var(--bad,#a9564a)'; cErr.textContent = t('Введите 6 цифр', 'Enter 6 digits'); return; }
+    busy = true; cBtn.textContent = t('Проверяю…', 'Checking…'); cErr.textContent = '';
+    try {
+      const r = await fetch('/auth/code/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { cBtn.textContent = t('Готово', 'Done'); location.reload(); }
+      else { busy = false; cBtn.textContent = t('Подтвердить', 'Confirm'); cErr.style.color = 'var(--bad,#a9564a)'; cErr.textContent = j.error || t('Неверный код', 'Wrong code'); ins.forEach(i => i.value = ''); ins[0].focus(); }
+    } catch (e) { busy = false; cBtn.textContent = t('Подтвердить', 'Confirm'); cErr.textContent = t('Сеть недоступна', 'Network error'); }
+  };
+  ins.forEach((inp, idx) => {
+    inp.addEventListener('focus', () => { inp.style.borderColor = 'var(--accent,#a98748)'; });
+    inp.addEventListener('blur', () => { inp.style.borderColor = 'var(--stroke,rgba(20,19,17,.16))'; });
+    inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 1); if (inp.value && idx < 5) ins[idx + 1].focus(); if (getCode().length === 6) submit(); });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Backspace' && !inp.value && idx > 0) ins[idx - 1].focus(); if (e.key === 'Enter') submit(); });
+    inp.addEventListener('paste', (e) => { const d = ((e.clipboardData || {}).getData ? e.clipboardData.getData('text') : '').replace(/\D/g, '').slice(0, 6); if (d) { e.preventDefault(); d.split('').forEach((c, k) => { if (ins[k]) ins[k].value = c; }); (ins[Math.min(d.length, 5)] || ins[5]).focus(); if (d.length === 6) submit(); } });
+  });
+  cBtn.addEventListener('click', submit);
+  box.querySelector('#codeResend').addEventListener('click', async () => {
+    cErr.style.color = 'var(--ink-3,#8b8983)'; cErr.textContent = t('Отправляем…', 'Sending…');
+    try { await fetch('/auth/code/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); cErr.style.color = '#5a9d6a'; cErr.textContent = t('Код отправлен', 'Code sent'); }
+    catch (e) { cErr.style.color = 'var(--bad,#a9564a)'; cErr.textContent = t('Не отправилось', 'Failed'); }
+  });
+  box.querySelector('#codeBack').addEventListener('click', () => box.remove());
+  ins[0].focus();
 }
 
 /* ---------- время ---------- */
