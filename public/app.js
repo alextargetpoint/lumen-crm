@@ -11370,9 +11370,10 @@ function metaCabGuide() {
   const sysWin = brw('Business Settings › Пользователи › System Users › Generate token', `
     ${mf('System User', 'agency-integration · Admin', false)}
     ${mf('Приложение', 'Agency CRM', false)}
+    ${mf('Assets', 'приложение + рекламный аккаунт + Страница (Full control)', true)}
     ${mf('Срок токена (expiration)', 'Never — бессрочный', true)}
-    ${mf('Права', 'ads_read · leads_retrieval', true)}
-    ${mf('+ для лид-форм', 'pages_read_engagement · pages_manage_ads', false)}
+    ${mf('Права (расход/кампании)', 'ads_read', false)}
+    ${mf('Права (лиды из форм)', 'ads_management · leads_retrieval · pages_show_list · pages_read_engagement · pages_manage_ads', true)}
     <div class="wag-winbtns"><span class="wag-buybtn">Generate token</span></div>`);
 
   const idWin = brw('Meta Ads Manager › выбор аккаунта', `
@@ -11380,8 +11381,8 @@ function metaCabGuide() {
     <div class="wag-shopnote">ID виден в выпадающем списке аккаунтов и в адресной строке Ads Manager (<code>…?act=1234567890</code>).</div>`);
 
   const faq = [
-    ['Нужно ли проходить App Review в Meta?', 'Для System User токена, который работает <b>в пределах вашего же бизнеса</b> (ваш рекламный аккаунт + ваша страница), права ads_read / leads_retrieval обычно доступны как <b>Advanced Access</b> без ревью. Ревью нужен, только если приложение обслуживает чужие бизнесы.'],
-    ['Лиды не тянутся, а расход тянется', 'Расходу хватает <b>ads_read</b>, а лидам нужны <b>leads_retrieval</b> + доступ к <b>Странице</b> формы. Проверьте: System User добавлен на Страницу (Add assets → Pages → Full control) и у токена есть pages_read_engagement.'],
+    ['Нужно ли проходить App Review в Meta?', 'Для чтения <b>в пределах своего</b> бизнеса — нет: <b>leads_retrieval</b> и page-права доступны администраторам/разработчикам/тестировщикам приложения без ревью (роль в App → Roles). <b>App Review</b> (Advanced Access) нужен, если приложение будет тянуть лиды для <b>чужих</b> бизнесов/клиентов.'],
+    ['Лиды не тянутся, а расход тянется', 'Расходу хватает <b>ads_read</b>. Лидам нужен полный набор: <b>ads_management · leads_retrieval · pages_show_list · pages_read_engagement · pages_manage_ads</b>, плюс <b>Страница</b> назначена System User (Add assets → Pages → Full control) и выпустивший токен имеет на Странице задачу <b>ADVERTISE</b>. Если чего-то нет — Meta молча вернёт пусто.'],
     ['«Invalid OAuth access token»', 'Токен временный (из API Setup, живёт 24 ч) или с недостающими правами. Сгенерируйте <b>постоянный</b> токен System User (expiration Never) с нужными правами и вставьте заново.'],
     ['Где взять сам Ad account ID', 'Meta Ads Manager → выпадающий список аккаунтов, либо Business Settings → Рекламные аккаунты. Вид <code>act_1234567890</code>. В Lumen можно вставить и просто цифры — префикс <code>act_</code> подставится сам.'],
     ['Карта обязательна?', 'Для чтения данных (расход/лиды) — нет. Но чтобы кампании реально крутились и был расход, к рекламному аккаунту должна быть привязана карта (Business Settings → Billing / Payment methods).'],
@@ -11405,7 +11406,7 @@ function metaCabGuide() {
 
     <div class="wag-sec">
       ${secH('3', 'Страница Facebook агентства', 'Нужна для лид-форм (Lead Ads) — без неё лиды не тянутся.')}
-      <p class="wag-p">Business Settings → <b>Аккаунты → Страницы</b> → добавьте существующую или создайте страницу агентства. Лид-формы принадлежат именно Странице, и токену нужен доступ к ней.</p>
+      <p class="wag-p">Business Settings → <b>Аккаунты → Страницы</b> → добавьте существующую или создайте страницу агентства. Лид-формы принадлежат именно <b>Странице</b>. Человек, который выпустит токен, должен иметь на Странице задачу <b>ADVERTISE</b> (роль администратора/рекламодателя), иначе Meta не отдаст лиды.</p>
     </div>
 
     <div class="wag-sec">
@@ -11415,10 +11416,11 @@ function metaCabGuide() {
     </div>
 
     <div class="wag-sec">
-      ${secH('5', 'Системный пользователь и постоянный токен', 'Главный шаг. Токен = связка приложение + аккаунт + страница.')}
-      <p class="wag-p">Business Settings → <b>Пользователи → System Users</b> → создайте юзера (роль Admin) → <b>Add assets</b>: приложение + рекламный аккаунт + Страница, все с <b>Full control</b>. Затем <b>Generate token</b>.</p>
+      ${secH('5', 'Системный пользователь и постоянный токен', 'Главный шаг. Токен = связка приложение + рекламный аккаунт + Страница.')}
+      <p class="wag-p">Business Settings → <b>Пользователи → System Users</b> → создайте юзера (роль Admin) → <b>Add assets</b>: приложение + рекламный аккаунт + <b>Страница</b>, все с <b>Full control</b>. Затем <b>Generate token</b> и отметьте права.</p>
       ${sysWin}
-      ${call('danger', 'Права и срок — критично', 'Обязательно: <b>ads_read</b> (расход/кампании) и <b>leads_retrieval</b> (лиды), для лид-форм ещё <b>pages_read_engagement</b>, <b>pages_manage_ads</b>. Срок — <b>Never</b>. Токен показывается <b>один раз</b> — скопируйте сразу.')}
+      ${call('danger', 'Права — по документации Meta (2025)', 'Для <b>расхода/кампаний</b> достаточно <b>ads_read</b>. Для <b>лидов из лид-форм</b> нужен полный набор: <b>ads_management</b>, <b>leads_retrieval</b>, <b>pages_show_list</b>, <b>pages_read_engagement</b>, <b>pages_manage_ads</b> (+ <b>pages_manage_metadata</b>, если используете вебхуки). Срок — <b>Never</b>. Токен показывается <b>один раз</b>.')}
+      ${call('warn', 'Не видите «leads_retrieval» в списке прав?', 'Это разрешение появляется в диалоге токена, только если у приложения есть к нему доступ. В пределах <b>своего</b> бизнеса оно доступно администраторам/разработчикам/тестировщикам приложения без App Review. Если права нет — либо добавьте себя в роли приложения (developers.facebook.com → App → Roles), либо оформите <b>App Review</b> (Advanced Access) на <b>leads_retrieval</b> + <b>pages_manage_ads</b>. Как запасной путь — используйте <b>Page access token</b> от админа Страницы с задачей ADVERTISE (у Page-токена лучше лимиты).')}
     </div>
 
     <div class="wag-sec">

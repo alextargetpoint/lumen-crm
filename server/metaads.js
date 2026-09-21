@@ -2,8 +2,11 @@
    В отличие от CAPI (capi.js — отправка событий В Meta) — этот модуль ТЯНЕТ данные ИЗ кабинета:
    • Insights (расход / кампании / adsets / объявления / креативы) → в db.ads (без ручного spend и CSV);
    • Lead Ads (лиды из лид-форм) → в db.leads (без Albato/интегратора).
-   Работает через официальный Graph API. Токен — постоянный (System User) с правами
-   ads_read + leads_retrieval. Хранится как секрет (в state не отдаётся).
+   Работает через официальный Graph API. Токен — постоянный (System User) или Page access token.
+   Права (по докам Meta 2025): Insights → ads_read; Lead Ads → ads_management + leads_retrieval +
+   pages_show_list + pages_read_engagement + pages_manage_ads (+ pages_manage_metadata для вебхуков).
+   Выпустивший токен должен иметь на Странице задачу ADVERTISE, Страница назначена System User.
+   Хранится как секрет (в state не отдаётся).
 
    Зависимости из index.js передаются через deps (без циклических require):
      deps = { matchAd(db,lead), nextId(prefix), pushEvent(db,{type,leadId,text}), save() }  */
