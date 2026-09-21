@@ -8511,6 +8511,11 @@ PAGES.ads = async (root) => {
               <label class="map-chip"><input type="checkbox" data-mapf="source" checked> source</label>
               <label class="map-chip"><input type="checkbox" data-mapf="geo"> geo</label>
             </div>
+            <div class="map-custom">
+              <div class="map-block-hd"><span>Кастомные поля (своё имя → значение из формы)</span><button class="btn btn-sm" id="mapAddCustom">${ic(I.plus)}Добавить поле</button></div>
+              <div id="mapCustomRows"></div>
+              <div class="muted" style="font-size:10px;margin-top:3px">Например: <code>budget</code> ← «Бюджет», <code>utm_source</code> ← «UTM». Попадёт в карточку лида (доп. поля). В JSON уходит как <code>custom_имя</code>.</div>
+            </div>
             <div class="map-block">
               <div class="map-block-hd"><span>Тело запроса (JSON) — вставить в действие Webhook интегратора</span><button class="btn btn-sm" id="mapCopyJson">${ic(I.copy)}Копировать</button></div>
               <pre class="map-code" id="mapJson"></pre>
@@ -9008,7 +9013,8 @@ PAGES.mediaplan = async (root) => {
     <div class="mp-toolbar">
       <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
       <button class="btn" id="mpContractors">${ic(I.users)}Подрядчики <span class="muted">· ${contractors.length}</span></button>
-      <div class="mp-hint muted">${ic(I.spark)}Факт вносится вручную. Синхронизация из рекламного кабинета — в следующей фазе.</div>
+      <button class="btn" id="mpDirMap">${ic(I.target)}Направления <span class="muted">· ${dirList.length}</span></button>
+      <div class="mp-hint muted">${ic(I.spark)}Факт из кабинета Meta сводится по направлениям. Сопоставьте кампании кнопкой «Направления».</div>
     </div>
     ${cmpRows.length > 1 ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}Сравнение подрядчиков<span class="sub">план vs факт · CPL</span></div>
@@ -9070,6 +9076,7 @@ PAGES.mediaplan = async (root) => {
   $('#mpNew', root) && $('#mpNew', root).addEventListener('click', openNew);
   $('#mpNew2', root) && $('#mpNew2', root).addEventListener('click', openNew);
   $('#mpContractors', root).addEventListener('click', () => openContractorsModal());
+  $('#mpDirMap', root) && $('#mpDirMap', root).addEventListener('click', () => openDirMap(() => render()));
 
   $$('[data-mpopen]', root).forEach(b => b.addEventListener('click', () => openMpBuilder(plans.find(x => x.id === b.dataset.mpopen), contractors)));
   $$('[data-mpshare]', root).forEach(b => b.addEventListener('click', () => {
@@ -9103,14 +9110,18 @@ PAGES.mediaplan = async (root) => {
 function openMpBuilder(mp, contractors) {
   const isNew = !mp;
   mp = mp || { id: null, contractorId: (contractors[0] || {}).id || null, title: '', period: { from: '', to: '' }, currency: 'USD', status: 'draft', lines: [], note: '' };
+  const DIRS = STATE.settings.adDirections || [];
+  const dirSel = (v) => `<select class="li" data-k="direction"><option value="">— направление</option>${DIRS.map(d => `<option value="${esc(d.key)}" ${d.key === v ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`;
   const lineRow = (ln) => {
     ln = ln || {};
     return `<tr data-lrow data-lid="${esc(ln.id || '')}" data-note="${esc(ln.note || '')}">
       <td><input class="li" data-k="channel" list="mpChList" value="${esc(ln.channel || '')}" placeholder="Meta"></td>
       <td><input class="li" data-k="geo" value="${esc(ln.geo || '')}" placeholder="dubai"></td>
+      <td>${dirSel(ln.direction || '')}</td>
       <td><input class="li" data-k="bundle" value="${esc(ln.bundle || '')}" placeholder="Связка / креатив → цель"></td>
       <td><input class="li num" data-k="budgetPlan" type="number" min="0" value="${ln.budgetPlan || ''}" placeholder="0"></td>
       <td><input class="li num" data-k="leadsPlan" type="number" min="0" value="${ln.leadsPlan || ''}" placeholder="0"></td>
+      <td><input class="li num" data-k="qualPlan" type="number" min="0" value="${ln.qualPlan || ''}" placeholder="0"></td>
       <td class="mp-cpl" data-cpl>—</td>
       <td><input class="li num fct" data-k="budgetFact" type="number" min="0" value="${ln.budgetFact || ''}" placeholder="0"></td>
       <td><input class="li num fct" data-k="leadsFact" type="number" min="0" value="${ln.leadsFact || ''}" placeholder="0"></td>
@@ -9138,12 +9149,12 @@ function openMpBuilder(mp, contractors) {
     </div>
     <div class="mp-lbl">Строки плана <span class="muted">· канал · гео · связка · бюджет/лиды план → CPL, и факт (вручную) → CPL факт · Δ</span></div>
     <div class="mp-tbl-wrap"><table class="mp-tbl"><thead><tr>
-      <th>Канал</th><th>Гео</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
+      <th>Канал</th><th>Гео</th><th>Направление</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
     </tr></thead>
     <tbody id="mpRows">${(mp.lines || []).map(lineRow).join('') || lineRow()}</tbody>
     <tfoot><tr class="mp-tot">
-      <td colspan="3">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
-      <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTcP">—</td>
+      <td colspan="4">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
+      <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTqP">—</td><td class="num" id="mpTcP">—</td>
       <td class="num fct" id="mpTbF">—</td><td class="num fct" id="mpTlF">—</td><td class="num" id="mpTcF">—</td><td></td>
     </tr></tfoot></table></div>
     <div class="form-row" style="margin-top:14px"><label>Заметка к плану (видна подрядчику в документе)</label><textarea id="mpNote" style="min-height:60px" placeholder="Условия, комментарии, что нужно согласовать…">${esc(mp.note || '')}</textarea></div>
@@ -9167,8 +9178,8 @@ function openMpBuilder(mp, contractors) {
     const ctVal = $('#mpCt', root2).value;
     const lines = $$('[data-lrow]', root2).map(tr => {
       const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); return el2 ? el2.value : ''; };
-      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), bundle: g('bundle').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
-    }).filter(l => l.channel || l.geo || l.bundle || l.budgetPlan || l.leadsPlan || l.budgetFact || l.leadsFact);
+      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), direction: g('direction').trim(), bundle: g('bundle').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    }).filter(l => l.channel || l.geo || l.bundle || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
     return { title, contractorId: ctVal === '__new' ? null : ctVal, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
   };
 
@@ -9235,6 +9246,50 @@ async function openContractorsModal() {
   }));
 }
 /* создать/редактировать одного подрядчика; onDone(savedCt) */
+/* Сопоставление кампаний с направлениями + управление направлениями (для План/Факт по направлениям).
+   Кампании берём из синка кабинета (db.ads), направления — settings.adDirections, карта — settings.adCampaignMap. */
+async function openDirMap(onDone) {
+  let ad = { ads: [] }; try { ad = await api.get('/ads'); } catch (_) {}
+  const campaigns = [...new Set((ad.ads || []).map(a => a.campaignName).filter(Boolean))].sort();
+  let dirs = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name }));
+  const map = Object.assign({}, STATE.settings.adCampaignMap || {});
+  const slug = (s) => 'dir_' + String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').slice(0, 24) + Math.random().toString(36).slice(2, 5);
+  const body = `<div id="dmBox">
+    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — это как «проекты» из плана. Свяжите каждую рекламную кампанию с направлением, чтобы факт из кабинета сводился по плану. Кампании без направления попадут в «Прочее (вне плана)».</div>
+    <div class="lp-sec" style="margin:0 0 6px">Направления</div>
+    <div id="dmDirs"></div>
+    <div style="display:flex;gap:6px;margin:8px 0 14px"><input id="dmNewDir" placeholder="Новое направление (напр. Leadgeneration)" style="flex:1"><button class="btn btn-sm btn-accent" id="dmAddDir">${ic(I.plus)}Добавить</button></div>
+    <div class="lp-sec" style="margin:0 0 6px">Кампании из кабинета → направление <span class="muted" style="font-weight:400">· ${campaigns.length}</span></div>
+    <div id="dmCamps" style="max-height:46vh;overflow-y:auto">${campaigns.length ? '' : '<div class="muted" style="font-size:12px;padding:10px">Кампаний пока нет — сначала синхронизируйте кабинет («Настройки рекламы» → «Синхронизировать сейчас»).</div>'}</div>
+  </div>`;
+  const bd = modal({ title: 'Направления и сопоставление кампаний', sub: 'Свяжите кампании Meta с направлениями плана', wide: true, body, actions: [
+    { label: 'Сохранить', cls: 'btn-accent', onClick: async (bdEl) => {
+      $$('[data-campmap]', bdEl).forEach(s => { const cn = s.dataset.campmap; if (s.value) map[cn] = s.value; else delete map[cn]; });
+      await api.patch('/settings', { adDirections: dirs, adCampaignMap: map });
+      await loadState();
+      toast('Сохранено', 'Направления и сопоставление применены', true);
+      if (onDone) onDone();
+    } },
+    { label: 'Отмена' },
+  ] });
+  const dirOpts = () => `<option value="">— Прочее (вне плана)</option>` + dirs.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join('');
+  const paintDirs = () => {
+    const el2 = $('#dmDirs', bd);
+    el2.innerHTML = dirs.length ? dirs.map(d => `<div class="dm-dir" data-dk="${esc(d.key)}"><span>${esc(d.name)}</span><button class="btn btn-sm" data-deldir="${esc(d.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:11.5px">Пока нет направлений — добавьте ниже (или подтянутся из направлений плана).</div>';
+    $$('[data-deldir]', el2).forEach(b => b.addEventListener('click', () => { dirs = dirs.filter(x => x.key !== b.dataset.deldir); paintDirs(); paintCampSelects(); }));
+  };
+  const paintCampSelects = () => { $$('[data-campmap]', bd).forEach(s => { const cur = s.value; s.innerHTML = dirOpts(); s.value = dirs.some(d => d.key === cur) ? cur : ''; }); };
+  const paintCamps = () => {
+    const el2 = $('#dmCamps', bd); if (!campaigns.length) return;
+    el2.innerHTML = campaigns.map(cn => `<div class="dm-camp"><span class="dm-camp-nm" title="${esc(cn)}">${esc(cn)}</span><select data-campmap="${esc(cn)}">${dirOpts()}</select></div>`).join('');
+    $$('[data-campmap]', el2).forEach(s => { s.value = map[s.dataset.campmap] || ''; });
+    try { enhanceControls(el2); } catch (_) {}
+  };
+  paintDirs(); paintCamps();
+  $('#dmAddDir', bd).addEventListener('click', () => { const v = $('#dmNewDir', bd).value.trim(); if (!v) return; dirs.push({ key: slug(v), name: v }); $('#dmNewDir', bd).value = ''; paintDirs(); paintCampSelects(); });
+  $('#dmNewDir', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#dmAddDir', bd).click(); } });
+}
+
 function openContractorEdit(ct, onDone) {
   const isNew = !ct;
   ct = ct || { name: '', channels: [], geos: [], adAccounts: [], contact: '', note: '' };

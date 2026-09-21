@@ -1054,7 +1054,7 @@
     .ob-geo-tag:hover{background:rgba(201,162,90,.22)}
     /* Финал: 2 колонки (обложка бренда + сводка) + ссылка «Изменить» */
     .ob-fin-sub{font-size:16px;color:#9e968b;font-weight:300;margin:6px 0 24px}
-    .ob-fin-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:840px;margin:0 auto;text-align:left;align-items:stretch}
+    .ob-fin-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:840px;margin:0 auto;text-align:left;align-items:start}
     .ob-fin-cols .ob-plate{max-width:none;margin:0}
     .ob-fin-cols .ob-recap{grid-template-columns:1fr;max-width:none;margin:0;padding:8px 22px 20px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(24,21,17,.4);align-content:start}
     .ob-recap-h{font-family:'Cormorant',Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.01em;color:#f4f3f1;padding:14px 0 6px;text-align:left}
@@ -1308,7 +1308,7 @@
     .ob-price-list li{display:flex;gap:11px;align-items:flex-start;font-size:14px;color:#a7a6a3;font-weight:300;line-height:1.5}
     .ob-price-list li svg{width:15px;height:15px;flex:0 0 15px;color:#d6c7a8;margin-top:2px}
     .ob-do-pay{width:100%;justify-content:center;display:flex;align-items:center}
-    .ob-price-rr{display:flex;align-items:center;gap:7px;font-size:12px;color:#6b6a68;font-weight:300;margin-top:14px;justify-content:center}
+    .ob-price-rr{display:flex;align-items:center;gap:11px;font-size:12px;color:#6b6a68;font-weight:300;margin-top:14px;justify-content:flex-start}
     .ob-price-rr svg{width:13px;height:13px;flex:0 0 13px;color:#d6c7a8}
     /* пилюля «Необязательный шаг» под подзаголовком */
     .ob-pill{display:inline-block;margin-top:16px;padding:7px 16px;border-radius:999px;border:1px solid rgba(214,199,168,.28);background:rgba(214,199,168,.06);color:#e7dcc4;font-size:13px;font-weight:500}

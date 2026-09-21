@@ -4015,6 +4015,8 @@ const server = http.createServer(async (req, res) => {
       /* Meta-идентификаторы для CAPI-матчинга (дообучение алгоритма на качественных событиях) */
       const metaCap = { fbclid: pick('fbclid', 'fbc_id'), fbc: pick('fbc', '_fbc'), fbp: pick('fbp', '_fbp'), leadId: pick('lead_id', 'leadId', 'leadgen_id'), adId, clickAt: Date.now() };
       Object.keys(metaCap).forEach(k => !metaCap[k] && delete metaCap[k]);
+      /* кастомные поля из конструктора маппинга: любой ключ custom_* → lead.custom[имя] */
+      const customFields = {}; for (const k of Object.keys(b)) { if (/^custom[_.]/i.test(k) && b[k] != null && String(b[k]).trim()) customFields[k.replace(/^custom[_.]/i, '')] = String(b[k]).slice(0, 300); }
       const entry = { at: Date.now(), name, phone, adId, raw: Object.keys(b).slice(0, 20) };
 
       const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
@@ -4023,6 +4025,7 @@ const server = http.createServer(async (req, res) => {
         entry.result = 'repeat';
         lead.tags = [...new Set([...(lead.tags || []), 'повторная заявка'])];
         if (Object.keys(metaCap).length) lead.meta = Object.assign(lead.meta || {}, metaCap);
+        if (Object.keys(customFields).length) lead.custom = Object.assign(lead.custom || {}, customFields);
         if (adId && !(lead.ads && lead.ads.adId)) { lead.ads = { adId, adsetId: pick('adset_id'), campaignId: pick('campaign_id') }; matchAd(db, lead); }
         ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка: ${lead.name} — дубль не создан, карточка обогащена` });
       } else {
@@ -4038,7 +4041,7 @@ const server = http.createServer(async (req, res) => {
           meta: metaCap,
           avatarUrl: avatarUrl || null, activeChannel: 'wa',
           channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' },
-          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: {}, transcripts: [],
+          contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: customFields, transcripts: [],
           ads: adId ? { adId, adsetId: pick('adset_id', 'adsetId'), campaignId: pick('campaign_id', 'campaignId'), formName: pick('form_name', 'form') } : null,
         };
         matchAd(db, lead);
@@ -6573,7 +6576,10 @@ const server = http.createServer(async (req, res) => {
       if (b.social) { for (const k of ['ig', 'fb']) if (b.social[k]) { const c = db.settings.social[k]; if (b.social[k].token) c.token = String(b.social[k].token); if (b.social[k].enabled != null) c.enabled = !!b.social[k].enabled; if (b.social[k].igId != null) c.igId = String(b.social[k].igId); if (b.social[k].pageId != null) c.pageId = String(b.social[k].pageId); } }
       if (b.inventorySources && b.inventorySources.reelly) { const c = db.settings.inventorySources.reelly; const r = b.inventorySources.reelly; if (r.key) c.key = String(r.key); if (r.enabled != null) c.enabled = !!r.enabled; if (r.baseUrl != null) c.baseUrl = String(r.baseUrl); }
       if (b.capi) { const c = db.settings.capi = db.settings.capi || {}; const x = b.capi; if (x.pixelId != null) c.pixelId = String(x.pixelId).trim(); if (x.token) c.token = String(x.token).trim(); if (x.testCode != null) c.testCode = String(x.testCode).trim(); if (x.enabled != null) c.enabled = !!x.enabled; if (x.stageEvents && typeof x.stageEvents === 'object') c.stageEvents = x.stageEvents; delete b.capi; }
-      if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (Array.isArray(x.accounts)) c.accounts = x.accounts.map(a => ({ id: metaads.acctId(a && a.id != null ? a.id : a), name: String((a && a.name) || '').slice(0, 60), currency: String((a && a.currency) || '').slice(0, 8) })).filter(a => a.id).slice(0, 20); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); if (x.displayCurrency != null) c.displayCurrency = String(x.displayCurrency).slice(0, 8); if (x.fxRate != null) c.fxRate = +x.fxRate || 0; delete b.metaAds; }
+      if (b.metaAds) { const c = db.settings.metaAds = db.settings.metaAds || {}; const x = b.metaAds; if (x.token) c.token = String(x.token).trim(); if (x.adAccountId != null) c.adAccountId = metaads.acctId(x.adAccountId); if (Array.isArray(x.accounts)) c.accounts = x.accounts.map(a => ({ id: metaads.acctId(a && a.id != null ? a.id : a), name: String((a && a.name) || '').slice(0, 60), currency: String((a && a.currency) || '').slice(0, 8) })).filter(a => a.id).slice(0, 20); if (x.enabled != null) c.enabled = !!x.enabled; if (x.mode != null && ['api', 'integrator', 'both'].includes(x.mode)) c.mode = x.mode; if (x.pullLeads != null) c.pullLeads = !!x.pullLeads; if (x.pullInsights != null) c.pullInsights = !!x.pullInsights; if (x.datePreset != null) c.datePreset = String(x.datePreset).trim(); if (x.displayCurrency != null) c.displayCurrency = String(x.displayCurrency).slice(0, 8); if (x.fxRate != null) c.fxRate = +x.fxRate || 0; if (x.sourceCurrency != null) c.sourceCurrency = String(x.sourceCurrency).slice(0, 8); if (x.taxOn != null) c.taxOn = !!x.taxOn; if (x.taxPct != null) c.taxPct = Math.max(0, Math.min(50, +x.taxPct || 0)); if (x.syncDays != null) c.syncDays = [30, 60, 90, 180].includes(+x.syncDays) ? +x.syncDays : 60; delete b.metaAds; }
+      /* направления рекламы + сопоставление кампаний (для План/Факт по направлениям) */
+      if (Array.isArray(b.adDirections)) db.settings.adDirections = b.adDirections.map(d => ({ key: String((d && d.key) || '').slice(0, 40) || ('dir_' + Math.random().toString(36).slice(2, 7)), name: String((d && d.name) || '').slice(0, 60) })).filter(d => d.name).slice(0, 60);
+      if (b.adCampaignMap && typeof b.adCampaignMap === 'object') { const m = {}; for (const k of Object.keys(b.adCampaignMap).slice(0, 500)) { const v = b.adCampaignMap[k]; if (v) m[String(k).slice(0, 200)] = String(v).slice(0, 40); } db.settings.adCampaignMap = m; }
       if (b.stagesCfg) {
         const sc = db.settings.stagesCfg;
         if (b.stagesCfg.order) sc.order = b.stagesCfg.order.slice(0, 30).map(String);
@@ -8574,9 +8580,11 @@ const server = http.createServer(async (req, res) => {
       id: (ln && ln.id) || store.nextId('mpl'),
       channel: String((ln && ln.channel) || '').slice(0, 40),
       geo: String((ln && ln.geo) || '').slice(0, 40),
+      direction: String((ln && ln.direction) || '').slice(0, 40),
       bundle: String((ln && ln.bundle) || '').slice(0, 160),
       budgetPlan: Math.max(0, +(ln && ln.budgetPlan) || 0),
       leadsPlan: Math.max(0, Math.round(+(ln && ln.leadsPlan) || 0)),
+      qualPlan: Math.max(0, Math.round(+(ln && ln.qualPlan) || 0)),
       budgetFact: Math.max(0, +(ln && ln.budgetFact) || 0),
       leadsFact: Math.max(0, Math.round(+(ln && ln.leadsFact) || 0)),
       note: String((ln && ln.note) || '').slice(0, 300),
