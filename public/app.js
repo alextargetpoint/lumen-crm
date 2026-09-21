@@ -117,6 +117,24 @@ function fxConv(amount, from, to) {
 }
 function curSym(c) { return ({ USD: '$', EUR: '€', AED: 'dh ', THB: '฿', IDR: 'Rp ', RUB: '₽', GBP: '£', TRY: '₺' })[c] || (c + ' '); }
 
+/* диапазон дат аналитики рекламы (пресеты + свой период) → {from,to} и query-string */
+const AD_RANGE_PRESETS = [['all', 'Всё'], ['today', 'Сегодня'], ['yesterday', 'Вчера'], ['7d', '7 дней'], ['14d', '14 дней'], ['month', 'Этот месяц']];
+function adRangeDates() {
+  const r = PAGE_STATE.adRange || { preset: 'all' };
+  const ymd = (dt) => dt.toISOString().slice(0, 10);
+  const today = new Date(); const t = ymd(today); const daysAgo = (n) => ymd(new Date(Date.now() - n * 864e5));
+  switch (r.preset) {
+    case 'today': return { from: t, to: t };
+    case 'yesterday': return { from: daysAgo(1), to: daysAgo(1) };
+    case '7d': return { from: daysAgo(6), to: t };
+    case '14d': return { from: daysAgo(13), to: t };
+    case 'month': return { from: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), to: t };
+    case 'custom': return { from: r.from || '', to: r.to || '' };
+    default: return { from: '', to: '' };
+  }
+}
+function adRangeQS() { const { from, to } = adRangeDates(); const p = []; if (from) p.push('from=' + from); if (to) p.push('to=' + to); return p.length ? ('?' + p.join('&')) : ''; }
+
 /* ---------- «?»-подсказки: объяснялки не занимают экран, живут в поповере ---------- */
 const HINTS = {};
 function hint(id, title, items) {
@@ -8339,6 +8357,7 @@ function restructureAdsTabs(root) {
   if (!root || root.querySelector('.adtabs')) return;
   const cardOf = (sel) => { const e = root.querySelector(sel); return e ? (e.closest('.glass.card') || e.closest('.glass') || e) : null; };
   const kpis = root.querySelector('.ad-kpis');
+  const rangeBar = cardOf('#adRangeBar');
   const anaExtra = cardOf('#anaExtra');
   const tree = root.querySelector('.ct-wrap');
   const capi = cardOf('#capiOn');
@@ -8354,8 +8373,8 @@ function restructureAdsTabs(root) {
   const panels = {};
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
-  /* Аналитика · факт: KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
-  put(kpis, 'analytics'); put(anaExtra, 'analytics');
+  /* Аналитика · факт: диапазон дат + KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
+  put(rangeBar, 'analytics'); put(kpis, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -8372,8 +8391,9 @@ function restructureAdsTabs(root) {
 /* ---------------- РЕКЛАМА (мост Albato + атрибуция) ---------------- */
 PAGES.ads = async (root) => {
   await ensureFx();
-  const d = await api.get('/ads');
-  const treeD = await api.get('/ads/tree').catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
+  const rq = adRangeQS();
+  const d = await api.get('/ads' + rq);
+  const treeD = await api.get('/ads/tree' + rq).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
@@ -8388,6 +8408,17 @@ PAGES.ads = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'right', hue: '#E4813D' })}
+    ${(() => { const r = PAGE_STATE.adRange || { preset: 'all' }; const dd = adRangeDates();
+      return `<div class="glass card mb" id="adRangeBar">
+        <div class="ad-range">
+          <div class="ad-range-presets">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${r.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</div>
+          <div class="ad-range-custom">
+            <span class="muted" style="font-size:11px">Свой период:</span>
+            <input type="date" id="adRangeFrom" value="${esc(dd.from || '')}"><span class="muted">—</span><input type="date" id="adRangeTo" value="${esc(dd.to || '')}">
+            <button class="btn btn-sm btn-accent" id="adRangeApply">Применить</button>
+          </div>
+        </div>
+      </div>`; })()}
     ${(() => {
       const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;
       const cv = (a) => fxConv(a, src2, dc); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
@@ -8703,6 +8734,8 @@ PAGES.ads = async (root) => {
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
   /* под-вкладки аналитики + вид клиента + копия отчёта */
   $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render(); }));
+  $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render(); }));
+  $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
   $$('[data-revlead]', root).forEach(r => r.addEventListener('click', () => { const id = r.dataset.revlead; if (id) openLeadModal(id); }));
   /* дерево кабинета: переключение режима + сворачивание узлов */

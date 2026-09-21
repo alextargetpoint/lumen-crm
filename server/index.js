@@ -518,6 +518,16 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
+/* метрики объявления за диапазон дат [from..to] из посуточного ряда ad.daily; без диапазона/ряда — тоталы */
+function adRangeMetrics(ad, from, to) {
+  if ((from || to) && Array.isArray(ad.daily) && ad.daily.length) {
+    const m = { spend: 0, leadsMeta: 0, clicks: 0, impr: 0 };
+    for (const p of ad.daily) { if (from && p.d < from) continue; if (to && p.d > to) continue; m.spend += p.spend || 0; m.leadsMeta += p.leads || 0; m.clicks += p.clicks || 0; m.impr += p.impr || 0; }
+    return { spend: Math.round(m.spend), leadsMeta: m.leadsMeta, clicks: m.clicks, impr: m.impr };
+  }
+  return { spend: Math.round(ad.spend || 0), leadsMeta: (ad.leadsMeta != null ? ad.leadsMeta : 0), clicks: ad.clicks || 0, impr: ad.impressions || 0 };
+}
+
 /* Раздать креатив/тезисы объявления на ВСЕ объявления с тем же именем (по всем адсетам/кампаниям).
    Explicit-save → перезаписываем одноимённые (пользователь задал креатив для этого названия). */
 function propagateAdByName(db, ad) {
@@ -9043,17 +9053,20 @@ ${SCR}
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
     if (p === '/api/ads' && req.method === 'GET') {
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+      const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
+      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const stats = db.ads.map(ad => {
-        const mine = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
+        const mine = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId) && inR(l));
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
         const qualified = mine.filter(l => QUAL.includes(l.stage)).length;
         const deals = mine.filter(l => l.stage === 'deal').length;
-        const spend = +ad.spend || 0;
+        const rm = adRangeMetrics(ad, from, to);
+        const spend = rm.spend;
         return Object.assign({}, ad, {
-          leads, dialogs, qualified, deals, spend,
+          leads, dialogs, qualified, deals, spend, leadsMeta: rm.leadsMeta, clicks: rm.clicks, impressions: rm.impr,
           cpl: leads ? Math.round(spend / leads) : 0,
           cpa: deals ? Math.round(spend / deals) : 0,
           qualRate: rate(qualified, leads),
@@ -9119,14 +9132,18 @@ ${SCR}
     if (p === '/api/ads/tree' && req.method === 'GET') {
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+      const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
+      const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
+      const dailyIn = (arr) => (from || to) ? (arr || []).filter(p => (!from || p.d >= from) && (!to || p.d <= to)) : (arr || []);
       const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0, dmap: {} });
-      const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.daily || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
+      const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.dailyR || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
       const camps = {};
       for (const ad of db.ads) {
-        const crmLeads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId));
+        const crmLeads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId) && inR(l));
         const leadsCRM = crmLeads.length;
-        const quals = (ad.qualsFact != null) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
-        const am = { spend: Math.round(ad.spend || 0), leads: (ad.leadsMeta != null ? ad.leadsMeta : leadsCRM), leadsCRM, quals, clicks: ad.clicks || 0, impr: ad.impressions || 0, daily: ad.daily || [] };
+        const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
+        const rm = adRangeMetrics(ad, from, to); const dR = dailyIn(ad.daily);
+        const am = { spend: rm.spend, leads: rm.leadsMeta, leadsCRM, quals, clicks: rm.clicks, impr: rm.impr, daily: dR, dailyR: dR };
         const cn = ad.campaignName || '— без кампании';
         const an = ad.adsetName || '— без адсета';
         camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), adsets: {}, m: mk() };

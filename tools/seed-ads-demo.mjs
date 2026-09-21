@@ -51,14 +51,14 @@ const rows = [
   ['TP / Leads | RU 1.2', 'Пляж Найхарн · рилс', 43.86, 3, 4588, 47],
 ];
 const DAYS = 14;
-const dailySeries = (total, leadsTot) => {
+const dailySeries = (total, leadsTot, clicksTot, imprTot) => {
   /* распределяем total по 14 дням с лёгкой волной (детерминированно, без Math.random для стабильности) */
   const w = Array.from({ length: DAYS }, (_, i) => 1 + 0.35 * Math.sin(i / 2) + (i / DAYS) * 0.3);
   const sw = w.reduce((s, x) => s + x, 0);
   const out = [];
   for (let i = 0; i < DAYS; i++) {
     const d = new Date(now - (DAYS - i) * 864e5).toISOString().slice(0, 10);
-    out.push({ d, spend: Math.round(total * w[i] / sw), leads: Math.round(leadsTot * w[i] / sw), clicks: 0, impr: 0 });
+    out.push({ d, spend: Math.round(total * w[i] / sw), leads: Math.round(leadsTot * w[i] / sw), clicks: Math.round((clicksTot || 0) * w[i] / sw), impr: Math.round((imprTot || 0) * w[i] / sw) });
   }
   return out;
 };
@@ -66,7 +66,7 @@ for (const [campaign, creative, spend, leads, impr, clicks] of rows) {
   db.ads.push({
     adId: 'seed_' + Math.random().toString(36).slice(2, 11), name: creative, campaignName: campaign, adsetName: campaign + ' · adset',
     geo: 'phuket', platform: 'meta', spend, leadsMeta: leads, qualsFact: 0, clicks, impressions: impr,
-    daily: dailySeries(spend, leads),
+    daily: dailySeries(spend, leads, clicks, impr),
     cpl: leads ? +(spend / leads).toFixed(2) : 0, spendSource: 'meta_api', adAccountId: ACC, syncedAt: now, seedTag: SEED, media: null, points: [],
   });
 }

@@ -7849,3 +7849,20 @@ body.client-view [data-team]{ display:none !important; }
 /* креативы по названиям */
 .ct-names{ display:flex; flex-direction:column; gap:8px; }
 .ct-ed-note{ font-size:11px; line-height:1.5; padding:8px 10px; border-radius:8px; background:color-mix(in srgb,var(--accent) 6%,var(--bg-2)); margin-bottom:10px; display:flex; gap:6px; align-items:flex-start; }
+
+/* диапазон дат аналитики */
+.ad-range{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.ad-range-presets{ display:inline-flex; gap:2px; border:1px solid var(--stroke); border-radius:9px; overflow:hidden; }
+.ad-range-b{ font-size:12px; padding:6px 12px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
+.ad-range-b.on{ background:var(--accent); color:#fff; }
+.ad-range-custom{ display:inline-flex; align-items:center; gap:6px; margin-left:auto; flex-wrap:wrap; }
+.ad-range-custom input[type=date]{ font-size:12px; }
+
+/* анимация загрузки цифр/данных — мягкий каскадный fade-up */
+@keyframes adFadeUp{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+.ad-kpis .ad-tile{ animation:adFadeUp .42s cubic-bezier(.22,.61,.36,1) both; }
+.ad-kpis .ad-tile:nth-child(2){ animation-delay:.04s } .ad-kpis .ad-tile:nth-child(3){ animation-delay:.08s }
+.ad-kpis .ad-tile:nth-child(4){ animation-delay:.12s } .ad-kpis .ad-tile:nth-child(5){ animation-delay:.16s }
+.ad-kpis .ad-tile:nth-child(6){ animation-delay:.20s } .ad-kpis .ad-tile:nth-child(7){ animation-delay:.24s } .ad-kpis .ad-tile:nth-child(8){ animation-delay:.28s }
+.cta-tree .cta-node{ animation:adFadeUp .34s ease both; }
+.mpd-tbl tbody tr, #anaExtra .mp-cmp tbody tr{ animation:adFadeUp .3s ease both; }
