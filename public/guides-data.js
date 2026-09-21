@@ -216,11 +216,25 @@ GUIDES.telephony = {
   ],
   outro: 'Записи и ИИ-резюме доступны в карточке лида — удобно поднять контекст перед следующим касанием.',
 };
+GUIDES.viber = {
+  icon: 'chat', title: 'Viber через Infobip', tagline: 'Официальный Viber Business — один отправитель на агентство',
+  intro: 'Viber подключается через BSP (официального посредника) — по умолчанию <b>Infobip</b>. У агентства один Viber-отправитель (имя бренда), а входящие ответы клиентов маршрутизируются в карточку нужного брокера. Ниже — подключение по шагам с реальными скриншотами консоли Infobip.',
+  sections: [
+    { badge: 'Подключение по шагам', steps: [
+      ['Аккаунт Infobip', 'Зарегистрируйтесь на infobip.com — это BSP, официальный посредник Viber Business.'],
+      ['API-ключ', 'Infobip → Developers → API Keys → Create; скопируйте ключ и Base URL.'],
+      ['Верификация отправителя', 'Infobip → Channels → Viber → запросите Viber Business sender (имя бренда). Бизнес-верификация обычно 1–3 дня.'],
+      ['Вебхук входящих', 'Укажите Inbound webhook на адрес из Настроек Lumen — ответы клиентов попадут в карточку лида.'],
+      ['Заполнить поля', 'Внесите провайдера, ключ, Base URL и имя-отправитель в Настройках Lumen → Viber.'],
+    ] },
+  ],
+  outro: 'Персонализация — в тексте сообщения (имя брокера, подпись), а не в отправителе. Каскад сам выберет Viber, если это лучший канал для лида.',
+};
 
 /* ── таксономия справочника: категории → ключи гайдов ── */
 const CATEGORIES = [
   { key: 'start',    icon: 'spark', title: 'Начало работы',            desc: 'Подключите бота и мобильный пульт брокера',        guides: ['tgsetup', 'botpanel'] },
-  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, телефония и ИИ-агент',         guides: ['wanumbers', 'wacloud', 'tgchannel', 'telephony', 'waagent'] },
+  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Viber, телефония и ИИ-агент',  guides: ['wanumbers', 'wacloud', 'tgchannel', 'viber', 'telephony', 'waagent'] },
   { key: 'leads',    icon: 'user',  title: 'Лиды и продажи',           desc: 'Воронка, карточка лида и автодожим касаниями',     guides: ['leads', 'chains'] },
   { key: 'ops',      icon: 'doc',   title: 'Планирование и документы', desc: 'Календарь, медиапланы, договоры и КП',             guides: ['calendar', 'mediaplan', 'docs'] },
 ];

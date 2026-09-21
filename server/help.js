@@ -5,6 +5,7 @@
    Роуты (в server/index.js): /help, /help/c/:cat, /help/:slug.
    ============================================================================ */
 const { GUIDES, CATEGORIES } = require('../public/guides-data.js');
+let RICH = {}; try { RICH = require('../public/guides-rich.js') || {}; } catch (e) { RICH = {}; }  // rich иллюстрированные гайды (мокапы+скриншоты)
 
 const OG_IMAGE = '/assets/site/niche-dubai-poster.jpg';   // брендовый ландшафт для превью ссылок
 
@@ -46,6 +47,7 @@ function head(opts) {
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${desc}">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+${opts.rich ? '<link rel="stylesheet" href="/guides.css?v=1">' : ''}
 <style>${CSS}</style>
 </head><body>`;
 }
@@ -124,7 +126,15 @@ h1.title{font-family:'Cormorant',Georgia,serif;font-size:clamp(40px,6vw,64px);fo
 .step-tx code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;background:rgba(214,199,168,.1);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#e7dcc4}
 .step-tx b code{font-weight:500}
 .art-img{margin-top:30px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
-.art-img img{width:100%;display:block}
+.art-img img{width:100%;display:block;cursor:zoom-in}
+/* мокапы/rich-контент */
+.art-mock{margin:22px 0;display:flex;justify-content:center;flex-wrap:wrap;gap:16px}
+.gd-rich{margin-top:14px}
+.gd-rich img{cursor:zoom-in}
+/* лайтбокс для скриншотов/мокапов */
+.lb{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:32px;background:rgba(6,6,5,.86);cursor:zoom-out}
+.lb.on{display:flex}
+.lb img{max-width:96vw;max-height:92vh;border-radius:14px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8)}
 .outro{margin-top:38px;display:flex;gap:12px;align-items:flex-start;padding:20px 22px;border-radius:16px;border:1px solid rgba(214,199,168,.22);background:rgba(214,199,168,.04);font-size:14.5px;line-height:1.65;color:#cfc6b6;font-weight:300}
 .outro b{color:var(--ink);font-weight:600}
 .outro svg{flex:0 0 auto;width:18px;height:18px;color:var(--gold);margin-top:2px}
@@ -220,9 +230,19 @@ function renderCategory(catKey, base) {
 function renderArticle(slug, base) {
   const g = GUIDES[slug]; if (!g) return null;
   const cat = catOf(slug);
+  const richFn = RICH[slug];
+  const richHtml = typeof richFn === 'function' ? (function () { try { return richFn(); } catch (e) { return ''; } })() : '';
   const stepHTML = (s, i) => `<div class="step"><span class="step-n">${i + 1}</span><div class="step-tx"><b>${s[0]}</b><span>${s[1]}</span></div></div>`;
-  const secHTML = (sec) => `<div class="sec"><div class="sec-h">${esc(sec.badge || '')}</div>${(sec.steps || []).map(stepHTML).join('')}</div>`;
+  const secHTML = (sec) => `<div class="sec"><div class="sec-h">${esc(sec.badge || '')}</div>${(sec.steps || []).map(stepHTML).join('')}${sec.shot ? `<div class="art-mock">${sec.shot}</div>` : ''}</div>`;
   const rel = cat ? cat.guides.map(k => `<a href="/help/${k}" class="${k === slug ? 'on' : ''}">${ic('arrow', 2)}${esc(GUIDES[k].title)}</a>`).join('') : '';
+  /* rich-гайд (мокапы+скриншоты) рендерим целиком; иначе — структурные шаги + диаграмма/мокапы из данных */
+  const main = richHtml
+    ? `<div class="intro">${g.intro || ''}</div><div class="gd-rich">${richHtml}</div>`
+    : `<div class="intro">${g.intro || ''}</div>
+       ${g.diagram ? `<div class="art-mock art-diagram">${g.diagram}</div>` : ''}
+       ${(g.sections || []).map(secHTML).join('')}
+       ${g.img ? `<div class="art-img"><img src="${esc(g.img)}" alt="" onerror="this.parentNode.style.display='none'"></div>` : ''}
+       ${g.outro ? `<div class="outro">${ic('spark')}<span>${g.outro}</span></div>` : ''}`;
   const body = `${topbar(base)}
   <div class="wrap"><div class="crumb">
     <a href="/help">Справочник</a><span class="sep">/</span>
@@ -232,10 +252,7 @@ function renderArticle(slug, base) {
   <div class="wrap art">
     <article class="art-main">
       <div class="art-head"><span class="art-ic">${ic(g.icon || 'doc')}</span><div><h1>${esc(g.title)}</h1><p>${esc(g.tagline || '')}</p></div></div>
-      <div class="intro">${g.intro || ''}</div>
-      ${(g.sections || []).map(secHTML).join('')}
-      ${g.img ? `<div class="art-img"><img src="${esc(g.img)}" alt="" onerror="this.parentNode.style.display='none'"></div>` : ''}
-      ${g.outro ? `<div class="outro">${ic('spark')}<span>${g.outro}</span></div>` : ''}
+      ${main}
     </article>
     <aside class="aside">
       <div class="aside-box"><div class="aside-t">Поделиться</div>
@@ -249,13 +266,18 @@ function renderArticle(slug, base) {
     <a class="tb-cta" href="/">Открыть Lumen ${ic('arrow', 2)}</a>
   </div></div>
   ${foot()}
+  <div class="lb" id="lb"><img id="lbimg" alt=""></div>
   <script>
     var b=document.getElementById('share'),l=document.getElementById('shareLbl');
     b.addEventListener('click',function(){var u=location.href;function ok(){l.textContent='Ссылка скопирована ✓';setTimeout(function(){l.textContent='Скопировать ссылку';},1800);}
       if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(ok,function(){prompt('Скопируйте ссылку:',u);});}else{prompt('Скопируйте ссылку:',u);}});
+    var lb=document.getElementById('lb'),lbi=document.getElementById('lbimg');
+    window.lumenZoom=function(img){lbi.src=img.currentSrc||img.src;lb.classList.add('on');};
+    document.addEventListener('click',function(e){var im=e.target.closest&&e.target.closest('.gd-rich img, .art-mock img, .art-img img');if(im&&!lb.contains(im)){lumenZoom(im);}});
+    lb.addEventListener('click',function(){lb.classList.remove('on');});
   </script>`;
   const desc = strip(g.intro).slice(0, 180) || g.tagline;
-  return head({ base, path: '/help/' + slug, title: g.title + ' — Справочник Lumen', desc }) + body + '</body></html>';
+  return head({ base, rich: !!(richHtml || g.diagram || (g.sections || []).some(s => s.shot)), path: '/help/' + slug, title: g.title + ' — Справочник Lumen', desc }) + body + '</body></html>';
 }
 
 module.exports = { renderLanding, renderArticle, renderCategory, GUIDES, CATEGORIES };
