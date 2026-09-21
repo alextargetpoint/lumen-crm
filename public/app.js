@@ -8335,18 +8335,21 @@ function restructureAdsTabs(root) {
   const twocol = root.querySelector('.two-col');
   const rightCol = twocol ? twocol.children[1] : null;
   const intakeLog = rightCol ? [...rightCol.children].find(c => c !== eff && (c.classList.contains('ds-fold') || /Журнал приёма/.test(c.textContent || ''))) : null;
-  const TABS = [['analytics', 'Аналитика по рекламе', I.bars], ['creatives', 'Дерево креативов', I.target], ['intake', 'Приём лидов', I.link || I.bolt], ['capi', 'Meta CAPI', I.spark]];
-  const active = ['analytics', 'creatives', 'intake', 'capi'].includes(PAGE_STATE.adsTab) ? PAGE_STATE.adsTab : 'analytics';
+  const TABS = [['analytics', 'Аналитика · факт из кабинетов', I.bars], ['creatives', 'Дерево креативов', I.target], ['settings', 'Настройки рекламы', I.gear]];
+  const KEYS = ['analytics', 'creatives', 'settings'];
+  const active = KEYS.includes(PAGE_STATE.adsTab) ? PAGE_STATE.adsTab : 'analytics';
   const bar = el(`<div class="adtabs">${TABS.map(([k, n, icn]) => `<button class="adtab ${k === active ? 'on' : ''}" data-adtab-btn="${k}">${ic(icn)}${n}</button>`).join('')}</div>`);
   const panels = {};
-  ['analytics', 'creatives', 'intake', 'capi'].forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
+  KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
+  /* Аналитика · факт: KPI + эффективность объявлений (то, что тянется из кабинета) */
   put(kpis, 'analytics'); put(eff, 'analytics');
-  put(tree, 'creatives');
-  put(most, 'intake'); put(metaCab, 'intake'); put(imp, 'intake'); put(intakeLog, 'intake');
-  put(capi, 'capi');
+  /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
+  put(tree, 'creatives'); put(imp, 'creatives');
+  /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
+  put(most, 'settings'); put(metaCab, 'settings'); put(capi, 'settings'); put(intakeLog, 'settings');
   const hero = root.firstElementChild;   /* heroArt-блок */
-  hero.after(bar); bar.after(panels.analytics); panels.analytics.after(panels.creatives); panels.creatives.after(panels.intake); panels.intake.after(panels.capi);
+  hero.after(bar); bar.after(panels.analytics); panels.analytics.after(panels.creatives); panels.creatives.after(panels.settings);
   if (twocol) twocol.remove();
   bar.querySelectorAll('[data-adtab-btn]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.adtabBtn; PAGE_STATE.adsTab = k;
@@ -8835,6 +8838,12 @@ PAGES.mediaplan = async (root) => {
      Источник правды — CUR: /mediaplan → Планы, /adsAnalytics → Аналитика. */
   MP_VIEW = (CUR === 'adsAnalytics') ? 'analytics' : 'plans';
   const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
+  /* факт из подключённых рекламных кабинетов (Meta API) — для сведения план-факт по подрядчику */
+  let adData = { ads: [] }; try { adData = await api.get('/ads'); } catch (_) {}
+  const accFact = {};   /* act_id → {spend, leads, qualified, deals} */
+  for (const a of (adData.ads || [])) { const acc = a.adAccountId; if (!acc) continue; const f = accFact[acc] = accFact[acc] || { spend: 0, leads: 0, qualified: 0, deals: 0 }; f.spend += a.spend || 0; f.leads += a.leads || 0; f.qualified += a.qualified || 0; f.deals += a.deals || 0; }
+  const boundAccts = new Set(contractors.flatMap(c => c.adAccounts || []));
+  const unboundAccts = Object.keys(accFact).filter(a => !boundAccts.has(a));
 
   /* Фаза 2: если активна вкладка «Аналитика» — тянем агрегаты план-факт */
   let anData = null;
@@ -8919,6 +8928,32 @@ PAGES.mediaplan = async (root) => {
     </div>`;
   };
 
+  /* ── ФАКТ ИЗ КАБИНЕТОВ по подрядчику (план vs факт из синка Meta) ── */
+  const cabRows = contractors.filter(ct => (ct.adAccounts || []).length).map(ct => {
+    const f = (ct.adAccounts || []).reduce((a, acc) => { const x = accFact[acc]; if (x) { a.spend += x.spend; a.leads += x.leads; a.qualified += x.qualified; a.deals += x.deals; } return a; }, { spend: 0, leads: 0, qualified: 0, deals: 0 });
+    const mps = byCt[ct.id] || [];
+    const plan = mps.reduce((a, mp) => { const t = mp.totals || {}; a.bp += t.budgetPlan || 0; a.lp += t.leadsPlan || 0; return a; }, { bp: 0, lp: 0 });
+    const cur = (mps[0] && mps[0].currency) || 'USD';
+    return { ct, f, plan, cur, cpl: f.leads ? Math.round(f.spend / f.leads) : 0, budgetPace: plan.bp ? Math.round(f.spend / plan.bp * 100) : null, leadsPace: plan.lp ? Math.round(f.leads / plan.lp * 100) : null };
+  });
+  const cabFactCard = (cabRows.length || unboundAccts.length) ? `<div class="glass card mb">
+      <div class="card-title">${ic(I.target)}Факт из рекламных кабинетов<span class="sub">расход и лиды из подключённых кабинетов Meta — сведено по подрядчику</span></div>
+      ${cabRows.length ? `<table class="tbl mp-cmp"><thead><tr><th>Подрядчик</th><th>Кабинет(ы)</th><th>Расход факт</th><th>Лиды факт</th><th>Квалы</th><th>CPL факт</th><th>Темп бюджета</th><th>Темп лидов</th></tr></thead><tbody>
+        ${cabRows.map(r => `<tr>
+          <td><b>${esc(r.ct.name)}</b></td>
+          <td class="muted" style="font-size:11px">${(r.ct.adAccounts || []).map(esc).join(', ')}</td>
+          <td>${mpMoney(r.f.spend, r.cur)}${r.plan.bp ? `<span class="muted" style="font-size:10px"> / ${mpMoney(r.plan.bp, r.cur)}</span>` : ''}</td>
+          <td>${r.f.leads}${r.plan.lp ? `<span class="muted" style="font-size:10px"> / ${r.plan.lp}</span>` : ''}</td>
+          <td>${r.f.qualified}</td>
+          <td><b class="accent">${r.cpl ? mpMoney(r.cpl, r.cur) : '—'}</b></td>
+          <td>${r.budgetPace != null ? `<b class="${r.budgetPace <= 100 ? 'mp-good' : 'mp-bad'}">${r.budgetPace}%</b>` : '<span class="muted">нет плана</span>'}</td>
+          <td>${r.leadsPace != null ? `<b class="${r.leadsPace >= 100 ? 'mp-good' : (r.leadsPace >= 60 ? '' : 'mp-bad')}">${r.leadsPace}%</b>` : '<span class="muted">нет плана</span>'}</td>
+        </tr>`).join('')}
+      </tbody></table>` : ''}
+      ${unboundAccts.length ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Есть данные кабинета(ов) <b>${unboundAccts.map(esc).join(', ')}</b>, не привязанных к подрядчику. Откройте «Подрядчики» → карточка нужного подрядчика → поле «Рекламные кабинеты» и впишите этот act_… — факт сведётся сюда и сравнится с планом.</span></div>` : ''}
+    </div>` : (contractors.length ? `<div class="glass card mb"><div class="card-title">${ic(I.target)}Факт из рекламных кабинетов<span class="sub">план vs факт из синка Meta</span></div>
+      <div class="muted" style="font-size:12px;line-height:1.6">Подключите кабинет (раздел «Реклама» → «Настройки рекламы» → «Рекламный кабинет (Meta API)») и привяжите его к подрядчику (карточка подрядчика → «Рекламные кабинеты», act_…). Тогда расход и лиды из кабинета автоматически сведутся здесь и сравнятся с планом — с темпом по бюджету и лидам.</div></div>` : '');
+
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
       <div class="ha-title">${ic(I.bars)}Медиапланы<span class="sub">подрядчики трафика · план/факт · согласование</span></div>
@@ -8929,6 +8964,7 @@ PAGES.mediaplan = async (root) => {
       ].map(([k, v, sub]) => `<div class="ha-row" data-ha><span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span></div>`).join('')}
     `, { v: 'right', hue: '#3E7BE0' })}
     ${seg}
+    ${cabFactCard}
     ${MP_VIEW === 'analytics' ? mpAnalyticsHtml(anData, contractors, plans) : `
     <div class="mp-toolbar">
       <button class="btn btn-accent" id="mpNew">${ic(I.plus)}Новый медиаплан</button>
@@ -9159,19 +9195,20 @@ async function openContractorsModal() {
 /* создать/редактировать одного подрядчика; onDone(savedCt) */
 function openContractorEdit(ct, onDone) {
   const isNew = !ct;
-  ct = ct || { name: '', channels: [], geos: [], contact: '', note: '' };
+  ct = ct || { name: '', channels: [], geos: [], adAccounts: [], contact: '', note: '' };
   const body = `
     <div class="form-row"><label>Название</label><input id="ceName" value="${esc(ct.name)}" placeholder="DXB Traffic Lab"></div>
     <div class="mp-b-top">
       <div class="form-row" style="flex:1"><label>Каналы (через запятую)</label><input id="ceCh" value="${esc((ct.channels || []).join(', '))}" placeholder="Meta, Google, TikTok"></div>
       <div class="form-row" style="flex:1"><label>Гео (через запятую)</label><input id="ceGeo" value="${esc((ct.geos || []).join(', '))}" placeholder="dubai, bali"></div>
     </div>
+    <div class="form-row"><label>Рекламные кабинеты подрядчика (Meta act_…, через запятую)</label><input id="ceAcct" value="${esc((ct.adAccounts || []).join(', '))}" placeholder="act_1234567890, act_9876543210"><div class="muted" style="font-size:10.5px;margin-top:3px;line-height:1.4">Привяжите кабинет(ы) этого подрядчика — тогда факт (расход/лиды) из синка кабинета автоматически сведётся по нему в аналитике «план-факт».</div></div>
     <div class="form-row"><label>Контакт</label><input id="ceContact" value="${esc(ct.contact || '')}" placeholder="@telegram · почта · телефон"></div>
     <div class="form-row"><label>Заметка</label><textarea id="ceNote" style="min-height:54px" placeholder="Условия, ставки, специализация…">${esc(ct.note || '')}</textarea></div>`;
   modal({ title: isNew ? 'Новый подрядчик' : 'Подрядчик', body, wide: true, actions: [
     { label: isNew ? 'Создать' : 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
       const name = $('#ceName', bd).value.trim(); if (!name) { toast('Укажите название'); return false; }
-      const payload = { name, channels: $('#ceCh', bd).value.split(',').map(s => s.trim()).filter(Boolean), geos: $('#ceGeo', bd).value.split(',').map(s => s.trim()).filter(Boolean), contact: $('#ceContact', bd).value.trim(), note: $('#ceNote', bd).value.trim() };
+      const payload = { name, channels: $('#ceCh', bd).value.split(',').map(s => s.trim()).filter(Boolean), geos: $('#ceGeo', bd).value.split(',').map(s => s.trim()).filter(Boolean), adAccounts: $('#ceAcct', bd).value.split(/[,\s]+/).map(s => s.trim()).filter(Boolean), contact: $('#ceContact', bd).value.trim(), note: $('#ceNote', bd).value.trim() };
       const saved = isNew ? await api.post('/contractors', payload) : await api.patch('/contractors/' + ct.id, payload);
       toast(isNew ? 'Подрядчик добавлен' : 'Сохранено', null, true);
       if (onDone) onDone(saved);

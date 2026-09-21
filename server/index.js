@@ -8586,7 +8586,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/contractors' && req.method === 'GET') return json(res, 200, db.mpContractors);
     if (p === '/api/contractors' && req.method === 'POST') {
       const b = await readBody(req);
-      const ct = { id: store.nextId('ct'), name: String(b.name || 'Подрядчик').slice(0, 80), channels: (Array.isArray(b.channels) ? b.channels : []).map(x => String(x).slice(0, 30)).slice(0, 12), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => String(x).slice(0, 30)).slice(0, 12), contact: String(b.contact || '').slice(0, 200), note: String(b.note || '').slice(0, 500), createdAt: Date.now() };
+      const normAccts = (arr) => (Array.isArray(arr) ? arr : []).map(x => metaads.acctId(x)).filter(Boolean).slice(0, 12);
+      const ct = { id: store.nextId('ct'), name: String(b.name || 'Подрядчик').slice(0, 80), channels: (Array.isArray(b.channels) ? b.channels : []).map(x => String(x).slice(0, 30)).slice(0, 12), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => String(x).slice(0, 30)).slice(0, 12), adAccounts: normAccts(b.adAccounts), contact: String(b.contact || '').slice(0, 200), note: String(b.note || '').slice(0, 500), createdAt: Date.now() };
       db.mpContractors.unshift(ct); store.save();
       return json(res, 200, ct);
     }
@@ -8596,6 +8597,7 @@ const server = http.createServer(async (req, res) => {
       if (b.name != null) ct.name = String(b.name).slice(0, 80);
       if (Array.isArray(b.channels)) ct.channels = b.channels.map(x => String(x).slice(0, 30)).slice(0, 12);
       if (Array.isArray(b.geos)) ct.geos = b.geos.map(x => String(x).slice(0, 30)).slice(0, 12);
+      if (Array.isArray(b.adAccounts)) ct.adAccounts = b.adAccounts.map(x => metaads.acctId(x)).filter(Boolean).slice(0, 12);
       if (b.contact != null) ct.contact = String(b.contact).slice(0, 200);
       if (b.note != null) ct.note = String(b.note).slice(0, 500);
       store.save();

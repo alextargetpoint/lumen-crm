@@ -78,6 +78,7 @@ async function syncInsights(db, deps, { datePreset = 'last_30d' } = {}) {
     ad.impressions = parseInt(row.impressions, 10) || 0;
     ad.clicks = parseInt(row.clicks, 10) || 0;
     ad.spendSource = 'meta_api';
+    ad.adAccountId = id;   /* из какого кабинета — для привязки факта к подрядчику */
     ad.syncedAt = Date.now();
   }
   /* креативы (превью) — одним запросом; заполняем media только если у объявления его ещё нет */
