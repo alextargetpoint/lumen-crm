@@ -8339,6 +8339,7 @@ function restructureAdsTabs(root) {
   if (!root || root.querySelector('.adtabs')) return;
   const cardOf = (sel) => { const e = root.querySelector(sel); return e ? (e.closest('.glass.card') || e.closest('.glass') || e) : null; };
   const kpis = root.querySelector('.ad-kpis');
+  const anaExtra = cardOf('#anaExtra');
   const tree = root.querySelector('.ct-wrap');
   const capi = cardOf('#capiOn');
   const metaCab = cardOf('#metaAdsOn');
@@ -8355,8 +8356,8 @@ function restructureAdsTabs(root) {
   const panels = {};
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
-  /* Аналитика · факт: KPI + эффективность объявлений (то, что тянется из кабинета) */
-  put(kpis, 'analytics'); put(eff, 'analytics');
+  /* Аналитика · факт: KPI + эффективность + гео/качество/отчёт (то, что тянется из кабинета) */
+  put(kpis, 'analytics'); put(eff, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -8404,6 +8405,45 @@ PAGES.ads = async (root) => {
         ${tile('CPQL', cm(md.quals ? md.spend / md.quals : 0), 'цена квала', true)}
         ${tile('Конв. в квал.', `${md.leadsMeta ? Math.round(md.quals / md.leadsMeta * 100) : 0}%`, 'лид → квал')}
       </div>`; })()}
+    ${(() => {
+      /* ── Под-вкладки аналитики: Гео / Качество лидов / Отчёт + «вид клиента» ── */
+      const maS = STATE.settings.metaAds || {}; const srcC = maS.sourceCurrency || (maS.accounts && maS.accounts[0] && maS.accounts[0].currency) || 'AED'; const dispC = maS.displayCurrency || srcC;
+      const cm2 = (n) => curSym(dispC) + Math.round(fxConv(n || 0, srcC, dispC)).toLocaleString('ru-RU').replace(/,/g, ' ');
+      const gname = (g) => ((STATE.settings.geoNames || {})[g] || g);
+      const campMap = STATE.settings.adCampaignMap || {}; const dirs = STATE.settings.adDirections || [];
+      const dirName = (k) => (dirs.find(d2 => d2.key === k) || {}).name || k || '— вне плана';
+      const sub = PAGE_STATE.anaSub || 'geo';
+      /* агрегаты по гео и по направлению из d.ads */
+      const byGeo = {}, byDir = {};
+      for (const a of (d.ads || [])) {
+        const gk = a.geo || '—'; const g = byGeo[gk] = byGeo[gk] || { spend: 0, leads: 0, quals: 0 };
+        const lm = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0); const q = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
+        g.spend += a.spend || 0; g.leads += lm; g.quals += q;
+        const dk = campMap[a.campaignName] || '__none'; const dd = byDir[dk] = byDir[dk] || { spend: 0, leads: 0, quals: 0 };
+        dd.spend += a.spend || 0; dd.leads += lm; dd.quals += q;
+      }
+      const seg = ['geo', 'quality', 'report'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${k === 'geo' ? 'Гео' : k === 'quality' ? 'Качество лидов' : 'Отчёт'}</button>`).join('');
+      const geoTbl = `<table class="tbl mp-cmp"><thead><tr><th>Направление / гео</th><th>Расход</th><th>Лиды</th><th>Квал</th><th>CPL</th><th>Конв. в квал</th></tr></thead><tbody>
+        ${Object.entries(byGeo).filter(([, g]) => g.spend || g.leads).sort((a, b) => b[1].spend - a[1].spend).map(([gk, g]) => `<tr><td><b>${esc(gname(gk))}</b></td><td>${cm2(g.spend)}</td><td>${g.leads}</td><td>${g.quals}</td><td><b class="accent">${g.leads ? cm2(g.spend / g.leads) : '—'}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td></tr>`).join('')}
+      </tbody></table>`;
+      const qualTbl = `<div class="muted" style="font-size:11.5px;margin-bottom:8px" data-team>Квал = стадии CRM (${(STATE.settings.qualStages || []).length} отмечено). Настроить — «Квал-статусы» в План/Факт.</div>
+        <table class="tbl mp-cmp"><thead><tr><th>Направление</th><th>Лиды (Meta)</th><th>Квал (CRM)</th><th>Конв. в квал</th><th>CPQL</th></tr></thead><tbody>
+        ${Object.entries(byDir).filter(([, g]) => g.leads || g.spend).sort((a, b) => b[1].quals - a[1].quals).map(([dk, g]) => `<tr><td><b>${esc(dk === '__none' ? 'Прочее (вне плана)' : dirName(dk))}</b></td><td>${g.leads}</td><td><b>${g.quals}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td><td><b class="accent">${g.quals ? cm2(g.spend / g.quals) : '—'}</b></td></tr>`).join('')}
+      </tbody></table>`;
+      const tot = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leads += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leads: 0, quals: 0 });
+      const topC = [...(d.ads || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0)).slice(0, 3);
+      const MON = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+      const reportTxt = `Отчёт по рекламе · ${MON[new Date().getMonth()]}\nРасход: ${cm2(tot.spend)} · Лиды: ${tot.leads} · Квал: ${tot.quals}\nCPL: ${tot.leads ? cm2(tot.spend / tot.leads) : '—'} · CPQL: ${tot.quals ? cm2(tot.spend / tot.quals) : '—'} · Конв. в квал: ${tot.leads ? Math.round(tot.quals / tot.leads * 100) : 0}%\nТоп по расходу: ${topC.map(c => `${c.campaignName || c.name} (${cm2(c.spend)}, ${c.leadsMeta != null ? c.leadsMeta : c.leads} лид)`).join('; ')}`;
+      const reportView = `<div class="muted" style="font-size:11.5px;margin-bottom:8px">Готовый текст-отчёт за период — скопируйте клиенту/в чат.</div>
+        <pre class="map-code" id="anaReport">${esc(reportTxt)}</pre>
+        <button class="btn btn-sm" id="anaReportCopy" style="margin-top:8px">${ic(I.copy)}Копировать отчёт</button>`;
+      return `<div class="glass card mb" id="anaExtra">
+        <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео · качество лидов · отчёт</span>
+          <button class="btn btn-sm" id="anaClientView" style="margin-left:auto" title="Скрыть внутренние блоки — как видит клиент">${ic(I.eye)}Вид клиента</button></div>
+        <div class="ana-sub">${seg}</div>
+        <div style="overflow-x:auto">${sub === 'geo' ? geoTbl : sub === 'quality' ? qualTbl : reportView}</div>
+      </div>`;
+    })()}
     ${(() => {
       const PL = { meta: ['Meta', '#2F6BFF'], google: ['Google', '#E0603B'], tiktok: ['TikTok', '#111'], other: ['Другое', '#888'] };
       const plBadge = (p) => { const x = PL[p] || PL.other; return `<span class="ct-pl" style="--c:${x[1]}">${x[0]}</span>`; };
@@ -8462,7 +8502,7 @@ PAGES.ads = async (root) => {
         if (m.spend > (T.spend / Math.max(1, treeD.tree.length)) && !m.quals) signals.push(`«${c.name}»: расход ${cm(m.spend)} без квалов`);
       }
       const cabHdr = `<div class="cta-hdr"><b>${ic(I.bars)}Дерево кабинета</b><span class="cta-sum">Σ ${cm(T.spend)} · ${T.leads} лидов · чистый открут (без налога) · <span class="mp-good">сходится со сводкой ✓</span></span></div>`;
-      const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}">${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
+      const cabSignals = `<div class="cta-signals ${signals.length ? 'warn' : ''}" data-team>${signals.length ? ic(I.spark) + signals.slice(0, 5).map(esc).join(' · ') : '✓ Сигналов оптимизации нет — связки в норме (CPL/CTR/CPM/квалы)'}</div>`;
       const modeSeg = `<span class="ct-modeseg"><button class="ct-mode-b ${treeMode === 'cabinet' ? 'on' : ''}" data-ctmode="cabinet">${ic(I.bars)}Кабинет</button><button class="ct-mode-b ${treeMode === 'creatives' ? 'on' : ''}" data-ctmode="creatives">${ic(I.image)}Креативы</button></span>`;
 
       return `<div class="glass card mb ct-wrap">
@@ -8636,6 +8676,10 @@ PAGES.ads = async (root) => {
   restructureAdsTabs(root);   /* упаковать хаос страницы в аккуратные вкладки (Аналитика/Креативы/Приём/CAPI) */
   /* дерево креативов: раскрытие редактора + сохранение креатива/тезисов */
   $$('[data-ctedit]', root).forEach(b => b.addEventListener('click', () => { const ed = $('#cted-' + b.dataset.ctedit, root); if (ed) { ed.hidden = !ed.hidden; if (!ed.hidden) { const i = ed.querySelector('.ct-media'); if (i) setTimeout(() => i.focus(), 0); } } }));
+  /* под-вкладки аналитики + вид клиента + копия отчёта */
+  $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render(); }));
+  $('#anaClientView', root) && $('#anaClientView', root).addEventListener('click', () => { document.body.classList.toggle('client-view'); const on = document.body.classList.contains('client-view'); toast(on ? 'Вид клиента' : 'Полный вид', on ? 'Внутренние блоки скрыты' : null, true); });
+  $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
   /* дерево кабинета: переключение режима + сворачивание узлов */
   $$('[data-ctmode]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.ctMode = b.dataset.ctmode; render(); }));
   $$('[data-ctacoll]', root).forEach(r => r.addEventListener('click', () => { const kids = r.parentElement.querySelector('.cta-kids'); if (kids) { kids.hidden = !kids.hidden; r.classList.toggle('open', !kids.hidden); } }));
@@ -9083,7 +9127,7 @@ PAGES.mediaplan = async (root) => {
   const hasAny = plannedDirs.length || other.spend || other.leadsMeta;
   const totTempo = totPlan.quals ? Math.round(totFact.quals / totPlan.quals * 100) : null;
   const totDiv = totFact.leadsMeta > 0 && Math.abs(totFact.leadsMeta - totFact.leadsCRM) / totFact.leadsMeta > 0.15;
-  const taxBtn = `<button class="btn btn-sm ${taxOn ? 'on' : ''}" id="mpdTax" title="Показывать расход с налогом/сборами">${taxOn ? `✓ +налог ${taxPct}%` : '+ налог'}</button>`;
+  const taxBtn = `<button class="btn btn-sm ${taxOn ? 'on' : ''}" id="mpdTax" data-team title="Показывать расход с налогом/сборами">${taxOn ? `✓ +налог ${taxPct}%` : '+ налог'}</button>`;
   const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${taxBtn}<button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
   const cabFactCard = hasAny ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
