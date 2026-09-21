@@ -7791,3 +7791,7 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .qs-row:hover{ background:var(--bg-2); }
 .qs-dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
 .mpd-cur{ flex-wrap:wrap; }
+
+/* сверка Meta/CRM + налог */
+.mpd-div{ color:var(--bad); font-weight:700; margin-left:2px; }
+.btn.on{ background:color-mix(in srgb,var(--accent) 14%,var(--card)); border-color:var(--accent); color:var(--accent); }

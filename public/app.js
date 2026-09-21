@@ -8995,13 +8995,21 @@ PAGES.mediaplan = async (root) => {
   const conv = (n) => fxConv(n, srcCur, dispCur);   /* база = валюта кабинета, по живым курсам */
   const cur = (n) => curSym(dispCur) + Math.round(conv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
   const dirName = (k) => (dirList.find(d => d.key === k) || {}).name || k;
-  const dirFact = {}; const other = { spend: 0, leads: 0, quals: 0, camps: new Set() };
+  const taxOn = !!(S.metaAds && S.metaAds.taxOn); const taxPct = +(S.metaAds && S.metaAds.taxPct) || 0; const taxF = taxOn ? (1 + taxPct / 100) : 1;
+  const mk0 = () => ({ spend: 0, leadsMeta: 0, leadsCRM: 0, quals: 0 });
+  const dirFact = {}; const other = Object.assign(mk0(), { camps: new Set() });
   for (const a of (adData.ads || [])) {
-    const dk = campMap[a.campaignName]; const spend = a.spend || 0, leads = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0), quals = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
-    if (!spend && !leads && !quals) continue;
-    if (dk) { const f = dirFact[dk] = dirFact[dk] || { spend: 0, leads: 0, quals: 0 }; f.spend += spend; f.leads += leads; f.quals += quals; }
-    else { other.spend += spend; other.leads += leads; other.quals += quals; if (a.campaignName) other.camps.add(a.campaignName); }
+    const dk = campMap[a.campaignName];
+    const spend = (a.spend || 0) * taxF;
+    const leadsMeta = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0);
+    const leadsCRM = a.leads || 0;
+    const quals = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
+    if (!spend && !leadsMeta && !leadsCRM && !quals) continue;
+    const tgt = dk ? (dirFact[dk] = dirFact[dk] || mk0()) : other;
+    tgt.spend += spend; tgt.leadsMeta += leadsMeta; tgt.leadsCRM += leadsCRM; tgt.quals += quals;
+    if (!dk && a.campaignName) other.camps.add(a.campaignName);
   }
+  const divFlag = (m, c) => (m > 0 && Math.abs(m - c) / m > 0.3) ? `<span class="mpd-div" title="Расхождение Meta/CRM">⚠</span>` : '';
   const dirPlan = {};
   for (const mp of plans) for (const ln of (mp.lines || [])) { const dk = ln.direction; if (!dk) continue; const p = dirPlan[dk] = dirPlan[dk] || { budget: 0, leads: 0, quals: 0 }; p.budget += +ln.budgetPlan || 0; p.leads += +ln.leadsPlan || 0; p.quals += +ln.qualPlan || 0; }
   const plannedDirs = Object.keys(dirPlan);
@@ -9019,33 +9027,37 @@ PAGES.mediaplan = async (root) => {
   const dRow = (label, plan, fact, isOther) => {
     const tempo = plan.quals ? Math.round(fact.quals / plan.quals * 100) : null;
     const tCls = tempo == null ? '' : (tempo < 80 || tempo > 110) ? 'mp-bad' : 'mp-good';
+    const crmSub = fact.leadsCRM !== fact.leadsMeta ? `<div class="muted" style="font-size:10px">CRM ${fact.leadsCRM} ${divFlag(fact.leadsMeta, fact.leadsCRM)}</div>` : '';
     return `<tr class="${isOther ? 'mpd-other' : ''}">
       <td><b>${esc(label)}</b>${isOther && other.camps.size ? `<div class="muted" style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc([...other.camps].join(', '))}">${esc([...other.camps].slice(0, 4).join(', '))}${other.camps.size > 4 ? '…' : ''}</div>` : ''}</td>
       <td>${plan.budget ? cur(plan.budget) : '—'}</td><td><b>${cur(fact.spend)}</b></td>
-      <td>${plan.leads || '—'}</td><td><b>${fact.leads}</b></td>
+      <td>${plan.leads || '—'}</td><td><b>${fact.leadsMeta}</b>${crmSub}</td>
       <td>${plan.quals || '—'}</td><td><b>${fact.quals}</b></td>
       <td>${tempo != null ? `<b class="${tCls}">${tempo}%</b>` : '<span class="muted">—</span>'}</td>
       <td>${plan.budget ? paceCell(plan.budget, fact.spend) : '<span class="muted">—</span>'}</td>
     </tr>`;
   };
-  const totPlan = { budget: 0, leads: 0, quals: 0 }, totFact = { spend: 0, leads: 0, quals: 0 };
+  const totPlan = { budget: 0, leads: 0, quals: 0 }, totFact = mk0();
   const planRowsHtml = plannedDirs.map(dk => {
-    const plan = dirPlan[dk], fact = dirFact[dk] || { spend: 0, leads: 0, quals: 0 };
+    const plan = dirPlan[dk], fact = dirFact[dk] || mk0();
     totPlan.budget += plan.budget; totPlan.leads += plan.leads; totPlan.quals += plan.quals;
-    totFact.spend += fact.spend; totFact.leads += fact.leads; totFact.quals += fact.quals;
+    totFact.spend += fact.spend; totFact.leadsMeta += fact.leadsMeta; totFact.leadsCRM += fact.leadsCRM; totFact.quals += fact.quals;
     return dRow(dirName(dk), plan, fact, false);
   }).join('');
-  const otherRow = (other.spend || other.leads) ? dRow('Прочее (вне плана)', { budget: 0, leads: 0, quals: 0 }, other, true) : '';
-  totFact.spend += other.spend; totFact.leads += other.leads; totFact.quals += other.quals;
-  const hasAny = plannedDirs.length || other.spend || other.leads;
+  const otherRow = (other.spend || other.leadsMeta) ? dRow('Прочее (вне плана)', { budget: 0, leads: 0, quals: 0 }, other, true) : '';
+  totFact.spend += other.spend; totFact.leadsMeta += other.leadsMeta; totFact.leadsCRM += other.leadsCRM; totFact.quals += other.quals;
+  const hasAny = plannedDirs.length || other.spend || other.leadsMeta;
   const totTempo = totPlan.quals ? Math.round(totFact.quals / totPlan.quals * 100) : null;
-  const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center"><button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
+  const totDiv = totFact.leadsMeta > 0 && Math.abs(totFact.leadsMeta - totFact.leadsCRM) / totFact.leadsMeta > 0.15;
+  const taxBtn = `<button class="btn btn-sm ${taxOn ? 'on' : ''}" id="mpdTax" title="Показывать расход с налогом/сборами">${taxOn ? `✓ +налог ${taxPct}%` : '+ налог'}</button>`;
+  const curSwitch = `<span style="margin-left:auto;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">${taxBtn}<button class="btn btn-sm" id="mpdQualCfg" title="Какие стадии CRM считать квалом">${ic(I.gear)}Квал-статусы</button><span class="mpd-cur">${CUR_LIST.map(c => `<button class="mpd-cur-b ${dispCur === c ? 'on' : ''}" data-dispcur="${c}">${curSym(c).trim() || c} ${c}</button>`).join('')}</span></span>`;
   const cabFactCard = hasAny ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
-      <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b>${srcCur !== dispCur ? ` · пересчёт ${srcCur}→${dispCur} по курсу` : ''}${FXRATES ? '' : ' <span title="курсы по дефолту, живые ещё не подтянулись">·</span>'}</div>
-      <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>Направление</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды</th><th>План квал.</th><th>Факт квал.</th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
+      <div class="muted" style="font-size:11px;margin:-2px 0 8px">Период бюджета: <b>${periodLabel}</b>${srcCur !== dispCur ? ` · пересчёт ${srcCur}→${dispCur} по курсу` : ''}${taxOn ? ` · расход с налогом +${taxPct}%` : ''}</div>
+      ${totDiv ? `<div class="lc-hint warn" style="margin-bottom:8px"><span>${ic(I.spark)}Расхождение <b>Meta ${totFact.leadsMeta}</b> ↔ <b>CRM ${totFact.leadsCRM}</b> лидов. Причины: не все лиды долетели в CRM (проверьте приём/вебхук) или разные окна атрибуции. «Факт квал» считается по CRM-стадиям.</span></div>` : ''}
+      <div style="overflow-x:auto"><table class="tbl mp-cmp mpd-tbl"><thead><tr><th>Направление</th><th>План</th><th>Факт</th><th>План лиды</th><th>Факт лиды<br><span class="muted" style="font-weight:400;font-size:9px">Meta / CRM</span></th><th>План квал.</th><th>Факт квал.<br><span class="muted" style="font-weight:400;font-size:9px">CRM</span></th><th>Темп</th><th>Темп/сутки</th></tr></thead><tbody>
         ${planRowsHtml}${otherRow}
-        <tr class="mpd-total"><td><b>Итого</b></td><td><b>${cur(totPlan.budget)}</b></td><td><b>${cur(totFact.spend)}</b></td><td><b>${totPlan.leads || '—'}</b></td><td><b>${totFact.leads}</b></td><td><b>${totPlan.quals || '—'}</b></td><td><b>${totFact.quals}</b></td><td>${totTempo != null ? `<b class="${totTempo < 80 || totTempo > 110 ? 'mp-bad' : 'mp-good'}">${totTempo}%</b>` : '—'}</td><td></td></tr>
+        <tr class="mpd-total"><td><b>Итого</b></td><td><b>${cur(totPlan.budget)}</b></td><td><b>${cur(totFact.spend)}</b></td><td><b>${totPlan.leads || '—'}</b></td><td><b>${totFact.leadsMeta}</b>${totFact.leadsCRM !== totFact.leadsMeta ? `<div class="muted" style="font-size:10px">CRM ${totFact.leadsCRM}</div>` : ''}</td><td><b>${totPlan.quals || '—'}</b></td><td><b>${totFact.quals}</b></td><td>${totTempo != null ? `<b class="${totTempo < 80 || totTempo > 110 ? 'mp-bad' : 'mp-good'}">${totTempo}%</b>` : '—'}</td><td></td></tr>
       </tbody></table></div>
       ${unboundAccts.length ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Кабинет(ы) <b>${unboundAccts.map(esc).join(', ')}</b> есть в данных. Кампании без сопоставления с направлением попадают в «Прочее» — сопоставление настраивается в медиаплане (поле «направление» у строк).</span></div>` : ''}
     </div>` : (contractors.length ? `<div class="glass card mb"><div class="card-title">${ic(I.bars)}План / Факт по направлениям<span class="sub">факт из синка Meta</span></div>
@@ -9102,6 +9114,14 @@ PAGES.mediaplan = async (root) => {
     try { await api.patch('/settings', { metaAds: { displayCurrency: b.dataset.dispcur } }); await loadState(); render(); } catch (e) { toast('Не вышло', e.message); }
   }));
   $('#mpdQualCfg', root) && $('#mpdQualCfg', root).addEventListener('click', () => openQualStages(() => render()));
+  $('#mpdTax', root) && $('#mpdTax', root).addEventListener('click', async () => {
+    const ma = STATE.settings.metaAds || {};
+    if (ma.taxOn) { await api.patch('/settings', { metaAds: { taxOn: false } }); await loadState(); render(); return; }
+    const v = prompt('Налог/сборы на расход, % (напр. 5 — VAT ОАЭ):', String(ma.taxPct || 5));
+    if (v == null) return;
+    await api.patch('/settings', { metaAds: { taxOn: true, taxPct: Math.max(0, Math.min(50, +v || 0)) } });
+    await loadState(); render();
+  });
   $$('[data-mpview]', root).forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.mpview; if (v === MP_VIEW) return;
     const targetPage = v === 'analytics' ? 'adsAnalytics' : 'mediaplan';
@@ -9171,7 +9191,6 @@ function openMpBuilder(mp, contractors) {
       <td><input class="li" data-k="channel" list="mpChList" value="${esc(ln.channel || '')}" placeholder="Meta"></td>
       <td><input class="li" data-k="geo" value="${esc(ln.geo || '')}" placeholder="dubai"></td>
       <td>${dirSel(ln.direction || '')}</td>
-      <td><input class="li" data-k="bundle" value="${esc(ln.bundle || '')}" placeholder="Связка / креатив → цель"></td>
       <td><input class="li num" data-k="budgetPlan" type="number" min="0" value="${ln.budgetPlan || ''}" placeholder="0"></td>
       <td><input class="li num" data-k="leadsPlan" type="number" min="0" value="${ln.leadsPlan || ''}" placeholder="0"></td>
       <td><input class="li num" data-k="qualPlan" type="number" min="0" value="${ln.qualPlan || ''}" placeholder="0"></td>
@@ -9200,13 +9219,13 @@ function openMpBuilder(mp, contractors) {
         <select id="mpStatus">${Object.entries(MP_STATUS).map(([k, v]) => `<option value="${k}" ${k === mp.status ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
       </div>
     </div>
-    <div class="mp-lbl">Строки плана <span class="muted">· канал · гео · связка · бюджет/лиды план → CPL, и факт (вручную) → CPL факт · Δ</span></div>
+    <div class="mp-lbl">Строки плана <span class="muted">· канал · гео · направление · бюджет/лиды/квал план → CPL, и факт (вручную) → CPL факт</span></div>
     <div class="mp-tbl-wrap"><table class="mp-tbl"><thead><tr>
-      <th>Канал</th><th>Гео</th><th>Направление</th><th>Связка</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
+      <th>Канал</th><th>Гео</th><th>Направление</th><th class="num">Бюджет</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">CPL</th><th class="num fct">Факт&nbsp;$</th><th class="num fct">Факт&nbsp;лид</th><th class="num">CPL&nbsp;факт</th><th></th>
     </tr></thead>
     <tbody id="mpRows">${(mp.lines || []).map(lineRow).join('') || lineRow()}</tbody>
     <tfoot><tr class="mp-tot">
-      <td colspan="4">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
+      <td colspan="3">Итого <button type="button" class="btn btn-sm" id="mpAddRow" style="margin-left:8px">${ic(I.plus)}Строка</button></td>
       <td class="num" id="mpTbP">—</td><td class="num" id="mpTlP">—</td><td class="num" id="mpTqP">—</td><td class="num" id="mpTcP">—</td>
       <td class="num fct" id="mpTbF">—</td><td class="num fct" id="mpTlF">—</td><td class="num" id="mpTcF">—</td><td></td>
     </tr></tfoot></table></div>
@@ -9231,8 +9250,8 @@ function openMpBuilder(mp, contractors) {
     const ctVal = $('#mpCt', root2).value;
     const lines = $$('[data-lrow]', root2).map(tr => {
       const g = (k) => { const el2 = tr.querySelector(`[data-k="${k}"]`); return el2 ? el2.value : ''; };
-      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), direction: g('direction').trim(), bundle: g('bundle').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
-    }).filter(l => l.channel || l.geo || l.bundle || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
+      return { id: tr.dataset.lid || undefined, channel: g('channel').trim(), geo: g('geo').trim(), direction: g('direction').trim(), budgetPlan: +g('budgetPlan') || 0, leadsPlan: +g('leadsPlan') || 0, qualPlan: +g('qualPlan') || 0, budgetFact: +g('budgetFact') || 0, leadsFact: +g('leadsFact') || 0, note: tr.dataset.note || '' };
+    }).filter(l => l.channel || l.geo || l.direction || l.budgetPlan || l.leadsPlan || l.qualPlan || l.budgetFact || l.leadsFact);
     return { title, contractorId: ctVal === '__new' ? null : ctVal, currency: $('#mpCur', root2).value, period: { from: $('#mpFrom', root2).value, to: $('#mpTo', root2).value }, status: $('#mpStatus', root2).value, lines, note: $('#mpNote', root2).value };
   };
 
