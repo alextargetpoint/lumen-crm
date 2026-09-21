@@ -8753,6 +8753,16 @@ const chLabel = (v) => { const c = chMeta(v); return c ? ((c.emoji ? c.emoji + '
 const langMeta = (k) => adLangs().find(l => l.key === k) || null;
 const langLabel = (k) => { const l = langMeta(k); return l ? (l.emoji ? l.emoji + ' ' : '') + l.name : (k || ''); };
 const langSlug = (s) => String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').replace(/^_|_$/g, '').slice(0, 16) || ('l' + Math.random().toString(36).slice(2, 5));
+/* Авто-детект языка по неймингу кампании/адсета (как в дашборде TargetPoint): токены RU/EN/рус/eng… */
+const LANG_ALIASES = { ru: ['ru', 'rus', 'russian', 'рус', 'русский', 'россия'], en: ['en', 'eng', 'english', 'uk', 'us', 'usa'], es: ['es', 'esp', 'spa', 'spanish', 'espanol', 'español'], de: ['de', 'ger', 'deu', 'german', 'deutsch'], fr: ['fr', 'fra', 'french', 'francais', 'français'], it: ['it', 'ita', 'italian', 'italiano'], pt: ['pt', 'por', 'portuguese', 'brasil'], ar: ['ar', 'ara', 'arabic', 'arab', 'араб'], th: ['th', 'tha', 'thai', 'тай'], zh: ['zh', 'chinese', 'china', 'cn'], tr: ['tr', 'tur', 'turkish', 'turkce'], ua: ['ua', 'ukr', 'ukrainian', 'укр'] };
+function detectAdLang(name) {
+  const s = ' ' + String(name || '').toLowerCase().replace(/[|_/\\.,()\-–—:]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+  for (const l of adLangs()) {
+    const keys = [l.key, l.name, ...(LANG_ALIASES[l.key] || [])].filter(Boolean).map(x => String(x).toLowerCase());
+    for (const k of keys) { const kk = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (kk && new RegExp('(^| )' + kk + '( |$)').test(s)) return l.key; }
+  }
+  return '';
+}
 const MP_STATUS = {
   draft: { name: 'Черновик', cls: 'warn' },
   sent: { name: 'Отправлен', cls: 'acc' },
@@ -8922,8 +8932,20 @@ PAGES.mediaplan = async (root) => {
   MP_VIEW = (CUR === 'adsAnalytics') ? 'analytics' : 'plans';
   await ensureFx();
   const [plans, contractors] = await Promise.all([api.get('/mediaplans'), api.get('/contractors')]);
-  /* факт из подключённых рекламных кабинетов (Meta API) — для сведения план-факт по подрядчику */
-  let adData = { ads: [] }; try { adData = await api.get('/ads'); } catch (_) {}
+  /* Окно факта План/Факт: по умолчанию = ПЕРИОД ПЛАНА (подрядчик мог стартовать в середине месяца),
+     переключается на текущий месяц / свой. Без диапазона /ads отдаёт всё окно синка → цифры завышались. */
+  const _mn = new Date();
+  const monthFrom = `${_mn.getFullYear()}-${String(_mn.getMonth() + 1).padStart(2, '0')}-01`;
+  const _me = new Date(_mn.getFullYear(), _mn.getMonth() + 1, 0);
+  const monthTo = `${_me.getFullYear()}-${String(_me.getMonth() + 1).padStart(2, '0')}-${String(_me.getDate()).padStart(2, '0')}`;
+  const mpdRange = PAGE_STATE.mpdRange || { preset: 'plan' };
+  const _mpdCt0 = PAGE_STATE.mpdCt || '';
+  const _periodPlans = _mpdCt0 ? plans.filter(p => p.contractorId === _mpdCt0) : plans;
+  let factFrom, factTo;
+  if (mpdRange.preset === 'month') { factFrom = monthFrom; factTo = monthTo; }
+  else if (mpdRange.preset === 'custom' && (mpdRange.from || mpdRange.to)) { factFrom = mpdRange.from || monthFrom; factTo = mpdRange.to || monthTo; }
+  else { const froms = _periodPlans.map(p => p.period && p.period.from).filter(Boolean).sort(); const tos = _periodPlans.map(p => p.period && p.period.to).filter(Boolean).sort(); factFrom = froms[0] || monthFrom; factTo = tos[tos.length - 1] || monthTo; }
+  let adData = { ads: [] }; try { adData = await api.get('/ads?from=' + factFrom + '&to=' + factTo); } catch (_) {}
   const accFact = {};   /* act_id → {spend, leads, qualified, deals} */
   for (const a of (adData.ads || [])) { const acc = a.adAccountId; if (!acc) continue; const f = accFact[acc] = accFact[acc] || { spend: 0, leads: 0, qualified: 0, deals: 0 }; f.spend += a.spend || 0; f.leads += a.leads || 0; f.qualified += a.qualified || 0; f.deals += a.deals || 0; }
   const boundAccts = new Set(contractors.flatMap(c => c.adAccounts || []));
@@ -9027,6 +9049,11 @@ PAGES.mediaplan = async (root) => {
   const S = STATE.settings || {};
   const dirList = S.adDirections || [];
   const campMap = S.adCampaignMap || {};
+  const campLangMap = S.adCampaignLangMap || {};
+  /* язык факта: ручная привязка кампании → иначе авто-детект по неймингу кампании/адсета */
+  const adLangOf = (a) => campLangMap[a.campaignName] || detectAdLang(a.campaignName) || detectAdLang(a.adsetName) || '';
+  /* канал факта: всё, что синкнуто из кабинета Meta (есть adAccountId / meta_api / platform=meta) — это Meta */
+  const adChannelOf = (a) => (a.platform === 'meta' || a.spendSource === 'meta_api' || a.adAccountId) ? 'Meta' : (a.platform || '');
   const srcCur = (S.metaAds && S.metaAds.sourceCurrency) || (S.metaAds && S.metaAds.accounts && S.metaAds.accounts[0] && S.metaAds.accounts[0].currency) || 'AED';
   const dispCur = (S.metaAds && S.metaAds.displayCurrency) || srcCur;
   const conv = (n) => fxConv(n, srcCur, dispCur);   /* база = валюта кабинета, по живым курсам */
@@ -9055,9 +9082,9 @@ PAGES.mediaplan = async (root) => {
   }
   const ctAccts = mpdCt ? new Set((contractors.find(c => c.id === mpdCt) || {}).adAccounts || []) : null;
   const factKey = (a) => {
-    if (mpdGroup === 'channel') { const nm = a.platform === 'meta' ? 'Meta' : (a.platform || ''); return nm ? [nm, chLabel(nm)] : [OTHER, 'Прочее (вне плана)']; }
+    if (mpdGroup === 'channel') { const nm = adChannelOf(a); return nm ? [nm, chLabel(nm)] : [OTHER, 'Прочее (вне плана)']; }
     if (mpdGroup === 'contractor') { const cid = acctToCt[a.adAccountId]; return cid ? [cid, ctName(cid)] : [OTHER, 'Прочее (вне плана)']; }
-    if (mpdGroup === 'language') return ['__nolang', 'Факт (язык не размечен)'];
+    if (mpdGroup === 'language') { const lk = adLangOf(a); return lk ? [lk, langLabel(lk)] : ['__nolang', 'Факт (язык не размечен)']; }
     const dk = campMap[a.campaignName]; return dk ? [dk, dirName(dk)] : [OTHER, 'Прочее (вне плана)'];
   };
   for (const a of (adData.ads || [])) {
@@ -9070,9 +9097,15 @@ PAGES.mediaplan = async (root) => {
   }
   const mpgKeys = Object.keys(MPG).filter(k => k !== OTHER && k !== '__nolang').sort((x, y) => (MPG[y].plan.budget + MPG[y].fact.spend) - (MPG[x].plan.budget + MPG[x].fact.spend));
   const tailKeys = [OTHER, '__nolang'].filter(k => MPG[k]);
-  const _now = new Date(); const y = _now.getFullYear(), mo = _now.getMonth();
-  const daysTotal = Math.round((new Date(y, mo + 1, 1) - new Date(y, mo, 1)) / 864e5); const daysPassed = Math.min(daysTotal, _now.getDate()); const daysLeft = Math.max(0, daysTotal - daysPassed);
-  const periodLabel = `01.${String(mo + 1).padStart(2, '0')}–${daysTotal}.${String(mo + 1).padStart(2, '0')}.${y} · прошло ${daysPassed} из ${daysTotal} дн · осталось ${daysLeft}`;
+  /* дни считаем по ФАКТИЧЕСКОМУ окну (период плана / месяц / свой), а не по календарному месяцу */
+  const _rFrom = new Date(factFrom + 'T00:00:00'); const _rTo = new Date(factTo + 'T00:00:00');
+  const _today0 = new Date(); _today0.setHours(0, 0, 0, 0);
+  const daysTotal = Math.max(1, Math.round((_rTo - _rFrom) / 864e5) + 1);
+  const daysPassed = Math.min(daysTotal, Math.max(0, Math.round((Math.min(_today0, _rTo) - _rFrom) / 864e5) + 1));
+  const daysLeft = Math.max(0, daysTotal - daysPassed);
+  const _fmtRuD = (s) => { const a = String(s).split('-'); return a[2] ? `${+a[2]}.${a[1]}.${a[0]}` : s; };
+  const rangeName = mpdRange.preset === 'month' ? 'текущий месяц' : mpdRange.preset === 'custom' ? 'свой период' : 'период плана';
+  const periodLabel = `${_fmtRuD(factFrom)}–${_fmtRuD(factTo)} (${rangeName}) · прошло ${daysPassed} из ${daysTotal} дн · осталось ${daysLeft}`;
   const paceCell = (planBudget, factSpend) => {
     const need = daysLeft > 0 ? (planBudget - factSpend) / daysLeft : planBudget / daysTotal;
     const perDay = factSpend / Math.max(1, daysPassed);   /* нет посуточных данных → среднесуточный (прокси) */
@@ -9107,8 +9140,10 @@ PAGES.mediaplan = async (root) => {
   const GRP = { direction: ['направлениям', 'Направление'], channel: ['каналам', 'Канал'], contractor: ['подрядчикам', 'Подрядчик'], language: ['языкам', 'Язык'] }[mpdGroup] || ['направлениям', 'Направление'];
   const groupSeg = `<span class="mpd-grp">${[['direction', 'Направление'], ['channel', 'Канал'], ['contractor', 'Подрядчик'], ['language', 'Язык']].map(([k, n]) => `<button class="mpd-grp-b ${mpdGroup === k ? 'on' : ''}" data-mpdgroup="${k}">${n}</button>`).join('')}</span>`;
   const ctFilter = contractors.length ? `<select id="mpdCtSel" data-mpdct><option value="">Все подрядчики</option>${contractors.map(c => `<option value="${c.id}" ${mpdCt === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : '';
-  const grpBar = `<div class="mpd-grpbar"><span class="mpd-grpbar-l">Дробить по:</span>${groupSeg}${ctFilter ? `<span class="mpd-grpbar-l" style="margin-left:6px">Подрядчик:</span>${ctFilter}` : ''}</div>`;
-  const langNote = mpdGroup === 'language' ? `<div class="muted" style="font-size:10.5px;margin:-2px 0 8px">План размечен по языку; факт из Meta по языку не разбивается — общий факт в строке «Факт (язык не размечен)».</div>` : '';
+  const rangeSeg = `<span class="mpd-grp">${[['plan', 'Период плана'], ['month', 'Тек. месяц'], ['custom', 'Свой']].map(([k, n]) => `<button class="mpd-grp-b ${mpdRange.preset === k ? 'on' : ''}" data-mpdrange="${k}">${n}</button>`).join('')}</span>${mpdRange.preset === 'custom' ? `<span class="mpd-custom"><input type="date" id="mpdFrom" value="${esc(factFrom || '')}"><span class="muted">—</span><input type="date" id="mpdTo" value="${esc(factTo || '')}"><button class="btn btn-sm btn-accent" id="mpdApply">ОК</button></span>` : ''}`;
+  const grpBar = `<div class="mpd-grpbar"><span class="mpd-grpbar-l">Дробить по:</span>${groupSeg}${ctFilter ? `<span class="mpd-grpbar-l" style="margin-left:6px">Подрядчик:</span>${ctFilter}` : ''}</div>
+    <div class="mpd-grpbar"><span class="mpd-grpbar-l">Окно факта:</span>${rangeSeg}</div>`;
+  const langNote = mpdGroup === 'language' ? `<div class="muted" style="font-size:10.5px;margin:-2px 0 8px">Язык факта определяется по неймингу кампании/адсета (RU/EN/рус/eng…) и ручной привязке в «Направления». Что не распознано — в «Факт (язык не размечен)».</div>` : '';
   const cabFactCard = hasAny ? `<div class="glass card mb">
       <div class="card-title">${ic(I.bars)}План / Факт по ${GRP[0]}<span class="sub">факт из кабинета Meta · календарный месяц</span>${curSwitch}</div>
       ${grpBar}
@@ -9187,6 +9222,8 @@ PAGES.mediaplan = async (root) => {
   $$('[data-mpfilter]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.mpFilter = b.dataset.mpfilter; render._silent = true; render(); }));
   $$('[data-mpdgroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.mpdGroup = b.dataset.mpdgroup; render._silent = true; render(); }));
   $('#mpdCtSel', root) && $('#mpdCtSel', root).addEventListener('change', (e) => { PAGE_STATE.mpdCt = e.target.value; render._silent = true; render(); });
+  $$('[data-mpdrange]', root).forEach(b => b.addEventListener('click', () => { const p = b.dataset.mpdrange; PAGE_STATE.mpdRange = p === 'custom' ? { preset: 'custom', from: (PAGE_STATE.mpdRange && PAGE_STATE.mpdRange.from) || '', to: (PAGE_STATE.mpdRange && PAGE_STATE.mpdRange.to) || '' } : { preset: p }; render._silent = true; render(); }));
+  $('#mpdApply', root) && $('#mpdApply', root).addEventListener('click', () => { const from = $('#mpdFrom', root)?.value || '', to = $('#mpdTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Даты «с» и «по»', false); return; } PAGE_STATE.mpdRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#mpdQualCfg', root) && $('#mpdQualCfg', root).addEventListener('click', () => openQualStages(() => render()));
   $('#mpdTax', root) && $('#mpdTax', root).addEventListener('click', async () => {
     const ma = STATE.settings.metaAds || {};
@@ -9490,30 +9527,36 @@ function openQualStages(onDone) {
 async function openDirMap(onDone) {
   let ad = { ads: [] }; try { ad = await api.get('/ads'); } catch (_) {}
   const campaigns = [...new Set((ad.ads || []).map(a => a.campaignName).filter(Boolean))].sort();
+  const campAdset = {}; for (const a of (ad.ads || [])) { if (a.campaignName && !campAdset[a.campaignName]) campAdset[a.campaignName] = a.adsetName || ''; }
   let dirs = (STATE.settings.adDirections || []).map(d => ({ key: d.key, name: d.name, strategy: d.strategy || '' }));
   const map = Object.assign({}, STATE.settings.adCampaignMap || {});
+  const langMap = Object.assign({}, STATE.settings.adCampaignLangMap || {});
   const slug = dirSlug;
+  /* авто-детект направления: имя кампании содержит имя направления как токен */
+  const detectDir = (cn) => { const s = ' ' + cn.toLowerCase() + ' '; const hit = dirs.find(d => d.name && s.includes(' ' + d.name.toLowerCase() + ' ') || cn.toLowerCase().includes((d.name || '').toLowerCase()) && (d.name || '').length >= 4); return hit ? hit.key : ''; };
   const body = `<div id="dmBox">
-    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — это как «проекты»/стратегии из плана. Свяжите каждую рекламную кампанию с направлением, чтобы факт из кабинета сводился по плану. Кампании без направления попадут в «Прочее (вне плана)».</div>
+    <div class="muted" style="font-size:12px;line-height:1.5;margin-bottom:10px">Направления — «проекты»/стратегии плана. Свяжите кампанию с направлением и языком, чтобы факт из кабинета сводился по плану. «Автоопределить» проставит язык (RU/EN/…) и направление по неймингу. Не размеченное → «Прочее».</div>
     <div class="lp-sec" style="margin:0 0 6px">Направления и стратегии</div>
     <div id="dmDirs"></div>
     <div style="display:flex;gap:6px;margin:8px 0 14px"><input id="dmNewDir" placeholder="Новое направление (напр. Leadgeneration)" style="flex:1"><button class="btn btn-sm btn-accent" id="dmAddDir">${ic(I.plus)}Добавить</button></div>
-    <div class="lp-sec" style="margin:0 0 6px">Кампании из кабинета → направление <span class="muted" style="font-weight:400">· ${campaigns.length}</span></div>
+    <div class="lp-sec dm-camps-lbl" style="margin:0 0 6px;display:flex;align-items:center;gap:8px">Кампании из кабинета → направление · язык <span class="muted" style="font-weight:400">· ${campaigns.length}</span>${campaigns.length ? `<button class="btn btn-sm" id="dmAuto" style="margin-left:auto">${ic(I.spark)}Автоопределить</button>` : ''}</div>
     <div id="dmCamps" style="max-height:40vh;overflow-y:auto">${campaigns.length ? '' : '<div class="muted" style="font-size:12px;padding:10px">Кампаний пока нет — сначала синхронизируйте кабинет («Настройки рекламы» → «Синхронизировать сейчас»).</div>'}</div>
   </div>`;
   const syncDirsFromDom = () => { $$('[data-dk]', bd).forEach(r => { const d = dirs.find(x => x.key === r.dataset.dk); if (!d) return; const nm = $('.dm-dir-nm', r); const st = $('.dm-dir-st', r); if (nm) d.name = nm.value.trim() || d.name; if (st) d.strategy = st.value.trim(); }); };
-  const bd = modal({ title: 'Направления и сопоставление кампаний', sub: 'Направления/стратегии · привязка кампаний Meta', wide: true, body, actions: [
+  const bd = modal({ title: 'Направления и сопоставление кампаний', sub: 'Направления/стратегии · привязка кампаний Meta по направлению и языку', wide: true, body, actions: [
     { label: 'Сохранить', cls: 'btn-accent', onClick: async (bdEl) => {
       syncDirsFromDom();
       $$('[data-campmap]', bdEl).forEach(s => { const cn = s.dataset.campmap; if (s.value) map[cn] = s.value; else delete map[cn]; });
-      await api.patch('/settings', { adDirections: dirs, adCampaignMap: map });
+      $$('[data-camplang]', bdEl).forEach(s => { const cn = s.dataset.camplang; if (s.value) langMap[cn] = s.value; else delete langMap[cn]; });
+      await api.patch('/settings', { adDirections: dirs, adCampaignMap: map, adCampaignLangMap: langMap });
       await loadState();
-      toast('Сохранено', 'Направления и сопоставление применены', true);
+      toast('Сохранено', 'Направления, язык и сопоставление применены', true);
       if (onDone) onDone();
     } },
     { label: 'Отмена' },
   ] });
   const dirOpts = () => `<option value="">— Прочее (вне плана)</option>` + dirs.map(d => `<option value="${esc(d.key)}">${esc(d.name)}</option>`).join('');
+  const langOpts = () => `<option value="">— язык (авто)</option>` + adLangs().map(l => `<option value="${esc(l.key)}">${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</option>`).join('');
   const paintDirs = () => {
     const el2 = $('#dmDirs', bd);
     el2.innerHTML = dirs.length ? dirs.map(d => `<div class="dm-dir" data-dk="${esc(d.key)}"><input class="dm-dir-nm" value="${esc(d.name)}" placeholder="Название"><input class="dm-dir-st" value="${esc(d.strategy || '')}" placeholder="Стратегия (оффер · аудитории · KPI)"><button class="btn btn-sm btn-danger" data-deldir="${esc(d.key)}">${ic(I.x)}</button></div>`).join('') : '<div class="muted" style="font-size:11.5px">Пока нет направлений — добавьте ниже (или подтянутся из направлений плана).</div>';
@@ -9522,13 +9565,21 @@ async function openDirMap(onDone) {
   const paintCampSelects = () => { $$('[data-campmap]', bd).forEach(s => { const cur = s.value; s.innerHTML = dirOpts(); s.value = dirs.some(d => d.key === cur) ? cur : ''; }); };
   const paintCamps = () => {
     const el2 = $('#dmCamps', bd); if (!campaigns.length) return;
-    el2.innerHTML = campaigns.map(cn => `<div class="dm-camp"><span class="dm-camp-nm" title="${esc(cn)}">${esc(cn)}</span><select data-campmap="${esc(cn)}">${dirOpts()}</select></div>`).join('');
+    el2.innerHTML = campaigns.map(cn => { const autoLang = detectAdLang(cn) || detectAdLang(campAdset[cn]); return `<div class="dm-camp"><span class="dm-camp-nm" title="${esc(cn)}">${esc(cn)}${autoLang && !langMap[cn] ? `<span class="dm-auto-hint" title="Авто-детект языка">${esc(langLabel(autoLang))}</span>` : ''}</span><select data-campmap="${esc(cn)}">${dirOpts()}</select><select data-camplang="${esc(cn)}">${langOpts()}</select></div>`; }).join('');
     $$('[data-campmap]', el2).forEach(s => { s.value = map[s.dataset.campmap] || ''; });
+    $$('[data-camplang]', el2).forEach(s => { s.value = langMap[s.dataset.camplang] || ''; });
     try { enhanceControls(el2); } catch (_) {}
   };
   paintDirs(); paintCamps();
   $('#dmAddDir', bd).addEventListener('click', () => { const v = $('#dmNewDir', bd).value.trim(); if (!v) return; syncDirsFromDom(); dirs.push({ key: slug(v), name: v, strategy: '' }); $('#dmNewDir', bd).value = ''; paintDirs(); paintCampSelects(); });
   $('#dmNewDir', bd).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#dmAddDir', bd).click(); } });
+  const dmAuto = $('#dmAuto', bd);
+  if (dmAuto) dmAuto.addEventListener('click', () => {
+    let n = 0;
+    $$('[data-camplang]', bd).forEach(s => { const cn = s.dataset.camplang; if (!s.value) { const lk = detectAdLang(cn) || detectAdLang(campAdset[cn]); if (lk && adLangs().some(l => l.key === lk)) { s.value = lk; langMap[cn] = lk; n++; } } });
+    $$('[data-campmap]', bd).forEach(s => { const cn = s.dataset.campmap; if (!s.value) { const dk = detectDir(cn); if (dk) { s.value = dk; map[cn] = dk; n++; } } });
+    toast(n ? 'Автоопределение готово' : 'Нечего определять', n ? `Проставлено ${n} · проверьте и сохраните` : 'Всё уже размечено или нет совпадений', true);
+  });
 }
 
 const dirSlug = (s) => 'dir_' + String(s).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '_').slice(0, 24) + Math.random().toString(36).slice(2, 5);
