@@ -8471,8 +8471,13 @@ PAGES.ads = async (root) => {
           ${cabHdr}${cabSignals}
           <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : '<div class="empty">Нет данных кабинета — подключите кабинет и синкните.</div>'}</div>`
         : `
-          <div class="muted ct-note">Список <b>по уникальным названиям креативов</b> (не по объявлениям). Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом. Первое касание по лиду = креатив + текст с сильными сторонами. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
-          <div class="ct-names">${nameGroups.length ? nameGroups.map(nameCard).join('') : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}</div>`}
+          <div class="muted ct-note">Креативы <b>по уникальным названиям</b>, сгруппированы по кампаниям и <b>свёрнуты</b> — раскрывайте нужную. Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
+          ${nameGroups.length ? (() => {
+            const byCamp = {}; nameGroups.forEach(g => { (g.camps.size ? [...g.camps] : ['— без кампании']).forEach(cn => { (byCamp[cn] = byCamp[cn] || []).push(g); }); });
+            const camps = Object.entries(byCamp).sort((a, b) => b[1].length - a[1].length);
+            return `<div class="cta-hdr" style="margin:2px 0 8px"><span class="cta-sum">${camps.length} ${plural(camps.length, 'кампания', 'кампании', 'кампаний')} · ${nameGroups.length} креативов</span><button class="btn btn-sm" id="ctCreaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>
+              <div class="ct-names">${camps.map(([cn, gs]) => `<div class="ct-camp-grp"><div class="ct-camp-hd" data-ctcamp>${ic(I.target)}<b>${esc(cn)}</b><span class="muted">· ${gs.length} ${plural(gs.length, 'креатив', 'креатива', 'креативов')}</span><span class="cta-caret" style="margin-left:auto">▸</span></div><div class="ct-camp-kids" hidden>${gs.map(nameCard).join('')}</div></div>`).join('')}</div>`;
+          })() : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}`}
       </div>`;
     })()}
     <div class="two-col">
@@ -8564,6 +8569,7 @@ PAGES.ads = async (root) => {
               <label class="map-chip locked"><input type="checkbox" checked disabled> name</label>
               <label class="map-chip locked"><input type="checkbox" checked disabled> phone</label>
               <label class="map-chip"><input type="checkbox" data-mapf="email" checked> email</label>
+              <label class="map-chip"><input type="checkbox" data-mapf="lead_id" checked title="ID лида из формы — нужен для вебхука/CAPI (дедуп, обратная передача события)"> lead_id</label>
               <label class="map-chip"><input type="checkbox" data-mapf="ad_id" checked> ad_id</label>
               <label class="map-chip"><input type="checkbox" data-mapf="adset_id"> adset_id</label>
               <label class="map-chip"><input type="checkbox" data-mapf="campaign_id"> campaign_id</label>
@@ -8641,6 +8647,8 @@ PAGES.ads = async (root) => {
   }));
   $$('[data-nodeleads]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openNodeLeads(b.dataset.nodeleads || '', b.dataset.nodetitle || ''); }));
   $('#ctaCollapseAll', root) && $('#ctaCollapseAll', root).addEventListener('click', () => { const exp = $$('.cta-kids:not([hidden])', root).length > 0; $$('.cta-kids', root).forEach(k => k.hidden = exp); $$('[data-ctacoll]', root).forEach(r => r.classList.toggle('open', !exp)); $('#ctaCollapseAll', root).textContent = exp ? 'Развернуть всё' : 'Свернуть всё'; });
+  $$('[data-ctcamp]', root).forEach(h => h.addEventListener('click', () => { const k = h.nextElementSibling; if (k) { k.hidden = !k.hidden; h.classList.toggle('open', !k.hidden); } }));
+  $('#ctCreaCollapseAll', root) && $('#ctCreaCollapseAll', root).addEventListener('click', () => { const kids = $$('.ct-camp-kids', root); const anyOpen = kids.some(k => !k.hidden); kids.forEach(k => k.hidden = anyOpen); $$('[data-ctcamp]', root).forEach(h => h.classList.toggle('open', !anyOpen)); $('#ctCreaCollapseAll', root).textContent = anyOpen ? 'Развернуть всё' : 'Свернуть всё'; });
   $$('[data-ctsave]', root).forEach(b => b.addEventListener('click', async () => {
     const ad = b.dataset.ctsave; const box = b.closest('.ct-ad');
     const url = box.querySelector('.ct-media').value.trim();
@@ -8668,9 +8676,9 @@ PAGES.ads = async (root) => {
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
   /* --- Генератор маппинга для интегратора (JSON тело + cURL) --- */
-  const MAP_TOK = { name: '{{full_name}}', phone: '{{phone_number}}', email: '{{email}}', ad_id: '{{ad_id}}', adset_id: '{{adset_id}}', campaign_id: '{{campaign_id}}', form_name: '{{form_name}}', source: 'meta_form', geo: '' };
-  const MAP_VALS = { name: 'Тест Тестов', phone: '+79001234567', email: 'test@example.com', ad_id: '120210000000000000', adset_id: '6100000000000', campaign_id: '2380000000000', form_name: 'Заявка · сайт', source: 'meta_form', geo: 'dubai' };
-  const MAP_ORDER = ['name', 'phone', 'email', 'ad_id', 'adset_id', 'campaign_id', 'form_name', 'source', 'geo'];
+  const MAP_TOK = { name: '{{full_name}}', phone: '{{phone_number}}', email: '{{email}}', lead_id: '{{lead_id}}', ad_id: '{{ad_id}}', adset_id: '{{adset_id}}', campaign_id: '{{campaign_id}}', form_name: '{{form_name}}', source: 'meta_form', geo: '' };
+  const MAP_VALS = { name: 'Тест Тестов', phone: '+79001234567', email: 'test@example.com', lead_id: 'l:1200000000000000', ad_id: '120210000000000000', adset_id: '6100000000000', campaign_id: '2380000000000', form_name: 'Заявка · сайт', source: 'meta_form', geo: 'dubai' };
+  const MAP_ORDER = ['name', 'phone', 'email', 'lead_id', 'ad_id', 'adset_id', 'campaign_id', 'form_name', 'source', 'geo'];
   const rebuildMap = () => {
     const on = { name: true, phone: true };
     $$('[data-mapf]', root).forEach(c => on[c.dataset.mapf] = c.checked);
