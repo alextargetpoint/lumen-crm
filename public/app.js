@@ -8444,7 +8444,7 @@ PAGES.ads = async (root) => {
               <div class="cg-step"><span class="cg-n">3</span><div><b>Свяжите стадии воронки с событиями Meta.</b> Ниже: когда лид доходит до стадии, Lumen шлёт соответствующее <b>стандартное событие</b> Meta. Стандартные имена (Lead / Schedule / Purchase) обязательны — только их понимает алгоритм оптимизации.</div></div>
               <div class="cg-step"><span class="cg-n">4</span><div><b>Проверьте.</b> Впишите <b>Test event code</b> (Events Manager → Test Events), нажмите «Тест-событие» и убедитесь, что оно видно в Meta. Затем очистите test code — события пойдут в прод.</div></div>
               <div class="cg-loop">🔄 Итог — двусторонний цикл: <b>Meta → лид-форма → CRM</b> (приём) и <b>CRM → квал/сделка → Meta</b> (обратный сигнал качества). Алгоритм дообучается на реально качественных лидах, а не на всех заявках подряд.</div>
-            </div>`, { open: !cp.enabled, count: 0, icon: I.doc })}
+            </div>`, { open: false, count: 0, icon: I.doc })}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Pixel / Dataset ID</label><input id="capiPixel" value="${esc(cp.pixelId || '')}" placeholder="напр. 1234567890"></div>
             <div class="form-row"><label>CAPI access token</label><input id="capiToken" type="password" placeholder="${cp.tokenSet ? '•••••• сохранён' : 'EAAB…'}"></div>
@@ -8464,7 +8464,7 @@ PAGES.ads = async (root) => {
           <div class="card-title">${ic(I.target)}Рекламный кабинет (Meta API)<span class="sub">прямое подключение — лиды и расход без интегратора</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите кабинет <b>напрямую</b> по Marketing API: лиды тянутся из лид-форм (Lead Ads), а <b>расход / кампании / креативы</b> — из Insights. Ручной ввод spend и загрузка CSV больше не нужны. Не хотите API — оставьте приём «через интегратор» (карточка «Мост приёма лидов» ниже, Albato / Make / Zapier). Можно <b>совмещать</b>.</div>
-          ${coll('📘 Полный гайд: приложение Meta, токен и Ad account ID — с нуля, со скриншотами', metaCabGuide(), { open: !ma.tokenSet, count: 0, icon: I.doc })}
+          ${coll('📘 Полный гайд: приложение Meta, токен и Ad account ID — с нуля, со скриншотами', metaCabGuide(), { open: false, count: 0, icon: I.doc })}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-row"><label>Ad account ID</label><input id="maAcct" value="${esc(ma.adAccountId || '')}" placeholder="act_1234567890"></div>
             <div class="form-row"><label>Access token (System User)</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
