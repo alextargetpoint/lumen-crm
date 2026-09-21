@@ -14,11 +14,18 @@
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
 function cfg(db) { return (db.settings && db.settings.metaAds) || {}; }
-function ready(db) { const c = cfg(db); return !!(c.enabled && c.token && c.adAccountId); }
+function acctId(id) { id = String(id || '').trim(); if (!id) return ''; return id.startsWith('act_') ? id : ('act_' + id.replace(/\D/g, '')); }
+/* список подключённых кабинетов: новый формат accounts:[{id,name,currency}] + легаси adAccountId */
+function accountsOf(db) {
+  const c = cfg(db);
+  const list = Array.isArray(c.accounts) ? c.accounts.map(a => ({ id: acctId(a.id || a), name: (a && a.name) || '', currency: (a && a.currency) || '' })).filter(a => a.id) : [];
+  if (!list.length && c.adAccountId) list.push({ id: acctId(c.adAccountId), name: '', currency: c.currency || '' });
+  /* дедуп по id */
+  const seen = new Set(); return list.filter(a => (seen.has(a.id) ? false : (seen.add(a.id), true)));
+}
+function ready(db) { const c = cfg(db); return !!(c.enabled && c.token && accountsOf(db).length); }
 /* mode: 'api' | 'integrator' | 'both' — тянем через API, если режим это разрешает */
 function apiEnabled(db) { const c = cfg(db); return ready(db) && (c.mode === 'api' || c.mode === 'both' || !c.mode); }
-
-function acctId(id) { id = String(id || '').trim(); if (!id) return ''; return id.startsWith('act_') ? id : ('act_' + id.replace(/\D/g, '')); }
 
 async function graphGet(path, token, params = {}) {
   const qs = new URLSearchParams(Object.assign({ access_token: token }, params)).toString();

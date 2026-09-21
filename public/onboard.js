@@ -56,6 +56,9 @@
     lock: _svg('<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 018 0v3.5"/>'),
     upload: _svg('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3"/>'),
     gear: _svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>', 1.7),
+    sliders: _svg('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', 1.8),
+    info: _svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/>', 1.8),
+    home: _svg('<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>', 1.8),
     wa: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 00-8.6 15l-1 3.7 3.8-1A10 10 0 1012 2zm0 2a8 8 0 11-4.2 14.8l-.3-.2-2.2.6.6-2.2-.2-.3A8 8 0 0112 4zm4.6 10.1c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1a6.5 6.5 0 01-3.2-2.8c-.1-.2 0-.4.1-.5l.4-.5c.1-.1.1-.3 0-.4l-.7-1.7c-.2-.4-.4-.4-.5-.4h-.5c-.2 0-.4.1-.6.3-.7.7-.9 1.7-.6 2.7.5 1.7 1.7 3.2 3.4 4.2 1.6.9 2.9 1 3.8.8.7-.2 1.4-.8 1.6-1.4.1-.4.1-.7 0-.8z"/></svg>',
   };
 
@@ -89,6 +92,7 @@
   /* правая колонка: 3D-стеклянный герой (маска убирает фон PNG) + опц. инфо-карточка (как в референсах S4/S5/S8) */
   const heroSide = (h) => `<div class="ob-heroside">
     <div class="ob-hero2"><img src="/onb/heroes/${h.img}.png?v=1" alt="" draggable="false"></div>
+    ${h.caption ? `<div class="ob-hcaption"><div class="ob-hcaption-b">${h.caption.big}</div>${h.caption.small ? `<div class="ob-hcaption-s">${h.caption.small}</div>` : ''}</div>` : ''}
     ${h.card ? `<div class="ob-hcard">
       ${h.card.title ? `<div class="ob-hcard-t">${h.card.title}</div>` : ''}
       ${(h.card.rows || []).map(r => `<div class="ob-hrow"><span class="ob-hrow-ic">${r[0]}</span><div class="ob-hrow-tx"><b>${r[1]}</b>${r[2] ? `<span>${r[2]}</span>` : ''}</div></div>`).join('')}
@@ -173,7 +177,11 @@
             <div class="ow-gcard ow-gcard-1">
               <div class="ow-gc-h">Ваше рабочее пространство</div>
               <div class="ow-gc-sw"><i style="background:#3a352e"></i><i style="background:#c9a25a"></i><i style="background:#ead9b0"></i></div>
-              <div class="ow-gc-rows"><span></span><span></span><span></span></div>
+              <div class="ow-gc-rows">
+                <div class="ow-gc-nav"><i class="ow-gc-ic">${IC.home}</i><span></span></div>
+                <div class="ow-gc-nav"><i class="ow-gc-ic">${IC.list}</i><span></span></div>
+                <div class="ow-gc-nav"><i class="ow-gc-ic">${IC.user}</i><span></span></div>
+              </div>
             </div>
             <div class="ow-gcard ow-gcard-2">
               <div class="ow-gc-chk">${IC.check}</div>
@@ -294,20 +302,28 @@
     };
   }
 
+  function geoWord(n) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return 'направление';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'направления';
+    return 'направлений';
+  }
   function stepGeos() {
-    const chip = (g) => `<button class="ob-chip ${S.geos.includes(g.k) ? 'on' : ''}" data-geo="${g.k}" data-l="${esc(g.l)}"><i class="ob-chip-plus">+</i>${g.l}</button>`;
+    const chip = (g) => `<button class="ob-chip ${S.geos.includes(g.k) ? 'on' : ''}" data-geo="${g.k}" data-l="${esc(g.l)}"><span class="ob-chip-ic"><i class="ob-chip-plus">+</i><i class="ob-chip-check">${IC.check}</i></span>${g.l}</button>`;
     const groups = GEO_REGIONS.map(r => `<div class="ob-geo-group"><div class="ob-geo-h">${r}</div><div class="ob-chips">${GEOS.filter(g => g.r === r).map(chip).join('')}</div></div>`).join('');
     const tags = `<div class="ob-geo-tags" id="obGeoTags">${S.geos.map(k => { const g = GEOS.find(x => x.k === k); return `<span class="ob-geo-tag" data-geotag="${k}">${g ? g.l : k}<i>×</i></span>`; }).join('')}</div>`;
     return {
       title: 'Где вы работаете?',
-      sub: 'Выберите рынки — Lumen адаптирует квалификацию лидов, тон и подборки под ваши направления. Можно выбрать несколько.',
+      sub: 'Выберите рынки — Lumen адаптирует квалификацию лидов и подборки под ваши направления.',
+      microsub: 'Можно выбрать несколько.',
+      splitTop: true,
       hero: { img: 'globe', card: { title: 'Что настроит Lumen', rows: [
-        [IC.list, 'Критерии квалификации', 'С учётом специфики выбранных рынков'],
-        [IC.chat, 'Тон общения', 'Под деловую культуру региона'],
-        [IC.building, 'Подборки объектов', 'Релевантные предложения'],
-      ], note: 'Бюджеты и правила для каждого рынка можно задать позже в «ИИ-квалификаторе».' } },
+        [IC.sliders, 'Критерии квалификации', 'С учётом специфики выбранных рынков'],
+        [IC.chat, 'Тон общения', 'Адаптированный под деловую культуру региона'],
+        [IC.building, 'Подборки объектов', 'Релевантные предложения и подборки'],
+      ], note: IC.info + ' Бюджеты и правила для каждого рынка можно задать позже в ИИ-квалификаторе.' } },
       html: `<div class="ob-geo-groups">${groups}</div>
-        <div class="ob-geo-sum">Выбрано: <b id="obGeoCount">${S.geos.length}</b> ${tags}</div>`,
+        <div class="ob-geo-sum">Выбрано: <b id="obGeoCount">${S.geos.length}</b>&nbsp;<span id="obGeoWord">${geoWord(S.geos.length)}</span> ${tags}</div>`,
       primaryDisabled: S.geos.length === 0,
     };
   }
@@ -381,7 +397,9 @@
     return {
       title: 'Подписка и активация',
       sub: 'Выберите количество мест и проверьте стоимость перед оплатой.',
-      hero: { img: 'ring', card: { title: 'Что дальше?', rows: [
+      eyebrowSuffix: ' · Финальный шаг',
+      splitTop: true,
+      hero: { img: 'ring', caption: { big: 'Всё готово к следующему этапу', small: 'Остался последний шаг' }, card: { title: 'Что дальше?', rows: [
         ['1', 'Перейдите в раздел оплаты', ''],
         ['2', 'Выберите карту или криптовалюту', ''],
         ['3', 'Завершите оплату для активации', ''],
@@ -389,7 +407,7 @@
       html: `
         <div class="ob-price ob-price-solo">
           <div class="ob-price-card">
-            <div class="ob-price-beta">Бета · под ключ</div>
+            <div class="ob-price-beta">Бета · настройка под ключ</div>
             <div class="ob-price-name">${solo ? 'Соло-брокер' : 'Агентство'}</div>
             <div class="ob-price-val"><b id="obTotal">$${total}</b><span>/мес</span></div>
             ${solo ? `<div class="ob-price-seats">1 рабочее место</div>` : `
@@ -464,7 +482,7 @@
     const name = S.name || (solo ? 'Ваш бренд' : 'Ваше агентство');
     const initial = esc(String(name).trim().charAt(0).toUpperCase() || 'L');
     const geoChips = (S.geos || []).slice(0, 6).map(k => `<span class="ob-plate-geo">${esc((GEOS.find(g => g.k === k) || {}).l || k)}</span>`).join('');
-    const logo = S.logo ? `<img src="${esc(S.logo)}" alt="">` : `<span class="ob-plate-mono">${initial}</span>`;
+    const logo = S.logo ? `<img src="${esc(S.logo)}" alt="">` : (S.name ? `<span class="ob-plate-mono">${initial}</span>` : `<span class="ob-plate-glyph">${IC.building}</span>`);
     /* персональная «обложка бренда» — скомпонована из их данных на анимированном золотом фоне (как hero-кавер писем) */
     const plate = `
       <div class="ob-plate">
@@ -473,7 +491,7 @@
           <div class="ob-plate-logo">${logo}</div>
           <div class="ob-plate-wm">&#10022;&nbsp;LUMEN</div>
           <div class="ob-plate-name">${esc(name)}</div>
-          <div class="ob-plate-sub">AI-CRM для недвижимости · ${solo ? 'Соло-брокер' : 'Агентство'}</div>
+          <div class="ob-plate-sub">CRM для недвижимости</div>
           ${geoChips ? `<div class="ob-plate-geos">${geoChips}</div>` : ''}
         </div>
       </div>`;
@@ -488,7 +506,7 @@
             ${plate}
             <div class="ob-recap" id="obRecap"></div>
           </div>
-          ${!S.autopilot ? `<div class="ob-fin-note">${IC.spark}Автопилот выключен — автоматические ответы пока не отправляются. Включить можно в разделе «ИИ-квалификатор».</div>` : ''}
+          <div class="ob-fin-note">${IC.info}${S.autopilot ? 'Автопилот включён — Lumen отвечает и квалифицирует новые заявки автоматически.' : 'Автопилот выключен — автоматические ответы пока не отправляются.'}</div>
           <button class="ob-btn ob-primary ob-fin-cta" data-act="next">Открыть Lumen →</button>
           <button class="ob-fin-change" data-act="back">Изменить настройки</button>
         </div>`,
@@ -544,7 +562,7 @@
       <div class="ob-panel ${d.bg ? 'ob-panel-cine' : ''} ${rightCol ? 'ob-panel-split' : ''} ${d.splitTop ? 'ob-panel-split-top' : ''} ${d.wide ? 'ob-panel-wide' : ''} ${d.center ? 'ob-panel-center' : ''}" key="${step.id}">
         ${ambient}
         <div class="ob-body">
-          ${d.title ? `<div class="ob-eyebrow">Шаг ${idx} из ${total - 2}</div><h2 class="ob-h2">${d.title}</h2>${d.sub ? `<p class="ob-sub">${d.sub}</p>` : ''}${d.pill ? `<div class="ob-pill">${d.pill}</div>` : ''}` : ''}
+          ${d.title ? `<div class="ob-eyebrow">${d.eyebrow || ('Шаг ' + idx + ' из ' + (total - 2))}${d.eyebrowSuffix || ''}</div><h2 class="ob-h2">${d.title}</h2>${d.sub ? `<p class="ob-sub">${d.sub}</p>` : ''}${d.microsub ? `<p class="ob-microsub">${d.microsub}</p>` : ''}${d.pill ? `<div class="ob-pill">${d.pill}</div>` : ''}` : ''}
           <div class="ob-content">${d.html}</div>
         </div>
         ${rightCol}
@@ -606,6 +624,7 @@
     if (step.id === 'geos') {
       const syncGeo = () => {
         q('#obGeoCount').textContent = S.geos.length;
+        const gw = q('#obGeoWord'); if (gw) gw.textContent = geoWord(S.geos.length);
         qq('[data-geo]').forEach(x => x.classList.toggle('on', S.geos.includes(x.dataset.geo)));
         const tg = q('#obGeoTags'); if (tg) { tg.innerHTML = S.geos.map(k => { const g = GEOS.find(x => x.k === k); return `<span class="ob-geo-tag" data-geotag="${k}">${g ? esc(g.l) : k}<i>×</i></span>`; }).join(''); qq('[data-geotag]').forEach(t => t.onclick = () => { const i = S.geos.indexOf(t.dataset.geotag); if (i >= 0) S.geos.splice(i, 1); syncGeo(); }); }
         const nb = root.querySelector('[data-act="next"]'); if (nb) nb.classList.toggle('dis', S.geos.length === 0);
@@ -677,12 +696,12 @@
     const rows = [
       ['Формат', S.edition === 'solo' ? 'Соло-брокер' : 'Агентство'],
       ['Стиль', th ? th.name : S.theme],
-      ['Бренд', S.name || '—'],
-      ['Направления', S.geos.length ? S.geos.map(k => (GEOS.find(g => g.k === k) || {}).l || k).join(', ') : '—'],
+      ['Бренд', S.name || 'Не добавлен'],
+      [S.geos.length === 1 ? 'Направление' : 'Направления', S.geos.length ? S.geos.map(k => (GEOS.find(g => g.k === k) || {}).l || k).join(', ') : '—'],
       ['Тон', (TONES.find(t => t.k === S.tone) || {}).name || '—'],
-      ['Автопилот', S.autopilot ? 'Вкл' : 'Выкл'],
+      ['Автопилот', S.autopilot ? 'Включён' : 'Выключен'],
     ];
-    box.innerHTML = rows.map(r => `<div class="ob-recap-row"><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join('');
+    box.innerHTML = `<div class="ob-recap-h">Ваши настройки</div>` + rows.map(r => `<div class="ob-recap-row"><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join('');
   }
 
   // ============================================================
@@ -874,9 +893,12 @@
     .ow-gc-h,.ow-gc-h2{font-size:12.5px;color:#d7d0c4;font-weight:500;margin-bottom:11px}
     .ow-gc-sw{display:flex;gap:7px;margin-bottom:12px}
     .ow-gc-sw i{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.2)}
-    .ow-gc-rows{display:flex;flex-direction:column;gap:7px}
-    .ow-gc-rows span{height:7px;border-radius:4px;background:rgba(255,255,255,.09);display:block}
-    .ow-gc-rows span:nth-child(1){width:90%}.ow-gc-rows span:nth-child(2){width:68%}.ow-gc-rows span:nth-child(3){width:80%}
+    .ow-gc-rows{display:flex;flex-direction:column;gap:11px}
+    .ow-gc-nav{display:flex;align-items:center;gap:11px}
+    .ow-gc-ic{flex:0 0 auto;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#b3aa98;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+    .ow-gc-ic svg{width:13px;height:13px}
+    .ow-gc-nav span{flex:1 1 auto;height:7px;border-radius:4px;background:rgba(255,255,255,.09);display:block}
+    .ow-gc-nav:nth-child(1) span{max-width:82%}.ow-gc-nav:nth-child(2) span{max-width:62%}.ow-gc-nav:nth-child(3) span{max-width:72%}
     .ow-gc-chk{width:34px;height:34px;border-radius:50%;border:1px solid rgba(201,162,90,.55);color:#c9a25a;display:grid;place-items:center;margin-bottom:10px}
     .ow-gc-chk svg{width:17px;height:17px}
     .ow-gc-chans{display:flex;gap:8px}
@@ -888,6 +910,9 @@
     .ob-hero2{width:100%;max-width:330px}
     .ob-hero2 img{width:100%;height:auto;display:block;-webkit-mask-image:radial-gradient(ellipse 60% 62% at 50% 45%,#000 52%,transparent 80%);mask-image:radial-gradient(ellipse 60% 62% at 50% 45%,#000 52%,transparent 80%);animation:owFloat 7s ease-in-out infinite}
     .ob-hcard{width:100%;max-width:360px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(24,21,17,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:16px 18px}
+    .ob-hcaption{text-align:center;margin-top:-6px}
+    .ob-hcaption-b{font-size:13px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:#cfc6b6;line-height:1.7}
+    .ob-hcaption-s{font-size:11px;font-weight:400;letter-spacing:.22em;text-transform:uppercase;color:#8a8272;margin-top:8px}
     .ob-hcard-t{font-size:12.5px;font-weight:600;letter-spacing:.02em;color:#d7d0c4;margin-bottom:10px}
     .ob-hrow{display:flex;gap:12px;align-items:flex-start;padding:9px 0}
     .ob-hrow+.ob-hrow{border-top:1px solid rgba(255,255,255,.05)}
@@ -896,6 +921,7 @@
     .ob-hrow-tx b{display:block;font-size:13.5px;font-weight:600;color:#f4efe7}
     .ob-hrow-tx span{display:block;font-size:12px;color:#9e968b;line-height:1.45;margin-top:2px}
     .ob-hcard-note{font-size:11.5px;color:#8a8272;line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+    .ob-hcard-note svg{width:14px;height:14px;vertical-align:-2px;margin-right:4px;color:#9e968b}
     /* центрированная шапка (S1/S7) */
     .ob-panel-center .ob-body,.ob-panel-center .ob-eyebrow,.ob-panel-center .ob-h2,.ob-panel-center .ob-sub{text-align:center}
     .ob-panel-center .ob-sub{margin-left:auto;margin-right:auto}
@@ -1003,15 +1029,21 @@
     .ob-logo-btn:hover{border-color:rgba(255,255,255,.4);color:#f4f3f1}
     .ob-logo-clear{font-size:12.5px;color:#6b6a68;background:none;border:none;cursor:pointer;text-decoration:underline}
     /* ── чипы (гео) ── */
-    .ob-chips{display:flex;flex-wrap:wrap;gap:10px}
-    .ob-chip{font-size:14px;font-weight:300;color:#cfcdc8;background:transparent;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:10px 18px;cursor:pointer;transition:.3s cubic-bezier(.19,1,.22,1)}
-    .ob-chip:hover{border-color:rgba(255,255,255,.34)}
-    .ob-chip.on{background:rgba(201,162,90,.14);border-color:rgba(201,162,90,.6);color:#f0e4c8}
-    .ob-chip-plus{font-style:normal;color:#8a8272;margin-right:6px;font-weight:400}
+    .ob-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+    .ob-chip{display:flex;align-items:center;gap:11px;text-align:left;font-size:14px;font-weight:400;color:#cfcdc8;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.13);border-radius:13px;padding:13px 15px;cursor:pointer;transition:.3s cubic-bezier(.19,1,.22,1);font-family:inherit}
+    .ob-chip:hover{border-color:rgba(214,199,168,.4);background:rgba(214,199,168,.03)}
+    .ob-chip.on{background:linear-gradient(180deg,#f3ecdd,#e6dcc4);border-color:#e6dcc4;color:#1a1712;font-weight:600}
+    .ob-chip-ic{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1px solid rgba(214,199,168,.4);display:flex;align-items:center;justify-content:center;color:#8a8272;transition:.3s}
+    .ob-chip-plus{font-style:normal;font-weight:400;font-size:16px;line-height:1}
+    .ob-chip-check{display:none;align-items:center;justify-content:center}
+    .ob-chip-check svg{width:14px;height:14px}
+    .ob-chip.on .ob-chip-ic{background:#1a1712;border-color:#1a1712;color:#e6dcc4}
     .ob-chip.on .ob-chip-plus{display:none}
+    .ob-chip.on .ob-chip-check{display:flex}
+    .ob-microsub{font-size:13px;color:#6b6a68;font-weight:300;margin-top:6px}
     /* S4 группы рынков + теги выбранного */
-    .ob-geo-groups{display:flex;flex-direction:column;gap:16px}
-    .ob-geo-h{font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#8a8272;margin-bottom:9px}
+    .ob-geo-groups{display:flex;flex-direction:column;gap:20px}
+    .ob-geo-h{font-size:12px;font-weight:500;letter-spacing:.04em;color:#cfcdc8;padding-bottom:11px;margin-bottom:13px;border-bottom:1px solid rgba(214,199,168,.14)}
     .ob-geo-sum{margin-top:20px;font-size:13px;color:#9e968b;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
     .ob-geo-sum b{color:#f0e4c8}
     .ob-geo-tags{display:flex;flex-wrap:wrap;gap:7px}
@@ -1022,7 +1054,10 @@
     .ob-fin-sub{font-size:16px;color:#9e968b;font-weight:300;margin:6px 0 24px}
     .ob-fin-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:840px;margin:0 auto;text-align:left;align-items:stretch}
     .ob-fin-cols .ob-plate{max-width:none;margin:0}
-    .ob-fin-cols .ob-recap{grid-template-columns:1fr;max-width:none;margin:0;padding:20px 22px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(24,21,17,.4);align-content:start}
+    .ob-fin-cols .ob-recap{grid-template-columns:1fr;max-width:none;margin:0;padding:8px 22px 20px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(24,21,17,.4);align-content:start}
+    .ob-recap-h{font-family:'Cormorant',Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.01em;color:#f4f3f1;padding:14px 0 6px;text-align:left}
+    .ob-plate-glyph{display:flex;align-items:center;justify-content:center;color:#e6dcc6}
+    .ob-plate-glyph svg{width:28px;height:28px}
     .ob-fin-note{max-width:840px;margin:18px auto 0;font-size:12.5px;color:#8a8272;display:flex;gap:8px;align-items:flex-start;justify-content:center;text-align:left}
     .ob-fin-note svg{width:15px;height:15px;flex:0 0 auto;color:#c9a25a;margin-top:1px}
     .ob-fin-cta{margin:26px auto 0;padding:15px 34px}
@@ -1252,7 +1287,7 @@
     .ob-price{display:grid;grid-template-columns:1.12fr .88fr;gap:24px;align-items:stretch;max-width:900px}
     .ob-price-card{position:relative;padding:28px;border-radius:20px;border:1px solid rgba(214,199,168,.22);background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
     .ob-price-beta{display:inline-block;font-size:11px;font-weight:500;letter-spacing:.24em;text-transform:uppercase;color:#6b6a68;border:1px solid rgba(214,199,168,.28);border-radius:999px;padding:6px 13px;margin-bottom:16px}
-    .ob-price-name{font-size:13px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#6b6a68}
+    .ob-price-name{font-family:'Cormorant',Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-.01em;color:#f4f3f1;line-height:1.05;margin-top:2px}
     .ob-price-val{display:flex;align-items:baseline;gap:9px;margin:8px 0 2px}
     .ob-price-val s{font-family:'Cormorant',Georgia,serif;font-size:28px;color:#6b6a68}
     .ob-price-val b{font-family:'Cormorant',Georgia,serif;font-size:56px;font-weight:400;letter-spacing:-.01em;color:#f4f3f1;line-height:1}
