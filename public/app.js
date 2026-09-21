@@ -11065,7 +11065,10 @@ PAGES.numbers = async (root) => {
           ].map(([t, d], i) => `<div class="viber-step">
             <div class="vs-num">${i + 1}</div>
             <div class="vs-body"><div class="vs-t">${t}</div><div class="vs-d">${d}</div>
-              <div class="vs-shot vs-shot-empty" data-shot="${i + 1}"><span class="vs-shot-ph">📷 живой скриншот шага ${i + 1} — добавим из консоли Infobip</span></div>
+              <div class="vs-shot vs-shot-empty" data-shot="${i + 1}">
+                <img src="/assets/infobip/step-${i + 1}-${(localStorage.getItem('lumen_lang') || 'ru')}.png?v=1" alt="Шаг ${i + 1}" loading="lazy" onload="this.closest('.vs-shot').classList.remove('vs-shot-empty')" onerror="this.remove()">
+                <span class="vs-shot-ph">📷 скриншот шага ${i + 1} появится после подключения консоли Infobip</span>
+              </div>
             </div>
           </div>`).join('')}
         </div>
