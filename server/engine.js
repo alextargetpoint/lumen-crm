@@ -375,15 +375,24 @@ function tickChains(db) {
     if (step.mode === 'template') {
       const tpl = db.templates.find(t => t.id === step.templateId);
       text = tpl ? renderTemplate(db, tpl, lead) : null;
-    } else if (step.mode === 'text') {
-      text = fillVars(db, lead, step.text);
+    } else if (step.mode === 'text' || step.mode === 'creative') {
+      text = step.text ? fillVars(db, lead, step.text) : '';   /* для «Креатив из рекламы» текст = подпись (необязательна) */
     } else {
       text = chainAiText(db, lead, step);
     }
-    /* креатив, прикреплённый к шагу вручную (из дерева креативов) — уходит на ЛЮБОМ шаге как медиа+подпись */
-    const stepCreative = (step.creative && step.creative.url && sendOpts.channel !== 'email')
-      ? { type: step.creative.type || (/\.(mp4|webm|mov)(\?|$)/i.test(step.creative.url) ? 'video' : 'image'), url: String(step.creative.url).slice(0, 500), name: step.creative.name || '' }
-      : null;
+    /* «Креатив из рекламы» (mode='creative') / прикреплённый креатив шага — уходит как медиа+подпись.
+       По умолчанию берётся креатив, ПО КОТОРОМУ ПРИШЁЛ ЛИД (его атрибуция), либо конкретный (step.creative.url). */
+    let stepCreative = null;
+    if (sendOpts.channel !== 'email' && (step.mode === 'creative' || (step.creative && (step.creative.url || step.creative.auto)))) {
+      if (step.creative && step.creative.url) {
+        stepCreative = { type: step.creative.type || (/\.(mp4|webm|mov)(\?|$)/i.test(step.creative.url) ? 'video' : 'image'), url: String(step.creative.url).slice(0, 500), name: step.creative.name || '' };
+      } else {
+        const adRec = lead.ads && lead.ads.adId ? (db.ads || []).find(a => String(a.adId) === String(lead.ads.adId)) : null;
+        const m = (adRec && adRec.media && adRec.media.url) ? adRec.media
+          : (lead.creativeUrl ? { type: /\.(mp4|webm|mov)(\?|$)/i.test(lead.creativeUrl) ? 'video' : 'image', url: lead.creativeUrl } : null);
+        if (m) stepCreative = { type: m.type || (/\.(mp4|webm|mov)(\?|$)/i.test(m.url) ? 'video' : 'image'), url: String(m.url).slice(0, 500), name: (adRec && adRec.name) || '' };
+      }
+    }
     if (text || stepCreative) {
       if (text && sendOpts.channel === 'email') {
         /* официальный тон для e-mail */

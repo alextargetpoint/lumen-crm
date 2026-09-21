@@ -6121,8 +6121,8 @@ PAGES.sequences = async (root) => {
   const creaThumb = (cr) => cr && cr.url ? (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`) : '';
 
   const stepNode = (st, i) => {
-    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст' }[st.mode] || st.mode;
-    const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
+    const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы' }[st.mode] || st.mode;
+    const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
     if (editIx === i) return `
       <div class="fl-node fl-edit" data-i="${i}">
         <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
@@ -6132,21 +6132,22 @@ PAGES.sequences = async (root) => {
           ${st.channel === 'email' ? `<input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" style="flex:1">` : ''}
         </div>
         <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
-          <select data-se="mode" style="width:130px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option></select>
+          <select data-se="mode" style="width:150px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option><option value="creative" ${st.mode === 'creative' ? 'selected' : ''}>Креатив из рекламы</option></select>
           <select data-se="templateId" style="flex:1;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
           <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что должен сказать ИИ" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
         </div>
-        <div data-se-textwrap style="${st.mode === 'text' ? '' : 'display:none'}">
-          <textarea data-se="text" style="width:100%;min-height:130px" placeholder="Текст сообщения…">${esc(st.text || '')}</textarea>
+        <div data-se-crnote class="se-crea-autonote" style="${st.mode === 'creative' ? '' : 'display:none'}">${ic(I.spark)}Уйдёт <b>тот креатив, по которому лид оставил заявку</b> (видео/картинка из дерева креативов — по атрибуции лида), затем текст-подпись ниже. Можно заменить на конкретный из библиотеки.</div>
+        <div data-se-textwrap style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">
+          <textarea data-se="text" style="width:100%;min-height:${st.mode === 'creative' ? '80' : '130'}px" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}">${esc(st.text || '')}</textarea>
           <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}<span class="muted" style="font-size:10.5px;margin-left:4px">клик — вставить · {ad} = название объявления из атрибуции</span></div>
         </div>
-        <div class="se-crea">
-          <div class="lc-lbl" style="margin:0 0 6px">Креатив к касанию <span class="muted" style="font-weight:400">— видео/картинка из дерева креативов; уйдёт медиа+подписью</span></div>
+        <div class="se-crea" data-se-crea style="${st.mode === 'creative' ? '' : 'display:none'}">
+          <div class="lc-lbl" style="margin:0 0 6px">Конкретный креатив <span class="muted" style="font-weight:400">— по умолчанию берётся креатив лида; здесь можно задать один на всех</span></div>
           <div class="se-crea-row">
-            <div class="se-crea-prev" id="seCreaPrev">${st.creative && st.creative.url ? creaThumb(st.creative) : '<span class="muted" style="font-size:11px">нет</span>'}</div>
+            <div class="se-crea-prev" id="seCreaPrev">${st.creative && st.creative.url ? creaThumb(st.creative) : '<span class="muted" style="font-size:11px">креатив лида (авто)</span>'}</div>
             <button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.image)}Из библиотеки</button>
-            <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка на .mp4 / .jpg / Reels" style="flex:1">
-            <button type="button" class="btn btn-sm ${st.creative && st.creative.url ? '' : 'hidden'}" id="seCreaClear" title="Убрать креатив">${ic(I.x)}</button>
+            <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка .mp4 / .jpg / Reels" style="flex:1">
+            <button type="button" class="btn btn-sm ${st.creative && st.creative.url ? '' : 'hidden'}" id="seCreaClear" title="Вернуть креатив лида">${ic(I.x)}</button>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -6160,7 +6161,7 @@ PAGES.sequences = async (root) => {
       <div class="fl-node ${st.active ? '' : 'off'}" data-i="${i}" data-drag="${i}">
         <div class="fl-day">${ic(I.clock)}${dayLabel(st.day)}</div>
         <div class="fl-body">
-          <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : ''}">${modeName}</span>${st.creative && st.creative.url ? `<span class="mini-badge crea">${ic(I.image)}креатив</span>` : ''}</div>
+          <div class="fl-title">${ic(st.channel === 'voice' ? I.mic || I.phone : I.chat)}<b>${esc(st.label || 'Касание')}</b><span class="mini-badge ${st.mode === 'text' ? 'ok' : st.mode === 'ai' ? 'ai' : st.mode === 'creative' ? 'crea' : ''}">${st.mode === 'creative' ? ic(I.image) + modeName : modeName}</span></div>
           <div class="fl-prev">${esc(preview.slice(0, 150))}${preview.length > 150 ? '…' : ''}</div>
         </div>
         <div class="fl-side">
@@ -6353,9 +6354,13 @@ PAGES.sequences = async (root) => {
   if (eb) {
     const modeSel = eb.querySelector('[data-se="mode"]');
     const syncMode = () => {
-      eb.querySelector('[data-se="templateId"]').closest('.cs').style.display = modeSel.value === 'template' ? '' : 'none';
-      eb.querySelector('[data-se="prompt"]').style.display = modeSel.value === 'ai' ? '' : 'none';
-      eb.querySelector('[data-se-textwrap]').style.display = modeSel.value === 'text' ? '' : 'none';
+      const m = modeSel.value;
+      eb.querySelector('[data-se="templateId"]').closest('.cs').style.display = m === 'template' ? '' : 'none';
+      eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
+      eb.querySelector('[data-se-textwrap]').style.display = (m === 'text' || m === 'creative') ? '' : 'none';
+      const cn = eb.querySelector('[data-se-crnote]'); if (cn) cn.style.display = m === 'creative' ? '' : 'none';
+      const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
+      const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…';
     };
     modeSel.addEventListener('change', syncMode);
     const ta = eb.querySelector('[data-se="text"]');
@@ -6376,17 +6381,21 @@ PAGES.sequences = async (root) => {
       st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
       st.prompt = eb.querySelector('[data-se="prompt"]').value;
       st.text = ta.value;
-      const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
-      st.creative = crUrl ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : null;
+      /* «Креатив из рекламы»: по умолчанию — креатив лида (авто); если задан конкретный URL — фиксированный на всех */
+      if (st.mode === 'creative') {
+        const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
+        st.creative = crUrl ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
+      } else st.creative = null;
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
-    /* креатив: подставить из библиотеки дерева креативов или очистить */
+    /* креатив: подставить из библиотеки дерева креативов или вернуть авто-креатив лида */
     const seCreaUrl = eb.querySelector('#seCreaUrl'), seCreaPrev = eb.querySelector('#seCreaPrev'), seCreaClear = eb.querySelector('#seCreaClear');
-    const setCrea = (cr) => { seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; seCreaPrev.innerHTML = cr ? creaThumb(cr) : '<span class="muted" style="font-size:11px">нет</span>'; seCreaClear.classList.toggle('hidden', !cr); };
-    eb.querySelector('#seCreaLib').addEventListener('click', () => openCreativePicker((cr) => setCrea(cr)));
-    seCreaClear.addEventListener('click', () => setCrea(null));
-    seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : '<span class="muted" style="font-size:11px">нет</span>'; seCreaClear.classList.toggle('hidden', !u); });
+    const autoHint = '<span class="muted" style="font-size:11px">креатив лида (авто)</span>';
+    const setCrea = (cr) => { if (!seCreaUrl) return; seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; seCreaPrev.innerHTML = cr ? creaThumb(cr) : autoHint; seCreaClear.classList.toggle('hidden', !cr); };
+    eb.querySelector('#seCreaLib') && eb.querySelector('#seCreaLib').addEventListener('click', () => openCreativePicker((cr) => setCrea(cr)));
+    seCreaClear && seCreaClear.addEventListener('click', () => setCrea(null));
+    seCreaUrl && seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : autoHint; seCreaClear.classList.toggle('hidden', !u); });
     eb.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
     eb.querySelector('[data-sedel]').addEventListener('click', async (e) => {
       seq.steps.splice(+e.currentTarget.dataset.sedel, 1);

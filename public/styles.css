@@ -430,6 +430,8 @@ textarea { resize: vertical; min-height: 70px; }
 .mini-badge.warn { color: var(--warn); background: var(--warn-bg); }
 .mini-badge.crea { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); display: inline-flex; align-items: center; gap: 3px; }
 /* креатив к шагу цепочки + пикер библиотеки */
+.se-crea-autonote { font-size: 11.5px; line-height: 1.5; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 7%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--stroke)); border-radius: 9px; padding: 8px 11px; margin-bottom: 10px; display: flex; gap: 7px; align-items: flex-start; }
+.se-crea-autonote svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
 .se-crea { margin-top: 12px; border-top: 1px dashed var(--stroke); padding-top: 12px; }
 .se-crea-row { display: flex; align-items: center; gap: 8px; }
 .se-crea-prev { flex: 0 0 52px; width: 52px; height: 52px; border-radius: 9px; border: 1px solid var(--stroke); background: var(--bg-2); display: grid; place-items: center; overflow: hidden; }
