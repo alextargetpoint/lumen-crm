@@ -11310,6 +11310,142 @@ function telGuideRich() {
   return `<div class="glass card mb">${coll('Инструкция: Телефония — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
 }
 
+/* ── Полная иллюстрированная инструкция «WhatsApp Cloud API» ──────────────────
+   Два пути (Embedded Signup / ручной мастер), мокапы экранов Meta (API Setup,
+   System User токен, App Secret, Configuration-вебхук), карта в Meta, шаблоны и
+   лимиты, тест, FAQ. Заменяет короткий chGuideCard для канала cloud. */
+function cloudGuideRich() {
+  const call = (kind, title, html) => `<div class="wag-call ${kind}"><div class="wag-call-t">${title}</div><div class="wag-call-b">${html}</div></div>`;
+  const secH = (n, t, sub) => `<div class="wag-h"><span class="wag-hn">${n}</span><div><div class="wag-ht">${t}</div>${sub ? `<div class="wag-hs">${sub}</div>` : ''}</div></div>`;
+  /* мокап окна браузера с «хлебными крошками» Meta */
+  const brw = (crumb, rowsHtml) => `<div class="wag-win"><div class="wag-win-bar wag-brw"><span class="wag-win-dots"><i></i><i></i><i></i></span><span class="wag-crumb">${crumb}</span></div><div class="wag-win-body">${rowsHtml}</div></div>`;
+  /* строка «поле Meta со значением» (hl — подсветить как «скопируй это») */
+  const mf = (label, val, hl, btn) => `<div class="wag-mf ${hl ? 'hl' : ''}"><span class="wag-mflabel">${label}</span><span class="wag-mfval">${val}</span>${btn ? `<span class="wag-copychip">${btn}</span>` : ''}</div>`;
+
+  const esWin = brw('facebook.com › Подключение WhatsApp Business', `
+    <div class="wag-es"><span class="wag-esn">1</span><span>Вход через ваш Facebook</span></div>
+    <div class="wag-es"><span class="wag-esn">2</span><span>Выбор бизнес-портфолио (или создать новое)</span></div>
+    <div class="wag-es"><span class="wag-esn">3</span><span>Выбор / добавление номера WhatsApp</span></div>
+    <div class="wag-es"><span class="wag-esn">4</span><span>Привязка карты для оплаты сообщений</span></div>
+    <div class="wag-mf hl"><span class="wag-mflabel">Готово</span><span class="wag-mfval">реквизиты подставятся в Lumen автоматически</span></div>`);
+
+  const apiSetupWin = brw('business.facebook.com › WhatsApp › API Setup', `
+    ${mf('Phone number ID', '1239824009222121', true, '⧉')}
+    ${mf('WhatsApp Business Account ID (WABA)', '1419979086730572', true, '⧉')}
+    ${mf('Temporary access token', 'EAAG… (живёт 24 ч — нужен постоянный, шаг ниже)', false)}`);
+
+  const tokenWin = brw('Business Settings › System Users › Generate token', `
+    ${mf('Token expiration', 'Never — бессрочный', true)}
+    ${mf('Assets', 'приложение + WABA · Full control', false)}
+    ${mf('Permissions', 'whatsapp_business_messaging · whatsapp_business_management', true)}
+    <div class="wag-winbtns"><span class="wag-buybtn">Generate token</span></div>`);
+
+  const secretWin = brw('App Dashboard › App settings › Basic', `
+    ${mf('App Secret', '•••••••••••••••• ', true, 'Show')}
+    <div class="wag-shopnote">Нужен, чтобы Lumen проверял подпись входящих вебхуков (без него входящие отклоняются, 401).</div>`);
+
+  const webhookWin = brw('App › WhatsApp › Configuration › Webhook', `
+    <div class="wag-copy"><code>https://ваш-lumen.app/wa/webhook</code><span class="wag-copychip">⧉ Callback URL</span></div>
+    <div class="wag-copy"><code>lumen-verify</code><span class="wag-copychip">⧉ Verify token</span></div>
+    ${mf('Webhook fields → messages', 'Subscribe ✓', true)}
+    <div class="wag-shopnote">«Verify and save» → у поля <b>messages</b> нажмите <b>Subscribe</b>. Без этого номер только <b>шлёт</b> — не принимает ответы клиентов и статусы доставки.</div>`);
+
+  const faq = [
+    ['Ошибка «Account does not exist in Cloud API»', 'Номер не зарегистрирован в Cloud API. Пройдите регистрацию номера (кнопка «Активация / коды» на карточке) — она создаёт аккаунт номера и задаёт PIN. Отдельно PIN в Meta ставить не нужно.'],
+    ['Не приходят ответы клиентов и статусы доставки', 'Не настроен вебхук или номер не подписан на поле <b>messages</b>. Meta → App → WhatsApp → Configuration → вставьте Callback URL + Verify token → «Verify and save» → Subscribe на messages. Ещё нужен <b>App Secret</b> — иначе входящие отклоняются (401).'],
+    ['Токен «протух» через сутки', 'Вы вставили <b>временный</b> токен из API Setup (живёт 24 ч). Нужен <b>постоянный</b> токен System User: Business Settings → System Users → Generate token → expiration <b>Never</b>, права whatsapp_business_messaging + management.'],
+    ['Тест-номер не шлёт клиенту', 'Бесплатный тест-номер (+1 555…) отправляет только на номера из allow-list. Для клиентов купите <b>боевой</b> номер (кнопка «Купить Cloud API номер»), либо на время теста добавьте свой номер: API Setup → To → Manage phone number list.'],
+    ['Сообщение не доставляется, если клиент писал давно', 'Вне 24-часового окна диалога Meta разрешает написать первым только <b>одобренным шаблоном</b> (HSM). Создайте шаблон в WhatsApp Manager → Message Templates и дождитесь аппрува.'],
+    ['Кто и как платит за сообщения', 'Cloud API тарифицирует <b>Meta напрямую с карты</b>, привязанной к вашему WhatsApp Business (не с баланса Lumen). Подключите карту в Meta Business Manager → Billing / Payment settings.'],
+    ['Чем Cloud API отличается от WhatsApp по QR', 'Cloud API — официальный канал: можно делать <b>массовые холодные</b> первые касания шаблонами, номер так не банится. QR-номера (серые) — только тёплые диалоги с согласившимися; рассылки с них запрещены. Идеально: холодный вход — Cloud API, дальше диалог — с личного номера.'],
+  ];
+
+  const body = `<div class="wag">
+    <div class="wag-lead">WhatsApp Cloud API — <b>официальный</b> канал Meta. Единственный, с которого можно делать <b>массовые «холодные» первые касания</b> (шаблонами) без риска бана. Взамен требует разовой настройки в Meta (реквизиты + вебхук) и тарифицируется Meta напрямую с вашей карты.</div>
+
+    <div class="wag-paths">
+      <div class="wag-path">
+        <div class="wag-ptag">Путь A · авто</div>
+        <div class="wag-pt">Подключить WhatsApp Business</div>
+        <div class="wag-pd">Embedded Signup: вход через Facebook, Meta сама создаёт связку и возвращает реквизиты. Быстрее всего.</div>
+        <div class="wag-pmeta">Нужен доступ к Facebook Business · карта в Meta</div>
+      </div>
+      <div class="wag-path">
+        <div class="wag-ptag alt">Путь B · вручную</div>
+        <div class="wag-pt">Мастер подключения (шаг за шагом)</div>
+        <div class="wag-pd">Купить/свой номер → вписать Phone Number ID, WABA ID, постоянный токен, App Secret → вебхук. Полный контроль.</div>
+        <div class="wag-pmeta">≈ реквизиты из Meta · 10–15 минут</div>
+      </div>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('A', 'Быстрый путь — Embedded Signup', 'Meta проведёт через вход и сама подставит реквизиты.')}
+      <ol class="wag-ol">
+        <li>В CRM (вкладка «Cloud API») нажмите <b>«Подключить WhatsApp Business»</b>.</li>
+        <li>Войдите через Facebook → выберите/создайте бизнес-портфолио и номер WhatsApp.</li>
+        <li>Привяжите карту для оплаты. Реквизиты (Phone Number ID, WABA, токен) подставятся автоматически.</li>
+      </ol>
+      ${esWin}
+      ${call('tip', 'Когда выбрать', 'Embedded Signup — если у вас есть доступ к Facebook Business и вы хотите минимум ручной работы. Нет доступа / нужен полный контроль — путь B ниже.')}
+    </div>
+
+    <div class="wag-sec">
+      ${secH('B', 'Ручной путь — мастер подключения', 'Полный контроль. В CRM это «Мастер подключения — шаг за шагом», ниже — что и где взять.')}
+
+      <div class="wag-sub">Шаг 1. Реальный номер</div>
+      <p class="wag-p">Нужен настоящий номер: бесплатный тест-номер (+1 555…) шлёт только на разрешённые номера. Купите виртуальный SMS-номер (<b>«Купить Cloud API номер»</b>) — код придёт в ленту OTP в CRM, зарегистрируйте номер в WhatsApp Business.</p>
+
+      <div class="wag-sub">Шаг 2. Phone Number ID и WABA ID</div>
+      <p class="wag-p">Meta → ваше приложение → <b>WhatsApp → API Setup</b>. Скопируйте два идентификатора и вставьте в мастере/карточке.</p>
+      ${apiSetupWin}
+
+      <div class="wag-sub">Шаг 3. Постоянный токен (System User)</div>
+      <p class="wag-p">Business Settings → <b>System Users</b> → выберите/создайте юзера → <b>Add assets</b> (приложение + WABA, Full control) → <b>Generate token</b>.</p>
+      ${tokenWin}
+      ${call('warn', 'Токен показывается один раз', 'Meta покажет токен только при генерации — вставьте сразу. Обязательно expiration <b>Never</b> и права whatsapp_business_messaging + management, иначе отправка отвалится.')}
+
+      <div class="wag-sub">Шаг 4. App Secret</div>
+      <p class="wag-p">Meta App → <b>Settings → Basic</b> → поле <b>App Secret</b> → Show. Им Lumen проверяет подпись входящих вебхуков.</p>
+      ${secretWin}
+
+      <div class="wag-sub">Шаг 5. Вебхук — входящие, статусы, «Отписаться»</div>
+      <p class="wag-p">Meta App → <b>WhatsApp → Configuration</b>: вставьте Callback URL + Verify token, «Verify and save», затем у поля <b>messages</b> нажмите <b>Subscribe</b>.</p>
+      ${webhookWin}
+      ${call('danger', 'Без вебхука канал «однобокий»', 'Без него номер только отправляет — не видит ответы клиентов, статусы доставки (нужны для аналитики рассылок) и клики «Отписаться». Настраивается один раз.')}
+
+      <div class="wag-sub">Шаг 6. Проверка и боевой режим</div>
+      <p class="wag-p">Нажмите <b>«Проверить подключение»</b> — Lumen спросит Meta, живо ли оно. Для тест-номера добавьте свой номер в allow-list (API Setup → To → Manage phone number list). Затем включите <b>боевой режим</b>.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('$', 'Оплата — карта в Meta', 'Важно: платите не нам, а Meta напрямую.')}
+      <p class="wag-p">Сообщения Cloud API тарифицирует <b>Meta</b> с карты, привязанной к вашему WhatsApp Business (не с баланса Lumen). Подключите карту: <b>Meta Business Manager → Billing / Payment settings</b>. Тариф зависит от страны и типа разговора (маркетинговый/сервисный/служебный).</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('C', 'Шаблоны и лимиты отправки', 'Как устроены холодные касания и рост лимита.')}
+      <ul class="wag-rules">
+        <li><b>Холодное первое касание — только одобренный шаблон (HSM).</b> Создайте в WhatsApp Manager → Message Templates и дождитесь аппрува Meta.</li>
+        <li><b>Лимит растёт с качеством.</b> Новый номер стартует с ограниченного тира (напр. 250 → 1000 → 10k/день) и поднимается при хорошем рейтинге.</li>
+        <li><b>Качество номера</b> (зелёный/жёлтый/красный) видно в WhatsApp Manager — следите, чтобы не срезали лимит.</li>
+        <li><b>В 24-часовом окне</b> (клиент написал сам) можно отвечать свободным текстом; вне окна — только шаблоном.</li>
+      </ul>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('✓', 'Тест и запуск', 'Финальная проверка.')}
+      <p class="wag-p">Отправьте тестовый шаблон. Дошёл — канал готов к массовым «белым» касаниям. Дальше диалог удобно продолжать с личного номера (WhatsApp по QR), а холодный вход держать на Cloud API.</p>
+    </div>
+
+    <div class="wag-sec">
+      ${secH('?', 'Частые проблемы', 'Всё, что чаще всего идёт не так при подключении Cloud API.')}
+      <div class="wag-faq">${faq.map(f => `<details class="wag-fq"><summary>${f[0]}</summary><div class="wag-fa">${f[1]}</div></details>`).join('')}</div>
+    </div>
+  </div>`;
+
+  return `<div class="glass card mb">${coll('Инструкция: WhatsApp Cloud API — подробно, со скриншотами', body, { open: false, icon: I.doc })}</div>`;
+}
+
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
@@ -11486,7 +11622,7 @@ PAGES.numbers = async (root) => {
         </div>
       </div>`).join('')}
     </div>` : ''}
-    ${chGuideCard(CH_GUIDES.cloud[0], CH_GUIDES.cloud[1])}
+    ${cloudGuideRich()}
     </div>
 
     <div data-numpane="viber" style="${NUMTAB === 'viber' ? '' : 'display:none'}">
