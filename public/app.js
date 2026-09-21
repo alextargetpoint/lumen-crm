@@ -8282,6 +8282,8 @@ PAGES.ads = async (root) => {
   const rq = adRangeQS();
   const d = await api.get('/ads' + rq);
   const treeD = await api.get('/ads/tree' + rq).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
+  const geoGroupMode = PAGE_STATE.anaGeoGroup === 'direction' ? 'direction' : 'lang';
+  const la = await api.get('/ads/leadanalytics' + (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode).catch(() => ({ geo: { groups: [], mode: geoGroupMode }, quality: { adsets: {}, creatives: {}, qleads: {} }, totalSpend: 0, hasLeads: 0 }));
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
@@ -8330,39 +8332,29 @@ PAGES.ads = async (root) => {
       const campMap = STATE.settings.adCampaignMap || {}; const dirs = STATE.settings.adDirections || [];
       const dirName = (k) => (dirs.find(d2 => d2.key === k) || {}).name || k || '— вне плана';
       const sub = ['geo', 'quality'].includes(PAGE_STATE.anaSub) ? PAGE_STATE.anaSub : 'geo';
-      /* агрегаты по гео и по направлению из d.ads. Гео: ad.geo → ручная привязка → авто-детект по неймингу */
-      const geoMap = STATE.settings.adCampaignGeoMap || {};
-      const geoOf = (a) => a.geo || geoMap[a.campaignName] || detectAdGeo(a.campaignName) || detectAdGeo(a.adsetName) || '—';
-      const byGeo = {}, byDir = {};
-      for (const a of (d.ads || [])) {
-        const gk = geoOf(a); const g = byGeo[gk] = byGeo[gk] || { spend: 0, leads: 0, quals: 0 };
-        const lm = a.leadsMeta != null ? a.leadsMeta : (a.leads || 0); const q = a.qualsFact != null ? a.qualsFact : (a.qualified || 0);
-        g.spend += a.spend || 0; g.leads += lm; g.quals += q;
-        const dk = campMap[a.campaignName] || '__none'; const dd = byDir[dk] = byDir[dk] || { spend: 0, leads: 0, quals: 0 };
-        dd.spend += a.spend || 0; dd.leads += lm; dd.quals += q;
-      }
       const SUBNAMES = { geo: 'Гео', quality: 'Качество лидов' };
       const seg = ['geo', 'quality'].map(k => `<button class="ana-sub-b ${sub === k ? 'on' : ''}" data-anasub="${k}">${SUBNAMES[k]}</button>`).join('');
-      const geoTbl = `<table class="tbl mp-cmp"><thead><tr><th>Направление / гео</th><th>Расход</th><th>Лиды</th><th>Квал</th><th>CPL</th><th>Конв. в квал</th></tr></thead><tbody>
-        ${Object.entries(byGeo).filter(([, g]) => g.spend || g.leads).sort((a, b) => b[1].spend - a[1].spend).map(([gk, g]) => `<tr><td><b>${esc(gname(gk))}</b></td><td>${cm2(g.spend)}</td><td>${g.leads}</td><td>${g.quals}</td><td><b class="accent">${g.leads ? cm2(g.spend / g.leads) : '—'}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td></tr>`).join('')}
-      </tbody></table>`;
-      const qualTbl = `<div class="muted" style="font-size:11.5px;margin-bottom:8px" data-team>Квал = стадии CRM (${(STATE.settings.qualStages || []).length} отмечено). Настроить — «Квал-статусы» в План/Факт.</div>
-        <table class="tbl mp-cmp"><thead><tr><th>Направление</th><th>Лиды (Meta)</th><th>Квал (CRM)</th><th>Конв. в квал</th><th>CPQL</th></tr></thead><tbody>
-        ${Object.entries(byDir).filter(([, g]) => g.leads || g.spend).sort((a, b) => b[1].quals - a[1].quals).map(([dk, g]) => `<tr><td><b>${esc(dk === '__none' ? 'Прочее (вне плана)' : dirName(dk))}</b></td><td>${g.leads}</td><td><b>${g.quals}</b></td><td>${g.leads ? Math.round(g.quals / g.leads * 100) : 0}%</td><td><b class="accent">${g.quals ? cm2(g.spend / g.quals) : '—'}</b></td></tr>`).join('')}
-      </tbody></table>`;
-      const tot = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leads += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leads: 0, quals: 0 });
-      const topC = [...(d.ads || [])].sort((a, b) => (b.spend || 0) - (a.spend || 0)).slice(0, 3);
-      const MON = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
-      const reportTxt = `Отчёт по рекламе · ${MON[new Date().getMonth()]}\nРасход: ${cm2(tot.spend)} · Лиды: ${tot.leads} · Квал: ${tot.quals}\nCPL: ${tot.leads ? cm2(tot.spend / tot.leads) : '—'} · CPQL: ${tot.quals ? cm2(tot.spend / tot.quals) : '—'} · Конв. в квал: ${tot.leads ? Math.round(tot.quals / tot.leads * 100) : 0}%\nТоп по расходу: ${topC.map(c => `${c.campaignName || c.name} (${cm2(c.spend)}, ${c.leadsMeta != null ? c.leadsMeta : c.leads} лид)`).join('; ')}`;
-      const reportView = `<div class="muted" style="font-size:11.5px;margin-bottom:8px">Готовый текст-отчёт за период — скопируйте клиенту/в чат.</div>
-        <pre class="map-code" id="anaReport">${esc(reportTxt)}</pre>
-        <button class="btn btn-sm" id="anaReportCopy" style="margin-top:8px">${ic(I.copy)}Копировать отчёт</button>`;
-      const log = (d.intakeLog || []);
-      const reviewView = log.length ? `<div class="muted" style="font-size:11.5px;margin-bottom:8px">Недавно принятые лиды с рекламы — открой карточку и переставь стадию, если квал недооценён.</div>
-        <div class="rev-list">${log.slice(0, 40).map(e => `<div class="rev-row" data-revlead="${esc(e.leadId || '')}"><b>${esc(e.name || '—')}</b><span class="muted">${esc(e.phone || '')}${e.adId ? ' · ad ' + esc(String(e.adId).slice(-6)) : ''}</span><i>${tmm(e.at)}</i><span class="rev-res ${e.result === 'created' ? '' : 'rep'}">${e.result === 'created' ? 'новый' : 'повтор'}</span></div>`).join('')}</div>`
-        : '<div class="empty" style="padding:24px;text-align:center">Пока нет принятых лидов с рекламы. Подключите приём (Albato) или синк кабинета.</div>';
+      /* ── ГЕО по стране лида (порт логики TargetPoint) ── */
+      const geoToggle = `<div class="ana-geo-toggle"><button class="ana-gt ${la.geo.mode === 'lang' ? 'on' : ''}" data-geogroup="lang">По языкам</button><button class="ana-gt ${la.geo.mode === 'direction' ? 'on' : ''}" data-geogroup="direction">По направлениям</button></div>`;
+      const geoTbl = !la.geo.groups.length
+        ? '<div class="empty" style="padding:26px;text-align:center">Нет лидов с определённой страной за период.<br><span class="muted" style="font-size:11px">Страна берётся из доп-поля «Страна» карточки лида или из кода телефона. CRM-лиды приходят через приём (Albato).</span></div>'
+        : geoToggle + `<div class="muted" style="font-size:10.5px;margin:8px 0 10px">Spend по странам — оценочный (общий Spend × доля лидов страны). Квал — фактические из CRM.</div>` + la.geo.groups.map(g => `
+          <div class="ana-geo-grp"><div class="ana-geo-gh">${esc(g.label)} <span class="muted">· ${g.countries.length} стран · ${g.totalTech} лид · ${g.totalQual} квал · ~${cm2(g.spend)}</span></div>
+          <table class="tbl mp-cmp"><thead><tr><th>#</th><th>Страна</th><th class="num">Тех.лиды</th><th class="num">Spend ~</th><th class="num">CPL тех.</th><th class="num">Квал.</th><th class="num">CPL квал.</th></tr></thead><tbody>
+          ${g.countries.map((c, i) => `<tr><td class="muted">${i + 1}</td><td>${c.flag} ${esc(c.country)}${i === 0 ? ' <span class="mini-badge ok">топ</span>' : ''}</td><td class="num"><b>${c.techLeads}</b></td><td class="num">${cm2(c.spend)}</td><td class="num">${cm2(c.cplTech)}</td><td class="num"><b>${c.qualLeads || '—'}</b></td><td class="num">${c.qualLeads ? cm2(c.cplQual) : '—'}</td></tr>`).join('')}
+          </tbody></table></div>`).join('');
+      /* ── КАЧЕСТВО: рейтинг adset + креативов + детально (порт TargetPoint, минималистично) ── */
+      const qBadge = (b) => b === 'leader' ? '<span class="mini-badge ok">лидер</span>' : b === 'eff' ? '<span class="mini-badge ai">эффект.</span>' : b === 'low' ? '<span class="mini-badge">мало данных</span>' : '';
+      const rankTbl = (byDir, nameCol, unit) => { const keys = Object.keys(byDir || {}); if (!keys.length) return '<div class="empty" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Нет квал-лидов за период.</div>'; return keys.map(dir => ({ dir, arr: byDir[dir] })).sort((a, b) => b.arr.reduce((s, x) => s + x.qual, 0) - a.arr.reduce((s, x) => s + x.qual, 0)).map(({ dir, arr }) => { const tot = arr.reduce((s, x) => s + x.total, 0), q = arr.reduce((s, x) => s + x.qual, 0); const shown = arr.slice(0, 15); return `<div class="ana-q-grp"><div class="ana-q-gh">${esc(dir)} <span class="muted">· ${arr.length} ${unit} · ${tot} лид · ${q} квал</span></div><table class="tbl mp-cmp"><thead><tr><th>#</th><th>${nameCol}</th><th class="num">Лид</th><th class="num">Квал</th><th class="num">Квал %</th></tr></thead><tbody>${shown.map((a, i) => `<tr><td class="muted">${i + 1}</td><td>${esc(a.key)} ${qBadge(a.badge)}</td><td class="num">${a.total}</td><td class="num"><b>${a.qual}</b></td><td class="num">${a.qualRate}%</td></tr>`).join('')}${arr.length > 15 ? `<tr><td colspan="5" class="muted" style="font-size:10.5px">… ещё ${arr.length - 15} (показаны top-15)</td></tr>` : ''}</tbody></table></div>`; }).join(''); };
+      const qleadsTbl = Object.keys(la.quality.qleads || {}).length ? Object.entries(la.quality.qleads).map(([dir, arr]) => `<div class="ana-q-grp"><div class="ana-q-gh">${esc(dir)} <span class="muted">· ${arr.length} квал-лидов</span></div><table class="tbl mp-cmp"><thead><tr><th>Дата</th><th>Имя</th><th>Страна</th><th>Статус</th><th>Adset</th><th>Креатив</th></tr></thead><tbody>${arr.slice(0, 30).map(l => `<tr><td class="muted">${esc(l.date)}</td><td>${esc(l.name || '—')}</td><td>${l.flag} ${esc(l.country || '—')}</td><td>${esc(l.status)}</td><td class="muted" style="font-size:11px">${esc(l.adset)}</td><td class="muted" style="font-size:11px">${esc(l.ad)}</td></tr>`).join('')}${arr.length > 30 ? `<tr><td colspan="6" class="muted" style="font-size:10.5px">… ещё ${arr.length - 30} (последние 30)</td></tr>` : ''}</tbody></table></div>`).join('') : '';
+      const qualTbl = !la.hasLeads
+        ? '<div class="empty" style="padding:26px;text-align:center">Пока нет CRM-лидов за период.<br><span class="muted" style="font-size:11px">Качество считается по стадиям воронки CRM. Подключите приём лидов (Albato) — появится рейтинг adset/креативов по квалам и детальный список.</span></div>'
+        : `<div class="muted" style="font-size:11px;margin-bottom:10px" data-team>Квал = стадии CRM (${(STATE.settings.qualStages || []).length} отмечено). «лидер» — больше всего квалов; «эффект.» — лучший % квала; «мало данных» — высокий % на малой выборке.</div>
+          ${coll('Рейтинг Adset — по квал-лидам', rankTbl(la.quality.adsets, 'Adset', 'adset'), { open: true, icon: I.bars })}
+          ${coll('Топ креативов — по квал-лидам', rankTbl(la.quality.creatives, 'Креатив (Ad Name)', 'креатив'), { open: false, icon: I.image })}
+          ${qleadsTbl ? coll('Квал-лиды — детально', qleadsTbl, { open: false, icon: I.users }) : ''}`;
       return `<div class="glass card mb" id="anaExtra">
-        <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео · качество лидов · пересмотр · отчёт</span></div>
+        <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео по странам · качество лидов</span></div>
         <div class="ana-sub">${seg}</div>
         <div style="overflow-x:auto">${sub === 'quality' ? qualTbl : geoTbl}</div>
       </div>`;
@@ -8581,9 +8573,8 @@ PAGES.ads = async (root) => {
             </div>
             <div class="map-custom">
               <div class="map-block-hd"><span>Кастомные поля (поле карточки лида ← значение из формы)</span><button class="btn btn-sm" id="mapAddCustom">${ic(I.plus)}Добавить поле</button></div>
-              <datalist id="mapCfList">${(STATE.settings.customFields || []).map(f => `<option value="${esc(f.key)}">${esc(f.label)}</option>`).join('')}</datalist>
               <div id="mapCustomRows"></div>
-              <div class="muted" style="font-size:10px;margin-top:3px">Слева — <b>поле карточки лида</b> (выберите из ваших доп-полей или впишите новое), справа — как оно называется в форме Meta. Данные лягут в это поле карточки. Доп-поля настраиваются в карточке лида / Настройках.</div>
+              <div class="muted" style="font-size:10px;margin-top:3px;line-height:1.5">Слева — <b>поле карточки лида</b> (выберите из списка с поиском или впишите своё). Справа — <b>переменная из вашего интегратора</b> (как поле называется в его действии/форме): подрядчик сам сопоставляет вопросы лид-формы со своими переменными в Albato/Make, а сюда вписывает их имя. Точное совпадение с текстом вопроса в Meta НЕ требуется.</div>
             </div>
             <div class="map-block">
               <div class="map-block-hd"><span>Тело запроса (JSON) — вставить в действие Webhook интегратора</span><button class="btn btn-sm" id="mapCopyJson">${ic(I.copy)}Копировать</button></div>
@@ -8629,6 +8620,7 @@ PAGES.ads = async (root) => {
   /* переключение диапазона/под-вкладок — ТИХО (render._silent): данные подменяются мгновенно
      после fetch, без fade всего #content → экран не мигает (старый контент держится до новых данных). */
   $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render._silent = true; render(); }));
+  $$('[data-geogroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaGeoGroup = b.dataset.geogroup; render._silent = true; render(); }));
   $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render._silent = true; render(); }));
   $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
@@ -8694,11 +8686,23 @@ PAGES.ads = async (root) => {
     if (jEl) jEl.textContent = JSON.stringify(obj, null, 2);
     if (cEl) cEl.textContent = `curl -X POST '${hookUrl}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify(sample)}'`;
   };
+  /* поля карточки лида для дропдауна маппинга: стандартные + доп-поля агентства */
+  const CARD_FIELDS = [['budget', 'Бюджет'], ['timeline', 'Срок сделки'], ['type', 'Тип объекта'], ['purpose', 'Цель покупки'], ['rooms', 'Комнатность'], ['country', 'Страна'], ['comment', 'Комментарий'], ['source', 'Источник'], ['email', 'E-mail']].concat((STATE.settings.customFields || []).map(f => [f.key, f.label]));
   const addCustomRow = (k, v) => {
     const box = $('#mapCustomRows', root); if (!box) return;
-    const rw = el(`<div class="map-crow" data-custrow><input data-custkey list="mapCfList" placeholder="поле карточки (budget)" value="${esc(k || '')}"><span class="map-carrow">←</span><input data-custval placeholder="значение из формы (Бюджет)" value="${esc(v || '')}"><button class="btn btn-sm" data-custdel title="Убрать">${ic(I.x)}</button></div>`);
+    const rw = el(`<div class="map-crow" data-custrow>
+      <div class="fcombo"><input data-custkey placeholder="поле карточки — выбрать или вписать" value="${esc(k || '')}" autocomplete="off"><div class="fcombo-pop" hidden></div></div>
+      <span class="map-carrow">←</span>
+      <input data-custval placeholder="как называется в форме (напр. Бюджет)" value="${esc(v || '')}">
+      <button class="btn btn-sm" data-custdel title="Убрать">${ic(I.x)}</button></div>`);
     box.appendChild(rw);
-    rw.querySelectorAll('input').forEach(i => i.addEventListener('input', rebuildMap));
+    const keyInp = rw.querySelector('[data-custkey]'), pop = rw.querySelector('.fcombo-pop');
+    const renderPop = () => { const q = keyInp.value.trim().toLowerCase(); const opts = CARD_FIELDS.filter(([kk, ll]) => !q || kk.toLowerCase().includes(q) || ll.toLowerCase().includes(q)); pop.innerHTML = opts.map(([kk, ll]) => `<button type="button" class="fcombo-opt" data-k="${esc(kk)}"><b>${esc(ll)}</b><span>${esc(kk)}</span></button>`).join('') + `<div class="fcombo-empty">${q ? 'Enter — создать поле «' + esc(q) + '»' : 'Начните вводить — фильтр; можно вписать своё поле'}</div>`; pop.hidden = false; };
+    keyInp.addEventListener('focus', renderPop);
+    keyInp.addEventListener('input', () => { renderPop(); rebuildMap(); });
+    keyInp.addEventListener('blur', () => setTimeout(() => { pop.hidden = true; }, 160));
+    pop.addEventListener('mousedown', (e) => { const b = e.target.closest('.fcombo-opt'); if (b) { e.preventDefault(); keyInp.value = b.dataset.k; pop.hidden = true; rebuildMap(); } });
+    rw.querySelector('[data-custval]').addEventListener('input', rebuildMap);
     rw.querySelector('[data-custdel]').addEventListener('click', () => { rw.remove(); rebuildMap(); });
   };
   $('#mapAddCustom', root)?.addEventListener('click', () => addCustomRow());

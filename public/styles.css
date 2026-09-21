@@ -7817,6 +7817,14 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .map-custom{ margin-top:8px; }
 .map-crow{ display:flex; align-items:center; gap:6px; margin:5px 0; }
 .map-crow input{ flex:1; min-width:0; font-size:11.5px; padding:6px 9px; border:1px solid var(--stroke); border-radius:8px; background:var(--card); color:var(--ink); }
+.fcombo{ position:relative; flex:1; min-width:0; }
+.fcombo > input{ width:100%; }
+.fcombo-pop{ position:absolute; top:100%; left:0; right:0; z-index:30; background:var(--card); border:1px solid var(--stroke); border-radius:9px; margin-top:3px; max-height:230px; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,.14); }
+.fcombo-opt{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; width:100%; text-align:left; border:none; background:none; padding:7px 11px; cursor:pointer; }
+.fcombo-opt:hover{ background:var(--bg-2); }
+.fcombo-opt b{ color:var(--ink); font-weight:600; font-size:12px; }
+.fcombo-opt span{ color:var(--muted); font-size:10.5px; font-family:ui-monospace,monospace; }
+.fcombo-empty{ padding:7px 11px; font-size:10.5px; color:var(--muted); border-top:1px solid var(--stroke-soft); }
 .map-carrow{ color:var(--accent); font-weight:800; }
 /* Модалка «Направления и сопоставление» */
 .dm-dir{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border:1px solid var(--stroke); border-radius:8px; background:var(--bg-2); margin-bottom:5px; font-size:12.5px; color:var(--ink); }
@@ -7898,6 +7906,16 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 .ana-sub{ display:inline-flex; gap:2px; border:1px solid var(--stroke); border-radius:9px; overflow:hidden; margin:2px 0 10px; }
 .ana-sub-b{ font-size:12px; padding:6px 13px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
 .ana-sub-b.on{ background:var(--accent); color:#fff; }
+/* гео по странам + качество (рейтинги) */
+.ana-geo-toggle{ display:inline-flex; border:1px solid var(--stroke); border-radius:8px; overflow:hidden; }
+.ana-gt{ font-size:11.5px; padding:5px 12px; background:var(--card); color:var(--ink-2); border:none; cursor:pointer; }
+.ana-gt+.ana-gt{ border-left:1px solid var(--stroke); }
+.ana-gt.on{ background:var(--accent); color:#fff; }
+.ana-geo-grp, .ana-q-grp{ margin:0 0 16px; }
+.ana-geo-gh, .ana-q-gh{ font-size:12.5px; font-weight:650; color:var(--ink); margin:8px 0 6px; padding-bottom:5px; border-bottom:1px solid var(--stroke-soft); }
+.ana-geo-gh .muted, .ana-q-gh .muted{ font-weight:400; font-size:11px; }
+#anaExtra .tbl.mp-cmp{ font-size:12px; }
+#anaExtra .tbl.mp-cmp th{ font-size:9.5px; }
 body.client-view [data-team]{ display:none !important; }
 
 /* Пересмотр лидов */
