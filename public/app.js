@@ -8345,10 +8345,8 @@ function restructureAdsTabs(root) {
   const metaCab = cardOf('#metaAdsOn');
   const most = cardOf('#copyHook');
   const imp = cardOf('#adsCsv');
-  const eff = cardOf('.ad-tbl');
   const twocol = root.querySelector('.two-col');
-  const rightCol = twocol ? twocol.children[1] : null;
-  const intakeLog = rightCol ? [...rightCol.children].find(c => c !== eff && (c.classList.contains('ds-fold') || /Журнал приёма/.test(c.textContent || ''))) : null;
+  const intakeLog = cardOf('[data-intakelog]');
   const TABS = [['analytics', 'Аналитика · факт из кабинетов', I.bars], ['creatives', 'Дерево креативов', I.target], ['settings', 'Настройки рекламы', I.gear]];
   const KEYS = ['analytics', 'creatives', 'settings'];
   const active = KEYS.includes(PAGE_STATE.adsTab) ? PAGE_STATE.adsTab : 'analytics';
@@ -8356,8 +8354,8 @@ function restructureAdsTabs(root) {
   const panels = {};
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
-  /* Аналитика · факт: KPI + эффективность + гео/качество/отчёт (то, что тянется из кабинета) */
-  put(kpis, 'analytics'); put(eff, 'analytics'); put(anaExtra, 'analytics');
+  /* Аналитика · факт: KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
+  put(kpis, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -8480,8 +8478,43 @@ PAGES.ads = async (root) => {
           <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a.adId}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
         </div>
       </div>`; };
-      const adsetBlock = (as) => `<div class="ct-adset"><div class="ct-adset-hd">${esc(as.name)}<span>${as.leads} лид · ${as.ads.length} объявл</span></div><div class="ct-ads">${as.ads.map(adRow).join('')}</div></div>`;
-      const campBlock = (c) => `<div class="ct-camp"><div class="ct-camp-hd">${plBadge(c.platform)}<b>${esc(c.name)}</b><span class="ct-camp-n">${c.leads} лид</span></div>${c.adsets.map(adsetBlock).join('')}</div>`;
+      /* режим «Креативы»: ГРУППИРОВКА ПО УНИКАЛЬНОМУ ИМЕНИ КРЕАТИВА (не по объявлениям).
+         Один креатив = одна карточка; грузишь раз → раздаётся на все связки с тем же названием. */
+      const flat = []; (treeD.tree || []).forEach(c => c.adsets.forEach(a => a.ads.forEach(ad => flat.push({ ...ad, camp: c.name, adset: a.name }))));
+      const byName = {};
+      for (const ad of flat) {
+        const n = ad.name || ad.adId;
+        const g = byName[n] = byName[n] || { name: n, adIds: [], media: null, points: [], camps: new Set(), sets: new Set(), geo: ad.geo, hasCreative: false, hasPoints: false, leads: 0 };
+        g.adIds.push(ad.adId); g.camps.add(ad.camp); g.sets.add(ad.adset);
+        if (ad.media && ad.media.url && !g.media) g.media = ad.media;
+        if (ad.points && ad.points.length && !g.points.length) g.points = ad.points;
+        g.hasCreative = g.hasCreative || ad.hasCreative; g.hasPoints = g.hasPoints || ad.hasPoints; g.leads += ad.leads || 0;
+      }
+      const nameGroups = Object.values(byName).sort((a, b) => b.camps.size - a.camps.size || b.leads - a.leads);
+      const nameCard = (g) => { const a0 = g.adIds[0]; const done = g.hasCreative || g.hasPoints; return `<div class="ct-ad" data-ctad="${a0}">
+        <div class="ct-ad-hd" data-ctedit="${a0}">
+          ${thumb(g.media)}
+          <div class="ct-ad-nm"><b>${esc(g.name)}</b><span>${g.adIds.length} ${plural(g.adIds.length, 'связка', 'связки', 'связок')} · ${g.camps.size} ${plural(g.camps.size, 'кампания', 'кампании', 'кампаний')} · ${g.leads} лид${g.leads === 1 ? '' : 'ов'}</span></div>
+          <span class="ct-flags">${g.hasCreative ? `<span class="ct-dot ok" title="Креатив привязан"></span>` : ''}${g.hasPoints ? `<span class="ct-dot ok2" title="Тезисы заданы"></span>` : ''}</span>
+          <button class="btn btn-sm ${done ? '' : 'btn-accent'} ct-edit">${done ? 'Править' : 'Загрузить'}</button>
+        </div>
+        <div class="ct-ed" id="cted-${a0}" hidden>
+          <div class="ct-ed-note muted">${ic(I.spark)}Загрузишь сюда — раздастся на все <b>${g.adIds.length}</b> одноимённых объявлений (${[...g.camps].slice(0, 3).map(esc).join(', ')}${g.camps.size > 3 ? '…' : ''}).</div>
+          <div class="ct-ed-grid">
+            <div class="ct-ed-crea">
+              <div class="ct-ed-lbl">Креатив — уходит первым сообщением</div>
+              <div class="ct-prev${(g.media && g.media.url) ? ' has' : ''}" data-ctprev="${a0}">${preview(g.media)}</div>
+              <div class="ct-crea-acts"><button class="btn btn-sm ct-upload" data-ctup="${a0}">${ic(I.plus)}Файл с ПК</button><input type="file" class="ct-file" data-ctfile="${a0}" accept="video/*,image/*" hidden></div>
+              <input class="ct-media" value="${esc((g.media && g.media.url) || '')}" placeholder="или ссылка: Reels / .mp4 / .jpg">
+            </div>
+            <div class="ct-ed-pts">
+              <div class="ct-ed-lbl">Сильные стороны — ИИ вплетёт 2-3 в касание</div>
+              <textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года&#10;Метро и школы в 5 минут&#10;Доходность аренды 8% годовых">${esc((g.points || []).join('\n'))}</textarea>
+            </div>
+          </div>
+          <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a0}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a0}">Сохранить и раздать</button></div>
+        </div>
+      </div>`; };
 
       /* ── РЕЖИМ «КАБИНЕТ»: полное дерево с метриками (как в TargetPoint) ── */
       const treeMode = PAGE_STATE.ctMode || 'cabinet';
@@ -8522,8 +8555,8 @@ PAGES.ads = async (root) => {
           ${cabHdr}${cabSignals}
           <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : '<div class="empty">Нет данных кабинета — подключите кабинет и синкните.</div>'}</div>`
         : `
-          <div class="muted ct-note">Одинаковые названия объявлений между связками делят один креатив: загрузи один раз — раздастся на все. По объявлению, с которого пришёл лид, первое касание = креатив (видео/картинка) + текст с 2-3 сильными сторонами. <b>${treeD.withCreative}/${treeD.totalAds}</b> с креативом · ${treeD.withPoints} с тезисами.</div>
-          ${treeD.tree && treeD.tree.length ? treeD.tree.map(campBlock).join('') : '<div class="empty">Пока нет объявлений в базе.</div>'}`}
+          <div class="muted ct-note">Список <b>по уникальным названиям креативов</b> (не по объявлениям). Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом. Первое касание по лиду = креатив + текст с сильными сторонами. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
+          <div class="ct-names">${nameGroups.length ? nameGroups.map(nameCard).join('') : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}</div>`}
       </div>`;
     })()}
     <div class="two-col">
@@ -8581,22 +8614,20 @@ PAGES.ads = async (root) => {
           <button class="btn btn-sm" id="maAddAcct" style="margin:2px 0 10px">${ic(I.plus)}Добавить кабинет</button>
           <div class="form-row"><label>Access token (System User) — один на все кабинеты бизнеса</label><input id="maToken" type="password" placeholder="${ma.tokenSet ? '•••••• сохранён' : 'EAAG…'}"></div>
           <div class="ma-mode-row">
-            <div class="form-row" style="margin:0"><label>Приём лидов</label>
-              <select id="maMode"><option value="api" ${mode === 'api' ? 'selected' : ''}>Напрямую через API</option><option value="integrator" ${mode === 'integrator' ? 'selected' : ''}>Через интегратор (Albato/Zapier)</option><option value="both" ${mode === 'both' ? 'selected' : ''}>Оба: API + интегратор</option></select></div>
-            <div class="form-row" style="margin:0"><label>Окно синка</label>
-              <select id="maSyncDays">${[30, 60, 90, 180].map(d => `<option value="${d}" ${syncDays === d ? 'selected' : ''}>${d} дн</option>`).join('')}</select></div>
-            <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maInsights" ${ma.pullInsights !== false ? 'checked' : ''}> Расход/кампании</label>
-            <label class="fd-toggle" style="white-space:nowrap"><input type="checkbox" id="maLeads" ${ma.pullLeads !== false ? 'checked' : ''}> Лиды</label>
+            <div class="form-row" style="margin:0"><label>Окно синка (глубина истории)</label>
+              <select id="maSyncDays">${[30, 60, 90, 180].map(d => `<option value="${d}" ${syncDays === d ? 'selected' : ''}>${d} дней</option>`).join('')}</select></div>
+            <div class="muted" style="font-size:11px;line-height:1.5;align-self:end">Отсюда тянется <b>аналитика кабинета</b> (расход/кампании/CPL/CTR…). Лиды через этот канал не тянутся — их приём настраивается в «Приём лидов через интегратор» выше.</div>
           </div>
           <div id="maVerify" class="muted" style="font-size:11.5px;margin-top:6px;min-height:0"></div>
+          <div id="maSyncStatus" class="ma-sync-status" hidden></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
             <button class="btn btn-accent btn-sm" id="maSave">Сохранить</button>
             <button class="btn btn-sm" id="maVerifyBtn">${ic(I.spark)}Проверить</button>
             <button class="btn btn-sm" id="maSyncBtn">${ic(I.send)}Обновить (синк)</button>
-            <button class="btn btn-sm" id="maBackfill" title="Подтянуть весь период (окно синка), частями">${ic(I.doc)}Догрузить историю</button>
+            <button class="btn btn-sm" id="maBackfill" title="Подтянуть весь период (окно синка)">${ic(I.doc)}Догрузить историю</button>
             <button class="btn btn-sm btn-danger" id="maReset" title="Удалить все данные, подтянутые из кабинета">${ic(I.x)}Полный сброс</button>
           </div>
-          <div class="muted" style="font-size:10.5px;margin-top:6px">Авто-долив каждые ~30 мин (окно синка). «Обновить» — лёгкий долив сейчас. «Догрузить историю» — весь период. «Полный сброс» — удалить данные кабинета.</div>
+          <div class="muted" style="font-size:10.5px;margin-top:6px">Авто-долив каждые ~30 мин. «Обновить» — свежий долив сейчас. «Догрузить историю» — весь период (окно синка). «Полный сброс» — удалить данные кабинета.</div>
           ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
         <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
@@ -8664,24 +8695,7 @@ PAGES.ads = async (root) => {
         </div>
       </div>
       <div>
-        <div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Эффективность объявлений<span class="sub">воронка · CPL · расход</span></div>
-          <table class="tbl ad-tbl"><thead><tr><th>Объявление</th><th>Лиды</th><th>Диал.</th><th>Квал.</th><th>Сделки</th><th>Расход $</th><th>CPL</th></tr></thead><tbody>
-            ${d.ads.slice().sort((a, b) => b.leads - a.leads).map(a => `<tr>
-              <td><b>${esc(a.name)}</b><div class="muted" style="font-size:10.5px">${esc(a.campaignName || '')}${a.adsetName ? ' · ' + esc(a.adsetName) : ''}</div>
-                <div class="ad-funnel" title="лиды → диалоги → квалы → сделки">${[['leads', 'var(--ov-cat-blue)'], ['dialogs', 'var(--ov-cat-purple)'], ['qualified', 'var(--ov-cat-green)'], ['deals', 'var(--ov-cat-amber)']].map(([k, c]) => `<span style="flex:${Math.max(a[k], 0.02)};background:${c}" title="${k}: ${a[k]}"></span>`).join('')}</div></td>
-              <td><b>${a.leads}</b></td>
-              <td>${a.dialogs}</td>
-              <td>${a.qualified}${a.leads ? `<span class="muted" style="font-size:9.5px"> ${a.qualRate}%</span>` : ''}</td>
-              <td>${a.deals}</td>
-              <td><input class="ad-spend" data-adid="${esc(a.adId)}" type="number" value="${a.spend || ''}" placeholder="0" style="width:74px"></td>
-              <td><b>${a.cpl ? '$' + a.cpl : '—'}</b></td>
-            </tr>`).join('') || '<tr><td colspan="7" class="empty">Объявлений нет — загрузите таблицей слева</td></tr>'}
-          </tbody></table>
-          ${d.geo && Object.keys(d.geo).length > 1 ? `<div class="ad-geo">${Object.values(d.geo).map(g => `<div class="ad-geo-row"><span class="ad-geo-nm">${esc(g.name)}</span><span class="muted">${g.leads} лид · ${g.qualified} квал · ${g.deals} сдел.</span></div>`).join('')}</div>` : ''}
-          ${d.unmatched.length ? coll('Лиды с неизвестным ad_id', d.unmatched.map(x => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(x.name)}</div><div class="sd">ad_id: ${esc(x.adId)} — добавьте объявление в базу, мэтчинг пройдёт сам</div></div></div>`).join(''), { open: false, count: d.unmatched.length, icon: I.x }) : ''}
-        </div>
-        ${coll('Журнал приёма', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: true, count: d.intakeLog.length, icon: I.bolt })}
+        <div class="glass card mb" data-intakelog>${coll('Журнал приёма лидов', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: false, count: d.intakeLog.length, icon: I.bolt })}</div>
       </div>
     </div>`;
   restructureAdsTabs(root);   /* упаковать хаос страницы в аккуратные вкладки (Аналитика/Креативы/Приём/CAPI) */
@@ -8753,27 +8767,29 @@ PAGES.ads = async (root) => {
   $('#mapCopyCurl', root)?.addEventListener('click', () => { navigator.clipboard.writeText($('#mapCurl', root).textContent); toast('cURL скопирован', 'Вставьте в терминал — придёт тест-лид в CRM', true); });
   /* --- Прямое подключение рекламных кабинетов Meta (Marketing API) --- */
   const maAccounts = () => $$('[data-acctrow]', root).map(rw => ({ id: (rw.querySelector('[data-acc="id"]').value || '').trim(), name: (rw.querySelector('[data-acc="name"]').value || '').trim(), currency: rw.querySelector('[data-acc="currency"]').value || '' })).filter(a => a.id);
-  const maPatch = () => { const p = { accounts: maAccounts(), mode: $('#maMode')?.value || 'api', syncDays: +($('#maSyncDays')?.value) || 60, pullInsights: !!$('#maInsights')?.checked, pullLeads: !!$('#maLeads')?.checked, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
+  const maPatch = () => { const p = { accounts: maAccounts(), mode: 'both', syncDays: +($('#maSyncDays')?.value) || 60, pullInsights: true, pullLeads: false, enabled: !!$('#metaAdsOn')?.checked }; const tok = ($('#maToken')?.value || '').trim(); if (tok) p.token = tok; return p; };
+  const maSyncProgress = (on, txt) => { const el2 = $('#maSyncStatus', root); if (!el2) return; el2.hidden = !on; if (on) el2.innerHTML = `<span class="ma-spin"></span><span>${esc(txt || 'Синхронизирую…')}</span>`; };
   const maAddAcctRow = () => { const box = $('#maAccts', root); if (!box) return; const rw = el(`<div class="ma-acct" data-acctrow><span class="ma-acct-dot"></span><input data-acc="id" placeholder="act_1234567890" style="flex:1.4"><input data-acc="name" placeholder="название" style="flex:1.4"><select data-acc="currency" style="flex:0 0 90px"><option value="">валюта</option>${['AED', 'USD', 'EUR', 'THB', 'RUB'].map(c => `<option value="${c}">${c}</option>`).join('')}</select><button class="btn btn-sm" data-acctdel>${ic(I.x)}</button></div>`); box.appendChild(rw); try { enhanceControls(rw); } catch (_) {} rw.querySelector('[data-acctdel]').addEventListener('click', () => rw.remove()); };
   $$('[data-acctdel]', root).forEach(b => b.addEventListener('click', () => b.closest('[data-acctrow]').remove()));
   $('#maAddAcct', root)?.addEventListener('click', maAddAcctRow);
   $('#metaAdsOn')?.addEventListener('change', async (e) => { await api.patch('/settings', { metaAds: { enabled: e.target.checked } }); toast(e.target.checked ? 'Кабинеты Meta включены' : 'Кабинеты Meta выключены', e.target.checked ? 'Синк расхода и лидов пойдёт по расписанию' : null, true); await loadState(); });
   $('#maSave')?.addEventListener('click', async () => { await api.patch('/settings', { metaAds: maPatch() }); toast('Сохранено', 'Кабинеты и настройки применены', true); await loadState(); render(); });
   $('#maVerifyBtn')?.addEventListener('click', async () => { const out = $('#maVerify'); out.textContent = 'Проверяю…'; const accs = maAccounts(); try { const results = []; for (const a of accs.slice(0, 8)) { const r = await api.post('/metaads/verify', { token: ($('#maToken')?.value || '').trim(), adAccountId: a.id }); results.push(r.ok ? `<span style="color:var(--ok)">✓ ${esc(r.name || a.id)} · ${esc(r.currency || '')}</span>` : `<span style="color:var(--bad)">✕ ${esc(a.id)}: ${esc(r.error || '')}</span>`); } out.innerHTML = results.join('<br>') || 'нет кабинетов'; } catch (e) { out.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; } });
-  $('#maBackfill', root)?.addEventListener('click', async (e) => { const btn = e.currentTarget; btn.disabled = true; const o = btn.textContent; btn.textContent = 'Догружаю историю…'; try { await api.patch('/settings', { metaAds: maPatch() }); const r = await api.post('/metaads/sync', { backfill: true }); toast(r.ok ? 'История догружена' : 'Ошибка', r.ok ? `Объявлений: ${(r.insights ? r.insights.updated + r.insights.added : 0)} · лидов: ${(r.leads && r.leads.created) || 0}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { toast('Не удалось', er.message); btn.disabled = false; btn.textContent = o; } });
+  $('#maBackfill', root)?.addEventListener('click', async () => { maSyncProgress(true, 'Догружаю историю за весь период — это дольше, тяну частями…'); try { await api.patch('/settings', { metaAds: maPatch() }); const r = await api.post('/metaads/sync', { backfill: true }); maSyncProgress(false); toast(r.ok ? 'История догружена' : 'Ошибка', r.ok ? `Объявлений обновлено: ${(r.insights ? r.insights.updated + r.insights.added : 0)}` : (r.error || ''), r.ok); await loadState(); render(); } catch (er) { maSyncProgress(false); toast('Не удалось', er.message); } });
   $('#maReset', root)?.addEventListener('click', () => { modal({ title: 'Полный сброс данных кабинета?', sub: 'Удалятся все объявления/расход, подтянутые из Meta', body: '<div class="muted">Медиапланы, направления и привязки кабинетов останутся. Действие необратимо.</div>', actions: [{ label: 'Сбросить', cls: 'btn-danger', onClick: async () => { const r = await api.post('/metaads/reset', {}); toast('Сброшено', `Удалено объявлений: ${r.removed || 0}`, true); await loadState(); render(); } }, { label: 'Отмена' }] }); });
-  $('#maSyncBtn')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Синхронизирую… (может занять до минуты)';
+  $('#maSyncBtn')?.addEventListener('click', async () => {
+    maSyncProgress(true, 'Тяну данные кабинета (расход, кампании, метрики)…');
     try {
       await api.patch('/settings', { metaAds: maPatch() });   /* сначала сохраняем то, что в полях, чтобы синк точно работал */
       const r = await api.post('/metaads/sync', {});
-      if (r.skipped) toast('Не запущено', 'Сначала вставьте токен + Ad account ID, нажмите «Сохранить» и включите тумблер вверху карточки', false);
+      maSyncProgress(false);
+      if (r.skipped) toast('Не запущено', 'Добавьте кабинет (act_…) + токен, нажмите «Сохранить» и включите тумблер', false);
       else if (!r.ok) toast('Синк с ошибкой', r.error || 'Meta вернула ошибку', false);
-      else { const nl = (r.leads && r.leads.created) || 0; const ni = r.insights ? (r.insights.updated + r.insights.added) : 0; toast('Синк готов', `Новых лидов: ${nl} · объявлений обновлено: ${ni}${nl === 0 && r.leads ? ' · лидов 0 — проверьте права Страницы (см. гайд)' : ''}`, true); }
+      else { const ni = r.insights ? (r.insights.updated + r.insights.added) : 0; toast('Синк готов', `Объявлений обновлено: ${ni}`, true); }
       await loadState(); render();
     } catch (er) {
+      maSyncProgress(false);
       toast('Не удалось', er.message || 'ошибка сети', false);
-      btn.disabled = false; btn.textContent = orig;
     }
   });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });

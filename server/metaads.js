@@ -69,6 +69,11 @@ async function syncInsights(db, deps, { acct, days } = {}) {
   const c = cfg(db); const token = c.token; const id = acct ? acctId(acct) : (accountsOf(db)[0] || {}).id;
   const res = { updated: 0, added: 0, capped: false };
   if (!id) return res;
+  /* авто-определение валюты кабинета — иначе конвертация считает от неверной базы */
+  try {
+    const info = await graphGet(id, token, { fields: 'currency,name' });
+    if (info.currency) { const acc = (c.accounts || []).find(a => acctId(a.id) === id); if (acc) { acc.currency = info.currency; if (info.name && !acc.name) acc.name = info.name; } c.sourceCurrency = info.currency; if (!c.displayCurrency) c.displayCurrency = info.currency; }
+  } catch (e) { /* не критично */ }
   const win = Math.max(1, days || 14);
   const until = new Date(); const since = new Date(until.getTime() - win * 864e5);
   const ymd = (d) => d.toISOString().slice(0, 10);
