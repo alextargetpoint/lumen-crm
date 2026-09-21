@@ -481,7 +481,9 @@
     const solo = S.edition === 'solo';
     const name = S.name || (solo ? 'Ваш бренд' : 'Ваше агентство');
     const initial = esc(String(name).trim().charAt(0).toUpperCase() || 'L');
-    const geoChips = (S.geos || []).slice(0, 6).map(k => `<span class="ob-plate-geo">${esc((GEOS.find(g => g.k === k) || {}).l || k)}</span>`).join('');
+    const geoAll = S.geos || [];
+    const geoChips = geoAll.slice(0, 3).map(k => `<span class="ob-plate-geo">${esc((GEOS.find(g => g.k === k) || {}).l || k)}</span>`).join('')
+      + (geoAll.length > 3 ? `<span class="ob-plate-geo ob-plate-geo-more">+${geoAll.length - 3}</span>` : '');
     const logo = S.logo ? `<img src="${esc(S.logo)}" alt="">` : (S.name ? `<span class="ob-plate-mono">${initial}</span>` : `<span class="ob-plate-glyph">${IC.building}</span>`);
     /* персональная «обложка бренда» — скомпонована из их данных на анимированном золотом фоне (как hero-кавер писем) */
     const plate = `
@@ -906,11 +908,11 @@
     .ow-gc-chans i svg{width:15px;height:15px}
     @media(max-width:820px){.ow{grid-template-columns:1fr;gap:18px}.ow-r{min-height:280px;order:-1}.ow-gcard{display:none}.ow-hero{max-width:230px}}
     /* ── правая колонка-герой (S4 глобус / S5 люди / S6 баблы / S8 кольцо) ── */
-    .ob-heroside{display:flex;flex-direction:column;align-items:center;gap:18px;min-width:0}
-    .ob-hero2{width:100%;max-width:330px}
-    .ob-hero2 img{width:100%;height:auto;display:block;-webkit-mask-image:radial-gradient(ellipse 60% 62% at 50% 45%,#000 52%,transparent 80%);mask-image:radial-gradient(ellipse 60% 62% at 50% 45%,#000 52%,transparent 80%);animation:owFloat 7s ease-in-out infinite}
-    .ob-hcard{width:100%;max-width:360px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(24,21,17,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:16px 18px}
-    .ob-hcaption{text-align:center;margin-top:-6px}
+    .ob-heroside{display:flex;flex-direction:column;align-items:stretch;gap:0;width:100%;max-width:392px;margin:0 auto;min-width:0}
+    .ob-hero2{width:100%;margin:0 0 -34px}
+    .ob-hero2 img{width:82%;max-width:300px;height:auto;display:block;margin:0 auto;-webkit-mask-image:radial-gradient(ellipse 64% 64% at 50% 50%,#000 56%,transparent 80%);mask-image:radial-gradient(ellipse 64% 64% at 50% 50%,#000 56%,transparent 80%);animation:owFloat 7s ease-in-out infinite}
+    .ob-hcard{width:100%;max-width:none;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(24,21,17,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:18px 20px}
+    .ob-hcaption{text-align:center;margin:-20px 0 12px}
     .ob-hcaption-b{font-size:13px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:#cfc6b6;line-height:1.7}
     .ob-hcaption-s{font-size:11px;font-weight:400;letter-spacing:.22em;text-transform:uppercase;color:#8a8272;margin-top:8px}
     .ob-hcard-t{font-size:12.5px;font-weight:600;letter-spacing:.02em;color:#d7d0c4;margin-bottom:10px}
@@ -1180,7 +1182,7 @@
     .ob-wa-pill svg{width:16px;height:16px;color:#25d366}
     .ob-chat{position:relative;border-radius:18px;padding:22px 20px;border:1px solid rgba(214,199,168,.16);background:radial-gradient(120% 120% at 80% 0,rgba(214,199,168,.05),transparent 60%),rgba(10,10,9,.6);display:flex;flex-direction:column;gap:20px;overflow:hidden}
     .ob-cb-who{display:block;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8b8a87;margin-bottom:6px}
-    .ob-cb-ai{color:#c9a86a}
+    .ob-cb-ai{color:#c9a86a;padding-left:46px}
     .ob-cb-in{max-width:82%;margin-left:6%}
     .ob-cb{position:relative;border-radius:16px;padding:12px 15px 20px;font-size:13.5px;line-height:1.5}
     .ob-cb p{margin:0;padding-right:34px}
@@ -1237,7 +1239,7 @@
     .ob-plate-art i:nth-child(2){width:340px;height:340px;margin:-170px -170px 0 0;opacity:.6;animation-delay:.6s}
     .ob-plate-art i:nth-child(3){width:460px;height:460px;margin:-230px -230px 0 0;opacity:.35;animation-delay:1.2s}
     @keyframes obRing{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.04)}}
-    .ob-plate-star{position:absolute;top:50%;right:12%;transform:translateY(-50%);font-family:'Cormorant',Georgia,serif;font-size:96px;color:rgba(214,199,168,.9);text-shadow:0 0 40px rgba(214,199,168,.5);line-height:1;animation:obEmblem 5s ease-in-out infinite}
+    .ob-plate-star{position:absolute;top:34%;right:8%;transform:translateY(-50%);font-family:'Cormorant',Georgia,serif;font-size:88px;color:rgba(214,199,168,.55);text-shadow:0 0 44px rgba(214,199,168,.4);line-height:1;animation:obEmblem 5s ease-in-out infinite}
     .ob-plate-body{position:relative;z-index:1;padding:30px 32px}
     .ob-plate-logo{width:56px;height:56px;border-radius:14px;overflow:hidden;background:rgba(214,199,168,.08);border:1px solid rgba(214,199,168,.28);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
     .ob-plate-logo img{max-width:82%;max-height:82%;object-fit:contain}
@@ -1245,7 +1247,8 @@
     .ob-plate-wm{font-family:'Cormorant',Georgia,serif;font-size:13px;letter-spacing:.22em;color:rgba(214,199,168,.7);margin-bottom:6px}
     .ob-plate-name{font-family:'Cormorant',Georgia,serif;font-size:clamp(30px,4.4vw,44px);font-weight:500;letter-spacing:-.01em;line-height:1.06;color:#f6f2ea;max-width:82%}
     .ob-plate-sub{font-size:12px;letter-spacing:.04em;color:#8f8b80;margin-top:8px}
-    .ob-plate-geos{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+    .ob-plate-geos{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;max-width:68%}
+    .ob-plate-geo-more{color:#8f8b80}
     .ob-plate-geo{font-size:12px;color:#d6c7a8;border:1px solid rgba(214,199,168,.28);border-radius:999px;padding:5px 12px;background:rgba(214,199,168,.05)}
     .ob-finish .ob-recap{margin-top:24px}
     /* ── витрина возможностей ── */
