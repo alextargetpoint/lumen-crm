@@ -211,7 +211,7 @@ function tgQrGuideRich() {
     ['04-enter-code', 'SMS-код на номер', 'Код возьми в ленте OTP в CRM'],
   ];
   const realShots = `<div class="wag-realshots">${shots.map(s => `<figure class="wag-fig">
-    <img src="assets/tg-guide/${s[0]}.png?v=1" loading="lazy" alt="${esc(s[1])}">
+    <img src="/assets/tg-guide/${s[0]}.png?v=1" loading="lazy" alt="${esc(s[1])}" onclick="window.lumenZoom&&lumenZoom(this)">
     <figcaption><b>${s[1]}</b><span>${s[2]}</span></figcaption>
   </figure>`).join('')}</div>`;
 
