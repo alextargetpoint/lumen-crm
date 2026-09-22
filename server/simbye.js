@@ -59,18 +59,32 @@ const getOtp   = (db, store, phone, service, timeoutMs, baselineKeys) =>
 const buy      = (db, store, country, calls)    => api(db, store, 'POST', '/buy', { country, calls }, 90000);
 const renew    = (db, store, phone, orderNo)    => api(db, store, 'POST', '/renew', { phone, orderNo }, 60000);
 const setSession = (db, store, state)           => api(db, store, 'POST', '/session', state, 90000);
-const login    = (db, store, email, password)   => api(db, store, 'POST', '/login', { email, password }, 160000);
+const login    = (db, store, email, password)   => api(db, store, 'POST', '/login', { email, password }, 20000); // старт джобы — быстро
+const loginStatus = (db, store)                 => api(db, store, 'GET', '/login-status', null, 15000);         // опрос статуса — короткий
 
 /* ── подключение СВОЕГО Simbye тенантом (email+пароль): сохраняем шифрованно + логинимся воркером ── */
 function creds(db) { const s = db.settings || (db.settings = {}); if (!s.simbye) s.simbye = {}; return s.simbye.creds || null; }
+/* Вход АСИНХРОННЫЙ. Стартуем джобу на воркере и СРАЗУ сохраняем креды (оптимистично — нужны
+   для авто-релогина; при провале входа /connect-status их сотрёт). Клиент опрашивает /connect-status. */
 async function connect(db, store, email, password) {
-  const r = await login(db, store, email, password);
+  const r = await login(db, store, email, password); // {ok:true, pending:true}
   if (r && r.ok) {
     const s = db.settings || (db.settings = {}); s.simbye = s.simbye || {};
-    s.simbye.creds = { email: String(email), passEnc: encSecret(password), connectedAt: Date.now() };
+    s.simbye.creds = { email: String(email), passEnc: encSecret(password), connectedAt: Date.now(), pending: true };
     try { store && store.save && store.save(); } catch (_) {}
   }
   return r;
+}
+/* результат асинхронного входа + фиксация/откат кредов */
+async function connectStatus(db, store) {
+  const st = await loginStatus(db, store).catch(e => ({ ok: false, state: 'error', error: e.message }));
+  if (st && st.state === 'done' && st.result) {
+    const s = db.settings || (db.settings = {}); s.simbye = s.simbye || {};
+    if (st.result.ok) { if (s.simbye.creds) delete s.simbye.creds.pending; }
+    else if (s.simbye.creds && s.simbye.creds.pending) { delete s.simbye.creds; } // вход не удался → откат оптимистично сохранённых кредов
+    try { store && store.save && store.save(); } catch (_) {}
+  }
+  return st;
 }
 /* авто-релогин при протухшей сессии — берём шифрованные креды тенанта */
 async function relogin(db, store) {
@@ -338,7 +352,7 @@ async function tick(db, store, deps) {
 
 module.exports = {
   ready, workerCfg, health, numbers, getOtp, buy, renew, setSession,
-  login, connect, relogin, disconnect, creds, encSecret, decSecret,
+  login, connect, connectStatus, relogin, disconnect, creds, encSecret, decSecret,
   farm, accById, chan, setState, clientNotice, pushAlert, resolveAlerts,
   daysToExpiry, tick, STEPS, STEP_RU, OTP_WAIT_MS,
   template, genRecoveryEmail, genTwoFAPin, ensureSecrets, personaFor,

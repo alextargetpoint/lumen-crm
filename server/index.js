@@ -5350,7 +5350,9 @@ const server = http.createServer(async (req, res) => {
     const isControlDelegate = IS_BROKER && !!(db.settings.control && db.settings.control.delegateBrokerId && db.settings.control.delegateBrokerId === ROLE.brokerId);
     const canControl = () => !!ROLE && (!IS_BROKER || isControlDelegate);
     const CONTROL_PATH = /^\/api\/(control-center|control-analytics|control-settings)$/.test(p) || /^\/api\/brokers\/[^/]+\/offboard$/.test(p) || p === '/api/leads/merge' || /^\/api\/leads\/[^/]+\/commission$/.test(p);
-    if (IS_BROKER && p.startsWith('/api/') && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
+    /* брокеру РАЗРЕШЕНО редактировать ТОЛЬКО свой закреплённый WhatsApp-профиль (проверка владения — внутри роутов) */
+    const brokerSelfWaOk = p === '/api/wa/gray/mine' || p === '/api/wa/gray/my-persona';
+    if (IS_BROKER && p.startsWith('/api/') && !brokerSelfWaOk && !(isControlDelegate && CONTROL_PATH) && nonOwnerBlocked(p, req.method, GRANTED)) { audit(db, req, 'отказ доступа', { path: p }); return json(res, 403, { error: 'недоступно для вашей роли' }); }
     /* видимость лида: own — только свои, all — все (ассистент/менеджер) + пер-сотрудник фильтр по тегам/источникам */
     const LF = (IS_BROKER && MEMBER && MEMBER.leadFilter && ((MEMBER.leadFilter.tags || []).length || (MEMBER.leadFilter.sources || []).length)) ? MEMBER.leadFilter : null;
     const matchesLeadFilter = (l) => { if (!LF) return true; const byTag = (LF.tags || []).length && (l.tags || []).some(t => LF.tags.includes(t)); const bySrc = (LF.sources || []).length && LF.sources.includes(l.source); return !!(byTag || bySrc); };
@@ -6705,13 +6707,29 @@ const server = http.createServer(async (req, res) => {
           if (item.toId) { const nb = db.brokers.find(x => x.id === item.toId); if (nb) nb.load = (nb.load || 0) + 1; }
           if (b.notifyClients && item.toId) {
             const nbName = (db.brokers.find(x => x.id === item.toId) || {}).name || 'наш эксперт';
-            engine.send(db, lead, `${lead.name.split(' ')[0]}, здравствуйте! Теперь с вами работает ${nbName} из нашей команды — вся история сохранена, продолжайте здесь же.`, 'human', { channel: 'wa' });
+            const nbFirst = String(nbName).split(' ')[0];
+            const oldFirst = String(br.name || '').split(' ')[0];
+            /* умная карточка передачи: новый брокер по-человечески представляется, объясняет смену (лид увидит новое имя/аватар) */
+            const tpl = (b.handoverText && String(b.handoverText).trim()) ? String(b.handoverText) : 'Здравствуйте, {name}! Меня зовут {broker}. {old} больше не работает в нашей команде — теперь ваш вопрос веду я. Вся история и договорённости сохранены, давайте познакомимся и продолжим?';
+            const msg = tpl.replace(/\{name\}/g, lead.name.split(' ')[0] || '').replace(/\{broker\}/g, nbFirst).replace(/\{old\}/g, oldFirst).replace(/\{agency\}/g, db.settings.agency.name);
+            engine.send(db, lead, msg, 'human', { channel: 'wa' });
           }
           moved++;
         }
         /* встречи → преемнику по гео/пулу */
         const fallback = db.brokers.filter(x => x.id !== br.id && x.active !== false).sort((a2, b2) => (a2.load || 0) - (b2.load || 0))[0];
         for (const mt of db.meetings || []) if (mt.brokerId === br.id && (!mt.status || !['done', 'cancelled', 'no_show'].includes(mt.status))) { const tgt = (successorId !== 'auto' && db.brokers.find(x => x.id === successorId && x.active !== false)) || fallback; if (tgt) mt.brokerId = tgt.id; }
+        /* WhatsApp-номер ушедшего брокера: передаём преемнику (если выбран конкретный) + СБРОС оформления,
+           чтобы новый брокер завёл имя/аватар заново; реальный аккаунт тоже сбрасываем через воркер. */
+        let numMoved = 0;
+        const numTarget = (successorId && successorId !== 'auto' && db.brokers.find(x => x.id === successorId && x.active !== false)) ? successorId : null;
+        for (const gn of ((db.settings.waGray || {}).numbers || [])) {
+          if (gn.brokerId !== br.id) continue;
+          gn.brokerId = numTarget;                                  /* null → номер «свободен», владелец закрепит позже */
+          gn.persona = { name: '', about: '', avatar: '' };         /* сброс оформления */
+          numMoved++;
+          if (waWorkerReady(db)) { try { await waGrayApi(db, 'POST', '/sessions/' + waGraySid(gn.phone) + '/profile', { name: '', about: '', photoUrl: '' }); } catch (_) {} }
+        }
         /* отзыв доступа */
         br.active = false; br.load = 0;
         for (const [sid2, s2] of Object.entries(db.settings.auth.sessions)) if (s2.brokerId === br.id) delete db.settings.auth.sessions[sid2];
@@ -6719,7 +6737,7 @@ const server = http.createServer(async (req, res) => {
         audit(db, req, `оффбординг: ${moved} лидов передано, доступ отозван`, { broker: br.name, successor: successorId });
         ai.pushEvent(db, { type: 'handover', text: `📦 Передача дел: ${br.name} отключён, ${moved} лидов переданы команде${b.notifyClients ? ' (клиенты уведомлены)' : ''}` });
         store.save();
-        return json(res, 200, { ok: true, moved, distribution: prev.distribution });
+        return json(res, 200, { ok: true, moved, numMoved, numTarget, distribution: prev.distribution });
       }
     }
 
@@ -7733,6 +7751,8 @@ const server = http.createServer(async (req, res) => {
       if (!reachable) return json(res, 200, { ok: false, error: `Simbye-воркер недоступен: ${why}. Задеплойте сервис lumen-simbye-worker на Railway (репо github.com/alextargetpoint/lumen-simbye-worker) и укажите его реальный URL в LUMEN_SIMBYE_WORKER_URL. Это не про ваш пароль.`, workerDown: true });
       try {
         const r = await simbye.connect(db, store, email, password);
+        /* Вход асинхронный: воркер вернул pending — клиент опрашивает /api/simbye/connect-status */
+        if (r.ok && r.pending) return json(res, 200, { ok: true, pending: true, email });
         if (r.ok) { simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, { ok: true, loggedIn: true, email }); }
         /* КОНКРЕТНАЯ причина от воркера (он снимает ошибку Shopify/верификацию/капчу) */
         let msg;
@@ -7745,6 +7765,27 @@ const server = http.createServer(async (req, res) => {
         else msg = r.detail || r.reason || r.error || 'ошибка входа';
         return json(res, 200, { ok: false, error: msg, reason: r.reason, _diag: { httpStatus: r.httpStatus, bodyText: r.bodyText, tokenGot: r.tokenGot, capAttempted: r.capAttempted } });
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* СТАТУС асинхронного входа: клиент опрашивает раз в 3с, пока идёт решение капчи */
+    if (p === '/api/simbye/connect-status' && (req.method === 'GET' || req.method === 'POST')) {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      try {
+        const st = await simbye.connectStatus(db, store);
+        if (!st || st.state === 'idle') return json(res, 200, { ok: true, state: 'idle' });
+        if (st.state === 'running') return json(res, 200, { ok: true, state: 'running', ageMs: st.ageMs || 0 });
+        // done
+        const r = st.result || {};
+        if (r.ok) { simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, { ok: true, state: 'done', loggedIn: true }); }
+        let msg;
+        if (r.reason === 'email_not_verified') msg = 'Simbye требует подтвердить e-mail. Откройте письмо от Simbye («Confirm your email» / «Активируйте аккаунт»), подтвердите — и подключите снова.';
+        else if (r.reason === 'captcha_no_key') msg = 'Вход в Simbye защищён hCaptcha. Чтобы система входила сама — задайте на воркере переменную CAPTCHA_API_KEY (ключ 2captcha, ~$5 на баланс).';
+        else if (r.reason === 'captcha_solve_failed') msg = `Сервис не решил капчу: ${r.detail || ''}. Проверьте баланс и ключ 2captcha.`;
+        else if (r.reason === 'captcha_failed' || r.reason === 'captcha') msg = 'Капча не прошла с первого раза — нажмите «Подключить» ещё раз.';
+        else if (r.reason === 'shopify_error') msg = `Simbye отклонил вход: «${r.detail || 'неверные данные'}». Чаще всего: неверный пароль, ИЛИ аккаунт создан через Google/Apple.`;
+        else if (r.reason === 'login_failed') msg = 'Не удалось войти в Simbye. Проверьте email+пароль и что аккаунт создан по email+паролю (не Google/Apple).';
+        else msg = r.detail || r.reason || r.error || 'ошибка входа';
+        return json(res, 200, { ok: false, state: 'done', error: msg, reason: r.reason, _diag: { httpStatus: r.httpStatus, bodyText: r.bodyText, tokenGot: r.tokenGot, capAttempted: r.capAttempted } });
+      } catch (e) { return json(res, 200, { ok: false, state: 'error', error: e.message }); }
     }
     /* URL «встроенного браузера» для входа в Simbye (человек решает hCaptcha, воркер держит сессию) */
     if (p === '/api/simbye/rb-url' && req.method === 'POST') {
@@ -8119,6 +8160,34 @@ const server = http.createServer(async (req, res) => {
       let sync = null;
       if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
       return json(res, 200, { ok: true, persona: rec.persona, sync });
+    }
+    /* БРОКЕР сам смотрит/редактирует СВОЙ закреплённый WhatsApp-профиль (владелец назначает номер, брокер оформляет).
+       Владение проверяется здесь: брокер видит/правит только номер, где brokerId === его id. */
+    if (p === '/api/wa/gray/mine' && req.method === 'GET') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const bid = R.role === 'owner' ? (u.searchParams.get('brokerId') || null) : R.brokerId;
+      const nums = ((db.settings.waGray || {}).numbers) || [];
+      const rec = bid ? nums.find(n => n.brokerId === bid) : null;
+      if (!rec) return json(res, 200, { number: null });
+      let live = null;
+      if (waWorkerReady(db)) { try { const s = await waGrayApi(db, 'GET', '/sessions'); const arr = s.sessions || s || []; const me2 = arr.find(x => String(x.phone || '').replace(/\D/g, '') === rec.phone); live = me2 ? me2.status : null; } catch (_) {} }
+      return json(res, 200, { number: { phone: rec.phone, label: rec.label || '', persona: rec.persona || {}, brokerId: rec.brokerId, connected: live === 'connected', live, workerReady: waWorkerReady(db) } });
+    }
+    if (p === '/api/wa/gray/my-persona' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const nums = ((db.settings.waGray || {}).numbers) || [];
+      const rec = R.role === 'owner' ? nums.find(n => n.phone === String(b.phone || '').replace(/\D/g, '')) : nums.find(n => n.brokerId === R.brokerId);
+      if (!rec) return json(res, 404, { error: R.role === 'owner' ? 'номер не найден' : 'За вами не закреплён WhatsApp-номер. Попросите руководителя закрепить номер — тогда сможете оформить профиль.' });
+      rec.persona = rec.persona || {};
+      if (b.name != null) rec.persona.name = String(b.name).slice(0, 25);
+      if (b.about != null) rec.persona.about = String(b.about).slice(0, 139);
+      if (b.avatar != null) rec.persona.avatar = String(b.avatar).slice(0, 500);
+      rec.persona.editedBy = R.role === 'owner' ? 'owner' : R.brokerId; rec.persona.editedAt = Date.now();
+      store.save();
+      let sync = null;
+      if (waWorkerReady(db)) { try { sync = await waGrayApi(db, 'POST', '/sessions/' + waGraySid(rec.phone) + '/profile', { name: rec.persona.name || '', about: rec.persona.about || '', photoUrl: rec.persona.avatar || '' }); } catch (e) { sync = { error: e.message }; } }
+      return json(res, 200, { ok: true, persona: rec.persona, connected: waWorkerReady(db), sync });
     }
     if (p === '/api/wa/gray/apply-profile' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });

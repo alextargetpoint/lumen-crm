@@ -440,6 +440,7 @@ const NAV = {
   wake:      { name: 'Реанимация базы', en: 'Reactivation', icon: I.wake, sub: '' },
   meetings:  { name: 'Встречи', en: 'Meetings', icon: I.cal, sub: '' },
   tasks:     { name: 'Мои задачи', en: 'My tasks', icon: I.task, sub: '' },
+  waProfile: { name: 'Мой WhatsApp', en: 'My WhatsApp', icon: I.chat, sub: 'ваше имя, фото и описание в WhatsApp', subEn: 'your WhatsApp name, photo & about' },
   moodboard: { name: 'Карта желаний', en: 'Vision board', icon: I.spark, sub: 'личная доска мотивации', subEn: 'personal motivation board' },
   automations: { name: 'Автоматизации', en: 'Automations', icon: I.bolt, sub: '' },
   playbook: { name: 'Плейбук продаж', en: 'Sales playbook', icon: I.flame, sub: '' },
@@ -2440,6 +2441,7 @@ const DEFAULT_HIDDEN_PAGES = ['academy', 'studio', 'hr', 'social'];
 /* единый предикат видимости раздела: дефолт-скрытие ∪ роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
 function pageHiddenForUser(pg) {
   if (COMPOSITE_TABS[pg]) return COMPOSITE_TABS[pg].every(([k]) => pageHiddenForUser(k));   /* композит скрыт, если ВСЕ под-вкладки скрыты */
+  if (pg === 'waProfile') return !(STATE && STATE.me && STATE.me.role === 'broker');   /* «Мой WhatsApp» — только брокеру (владелец правит в «Номера») */
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const rt = (me && me.roleType) || 'broker';
@@ -6306,6 +6308,53 @@ async function renderComposite(root, compKey) {
 }
 PAGES.autopilot = (root) => renderComposite(root, 'autopilot');
 PAGES.knowledge = (root) => renderComposite(root, 'knowledge');
+
+/* ---------------- МОЙ WHATSAPP (брокер сам оформляет свой закреплённый номер) ---------------- */
+PAGES.waProfile = async (root) => {
+  let data = {}; try { data = await api.get('/wa/gray/mine'); } catch (_) {}
+  const n = data.number, pr = (n && n.persona) || {};
+  const inits = (String(pr.name || '')).trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '👤';
+  root.innerHTML = `
+    <div class="plo-h1" style="display:flex;align-items:center;gap:9px;margin-bottom:4px">${ic(I.chat)}Мой WhatsApp</div>
+    <div class="muted" style="font-size:13px;margin-bottom:18px">Ваше имя, фото и описание — как вас увидит клиент в WhatsApp. Меняете сами, синкается в реальный аккаунт.</div>
+    <div class="two-col wapf" style="grid-template-columns:1.2fr 1fr;max-width:860px;align-items:start">
+      <div class="glass card">
+        ${!n ? `<div class="lc-hint warn"><span>${ic(I.shield)}За вами пока не закреплён WhatsApp-номер. Попросите руководителя закрепить номер за вами (Номера → выбрать вас) — и здесь появится оформление профиля.</span></div>`
+          : `<div class="wapf-status ${n.connected ? 'on' : ''}">${ic(n.connected ? I.check : I.shield)}<span>${n.connected ? 'Номер на связи · +' + esc(n.phone) : (n.workerReady ? 'Номер не на связи — профиль сохранится и применится после подключения по QR' : 'Профиль сохранится и применится, когда номер подключат')}</span></div>
+          <div class="form-row"><label>Имя (видит лид, до 25 симв.)</label><input id="wmName" maxlength="25" value="${esc(pr.name || '')}" placeholder="напр. Анна · ${esc(STATE.settings.agency.name)}"></div>
+          <div class="form-row"><label>Описание «О себе» (до 139 симв.)</label><input id="wmAbout" maxlength="139" value="${esc(pr.about || '')}" placeholder="напр. Недвижимость Дубай · на связи 10:00–20:00"></div>
+          <div class="form-row"><label>Аватар (ссылка на картинку)</label><input id="wmAvatar" value="${esc(pr.avatar || '')}" placeholder="https://…/photo.jpg"></div>
+          <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-accent" id="wmSave">${ic(I.check)}Сохранить и применить</button></div>
+          <div id="wmOut" class="muted" style="font-size:11.5px;margin-top:8px"></div>`}
+      </div>
+      ${n ? `<div class="glass card">
+        <div class="muted" style="font-size:11px;margin-bottom:12px;display:inline-flex;gap:5px;align-items:center">${ic(I.eye)}Как увидят в WhatsApp</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div id="wmAva" class="wapf-ava">${pr.avatar ? `<img src="${esc(pr.avatar)}">` : ''}<span id="wmAvaTx" ${pr.avatar ? 'style="display:none"' : ''}>${esc(inits)}</span></div>
+          <div id="wmNamePrev" style="font-size:16px;font-weight:700;color:var(--ink-1)">${esc(pr.name || 'Имя')}</div>
+          <div id="wmAboutPrev" class="muted" style="font-size:12px;text-align:center">${esc(pr.about || 'О себе — появится здесь')}</div>
+        </div>
+      </div>` : ''}
+    </div>`;
+  if (!n) return;
+  const upd = () => {
+    const nm = ($('#wmName', root) || {}).value || '', ab = ($('#wmAbout', root) || {}).value || '', av = ($('#wmAvatar', root) || {}).value || '';
+    const np = $('#wmNamePrev', root); if (np) np.textContent = nm || 'Имя';
+    const apr = $('#wmAboutPrev', root); if (apr) apr.textContent = ab || 'О себе — появится здесь';
+    const ava = $('#wmAva', root), tx = $('#wmAvaTx', root);
+    if (ava) { let img = ava.querySelector('img'); if (av) { if (!img) { img = document.createElement('img'); ava.insertBefore(img, ava.firstChild); } img.onerror = () => { img.style.display = 'none'; if (tx) tx.style.display = ''; }; img.src = av; img.style.display = ''; if (tx) tx.style.display = 'none'; } else { if (img) img.style.display = 'none'; if (tx) tx.style.display = ''; } }
+  };
+  ['wmName', 'wmAbout', 'wmAvatar'].forEach(id => { const e = $('#' + id, root); if (e) e.addEventListener('input', upd); });
+  $('#wmSave', root)?.addEventListener('click', async () => {
+    const out = $('#wmOut', root); if (out) out.textContent = 'Сохраняю и синкаю в WhatsApp…';
+    try {
+      const r = await api.post('/wa/gray/my-persona', { name: ($('#wmName', root) || {}).value, about: ($('#wmAbout', root) || {}).value, avatar: ($('#wmAvatar', root) || {}).value });
+      const sy = r.sync || {};
+      toast((sy.error || !r.connected) ? 'Сохранено' : 'Профиль применён в WhatsApp', (sy.error || !r.connected) ? 'Применится после подключения номера' : 'Клиенты увидят обновление', true);
+      if (out) out.textContent = '';
+    } catch (e) { if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+  });
+};
 
 /* ---------------- ИИ-КВАЛИФИКАТОР ---------------- */
 PAGES.qualifier = async (root) => {
@@ -12230,12 +12279,28 @@ function wireSimbye(scope, d, reload) {
     const paint = () => { if (done) return; const el = Date.now() - t0; const s = [...stages].reverse().find(x => el >= x.at) || stages[0]; prog.innerHTML = `<span class="sbf-spin"></span><span class="sbc-prog-t">${esc(s.t)}</span><span class="sbc-prog-el">${Math.round(el / 1000)}с</span>`; };
     btn.innerHTML = '<span class="sbf-spin"></span>Подключаю…'; paint();
     const iv = setInterval(paint, 500); const fin = () => { done = true; clearInterval(iv); };
+    const restore = () => { if (prog) prog.remove(); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; };
     try {
       const r = await api.post('/simbye/connect', { email, password });
+      if (r.ok && r.pending) {
+        /* Вход асинхронный: капча решается на воркере 30-135с. Опрашиваем статус, не держим запрос. */
+        const started = Date.now(); let out = null;
+        while (Date.now() - started < 165000) {
+          await new Promise(res => setTimeout(res, 3000));
+          let st; try { st = await api.get('/simbye/connect-status'); } catch (_) { continue; }
+          if (st && st.state === 'done') { out = st; break; }
+          // ещё идёт — прогресс сам крутится через paint()
+        }
+        fin();
+        if (out && out.ok) { if (prog) prog.innerHTML = '<span class="sbc-prog-ok">✓ Подключено — забираю номера…</span>'; toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); }
+        else if (out) { restore(); toast('Не вышло', out.error || 'вход не удался', false); }
+        else { restore(); toast('Долго', 'Вход занял слишком много времени — попробуйте ещё раз.', false); }
+        return;
+      }
       fin();
       if (r.ok) { if (prog) prog.innerHTML = '<span class="sbc-prog-ok">✓ Подключено — забираю номера…</span>'; toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); }
-      else { if (prog) prog.remove(); toast('Не вышло', r.error || '', false); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
-    } catch (er) { fin(); if (prog) prog.remove(); toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+      else { restore(); toast('Не вышло', r.error || '', false); }
+    } catch (er) { fin(); restore(); toast('Ошибка', er.message); }
   });
   /* ВСТРОЕННЫЙ БРАУЗЕР (фолбэк): открываем живую страницу входа Simbye в iframe — человек решает hCaptcha */
   $s('#sbcRemote')?.addEventListener('click', async (e) => {
