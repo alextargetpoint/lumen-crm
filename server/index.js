@@ -6930,6 +6930,43 @@ const server = http.createServer(async (req, res) => {
       const reg = store.getRegistry(); reg.platformTelnyx = { key, at: Date.now() }; store.saveRegistry();
       return json(res, 200, { ok: true });
     }
+    /* АВТО-НАСТРОЙКА телефонии Telnyx одним запросом: найти/создать Call Control App (его id = connection_id для звонков),
+       импортировать номера аккаунта в пул исходящих + привязать к connection. После этого звонки едут. */
+    if (p === '/api/telephony/auto-setup' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const t = db.settings.telephony || (db.settings.telephony = {});
+      t.provider = 'telnyx';
+      if (!telnyxKey(t)) return json(res, 400, { error: 'нет Telnyx API-ключа (env TELNYX_API_KEY или платформенный)' });
+      const voiceHook = telnyxWebhook(db);
+      try {
+        /* 1) Call Control Application: используем существующий «Lumen», иначе создаём */
+        let appId = t.connId;
+        if (appId) { try { await telnyxApi(db, 'GET', '/call_control_applications/' + encodeURIComponent(appId)); } catch (_) { appId = null; } }
+        if (!appId) {
+          let list = {}; try { list = await telnyxApi(db, 'GET', '/call_control_applications?page[size]=50'); } catch (_) { }
+          const existing = (list.data || []).find(a => /lumen/i.test(a.application_name || ''));
+          if (existing) appId = existing.id;
+          else { const created = await telnyxApi(db, 'POST', '/call_control_applications', { application_name: 'Lumen Calls', webhook_event_url: voiceHook || undefined, first_command_timeout_secs: 30 }); appId = created.data && created.data.id; }
+        }
+        if (!appId) return json(res, 400, { error: 'не удалось получить/создать Call Control App' });
+        if (voiceHook) { try { await telnyxApi(db, 'PATCH', '/call_control_applications/' + appId, { webhook_event_url: voiceHook }); } catch (_) { } }
+        t.connId = appId;
+        /* 2) импорт номеров аккаунта в пул + привязка voice-connection (не трогает messaging-profile) */
+        let imported = 0, attached = 0;
+        try {
+          const pn = await telnyxApi(db, 'GET', '/phone_numbers?page[size]=50');
+          t.fromNumbers = Array.isArray(t.fromNumbers) ? t.fromNumbers.map(x => typeof x === 'string' ? x : (x && x.number)).filter(Boolean) : [];
+          for (const d of (pn.data || [])) {
+            const num = d.phone_number; if (!num) continue;
+            if (!t.fromNumbers.includes(num)) { t.fromNumbers.push(num); imported++; }
+            if (d.connection_id !== appId) { try { await telnyxApi(db, 'PATCH', '/phone_numbers/' + d.id, { connection_id: appId }); attached++; } catch (_) { } }
+          }
+          if (!t.fromNumber && t.fromNumbers.length) t.fromNumber = t.fromNumbers[0];
+        } catch (_) { }
+        store.save();
+        return json(res, 200, { ok: true, connId: appId, numbers: t.fromNumbers, imported, attached });
+      } catch (e) { return json(res, 400, { error: e.message }); }
+    }
     /* ДИАГНОСТИКА ключа Telnyx: что реально доступно (баланс / поиск номеров / список номеров / мессенджинг) */
     if (p === '/api/telephony/telnyx-probe' && (req.method === 'GET' || req.method === 'POST')) {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
