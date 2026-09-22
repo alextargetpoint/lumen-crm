@@ -1501,11 +1501,23 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .clib-add { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--stroke); background: var(--card); color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .13s; }
 .clib-add:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .clib-add svg { width: 14px; height: 14px; }
-/* превью сообщения внутри карточки (визуальный пример) */
-.clib-pv { background: color-mix(in srgb, var(--accent) 4%, transparent); border-radius: 10px; padding: 8px; }
-.clib-pv-creo { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 14px; padding: 2px 8px; margin-bottom: 6px; }
-.clib-pv-creo svg { width: 10px; height: 10px; }
-.clib-pv-bubble { position: relative; background: var(--card); border: 1px solid var(--stroke); border-radius: 10px 10px 10px 3px; padding: 7px 9px; font-size: 11px; line-height: 1.5; color: var(--ink-2); max-height: 118px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+/* превью сообщения внутри карточки — мини-чат WhatsApp (визуальный пример) */
+.clib-pv { border-radius: 11px; padding: 9px 9px 6px; background:
+  linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent), color-mix(in srgb, var(--accent) 4%, transparent)),
+  repeating-linear-gradient(45deg, rgba(127,127,127,.03) 0 8px, transparent 8px 16px);
+  max-height: 176px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+.clib-pv-chat { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.clib-pv-msg { position: relative; align-self: flex-end; max-width: 92%; background: color-mix(in srgb, #25D366 16%, var(--card)); border: 1px solid color-mix(in srgb, #25D366 24%, var(--stroke)); border-radius: 11px 11px 3px 11px; padding: 6px 9px 5px; font-size: 11px; line-height: 1.5; color: var(--ink-1); }
+.clib-pv-msg p { margin: 0 0 5px; }
+.clib-pv-msg p:last-of-type { margin-bottom: 0; }
+.clib-pv-para { margin-top: 5px; }
+.clib-pv-t { display: block; text-align: right; font-size: 8.5px; color: color-mix(in srgb, #128C7E 70%, var(--muted)); margin-top: 2px; letter-spacing: .02em; }
+.clib-pv-media { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; color: #0e7a67; background: color-mix(in srgb, #25D366 14%, transparent); border-radius: 8px; padding: 10px 9px; }
+.clib-pv-media svg { width: 13px; height: 13px; }
+.clib-pv-voice { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #0e7a67; font-weight: 600; }
+.clib-pv-voice svg { width: 13px; height: 13px; margin-right: 3px; }
+.clib-pv-voice i { width: 2px; border-radius: 2px; background: color-mix(in srgb, #128C7E 55%, transparent); }
+.clib-pv-voice i:nth-child(2){height:7px} .clib-pv-voice i:nth-child(3){height:12px} .clib-pv-voice i:nth-child(4){height:8px} .clib-pv-voice i:nth-child(5){height:5px}
 
 /* ── Реорганизованный редактор шага (se2) ── */
 .se2 { display: flex; flex-direction: column; gap: 12px; }

@@ -6520,17 +6520,17 @@ const CHAIN_CARDS = [
     steps: [
       { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: true }, text: '', label: '1 · Креатив из заявки', active: true },
       { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: '2 · Сопроводительный текст', active: true,
-        text: 'Hey {name}! Saw your request about {creative} — great pick! Prices might be going up soon, so timing is key.\n\n{priceLineEn}Want me to send you the best options in this range?' },
+        text: 'Hello {name}! I saw your request about {creative}, a great choice.\n\nPrices here may rise soon, so timing matters. {priceLineEn}\n\nWould you like me to send the best options in this range?' },
     ] },
   { id: 'first-question', icon: 'chat', tag: 'Первое касание', cat: 'Первое касание', title: 'Первое касание · сразу вопрос', timing: 'сразу',
     desc: 'Короткое дружелюбное касание одним сообщением: признать выбор + один лёгкий вопрос-альтернатива, чтобы получить любой ответ.',
     steps: [ { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: 'Первое касание · вопрос', active: true,
-        text: "Hi {name}! Thanks for your interest in {creative} — solid choice. Quick one so I send the right thing: are you looking at it for yourself, or as an investment?" } ] },
+        text: "Hello {name}! Thank you for your interest in {creative}, a solid choice.\n\nOne quick question so I send you the right options: are you considering it for yourself, or as an investment?" } ] },
   /* ── Доверие и раппорт ── */
   { id: 'photo-card', icon: 'image', tag: 'Доверие', cat: 'Доверие и раппорт', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку',
     desc: 'Фото-визитка брокера (прикрепите картинку) + тёплое приветствие и вопрос-альтернатива (релокация или инвестиции).',
     steps: [ { day: 0.12, delayVal: 3, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Фотовизитка + приветствие', active: true,
-        text: "By the way, I'm {manager} from {agency} — we don't just list properties, we handpick the best. And this one definitely made the cut.\n\nI can help you find the right deal and sort out the details. Are you looking to buy for relocation or as an investment?" } ] },
+        text: "By the way, I'm {manager} from {agency}. We don't just list properties, we handpick the best, and this one made the cut.\n\nI'll help you find the right deal and handle the details.\n\nAre you buying for relocation, or as an investment?" } ] },
   { id: 'voice-note', icon: 'mic', tag: 'Личный контакт', cat: 'Доверие и раппорт', title: 'Голосовое касание', timing: 'день 3',
     desc: 'Короткое голосовое — резко повышает доверие и ответы. ИИ подскажет, что записать.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'voice', mode: 'ai', label: 'Голосовое', active: true,
@@ -6538,46 +6538,46 @@ const CHAIN_CARDS = [
   { id: 'social-proof', icon: 'flame', tag: 'Соц. доказательство', cat: 'Доверие и раппорт', title: 'Кейс клиента (соц. доказательство)', timing: 'день 2',
     desc: 'Свежий кейс: клиент закрыл сделку на лучших условиях. Снимает недоверие + мягкий заход на подбор.',
     steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Кейс клиента', active: true,
-        text: "{name}, just closed a deal for a client on a unit like {creative} — got them in ~15% below list before public launch.\n\nThese windows open up regularly. Want me to keep an eye out and send you only the ones that fit your budget?" } ] },
+        text: "{name}, we just closed a deal for a client on a unit like {creative}, about 15% below list price, before the public launch.\n\nThese windows open up regularly.\n\nWant me to watch for them and send only the ones that fit your budget?" } ] },
   /* ── Ценность и срочность ── */
   { id: 'value-urgency', icon: 'bolt', tag: 'Ценность + срочность', cat: 'Ценность и срочность', title: 'Follow-up: ценность и срочность', timing: 'день 2',
     desc: 'ROI, спрос на аренду, премиум-удобства + предложение прислать сравнение лучших вариантов месяца.',
     steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Ценность + срочность', active: true,
-        text: 'Hey {name}, quick heads-up — prices for {creative} are going up soon!\n\n💰 Potential ROI up to 10% annually\n📈 High short-term rental demand — strong cash flow\n🏤 Luxury amenities: pool, sauna, gym & more\n\nWant me to send a comparison of the best options this month?' } ] },
+        text: 'Hello {name}, a quick heads-up: prices for {creative} are rising soon.\n\n💰 Potential ROI up to 10% per year\n📈 High short-term rental demand, strong cash flow\n🏤 Premium amenities: pool, sauna, gym and more\n\nWould you like a comparison of the best options this month?' } ] },
   { id: 'scarcity', icon: 'bolt', tag: 'Дефицит', cat: 'Ценность и срочность', title: 'Осталось мало юнитов', timing: 'день 3',
     desc: 'Честный дефицит: лучшие планировки/этажи уходят первыми. Подталкивает решиться без давления.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Дефицит юнитов', active: true,
-        text: "{name}, small update on {creative}: the best layouts and floors are going fast — a few of the top units are already reserved.\n\nWant me to lock in the current availability and pricing for you before they're gone?" } ] },
+        text: "{name}, a quick update on {creative}: the best layouts and floors are going fast, and several of the top units are already reserved.\n\nWant me to lock in the current availability and pricing for you before they're gone?" } ] },
   { id: 'payment-plan', icon: 'card', tag: 'Рассрочка', cat: 'Ценность и срочность', title: 'Рассрочка 0% · условия', timing: 'день 3',
     desc: 'Акцент на выгодном плане оплаты (0% рассрочка, вход небольшой). Снимает возражение по деньгам.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'План оплаты', active: true,
-        text: "{name}, one thing that makes {creative} stand out — the payment plan. {priceLineEn}0% installments, low entry, and the rest spread until handover.\n\nWant me to break down the exact numbers for your budget?" } ] },
+        text: "{name}, one thing that makes {creative} stand out is the payment plan.\n\n{priceLineEn}0% installments, a low entry, and the rest spread until handover.\n\nWant me to break down the exact numbers for your budget?" } ] },
   { id: 'launch-predstart', icon: 'spark', tag: 'Предстарт', cat: 'Ценность и срочность', title: 'Раньше рынка (предстарт)', timing: 'день 4',
     desc: 'Доступ к юнитам до открытия общих продаж — по ценам застройщика. Эксклюзивность + срочность.',
     steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Предстарт', active: true,
-        text: "{name}, we're getting early access to the next release around {creative} — developer prices, before it opens to the public.\n\nThese usually sell out in the first days. Want me to put you on the priority list?" } ] },
+        text: "{name}, we're getting early access to the next release around {creative}, at developer prices, before it opens to the public.\n\nThese usually sell out in the first days.\n\nWant me to add you to the priority list?" } ] },
   /* ── Полезность ── */
   { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', cat: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку',
     desc: 'Заготовленная PDF-подборка топ-проектов (прикрепите файл) + короткий текст «прислать?».',
     steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'PDF-подборка + текст', active: true,
-        text: "Just prepared a fresh selection of {geo}'s top projects — handpicked options with the best payment plans and locations.\n\nWant me to send it over?" } ] },
+        text: "I've prepared a fresh selection of {geo}'s top projects: handpicked options with the best payment plans and locations.\n\nWould you like me to send it over?" } ] },
   { id: 'video-tour', icon: 'play', tag: 'Видео-тур', cat: 'Полезность', title: 'Видео-тур объекта', timing: 'день 3', needsAsset: 'видео-тур',
     desc: 'Персональный видео-обход объекта/района (прикрепите видео). Очень высокий отклик.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Видео-тур + текст', active: true,
-        text: "{name}, recorded a quick walkthrough of {creative} and the area so you can get a real feel for it — take a look.\n\nWant me to check availability and pricing for the layout you liked?" } ] },
+        text: "{name}, I recorded a short walkthrough of {creative} and the area so you can get a real feel for it. Take a look.\n\nWant me to check availability and pricing for the layout you liked?" } ] },
   { id: 'comparison', icon: 'layers', tag: 'Сравнение', cat: 'Полезность', title: 'Сравнение 2–3 объектов', timing: 'день 5',
     desc: 'Подборка-сравнение похожих объектов в бюджете лида: цена, ROI, локация. Помогает выбрать.',
     steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Сравнение объектов', active: true,
-        text: "{name}, put together a quick side-by-side of {creative} vs 2 similar projects in your range — price, expected ROI and location.\n\nWant me to send the comparison so you can see which fits best?" } ] },
+        text: "{name}, I put together a side-by-side of {creative} and two similar projects in your range: price, expected ROI, and location.\n\nWant me to send the comparison so you can see which fits best?" } ] },
   { id: 'market-update', icon: 'bars', tag: 'Новость рынка', cat: 'Полезность', title: 'Апдейт по рынку/гео', timing: 'день 6',
     desc: 'Полезная новость по направлению (спрос, цены, инфраструктура) — держит контакт тёплым.',
     steps: [ { day: 6, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Апдейт рынка', active: true,
-        text: "{name}, quick market note on {geo}: demand keeps climbing and developers are lining up price increases for the next quarter.\n\nHappy to send a short breakdown of where the smart money is going right now — want it?" } ] },
+        text: "{name}, a quick market note on {geo}: demand keeps climbing, and developers are lining up price increases for next quarter.\n\nI can send a short breakdown of where the smart money is going right now.\n\nWould that be useful?" } ] },
   /* ── Дожим на звонок ── */
   { id: 'call-country', icon: 'phone', tag: 'Заход на звонок', cat: 'Дожим на звонок', title: 'Мягкий заход на звонок', timing: 'день 3',
     desc: 'Уточнение страны клиента + естественное предложение короткого созвона (после 2-го дня без ответа).',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Заход на звонок', active: true,
-        text: "Let's have a quick call tomorrow — I'll walk you through the best deals and answer any questions.\n\n{countryQEn}" } ] },
+        text: "Let's have a quick call tomorrow. I'll walk you through the best deals and answer any questions.\n\n{countryQEn}" } ] },
   { id: 'deadline-call', icon: 'clock', tag: 'Дедлайн', cat: 'Дожим на звонок', title: 'Звонок под дедлайн', timing: 'день 5',
     desc: 'Мягкий дедлайн + предложение созвона: успеть зафиксировать условия до повышения цен.',
     steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Звонок под дедлайн', active: true,
@@ -6586,24 +6586,24 @@ const CHAIN_CARDS = [
   { id: 'objection-price', icon: 'shield', tag: 'Возражение «дорого»', cat: 'Возражения', title: 'Отработка «дорого»', timing: 'день 4',
     desc: 'Мягко переводит фокус с цены на план оплаты и доходность. Для молчунов, кого смутила цена.',
     steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Возражение «дорого»', active: true,
-        text: "{name}, totally get it if the number felt high at first glance. With {creative} the entry is smaller than most think — the rest is 0% installments until handover, and rental income can cover a big part of it.\n\nWant me to show how it actually looks month-to-month?" } ] },
+        text: "{name}, I understand if the number felt high at first glance.\n\nWith {creative} the entry is smaller than most expect: the rest is 0% installments until handover, and rental income can cover a large part of it.\n\nWant me to show how it looks month to month?" } ] },
   { id: 'objection-think', icon: 'chat', tag: 'Возражение «подумаю»', cat: 'Возражения', title: 'Отработка «я подумаю»', timing: 'день 5',
     desc: 'Уважительно снимает «подумаю»: узнать реальное сомнение и помочь с ним, без давления.',
     steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Возражение «подумаю»', active: true,
-        text: "{name}, take all the time you need — no rush at all. Just so I'm useful: is it the budget, the location, or timing that you're weighing up?\n\nWhatever it is, I can send something that actually helps you decide." } ] },
+        text: "{name}, take all the time you need, there's no rush at all.\n\nJust so I can be useful: is it the budget, the location, or the timing you're weighing up?\n\nWhatever it is, I'll send something that helps you decide." } ] },
   /* ── Реактивация ── */
   { id: 'soft-ping', icon: 'wake', tag: 'Лёгкий пинг', cat: 'Реактивация', title: 'Лёгкий пинг «ещё актуально?»', timing: 'день 6',
     desc: 'Короткий человеческий пинг для молчунов — вернуть в диалог без давления.',
     steps: [ { day: 6, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Лёгкий пинг', active: true,
-        text: "{name}, is {creative} still on your radar? Totally fine either way — just let me know so I keep sending only what's relevant to you 🙂" } ] },
+        text: "{name}, is {creative} still on your radar?\n\nEither way is completely fine. Just let me know, so I keep sending only what's relevant to you." } ] },
   { id: 'referral', icon: 'users', tag: 'Реферал', cat: 'Реактивация', title: 'Реферал «если не время»', timing: 'день 8',
     desc: 'Если лиду сейчас не актуально — мягко спросить про знакомых, кто ищет. Разворачивает «нет» в лид.',
     steps: [ { day: 8, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Реферал', active: true,
-        text: "{name}, if the timing isn't right for you now, no problem at all. Do you happen to know someone looking at {geo} property? I'd take great care of them — and there's a thank-you from our side for the intro." } ] },
+        text: "{name}, if the timing isn't right for you now, that's completely fine.\n\nDo you happen to know someone looking at {geo} property? I'd take great care of them, and there's a thank-you from our side for the introduction." } ] },
   { id: 'final-checkin', icon: 'moon', tag: 'Финальный дожим', cat: 'Реактивация', title: 'Финальный чек-ин (мягко)', timing: 'день 9',
     desc: 'Сухой уважительный последний вопрос, если лид совсем не реагирует — без давления.',
     steps: [ { day: 9, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Финальный чек-ин', active: true,
-        text: "Hey {name}, honestly it's a bit hard to move forward without knowing if this is still on your radar. If you have a minute, could you let me know? Appreciate it! 🙏" } ] },
+        text: "Hello {name}, it's hard for me to move things forward without knowing whether this is still relevant for you.\n\nIf you have a minute, could you let me know? Thank you." } ] },
 ];
 /* ЛИНТЕР ЦЕПОЧКИ: ловим типовые ошибки фоллоуапов и агрессивный каденс. Возвращает [{level, text}]. */
 function lintChain(seq) {
@@ -6902,13 +6902,20 @@ PAGES.sequences = async (root) => {
     if (st.mode === 'template') { const t = tpls.find(t => t.id === st.templateId); return t ? fillVarsDemo(t.body) : st.label; }
     return st.prompt ? fillVarsDemo(st.prompt) : '💬 ' + st.label;
   };
-  /* превью карточки библиотеки: как выглядит сообщение (демо-подстановка переменных) */
+  /* превью карточки библиотеки: рисуем шаги как реальные WhatsApp-пузыри (с абзацами и временем) */
   function cardPreview(c) {
-    const txtStep = c.steps.slice().reverse().find(s => (s.text || '').trim());
-    const t = txtStep ? txtStep.text : ((c.steps.find(s => s.prompt) || {}).prompt || '');
-    const hasCreative = c.steps.some(s => s.mode === 'creative');
-    const body = t ? esc(fillVarsDemo(t)).replace(/\n/g, '<br>') : (hasCreative ? '🎬 креатив, по которому пришёл лид' : '—');
-    return `${hasCreative ? `<div class="clib-pv-creo">${ic(I.image)}креатив${t ? ' + текст' : ''}</div>` : ''}<div class="clib-pv-bubble">${body}</div>`;
+    const bubbles = (c.steps || []).map(s => {
+      if (s.mode === 'creative') {
+        const cap = (s.text || '').trim() ? `<div class="clib-pv-para">${fillVarsDemo(s.text).split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>` : '';
+        return `<div class="clib-pv-msg"><div class="clib-pv-media">${ic(I.play)}<span>креатив, по которому пришёл лид</span></div>${cap}<span class="clib-pv-t">✓✓</span></div>`;
+      }
+      if (s.channel === 'voice') return `<div class="clib-pv-msg"><div class="clib-pv-voice">${ic(I.mic)}<i></i><i></i><i></i><i></i>0:18</div><span class="clib-pv-t">✓✓</span></div>`;
+      const t = s.text || s.prompt || '';
+      if (!t.trim()) return '';
+      const paras = fillVarsDemo(t).split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+      return `<div class="clib-pv-msg">${paras}<span class="clib-pv-t">✓✓</span></div>`;
+    }).filter(Boolean).join('');
+    return `<div class="clib-pv-chat">${bubbles || '<div class="clib-pv-msg"><p class="muted">—</p></div>'}</div>`;
   }
   function cardLibCardHtml(c) {
     return `<div class="clib-card" data-card="${c.id}">
