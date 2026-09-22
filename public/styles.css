@@ -8191,3 +8191,25 @@ body.client-view [data-team]{ display:none !important; }
 .sbf-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .sbf-grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
 @media(max-width:640px){ .sbf-grid2,.sbf-grid3{ grid-template-columns:1fr; } }
+
+/* Ферма Simbye — карточка-заготовка покупки */
+.sbf-prov{ border-style:dashed !important; }
+.sbf-prov.to{ border-color:color-mix(in srgb,var(--warn) 40%,var(--stroke)) !important; }
+.sbf-prov-hd{ display:flex; align-items:center; gap:12px; }
+.sbf-prov-ic{ flex:0 0 auto; display:grid; place-items:center; width:26px; height:26px; }
+.sbf-prov-ic .sbf-spin{ width:16px; height:16px; }
+.sbf-warn{ width:22px;height:22px;border-radius:50%;background:var(--warn);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px; }
+.sbf-prov-t{ font-weight:650; font-size:13.5px; }
+.sbf-prov-s{ font-size:11px; color:var(--muted); margin-top:2px; }
+.sbf-provtrack{ display:flex; align-items:center; gap:0; margin-top:10px; }
+.sbf-provtrack .p{ font-size:10.5px; color:var(--muted); padding:3px 9px; border-radius:12px; background:var(--bg-2,#20222a); border:1px solid var(--stroke); }
+.sbf-provtrack .p.on{ background:color-mix(in srgb,var(--ok) 16%,transparent); color:var(--ok); border-color:transparent; }
+.sbf-provtrack .p.cur{ background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent); border-color:var(--accent); }
+.sbf-provtrack .l{ flex:1; height:2px; background:var(--stroke); min-width:12px; }
+
+/* Ферма Simbye — подключение своего аккаунта (SaaS) */
+.sbf-steps3{ display:grid; gap:10px; margin:4px 0; }
+.sbf-s3{ display:flex; gap:10px; align-items:flex-start; }
+.sbf-s3>span{ flex:0 0 22px; height:22px; border-radius:50%; background:color-mix(in srgb,var(--accent) 16%,transparent); color:var(--accent); display:grid; place-items:center; font-size:12px; font-weight:700; }
+.sbf-s3>div{ font-size:12.5px; line-height:1.5; }
+.sbf-s3 .muted{ font-size:11px; }

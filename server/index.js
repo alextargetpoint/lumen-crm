@@ -7484,8 +7484,11 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req);
       const owner = !!(R && R.role === 'owner');
       const tpl = simbye.template(db);
+      const cr = simbye.creds(db);
       return json(res, 200, {
         ok: true, ready: simbye.ready(db, store),
+        workerSet: !!simbye.workerCfg(db, store).url,
+        connected: !!cr, credEmail: cr ? cr.email : '',
         platform: !!(process.env.LUMEN_SIMBYE_WORKER_URL || (store.getRegistry().platformSimbyeWorker || {}).url),
         envLocked: !!process.env.LUMEN_SIMBYE_WORKER_URL,
         isOwner: owner,
@@ -7543,8 +7546,12 @@ const server = http.createServer(async (req, res) => {
       if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
       const b = await readBody(req);
       const guard = simbye.buyGuard(db); if (!guard.ok) return json(res, 200, { ok: false, error: 'Покупка заблокирована: ' + guard.reason + '. Измените лимиты в шаблоне.' });
-      try { const r = await simbye.buy(db, store, b.country || 'uk', !!b.calls); if (r.ok) simbye.recordBuy(db); store.save(); return json(res, 200, r); }
-      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+      try {
+        const r = await simbye.buy(db, store, b.country || 'uk', !!b.calls);
+        if (r.ok) { simbye.recordBuy(db); const acc = simbye.startProvision(db, b.country || 'uk', r.url || ''); r.provisionId = acc.id; } // карточка-заготовка появляется сразу
+        store.save();
+        return json(res, 200, r);
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* залить/обновить сессию Simbye (storageState из живого Chrome владельца). Только владелец. */
     if (p === '/api/simbye/session' && req.method === 'POST') {
@@ -7555,6 +7562,24 @@ const server = http.createServer(async (req, res) => {
       if (!simbye.ready(db, store) && !simbye.workerCfg(db, store).url) return json(res, 400, { error: 'сначала укажите URL воркера' });
       try { const r = await simbye.setSession(db, store, state); if (r.ok) simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, r); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* КЛИЕНТ подключает СВОЙ Simbye (email+пароль): воркер логинится за него, пароль шифруется в CRM */
+    if (p === '/api/simbye/connect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!simbye.workerCfg(db, store).url) return json(res, 400, { error: 'Simbye-воркер не настроен (URL). Обратитесь к оператору платформы.' });
+      const b = await readBody(req);
+      const email = String(b.email || '').trim(), password = String(b.password || '');
+      if (!email || !password) return json(res, 400, { error: 'нужны email и пароль от Simbye' });
+      try {
+        const r = await simbye.connect(db, store, email, password);
+        if (r.ok) { simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, { ok: true, loggedIn: true, email }); }
+        return json(res, 200, { ok: false, error: r.reason === 'login_failed' ? 'Не удалось войти: проверьте email/пароль. ⚠️ Аккаунт Simbye должен быть на email+пароле, НЕ через Google/Apple.' : (r.reason || r.error || 'ошибка входа') });
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* отключить свой Simbye (снести креды+сессию) */
+    if (p === '/api/simbye/disconnect' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      simbye.disconnect(db, store); return json(res, 200, { ok: true });
     }
     /* ПЛАТФОРМА: задать URL+токен Simbye-воркера один раз для всех агентств (только владелец primary) */
     if (p === '/api/simbye/platform' && req.method === 'POST') {
