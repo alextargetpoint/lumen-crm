@@ -8492,13 +8492,8 @@ PAGES.ads = async (root) => {
           ${cabHdr}${cabSignals}
           <div class="cta-tree">${treeD.tree && treeD.tree.length ? treeD.tree.map(cRow).join('') : '<div class="empty">Нет данных кабинета — подключите кабинет и синкните.</div>'}</div>`
         : `
-          <div class="muted ct-note">Креативы <b>по уникальным названиям</b>, сгруппированы по кампаниям и <b>свёрнуты</b> — раскрывайте нужную. Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
-          ${nameGroups.length ? (() => {
-            const byCamp = {}; nameGroups.forEach(g => { (g.camps.size ? [...g.camps] : ['— без кампании']).forEach(cn => { (byCamp[cn] = byCamp[cn] || []).push(g); }); });
-            const camps = Object.entries(byCamp).sort((a, b) => b[1].length - a[1].length);
-            return `<div class="cta-hdr" style="margin:2px 0 8px"><span class="cta-sum">${camps.length} ${plural(camps.length, 'кампания', 'кампании', 'кампаний')} · ${nameGroups.length} креативов</span><button class="btn btn-sm" id="ctCreaCollapseAll" style="margin-left:auto">Развернуть всё</button></div>
-              <div class="ct-names">${camps.map(([cn, gs]) => `<div class="ct-camp-grp"><div class="ct-camp-hd" data-ctcamp>${ic(I.target)}<b>${esc(cn)}</b><span class="muted">· ${gs.length} ${plural(gs.length, 'креатив', 'креатива', 'креативов')}</span><span class="cta-caret" style="margin-left:auto">▸</span></div><div class="ct-camp-kids" hidden>${gs.map(nameCard).join('')}</div></div>`).join('')}</div>`;
-          })() : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}`}
+          <div class="muted ct-note">Список <b>по уникальным названиям креативов</b> — каждый показан <b>один раз</b> (не по объявлениям и не по кампаниям). Загрузи креатив+тезисы один раз на название — раздастся на ВСЕ связки с тем же неймингом, повторно грузить не нужно. <b>${nameGroups.filter(g => g.hasCreative).length}/${nameGroups.length}</b> названий с креативом.</div>
+          <div class="ct-names">${nameGroups.length ? nameGroups.map(nameCard).join('') : '<div class="empty">Пока нет объявлений — подключите кабинет и синкните.</div>'}</div>`}
       </div>`;
     })()}
     <div class="two-col">
