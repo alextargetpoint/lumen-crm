@@ -8326,3 +8326,11 @@ body.client-view [data-team]{ display:none !important; }
 /* Настройки рекламы — номер шага в заголовке карточки (Приём 1 → Кабинеты 2 → CAPI 3) */
 .setup-step{ flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; display:inline-grid; place-items:center; font-size:12px; font-weight:700; margin-right:4px; }
 [data-adtab="settings"] .card-title{ align-items:center; }
+
+/* Подключение Simbye — кастомный индикатор загрузки (вход в браузере ~10-30с) */
+.sbc-prog{ display:flex; align-items:center; gap:9px; margin-top:10px; padding:10px 12px; border-radius:10px; background:color-mix(in srgb,var(--accent) 7%,transparent); font-size:12px; }
+.sbc-prog .sbf-spin{ flex:0 0 auto; width:14px; height:14px; }
+.sbc-prog-t{ flex:1; color:var(--ink-2); }
+.sbc-prog-el{ font-variant-numeric:tabular-nums; color:var(--muted); font-size:11px; }
+.sbc-prog-ok{ color:var(--ok); font-weight:600; }
+#sbcConnect .sbf-spin{ width:13px; height:13px; margin-right:6px; vertical-align:-2px; }

@@ -12000,9 +12000,28 @@ function wireSimbye(scope, d, reload) {
   $s('#sbcConnect')?.addEventListener('click', async (e) => {
     const email = ($s('#sbcEmail')?.value || '').trim(), password = $s('#sbcPass')?.value || '';
     if (!email || !password) { toast('Введите email и пароль от Simbye'); return; }
-    const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = 'Подключаю…';
-    try { const r = await api.post('/simbye/connect', { email, password }); if (r.ok) { toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); } else { toast('Не вышло', r.error || ''); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; } }
-    catch (er) { toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+    const btn = e.currentTarget; btn.disabled = true;
+    /* кастомный индикатор: спиннер + этапы прогресса (вход в браузере ~10-30с) */
+    let prog = btn.parentElement.querySelector('#sbcProg');
+    if (!prog) { prog = document.createElement('div'); prog.id = 'sbcProg'; prog.className = 'sbc-prog'; btn.parentElement.appendChild(prog); }
+    const stages = [
+      { t: 'Открываю Simbye в защищённом браузере…', at: 0 },
+      { t: 'Ввожу ваш логин и вхожу в аккаунт…', at: 5000 },
+      { t: 'Проверяю доступ и забираю ваши номера…', at: 13000 },
+      { t: 'Почти готово — запускаю конвейер…', at: 22000 },
+    ];
+    const t0 = Date.now(); let done = false;
+    const paint = () => { if (done) return; const el = Date.now() - t0; const s = [...stages].reverse().find(x => el >= x.at) || stages[0]; const dots = '.'.repeat(1 + Math.floor((el / 500) % 3)); prog.innerHTML = `<span class="sbf-spin"></span><span class="sbc-prog-t">${esc(s.t)}</span><span class="sbc-prog-el">${Math.round(el / 1000)}с</span>`; };
+    btn.innerHTML = '<span class="sbf-spin"></span>Подключаю…'; paint();
+    const iv = setInterval(paint, 500);
+    const fin = () => { done = true; clearInterval(iv); };
+    try {
+      const r = await api.post('/simbye/connect', { email, password });
+      fin();
+      if (r.ok) { if (prog) prog.innerHTML = '<span class="sbc-prog-ok">✓ Подключено — забираю номера…</span>'; toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); }
+      else { if (prog) prog.remove(); toast('Не вышло', r.error || '', false); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+    }
+    catch (er) { fin(); if (prog) prog.remove(); toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
   });
   $s('#sbfDisconnect')?.addEventListener('click', async () => { if (!await uiConfirm('Отключить Simbye?', 'Уберём доступ к вашему аккаунту Simbye. Номера в ферме останутся, но авто-подхват кодов остановится.', { ok: 'Отключить', danger: true })) return; try { await api.post('/simbye/disconnect', {}); reload(); } catch (e) { toast('Не вышло', e.message); } });
   $s('#sbfImport')?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/simbye/import', {}); toast('Импортировано', `Добавлено ${r.added}, обновлено ${r.updated}`, true); reload(); } catch (er) { toast('Не вышло', er.message); b.disabled = false; } });
