@@ -91,6 +91,7 @@ const shot = require('./shot'); /* серверный скриншот (chrome-h
 const playbook = require('./playbook');
 const academy = require('./academy'); /* Академия продаж (методология Ольги Синенко): курс + оценка звонка + советы */
 const billing = require('./billing');
+const simbye = require('./simbye'); /* ⭐ ферма номеров: скрейпер Simbye (OTP/детект/продление) + вотчдог/сигналы */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
@@ -134,6 +135,25 @@ const STARTER_TEMPLATES = [
 
 store.load(seed);
 engine.startLoop();
+
+/* ---------- вотчдог фермы номеров Simbye (health сессии + застрявшие OTP + истечение) ----------
+ * Отдельный медленный цикл (60с): обходит тенантов, гоняет simbye.tick только там, где ферма реально
+ * настроена/используется. Сигналы владельцу идут через engine.sendReport (Telegram-мост). */
+setInterval(() => {
+  try {
+    for (const tid of store.listTenants()) {
+      store.runInTenant(tid, () => {
+        const db = store.get();
+        const f = db.settings && db.settings.simbyeFarm;
+        const cfg = db.settings && db.settings.simbye;
+        const has = (f && Array.isArray(f.accounts) && f.accounts.length) || (cfg && (cfg.url || cfg.token));
+        if (!has && !process.env.LUMEN_SIMBYE_WORKER_URL) return; // ничего не настроено — пропускаем
+        simbye.tick(db, store, { notifyOwner: (d, msg) => { try { engine.sendReport(d, msg); } catch (_) {} } })
+          .catch(e => console.error('[simbye.tick]', tid, e && e.message));
+      });
+    }
+  } catch (e) { console.error('[simbye watchdog]', e && e.message); }
+}, 60000);
 
 /* ---------- авторизация ---------- */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -7368,6 +7388,120 @@ const server = http.createServer(async (req, res) => {
       try { const r = await waGrayApi(db, 'GET', '/sessions'); return json(res, 200, { ok: true, base, platform: waWorkerPlatform(), sessions: Object.keys(r.sessions || {}).length, workerSessions: (health && health.sessions) || 0, msg: 'Связь есть, токен верный.' }); }
       catch (e) { return json(res, 200, { ok: false, stage: 'auth', base, platform: waWorkerPlatform(), msg: 'Воркер отвечает, но ТОКЕН НЕВЕРНЫЙ (' + e.message + '). Значение LUMEN_WA_WORKER_TOKEN должно совпадать с WORKER_TOKEN на воркере.' }); }
     }
+
+    /* ===== Simbye: скрейпер-ферма номеров (детект/OTP/продление) + вотчдог/сигналы ===== */
+    /* сводка фермы: настроен ли воркер, health сессии, аккаунты + их этапы, алерты */
+    if (p === '/api/simbye/farm' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const f = simbye.farm(db);
+      const R = sessionRole(req);
+      return json(res, 200, {
+        ok: true, ready: simbye.ready(db, store),
+        platform: !!(process.env.LUMEN_SIMBYE_WORKER_URL || (store.getRegistry().platformSimbyeWorker || {}).url),
+        envLocked: !!process.env.LUMEN_SIMBYE_WORKER_URL,
+        isOwner: !!(R && R.role === 'owner'),
+        health: f.health || null,
+        accounts: f.accounts.map(a => ({ ...a, notices: Object.keys(a.channels || {}).reduce((o, ch) => { const n = simbye.clientNotice(a, ch); if (n) o[ch] = n; return o; }, {}) })),
+        alerts: f.alerts.filter(a => !a.resolved).slice(0, 20),
+        steps: simbye.STEPS, stepLabels: simbye.STEP_RU,
+      });
+    }
+    /* живой список номеров прямо из панели Simbye (детект + распарсенные OTP) */
+    if (p === '/api/simbye/numbers' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён (LUMEN_SIMBYE_WORKER_URL / сессия).' });
+      try { const r = await simbye.numbers(db, store); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* health сессии Simbye (залогинены ли, сколько номеров) */
+    if (p === '/api/simbye/health' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!simbye.ready(db, store)) return json(res, 200, { ok: false, error: 'воркер не настроен' });
+      try { const r = await simbye.health(db, store); simbye.farm(db).health = { loggedIn: !!r.loggedIn, email: r.email || '', numbers: r.numbers || 0, checkedAt: Date.now(), ok: !!r.ok }; store.save(); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* умный забор OTP: ждём код сервиса до 2 мин; таймаут → сигнал (клиенту «в поддержку») */
+    if (p === '/api/simbye/otp' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
+      const b = await readBody(req);
+      const phone = String(b.phone || '').trim();
+      const service = (b.service === 'tg' || b.service === 'telegram') ? 'telegram' : 'whatsapp';
+      if (!phone) return json(res, 400, { error: 'нужен phone' });
+      const acc = simbye.farm(db).accounts.find(a => a.phone === phone);
+      const ch = service === 'telegram' ? 'tg' : 'wa';
+      if (acc) { simbye.setState(db, acc, ch, 'awaiting_otp'); store.save(); }
+      try {
+        const r = await simbye.getOtp(db, store, phone, service, b.timeoutMs, b.baselineKeys);
+        if (acc) {
+          if (r.ok) { simbye.setState(db, acc, ch, 'otp_received', { otp: r.otp, otpAt: Date.now() }); simbye.resolveAlerts(db, a => a.ctx === acc.id + ':' + ch); }
+          else { simbye.setState(db, acc, ch, 'stuck', { error: r.reason || 'timeout' }); simbye.pushAlert(db, 'warn', `Номер ${phone} (${service}): код не пришёл.`, acc.id + ':' + ch); try { engine.sendReport(db, `⚠️ ${phone} (${service}): OTP не пришёл за таймаут — проверьте в CRM.`); } catch (_) {} }
+          store.save();
+        }
+        return json(res, 200, r);
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* подготовить покупку номера (корзина/чекаут; оплата — вручную владельцем, авто-списание не делаем) */
+    if (p === '/api/simbye/buy' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
+      const b = await readBody(req);
+      try { const r = await simbye.buy(db, store, b.country || 'uk', !!b.calls); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* залить/обновить сессию Simbye (storageState из живого Chrome владельца). Только владелец. */
+    if (p === '/api/simbye/session' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req);
+      const state = b.storageState || b.state || b;
+      if (!state || !Array.isArray(state.cookies)) return json(res, 400, { error: 'нужен storageState {cookies:[...]}' });
+      if (!simbye.ready(db, store) && !simbye.workerCfg(db, store).url) return json(res, 400, { error: 'сначала укажите URL воркера' });
+      try { const r = await simbye.setSession(db, store, state); if (r.ok) simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* ПЛАТФОРМА: задать URL+токен Simbye-воркера один раз для всех агентств (только владелец primary) */
+    if (p === '/api/simbye/platform' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (process.env.LUMEN_SIMBYE_WORKER_URL) return json(res, 400, { error: 'URL воркера задан переменной окружения — меняйте в Railway' });
+      const b = await readBody(req);
+      const reg = store.getRegistry();
+      if (b.clear) { reg.platformSimbyeWorker = {}; store.saveRegistry(); return json(res, 200, { ok: true, cleared: true }); }
+      const url = normWorkerUrl(b.url); const token = String(b.token || '').trim();
+      if (!url || !token) return json(res, 400, { error: 'нужны url и token воркера' });
+      try { const h = await fetch(url + '/health', { signal: AbortSignal.timeout(8000) }); if (!h.ok) throw new Error('health ' + h.status); } catch (e) { return json(res, 400, { error: 'воркер недоступен: ' + e.message }); }
+      reg.platformSimbyeWorker = { url, token, at: Date.now() }; store.saveRegistry();
+      return json(res, 200, { ok: true, url });
+    }
+    /* импорт обнаруженных в Simbye номеров в ферму тенанта (upsert по phone) */
+    if (p === '/api/simbye/import' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
+      let r; try { r = await simbye.numbers(db, store); } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+      const f = simbye.farm(db); let added = 0, updated = 0;
+      for (const n of (r.numbers || [])) {
+        if (!n.phone) continue;
+        let acc = f.accounts.find(a => a.phone === n.phone);
+        if (!acc) { acc = { id: 'sf_' + Math.random().toString(36).slice(2, 9), phone: n.phone, country: /\+44/.test(n.phone) ? 'uk' : (/\+1/.test(n.phone) ? 'usa' : ''), orderNo: n.orderNo || '', expiresAt: n.expiresAt || '', channels: {}, createdAt: Date.now() }; f.accounts.push(acc); added++; }
+        else { acc.expiresAt = n.expiresAt || acc.expiresAt; acc.orderNo = n.orderNo || acc.orderNo; updated++; }
+      }
+      f.updatedAt = Date.now(); store.save();
+      return json(res, 200, { ok: true, added, updated, total: f.accounts.length });
+    }
+    /* удалить аккаунт из фермы (не трогает сам номер в Simbye) */
+    if (p === '/api/simbye/account/remove' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const f = simbye.farm(db);
+      f.accounts = f.accounts.filter(a => a.id !== b.id && a.phone !== b.phone); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* пометить алерт прочитанным */
+    if (p === '/api/simbye/alert/resolve' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      simbye.resolveAlerts(db, a => a.id === b.id); store.save();
+      return json(res, 200, { ok: true });
+    }
+
     /* ===== Yesim Virtual Numbers: покупка серых номеров под WhatsApp (OTP по SMS) ===== */
     /* оператор задаёт платформенный Yesim-токен (все агентства покупают через наш аккаунт) */
     if (p === '/api/gray/yesim/token' && req.method === 'POST') {

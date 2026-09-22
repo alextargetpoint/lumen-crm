@@ -11833,6 +11833,54 @@ function telGuideRich() { return '<div class="glass card mb">' + coll('Инст�
 function albatoGuide(hookUrl) { return (window.LUMEN_RICH && window.LUMEN_RICH.albato ? window.LUMEN_RICH.albato(hookUrl) : ''); }
 function cloudGuideRich() { return '<div class="glass card mb">' + coll('Инструкция: WhatsApp Cloud API — подробно, со скриншотами', (window.LUMEN_RICH && window.LUMEN_RICH.wacloud ? window.LUMEN_RICH.wacloud() : ''), { open: false, icon: I.doc }) + '</div>'; }
 
+/* ── Simbye: форма подключения воркера + сессии (владелец) ── */
+function sbfConnectFormHtml(d) {
+  return `<div class="sbf-connect">
+    ${d.envLocked ? '<div class="muted" style="font-size:11px;margin-bottom:8px">URL воркера задан переменной окружения (Railway) — здесь только сессия.</div>' : `<div class="sbf-row"><label>URL воркера</label><input id="sbfUrl" placeholder="https://lumen-simbye-worker-production.up.railway.app"></div>
+    <div class="sbf-row"><label>Токен воркера (WORKER_TOKEN)</label><input id="sbfToken" type="password" placeholder="секрет с воркера"></div>
+    <div style="margin:8px 0"><button class="btn btn-sm btn-accent" id="sbfPlatSave">${ic(I.check)}Сохранить воркер</button></div>`}
+    <div class="sbf-row"><label>Сессия Simbye (storageState JSON)</label>
+      <textarea id="sbfSess" rows="3" placeholder='{"cookies":[...],"origins":[...]}' style="font-family:ui-monospace,monospace;font-size:11px"></textarea></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="sbfSessSave">${ic(I.link)}Загрузить сессию</button>
+      <span class="muted" style="font-size:11px">Снимается один раз скриптом захвата из вашего залогиненного Chrome (операторская настройка платформы).</span></div>
+  </div>`;
+}
+/* ── Simbye: единая обвязка кнопок фермы ── */
+function wireSimbye(scope, d, reload) {
+  const $$s = (sel) => Array.from(scope.querySelectorAll(sel));
+  const $s = (sel) => scope.querySelector(sel);
+  $$s('.sbf-getotp').forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.phone, ch = b.dataset.ch, service = ch === 'tg' ? 'telegram' : 'whatsapp';
+    const orig = b.innerHTML; b.disabled = true; b.innerHTML = 'Ждём код…';
+    try {
+      const r = await api.post('/simbye/otp', { phone, service });
+      if (r.ok) { toast('Код получен', service + ': ' + r.otp, true); try { await navigator.clipboard.writeText(r.otp); } catch (_) {} }
+      else toast('Код не пришёл', r.reason === 'timeout' ? 'За 2 минуты SMS не появился — номер помечен «нужно внимание».' : (r.error || ''));
+    } catch (e) { toast('Ошибка', e.message); }
+    b.disabled = false; b.innerHTML = orig; reload();
+  }));
+  $$s('.sbf-al-x').forEach(b => b.addEventListener('click', async () => { try { await api.post('/simbye/alert/resolve', { id: b.dataset.id }); reload(); } catch (_) {} }));
+  $$s('.sbf-acct-x').forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать из фермы?', 'Сам номер в Simbye останется — уберём только из отслеживания.', { ok: 'Убрать', danger: true })) return; try { await api.post('/simbye/account/remove', { phone: b.dataset.phone }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
+  $s('#sbfImport')?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/simbye/import', {}); toast('Импортировано', `Добавлено ${r.added}, обновлено ${r.updated}`, true); reload(); } catch (er) { toast('Не вышло', er.message); b.disabled = false; } });
+  $s('#sbfRefresh')?.addEventListener('click', () => reload());
+  $s('#sbfBuy')?.addEventListener('click', async () => {
+    if (!await uiConfirm('Купить номер в Simbye?', 'Откроем оформление UK-номера (9,95€/30 дней). Оплата картой/PayPal/Apple Pay — вручную, авто-списание мы не делаем.', { ok: 'Открыть оформление' })) return;
+    try { const r = await api.post('/simbye/buy', { country: 'uk' }); if (r.ok && r.url) { window.open(r.url, '_blank'); toast('Оформление открыто', 'Завершите оплату в новой вкладке', true); } else toast('Не вышло', r.error || r.note || ''); } catch (e) { toast('Ошибка', e.message); }
+  });
+  $s('#sbfSession, #sbfSessInline')?.addEventListener('click', () => { const f = $s('#sbfSessionForm'); if (f) { f.style.display = f.style.display === 'none' ? '' : 'none'; } else reload(); });
+  $s('#sbfPlatSave')?.addEventListener('click', async (e) => {
+    const url = ($s('#sbfUrl')?.value || '').trim(), token = ($s('#sbfToken')?.value || '').trim();
+    if (!url || !token) { toast('Укажите URL и токен'); return; }
+    e.currentTarget.disabled = true;
+    try { const r = await api.post('/simbye/platform', { url, token }); if (r.ok) { toast('Воркер подключён', null, true); reload(); } else toast('Не вышло', r.error); } catch (er) { toast('Ошибка', er.message); e.currentTarget.disabled = false; }
+  });
+  $s('#sbfSessSave')?.addEventListener('click', async (e) => {
+    const raw = ($s('#sbfSess')?.value || '').trim(); if (!raw) { toast('Вставьте JSON сессии'); return; }
+    let state; try { state = JSON.parse(raw); } catch (_) { toast('Невалидный JSON'); return; }
+    e.currentTarget.disabled = true;
+    try { const r = await api.post('/simbye/session', { storageState: state }); if (r.ok) { toast('Сессия загружена', r.loggedIn ? 'Залогинены · номеров: ' + (r.numbers || 0) : 'но вход не подтверждён', !!r.loggedIn); reload(); } else toast('Не вышло', r.error); } catch (er) { toast('Ошибка', er.message); e.currentTarget.disabled = false; }
+  });
+}
 PAGES.numbers = async (root) => {
   const st = await api.get('/state');
   STATE.numbers = st.numbers;
@@ -11874,6 +11922,7 @@ PAGES.numbers = async (root) => {
       </div>`).join('')}
     `, { v: 'right', hue: '#23B383' })}
     <div class="muted" style="font-size:12px;line-height:1.5;margin:2px 0 12px">Каждый канал — на своей вкладке ниже: подключение и покупка номеров живут <b>внутри вкладки</b> нужного канала.</div>
+    <div id="simbyeFarm"></div>
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
       <button class="seg-btn ${NUMTAB === 'cloud' ? 'on' : ''}" data-numtab="cloud">${ic(I.shield)}Cloud API · ${otpNums.length + st.numbers.length}</button>
@@ -12235,6 +12284,97 @@ PAGES.numbers = async (root) => {
   }
   window.__reloadTgGray = loadTgGray;
   loadTgGray();
+
+  /* ── Ферма номеров Simbye: процессная цепочка над всеми вкладками + здоровье + сигналы ── */
+  async function loadSimbyeFarm() {
+    const box = $('#simbyeFarm', root); if (!box) return;
+    let d; try { d = await api.get('/simbye/farm'); } catch (e) { box.innerHTML = ''; return; }
+    const STEPS = d.steps || ['purchased', 'awaiting_otp', 'otp_received', 'linking', 'warming', 'active'];
+    const L = d.stepLabels || {};
+    const isOwner = !!d.isOwner;
+    const h = d.health;
+    // клиент без фермы и без прав — ничего не показываем
+    if (!d.accounts.length && !d.ready && !isOwner) { box.innerHTML = ''; return; }
+
+    const chanStepper = (cs) => {
+      cs = cs || { state: 'purchased' };
+      const st = cs.state;
+      let cur = STEPS.indexOf(st);
+      const stuck = st === 'stuck', expired = st === 'expired';
+      if (cur < 0) cur = stuck ? 1 : 0; // stuck ≈ упал на «ждём код»
+      return `<div class="sbf-track">${STEPS.map((s, i) => {
+        let cls = i < cur ? 'done' : (i === cur ? 'cur' : '');
+        if (stuck && i === cur) cls = 'err';
+        if (st === 'active') cls = 'done';
+        const spin = (i === cur && st === 'awaiting_otp');
+        return `<div class="sbf-node ${cls}"><span class="sbf-dot">${spin ? '<span class="sbf-spin"></span>' : (cls === 'done' ? '✓' : (cls === 'err' ? '!' : i + 1))}</span><span class="sbf-lbl">${esc(L[s] || s)}</span></div>${i < STEPS.length - 1 ? `<span class="sbf-bar ${i < cur ? 'on' : ''}"></span>` : ''}`;
+      }).join('')}</div>`;
+    };
+
+    const chanRow = (acc, ch, name) => {
+      const cs = (acc.channels || {})[ch];
+      const notice = (acc.notices || {})[ch];
+      const showActions = isOwner && (!cs || ['purchased', 'awaiting_otp', 'stuck'].includes(cs.state));
+      return `<div class="sbf-chan">
+        <div class="sbf-chan-hd"><span class="sbf-ch-name">${ic(ch === 'wa' ? I.chat : I.send)}${name}</span>
+          ${cs && cs.state === 'otp_received' && cs.otp ? `<span class="sbf-code" title="Код ${esc(cs.otp)}">код: <b>${esc(cs.otp)}</b></span>` : ''}
+          ${showActions ? `<button class="btn-ghost btn-sm sbf-getotp" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.refresh || I.spark)}Забрать код</button>` : ''}
+        </div>
+        ${chanStepper(cs)}
+        ${notice ? `<div class="sbf-notice ${notice.level}">${esc(notice.text)}</div>` : ''}
+      </div>`;
+    };
+
+    const flag = (c) => c === 'uk' ? '+44 · UK' : c === 'usa' ? '+1 · USA' : '';
+    const dExp = (acc) => { if (!acc.expiresAt) return ''; const m = String(acc.expiresAt).match(/(\d{4})-(\d{2})-(\d{2})/); if (!m) return ''; const dd = Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - new Date()) / 864e5); return dd < 0 ? '<span class="sbf-exp bad">истёк</span>' : `<span class="sbf-exp ${dd <= 3 ? 'warn' : ''}">${dd} дн. до истечения</span>`; };
+
+    const alertsHtml = (d.alerts || []).length ? `<div class="sbf-alerts">${d.alerts.map(a => `<div class="sbf-alert ${a.level}"><span>${ic(I.shield)}${esc(a.msg)}${a.count > 1 ? ` <i>×${a.count}</i>` : ''}</span>${isOwner ? `<button class="btn-ghost btn-sm sbf-al-x" data-id="${esc(a.id)}">✕</button>` : ''}</div>`).join('')}</div>` : '';
+
+    // не настроено — карточка подключения только владельцу
+    if (!d.ready) {
+      box.innerHTML = isOwner ? `<div class="glass card mb sbf-wrap">
+        <div class="card-title">${ic(I.sim)}Ферма номеров Simbye<span class="sub">авто-детект номеров и SMS-кодов</span><span class="sbf-badge off">не подключено</span></div>
+        <div class="muted" style="font-size:11.5px;line-height:1.6;margin:2px 0 10px">Simbye — источник реальных не-VoIP номеров (UK/USA, без KYC). API у него нет, поэтому коды и номера забирает наш <b>воркер</b> (headless-браузер с одной платформенной сессией). Подключите воркер и загрузите сессию — дальше OTP приходит в CRM автоматически.</div>
+        ${sbfConnectFormHtml(d)}
+      </div>` : '';
+      wireSimbye(box, d, loadSimbyeFarm);
+      return;
+    }
+
+    const detected = h && h.numbers ? h.numbers : 0;
+    const canImport = isOwner && detected > d.accounts.length;
+
+    box.innerHTML = `<div class="glass card mb sbf-wrap">
+      <div class="card-title">${ic(I.sim)}Ферма номеров Simbye<span class="sub">процесс каждого номера: покупка → регистрация → код → подключение → прогрев</span>
+        <span class="sbf-badge ${h && h.loggedIn && h.ok ? 'ok' : 'off'}">${h && h.loggedIn && h.ok ? 'сессия активна' : 'сессия недоступна'}</span></div>
+      ${h && (!h.loggedIn || !h.ok) ? `<div class="sbf-notice error" style="margin:0 0 10px">Сессия Simbye не отвечает или разлогинена. ${isOwner ? 'Обновите её ниже.' : 'Мы уже уведомлены — регистрация номеров временно на паузе.'}</div>` : ''}
+      ${alertsHtml}
+      ${d.accounts.length ? `<div class="sbf-accts">${d.accounts.map(acc => `<div class="sbf-acct" data-acct="${esc(acc.phone)}">
+        <div class="sbf-acct-hd">
+          <div><span class="sbf-phone">${esc(acc.phone)}</span> <span class="sbf-cc">${flag(acc.country)}</span></div>
+          <div class="sbf-acct-meta">${dExp(acc)}${isOwner ? `<button class="btn-ghost btn-sm sbf-acct-x" data-phone="${esc(acc.phone)}" title="Убрать из фермы">✕</button>` : ''}</div>
+        </div>
+        ${chanRow(acc, 'wa', 'WhatsApp')}
+        ${chanRow(acc, 'tg', 'Telegram')}
+      </div>`).join('')}</div>` : `<div class="muted" style="font-size:12px;padding:6px 0">${detected ? `В Simbye обнаружено номеров: <b>${detected}</b>.` : 'Номеров пока нет.'} ${isOwner ? 'Импортируйте их в ферму, чтобы отслеживать процесс.' : ''}</div>`}
+      <div class="sbf-foot">
+        ${canImport ? `<button class="btn btn-sm btn-accent" id="sbfImport">${ic(I.plus)}Импортировать номера (${detected})</button>` : ''}
+        ${isOwner ? `<button class="btn btn-sm" id="sbfBuy">${ic(I.plus)}Купить номер</button>` : ''}
+        <button class="btn btn-sm" id="sbfRefresh">${ic(I.refresh || I.spark)}Обновить</button>
+        ${isOwner ? `<button class="btn-ghost btn-sm" id="sbfSession">Обновить сессию</button>` : ''}
+      </div>
+      ${isOwner ? `<div id="sbfSessionForm" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--stroke)">
+        <div class="sbf-row"><label>Сессия Simbye (storageState JSON)</label>
+          <textarea id="sbfSess" rows="3" placeholder='{"cookies":[...],"origins":[...]}' style="font-family:ui-monospace,monospace;font-size:11px"></textarea></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="sbfSessSave">${ic(I.link)}Загрузить сессию</button>
+          <span class="muted" style="font-size:11px">Снимается скриптом захвата из залогиненного Chrome (операторская настройка).</span></div>
+      </div>` : ''}
+      <div class="muted" style="font-size:11px;line-height:1.55;margin-top:8px">${ic(I.shield)}Регистрируйте номера через <b>обычный WhatsApp</b> (не WhatsApp Business — он чаще отклоняет виртуальные номера). Когда приложение попросит SMS-код — нажмите «Забрать код»: система сама вытащит его из Simbye. Не приходит за 2 минуты → номер помечается «нужно внимание» и мы сигналим.</div>
+    </div>`;
+    wireSimbye(box, d, loadSimbyeFarm);
+  }
+  window.__reloadSimbyeFarm = loadSimbyeFarm;
+  loadSimbyeFarm();
   $$('[data-num] [data-act]', root).forEach(b => b.addEventListener('click', async () => {
     const id = b.closest('[data-num]').dataset.num;
     if (b.dataset.act === 'del') { if (!await uiConfirm('Убрать номер из пула?', 'Официальный Cloud-API номер перестанет использоваться для отправки. Это действие нельзя отменить.', { ok: 'Убрать', danger: true })) return; await fetch('/api/numbers/' + id, { method: 'DELETE' }); toast('Номер убран из пула', null, true); render(); return; }

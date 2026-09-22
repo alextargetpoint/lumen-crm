@@ -8126,3 +8126,53 @@ body.client-view [data-team]{ display:none !important; }
 .nl-ph{ flex:1; font-size:11px; }
 .nl-stage{ font-size:10.5px; padding:2px 8px; border-radius:10px; background:var(--bg-2); color:var(--ink-2); }
 .nl-lead i{ font-style:normal; font-size:10.5px; color:var(--muted); }
+
+/* ── Ферма номеров Simbye: процессная цепочка + сигналы ── */
+.sbf-wrap .sbf-badge{ margin-left:auto; font-size:10.5px; padding:2px 9px; border-radius:20px; font-weight:600; }
+.sbf-badge.ok{ background:color-mix(in srgb,var(--ok) 15%,transparent); color:var(--ok); }
+.sbf-badge.off{ background:color-mix(in srgb,var(--bad) 14%,transparent); color:var(--bad); }
+.sbf-accts{ display:grid; gap:10px; margin:4px 0 12px; }
+.sbf-acct{ border:1px solid var(--stroke); border-radius:12px; padding:12px 14px; background:color-mix(in srgb,var(--panel-2,#191a1e) 40%,transparent); }
+.sbf-acct-hd{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.sbf-phone{ font-weight:650; font-size:14px; letter-spacing:.2px; }
+.sbf-cc{ font-size:11px; color:var(--muted); margin-left:6px; }
+.sbf-acct-meta{ display:flex; align-items:center; gap:8px; }
+.sbf-exp{ font-size:10.5px; color:var(--muted); }
+.sbf-exp.warn{ color:var(--warn); } .sbf-exp.bad{ color:var(--bad); }
+.sbf-acct-x,.sbf-al-x{ opacity:.5; } .sbf-acct-x:hover,.sbf-al-x:hover{ opacity:1; }
+.sbf-chan{ margin:8px 0; }
+.sbf-chan-hd{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+.sbf-ch-name{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--ink-2); }
+.sbf-ch-name svg{ width:14px; height:14px; }
+.sbf-code{ font-size:11px; color:var(--muted); } .sbf-code b{ color:var(--accent); letter-spacing:1px; }
+.sbf-getotp{ margin-left:auto; }
+/* степпер */
+.sbf-track{ display:flex; align-items:flex-start; gap:0; overflow-x:auto; padding:2px 0; }
+.sbf-node{ display:flex; flex-direction:column; align-items:center; gap:5px; min-width:60px; flex:0 0 auto; text-align:center; }
+.sbf-dot{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700;
+  background:var(--bg-2,#20222a); color:var(--muted); border:1.5px solid var(--stroke); transition:.25s; }
+.sbf-node.done .sbf-dot{ background:var(--ok); color:#fff; border-color:var(--ok); }
+.sbf-node.cur .sbf-dot{ background:color-mix(in srgb,var(--accent) 18%,transparent); color:var(--accent); border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent); }
+.sbf-node.err .sbf-dot{ background:var(--bad); color:#fff; border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 16%,transparent); }
+.sbf-lbl{ font-size:9.5px; line-height:1.2; color:var(--muted); max-width:64px; }
+.sbf-node.cur .sbf-lbl{ color:var(--accent); font-weight:600; }
+.sbf-node.err .sbf-lbl{ color:var(--bad); font-weight:600; }
+.sbf-bar{ flex:1 1 auto; height:2px; min-width:14px; margin-top:10px; background:var(--stroke); border-radius:2px; }
+.sbf-bar.on{ background:var(--ok); }
+.sbf-spin{ width:11px; height:11px; border:2px solid color-mix(in srgb,var(--accent) 30%,transparent); border-top-color:var(--accent); border-radius:50%; animation:sbfspin .7s linear infinite; }
+@keyframes sbfspin{ to{ transform:rotate(360deg); } }
+/* уведомления/сигналы */
+.sbf-notice{ font-size:11px; line-height:1.5; padding:7px 10px; border-radius:8px; margin-top:8px; }
+.sbf-notice.info{ background:color-mix(in srgb,var(--accent) 9%,transparent); color:var(--ink-2); }
+.sbf-notice.warn{ background:color-mix(in srgb,var(--warn) 12%,transparent); color:var(--warn); }
+.sbf-notice.error{ background:color-mix(in srgb,var(--bad) 12%,transparent); color:var(--bad); }
+.sbf-alerts{ display:grid; gap:6px; margin:2px 0 12px; }
+.sbf-alert{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11.5px; padding:7px 10px; border-radius:8px; }
+.sbf-alert svg{ width:13px; height:13px; margin-right:6px; vertical-align:-2px; }
+.sbf-alert.warn{ background:color-mix(in srgb,var(--warn) 11%,transparent); color:var(--warn); }
+.sbf-alert.error{ background:color-mix(in srgb,var(--bad) 12%,transparent); color:var(--bad); }
+.sbf-alert i{ opacity:.7; font-style:normal; }
+.sbf-foot{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px; }
+.sbf-connect .sbf-row,.sbf-row{ display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.sbf-row label{ font-size:11px; color:var(--ink-3,var(--muted)); }
+.sbf-row input,.sbf-row textarea{ width:100%; }
