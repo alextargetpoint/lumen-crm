@@ -6469,6 +6469,7 @@ PAGES.sequences = async (root) => {
           <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что сказать ИИ (можно с переменными: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»)" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
         </div>
         <div data-se-perso class="se-perso" style="${st.mode === 'template' ? 'display:none' : ''}">
+          <div class="se-ai-row"><button type="button" class="btn btn-sm btn-accent" data-se-aidraft>${ic(I.spark)}Собрать через ИИ по креативу</button><span class="se-ai-note" data-se-ainote></span></div>
           <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}</div>
           <div class="se-perso-hint">${ic(I.spark)}<span>Текст и ИИ уже понимают, <b>по какому объявлению пришёл лид</b>: <code>{creative}</code> — само объявление (его видео мы пускаем на транскрибацию в дереве креативов), плюс критерии заявки — <code>{district}</code> · <code>{budget}</code> · <code>{timeline}</code> · <code>{type}</code> · <code>{purpose}</code>. Клик по переменной — вставить. Пример: «Видели, вы оставили заявку на {creative} в районе {district}. Проект на стадии стройки — прислать инфо или подборку похожих в бюджете {budget}?»</span></div>
         </div>
@@ -6711,6 +6712,21 @@ PAGES.sequences = async (root) => {
       tgt.value = tgt.value.slice(0, p2) + v.dataset.var + tgt.value.slice(p2);
       tgt.focus(); tgt.selectionStart = tgt.selectionEnd = p2 + v.dataset.var.length;
     }));
+    /* ✦ собрать текст шага через ИИ по пониманию креатива (транскрипт видео) на примере подходящего лида */
+    const aiBtn = eb.querySelector('[data-se-aidraft]');
+    if (aiBtn) aiBtn.addEventListener('click', async () => {
+      const orig = aiBtn.innerHTML; aiBtn.disabled = true; aiBtn.innerHTML = '✦ Gemini собирает…';
+      const note = eb.querySelector('[data-se-ainote]');
+      try {
+        const r = await fetch('/api/sequences/' + seq.id + '/ai-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stepIndex: editIx }) });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+        const tgt = modeSel.value === 'ai' ? promptInp : ta;
+        if (tgt) { tgt.value = j.message; tgt.focus(); }
+        if (note) note.textContent = (j.hook ? '✦ ' + j.hook : '') + (j.sample && j.sample.adName ? ' · по креативу «' + j.sample.adName + '»' + (j.sample.hasTranscript ? ' (с транскриптом)' : '') : ' · общий пример (нет подходящего лида)');
+        toast('ИИ собрал касание', j.sample && j.sample.adName ? 'По креативу «' + j.sample.adName + '»' : 'Проверьте и сохраните', true);
+      } catch (e2) { toast('ИИ не справился', e2.message); }
+      finally { aiBtn.disabled = false; aiBtn.innerHTML = orig; }
+    });
     eb.querySelector('[data-sesave]').addEventListener('click', async (e) => {
       const i = +e.currentTarget.dataset.sesave;
       const st = seq.steps[i];
@@ -8849,7 +8865,7 @@ PAGES.ads = async (root) => {
           const evOpts = ['Lead', 'Contact', 'Schedule', 'CompleteRegistration', 'Purchase'];
           const STAGE_HINT = { qualified: 'лид прошёл квалификацию', handover: 'передан брокеру / на встречу', viewing: 'назначен показ / просмотр', deal: 'закрыта сделка' };
           return `<div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Meta CAPI · дообучение рекламы<span class="sub">офлайн-конверсии в Meta</span>
+          <div class="card-title"><span class="setup-step">3</span>${ic(I.target)}Meta CAPI · дообучение рекламы<span class="sub">офлайн-конверсии в Meta</span>
             <label class="switch" style="margin-left:auto"><input type="checkbox" id="capiOn" ${cp.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Лид дошёл до целевой стадии (квал / передан / сделка) → Lumen шлёт событие в Meta по официальному Conversions API, и алгоритм учится приводить ПОХОЖИХ качественных лидов, а не просто заявки. Персональные данные хешируются (SHA-256).</div>
           ${coll('📘 Как настроить весь цикл — приём лидов и обратные сигналы', `
@@ -8886,7 +8902,7 @@ PAGES.ads = async (root) => {
             <button class="btn btn-sm" data-acctdel title="Убрать кабинет">${ic(I.x)}</button>
           </div>`;
           return `<div class="glass card mb">
-          <div class="card-title">${ic(I.target)}Рекламные кабинеты (Meta API)<span class="sub">прямое чтение расхода/лидов из кабинетов</span>
+          <div class="card-title"><span class="setup-step">2</span>${ic(I.target)}Рекламные кабинеты (Meta API)<span class="sub">прямое чтение расхода/лидов из кабинетов</span>
             <span class="ma-status">${okCount ? `${ic(I.check)}${okCount} ${plural(okCount, 'кабинет', 'кабинета', 'кабинетов')}${ma.lastSyncAt ? ' · синк ' + tmm(ma.lastSyncAt) : ''}` : 'нет кабинетов'}</span>
             <label class="switch" style="margin-left:10px"><input type="checkbox" id="metaAdsOn" ${ma.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Подключите один или несколько кабинетов Meta — данные (расход/кампании/лиды) сведутся в аналитику и «План/Факт по направлениям». Требует постоянного токена System User (для лидов — права Страницы; см. гайд в приёме лидов).</div>
@@ -8911,7 +8927,7 @@ PAGES.ads = async (root) => {
           ${(ma.log || []).length ? coll('Журнал синков', (ma.log || []).map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${e.ok ? '✓' : '✕'} синк · +${e.newLeads || 0} лид · ${e.ins || 0} объявл${e.capped ? ' · ⚠️ данные обрезаны (потолок страниц)' : ''}</div><div class="sd">${tmm(e.at)}${e.error ? ' · ' + esc(e.error) : ''}</div></div></div>`).join(''), { open: false, count: (ma.log || []).length, icon: I.doc }) : ''}
         </div>`; })()}
         <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
-          <div class="card-title">${ic(I.link)}Приём лидов через интегратор (Albato)<span class="sub">рекомендуемый способ · Meta Lead Form → Albato → CRM</span></div>
+          <div class="card-title"><span class="setup-step">1</span>${ic(I.link)}Приём лидов через интегратор (Albato)<span class="sub">рекомендуемый способ · Meta Lead Form → Albato → CRM</span></div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Лиды из лид-форм Meta попадают в CRM через интегратор (Albato / Make / Zapier) — <b>без App Review и сложных прав</b>. Ниже — подробный гайд со скриншотами; сам адрес приёма — в поле после него.</div>
           ${coll('📘 Как настроить приём через Albato — по шагам, со скриншотами', albatoGuide(hookUrl), { open: false, count: 0, icon: I.doc })}
           <div class="form-row" style="margin-top:12px"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
