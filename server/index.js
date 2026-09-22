@@ -4046,6 +4046,17 @@ const server = http.createServer(async (req, res) => {
       Object.keys(metaCap).forEach(k => !metaCap[k] && delete metaCap[k]);
       /* кастомные поля из конструктора маппинга: любой ключ custom_* → lead.custom[имя] */
       const customFields = {}; for (const k of Object.keys(b)) { if (/^custom[_.]/i.test(k) && b[k] != null && String(b[k]).trim()) customFields[k.replace(/^custom[_.]/i, '')] = String(b[k]).slice(0, 300); }
+      /* АВТО-РЕГИСТРАЦИЯ доп-полей: если пришёл новый custom_* — заводим поле карточки само (SaaS-friendly),
+         чтобы не приходилось вручную создавать и следить за совпадением ключа. Юзер потом переименует ярлык. */
+      if (Object.keys(customFields).length) {
+        db.settings.customFields = db.settings.customFields || [];
+        const FLABEL = { country: 'Страна', comment: 'Комментарий', purpose: 'Цель', budget: 'Бюджет', timeline: 'Срок', type: 'Тип объекта', rooms: 'Комнатность', time_to_contact: 'Время для связи', city: 'Город', email: 'E-mail' };
+        for (const fk of Object.keys(customFields)) {
+          if (!db.settings.customFields.some(f => f.key === fk)) {
+            db.settings.customFields.push({ key: fk, label: FLABEL[fk] || (fk.charAt(0).toUpperCase() + fk.slice(1).replace(/_/g, ' ')), type: 'text', auto: true });
+          }
+        }
+      }
       const entry = { at: Date.now(), name, phone, adId, raw: Object.keys(b).slice(0, 20) };
 
       const norm = (ph) => ph.replace(/\D/g, '').replace(/^8(\d{10})$/, '7$1');
