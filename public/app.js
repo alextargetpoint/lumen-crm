@@ -5226,6 +5226,17 @@ function adPathHtml(l) {
 function adPathLine(l) { const a = adInfo(l); if (!a) return ''; return [a.ad, a.set, a.camp].filter(Boolean).join(' · ') || a.id; }
 /* КАРТОЧКА ЗАЯВКИ — фото + вопросы/ответы из формы + путь из рекламы + просьба клиента с движком времени.
    Общая для карточки лида и панели «Диалоги». Всегда наверху ленты (вне фильтров). */
+/* формы Meta часто пакуют несколько ответов в одно поле: «Stage: ready_to_move_in Time: Today».
+   Разбираем такую строку на пары ключ→значение, чтобы показать их отдельными строками, а не слепком. */
+function packedKV(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.length > 400) return null;
+  /* нужно ≥2 сегмента вида «Слово: значение» */
+  const parts = s.split(/\s+(?=[A-Za-zА-Яа-яЁё][\w\/-]{0,24}:\s)/g);
+  if (parts.length < 2) return null;
+  const out = parts.map(p => { const mm = p.match(/^\s*([^:]{1,26}):\s*(.+)$/s); return mm ? { k: mm[1].trim(), v: mm[2].trim().replace(/_/g, ' ') } : null; }).filter(Boolean);
+  return out.length >= 2 ? out : null;
+}
 function buildIntakeCard(l) {
   const cf = l.custom || {};
   const defs = (STATE.settings.customFields || []);
@@ -5238,11 +5249,16 @@ function buildIntakeCard(l) {
   const plan = resolveContactPlan(l);
   const fromForm = ['meta_form', 'ctwa', 'landing', 'meta', 'google', 'tiktok', 'yandex', 'avito'].includes(l.source) || (l.tags || []).includes('интегратор');
   const sched = (l.scheduled || []).filter(s => s.status === 'pending');
-  if (!entries.length && !adBlock && !crea && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
+  const metaLeadId = (l.meta && (l.meta.leadId || l.meta.leadgenId)) || l.leadId || '';
+  if (!entries.length && !adBlock && !crea && !plan && !sched.length && !metaLeadId && !(fromForm && l.avatarUrl)) return '';
   const initials = esc((l.name || 'К').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'К');
   const photo = l.avatarUrl ? `<img class="lc-ik-ph" src="${esc(l.avatarUrl)}" alt="">` : `<span class="lc-ik-ph empty">${initials}</span>`;
   const showVal = (k, v) => { const s = String(v); if (/country|стран/i.test(k) && /^[A-Za-z]{2}$/.test(s.trim())) { try { const n = new Intl.DisplayNames(['ru'], { type: 'region' }).of(s.trim().toUpperCase()); if (n && n !== s.trim().toUpperCase()) return n; } catch (_) { } } return s.slice(0, 220); };
-  const qa = entries.length ? `<div class="lc-ik-qa">${entries.map(([k, v]) => `<div><i>${esc(labelOf(k))}</i><b>${esc(showVal(k, v))}</b></div>`).join('')}</div>` : '';
+  const qa = entries.length ? `<div class="lc-ik-qa">${entries.map(([k, v]) => {
+    const kv = packedKV(v);   /* «Stage: X Time: Y» из формы Meta — разбить на отдельные строки, а не слипать в одну */
+    if (kv) return `<div class="lc-ik-packed"><i>${esc(labelOf(k))}</i><div class="lc-ik-kv">${kv.map(p => `<span><em>${esc(p.k)}</em><b>${esc(p.v)}</b></span>`).join('')}</div></div>`;
+    return `<div><i>${esc(labelOf(k))}</i><b>${esc(showVal(k, v))}</b></div>`;
+  }).join('')}</div>` : '';
   const hasEmail = (l.contacts || []).some(c => c.kind === 'email') || !!l.email;
   let prefRow = '';
   if (plan) {
@@ -5259,7 +5275,6 @@ function buildIntakeCard(l) {
     prefRow = `<div class="lc-ik-pref"><div class="lc-ik-pref-hd">${ic(I.spark)}<b>Просьба клиента${line ? ': ' + esc(line) : ' по времени/каналу'}</b></div><i class="lc-ik-pref-q">«${esc(plan.raw.slice(0, 140))}»</i>${brokerTxt}<div class="lc-ik-pref-acts">${acts.join('')}</div></div>`;
   }
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
-  const metaLeadId = (l.meta && (l.meta.leadId || l.meta.leadgenId)) || l.leadId || '';
   const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
   return `<div class="lc-intake">
     <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
@@ -5483,6 +5498,10 @@ async function openLeadModal(id) {
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
   const contactKinds = { telegram: 'Telegram', email: 'E-mail', instagram: 'Instagram', whatsapp: 'WhatsApp #2', other: 'Другое' };
+  /* креатив первого касания: вручную загруженный (l.creativeUrl) ИЛИ по умолчанию тот, ПО КОТОРОМУ ПРИШЁЛ ЛИД
+     (атрибуция объявления, l.adCreative) — тот же, что показан в сводке слева. Уходит первым сообщением. */
+  const ftCreo = l.creativeUrl || (l.adCreative && l.adCreative.url) || '';
+  const ftCreoAuto = !l.creativeUrl && !!(l.adCreative && l.adCreative.url);
 
   /* единая хронология: сообщения + события + заметки + встречи */
   const timeline = [
@@ -5888,9 +5907,11 @@ async function openLeadModal(id) {
     });
     $('#lcFtSend', bd).addEventListener('click', async () => {
       const text = $('#lcFtText', bd).value.trim();
-      if (!text) { toast('Пустой текст'); return; }
-      await api.post(`/leads/${id}/message`, { text });
-      toast('Первое касание отправлено', 'Ушло клиенту в WhatsApp', true);
+      const wrap = $('#lcCreoWrap', bd); const cimg = wrap && wrap.querySelector('img');
+      const creativeUrl = cimg ? cimg.getAttribute('src') : '';
+      if (!text && !creativeUrl) { toast('Пустой текст'); return; }
+      await api.post(`/leads/${id}/message`, { text, creativeUrl });
+      toast('Первое касание отправлено', creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp', true);
       openLeadModal(id);
     });
   }
@@ -6342,6 +6363,7 @@ PAGES.qualifier = async (root) => {
 /* ---------------- ЦЕПОЧКИ ---------------- */
 /* ---------------- ЦЕПОЧКИ: визуальный flow-конструктор ---------------- */
 PAGES.sequences = async (root) => {
+  await ensureVendors();
   const seqs = STATE.sequences;
   if (!PAGE_STATE.seqSel || !seqs.find(x => x.id === PAGE_STATE.seqSel)) PAGE_STATE.seqSel = seqs[0].id;
   const seq = seqs.find(x => x.id === PAGE_STATE.seqSel);
@@ -6358,7 +6380,60 @@ PAGES.sequences = async (root) => {
   const save = async (patch) => { await api.patch('/sequences/' + seq.id, patch || { steps: seq.steps }); };
   const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
   const dayLabel = (d) => d === 0 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + d;
-  const VARS = ['{name}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
+  /* ---- ТАРГЕТИНГ цепочки: на какие лиды распространяется ---- */
+  const SEQ_SOURCES = [['meta_form', 'Lead-форма Meta'], ['ctwa', 'Click-to-WhatsApp'], ['ig_direct', 'Instagram Direct'], ['ad_comment', 'Комментарии рекламы'], ['landing', 'Лендинг'], ['site', 'Сайт'], ['meta_api', 'Meta API'], ['wa_inbound', 'Входящий WhatsApp'], ['wa_gray', 'WhatsApp (серый)'], ['viber', 'Viber'], ['import', 'Импорт'], ['broker_card', 'От брокера']];
+  const SEQ_CHANNELS = [['wa', 'WhatsApp'], ['ig', 'Instagram'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']];
+  const srcLabel = k => (SEQ_SOURCES.find(s => s[0] === k) || [k, k])[1];
+  const chLabel = k => (SEQ_CHANNELS.find(s => s[0] === k) || [k, k])[1];
+  const vndName = id => ((LUMEN_VENDORS || []).find(v => v.id === id) || {}).name || id;
+  const brName = id => ((STATE.brokers || []).find(b => b.id === id) || {}).name || id;
+  const seqFiltersOf = (sq) => { const f = sq.filters || {}; return { geos: Array.isArray(f.geos) ? f.geos : (sq.geo && sq.geo !== 'all' ? [sq.geo] : []), sources: Array.isArray(f.sources) ? f.sources : [], channels: Array.isArray(f.channels) ? f.channels : [], contractors: Array.isArray(f.contractors) ? f.contractors : [], brokers: (f.brokers === 'all' || Array.isArray(f.brokers)) ? f.brokers : 'all' }; };
+  const targetingSummary = (sq) => {
+    const f = seqFiltersOf(sq); const parts = [];
+    parts.push(f.geos.length ? f.geos.map(geoName).join(', ') : 'Все гео');
+    if (f.sources.length) parts.push(f.sources.map(srcLabel).join(', '));
+    if (f.channels.length) parts.push('канал: ' + f.channels.map(chLabel).join(', '));
+    if (f.contractors.length) parts.push(f.contractors.length === 1 ? vndName(f.contractors[0]) : f.contractors.length + ' подрядчика');
+    parts.push(f.brokers === 'all' ? 'все брокеры' : (Array.isArray(f.brokers) && f.brokers.length === 1 ? brName(f.brokers[0]) : (Array.isArray(f.brokers) ? f.brokers.length + ' брокера' : 'все брокеры')));
+    return parts.join(' · ');
+  };
+  const targetingShort = (sq) => {
+    const f = seqFiltersOf(sq); const g = f.geos.length ? f.geos.map(geoName).join(',') : 'Все гео';
+    const ex = []; if (f.sources.length) ex.push(f.sources.length + ' ист.'); if (f.channels.length) ex.push(f.channels.length + ' кан.'); if (f.contractors.length) ex.push(f.contractors.length + ' подр.'); if (f.brokers !== 'all') ex.push((Array.isArray(f.brokers) ? f.brokers.length : 0) + ' бр.');
+    return g + (ex.length ? ' · ' + ex.join(' · ') : '');
+  };
+  const openSeqTargeting = () => {
+    const f = seqFiltersOf(seq);
+    const geos = STATE.settings.agency.geos || [];
+    const vendors = LUMEN_VENDORS || [];
+    const brokers = (STATE.brokers || []).filter(b => b.active !== false);
+    const chipRow = (items, sel, attr) => items.map(([val, lab]) => `<button type="button" class="seq-chip ${sel.includes(val) ? 'on' : ''}" data-${attr}="${esc(val)}">${esc(lab)}</button>`).join('');
+    const md = modal({
+      title: 'Кому идёт эта цепочка', sub: 'Триггер: новый лид · до первого ответа. Пустой раздел = «любой».', wide: true, body: `
+        <div class="seq-tg">
+          <div class="seq-tg-sec"><div class="seq-tg-h">Гео<span>пусто = все направления</span></div><div class="seq-tg-chips">${chipRow(geos.map(g => [g, STATE.settings.geoNames[g] || g]), f.geos, 'tgeo') || '<span class="muted" style="font-size:12px">Нет направлений</span>'}</div></div>
+          <div class="seq-tg-sec"><div class="seq-tg-h">Источник заявки<span>откуда пришёл лид</span></div><div class="seq-tg-chips">${chipRow(SEQ_SOURCES, f.sources, 'tsrc')}</div></div>
+          <div class="seq-tg-sec"><div class="seq-tg-h">Канал<span>в каком мессенджере лид</span></div><div class="seq-tg-chips">${chipRow(SEQ_CHANNELS, f.channels, 'tch')}</div></div>
+          ${vendors.length ? `<div class="seq-tg-sec"><div class="seq-tg-h">Подрядчики<span>несколько сразу</span></div><div class="seq-tg-chips">${chipRow(vendors.map(v => [v.id, v.name]), f.contractors, 'tvnd')}</div></div>` : ''}
+          <div class="seq-tg-sec"><div class="seq-tg-h">Брокеры</div>
+            <div class="seq-tg-chips" style="margin-bottom:7px"><button type="button" class="seq-chip ${f.brokers === 'all' ? 'on' : ''}" id="tgBrAll">${ic(I.check)}Все брокеры</button></div>
+            <div class="seq-tg-chips" id="tgBrList" style="${f.brokers === 'all' ? 'opacity:.4;pointer-events:none' : ''}">${chipRow(brokers.map(b => [b.id, b.name]), Array.isArray(f.brokers) ? f.brokers : [], 'tbr') || '<span class="muted" style="font-size:12px">Брокеров нет</span>'}</div>
+          </div>
+        </div>`,
+      actions: [{ label: 'Сохранить таргетинг', cls: 'btn-accent', onClick: async () => {
+        const pick = (attr) => $$(`[data-${attr}]`, md).filter(x => x.classList.contains('on')).map(x => x.dataset[attr]);
+        const brAll = $('#tgBrAll', md).classList.contains('on');
+        const filters = { geos: pick('tgeo'), sources: pick('tsrc'), channels: pick('tch'), contractors: pick('tvnd'), brokers: brAll ? 'all' : pick('tbr') };
+        await api.patch('/sequences/' + seq.id, { filters });
+        toast('Таргетинг сохранён', targetingSummary({ filters }), true);
+        await loadState(); render();
+      } }, { label: 'Отмена' }],
+    });
+    $$('.seq-chip[data-tgeo],.seq-chip[data-tsrc],.seq-chip[data-tch],.seq-chip[data-tvnd],.seq-chip[data-tbr]', md).forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+    const brAllBtn = $('#tgBrAll', md), brList = $('#tgBrList', md);
+    brAllBtn.addEventListener('click', () => { brAllBtn.classList.toggle('on'); const on = brAllBtn.classList.contains('on'); brList.style.opacity = on ? '.4' : ''; brList.style.pointerEvents = on ? 'none' : ''; if (on) $$('[data-tbr]', brList).forEach(x => x.classList.remove('on')); });
+  };
+  const VARS = ['{name}', '{creative}', '{district}', '{budget}', '{timeline}', '{type}', '{purpose}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
   const creaThumb = (cr) => cr && cr.url ? (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`) : '';
 
   /* задержка шага «через X после предыдущего» в мин/ч/дн; в модели храним кумулятивный day (для движка) + delayVal/delayUnit */
@@ -6391,12 +6466,15 @@ PAGES.sequences = async (root) => {
         <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
           <select data-se="mode" style="width:150px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option><option value="creative" ${st.mode === 'creative' ? 'selected' : ''}>Креатив из рекламы</option></select>
           <select data-se="templateId" style="flex:1;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
-          <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что должен сказать ИИ" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
+          <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что сказать ИИ (можно с переменными: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»)" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
+        </div>
+        <div data-se-perso class="se-perso" style="${st.mode === 'template' ? 'display:none' : ''}">
+          <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}</div>
+          <div class="se-perso-hint">${ic(I.spark)}<span>Текст и ИИ уже понимают, <b>по какому объявлению пришёл лид</b>: <code>{creative}</code> — само объявление (его видео мы пускаем на транскрибацию в дереве креативов), плюс критерии заявки — <code>{district}</code> · <code>{budget}</code> · <code>{timeline}</code> · <code>{type}</code> · <code>{purpose}</code>. Клик по переменной — вставить. Пример: «Видели, вы оставили заявку на {creative} в районе {district}. Проект на стадии стройки — прислать инфо или подборку похожих в бюджете {budget}?»</span></div>
         </div>
         <div data-se-crnote class="se-crea-autonote" style="${st.mode === 'creative' ? '' : 'display:none'}">${ic(I.spark)}Уйдёт <b>тот креатив, по которому лид оставил заявку</b> (видео/картинка из дерева креативов — по атрибуции лида), затем текст-подпись ниже. Можно заменить на конкретный из библиотеки.</div>
         <div data-se-textwrap style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">
           <textarea data-se="text" style="width:100%;min-height:${st.mode === 'creative' ? '80' : '130'}px" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}">${esc(st.text || '')}</textarea>
-          <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}<span class="muted" style="font-size:10.5px;margin-left:4px">клик — вставить · {ad} = название объявления из атрибуции</span></div>
         </div>
         <div class="se-crea" data-se-crea style="${st.mode === 'creative' ? '' : 'display:none'}">
           <div class="lc-lbl" style="margin:0 0 6px">Конкретный креатив <span class="muted" style="font-weight:400">— по умолчанию берётся креатив лида; здесь можно задать один на всех</span></div>
@@ -6438,12 +6516,12 @@ PAGES.sequences = async (root) => {
     `, { v: 'left', hue: '#2563EB' })}
     <div class="fl-tabs">
       ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
-        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 30 ? sq.name.slice(0, 28) + '…' : sq.name)}<span>${geoName(sq.geo)} · ${ownTag(sq)}</span></button>`).join('')}
+        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 30 ? sq.name.slice(0, 28) + '…' : sq.name)}<span>${esc(targetingShort(sq))} · ${ownTag(sq)}</span></button>`).join('')}
       <button class="btn btn-sm" id="seqNew">${ic(I.plus)}Цепочка</button>
       ${hint('chains', 'Как работают цепочки', [
-        ['Одна цепочка на гео', 'Лид получает цепочку своего направления; «Все гео» — запасная'],
+        ['Точный таргетинг', 'Кнопка «Кому идёт» — гео, источник, канал, подрядчики, брокеры (можно несколько сразу). Более узкая цепочка перебивает общую'],
         ['Только до первого ответа', 'Клиент написал → живой диалог ИИ, рассылка стоит'],
-        ['Переменные', '{name} · {geo} · {ad} · {month} · {slots} · {agency}'],
+        ['Переменные под лида', '{creative} — объявление, по которому пришёл лид · {district} · {budget} · {timeline} · {type} · {purpose} · {name} · {geo}'],
         ['Пресеты внизу списка', '«B2C-скрипт 2025» и «Онбординг Facebook-лидгена» — включите и правьте под себя']])}
     </div>
     <div class="two-col" style="grid-template-columns:1.5fr 1fr">
@@ -6452,7 +6530,7 @@ PAGES.sequences = async (root) => {
         <div class="glass card mb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span class="seq-own">${ownTag(seq)}</span>
           <input id="seqName" value="${esc(seq.name)}" style="flex:1;min-width:180px;font-weight:650" ${ro('')}>
-          <select id="seqGeo" style="width:140px" ${ro('')}><option value="all" ${seq.geo === 'all' ? 'selected' : ''}>Все гео</option>${STATE.settings.agency.geos.map(g => `<option value="${g}" ${seq.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
+          <button class="btn btn-sm seq-target-btn" id="seqTarget" ${ro('')} title="Кому идёт эта цепочка — гео, источник, канал, подрядчики, брокеры">${ic(I.target)}<span class="seq-target-val">${esc(targetingShort(seq))}</span>${ic(I.chevron || I.edit)}</button>
           <div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:12px">Активна</span>
             <label class="switch"><input type="checkbox" id="seqActive" ${seq.active ? 'checked' : ''} ${ro('')}><span class="tr"></span><span class="th"></span></label></div>
           <button class="btn btn-sm" id="seqFork" title="Скопировать в свою личную цепочку">${ic(I.copy || I.plus)}Форкнуть себе</button>
@@ -6462,7 +6540,7 @@ PAGES.sequences = async (root) => {
         </div>
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
-            <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${geoName(seq.geo)}</b></div>
+            <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${esc(targetingSummary(seq))}</b></div>
             <div class="fl-prev">Lead Form / CTWA / вебхук — пока клиент не ответил</div></div>
           </div>
           ${seq.steps.map((st, i) => `<div class="fl-conn"><i></i><button class="fl-add" data-addat="${i}" title="Вставить шаг">${ic(I.plus, 2.2)}</button></div>` + stepNode(st, i)).join('')}
@@ -6511,12 +6589,14 @@ PAGES.sequences = async (root) => {
   const waPreview = (st) => {
     if (st.mode === 'text') return fillVarsDemo(st.text);
     if (st.mode === 'template') { const t = tpls.find(t => t.id === st.templateId); return t ? fillVarsDemo(t.body) : st.label; }
-    return '💬 ' + (st.prompt ? 'ИИ: ' + st.prompt : st.label);
+    return st.prompt ? fillVarsDemo(st.prompt) : '💬 ' + st.label;
   };
   function fillVarsDemo(t) {
     return String(t || '')
       .replace(/\{name\}/g, 'Алекс').replace(/\{geo\}/g, geoName(seq.geo === 'all' ? 'dubai' : seq.geo))
-      .replace(/\{ad\}/g, '«Дубай · студии JVC»').replace(/\{month\}/g, 'июле')
+      .replace(/\{ad\}/g, '«Дубай · студии JVC»').replace(/\{creative\}/g, '«Дубай · студии JVC»').replace(/\{project\}/g, 'Evgenia Laya Resort')
+      .replace(/\{district\}/g, 'JVC').replace(/\{budget\}/g, '$150–250k').replace(/\{timeline\}/g, '3–6 месяцев').replace(/\{type\}/g, 'студия').replace(/\{purpose\}/g, 'инвестиций')
+      .replace(/\{month\}/g, 'июле')
       .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name)
       .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ')
       .replace(/\{countryQ\}/g, 'Вы же из России? Во сколько удобно созвониться?')
@@ -6579,7 +6659,7 @@ PAGES.sequences = async (root) => {
   });
   if (editable) {
     $('#seqName')?.addEventListener('change', (e) => save({ name: e.target.value }));
-    $('#seqGeo')?.addEventListener('change', (e) => { seq.geo = e.target.value; save({ geo: e.target.value }).then(() => render()); });
+    $('#seqTarget')?.addEventListener('click', openSeqTargeting);
     $('#seqActive')?.addEventListener('change', (e) => { seq.active = e.target.checked; save({ active: e.target.checked }); });
     $('#seqDel')?.addEventListener('click', () => modal({
       title: 'Удалить цепочку?', sub: seq.name,
@@ -6615,16 +6695,21 @@ PAGES.sequences = async (root) => {
       eb.querySelector('[data-se="templateId"]').closest('.cs').style.display = m === 'template' ? '' : 'none';
       eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
       eb.querySelector('[data-se-textwrap]').style.display = (m === 'text' || m === 'creative') ? '' : 'none';
+      const pe = eb.querySelector('[data-se-perso]'); if (pe) pe.style.display = m === 'template' ? 'none' : '';
       const cn = eb.querySelector('[data-se-crnote]'); if (cn) cn.style.display = m === 'creative' ? '' : 'none';
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
       const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…';
     };
     modeSel.addEventListener('change', syncMode);
     const ta = eb.querySelector('[data-se="text"]');
+    const promptInp = eb.querySelector('[data-se="prompt"]');
+    /* вставляем переменную в АКТИВНОЕ поле: для ИИ-режима — в промпт, иначе — в текст/подпись */
     $$('.fl-var', eb).forEach(v => v.addEventListener('click', () => {
-      const p2 = ta.selectionStart || ta.value.length;
-      ta.value = ta.value.slice(0, p2) + v.dataset.var + ta.value.slice(p2);
-      ta.focus();
+      const tgt = modeSel.value === 'ai' ? promptInp : ta;
+      if (!tgt) return;
+      const p2 = tgt.selectionStart != null ? tgt.selectionStart : tgt.value.length;
+      tgt.value = tgt.value.slice(0, p2) + v.dataset.var + tgt.value.slice(p2);
+      tgt.focus(); tgt.selectionStart = tgt.selectionEnd = p2 + v.dataset.var.length;
     }));
     eb.querySelector('[data-sesave]').addEventListener('click', async (e) => {
       const i = +e.currentTarget.dataset.sesave;
