@@ -6796,7 +6796,7 @@ PAGES.sequences = async (root) => {
         </div>
         <!-- 4. Контент -->
         <div class="se2-content">
-          <select data-se="templateId" class="se2-full" style="${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('') || '<option>Нет шаблонов — создайте в «Шаблоны»</option>'}</select>
+          <div data-se-tplwrap style="${st.mode === 'template' ? '' : 'display:none'}"><select data-se="templateId" class="se2-full">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('') || '<option>Нет шаблонов — создайте в «Шаблоны»</option>'}</select></div>
           <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
           <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
           <div class="se2-tools" data-se-tools style="${st.mode === 'template' ? 'display:none' : ''}">
@@ -7195,7 +7195,7 @@ PAGES.sequences = async (root) => {
     const syncMode = () => {
       const m = curMode();
       $$('.se2-mode', eb).forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-      eb.querySelector('[data-se="templateId"]').style.display = m === 'template' ? '' : 'none';
+      { const tw = eb.querySelector('[data-se-tplwrap]'); if (tw) tw.style.display = m === 'template' ? '' : 'none'; }
       eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
       const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) { ta2.style.display = (m === 'text' || m === 'creative') ? '' : 'none'; ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'; }
       const tools = eb.querySelector('[data-se-tools]'); if (tools) tools.style.display = m === 'template' ? 'none' : '';
