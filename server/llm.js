@@ -516,6 +516,58 @@ ${draft ? 'ЧЕРНОВИК МЕНЕДЖЕРА (улучши, сохрани с�
   return { message: msg, variantB: clean(out.variantB), hook: String(out.hook || '').slice(0, 80), analysis: String(out.analysis || '').slice(0, 400), media: adMedia || null };
 }
 
+/* КОНСТРУКТОР ЦЕПОЧКИ: собрать текст шага-касания через ИИ на основе ПОНИМАНИЯ КРЕАТИВА
+   (транскрипт видео + сильные стороны из дерева креативов) и критериев лида. Design-time:
+   вызывается по кнопке в конструкторе на примере реального лида — результат «вшивается» в шаг.
+   position: 0 = первое касание, N>0 = follow-up без ответа (тон и цель другие). */
+async function composeChainStep(db, lead, step, agencyName, position) {
+  const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
+  const ads = lead.ads || {};
+  const adName = ads.adName || '';
+  const adRec = ads.adId ? (db.ads || []).find(a => String(a.adId) === String(ads.adId)) : null;
+  const adPoints = (adRec && Array.isArray(adRec.points) && adRec.points.length) ? adRec.points : (Array.isArray(ads.points) ? ads.points : []);
+  const adTranscript = (adRec && adRec.transcript && !/^\(без речи\)?$/i.test(adRec.transcript.trim())) ? String(adRec.transcript).slice(0, 2500) : '';
+  const adNotes = (adRec && adRec.notes) ? String(adRec.notes).slice(0, 1500) : '';
+  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[lead.lang] || 'русском';
+  const qualLines = [];
+  const AXN = { purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' };
+  for (const a of Object.keys(AXN)) { const q = (lead.quals || {})[a]; if (q && q.value) qualLines.push(`${AXN[a]}: ${q.value}`); }
+  const pos = +position || 0;
+  const label = String(step && step.label || '').slice(0, 80);
+  const intent = String(step && step.prompt || '').slice(0, 400);
+  const stageGoal = pos === 0
+    ? 'ПЕРВОЕ касание сразу после заявки: признай выбор проекта, дай 2-3 причины ценности из понимания креатива, задай один лёгкий вопрос — вытащить любой ответ.'
+    : `Follow-up №${pos + 1} — клиент ещё НЕ ответил на предыдущие касания. Не повторяйся, зайди с нового угла (новый факт/выгода/срочность/забота), по-человечески, без давления и без «вы не ответили». Цель — оживить диалог.`;
+  const prompt = `Ты — сильнейший брокер зарубежной недвижимости в агентстве «${String(agencyName || 'агентство').slice(0, 80)}». Собери ОДНО сообщение-касание для WhatsApp-цепочки. Это ШАБЛОН: пиши под конкретного лида ниже, но естественно — его потом переиспользуют для похожих лидов.
+
+ЦЕЛЬ ЭТОГО КАСАНИЯ: ${stageGoal}
+${label ? 'НАЗВАНИЕ ШАГА (ориентир по смыслу): ' + label : ''}
+${intent ? 'ЧТО ИМЕННО ДОЛЖЕН СКАЗАТЬ МЕНЕДЖЕР (обязательно учти): ' + intent : ''}
+
+ТРЕБОВАНИЯ:
+- Язык — ${LANG}. Тон — живой человек: коротко (2-4 предложения), тепло, уверенно, без канцелярита и клише.
+- Раздели на 2-3 коротких абзаца с ПУСТОЙ строкой между ними (\\n\\n) — не стеной.
+- Эмодзи максимум один. Никаких «уникальных предложений».
+- Опирайся на ПОНИМАНИЕ КРЕАТИВА (ниже) — по какому объявлению пришёл лид; вплетай факты естественно, не списком, ничего не выдумывай.
+- Где уместно — используй переменные в фигурных скобках, чтобы шаблон подставил данные конкретного лида: {name}, {creative} (объявление, по которому пришёл лид), {district}, {budget}, {timeline}, {type}, {purpose}, {agency}, {geo}. Не пиши реальные бюджеты/сроки — используй переменные.
+${adPoints.length ? 'СИЛЬНЫЕ СТОРОНЫ ПРОЕКТА (из дерева креативов, вплети 2-3):\n' + adPoints.slice(0, 5).map(x => '- ' + String(x).slice(0, 160)).join('\n') : ''}
+${adTranscript ? 'ЧТО КЛИЕНТ УСЛЫШАЛ В ВИДЕО (транскрипт озвучки креатива — реальные акценты, вплетай естественно):\n«' + adTranscript + '»' : ''}
+${adNotes ? 'ДОП. ИНФО ПО ПРОЕКТУ (менеджер добавил вручную):\n' + adNotes : ''}
+${LIVE_STYLE}
+
+ПРИМЕР ЛИДА (по нему пишем, но с переменными вместо конкретики):
+имя: ${lead.name || '—'}
+направление: ${geoName}
+${adName ? 'объявление/проект: «' + adName + '»' : ''}
+${qualLines.length ? 'квалификация: ' + qualLines.join('; ') : ''}
+
+Верни строго JSON: {"message":"текст касания с переменными в {…}, разбитый на абзацы реальными переносами строк","hook":"на чём построено — 3-6 слов"}`;
+  const out = await callGemini(prompt, 20000, 900);
+  if (!out || typeof out.message !== 'string' || !out.message.trim()) throw new Error('bad chain-step');
+  const msg = humanize(String(out.message).trim()).slice(0, 900);
+  return { message: msg, hook: String(out.hook || '').slice(0, 80) };
+}
+
 /* ПОСТ-ЗВОНКОВОЕ касание: после дозвона ИИ читает транскрипт + как человек общался (психо-паттерны)
    и решает развилку — слать подборку сразу / мягко прогреть / просто закрепиться в мессенджере.
    Возвращает готовое высококонверсионное первое сообщение в WhatsApp со ссылкой на разговор. */
@@ -1182,6 +1234,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

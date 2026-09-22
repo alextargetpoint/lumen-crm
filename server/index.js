@@ -6901,6 +6901,30 @@ const server = http.createServer(async (req, res) => {
       store.save();
       return json(res, 200, seq);
     }
+    /* КОНСТРУКТОР: собрать текст шага через ИИ по ПОНИМАНИЮ КРЕАТИВА (транскрипт видео + сильные стороны)
+       на примере реального лида, подходящего под таргетинг цепочки. Design-time: один вызов по кнопке. */
+    if ((m = p.match(/^\/api\/sequences\/([^/]+)\/ai-draft$/)) && req.method === 'POST') {
+      const seq = db.sequences.find(s => s.id === m[1]);
+      if (!seq) return json(res, 404, { error: 'not found' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
+      const b = await readBody(req);
+      const idx = Math.max(0, Math.min(29, +b.stepIndex || 0));
+      const step = (seq.steps || [])[idx] || {};
+      const activeSteps = (seq.steps || []).filter(s => s.active);
+      const position = activeSteps.indexOf(step) >= 0 ? activeSteps.indexOf(step) : idx;
+      /* репрезентативный лид под таргетинг цепочки, ПРЕДПОЧТИТЕЛЬНО с транскрибированным креативом */
+      const cand = (db.leads || []).filter(l => engine.seqMatchesLead(seq, l));
+      const withTr = cand.find(l => l.ads && l.ads.adId && (db.ads || []).some(a => String(a.adId) === String(l.ads.adId) && a.transcript && String(a.transcript).trim().length > 10));
+      let sample = withTr || cand.find(l => l.ads && l.ads.adName) || cand[0];
+      if (!sample) {
+        const f = engine.seqFilters(seq);
+        sample = { name: 'Клиент', geo: f.geos[0] || (db.settings.agency.geos || [])[0] || 'dubai', lang: 'ru', quals: {}, ads: null, custom: {} };
+      }
+      try {
+        const out = await llm.composeChainStep(db, sample, step, db.settings.agency.name, position);
+        return json(res, 200, { message: out.message, hook: out.hook, sample: { name: sample.name || '—', adName: (sample.ads && sample.ads.adName) || '', hasTranscript: !!withTr, matched: cand.length } });
+      } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
 
     if (p === '/api/templates' && req.method === 'POST') {
       const b = await readBody(req);
