@@ -1815,8 +1815,8 @@ window.grayAddQR = function (phone, label) {
 /* ── Серый Telegram: подключение по QR (как WhatsApp Web) + гид по разовой регистрации номера.
    Telegram при регистрации НОВОГО номера ставит забор (e-mail код → ~$0.99 → SMS). Его человек
    проходит один раз на телефоне, а Lumen цепляет аккаунт по QR (Настройки→Устройства) — без SMS. ── */
-window.openTgConnect = function () {
-  if (!grayConsentOk()) return openGrayConsent('tg', () => window.openTgConnect());
+window.openTgConnect = function (prefillPhone) {
+  if (!grayConsentOk()) return openGrayConsent('tg', () => window.openTgConnect(prefillPhone));
   let pollTimer = null, curPhone = '';
   const stop = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
   const bd = modal({ title: 'Подключить Telegram по QR', sub: 'Аккаунт создаёшь на телефоне (1 раз) → цепляем по QR, как WhatsApp Web', wide: true, body: '<div id="tgqBox"></div>', actions: [{ label: 'Закрыть', onClick: stop }] });
@@ -1897,7 +1897,9 @@ window.openTgConnect = function () {
         На телефоне, где создан аккаунт:<br><b>Telegram → Настройки → Устройства → Подключить устройство</b> → наведи камеру на этот QR.
       </div>
       <div id="tgqOut" class="muted" style="font-size:11.5px;margin-top:10px">Жду сканирования…</div>
+      <button class="btn btn-sm" id="tgqRefresh" style="margin-top:10px" title="Если написал «токен истёк» — сгенерируй новый QR">${ic(I.refresh || I.spark)}Обновить QR</button>
     </div>`;
+    $('#tgqRefresh', bd)?.addEventListener('click', () => { stop(); startQr(); });
   };
   const drawPwd = () => {
     host().innerHTML = `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}На аккаунте включён облачный пароль (2FA). Введи его, чтобы завершить подключение.</span></div>
@@ -1948,6 +1950,8 @@ window.openTgConnect = function () {
     else if (r.status === 'error') { stop(); const out = $('#tgqOut', bd); if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'ошибка') + '</span>'; }
   };
   drawForm();
+  /* переподключение с карточки: номер уже задан → сразу генерим свежий QR (минуя ручной ввод) */
+  if (prefillPhone) { const pf = $('#tgqPhone', bd); if (pf) pf.value = '+' + String(prefillPhone).replace(/[^0-9]/g, ''); startQr(); }
   return bd;
 };
 window.openTgBuy = function () {
@@ -12214,7 +12218,8 @@ PAGES.numbers = async (root) => {
         <div style="font-size:11px;margin:6px 0">Персона: <b>${esc(p.name || '— не задана')}</b><br>${persBadge[p.mode || 'qualifier']}</div>
         <div class="num-actions">
           <button class="btn btn-sm" data-tgpersona="${esc(n.phone)}">${ic(I.gear)}Персона</button>
-          ${!conn ? `<button class="btn btn-sm btn-accent" data-tgcode="${esc(n.phone)}">${ic(I.spark)}Ввести код</button>` : ''}
+          ${!conn ? `<button class="btn btn-sm btn-accent" data-tgqr="${esc(n.phone)}" title="Сгенерировать свежий QR и переподключить (если истёк токен)">${ic(I.refresh || I.spark)}Переподключить (QR)</button>` : ''}
+          ${!conn ? `<button class="btn btn-sm" data-tgcode="${esc(n.phone)}">${ic(I.spark)}Ввести код</button>` : ''}
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
@@ -12224,6 +12229,7 @@ PAGES.numbers = async (root) => {
     $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
     $('#tgWarmNow', box)?.addEventListener('click', async (e) => { const btn = e.currentTarget; const o = $('#tgWarmNowOut', box); btn.disabled = true; if (o) o.textContent = 'Отправляю…'; try { const r = await api.post('/tg/gray/warmup-now', {}); if (r.ok) { if (o) o.innerHTML = '<span style="color:var(--ok,#3f7d4f)">✓ ' + esc(r.from) + ' → ' + esc(r.to) + '</span>'; toast('Обмен отправлен', r.text, true); } else { if (o) o.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || '') + '</span>'; } } catch (er) { if (o) o.innerHTML = '<span style="color:var(--bad)">' + esc(er.message) + '</span>'; } btn.disabled = false; });
     $$('[data-tgpersona]', box).forEach(b => b.addEventListener('click', () => openTgPersona(b.dataset.tgpersona, nums.find(n => n.phone === b.dataset.tgpersona))));
+    $$('[data-tgqr]', box).forEach(b => b.addEventListener('click', () => openTgConnect(b.dataset.tgqr)));
     $$('[data-tgcode]', box).forEach(b => b.addEventListener('click', () => openTgCode(b.dataset.tgcode)));
     $$('[data-tgrm]', box).forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать TG-номер?', 'Сессия выйдет из Telegram.', { ok: 'Убрать', danger: true })) return; try { await api.post('/tg/gray/remove', { phone: b.dataset.tgrm }); toast('Убран', null, true); loadTgGray(); } catch (e) { toast('Не вышло', e.message); } }));
   }
