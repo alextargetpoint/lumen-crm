@@ -115,12 +115,13 @@ body {
 .kpi .val, .stat-big, .big-num { font-family: var(--font); font-variant-numeric: tabular-nums; }
 
 /* ---------- сегментированная суб-навигация раздела ---------- */
-.auto-seg { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-bottom: 20px; background: var(--card); border: 1px solid var(--stroke); padding: 5px; border-radius: 13px; box-shadow: var(--shadow); }
-.auto-seg .seg-b { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-3); transition: color var(--dur-fast), background var(--dur-fast); white-space: nowrap; }
-.auto-seg .seg-b svg { width: 15px; height: 15px; opacity: .8; }
-.auto-seg .seg-b:hover { color: var(--ink); background: var(--bg-2); }
-.auto-seg .seg-b.on { background: linear-gradient(180deg, var(--navy-700), var(--navy-900)); color: #fff; box-shadow: 0 6px 16px -6px rgba(16, 43, 92, .5); }
-.auto-seg .seg-b.on svg { opacity: 1; color: var(--blue-300); }
+/* унифицировано с .cmp-tabs (под-вкладки Автопилота/Базы знаний) — единый вид навигации */
+.auto-seg { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--stroke); }
+.auto-seg .seg-b { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 10px; border: 1px solid transparent; background: transparent; font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; transition: all .14s; white-space: nowrap; }
+.auto-seg .seg-b svg { width: 15px; height: 15px; }
+.auto-seg .seg-b:hover { color: var(--ink-1); background: var(--surface-2, rgba(127,127,127,.06)); }
+.auto-seg .seg-b.on { background: color-mix(in srgb, var(--accent) 11%, transparent); border-color: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); }
+.auto-seg .seg-b.on svg { color: var(--accent); }
 /* масонри-колонки вместо grid: короткие карточки НЕ оставляют вертикальных провалов до высоты
    соседней (была «странная высота между блоками» + скачки при переключении подвкладок). */
 .auto-grid { column-count: 2; column-gap: 16px; }
@@ -128,7 +129,7 @@ body {
 .auto-grid > .card, .auto-grid > .glass { margin-bottom: 16px; display: block; width: 100%; }
 .auto-grid.solo { column-count: 1; max-width: 760px; }
 @media (max-width: 1000px) { .auto-grid, .auto-grid.solo { column-count: 1; } }
-html[data-night] .auto-seg { background: var(--card); border-color: var(--stroke); }
+html[data-night] .auto-seg { border-bottom-color: var(--stroke); }
 html[data-night] .auto-seg .seg-b { color: var(--ink-3); }
 html[data-night] .auto-seg .seg-b:hover { color: var(--ink); background: rgba(140, 165, 230, .1); }
 ::-webkit-scrollbar { width: 8px; height: 8px; }

@@ -7991,6 +7991,13 @@ PAGES.automations = async (root) => {
   const link = (page, label) => `<button class="btn btn-sm" data-go="${page}">${label}</button>`;
   const autoOn = ['autoHandover', 'meetRemind', 'noshowReturn'].filter(k => a[k]).length + (s.ai.autopilot ? 1 : 0);
   root.innerHTML = `
+    <div class="seg auto-seg" id="autoSeg">
+      <button class="seg-b on" data-ag="first">${ic(I.spark)}Первая линия</button>
+      <button class="seg-b" data-ag="dist">${ic(I.users)}Распределение</button>
+      <button class="seg-b" data-ag="meet">${ic(I.cal)}Встречи</button>
+      <button class="seg-b" data-ag="reports">${ic(I.send)}Отчёты и каналы</button>
+      <button class="seg-b" data-ag="build">${ic(I.funnel)}Конструкторы</button>
+    </div>
     ${heroArt('assets/art/gears.png', `
       <div class="ha-title">${ic(I.bolt)}Автоматизации<span class="sub">рутина крутится сама — команда занимается клиентами</span></div>
       <div class="ha-chips">
@@ -8000,13 +8007,6 @@ PAGES.automations = async (root) => {
       </div>
       <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Отчёты в мессенджер: <b>${(s.reports || {}).daily || (s.reports || {}).weekly ? 'включены' : 'выключены'}</b> · мгновенные алерты: <b>${Object.values((s.reports || {}).instant || {}).filter(Boolean).length}</b></span></div>
     `, { v: 'mark', hue: '#5E7BB8' })}
-    <div class="seg auto-seg" id="autoSeg">
-      <button class="seg-b on" data-ag="first">${ic(I.spark)}Первая линия</button>
-      <button class="seg-b" data-ag="dist">${ic(I.users)}Распределение</button>
-      <button class="seg-b" data-ag="meet">${ic(I.cal)}Встречи</button>
-      <button class="seg-b" data-ag="reports">${ic(I.send)}Отчёты и каналы</button>
-      <button class="seg-b" data-ag="build">${ic(I.funnel)}Конструкторы</button>
-    </div>
     <div class="auto-grid" id="autoGrid">
         <div class="glass card mb" data-ag="dist">
           <div class="card-title">${ic(I.users)}Распределение по брокерам</div>
