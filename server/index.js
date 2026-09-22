@@ -962,6 +962,21 @@ function sessionRole(req) {
   }
   return { sid, role: realRole, brokerId: s.brokerId || null };
 }
+/* СТИЛЬ ПЕРВЫХ КАСАНИЙ ПОД БРОКЕРА (few-shot «дообучение под брокера»):
+   копим последние отправленные/утверждённые касания брокера → ИИ подражает его манере.
+   Ключ — brokerId пишущего (или 'owner'); хранится per-tenant в db.brokerStyles. */
+function touchStyleStore(db) { if (!db.brokerStyles || typeof db.brokerStyles !== 'object') db.brokerStyles = {}; return db.brokerStyles; }
+function getTouchStyle(db, key) { return (touchStyleStore(db)[key || 'owner'] || []).map(x => x.text).filter(Boolean); }
+function captureTouchStyle(db, key, text, adName) {
+  key = key || 'owner';
+  const t = String(text || '').trim();
+  if (t.length < 25) return false;                       // слишком коротко — не стиль
+  const st = touchStyleStore(db); const arr = st[key] = st[key] || [];
+  if (arr.some(x => x.text === t)) return false;         // дубль
+  arr.push({ text: t.slice(0, 900), adName: String(adName || '').slice(0, 120), at: Date.now() });
+  st[key] = arr.slice(-8);                               // держим последние 8 примеров
+  return true;
+}
 /* реальная роль сессии (без preview) — для проверок «может ли owner» */
 function realRole(req) {
   const sid = getSession(req); if (!sid) return null;
@@ -6263,6 +6278,8 @@ const server = http.createServer(async (req, res) => {
         const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
         if (cu) engine.send(db, lead, '', 'human', { media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } });
         if (b.text || !cu) engine.send(db, lead, b.text || '', 'human');
+        /* «дообучение под брокера»: отправленное из панели первого касания сообщение учим как СТИЛЬ пишущего */
+        if (b.learnStyle && b.text) captureTouchStyle(db, IS_BROKER ? ROLE.brokerId : 'owner', b.text, (lead.ads && lead.ads.adName) || '');
         /* менеджер подхватил — ИИ на паузу (правило autoOff.onHumanReply) */
         if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) {
           lead.ai.enabled = false;
@@ -6308,10 +6325,20 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       if (!llm.available()) return json(res, 400, { error: 'нет ключей LLM' });
       const b = await readBody(req);
+      const styleKey = IS_BROKER ? ROLE.brokerId : 'owner';   /* стиль = у кого рука писала (acting user) */
+      const styleSamples = getTouchStyle(db, styleKey);
       try {
-        const out = await llm.composeFirstTouch(db, lead, b.draft ? String(b.draft) : '', db.settings.agency.name);
-        return json(res, 200, out);
+        const out = await llm.composeFirstTouch(db, lead, b.draft ? String(b.draft) : '', db.settings.agency.name, styleSamples);
+        return json(res, 200, Object.assign(out, { styleCount: styleSamples.length }));
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
+    }
+    /* явно запомнить текст как «мой стиль» первого касания (кнопка ★) */
+    if (p === '/api/touch-style' && req.method === 'POST') {
+      const b = await readBody(req);
+      const key = IS_BROKER ? ROLE.brokerId : (b.brokerId || 'owner');
+      const ok = captureTouchStyle(db, key, b.text, b.adName);
+      if (ok) store.save();
+      return json(res, 200, { ok, styleCount: getTouchStyle(db, key).length });
     }
     /* предпросмотр передачи брокеру: что уйдёт клиенту + саммари брокеру */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/handover-preview$/)) && req.method === 'GET') {
@@ -6920,9 +6947,11 @@ const server = http.createServer(async (req, res) => {
         const f = engine.seqFilters(seq);
         sample = { name: 'Клиент', geo: f.geos[0] || (db.settings.agency.geos || [])[0] || 'dubai', lang: 'ru', quals: {}, ads: null, custom: {} };
       }
+      const styleKey = IS_BROKER ? ROLE.brokerId : 'owner';   /* стиль = у кого рука писала (acting user) */
+      const styleSamples = getTouchStyle(db, styleKey);
       try {
-        const out = await llm.composeChainStep(db, sample, step, db.settings.agency.name, position);
-        return json(res, 200, { message: out.message, hook: out.hook, sample: { name: sample.name || '—', adName: (sample.ads && sample.ads.adName) || '', hasTranscript: !!withTr, matched: cand.length } });
+        const out = await llm.composeChainStep(db, sample, step, db.settings.agency.name, position, styleSamples);
+        return json(res, 200, { message: out.message, variantB: out.variantB, hook: out.hook, styleCount: styleSamples.length, sample: { name: sample.name || '—', adName: (sample.ads && sample.ads.adName) || '', hasTranscript: !!withTr, matched: cand.length } });
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }
 
@@ -7713,6 +7742,19 @@ const server = http.createServer(async (req, res) => {
         else if (r.reason === 'login_failed') msg = 'Не удалось войти в Simbye. Проверьте: (1) email+пароль верны; (2) аккаунт создан по email+паролю, НЕ через Google/Apple; (3) если только что зарегистрировались — подтвердите e-mail и попробуйте снова.';
         else msg = r.detail || r.reason || r.error || 'ошибка входа';
         return json(res, 200, { ok: false, error: msg, reason: r.reason });
+      } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
+    /* URL «встроенного браузера» для входа в Simbye (человек решает hCaptcha, воркер держит сессию) */
+    if (p === '/api/simbye/rb-url' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const cfg = simbye.workerCfg(db, store);
+      if (!cfg.url) return json(res, 400, { error: 'Simbye-воркер не настроен (URL).' });
+      const tid = store.currentTid();
+      try {
+        const r = await fetch(cfg.url + '/rb/token?tenant=' + encodeURIComponent(tid), { headers: { 'x-worker-token': cfg.token, 'x-tenant': tid }, signal: AbortSignal.timeout(12000) });
+        const j = await r.json().catch(() => null);
+        if (!j || !j.ok || !j.token) return json(res, 200, { ok: false, error: 'Воркер не выдал токен встроенного браузера. Убедитесь, что lumen-simbye-worker задеплоен и обновлён (версия с /rb).' });
+        return json(res, 200, { ok: true, url: cfg.url + '/rb/view?tenant=' + encodeURIComponent(tid) + '&token=' + encodeURIComponent(j.token) });
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* отключить свой Simbye (снести креды+сессию) */

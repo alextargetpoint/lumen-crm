@@ -5618,6 +5618,7 @@ async function openLeadModal(id) {
                   <div class="lc-ft-btns">
                     <button class="btn btn-accent" id="lcFtAi">${ic(I.spark)}Персонализировать</button>
                     <button class="btn" id="lcFtSend">${ic(I.send)}Отправить</button>
+                    <button class="btn btn-ghost lc-ft-stylebtn" id="lcFtStyle" title="Запомнить этот текст как образец вашего стиля — ИИ будет писать в вашей манере и для других лидов">${ic(I.star || I.spark)}Мой стиль</button>
                   </div>
                   <div id="lcFtVarB" class="lc-ft-varb" style="display:none"></div>
                   <div id="lcFtAnalysis" class="lc-ft-an" style="display:none"></div>
@@ -5915,7 +5916,8 @@ async function openLeadModal(id) {
         $('#lcFtText', bd).value = j.message; renderFtPhone(bd);
         const vb = $('#lcFtVarB', bd);
         if (j.variantB && vb) { vb.style.display = 'block'; vb.innerHTML = `<div class="lc-ftvb-t">${ic(I.copy)}Вариант B${j.hook ? ' · <i>' + esc(j.hook) + '</i>' : ''}</div><div class="lc-ftvb-x">${esc(j.variantB)}</div><button class="btn btn-sm" id="lcFtVbUse">Поставить вариант B</button>`; $('#lcFtVbUse', vb).addEventListener('click', () => { $('#lcFtText', bd).value = j.variantB; renderFtPhone(bd); toast('Вариант B подставлен', null, true); }); }
-        if (j.analysis) { const a = $('#lcFtAnalysis', bd); a.style.display = 'block'; a.innerHTML = `${ic(I.spark)}<span>${esc(j.analysis)}</span>`; }
+        const styleNote = j.styleCount ? `<span class="lc-ft-style">${ic(I.spark)}учтён ваш стиль · ${j.styleCount}</span>` : '';
+        if (j.analysis || styleNote) { const a = $('#lcFtAnalysis', bd); a.style.display = 'block'; a.innerHTML = `${j.analysis ? `${ic(I.spark)}<span>${esc(j.analysis)}</span>` : ''}${styleNote}`; }
         toast('Gemini собрал персональное касание', j.hook ? 'Заход: ' + j.hook : 'Проверьте и отправьте', true);
       } catch (e2) { toast('ИИ не справился', e2.message); }
       finally { btn.disabled = false; btn.innerHTML = orig; }
@@ -5925,9 +5927,17 @@ async function openLeadModal(id) {
       const wrap = $('#lcCreoWrap', bd);
       const creativeUrl = (wrap && !wrap.classList.contains('skip')) ? (wrap.dataset.creo || '') : '';
       if (!text && !creativeUrl) { toast('Пустой текст'); return; }
-      await api.post(`/leads/${id}/message`, { text, creativeUrl });
-      toast('Первое касание отправлено', creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp', true);
+      /* learnStyle: отправленное касание учим как СТИЛЬ пишущего брокера (дообучение под него) */
+      await api.post(`/leads/${id}/message`, { text, creativeUrl, learnStyle: true });
+      toast('Первое касание отправлено', (creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp') + ' · стиль учтён', true);
       openLeadModal(id);
+    });
+    /* ★ явно запомнить текущий текст как «мой стиль» — не отправляя (движок будет подражать) */
+    $('#lcFtStyle', bd)?.addEventListener('click', async () => {
+      const text = $('#lcFtText', bd).value.trim();
+      if (text.length < 25) { toast('Слишком коротко', 'Наберите полноценное касание — его возьмём за образец вашего стиля'); return; }
+      try { const r = await api.post('/touch-style', { text }); toast('Запомнил ваш стиль', 'Учтено примеров: ' + (r.styleCount || 1) + '. ИИ будет писать в вашей манере', true); }
+      catch (e) { toast('Не вышло', e.message); }
     });
   }
   /* психо-профиль: разбор + вставка/копирование готовых ответов */
@@ -6735,9 +6745,18 @@ PAGES.sequences = async (root) => {
       try {
         const r = await fetch('/api/sequences/' + seq.id + '/ai-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stepIndex: editIx }) });
         const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-        const tgt = modeSel.value === 'ai' ? promptInp : ta;
-        if (tgt) { tgt.value = j.message; tgt.focus(); }
-        if (note) note.textContent = (j.hook ? '✦ ' + j.hook : '') + (j.sample && j.sample.adName ? ' · по креативу «' + j.sample.adName + '»' + (j.sample.hasTranscript ? ' (с транскриптом)' : '') : ' · общий пример (нет подходящего лида)');
+        const tgt = () => modeSel.value === 'ai' ? promptInp : ta;
+        let showingB = false;
+        const put = (v) => { const t = tgt(); if (t) { t.value = v; t.focus(); } };
+        put(j.message);
+        if (note) note.innerHTML = `${j.hook ? '✦ ' + esc(j.hook) : ''}${j.sample && j.sample.adName ? ' · по креативу «' + esc(j.sample.adName) + '»' + (j.sample.hasTranscript ? ' (с транскриптом)' : '') : ' · общий пример (нет подходящего лида)'}${j.styleCount ? ' · учтён стиль: ' + j.styleCount : ''}`;
+        /* формат А/Б — кнопка-переключатель рядом (как в карточке лида) */
+        let vbBtn = eb.querySelector('#seAiVb');
+        if (j.variantB) {
+          if (!vbBtn) { vbBtn = document.createElement('button'); vbBtn.type = 'button'; vbBtn.className = 'btn btn-sm'; vbBtn.id = 'seAiVb'; aiBtn.parentNode.insertBefore(vbBtn, note); }
+          vbBtn.textContent = 'Вариант Б';
+          vbBtn.onclick = () => { showingB = !showingB; put(showingB ? j.variantB : j.message); vbBtn.textContent = showingB ? 'Вариант А' : 'Вариант Б'; };
+        } else if (vbBtn) { vbBtn.remove(); }
         toast('ИИ собрал касание', j.sample && j.sample.adName ? 'По креативу «' + j.sample.adName + '»' : 'Проверьте и сохраните', true);
       } catch (e2) { toast('ИИ не справился', e2.message); }
       finally { aiBtn.disabled = false; aiBtn.innerHTML = orig; }
@@ -12012,31 +12031,17 @@ function wireSimbye(scope, d, reload) {
     $$s('#sbcTabs .seg-btn').forEach(x => x.classList.toggle('on', x === b));
     $$s('[data-sbcpane]').forEach(pane => { pane.style.display = pane.dataset.sbcpane === b.dataset.sbctab ? '' : 'none'; });
   }));
-  $s('#sbcConnect')?.addEventListener('click', async (e) => {
-    const email = ($s('#sbcEmail')?.value || '').trim(), password = $s('#sbcPass')?.value || '';
-    if (!email || !password) { toast('Введите email и пароль от Simbye'); return; }
-    const btn = e.currentTarget; btn.disabled = true;
-    /* кастомный индикатор: спиннер + этапы прогресса (вход в браузере ~10-30с) */
-    let prog = btn.parentElement.querySelector('#sbcProg');
-    if (!prog) { prog = document.createElement('div'); prog.id = 'sbcProg'; prog.className = 'sbc-prog'; btn.parentElement.appendChild(prog); }
-    const stages = [
-      { t: 'Открываю Simbye в защищённом браузере…', at: 0 },
-      { t: 'Ввожу ваш логин и вхожу в аккаунт…', at: 5000 },
-      { t: 'Проверяю доступ и забираю ваши номера…', at: 13000 },
-      { t: 'Почти готово — запускаю конвейер…', at: 22000 },
-    ];
-    const t0 = Date.now(); let done = false;
-    const paint = () => { if (done) return; const el = Date.now() - t0; const s = [...stages].reverse().find(x => el >= x.at) || stages[0]; const dots = '.'.repeat(1 + Math.floor((el / 500) % 3)); prog.innerHTML = `<span class="sbf-spin"></span><span class="sbc-prog-t">${esc(s.t)}</span><span class="sbc-prog-el">${Math.round(el / 1000)}с</span>`; };
-    btn.innerHTML = '<span class="sbf-spin"></span>Подключаю…'; paint();
-    const iv = setInterval(paint, 500);
-    const fin = () => { done = true; clearInterval(iv); };
-    try {
-      const r = await api.post('/simbye/connect', { email, password });
-      fin();
-      if (r.ok) { if (prog) prog.innerHTML = '<span class="sbc-prog-ok">✓ Подключено — забираю номера…</span>'; toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); }
-      else { if (prog) prog.remove(); toast('Не вышло', r.error || '', false); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
-    }
-    catch (er) { fin(); if (prog) prog.remove(); toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+  /* ВСТРОЕННЫЙ БРАУЗЕР: открываем живую страницу входа Simbye в iframe (стрим воркера) — человек решает hCaptcha */
+  $s('#sbcRemote')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget; const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="sbf-spin"></span>Открываю…';
+    let r; try { r = await api.post('/simbye/rb-url', {}); } catch (er) { toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = orig; return; }
+    btn.disabled = false; btn.innerHTML = orig;
+    if (!r.ok || !r.url) { toast('Не вышло', r.error || 'воркер не готов'); return; }
+    modal({ title: 'Вход в Simbye', sub: 'Введите email + пароль и решите капчу — как обычно. Как войдёте, мы поймаем это сами и окно закроется.', wide: 'card', body: `<iframe id="sbcRbFrame" src="${esc(r.url)}" allow="clipboard-read; clipboard-write; autoplay" style="width:100%;height:72vh;border:0;border-radius:10px;background:#0f1115;display:block"></iframe>`, actions: [{ label: 'Отмена' }] });
+    const onMsg = (ev) => { if (ev && ev.data && ev.data.simbyeConnected) { window.removeEventListener('message', onMsg); closeModal(); toast('Simbye подключён', 'Забираю ваши номера…', true); setTimeout(reload, 600); } };
+    window.addEventListener('message', onMsg);
+    /* снять слушатель, если модалку закрыли вручную */
+    const chk = setInterval(() => { if (!document.querySelector('#sbcRbFrame')) { clearInterval(chk); window.removeEventListener('message', onMsg); } }, 1000);
   });
   $s('#sbfDisconnect')?.addEventListener('click', async () => { if (!await uiConfirm('Отключить Simbye?', 'Уберём доступ к вашему аккаунту Simbye. Номера в ферме останутся, но авто-подхват кодов остановится.', { ok: 'Отключить', danger: true })) return; try { await api.post('/simbye/disconnect', {}); reload(); } catch (e) { toast('Не вышло', e.message); } });
   $s('#sbfImport')?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/simbye/import', {}); toast('Импортировано', `Добавлено ${r.added}, обновлено ${r.updated}`, true); reload(); } catch (er) { toast('Не вышло', er.message); b.disabled = false; } });
@@ -12596,13 +12601,9 @@ PAGES.numbers = async (root) => {
           <div class="sbf-guide">
             ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. ⚠️ Не через Google/Apple — иначе автоматика не сможет войти. Внизу сайта можно переключить язык на <b>«Русский»</b>. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
             ${step(2, 'Купите номер', 'В Simbye: <b>«Виртуальные номера»</b> → UK (9,95€/30дн) или USA → оплатите картой/PayPal/Apple Pay. Или позже — кнопкой «Купить номер» здесь.', 'q2')}
-            ${step(3, 'Введите логин Simbye ниже', 'Система войдёт за вас, найдёт ваши номера и запустит конвейер. Пароль хранится в зашифрованном виде.', '')}
+            ${step(3, 'Войдите через встроенный браузер', 'Откроется <b>настоящая страница входа Simbye</b> прямо здесь. Введите email+пароль и решите капчу (у Simbye стоит защита hCaptcha — её проходит живой человек). Мы поймаем вход сами и сохраним сессию — дальше система работает автоматически.', '')}
           </div>
-          <div class="sbf-grid2" style="margin-top:12px">
-            <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com" autocomplete="off"></div>
-            <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль" autocomplete="new-password"></div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-accent btn-sm" id="sbcConnect">${ic(I.link)}Подключить Simbye</button><span class="muted" style="font-size:11px">🔒 Пароль шифруется (AES-256) и используется только для входа в ваш Simbye.</span></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px"><button class="btn btn-accent btn-sm" id="sbcRemote">${ic(I.link)}Войти в Simbye (встроенный браузер)</button><span class="muted" style="font-size:11px">🔒 Пароль вводится прямо в Simbye, к нам не попадает. Держим только сессию.</span></div>
         </div>
         <div data-sbcpane="manual" style="display:none">
           <div class="sbf-reco muted2">${ic(I.gear)}Если хотите всё делать сами со своего телефона. Номера и коды сюда автоматически не попадут — коды смотрите в панели Simbye вручную. Подключение к CRM — по QR в конце.</div>
