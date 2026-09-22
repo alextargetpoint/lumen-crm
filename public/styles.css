@@ -8254,3 +8254,28 @@ body.client-view [data-team]{ display:none !important; }
 .sbf-code b{ animation: sbfPop .4s cubic-bezier(.2,1.5,.4,1); display:inline-block; }
 /* активный номер — тонкая живая рамка-акцент */
 .sbf-acct:has(.sbf-node.work){ border-color:color-mix(in srgb,var(--accent) 26%,var(--stroke)); }
+
+/* Аналитика — панели «Топ кампаний / Adset / Креативы» яснее, не сливаются с фоном */
+#anaExtra .coll{ border:1px solid var(--stroke); background:var(--card); margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.03); }
+#anaExtra .coll-head{ font-weight:660; font-size:13px; padding:12px 14px; background:color-mix(in srgb,var(--accent) 5%,var(--card)); }
+#anaExtra .coll-head:hover{ background:color-mix(in srgb,var(--accent) 9%,var(--card)); }
+#anaExtra .coll.open .coll-head{ border-bottom:1px solid var(--stroke-soft); }
+#anaExtra .coll-body-inner{ padding:12px 14px; }
+/* группы внутри рейтингов — как отдельные под-карточки с акцент-полосой слева */
+.ana-geo-grp, .ana-q-grp{ margin:0 0 14px; padding:11px 13px; border:1px solid var(--stroke-soft); border-left:3px solid color-mix(in srgb,var(--accent) 50%,var(--stroke)); border-radius:11px; background:color-mix(in srgb,var(--accent) 3.5%,var(--card)); }
+.ana-geo-grp:last-child, .ana-q-grp:last-child{ margin-bottom:0; }
+.ana-geo-gh, .ana-q-gh{ font-size:12.5px; font-weight:660; color:var(--ink); margin:0 0 9px; padding:0; border-bottom:0; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.ana-geo-gh .muted, .ana-q-gh .muted{ font-weight:500; font-size:10.8px; padding:2px 8px; border-radius:9px; background:var(--bg-2,#eef1f4); color:var(--ink-3); }
+
+/* Настройки рекламы — яснее иерархия карточек (Приём/Кабинеты/CAPI), меньше «каши» */
+[data-adtab="settings"] .glass.card{ padding:16px 18px 15px; }
+[data-adtab="settings"] .card-title{ padding-bottom:11px; margin-bottom:13px; border-bottom:1px solid var(--stroke-soft); font-size:14px; }
+[data-adtab="settings"] .card-title .sub{ font-weight:400; }
+/* ряд кнопок действий → визуальный «футер» карточки */
+[data-adtab="settings"] .glass.card > div:last-child:has(> .btn-accent),
+[data-adtab="settings"] .glass.card > div:has(> #saveOut),
+[data-adtab="settings"] .glass.card > div:has(> #maSave),
+[data-adtab="settings"] .glass.card > div:has(> #capiSave){ margin-top:14px; padding-top:13px; border-top:1px solid var(--stroke-soft); }
+[data-adtab="settings"] .btn-accent{ padding:8px 16px; font-weight:600; }
+/* внутренние коллапсы настроек — чуть отделить от полей */
+[data-adtab="settings"] .coll{ margin:12px 0; }
