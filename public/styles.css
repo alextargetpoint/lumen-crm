@@ -684,7 +684,8 @@ textarea { resize: vertical; min-height: 70px; }
 .lc-ik-who span { font-size: 11px; color: var(--muted); }
 .lc-ik-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 20px; padding: 3px 8px; flex: 0 0 auto; }
 .lc-ik-tag svg { width: 11px; height: 11px; }
-.lc-ik-clock { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; margin-left: auto; font-size: 12px; color: var(--ink-2); background: var(--surface-2, rgba(127,127,127,.07)); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 10px; overflow: hidden; }
+.lc-ik-clock { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; margin: 8px 0 0; font-size: 12px; color: var(--ink-2); background: var(--surface-2, rgba(127,127,127,.07)); border: 1px solid var(--stroke); border-radius: 20px; padding: 4px 10px; overflow: hidden; vertical-align: middle; }
+.lc-ik-clock:empty { display: none; }
 .lc-ik-clock svg { width: 13px; height: 13px; opacity: .8; flex: 0 0 auto; }
 .lc-ik-clock b { font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .lc-ik-clock span { color: var(--muted); font-size: 11px; flex: 0 0 auto; }

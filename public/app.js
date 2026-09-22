@@ -5300,7 +5300,8 @@ function buildIntakeCard(l) {
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
   const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
   return `<div class="lc-intake">
-    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-clock" id="lcIkClock" title="Местное время клиента — по нему считаются тихие часы (ночью дожимы не идут)"></span></div>
+    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
+    <span class="lc-ik-clock" id="lcIkClock" title="Местное время клиента — по нему считаются тихие часы (ночью дожимы не идут)"></span>
     ${adBlock}
     ${crea}
     ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
