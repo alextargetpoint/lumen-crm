@@ -8232,3 +8232,25 @@ body.client-view [data-team]{ display:none !important; }
 .sbf-shot-ph{ font-size:10.5px; color:var(--muted); padding:12px; text-align:center; }
 .sbf-shot.has .sbf-shot-ph{ display:none; }
 .sbf-buy-c{ justify-content:center; padding:14px; font-size:13px; }
+
+/* Ферма Simbye — премиальная анимация процесса */
+.sbf-node.cur .sbf-dot{ animation: sbfPulse 2.2s ease-in-out infinite; }
+@keyframes sbfPulse{
+  0%,100%{ box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent); }
+  50%{ box-shadow:0 0 0 7px color-mix(in srgb,var(--accent) 6%,transparent); }
+}
+.sbf-node.work .sbf-dot{ animation: sbfPulseWork 1.4s ease-in-out infinite; }
+@keyframes sbfPulseWork{
+  0%,100%{ box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent); transform:scale(1); }
+  50%{ box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 8%,transparent); transform:scale(1.08); }
+}
+/* галочка «выскакивает» при завершении */
+.sbf-tick{ display:inline-block; animation: sbfPop .35s cubic-bezier(.2,1.5,.4,1); }
+@keyframes sbfPop{ 0%{ transform:scale(0); } 70%{ transform:scale(1.25); } 100%{ transform:scale(1); } }
+/* «поток» по линии, входящей в текущий рабочий шаг */
+.sbf-bar.work{ background:linear-gradient(90deg, var(--ok) 0%, color-mix(in srgb,var(--accent) 90%,#fff) 50%, var(--stroke) 50%); background-size:220% 100%; animation: sbfFlow 1.5s linear infinite; }
+@keyframes sbfFlow{ 0%{ background-position:120% 0; } 100%{ background-position:-40% 0; } }
+/* код «прилетел» */
+.sbf-code b{ animation: sbfPop .4s cubic-bezier(.2,1.5,.4,1); display:inline-block; }
+/* активный номер — тонкая живая рамка-акцент */
+.sbf-acct:has(.sbf-node.work){ border-color:color-mix(in srgb,var(--accent) 26%,var(--stroke)); }

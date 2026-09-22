@@ -12340,6 +12340,12 @@ PAGES.numbers = async (root) => {
   async function loadSimbyeFarm() {
     const box = $('#simbyeFarm', root); if (!box) return;
     let d; try { d = await api.get('/simbye/farm'); } catch (e) { box.innerHTML = ''; return; }
+    // отпечаток состояния: если ничего не изменилось — НЕ перерисовываем (иначе анимация сбрасывается каждые 15с)
+    const fp = JSON.stringify({ c: d.connected, r: d.ready, h: d.health ? (d.health.loggedIn + '/' + d.health.ok + '/' + d.health.numbers) : 0,
+      a: (d.accounts || []).map(x => x.phone + '|' + (x.provision ? x.provision.state : '') + '|' + Object.entries(x.channels || {}).map(([k, v]) => k + v.state + (v.otp || '')).join(',')),
+      al: (d.alerts || []).map(x => x.id + x.count).join(','), au: d.autopilot });
+    if (box.__sbfFp === fp && box.querySelector('.sbf-wrap')) return; // без изменений — оставляем как есть (плавные анимации)
+    box.__sbfFp = fp;
     const STEPS = d.steps || ['purchased', 'awaiting_otp', 'otp_received', 'linking', 'warming', 'active'];
     const L = d.stepLabels || {};
     const isOwner = !!d.isOwner;
@@ -12353,12 +12359,18 @@ PAGES.numbers = async (root) => {
       let cur = STEPS.indexOf(st);
       const stuck = st === 'stuck', expired = st === 'expired';
       if (cur < 0) cur = stuck ? 1 : 0; // stuck ≈ упал на «ждём код»
-      return `<div class="sbf-track">${STEPS.map((s, i) => {
-        let cls = i < cur ? 'done' : (i === cur ? 'cur' : '');
+      const working = ['awaiting_otp', 'linking', 'warming', 'otp_received'].includes(st) && !stuck; // «в процессе» — линия «течёт»
+      const full = st === 'active';
+      return `<div class="sbf-track ${working ? 'live' : ''}">${STEPS.map((s, i) => {
+        let cls = (i < cur || full) ? 'done' : (i === cur ? 'cur' : '');
         if (stuck && i === cur) cls = 'err';
-        if (st === 'active') cls = 'done';
+        if (cls === 'cur' && working) cls += ' work';
         const spin = (i === cur && st === 'awaiting_otp');
-        return `<div class="sbf-node ${cls}"><span class="sbf-dot">${spin ? '<span class="sbf-spin"></span>' : (cls === 'done' ? '✓' : (cls === 'err' ? '!' : i + 1))}</span><span class="sbf-lbl">${esc(L[s] || s)}</span></div>${i < STEPS.length - 1 ? `<span class="sbf-bar ${i < cur ? 'on' : ''}"></span>` : ''}`;
+        const dot = spin ? '<span class="sbf-spin"></span>' : (cls.includes('done') ? '<span class="sbf-tick">✓</span>' : (cls.includes('err') ? '!' : i + 1));
+        // класс линии: пройденная=on, входящая в текущий рабочий шаг=work (анимированный поток)
+        let barCls = (i < cur || full) ? 'on' : '';
+        if (working && i === cur - 1) barCls += ' work';
+        return `<div class="sbf-node ${cls}"><span class="sbf-dot">${dot}</span><span class="sbf-lbl">${esc(L[s] || s)}</span></div>${i < STEPS.length - 1 ? `<span class="sbf-bar ${barCls}"></span>` : ''}`;
       }).join('')}</div>`;
     };
 
