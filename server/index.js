@@ -6954,7 +6954,7 @@ const server = http.createServer(async (req, res) => {
         if (contains) qp.push(`filter[national_destination_code]=${contains.slice(0, 3)}`);
         try {
           const j = await telnyxApi(db, 'GET', '/available_phone_numbers?' + qp.join('&'));
-          const list = (j.data || []).map(n => { const raw = n.cost_information ? parseFloat(n.cost_information.monthly_cost) : 1; const shown = (isNaN(raw) ? 1 : raw) + TELNYX_MARKUP; return { number: n.phone_number, friendly: n.phone_number, region: (n.region_information || []).map(r => r.region_name).filter(Boolean).join(', '), country, cost: `$${shown.toFixed(2)}/мес` }; });
+          const list = (j.data || []).map(n => { const raw = n.cost_information ? parseFloat(n.cost_information.monthly_cost) : 1; const shown = (isNaN(raw) ? 1 : raw) + TELNYX_MARKUP; return { number: n.phone_number, friendly: n.phone_number, region: (n.region_information || []).map(r => r.region_name).filter(Boolean).join(', '), country, cost: `$${shown.toFixed(2)}/мес`, reqs: (n.regulatory_requirements || []).length, reservable: n.reservable !== false }; });
           return json(res, 200, { list, provider: 'telnyx' });
         } catch (e) { return json(res, 200, { list: [], error: e.message, provider: 'telnyx' }); }
       }
@@ -7077,6 +7077,25 @@ const server = http.createServer(async (req, res) => {
         lowBalanceCheck(db);
         return json(res, 200, { ok: true, number: bought, balance: ch.balance, charged: otpPrice });
       } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    /* ОТПУСТИТЬ (release) OTP-номер: удаляем из Telnyx (прекращаем биллинг) + убираем из ленты. */
+    if (p === '/api/telephony/otp/release' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const num = String(b.number || '').replace(/[^0-9]/g, '');
+      if (!num) return json(res, 400, { error: 'нужен номер' });
+      const t = db.settings.telephony || {};
+      let released = false, err = null;
+      if (t.provider === 'telnyx') {
+        try {
+          const pn = await telnyxApi(db, 'GET', '/phone_numbers?filter[phone_number]=' + encodeURIComponent('+' + num));
+          const d = pn.data && pn.data[0];
+          if (d && d.id) { await telnyxApi(db, 'DELETE', '/phone_numbers/' + d.id); released = true; }
+          else err = 'номер не найден в Telnyx (возможно уже отпущен)';
+        } catch (e) { err = e.message; }
+      }
+      if (t.otpNumbers && t.otpNumbers[num]) delete t.otpNumbers[num];
+      store.save();
+      return json(res, 200, { ok: true, released, error: err });
     }
     /* починка OTP-номера: привязать messaging-profile (для приёма SMS) + голосовое подключение. Идемпотентно. */
     if (p === '/api/telephony/otp/repair' && req.method === 'POST') {
