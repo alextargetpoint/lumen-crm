@@ -5632,10 +5632,8 @@ async function openLeadModal(id) {
               <button class="btn-ghost lc-pin-ref" id="lcPinRefresh" title="Пересобрать сводку из переписки, звонков и квалификации">${ic(I.refresh || I.spark)}<span>Обновить</span></button></div>
             <div class="lc-pin-status">
               <span class="lc-pin-chip">${stageName(l.stage)}</span>
-              <span class="lc-pin-chip">Квал ${l.axesFilled}/4</span>
-              ${l.quals.budget ? `<span class="lc-pin-chip">${esc(l.quals.budget.value)}</span>` : ''}
               <span class="lc-pin-chip">${esc(l.geoName)}</span>
-              ${l.lastMsgAt ? `<span class="lc-pin-chip muted">контакт ${ago(l.lastMsgAt)}</span>` : ''}
+              <span class="lc-pin-chip">Квал ${l.axesFilled}/4</span>
               ${(l.nextAction && l.nextAction.text) ? `<span class="lc-pin-chip act">→ ${esc(l.nextAction.text)}</span>` : ''}
             </div>
             <div class="lc-pin-body" id="lcPinBody">${l.summary ? esc(l.summary) : '<i class="lc-pin-empty">Сводки ещё нет. Нажмите «Обновить» — ИИ соберёт: кто клиент, что хочет, на чём остановились.</i>'}</div>
@@ -5653,7 +5651,7 @@ async function openLeadModal(id) {
             <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
-          ${intakeCardHtml}
+          ${intakeCardHtml ? coll('Заявка из рекламы', intakeCardHtml, { open: true, icon: I.bolt }) : ''}
           <div class="lc-filters">
             <button class="btn btn-sm lc-f active" data-f="all">Всё</button>
             <button class="btn btn-sm lc-f" data-f="msg">Переписка</button>
