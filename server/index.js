@@ -1148,6 +1148,7 @@ function leadHint(db, l, axesFilled) {
 }
 
 function leadView(db, l) {
+  if (l.ads) healAdNames(l.ads);   /* лечим имена из полей *_id прямо на лиде (Albato) — идемпотентно */
   let lastText = null;
   for (let i = db.messages.length - 1; i >= 0; i--) {
     if (db.messages[i].leadId === l.id) { lastText = db.messages[i].text; break; }
@@ -3418,7 +3419,14 @@ const server = http.createServer(async (req, res) => {
          Иначе события НЕ-primary агентства (демо и др.) падали в PRIMARY, подпись проверялась чужим App Secret → дроп. */
       const _pnid = body.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
       const _wabaId = body.entry?.[0]?.id;
-      const _wtid = findTenant(() => { const w = store.get().settings.wa || {}; return (_pnid && String(w.phoneId) === String(_pnid)) || (_wabaId && String(w.wabaId) === String(_wabaId)); }) || store.currentTid();
+      const _entryId = body.entry?.[0]?.id;   /* для IG/FB events entry.id = ig-account-id / page-id */
+      /* мульти-тенант: сначала по WA (phone_number_id/waba_id), затем по Instagram-id / Page-id из social —
+         так комментарии и Директ роутятся в нужное агентство, а не в PRIMARY. */
+      const _wtid = findTenant(() => {
+        const st = store.get().settings; const w = st.wa || {}; const so = st.social || {};
+        return (_pnid && String(w.phoneId) === String(_pnid)) || (_wabaId && String(w.wabaId) === String(_wabaId))
+          || (_entryId && (String((so.ig || {}).igId || '') === String(_entryId) || String((so.fb || {}).pageId || '') === String(_entryId)));
+      }) || store.currentTid();
       return await store.runInTenant(_wtid, async () => {
         const db = store.get();
         const waSecret = process.env.WA_APP_SECRET || (db.settings.wa && db.settings.wa.appSecret) || '';
@@ -3428,6 +3436,32 @@ const server = http.createServer(async (req, res) => {
         const okSig = sig.length === expected.length && (() => { try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch (_) { return false; } })();
         if (!okSig) { return json(res, 403, { error: 'bad signature' }); }
         try {
+        /* Instagram Direct — входящие DM в инбокс. Gated: только если IG-канал включён в Подключениях.
+           Чистый приём (без авто-ответа — у лида ai.enabled=false): лид по IGSID + сообщение → диалоги. */
+        if (body.object === 'instagram' && Array.isArray(body.entry?.[0]?.messaging)) {
+          const so = db.settings.social || {};
+          if (so.ig && so.ig.enabled) {
+            for (const ev of body.entry[0].messaging) {
+              const msg = ev && ev.message;
+              if (!msg || msg.is_echo || !(ev.sender && ev.sender.id)) continue;
+              const igsid = String(ev.sender.id);
+              let lead = db.leads.find(l => l.igsid === igsid);
+              if (!lead) {
+                lead = { id: store.nextId('ld'), name: 'Instagram · ' + igsid.slice(-6), phone: '', igsid, channel: 'ig', geo: db.settings.agency.geos[0], lang: 'ru', tz: null, stage: 'new', score: 0, source: 'ig_direct', createdAt: Date.now(), lastMsgAt: null, lastDir: null, quals: { purpose: null, timeline: null, budget: null, type: null }, ai: { enabled: false, chainStep: 0, nextTouchAt: null, silentSince: null }, broker: null, summary: null, tags: ['instagram', 'входящий'], numberId: null, ads: null };
+                db.leads.push(lead);
+                ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: 'Входящий Instagram Direct: ' + lead.name });
+              }
+              const text = String(msg.text || (Array.isArray(msg.attachments) && msg.attachments.length ? '[вложение]' : '')).slice(0, 1000);
+              if (text) {
+                db.messages.push({ id: store.nextId('m'), leadId: lead.id, dir: 'in', via: 'ig', text, at: Date.now(), status: 'received' });
+                lead.unread = (lead.unread || 0) + 1; lead.lastInboundAt = Date.now(); lead.lastMsgAt = Date.now(); lead.lastDir = 'in';
+                if (lead.stage === 'sleeping') lead.stage = 'dialog';
+              }
+            }
+            store.save();
+          }
+          json(res, 200, { ok: true }); return;
+        }
         const field = body.entry?.[0]?.changes?.[0]?.field;
         const changes = body.entry?.[0]?.changes?.[0]?.value;
         /* комментарии под публикацией/рекламой (IG field 'comments', FB 'feed' item 'comment') */
@@ -8846,6 +8880,7 @@ const server = http.createServer(async (req, res) => {
        Считаем ТОЛЬКО из внесённого факта (budgetFact/leadsFact). CPL всюду производный. Ничего не выдумываем:
        если у измерения факта нет — hasFact=false, UI покажет «факт не внесён». Опц. фильтры ?contractorId=&from=&to=. */
     if (p === '/api/mediaplans/analytics' && req.method === 'GET') {
+      for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
       const ctFilter = u.searchParams.get('contractorId') || '';
       const fromF = u.searchParams.get('from') || '';
       const toF = u.searchParams.get('to') || '';
@@ -9371,6 +9406,7 @@ ${SCR}
     }
     /* дерево: кампании → адсеты → объявления, с креативом, лидами И МЕТРИКАМИ кабинета (Расход/CPL/Квал/CTR/CPM/клики) */
     if (p === '/api/ads/tree' && req.method === 'GET') {
+      for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
       const platformOf = (ad) => ad.platform || (/google|gads|search|pmax/i.test((ad.campaignName || '') + (ad.source || '')) ? 'google' : 'meta');
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
@@ -9416,6 +9452,7 @@ ${SCR}
       return json(res, 200, { leads, total: leads.length, quals, breakdown, stageNames: namesCfg, qualStages: QUAL });
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
+      for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);   /* имена из *_id (Albato) */
       /* Гео (по стране лида) + Качество (рейтинг adset/креативов по квалам, детально) — порт логики дашборда TargetPoint. */
       const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
       const geoGroup = u.searchParams.get('geoGroup') === 'direction' ? 'direction' : 'lang';
