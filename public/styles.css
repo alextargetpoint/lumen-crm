@@ -437,6 +437,8 @@ textarea { resize: vertical; min-height: 70px; }
 .se-crea-row { display: flex; align-items: center; gap: 8px; }
 .se-crea-prev { flex: 0 0 52px; width: 52px; height: 52px; border-radius: 9px; border: 1px solid var(--stroke); background: var(--bg-2); display: grid; place-items: center; overflow: hidden; }
 .se-crea-th { width: 100%; height: 100%; object-fit: cover; }
+.se-crea-pdf { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; font-weight: 700; color: #a9564a; background: color-mix(in srgb, #a9564a 10%, transparent); }
+.se-crea-pdf svg { width: 18px; height: 18px; }
 .crp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-height: 56vh; overflow-y: auto; padding: 2px; }
 .crp-card { border: 1px solid var(--stroke); border-radius: 11px; background: var(--card); cursor: pointer; overflow: hidden; padding: 0; display: flex; flex-direction: column; text-align: left; }
 .crp-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }

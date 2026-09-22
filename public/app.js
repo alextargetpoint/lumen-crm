@@ -6546,7 +6546,7 @@ const CHAIN_CARDS = [
     steps: [ { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: 'Первое касание · вопрос', active: true,
         text: "Hello {name}! Thank you for your interest in {creative}, a solid choice.\n\nOne quick question so I send you the right options: are you considering it for yourself, or as an investment?" } ] },
   /* ── Доверие и раппорт ── */
-  { id: 'photo-card', icon: 'image', tag: 'Доверие', cat: 'Доверие и раппорт', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку',
+  { id: 'photo-card', icon: 'image', tag: 'Доверие', cat: 'Доверие и раппорт', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку', asset: 'image',
     desc: 'Фото-визитка брокера (прикрепите картинку) + тёплое приветствие и вопрос-альтернатива (релокация или инвестиции).',
     steps: [ { day: 0.12, delayVal: 3, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Фотовизитка + приветствие', active: true,
         text: "By the way, I'm {manager} from {agency}. We don't just list properties, we handpick the best, and this one made the cut.\n\nI'll help you find the right deal and handle the details.\n\nAre you buying for relocation, or as an investment?" } ] },
@@ -6576,11 +6576,11 @@ const CHAIN_CARDS = [
     steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Предстарт', active: true,
         text: "{name}, we're getting early access to the next release around {creative}, at developer prices, before it opens to the public.\n\nThese usually sell out in the first days.\n\nWant me to add you to the priority list?" } ] },
   /* ── Полезность ── */
-  { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', cat: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку',
+  { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', cat: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку', asset: 'pdf',
     desc: 'Заготовленная PDF-подборка топ-проектов (прикрепите файл) + короткий текст «прислать?».',
     steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'PDF-подборка + текст', active: true,
         text: "I've prepared a fresh selection of {geo}'s top projects: handpicked options with the best payment plans and locations.\n\nWould you like me to send it over?" } ] },
-  { id: 'video-tour', icon: 'play', tag: 'Видео-тур', cat: 'Полезность', title: 'Видео-тур объекта', timing: 'день 3', needsAsset: 'видео-тур',
+  { id: 'video-tour', icon: 'play', tag: 'Видео-тур', cat: 'Полезность', title: 'Видео-тур объекта', timing: 'день 3', needsAsset: 'видео-тур', asset: 'video',
     desc: 'Персональный видео-обход объекта/района (прикрепите видео). Очень высокий отклик.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Видео-тур + текст', active: true,
         text: "{name}, I recorded a short walkthrough of {creative} and the area so you can get a real feel for it. Take a look.\n\nWant me to check availability and pricing for the layout you liked?" } ] },
@@ -6748,7 +6748,7 @@ PAGES.sequences = async (root) => {
     brAllBtn.addEventListener('click', () => { brAllBtn.classList.toggle('on'); const on = brAllBtn.classList.contains('on'); brList.style.opacity = on ? '.4' : ''; brList.style.pointerEvents = on ? 'none' : ''; if (on) $$('[data-tbr]', brList).forEach(x => x.classList.remove('on')); });
   };
   const VARS = ['{name}', '{creative}', '{district}', '{budget}', '{timeline}', '{type}', '{purpose}', '{geo}', '{ad}', '{month}', '{slots}', '{agency}'];
-  const creaThumb = (cr) => cr && cr.url ? (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`) : '';
+  const creaThumb = (cr, type) => { if (!cr || !cr.url) return ''; const isPdf = type === 'pdf' || cr.type === 'pdf' || /\.pdf(\?|$)/i.test(cr.url); if (isPdf) return `<span class="se-crea-th se-crea-pdf">${ic(I.doc)}PDF</span>`; return (cr.type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(cr.url)) ? `<video src="${esc(cr.url)}" muted class="se-crea-th"></video>` : `<img src="${esc(cr.url)}" class="se-crea-th">`; };
 
   /* задержка шага «через X после предыдущего» в мин/ч/дн; в модели храним кумулятивный day (для движка) + delayVal/delayUnit */
   const stepDelayParts = (st, i) => {
@@ -6768,6 +6768,10 @@ PAGES.sequences = async (root) => {
     const _d = stepDelayParts(st, i);
     if (editIx === i) {
       const hasFixed = !!(st.creative && st.creative.url);
+      const need = st._need || '';                       /* шаг требует заготовленный ассет (PDF/видео-тур/фотовизитка) */
+      const needType = st._needType || '';               /* 'pdf' | 'video' | 'image' */
+      const acceptBy = { pdf: 'application/pdf', video: 'video/mp4,video/webm,video/quicktime', image: 'image/png,image/jpeg,image/webp' }[needType] || 'image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime';
+      const upLabel = needType === 'pdf' ? 'Загрузить PDF' : needType === 'video' ? 'Загрузить видео' : needType === 'image' ? 'Загрузить фото' : 'Загрузить фото/видео';
       const MODES = [['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
       return `
       <div class="fl-node fl-edit se2" data-i="${i}" data-mode="${st.mode || 'text'}">
@@ -6806,7 +6810,19 @@ PAGES.sequences = async (root) => {
           </div>
         </div>
         <!-- 5. Медиа (креатив) -->
-        <div class="se2-media" data-se-crea style="${st.mode === 'creative' ? '' : 'display:none'}">
+        <div class="se2-media" data-se-crea data-need="${need ? '1' : ''}" style="${st.mode === 'creative' ? '' : 'display:none'}">
+          ${need ? `
+          <div class="se2-k" style="margin-bottom:8px">${ic(I.doc)} Прикрепите: <b style="color:var(--ink-1)">${esc(need)}</b></div>
+          <div class="se2-fixed" data-se-fixed>
+            <div class="se-crea-prev" id="seCreaPrev">${hasFixed ? creaThumb(st.creative, needType) : `<span class="muted" style="font-size:11px">${esc(need)} не загружена</span>`}</div>
+            <div class="se2-fixed-actions">
+              <button type="button" class="btn btn-sm btn-accent" id="seCreaUpload">${ic(needType === 'pdf' ? I.doc : needType === 'video' ? I.play : I.image)}${upLabel}</button>
+              ${needType !== 'pdf' ? `<button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.layers)}Из дерева креативов</button>` : ''}
+              <input type="file" id="seCreaFile" accept="${acceptBy}" style="display:none">
+              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка на файл" class="se2-grow">
+            </div>
+            <div class="se2-mut" style="margin-top:4px">${ic(I.spark)} Этот шаг отправит именно ${esc(need)} (один файл на всех лидов).${needType === 'image' ? ' Фото авто-сжимается.' : needType === 'video' ? ' Видео до 12 МБ.' : ''}</div>
+          </div>` : `
           <div class="se2-k" style="margin-bottom:8px">Какое медиа уйдёт</div>
           <div class="se2-radios">
             <label class="se2-radio ${hasFixed ? '' : 'on'}"><input type="radio" name="crea${i}" data-creamode="auto" ${hasFixed ? '' : 'checked'}><span><b>Креатив лида</b> — тот, по которому пришёл лид (авто)</span></label>
@@ -6821,7 +6837,7 @@ PAGES.sequences = async (root) => {
               <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или вставьте ссылку .mp4 / .jpg" class="se2-grow">
             </div>
             <div class="se2-mut" style="margin-top:4px">${ic(I.spark)} Фото авто-сжимается перед загрузкой (как в дереве креативов). Видео — до 12 МБ.</div>
-          </div>
+          </div>`}
         </div>
         <div class="se2-foot">
           <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
@@ -7027,9 +7043,10 @@ PAGES.sequences = async (root) => {
   $$('.seq-card[data-seq]', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
   /* ---- БИБЛИОТЕКА КАРТОЧЕК: добавление по клику ＋ и drag-and-drop в цепочку ---- */
   const recalcDays = () => { let cum = 0; seq.steps.forEach(s => { if (s.delayVal == null || !s.delayUnit) { s.delayUnit = 'day'; s.delayVal = 0; } const n = Math.max(0, +s.delayVal || 0), u = s.delayUnit; const d = u === 'min' ? n / 1440 : u === 'hour' ? n / 24 : n; cum += d; s.day = +cum.toFixed(4); }); };
+  const tagAsset = (clones, card) => { if (card.needsAsset) clones.forEach(s => { if (s.mode === 'creative') { s._need = card.needsAsset; s._needType = card.asset || 'image'; } }); return clones; };
   const addCard = async (cardId, at) => {
     const card = CHAIN_CARDS.find(c => c.id === cardId); if (!card) return;
-    const clones = JSON.parse(JSON.stringify(card.steps));
+    const clones = tagAsset(JSON.parse(JSON.stringify(card.steps)), card);
     const pos = (at == null || at > seq.steps.length) ? seq.steps.length : Math.max(0, at);
     seq.steps.splice(pos, 0, ...clones);
     recalcDays();
@@ -7053,8 +7070,8 @@ PAGES.sequences = async (root) => {
     const steps = [];
     AUTO_SLOTS.forEach(slot => {
       const card = CHAIN_CARDS.find(c => c.id === pick(slot.pool)); if (!card) return;
-      const clones = JSON.parse(JSON.stringify(card.steps));
-      if (clones[0]) { clones[0].delayVal = slot.v; clones[0].delayUnit = slot.u; if (card.needsAsset) clones[0]._need = card.needsAsset; }
+      const clones = tagAsset(JSON.parse(JSON.stringify(card.steps)), card);
+      if (clones[0]) { clones[0].delayVal = slot.v; clones[0].delayUnit = slot.u; }
       steps.push(...clones);
     });
     seq.steps = steps; recalcDays(); await save(); render();
@@ -7236,11 +7253,13 @@ PAGES.sequences = async (root) => {
       st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
       st.prompt = eb.querySelector('[data-se="prompt"]').value;
       st.text = ta.value;
-      /* креатив: «Один на всех» (radio fixed + url) → фиксированный; иначе — креатив лида (авто) */
+      /* креатив: шаг с заготовленным ассетом (st._need) — всегда фиксированный файл; иначе radio «свой / креатив лида» */
       if (st.mode === 'creative') {
-        const fixed = eb.querySelector('[data-creamode="fixed"]')?.checked;
+        const needStep = !!st._need;
+        const fixed = needStep || eb.querySelector('[data-creamode="fixed"]')?.checked;
         const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
-        st.creative = (fixed && crUrl) ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
+        const typ = st._needType || (/\.pdf(\?|$)/i.test(crUrl) ? 'pdf' : /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image');
+        st.creative = (fixed && crUrl) ? { url: crUrl.slice(0, 500), type: typ, name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
       } else st.creative = null;
       PAGE_STATE.seqEdit = null;
       await save(); render();
