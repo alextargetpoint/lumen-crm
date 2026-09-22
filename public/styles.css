@@ -697,6 +697,11 @@ textarea { resize: vertical; min-height: 70px; }
 .lc-ik-qa > div { min-width: 0; }
 .lc-ik-qa i { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-style: normal; font-weight: 600; }
 .lc-ik-qa b { font-size: 12.5px; font-weight: 550; overflow-wrap: break-word; }
+.lc-ik-packed { grid-column: 1 / -1; }
+.lc-ik-kv { display: flex; flex-wrap: wrap; gap: 5px 7px; margin-top: 3px; }
+.lc-ik-kv span { display: inline-flex; align-items: baseline; gap: 5px; background: var(--surface-2, rgba(127,127,127,.08)); border: 1px solid var(--stroke); border-radius: 8px; padding: 3px 9px; max-width: 100%; }
+.lc-ik-kv em { font-style: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.lc-ik-kv b { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
 .lc-ik-empty { margin-top: 9px; font-size: 11.5px; color: var(--muted); }
 .lc-ik-pref { margin-top: 11px; border-radius: 11px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--stroke)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .lc-ik-pref-hd { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -1489,6 +1494,24 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
   background: var(--blue-100); border: 1px solid var(--accent-soft-bd); border-radius: 7px; padding: 3px 8px;
 }
 .fl-var:hover { background: #CCE0FF; }
+.se-perso { margin: 2px 0 10px; }
+.se-perso .fl-vars { margin-top: 0; margin-bottom: 7px; }
+.se-perso-hint { font-size: 11.5px; line-height: 1.55; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--stroke)); border-radius: 9px; padding: 8px 11px; display: flex; gap: 7px; align-items: flex-start; }
+.se-perso-hint svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); width: 14px; height: 14px; }
+.se-perso-hint code { font-family: 'SF Mono', Menlo, monospace; font-size: 10.5px; color: var(--accent); background: var(--blue-100); border-radius: 4px; padding: 0 4px; }
+/* таргетинг цепочки */
+.seq-target-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; }
+.seq-target-btn .seq-target-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.seq-target-btn svg { flex: 0 0 auto; width: 14px; height: 14px; opacity: .7; }
+.seq-tg { display: flex; flex-direction: column; gap: 15px; }
+.seq-tg-sec { }
+.seq-tg-h { font-size: 12px; font-weight: 650; color: var(--ink-1); margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
+.seq-tg-h span { font-size: 11px; font-weight: 400; color: var(--muted); }
+.seq-tg-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.seq-chip { font-size: 12px; font-weight: 550; color: var(--ink-2); background: var(--surface-2, rgba(127,127,127,.07)); border: 1px solid var(--stroke); border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: all .13s; display: inline-flex; align-items: center; gap: 5px; }
+.seq-chip:hover { border-color: var(--accent); }
+.seq-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.seq-chip svg { width: 12px; height: 12px; }
 .fl-side .switch { flex: 0 0 auto; height: 22px; }
 
 /* ---------- логотип агентства ---------- */
@@ -4300,6 +4323,8 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 .lc-creo2-ph i { font-size: 11px; font-style: normal; }
 .lc-creo2-badge { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.58); color: #fff; border-radius: 8px; padding: 3px 9px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; backdrop-filter: blur(4px); }
 .lc-creo2-badge svg { width: 12px; height: 12px; }
+.lc-creo2-auto { position: absolute; top: 8px; left: 8px; background: color-mix(in srgb, var(--accent) 86%, #000); color: #fff; border-radius: 8px; padding: 3px 9px; font-size: 10.5px; font-weight: 650; display: inline-flex; align-items: center; gap: 4px; letter-spacing: .01em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.lc-creo2-auto svg { width: 11px; height: 11px; }
 /* comfortable textarea + buttons */
 .lc-ft-ta { width: 100%; min-height: 104px; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; font-family: inherit; color: var(--ink); resize: vertical; outline: none; background: var(--card, #fff); transition: border-color .15s; }
 .lc-ft-ta:focus { border-color: var(--accent); }

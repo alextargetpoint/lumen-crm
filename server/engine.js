@@ -303,6 +303,34 @@ function morningAt(db, lead) {
   return +m - tz + Math.floor(Math.random() * 20 * 60e3); /* джиттер 0-20 мин, чтобы не залпом */
 }
 
+/* ТАРГЕТИНГ ЦЕПОЧКИ: на какие лиды она распространяется.
+   Модель seq.filters { geos[], sources[], channels[], contractors[], brokers:'all'|[ids] };
+   пустой массив = «любой». Backward-compat: старое поле seq.geo ('all'|geoKey). */
+function seqFilters(seq) {
+  const f = (seq && seq.filters) || {};
+  const arr = v => Array.isArray(v) ? v.filter(Boolean) : [];
+  return {
+    geos: Array.isArray(f.geos) ? f.geos.filter(Boolean) : (seq && seq.geo && seq.geo !== 'all' ? [seq.geo] : []),
+    sources: arr(f.sources),
+    channels: arr(f.channels),
+    contractors: arr(f.contractors),
+    brokers: (f.brokers === 'all' || Array.isArray(f.brokers)) ? f.brokers : 'all',
+  };
+}
+function seqMatchesLead(seq, lead) {
+  const f = seqFilters(seq);
+  if (f.geos.length && !f.geos.includes(lead.geo)) return false;
+  if (f.sources.length && !f.sources.includes(lead.source)) return false;
+  if (f.channels.length && !f.channels.includes(lead.channel || lead.activeChannel || 'wa')) return false;
+  if (f.contractors.length && !f.contractors.includes(lead.vendor || lead.contractor || '')) return false;
+  if (f.brokers !== 'all' && Array.isArray(f.brokers) && !f.brokers.includes(lead.broker)) return false;
+  return true;
+}
+function seqSpecificity(seq) {
+  const f = seqFilters(seq);
+  return (f.geos.length ? 1 : 0) + (f.sources.length ? 1 : 0) + (f.channels.length ? 1 : 0) + (f.contractors.length ? 1 : 0) + (f.brokers !== 'all' ? 1 : 0);
+}
+
 function tickChains(db) {
   const nowT = Date.now();
   const actives = db.sequences.filter(s => s.active);
@@ -318,12 +346,22 @@ function tickChains(db) {
     /* какую цепочку крутить (приоритет): принудительная (ручной запуск) → ЛИЧНАЯ цепочка закреплённого
        брокера (по гео, затем «все») → дефолтная из настроек → агентская (base) по гео → агентская «все».
        Личные цепочки (ownerId) применяются ТОЛЬКО к лидам своего брокера — чужим не протекают. */
-    const seq = (lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq))
-      || (lead.broker && actives.find(s => s.ownerId === lead.broker && s.geo === lead.geo))
-      || (lead.broker && actives.find(s => s.ownerId === lead.broker && (!s.geo || s.geo === 'all')))
-      || (defaultSeqId && actives.find(s => s.id === defaultSeqId && !s.ownerId))
-      || actives.find(s => !s.ownerId && s.geo === lead.geo)
-      || actives.find(s => !s.ownerId && (!s.geo || s.geo === 'all'));
+    /* приоритет: принудительная (ручной запуск) → среди подходящих по ТАРГЕТИНГУ:
+       личная цепочка закреплённого брокера → более специфичная (больше фильтров) → дефолтная → агентская.
+       Личные цепочки (ownerId) применяются ТОЛЬКО к лидам своего брокера. */
+    let seq = lead.ai.forceSeq && actives.find(s => s.id === lead.ai.forceSeq);
+    if (!seq) {
+      const elig = actives.filter(s => (!s.ownerId || s.ownerId === lead.broker) && seqMatchesLead(s, lead));
+      elig.sort((a, b) => {
+        const pa = a.ownerId === lead.broker ? 1 : 0, pb = b.ownerId === lead.broker ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        const sa = seqSpecificity(a), sb = seqSpecificity(b);
+        if (sa !== sb) return sb - sa;
+        const da = a.id === defaultSeqId ? 1 : 0, dbb = b.id === defaultSeqId ? 1 : 0;
+        return dbb - da;
+      });
+      seq = elig[0];
+    }
     if (!seq) continue;
     /* цепочка — только до первого ответа клиента; ответил → живой диалог,
        и обратно в «Спящие» из диалога цепочка лида не роняет */
@@ -350,6 +388,7 @@ function tickChains(db) {
         lead.ai.secondRound = true;
         lead.ai.chainStep = 0;
         lead.ai.nextTouchAt = nowT + 0.5 * dayMs(db);
+        lead.ai.chainBaseAt = lead.ai.nextTouchAt;   /* второй круг: кумулятивный day считаем от старта круга */
         ai.pushEvent(db, { type: 'touch', leadId: lead.id, text: `${lead.name}: молчит в WhatsApp — переключаю каскад на ${CH_NAMES[nx]}, второй круг касаний` });
         continue;
       }
@@ -358,7 +397,10 @@ function tickChains(db) {
       continue;
     }
     if (lead.ai.nextTouchAt == null) {
-      lead.ai.nextTouchAt = nowT + (lead.ai.chainStep === 0 ? 30e3 : step.day * dayMs(db));
+      /* тайминг: step.day — КУМУЛЯТИВНЫЙ день от старта цепочки (chainBaseAt), а не дельта от «сейчас».
+         Так шаги не накапливают задержку, а шаг «сразу» (тот же day, что у предыдущего) уходит сразу за ним. */
+      if (lead.ai.chainStep === 0) { lead.ai.chainBaseAt = nowT; lead.ai.nextTouchAt = nowT + 30e3; }
+      else { lead.ai.nextTouchAt = (lead.ai.chainBaseAt || lead.createdAt || nowT) + (+step.day || 0) * dayMs(db); }
       continue;
     }
     if (nowT < lead.ai.nextTouchAt) continue;
@@ -443,8 +485,21 @@ function fillVars(db, lead, text) {
        .replace(/\{price\}/g, price || 'вашего бюджета')
        .replace(/\{countryQ\}/g, country ? `Вы же из ${country}, верно? Во сколько вам удобно?` : 'Во сколько вам удобно?')
        .replace(/\{countryQEn\}/g, country ? `You're from ${country}, right? What time works for you?` : 'What time works for you?');
+  /* персонализация под КРЕАТИВ (по которому пришёл лид) и его КРИТЕРИИ квалификации.
+     quals могут быть как {budget:{value,quote}}, так и плоскими {budget:'...'} — берём .value если это объект. */
+  const q = lead.quals || {};
+  const qv = x => (x && typeof x === 'object') ? (x.value || '') : (x || '');
+  const creative = (lead.ads && (lead.ads.adName || lead.ads.headline)) || '';
+  const district = (adRec && (adRec.area || adRec.district)) || '';
   return t
     .replace(/\{ad\}/g, adRef)
+    .replace(/\{creative\}/g, creative || 'ваш запрос')
+    .replace(/\{project\}/g, creative || 'проект по вашему запросу')
+    .replace(/\{district\}/g, district || (db.settings.geoNames[lead.geo] || lead.geo))
+    .replace(/\{budget\}/g, qv(q.budget) || price || 'ваш бюджет')
+    .replace(/\{purpose\}/g, qv(q.purpose) || 'вашей цели')
+    .replace(/\{timeline\}/g, qv(q.timeline) || 'ваш срок')
+    .replace(/\{type\}/g, qv(q.type) || 'подходящий формат')
     .replace(/\{geo\}/g, db.settings.geoNames[lead.geo] || lead.geo)
     .replace(/\{month\}/g, MONTHS_PREP[new Date().getMonth()])
     .replace(/\{agency\}/g, db.settings.agency.name)
@@ -452,6 +507,10 @@ function fillVars(db, lead, text) {
 }
 
 function chainAiText(db, lead, step) {
+  /* если в шаге задан промпт — это персонализируемый шаблон: подставляем переменные
+     ({creative}/{district}/{budget}/{timeline}/{type}/{purpose} и т.д.) под конкретного лида.
+     Так конструктор собирает текст со ссылкой на креатив, по которому пришёл лид, и его критерии. */
+  if (step && step.prompt && String(step.prompt).trim()) return fillVars(db, lead, step.prompt);
   const g = db.settings.geoNames[lead.geo] || lead.geo;
   const name = lead.name.split(' ')[0];
   const bank = {
@@ -993,4 +1052,4 @@ function startLoop() {
   }, 5000);
 }
 
-module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender };
+module.exports = { send, handover, handoverPreview, inbound, wakePreview, wakeScore, segmentOf, startCampaign, renderTemplate, startLoop, pickBroker, brokerOnShift, buildReport, sendReport, maybeInstantNotify, simulateComment, optOut, setGraySender, seqFilters, seqMatchesLead, seqSpecificity };

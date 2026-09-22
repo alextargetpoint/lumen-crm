@@ -6879,6 +6879,22 @@ const server = http.createServer(async (req, res) => {
       if (b.active != null) seq.active = b.active;
       if (b.name) seq.name = String(b.name).slice(0, 80);
       if (b.geo) seq.geo = b.geo;
+      /* ТАРГЕТИНГ: на какие лиды распространяется цепочка (мульти-фильтры + брокеры).
+         Пустой массив = «любой»; brokers 'all' | список id. Санитизируем и держим seq.geo синхронным для обратной совместимости. */
+      if (b.filters && typeof b.filters === 'object') {
+        const strArr = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => typeof x === 'string' && x).map(x => x.slice(0, 60)))].slice(0, n) : [];
+        const brokers = b.filters.brokers === 'all' ? 'all'
+          : Array.isArray(b.filters.brokers) ? [...new Set(b.filters.brokers.filter(x => typeof x === 'string' && x))].slice(0, 200) : 'all';
+        seq.filters = {
+          geos: strArr(b.filters.geos, 40),
+          sources: strArr(b.filters.sources, 40),
+          channels: strArr(b.filters.channels, 20),
+          contractors: strArr(b.filters.contractors, 200),
+          brokers,
+        };
+        /* seq.geo (legacy) синхронно: один гео → он, иначе 'all' */
+        seq.geo = seq.filters.geos.length === 1 ? seq.filters.geos[0] : 'all';
+      }
       /* шаринг: владелец шарит агентские кому угодно; брокер — свои личные конкретным брокерам/всем */
       if (b.visibility && ['base', 'private', 'shared', 'agency'].includes(b.visibility)) seq.visibility = b.visibility;
       if (Array.isArray(b.sharedWith)) seq.sharedWith = b.sharedWith.filter(x => typeof x === 'string').slice(0, 200);
