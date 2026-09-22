@@ -5352,7 +5352,8 @@ function startLeadClock(scope, l) {
     const hh = now.getUTCHours(), mm = now.getUTCMinutes();
     const night = q.enabled !== false && (q.from > q.to ? (hh >= q.from || hh < q.to) : (hh >= q.from && hh < q.to));
     el.classList.toggle('night', night);
-    el.innerHTML = `${ic(night ? (I.moon || I.clock) : I.clock)}<b>${pad2h(hh)}:${pad2h(mm)}</b><span>${esc(tzLabel || '')}</span>${night ? `<em class="lc-clk-badge">🌙 ночь · дожимы до ${pad2h(q.to || 9)}:00</em>` : `<em class="lc-clk-badge ok">☀️ можно писать</em>`}`;
+    el.title = night ? `У клиента сейчас ночь (${pad2h(hh)}:${pad2h(mm)} ${tzLabel}). Автокасания стоят до ${pad2h(q.to || 9)}:00 по его времени.` : `У клиента ${pad2h(hh)}:${pad2h(mm)} ${tzLabel} — рабочее время, можно писать.`;
+    el.innerHTML = `${ic(night ? (I.moon || I.clock) : I.clock)}<b>${pad2h(hh)}:${pad2h(mm)}</b><span>${esc(tzLabel || '')}</span><em class="lc-clk-badge${night ? '' : ' ok'}">${night ? '🌙 ночь' : '☀️'}</em>`;
   };
   tick(); const t = setInterval(tick, 15000);
 }
@@ -5938,6 +5939,13 @@ async function openLeadModal(id) {
   if (ftText) {
     renderFtPhone(bd);
     ftText.addEventListener('input', () => renderFtPhone(bd));
+    /* клик по превью креатива → открыть плеер (как слева в сводке); «Заменить»/пустой плейсхолдер → выбор файла */
+    $('#lcCreoWrap', bd)?.addEventListener('click', (e) => {
+      const w = e.currentTarget;
+      if (e.target.closest('.lc-creo2-badge') || e.target.closest('.lc-creo2-ph')) return;   /* Заменить / прикрепить → файл (default label) */
+      const url = w.dataset.creo;
+      if (url && e.target.closest('img, video, .lc-creo2-play')) { e.preventDefault(); openCreativeView(url, w.dataset.creotype || 'image'); }
+    });
     $('#lcCreoFile', bd).addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
       const r = await fetch(`/api/leads/${id}/creative?filename=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
@@ -6311,9 +6319,19 @@ async function renderComposite(root, compKey) {
   if (idx >= tabs.length || idx < 0) idx = 0;
   const [selKey] = tabs[idx];
   root.innerHTML = `<div class="cmp-tabs">${tabs.map(([k, label], i) => `<button class="cmp-tab${i === idx ? ' on' : ''}" data-cmpi="${i}">${ic(NAV[k].icon)}<span>${esc(label)}</span></button>`).join('')}</div><div class="cmp-body" id="cmpBody"></div>`;
-  root.querySelectorAll('.cmp-tab').forEach(b => b.addEventListener('click', () => { PAGE_STATE[compKey + 'Tab'] = +b.dataset.cmpi; render(); }));
   const body = $('#cmpBody', root);
-  try { await PAGES[selKey](body); } catch (e) { body.innerHTML = `<div class="muted" style="padding:20px">Не удалось открыть раздел: ${esc(e.message || '')}</div>`; }
+  const paint = async (k) => { try { await PAGES[k](body); } catch (e) { body.innerHTML = `<div class="muted" style="padding:20px">Не удалось открыть раздел: ${esc(e.message || '')}</div>`; } };
+  /* переключение под-вкладки = перерисовываем ТОЛЬКО внутренний блок (без мигания всего экрана) + мягкий fade */
+  root.querySelectorAll('.cmp-tab').forEach(b => b.addEventListener('click', async () => {
+    const i = +b.dataset.cmpi; if (i === idx) return;
+    idx = i; PAGE_STATE[compKey + 'Tab'] = i;
+    root.querySelectorAll('.cmp-tab').forEach((x, ix) => x.classList.toggle('on', ix === i));
+    body.classList.remove('cmp-in'); void body.offsetWidth;
+    await paint(tabs[i][0]);
+    enhanceControls(body); try { wireAiWand(body); wireDictate(body); wireHeroArt(body); mountHeroVideos(body); applyI18n(body); } catch (_) {}
+    body.classList.add('cmp-in');
+  }));
+  await paint(selKey); body.classList.add('cmp-in');
 }
 PAGES.autopilot = (root) => renderComposite(root, 'autopilot');
 PAGES.knowledge = (root) => renderComposite(root, 'knowledge');
@@ -6907,7 +6925,10 @@ PAGES.sequences = async (root) => {
     const bubbles = (c.steps || []).map(s => {
       if (s.mode === 'creative') {
         const cap = (s.text || '').trim() ? `<div class="clib-pv-para">${fillVarsDemo(s.text).split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>` : '';
-        return `<div class="clib-pv-msg"><div class="clib-pv-media">${ic(I.play)}<span>креатив, по которому пришёл лид</span></div>${cap}<span class="clib-pv-t">✓✓</span></div>`;
+        /* если у шага заготовленный ассет (creative.auto===false) — показываем ЕГО (PDF-подборка / видео-тур / фотовизитка), а не «креатив лида» */
+        const prepared = s.creative && s.creative.auto === false;
+        const mediaLabel = prepared ? ('заготовленный материал: ' + (c.needsAsset || 'файл')) : 'креатив, по которому пришёл лид';
+        return `<div class="clib-pv-msg"><div class="clib-pv-media">${ic(prepared ? (I[c.icon] || I.doc) : I.play)}<span>${esc(mediaLabel)}</span></div>${cap}<span class="clib-pv-t">✓✓</span></div>`;
       }
       if (s.channel === 'voice') return `<div class="clib-pv-msg"><div class="clib-pv-voice">${ic(I.mic)}<i></i><i></i><i></i><i></i>0:18</div><span class="clib-pv-t">✓✓</span></div>`;
       const t = s.text || s.prompt || '';
