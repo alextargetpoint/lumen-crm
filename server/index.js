@@ -4035,10 +4035,22 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       /* гибкий маппинг полей — интеграторы шлют по-разному */
       const pick = (...keys) => { for (const k of keys) { if (b[k] != null && String(b[k]).trim()) return String(b[k]).trim(); } return null; };
+      /* ТЕГИ ИЗ URL приёма: у каждого подрядчика/канала — своя ссылка (?src=meta&vendor=ct_xxx).
+         Так CRM знает, по какому источнику и какому подрядчику упал лид, даже если объявление ещё не синкнуто.
+         Query имеет приоритет над телом: ссылку задаёт владелец, тело — интегратор. */
+      const qSrc = (u.searchParams.get('src') || u.searchParams.get('source') || '').trim().toLowerCase() || null;
+      const qVendorId = (u.searchParams.get('vendor') || u.searchParams.get('contractor') || '').trim() || null;
+      const qVendor = qVendorId ? (db.mpContractors || []).find(c => c.id === qVendorId) : null;
+      const qVendorName = qVendor ? qVendor.name : (qVendorId || null);
       const name = pick('name', 'full_name', 'fullName', 'first_name', 'имя') || 'Без имени';
       const phone = pick('phone', 'phone_number', 'phoneNumber', 'tel', 'телефон');
       if (!phone) return json(res, 400, { error: 'phone required' });
       const adId = pick('ad_id', 'adId', 'ad', 'utm_content');
+      /* путь лида из интегратора напрямую (когда объявление ещё не синкнуто) — имена кампании/адсета/объявления */
+      const campaignName = pick('campaign_name', 'campaignName', 'campaign', 'utm_campaign');
+      const adsetName = pick('adset_name', 'set_name', 'ad_set_name', 'adsetName', 'adset', 'utm_medium');
+      const adName = pick('ad_name', 'adName', 'creative_name', 'creative', 'utm_content');
+      const adsFromBody = () => (adId || campaignName || adsetName || adName) ? { adId: adId || null, adsetId: pick('adset_id', 'adsetId') || null, campaignId: pick('campaign_id', 'campaignId') || null, formName: pick('form_name', 'form') || null, campaignName: campaignName || null, adsetName: adsetName || null, adName: adName || null } : null;
       const email = pick('email', 'e-mail', 'почта');
       const avatarUrl = pick('avatar_url', 'avatar', 'profile_pic');
       /* Meta-идентификаторы для CAPI-матчинга (дообучение алгоритма на качественных событиях) */
@@ -4066,23 +4078,26 @@ const server = http.createServer(async (req, res) => {
         lead.tags = [...new Set([...(lead.tags || []), 'повторная заявка'])];
         if (Object.keys(metaCap).length) lead.meta = Object.assign(lead.meta || {}, metaCap);
         if (Object.keys(customFields).length) lead.custom = Object.assign(lead.custom || {}, customFields);
-        if (adId && !(lead.ads && lead.ads.adId)) { lead.ads = { adId, adsetId: pick('adset_id'), campaignId: pick('campaign_id') }; matchAd(db, lead); }
+        if (qVendorId && !lead.vendorId) { lead.vendorId = qVendorId; if (qVendorName) lead.tags = [...new Set([...(lead.tags || []), qVendorName])]; }
+        if (qSrc && (!lead.source || lead.source === 'meta_form')) lead.source = qSrc;
+        if (!(lead.ads && (lead.ads.adId || lead.ads.campaignName))) { const a = adsFromBody(); if (a) { lead.ads = a; matchAd(db, lead); } }
         ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Повторная заявка: ${lead.name} — дубль не создан, карточка обогащена` });
       } else {
         lead = {
           id: store.nextId('ld'), name, phone,
           geo: pick('geo', 'direction') || db.settings.agency.geos[0],
           lang: pick('lang', 'language') || 'ru', tz: tzFromPhone(phone), stage: 'new', score: 0,
-          source: pick('source', 'src') || 'meta_form',
+          source: qSrc || pick('source', 'src') || 'meta_form',
+          vendorId: qVendorId || null,
           createdAt: Date.now(), lastMsgAt: null, lastDir: null,
           quals: { purpose: null, timeline: null, budget: null, type: null },
           ai: { enabled: true, chainStep: 0, nextTouchAt: Date.now() + 15e3, silentSince: null },
-          broker: null, summary: null, tags: ['интегратор'], numberId: null,
+          broker: null, summary: null, tags: ['интегратор'].concat(qVendorName ? [qVendorName] : []), numberId: null,
           meta: metaCap,
           avatarUrl: avatarUrl || null, activeChannel: 'wa',
           channels: { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: email ? 'yes' : 'unknown' },
           contacts: email ? [{ kind: 'email', value: email }] : [], notes: [], custom: customFields, transcripts: [],
-          ads: adId ? { adId, adsetId: pick('adset_id', 'adsetId'), campaignId: pick('campaign_id', 'campaignId'), formName: pick('form_name', 'form') } : null,
+          ads: adsFromBody(),
         };
         matchAd(db, lead);
         db.leads.push(lead);
@@ -5777,6 +5792,50 @@ const server = http.createServer(async (req, res) => {
       if (m[2] === 'contacts') lead.contacts = (b.contacts || []).slice(0, 20).map(c => ({ kind: String(c.kind || 'other').slice(0, 20), value: String(c.value || '').slice(0, 200) })).filter(c => c.value);
       store.save();
       return json(res, 200, { notes: lead.notes, contacts: lead.contacts });
+    }
+    /* ЗАПЛАНИРОВАТЬ по пожеланию клиента: отложенное сообщение (движок сам отправит) или напоминание брокеру о звонке.
+       at — абсолютный UTC-таймстамп, посчитанный на клиенте (знает и tz клиента, и tz брокера). */
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/schedule$/)) && req.method === 'POST') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req);
+      const kind = b.kind === 'call' ? 'call' : 'message';
+      const at = Number(b.at) || 0;
+      if (!at || at < Date.now() - 60000) return json(res, 400, { error: 'нужно будущее время' });
+      lead.scheduled = lead.scheduled || [];
+      const nameShort = (lead.name || 'клиент').split(' ')[0];
+      const whenTxt = String(b.when || '').slice(0, 60);
+      const atStr = new Date(at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      if (kind === 'message') {
+        const text = String(b.text || '').trim().slice(0, 2000);
+        if (!text) return json(res, 400, { error: 'пустое сообщение' });
+        const channel = ['wa', 'tg', 'viber', 'email'].includes(b.channel) ? b.channel : 'wa';
+        const item = { id: crypto.randomBytes(5).toString('hex'), kind: 'message', at, text, channel, status: 'pending', createdAt: Date.now() };
+        lead.scheduled.unshift(item);
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Запланировано сообщение клиенту ${lead.name} на ${atStr} (${channel.toUpperCase()})` });
+        store.save();
+        return json(res, 200, { ok: true, item });
+      } else {
+        /* напоминание о звонке = задача с дедлайном; всплывёт в «Сегодня» и уйдёт в Telegram владельцу при наступлении */
+        const remindAt = at - Math.min(15 * 60000, Math.max(0, at - Date.now())); /* за 15 мин, но не в прошлом */
+        const _d = new Date(at); const dstr = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+        const task = { id: crypto.randomBytes(5).toString('hex'), brokerId: lead.broker || null, title: `Позвонить: ${nameShort}${whenTxt ? ' — просил ' + whenTxt : ''}`, priority: 'p1', status: 'todo', due: at, scheduled: dstr, leadId: lead.id, meetingId: null, notes: String(b.note || '').slice(0, 300), createdAt: Date.now(), doneAt: null };
+        db.brokerTasks = db.brokerTasks || []; db.brokerTasks.unshift(task); db.brokerTasks = db.brokerTasks.slice(0, 1000);
+        const item = { id: crypto.randomBytes(5).toString('hex'), kind: 'call', at, remindAt, taskId: task.id, status: 'pending', notified: false, note: whenTxt, createdAt: Date.now() };
+        lead.scheduled.unshift(item);
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Напоминание о звонке ${lead.name} на ${atStr}${whenTxt ? ' (просил ' + whenTxt + ')' : ''}` });
+        store.save();
+        return json(res, 200, { ok: true, item, task });
+      }
+    }
+    if ((m = p.match(/^\/api\/leads\/([^/]+)\/schedule\/([a-f0-9]+)$/)) && req.method === 'DELETE') {
+      const lead = db.leads.find(l => l.id === m[1]);
+      if (!lead) return json(res, 404, { error: 'not found' });
+      const item = (lead.scheduled || []).find(s => s.id === m[2]);
+      if (item && item.taskId) db.brokerTasks = (db.brokerTasks || []).filter(t => t.id !== item.taskId);
+      lead.scheduled = (lead.scheduled || []).filter(s => s.id !== m[2]);
+      store.save();
+      return json(res, 200, { ok: true });
     }
     /* редактирование базовых полей лида из карточки (пробел: раньше телефон/имя/гео нельзя было изменить) */
     if ((m = p.match(/^\/api\/leads\/([^/]+)\/update$/)) && req.method === 'POST') {
@@ -9252,7 +9311,10 @@ ${SCR}
       const N2I = { 'czechia': 'CZ', 'чехия': 'CZ', 'switzerland': 'CH', 'швейцария': 'CH', 'finland': 'FI', 'финляндия': 'FI', 'sweden': 'SE', 'швеция': 'SE', 'denmark': 'DK', 'дания': 'DK', 'netherlands': 'NL', 'нидерланды': 'NL', 'belgium': 'BE', 'бельгия': 'BE', 'austria': 'AT', 'австрия': 'AT', 'poland': 'PL', 'польша': 'PL', 'portugal': 'PT', 'португалия': 'PT', 'greece': 'GR', 'греция': 'GR', 'ireland': 'IE', 'ирландия': 'IE', 'cyprus': 'CY', 'кипр': 'CY', 'malta': 'MT', 'мальта': 'MT', 'armenia': 'AM', 'армения': 'AM', 'georgia': 'GE', 'грузия': 'GE', 'azerbaijan': 'AZ', 'азербайджан': 'AZ', 'uzbekistan': 'UZ', 'узбекистан': 'UZ', 'belarus': 'BY', 'беларусь': 'BY', 'lithuania': 'LT', 'литва': 'LT', 'latvia': 'LV', 'латвия': 'LV', 'estonia': 'EE', 'эстония': 'EE', 'norway': 'NO', 'норвегия': 'NO' };
       const isoFlag = (code) => { const A = 0x1F1E6, b = 65; if (/^[A-Z]{2}$/.test(code)) return String.fromCodePoint(A + code.charCodeAt(0) - b, A + code.charCodeAt(1) - b); return ''; };
       const flag = (c) => { if (!c) return '🌐'; c = String(c).trim(); if (FMAP[c]) return FMAP[c]; for (const k of Object.keys(FMAP)) if (k.toLowerCase() === c.toLowerCase()) return FMAP[k]; const code = c.replace(/[^A-Za-z]/g, '').toUpperCase(); if (/^[A-Z]{2}$/.test(code)) return isoFlag(code); const iso = N2I[c.toLowerCase()]; return iso ? isoFlag(iso) : '🌐'; };
-      const canon = (c) => { if (!c) return ''; let s = String(c).trim(); if (s.length > 40) { const m = s.match(/^\s*([A-Za-z]{2})\b/); s = m ? m[1] : ''; if (!s) return 'Не определена'; } const al = { 'россия': 'Russia', 'рф': 'Russia', 'эмираты': 'UAE', 'оаэ': 'UAE', 'united arab emirates': 'UAE', 'usa': 'United States', 'us': 'United States', 'сша': 'United States', 'uk': 'United Kingdom', 'великобритания': 'United Kingdom' }; if (al[s.toLowerCase()]) return al[s.toLowerCase()]; return s.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '); };
+      /* ISO-2 → полное название (расшифровка кодов из лид-формы: "au"→"Australia"); Intl покрывает ВСЕ коды, ISO_NAME — наши переопределения (UAE, South Korea…) */
+      let REGION_DN = null; try { REGION_DN = new Intl.DisplayNames(['en'], { type: 'region' }); } catch (_) { }
+      const iso2name = (code) => { const up = String(code).toUpperCase(); if (ISO_NAME[up]) return ISO_NAME[up]; if (REGION_DN) { try { const n = REGION_DN.of(up); if (n && n !== up) return n; } catch (_) { } } return up; };
+      const canon = (c) => { if (!c) return ''; let s = String(c).trim(); if (s.length > 40) { const m = s.match(/^\s*([A-Za-z]{2})\b/); s = m ? m[1] : ''; if (!s) return 'Не определена'; } const al = { 'россия': 'Russia', 'рф': 'Russia', 'эмираты': 'UAE', 'оаэ': 'UAE', 'uae': 'UAE', 'united arab emirates': 'UAE', 'usa': 'United States', 'us': 'United States', 'сша': 'United States', 'uk': 'United Kingdom', 'великобритания': 'United Kingdom' }; if (al[s.toLowerCase()]) return al[s.toLowerCase()]; if (/^[A-Za-z]{2}$/.test(s)) return iso2name(s); return s.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '); };
       /* страна лида: доп-поле → phone dial-code (fallback) */
       const DIAL = [['971', 'AE'], ['966', 'SA'], ['380', 'UA'], ['995', 'GE'], ['994', 'AZ'], ['998', 'UZ'], ['375', 'BY'], ['352', 'LU'], ['351', 'PT'], ['357', 'CY'], ['356', 'MT'], ['420', 'CZ'], ['7', 'RU'], ['1', 'US'], ['44', 'GB'], ['34', 'ES'], ['49', 'DE'], ['33', 'FR'], ['39', 'IT'], ['90', 'TR'], ['66', 'TH'], ['62', 'ID'], ['91', 'IN'], ['61', 'AU'], ['81', 'JP'], ['82', 'KR'], ['86', 'CN'], ['65', 'SG'], ['852', 'HK'], ['48', 'PL'], ['30', 'GR'], ['353', 'IE'], ['31', 'NL'], ['32', 'BE'], ['41', 'CH'], ['43', 'AT'], ['46', 'SE'], ['47', 'NO'], ['45', 'DK'], ['358', 'FI'], ['972', 'IL'], ['974', 'QA'], ['968', 'OM'], ['973', 'BH'], ['965', 'KW'], ['20', 'EG']];
       const ISO_NAME = { AE: 'UAE', SA: 'Saudi Arabia', RU: 'Russia', US: 'United States', GB: 'United Kingdom', ES: 'Spain', DE: 'Germany', FR: 'France', IT: 'Italy', TR: 'Turkey', TH: 'Thailand', ID: 'Indonesia', IN: 'India', UA: 'Ukraine', GE: 'Georgia', AZ: 'Azerbaijan', UZ: 'Uzbekistan', BY: 'Belarus', KZ: 'Kazakhstan', AU: 'Australia', JP: 'Japan', KR: 'South Korea', CN: 'China', SG: 'Singapore', HK: 'Hong Kong', PL: 'Poland', GR: 'Greece', IE: 'Ireland', NL: 'Netherlands', BE: 'Belgium', CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', IL: 'Israel', QA: 'Qatar', OM: 'Oman', BH: 'Bahrain', KW: 'Kuwait', EG: 'Egypt', PT: 'Portugal', CY: 'Cyprus', MT: 'Malta', LU: 'Luxembourg', CZ: 'Czechia' };

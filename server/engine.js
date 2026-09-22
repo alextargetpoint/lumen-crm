@@ -952,6 +952,28 @@ function tickControl(db) {
   } catch (e) { console.error('[control]', e.message); }
 }
 
+/* отложенные действия по пожеланию клиента: сообщение отправляем сами; звонок — уведомляем брокера */
+function tickScheduled(db) {
+  const now = Date.now();
+  for (const lead of (db.leads || [])) {
+    if (!Array.isArray(lead.scheduled) || !lead.scheduled.length) continue;
+    for (const it of lead.scheduled) {
+      if (it.status !== 'pending') continue;
+      if (it.kind === 'message' && it.at <= now) {
+        try { send(db, lead, it.text, 'chain', { channel: it.channel || 'wa' }); it.status = 'sent'; it.sentAt = now; ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `Отложенное сообщение отправлено: ${lead.name}` }); }
+        catch (e) { it.status = 'error'; it.error = String(e.message || e).slice(0, 120); }
+      } else if (it.kind === 'call' && !it.notified && (it.remindAt || it.at) <= now) {
+        it.notified = true;
+        const atStr = new Date(it.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        try { sendReport(db, `📞 Не забудьте позвонить: ${lead.name} (${lead.phone || ''}) — ${atStr}${it.note ? ', просил ' + it.note : ''}`); } catch (_) {}
+        ai.pushEvent(db, { type: 'lead_new', leadId: lead.id, text: `⏰ Пора звонить ${lead.name}${it.note ? ' (просил ' + it.note + ')' : ''}` });
+      }
+    }
+    /* чистим отработавшие старше суток, чтобы не копить */
+    lead.scheduled = lead.scheduled.filter(it => it.status === 'pending' || (now - (it.sentAt || it.at)) < 86400000);
+  }
+}
+
 /* ---------- основной цикл ---------- */
 function startLoop() {
   setInterval(() => {
@@ -965,6 +987,7 @@ function startLoop() {
       tickReports(db);
       tickSimulator(db);
       tickControl(db);
+      tickScheduled(db);
       store.save();
     } catch (e) { console.error('[engine]', e); }
   }, 5000);

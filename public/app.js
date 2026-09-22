@@ -5114,6 +5114,171 @@ function openMeetingModal(lead, after) {
 
 
 /* тело панели «Психо-профиль и подход» лида */
+/* Умный разбор ответа лида про «как/когда связаться» (из лид-формы) → подсказка брокеру.
+   Анализируем поля time_to_contact/contact/preferred/comment: канал (email/whatsapp/звонок/telegram),
+   время (утро/вечер/конкретное), часовой пояс. Клиент часто пишет свободным текстом. */
+function analyzeContactPref(l) {
+  const c = l.custom || {};
+  const src = [c.time_to_contact, c.contact, c.contact_time, c.preferred, c.preferred_contact, c.time, c.comment, c['время для связи'], c['время']].filter(v => v && String(v).trim()).map(String);
+  if (!src.length) return null;
+  const s = src.join(' · ');
+  const low = s.toLowerCase();
+  let channel = '', chLabel = '';
+  if (/e-?mail|почт|мейл|на майл|по майл/i.test(low)) { channel = 'email'; chLabel = 'на E-mail'; }
+  else if (/whats\s?app|ватсап|вотсап|в вотс|в вацап|wa\b/i.test(low)) { channel = 'whatsapp'; chLabel = 'в WhatsApp'; }
+  else if (/telegram|телеграм|тг\b/i.test(low)) { channel = 'telegram'; chLabel = 'в Telegram'; }
+  else if (/позвон|перезвон|созвон|\bcall\b|по телефону|голосом|звонок/i.test(low)) { channel = 'call'; chLabel = 'звонком'; }
+  /* время */
+  let when = '';
+  const mRange = s.match(/(?:с|from)?\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:до|-|–|to)\s*(\d{1,2})(?:[:.](\d{2}))?/i);
+  const mAt = s.match(/(?:в|at|после|around|к)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|утра|вечера|дня|ночи)?/i);
+  const mHour = s.match(/\b(\d{1,2})[:.](\d{2})\b/);
+  if (mRange) when = `${mRange[1]}${mRange[2] ? ':' + mRange[2] : ''}–${mRange[3]}${mRange[4] ? ':' + mRange[4] : ''}`;
+  else if (mAt) when = `${mAt[1]}${mAt[2] ? ':' + mAt[2] : ''}${mAt[3] ? ' ' + mAt[3] : ''}`;
+  else if (mHour) when = mHour[0];
+  else if (/утр|morning/i.test(low)) when = 'утром';
+  else if (/вечер|evening|after ?work/i.test(low)) when = 'вечером';
+  else if (/днём|днем|midday|noon|обед/i.test(low)) when = 'днём';
+  else if (/night|ноч/i.test(low)) when = 'ночью';
+  /* часовой пояс */
+  let tz = '', offMin = null;
+  const mTz = s.match(/(?:gmt|utc)\s*([+-]?\s*\d{1,2})?|(?<![:\d])([+-]?\d{1,2})\s*(?:gmt|utc)|мск|msk|по москве|по мск/i);
+  if (mTz) {
+    tz = mTz[0].toUpperCase().replace('ПО МОСКВЕ', 'МСК').replace('ПО МСК', 'МСК');
+    if (/мск|msk/i.test(mTz[0])) offMin = 180;
+    else { const num = (mTz[1] || mTz[2] || '').replace(/\s/g, ''); if (num !== '') offMin = parseInt(num, 10) * 60; else offMin = 0; }
+  }
+  /* 24-часовое время цели (для точного расчёта): начало диапазона / указанный час / часть суток */
+  let hh = null, mm = 0;
+  if (mRange) { hh = parseInt(mRange[1], 10); mm = mRange[2] ? parseInt(mRange[2], 10) : 0; }
+  else if (mAt) { hh = parseInt(mAt[1], 10); mm = mAt[2] ? parseInt(mAt[2], 10) : 0; const suf = (mAt[3] || '').toLowerCase(); if (/pm|вечера|дня/.test(suf) && hh < 12) hh += 12; if (/am|утра/.test(suf) && hh === 12) hh = 0; }
+  else if (mHour) { hh = parseInt(mHour[1], 10); mm = parseInt(mHour[2], 10); }
+  else if (/утр|morning/i.test(low)) hh = 10;
+  else if (/вечер|evening|after ?work/i.test(low)) hh = 18;
+  else if (/днём|днем|midday|noon|обед/i.test(low)) hh = 14;
+  else if (/night|ноч/i.test(low)) hh = 21;
+  if (hh != null) { hh = Math.max(0, Math.min(23, hh)); mm = Math.max(0, Math.min(59, mm || 0)); }
+  const signal = !!(channel || when || tz);
+  return signal ? { raw: s, channel, chLabel, when, tz, hh, mm, offMin } : null;
+}
+/* ── ДВИЖОК ЧАСОВЫХ ПОЯСОВ: страна → зона → смещение (с учётом DST через Intl) ── */
+const COUNTRY_ZONE = { AE: 'Asia/Dubai', UAE: 'Asia/Dubai', SA: 'Asia/Riyadh', QA: 'Asia/Qatar', KW: 'Asia/Kuwait', BH: 'Asia/Bahrain', OM: 'Asia/Muscat', RU: 'Europe/Moscow', US: 'America/New_York', GB: 'Europe/London', UK: 'Europe/London', ES: 'Europe/Madrid', DE: 'Europe/Berlin', FR: 'Europe/Paris', IT: 'Europe/Rome', PT: 'Europe/Lisbon', NL: 'Europe/Amsterdam', BE: 'Europe/Brussels', CH: 'Europe/Zurich', AT: 'Europe/Vienna', SE: 'Europe/Stockholm', NO: 'Europe/Oslo', DK: 'Europe/Copenhagen', FI: 'Europe/Helsinki', PL: 'Europe/Warsaw', GR: 'Europe/Athens', IE: 'Europe/Dublin', CZ: 'Europe/Prague', RO: 'Europe/Bucharest', BG: 'Europe/Sofia', HU: 'Europe/Budapest', SI: 'Europe/Ljubljana', HR: 'Europe/Zagreb', CY: 'Asia/Nicosia', MT: 'Europe/Malta', TR: 'Europe/Istanbul', UA: 'Europe/Kyiv', BY: 'Europe/Minsk', GE: 'Asia/Tbilisi', AM: 'Asia/Yerevan', AZ: 'Asia/Baku', KZ: 'Asia/Almaty', UZ: 'Asia/Tashkent', IL: 'Asia/Jerusalem', EG: 'Africa/Cairo', IN: 'Asia/Kolkata', TH: 'Asia/Bangkok', ID: 'Asia/Jakarta', SG: 'Asia/Singapore', HK: 'Asia/Hong_Kong', CN: 'Asia/Shanghai', JP: 'Asia/Tokyo', KR: 'Asia/Seoul', AU: 'Australia/Sydney', CA: 'America/Toronto', BR: 'America/Sao_Paulo', MX: 'America/Mexico_City', LU: 'Europe/Luxembourg' };
+const COUNTRY_NAME2ISO = { 'россия': 'RU', 'russia': 'RU', 'рф': 'RU', 'оаэ': 'AE', 'эмираты': 'AE', 'uae': 'AE', 'united arab emirates': 'AE', 'сша': 'US', 'usa': 'US', 'united states': 'US', 'великобритания': 'GB', 'uk': 'GB', 'united kingdom': 'GB', 'испания': 'ES', 'spain': 'ES', 'германия': 'DE', 'germany': 'DE', 'франция': 'FR', 'france': 'FR', 'италия': 'IT', 'italy': 'IT', 'таиланд': 'TH', 'thailand': 'TH', 'индия': 'IN', 'india': 'IN', 'турция': 'TR', 'turkey': 'TR', 'австралия': 'AU', 'australia': 'AU', 'украина': 'UA', 'ukraine': 'UA', 'казахстан': 'KZ', 'грузия': 'GE', 'georgia': 'GE', 'индонезия': 'ID', 'indonesia': 'ID', 'сингапур': 'SG', 'канада': 'CA', 'canada': 'CA', 'кипр': 'CY', 'cyprus': 'CY', 'португалия': 'PT', 'нидерланды': 'NL', 'швейцария': 'CH', 'ирландия': 'IE', 'греция': 'GR', 'румыния': 'RO', 'romania': 'RO', 'болгария': 'BG', 'венгрия': 'HU', 'словения': 'SI', 'мальта': 'MT', 'malta': 'MT', 'израиль': 'IL', 'egypt': 'EG', 'египет': 'EG', 'катар': 'QA', 'qatar': 'QA', 'саудовская аравия': 'SA' };
+function countryToIso(c) { if (!c) return null; let s = String(c).trim(); if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase(); const key = s.toLowerCase(); if (COUNTRY_NAME2ISO[key]) return COUNTRY_NAME2ISO[key]; if (s.length > 40) { const mm = s.match(/^\s*([A-Za-z]{2})\b/); if (mm) return mm[1].toUpperCase(); } return null; }
+function zoneOffsetMin(zone) { try { const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(new Date()); const tzn = (parts.find(p => p.type === 'timeZoneName') || {}).value || ''; const mm = tzn.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/); if (mm) { const sign = mm[1] === '-' ? -1 : 1; return sign * (parseInt(mm[2], 10) * 60 + (mm[3] ? parseInt(mm[3], 10) : 0)); } if (/GMT|UTC/.test(tzn)) return 0; } catch (_) { } return null; }
+function countryOffsetMin(c) { const iso = countryToIso(c); if (!iso) return null; const zone = COUNTRY_ZONE[iso]; return zone ? zoneOffsetMin(zone) : null; }
+function gmtLabel(offMin) { if (offMin == null) return ''; const h = offMin / 60; return 'GMT' + (h >= 0 ? '+' : '') + (Number.isInteger(h) ? h : h.toFixed(1)); }
+/* следующий момент, когда в поясе клиента (offMin — смещение к востоку от UTC) настанет hh:mm */
+function nextLocalUTC(hh, mm, offMin) { const nowClient = new Date(Date.now() + offMin * 60000); const y = nowClient.getUTCFullYear(), mo = nowClient.getUTCMonth(), d = nowClient.getUTCDate(); let t = Date.UTC(y, mo, d, hh, mm) - offMin * 60000; if (t <= Date.now() + 60000) t += 86400000; return t; }
+/* полный план по пожеланию клиента: пояс (ответ→страна формы→страна лида→код телефона) + абсолютное время + локальное время брокера */
+function resolveContactPlan(l) {
+  const p = analyzeContactPref(l); if (!p) return null;
+  let offMin = null, tzSource = '';
+  if (p.offMin != null) { offMin = p.offMin; tzSource = 'из ответа клиента'; }
+  if (offMin == null) { const cf = l.custom || {}; const co = cf.country || cf['страна'] || cf.Country || ''; const o = countryOffsetMin(co); if (o != null) { offMin = o; tzSource = 'по стране из формы'; } }
+  if (offMin == null && l.country) { const o = countryOffsetMin(l.country); if (o != null) { offMin = o; tzSource = 'по стране лида'; } }
+  if (offMin == null && typeof l.tz === 'number') { offMin = l.tz * 60; tzSource = 'по коду телефона'; }
+  let targetUTC = null, brokerLocal = '', brokerOffMin = -new Date().getTimezoneOffset();
+  if (p.hh != null && offMin != null) { targetUTC = nextLocalUTC(p.hh, p.mm || 0, offMin); brokerLocal = new Date(targetUTC).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+  return Object.assign({}, p, { offMin, tzSource, targetUTC, brokerLocal, clientTzLabel: offMin != null ? gmtLabel(offMin) : (p.tz || ''), sameTz: offMin != null && offMin === brokerOffMin });
+}
+/* КАРТОЧКА ЗАЯВКИ — фото + вопросы/ответы из формы + путь из рекламы + просьба клиента с движком времени.
+   Общая для карточки лида и панели «Диалоги». Всегда наверху ленты (вне фильтров). */
+function buildIntakeCard(l) {
+  const cf = l.custom || {};
+  const defs = (STATE.settings.customFields || []);
+  const FL = { country: 'Страна', comment: 'Комментарий', purpose: 'Цель', budget: 'Бюджет', timeline: 'Срок', type: 'Тип объекта', rooms: 'Комнатность', time_to_contact: 'Время для связи', city: 'Город', email: 'E-mail' };
+  const labelOf = k => (defs.find(f => f.key === k) || {}).label || FL[k] || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
+  const HIDE = ['time_to_contact', 'contact', 'contact_time', 'time', 'when', 'preferred', 'preferred_contact'];
+  const entries = Object.entries(cf).filter(([k, v]) => v != null && String(v).trim() && !HIDE.includes(k.toLowerCase()));
+  const adPath = l.ads && (l.ads.adName || l.ads.campaignName) ? [l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') : '';
+  const plan = resolveContactPlan(l);
+  const fromForm = ['meta_form', 'ctwa', 'landing', 'meta', 'google', 'tiktok', 'yandex', 'avito'].includes(l.source) || (l.tags || []).includes('интегратор');
+  const sched = (l.scheduled || []).filter(s => s.status === 'pending');
+  if (!entries.length && !adPath && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
+  const initials = esc((l.name || 'К').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'К');
+  const photo = l.avatarUrl ? `<img class="lc-ik-ph" src="${esc(l.avatarUrl)}" alt="">` : `<span class="lc-ik-ph empty">${initials}</span>`;
+  const showVal = (k, v) => { const s = String(v); if (/country|стран/i.test(k) && /^[A-Za-z]{2}$/.test(s.trim())) { try { const n = new Intl.DisplayNames(['ru'], { type: 'region' }).of(s.trim().toUpperCase()); if (n && n !== s.trim().toUpperCase()) return n; } catch (_) { } } return s.slice(0, 220); };
+  const qa = entries.length ? `<div class="lc-ik-qa">${entries.map(([k, v]) => `<div><i>${esc(labelOf(k))}</i><b>${esc(showVal(k, v))}</b></div>`).join('')}</div>` : '';
+  const hasEmail = (l.contacts || []).some(c => c.kind === 'email') || !!l.email;
+  let prefRow = '';
+  if (plan) {
+    const line = [plan.chLabel ? 'связаться ' + plan.chLabel : '', plan.when ? 'в ' + plan.when : ''].filter(Boolean).join(' · ');
+    const tzTxt = plan.clientTzLabel ? `${plan.clientTzLabel}${plan.tzSource ? ' · ' + plan.tzSource : ''}` : '';
+    const brokerTxt = plan.targetUTC && !plan.sameTz ? `<div class="lc-ik-when">${ic(I.clock)}У вас это <b>${esc(plan.brokerLocal)}</b>${tzTxt ? ` <span>(клиент ${esc(tzTxt)})</span>` : ''}</div>`
+      : plan.targetUTC ? `<div class="lc-ik-when">${ic(I.clock)}Время <b>${esc(plan.brokerLocal)}</b>${tzTxt ? ` <span>(${esc(tzTxt)})</span>` : ''}</div>`
+      : (tzTxt ? `<div class="lc-ik-when muted">${ic(I.clock)}Пояс клиента: ${esc(tzTxt)} — точное время не распознано</div>` : '');
+    const isCall = plan.channel === 'call' || !plan.channel;
+    const acts = [];
+    if (plan.channel === 'email' && hasEmail) acts.push(`<button class="btn btn-sm" data-cprefemail>${ic(I.doc)}E-mail</button>`);
+    acts.push(`<button class="btn btn-sm ${isCall ? 'btn-accent' : ''}" data-plancall title="Напоминание брокеру подготовиться и позвонить в это время">${ic(I.phone)}Напомнить о звонке</button>`);
+    acts.push(`<button class="btn btn-sm ${isCall ? '' : 'btn-accent'}" data-planmsg title="Запланировать отправку сообщения в это время — уйдёт автоматически">${ic(I.send)}Отложить сообщение</button>`);
+    prefRow = `<div class="lc-ik-pref"><div class="lc-ik-pref-hd">${ic(I.spark)}<b>Просьба клиента${line ? ': ' + esc(line) : ' по времени/каналу'}</b></div><i class="lc-ik-pref-q">«${esc(plan.raw.slice(0, 140))}»</i>${brokerTxt}<div class="lc-ik-pref-acts">${acts.join('')}</div></div>`;
+  }
+  const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
+  return `<div class="lc-intake">
+    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
+    ${adPath ? `<div class="lc-ik-ad">${ic(I.image)}<span>${esc(adPath)}</span></div>` : ''}
+    ${qa || (adPath || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
+    ${prefRow}
+    ${schedRow}
+  </div>`;
+}
+/* обработчики карточки заявки — общие для карточки лида и панели «Диалоги» (scope — контейнер, done — колбэк после изменения) */
+function wireIntakeCard(scope, l, done) {
+  if (!scope) return;
+  $('[data-cprefemail]', scope)?.addEventListener('click', () => { const em = ((l.contacts || []).find(c => c.kind === 'email') || {}).value || l.email || ''; if (em) window.open('mailto:' + em, '_blank'); else toast('E-mail не найден', 'В карточке нет адреса', false); });
+  $('[data-plancall]', scope)?.addEventListener('click', () => scheduleCall(l, done));
+  $('[data-planmsg]', scope)?.addEventListener('click', () => openScheduleMessage(l, done));
+  $$('[data-schedcancel]', scope).forEach(b => b.addEventListener('click', async () => { try { await api.del(`/leads/${l.id}/schedule/${b.dataset.schedcancel}`); toast('Отменено', null, true); done && done(); } catch (e) { toast('Не вышло', e.message); } }));
+}
+/* напоминание о звонке: считаем момент по поясу клиента, ставим задачу+уведомление */
+async function scheduleCall(l, done) {
+  const plan = resolveContactPlan(l);
+  let at = plan && plan.targetUTC ? plan.targetUTC : null;
+  const localDefault = at ? new Date(at - new Date(at).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : new Date(Date.now() + 3600000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  modal({
+    title: 'Напоминание о звонке',
+    sub: plan && plan.brokerLocal ? `Клиент просил ${plan.chLabel || 'связаться'}${plan.when ? ' ' + plan.when : ''} — у вас это ${plan.brokerLocal}` : 'Когда напомнить позвонить',
+    body: `<div class="form-row"><label>Позвонить в (ваше локальное время)</label><input type="datetime-local" id="scWhen" value="${localDefault}"></div>
+      <div class="muted" style="font-size:11px;line-height:1.5">Придёт уведомление за ~15 мин: «Не забудьте позвонить». Задача появится в «Сегодня».${plan && plan.tzSource ? ` Пояс клиента определён ${esc(plan.tzSource)}.` : ''}</div>`,
+    actions: [
+      { label: 'Поставить напоминание', cls: 'btn-accent', onClick: async (b) => {
+        const v = $('#scWhen', b).value; if (!v) { toast('Укажите время'); return false; }
+        const ts = new Date(v).getTime();
+        try { await api.post(`/leads/${l.id}/schedule`, { kind: 'call', at: ts, when: plan ? (plan.when || plan.chLabel || '') : '', note: plan ? plan.raw.slice(0, 120) : '' }); toast('Напоминание поставлено', 'Придёт до звонка', true); done && done(); } catch (e) { toast('Не вышло', e.message); return false; }
+      } },
+      { label: 'Отмена' },
+    ],
+  });
+}
+/* отложенная отправка сообщения: текст + время (по поясу клиента) + канал → сервер отправит сам */
+async function openScheduleMessage(l, done) {
+  const plan = resolveContactPlan(l);
+  let at = plan && plan.targetUTC ? plan.targetUTC : Date.now() + 3600000;
+  const localDefault = new Date(at - new Date(at).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const first = (l.name || '').split(' ')[0] || '';
+  const preset = `Здравствуйте, ${first}! Пишу по вашей заявке${l.ads && l.ads.adName ? ' по «' + l.ads.adName + '»' : ''}. Подскажите, вам удобно сейчас пообщаться?`;
+  const chMap = [['wa', 'WhatsApp'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']];
+  const defCh = plan && plan.channel === 'telegram' ? 'tg' : plan && plan.channel === 'email' ? 'email' : 'wa';
+  modal({
+    title: 'Отложенное сообщение',
+    sub: plan && plan.brokerLocal ? `Клиент просил написать${plan.when ? ' ' + plan.when : ''} — у вас это ${plan.brokerLocal}` : 'Уйдёт автоматически в заданное время',
+    body: `<div class="form-row"><label>Текст сообщения</label><textarea id="smText" style="min-height:96px">${esc(preset)}</textarea></div>
+      <div class="form-row"><label>Отправить в (ваше локальное время)</label><input type="datetime-local" id="smWhen" value="${localDefault}"></div>
+      <div class="form-row"><label>Канал</label><select id="smCh">${chMap.map(([k, n]) => `<option value="${k}" ${k === defCh ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="muted" style="font-size:11px;line-height:1.5">Движок отправит сообщение сам в указанный момент.${plan && plan.tzSource ? ` Пояс клиента определён ${esc(plan.tzSource)}.` : ''}</div>`,
+    actions: [
+      { label: 'Запланировать', cls: 'btn-accent', onClick: async (b) => {
+        const text = $('#smText', b).value.trim(); const v = $('#smWhen', b).value; const channel = $('#smCh', b).value;
+        if (!text) { toast('Пустое сообщение'); return false; }
+        if (!v) { toast('Укажите время'); return false; }
+        try { await api.post(`/leads/${l.id}/schedule`, { kind: 'message', at: new Date(v).getTime(), text, channel }); toast('Сообщение запланировано', 'Уйдёт автоматически', true); done && done(); } catch (e) { toast('Не вышло', e.message); return false; }
+      } },
+      { label: 'Отмена' },
+    ],
+  });
+}
 /* чипы персонализации первого касания — что ИИ учтёт */
 function ftChipsHtml(l) {
   const chips = [];
@@ -5292,6 +5457,8 @@ async function openLeadModal(id) {
         ? `<button class="tl-old-btn" id="tlMore">Показать ранние · ${timeline.length - TL_SHOW}</button><div class="tl-old" style="display:none">${timeline.slice(TL_SHOW).map(tlItem).join('')}</div>`
         : '')
     : '<div class="empty">Хронология пуста</div>';
+  const intakeCardHtml = buildIntakeCard(l);
+
   const bd = modal({
     title: l.name,
     sub: `<span class="lp-phone" id="lcPhone" title="Скопировать">${esc(l.phone)}</span> · ${l.geoName} · источник: ${l.source} · создан ${ago(l.createdAt)}`,
@@ -5331,6 +5498,7 @@ async function openLeadModal(id) {
             <button class="btn btn-sm" id="lcDial" title="Позвонить через телефонию — Twilio соединит вас с лидом, запись и транскрипт лягут в карточку">${ic(I.phone)}Позвонить</button>
             <input type="file" id="lcCallFile" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.webm" style="display:none">
           </div>
+          ${intakeCardHtml}
           <div class="lc-filters">
             <button class="btn btn-sm lc-f active" data-f="all">Всё</button>
             <button class="btn btn-sm lc-f" data-f="msg">Переписка</button>
@@ -5382,7 +5550,7 @@ async function openLeadModal(id) {
             <input id="lcNaDate" type="date" value="${l.nextAction && l.nextAction.at ? (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(l.nextAction.at)) : ''}" style="width:150px;flex:0 0 150px">
             <button class="btn btn-sm" id="lcNaSave">${ic(I.check)}</button>
           </div>
-          ${l.ads && l.ads.adId ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) : 'ad_id ' + esc(l.ads.adId)}</div>` : ''}
+          ${l.ads && (l.ads.adId || l.ads.campaignName || l.ads.adName) ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${esc([l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') || ('ad_id ' + (l.ads.adId || '—')))}${l.ads.adId && !l.ads.matched ? ' <span>· не в базе (путь из интегратора)</span>' : ''}</div>` : ''}
           <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
           <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
           ${coll('Свои поля', `
@@ -5472,6 +5640,8 @@ async function openLeadModal(id) {
     await api.patch('/leads/' + l.id, { nextAction: { text: $('#lcNaText', bd).value, at: dt ? new Date(dt + 'T10:00').getTime() : null } });
     openLeadModal(id);
   });
+  /* карточка заявки: просьба клиента → отложенное сообщение / напоминание о звонке / отмена запланированного */
+  wireIntakeCard(bd, l, () => openLeadModal(id));
   $('#cfGear', bd)?.addEventListener('click', () => { const ed = $('#cfEditor', bd); ed.style.display = ed.style.display === 'none' ? '' : 'none'; });
   $('#cfNewAdd', bd)?.addEventListener('click', () => {
     const nm = $('#cfNewName', bd).value.trim();
@@ -5911,6 +6081,7 @@ async function renderChat(id, rebuild) {
       return `<span class="ch-pill ${st}" title="${n}: ${st === 'yes' ? 'есть' : st === 'no' ? 'нет' : 'не проверен'}">${n}</span>`;
     }).join('')}${l.activeChannel && l.activeChannel !== 'wa' ? `<span class="mini-badge warn">активен: ${{ tg: 'Telegram', viber: 'Viber', email: 'E-mail' }[l.activeChannel]}</span>` : ''}</div>
     ${l.source === "ad_comment" ? `<div class="lp-ad" style="background:#FFF0E4;color:#C05B18">${ic(I.chat)}Лид из комментария под рекламой${l.social && l.social.username ? " · @" + esc(l.social.username) : ""}</div>` : ""}${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
+    ${buildIntakeCard(l)}
     <div style="margin:14px 0 10px">${primary}</div>
     ${l.hint ? `<div class="lc-hint ${l.hint.kind}" style="margin-bottom:10px">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
     <div class="lp-sec">Быстрые действия</div>
@@ -5950,6 +6121,7 @@ async function renderChat(id, rebuild) {
   $('#lpNoteBtn').addEventListener('click', addNote);
   lpNote.addEventListener('keydown', (e) => { if (e.key === 'Enter') addNote(); });
   $('#lpOpenCard').addEventListener('click', () => openLeadModal(id));
+  wireIntakeCard(panel, l, () => renderChat(id, true));
   const cp = $('#copyPhone');
   if (cp) cp.addEventListener('click', () => { navigator.clipboard.writeText(l.phone); toast('Телефон скопирован', null, true); });
   $('#aiToggle').addEventListener('change', async (e) => { const chatEl = document.querySelector('.chat'); if (chatEl) chatEl.classList.toggle('ai-live', e.target.checked); await api.patch('/leads/' + id, { ai: { enabled: e.target.checked } }); renderChat(id, false); });
@@ -8574,6 +8746,15 @@ PAGES.ads = async (root) => {
           <div class="form-row" style="margin-top:12px"><label>Webhook приёма (Meta Lead Form → интегратор → сюда, POST JSON)</label>
             <div style="display:flex;gap:8px;align-items:center"><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${hookUrl}</code>
             <button class="btn btn-sm" id="copyHook">${ic(I.copy)}</button></div></div>
+          <div class="hook-tag">
+            <div class="hook-tag-hd">${ic(I.link)}Своя ссылка на подрядчика и канал<span>чтобы CRM знала, кто и откуда прислал лид</span></div>
+            <div class="muted" style="font-size:11px;line-height:1.55;margin:2px 0 9px">Один вебхук — общий. Чтобы различать источники, дай <b>каждому подрядчику и каналу свою ссылку</b>: выбери ниже — получишь ссылку с метками <code>src</code> и <code>vendor</code>. Именно её вставь в его Albato. Канал/подрядчик проставятся автоматически, даже если объявление ещё не синкнуто.</div>
+            <div class="hook-tag-row">
+              <label>Канал<select id="hookSrc"><option value="">— не метить —</option><option value="meta">Meta</option><option value="google">Google</option><option value="tiktok">TikTok</option><option value="yandex">Яндекс</option><option value="avito">Авито</option><option value="other">Другое</option></select></label>
+              <label>Подрядчик<select id="hookVendor"><option value="">— не метить —</option></select></label>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:9px"><code class="pill" id="hookTagUrl" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${hookUrl}</code><button class="btn btn-sm btn-accent" id="copyHookTag">${ic(I.copy)}</button></div>
+          </div>
           <div class="muted" style="font-size:11.8px;line-height:1.6;margin:4px 0 10px">
             Поля (гибкий маппинг): <b>name</b>, <b>phone</b> (обязательно), geo, source, <b>ad_id</b>, adset_id, campaign_id, form_name.
             Дубли по телефону не создаются — карточка обогащается. Лид с ad_id мэтчится на базу объявлений автоматически.
@@ -8691,6 +8872,15 @@ PAGES.ads = async (root) => {
     } catch (e) { st.textContent = ''; toast('Не загрузилось', e.message); }
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
+  /* --- Генератор ссылки с метками подрядчик+канал (?src=&vendor=) --- */
+  (async () => {
+    const vSel = $('#hookVendor'), sSel = $('#hookSrc'), out = $('#hookTagUrl');
+    if (!vSel || !sSel || !out) return;
+    try { const cs = await api.get('/contractors'); vSel.innerHTML = '<option value="">— не метить —</option>' + (cs || []).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join(''); } catch (_) {}
+    const rebuild = () => { const q = []; if (sSel.value) q.push('src=' + encodeURIComponent(sSel.value)); if (vSel.value) q.push('vendor=' + encodeURIComponent(vSel.value)); out.textContent = hookUrl + (q.length ? '&' + q.join('&') : ''); };
+    sSel.addEventListener('change', rebuild); vSel.addEventListener('change', rebuild); rebuild();
+    $('#copyHookTag')?.addEventListener('click', () => { navigator.clipboard.writeText(out.textContent); toast('Ссылка скопирована', sSel.value || vSel.value ? 'С метками канала/подрядчика — вставь её в Albato этого подрядчика' : 'Общая ссылка без меток', true); });
+  })();
   /* --- Генератор маппинга для интегратора (JSON тело + cURL) --- */
   const MAP_TOK = { name: '{{full_name}}', phone: '{{phone_number}}', email: '{{email}}', lead_id: '{{lead_id}}', ad_id: '{{ad_id}}', adset_id: '{{adset_id}}', campaign_id: '{{campaign_id}}', form_name: '{{form_name}}', source: 'meta_form', geo: '' };
   const MAP_VALS = { name: 'Тест Тестов', phone: '+79001234567', email: 'test@example.com', lead_id: 'l:1200000000000000', ad_id: '120210000000000000', adset_id: '6100000000000', campaign_id: '2380000000000', form_name: 'Заявка · сайт', source: 'meta_form', geo: 'dubai' };
@@ -11265,7 +11455,7 @@ function openQuickTask(lead) {
   let pri = 'p3', dueMs = null;
   const bd = modal({
     title: 'Задача по лиду', sub: `${esc(lead.name || '—')}${lead.geoName || lead.geo ? ' · ' + esc(lead.geoName || lead.geo) : ''}`,
-    body: `<div class="form-row"><label>Что сделать</label><input id="qtTitle" placeholder="перезвонить, отправить подборку, подготовить договор…"></div>
+    body: `<div class="form-row"><label>Что сделать</label><input id="qtTitle" value="${esc(lead.presetText || '')}" placeholder="перезвонить, отправить подборку, подготовить договор…"></div>
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px">
         <div class="tk-cap-pri" id="qtPri">${Object.entries(TPRI).map(([k, v]) => `<button class="tk-pdot ${k === 'p3' ? 'on' : ''}" data-np="${k}" style="--pc:${v.c}" title="${v.n}"></button>`).join('')}</div>
         <button class="btn btn-sm" id="qtDue">${ic(I.cal)}Срок</button><span class="muted" id="qtDueLbl" style="font-size:12px"></span>
