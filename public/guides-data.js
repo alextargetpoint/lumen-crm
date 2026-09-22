@@ -258,13 +258,13 @@ GUIDES['meta-inbound'] = {
       ['App Secret', 'Настройки приложения → «Основные» → App Secret. Им Meta подписывает входящие — он общий для приложения (тот же, что для WhatsApp).'],
     ] },
     { badge: 'Шаг 4 · Вебхук и поля', steps: [
-      ['Возьмите Callback URL и Verify token в Lumen', 'Lumen → Подключения → карточка «Instagram и Facebook» → скопируйте <b>Callback URL</b> и <b>Verify token</b> (это тот же вебхук, что у WhatsApp).'],
+      ['Возьмите Callback URL и Verify token в Lumen', 'Lumen → Номера → карточка «Instagram и Facebook» (рядом с «Вебхук официального WhatsApp») → скопируйте <b>Callback URL</b> и <b>Verify token</b> (это тот же вебхук, что у WhatsApp).'],
       ['Вставьте в Meta', 'Приложение Meta → Webhooks → выберите объект и вставьте Callback URL + Verify token → «Проверить и сохранить».'],
       ['Подпишите поля Instagram', 'Объект Instagram → подпишите <b>messages</b> (Директ) и <b>comments</b> (комментарии).'],
       ['Подпишите поле Страницы', 'Объект Page → подпишите <b>feed</b> (это и есть комментарии под постами и рекламой Facebook).'],
     ] },
     { badge: 'Шаг 5 · Вставить в Lumen', steps: [
-      ['Откройте карточку Meta', 'Lumen → Подключения → «Instagram и Facebook — Директ и комментарии».'],
+      ['Откройте карточку Meta', 'Lumen → Номера → «Instagram и Facebook — Директ и комментарии».'],
       ['Instagram', 'Вставьте Instagram access token + Instagram account ID, включите тумблер «Instagram-канал».'],
       ['Facebook', 'Вставьте Page access token + Page ID, включите тумблер «Facebook-страница».'],
       ['Сохранить', 'Кнопка «Сохранить подключение Meta». Статус в карточке сменится с «демо» на «подключён».'],

@@ -7564,27 +7564,6 @@ PAGES.automations = async (root) => {
           <div class="muted" style="font-size:11px;margin-top:6px">Viber BSP (Infobip/360dialog) = официальные холодные персональные касания по номерам (аналог WA Cloud API): платно, нужна бизнес-верификация и consent. ⛔ Рассылки не делаем. Серого Viber (как WA/TG) нет.</div>
           <button class="btn" id="chSave">Сохранить каскад</button>
         </div>
-        <div class="glass card mb" data-ag="meta">
-          <div class="card-title">${ic(I.chat)}Instagram и Facebook — Директ и комментарии<span class="sub">входящие DM + комментарии под рекламой → карточки лидов</span></div>
-          <div class="lc-hint info" style="margin-bottom:10px">${ic(I.shield)}<span>Один вебхук на все каналы Meta. В Meta App → <b>Webhooks</b> вставьте Callback URL и Verify token ниже и подпишите поля: <b>messages</b> (Директ Instagram), <b>comments</b> (комментарии Instagram), <b>feed</b> (комментарии Facebook-страницы). Пошагово — <a href="/help/meta-inbound" target="_blank" rel="noopener">в справочнике →</a></span></div>
-          <div class="form-row"><label>Callback URL (вебхук)</label><div class="tc-copy" data-copy="${(s.tunnelUrl || location.origin)}/wa/webhook" style="cursor:pointer"><code style="word-break:break-all">${(s.tunnelUrl || location.origin)}/wa/webhook</code>${ic(I.copy || I.doc)}</div></div>
-          <div class="form-row"><label>Verify token</label><div class="tc-copy" data-copy="${esc((s.wa && s.wa.webhookVerifyToken) || 'lumen-verify')}" style="cursor:pointer"><code>${esc((s.wa && s.wa.webhookVerifyToken) || 'lumen-verify')}</code>${ic(I.copy || I.doc)}</div></div>
-          <div style="height:1px;background:var(--stroke);margin:12px 0"></div>
-          <div class="sl" style="font-weight:700;margin-bottom:8px">Instagram — Директ и комментарии</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Instagram access token</label><input id="igTok" type="password" placeholder="${((s.social || {}).ig || {}).tokenSet ? '•••••• сохранён' : 'токен (instagram_manage_messages/comments)'}"></div>
-            <div class="form-row"><label>Instagram account ID</label><input id="igId" value="${esc(((s.social || {}).ig || {}).igId || '')}" placeholder="напр. 17841400000000000"></div>
-          </div>
-          <div class="set-row"><div class="sp"><div class="sl">Включить Instagram-канал</div><div class="sd">Входящие Директ-сообщения и комментарии станут создавать карточки лидов и отвечаться из CRM</div></div><label class="switch"><input type="checkbox" id="igEn" ${((s.social || {}).ig || {}).enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-          <div class="sl" style="font-weight:700;margin:14px 0 8px">Facebook-страница — комментарии</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div class="form-row"><label>Page access token</label><input id="fbTok" type="password" placeholder="${((s.social || {}).fb || {}).tokenSet ? '•••••• сохранён' : 'токен страницы (pages_manage_engagement)'}"></div>
-            <div class="form-row"><label>Page ID</label><input id="fbId" value="${esc(((s.social || {}).fb || {}).pageId || '')}" placeholder="ID Facebook-страницы"></div>
-          </div>
-          <div class="set-row"><div class="sp"><div class="sl">Включить Facebook-страницу</div><div class="sd">Комментарии под постами/рекламой Страницы попадут в раздел «Комментарии»</div></div><label class="switch"><input type="checkbox" id="fbEn" ${((s.social || {}).fb || {}).enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
-          <button class="btn" id="metaSave" style="margin-top:12px">Сохранить подключение Meta</button>
-          <div class="muted" style="font-size:11px;margin-top:8px">Статус: Instagram — ${(((s.social || {}).ig || {}).enabled && ((s.social || {}).ig || {}).tokenSet) ? '<b style="color:var(--ok)">подключён</b>' : 'демо'} · Facebook — ${(((s.social || {}).fb || {}).enabled && ((s.social || {}).fb || {}).tokenSet) ? '<b style="color:var(--ok)">подключён</b>' : 'демо'}. App Secret (проверка подписи) — общий из WhatsApp Cloud API (одно приложение Meta).</div>
-        </div>
         <div class="glass card mb" data-ag="meet">
           <div class="card-title">${ic(I.cal)}Встречи</div>
           ${swRow('Цепочка напоминаний клиенту', 'Часы до встречи через запятую (0.5 = за 30 мин) — каждое уходит в WhatsApp со ссылкой на страницу встречи', `<input id="meetChain" style="width:150px" value="${esc((a.meetRemindChain || (a.meetingReminderHrs ? [a.meetingReminderHrs] : [24, 3])).join(', '))}" placeholder="24, 3, 0.5">`)}
@@ -7672,12 +7651,6 @@ PAGES.automations = async (root) => {
     if (sib) (+b.dataset.chmv < 0 ? sib.before(row) : sib.after(row));
     $$('#chPrio .ch-prio b', root).forEach((x, i2) => x.textContent = i2 + 1);
   }));
-  if ($('#metaSave')) $('#metaSave').addEventListener('click', async () => {
-    const social = { ig: { enabled: $('#igEn').checked, igId: $('#igId').value.trim() }, fb: { enabled: $('#fbEn').checked, pageId: $('#fbId').value.trim() } };
-    if ($('#igTok').value.trim()) social.ig.token = $('#igTok').value.trim();
-    if ($('#fbTok').value.trim()) social.fb.token = $('#fbTok').value.trim();
-    try { await api.patch('/settings', { social }); toast('Подключение Meta сохранено', 'Instagram/Facebook готовы принимать', true); await loadState(); go('settings'); } catch (e) { toast('Не вышло', e.message); }
-  });
   $('#chSave').addEventListener('click', async () => {
     const priority = $$('#chPrio .ch-prio', root).map(x => x.dataset.ch);
     const enabled = {};
@@ -11989,6 +11962,27 @@ PAGES.numbers = async (root) => {
       <div id="waWebhookBody" class="muted" style="font-size:12px">Загрузка…</div>
     </div>
 
+    <div class="glass card mb" id="metaCard">
+      <div class="card-title">${ic(I.chat)}Instagram и Facebook — Директ и комментарии<span class="sub">входящие DM + комментарии под рекламой → карточки лидов</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Тот же вебхук, что у WhatsApp. В <b>Meta → приложение → Webhooks</b> вставьте Callback URL и Verify token ниже и подпишите поля: <b>messages</b> (Директ Instagram), <b>comments</b> (комментарии Instagram), <b>feed</b> (комментарии Facebook-страницы). Пошагово — <a href="/help/meta-inbound" target="_blank" rel="noopener" style="color:var(--accent)">в справочнике →</a></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="muted" style="font-size:11px;width:92px">Callback URL</span><code class="pill" style="flex:1;overflow-x:auto;white-space:nowrap;padding:8px 10px">${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook</code><button class="btn btn-sm tc-copy" data-copy="${(STATE.settings.tunnelUrl || location.origin)}/wa/webhook">${ic(I.copy || I.doc)}</button></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><span class="muted" style="font-size:11px;width:92px">Verify token</span><code class="pill" style="flex:1;padding:8px 10px">${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}</code><button class="btn btn-sm tc-copy" data-copy="${esc((STATE.settings.wa && STATE.settings.wa.webhookVerifyToken) || 'lumen-verify')}">${ic(I.copy || I.doc)}</button></div>
+      <div class="lp-sec" style="margin:4px 0 8px">Instagram — Директ и комментарии</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Instagram access token</label><input id="igTok" type="password" placeholder="${((STATE.settings.social || {}).ig || {}).tokenSet ? '•••••• сохранён' : 'токен (instagram_manage_messages/comments)'}"></div>
+        <div class="form-row"><label>Instagram account ID</label><input id="igId" value="${esc(((STATE.settings.social || {}).ig || {}).igId || '')}" placeholder="напр. 17841400000000000"></div>
+      </div>
+      <div class="set-row"><div class="sp"><div class="sl">Включить Instagram-канал</div><div class="sd">Входящие Директ-сообщения и комментарии станут создавать карточки лидов</div></div><label class="switch"><input type="checkbox" id="igEn" ${((STATE.settings.social || {}).ig || {}).enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <div class="lp-sec" style="margin:12px 0 8px">Facebook-страница — комментарии</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-row"><label>Page access token</label><input id="fbTok" type="password" placeholder="${((STATE.settings.social || {}).fb || {}).tokenSet ? '•••••• сохранён' : 'токен страницы (pages_manage_engagement)'}"></div>
+        <div class="form-row"><label>Page ID</label><input id="fbId" value="${esc(((STATE.settings.social || {}).fb || {}).pageId || '')}" placeholder="ID Facebook-страницы"></div>
+      </div>
+      <div class="set-row"><div class="sp"><div class="sl">Включить Facebook-страницу</div><div class="sd">Комментарии под постами/рекламой Страницы попадут в раздел «Комментарии»</div></div><label class="switch"><input type="checkbox" id="fbEn" ${((STATE.settings.social || {}).fb || {}).enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+      <button class="btn btn-accent" id="metaSave" style="margin-top:12px">Сохранить подключение Meta</button>
+      <div class="muted" style="font-size:11px;margin-top:8px">Статус: Instagram — ${(((STATE.settings.social || {}).ig || {}).enabled && ((STATE.settings.social || {}).ig || {}).tokenSet) ? '<b style="color:var(--ok)">подключён</b>' : 'демо'} · Facebook — ${(((STATE.settings.social || {}).fb || {}).enabled && ((STATE.settings.social || {}).fb || {}).tokenSet) ? '<b style="color:var(--ok)">подключён</b>' : 'демо'}. App Secret (проверка подписи) — общий из карточки «Официальный WhatsApp» выше.</div>
+    </div>
+
     ${st.numbers.length ? `<div class="lp-sec" style="margin:0 0 10px">Официальные Cloud-API номера · ${st.numbers.length}</div>
     <div class="num-grid">
       ${st.numbers.map(n => `<div class="glass num-card" data-num="${n.id}">
@@ -12156,6 +12150,14 @@ PAGES.numbers = async (root) => {
     } catch (e) { box.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
   }
   loadWaWebhook();
+  /* Instagram/Facebook — Директ и комментарии: копирование вебхука + сохранение токенов */
+  $$('#metaCard .tc-copy', root).forEach(c => c.addEventListener('click', () => { try { navigator.clipboard.writeText(c.dataset.copy); toast('Скопировано', null, true); } catch (_) {} }));
+  if ($('#metaSave', root)) $('#metaSave', root).addEventListener('click', async () => {
+    const social = { ig: { enabled: $('#igEn', root).checked, igId: $('#igId', root).value.trim() }, fb: { enabled: $('#fbEn', root).checked, pageId: $('#fbId', root).value.trim() } };
+    if ($('#igTok', root).value.trim()) social.ig.token = $('#igTok', root).value.trim();
+    if ($('#fbTok', root).value.trim()) social.fb.token = $('#fbTok', root).value.trim();
+    try { await api.patch('/settings', { social }); toast('Подключение Meta сохранено', 'Instagram/Facebook готовы принимать', true); await loadState(); PAGES.numbers(root); } catch (e) { toast('Не вышло', e.message); }
+  });
   /* ── Серый Telegram: статус + подключение + карточки с персоной + прогрев ── */
   async function loadTgGray() {
     const box = $('#tgGraySection', root); if (!box) return;
