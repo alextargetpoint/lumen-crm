@@ -5595,6 +5595,24 @@ async function openLeadModal(id) {
         : '')
     : '<div class="empty">Хронология пуста</div>';
   const intakeCardHtml = buildIntakeCard(l);
+  /* блок «Управление лидом» — стадия/брокер/след.шаг/квалификация; собран отдельно, чтобы спрятать в сворачиваемую секцию
+     и не перегружать правую колонку (главное действие — «Первое касание») */
+  const mgmtHtml = `
+    <div class="lc-3sel">
+      <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
+      <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
+      <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+      ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
+    </div>
+    <div class="lp-sec">Следующий шаг</div>
+    <div class="lc-note-row">
+      <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
+      <input id="lcNaDate" type="date" value="${l.nextAction && l.nextAction.at ? (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(l.nextAction.at)) : ''}" style="width:150px;flex:0 0 150px">
+      <button class="btn btn-sm" id="lcNaSave">${ic(I.check)}</button>
+    </div>
+    ${l.ads && (l.ads.adId || l.ads.campaignName || l.ads.adName) ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${esc([l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') || ('ad_id ' + (l.ads.adId || '—')))}${l.ads.adId && !l.ads.matched ? ' <span>· не в базе (путь из интегратора)</span>' : ''}</div>` : ''}
+    <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
+    <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>`;
 
   const bd = modal({
     title: l.name,
@@ -5678,21 +5696,7 @@ async function openLeadModal(id) {
               </div>
             </div>`, { open: ['new', 'touch'].includes(l.stage), icon: I.send })}
           ${coll('🧠 Психо-профиль и подход', `<div id="lcPsych" class="lc-psy">${psychBody(l.psych)}</div>`, { open: !!l.psych, icon: I.spark })}
-          <div class="lc-3sel">
-            <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
-            <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
-            <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
-            ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
-          </div>
-          <div class="lp-sec">Следующий шаг</div>
-          <div class="lc-note-row">
-            <input id="lcNaText" placeholder="например: дожать по подборке" value="${esc((l.nextAction || {}).text || '')}">
-            <input id="lcNaDate" type="date" value="${l.nextAction && l.nextAction.at ? (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(l.nextAction.at)) : ''}" style="width:150px;flex:0 0 150px">
-            <button class="btn btn-sm" id="lcNaSave">${ic(I.check)}</button>
-          </div>
-          ${l.ads && (l.ads.adId || l.ads.campaignName || l.ads.adName) ? `<div class="lp-ad" style="margin-top:12px">${ic(I.target)}${esc([l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') || ('ad_id ' + (l.ads.adId || '—')))}${l.ads.adId && !l.ads.matched ? ' <span>· не в базе (путь из интегратора)</span>' : ''}</div>` : ''}
-          <div class="lp-sec">Квалификация · ${l.axesFilled}/4</div>
-          <div class="axg">${Object.keys(axName).map(a => { const q = l.quals[a]; return `<div class="axg-c ${q ? 'done' : ''}" data-qual="${a}" style="cursor:pointer" title="Нажмите, чтобы изменить"><i>${axName[a]}${q ? `<span class="axg-ok">${ic(I.check)}</span>` : ''}</i><b>${q ? esc(q.value) : '—'}</b></div>`; }).join('')}</div>
+          ${coll('Управление · стадия, брокер, квалификация', mgmtHtml, { open: false, icon: I.layers, count: l.axesFilled ? l.axesFilled + '/4' : null })}
           ${coll('Свои поля', `
             <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn-ghost" id="cfGear" title="Настроить поля">${ic(I.gear)}Настроить</button></div>
             <div id="cfEditor" style="display:none">
