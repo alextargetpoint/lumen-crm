@@ -7034,6 +7034,8 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       const b = await readBody(req);
       const country = String(b.country || 'US').toUpperCase().slice(0, 2);
+      /* тип номера: local (дефолт) / mobile / toll_free. mobile — реальный мобильный диапазон, у него выше шанс пройти верификацию Telegram/WA (local = VoIP, часто блокируется). */
+      const numType = ({ local: 'local', mobile: 'mobile', toll_free: 'toll_free', tollfree: 'toll_free', national: 'national' })[String(b.type || 'local').toLowerCase()] || 'local';
       const t = db.settings.telephony || {};
       if (t.provider !== 'telnyx') return json(res, 400, { error: 'OTP-номера доступны для Telnyx' });
       if (!db.settings.billing) db.settings.billing = billing.defBilling();
@@ -7043,9 +7045,9 @@ const server = http.createServer(async (req, res) => {
       }
       try {
         const profileId = await ensureTelnyxMsgProfile(db);
-        const j = await telnyxApi(db, 'GET', `/available_phone_numbers?filter[country_code]=${country}&filter[phone_number_type]=local&filter[features][]=sms&filter[limit]=8`);
+        const j = await telnyxApi(db, 'GET', `/available_phone_numbers?filter[country_code]=${country}&filter[phone_number_type]=${numType}&filter[features][]=sms&filter[limit]=8`);
         const cand = (j.data || []).map(n => n.phone_number);
-        if (!cand.length) return json(res, 400, { error: 'нет SMS-номеров по стране ' + country });
+        if (!cand.length) return json(res, 400, { error: `нет SMS-номеров типа ${numType} по стране ${country}` });
         let bought = null;
         for (const number of cand) {
           try {
