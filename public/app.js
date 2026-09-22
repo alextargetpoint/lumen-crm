@@ -6848,9 +6848,7 @@ PAGES.sequences = async (root) => {
             <div id="cardLib">${cats.map(cat => `<div class="clib-cat">${esc(cat)}</div><div class="cardlib">${byCat[cat].map(cardLibCardHtml).join('')}</div>`).join('')}</div>`;
         })(), { open: seq.steps.length === 0, icon: I.layers, count: CHAIN_CARDS.length }) : ''}
         ${(() => { const items = lintChain(seq); const bad = items.filter(x => x.level === 'error' || x.level === 'warn').length; return coll('Проверка цепочки', `<div class="lint">${items.map(it => `<div class="lint-i lint-${it.level}">${ic(it.level === 'ok' ? I.check : it.level === 'error' ? (I.alert || I.x) : (I.info || I.spark))}<span>${it.text}</span></div>`).join('')}</div>`, { open: bad > 0, icon: I.shield, count: bad || null }); })()}
-        ${!isBrokerUser ? (() => { const qh = (STATE.settings.automations || {}).quietHours || {}; return coll('Тихие часы — ночью не беспокоим', `
-          <div class="qh-row"><label class="switch"><input type="checkbox" id="qhOn" ${qh.enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><span class="muted" style="font-size:12px">Не слать автокасания ночью <b>по часовому поясу клиента</b> (в карточке лида видно его локальное время)</span></div>
-          <div class="qh-row" style="margin-top:9px"><span class="lc-lbl" style="margin:0">С</span><input type="number" id="qhFrom" min="0" max="23" value="${qh.from ?? 21}" style="width:60px">:00<span class="lc-lbl" style="margin:0 0 0 8px">до</span><input type="number" id="qhTo" min="0" max="23" value="${qh.to ?? 9}" style="width:60px">:00<button class="btn btn-sm btn-accent" id="qhSave" style="margin-left:8px">${ic(I.check)}Сохранить</button></div>`, { open: false, icon: I.moon }); })() : ''}
+        ${!isBrokerUser ? `<div class="lc-hint info" style="margin-bottom:12px;border-style:dashed"><span>${ic(I.moon)}Тихие часы (ночью по поясу клиента дожимы не идут) настраиваются один раз в <b><a href="#automations" class="link" data-go="automations">Автоматизациях</a></b> — действуют на все цепочки.</span></div>` : ''}
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
             <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${esc(targetingSummary(seq))}</b></div>
@@ -7007,14 +7005,6 @@ PAGES.sequences = async (root) => {
       });
     });
   }
-  $('#qhSave')?.addEventListener('click', async () => {
-    const enabled = $('#qhOn', root).checked;
-    const from = Math.max(0, Math.min(23, +$('#qhFrom', root).value || 21));
-    const to = Math.max(0, Math.min(23, +$('#qhTo', root).value || 9));
-    await api.patch('/settings', { automations: { quietHours: { enabled, from, to } } });
-    toast('Тихие часы сохранены', enabled ? `Ночью ${from}:00–${to}:00 по времени клиента автокасания стоят` : 'Тихие часы выключены', true);
-    await loadState();
-  });
   $('#seqNew').addEventListener('click', async () => { const nq = await api.post('/sequences', {}); await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = 0; render(); });
   $('#seqFork')?.addEventListener('click', async () => {
     const nq = await api.post('/sequences/' + seq.id + '/fork', {});
