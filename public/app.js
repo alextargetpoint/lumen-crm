@@ -4239,6 +4239,10 @@ function selTagPrompt(cfg) {
 
 /* ---------- конфиг: ЛИДЫ ---------- */
 let LEAD_LOOKUP = {};
+let LUMEN_VENDORS = [], LUMEN_VENDORS_LOADED = false; /* кэш подрядчиков (для фильтров/назначения на лид) */
+async function ensureVendors() { if (LUMEN_VENDORS_LOADED) return LUMEN_VENDORS; try { LUMEN_VENDORS = (await api.get('/contractors')) || []; } catch (_) { } LUMEN_VENDORS_LOADED = true; return LUMEN_VENDORS; }
+const vendorName = (id) => (LUMEN_VENDORS.find(v => v.id === id) || {}).name || '';
+function vendorSelectHtml(id, sel) { return `<select ${id ? `id="${id}"` : ''} class="lp-vendor"><option value="">— без подрядчика —</option>${LUMEN_VENDORS.map(v => `<option value="${v.id}" ${sel === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>`; }
 const SELCFG_LEADS = {
   kind: 'funnel', itemSel: '.lead-card, [data-row]', colSel: '.kb-col', bulkUrl: '/leads/bulk',
   entity: 'лид', entityPlural: 'выбрано', dragGuard: () => DRAG.moved,
@@ -4246,6 +4250,7 @@ const SELCFG_LEADS = {
   actions: (n) => [
     { id: 'stage', label: 'Стадия', ic: I.arrow, run: (cfg, c) => ctxPopup(c.x, c.y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => selBulk(cfg, 'stage', s.id) }))) },
     { id: 'broker', label: 'Брокеру', ic: I.handover, run: (cfg, c) => ctxPopup(c.x, c.y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => selBulk(cfg, 'broker', b.id) }))) },
+    { id: 'vendor', label: 'Подрядчик', ic: I.link, run: async (cfg, c) => { await ensureVendors(); ctxPopup(c.x, c.y, [{ ic: I.x, label: '— снять подрядчика —', onClick: () => selBulk(cfg, 'vendor', '') }, ...LUMEN_VENDORS.map(v => ({ ic: I.link, label: v.name, onClick: () => selBulk(cfg, 'vendor', v.id) }))]); } },
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'chain', label: 'Запустить цепочку', ic: I.chain, run: (cfg, c) => { const seqs = (STATE.sequences || []).filter(s => s.active); ctxPopup(c.x, c.y, [{ ic: I.bolt, label: 'По направлению (авто)', onClick: () => selBulk(cfg, 'chain', '', { title: `Запустить цепочку на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания по WhatsApp (по гео-цепочке). Первое — в ближайшую минуту.', ok: 'Запустить' }) }, ...seqs.map(s => ({ ic: I.chain, label: s.name, onClick: () => selBulk(cfg, 'chain', s.id, { title: `Запустить «${s.name}» на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания этой цепочки по WhatsApp. Первое — в ближайшую минуту.', ok: 'Запустить' }) }))]); } },
     { id: 'aion', label: 'ИИ вкл', ic: I.spark, run: (cfg) => selBulk(cfg, 'ai', true) },
@@ -4518,6 +4523,7 @@ function openMerge(cluster) {
 }
 PAGES.funnel = async (root) => {
   const all = await api.get('/leads');
+  const vendors = await ensureVendors();
   LEAD_LOOKUP = Object.fromEntries(all.map(l => [l.id, l]));
   selSet("funnel").forEach(id => { if (!LEAD_LOOKUP[id]) selSet("funnel").delete(id); });
   const F = PAGE_STATE;
@@ -4526,6 +4532,7 @@ PAGES.funnel = async (root) => {
   const leads = all.filter(l =>
     (!F.funnelGeo || l.geo === F.funnelGeo) &&
     (!F.funnelSrc || l.source === F.funnelSrc) &&
+    (!F.funnelVendor || (F.funnelVendor === '__none' ? !l.vendorId : l.vendorId === F.funnelVendor)) &&
     (!F.funnelBroker || l.broker === F.funnelBroker) &&
     (!q || l.name.toLowerCase().includes(q) || l.phone.includes(q)) &&
     (!F.funnelFlag ||
@@ -4547,6 +4554,7 @@ PAGES.funnel = async (root) => {
       <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:180px">
       <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${F.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
       <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
+      ${vendors.length ? `<select id="fVendor"><option value="">Все подрядчики</option><option value="__none" ${F.funnelVendor === '__none' ? 'selected' : ''}>Без подрядчика</option>${vendors.map(v => `<option value="${v.id}" ${F.funnelVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}
       <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
       <div class="seg-toggle">
         ${[['', 'Все'], ['hot', 'Горячие'], ['overdue', 'Просрочка'], ['human', 'Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
@@ -4582,6 +4590,7 @@ PAGES.funnel = async (root) => {
               <div class="axes">${['purpose', 'timeline', 'budget', 'type'].map(a => `<i class="${l.quals[a] ? 'on' : ''}"></i>`).join('')}</div>
               <div class="foot">
                 ${l.ai && l.ai.enabled ? '<span class="mini-badge ai">ИИ</span>' : ''}
+                ${l.vendorId && vendorName(l.vendorId) ? `<span class="mini-badge" title="Рекламный подрядчик">${esc(vendorName(l.vendorId))}</span>` : ''}
                 ${l.brokerName ? `<span class="mini-badge ok">${esc(l.brokerName.split(' ')[0])}</span>` : ''}
                 ${l.wakeScore != null ? `<span class="mini-badge warn">score ${l.wakeScore}</span>` : ''}
                 ${l.nextAction && l.nextAction.at && l.nextAction.at < Date.now() ? '<span class="mini-badge warn">просрочен шаг</span>' : ''}
@@ -4625,6 +4634,7 @@ PAGES.funnel = async (root) => {
   $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
   $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
+  $('#fVendor')?.addEventListener('change', (e) => setF('funnelVendor', e.target.value));
   $('#fBroker').addEventListener('change', (e) => setF('funnelBroker', e.target.value));
   $$('[data-flag]', root).forEach(b => b.addEventListener('click', () => setF('funnelFlag', b.dataset.flag)));
   $$('[data-view]', root).forEach(b => b.addEventListener('click', () => setF('funnelView', b.dataset.view)));
@@ -5416,6 +5426,7 @@ let LC_AUDIO = null;
 
 async function openLeadModal(id) {
   const l = await api.get('/leads/' + id);
+  await ensureVendors();
   const axName = { purpose: 'Цель', timeline: 'Срок', budget: 'Бюджет', type: 'Объект' };
   const kindRu = { call: 'Созвон', video: 'Видео-показ', tour: 'Показ' };
   const contactKinds = { telegram: 'Telegram', email: 'E-mail', instagram: 'Instagram', whatsapp: 'WhatsApp #2', other: 'Другое' };
@@ -5543,6 +5554,7 @@ async function openLeadModal(id) {
             <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+            ${LUMEN_VENDORS.length ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
           </div>
           <div class="lp-sec">Следующий шаг</div>
           <div class="lc-note-row">
@@ -5618,6 +5630,7 @@ async function openLeadModal(id) {
   $('#mStage', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { stage: e.target.value }); if (['funnel', 'overview'].includes(CUR)) render(); });
   $('#mGeo', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { geo: e.target.value }); });
   $('#mBroker', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { broker: e.target.value || null }); });
+  $('#mVendor', bd)?.addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { vendorId: e.target.value }); toast('Подрядчик назначен', e.target.value ? vendorName(e.target.value) : 'снят', true); if (['funnel', 'overview', 'inbox'].includes(CUR)) render(); });
   $('#lcAi', bd).addEventListener('change', async (e) => { await api.patch('/leads/' + l.id, { ai: { enabled: e.target.checked } }); openLeadModal(id); });
   const rebuildSummary = async (btn) => {
     const body = $('#lcPinBody', bd);
@@ -5979,6 +5992,7 @@ async function openHandoverPreview(id) {
 
 async function renderChat(id, rebuild) {
   const l = await api.get('/leads/' + id);
+  await ensureVendors();
   const pane = $('#chatPane');
   if (!pane) return;
   const draft = $('#composerText') ? $('#composerText').value : '';
@@ -6108,6 +6122,7 @@ async function renderChat(id, rebuild) {
     <div class="lp-sec">Управление</div>
     <div class="lp-manage">
       <div class="pd-fact"><label class="lc-lbl">Стадия</label><select id="lpStage">${STAGES.map(s2 => `<option value="${s2.id}" ${l.stage === s2.id ? 'selected' : ''}>${s2.name}</option>`).join('')}</select></div>
+      ${LUMEN_VENDORS.length ? `<div class="pd-fact"><label class="lc-lbl">Рекламный подрядчик</label>${vendorSelectHtml('lpVendor', l.vendorId)}</div>` : ''}
       ${l.nextAction && l.nextAction.text ? `<div class="lc-hint ${l.nextAction.at && l.nextAction.at < Date.now() ? 'warn' : 'info'}" style="margin-top:8px">${ic(I.clock)}${esc(l.nextAction.text)}${l.nextAction.at ? ' · ' + new Date(l.nextAction.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' ' + tmm(l.nextAction.at) : ''}</div>` : ''}
       <div class="lc-note-row" style="margin-top:9px"><input id="lpNote" placeholder="Комментарий по лиду… (Enter)"><button class="btn btn-sm" id="lpNoteBtn">${ic(I.plus)}</button></div>
       <button class="btn btn-sm" id="lpOpenCard" style="width:100%;justify-content:center;margin-top:9px">${ic(I.user)}Полная карточка лида</button>
@@ -6116,6 +6131,7 @@ async function renderChat(id, rebuild) {
     ${l.brokerName ? `<div class="badge ok" style="margin-top:12px">${ic(I.check)}У брокера: ${esc(l.brokerName)}</div>` : ''}`;
   enhanceControls(panel);
   $('#lpStage').addEventListener('change', async (e) => { await api.patch('/leads/' + id, { stage: e.target.value }); renderChat(id, true); refreshInbox(false); });
+  $('#lpVendor')?.addEventListener('change', async (e) => { await api.patch('/leads/' + id, { vendorId: e.target.value }); toast('Подрядчик назначен', e.target.value ? vendorName(e.target.value) : 'снят', true); renderChat(id, true); });
   const lpNote = $('#lpNote');
   const addNote = async () => { const v = lpNote.value.trim(); if (!v) return; lpNote.value = ''; await api.post(`/leads/${id}/note`, { text: v }); toast('Комментарий добавлен', null, true); };
   $('#lpNoteBtn').addEventListener('click', addNote);

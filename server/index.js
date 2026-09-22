@@ -5681,6 +5681,12 @@ const server = http.createServer(async (req, res) => {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
         else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } if (l.broker !== br.id) recordOwner(db, l, br.id, 'owner', 'массовое назначение'); l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
+        else if (action === 'vendor') { /* массовое назначение подрядчика (b.value = contractorId или пусто = снять) */
+          const nv = b.value ? String(b.value) : null; const prev = (db.mpContractors || []).find(c => c.id === l.vendorId);
+          if (prev && prev.name) l.tags = (l.tags || []).filter(t => t !== prev.name);
+          l.vendorId = nv; const nc = nv ? (db.mpContractors || []).find(c => c.id === nv) : null;
+          if (nc && nc.name) l.tags = [...new Set([...(l.tags || []), nc.name])]; done++;
+        }
         else if (action === 'tag' && b.value) { l.tags = [...new Set([...(l.tags || []), String(b.value).slice(0, 40)])]; done++; }
         else if (action === 'untag' && b.value) { l.tags = (l.tags || []).filter(t => t !== b.value); done++; }
         else if (action === 'ai') { l.ai.enabled = !!b.value; if (b.value) l.tags = (l.tags || []).filter(t => t !== 'нужен человек'); done++; }
@@ -5731,6 +5737,13 @@ const server = http.createServer(async (req, res) => {
           Object.assign(lead.ai, b.ai);
         }
         if (b.name) lead.name = b.name;
+        if (b.vendorId !== undefined) { /* ручное назначение подрядчика на лид */
+          const nv = b.vendorId || null; const prev = (db.mpContractors || []).find(c => c.id === lead.vendorId);
+          if (prev && prev.name) lead.tags = (lead.tags || []).filter(t => t !== prev.name);
+          lead.vendorId = nv;
+          const nc = nv ? (db.mpContractors || []).find(c => c.id === nv) : null;
+          if (nc && nc.name) lead.tags = [...new Set([...(lead.tags || []), nc.name])];
+        }
         if (b.custom) { lead.custom = lead.custom || {}; Object.assign(lead.custom, b.custom); }
         if (b.channels) Object.assign(lead.channels = lead.channels || {}, b.channels);
         if (b.avatarUrl !== undefined) lead.avatarUrl = b.avatarUrl || null;
