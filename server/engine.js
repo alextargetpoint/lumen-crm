@@ -503,6 +503,7 @@ function fillVars(db, lead, text) {
     .replace(/\{geo\}/g, db.settings.geoNames[lead.geo] || lead.geo)
     .replace(/\{month\}/g, MONTHS_PREP[new Date().getMonth()])
     .replace(/\{agency\}/g, db.settings.agency.name)
+    .replace(/\{manager\}/g, (db.settings.agency.manager && db.settings.agency.manager.name) || db.settings.agency.name)
     .replace(/\{slots\}/g, slots);
 }
 

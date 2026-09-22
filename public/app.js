@@ -5315,9 +5315,13 @@ function wireIntakeCard(scope, l, done) {
    Пояс берём как в движке — из ответа клиента → страны → телефона (resolveContactPlan). Leak-safe: тикер сам гаснет, когда карточка закрыта. */
 function startLeadClock(scope, l) {
   const el = $('#lcIkClock', scope); if (!el) return;
-  const plan = resolveContactPlan(l);
-  const offMin = plan && plan.offMin;
+  const plan = resolveContactPlan(l);   /* даёт offMin из ответа клиента/страны, но может вернуть null без предпочтения */
+  let offMin = plan && plan.offMin;
+  if (offMin == null && typeof l.tz === 'number') offMin = l.tz * 60;                 /* fallback: пояс по коду телефона */
+  if (offMin == null) { const cf = l.custom || {}; const co = cf.country || cf['страна'] || cf.Country || l.country || ''; const o = countryOffsetMin(co); if (o != null) offMin = o; }
+  const tzLabel = (plan && plan.clientTzLabel) || (offMin != null ? gmtLabel(offMin) : '');
   if (offMin == null) { el.innerHTML = `${ic(I.clock)}<span class="muted">пояс не определён</span>`; el.classList.add('unk'); return; }
+  el.classList.remove('unk');
   const q = (STATE.settings.automations || {}).quietHours || { enabled: true, from: 21, to: 9 };
   const tick = () => {
     if (!document.body.contains(el)) { clearInterval(t); return; }   /* карточка закрыта → гасим тикер */
@@ -5325,7 +5329,7 @@ function startLeadClock(scope, l) {
     const hh = now.getUTCHours(), mm = now.getUTCMinutes();
     const night = q.enabled !== false && (q.from > q.to ? (hh >= q.from || hh < q.to) : (hh >= q.from && hh < q.to));
     el.classList.toggle('night', night);
-    el.innerHTML = `${ic(night ? (I.moon || I.clock) : I.clock)}<b>${pad2h(hh)}:${pad2h(mm)}</b><span>${esc(plan.clientTzLabel || '')}</span>${night ? `<em class="lc-clk-badge">🌙 ночь · дожимы до ${pad2h(q.to || 9)}:00</em>` : `<em class="lc-clk-badge ok">☀️ можно писать</em>`}`;
+    el.innerHTML = `${ic(night ? (I.moon || I.clock) : I.clock)}<b>${pad2h(hh)}:${pad2h(mm)}</b><span>${esc(tzLabel || '')}</span>${night ? `<em class="lc-clk-badge">🌙 ночь · дожимы до ${pad2h(q.to || 9)}:00</em>` : `<em class="lc-clk-badge ok">☀️ можно писать</em>`}`;
   };
   tick(); const t = setInterval(tick, 15000);
 }
@@ -6652,12 +6656,15 @@ PAGES.sequences = async (root) => {
           ${editable ? `<button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>` : ''}
         </div>
         ${editable ? coll('Библиотека умных карточек', `<div class="clib-note">${ic(I.spark)}Перетащите карточку в цепочку или нажмите ＋. Готовые приёмы фоллоуапов — тексты и тайминг можно менять после добавления.</div><div class="cardlib" id="cardLib">${CHAIN_CARDS.map(c => `
-          <div class="clib-card" draggable="true" data-card="${c.id}">
+          <div class="clib-card" data-card="${c.id}">
             <span class="clib-ic">${ic(I[c.icon] || I.spark)}</span>
             <div class="clib-b"><div class="clib-t">${esc(c.title)}<span class="clib-tag">${esc(c.tag)}</span></div><div class="clib-d">${esc(c.desc)}</div><div class="clib-meta">${ic(I.clock)}${esc(c.timing)}${c.needsAsset ? ` · <em>+ ${esc(c.needsAsset)}</em>` : ''}</div></div>
             <button class="clib-add" data-cardadd="${c.id}" title="Добавить в конец цепочки">${ic(I.plus)}</button>
           </div>`).join('')}</div>`, { open: seq.steps.length === 0, icon: I.layers, count: CHAIN_CARDS.length }) : ''}
         ${(() => { const items = lintChain(seq); const bad = items.filter(x => x.level === 'error' || x.level === 'warn').length; return coll('Проверка цепочки', `<div class="lint">${items.map(it => `<div class="lint-i lint-${it.level}">${ic(it.level === 'ok' ? I.check : it.level === 'error' ? (I.alert || I.x) : (I.info || I.spark))}<span>${it.text}</span></div>`).join('')}</div>`, { open: bad > 0, icon: I.shield, count: bad || null }); })()}
+        ${!isBrokerUser ? (() => { const qh = (STATE.settings.automations || {}).quietHours || {}; return coll('Тихие часы — ночью не беспокоим', `
+          <div class="qh-row"><label class="switch"><input type="checkbox" id="qhOn" ${qh.enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><span class="muted" style="font-size:12px">Не слать автокасания ночью <b>по часовому поясу клиента</b> (в карточке лида видно его локальное время)</span></div>
+          <div class="qh-row" style="margin-top:9px"><span class="lc-lbl" style="margin:0">С</span><input type="number" id="qhFrom" min="0" max="23" value="${qh.from ?? 21}" style="width:60px">:00<span class="lc-lbl" style="margin:0 0 0 8px">до</span><input type="number" id="qhTo" min="0" max="23" value="${qh.to ?? 9}" style="width:60px">:00<button class="btn btn-sm btn-accent" id="qhSave" style="margin-left:8px">${ic(I.check)}Сохранить</button></div>`, { open: false, icon: I.moon }); })() : ''}
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
             <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${esc(targetingSummary(seq))}</b></div>
@@ -6767,18 +6774,47 @@ PAGES.sequences = async (root) => {
   };
   if (editable) {
     $$('[data-cardadd]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); addCard(b.dataset.cardadd, seq.steps.length); }));
-    /* нативный drag-and-drop: тащим карточку из библиотеки на коннектор (точку вставки) внутри flow */
-    let dragCard = null;
-    $$('.clib-card', root).forEach(c => {
-      c.addEventListener('dragstart', (e) => { dragCard = c.dataset.card; c.classList.add('dragging'); try { e.dataTransfer.setData('text/plain', c.dataset.card); e.dataTransfer.effectAllowed = 'copy'; } catch (_) {} });
-      c.addEventListener('dragend', () => { dragCard = null; c.classList.remove('dragging'); $$('.fl-conn.drop', root).forEach(x => x.classList.remove('drop')); });
-    });
-    $$('#flow .fl-conn', root).forEach((conn, idx) => {
-      conn.addEventListener('dragover', (e) => { if (!dragCard) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; conn.classList.add('drop'); });
-      conn.addEventListener('dragleave', () => conn.classList.remove('drop'));
-      conn.addEventListener('drop', (e) => { e.preventDefault(); const id = dragCard || (e.dataTransfer && e.dataTransfer.getData('text/plain')); conn.classList.remove('drop'); const at = +(conn.querySelector('.fl-add')?.dataset.addat ?? seq.steps.length); if (id) addCard(id, at); });
+    /* DRAG & DROP на pointer-событиях (надёжно + тач): тащим карточку из библиотеки на коннектор (точку вставки). */
+    $$('.clib-card', root).forEach(card => {
+      card.addEventListener('pointerdown', (e) => {
+        if (e.button != null && e.button !== 0) return;
+        if (e.target.closest('.clib-add')) return;              /* клик по ＋ — отдельный обработчик */
+        e.preventDefault();
+        const id = card.dataset.card;
+        let ghost = null, moved = false;
+        const clearDrop = () => $$('#flow .fl-conn', root).forEach(c => c.classList.remove('drop'));
+        const flowEl = $('#flow', root);
+        /* ближайший коннектор к точке Y — чтобы не требовать пиксель-точного попадания */
+        const nearestConn = (y) => { let best = null, bestD = Infinity; $$('#flow .fl-conn', root).forEach(c => { const r = c.getBoundingClientRect(); const d = Math.abs((r.top + r.bottom) / 2 - y); if (d < bestD) { bestD = d; best = c; } }); return best; };
+        const overFlow = (x, y) => { if (!flowEl) return false; const r = flowEl.getBoundingClientRect(); return x >= r.left - 40 && x <= r.right + 40 && y >= r.top - 20 && y <= r.bottom + 20; };
+        const onMove = (ev) => {
+          if (!ghost) { moved = true; const r = card.getBoundingClientRect(); ghost = card.cloneNode(true); ghost.classList.add('clib-ghost'); ghost.style.cssText = `position:fixed;width:${r.width}px;z-index:600;pointer-events:none;opacity:.95;transform:rotate(-1.5deg);box-shadow:0 16px 38px rgba(0,0,0,.24)`; document.body.appendChild(ghost); card.classList.add('dragging'); }
+          ghost.style.left = (ev.clientX - 34) + 'px'; ghost.style.top = (ev.clientY - 22) + 'px';
+          /* авто-скролл у краёв окна — чтобы дотащить до дальних коннекторов */
+          if (ev.clientY < 90) window.scrollBy(0, -16); else if (ev.clientY > window.innerHeight - 90) window.scrollBy(0, 16);
+          clearDrop();
+          if (overFlow(ev.clientX, ev.clientY)) { const c = nearestConn(ev.clientY); if (c) c.classList.add('drop'); }
+        };
+        const onUp = (ev) => {
+          document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
+          card.classList.remove('dragging'); if (ghost) ghost.remove();
+          clearDrop();
+          if (!moved) return;                                   /* просто клик без перетаскивания — игнор (есть ＋) */
+          if (overFlow(ev.clientX, ev.clientY)) { const c = nearestConn(ev.clientY); addCard(id, c ? +(c.querySelector('.fl-add')?.dataset.addat ?? seq.steps.length) : seq.steps.length); }
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
     });
   }
+  $('#qhSave')?.addEventListener('click', async () => {
+    const enabled = $('#qhOn', root).checked;
+    const from = Math.max(0, Math.min(23, +$('#qhFrom', root).value || 21));
+    const to = Math.max(0, Math.min(23, +$('#qhTo', root).value || 9));
+    await api.patch('/settings', { automations: { quietHours: { enabled, from, to } } });
+    toast('Тихие часы сохранены', enabled ? `Ночью ${from}:00–${to}:00 по времени клиента автокасания стоят` : 'Тихие часы выключены', true);
+    await loadState();
+  });
   $('#seqNew').addEventListener('click', async () => { const nq = await api.post('/sequences', {}); await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = 0; render(); });
   $('#seqFork')?.addEventListener('click', async () => {
     const nq = await api.post('/sequences/' + seq.id + '/fork', {});
