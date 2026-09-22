@@ -292,7 +292,8 @@ function ensureTenantDefaults(db) {
   if (!db.settings.customFields) db.settings.customFields = [];
   if (!db.settings.stagesCfg) db.settings.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
   if (!db.settings.qualStages) db.settings.qualStages = ['qualified', 'handover', 'viewing', 'deal'];   /* какие стадии CRM считаем квалом (настраивается) */
-  if (!db.settings.telephony) db.settings.telephony = { provider: 'none', key: '', secret: '', note: '' };
+  /* по умолчанию телефония на общем Telnyx-магазине платформы (если есть платформенный ключ) — иначе новый тенант падает в Twilio-ветку и просит Account SID */
+  if (!db.settings.telephony) db.settings.telephony = { provider: (process.env.TELNYX_API_KEY || platformTelnyxKey()) ? 'telnyx' : 'none', key: '', secret: '', note: '' };
   if (!db.settings.voice) db.settings.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
   if (!db.settings.reports) db.settings.reports = {
     channel: 'tg', tgChatId: '',
