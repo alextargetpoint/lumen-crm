@@ -7692,14 +7692,20 @@ const server = http.createServer(async (req, res) => {
     /* КЛИЕНТ подключает СВОЙ Simbye (email+пароль): воркер логинится за него, пароль шифруется в CRM */
     if (p === '/api/simbye/connect' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
-      if (!simbye.workerCfg(db, store).url) return json(res, 400, { error: 'Simbye-воркер не настроен (URL). Обратитесь к оператору платформы.' });
+      const cfg = simbye.workerCfg(db, store);
+      if (!cfg.url) return json(res, 400, { error: 'Simbye-воркер не настроен (URL). Обратитесь к оператору платформы.' });
       const b = await readBody(req);
       const email = String(b.email || '').trim(), password = String(b.password || '');
       if (!email || !password) return json(res, 400, { error: 'нужны email и пароль от Simbye' });
+      /* ПРЕ-ЧЕК: воркер вообще задеплоен и жив? (иначе «ошибка входа» вводит в заблуждение — на деле воркер мёртв) */
+      let reachable = false, why = '';
+      try { const h = await fetch(cfg.url + '/', { signal: AbortSignal.timeout(9000) }); const t = await h.text(); reachable = h.ok && /lumen-simbye-worker/.test(t); if (!reachable) why = /Application not found|not found/i.test(t) ? 'Railway вернул «Application not found» — сервис воркера НЕ задеплоен по этому адресу' : ('воркер ответил HTTP ' + h.status); }
+      catch (e) { why = 'нет связи (' + String(e.message || e).slice(0, 60) + ')'; }
+      if (!reachable) return json(res, 200, { ok: false, error: `Simbye-воркер недоступен: ${why}. Задеплойте сервис lumen-simbye-worker на Railway (репо github.com/alextargetpoint/lumen-simbye-worker) и укажите его реальный URL в LUMEN_SIMBYE_WORKER_URL. Это не про ваш пароль.`, workerDown: true });
       try {
         const r = await simbye.connect(db, store, email, password);
         if (r.ok) { simbye.resolveAlerts(db, a => a.ctx === 'session'); store.save(); return json(res, 200, { ok: true, loggedIn: true, email }); }
-        return json(res, 200, { ok: false, error: r.reason === 'login_failed' ? 'Не удалось войти: проверьте email/пароль. ⚠️ Аккаунт Simbye должен быть на email+пароле, НЕ через Google/Apple.' : (r.reason || r.error || 'ошибка входа') });
+        return json(res, 200, { ok: false, error: r.reason === 'login_failed' ? 'Не удалось войти в Simbye. Проверьте: (1) email+пароль верны; (2) аккаунт создан по email+паролю, НЕ через Google/Apple; (3) если только что зарегистрировались — подтвердите e-mail (Simbye может требовать верификацию) и попробуйте снова.' : (r.reason || r.error || 'ошибка входа') });
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* отключить свой Simbye (снести креды+сессию) */

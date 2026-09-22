@@ -11992,6 +11992,7 @@ function wireSimbye(scope, d, reload) {
   $$s('.sbf-al-x').forEach(b => b.addEventListener('click', async () => { try { await api.post('/simbye/alert/resolve', { id: b.dataset.id }); reload(); } catch (_) {} }));
   $$s('.sbf-acct-x').forEach(b => b.addEventListener('click', async () => { const isProv = !!b.dataset.id; if (!await uiConfirm(isProv ? 'Отменить покупку?' : 'Убрать из фермы?', isProv ? 'Уберём карточку-заготовку (если уже оплатил — номер подхватится авто).' : 'Сам номер в Simbye останется — уберём только из отслеживания.', { ok: isProv ? 'Отменить' : 'Убрать', danger: true })) return; try { await api.post('/simbye/account/remove', { phone: b.dataset.phone, id: b.dataset.id }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
   $$s('.sbf-paylink').forEach(b => b.addEventListener('click', () => { window.open(b.dataset.url, '_blank'); toast('Оплата открыта', 'После оплаты номер появится в ферме сам', true); }));
+  $$s('.sbf-shot img').forEach(img => img.addEventListener('click', () => { try { openCreativeView(img.getAttribute('src'), 'image'); } catch (_) {} }));
   $$s('#sbcTabs .seg-btn').forEach(b => b.addEventListener('click', () => {
     $$s('#sbcTabs .seg-btn').forEach(x => x.classList.toggle('on', x === b));
     $$s('[data-sbcpane]').forEach(pane => { pane.style.display = pane.dataset.sbcpane === b.dataset.sbctab ? '' : 'none'; });
