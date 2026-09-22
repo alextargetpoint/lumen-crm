@@ -45,6 +45,48 @@ async function compressVideoToMp4(inPath, outPath, targetMB = 24) {
   return outPath;
 }
 
+/* ── УМНЫЙ ТРАНСКРИБАТОР креативов: видео → аудио (ffmpeg) → Gemini транскрипт → контекст для персонализации ── */
+function extractAudioMp3(inPath, outPath, maxSec = 300) {
+  return new Promise((resolve, reject) => {
+    const args = ['-y', '-i', inPath, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', '-t', String(maxSec), outPath];
+    const pr = spawn('ffmpeg', args); let err = '';
+    pr.stderr.on('data', d => { err += d; if (err.length > 3000) err = err.slice(-3000); });
+    pr.on('error', reject);
+    pr.on('close', c => c === 0 ? resolve(outPath) : reject(new Error('ffmpeg audio ' + c)));
+  });
+}
+/* транскрипт озвучки видео через Gemini (аудио-вход). Возврат {ok,text} или {ok:false,error}. */
+async function transcribeCreativeVideo(videoAbsPath) {
+  const key = process.env.GEMINI_API_KEY || '';
+  if (!key) return { ok: false, error: 'no_gemini_key' };
+  const audioPath = videoAbsPath + '.tr.mp3';
+  try {
+    await extractAudioMp3(videoAbsPath, audioPath);
+    const b64 = fs.readFileSync(audioPath).toString('base64');
+    if (b64.length > 18e6) return { ok: false, error: 'audio_too_long' };
+    const prompt = 'Это озвучка рекламного видео о недвижимости. Транскрибируй речь ДОСЛОВНО на языке оригинала. Верни ТОЛЬКО текст транскрипта, без пояснений и таймкодов. Если речи нет — верни «(без речи)».';
+    const body = { contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'audio/mp3', data: b64 } }] }], generationConfig: { temperature: 0, maxOutputTokens: 2000 } };
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(90000) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) return { ok: false, error: 'gemini http ' + r.status + (j && j.error ? ' ' + (j.error.message || '').slice(0, 80) : '') };
+    const parts = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+    const text = parts ? parts.map(p => p.text || '').join('').trim() : '';
+    return text ? { ok: true, text } : { ok: false, error: 'empty' };
+  } catch (e) { return { ok: false, error: e.message }; }
+  finally { try { fs.unlinkSync(audioPath); } catch (_) {} }
+}
+/* фоновый прогон: ставит статус, транскрибирует, кладёт на объявление (+одноимённые), сохраняет */
+async function runCreativeTranscription(db, adId, videoAbsPath) {
+  const setAll = (patch) => { for (const a of (db.ads || [])) if (String(a.adId) === String(adId) || (a.name && a.name === (db.ads.find(x => String(x.adId) === String(adId)) || {}).name)) Object.assign(a, patch); };
+  const a0 = (db.ads || []).find(x => String(x.adId) === String(adId)); if (!a0) return;
+  a0.transcriptStatus = 'pending'; store.save();
+  const r = await transcribeCreativeVideo(videoAbsPath).catch(e => ({ ok: false, error: e.message }));
+  const cur = (db.ads || []).find(x => String(x.adId) === String(adId)); if (!cur) return;
+  if (r.ok) { cur.transcript = r.text.slice(0, 8000); cur.transcriptStatus = 'done'; cur.transcriptAt = Date.now(); cur.transcriptError = ''; propagateAdByName(db, cur); }
+  else { cur.transcriptStatus = 'failed'; cur.transcriptError = String(r.error || '').slice(0, 120); }
+  store.save();
+}
+
 /* .env → process.env (без зависимостей) */
 try {
   const envFile = path.join(__dirname, '..', '.env');
@@ -722,6 +764,8 @@ function propagateAdByName(db, ad) {
     o.media = ad.media || null;
     o.points = (ad.points || []).slice();
     if (ad.platform) o.platform = ad.platform;
+    if (ad.transcript !== undefined) { o.transcript = ad.transcript; o.transcriptStatus = ad.transcriptStatus; o.transcriptAt = ad.transcriptAt; }
+    if (ad.notes !== undefined) o.notes = ad.notes;
     c++;
   }
   return c;
@@ -6214,7 +6258,11 @@ const server = http.createServer(async (req, res) => {
       if (!lead) return json(res, 404, { error: 'not found' });
       const b = await readBody(req);
       if (m[2] === 'message') {
-        engine.send(db, lead, b.text || '', 'human');
+        /* первое касание вручную: если в панели показан креатив (загруженный ИЛИ атрибуция объявления,
+           l.adCreative), он уходит первым сообщением — как это делает автопилот на chainStep 0. */
+        const cu = b.creativeUrl ? String(b.creativeUrl).slice(0, 500) : '';
+        if (cu) engine.send(db, lead, '', 'human', { media: { type: /\.(mp4|webm|mov)(\?|$)/i.test(cu) ? 'video' : 'image', url: cu } });
+        if (b.text || !cu) engine.send(db, lead, b.text || '', 'human');
         /* менеджер подхватил — ИИ на паузу (правило autoOff.onHumanReply) */
         if (db.settings.ai.autoOff.onHumanReply && lead.ai.enabled) {
           lead.ai.enabled = false;
@@ -9820,7 +9868,31 @@ ${SCR}
         const fname = `${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(CREATIVES_DIR, fname)); storeAs(fname, isVideo ? 'video' : 'image'); out.url = ad.media.url;
       }
       cleanTmp();
-      return json(res, 200, { url: out.url, type: out.type, compressed: out.compressed, inMB: out.inMB, outMB: out.outMB });
+      /* умный транскрибатор: видео → фон транскрипции для персонализации первого касания */
+      let transcribing = false;
+      if (out.type === 'video' && out.url && process.env.GEMINI_API_KEY) {
+        const abs = path.join(CREATIVES_DIR, out.url.replace('/creatives/', ''));
+        if (fs.existsSync(abs)) { transcribing = true; runCreativeTranscription(db, ad.adId, abs).catch(e => console.error('[transcribe]', e && e.message)); }
+      }
+      return json(res, 200, { url: out.url, type: out.type, compressed: out.compressed, inMB: out.inMB, outMB: out.outMB, transcribing });
+    }
+    /* сохранить доп-информацию о проекте (ручные заметки для персонализации) */
+    if ((m = p.match(/^\/api\/ads\/([^/]+)\/notes$/)) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const ad = db.ads.find(a => String(a.adId) === String(m[1])); if (!ad) return json(res, 404, { error: 'not found' });
+      const b = await readBody(req); ad.notes = String(b.notes || '').slice(0, 4000); propagateAdByName(db, ad); store.save();
+      return json(res, 200, { ok: true });
+    }
+    /* ручной запуск/перезапуск транскрибации креатива */
+    if ((m = p.match(/^\/api\/ads\/([^/]+)\/transcribe$/)) && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const ad = db.ads.find(a => String(a.adId) === String(m[1])); if (!ad) return json(res, 404, { error: 'not found' });
+      if (!ad.media || ad.media.type !== 'video' || !ad.media.url) return json(res, 400, { error: 'у объявления нет видео-креатива' });
+      if (!process.env.GEMINI_API_KEY) return json(res, 400, { error: 'транскрибатор не настроен (GEMINI_API_KEY)' });
+      const abs = path.join(CREATIVES_DIR, String(ad.media.url).replace('/creatives/', ''));
+      if (!fs.existsSync(abs)) return json(res, 400, { error: 'файл видео не найден на сервере (перезалейте креатив)' });
+      runCreativeTranscription(db, ad.adId, abs).catch(e => console.error('[transcribe]', e && e.message));
+      return json(res, 200, { ok: true, status: 'pending' });
     }
     /* дерево: кампании → адсеты → объявления, с креативом, лидами И МЕТРИКАМИ кабинета (Расход/CPL/Квал/CTR/CPM/клики) */
     if (p === '/api/ads/tree' && req.method === 'GET') {
@@ -9843,7 +9915,7 @@ ${SCR}
         const an = ad.adsetName || '— без адсета';
         camps[cn] = camps[cn] || { name: cn, platform: platformOf(ad), campaignType: ad.campaignType || 'lead', adsets: {}, m: mk() };
         camps[cn].adsets[an] = camps[cn].adsets[an] || { name: an, ads: [], m: mk() };
-        camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], m: am, leads: am.leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length) });
+        camps[cn].adsets[an].ads.push({ adId: ad.adId, name: ad.name, geo: ad.geo, platform: platformOf(ad), media: ad.media || null, points: ad.points || [], m: am, leads: am.leads, hasCreative: !!(ad.media && ad.media.url), hasPoints: !!(ad.points && ad.points.length), transcript: ad.transcript || '', transcriptStatus: ad.transcriptStatus || '', notes: ad.notes || '' });
         add(camps[cn].adsets[an].m, am); add(camps[cn].m, am);
       }
       /* dmap → sorted daily spend array + factPerDay (последний полный день = вчера) */

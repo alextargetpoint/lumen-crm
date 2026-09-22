@@ -5259,6 +5259,8 @@ function buildIntakeCard(l) {
     prefRow = `<div class="lc-ik-pref"><div class="lc-ik-pref-hd">${ic(I.spark)}<b>Просьба клиента${line ? ': ' + esc(line) : ' по времени/каналу'}</b></div><i class="lc-ik-pref-q">«${esc(plan.raw.slice(0, 140))}»</i>${brokerTxt}<div class="lc-ik-pref-acts">${acts.join('')}</div></div>`;
   }
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
+  const metaLeadId = (l.meta && (l.meta.leadId || l.meta.leadgenId)) || l.leadId || '';
+  const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
   return `<div class="lc-intake">
     <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
     ${adBlock}
@@ -5266,6 +5268,7 @@ function buildIntakeCard(l) {
     ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
     ${prefRow}
     ${schedRow}
+    ${leadIdLine}
   </div>`;
 }
 /* лёгкий лайтбокс креатива ПОВЕРХ карточки лида — НЕ через modal() (тот закрывает карточку под собой).
@@ -5286,6 +5289,7 @@ function openCreativeView(url, type) {
 function wireIntakeCard(scope, l, done) {
   if (scope) $$('[data-creaview]', scope).forEach(el2 => el2.addEventListener('click', () => openCreativeView(el2.dataset.creaview, el2.dataset.creatype)));
   if (!scope) return;
+  $('.lc-ik-leadid code[data-copy]', scope)?.addEventListener('click', (e) => { try { navigator.clipboard.writeText(e.currentTarget.dataset.copy); toast('Lead ID скопирован', null, true); } catch (_) {} });
   $('[data-cprefemail]', scope)?.addEventListener('click', () => { const em = ((l.contacts || []).find(c => c.kind === 'email') || {}).value || l.email || ''; if (em) window.open('mailto:' + em, '_blank'); else toast('E-mail не найден', 'В карточке нет адреса', false); });
   $('[data-plancall]', scope)?.addEventListener('click', () => scheduleCall(l, done));
   $('[data-planmsg]', scope)?.addEventListener('click', () => openScheduleMessage(l, done));
@@ -5580,8 +5584,8 @@ async function openLeadModal(id) {
               <div class="lc-ft-chips" id="lcFtChips">${ftChipsHtml(l)}</div>
               <div class="lc-ft-grid">
                 <div class="lc-ft-compose">
-                  <label class="lc-creo2 ${l.creativeUrl ? 'has' : ''}" id="lcCreoWrap">
-                    ${l.creativeUrl ? `<img src="${esc(l.creativeUrl)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>` : `<span class="lc-creo2-ph">${ic(I.image || I.plus)}<b>Прикрепить креатив</b><i>уйдёт первым сообщением</i></span>`}
+                  <label class="lc-creo2 ${ftCreo ? 'has' : ''}" id="lcCreoWrap">
+                    ${ftCreo ? `<img src="${esc(ftCreo)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>${ftCreoAuto ? `<span class="lc-creo2-auto">${ic(I.target)}из объявления</span>` : ''}` : `<span class="lc-creo2-ph">${ic(I.image || I.plus)}<b>Прикрепить креатив</b><i>уйдёт первым сообщением</i></span>`}
                     <input type="file" id="lcCreoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
                   </label>
                   <textarea id="lcFtText" class="lc-ft-ta" placeholder="Напишите первое сообщение сами — или соберите персонализацию через ИИ ✦">${esc(`Здравствуйте, ${(l.name || '').split(' ')[0] || ''}! Это ${STATE.settings.agency.name}. Вы оставили заявку${l.ads && l.ads.adName ? ' по «' + l.ads.adName + '»' : ' по недвижимости — ' + l.geoName}. Подскажу по нему детали. Рассматриваете для себя или под инвестиции?`)}</textarea>
@@ -8626,6 +8630,14 @@ PAGES.ads = async (root) => {
       const geoName = (g) => g ? (((STATE && STATE.settings && STATE.settings.geoNames) || {})[g] || g) : '';
       const thumb = (media) => media && media.url ? (media.type === 'video' ? `<span class="ct-th vid" ${media.url ? `style="background-image:url('${esc(media.poster || '')}')"` : ''}>${ic(I.play, 2)}</span>` : `<span class="ct-th" style="background-image:url('${esc(media.url)}')"></span>`) : `<span class="ct-th empty">${ic(I.doc, 2)}</span>`;
       const preview = (media) => media && media.url ? (media.type === 'video' ? `<video src="${esc(media.url)}" controls playsinline></video>` : `<img src="${esc(media.url)}" alt="креатив">`) : '';
+      /* блок «умный транскрибатор + доп-инфо» — под креативом в редакторе (ИИ учтёт в персонализации 1-го касания) */
+      const ctExtra = (adId, o) => { const isVid = o.media && o.media.type === 'video' && o.media.url; const st = o.transcriptStatus || ''; const tr = o.transcript || '';
+        const badge = st === 'done' ? '<span class="ct-tr-b ok">✓ расшифровано</span>' : st === 'pending' ? '<span class="ct-tr-b run"><span class="sbf-spin"></span> расшифровываю…</span>' : st === 'failed' ? '<span class="ct-tr-b bad">не удалось</span>' : (isVid ? '<span class="ct-tr-b">не расшифровано</span>' : '');
+        return `<div class="ct-ed-extra">
+          <div class="ct-ed-lbl" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic(I.spark)}Что в видео + доп-инфо — ИИ вплетёт в первое касание ${badge}${isVid ? `<button class="btn-ghost btn-sm ct-transcribe" data-cttr="${adId}" style="margin-left:auto">${tr ? 'Пере-расшифровать' : 'Расшифровать видео'}</button>` : ''}</div>
+          ${tr ? `<div class="ct-transcript" title="Транскрипт озвучки видео">${esc(tr)}</div>` : (st === 'pending' ? '<div class="muted" style="font-size:11.5px;padding:6px 0">Слушаю озвучку и расшифровываю…</div>' : '')}
+          <textarea class="ct-notes" rows="3" placeholder="Доп. информация о проекте, которой НЕТ в видео (ИИ учтёт): цены/рассрочка, ЖК и застройщик, сроки сдачи, гарантии, ROI, район…">${esc(o.notes || '')}</textarea>
+        </div>`; };
       const adRow = (a) => { const done = a.hasCreative || a.hasPoints; return `<div class="ct-ad" data-ctad="${a.adId}">
         <div class="ct-ad-hd" data-ctedit="${a.adId}">
           ${thumb(a.media)}
@@ -8649,6 +8661,7 @@ PAGES.ads = async (root) => {
               <textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года&#10;Метро и школы в 5 минут&#10;Доходность аренды 8% годовых">${esc((a.points || []).join('\n'))}</textarea>
             </div>
           </div>
+          ${ctExtra(a.adId, a)}
           <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a.adId}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a.adId}">Сохранить</button></div>
         </div>
       </div>`; };
@@ -8662,6 +8675,8 @@ PAGES.ads = async (root) => {
         g.adIds.push(ad.adId); g.camps.add(ad.camp); g.sets.add(ad.adset);
         if (ad.media && ad.media.url && !g.media) g.media = ad.media;
         if (ad.points && ad.points.length && !g.points.length) g.points = ad.points;
+        if (ad.transcript && !g.transcript) { g.transcript = ad.transcript; g.transcriptStatus = ad.transcriptStatus; }
+        if (ad.notes && !g.notes) g.notes = ad.notes;
         g.hasCreative = g.hasCreative || ad.hasCreative; g.hasPoints = g.hasPoints || ad.hasPoints; g.leads += ad.leads || 0;
       }
       const nameGroups = Object.values(byName).sort((a, b) => b.camps.size - a.camps.size || b.leads - a.leads);
@@ -8686,6 +8701,7 @@ PAGES.ads = async (root) => {
               <textarea class="ct-points" rows="4" placeholder="Рассрочка 0% на 3 года&#10;Метро и школы в 5 минут&#10;Доходность аренды 8% годовых">${esc((g.points || []).join('\n'))}</textarea>
             </div>
           </div>
+          ${ctExtra(a0, g)}
           <div class="ct-ed-foot"><span class="ct-up-status" data-ctupst="${a0}"></span><span class="tb-spacer"></span><button class="btn btn-sm btn-accent ct-save" data-ctsave="${a0}">Сохранить и раздать</button></div>
         </div>
       </div>`; };
@@ -8905,9 +8921,23 @@ PAGES.ads = async (root) => {
     const ad = b.dataset.ctsave; const box = b.closest('.ct-ad');
     const url = box.querySelector('.ct-media').value.trim();
     const points = box.querySelector('.ct-points').value.split('\n').map(x => x.trim()).filter(Boolean);
+    const notesEl = box.querySelector('.ct-notes'); const notes = notesEl ? notesEl.value.trim() : null;
     b.disabled = true; b.textContent = 'Сохраняю…';
-    try { const r = await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); toast('Сохранено', r && r.propagated ? `Креатив привязан + раздан на ${r.propagated} одноимённых объявл.` : 'Креатив и тезисы привязаны к объявлению', true); render(); }
+    try { const r = await api.patch('/ads/' + ad + '/creative', { media: url ? { url } : null, points }); if (notes !== null) { try { await api.post('/ads/' + ad + '/notes', { notes }); } catch (_) {} } toast('Сохранено', r && r.propagated ? `Креатив + доп-инфо раздано на ${r.propagated} одноимённых объявл.` : 'Креатив, тезисы и доп-инфо привязаны', true); render(); }
     catch (e) { toast('Не сохранилось', e.message); b.disabled = false; b.textContent = 'Сохранить'; }
+  }));
+  /* ручной запуск транскрибации видео-креатива + опрос статуса */
+  $$('[data-cttr]', root).forEach(b => b.addEventListener('click', async () => {
+    const ad = b.dataset.cttr; b.disabled = true; b.textContent = 'Запускаю…';
+    try {
+      const r = await api.post('/ads/' + ad + '/transcribe', {});
+      if (!r.ok) { toast('Не вышло', r.error || ''); b.disabled = false; b.textContent = 'Расшифровать видео'; return; }
+      toast('Расшифровка запущена', 'Обычно 10-40 сек — обновлю сам', true);
+      let tries = 0; const poll = setInterval(async () => {
+        tries++; if (tries > 20 || (typeof CUR !== 'undefined' && CUR !== 'ads')) { clearInterval(poll); return; }
+        try { const t = await api.get('/ads/tree'); const found = (t.tree || []).flatMap(c => c.adsets.flatMap(a => a.ads)).find(x => String(x.adId) === String(ad)); if (found && found.transcriptStatus && found.transcriptStatus !== 'pending') { clearInterval(poll); render(); } } catch (_) {}
+      }, 4000);
+    } catch (e) { toast('Ошибка', e.message); b.disabled = false; b.textContent = 'Расшифровать видео'; }
   }));
   /* загрузка исходника креатива с ПК */
   $$('[data-ctup]', root).forEach(b => b.addEventListener('click', () => { const f = root.querySelector('.ct-file[data-ctfile="' + b.dataset.ctup + '"]'); if (f) f.click(); }));
