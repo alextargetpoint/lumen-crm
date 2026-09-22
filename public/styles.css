@@ -8176,3 +8176,18 @@ body.client-view [data-team]{ display:none !important; }
 .sbf-connect .sbf-row,.sbf-row{ display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
 .sbf-row label{ font-size:11px; color:var(--ink-3,var(--muted)); }
 .sbf-row input,.sbf-row textarea{ width:100%; }
+
+/* Ферма Simbye — шаблон/автопилот/секреты */
+.sbf-auto{ display:inline-flex; align-items:center; gap:7px; margin-left:auto; font-size:11px; color:var(--ink-2); }
+.sbf-auto .switch{ transform:scale(.82); }
+.sbf-wrap .sbf-badge{ margin-left:10px; }
+.sbf-budget{ font-size:11px; color:var(--muted); margin:0 0 12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.sbf-budget svg{ width:12px; height:12px; }
+.sbf-secrets{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:10.5px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px dashed var(--stroke); }
+.sbf-secrets svg{ width:12px; height:12px; }
+.sbf-secrets b{ color:var(--ink-2); font-weight:600; letter-spacing:.3px; }
+.sbf-register,.sbf-getotp{ margin-left:auto; }
+.sbf-tpl{ margin:6px 0 12px; }
+.sbf-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.sbf-grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+@media(max-width:640px){ .sbf-grid2,.sbf-grid3{ grid-template-columns:1fr; } }

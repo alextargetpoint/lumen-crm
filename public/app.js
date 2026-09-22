@@ -11859,6 +11859,35 @@ function wireSimbye(scope, d, reload) {
     } catch (e) { toast('Ошибка', e.message); }
     b.disabled = false; b.innerHTML = orig; reload();
   }));
+  $$s('.sbf-register').forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.phone, ch = b.dataset.ch, service = ch === 'tg' ? 'telegram' : 'whatsapp';
+    b.disabled = true;
+    try {
+      const r = await api.post('/simbye/register', { phone, service });
+      if (r.ok) {
+        const steps = (r.guide || []).map((g, i) => `<div style="display:flex;gap:8px;margin:6px 0"><span style="flex:0 0 20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700">${i + 1}</span><span style="font-size:12.5px;line-height:1.5">${esc(g)}</span></div>`).join('');
+        const sec = r.secrets ? `<div class="sbf-notice info" style="margin-top:10px">2FA-PIN: <b>${esc(r.secrets.twoFAPin || '')}</b> · резервная почта: <b>${esc(r.secrets.recoveryEmail || '')}</b></div>` : '';
+        modal({ title: `${ch === 'wa' ? 'WhatsApp' : 'Telegram'} · регистрация ${esc(phone)}`, body: `<div>${steps}${sec}<div class="muted" style="font-size:11px;margin-top:10px">Когда приложение попросит код — закрой это окно и нажми «Забрать код». Номер уже переведён в статус «ждём код».</div></div>`, actions: [{ label: 'Понятно', cls: 'btn-accent' }] });
+      } else toast('Не вышло', r.error || '');
+    } catch (e) { toast('Ошибка', e.message); }
+    b.disabled = false; reload();
+  }));
+  $$s('.sbf-regen').forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Обновить секреты?', 'Сгенерируем новый 2FA-PIN и резервную почту для этого номера.', { ok: 'Обновить' })) return; try { await api.post('/simbye/account/secrets', { phone: b.dataset.phone, regen: true }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
+  $s('#sbfAuto')?.addEventListener('change', async (e) => { try { await api.post('/simbye/autopilot', { on: e.target.checked }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', e.target.checked ? 'Система сама двигает этапы' : null, true); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
+  $s('#tplSave')?.addEventListener('click', async (e) => {
+    const recMode = $s('#tplRecMode').value; const recVal = ($s('#tplRecVal').value || '').trim();
+    const twofa = $s('#tpl2fa').value;
+    const patch = {
+      personaMode: $s('#tplPersona').value, namePattern: $s('#tplName').value, bio: $s('#tplBio').value,
+      avatarPool: ($s('#tplAva').value || '').split(',').map(x => x.trim()).filter(Boolean),
+      recoveryMode: recMode, recoveryDomain: recMode === 'catchall' ? recVal : '', recoveryBase: recMode === 'gmail-alias' ? recVal : '',
+      twoFA: { enabled: twofa !== 'off', pinMode: twofa === 'fixed' ? 'fixed' : 'random', pin: $s('#tpl2faPin').value },
+      targets: { wa: +$s('#tplTgtWa').value, tg: +$s('#tplTgtTg').value },
+      budget: { maxNumbers: +$s('#tplMaxNum').value, maxBuysPerDay: +$s('#tplMaxBuy').value, maxRetries: +$s('#tplRetry').value },
+    };
+    e.currentTarget.disabled = true;
+    try { await api.post('/simbye/template', patch); toast('Шаблон сохранён', 'Новые аккаунты будут заполняться так', true); reload(); } catch (er) { toast('Не вышло', er.message); e.currentTarget.disabled = false; }
+  });
   $$s('.sbf-al-x').forEach(b => b.addEventListener('click', async () => { try { await api.post('/simbye/alert/resolve', { id: b.dataset.id }); reload(); } catch (_) {} }));
   $$s('.sbf-acct-x').forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Убрать из фермы?', 'Сам номер в Simbye останется — уберём только из отслеживания.', { ok: 'Убрать', danger: true })) return; try { await api.post('/simbye/account/remove', { phone: b.dataset.phone }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
   $s('#sbfImport')?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/simbye/import', {}); toast('Импортировано', `Добавлено ${r.added}, обновлено ${r.updated}`, true); reload(); } catch (er) { toast('Не вышло', er.message); b.disabled = false; } });
@@ -12314,15 +12343,24 @@ PAGES.numbers = async (root) => {
     const chanRow = (acc, ch, name) => {
       const cs = (acc.channels || {})[ch];
       const notice = (acc.notices || {})[ch];
-      const showActions = isOwner && (!cs || ['purchased', 'awaiting_otp', 'stuck'].includes(cs.state));
+      const state = cs ? cs.state : 'purchased';
+      const canRegister = isOwner && ['purchased', 'parked'].includes(state);
+      const canGetOtp = isOwner && ['awaiting_otp', 'stuck'].includes(state);
       return `<div class="sbf-chan">
         <div class="sbf-chan-hd"><span class="sbf-ch-name">${ic(ch === 'wa' ? I.chat : I.send)}${name}</span>
           ${cs && cs.state === 'otp_received' && cs.otp ? `<span class="sbf-code" title="Код ${esc(cs.otp)}">код: <b>${esc(cs.otp)}</b></span>` : ''}
-          ${showActions ? `<button class="btn-ghost btn-sm sbf-getotp" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.refresh || I.spark)}Забрать код</button>` : ''}
+          ${canRegister ? `<button class="btn-ghost btn-sm sbf-register" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.link)}Начать регистрацию</button>` : ''}
+          ${canGetOtp ? `<button class="btn-ghost btn-sm sbf-getotp" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.refresh || I.spark)}Забрать код</button>` : ''}
         </div>
         ${chanStepper(cs)}
         ${notice ? `<div class="sbf-notice ${notice.level}">${esc(notice.text)}</div>` : ''}
       </div>`;
+    };
+    /* секреты аккаунта — только владельцу (2FA PIN + резервная почта, чтобы аккаунты не воровали/не слетали) */
+    const secretsRow = (acc) => {
+      if (!isOwner || !acc.secrets) return '';
+      const s = acc.secrets;
+      return `<div class="sbf-secrets">${ic(I.shield)}<span>2FA-PIN <b>${esc(s.twoFAPin || '—')}</b></span><span>почта <b>${esc(s.recoveryEmail || '—')}</b></span><button class="btn-ghost btn-sm sbf-regen" data-phone="${esc(acc.phone)}">обновить</button></div>`;
     };
 
     const flag = (c) => c === 'uk' ? '+44 · UK' : c === 'usa' ? '+1 · USA' : '';
@@ -12344,9 +12382,12 @@ PAGES.numbers = async (root) => {
     const detected = h && h.numbers ? h.numbers : 0;
     const canImport = isOwner && detected > d.accounts.length;
 
+    const tpl = d.template || {};
     box.innerHTML = `<div class="glass card mb sbf-wrap">
       <div class="card-title">${ic(I.sim)}Ферма номеров Simbye<span class="sub">процесс каждого номера: покупка → регистрация → код → подключение → прогрев</span>
+        ${isOwner ? `<label class="sbf-auto" title="Автопилот: сам двигает этапы, применяет персону, добивает до «активен»"><span>Автопилот</span><span class="switch"><input type="checkbox" id="sbfAuto" ${d.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></span></label>` : ''}
         <span class="sbf-badge ${h && h.loggedIn && h.ok ? 'ok' : 'off'}">${h && h.loggedIn && h.ok ? 'сессия активна' : 'сессия недоступна'}</span></div>
+      ${isOwner && d.budget ? `<div class="sbf-budget">${ic(I.shield)}Номеров: <b>${d.budget.used}</b>/${d.budget.maxNumbers} · сегодня куплено ${d.budget.buysToday}/${d.budget.maxBuysPerDay}${d.budget.guard && !d.budget.guard.ok ? ` · <span style="color:var(--warn)">${esc(d.budget.guard.reason)}</span>` : ''} · цель ${(tpl.targets || {}).wa || 0} WA + ${(tpl.targets || {}).tg || 0} TG на агентство</div>` : ''}
       ${h && (!h.loggedIn || !h.ok) ? `<div class="sbf-notice error" style="margin:0 0 10px">Сессия Simbye не отвечает или разлогинена. ${isOwner ? 'Обновите её ниже.' : 'Мы уже уведомлены — регистрация номеров временно на паузе.'}</div>` : ''}
       ${alertsHtml}
       ${d.accounts.length ? `<div class="sbf-accts">${d.accounts.map(acc => `<div class="sbf-acct" data-acct="${esc(acc.phone)}">
@@ -12356,7 +12397,44 @@ PAGES.numbers = async (root) => {
         </div>
         ${chanRow(acc, 'wa', 'WhatsApp')}
         ${chanRow(acc, 'tg', 'Telegram')}
+        ${secretsRow(acc)}
       </div>`).join('')}</div>` : `<div class="muted" style="font-size:12px;padding:6px 0">${detected ? `В Simbye обнаружено номеров: <b>${detected}</b>.` : 'Номеров пока нет.'} ${isOwner ? 'Импортируйте их в ферму, чтобы отслеживать процесс.' : ''}</div>`}
+      ${isOwner ? `<div class="sbf-tpl">${coll('Шаблон аккаунта агентства — персона, резервная почта, 2FA, цели и лимиты', `
+        <div class="muted" style="font-size:11px;line-height:1.5;margin:2px 0 10px">Как заполнять новые аккаунты, чтобы они были живыми и не слетали: единая персона, уникальная резервная почта на номер (повтор одной почты ломает коды Telegram), двухфакторка и лимиты, чтобы не покупать номера бесконечно.</div>
+        <div class="sbf-grid2">
+          <div class="sbf-row"><label>Тип персоны</label><select id="tplPersona">
+            <option value="agency" ${tpl.personaMode === 'agency' ? 'selected' : ''}>Агентство (нейтральный бренд)</option>
+            <option value="broker" ${tpl.personaMode === 'broker' ? 'selected' : ''}>Под брокера</option>
+            <option value="neutral" ${tpl.personaMode === 'neutral' ? 'selected' : ''}>Нейтральная</option></select></div>
+          <div class="sbf-row"><label>Шаблон имени <span class="muted">{agency}, {n}</span></label><input id="tplName" value="${esc(tpl.namePattern || '')}" placeholder="{agency} · Отдел заботы {n}"></div>
+        </div>
+        <div class="sbf-row"><label>Описание (bio)</label><input id="tplBio" value="${esc(tpl.bio || '')}" placeholder="Помогаем подобрать недвижимость"></div>
+        <div class="sbf-row"><label>Аватарки (URL через запятую, ротация по номерам)</label><input id="tplAva" value="${esc((tpl.avatarPool || []).join(', '))}" placeholder="https://…/a.png, https://…/b.png"></div>
+        <div class="sbf-grid2">
+          <div class="sbf-row"><label>Резервная почта</label><select id="tplRecMode">
+            <option value="catchall" ${tpl.recoveryMode === 'catchall' ? 'selected' : ''}>Catch-all домен (любой@домен)</option>
+            <option value="gmail-alias" ${tpl.recoveryMode === 'gmail-alias' ? 'selected' : ''}>Gmail-алиасы (base+xxx@)</option>
+            <option value="manual" ${tpl.recoveryMode === 'manual' ? 'selected' : ''}>Вручную</option></select></div>
+          <div class="sbf-row"><label>Домен / база почты</label><input id="tplRecVal" value="${esc(tpl.recoveryDomain || tpl.recoveryBase || '')}" placeholder="mail.agency.io  или  agency@gmail.com"></div>
+        </div>
+        <div class="sbf-grid3">
+          <div class="sbf-row"><label>2FA</label><select id="tpl2fa">
+            <option value="random" ${(tpl.twoFA || {}).enabled !== false && (tpl.twoFA || {}).pinMode !== 'fixed' ? 'selected' : ''}>Случайный PIN</option>
+            <option value="fixed" ${(tpl.twoFA || {}).pinMode === 'fixed' ? 'selected' : ''}>Общий PIN</option>
+            <option value="off" ${(tpl.twoFA || {}).enabled === false ? 'selected' : ''}>Выкл</option></select></div>
+          <div class="sbf-row"><label>Общий PIN (если выбран)</label><input id="tpl2faPin" value="${esc((tpl.twoFA || {}).pin || '')}" placeholder="6 цифр" maxlength="6"></div>
+          <div class="sbf-row"><label>Макс. ретраев</label><input id="tplRetry" type="number" min="1" value="${(tpl.budget || {}).maxRetries || 3}"></div>
+        </div>
+        <div class="sbf-grid3">
+          <div class="sbf-row"><label>Цель WA / агентство</label><input id="tplTgtWa" type="number" min="0" value="${(tpl.targets || {}).wa || 5}"></div>
+          <div class="sbf-row"><label>Цель TG / агентство</label><input id="tplTgtTg" type="number" min="0" value="${(tpl.targets || {}).tg || 5}"></div>
+          <div class="sbf-row"><label>Лимит номеров всего</label><input id="tplMaxNum" type="number" min="0" value="${(tpl.budget || {}).maxNumbers || 12}"></div>
+        </div>
+        <div class="sbf-grid2">
+          <div class="sbf-row"><label>Макс. покупок в день</label><input id="tplMaxBuy" type="number" min="0" value="${(tpl.budget || {}).maxBuysPerDay || 5}"></div>
+          <div class="sbf-row" style="justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-sm btn-accent" id="tplSave">${ic(I.check)}Сохранить шаблон</button></div>
+        </div>
+      `, { open: false, icon: I.gear })}</div>` : ''}
       <div class="sbf-foot">
         ${canImport ? `<button class="btn btn-sm btn-accent" id="sbfImport">${ic(I.plus)}Импортировать номера (${detected})</button>` : ''}
         ${isOwner ? `<button class="btn btn-sm" id="sbfBuy">${ic(I.plus)}Купить номер</button>` : ''}

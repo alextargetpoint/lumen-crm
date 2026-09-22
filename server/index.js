@@ -150,10 +150,47 @@ setInterval(() => {
         if (!has && !process.env.LUMEN_SIMBYE_WORKER_URL) return; // ничего не настроено — пропускаем
         simbye.tick(db, store, { notifyOwner: (d, msg) => { try { engine.sendReport(d, msg); } catch (_) {} } })
           .catch(e => console.error('[simbye.tick]', tid, e && e.message));
+        autopilotReconcile(db).catch(e => console.error('[simbye.autopilot]', tid, e && e.message));
       });
     }
   } catch (e) { console.error('[simbye watchdog]', e && e.message); }
 }, 60000);
+
+/* Автопилот фермы: когда номер РЕАЛЬНО подключился в WA/TG-воркере — двигаем этап,
+ * закрепляем секреты (2FA/почта), применяем персону из шаблона агентства, добиваем до «активен».
+ * Отвалился — сигнал. Только при template.autopilot. Живые вызовы воркеров — best-effort. */
+async function autopilotReconcile(db) {
+  const t = simbye.template(db);
+  if (!t.autopilot) return;
+  const f = simbye.farm(db);
+  if (!f.accounts.length) return;
+  let waLive = {}, tgLive = {};
+  try { if (waWorkerReady(db)) waLive = (await waGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) {}
+  try { if (tgWorkerReady(db)) tgLive = (await tgGrayApi(db, 'GET', '/sessions')).sessions || {}; } catch (_) {}
+  const chans = [
+    { ch: 'wa', live: waLive, sid: waGraySid, api: waGrayApi, profile: (p) => ({ name: p.name, about: p.bio, photoUrl: p.avatar }) },
+    { ch: 'tg', live: tgLive, sid: tgGraySid, api: tgGrayApi, profile: (p) => ({ firstName: p.name, about: p.bio, photoUrl: p.avatar }) },
+  ];
+  let idx = 0;
+  for (const acc of f.accounts) {
+    for (const cfg of chans) {
+      const s = cfg.live[cfg.sid(acc.phone)];
+      const connected = s && s.status === 'connected';
+      if (connected) {
+        const need = simbye.onConnected(db, acc, cfg.ch);
+        if (need) {
+          const p = simbye.personaFor(db, acc, idx);
+          try { await cfg.api(db, 'POST', '/sessions/' + cfg.sid(acc.phone) + '/profile', cfg.profile(p)); const c = simbye.chan(acc, cfg.ch); c.personaPending = false; c.persona = p; } catch (_) {}
+        }
+        simbye.maybeActivate(db, acc, cfg.ch);
+      } else {
+        simbye.onDisconnected(db, acc, cfg.ch);
+      }
+    }
+    idx++;
+  }
+  try { store.save(); } catch (_) {}
+}
 
 /* ---------- авторизация ---------- */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -7390,18 +7427,77 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ===== Simbye: скрейпер-ферма номеров (детект/OTP/продление) + вотчдог/сигналы ===== */
+    /* шаблон аккаунта агентства (persona/резервная почта/2FA/цели/бюджет) — сохранить (владелец) */
+    if (p === '/api/simbye/template' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const t = simbye.template(db);
+      const S = (v, d) => (v == null ? d : v);
+      if (b.personaMode != null) t.personaMode = b.personaMode;
+      if (b.namePattern != null) t.namePattern = String(b.namePattern).slice(0, 80);
+      if (b.bio != null) t.bio = String(b.bio).slice(0, 140);
+      if (Array.isArray(b.avatarPool)) t.avatarPool = b.avatarPool.filter(x => typeof x === 'string').slice(0, 20);
+      if (b.recoveryMode != null) t.recoveryMode = b.recoveryMode;
+      if (b.recoveryDomain != null) t.recoveryDomain = String(b.recoveryDomain).trim();
+      if (b.recoveryBase != null) t.recoveryBase = String(b.recoveryBase).trim();
+      if (b.twoFA) t.twoFA = { enabled: !!b.twoFA.enabled, pinMode: b.twoFA.pinMode === 'fixed' ? 'fixed' : 'random', pin: String(b.twoFA.pin || '').replace(/\D/g, '').slice(0, 6) };
+      if (b.targets) t.targets = { wa: Math.max(0, +b.targets.wa || 0), tg: Math.max(0, +b.targets.tg || 0) };
+      if (b.budget) t.budget = { maxNumbers: Math.max(0, +b.budget.maxNumbers || 0), maxBuysPerDay: Math.max(0, +b.budget.maxBuysPerDay || 0), maxRetries: Math.max(1, +b.budget.maxRetries || 3) };
+      if (b.autopilot != null) t.autopilot = !!b.autopilot;
+      store.save();
+      return json(res, 200, { ok: true, template: t });
+    }
+    /* включить/выключить автопилот отдельным тумблером */
+    if (p === '/api/simbye/autopilot' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const t = simbye.template(db); t.autopilot = !!b.on; store.save();
+      return json(res, 200, { ok: true, autopilot: t.autopilot });
+    }
+    /* запустить (ассистированную) регистрацию канала: закрепить секреты, перевести в «ждём код», отдать номер+инструкцию */
+    if (p === '/api/simbye/register' && req.method === 'POST') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const b = await readBody(req);
+      const acc = simbye.farm(db).accounts.find(a => a.phone === b.phone);
+      if (!acc) return json(res, 404, { error: 'номер не в ферме' });
+      const ch = (b.service === 'tg' || b.service === 'telegram') ? 'tg' : 'wa';
+      const secrets = simbye.ensureSecrets(db, acc);
+      simbye.setState(db, acc, ch, 'awaiting_otp'); store.save();
+      return json(res, 200, {
+        ok: true, phone: acc.phone, service: ch,
+        secrets: (sessionRole(req) || {}).role === 'owner' ? secrets : undefined,
+        guide: ch === 'wa'
+          ? ['Открой ОБЫЧНЫЙ WhatsApp (не Business) на телефоне/эмуляторе', 'Введи номер ' + acc.phone, 'Когда попросит SMS-код — вернись сюда и нажми «Забрать код»', 'После входа: Настройки → Аккаунт → Двухшаговая проверка → включи PIN ' + (secrets.twoFAPin || '(из шаблона)') + ', e-mail восстановления ' + (secrets.recoveryEmail || '')]
+          : ['Открой Telegram, введи номер ' + acc.phone, 'Если попросит e-mail — укажи ' + (secrets.recoveryEmail || '(из шаблона)'), 'Когда попросит код — нажми «Забрать код»', 'Включи Настройки → Конфиденциальность → Облачный пароль (2FA) ' + (secrets.twoFAPin || '')],
+      });
+    }
+    /* перегенерировать секреты аккаунта (владелец) */
+    if (p === '/api/simbye/account/secrets' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      const b = await readBody(req); const acc = simbye.farm(db).accounts.find(a => a.phone === b.phone); if (!acc) return json(res, 404, { error: 'нет номера' });
+      if (b.regen) acc.secrets = {};
+      const s = simbye.ensureSecrets(db, acc); store.save();
+      return json(res, 200, { ok: true, secrets: s });
+    }
     /* сводка фермы: настроен ли воркер, health сессии, аккаунты + их этапы, алерты */
     if (p === '/api/simbye/farm' && req.method === 'GET') {
       if (!getSession(req)) return json(res, 401, { error: 'auth' });
       const f = simbye.farm(db);
       const R = sessionRole(req);
+      const owner = !!(R && R.role === 'owner');
+      const tpl = simbye.template(db);
       return json(res, 200, {
         ok: true, ready: simbye.ready(db, store),
         platform: !!(process.env.LUMEN_SIMBYE_WORKER_URL || (store.getRegistry().platformSimbyeWorker || {}).url),
         envLocked: !!process.env.LUMEN_SIMBYE_WORKER_URL,
-        isOwner: !!(R && R.role === 'owner'),
+        isOwner: owner,
         health: f.health || null,
-        accounts: f.accounts.map(a => ({ ...a, notices: Object.keys(a.channels || {}).reduce((o, ch) => { const n = simbye.clientNotice(a, ch); if (n) o[ch] = n; return o; }, {}) })),
+        template: owner ? tpl : { autopilot: tpl.autopilot, targets: tpl.targets },
+        autopilot: !!tpl.autopilot,
+        budget: owner ? { ...tpl.budget, used: f.accounts.length, buysToday: (f.buyLog || []).filter(x => x > Date.now() - 864e5).length, guard: simbye.buyGuard(db) } : null,
+        accounts: f.accounts.map(a => ({
+          ...a,
+          secrets: owner ? (a.secrets || null) : undefined, // секреты — только владельцу
+          notices: Object.keys(a.channels || {}).reduce((o, ch) => { const n = simbye.clientNotice(a, ch); if (n) o[ch] = n; return o; }, {}),
+        })),
         alerts: f.alerts.filter(a => !a.resolved).slice(0, 20),
         steps: simbye.STEPS, stepLabels: simbye.STEP_RU,
       });
@@ -7446,7 +7542,8 @@ const server = http.createServer(async (req, res) => {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
       if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
       const b = await readBody(req);
-      try { const r = await simbye.buy(db, store, b.country || 'uk', !!b.calls); return json(res, 200, r); }
+      const guard = simbye.buyGuard(db); if (!guard.ok) return json(res, 200, { ok: false, error: 'Покупка заблокирована: ' + guard.reason + '. Измените лимиты в шаблоне.' });
+      try { const r = await simbye.buy(db, store, b.country || 'uk', !!b.calls); if (r.ok) simbye.recordBuy(db); store.save(); return json(res, 200, r); }
       catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* залить/обновить сессию Simbye (storageState из живого Chrome владельца). Только владелец. */
