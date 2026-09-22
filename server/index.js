@@ -91,6 +91,22 @@ const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
 
+/* ── анти-перебор публичных шаринг-страниц (defense-in-depth от лид-хантеров) ──
+   Легитимный клиент открывает 1–2 ссылки; бот-сборщик перебирает сотни последовательных id.
+   Лимит по IP на публичные GET без сессии: /m/ /b/ /mp/ /p/ /c/ /car/ /cal/. In-memory (на инстанс). */
+const _pubRL = new Map();   // ip -> { n, resetAt }
+function publicEnumLimited(req, p, hasSession) {
+  if (hasSession) return false;
+  if (!/^\/(m|b|mp|p|c|car|cal)\//.test(p)) return false;
+  const ip = String((req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || 'x');
+  const now = Date.now();
+  let e = _pubRL.get(ip);
+  if (!e || now > e.resetAt) { e = { n: 0, resetAt: now + 60000 }; _pubRL.set(ip, e); }
+  e.n += 1;
+  if (_pubRL.size > 5000) { for (const [k, v] of _pubRL) if (now > v.resetAt) _pubRL.delete(k); }   // GC старых окон
+  return e.n > 40;   // >40 публичных страниц/мин с одного IP = перебор → 429
+}
+
 /* Стартовые WhatsApp-шаблоны первого касания. Тело = фикс-текст + {{1}},
    где {{1}} — полностью собранное Lumen персональное сообщение (совпадает
    с одно-параметровой отправкой в wa.sendTemplate). Категория MARKETING —
@@ -3422,6 +3438,8 @@ const server = http.createServer(async (req, res) => {
   /* SEC: безопасные хедеры-страховка (не ломают inline-скрипты приложения) */
   res.setHeader('Content-Security-Policy', "object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
   if ((req.headers['x-forwarded-proto'] || '') === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  /* SEC: анти-перебор публичных шаринг-страниц (лид-хантеры перебирают id) — 429 на залп с одного IP */
+  if (req.method === 'GET' && publicEnumLimited(req, p, !!_sidM)) { res.writeHead(429, { 'Retry-After': '60', 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Слишком много запросов. Попробуйте позже.'); return; }
   /* базовый URL для ссылок в сообщениях И для серверных скриншотов (shot.capture) — engine берёт из global.
      SSRF-фикс: в проде пиним через env PUBLIC_BASE_URL; иначе доверяем Host, только если он НЕ приватный/внутренний
      (иначе Host: 169.254.169.254 заставил бы сервер сам сходить во внутреннюю сеть Railway). */
