@@ -4409,7 +4409,13 @@ async function openOffboard(brokerId) {
     <label class="off-lbl">Кому передать</label>
     <select id="offSucc">${succOpts}</select>
     <div class="off-dist" id="offDist"><div class="off-dist-hd">Распределение</div>${distHtml(prev.distribution)}</div>
-    <label class="off-check"><input type="checkbox" id="offNotify"> Уведомить клиентов в WhatsApp («теперь с вами работает …»)</label>
+    <label class="off-check"><input type="checkbox" id="offNotify"> Отправить лидам «карточку передачи» — новый брокер представится</label>
+    <div id="offHandover" style="display:none;margin:8px 0 4px">
+      <label class="off-lbl">Текст передачи (новый брокер представляется). Переменные: {name} · {broker} · {old} · {agency}</label>
+      <textarea id="offHandText" style="width:100%;min-height:96px">Здравствуйте, {name}! Меня зовут {broker}. {old} больше не работает в нашей команде — теперь ваш вопрос веду я. Вся история и договорённости сохранены, давайте познакомимся и продолжим?</textarea>
+      <div class="muted" style="font-size:11px;margin-top:4px">${ic(I.shield)} Лид увидит новое имя и аватар — поэтому важно по-человечески представиться. Уйдёт по тихим часам клиента.</div>
+    </div>
+    <div class="off-note" style="font-size:11.5px;color:var(--muted);margin-top:8px;display:flex;gap:6px;align-items:flex-start">${ic(I.sim || I.chat)}<span>WhatsApp-номер брокера передаётся преемнику (если выбран конкретный) или освобождается, а оформление профиля сбрасывается — новый брокер заведёт имя и аватар заново.</span></div>
     ${prev.poolEmpty ? '<div class="off-warn">Нет активных брокеров для передачи — лиды останутся ничьими.</div>' : ''}`;
   const bd = modal({
     title: 'Передача дел и отключение', sub: 'Мастер оффбординга — доступ отзывается сразу', body, wide: true,
@@ -4417,12 +4423,15 @@ async function openOffboard(brokerId) {
       { label: 'Отмена' },
       { label: 'Передать и отключить', cls: 'btn-danger', onClick: async (bd2) => {
           const successor = $('#offSucc', bd2).value; const notifyClients = $('#offNotify', bd2).checked;
-          try { const r = await api.post('/brokers/' + brokerId + '/offboard', { successor, notifyClients });
-            toast(`Передано ${r.moved} лидов`, br.name + ' отключён', true); await loadState(); go('control'); }
+          const handoverText = notifyClients ? ($('#offHandText', bd2) || {}).value : '';
+          try { const r = await api.post('/brokers/' + brokerId + '/offboard', { successor, notifyClients, handoverText });
+            toast(`Передано ${r.moved} лидов`, br.name + ' отключён' + (r.numMoved ? ` · номер ${r.numTarget ? 'передан преемнику' : 'освобождён'} и сброшен` : ''), true); await loadState(); go('control'); }
           catch (e) { toast('Ошибка', e.message); return false; }
         } },
     ],
   });
+  /* карточка передачи показывается только при включённом уведомлении */
+  $('#offNotify', bd)?.addEventListener('change', (e) => { const h = $('#offHandover', bd); if (h) h.style.display = e.target.checked ? '' : 'none'; });
   /* пересчёт распределения при смене преемника */
   $('#offSucc', bd).addEventListener('change', async (e) => {
     try { const p2 = await api.get('/brokers/' + brokerId + '/offboard?successor=' + encodeURIComponent(e.target.value));
