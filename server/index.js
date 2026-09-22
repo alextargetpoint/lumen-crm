@@ -4,7 +4,46 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
+const { spawn } = require('child_process');
 const { URL } = require('url');
+
+/* ── Авто-сжатие видео при загрузке креатива (ffmpeg → mp4/H.264, совместимо с WhatsApp) ── */
+let FFMPEG_OK = null; /* кэш доступности ffmpeg на этой машине (Railway: ставится через nixpacks.toml) */
+function ffmpegAvailable() {
+  return new Promise((resolve) => {
+    if (FFMPEG_OK !== null) return resolve(FFMPEG_OK);
+    try { const p = spawn('ffmpeg', ['-version']); p.on('error', () => { FFMPEG_OK = false; resolve(false); }); p.on('close', (c) => { FFMPEG_OK = c === 0; resolve(FFMPEG_OK); }); }
+    catch (_) { FFMPEG_OK = false; resolve(false); }
+  });
+}
+/* длительность видео — из stderr самого ffmpeg (ffprobe может отсутствовать; ffmpeg гарантированно есть) */
+function ffprobeDuration(inPath) {
+  return new Promise((resolve) => {
+    let done = false; const fin = (v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      const p = spawn('ffmpeg', ['-i', inPath]); let err = '';
+      p.stderr.on('data', d => { err += d; if (err.length > 20000) err = err.slice(-20000); });
+      p.on('error', () => fin(0));
+      p.on('close', () => { const m = err.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/); fin(m ? (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]) : 0); });
+    } catch (_) { fin(0); }
+  });
+}
+/* сжать до ~targetMB: битрейт из длительности, downscale ≤1280px, mp4 H.264 + AAC + faststart */
+async function compressVideoToMp4(inPath, outPath, targetMB = 24) {
+  const dur = await ffprobeDuration(inPath);
+  const audioKbps = 96;
+  let vKbps = dur > 0 ? Math.floor((targetMB * 1024 * 8) / dur) - audioKbps : 2500;
+  vKbps = Math.max(400, Math.min(6000, vKbps));
+  const args = ['-y', '-i', inPath, '-vf', "scale='min(1280,iw)':-2", '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', vKbps + 'k', '-maxrate', Math.round(vKbps * 1.45) + 'k', '-bufsize', Math.round(vKbps * 2) + 'k', '-c:a', 'aac', '-b:a', audioKbps + 'k', '-movflags', '+faststart', outPath];
+  await new Promise((resolve, reject) => {
+    const p = spawn('ffmpeg', args); let err = '';
+    p.stderr.on('data', d => { err += d; if (err.length > 4000) err = err.slice(-4000); });
+    p.on('error', reject);
+    p.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg exit ' + code + ': ' + err.slice(-200))));
+  });
+  return outPath;
+}
 
 /* .env → process.env (без зависимостей) */
 try {
@@ -9280,17 +9319,43 @@ ${SCR}
       if (!ad) return json(res, 404, { error: 'not found' });
       const extM = String(u.searchParams.get('filename') || '').match(/\.(mp4|webm|mov|jpe?g|png|webp|gif)$/i);
       if (!extM) return json(res, 400, { error: 'формат: mp4/webm/mov/jpg/png/webp/gif' });
-      const chunks = []; let size = 0, over = false;
-      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 100e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
-      if (over) return json(res, 400, { error: 'файл до 100 МБ' });
-      if (!size) return json(res, 400, { error: 'пустой файл' });
+      const ext = extM[1].toLowerCase();
+      const isVideo = /^(mp4|webm|mov)$/.test(ext);
+      const CAP = 500e6;   /* большие видео принимаем — сожмём сами (было 100 МБ и отказ) */
+      /* стримим в temp-файл (не буферим сотни МБ в RAM) */
+      const tmpIn = path.join(os.tmpdir(), 'lum-up-' + crypto.randomBytes(5).toString('hex') + '.' + ext);
+      const ws = fs.createWriteStream(tmpIn);
+      let size = 0, over = false;
+      await new Promise((resolve) => {
+        req.on('data', (ch) => { size += ch.length; if (size > CAP) { over = true; try { req.destroy(); } catch (_) { } try { ws.destroy(); } catch (_) { } resolve(); } else ws.write(ch); });
+        req.on('end', () => ws.end(resolve)); req.on('close', resolve); req.on('error', resolve);
+      });
+      const cleanTmp = () => { try { fs.unlinkSync(tmpIn); } catch (_) { } };
+      if (over) { cleanTmp(); return json(res, 400, { error: 'файл до 500 МБ' }); }
+      if (!size) { cleanTmp(); return json(res, 400, { error: 'пустой файл' }); }
       fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
-      const ext = extM[1].toLowerCase(); const fname = `creatives/ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
-      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
-      ad.media = { type: /^(mp4|webm|mov)$/.test(ext) ? 'video' : 'image', url: '/assets/' + fname };
-      propagateAdByName(db, ad);   /* тот же креатив — на все одноимённые объявления */
-      store.save();
-      return json(res, 200, { url: ad.media.url, type: ad.media.type });
+      const stamp = `ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}`;
+      const storeAs = (relName, type) => { ad.media = { type, url: '/assets/' + relName }; propagateAdByName(db, ad); store.save(); };
+      const COMPRESS_OVER = 28e6;   /* видео крупнее ~28 МБ — жмём под ~24 МБ */
+      let out = { url: '', type: isVideo ? 'video' : 'image', compressed: false, inMB: +(size / 1e6).toFixed(1) };
+      if (isVideo && size > COMPRESS_OVER && await ffmpegAvailable()) {
+        const rel = `creatives/${stamp}.mp4`; const outAbs = path.join(PUBLIC, 'assets', rel);
+        try {
+          await compressVideoToMp4(tmpIn, outAbs, 24);
+          const outSize = (() => { try { return fs.statSync(outAbs).size; } catch (_) { return 0; } })();
+          storeAs(rel, 'video'); out.url = ad.media.url; out.compressed = true; out.outMB = +(outSize / 1e6).toFixed(1);
+        } catch (e) {
+          try { fs.unlinkSync(outAbs); } catch (_) { }
+          if (size <= 100e6) { const rel2 = `creatives/${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel2)); storeAs(rel2, 'video'); out.url = ad.media.url; }
+          else { cleanTmp(); return json(res, 500, { error: 'не удалось сжать видео: ' + e.message }); }
+        }
+      } else if (isVideo && size > 100e6) {
+        cleanTmp(); return json(res, 400, { error: 'видео больше 100 МБ, а сжатие на сервере недоступно — сожмите вручную или загрузите ссылкой' });
+      } else {
+        const rel = `creatives/${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel)); storeAs(rel, isVideo ? 'video' : 'image'); out.url = ad.media.url;
+      }
+      cleanTmp();
+      return json(res, 200, { url: out.url, type: out.type, compressed: out.compressed, inMB: out.inMB, outMB: out.outMB });
     }
     /* дерево: кампании → адсеты → объявления, с креативом, лидами И МЕТРИКАМИ кабинета (Расход/CPL/Квал/CTR/CPM/клики) */
     if (p === '/api/ads/tree' && req.method === 'GET') {

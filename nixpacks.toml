@@ -1,0 +1,4 @@
+# Railway/Nixpacks: доустановить ffmpeg — для авто-сжатия видео-креативов при загрузке (mp4/H.264).
+# aptPkgs дополняет базовый setup (node ставится автоматически), не заменяя его.
+[phases.setup]
+aptPkgs = ["ffmpeg"]

@@ -8903,8 +8903,10 @@ PAGES.ads = async (root) => {
   $$('.ct-file', root).forEach(f => f.addEventListener('change', async () => {
     const ad = f.dataset.ctfile; const file = f.files && f.files[0]; if (!file) return;
     const box = f.closest('.ct-ad'); const st = box.querySelector('.ct-up-status'); const prev = box.querySelector('.ct-prev');
-    if (file.size > 100e6) { toast('Файл больше 100 МБ', 'Сожми видео или загрузи ссылкой'); return; }
-    st.textContent = 'Загружаю ' + Math.round(file.size / 1e6 * 10) / 10 + ' МБ…';
+    const sizeMB = file.size / 1e6;
+    if (file.size > 500e6) { toast('Файл больше 500 МБ', 'Слишком большое даже для авто-сжатия — загрузи ссылкой'); return; }
+    const big = /^video\//.test(file.type) && sizeMB > 28;
+    st.textContent = big ? `Загружаю ${Math.round(sizeMB * 10) / 10} МБ и сжимаю…` : 'Загружаю ' + Math.round(sizeMB * 10) / 10 + ' МБ…';
     try {
       const r = await fetch('/api/ads/' + ad + '/creative-upload?filename=' + encodeURIComponent(file.name), { method: 'POST', body: file });
       const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка');
@@ -8912,7 +8914,8 @@ PAGES.ads = async (root) => {
       prev.classList.add('has');
       prev.innerHTML = j.type === 'video' ? `<video src="${j.url}" controls playsinline></video>` : `<img src="${j.url}" alt="креатив">`;
       st.textContent = '✓ загружено'; setTimeout(() => st.textContent = '', 2500);
-      toast('Креатив загружен', 'Нажми «Сохранить», чтобы привязать', true);
+      if (j.compressed && j.outMB) toast('Видео сжато', `${j.inMB} → ${j.outMB} МБ (mp4). Нажми «Сохранить», чтобы привязать`, true);
+      else toast('Креатив загружен', 'Нажми «Сохранить», чтобы привязать', true);
     } catch (e) { st.textContent = ''; toast('Не загрузилось', e.message); }
   }));
   $('#copyHook').addEventListener('click', () => { navigator.clipboard.writeText(hookUrl); toast('Ссылка скопирована', 'Вставь её в Albato как Webhook-действие', true); });
