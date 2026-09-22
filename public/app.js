@@ -5277,7 +5277,7 @@ function buildIntakeCard(l) {
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
   const leadIdLine = metaLeadId ? `<div class="lc-ik-leadid" title="ID заявки из лид-формы Meta — для сверки с рекламным кабинетом, поддержки и Conversions API"><span>Lead ID</span><code data-copy="${esc(metaLeadId)}">${esc(metaLeadId)}</code></div>` : '';
   return `<div class="lc-intake">
-    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
+    <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-clock" id="lcIkClock" title="Местное время клиента — по нему считаются тихие часы (ночью дожимы не идут)"></span></div>
     ${adBlock}
     ${crea}
     ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
@@ -5309,6 +5309,25 @@ function wireIntakeCard(scope, l, done) {
   $('[data-plancall]', scope)?.addEventListener('click', () => scheduleCall(l, done));
   $('[data-planmsg]', scope)?.addEventListener('click', () => openScheduleMessage(l, done));
   $$('[data-schedcancel]', scope).forEach(b => b.addEventListener('click', async () => { try { await api.del(`/leads/${l.id}/schedule/${b.dataset.schedcancel}`); toast('Отменено', null, true); done && done(); } catch (e) { toast('Не вышло', e.message); } }));
+  startLeadClock(scope, l);
+}
+/* УМНЫЕ ЧАСЫ: живое местное время клиента + индикатор тихих часов (ночью автопилот дожимы не шлёт).
+   Пояс берём как в движке — из ответа клиента → страны → телефона (resolveContactPlan). Leak-safe: тикер сам гаснет, когда карточка закрыта. */
+function startLeadClock(scope, l) {
+  const el = $('#lcIkClock', scope); if (!el) return;
+  const plan = resolveContactPlan(l);
+  const offMin = plan && plan.offMin;
+  if (offMin == null) { el.innerHTML = `${ic(I.clock)}<span class="muted">пояс не определён</span>`; el.classList.add('unk'); return; }
+  const q = (STATE.settings.automations || {}).quietHours || { enabled: true, from: 21, to: 9 };
+  const tick = () => {
+    if (!document.body.contains(el)) { clearInterval(t); return; }   /* карточка закрыта → гасим тикер */
+    const now = new Date(Date.now() + offMin * 60000);
+    const hh = now.getUTCHours(), mm = now.getUTCMinutes();
+    const night = q.enabled !== false && (q.from > q.to ? (hh >= q.from || hh < q.to) : (hh >= q.from && hh < q.to));
+    el.classList.toggle('night', night);
+    el.innerHTML = `${ic(night ? (I.moon || I.clock) : I.clock)}<b>${pad2h(hh)}:${pad2h(mm)}</b><span>${esc(plan.clientTzLabel || '')}</span>${night ? `<em class="lc-clk-badge">🌙 ночь · дожимы до ${pad2h(q.to || 9)}:00</em>` : `<em class="lc-clk-badge ok">☀️ можно писать</em>`}`;
+  };
+  tick(); const t = setInterval(tick, 15000);
 }
 /* напоминание о звонке: считаем момент по поясу клиента, ставим задачу+уведомление */
 async function scheduleCall(l, done) {
@@ -6386,6 +6405,67 @@ PAGES.qualifier = async (root) => {
 };
 
 /* ---------------- ЦЕПОЧКИ ---------------- */
+/* БИБЛИОТЕКА УМНЫХ КАРТОЧЕК — готовые шаги-приёмы, из которых собирается цепочка.
+   Каждая карточка разворачивается в 1+ шаг(ов). Тексты — по эталонным фоллоуапам (EN, редактируются). */
+const CHAIN_CARDS = [
+  { id: 'smart-first', icon: 'spark', tag: 'Первое касание', accent: true, title: 'Умное первое касание', timing: 'сразу · 2 сообщения',
+    desc: 'Сначала уходит креатив, по которому пришёл лид, а следом — текст: отсылка на заявку, тезис по видео, крючок и вопрос-альтернатива.',
+    steps: [
+      { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: true }, text: '', label: '1 · Креатив из заявки', active: true },
+      { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: '2 · Сопроводительный текст', active: true,
+        text: 'Hey {name}! Saw your request about {creative} — great pick! Prices might be going up soon, so timing is key.\n\n{priceLineEn}Want me to send you the best options in this range?' },
+    ] },
+  { id: 'photo-card', icon: 'image', tag: 'Доверие', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку',
+    desc: 'Фото-визитка брокера (прикрепите картинку) + тёплое приветствие и вопрос-альтернатива (релокация или инвестиции).',
+    steps: [ { day: 0.12, delayVal: 3, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Фотовизитка + приветствие', active: true,
+        text: "By the way, I'm {manager} from {agency} — we don't just list properties, we handpick the best. And this one definitely made the cut.\n\nI can help you find the right deal and sort out the details. Are you looking to buy for relocation or as an investment?" } ] },
+  { id: 'value-urgency', icon: 'bolt', tag: 'Ценность + срочность', title: 'Follow-up: ценность и срочность', timing: 'день 2',
+    desc: 'ROI, спрос на аренду, премиум-удобства + предложение прислать сравнение лучших вариантов месяца.',
+    steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Ценность + срочность', active: true,
+        text: 'Hey {name}, quick heads-up — prices for {creative} are going up soon!\n\n💰 Potential ROI up to 10% annually\n📈 High short-term rental demand — strong cash flow\n🏤 Luxury amenities: pool, sauna, gym & more\n\nWant me to send a comparison of the best options this month?' } ] },
+  { id: 'call-country', icon: 'phone', tag: 'Заход на звонок', title: 'Мягкий заход на звонок', timing: 'день 3',
+    desc: 'Уточнение страны клиента + естественное предложение короткого созвона (после 2-го дня без ответа).',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Заход на звонок', active: true,
+        text: "Let's have a quick call tomorrow — I'll walk you through the best deals and answer any questions.\n\n{countryQEn}" } ] },
+  { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку',
+    desc: 'Заготовленная PDF-подборка топ-проектов (прикрепите файл) + короткий текст «прислать?».',
+    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'PDF-подборка + текст', active: true,
+        text: "Just prepared a fresh selection of {geo}'s top projects — handpicked options with the best payment plans and locations.\n\nWant me to send it over?" } ] },
+  { id: 'final-checkin', icon: 'moon', tag: 'Финальный дожим', title: 'Финальный чек-ин (мягко)', timing: 'день 7',
+    desc: 'Сухой уважительный последний вопрос, если лид совсем не реагирует — без давления.',
+    steps: [ { day: 7, delayVal: 3, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Финальный чек-ин', active: true,
+        text: "Hey {name}, honestly it's a bit hard to move forward without knowing if this is still on your radar. If you have a minute, could you let me know? Appreciate it! 🙏" } ] },
+  { id: 'voice-note', icon: 'mic', tag: 'Личный контакт', title: 'Голосовое касание', timing: 'день 3',
+    desc: 'Короткое голосовое — резко повышает доверие и ответы. ИИ подскажет, что записать.',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'voice', mode: 'ai', label: 'Голосовое', active: true,
+        prompt: 'Короткое голосовое по проекту {creative}: по-человечески, тепло, один вопрос в конце.' } ] },
+];
+/* ЛИНТЕР ЦЕПОЧКИ: ловим типовые ошибки фоллоуапов и агрессивный каденс. Возвращает [{level, text}]. */
+function lintChain(seq) {
+  const out = [];
+  const steps = (seq.steps || []).filter(s => s.active);
+  if (!steps.length) return [{ level: 'warn', text: 'В цепочке нет активных шагов.' }];
+  const txt = (s) => s.mode === 'template' ? '' : String(s.text || s.prompt || '');
+  const hasRef = (s) => s.mode === 'creative' || /\{(creative|ad|project|district)\}/.test(txt(s));
+  const first = steps[0];
+  /* 1-е касание */
+  if (!hasRef(first) && !(steps[1] && steps[1].day < 0.05 && hasRef(steps[1]))) out.push({ level: 'error', text: 'Первое касание без отсылки на объявление/креатив — начните с креатива, по которому пришёл лид, или вставьте {creative}.' });
+  const firstTextStep = steps.find(s => txt(s).trim());
+  if (firstTextStep && !/\?/.test(txt(firstTextStep))) out.push({ level: 'warn', text: 'В первом текстовом касании нет вопроса — клиенту не на что ответить. Добавьте вопрос-альтернативу.' });
+  if (firstTextStep && !/\bили\b|\bor\b|\/|➜|→/i.test(txt(firstTextStep))) out.push({ level: 'tip', text: 'Сделайте вопрос альтернативным («для себя или под инвестиции?») — отвечать легче, конверсия в ответ выше.' });
+  /* полотно */
+  steps.forEach((s, i) => { const t = txt(s); if (t.length > 420) out.push({ level: 'warn', text: `Шаг ${i + 1} («${esc(s.label || '')}») — слишком длинно (${t.length} симв.). В мессенджере лучше 2–4 коротких предложения.` }); });
+  /* каденс: сколько касаний в первые сутки */
+  const firstDay = steps.filter(s => (+s.day || 0) < 1);
+  if (firstDay.length > 2) out.push({ level: 'error', text: `Слишком агрессивно: ${firstDay.length} касания в первый день — это читается как спам. Оставьте максимум 2 с интервалом в несколько часов.` });
+  /* слишком близко подряд (<2 ч между активными шагами в первый день) */
+  for (let i = 1; i < firstDay.length; i++) { const gap = ((+firstDay[i].day || 0) - (+firstDay[i - 1].day || 0)) * 24; if (gap >= 0 && gap < 2) { out.push({ level: 'warn', text: `Шаги «${esc(firstDay[i - 1].label || '')}» и «${esc(firstDay[i].label || '')}» идут почти подряд (<2 ч). Дайте клиенту паузу.` }); break; } }
+  if (steps.length > 8) out.push({ level: 'tip', text: `${steps.length} касаний — многовато. 5–7 обычно достаточно, дальше отклик падает.` });
+  /* карточки, которым нужен ассет */
+  steps.forEach((s, i) => { if (s.mode === 'creative' && s.creative && s.creative.auto === false && !(s.creative && s.creative.url)) out.push({ level: 'tip', text: `Шаг ${i + 1} («${esc(s.label || '')}») — прикрепите изображение/файл (сейчас уйдёт креатив лида по умолчанию).` }); });
+  if (!out.length) out.push({ level: 'ok', text: 'Цепочка выглядит здорово: есть отсылка на креатив, вопрос-альтернатива, спокойный каденс.' });
+  return out;
+}
 /* ---------------- ЦЕПОЧКИ: визуальный flow-конструктор ---------------- */
 PAGES.sequences = async (root) => {
   await ensureVendors();
@@ -6542,15 +6622,20 @@ PAGES.sequences = async (root) => {
       <div class="ha-steps">${haSteps.map((st, i) => `<span class="ha-step" style="--i:${i}" data-ha>${dayLabel(st.day)}</span>`).join('') || '<span class="sub2">в цепочке нет активных шагов</span>'}</div>
       <div class="sub2" style="margin-top:9px">До первого ответа клиента — дальше ведёт ИИ</div>
     `, { v: 'left', hue: '#2563EB' })}
-    <div class="fl-tabs">
-      ${seqs.map(sq => `<button class="fl-tab ${sq.id === seq.id ? 'active' : ''}" data-seq="${sq.id}">
-        <i class="${sq.active ? 'on' : ''}"></i>${esc(sq.name.length > 30 ? sq.name.slice(0, 28) + '…' : sq.name)}<span>${esc(targetingShort(sq))} · ${ownTag(sq)}</span></button>`).join('')}
-      <button class="btn btn-sm" id="seqNew">${ic(I.plus)}Цепочка</button>
-      ${hint('chains', 'Как работают цепочки', [
+    <div class="seq-cards-wrap">
+      <div class="seq-cards-hd"><span>Мои цепочки</span>${hint('chains', 'Как работают цепочки', [
         ['Точный таргетинг', 'Кнопка «Кому идёт» — гео, источник, канал, подрядчики, брокеры (можно несколько сразу). Более узкая цепочка перебивает общую'],
         ['Только до первого ответа', 'Клиент написал → живой диалог ИИ, рассылка стоит'],
-        ['Переменные под лида', '{creative} — объявление, по которому пришёл лид · {district} · {budget} · {timeline} · {type} · {purpose} · {name} · {geo}'],
-        ['Пресеты внизу списка', '«B2C-скрипт 2025» и «Онбординг Facebook-лидгена» — включите и правьте под себя']])}
+        ['Библиотека карточек', 'Перетащите готовый приём-карточку в цепочку или нажмите ＋. Умный первый шаг = креатив + текст следом'],
+        ['Переменные под лида', '{creative} · {district} · {budget} · {timeline} · {type} · {name} · {price} · {countryQEn}']])}</div>
+      <div class="seq-cards">
+        ${seqs.map(sq => { const n = (sq.steps || []).filter(s => s.active).length; const md = Math.max(0, ...(sq.steps || []).filter(s => s.active).map(s => +s.day || 0)); return `<button class="seq-card ${sq.id === seq.id ? 'active' : ''} ${sq.active ? '' : 'off'}" data-seq="${sq.id}">
+          <div class="seq-card-top"><i class="seq-dot ${sq.active ? 'on' : ''}"></i><b>${esc(sq.name.length > 34 ? sq.name.slice(0, 32) + '…' : sq.name)}</b></div>
+          <div class="seq-card-meta">${ic(I.target)}<span>${esc(targetingShort(sq))}</span></div>
+          <div class="seq-card-foot"><span>${n} касаний · ${md < 1 ? 'первые сутки' : fmtDay(md) + ' дн'}</span>${ownTag(sq)}</div>
+        </button>`; }).join('')}
+        <button class="seq-card seq-card-new" id="seqNew">${ic(I.plus)}<span>Новая цепочка</span></button>
+      </div>
     </div>
     <div class="two-col" style="grid-template-columns:1.5fr 1fr">
       <div>
@@ -6566,6 +6651,13 @@ PAGES.sequences = async (root) => {
           ${editable && !isBrokerUser ? `<button class="btn btn-sm" id="seqShare" title="Раздать эту цепочку конкретным брокерам">${ic(I.send)}Раздать брокерам</button>` : ''}
           ${editable ? `<button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>` : ''}
         </div>
+        ${editable ? coll('Библиотека умных карточек', `<div class="clib-note">${ic(I.spark)}Перетащите карточку в цепочку или нажмите ＋. Готовые приёмы фоллоуапов — тексты и тайминг можно менять после добавления.</div><div class="cardlib" id="cardLib">${CHAIN_CARDS.map(c => `
+          <div class="clib-card" draggable="true" data-card="${c.id}">
+            <span class="clib-ic">${ic(I[c.icon] || I.spark)}</span>
+            <div class="clib-b"><div class="clib-t">${esc(c.title)}<span class="clib-tag">${esc(c.tag)}</span></div><div class="clib-d">${esc(c.desc)}</div><div class="clib-meta">${ic(I.clock)}${esc(c.timing)}${c.needsAsset ? ` · <em>+ ${esc(c.needsAsset)}</em>` : ''}</div></div>
+            <button class="clib-add" data-cardadd="${c.id}" title="Добавить в конец цепочки">${ic(I.plus)}</button>
+          </div>`).join('')}</div>`, { open: seq.steps.length === 0, icon: I.layers, count: CHAIN_CARDS.length }) : ''}
+        ${(() => { const items = lintChain(seq); const bad = items.filter(x => x.level === 'error' || x.level === 'warn').length; return coll('Проверка цепочки', `<div class="lint">${items.map(it => `<div class="lint-i lint-${it.level}">${ic(it.level === 'ok' ? I.check : it.level === 'error' ? (I.alert || I.x) : (I.info || I.spark))}<span>${it.text}</span></div>`).join('')}</div>`, { open: bad > 0, icon: I.shield, count: bad || null }); })()}
         <div class="flow" id="flow">
           <div class="fl-node fl-trigger">
             <div class="fl-body"><div class="fl-title">${ic(I.bolt)}<b>Триггер: новый лид · ${esc(targetingSummary(seq))}</b></div>
@@ -6626,7 +6718,8 @@ PAGES.sequences = async (root) => {
       .replace(/\{district\}/g, 'JVC').replace(/\{budget\}/g, '$150–250k').replace(/\{timeline\}/g, '3–6 месяцев').replace(/\{type\}/g, 'студия').replace(/\{purpose\}/g, 'инвестиций')
       .replace(/\{month\}/g, 'июле')
       .replace(/\{slots\}/g, 'сегодня в 18:00 или завтра в 11:00').replace(/\{agency\}/g, STATE.settings.agency.name)
-      .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ')
+      .replace(/\{manager\}/g, (STATE.settings.agency.manager && STATE.settings.agency.manager.name) || STATE.settings.agency.name)
+      .replace(/\{priceLine\}/g, 'Цены в этой вилке — от $145 000. ').replace(/\{priceLineEn\}/g, 'It starts from $145,000. ').replace(/\{price\}/g, '$145,000')
       .replace(/\{countryQ\}/g, 'Вы же из России? Во сколько удобно созвониться?')
       .replace(/\{countryQEn\}/g, 'You are from the UK, right? What time works for a quick call?')
       .replace(/\{[a-zA-Z]+\}/g, '…'); /* незнакомая переменная не должна торчать в превью */
@@ -6659,7 +6752,33 @@ PAGES.sequences = async (root) => {
   renderWa();
 
   /* табы и шапка */
-  $$('.fl-tab', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
+  $$('.seq-card[data-seq]', root).forEach(t => t.addEventListener('click', () => { PAGE_STATE.seqSel = t.dataset.seq; PAGE_STATE.seqEdit = null; render(); }));
+  /* ---- БИБЛИОТЕКА КАРТОЧЕК: добавление по клику ＋ и drag-and-drop в цепочку ---- */
+  const recalcDays = () => { let cum = 0; seq.steps.forEach(s => { if (s.delayVal == null || !s.delayUnit) { s.delayUnit = 'day'; s.delayVal = 0; } const n = Math.max(0, +s.delayVal || 0), u = s.delayUnit; const d = u === 'min' ? n / 1440 : u === 'hour' ? n / 24 : n; cum += d; s.day = +cum.toFixed(4); }); };
+  const addCard = async (cardId, at) => {
+    const card = CHAIN_CARDS.find(c => c.id === cardId); if (!card) return;
+    const clones = JSON.parse(JSON.stringify(card.steps));
+    const pos = (at == null || at > seq.steps.length) ? seq.steps.length : Math.max(0, at);
+    seq.steps.splice(pos, 0, ...clones);
+    recalcDays();
+    await save();
+    toast('Карточка добавлена', card.title + (card.needsAsset ? ' · не забудьте прикрепить ' + card.needsAsset : ''), true);
+    render();
+  };
+  if (editable) {
+    $$('[data-cardadd]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); addCard(b.dataset.cardadd, seq.steps.length); }));
+    /* нативный drag-and-drop: тащим карточку из библиотеки на коннектор (точку вставки) внутри flow */
+    let dragCard = null;
+    $$('.clib-card', root).forEach(c => {
+      c.addEventListener('dragstart', (e) => { dragCard = c.dataset.card; c.classList.add('dragging'); try { e.dataTransfer.setData('text/plain', c.dataset.card); e.dataTransfer.effectAllowed = 'copy'; } catch (_) {} });
+      c.addEventListener('dragend', () => { dragCard = null; c.classList.remove('dragging'); $$('.fl-conn.drop', root).forEach(x => x.classList.remove('drop')); });
+    });
+    $$('#flow .fl-conn', root).forEach((conn, idx) => {
+      conn.addEventListener('dragover', (e) => { if (!dragCard) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; conn.classList.add('drop'); });
+      conn.addEventListener('dragleave', () => conn.classList.remove('drop'));
+      conn.addEventListener('drop', (e) => { e.preventDefault(); const id = dragCard || (e.dataTransfer && e.dataTransfer.getData('text/plain')); conn.classList.remove('drop'); const at = +(conn.querySelector('.fl-add')?.dataset.addat ?? seq.steps.length); if (id) addCard(id, at); });
+    });
+  }
   $('#seqNew').addEventListener('click', async () => { const nq = await api.post('/sequences', {}); await loadState(); PAGE_STATE.seqSel = nq.id; PAGE_STATE.seqEdit = 0; render(); });
   $('#seqFork')?.addEventListener('click', async () => {
     const nq = await api.post('/sequences/' + seq.id + '/fork', {});
@@ -12033,7 +12152,26 @@ function wireSimbye(scope, d, reload) {
     $$s('#sbcTabs .seg-btn').forEach(x => x.classList.toggle('on', x === b));
     $$s('[data-sbcpane]').forEach(pane => { pane.style.display = pane.dataset.sbcpane === b.dataset.sbctab ? '' : 'none'; });
   }));
-  /* ВСТРОЕННЫЙ БРАУЗЕР: открываем живую страницу входа Simbye в iframe (стрим воркера) — человек решает hCaptcha */
+  /* ПОДКЛЮЧЕНИЕ email+паролем (капча решается авто через 2captcha на воркере) */
+  $s('#sbcConnect')?.addEventListener('click', async (e) => {
+    const email = ($s('#sbcEmail')?.value || '').trim(), password = $s('#sbcPass')?.value || '';
+    if (!email || !password) { toast('Введите email и пароль от Simbye'); return; }
+    const btn = e.currentTarget; btn.disabled = true;
+    let prog = btn.parentElement.querySelector('#sbcProg');
+    if (!prog) { prog = document.createElement('div'); prog.id = 'sbcProg'; prog.className = 'sbc-prog'; btn.parentElement.appendChild(prog); }
+    const stages = [{ t: 'Открываю Simbye…', at: 0 }, { t: 'Решаю капчу через сервис (10-40с)…', at: 4000 }, { t: 'Вхожу в ваш аккаунт…', at: 20000 }, { t: 'Забираю номера и запускаю конвейер…', at: 30000 }];
+    const t0 = Date.now(); let done = false;
+    const paint = () => { if (done) return; const el = Date.now() - t0; const s = [...stages].reverse().find(x => el >= x.at) || stages[0]; prog.innerHTML = `<span class="sbf-spin"></span><span class="sbc-prog-t">${esc(s.t)}</span><span class="sbc-prog-el">${Math.round(el / 1000)}с</span>`; };
+    btn.innerHTML = '<span class="sbf-spin"></span>Подключаю…'; paint();
+    const iv = setInterval(paint, 500); const fin = () => { done = true; clearInterval(iv); };
+    try {
+      const r = await api.post('/simbye/connect', { email, password });
+      fin();
+      if (r.ok) { if (prog) prog.innerHTML = '<span class="sbc-prog-ok">✓ Подключено — забираю номера…</span>'; toast('Simbye подключён', 'Забираю ваши номера…', true); reload(); }
+      else { if (prog) prog.remove(); toast('Не вышло', r.error || '', false); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+    } catch (er) { fin(); if (prog) prog.remove(); toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = 'Подключить Simbye'; }
+  });
+  /* ВСТРОЕННЫЙ БРАУЗЕР (фолбэк): открываем живую страницу входа Simbye в iframe — человек решает hCaptcha */
   $s('#sbcRemote')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget; const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="sbf-spin"></span>Открываю…';
     let r; try { r = await api.post('/simbye/rb-url', {}); } catch (er) { toast('Ошибка', er.message); btn.disabled = false; btn.innerHTML = orig; return; }
@@ -12603,9 +12741,14 @@ PAGES.numbers = async (root) => {
           <div class="sbf-guide">
             ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. ⚠️ Не через Google/Apple — иначе автоматика не сможет войти. Внизу сайта можно переключить язык на <b>«Русский»</b>. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
             ${step(2, 'Купите номер', 'В Simbye: <b>«Виртуальные номера»</b> → UK (9,95€/30дн) или USA → оплатите картой/PayPal/Apple Pay. Или позже — кнопкой «Купить номер» здесь.', 'q2')}
-            ${step(3, 'Войдите через встроенный браузер', 'Откроется <b>настоящая страница входа Simbye</b> прямо здесь. Введите email+пароль и решите капчу (у Simbye стоит защита hCaptcha — её проходит живой человек). Мы поймаем вход сами и сохраним сессию — дальше система работает автоматически.', '')}
+            ${step(3, 'Введите логин Simbye — система войдёт сама', 'Введите email+пароль от Simbye. Система войдёт за вас (капчу hCaptcha решаем автоматически через сервис), найдёт ваши номера и запустит конвейер. Пароль хранится в зашифрованном виде.', '')}
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px"><button class="btn btn-accent btn-sm" id="sbcRemote">${ic(I.link)}Войти в Simbye (встроенный браузер)</button><span class="muted" style="font-size:11px">🔒 Пароль вводится прямо в Simbye, к нам не попадает. Держим только сессию.</span></div>
+          <div class="sbf-grid2" style="margin-top:12px">
+            <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com" autocomplete="off"></div>
+            <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль" autocomplete="new-password"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-accent btn-sm" id="sbcConnect">${ic(I.link)}Подключить Simbye</button><span class="muted" style="font-size:11px">🔒 Пароль шифруется (AES-256), капча решается автоматически.</span></div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--stroke-soft)"><button class="btn-ghost btn-sm" id="sbcRemote">${ic(I.link)}Не сработало? Войти вручную во встроенном браузере</button></div>
         </div>
         <div data-sbcpane="manual" style="display:none">
           <div class="sbf-reco muted2">${ic(I.gear)}Если хотите всё делать сами со своего телефона. Номера и коды сюда автоматически не попадут — коды смотрите в панели Simbye вручную. Подключение к CRM — по QR в конце.</div>

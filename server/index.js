@@ -7737,7 +7737,9 @@ const server = http.createServer(async (req, res) => {
         /* КОНКРЕТНАЯ причина от воркера (он снимает ошибку Shopify/верификацию/капчу) */
         let msg;
         if (r.reason === 'email_not_verified') msg = 'Simbye требует подтвердить e-mail. Откройте письмо от Simbye («Confirm your email» / «Активируйте аккаунт»), подтвердите — и подключите снова.';
-        else if (r.reason === 'captcha') msg = 'Simbye показал анти-бот проверку (капчу) — так бывает при частых входах. Подождите 5-10 минут и попробуйте снова.';
+        else if (r.reason === 'captcha_no_key') msg = 'Вход в Simbye защищён hCaptcha. Чтобы система входила сама — задайте на воркере переменную CAPTCHA_API_KEY (ключ 2captcha, ~$5 на баланс). Инструкция у оператора.';
+        else if (r.reason === 'captcha_solve_failed') msg = `Сервис не решил капчу: ${r.detail || ''}. Проверьте баланс и ключ 2captcha (CAPTCHA_API_KEY на воркере).`;
+        else if (r.reason === 'captcha_failed' || r.reason === 'captcha') msg = 'Капча не прошла с первого раза — нажмите «Подключить» ещё раз (капчу решаем через сервис, иногда нужна вторая попытка).';
         else if (r.reason === 'shopify_error') msg = `Simbye отклонил вход: «${r.detail || 'неверные данные'}». Чаще всего: неверный пароль, ИЛИ аккаунт создан через Google/Apple (тогда пароля нет — задайте пароль в Simbye через «Забыли пароль?» или заведите аккаунт по email+паролю).`;
         else if (r.reason === 'login_failed') msg = 'Не удалось войти в Simbye. Проверьте: (1) email+пароль верны; (2) аккаунт создан по email+паролю, НЕ через Google/Apple; (3) если только что зарегистрировались — подтвердите e-mail и попробуйте снова.';
         else msg = r.detail || r.reason || r.error || 'ошибка входа';
