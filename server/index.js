@@ -7743,7 +7743,7 @@ const server = http.createServer(async (req, res) => {
         else if (r.reason === 'shopify_error') msg = `Simbye отклонил вход: «${r.detail || 'неверные данные'}». Чаще всего: неверный пароль, ИЛИ аккаунт создан через Google/Apple (тогда пароля нет — задайте пароль в Simbye через «Забыли пароль?» или заведите аккаунт по email+паролю).`;
         else if (r.reason === 'login_failed') msg = 'Не удалось войти в Simbye. Проверьте: (1) email+пароль верны; (2) аккаунт создан по email+паролю, НЕ через Google/Apple; (3) если только что зарегистрировались — подтвердите e-mail и попробуйте снова.';
         else msg = r.detail || r.reason || r.error || 'ошибка входа';
-        return json(res, 200, { ok: false, error: msg, reason: r.reason });
+        return json(res, 200, { ok: false, error: msg, reason: r.reason, _diag: { httpStatus: r.httpStatus, bodyText: r.bodyText, tokenGot: r.tokenGot, capAttempted: r.capAttempted } });
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     /* URL «встроенного браузера» для входа в Simbye (человек решает hCaptcha, воркер держит сессию) */
