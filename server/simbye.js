@@ -59,7 +59,7 @@ const getOtp   = (db, store, phone, service, timeoutMs, baselineKeys) =>
 const buy      = (db, store, country, calls)    => api(db, store, 'POST', '/buy', { country, calls }, 90000);
 const renew    = (db, store, phone, orderNo)    => api(db, store, 'POST', '/renew', { phone, orderNo }, 60000);
 const setSession = (db, store, state)           => api(db, store, 'POST', '/session', state, 90000);
-const login    = (db, store, email, password)   => api(db, store, 'POST', '/login', { email, password }, 90000);
+const login    = (db, store, email, password)   => api(db, store, 'POST', '/login', { email, password }, 160000);
 
 /* ── подключение СВОЕГО Simbye тенантом (email+пароль): сохраняем шифрованно + логинимся воркером ── */
 function creds(db) { const s = db.settings || (db.settings = {}); if (!s.simbye) s.simbye = {}; return s.simbye.creds || null; }
