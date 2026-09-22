@@ -4327,6 +4327,15 @@ html[data-night] .lc-fp-body { background: #0e1626; }
 .lc-creo2-badge svg { width: 12px; height: 12px; }
 .lc-creo2-auto { position: absolute; top: 8px; left: 8px; background: color-mix(in srgb, var(--accent) 86%, #000); color: #fff; border-radius: 8px; padding: 3px 9px; font-size: 10.5px; font-weight: 650; display: inline-flex; align-items: center; gap: 4px; letter-spacing: .01em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .lc-creo2-auto svg { width: 11px; height: 11px; }
+.lc-creo2-vid { width: 100%; max-height: 150px; object-fit: cover; display: block; background: #000; }
+.lc-creo2-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,.5); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.lc-creo2-play svg { width: 18px; height: 18px; color: #fff; }
+.lc-creo2.skip img, .lc-creo2.skip video { opacity: .3; filter: grayscale(.6); }
+.lc-creo2.skip .lc-creo2-play { opacity: .3; }
+.lc-creo-skip { display: inline-flex; align-items: center; gap: 5px; margin: 0 0 10px; padding: 4px 10px; font-size: 11.5px; font-weight: 550; color: var(--ink-3); background: none; border: 1px solid var(--stroke); border-radius: 8px; cursor: pointer; transition: all .13s; }
+.lc-creo-skip:hover { color: var(--ink-2); border-color: var(--ink-3); }
+.lc-creo-skip.on { color: #fff; background: var(--ink-2, #444); border-color: var(--ink-2, #444); }
+.lc-creo-skip svg { width: 12px; height: 12px; }
 /* comfortable textarea + buttons */
 .lc-ft-ta { width: 100%; min-height: 104px; border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; font-family: inherit; color: var(--ink); resize: vertical; outline: none; background: var(--card, #fff); transition: border-color .15s; }
 .lc-ft-ta:focus { border-color: var(--accent); }

@@ -5380,11 +5380,16 @@ function ftChipsHtml(l) {
 function renderFtPhone(bd) {
   const body = $('#lcWaBody', bd); if (!body) return;
   const txt = ($('#lcFtText', bd) || {}).value || '';
-  const wrap = $('#lcCreoWrap', bd); const img = wrap && wrap.querySelector('img');
-  const creo = img ? img.getAttribute('src') : '';
+  const wrap = $('#lcCreoWrap', bd);
+  const skipped = wrap && wrap.classList.contains('skip');
+  const creo = (wrap && !skipped) ? (wrap.dataset.creo || '') : '';
+  const creoType = wrap ? (wrap.dataset.creotype || 'image') : 'image';
   const now = new Date(); const tm = pad2h(now.getHours()) + ':' + pad2h(now.getMinutes());
+  const creoMsg = creoType === 'video'
+    ? `<div class="wa-msg out"><video class="wa-img" src="${esc(creo)}#t=0.1" muted playsinline preload="metadata"></video><span class="wa-time">${tm} ✓✓</span></div>`
+    : `<div class="wa-msg out"><img class="wa-img" src="${esc(creo)}" alt=""><span class="wa-time">${tm} ✓✓</span></div>`;
   body.innerHTML = `<div class="wa-day">сегодня</div>`
-    + (creo ? `<div class="wa-msg out"><img class="wa-img" src="${esc(creo)}" alt=""><span class="wa-time">${tm} ✓✓</span></div>` : '')
+    + (creo ? creoMsg : '')
     + (txt.trim() ? `<div class="wa-msg out">${esc(txt).replace(/\n/g, '<br>')}<span class="wa-time">${tm} ✓✓</span></div>` : `<div class="wa-ph">Наберите или сгенерируйте сообщение — увидите его глазами клиента</div>`);
   body.scrollTop = body.scrollHeight;
 }
@@ -5502,6 +5507,7 @@ async function openLeadModal(id) {
      (атрибуция объявления, l.adCreative) — тот же, что показан в сводке слева. Уходит первым сообщением. */
   const ftCreo = l.creativeUrl || (l.adCreative && l.adCreative.url) || '';
   const ftCreoAuto = !l.creativeUrl && !!(l.adCreative && l.adCreative.url);
+  const ftCreoType = ftCreo ? (((l.adCreative && l.adCreative.type === 'video' && !l.creativeUrl) || /\.(mp4|webm|mov)(\?|$)/i.test(ftCreo)) ? 'video' : 'image') : '';
 
   /* единая хронология: сообщения + события + заметки + встречи */
   const timeline = [
@@ -5603,10 +5609,11 @@ async function openLeadModal(id) {
               <div class="lc-ft-chips" id="lcFtChips">${ftChipsHtml(l)}</div>
               <div class="lc-ft-grid">
                 <div class="lc-ft-compose">
-                  <label class="lc-creo2 ${ftCreo ? 'has' : ''}" id="lcCreoWrap">
-                    ${ftCreo ? `<img src="${esc(ftCreo)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>${ftCreoAuto ? `<span class="lc-creo2-auto">${ic(I.target)}из объявления</span>` : ''}` : `<span class="lc-creo2-ph">${ic(I.image || I.plus)}<b>Прикрепить креатив</b><i>уйдёт первым сообщением</i></span>`}
+                  <label class="lc-creo2 ${ftCreo ? 'has' : ''}" id="lcCreoWrap" data-creo="${esc(ftCreo)}" data-creotype="${ftCreoType}">
+                    ${ftCreo ? `${ftCreoType === 'video' ? `<video src="${esc(ftCreo)}#t=0.1" muted playsinline preload="metadata" class="lc-creo2-vid"></video><span class="lc-creo2-play">${ic(I.play)}</span>` : `<img src="${esc(ftCreo)}" alt="креатив">`}<span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>${ftCreoAuto ? `<span class="lc-creo2-auto">${ic(I.target)}из объявления</span>` : ''}` : `<span class="lc-creo2-ph">${ic(I.image || I.plus)}<b>Прикрепить креатив</b><i>уйдёт первым сообщением</i></span>`}
                     <input type="file" id="lcCreoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
                   </label>
+                  <button type="button" class="lc-creo-skip" id="lcCreoSkip" title="Не отправлять креатив — уйдёт только текст" style="${ftCreo ? '' : 'display:none'}">${ic(I.x)}<span>Без объявления · только текст</span></button>
                   <textarea id="lcFtText" class="lc-ft-ta" placeholder="Напишите первое сообщение сами — или соберите персонализацию через ИИ ✦">${esc(`Здравствуйте, ${(l.name || '').split(' ')[0] || ''}! Это ${STATE.settings.agency.name}. Вы оставили заявку${l.ads && l.ads.adName ? ' по «' + l.ads.adName + '»' : ' по недвижимости — ' + l.geoName}. Подскажу по нему детали. Рассматриваете для себя или под инвестиции?`)}</textarea>
                   <div class="lc-ft-btns">
                     <button class="btn btn-accent" id="lcFtAi">${ic(I.spark)}Персонализировать</button>
@@ -5888,8 +5895,16 @@ async function openLeadModal(id) {
       const f = e.target.files[0]; if (!f) return;
       const r = await fetch(`/api/leads/${id}/creative?filename=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
       const j = await r.json();
-      if (r.ok) { const w = $('#lcCreoWrap', bd); const inp = $('#lcCreoFile', bd); w.classList.add('has'); w.innerHTML = `<img src="${esc(j.url)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>`; if (inp) w.appendChild(inp); renderFtPhone(bd); toast('Креатив прикреплён', 'Уйдёт первым сообщением', true); }
+      if (r.ok) { const w = $('#lcCreoWrap', bd); const inp = $('#lcCreoFile', bd); w.classList.add('has'); w.classList.remove('skip'); w.dataset.creo = j.url; w.dataset.creotype = /\.(mp4|webm|mov)(\?|$)/i.test(j.url) ? 'video' : 'image'; w.innerHTML = `<img src="${esc(j.url)}" alt="креатив"><span class="lc-creo2-badge">${ic(I.plus)}Заменить</span>`; if (inp) w.appendChild(inp); const sk = $('#lcCreoSkip', bd); if (sk) { sk.style.display = ''; sk.classList.remove('on'); sk.querySelector('span').textContent = 'Без объявления · только текст'; } renderFtPhone(bd); toast('Креатив прикреплён', 'Уйдёт первым сообщением', true); }
       else toast('Не загрузилось', j.error);
+    });
+    /* быстрый тумблер «только текст» — брокер может не отправлять креатив первым сообщением */
+    $('#lcCreoSkip', bd)?.addEventListener('click', () => {
+      const w = $('#lcCreoWrap', bd); const sk = $('#lcCreoSkip', bd);
+      const off = w.classList.toggle('skip');   /* skip=true → креатив не уйдёт */
+      sk.classList.toggle('on', off);
+      sk.querySelector('span').textContent = off ? 'Вернуть объявление в отправку' : 'Без объявления · только текст';
+      renderFtPhone(bd);
     });
     $('#lcFtAi', bd).addEventListener('click', async () => {
       const btn = $('#lcFtAi', bd); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '✦ Gemini думает…';
@@ -5907,8 +5922,8 @@ async function openLeadModal(id) {
     });
     $('#lcFtSend', bd).addEventListener('click', async () => {
       const text = $('#lcFtText', bd).value.trim();
-      const wrap = $('#lcCreoWrap', bd); const cimg = wrap && wrap.querySelector('img');
-      const creativeUrl = cimg ? cimg.getAttribute('src') : '';
+      const wrap = $('#lcCreoWrap', bd);
+      const creativeUrl = (wrap && !wrap.classList.contains('skip')) ? (wrap.dataset.creo || '') : '';
       if (!text && !creativeUrl) { toast('Пустой текст'); return; }
       await api.post(`/leads/${id}/message`, { text, creativeUrl });
       toast('Первое касание отправлено', creativeUrl ? 'Креатив + текст ушли клиенту' : 'Ушло клиенту в WhatsApp', true);
