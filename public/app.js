@@ -433,6 +433,8 @@ const NAV = {
   inbox:     { name: 'Диалоги', en: 'Inbox', icon: I.chat, sub: '' },
   properties: { name: 'Объекты', en: 'Properties', icon: I.building, sub: '' },
   collections: { name: 'Подборки', en: 'Collections', icon: I.layers, sub: '' },
+  autopilot: { name: 'Автопилот', en: 'Autopilot', icon: I.spark, sub: 'квалификатор · цепочки · шаблоны', subEn: 'qualifier · chains · templates' },
+  knowledge: { name: 'База знаний ИИ', en: 'AI knowledge', icon: I.flame, sub: 'приёмы · академия · оценка звонка', subEn: 'plays · academy · call review' },
   qualifier: { name: 'ИИ-квалификатор', en: 'AI Qualifier', icon: I.spark, sub: '' },
   sequences: { name: 'Цепочки касаний', en: 'Touch chains', icon: I.chain, sub: '' },
   wake:      { name: 'Реанимация базы', en: 'Reactivation', icon: I.wake, sub: '' },
@@ -475,11 +477,18 @@ const WORKSPACES = {
   base:   { label: 'База',           labelEn: 'Base',       icon: I.building, pages: ['properties', 'collections'] },
   ads:    { label: 'Реклама',         labelEn: 'Ads',        icon: I.target,   pages: ['mediaplan', 'ads'] },
   analytics: { label: 'Аналитика',   labelEn: 'Analytics',  icon: I.bars,     pages: ['analytics', 'adsAnalytics'] },
-  engine: { label: 'Автоматизация',  labelEn: 'Automation', icon: I.bolt,     pages: ['qualifier', 'sequences', 'playbook', 'academy', 'learn', 'studio', 'callReview', 'automations', 'templates'] },
+  engine: { label: 'Автоматизация',  labelEn: 'Automation', icon: I.bolt,     pages: ['autopilot', 'automations', 'knowledge', 'learn', 'studio'] },
   config: { label: 'Настройки',      labelEn: 'Settings',   icon: I.gear,     pages: ['settings', 'numbers', 'agency', 'billing'] },
 };
 const PARENT_OF = {};
 for (const [ws, def] of Object.entries(WORKSPACES)) for (const pk of def.pages) PARENT_OF[pk] = ws;
+/* СВЁРНУТЫЕ подстраницы → композитная страница + индекс её под-вкладки (реорг 9→5).
+   Старые прямые ссылки (go('sequences') из воронки и т.п.) продолжают работать — открывают нужную под-вкладку. */
+const FOLDED = { qualifier: ['autopilot', 0], sequences: ['autopilot', 1], templates: ['autopilot', 2], playbook: ['knowledge', 0], academy: ['knowledge', 1], callReview: ['knowledge', 2] };
+const COMPOSITE_TABS = {
+  autopilot: [['qualifier', 'Квалификатор'], ['sequences', 'Цепочки касаний'], ['templates', 'Шаблоны']],
+  knowledge: [['playbook', 'Приёмы продаж'], ['academy', 'Академия продаж'], ['callReview', 'Оценка звонка']],
+};
 
 const BASE_STAGES = [
   { id: 'new', name: 'Новые', icon: 'plus', sys: true },
@@ -2430,6 +2439,7 @@ const SOLO_HIDDEN_PAGES = ['feed', 'hr', 'brokers', 'roles', 'control', 'learn',
 const DEFAULT_HIDDEN_PAGES = ['academy', 'studio', 'hr', 'social'];
 /* единый предикат видимости раздела: дефолт-скрытие ∪ роль-брокер ∪ индивидуальное скрытие ∪ solo-издание */
 function pageHiddenForUser(pg) {
+  if (COMPOSITE_TABS[pg]) return COMPOSITE_TABS[pg].every(([k]) => pageHiddenForUser(k));   /* композит скрыт, если ВСЕ под-вкладки скрыты */
   const me = STATE && STATE.me;
   const isBroker = me && me.role === 'broker';
   const rt = (me && me.roleType) || 'broker';
@@ -2682,6 +2692,8 @@ function navProgressDone() { const b = $('#navprog'); if (b) { b.classList.remov
 /* ripple убран: Material-волна «раскрывала» кнопки/пункты меню при клике — не в стиле продукта */
 
 function go(page) {
+  /* реорг 9→5: прямой заход на свёрнутую страницу открывает её композит + нужную под-вкладку */
+  if (FOLDED[page]) { const [comp, idx] = FOLDED[page]; PAGE_STATE[comp + 'Tab'] = idx; page = comp; }
   CUR = page;
   closeModal();   /* FIX: навигация закрывает открытую модалку (иначе QR-подключение/др. попап висит поверх новой страницы = «глюк/мерцание») */
   document.getElementById('bulkBar')?.remove();   /* FIX: снять панель массовых действий при уходе со страницы (не висеть сиротой поверх других разделов) */
@@ -6276,6 +6288,24 @@ async function renderChat(id, rebuild) {
   });
   $('#reScreenBtn').addEventListener('click', async () => { await api.post(`/leads/${id}/analyze`); renderChat(id, false); });
 }
+
+/* ---------------- КОМПОЗИТНЫЕ СТРАНИЦЫ (реорг 9→5) ----------------
+   Автопилот = Квалификатор+Цепочки+Шаблоны; База знаний = Приёмы+Академия+Оценка звонка.
+   Делегируют рендер существующим PAGES.* в под-контейнер — без дублирования кода. */
+async function renderComposite(root, compKey) {
+  const all = COMPOSITE_TABS[compKey] || [];
+  const tabs = all.filter(([k]) => !pageHiddenForUser(k));
+  if (!tabs.length) { root.innerHTML = '<div class="muted" style="padding:24px">Нет доступных разделов в этой роли.</div>'; return; }
+  let idx = PAGE_STATE[compKey + 'Tab'] || 0;
+  if (idx >= tabs.length || idx < 0) idx = 0;
+  const [selKey] = tabs[idx];
+  root.innerHTML = `<div class="cmp-tabs">${tabs.map(([k, label], i) => `<button class="cmp-tab${i === idx ? ' on' : ''}" data-cmpi="${i}">${ic(NAV[k].icon)}<span>${esc(label)}</span></button>`).join('')}</div><div class="cmp-body" id="cmpBody"></div>`;
+  root.querySelectorAll('.cmp-tab').forEach(b => b.addEventListener('click', () => { PAGE_STATE[compKey + 'Tab'] = +b.dataset.cmpi; render(); }));
+  const body = $('#cmpBody', root);
+  try { await PAGES[selKey](body); } catch (e) { body.innerHTML = `<div class="muted" style="padding:20px">Не удалось открыть раздел: ${esc(e.message || '')}</div>`; }
+}
+PAGES.autopilot = (root) => renderComposite(root, 'autopilot');
+PAGES.knowledge = (root) => renderComposite(root, 'knowledge');
 
 /* ---------------- ИИ-КВАЛИФИКАТОР ---------------- */
 PAGES.qualifier = async (root) => {

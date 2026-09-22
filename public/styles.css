@@ -1515,6 +1515,12 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .lint-tip svg { color: var(--accent); }
 .lint-ok { background: color-mix(in srgb, #23b383 8%, transparent); border-color: color-mix(in srgb, #23b383 26%, var(--stroke)); }
 .lint-ok svg { color: #23b383; }
+/* композитные под-вкладки (Автопилот / База знаний) */
+.cmp-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--stroke); }
+.cmp-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 10px; border: 1px solid transparent; background: transparent; font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; transition: all .14s; }
+.cmp-tab:hover { color: var(--ink-1); background: var(--surface-2, rgba(127,127,127,.06)); }
+.cmp-tab.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); border-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+.cmp-tab svg { width: 15px; height: 15px; }
 .qh-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
 .qh-row input[type=number] { text-align: center; }
 
