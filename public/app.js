@@ -2405,6 +2405,8 @@ let CUR = 'overview';
 const PAGE_STATE = { inboxLead: null, funnelGeo: '', wakePreview: [] };
 
 const IS_SOLO = () => !!(STATE && STATE.settings.agency.edition === 'solo');
+/* поле скрыто для ТЕКУЩЕГО пользователя? (владелец видит всё; брокеру — по settings.brokerHiddenFields) */
+const fieldHiddenForMe = (key) => { const me = STATE && STATE.me; if (!me || me.role !== 'broker') return false; return ((STATE.settings && STATE.settings.brokerHiddenFields) || []).includes(key); };
 
 /* брокер-режим: админ-разделы недоступны и скрыты */
 /* 'sequences' открыта брокеру: он видит агентские (read-only) + свои личные + расшаренные, форкает и делится */
@@ -4250,7 +4252,7 @@ const SELCFG_LEADS = {
   actions: (n) => [
     { id: 'stage', label: 'Стадия', ic: I.arrow, run: (cfg, c) => ctxPopup(c.x, c.y, (STAGES._all || STAGES).map(s => ({ ic: I[s.icon], label: s.name, onClick: () => selBulk(cfg, 'stage', s.id) }))) },
     { id: 'broker', label: 'Брокеру', ic: I.handover, run: (cfg, c) => ctxPopup(c.x, c.y, STATE.brokers.filter(b => b.active !== false).map(b => ({ ic: I.user, label: b.name, onClick: () => selBulk(cfg, 'broker', b.id) }))) },
-    { id: 'vendor', label: 'Подрядчик', ic: I.link, run: async (cfg, c) => { await ensureVendors(); ctxPopup(c.x, c.y, [{ ic: I.x, label: '— снять подрядчика —', onClick: () => selBulk(cfg, 'vendor', '') }, ...LUMEN_VENDORS.map(v => ({ ic: I.link, label: v.name, onClick: () => selBulk(cfg, 'vendor', v.id) }))]); } },
+    ...(fieldHiddenForMe('vendor') ? [] : [{ id: 'vendor', label: 'Подрядчик', ic: I.link, run: async (cfg, c) => { await ensureVendors(); ctxPopup(c.x, c.y, [{ ic: I.x, label: '— снять подрядчика —', onClick: () => selBulk(cfg, 'vendor', '') }, ...LUMEN_VENDORS.map(v => ({ ic: I.link, label: v.name, onClick: () => selBulk(cfg, 'vendor', v.id) }))]); } }]),
     { id: 'tag', label: 'Тег', ic: I.plus, run: (cfg) => selTagPrompt(cfg) },
     { id: 'chain', label: 'Запустить цепочку', ic: I.chain, run: (cfg, c) => { const seqs = (STATE.sequences || []).filter(s => s.active); ctxPopup(c.x, c.y, [{ ic: I.bolt, label: 'По направлению (авто)', onClick: () => selBulk(cfg, 'chain', '', { title: `Запустить цепочку на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания по WhatsApp (по гео-цепочке). Первое — в ближайшую минуту.', ok: 'Запустить' }) }, ...seqs.map(s => ({ ic: I.chain, label: s.name, onClick: () => selBulk(cfg, 'chain', s.id, { title: `Запустить «${s.name}» на ${[...selSet(cfg.kind)].length} лид(ов)?`, sub: 'Клиентам уйдут касания этой цепочки по WhatsApp. Первое — в ближайшую минуту.', ok: 'Запустить' }) }))]); } },
     { id: 'aion', label: 'ИИ вкл', ic: I.spark, run: (cfg) => selBulk(cfg, 'ai', true) },
@@ -4550,25 +4552,30 @@ PAGES.funnel = async (root) => {
   const launchable = leads.filter(l => ['new', 'touch', 'sleeping'].includes(l.stage));
 
   root.innerHTML = `
+    ${(() => { const activeN = ['funnelGeo', 'funnelSrc', 'funnelVendor', 'funnelBroker'].filter(k => F[k]).length; const drawerOpen = !!F.funnelFiltersOpen || activeN > 0; return `
     <div class="filters">
-      <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:180px">
-      <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${F.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
-      <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
-      ${vendors.length ? `<select id="fVendor"><option value="">Все подрядчики</option><option value="__none" ${F.funnelVendor === '__none' ? 'selected' : ''}>Без подрядчика</option>${vendors.map(v => `<option value="${v.id}" ${F.funnelVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}
-      <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+      <input id="fQ" placeholder="Имя или номер…" value="${esc(F.funnelQ || '')}" style="width:170px">
+      <button class="btn btn-sm f-toggle ${activeN ? 'on' : ''}" id="fToggle" title="Фильтры: направление, источник, подрядчик, брокер">${ic(I.funnel)}Фильтры${activeN ? ` · ${activeN}` : ''}</button>
       <div class="seg-toggle">
         ${[['', 'Все'], ['hot', 'Горячие'], ['overdue', 'Просрочка'], ['human', 'Ждут менеджера'], ['ai', 'ИИ ведёт']].map(([k, n]) => `<button class="seg-btn ${(F.funnelFlag || '') === k ? 'on' : ''}" data-flag="${k}">${n}</button>`).join('')}
       </div>
       <span class="tb-spacer"></span>
       <button class="btn btn-sm cc-chip ${PAGE_STATE.funnelChainOpen ? 'on' : ''}" data-cctoggle title="Цепочки касаний: авто-запуск и ручной запуск">${ic(I.chain)}Цепочки<i class="cc-chip-dot ${autoChains ? 'on' : ''}"></i></button>
-      <button class="btn btn-sm" id="importBtn">${ic(I.doc)}Импорт</button>
-      <button class="btn btn-sm" id="dupesBtn">${ic(I.copy)}Дубли</button>
+      <button class="btn btn-sm btn-icon" id="importBtn" title="Импорт лидов">${ic(I.doc)}</button>
+      <button class="btn btn-sm btn-icon" id="dupesBtn" title="Найти дубли">${ic(I.copy)}</button>
       <span class="muted" style="font-size:12px">${leads.length} из ${all.length}</span>
       <div class="seg-toggle">
         <button class="seg-btn ${view === 'kanban' ? 'on' : ''}" data-view="kanban" title="Канбан">${ic(I.grid)}</button>
         <button class="seg-btn ${view === 'table' ? 'on' : ''}" data-view="table" title="Таблица">${ic(I.doc)}</button>
       </div>
     </div>
+    <div class="f-drawer" id="fDrawer" ${drawerOpen ? '' : 'hidden'}>
+      <select id="fGeo"><option value="">Все направления</option>${geos.map(g => `<option value="${g}" ${F.funnelGeo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select>
+      <select id="fSrc"><option value="">Все источники</option>${srcs.map(x => `<option value="${x}" ${F.funnelSrc === x ? 'selected' : ''}>${srcName[x] || x}</option>`).join('')}</select>
+      ${vendors.length && !fieldHiddenForMe('vendor') ? `<select id="fVendor"><option value="">Все подрядчики</option><option value="__none" ${F.funnelVendor === '__none' ? 'selected' : ''}>Без подрядчика</option>${vendors.map(v => `<option value="${v.id}" ${F.funnelVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}
+      <select id="fBroker"><option value="">Все брокеры</option>${STATE.brokers.map(b => `<option value="${b.id}" ${F.funnelBroker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+      ${activeN ? `<button class="btn btn-sm" id="fClear">${ic(I.x)}Сбросить</button>` : ''}
+    </div>`; })()}
     <div class="cc-panel glass" id="ccPanel" ${PAGE_STATE.funnelChainOpen ? '' : 'hidden'}>
       <label class="switch cc-sw" title="Автозапуск цепочки на новые лиды"><input type="checkbox" id="ccAuto" ${autoChains ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>
       <div class="cc-txt"><b>Авто-цепочка на новые лиды</b><i>${autoChains ? 'запускается на каждый новый лид сама' : 'выключена — новые лиды ждут ручного запуска'}</i></div>
@@ -4631,6 +4638,8 @@ PAGES.funnel = async (root) => {
     </div>`}`;
 
   const setF = (k, v) => { PAGE_STATE[k] = v; render(); };
+  $('#fToggle')?.addEventListener('click', () => { const d = $('#fDrawer', root); if (!d) return; const willOpen = d.hasAttribute('hidden'); d.toggleAttribute('hidden'); PAGE_STATE.funnelFiltersOpen = willOpen; $('#fToggle', root)?.classList.toggle('open', willOpen); });
+  $('#fClear')?.addEventListener('click', () => { PAGE_STATE.funnelGeo = ''; PAGE_STATE.funnelSrc = ''; PAGE_STATE.funnelVendor = ''; PAGE_STATE.funnelBroker = ''; render(); });
   $('#fQ').addEventListener('input', (e) => { clearTimeout(PAGE_STATE._fq); PAGE_STATE._fq = setTimeout(() => setF('funnelQ', e.target.value), 350); });
   $('#fGeo').addEventListener('change', (e) => setF('funnelGeo', e.target.value));
   $('#fSrc').addEventListener('change', (e) => setF('funnelSrc', e.target.value));
@@ -5192,6 +5201,25 @@ function resolveContactPlan(l) {
   if (p.hh != null && offMin != null) { targetUTC = nextLocalUTC(p.hh, p.mm || 0, offMin); brokerLocal = new Date(targetUTC).toLocaleString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
   return Object.assign({}, p, { offMin, tzSource, targetUTC, brokerLocal, clientTzLabel: offMin != null ? gmtLabel(offMin) : (p.tz || ''), sameTz: offMin != null && offMin === brokerOffMin });
 }
+/* путь лида из рекламы — явно Кампания / Группа / Объявление (что пришло из Albato: campaign_name/adset_name/ad_name).
+   Показывает ВСЁ, что есть, даже если пришло только имя объявления или только ad_id. */
+function adInfo(l) {
+  const a = (l && l.ads) || {};
+  const camp = a.campaignName || '', set = a.adsetName || '', ad = a.adName || a.name || '', id = a.adId || '';
+  if (!(camp || set || ad || id)) return null;
+  return { camp, set, ad, id, matched: !!a.matched };
+}
+function adPathHtml(l) {
+  const a = adInfo(l); if (!a) return '';
+  const rows = [];
+  if (a.camp) rows.push(['Кампания', a.camp]);
+  if (a.set) rows.push(['Группа', a.set]);
+  if (a.ad) rows.push(['Объявление', a.ad]);
+  if (!a.camp && !a.set && !a.ad && a.id) rows.push(['ID объявления', a.id]);
+  return `<div class="lc-ik-path">${ic(I.target)}<div class="lc-ik-path-rows">${rows.map(([k, v]) => `<div><i>${k}</i><b>${esc(v)}</b></div>`).join('')}${a.id && !a.matched ? '<div class="lc-ik-path-note">не в базе объявлений — метрики кабинета подтянутся после синка</div>' : ''}</div></div>`;
+}
+/* компактная строка пути (для бейджей/списков) */
+function adPathLine(l) { const a = adInfo(l); if (!a) return ''; return [a.ad, a.set, a.camp].filter(Boolean).join(' · ') || a.id; }
 /* КАРТОЧКА ЗАЯВКИ — фото + вопросы/ответы из формы + путь из рекламы + просьба клиента с движком времени.
    Общая для карточки лида и панели «Диалоги». Всегда наверху ленты (вне фильтров). */
 function buildIntakeCard(l) {
@@ -5201,11 +5229,11 @@ function buildIntakeCard(l) {
   const labelOf = k => (defs.find(f => f.key === k) || {}).label || FL[k] || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
   const HIDE = ['time_to_contact', 'contact', 'contact_time', 'time', 'when', 'preferred', 'preferred_contact'];
   const entries = Object.entries(cf).filter(([k, v]) => v != null && String(v).trim() && !HIDE.includes(k.toLowerCase()));
-  const adPath = l.ads && (l.ads.adName || l.ads.campaignName) ? [l.ads.adName, l.ads.adsetName, l.ads.campaignName].filter(Boolean).join(' · ') : '';
+  const adBlock = adPathHtml(l);
   const plan = resolveContactPlan(l);
   const fromForm = ['meta_form', 'ctwa', 'landing', 'meta', 'google', 'tiktok', 'yandex', 'avito'].includes(l.source) || (l.tags || []).includes('интегратор');
   const sched = (l.scheduled || []).filter(s => s.status === 'pending');
-  if (!entries.length && !adPath && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
+  if (!entries.length && !adBlock && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
   const initials = esc((l.name || 'К').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'К');
   const photo = l.avatarUrl ? `<img class="lc-ik-ph" src="${esc(l.avatarUrl)}" alt="">` : `<span class="lc-ik-ph empty">${initials}</span>`;
   const showVal = (k, v) => { const s = String(v); if (/country|стран/i.test(k) && /^[A-Za-z]{2}$/.test(s.trim())) { try { const n = new Intl.DisplayNames(['ru'], { type: 'region' }).of(s.trim().toUpperCase()); if (n && n !== s.trim().toUpperCase()) return n; } catch (_) { } } return s.slice(0, 220); };
@@ -5228,8 +5256,8 @@ function buildIntakeCard(l) {
   const schedRow = sched.length ? `<div class="lc-ik-sched">${sched.map(s => { const at = new Date(s.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); return `<div class="lc-ik-sc"><span class="lc-ik-sc-ic">${ic(s.kind === 'call' ? I.phone : I.send)}</span><div class="lc-ik-sc-b"><b>${s.kind === 'call' ? 'Звонок-напоминание' : 'Отложенное сообщение'} · ${esc(at)}</b>${s.kind === 'message' && s.text ? `<i>${esc(s.text.slice(0, 90))}</i>` : ''}</div><button class="btn-ghost lc-ik-sc-x" data-schedcancel="${s.id}" title="Отменить">${ic(I.close || I.x || I.trash)}✕</button></div>`; }).join('')}</div>` : '';
   return `<div class="lc-intake">
     <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
-    ${adPath ? `<div class="lc-ik-ad">${ic(I.image)}<span>${esc(adPath)}</span></div>` : ''}
-    ${qa || (adPath || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
+    ${adBlock}
+    ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
     ${prefRow}
     ${schedRow}
   </div>`;
@@ -5554,7 +5582,7 @@ async function openLeadModal(id) {
             <div><label class="lc-lbl">Стадия</label><select id="mStage">${STAGES.map(s => `<option value="${s.id}" ${l.stage === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Направление</label><select id="mGeo">${STATE.settings.agency.geos.map(g => `<option value="${g}" ${l.geo === g ? 'selected' : ''}>${STATE.settings.geoNames[g]}</option>`).join('')}</select></div>
             <div><label class="lc-lbl">Брокер</label><select id="mBroker"><option value="">— не назначен</option>${STATE.brokers.map(b => `<option value="${b.id}" ${l.broker === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
-            ${LUMEN_VENDORS.length ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
+            ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div><label class="lc-lbl">Рекл. подрядчик</label>${vendorSelectHtml('mVendor', l.vendorId)}</div>` : ''}
           </div>
           <div class="lp-sec">Следующий шаг</div>
           <div class="lc-note-row">
@@ -6094,7 +6122,7 @@ async function renderChat(id, rebuild) {
       const st = k === 'email' ? ((l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown') : (l.channels || {})[k] || 'unknown';
       return `<span class="ch-pill ${st}" title="${n}: ${st === 'yes' ? 'есть' : st === 'no' ? 'нет' : 'не проверен'}">${n}</span>`;
     }).join('')}${l.activeChannel && l.activeChannel !== 'wa' ? `<span class="mini-badge warn">активен: ${{ tg: 'Telegram', viber: 'Viber', email: 'E-mail' }[l.activeChannel]}</span>` : ''}</div>
-    ${l.source === "ad_comment" ? `<div class="lp-ad" style="background:#FFF0E4;color:#C05B18">${ic(I.chat)}Лид из комментария под рекламой${l.social && l.social.username ? " · @" + esc(l.social.username) : ""}</div>` : ""}${l.ads && l.ads.adId ? `<div class="lp-ad">${ic(I.target)}${l.ads.matched ? esc(l.ads.adName) + (l.ads.campaignName ? ` <span>· ${esc(l.ads.campaignName)}</span>` : '') : `ad_id ${esc(l.ads.adId)} <span>· не в базе объявлений</span>`}</div>` : ''}
+    ${l.source === "ad_comment" ? `<div class="lp-ad" style="background:#FFF0E4;color:#C05B18">${ic(I.chat)}Лид из комментария под рекламой${l.social && l.social.username ? " · @" + esc(l.social.username) : ""}</div>` : ""}
     ${buildIntakeCard(l)}
     <div style="margin:14px 0 10px">${primary}</div>
     ${l.hint ? `<div class="lc-hint ${l.hint.kind}" style="margin-bottom:10px">${ic(l.hint.kind === 'warn' ? I.shield : l.hint.kind === 'act' ? I.bolt : I.spark)}${esc(l.hint.text)}</div>` : ''}
@@ -6122,7 +6150,7 @@ async function renderChat(id, rebuild) {
     <div class="lp-sec">Управление</div>
     <div class="lp-manage">
       <div class="pd-fact"><label class="lc-lbl">Стадия</label><select id="lpStage">${STAGES.map(s2 => `<option value="${s2.id}" ${l.stage === s2.id ? 'selected' : ''}>${s2.name}</option>`).join('')}</select></div>
-      ${LUMEN_VENDORS.length ? `<div class="pd-fact"><label class="lc-lbl">Рекламный подрядчик</label>${vendorSelectHtml('lpVendor', l.vendorId)}</div>` : ''}
+      ${LUMEN_VENDORS.length && !fieldHiddenForMe('vendor') ? `<div class="pd-fact"><label class="lc-lbl">Рекламный подрядчик</label>${vendorSelectHtml('lpVendor', l.vendorId)}</div>` : ''}
       ${l.nextAction && l.nextAction.text ? `<div class="lc-hint ${l.nextAction.at && l.nextAction.at < Date.now() ? 'warn' : 'info'}" style="margin-top:8px">${ic(I.clock)}${esc(l.nextAction.text)}${l.nextAction.at ? ' · ' + new Date(l.nextAction.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' ' + tmm(l.nextAction.at) : ''}</div>` : ''}
       <div class="lc-note-row" style="margin-top:9px"><input id="lpNote" placeholder="Комментарий по лиду… (Enter)"><button class="btn btn-sm" id="lpNoteBtn">${ic(I.plus)}</button></div>
       <button class="btn btn-sm" id="lpOpenCard" style="width:100%;justify-content:center;margin-top:9px">${ic(I.user)}Полная карточка лида</button>
@@ -9165,6 +9193,7 @@ function mpAnalyticsHtml(an, contractors, plans) {
         <div class="mpa-ct-pb"><span>Бюджет освоен</span><div class="mp-bar"><span style="width:${Math.min(100, r.budgetPct)}%"></span></div><i>${r.hasFact ? r.budgetPct + '%' : '—'}</i></div>
         <div class="mpa-ct-pb"><span>Лиды выполнены</span><div class="mp-bar"><span style="width:${Math.min(100, r.leadsPct)}%"></span></div><i>${r.hasFact ? r.leadsPct + '%' : '—'}</i></div>
       </div>
+      ${r.crmLeads != null ? `<div class="mpa-crm mpa-crm-ct">${ic(I.users)}Факт из CRM: <b>${r.crmLeads}</b> ${plural(r.crmLeads, 'лид', 'лида', 'лидов')}${r.crmQuals ? ` · <b>${r.crmQuals}</b> квал` : ''} <span class="muted">· реально в базе за период у этого подрядчика</span></div>` : ''}
     </div>`).join('')}</div>
   </div>` : '';
 
@@ -9202,7 +9231,13 @@ function mpAnalyticsHtml(an, contractors, plans) {
     ${!anyFact ? '<div class="mpa-hint-fact">Внесите факт в строках плана — и связки отранжируются по реальному CPL.</div>' : ''}
   </div>` : '';
 
-  return filterBar + headline + pacing + ctCards + chBlock + geoBlock + bundleBlock;
+  /* CRM-факт: сколько лидов реально в базе за период размечено по подрядчикам + сколько ещё без метки */
+  const crmBanner = (O.crmLeads != null && (O.crmLeads > 0 || O.crmLeadsUnassigned > 0)) ? `<div class="glass card mb mpa-crmbanner">
+    ${ic(I.users)}<div class="mpa-crmb-txt"><b>Факт из CRM за период: ${O.crmLeads} ${plural(O.crmLeads, 'лид', 'лида', 'лидов')} размечены по подрядчикам${O.crmQuals ? ` · ${O.crmQuals} квал` : ''}.</b>
+    ${O.crmLeadsUnassigned > 0 ? `<i>Ещё <b>${O.crmLeadsUnassigned}</b> ${plural(O.crmLeadsUnassigned, 'лид', 'лида', 'лидов')} без подрядчика — назначьте их в воронке (фильтр «Без подрядчика» → выделить → «Подрядчик»), чтобы они попали в этот факт.</i>` : '<i>Все лиды за период размечены. 🎯</i>'}</div>
+    ${O.crmLeadsUnassigned > 0 ? `<button class="btn btn-sm" id="mpaGoAssign">${ic(I.funnel)}В воронку</button>` : ''}
+  </div>` : '';
+  return filterBar + headline + crmBanner + pacing + ctCards + chBlock + geoBlock + bundleBlock;
 }
 
 /* Аналитика рекламы = страница медиаплана, открытая на вкладке «Аналитика».
@@ -9544,6 +9579,7 @@ PAGES.mediaplan = async (root) => {
     const ff = $('#mpaFFrom', root); if (ff) ff.addEventListener('change', applyFilter);
     const ft = $('#mpaFTo', root); if (ft) ft.addEventListener('change', applyFilter);
     const fr = $('#mpaFReset', root); if (fr) fr.addEventListener('click', () => { MP_AN_FILTER.contractorId = ''; MP_AN_FILTER.from = ''; MP_AN_FILTER.to = ''; render(); });
+    const ga = $('#mpaGoAssign', root); if (ga) ga.addEventListener('click', () => { PAGE_STATE.funnelVendor = '__none'; PAGE_STATE.funnelFiltersOpen = true; go('funnel'); });
     return;
   }
 
@@ -14301,10 +14337,33 @@ PAGES.roles = async (root) => {
         <div class="roles-step"><span>3</span><div><b>Видимость карточек</b> — по роли (свои / все) или ограничить конкретными источниками и тегами.</div></div>
       </div>
     </div>
-    ${rbacCardHtml()}`;
+    ${rbacCardHtml()}
+    ${brokerHiddenFieldsCardHtml()}`;
   wireRbac(root);
+  wireBrokerHiddenFields(root);
   $$('[data-ovgo]', root).forEach(b => b.addEventListener('click', () => go(b.dataset.ovgo)));
 };
+
+/* Гибкая приватность: какие поля лида СКРЫТЬ от брокеров (подрядчик/путь рекламы/источник/доп-поля). Применяется на сервере. */
+function brokerHiddenFieldsCardHtml() {
+  const hidden = new Set((STATE.settings.brokerHiddenFields) || []);
+  const base = [['vendor', 'Рекламный подрядчик', 'кто поставщик лидов'], ['adpath', 'Путь из рекламы', 'кампания · группа · объявление'], ['source', 'Источник лида', 'meta_form / landing / …']];
+  const cfs = (STATE.settings.customFields || []).map(f => ['custom:' + f.key, f.label || f.key, 'доп-поле карточки']);
+  const rows = base.concat(cfs);
+  return `<div class="glass card mb">
+    <div class="card-title">${ic(I.shield || I.lock)}Скрыть поля от брокеров<span class="sub">брокеры не увидят эти данные — ни в интерфейсе, ни в API</span></div>
+    <div class="muted" style="font-size:11.5px;margin-bottom:12px;line-height:1.55">Отметь поля, которые не должны быть доступны брокерам (например, кто рекламный подрядчик — поставщик лидов). Владелец и роли с полным доступом видят всё. Приватность применяется <b>на сервере</b>, а не только прячется в интерфейсе.</div>
+    <div class="bhf-grid">${rows.map(([k, label, hint]) => `<label class="bhf-row"><input type="checkbox" data-bhf="${esc(k)}" ${hidden.has(k) ? 'checked' : ''}><span class="bhf-txt"><b>${esc(label)}</b><i>${esc(hint)}</i></span></label>`).join('')}</div>
+  </div>`;
+}
+function wireBrokerHiddenFields(root) {
+  const save = async () => {
+    const keys = $$('[data-bhf]', root).filter(c => c.checked).map(c => c.dataset.bhf);
+    try { await api.patch('/settings', { brokerHiddenFields: keys }); toast('Приватность обновлена', keys.length ? `Скрыто от брокеров: ${keys.length}` : 'Ничего не скрыто', true); await loadState(); }
+    catch (e) { toast('Не вышло', e.message); }
+  };
+  $$('[data-bhf]', root).forEach(c => c.addEventListener('change', save));
+}
 
 /* ── Интерактивный мастер подключения WhatsApp Cloud API ──
    Пошагово: где что взять в Meta (со схемами полей) → вставить в Lumen → живая проверка → боевой режим. */

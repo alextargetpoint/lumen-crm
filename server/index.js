@@ -1113,6 +1113,23 @@ function leadView(db, l) {
   });
 }
 
+/* приватность: убрать из карточки лида поля, скрытые от брокеров (server-side — не обойти через devtools).
+   Работает по КОПИИ из leadView; массивы/объекты клонируем перед изменением, чтобы не портить исходный лид. */
+function redactLeadForBroker(db, v) {
+  const hidden = (db.settings.brokerHiddenFields || []);
+  if (!hidden.length || !v) return v;
+  if (hidden.includes('vendor')) {
+    const ct = (db.mpContractors || []).find(c => c.id === v.vendorId);
+    v.vendorId = null;
+    if (ct && ct.name && Array.isArray(v.tags)) v.tags = v.tags.filter(t => t !== ct.name);
+  }
+  if (hidden.includes('adpath')) v.ads = null;
+  if (hidden.includes('source')) v.source = '';
+  const cfHidden = hidden.filter(h => h.startsWith('custom:')).map(h => h.slice(7));
+  if (cfHidden.length && v.custom) { v.custom = Object.assign({}, v.custom); for (const k of cfHidden) delete v.custom[k]; }
+  return v;
+}
+
 function analytics(db, opts = {}) {
   /* SEC: брокер (leads:'own') видит аналитику ТОЛЬКО по своим лидам; агентские срезы по коллегам (byBroker) скрыты.
      Владелец и брокер с capability leads:'all' — полная аналитика (onlyBroker не передаётся). */
@@ -5641,7 +5658,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/leads' && req.method === 'GET') {
-      let list = (IS_BROKER ? db.leads.filter(canSeeLead) : db.leads).map(l => leadView(db, l));
+      let list = (IS_BROKER ? db.leads.filter(canSeeLead) : db.leads).map(l => IS_BROKER ? redactLeadForBroker(db, leadView(db, l)) : leadView(db, l));
       const stage = u.searchParams.get('stage'), geo = u.searchParams.get('geo'), q = (u.searchParams.get('q') || '').toLowerCase();
       if (stage) list = list.filter(l => l.stage === stage);
       if (geo) list = list.filter(l => l.geo === geo);
@@ -5675,7 +5692,7 @@ const server = http.createServer(async (req, res) => {
       let targets = ids.map(id => db.leads.find(l => l.id === id)).filter(Boolean);
       if (IS_BROKER) targets = targets.filter(canSeeLead); /* брокер — только свои */
       if (!targets.length) return json(res, 400, { error: 'нет доступных лидов' });
-      if (IS_BROKER && ['delete', 'broker'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
+      if (IS_BROKER && ['delete', 'broker', 'vendor'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
       let done = 0;
       for (const l of targets) {
         if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); capi.onStageChange(db, l, l.stage); } done++; }
@@ -5721,7 +5738,8 @@ const server = http.createServer(async (req, res) => {
         if (IS_BROKER) audit(db, req, 'открыл карточку лида', { leadId: lead.id, lead: lead.name });
         if (lead.unread) { lead.unread = 0; store.save(); }   /* открыл карточку → непрочитанные обнулены */
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
-        return json(res, 200, Object.assign(leadView(db, lead), {
+        const view = IS_BROKER ? redactLeadForBroker(db, leadView(db, lead)) : leadView(db, lead);
+        return json(res, 200, Object.assign(view, {
           messages: msgs,
           events: db.events.filter(e => e.leadId === lead.id).slice(0, 60),
           meetings: (db.meetings || []).filter(mt => mt.leadId === lead.id).map(mt => Object.assign({}, mt, { brokerName: (db.brokers.find(x => x.id === mt.brokerId) || {}).name || '—' })),
@@ -5737,7 +5755,7 @@ const server = http.createServer(async (req, res) => {
           Object.assign(lead.ai, b.ai);
         }
         if (b.name) lead.name = b.name;
-        if (b.vendorId !== undefined) { /* ручное назначение подрядчика на лид */
+        if (b.vendorId !== undefined && !IS_BROKER) { /* ручное назначение подрядчика на лид (не брокер) */
           const nv = b.vendorId || null; const prev = (db.mpContractors || []).find(c => c.id === lead.vendorId);
           if (prev && prev.name) lead.tags = (lead.tags || []).filter(t => t !== prev.name);
           lead.vendorId = nv;
@@ -6705,6 +6723,8 @@ const server = http.createServer(async (req, res) => {
         if (b.stagesCfg.hidden) sc.hidden = b.stagesCfg.hidden.slice(0, 20).map(String);
       }
       if (b.customFields) { const CF_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'phone', 'url', 'email', 'select', 'multiselect', 'bool', 'rating']; db.settings.customFields = b.customFields.slice(0, 40).map(f => ({ key: String(f.key || '').slice(0, 40), label: String(f.label || '').slice(0, 60), type: CF_TYPES.includes(f.type) ? f.type : 'text', options: (f.options || []).slice(0, 30).map(v => String(v).slice(0, 60)).filter(Boolean), unit: String(f.unit || '').slice(0, 12) })).filter(f => f.key && f.label); }
+      /* какие поля лида СКРЫТЬ от брокеров (гибкая приватность: подрядчик/источник/путь рекламы/доп-поля) */
+      if (Array.isArray(b.brokerHiddenFields)) db.settings.brokerHiddenFields = b.brokerHiddenFields.map(x => String(x).slice(0, 60)).slice(0, 80);
       if (b.wa && b.wa.tokenSet === false) delete db.settings.wa.token; // явное отключение
       if (b.criteria) for (const g of Object.keys(b.criteria)) Object.assign(db.settings.criteria[g] = db.settings.criteria[g] || {}, b.criteria[g]);
       if (b.stopWords) db.settings.stopWords = b.stopWords;
@@ -8799,7 +8819,11 @@ const server = http.createServer(async (req, res) => {
       const tos = plans.map(m => m.period && m.period.to).filter(Boolean).sort();
       const gFrom = froms[0] || '', gTo = tos[tos.length - 1] || '';
       const dayOf = (ts) => { try { return new Date(ts).toISOString().slice(0, 10); } catch { return ''; } };
-      const crmLeadsGeo = (g) => (db.leads || []).filter(l => l.geo === g && (() => { const s = dayOf(l.createdAt); return s && (!gFrom || s >= gFrom) && (!gTo || s <= gTo); })()).length;
+      const inPer = (l) => { const s = dayOf(l.createdAt); return s && (!gFrom || s >= gFrom) && (!gTo || s <= gTo); };
+      const crmLeadsGeo = (g) => (db.leads || []).filter(l => l.geo === g && inPer(l)).length;
+      /* CRM-факт по ПОДРЯДЧИКУ (надёжно — по lead.vendorId, назначенному вручную/из вебхука ?vendor=) */
+      const QSTAGES = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+      const crmByVendor = (cid) => { const arr = (db.leads || []).filter(l => (l.vendorId || null) === (cid === '__none' ? null : cid) && inPer(l)); return { leads: arr.length, quals: arr.filter(l => QSTAGES.includes(l.stage)).length }; };
 
       /* rollup */
       const overallCur = curOf(plans);
@@ -8821,8 +8845,13 @@ const server = http.createServer(async (req, res) => {
         r.name = ct ? ct.name : (cid === '__none' ? 'Без подрядчика' : (mps[0] && mps[0].contractorName) || '—');
         r.channels = ct ? (ct.channels || []) : [];
         r.geos = ct ? (ct.geos || []) : [];
+        const cb = crmByVendor(cid); r.crmLeads = cb.leads; r.crmQuals = cb.quals; /* реальный факт из CRM по этому подрядчику */
         return r;
       }).sort((x, y) => y.budgetPlan - x.budgetPlan);
+      /* общий CRM-факт по всем подрядчикам плана + сколько лидов ещё БЕЗ подрядчика (нужно разметить) */
+      overall.crmLeads = (db.leads || []).filter(l => l.vendorId && inPer(l)).length;
+      overall.crmLeadsUnassigned = (db.leads || []).filter(l => !l.vendorId && inPer(l)).length;
+      overall.crmQuals = (db.leads || []).filter(l => l.vendorId && inPer(l) && QSTAGES.includes(l.stage)).length;
       /* ранг эффективности: только среди тех, у кого есть реальный CPL факт */
       const ranked = byContractor.filter(r => r.hasFact && r.cplFact > 0).sort((x, y) => x.cplFact - y.cplFact);
       ranked.forEach((r, i) => { r.rank = i + 1; r.bestCpl = i === 0; });
@@ -9332,7 +9361,14 @@ ${SCR}
       const DIAL = [['971', 'AE'], ['966', 'SA'], ['380', 'UA'], ['995', 'GE'], ['994', 'AZ'], ['998', 'UZ'], ['375', 'BY'], ['352', 'LU'], ['351', 'PT'], ['357', 'CY'], ['356', 'MT'], ['420', 'CZ'], ['7', 'RU'], ['1', 'US'], ['44', 'GB'], ['34', 'ES'], ['49', 'DE'], ['33', 'FR'], ['39', 'IT'], ['90', 'TR'], ['66', 'TH'], ['62', 'ID'], ['91', 'IN'], ['61', 'AU'], ['81', 'JP'], ['82', 'KR'], ['86', 'CN'], ['65', 'SG'], ['852', 'HK'], ['48', 'PL'], ['30', 'GR'], ['353', 'IE'], ['31', 'NL'], ['32', 'BE'], ['41', 'CH'], ['43', 'AT'], ['46', 'SE'], ['47', 'NO'], ['45', 'DK'], ['358', 'FI'], ['972', 'IL'], ['974', 'QA'], ['968', 'OM'], ['973', 'BH'], ['965', 'KW'], ['20', 'EG']];
       const ISO_NAME = { AE: 'UAE', SA: 'Saudi Arabia', RU: 'Russia', US: 'United States', GB: 'United Kingdom', ES: 'Spain', DE: 'Germany', FR: 'France', IT: 'Italy', TR: 'Turkey', TH: 'Thailand', ID: 'Indonesia', IN: 'India', UA: 'Ukraine', GE: 'Georgia', AZ: 'Azerbaijan', UZ: 'Uzbekistan', BY: 'Belarus', KZ: 'Kazakhstan', AU: 'Australia', JP: 'Japan', KR: 'South Korea', CN: 'China', SG: 'Singapore', HK: 'Hong Kong', PL: 'Poland', GR: 'Greece', IE: 'Ireland', NL: 'Netherlands', BE: 'Belgium', CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', IL: 'Israel', QA: 'Qatar', OM: 'Oman', BH: 'Bahrain', KW: 'Kuwait', EG: 'Egypt', PT: 'Portugal', CY: 'Cyprus', MT: 'Malta', LU: 'Luxembourg', CZ: 'Czechia' };
       const countryOf = (l) => { const cf = l.custom || {}; let c = cf.country || cf['страна'] || cf.Country || l.country || ''; if (!c && l.phone) { const d = String(l.phone).replace(/[^\d]/g, ''); for (const [pre, iso] of DIAL) { if (d.startsWith(pre)) { c = ISO_NAME[iso] || iso; break; } } } return c; };
-      const langOf = (l) => { const v = (l.lang || '').toUpperCase(); if (v) return v.slice(0, 4); const s = ' ' + String((l.ads && (l.ads.campaignName + ' ' + l.ads.adsetName)) || '').toUpperCase().replace(/[|_/\-]+/g, ' ') + ' '; for (const L of ['RU', 'EN', 'AR', 'ES', 'DE', 'FR', 'IT', 'TR', 'TH', 'ID']) if (new RegExp('(^| )' + L + '( |$)').test(s)) return L; return 'OTHER'; };
+      /* язык лида: нейминг кампании/адсета/объявления — ПРИОРИТЕТ (это язык таргетинга рекламы, «источник правды»),
+         иначе l.lang. Пробел: раньше l.lang='ru' по умолчанию у всех вебхук-лидов затирал детект EN из нейминга. */
+      const langOf = (l) => {
+        const nameStr = ' ' + String((l.ads && ((l.ads.campaignName || '') + ' ' + (l.ads.adsetName || '') + ' ' + (l.ads.adName || l.ads.name || ''))) || '').toUpperCase().replace(/[|_/\\\-.,]+/g, ' ') + ' ';
+        for (const L of ['RU', 'EN', 'AR', 'ES', 'DE', 'FR', 'IT', 'TR', 'TH', 'ID']) if (new RegExp('(^| )' + L + '( |$)').test(nameStr)) return L;
+        const v = (l.lang || '').toUpperCase(); if (v) return v.slice(0, 4);
+        return 'OTHER';
+      };
       const dirOf = (l) => { const dk = campMap[l.ads && l.ads.campaignName]; return dk ? dirName(dk) : 'Прочее (вне плана)'; };
       const leads = (db.leads || []).filter(inR);
       /* totalSpend за период */
