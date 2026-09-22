@@ -6623,6 +6623,27 @@ const CHAIN_CARDS = [
     desc: 'Сухой уважительный последний вопрос, если лид совсем не реагирует — без давления.',
     steps: [ { day: 9, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Финальный чек-ин', active: true,
         text: "Hello {name}, it's hard for me to move things forward without knowing whether this is still relevant for you.\n\nIf you have a minute, could you let me know? Thank you." } ] },
+  /* ── Инсайд и экспертиза (не сухая рассылка, а «свой человек в теме») ── */
+  { id: 'insider-offmarket', icon: 'flame', tag: 'Инсайд', cat: 'Инсайд и экспертиза', title: 'Инсайд: до листинга', timing: 'день 2',
+    desc: 'Даёте почувствовать доступ к закрытой информации: юнит, который ещё не в открытой продаже. Сильно поднимает вовлечённость.',
+    steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Инсайд до листинга', active: true,
+        text: "{name}, one off the record: a unit in {creative} is coming up before it hits the public listings, on better terms than the open market.\n\nI can only share these quietly with a few clients.\n\nWant me to send you the details first?" } ] },
+  { id: 'insider-incentive', icon: 'spark', tag: 'Скрытый бонус', cat: 'Инсайд и экспертиза', title: 'Инсайд: бонус застройщика', timing: 'день 3',
+    desc: 'Застройщик даёт неафишируемый бонус (доп. скидка, оплата DLD, мебель) через прямых партнёров. Ценность + эксклюзивность.',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Бонус застройщика', active: true,
+        text: "{name}, quick insider note on {creative}: the developer is giving an extra incentive through direct partners right now (it isn't advertised) — think waived fees or a furniture package.\n\nWorth grabbing while it lasts. Want me to check if your unit qualifies?" } ] },
+  { id: 'insider-tip', icon: 'shield', tag: 'Экспертиза', cat: 'Инсайд и экспертиза', title: 'Чего не пишут в рекламе', timing: 'день 4',
+    desc: 'Честный экспертный разбор: на что реально смотреть в проекте/районе. Строит доверие «свой человек, не продавец».',
+    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Экспертный разбор', active: true,
+        text: "{name}, one thing the ads never mention about {district}: not every tower there rents the same. The view line and the handover year make a real difference to yield.\n\nI can tell you honestly which stack in {creative} is worth it and which to skip. Want the straight version?" } ] },
+  { id: 'personal-pick', icon: 'flame', tag: 'Личный выбор', cat: 'Инсайд и экспертиза', title: 'Личная рекомендация брокера', timing: 'день 5',
+    desc: 'Персональная рекомендация «я бы сам взял вот это, потому что…». Тёплое доверие + конкретика.',
+    steps: [ { day: 5, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Личная рекомендация', active: true,
+        text: "{name}, if a friend asked me, I'd point them to {creative} for the {purpose} you have in mind. The entry is reasonable, the payment plan is soft, and the location holds value.\n\nI can send you the exact unit I'd pick and why. Want it?" } ] },
+  { id: 'care-warning', icon: 'shield', tag: 'Забота', cat: 'Инсайд и экспертиза', title: 'Предупреждение (забота)', timing: 'день 6',
+    desc: 'Предупреждаете о типичной ошибке покупателя. Продаёт доверие: вы на стороне клиента, а не сделки.',
+    steps: [ { day: 6, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Забота о клиенте', active: true,
+        text: "{name}, a small heads-up so you don't overpay: with projects like {creative}, some brokers push the priciest units first.\n\nBefore you decide anything, let me send you a fair comparison, including the quieter options that actually give better returns. No pressure either way." } ] },
 ];
 /* ЛИНТЕР ЦЕПОЧКИ: ловим типовые ошибки фоллоуапов и агрессивный каденс. Возвращает [{level, text}]. */
 function lintChain(seq) {
