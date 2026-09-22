@@ -12877,18 +12877,23 @@ PAGES.numbers = async (root) => {
           <button class="seg-btn" data-sbctab="manual">${ic(I.gear)}Вручную — сам на телефоне</button>
         </div>
         <div data-sbcpane="quick">
-          <div class="sbf-reco">${ic(I.check)}<b>Рекомендуем.</b> Вы вводите логин от Simbye один раз — система сама забирает номера и SMS-коды и ведёт их по всем шагам. Минимум действий.</div>
+          <div class="sbf-reco">${ic(I.check)}<b>Рекомендуем.</b> Вы один раз входите в Simbye прямо здесь, во встроенном окне (сами проходите вход и капчу — ~30 секунд). Дальше система сама забирает номера и SMS-коды и ведёт их по всем шагам. Сессия сохраняется — повторно вводить ничего не нужно.</div>
           <div class="sbf-guide">
-            ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. ⚠️ Не через Google/Apple — иначе автоматика не сможет войти. Внизу сайта можно переключить язык на <b>«Русский»</b>. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
+            ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. Внизу сайта можно переключить язык на <b>«Русский»</b>. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
             ${step(2, 'Купите номер', 'В Simbye: <b>«Виртуальные номера»</b> → UK (9,95€/30дн) или USA → оплатите картой/PayPal/Apple Pay. Или позже — кнопкой «Купить номер» здесь.', 'q2')}
-            ${step(3, 'Введите логин Simbye — система войдёт сама', 'Введите email+пароль от Simbye. Система войдёт за вас (капчу hCaptcha решаем автоматически через сервис), найдёт ваши номера и запустит конвейер. Пароль хранится в зашифрованном виде.', '')}
+            ${step(3, 'Войдите через встроенное окно — один раз', 'Нажмите кнопку ниже: прямо здесь откроется окно входа Simbye. Введите email+пароль, пройдите капчу (обычно один клик) — и всё. Мы сохраним сессию и дальше сделаем всё сами: номера, коды, конвейер. Пароль остаётся в окне Simbye — мы храним только сессию.', '')}
           </div>
-          <div class="sbf-grid2" style="margin-top:12px">
-            <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com" autocomplete="off"></div>
-            <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль" autocomplete="new-password"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px"><button class="btn btn-accent" id="sbcRemote">${ic(I.link)}Войти в Simbye (встроенное окно)</button><span class="muted" style="font-size:11px">🔒 Один раз — дальше автоматически.</span></div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--stroke-soft)">
+            ${coll('Автоматический вход по паролю (экспериментально)', `
+              <div class="muted" style="font-size:11px;line-height:1.55;margin:2px 0 10px">Система попробует войти сама и решить капчу через сервис. ⚠️ Simbye использует усиленную защиту (hCaptcha proof-of-work) — авто-вход срабатывает <b>не всегда</b>. Если не вышло — используйте встроенное окно выше (надёжно). Аккаунт должен быть заведён по email+паролю, не через Google/Apple.</div>
+              <div class="sbf-grid2">
+                <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com" autocomplete="off"></div>
+                <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль" autocomplete="new-password"></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="sbcConnect">${ic(I.link)}Попробовать авто-вход</button><span class="muted" style="font-size:11px">🔒 Пароль шифруется (AES-256).</span></div>
+            `)}
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-accent btn-sm" id="sbcConnect">${ic(I.link)}Подключить Simbye</button><span class="muted" style="font-size:11px">🔒 Пароль шифруется (AES-256), капча решается автоматически.</span></div>
-          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--stroke-soft)"><button class="btn-ghost btn-sm" id="sbcRemote">${ic(I.link)}Не сработало? Войти вручную во встроенном браузере</button></div>
         </div>
         <div data-sbcpane="manual" style="display:none">
           <div class="sbf-reco muted2">${ic(I.gear)}Если хотите всё делать сами со своего телефона. Номера и коды сюда автоматически не попадут — коды смотрите в панели Simbye вручную. Подключение к CRM — по QR в конце.</div>
