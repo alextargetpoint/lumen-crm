@@ -5484,6 +5484,13 @@ const server = http.createServer(async (req, res) => {
         return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, onboarded: !!(d.settings.agency && d.settings.agency.onboarded), createdAt: meta.createdAt || 0, lastActivity, sleeping: lastActivity > 0 && (Date.now() - lastActivity) > 7 * 864e5, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length };
       });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
+      /* СКВОЗНАЯ ПРОВЕРКА офф-сайт бэкапа B2: снять→выгрузить→скачать обратно→расшифровать→сверить */
+      if (p === '/api/admin/backup/verify' && (req.method === 'POST' || req.method === 'GET')) {
+        const st = { enabled: b2backup.enabled(), bucket: b2backup.CFG.bucket, encrypted: !!b2backup.CFG.encKey };
+        if (!st.enabled) return json(res, 200, { ok: false, ...st, error: 'B2 выключен — задайте BACKUP_B2_KEY_ID/APP_KEY/BUCKET_ID' });
+        try { const r = await b2backup.runAndVerify(store); return json(res, 200, { ...r, ...st }); }
+        catch (e) { return json(res, 200, { ok: false, ...st, error: e.message }); }
+      }
       /* СВЕРКА КРИПТО-ПЛАТЕЖЕЙ вручную: тянем ончейн (TRC20+ERC20) и зачисляем ЛЮБУЮ незачтённую заявку,
          совпавшую по точной сумме, ИГНОРИРУЯ окно 24ч (вывод с биржи может идти сутками). Идемпотентно по txid.
          Плюс ручной режим: {manual:{tid, amountUsd, chain, txid, purpose}} — если заявки в системе уже нет. */

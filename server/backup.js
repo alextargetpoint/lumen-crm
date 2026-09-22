@@ -64,9 +64,17 @@ async function b2Auth() {
   });
   if (!r.ok) throw new Error('b2_authorize ' + r.status + ' ' + (await r.text()).slice(0, 120));
   const j = await r.json();
-  _auth = { token: j.authorizationToken, apiUrl: j.apiInfo.storageApi.apiUrl };
+  _auth = { token: j.authorizationToken, apiUrl: j.apiInfo.storageApi.apiUrl, downloadUrl: j.apiInfo.storageApi.downloadUrl };
   _authAt = Date.now();
   return _auth;
+}
+/* скачать файл обратно из B2 (для сквозной проверки/восстановления) */
+async function b2Download(name) {
+  const a = await b2Auth();
+  const url = a.downloadUrl + '/file/' + CFG.bucket + '/' + name.split('/').map(encodeURIComponent).join('/');
+  const r = await fetch(url, { headers: { Authorization: a.token }, signal: AbortSignal.timeout(60000) });
+  if (!r.ok) throw new Error('b2_download ' + r.status);
+  return Buffer.from(await r.arrayBuffer());
 }
 async function b2Upload(name, buf) {
   const a = await b2Auth();
@@ -140,6 +148,27 @@ async function snapshotOnce(store, label) {
   } finally { _running = false; }
 }
 
+/* СКВОЗНАЯ ПРОВЕРКА: снять снимок → выгрузить → скачать обратно → расшифровать → распаковать →
+   распарсить → сверить число агентств. Доказывает, что бэкап реально пригоден к восстановлению. */
+async function runAndVerify(store) {
+  if (!enabled()) return { ok: false, error: 'B2 не настроен (нет BACKUP_B2_KEY_ID/APP_KEY/BUCKET_ID)' };
+  const snap = await snapshotOnce(store, 'manual');
+  if (!snap.ok) return { ok: false, error: 'снимок не удался: ' + (snap.error || '?') };
+  try {
+    const raw = await b2Download(snap.name);
+    const gz = CFG.encKey ? decrypt(raw) : raw;
+    const json = zlib.gunzipSync(gz).toString();
+    const bundle = JSON.parse(json);
+    const tenantsBack = Object.keys(bundle.tenants || {}).length;
+    return {
+      ok: true, name: snap.name, uploadedTenants: snap.tenants, verifiedTenants: tenantsBack,
+      encrypted: !!CFG.encKey, sizeKB: +(raw.length / 1024).toFixed(1),
+      match: tenantsBack === snap.tenants,
+      sampleTids: Object.keys(bundle.tenants || {}).slice(0, 5),
+    };
+  } catch (e) { return { ok: false, error: 'выгрузка есть, но обратное чтение упало: ' + e.message, name: snap.name }; }
+}
+
 function start(store) {
   if (!enabled()) { console.log('[b2backup] выключен — задайте BACKUP_B2_KEY_ID/APP_KEY/BUCKET_ID (+BACKUP_ENC_KEY) на сервисе CRM'); return; }
   if (!CFG.encKey) console.warn('[b2backup] ⚠ BACKUP_ENC_KEY не задан — снимки уйдут БЕЗ шифрования. Задайте 64-hex ключ!');
@@ -149,4 +178,4 @@ function start(store) {
   setInterval(() => snapshotOnce(store, 'daily'), CFG.dailyHours * 3600e3);
 }
 
-module.exports = { start, snapshotOnce, decrypt, enabled, CFG };
+module.exports = { start, snapshotOnce, runAndVerify, decrypt, enabled, CFG };
