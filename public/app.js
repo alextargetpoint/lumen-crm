@@ -5264,16 +5264,19 @@ function buildIntakeCard(l) {
     ${schedRow}
   </div>`;
 }
-/* попап-просмотр креатива с кастомным минималистичным плеером */
+/* лёгкий лайтбокс креатива ПОВЕРХ карточки лида — НЕ через modal() (тот закрывает карточку под собой).
+   Закрытие (✕ / клик по фону / Esc) убирает только лайтбокс, карточка остаётся открытой. */
 function openCreativeView(url, type) {
   if (!url) return;
-  modal({
-    title: 'Креатив объявления', wide: 'card', favicon: '',
-    body: `<div class="crea-view">${type === 'video'
-      ? `<video src="${esc(url)}" controls autoplay playsinline controlslist="nodownload" style="width:100%;max-height:74vh;border-radius:14px;background:#000;display:block"></video>`
-      : `<img src="${esc(url)}" alt="креатив" style="width:100%;border-radius:14px;display:block">`}</div>`,
-    actions: [{ label: 'Закрыть' }],
-  });
+  document.getElementById('creaLightbox')?.remove();
+  const ov = el(`<div id="creaLightbox" class="crea-lb"><div class="crea-lb-box"><button class="crea-lb-x" aria-label="Закрыть">${ic(I.x || I.close) || '✕'}</button>${type === 'video'
+    ? `<video src="${esc(url)}" controls autoplay playsinline controlslist="nodownload"></video>`
+    : `<img src="${esc(url)}" alt="креатив">`}</div></div>`);
+  document.body.appendChild(ov);
+  const close = () => { try { ov.querySelector('video')?.pause(); } catch (_) { } ov.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); close(); } };
+  ov.addEventListener('click', (e) => { if (e.target === ov || e.target.closest('.crea-lb-x')) { e.stopPropagation(); close(); } });
+  document.addEventListener('keydown', onKey, true);   /* capture: перехватываем Esc раньше обработчика модалки */
 }
 /* обработчики карточки заявки — общие для карточки лида и панели «Диалоги» (scope — контейнер, done — колбэк после изменения) */
 function wireIntakeCard(scope, l, done) {
