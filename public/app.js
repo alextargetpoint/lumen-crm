@@ -6404,7 +6404,9 @@ PAGES.sequences = async (root) => {
   const ro = (attr) => editable ? attr : (attr + ' disabled');
   const save = async (patch) => { await api.patch('/sequences/' + seq.id, patch || { steps: seq.steps }); };
   const geoName = (g) => g === 'all' ? 'Все гео' : STATE.settings.geoNames[g] || g;
-  const dayLabel = (d) => d === 0 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + d;
+  /* убираем дрейф float в day (напр. 1.0035 → 1): для показа снапим к целому, если рядом */
+  const fmtDay = (d) => { const r = Math.round(d); return Math.abs(d - r) < 0.05 ? r : +d.toFixed(1); };
+  const dayLabel = (d) => d < 0.02 ? 'сразу' : d < 1 ? '~' + Math.round(d * 24) + ' ч' : 'день ' + fmtDay(d);
   /* ---- ТАРГЕТИНГ цепочки: на какие лиды распространяется ---- */
   const SEQ_SOURCES = [['meta_form', 'Lead-форма Meta'], ['ctwa', 'Click-to-WhatsApp'], ['ig_direct', 'Instagram Direct'], ['ad_comment', 'Комментарии рекламы'], ['landing', 'Лендинг'], ['site', 'Сайт'], ['meta_api', 'Meta API'], ['wa_inbound', 'Входящий WhatsApp'], ['wa_gray', 'WhatsApp (серый)'], ['viber', 'Viber'], ['import', 'Импорт'], ['broker_card', 'От брокера']];
   const SEQ_CHANNELS = [['wa', 'WhatsApp'], ['ig', 'Instagram'], ['tg', 'Telegram'], ['viber', 'Viber'], ['email', 'E-mail']];
@@ -6536,7 +6538,7 @@ PAGES.sequences = async (root) => {
   const haMaxDay = Math.max(...haSteps.map(st => st.day), 0);
   root.innerHTML = `
     ${heroArt('assets/art/chain.png', `
-      <div class="ha-title">${ic(I.chain)}Цепочки касаний<span class="sub">${esc(seq.name.length > 44 ? seq.name.slice(0, 42) + '…' : seq.name)} · ${haSteps.length} касаний · ${haMaxDay < 1 ? 'первые сутки' : haMaxDay + ' дней'}</span></div>
+      <div class="ha-title">${ic(I.chain)}Цепочки касаний<span class="sub">${esc(seq.name.length > 44 ? seq.name.slice(0, 42) + '…' : seq.name)} · ${haSteps.length} касаний · ${haMaxDay < 1 ? 'первые сутки' : fmtDay(haMaxDay) + ' дней'}</span></div>
       <div class="ha-steps">${haSteps.map((st, i) => `<span class="ha-step" style="--i:${i}" data-ha>${dayLabel(st.day)}</span>`).join('') || '<span class="sub2">в цепочке нет активных шагов</span>'}</div>
       <div class="sub2" style="margin-top:9px">До первого ответа клиента — дальше ведёт ИИ</div>
     `, { v: 'left', hue: '#2563EB' })}
@@ -6631,13 +6633,13 @@ PAGES.sequences = async (root) => {
   }
   /* спокойный интерактив: вся цепочка видна сразу, шкала дней сверху —
      клик по дню плавно листает телефон к сообщению и подсвечивает его */
-  const dayTxt = (st) => st.day === 0 ? 'сразу' : st.day < 1 ? '~' + Math.round(st.day * 24) + ' ч' : 'день ' + st.day;
+  const dayTxt = (st) => st.day < 0.02 ? 'сразу' : st.day < 1 ? '~' + Math.round(st.day * 24) + ' ч' : 'день ' + fmtDay(st.day);
   const renderWa = () => {
     const body = $('#waBody', root);
     const scrub = $('#waScrub', root);
     if (!body) return;
     body.innerHTML = waSteps.map((st, i) => `
-      <div class="wa-day" style="--wi:${i}">${st.day === 0 ? 'сразу после заявки' : st.day < 1 ? 'через ~' + Math.round(st.day * 24) + ' ч' : 'день ' + st.day}</div>
+      <div class="wa-day" style="--wi:${i}">${st.day < 0.02 ? 'сразу после заявки' : st.day < 1 ? 'через ~' + Math.round(st.day * 24) + ' ч' : 'день ' + fmtDay(st.day)}</div>
       <div class="wa-msg out calm" style="--wi:${i}" data-wamsg="${i}">
         ${st.channel === 'voice' ? '<span class="wa-voice">▶ голосовое 0:24</span>' : esc(waPreview(st)).replace(/\n/g, '<br>')}
         <span class="wa-time">${st.day === 0 ? '12:0' + (i % 10) : '11:1' + (i % 10)} ✓✓</span>
