@@ -6949,6 +6949,19 @@ const server = http.createServer(async (req, res) => {
     }
     /* КОНСТРУКТОР: собрать текст шага через ИИ по ПОНИМАНИЮ КРЕАТИВА (транскрипт видео + сильные стороны)
        на примере реального лида, подходящего под таргетинг цепочки. Design-time: один вызов по кнопке. */
+    /* загрузка своего фото/видео в шаг цепочки (фото приходит уже сжатым с клиента) */
+    if (p === '/api/sequences/creative-upload' && req.method === 'POST') {
+      const extM = String(u.searchParams.get('filename') || 'file.jpg').match(/\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i) || [null, 'jpg'];
+      const chunks = []; let size = 0, over = false;
+      await new Promise((resolve) => { req.on('data', (ch) => { size += ch.length; if (size > 12e6) { over = true; req.destroy(); resolve(); } else chunks.push(ch); }); req.on('end', resolve); req.on('close', resolve); });
+      if (over) return json(res, 400, { error: 'файл до 12 МБ — фото сжимается автоматически, видео сократите' });
+      if (!size) return json(res, 400, { error: 'пустой файл' });
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      const ext = extM[1].toLowerCase().replace('jpeg', 'jpg');
+      const fname = `creatives/seq-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(PUBLIC, 'assets', fname), Buffer.concat(chunks));
+      return json(res, 200, { url: '/assets/' + fname, type: /(mp4|webm|mov)/.test(ext) ? 'video' : 'image', compressed: /(png|jpg|webp)/.test(ext) });
+    }
     if ((m = p.match(/^\/api\/sequences\/([^/]+)\/ai-draft$/)) && req.method === 'POST') {
       const seq = db.sequences.find(s => s.id === m[1]);
       if (!seq) return json(res, 404, { error: 'not found' });

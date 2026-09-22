@@ -6499,38 +6499,111 @@ PAGES.qualifier = async (root) => {
 /* ---------------- ЦЕПОЧКИ ---------------- */
 /* БИБЛИОТЕКА УМНЫХ КАРТОЧЕК — готовые шаги-приёмы, из которых собирается цепочка.
    Каждая карточка разворачивается в 1+ шаг(ов). Тексты — по эталонным фоллоуапам (EN, редактируются). */
+/* авто-сжатие фото перед загрузкой (как в дереве креативов): даунскейл до 1600px + jpeg .82; видео/gif — как есть */
+async function compressIfImage(file, maxDim = 1600, quality = 0.82) {
+  if (!file || !/^image\//.test(file.type) || /gif/.test(file.type)) return file;
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+    let w = img.naturalWidth, h = img.naturalHeight; const scale = Math.min(1, maxDim / Math.max(w, h));
+    if (scale >= 1 && file.size < 500 * 1024) { URL.revokeObjectURL(img.src); return file; }
+    w = Math.round(w * scale); h = Math.round(h * scale);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+    URL.revokeObjectURL(img.src);
+    return (blob && blob.size < file.size) ? blob : file;
+  } catch (_) { return file; }
+}
 const CHAIN_CARDS = [
-  { id: 'smart-first', icon: 'spark', tag: 'Первое касание', accent: true, title: 'Умное первое касание', timing: 'сразу · 2 сообщения',
+  /* ── Первое касание ── */
+  { id: 'smart-first', icon: 'spark', tag: 'Первое касание', cat: 'Первое касание', accent: true, title: 'Умное первое касание', timing: 'сразу · 2 сообщения',
     desc: 'Сначала уходит креатив, по которому пришёл лид, а следом — текст: отсылка на заявку, тезис по видео, крючок и вопрос-альтернатива.',
     steps: [
       { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: true }, text: '', label: '1 · Креатив из заявки', active: true },
       { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: '2 · Сопроводительный текст', active: true,
         text: 'Hey {name}! Saw your request about {creative} — great pick! Prices might be going up soon, so timing is key.\n\n{priceLineEn}Want me to send you the best options in this range?' },
     ] },
-  { id: 'photo-card', icon: 'image', tag: 'Доверие', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку',
+  { id: 'first-question', icon: 'chat', tag: 'Первое касание', cat: 'Первое касание', title: 'Первое касание · сразу вопрос', timing: 'сразу',
+    desc: 'Короткое дружелюбное касание одним сообщением: признать выбор + один лёгкий вопрос-альтернатива, чтобы получить любой ответ.',
+    steps: [ { day: 0, delayVal: 0, delayUnit: 'hour', channel: 'wa', mode: 'text', label: 'Первое касание · вопрос', active: true,
+        text: "Hi {name}! Thanks for your interest in {creative} — solid choice. Quick one so I send the right thing: are you looking at it for yourself, or as an investment?" } ] },
+  /* ── Доверие и раппорт ── */
+  { id: 'photo-card', icon: 'image', tag: 'Доверие', cat: 'Доверие и раппорт', title: 'Фотовизитка + приветствие', timing: '~3 часа', needsAsset: 'фото-визитку',
     desc: 'Фото-визитка брокера (прикрепите картинку) + тёплое приветствие и вопрос-альтернатива (релокация или инвестиции).',
     steps: [ { day: 0.12, delayVal: 3, delayUnit: 'hour', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Фотовизитка + приветствие', active: true,
         text: "By the way, I'm {manager} from {agency} — we don't just list properties, we handpick the best. And this one definitely made the cut.\n\nI can help you find the right deal and sort out the details. Are you looking to buy for relocation or as an investment?" } ] },
-  { id: 'value-urgency', icon: 'bolt', tag: 'Ценность + срочность', title: 'Follow-up: ценность и срочность', timing: 'день 2',
-    desc: 'ROI, спрос на аренду, премиум-удобства + предложение прислать сравнение лучших вариантов месяца.',
-    steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Ценность + срочность', active: true,
-        text: 'Hey {name}, quick heads-up — prices for {creative} are going up soon!\n\n💰 Potential ROI up to 10% annually\n📈 High short-term rental demand — strong cash flow\n🏤 Luxury amenities: pool, sauna, gym & more\n\nWant me to send a comparison of the best options this month?' } ] },
-  { id: 'call-country', icon: 'phone', tag: 'Заход на звонок', title: 'Мягкий заход на звонок', timing: 'день 3',
-    desc: 'Уточнение страны клиента + естественное предложение короткого созвона (после 2-го дня без ответа).',
-    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Заход на звонок', active: true,
-        text: "Let's have a quick call tomorrow — I'll walk you through the best deals and answer any questions.\n\n{countryQEn}" } ] },
-  { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку',
-    desc: 'Заготовленная PDF-подборка топ-проектов (прикрепите файл) + короткий текст «прислать?».',
-    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'PDF-подборка + текст', active: true,
-        text: "Just prepared a fresh selection of {geo}'s top projects — handpicked options with the best payment plans and locations.\n\nWant me to send it over?" } ] },
-  { id: 'final-checkin', icon: 'moon', tag: 'Финальный дожим', title: 'Финальный чек-ин (мягко)', timing: 'день 7',
-    desc: 'Сухой уважительный последний вопрос, если лид совсем не реагирует — без давления.',
-    steps: [ { day: 7, delayVal: 3, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Финальный чек-ин', active: true,
-        text: "Hey {name}, honestly it's a bit hard to move forward without knowing if this is still on your radar. If you have a minute, could you let me know? Appreciate it! 🙏" } ] },
-  { id: 'voice-note', icon: 'mic', tag: 'Личный контакт', title: 'Голосовое касание', timing: 'день 3',
+  { id: 'voice-note', icon: 'mic', tag: 'Личный контакт', cat: 'Доверие и раппорт', title: 'Голосовое касание', timing: 'день 3',
     desc: 'Короткое голосовое — резко повышает доверие и ответы. ИИ подскажет, что записать.',
     steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'voice', mode: 'ai', label: 'Голосовое', active: true,
         prompt: 'Короткое голосовое по проекту {creative}: по-человечески, тепло, один вопрос в конце.' } ] },
+  { id: 'social-proof', icon: 'flame', tag: 'Соц. доказательство', cat: 'Доверие и раппорт', title: 'Кейс клиента (соц. доказательство)', timing: 'день 2',
+    desc: 'Свежий кейс: клиент закрыл сделку на лучших условиях. Снимает недоверие + мягкий заход на подбор.',
+    steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Кейс клиента', active: true,
+        text: "{name}, just closed a deal for a client on a unit like {creative} — got them in ~15% below list before public launch.\n\nThese windows open up regularly. Want me to keep an eye out and send you only the ones that fit your budget?" } ] },
+  /* ── Ценность и срочность ── */
+  { id: 'value-urgency', icon: 'bolt', tag: 'Ценность + срочность', cat: 'Ценность и срочность', title: 'Follow-up: ценность и срочность', timing: 'день 2',
+    desc: 'ROI, спрос на аренду, премиум-удобства + предложение прислать сравнение лучших вариантов месяца.',
+    steps: [ { day: 2, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Ценность + срочность', active: true,
+        text: 'Hey {name}, quick heads-up — prices for {creative} are going up soon!\n\n💰 Potential ROI up to 10% annually\n📈 High short-term rental demand — strong cash flow\n🏤 Luxury amenities: pool, sauna, gym & more\n\nWant me to send a comparison of the best options this month?' } ] },
+  { id: 'scarcity', icon: 'bolt', tag: 'Дефицит', cat: 'Ценность и срочность', title: 'Осталось мало юнитов', timing: 'день 3',
+    desc: 'Честный дефицит: лучшие планировки/этажи уходят первыми. Подталкивает решиться без давления.',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Дефицит юнитов', active: true,
+        text: "{name}, small update on {creative}: the best layouts and floors are going fast — a few of the top units are already reserved.\n\nWant me to lock in the current availability and pricing for you before they're gone?" } ] },
+  { id: 'payment-plan', icon: 'card', tag: 'Рассрочка', cat: 'Ценность и срочность', title: 'Рассрочка 0% · условия', timing: 'день 3',
+    desc: 'Акцент на выгодном плане оплаты (0% рассрочка, вход небольшой). Снимает возражение по деньгам.',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'План оплаты', active: true,
+        text: "{name}, one thing that makes {creative} stand out — the payment plan. {priceLineEn}0% installments, low entry, and the rest spread until handover.\n\nWant me to break down the exact numbers for your budget?" } ] },
+  { id: 'launch-predstart', icon: 'spark', tag: 'Предстарт', cat: 'Ценность и срочность', title: 'Раньше рынка (предстарт)', timing: 'день 4',
+    desc: 'Доступ к юнитам до открытия общих продаж — по ценам застройщика. Эксклюзивность + срочность.',
+    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Предстарт', active: true,
+        text: "{name}, we're getting early access to the next release around {creative} — developer prices, before it opens to the public.\n\nThese usually sell out in the first days. Want me to put you on the priority list?" } ] },
+  /* ── Полезность ── */
+  { id: 'pdf-catalog', icon: 'doc', tag: 'Полезность', cat: 'Полезность', title: 'PDF-подборка (каталог)', timing: 'день 4', needsAsset: 'PDF-подборку',
+    desc: 'Заготовленная PDF-подборка топ-проектов (прикрепите файл) + короткий текст «прислать?».',
+    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'PDF-подборка + текст', active: true,
+        text: "Just prepared a fresh selection of {geo}'s top projects — handpicked options with the best payment plans and locations.\n\nWant me to send it over?" } ] },
+  { id: 'video-tour', icon: 'play', tag: 'Видео-тур', cat: 'Полезность', title: 'Видео-тур объекта', timing: 'день 3', needsAsset: 'видео-тур',
+    desc: 'Персональный видео-обход объекта/района (прикрепите видео). Очень высокий отклик.',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'creative', creative: { auto: false }, label: 'Видео-тур + текст', active: true,
+        text: "{name}, recorded a quick walkthrough of {creative} and the area so you can get a real feel for it — take a look.\n\nWant me to check availability and pricing for the layout you liked?" } ] },
+  { id: 'comparison', icon: 'layers', tag: 'Сравнение', cat: 'Полезность', title: 'Сравнение 2–3 объектов', timing: 'день 5',
+    desc: 'Подборка-сравнение похожих объектов в бюджете лида: цена, ROI, локация. Помогает выбрать.',
+    steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Сравнение объектов', active: true,
+        text: "{name}, put together a quick side-by-side of {creative} vs 2 similar projects in your range — price, expected ROI and location.\n\nWant me to send the comparison so you can see which fits best?" } ] },
+  { id: 'market-update', icon: 'bars', tag: 'Новость рынка', cat: 'Полезность', title: 'Апдейт по рынку/гео', timing: 'день 6',
+    desc: 'Полезная новость по направлению (спрос, цены, инфраструктура) — держит контакт тёплым.',
+    steps: [ { day: 6, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Апдейт рынка', active: true,
+        text: "{name}, quick market note on {geo}: demand keeps climbing and developers are lining up price increases for the next quarter.\n\nHappy to send a short breakdown of where the smart money is going right now — want it?" } ] },
+  /* ── Дожим на звонок ── */
+  { id: 'call-country', icon: 'phone', tag: 'Заход на звонок', cat: 'Дожим на звонок', title: 'Мягкий заход на звонок', timing: 'день 3',
+    desc: 'Уточнение страны клиента + естественное предложение короткого созвона (после 2-го дня без ответа).',
+    steps: [ { day: 3, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Заход на звонок', active: true,
+        text: "Let's have a quick call tomorrow — I'll walk you through the best deals and answer any questions.\n\n{countryQEn}" } ] },
+  { id: 'deadline-call', icon: 'clock', tag: 'Дедлайн', cat: 'Дожим на звонок', title: 'Звонок под дедлайн', timing: 'день 5',
+    desc: 'Мягкий дедлайн + предложение созвона: успеть зафиксировать условия до повышения цен.',
+    steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Звонок под дедлайн', active: true,
+        text: "{name}, prices on {creative} update at the end of the week. A 5-minute call and I can lock in the current terms for you.\n\n{countryQEn}" } ] },
+  /* ── Возражения ── */
+  { id: 'objection-price', icon: 'shield', tag: 'Возражение «дорого»', cat: 'Возражения', title: 'Отработка «дорого»', timing: 'день 4',
+    desc: 'Мягко переводит фокус с цены на план оплаты и доходность. Для молчунов, кого смутила цена.',
+    steps: [ { day: 4, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Возражение «дорого»', active: true,
+        text: "{name}, totally get it if the number felt high at first glance. With {creative} the entry is smaller than most think — the rest is 0% installments until handover, and rental income can cover a big part of it.\n\nWant me to show how it actually looks month-to-month?" } ] },
+  { id: 'objection-think', icon: 'chat', tag: 'Возражение «подумаю»', cat: 'Возражения', title: 'Отработка «я подумаю»', timing: 'день 5',
+    desc: 'Уважительно снимает «подумаю»: узнать реальное сомнение и помочь с ним, без давления.',
+    steps: [ { day: 5, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Возражение «подумаю»', active: true,
+        text: "{name}, take all the time you need — no rush at all. Just so I'm useful: is it the budget, the location, or timing that you're weighing up?\n\nWhatever it is, I can send something that actually helps you decide." } ] },
+  /* ── Реактивация ── */
+  { id: 'soft-ping', icon: 'wake', tag: 'Лёгкий пинг', cat: 'Реактивация', title: 'Лёгкий пинг «ещё актуально?»', timing: 'день 6',
+    desc: 'Короткий человеческий пинг для молчунов — вернуть в диалог без давления.',
+    steps: [ { day: 6, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Лёгкий пинг', active: true,
+        text: "{name}, is {creative} still on your radar? Totally fine either way — just let me know so I keep sending only what's relevant to you 🙂" } ] },
+  { id: 'referral', icon: 'users', tag: 'Реферал', cat: 'Реактивация', title: 'Реферал «если не время»', timing: 'день 8',
+    desc: 'Если лиду сейчас не актуально — мягко спросить про знакомых, кто ищет. Разворачивает «нет» в лид.',
+    steps: [ { day: 8, delayVal: 2, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Реферал', active: true,
+        text: "{name}, if the timing isn't right for you now, no problem at all. Do you happen to know someone looking at {geo} property? I'd take great care of them — and there's a thank-you from our side for the intro." } ] },
+  { id: 'final-checkin', icon: 'moon', tag: 'Финальный дожим', cat: 'Реактивация', title: 'Финальный чек-ин (мягко)', timing: 'день 9',
+    desc: 'Сухой уважительный последний вопрос, если лид совсем не реагирует — без давления.',
+    steps: [ { day: 9, delayVal: 1, delayUnit: 'day', channel: 'wa', mode: 'text', label: 'Финальный чек-ин', active: true,
+        text: "Hey {name}, honestly it's a bit hard to move forward without knowing if this is still on your radar. If you have a minute, could you let me know? Appreciate it! 🙏" } ] },
 ];
 /* ЛИНТЕР ЦЕПОЧКИ: ловим типовые ошибки фоллоуапов и агрессивный каденс. Возвращает [{level, text}]. */
 function lintChain(seq) {
@@ -6651,47 +6724,71 @@ PAGES.sequences = async (root) => {
     const modeName = { text: 'Свой текст', template: 'Шаблон', ai: 'ИИ-текст', creative: 'Креатив из рекламы' }[st.mode] || st.mode;
     const preview = st.mode === 'text' ? (st.text || '') : st.mode === 'template' ? 'Шаблон: ' + ((tpls.find(t => t.id === st.templateId) || {}).name || '—') : st.mode === 'creative' ? ('🎬 Креатив, по которому пришёл лид' + (st.text ? ' + подпись' : '')) : 'ИИ: ' + (st.prompt || 'сгенерирует по контексту');
     const _d = stepDelayParts(st, i);
-    if (editIx === i) return `
-      <div class="fl-node fl-edit" data-i="${i}">
-        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-          <span class="lc-lbl" style="margin:0">Через</span>
-          <input data-se="delayval" type="number" min="0" step="1" value="${_d.val}" style="width:64px">
-          <select data-se="delayunit" style="width:104px"><option value="min" ${_d.unit === 'min' ? 'selected' : ''}>минут</option><option value="hour" ${_d.unit === 'hour' ? 'selected' : ''}>часов</option><option value="day" ${_d.unit === 'day' ? 'selected' : ''}>дней</option></select>
-          <span class="muted" style="font-size:10.5px">после предыдущего · 0 = сразу</span>
-          <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага" style="flex:1;min-width:140px">
-          <select data-se="channel" style="width:130px"><option value="wa" ${!['voice', 'email'].includes(st.channel) ? 'selected' : ''}>Авто (каскад)</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option><option value="email" ${st.channel === 'email' ? 'selected' : ''}>E-mail</option></select>
-          ${st.channel === 'email' ? `<input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" style="flex:1">` : ''}
+    if (editIx === i) {
+      const hasFixed = !!(st.creative && st.creative.url);
+      const MODES = [['text', 'Свой текст', I.chat], ['ai', 'ИИ-текст', I.spark], ['template', 'Шаблон', I.doc], ['creative', 'Креатив', I.image]];
+      return `
+      <div class="fl-node fl-edit se2" data-i="${i}" data-mode="${st.mode || 'text'}">
+        <!-- 1. Когда -->
+        <div class="se2-line">
+          <span class="se2-k">Когда</span>
+          <div class="se2-when">через <input data-se="delayval" type="number" min="0" step="1" value="${_d.val}" class="se2-num">
+            <select data-se="delayunit" class="se2-sel"><option value="min" ${_d.unit === 'min' ? 'selected' : ''}>мин</option><option value="hour" ${_d.unit === 'hour' ? 'selected' : ''}>часов</option><option value="day" ${_d.unit === 'day' ? 'selected' : ''}>дней</option></select>
+            <span class="se2-mut">после предыдущего · 0 = сразу</span></div>
         </div>
-        <div style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
-          <select data-se="mode" style="width:150px"><option value="text" ${st.mode === 'text' ? 'selected' : ''}>Свой текст</option><option value="template" ${st.mode === 'template' ? 'selected' : ''}>Шаблон</option><option value="ai" ${st.mode === 'ai' ? 'selected' : ''}>ИИ-текст</option><option value="creative" ${st.mode === 'creative' ? 'selected' : ''}>Креатив из рекламы</option></select>
-          <select data-se="templateId" style="flex:1;${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>
-          <input data-se="prompt" value="${esc(st.prompt || '')}" placeholder="Что сказать ИИ (можно с переменными: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»)" style="flex:1;${st.mode === 'ai' ? '' : 'display:none'}">
+        <!-- 2. Канал -->
+        <div class="se2-line">
+          <span class="se2-k">Канал</span>
+          <select data-se="channel" class="se2-sel"><option value="wa" ${!['voice', 'email'].includes(st.channel) ? 'selected' : ''}>WhatsApp (авто-каскад)</option><option value="voice" ${st.channel === 'voice' ? 'selected' : ''}>Голосовое</option><option value="email" ${st.channel === 'email' ? 'selected' : ''}>E-mail</option></select>
+          <input data-se="subject" value="${esc(st.subject || '')}" placeholder="Тема письма" class="se2-grow" style="${st.channel === 'email' ? '' : 'display:none'}">
+          <input data-se="label" value="${esc(st.label || '')}" placeholder="Название шага (для себя)" class="se2-grow">
         </div>
-        <div data-se-perso class="se-perso" style="${st.mode === 'template' ? 'display:none' : ''}">
-          <div class="se-ai-row"><button type="button" class="btn btn-sm btn-accent" data-se-aidraft>${ic(I.spark)}Собрать через ИИ по креативу</button><span class="se-ai-note" data-se-ainote></span></div>
-          <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}</div>
-          <div class="se-perso-hint">${ic(I.spark)}<span>Текст и ИИ уже понимают, <b>по какому объявлению пришёл лид</b>: <code>{creative}</code> — само объявление (его видео мы пускаем на транскрибацию в дереве креативов), плюс критерии заявки — <code>{district}</code> · <code>{budget}</code> · <code>{timeline}</code> · <code>{type}</code> · <code>{purpose}</code>. Клик по переменной — вставить. Пример: «Видели, вы оставили заявку на {creative} в районе {district}. Проект на стадии стройки — прислать инфо или подборку похожих в бюджете {budget}?»</span></div>
+        <!-- 3. Что отправляем -->
+        <div class="se2-line se2-line-top">
+          <span class="se2-k">Что</span>
+          <div class="se2-modes">${MODES.map(([m, l, icn]) => `<button type="button" class="se2-mode${(st.mode || 'text') === m ? ' on' : ''}" data-mode="${m}">${ic(icn)}${l}</button>`).join('')}</div>
         </div>
-        <div data-se-crnote class="se-crea-autonote" style="${st.mode === 'creative' ? '' : 'display:none'}">${ic(I.spark)}Уйдёт <b>тот креатив, по которому лид оставил заявку</b> (видео/картинка из дерева креативов — по атрибуции лида), затем текст-подпись ниже. Можно заменить на конкретный из библиотеки.</div>
-        <div data-se-textwrap style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">
-          <textarea data-se="text" style="width:100%;min-height:${st.mode === 'creative' ? '80' : '130'}px" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}">${esc(st.text || '')}</textarea>
-        </div>
-        <div class="se-crea" data-se-crea style="${st.mode === 'creative' ? '' : 'display:none'}">
-          <div class="lc-lbl" style="margin:0 0 6px">Конкретный креатив <span class="muted" style="font-weight:400">— по умолчанию берётся креатив лида; здесь можно задать один на всех</span></div>
-          <div class="se-crea-row">
-            <div class="se-crea-prev" id="seCreaPrev">${st.creative && st.creative.url ? creaThumb(st.creative) : '<span class="muted" style="font-size:11px">креатив лида (авто)</span>'}</div>
-            <button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.image)}Из библиотеки</button>
-            <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или ссылка .mp4 / .jpg / Reels" style="flex:1">
-            <button type="button" class="btn btn-sm ${st.creative && st.creative.url ? '' : 'hidden'}" id="seCreaClear" title="Вернуть креатив лида">${ic(I.x)}</button>
+        <!-- 4. Контент -->
+        <div class="se2-content">
+          <select data-se="templateId" class="se2-full" style="${st.mode === 'template' ? '' : 'display:none'}">${tpls.map(t => `<option value="${t.id}" ${st.templateId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('') || '<option>Нет шаблонов — создайте в «Шаблоны»</option>'}</select>
+          <textarea data-se="prompt" class="se2-full se2-ta" placeholder="Что сказать ИИ. Напр.: «Напомни про {creative} в районе {district}, предложи подборку в бюджете {budget}»" style="${st.mode === 'ai' ? '' : 'display:none'}">${esc(st.prompt || '')}</textarea>
+          <textarea data-se="text" class="se2-full se2-ta" placeholder="${st.mode === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'}" style="${st.mode === 'text' || st.mode === 'creative' ? '' : 'display:none'}">${esc(st.text || '')}</textarea>
+          <div class="se2-tools" data-se-tools style="${st.mode === 'template' ? 'display:none' : ''}">
+            <button type="button" class="btn btn-sm btn-accent" data-se-aidraft>${ic(I.spark)}Собрать через ИИ</button>
+            <button type="button" class="btn btn-sm" data-se-varbtn>${ic(I.plus)}Переменная</button>
+            <span class="se-ai-note" data-se-ainote></span>
+          </div>
+          <div class="se2-varpop" data-se-varpop hidden>
+            <div class="se2-varpop-h">Подставится под конкретного лида. Клик — вставить в текст.</div>
+            <div class="fl-vars">${VARS.map(v => `<button type="button" class="fl-var" data-var="${v}">${v}</button>`).join('')}</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
+        <!-- 5. Медиа (креатив) -->
+        <div class="se2-media" data-se-crea style="${st.mode === 'creative' ? '' : 'display:none'}">
+          <div class="se2-k" style="margin-bottom:8px">Какое медиа уйдёт</div>
+          <div class="se2-radios">
+            <label class="se2-radio ${hasFixed ? '' : 'on'}"><input type="radio" name="crea${i}" data-creamode="auto" ${hasFixed ? '' : 'checked'}><span><b>Креатив лида</b> — тот, по которому пришёл лид (авто)</span></label>
+            <label class="se2-radio ${hasFixed ? 'on' : ''}"><input type="radio" name="crea${i}" data-creamode="fixed" ${hasFixed ? 'checked' : ''}><span><b>Один на всех</b> — своё фото/видео</span></label>
+          </div>
+          <div class="se2-fixed" data-se-fixed style="${hasFixed ? '' : 'display:none'}">
+            <div class="se-crea-prev" id="seCreaPrev">${hasFixed ? creaThumb(st.creative) : '<span class="muted" style="font-size:11px">файл не выбран</span>'}</div>
+            <div class="se2-fixed-actions">
+              <button type="button" class="btn btn-sm" id="seCreaUpload">${ic(I.image)}Загрузить фото/видео</button>
+              <button type="button" class="btn btn-sm" id="seCreaLib">${ic(I.layers)}Из дерева креативов</button>
+              <input type="file" id="seCreaFile" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" style="display:none">
+              <input id="seCreaUrl" value="${esc((st.creative && st.creative.url) || '')}" data-craname="${esc((st.creative && st.creative.name) || '')}" placeholder="или вставьте ссылку .mp4 / .jpg" class="se2-grow">
+            </div>
+            <div class="se2-mut" style="margin-top:4px">${ic(I.spark)} Фото авто-сжимается перед загрузкой (как в дереве креативов). Видео — до 12 МБ.</div>
+          </div>
+        </div>
+        <div class="se2-foot">
           <button class="btn btn-accent btn-sm" data-sesave="${i}">${ic(I.check)}Готово</button>
           <button class="btn btn-sm" data-secancel>Отмена</button>
           <span class="tb-spacer"></span>
-          <button class="btn btn-danger btn-sm" data-sedel="${i}">Удалить шаг</button>
+          <button class="btn btn-danger btn-sm" data-sedel="${i}">${ic(I.trash || I.x)}Удалить</button>
         </div>
       </div>`;
+    }
     return `
       <div class="fl-node ${st.active ? '' : 'off'}" data-i="${i}" data-drag="${i}">
         <div class="fl-day">${ic(I.clock)}${delayLabel(st, i)}</div>
@@ -6743,12 +6840,13 @@ PAGES.sequences = async (root) => {
           ${editable && !isBrokerUser ? `<button class="btn btn-sm" id="seqShare" title="Раздать эту цепочку конкретным брокерам">${ic(I.send)}Раздать брокерам</button>` : ''}
           ${editable ? `<button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>` : ''}
         </div>
-        ${editable ? coll('Библиотека умных карточек', `<div class="clib-note">${ic(I.spark)}Перетащите карточку в цепочку или нажмите ＋. Готовые приёмы фоллоуапов — тексты и тайминг можно менять после добавления.</div><div class="cardlib" id="cardLib">${CHAIN_CARDS.map(c => `
-          <div class="clib-card" data-card="${c.id}">
-            <span class="clib-ic">${ic(I[c.icon] || I.spark)}</span>
-            <div class="clib-b"><div class="clib-t">${esc(c.title)}<span class="clib-tag">${esc(c.tag)}</span></div><div class="clib-d">${esc(c.desc)}</div><div class="clib-meta">${ic(I.clock)}${esc(c.timing)}${c.needsAsset ? ` · <em>+ ${esc(c.needsAsset)}</em>` : ''}</div></div>
-            <button class="clib-add" data-cardadd="${c.id}" title="Добавить в конец цепочки">${ic(I.plus)}</button>
-          </div>`).join('')}</div>`, { open: seq.steps.length === 0, icon: I.layers, count: CHAIN_CARDS.length }) : ''}
+        ${editable ? coll('Библиотека умных карточек', (() => {
+          const CAT_ORDER = ['Первое касание', 'Доверие и раппорт', 'Ценность и срочность', 'Полезность', 'Дожим на звонок', 'Возражения', 'Реактивация'];
+          const byCat = {}; CHAIN_CARDS.forEach(c => { const k = c.cat || 'Прочее'; (byCat[k] = byCat[k] || []).push(c); });
+          const cats = CAT_ORDER.filter(k => byCat[k]).concat(Object.keys(byCat).filter(k => !CAT_ORDER.includes(k)));
+          return `<div class="clib-note">${ic(I.spark)}Перетащите карточку в цепочку или нажмите ＋. Внутри карточки — как выглядит само сообщение; текст, тайминг и креатив можно менять после добавления.</div>
+            <div id="cardLib">${cats.map(cat => `<div class="clib-cat">${esc(cat)}</div><div class="cardlib">${byCat[cat].map(cardLibCardHtml).join('')}</div>`).join('')}</div>`;
+        })(), { open: seq.steps.length === 0, icon: I.layers, count: CHAIN_CARDS.length }) : ''}
         ${(() => { const items = lintChain(seq); const bad = items.filter(x => x.level === 'error' || x.level === 'warn').length; return coll('Проверка цепочки', `<div class="lint">${items.map(it => `<div class="lint-i lint-${it.level}">${ic(it.level === 'ok' ? I.check : it.level === 'error' ? (I.alert || I.x) : (I.info || I.spark))}<span>${it.text}</span></div>`).join('')}</div>`, { open: bad > 0, icon: I.shield, count: bad || null }); })()}
         ${!isBrokerUser ? (() => { const qh = (STATE.settings.automations || {}).quietHours || {}; return coll('Тихие часы — ночью не беспокоим', `
           <div class="qh-row"><label class="switch"><input type="checkbox" id="qhOn" ${qh.enabled !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label><span class="muted" style="font-size:12px">Не слать автокасания ночью <b>по часовому поясу клиента</b> (в карточке лида видно его локальное время)</span></div>
@@ -6806,6 +6904,20 @@ PAGES.sequences = async (root) => {
     if (st.mode === 'template') { const t = tpls.find(t => t.id === st.templateId); return t ? fillVarsDemo(t.body) : st.label; }
     return st.prompt ? fillVarsDemo(st.prompt) : '💬 ' + st.label;
   };
+  /* превью карточки библиотеки: как выглядит сообщение (демо-подстановка переменных) */
+  function cardPreview(c) {
+    const txtStep = c.steps.slice().reverse().find(s => (s.text || '').trim());
+    const t = txtStep ? txtStep.text : ((c.steps.find(s => s.prompt) || {}).prompt || '');
+    const hasCreative = c.steps.some(s => s.mode === 'creative');
+    const body = t ? esc(fillVarsDemo(t)).replace(/\n/g, '<br>') : (hasCreative ? '🎬 креатив, по которому пришёл лид' : '—');
+    return `${hasCreative ? `<div class="clib-pv-creo">${ic(I.image)}креатив${t ? ' + текст' : ''}</div>` : ''}<div class="clib-pv-bubble">${body}</div>`;
+  }
+  function cardLibCardHtml(c) {
+    return `<div class="clib-card" data-card="${c.id}">
+      <div class="clib-head"><span class="clib-ic">${ic(I[c.icon] || I.spark)}</span><div class="clib-b"><div class="clib-t">${esc(c.title)}</div><div class="clib-meta">${ic(I.clock)}${esc(c.timing)}${c.needsAsset ? ` · <em>+ ${esc(c.needsAsset)}</em>` : ''}</div></div><button class="clib-add" data-cardadd="${c.id}" title="Добавить в конец цепочки">${ic(I.plus)}</button></div>
+      <div class="clib-pv">${cardPreview(c)}</div>
+    </div>`;
+  }
   function fillVarsDemo(t) {
     return String(t || '')
       .replace(/\{name\}/g, 'Алекс').replace(/\{geo\}/g, geoName(seq.geo === 'all' ? 'dubai' : seq.geo))
@@ -6960,23 +7072,24 @@ PAGES.sequences = async (root) => {
   /* редактор шага */
   const eb = root.querySelector('.fl-edit');
   if (eb) {
-    const modeSel = eb.querySelector('[data-se="mode"]');
+    const curMode = () => eb.dataset.mode || 'text';
     const syncMode = () => {
-      const m = modeSel.value;
-      eb.querySelector('[data-se="templateId"]').closest('.cs').style.display = m === 'template' ? '' : 'none';
+      const m = curMode();
+      $$('.se2-mode', eb).forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+      eb.querySelector('[data-se="templateId"]').style.display = m === 'template' ? '' : 'none';
       eb.querySelector('[data-se="prompt"]').style.display = m === 'ai' ? '' : 'none';
-      eb.querySelector('[data-se-textwrap]').style.display = (m === 'text' || m === 'creative') ? '' : 'none';
-      const pe = eb.querySelector('[data-se-perso]'); if (pe) pe.style.display = m === 'template' ? 'none' : '';
-      const cn = eb.querySelector('[data-se-crnote]'); if (cn) cn.style.display = m === 'creative' ? '' : 'none';
+      const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) { ta2.style.display = (m === 'text' || m === 'creative') ? '' : 'none'; ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…'; }
+      const tools = eb.querySelector('[data-se-tools]'); if (tools) tools.style.display = m === 'template' ? 'none' : '';
       const cr = eb.querySelector('[data-se-crea]'); if (cr) cr.style.display = m === 'creative' ? '' : 'none';
-      const ta2 = eb.querySelector('[data-se="text"]'); if (ta2) ta2.placeholder = m === 'creative' ? 'Подпись к креативу (необязательно)…' : 'Текст сообщения…';
     };
-    modeSel.addEventListener('change', syncMode);
+    $$('.se2-mode', eb).forEach(b => b.addEventListener('click', () => { eb.dataset.mode = b.dataset.mode; syncMode(); }));
     const ta = eb.querySelector('[data-se="text"]');
     const promptInp = eb.querySelector('[data-se="prompt"]');
-    /* вставляем переменную в АКТИВНОЕ поле: для ИИ-режима — в промпт, иначе — в текст/подпись */
+    /* переменные спрятаны за кнопкой «Переменная» (поповер) — не заваливаем экран */
+    const varpop = eb.querySelector('[data-se-varpop]');
+    eb.querySelector('[data-se-varbtn]')?.addEventListener('click', () => { if (varpop) varpop.hidden = !varpop.hidden; });
     $$('.fl-var', eb).forEach(v => v.addEventListener('click', () => {
-      const tgt = modeSel.value === 'ai' ? promptInp : ta;
+      const tgt = curMode() === 'ai' ? promptInp : ta;
       if (!tgt) return;
       const p2 = tgt.selectionStart != null ? tgt.selectionStart : tgt.value.length;
       tgt.value = tgt.value.slice(0, p2) + v.dataset.var + tgt.value.slice(p2);
@@ -6990,7 +7103,7 @@ PAGES.sequences = async (root) => {
       try {
         const r = await fetch('/api/sequences/' + seq.id + '/ai-draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stepIndex: editIx }) });
         const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-        const tgt = () => modeSel.value === 'ai' ? promptInp : ta;
+        const tgt = () => curMode() === 'ai' ? promptInp : ta;
         let showingB = false;
         const put = (v) => { const t = tgt(); if (t) { t.value = v; t.focus(); } };
         put(j.message);
@@ -7017,25 +7130,43 @@ PAGES.sequences = async (root) => {
       st.channel = eb.querySelector('[data-se="channel"]').value;
       const subj = eb.querySelector('[data-se="subject"]');
       if (subj) st.subject = subj.value;
-      st.mode = modeSel.value;
+      st.mode = curMode();
       st.templateId = st.mode === 'template' ? eb.querySelector('[data-se="templateId"]').value : null;
       st.prompt = eb.querySelector('[data-se="prompt"]').value;
       st.text = ta.value;
-      /* «Креатив из рекламы»: по умолчанию — креатив лида (авто); если задан конкретный URL — фиксированный на всех */
+      /* креатив: «Один на всех» (radio fixed + url) → фиксированный; иначе — креатив лида (авто) */
       if (st.mode === 'creative') {
+        const fixed = eb.querySelector('[data-creamode="fixed"]')?.checked;
         const crUrl = (eb.querySelector('#seCreaUrl').value || '').trim();
-        st.creative = crUrl ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
+        st.creative = (fixed && crUrl) ? { url: crUrl.slice(0, 500), type: /\.(mp4|webm|mov)(\?|$)/i.test(crUrl) ? 'video' : 'image', name: (eb.querySelector('#seCreaUrl').dataset.craname || '').slice(0, 120) } : { auto: true };
       } else st.creative = null;
       PAGE_STATE.seqEdit = null;
       await save(); render();
     });
-    /* креатив: подставить из библиотеки дерева креативов или вернуть авто-креатив лида */
-    const seCreaUrl = eb.querySelector('#seCreaUrl'), seCreaPrev = eb.querySelector('#seCreaPrev'), seCreaClear = eb.querySelector('#seCreaClear');
-    const autoHint = '<span class="muted" style="font-size:11px">креатив лида (авто)</span>';
-    const setCrea = (cr) => { if (!seCreaUrl) return; seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; seCreaPrev.innerHTML = cr ? creaThumb(cr) : autoHint; seCreaClear.classList.toggle('hidden', !cr); };
-    eb.querySelector('#seCreaLib') && eb.querySelector('#seCreaLib').addEventListener('click', () => openCreativePicker((cr) => setCrea(cr)));
-    seCreaClear && seCreaClear.addEventListener('click', () => setCrea(null));
-    seCreaUrl && seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : autoHint; seCreaClear.classList.toggle('hidden', !u); });
+    /* креатив: радио авто/фикс + загрузка файла (авто-сжатие фото) + из дерева + ссылка */
+    const seCreaUrl = eb.querySelector('#seCreaUrl'), seCreaPrev = eb.querySelector('#seCreaPrev'), seFixed = eb.querySelector('[data-se-fixed]');
+    const setCrea = (cr) => { if (!seCreaUrl) return; seCreaUrl.value = cr ? cr.url : ''; seCreaUrl.dataset.craname = cr ? (cr.name || '') : ''; if (seCreaPrev) seCreaPrev.innerHTML = cr ? creaThumb(cr) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; };
+    $$('[data-creamode]', eb).forEach(r => r.addEventListener('change', () => {
+      const fixed = eb.querySelector('[data-creamode="fixed"]')?.checked;
+      $$('.se2-radio', eb).forEach(l => l.classList.toggle('on', l.contains(l.querySelector(':checked'))));
+      if (seFixed) seFixed.style.display = fixed ? '' : 'none';
+      if (!fixed) setCrea(null);
+    }));
+    eb.querySelector('#seCreaLib')?.addEventListener('click', () => openCreativePicker((cr) => setCrea(cr)));
+    eb.querySelector('#seCreaUpload')?.addEventListener('click', () => eb.querySelector('#seCreaFile')?.click());
+    eb.querySelector('#seCreaFile')?.addEventListener('change', async (ev) => {
+      const f = ev.target.files[0]; if (!f) return;
+      const btn = eb.querySelector('#seCreaUpload'); const orig = btn.innerHTML; btn.disabled = true; btn.textContent = 'Загружаю…';
+      try {
+        const blob = await compressIfImage(f);   /* авто-сжатие фото перед отправкой */
+        const r = await fetch('/api/sequences/creative-upload?filename=' + encodeURIComponent(f.name), { method: 'POST', headers: { 'Content-Type': blob.type || f.type || 'application/octet-stream' }, body: blob });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+        setCrea({ url: j.url, type: j.type || (/\.(mp4|webm|mov)(\?|$)/i.test(j.url) ? 'video' : 'image'), name: f.name });
+        toast('Креатив загружен', j.compressed ? 'Фото авто-сжато' : null, true);
+      } catch (e2) { toast('Не загрузилось', e2.message); }
+      finally { btn.disabled = false; btn.innerHTML = orig; }
+    });
+    seCreaUrl && seCreaUrl.addEventListener('input', () => { const u = seCreaUrl.value.trim(); if (seCreaPrev) seCreaPrev.innerHTML = u ? creaThumb({ url: u }) : '<span class="muted" style="font-size:11px">файл не выбран</span>'; });
     eb.querySelector('[data-secancel]').addEventListener('click', () => { PAGE_STATE.seqEdit = null; render(); });
     eb.querySelector('[data-sedel]').addEventListener('click', async (e) => {
       seq.steps.splice(+e.currentTarget.dataset.sedel, 1);
