@@ -184,6 +184,27 @@ const PLANS = {
   pro: { name: 'Pro', maxBrokers: 25, maxLeads: 50000, maxNumbers: 15, price: 149 },
 };
 function planOf(tid) { try { const t = store.getRegistry().tenants[tid]; return PLANS[(t && t.plan) || 'trial'] || PLANS.trial; } catch (e) { return PLANS.trial; } }
+/* ЛИМИТЫ по РЕАЛЬНОМУ тарифу биллинга (broker/agency/network — как на сайте), а не по legacy-реестру (trial/starter/pro).
+   Пробел, который ловил клиент: оплатил «Агентство» → billing.plan='agency', status='active', но реестр остался 'trial'
+   → фичи (WA-номера по QR и пр.) блокировались. Теперь гейты читают активную подписку напрямую. */
+const PLAN_LIMITS = {
+  trial:   { name: 'Триал',     maxBrokers: 3,   maxLeads: 300,        maxNumbers: 1 },
+  broker:  { name: 'Брокер',    maxBrokers: 1,   maxLeads: 400,        maxNumbers: 3 },
+  agency:  { name: 'Агентство', maxBrokers: 200, maxLeads: 1000000000, maxNumbers: 15 },
+  network: { name: 'Сеть',      maxBrokers: 1e9, maxLeads: 1e9,        maxNumbers: 100 },
+};
+/* эффективный тариф тенанта: активная подписка биллинга — источник правды; иначе триал. db — из store.get() в обработчике. */
+function effectivePlan(db) {
+  try {
+    const b = db && db.settings && db.settings.billing;
+    if (b && b.status === 'active' && b.plan && PLAN_LIMITS[b.plan]) {
+      const lim = PLAN_LIMITS[b.plan];
+      const seats = +b.seats || 0;
+      return seats ? Object.assign({}, lim, { maxBrokers: Math.max(lim.maxBrokers, seats) }) : lim;
+    }
+  } catch (_) { }
+  return PLAN_LIMITS.trial;
+}
 
 /* SaaS: минимальные критичные дефолты для НОВОГО тенанта (seed даёт только agency).
    Мигрирующий boot-блок ниже трогает primary; для новых агентств хватает этого набора. */
@@ -4914,7 +4935,7 @@ const server = http.createServer(async (req, res) => {
       let br = (db.brokers || []).find(x => x.email === email);
       if (!br) {
         const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
-        const lim = _beta ? 9999 : planOf(store.currentTid()).maxBrokers;
+        const lim = _beta ? 9999 : effectivePlan(db).maxBrokers;
         if ((db.brokers || []).filter(x => x.active !== false).length >= lim) return json(res, 402, { error: `Лимит брокеров на вашем тарифе — ${lim}. Обновите тариф, чтобы добавить больше.` });
         br = { id: 'br_' + crypto.randomBytes(4).toString('hex'), name: name || email, email, active: true, invited: true, createdAt: Date.now() }; db.brokers = db.brokers || []; db.brokers.push(br);
       }
@@ -4943,7 +4964,9 @@ const server = http.createServer(async (req, res) => {
       const tid = store.currentTid();
       const t = store.getRegistry().tenants[tid] || {};
       const usage = { brokers: (db.brokers || []).filter(x => x.active !== false).length, leads: (db.leads || []).length, numbers: ((db.settings.waGray && db.settings.waGray.numbers) || []).length };
-      return json(res, 200, { ok: true, plan: t.plan || 'trial', limits: planOf(tid), usage, plans: PLANS });
+      const bl = db.settings.billing || {};
+      const ep = effectivePlan(db);   /* реальный тариф из активной подписки биллинга */
+      return json(res, 200, { ok: true, plan: (bl.status === 'active' && bl.plan) ? bl.plan : (t.plan || 'trial'), planName: ep.name, billingStatus: bl.status || 'trial', limits: ep, usage, plans: PLANS });
     }
     /* страница принятия приглашения (публичная, по токену) */
     if (p === '/invite' && req.method === 'GET') {
@@ -7206,7 +7229,7 @@ const server = http.createServer(async (req, res) => {
       const platform = waWorkerPlatform();
       const R2 = sessionRole(req);
       const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
-      const _plan = planOf(store.currentTid());
+      const _plan = effectivePlan(db);
       return json(res, 200, { ok: true, url: platform ? '' : (g.url || DEFAULT_WA_WORKER), tokenSet: waWorkerReady(db), platform, ready: waWorkerReady(db), isPrimary: !!(R2 && R2.role === 'owner'), envLocked: !!process.env.LUMEN_WA_WORKER_TOKEN, numLimit: _beta ? 999 : (_plan.maxNumbers || 0), planName: _plan.name, beta: _beta, numbers, warmup: g.warmup || { running: false, perDay: 16 } });
     }
     /* ПЛАТФОРМА: задать токен (и опц. URL) серого воркера ОДИН раз для всех агентств — из CRM, без Railway.
@@ -7513,8 +7536,9 @@ const server = http.createServer(async (req, res) => {
       if (!rec) {
         /* лимит номеров по тарифу; аккаунт разработки (agency.betaAll) — без лимита для тестов */
         const _beta = !!(db.settings.agency && db.settings.agency.betaAll);
-        const lim = _beta ? 999 : (planOf(store.currentTid()).maxNumbers || 0);
-        if (db.settings.waGray.numbers.length >= lim) return json(res, 403, { error: `На тарифе «${planOf(store.currentTid()).name}» можно подключить по QR ${lim} ${lim === 1 ? 'номер' : 'номера'}. Освободите номер или перейдите на план выше.`, limit: lim });
+        const _ep = effectivePlan(db);
+        const lim = _beta ? 999 : (_ep.maxNumbers || 0);
+        if (db.settings.waGray.numbers.length >= lim) return json(res, 403, { error: `На тарифе «${_ep.name}» можно подключить по QR ${lim} ${lim === 1 ? 'номер' : 'номера'}. Освободите номер или перейдите на план выше.`, limit: lim });
         rec = { phone, label: String(b.label || '').slice(0, 60), roles: { send: true, call: false }, addedAt: Date.now() }; db.settings.waGray.numbers.push(rec);
       }
       if (b.label !== undefined) rec.label = String(b.label).slice(0, 60);

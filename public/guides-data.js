@@ -230,11 +230,58 @@ GUIDES.viber = {
   ],
   outro: 'Персонализация — в тексте сообщения (имя брокера, подпись), а не в отправителе. Каскад сам выберет Viber, если это лучший канал для лида.',
 };
+GUIDES['meta-inbound'] = {
+  icon: 'chat', title: 'Instagram Директ + комментарии под рекламой', tagline: 'Подключение Meta: входящие DM и комментарии → карточки лидов',
+  intro: 'Эта инструкция — как <b>для чайника</b>, по шагам. В конце Instagram-Директ (входящие сообщения) и комментарии под рекламой Facebook/Instagram начнут <b>сами создавать карточки лидов</b> в Lumen. Всё идёт через <b>одно приложение Meta</b> и <b>один вебхук</b> — тот же, что у WhatsApp Cloud API.',
+  sections: [
+    { badge: 'Что понадобится (один раз)', steps: [
+      ['Аккаунт Meta Business', 'business.facebook.com — бизнес-аккаунт, где лежат ваша Страница и рекламный кабинет.'],
+      ['Facebook-страница', 'Та, от имени которой идёт реклама. Комментарии ловятся именно с неё.'],
+      ['Instagram Business/Creator', 'В профиле Instagram: Настройки → Аккаунт → «Переключиться на профессиональный». И привяжите этот Instagram к Facebook-странице (Страница → Настройки → Связанные аккаунты → Instagram).'],
+      ['Приложение Meta для разработчиков', 'developers.facebook.com → «Создать приложение» → тип «Бизнес». Это то же приложение, что и для WhatsApp Cloud API — второй раз создавать не нужно.'],
+    ] },
+    { badge: 'Шаг 1 · Продукты в приложении', steps: [
+      ['Добавьте «Webhooks»', 'В приложении Meta → «Добавить продукт» → Webhooks. Через него Meta будет присылать нам события.'],
+      ['Добавьте «Instagram» (для Директа и IG-комментариев)', 'Продукт «Instagram» → «API setup with Instagram login» / «Instagram Graph API». Он даёт доступ к сообщениям и комментариям Instagram.'],
+      ['Мессенджер/Страница уже есть', 'Для комментариев Facebook отдельный продукт не нужен — хватит подписки на Страницу (шаг 4).'],
+    ] },
+    { badge: 'Шаг 2 · Права (permissions)', steps: [
+      ['Instagram Директ', 'instagram_manage_messages — читать и отвечать в Директ.'],
+      ['Instagram комментарии', 'instagram_manage_comments — комментарии под постами/рекламой.'],
+      ['Facebook комментарии', 'pages_manage_engagement + pages_read_engagement + pages_manage_metadata — комментарии Страницы и подписка на вебхук.'],
+      ['База', 'pages_show_list, instagram_basic, business_management. На время теста приложение может быть в режиме разработки; для боевого — пройдите App Review Meta по этим правам.'],
+    ] },
+    { badge: 'Шаг 3 · Токены и ID', steps: [
+      ['Page access token (Facebook)', 'Graph API Explorer (developers.facebook.com/tools/explorer) → выберите приложение и Страницу → сгенерируйте Page Token с правами из шага 2. Лучше сделать «долгоживущий» (long-lived).'],
+      ['Page ID', 'На Странице → «О себе» / Настройки → «ID страницы» (число).'],
+      ['Instagram token + IG ID', 'Тот же Explorer с instagram_* правами даёт токен для Instagram; IG account ID возьмите там же (поле instagram_business_account у Страницы) — длинное число вида 1784…'],
+      ['App Secret', 'Настройки приложения → «Основные» → App Secret. Им Meta подписывает входящие — он общий для приложения (тот же, что для WhatsApp).'],
+    ] },
+    { badge: 'Шаг 4 · Вебхук и поля', steps: [
+      ['Возьмите Callback URL и Verify token в Lumen', 'Lumen → Подключения → карточка «Instagram и Facebook» → скопируйте <b>Callback URL</b> и <b>Verify token</b> (это тот же вебхук, что у WhatsApp).'],
+      ['Вставьте в Meta', 'Приложение Meta → Webhooks → выберите объект и вставьте Callback URL + Verify token → «Проверить и сохранить».'],
+      ['Подпишите поля Instagram', 'Объект Instagram → подпишите <b>messages</b> (Директ) и <b>comments</b> (комментарии).'],
+      ['Подпишите поле Страницы', 'Объект Page → подпишите <b>feed</b> (это и есть комментарии под постами и рекламой Facebook).'],
+    ] },
+    { badge: 'Шаг 5 · Вставить в Lumen', steps: [
+      ['Откройте карточку Meta', 'Lumen → Подключения → «Instagram и Facebook — Директ и комментарии».'],
+      ['Instagram', 'Вставьте Instagram access token + Instagram account ID, включите тумблер «Instagram-канал».'],
+      ['Facebook', 'Вставьте Page access token + Page ID, включите тумблер «Facebook-страница».'],
+      ['Сохранить', 'Кнопка «Сохранить подключение Meta». Статус в карточке сменится с «демо» на «подключён».'],
+    ] },
+    { badge: 'Шаг 6 · Проверка', steps: [
+      ['Комментарий', 'Оставьте тестовый комментарий под своим постом/рекламой — в разделе «Комментарии» появится карточка. Включите там ИИ-автоответ и авто-модерацию по вкусу.'],
+      ['Директ', 'Напишите в Instagram-Директ с другого аккаунта — входящее появится карточкой лида в «Диалогах».'],
+      ['Если ничего нет', 'Проверьте: токены сохранены и тумблеры включены; в Meta поля подписаны (messages/comments/feed); App Secret задан (иначе вебхук отклоняет входящие).'],
+    ] },
+  ],
+  outro: 'Комментарии отвечаются публично + уводят в Директ автоматически (ИИ, если включён). Входящие Instagram-Директы сейчас принимаются в карточки лидов; авто-ответ ИИ прямо в IG-Директ подключаем следующим шагом. Всё привязано к вашему агентству — у каждого аккаунта свои токены и свой роутинг.',
+};
 
 /* ── таксономия справочника: категории → ключи гайдов ── */
 const CATEGORIES = [
   { key: 'start',    icon: 'spark', title: 'Начало работы',            desc: 'Подключите бота и мобильный пульт брокера',        guides: ['tgsetup', 'botpanel'] },
-  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Viber, телефония и ИИ-агент',  guides: ['wanumbers', 'wacloud', 'tgchannel', 'viber', 'telephony', 'waagent'] },
+  { key: 'channels', icon: 'chat',  title: 'Каналы связи',             desc: 'WhatsApp, Telegram, Instagram, Viber, телефония и ИИ',  guides: ['wanumbers', 'wacloud', 'tgchannel', 'meta-inbound', 'viber', 'telephony', 'waagent'] },
   { key: 'leads',    icon: 'user',  title: 'Лиды и продажи',           desc: 'Воронка, карточка лида и автодожим касаниями',     guides: ['leads', 'chains'] },
   { key: 'ops',      icon: 'doc',   title: 'Планирование и документы', desc: 'Календарь, медиапланы, договоры и КП',             guides: ['calendar', 'mediaplan', 'docs'] },
 ];
