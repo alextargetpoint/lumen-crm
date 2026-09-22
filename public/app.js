@@ -8864,21 +8864,6 @@ PAGES.ads = async (root) => {
             <button class="btn btn-sm" id="rotateKey">Сменить секрет</button>
           </div>
         </div>
-        <div class="glass card">
-          <div class="card-title">${ic(I.doc)}Каталог объявлений<button class="btn btn-sm" id="adsClearDemo" style="margin-left:auto" title="Удалить демо-примеры: объявления без синка из API, без своего креатива и без лидов">${ic(I.x)}Очистить демо</button></div>
-          <div class="muted" style="font-size:11.8px;line-height:1.6;margin-bottom:10px">Объявления появляются здесь <b>сами</b>, когда с них приходит заявка (по <code class="pill">ad_id</code> из моста приёма) или из синка кабинета. Одинаковые названия в разных адсетах/кампаниях <b>делят один креатив</b> — задаёшь на одном, раздаётся на все одноимённые. «Очистить демо» убирает пустые примеры.</div>
-          <div class="adadd-row">
-            <input class="adadd" data-k="ad_id" placeholder="ad_id (обязательно)">
-            <input class="adadd" data-k="name" placeholder="Название">
-            <select class="adadd" data-k="geo"><option value="">гео —</option>${Object.entries((STATE.settings && STATE.settings.geoNames) || {}).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select>
-            <button class="btn btn-accent btn-sm" id="adAddOne">${ic(I.plus)}Добавить</button>
-          </div>
-          ${coll('Загрузить пачкой из таблицы (CSV / Excel)', `
-            <div class="muted" style="font-size:11.5px;margin-bottom:7px">Колонки: <code class="pill">ad_id</code> <code class="pill">name</code> <code class="pill">adset</code> <code class="pill">campaign</code> <code class="pill">geo</code> — порядок любой, читается по заголовку.</div>
-            <textarea id="adsCsv" data-nodic style="min-height:90px;font-family:Menlo,monospace;font-size:11.5px;width:100%;border:1px solid var(--stroke);border-radius:9px;padding:8px 10px" placeholder="ad_id,name,adset,campaign,geo
-120211478921230508,Дубай · видео-тур JVC,RU 30-55,DXB Sept,dubai"></textarea>
-            <button class="btn btn-accent btn-sm" id="importAds" style="margin-top:8px">Импортировать и смэтчить</button>`, { open: false, count: 0, icon: I.doc })}
-        </div>
       </div>
       <div>
         <div class="glass card mb" data-intakelog>${coll('Журнал приёма лидов', d.intakeLog.map(e => `<div class="set-row"><div class="sp"><div class="sl" style="font-size:12.5px">${esc(e.name)} · ${esc(e.phone)}</div><div class="sd">${tmm(e.at)} · ${e.result === 'created' ? 'создан' : 'повторная заявка'}${e.adId ? ' · ad ' + esc(e.adId) : ''}</div></div></div>`).join('') || '<div class="empty" style="padding:14px">Приёмов ещё не было</div>', { open: false, count: d.intakeLog.length, icon: I.bolt })}</div>
@@ -9026,24 +9011,7 @@ PAGES.ads = async (root) => {
   });
   $('#saveOut').addEventListener('click', async () => { await api.patch('/hooks', { outboundUrl: $('#outUrl').value }); toast('Исходящий мост сохранён', null, true); });
   $('#rotateKey').addEventListener('click', async () => { await api.patch('/hooks', { rotateSecret: true }); toast('Секрет обновлён', 'Обнови ссылку в Albato', true); render(); });
-  $('#importAds')?.addEventListener('click', async () => {
-    const r = await api.post('/ads/import', { csv: $('#adsCsv').value });
-    toast(`Импорт: +${r.added}, обновлено ${r.updated}`, `Домэтчено лидов: ${r.rematched}`, true);
-    render();
-  });
-  $('#adsClearDemo')?.addEventListener('click', async () => {
-    const r = await api.post('/ads/clear-demo', {});
-    toast(r.removed ? `Убрано демо-объявлений: ${r.removed}` : 'Демо-примеров не найдено', r.removed ? `Осталось объявлений: ${r.total}` : 'Пустых примеров нет', true);
-    render();
-  });
-  $('#adAddOne')?.addEventListener('click', async () => {
-    const g = {}; $$('.adadd', root).forEach(i => g[i.dataset.k] = i.value.trim());
-    if (!g.ad_id) { toast('Нужен ad_id', 'Скопируй ID объявления из Meta Ads', false); return; }
-    const csv = 'ad_id,name,geo\n' + [g.ad_id, (g.name || '').replace(/,/g, ' '), g.geo || ''].join(',');
-    const r = await api.post('/ads/import', { csv });
-    toast(r.added ? 'Объявление добавлено' : 'Объявление обновлено', 'Раскрой его в дереве и привяжи креатив', true);
-    render();
-  });
+  /* «Каталог объявлений» (ручной ad_id/CSV-импорт) убран — оставлен только ручной аплоуд креативов в дерево */
   $$('.ad-spend', root).forEach(inp => inp.addEventListener('change', async () => {
     await api.post(`/ads/${encodeURIComponent(inp.dataset.adid)}/spend`, { spend: +inp.value || 0 });
     render();
