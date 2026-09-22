@@ -278,6 +278,7 @@ function ensureTenantDefaults(db) {
     if (!l.channels) l.channels = { wa: 'unknown', tg: 'unknown', viber: 'unknown', email: (l.contacts || []).some(c => c.kind === 'email') ? 'yes' : 'unknown' };
     if (l.activeChannel === undefined) l.activeChannel = 'wa';
     if (!l.avatarUrl) l.avatarUrl = null;
+    if (l.ads) healAdNames(l.ads);   /* лечим имена кампании/адсета/объявления, попавшие в поля *_id (Albato) */
   }
   for (const sq of db.sequences) if (!sq.geo) sq.geo = 'all';
   if (!db.settings.chainV4) {
@@ -546,7 +547,18 @@ function ensureTenantDefaults(db) {
 }
 
 /* мэтчинг лида на объявление по ad_id из вебхука */
+/* Albato/интеграторы часто кладут НАЗВАНИЯ кампании/адсета/объявления в поля *_id (Meta id — длинные цифры).
+   Если *_id нечисловой — это на самом деле имя: переносим в *Name, чтобы работал детект языка, путь в карточке и аналитика. */
+function healAdNames(ads) {
+  if (!ads) return ads;
+  const isId = v => v != null && /^\s*\d{5,}\s*$/.test(String(v));
+  if (!ads.campaignName && ads.campaignId && !isId(ads.campaignId)) { ads.campaignName = String(ads.campaignId).trim(); ads.campaignId = null; }
+  if (!ads.adsetName && ads.adsetId && !isId(ads.adsetId)) { ads.adsetName = String(ads.adsetId).trim(); ads.adsetId = null; }
+  if (!ads.adName && ads.adId && !isId(ads.adId)) { ads.adName = String(ads.adId).trim(); ads.adId = null; }
+  return ads;
+}
 function matchAd(db, lead) {
+  if (lead.ads) healAdNames(lead.ads);
   if (!lead.ads || !lead.ads.adId) return;
   const ad = db.ads.find(a => String(a.adId) === String(lead.ads.adId));
   if (ad) {
