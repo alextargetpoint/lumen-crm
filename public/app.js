@@ -5666,7 +5666,6 @@ async function openLeadModal(id) {
             <div class="lc-ai-head">${ic(I.spark)}<b>ИИ-помощник</b>
               <label class="switch" title="Автопилот"><input type="checkbox" id="lcAi" ${l.ai.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
             <div class="lc-ai-sub">${l.ai.enabled ? 'Ведёт диалог сам. Напишете вручную — встанет на паузу.' : (l.tags || []).includes('нужен человек') ? 'Отключился сам: клиент попросил человека.' : 'На паузе — лид на менеджере.'}</div>
-            <button class="btn btn-sm" id="lcSumBtn" style="margin-top:9px">${ic(I.doc)}Сводка ИИ по лиду</button>
           </div>
           ${coll('Первое касание', `
             <div class="lc-ft2" style="margin-top:6px">
@@ -5769,7 +5768,6 @@ async function openLeadModal(id) {
     try { await api.post(`/leads/${id}/summary`); } catch (_) {}
     openLeadModal(id);
   };
-  $('#lcSumBtn', bd)?.addEventListener('click', () => rebuildSummary($('#lcSumBtn', bd)));
   $('#lcPinRefresh', bd)?.addEventListener('click', () => rebuildSummary($('#lcPinRefresh', bd)));
   $('#lcPcUse', bd)?.addEventListener('click', () => {
     const ta = $('#lcFtText', bd); if (ta && l.postCall) { ta.value = l.postCall.message; ta.dispatchEvent(new Event('input', { bubbles: true })); }
