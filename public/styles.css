@@ -1484,6 +1484,19 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 /* ——— библиотека умных карточек (drag & drop) ——— */
 .clib-note { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; line-height: 1.5; color: var(--ink-2); margin-bottom: 10px; }
 .clib-note svg { flex: 0 0 auto; margin-top: 1px; width: 14px; height: 14px; color: var(--accent); }
+.seq-autobuild { width: 100%; justify-content: flex-start; gap: 11px; padding: 14px 16px; margin-bottom: 14px; text-align: left; }
+.seq-autobuild svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.seq-autobuild span { display: flex; flex-direction: column; line-height: 1.3; }
+.seq-autobuild i { font-style: normal; font-size: 11px; font-weight: 400; opacity: .82; }
+.miss-list { display: flex; flex-direction: column; gap: 8px; }
+.miss-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 11px; background: var(--card); cursor: pointer; transition: all .13s; color: var(--ink-1); }
+.miss-row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.miss-ic { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.miss-ic svg { width: 17px; height: 17px; }
+.miss-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.miss-tx b { font-size: 13.5px; font-weight: 650; }
+.miss-tx i { font-style: normal; font-size: 11.5px; color: var(--muted); }
+.miss-row > svg:last-child { width: 15px; height: 15px; color: var(--ink-3); flex: 0 0 auto; }
 .clib-cat { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 8px; }
 .clib-cat:first-child { margin-top: 2px; }
 .cardlib { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }

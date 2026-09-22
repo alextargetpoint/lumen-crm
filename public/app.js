@@ -6662,9 +6662,11 @@ function lintChain(seq) {
   steps.forEach((s, i) => { const t = txt(s); if (t.length > 420) out.push({ level: 'warn', text: `Шаг ${i + 1} («${esc(s.label || '')}») — слишком длинно (${t.length} симв.). В мессенджере лучше 2–4 коротких предложения.` }); });
   /* каденс: сколько касаний в первые сутки */
   const firstDay = steps.filter(s => (+s.day || 0) < 1);
-  if (firstDay.length > 2) out.push({ level: 'error', text: `Слишком агрессивно: ${firstDay.length} касания в первый день — это читается как спам. Оставьте максимум 2 с интервалом в несколько часов.` });
+  let touchesFD = 0, prevFD = -1;   /* мгновенные подряд-шаги (креатив+подпись) = одно касание */
+  firstDay.forEach(s => { const d = +s.day || 0; if (prevFD < 0 || d - prevFD > 0.03) touchesFD++; prevFD = d; });
+  if (touchesFD > 2) out.push({ level: 'error', text: `Слишком агрессивно: ${touchesFD} касания в первый день — это читается как спам. Оставьте максимум 2 с интервалом в несколько часов.` });
   /* слишком близко подряд (<2 ч между активными шагами в первый день) */
-  for (let i = 1; i < firstDay.length; i++) { const gap = ((+firstDay[i].day || 0) - (+firstDay[i - 1].day || 0)) * 24; if (gap >= 0 && gap < 2) { out.push({ level: 'warn', text: `Шаги «${esc(firstDay[i - 1].label || '')}» и «${esc(firstDay[i].label || '')}» идут почти подряд (<2 ч). Дайте клиенту паузу.` }); break; } }
+  for (let i = 1; i < firstDay.length; i++) { const gap = ((+firstDay[i].day || 0) - (+firstDay[i - 1].day || 0)) * 24; if (gap > 0.5 && gap < 2) { out.push({ level: 'warn', text: `Шаги «${esc(firstDay[i - 1].label || '')}» и «${esc(firstDay[i].label || '')}» идут почти подряд (<2 ч). Дайте клиенту паузу.` }); break; } }
   if (steps.length > 8) out.push({ level: 'tip', text: `${steps.length} касаний — многовато. 5–7 обычно достаточно, дальше отклик падает.` });
   /* карточки, которым нужен ассет */
   steps.forEach((s, i) => { if (s.mode === 'creative' && s.creative && s.creative.auto === false && !(s.creative && s.creative.url)) out.push({ level: 'tip', text: `Шаг ${i + 1} («${esc(s.label || '')}») — прикрепите изображение/файл (сейчас уйдёт креатив лида по умолчанию).` }); });
@@ -6881,6 +6883,7 @@ PAGES.sequences = async (root) => {
           ${editable && !isBrokerUser ? `<button class="btn btn-sm" id="seqShare" title="Раздать эту цепочку конкретным брокерам">${ic(I.send)}Раздать брокерам</button>` : ''}
           ${editable ? `<button class="btn-ghost" id="seqDel" title="Удалить цепочку">${ic(I.x)}</button>` : ''}
         </div>
+        ${editable ? `<button class="btn btn-accent seq-autobuild" id="seqAutoBuild">${ic(I.spark)}<span><b>Собрать умную цепочку</b><i>ИИ подберёт 7-8 касаний с выверенным таймингом</i></span></button>` : ''}
         ${editable ? coll('Библиотека умных карточек', (() => {
           const CAT_ORDER = ['Первое касание', 'Доверие и раппорт', 'Ценность и срочность', 'Полезность', 'Дожим на звонок', 'Возражения', 'Реактивация'];
           const byCat = {}; CHAIN_CARDS.forEach(c => { const k = c.cat || 'Прочее'; (byCat[k] = byCat[k] || []).push(c); });
@@ -7034,8 +7037,52 @@ PAGES.sequences = async (root) => {
     toast('Карточка добавлена', card.title + (card.needsAsset ? ' · не забудьте прикрепить ' + card.needsAsset : ''), true);
     render();
   };
+  /* ✦ АВТО-КОНФИГУРАТОР: собирает выверенную цепочку 7-8 касаний, комбинируя приёмы по слотам + калиброванный тайминг */
+  const AUTO_SLOTS = [
+    { pool: ['smart-first'], v: 0, u: 'hour' },                                          // day0 · креатив+текст
+    { pool: ['insider-tip', 'first-question', 'value-urgency'], v: 4, u: 'hour' },       // +4ч · лёгкое 2-е касание
+    { pool: ['photo-card', 'personal-pick', 'social-proof'], v: 1, u: 'day' },           // день 1 · доверие
+    { pool: ['payment-plan', 'scarcity', 'insider-incentive'], v: 1, u: 'day' },         // день 2 · ценность
+    { pool: ['call-country', 'deadline-call'], v: 2, u: 'day' },                          // день 4 · заход на звонок
+    { pool: ['pdf-catalog', 'video-tour', 'comparison'], v: 2, u: 'day' },               // день 6 · полезность
+    { pool: ['insider-offmarket', 'market-update', 'objection-think'], v: 2, u: 'day' }, // день 8 · инсайд/возражение
+    { pool: ['final-checkin', 'soft-ping'], v: 2, u: 'day' },                            // день 10 · мягкий финал
+  ];
+  const autoBuildChain = async () => {
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    const steps = [];
+    AUTO_SLOTS.forEach(slot => {
+      const card = CHAIN_CARDS.find(c => c.id === pick(slot.pool)); if (!card) return;
+      const clones = JSON.parse(JSON.stringify(card.steps));
+      if (clones[0]) { clones[0].delayVal = slot.v; clones[0].delayUnit = slot.u; if (card.needsAsset) clones[0]._need = card.needsAsset; }
+      steps.push(...clones);
+    });
+    seq.steps = steps; recalcDays(); await save(); render();
+    setTimeout(showMissingAssets, 350);
+  };
+  const showMissingAssets = () => {
+    const need = [];
+    (seq.steps || []).forEach((s, i) => {
+      if (s.channel === 'voice') need.push({ i, label: s.label || 'Голосовое', what: 'записать голосовое', icon: I.mic });
+      else if (s.mode === 'creative' && s.creative && s.creative.auto === false && !(s.creative && s.creative.url)) need.push({ i, label: s.label || 'Медиа-шаг', what: 'прикрепить ' + (s._need || 'фото/видео'), icon: I.image });
+    });
+    const total = seq.steps.filter(s => s.active).length;
+    if (!need.length) { toast('Умная цепочка собрана', total + ' касаний с выверенным таймингом', true); return; }
+    const md = modal({
+      title: 'Цепочка собрана — догрузите материалы', sub: `ИИ подобрал ${total} касаний с выверенными паузами. Для этих шагов нужны ваши файлы:`, wide: true,
+      body: `<div class="miss-list">${need.map(n => `<button class="miss-row" data-missedit="${n.i}"><span class="miss-ic">${ic(n.icon)}</span><div class="miss-tx"><b>${esc(n.label)}</b><i>${esc(n.what)}</i></div>${ic(I.chevron || I.plus)}</button>`).join('')}</div>
+        <div class="muted" style="font-size:11.5px;margin-top:12px;display:flex;gap:6px;align-items:flex-start">${ic(I.spark)}<span>Можно догрузить сейчас или позже. Шаг без файла отправит креатив лида по умолчанию, а незаписанное голосовое — пропустится.</span></div>`,
+      actions: [{ label: 'Готово', cls: 'btn-accent' }],
+    });
+    $$('[data-missedit]', md).forEach(b => b.addEventListener('click', () => { closeModal(); PAGE_STATE.seqEdit = +b.dataset.missedit; render(); }));
+  };
   if (editable) {
     $$('[data-cardadd]', root).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); addCard(b.dataset.cardadd, seq.steps.length); }));
+    $('#seqAutoBuild', root)?.addEventListener('click', () => {
+      const has = (seq.steps || []).filter(s => s.active).length;
+      if (has) modal({ title: 'Собрать умную цепочку заново?', sub: `Текущие ${has} шагов заменятся на выверенную схему из 7-8 касаний. Тексты и тайминг потом можно менять.`, actions: [{ label: 'Собрать заново', cls: 'btn-accent', onClick: () => { closeModal(); autoBuildChain(); } }, { label: 'Отмена' }] });
+      else autoBuildChain();
+    });
     /* DRAG & DROP на pointer-событиях (надёжно + тач): тащим карточку из библиотеки на коннектор (точку вставки). */
     $$('.clib-card', root).forEach(card => {
       card.addEventListener('pointerdown', (e) => {
