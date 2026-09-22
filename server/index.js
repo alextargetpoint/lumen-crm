@@ -1168,6 +1168,15 @@ function leadHint(db, l, axesFilled) {
   return null;
 }
 
+/* креатив (media), загруженный в дерево, по объявлению лида: сперва по adId, затем по ИМЕНИ объявления
+   (креативы раздаются по имени через propagateAdByName, поэтому матч по name надёжен). */
+function creativeForAd(db, ads) {
+  if (!ads) return null;
+  if (ads.adId) { const a = (db.ads || []).find(x => String(x.adId) === String(ads.adId) && x.media && x.media.url); if (a) return a.media; }
+  const nm = ads.adName || ads.name;
+  if (nm) { const a = (db.ads || []).find(x => x.name === nm && x.media && x.media.url); if (a) return a.media; }
+  return null;
+}
 function leadView(db, l) {
   if (l.ads) healAdNames(l.ads);   /* лечим имена из полей *_id прямо на лиде (Albato) — идемпотентно */
   let lastText = null;
@@ -5847,6 +5856,7 @@ const server = http.createServer(async (req, res) => {
         if (lead.unread) { lead.unread = 0; store.save(); }   /* открыл карточку → непрочитанные обнулены */
         const msgs = db.messages.filter(x => x.leadId === lead.id).sort((a, b) => a.at - b.at);
         const view = IS_BROKER ? redactLeadForBroker(db, leadView(db, lead)) : leadView(db, lead);
+        if (view.ads && !view.adCreative) { const cm = creativeForAd(db, view.ads); if (cm) view.adCreative = cm; }   /* превью креатива по имени объявления */
         return json(res, 200, Object.assign(view, {
           messages: msgs,
           events: db.events.filter(e => e.leadId === lead.id).slice(0, 60),
@@ -9388,10 +9398,12 @@ ${SCR}
     if ((m = p.match(/^\/api\/ads\/([^/]+)\/creative-upload$/)) && req.method === 'POST') {
       const ad = db.ads.find(a => String(a.adId) === String(m[1]));
       if (!ad) return json(res, 404, { error: 'not found' });
-      const extM = String(u.searchParams.get('filename') || '').match(/\.(mp4|webm|mov|jpe?g|png|webp|gif)$/i);
-      if (!extM) return json(res, 400, { error: 'формат: mp4/webm/mov/jpg/png/webp/gif' });
+      const VIDEO_EXT = 'mp4|m4v|mov|qt|webm|mkv|avi|3gp|3gpp|m2ts|mts|ts|ogv|wmv|flv|hevc|h264';
+      const IMG_EXT = 'jpe?g|png|webp|gif|heic|heif|bmp|tiff?';
+      const extM = String(u.searchParams.get('filename') || '').match(new RegExp('\\.(' + VIDEO_EXT + '|' + IMG_EXT + ')$', 'i'));
+      if (!extM) return json(res, 400, { error: 'формат не распознан. Видео: mp4/mov/m4v/mkv/avi/webm/… · фото: jpg/png/webp/gif' });
       const ext = extM[1].toLowerCase();
-      const isVideo = /^(mp4|webm|mov)$/.test(ext);
+      const isVideo = new RegExp('^(' + VIDEO_EXT + ')$').test(ext);
       const CAP = 500e6;   /* большие видео принимаем — сожмём сами (было 100 МБ и отказ) */
       /* стримим в temp-файл (не буферим сотни МБ в RAM) */
       const tmpIn = path.join(os.tmpdir(), 'lum-up-' + crypto.randomBytes(5).toString('hex') + '.' + ext);
@@ -9408,18 +9420,25 @@ ${SCR}
       const stamp = `ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}`;
       const storeAs = (relName, type) => { ad.media = { type, url: '/assets/' + relName }; propagateAdByName(db, ad); store.save(); };
       const COMPRESS_OVER = 28e6;   /* видео крупнее ~28 МБ — жмём под ~24 МБ */
-      let out = { url: '', type: isVideo ? 'video' : 'image', compressed: false, inMB: +(size / 1e6).toFixed(1) };
-      if (isVideo && size > COMPRESS_OVER && await ffmpegAvailable()) {
+      const sizeMB = size / 1e6;
+      /* транскодим В mp4 если: видео большое ИЛИ формат не mp4 (mov/m4v/mkv/… — иначе WhatsApp не проиграет по ссылке) */
+      const needTranscode = isVideo && (size > COMPRESS_OVER || ext !== 'mp4');
+      let out = { url: '', type: isVideo ? 'video' : 'image', compressed: false, inMB: +sizeMB.toFixed(1) };
+      if (needTranscode && await ffmpegAvailable()) {
         const rel = `creatives/${stamp}.mp4`; const outAbs = path.join(PUBLIC, 'assets', rel);
         try {
-          await compressVideoToMp4(tmpIn, outAbs, 24);
+          const targetMB = Math.min(24, Math.max(2, Math.ceil(sizeMB)));   /* не раздуваем короткие клипы */
+          await compressVideoToMp4(tmpIn, outAbs, targetMB);
           const outSize = (() => { try { return fs.statSync(outAbs).size; } catch (_) { return 0; } })();
-          storeAs(rel, 'video'); out.url = ad.media.url; out.compressed = true; out.outMB = +(outSize / 1e6).toFixed(1);
+          storeAs(rel, 'video'); out.url = ad.media.url; out.compressed = size > COMPRESS_OVER; out.outMB = +(outSize / 1e6).toFixed(1);
         } catch (e) {
           try { fs.unlinkSync(outAbs); } catch (_) { }
-          if (size <= 100e6) { const rel2 = `creatives/${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel2)); storeAs(rel2, 'video'); out.url = ad.media.url; }
-          else { cleanTmp(); return json(res, 500, { error: 'не удалось сжать видео: ' + e.message }); }
+          /* фолбэк: mp4 ≤100МБ кладём как есть; прочие форматы без ffmpeg отдать нельзя (WA не проиграет) */
+          if (ext === 'mp4' && size <= 100e6) { const rel2 = `creatives/${stamp}.mp4`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel2)); storeAs(rel2, 'video'); out.url = ad.media.url; }
+          else { cleanTmp(); return json(res, 500, { error: 'не удалось обработать видео: ' + e.message + '. Попробуйте mp4 или ссылку.' }); }
         }
+      } else if (isVideo && ext !== 'mp4') {
+        cleanTmp(); return json(res, 400, { error: `формат .${ext} требует конвертации, а она сейчас недоступна на сервере — загрузите mp4 или ссылкой` });
       } else if (isVideo && size > 100e6) {
         cleanTmp(); return json(res, 400, { error: 'видео больше 100 МБ, а сжатие на сервере недоступно — сожмите вручную или загрузите ссылкой' });
       } else {
@@ -9518,10 +9537,14 @@ ${SCR}
       const geoGroups = Object.values(byGroup).sort((a, b) => b.totalTech - a.totalTech).map(g => { const groupSpend = totCounted ? totalSpend * (g.totalTech / totCounted) : 0; const countries = Object.values(g.countries).sort((a, b) => b.techLeads - a.techLeads).map(c => { const sp = g.totalTech ? groupSpend * (c.techLeads / g.totalTech) : 0; return { country: c.country, flag: c.flag, techLeads: c.techLeads, qualLeads: c.qualLeads, spend: Math.round(sp), cplTech: c.techLeads ? +(sp / c.techLeads).toFixed(1) : 0, cplQual: c.qualLeads ? +(sp / c.qualLeads).toFixed(1) : 0 }; }); return { key: g.key, label: g.label, totalTech: g.totalTech, totalQual: g.totalQual, spend: Math.round(groupSpend), countries }; });
       /* ── КАЧЕСТВО: рейтинг adset + креативов + детально, по направлениям ── */
       const rankBy = (keyFn) => { const byDir = {}; for (const l of leads) { const dir = dirOf(l); const k = (keyFn(l) || '—'); const d = byDir[dir] = byDir[dir] || {}; const e = d[k] = d[k] || { key: k, total: 0, qual: 0 }; e.total++; if (isQual(l)) e.qual++; } const out = {}; for (const dir of Object.keys(byDir)) { const arr = Object.values(byDir[dir]).map(e => ({ ...e, qualRate: e.total ? +(e.qual / e.total * 100).toFixed(1) : 0 })).sort((a, b) => b.qual - a.qual || b.total - a.total); const MINQ = 3, MINL = 8; const elig = arr.filter(a => a.qual >= MINQ && a.total >= MINL); const leader = elig.slice().sort((a, b) => b.qual - a.qual || b.qualRate - a.qualRate)[0]; const eff = elig.slice().sort((a, b) => b.qualRate - a.qualRate || b.qual - a.qual)[0]; arr.forEach(a => { a.badge = (leader && a.key === leader.key) ? 'leader' : (eff && a.key === eff.key) ? 'eff' : (a.qual > 0 && (a.qual < MINQ || a.total < MINL)) ? 'low' : ''; }); out[dir] = arr; } return out; };
+      const campaigns = rankBy(l => l.ads && l.ads.campaignName);
       const adsets = rankBy(l => l.ads && l.ads.adsetName);
       const creatives = rankBy(l => l.ads && (l.ads.adName || l.ads.name));
+      /* превью креатива по имени объявления (что загружено в дерево) — цепляем к строкам рейтинга креативов */
+      const creaMedia = {}; for (const a of (db.ads || [])) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
+      for (const dir of Object.keys(creatives)) for (const row of creatives[dir]) if (creaMedia[row.key]) row.media = creaMedia[row.key];
       const qleads = {}; for (const l of leads.filter(isQual).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const dir = dirOf(l); (qleads[dir] = qleads[dir] || []).push({ date: l.createdAt ? new Date(l.createdAt).toISOString().slice(5, 10) : '', name: l.name, country: canon(countryOf(l)), flag: flag(canon(countryOf(l))), status: namesCfg[l.stage] || l.stage, adset: (l.ads && l.ads.adsetName) || '—', ad: (l.ads && (l.ads.adName || l.ads.name)) || '—' }); }
-      return json(res, 200, { geo: { mode: geoGroup, groups: geoGroups, totalCounted: totCounted }, quality: { adsets, creatives, qleads }, totalSpend: Math.round(totalSpend), qualStages: QUAL, hasLeads: leads.length });
+      return json(res, 200, { geo: { mode: geoGroup, groups: geoGroups, totalCounted: totCounted }, quality: { campaigns, adsets, creatives, qleads }, totalSpend: Math.round(totalSpend), qualStages: QUAL, hasLeads: leads.length });
     }
     if (p === '/api/ads/import' && req.method === 'POST') {
       const b = await readBody(req);

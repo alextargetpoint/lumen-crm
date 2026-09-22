@@ -5230,10 +5230,11 @@ function buildIntakeCard(l) {
   const HIDE = ['time_to_contact', 'contact', 'contact_time', 'time', 'when', 'preferred', 'preferred_contact'];
   const entries = Object.entries(cf).filter(([k, v]) => v != null && String(v).trim() && !HIDE.includes(k.toLowerCase()));
   const adBlock = adPathHtml(l);
+  const crea = (l.adCreative && l.adCreative.url) ? `<div class="lc-ik-crea">${l.adCreative.type === 'video' ? `<video src="${esc(l.adCreative.url)}" controls playsinline preload="metadata"></video>` : `<img src="${esc(l.adCreative.url)}" alt="креатив">`}<span class="lc-ik-crea-lbl">${ic(I.image)}Креатив объявления, на которое пришёл лид</span></div>` : '';
   const plan = resolveContactPlan(l);
   const fromForm = ['meta_form', 'ctwa', 'landing', 'meta', 'google', 'tiktok', 'yandex', 'avito'].includes(l.source) || (l.tags || []).includes('интегратор');
   const sched = (l.scheduled || []).filter(s => s.status === 'pending');
-  if (!entries.length && !adBlock && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
+  if (!entries.length && !adBlock && !crea && !plan && !sched.length && !(fromForm && l.avatarUrl)) return '';
   const initials = esc((l.name || 'К').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'К');
   const photo = l.avatarUrl ? `<img class="lc-ik-ph" src="${esc(l.avatarUrl)}" alt="">` : `<span class="lc-ik-ph empty">${initials}</span>`;
   const showVal = (k, v) => { const s = String(v); if (/country|стран/i.test(k) && /^[A-Za-z]{2}$/.test(s.trim())) { try { const n = new Intl.DisplayNames(['ru'], { type: 'region' }).of(s.trim().toUpperCase()); if (n && n !== s.trim().toUpperCase()) return n; } catch (_) { } } return s.slice(0, 220); };
@@ -5257,6 +5258,7 @@ function buildIntakeCard(l) {
   return `<div class="lc-intake">
     <div class="lc-ik-hd">${photo}<div class="lc-ik-who"><b>${esc(l.name || 'Без имени')}</b><span>${[l.geoName, l.phone].filter(Boolean).map(esc).join(' · ')}</span></div><span class="lc-ik-tag">${ic(I.bolt)}заявка</span></div>
     ${adBlock}
+    ${crea}
     ${qa || (adBlock || prefRow ? '' : '<div class="lc-ik-empty">Клиент не заполнил доп-поля формы.</div>')}
     ${prefRow}
     ${schedRow}
@@ -8581,12 +8583,15 @@ PAGES.ads = async (root) => {
       /* ── КАЧЕСТВО: рейтинг adset + креативов + детально (порт TargetPoint, минималистично) ── */
       const qBadge = (b) => b === 'leader' ? '<span class="mini-badge ok">лидер</span>' : b === 'eff' ? '<span class="mini-badge ai">эффект.</span>' : b === 'low' ? '<span class="mini-badge">мало данных</span>' : '';
       const rankTbl = (byDir, nameCol, unit) => { const keys = Object.keys(byDir || {}); if (!keys.length) return '<div class="empty" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Нет квал-лидов за период.</div>'; return keys.map(dir => ({ dir, arr: byDir[dir] })).sort((a, b) => b.arr.reduce((s, x) => s + x.qual, 0) - a.arr.reduce((s, x) => s + x.qual, 0)).map(({ dir, arr }) => { const tot = arr.reduce((s, x) => s + x.total, 0), q = arr.reduce((s, x) => s + x.qual, 0); const shown = arr.slice(0, 15); return `<div class="ana-q-grp"><div class="ana-q-gh">${esc(dir)} <span class="muted">· ${arr.length} ${unit} · ${tot} лид · ${q} квал</span></div><table class="tbl mp-cmp"><thead><tr><th>#</th><th>${nameCol}</th><th class="num">Лид</th><th class="num">Квал</th><th class="num">Квал %</th></tr></thead><tbody>${shown.map((a, i) => `<tr><td class="muted">${i + 1}</td><td>${esc(a.key)} ${qBadge(a.badge)}</td><td class="num">${a.total}</td><td class="num"><b>${a.qual}</b></td><td class="num">${a.qualRate}%</td></tr>`).join('')}${arr.length > 15 ? `<tr><td colspan="5" class="muted" style="font-size:10.5px">… ещё ${arr.length - 15} (показаны top-15)</td></tr>` : ''}</tbody></table></div>`; }).join(''); };
+      /* креативы — карточками с превью загруженного видео/фото (быстрый просмотр) */
+      const creaTbl = (byDir) => { const keys = Object.keys(byDir || {}); if (!keys.length) return '<div class="empty" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Нет квал-лидов за период.</div>'; return keys.map(dir => ({ dir, arr: byDir[dir] })).sort((a, b) => b.arr.reduce((s, x) => s + x.qual, 0) - a.arr.reduce((s, x) => s + x.qual, 0)).map(({ dir, arr }) => { const q = arr.reduce((s, x) => s + x.qual, 0); const shown = arr.slice(0, 18); return `<div class="ana-q-grp"><div class="ana-q-gh">${esc(dir)} <span class="muted">· ${arr.length} креативов · ${q} квал</span></div><div class="ana-crea-grid">${shown.map(a => `<div class="ana-crea ${a.badge === 'leader' ? 'lead' : ''}">${a.media && a.media.url ? `<div class="ana-crea-th" data-creaview="${esc(a.media.url)}" data-creatype="${esc(a.media.type || 'image')}">${a.media.type === 'video' ? `<video src="${esc(a.media.url)}#t=0.1" muted playsinline preload="metadata"></video><span class="ana-crea-play">${ic(I.play)}</span>` : `<img src="${esc(a.media.url)}" alt="">`}</div>` : `<div class="ana-crea-th empty">${ic(I.image)}</div>`}<div class="ana-crea-b"><b title="${esc(a.key)}">${esc(a.key)}</b>${qBadge(a.badge)}<span>${a.total} лид · <b>${a.qual}</b> квал · ${a.qualRate}%</span></div></div>`).join('')}</div></div>`; }).join(''); };
       const qleadsTbl = Object.keys(la.quality.qleads || {}).length ? Object.entries(la.quality.qleads).map(([dir, arr]) => `<div class="ana-q-grp"><div class="ana-q-gh">${esc(dir)} <span class="muted">· ${arr.length} квал-лидов</span></div><table class="tbl mp-cmp"><thead><tr><th>Дата</th><th>Имя</th><th>Страна</th><th>Статус</th><th>Adset</th><th>Креатив</th></tr></thead><tbody>${arr.slice(0, 30).map(l => `<tr><td class="muted">${esc(l.date)}</td><td>${esc(l.name || '—')}</td><td>${l.flag} ${esc(l.country || '—')}</td><td>${esc(l.status)}</td><td class="muted" style="font-size:11px">${esc(l.adset)}</td><td class="muted" style="font-size:11px">${esc(l.ad)}</td></tr>`).join('')}${arr.length > 30 ? `<tr><td colspan="6" class="muted" style="font-size:10.5px">… ещё ${arr.length - 30} (последние 30)</td></tr>` : ''}</tbody></table></div>`).join('') : '';
       const qualTbl = !la.hasLeads
         ? '<div class="empty" style="padding:26px;text-align:center">Пока нет CRM-лидов за период.<br><span class="muted" style="font-size:11px">Качество считается по стадиям воронки CRM. Подключите приём лидов (Albato) — появится рейтинг adset/креативов по квалам и детальный список.</span></div>'
         : `<div class="muted" style="font-size:11px;margin-bottom:10px" data-team>Квал = стадии CRM (${(STATE.settings.qualStages || []).length} отмечено). «лидер» — больше всего квалов; «эффект.» — лучший % квала; «мало данных» — высокий % на малой выборке.</div>
-          ${coll('Рейтинг Adset — по квал-лидам', rankTbl(la.quality.adsets, 'Adset', 'adset'), { open: true, icon: I.bars })}
-          ${coll('Топ креативов — по квал-лидам', rankTbl(la.quality.creatives, 'Креатив (Ad Name)', 'креатив'), { open: false, icon: I.image })}
+          ${coll('Топ кампаний — по квал-лидам', rankTbl(la.quality.campaigns, 'Кампания', 'кампаний'), { open: true, icon: I.target })}
+          ${coll('Рейтинг Adset — по квал-лидам', rankTbl(la.quality.adsets, 'Adset', 'adset'), { open: false, icon: I.bars })}
+          ${coll('Топ креативов — превью + по квал-лидам', creaTbl(la.quality.creatives), { open: true, icon: I.image })}
           ${qleadsTbl ? coll('Квал-лиды — детально', qleadsTbl, { open: false, icon: I.users }) : ''}`;
       return `<div class="glass card mb" id="anaExtra">
         <div class="card-title">${ic(I.bars)}Разбивка<span class="sub">гео по странам · качество лидов</span></div>
@@ -8868,6 +8873,7 @@ PAGES.ads = async (root) => {
      после fetch, без fade всего #content → экран не мигает (старый контент держится до новых данных). */
   $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render._silent = true; render(); }));
   $$('[data-geogroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaGeoGroup = b.dataset.geogroup; render._silent = true; render(); }));
+  $$('[data-creaview]', root).forEach(el2 => el2.addEventListener('click', () => { const url = el2.dataset.creaview, ty = el2.dataset.creatype; modal({ title: 'Креатив объявления', wide: 'card', body: `<div class="crea-view">${ty === 'video' ? `<video src="${esc(url)}" controls autoplay playsinline style="width:100%;max-height:70vh;border-radius:12px;background:#000"></video>` : `<img src="${esc(url)}" alt="креатив" style="width:100%;border-radius:12px">`}</div>`, actions: [{ label: 'Закрыть' }] }); }));
   $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render._silent = true; render(); }));
   $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
@@ -8905,8 +8911,9 @@ PAGES.ads = async (root) => {
     const box = f.closest('.ct-ad'); const st = box.querySelector('.ct-up-status'); const prev = box.querySelector('.ct-prev');
     const sizeMB = file.size / 1e6;
     if (file.size > 500e6) { toast('Файл больше 500 МБ', 'Слишком большое даже для авто-сжатия — загрузи ссылкой'); return; }
-    const big = /^video\//.test(file.type) && sizeMB > 28;
-    st.textContent = big ? `Загружаю ${Math.round(sizeMB * 10) / 10} МБ и сжимаю…` : 'Загружаю ' + Math.round(sizeMB * 10) / 10 + ' МБ…';
+    const isVid = /^video\//.test(file.type) || /\.(mp4|m4v|mov|qt|mkv|avi|3gp|3gpp|m2ts|mts|ts|webm|ogv|wmv|flv)$/i.test(file.name);
+    const big = isVid && sizeMB > 28;
+    st.textContent = big ? `Загружаю ${Math.round(sizeMB * 10) / 10} МБ и сжимаю…` : (isVid && sizeMB > 8 ? 'Загружаю и конвертирую…' : 'Загружаю ' + Math.round(sizeMB * 10) / 10 + ' МБ…');
     try {
       const r = await fetch('/api/ads/' + ad + '/creative-upload?filename=' + encodeURIComponent(file.name), { method: 'POST', body: file });
       const j = await r.json(); if (!r.ok) throw new Error(j.error || 'ошибка');
