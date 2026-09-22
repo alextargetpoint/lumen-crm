@@ -191,7 +191,7 @@ const PROVISION_TIMEOUT_MS = 30 * 60000; // 30 мин на оплату+появ
 /* создать заготовку сразу при инициации покупки (номера ещё нет — ждём оплату+появление) */
 function startProvision(db, country, checkoutUrl) {
   const f = farm(db);
-  const acc = { id: 'sf_' + Math.random().toString(36).slice(2, 9), phone: null, country: country || 'uk', channels: {}, createdAt: Date.now(), provision: { state: 'paying', at: Date.now(), country: country || 'uk', checkoutUrl: checkoutUrl || '' } };
+  const acc = { id: 'sf_' + Math.random().toString(36).slice(2, 9), phone: null, country: country || 'uk', channels: {}, createdAt: Date.now(), autoManage: true, provision: { state: 'paying', at: Date.now(), country: country || 'uk', checkoutUrl: checkoutUrl || '' } };
   f.accounts.unshift(acc); f.updatedAt = Date.now();
   return acc;
 }
@@ -203,7 +203,8 @@ function matchProvision(db, simbyeNumbers) {
     if (!n.phone || known.has(n.phone)) continue;
     // старейшая незаполненная заготовка ждёт номер?
     const slot = f.accounts.filter(a => a.provision && a.provision.state === 'paying' && !a.phone).sort((a, b) => a.provision.at - b.provision.at)[0];
-    const target = slot || { id: 'sf_' + Math.random().toString(36).slice(2, 9), channels: {}, createdAt: Date.now() };
+    // слот из «Купить» = автопилот управляет; обнаруженный вне CRM — только отслеживаем (не трогаем профиль)
+    const target = slot || { id: 'sf_' + Math.random().toString(36).slice(2, 9), channels: {}, createdAt: Date.now(), autoManage: false };
     target.phone = n.phone;
     target.country = /\+44/.test(n.phone) ? 'uk' : (/\+1/.test(n.phone) ? 'usa' : (target.country || ''));
     target.orderNo = n.orderNo || target.orderNo || '';

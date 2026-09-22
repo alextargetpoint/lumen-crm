@@ -11873,6 +11873,7 @@ function wireSimbye(scope, d, reload) {
     b.disabled = false; reload();
   }));
   $$s('.sbf-regen').forEach(b => b.addEventListener('click', async () => { if (!await uiConfirm('Обновить секреты?', 'Сгенерируем новый 2FA-PIN и резервную почту для этого номера.', { ok: 'Обновить' })) return; try { await api.post('/simbye/account/secrets', { phone: b.dataset.phone, regen: true }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
+  $$s('.sbf-qr').forEach(b => b.addEventListener('click', () => { const ph = b.dataset.phone; if (b.dataset.ch === 'tg') { (window.openTgConnect || function () {})(ph); } else { (window.openGrayManager || function () {})(ph); } }));
   $s('#sbfAuto')?.addEventListener('change', async (e) => { try { await api.post('/simbye/autopilot', { on: e.target.checked }); toast(e.target.checked ? 'Автопилот включён' : 'Автопилот выключен', e.target.checked ? 'Система сама двигает этапы' : null, true); } catch (er) { toast('Не вышло', er.message); e.target.checked = !e.target.checked; } });
   $s('#tplSave')?.addEventListener('click', async (e) => {
     const recMode = $s('#tplRecMode').value; const recVal = ($s('#tplRecVal').value || '').trim();
@@ -11891,6 +11892,10 @@ function wireSimbye(scope, d, reload) {
   $$s('.sbf-al-x').forEach(b => b.addEventListener('click', async () => { try { await api.post('/simbye/alert/resolve', { id: b.dataset.id }); reload(); } catch (_) {} }));
   $$s('.sbf-acct-x').forEach(b => b.addEventListener('click', async () => { const isProv = !!b.dataset.id; if (!await uiConfirm(isProv ? 'Отменить покупку?' : 'Убрать из фермы?', isProv ? 'Уберём карточку-заготовку (если уже оплатил — номер подхватится авто).' : 'Сам номер в Simbye останется — уберём только из отслеживания.', { ok: isProv ? 'Отменить' : 'Убрать', danger: true })) return; try { await api.post('/simbye/account/remove', { phone: b.dataset.phone, id: b.dataset.id }); reload(); } catch (e) { toast('Не вышло', e.message); } }));
   $$s('.sbf-paylink').forEach(b => b.addEventListener('click', () => { window.open(b.dataset.url, '_blank'); toast('Оплата открыта', 'После оплаты номер появится в ферме сам', true); }));
+  $$s('#sbcTabs .seg-btn').forEach(b => b.addEventListener('click', () => {
+    $$s('#sbcTabs .seg-btn').forEach(x => x.classList.toggle('on', x === b));
+    $$s('[data-sbcpane]').forEach(pane => { pane.style.display = pane.dataset.sbcpane === b.dataset.sbctab ? '' : 'none'; });
+  }));
   $s('#sbcConnect')?.addEventListener('click', async (e) => {
     const email = ($s('#sbcEmail')?.value || '').trim(), password = $s('#sbcPass')?.value || '';
     if (!email || !password) { toast('Введите email и пароль от Simbye'); return; }
@@ -11902,9 +11907,19 @@ function wireSimbye(scope, d, reload) {
   $s('#sbfImport')?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/simbye/import', {}); toast('Импортировано', `Добавлено ${r.added}, обновлено ${r.updated}`, true); reload(); } catch (er) { toast('Не вышло', er.message); b.disabled = false; } });
   $s('#sbfRefresh')?.addEventListener('click', () => reload());
   $s('#sbfBuy')?.addEventListener('click', async () => {
-    if (!await uiConfirm('Купить номер в Simbye?', 'Откроем оформление UK-номера (9,95€/30 дней). Оплата картой/PayPal/Apple Pay — вручную, авто-списание мы не делаем.', { ok: 'Открыть оформление' })) return;
-    try { const r = await api.post('/simbye/buy', { country: 'uk' }); if (r.ok && r.url) { window.open(r.url, '_blank'); toast('Оформление открыто', 'Завершите оплату в новой вкладке', true); } else toast('Не вышло', r.error || r.note || ''); } catch (e) { toast('Ошибка', e.message); }
+    modal({ title: 'Купить номер в Simbye', body: `<div style="font-size:12.5px;line-height:1.6">Выберите страну. Оплата картой/PayPal/Apple Pay — вручную (авто-списание не делаем). После оплаты номер появится в ферме автоматически.</div>
+      <div class="sbf-grid2" style="margin-top:12px">
+        <button class="btn sbf-buy-c" data-c="uk">🇬🇧 UK · +44 · 9,95€/30д</button>
+        <button class="btn sbf-buy-c" data-c="usa">🇺🇸 USA · +1 · 14,99$/30д</button>
+      </div>`, actions: [{ label: 'Отмена' }] });
+    setTimeout(() => document.querySelectorAll('.sbf-buy-c').forEach(bb => bb.addEventListener('click', async () => {
+      const c = bb.dataset.c; document.querySelectorAll('.modal-x,.mdl-close,[data-close]')[0]?.click();
+      try { const r = await api.post('/simbye/buy', { country: c }); if (r.ok && r.url) { window.open(r.url, '_blank'); toast('Оформление открыто', 'После оплаты номер появится в ферме сам', true); reload(); } else toast('Не вышло', r.error || r.note || ''); } catch (e) { toast('Ошибка', e.message); }
+    })), 100);
   });
+  $$s('.sbf-renew').forEach(b => b.addEventListener('click', async () => {
+    try { const r = await api.post('/simbye/renew', { phone: b.dataset.phone }); if (r.ok && r.renewUrl) { window.open(r.renewUrl, '_blank'); toast('Продление открыто', 'Оплатите — срок продлится на 30 дней', true); } else toast('Не вышло', r.reason || r.error || ''); } catch (e) { toast('Ошибка', e.message); }
+  }));
   $s('#sbfSession, #sbfSessInline')?.addEventListener('click', () => { const f = $s('#sbfSessionForm'); if (f) { f.style.display = f.style.display === 'none' ? '' : 'none'; } else reload(); });
   $s('#sbfPlatSave')?.addEventListener('click', async (e) => {
     const url = ($s('#sbfUrl')?.value || '').trim(), token = ($s('#sbfToken')?.value || '').trim();
@@ -11970,11 +11985,10 @@ PAGES.numbers = async (root) => {
     </div>
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
     <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
-      <div class="card-title">${ic(I.chat)}WhatsApp по QR<span class="sub">свой номер по QR (как WhatsApp Web) или купить виртуальный</span></div>
-      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Основная переписка с лидами — с личных номеров. Подключите свой по QR или купите виртуальный (поймает OTP → регистрируете WhatsApp → подключаете). Прогрев + закреп за брокером. Списывается с баланса расходников.</div>
+      <div class="card-title">${ic(I.chat)}WhatsApp по QR<span class="sub">подключение своего номера (как WhatsApp Web)</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Основная переписка с лидами — с личных номеров. Подключите свой по QR. <b>Покупка виртуальных номеров теперь в «Ферме номеров Simbye» вверху страницы</b> — там же авто-подхват SMS-кодов и весь конвейер.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
-        <button class="btn btn-sm" id="openYesimBtn">${ic(I.plus)}Купить номер</button>
       </div>
     </div>
     ${(() => { const ab = (STATE.brokers || []).filter(b => b.active !== false).length || 0; const have = grayNums.length; const need = Math.max(0, ab - have); const pl = (n) => n === 1 ? 'номер' : (n >= 2 && n <= 4 ? 'номера' : 'номеров'); return `<div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
@@ -11987,7 +12001,7 @@ PAGES.numbers = async (root) => {
         <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">потолок при 1-на-1</div></div>
       </div>
       ${need > 0 ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> ${pl(need)} до «1 на брокера». Докупи/подключи — закроешь всех брокеров и поднимешь дневной потолок новых лидов до ${ab * 5}.</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-accent btn-sm" id="grayRecBuy">${ic(I.plus)}Купить недостающие (${need})</button><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button><span class="muted" style="font-size:11px;align-self:center">купить недостающие — в «Ферме номеров Simbye» вверху</span></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
     </div>`; })()}
     <div class="glass card mb">${coll('Гигиена канала', `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:8px">
         ${[['Inbound-first', 'Первым в идеале пишет клиент: CTWA-реклама и Lead Form дают согласие на диалог'],
@@ -11998,8 +12012,7 @@ PAGES.numbers = async (root) => {
       </div>`, { open: false, icon: I.shield })}</div>
 
     ${grayNums.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap">
-      <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div>
-      <button class="btn btn-sm btn-accent" id="grayListBuy">${ic(I.plus)}Докупить номера</button></div>
+      <div class="lp-sec" style="margin:0">WhatsApp номера (QR) · ${grayNums.length}</div></div>
     <div class="num-grid" style="margin-bottom:18px">
       ${grayNums.map(n => { const conn = n.live && n.live.status === 'connected'; const risk = conn ? 82 : (n.live && n.live.status === 'qr' ? 40 : 15); return `<div class="glass num-card" data-gray="${esc(n.phone)}">
         <div class="num-head">
@@ -12290,9 +12303,9 @@ PAGES.numbers = async (root) => {
           <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">новых/день при 1-на-1</div></div>
         </div>
         ${!d.ready ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}TG-воркер не подключён. Кнопки покупки/подключения активируются, когда задеплоишь <b>lumen-tg-worker</b> (Railway) и зададишь env <code>LUMEN_TG_WORKER_URL</code>+<code>LUMEN_TG_WORKER_TOKEN</code>.</span></div>` : (need > 0 ? `<div class="lc-hint" style="margin-bottom:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> TG-номеров до «1 на брокера». Купи недостающие — закроешь всех.</span></div>` : '')}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-accent btn-sm" id="tgBuyBtn" ${d.ready ? '' : 'disabled'}>${ic(I.plus)}${nums.length ? 'Докупить номера' : 'Купить номер для Telegram'}</button>
-          <button class="btn btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-accent btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
+          <span class="muted" style="font-size:11px">покупка номеров — в «Ферме номеров Simbye» вверху страницы</span>
         </div>
         <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">Прогрев между номерами</div><div class="sd">Плавный рамп (день0≈3 → +2/день до 20), рандом+джиттер, «сначала принимай» — чтобы аккаунты не отлетали. ⛔ Не рассылки.</div></div>
           <label class="switch"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span></label></div>
@@ -12310,7 +12323,7 @@ PAGES.numbers = async (root) => {
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
-      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет — нажми «Купить номер для Telegram»: купим виртуальный номер, авторизуем TG, код прилетит в ленту автоматически.</div>' : '')}`;
+      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет. Купите номер в «Ферме номеров Simbye» вверху страницы — он подхватится сюда и код придёт автоматически.</div>' : '')}`;
     $('#tgBuyBtn', box)?.addEventListener('click', () => openTgBuy());
     $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
     $('#tgWarm', box)?.addEventListener('change', async (e) => { try { await api.post('/tg/gray/warmup', { running: e.target.checked }); toast(e.target.checked ? 'Прогрев TG включён' : 'Выключен', null, true); } catch (er) { toast('Не вышло', er.message); } });
@@ -12355,11 +12368,16 @@ PAGES.numbers = async (root) => {
       const state = cs ? cs.state : 'purchased';
       const canRegister = isOwner && ['purchased', 'parked'].includes(state);
       const canGetOtp = isOwner && ['awaiting_otp', 'stuck'].includes(state);
+      const canLink = isOwner && ['otp_received', 'linking', 'stuck'].includes(state);
+      const acts = [
+        canRegister ? `<button class="btn-ghost btn-sm sbf-register" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.link)}Начать регистрацию</button>` : '',
+        canGetOtp ? `<button class="btn-ghost btn-sm sbf-getotp" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.refresh || I.spark)}Забрать код</button>` : '',
+        canLink ? `<button class="btn-ghost btn-sm sbf-qr" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.link)}Подключить по QR</button>` : '',
+      ].filter(Boolean).join('');
       return `<div class="sbf-chan">
         <div class="sbf-chan-hd"><span class="sbf-ch-name">${ic(ch === 'wa' ? I.chat : I.send)}${name}</span>
           ${cs && cs.state === 'otp_received' && cs.otp ? `<span class="sbf-code" title="Код ${esc(cs.otp)}">код: <b>${esc(cs.otp)}</b></span>` : ''}
-          ${canRegister ? `<button class="btn-ghost btn-sm sbf-register" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.link)}Начать регистрацию</button>` : ''}
-          ${canGetOtp ? `<button class="btn-ghost btn-sm sbf-getotp" data-phone="${esc(acc.phone)}" data-ch="${ch}">${ic(I.refresh || I.spark)}Забрать код</button>` : ''}
+          ${acts ? `<span class="sbf-ch-acts">${acts}</span>` : ''}
         </div>
         ${chanStepper(cs)}
         ${notice ? `<div class="sbf-notice ${notice.level}">${esc(notice.text)}</div>` : ''}
@@ -12391,7 +12409,7 @@ PAGES.numbers = async (root) => {
       return `<div class="sbf-acct" data-acct="${esc(acc.phone)}">
         <div class="sbf-acct-hd">
           <div><span class="sbf-phone">${esc(acc.phone)}</span> <span class="sbf-cc">${flag(acc.country)}</span></div>
-          <div class="sbf-acct-meta">${dExp(acc)}${isOwner ? `<button class="btn-ghost btn-sm sbf-acct-x" data-phone="${esc(acc.phone)}" title="Убрать из фермы">✕</button>` : ''}</div>
+          <div class="sbf-acct-meta">${dExp(acc)}${isOwner && (() => { const m = String(acc.expiresAt || '').match(/(\d{4})-(\d{2})-(\d{2})/); if (!m) return false; return Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - new Date()) / 864e5) <= 5; })() ? `<button class="btn-ghost btn-sm sbf-renew" data-phone="${esc(acc.phone)}">${ic(I.refresh || I.spark)}Продлить</button>` : ''}${isOwner ? `<button class="btn-ghost btn-sm sbf-acct-x" data-phone="${esc(acc.phone)}" title="Убрать из фермы">✕</button>` : ''}</div>
         </div>
         ${chanRow(acc, 'wa', 'WhatsApp')}
         ${chanRow(acc, 'tg', 'Telegram')}
@@ -12414,21 +12432,41 @@ PAGES.numbers = async (root) => {
       wireSimbye(box, d, loadSimbyeFarm);
       return;
     }
-    // 2) воркер есть, но агентство не подключило свой Simbye — форма подключения (email+пароль)
+    // 2) воркер есть, но агентство не подключило свой Simbye — ДВА варианта подключения
     if (!d.connected) {
+      const shot = (id, cap) => `<div class="sbf-shot"><img src="/assets/simbye-guide/${id}.png" alt="${esc(cap)}" loading="lazy" onload="this.closest('.sbf-shot').classList.add('has')" onerror="this.remove()"><span class="sbf-shot-ph">${esc(cap)}</span></div>`;
+      const step = (n, title, body, img) => `<div class="sbf-gstep"><div class="sbf-gnum">${n}</div><div class="sbf-gbody"><div class="sbf-gt">${title}</div><div class="sbf-gd">${body}</div>${img ? shot(img, 'скриншот шага ' + n) : ''}</div></div>`;
       box.innerHTML = isOwner ? `<div class="glass card mb sbf-wrap">
-        <div class="card-title">${ic(I.sim)}Подключите свой Simbye<span class="sub">свои номера с автоподхватом в конвейер</span><span class="sbf-badge off">не подключено</span></div>
-        <div class="muted" style="font-size:12px;line-height:1.6;margin:2px 0 12px">Simbye — реальные не-VoIP номера (UK/USA, без KYC) для WhatsApp/Telegram. Заведите аккаунт, купите номера — а система сама будет забирать номера и SMS-коды и вести их по всем шагам.</div>
-        <div class="sbf-steps3">
-          <div class="sbf-s3"><span>1</span><div><b>Зарегистрируйтесь в Simbye</b><div class="muted">Обязательно <b>по email + паролю</b> (не через Google/Apple — иначе подключение не сработает).</div><a href="https://simbye.com/it/account/register" target="_blank" class="btn btn-sm" style="margin-top:6px">${ic(I.link)}Открыть регистрацию Simbye</a></div></div>
-          <div class="sbf-s3"><span>2</span><div><b>Купите номер</b> (UK 9,95€/30дн или USA) прямо в Simbye — или позже кнопкой «Купить» здесь.</div></div>
-          <div class="sbf-s3"><span>3</span><div><b>Введите логин Simbye ниже</b> — система войдёт за вас и подхватит все номера автоматически.</div></div>
+        <div class="card-title">${ic(I.sim)}Подключите номера Simbye<span class="sub">реальные не-VoIP номера (UK/USA, без KYC) для WhatsApp/Telegram</span><span class="sbf-badge off">не подключено</span></div>
+        <div class="seg-toggle" id="sbcTabs" style="margin:6px 0 14px">
+          <button class="seg-btn on" data-sbctab="quick">${ic(I.spark)}Быстро — через Simbye</button>
+          <button class="seg-btn" data-sbctab="manual">${ic(I.gear)}Вручную — сам на телефоне</button>
         </div>
-        <div class="sbf-grid2" style="margin-top:12px">
-          <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com"></div>
-          <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль"></div>
+        <div data-sbcpane="quick">
+          <div class="sbf-reco">${ic(I.check)}<b>Рекомендуем.</b> Вы вводите логин от Simbye один раз — система сама забирает номера и SMS-коды и ведёт их по всем шагам. Минимум действий.</div>
+          <div class="sbf-guide">
+            ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. ⚠️ Не через Google/Apple — иначе автоматика не сможет войти. <a href="https://simbye.com/it/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
+            ${step(2, 'Купите номер', 'В Simbye: «Numeri virtuali» → UK (9,95€/30дн) или USA → оплатите картой/PayPal/Apple Pay. Или позже — кнопкой «Купить номер» здесь.', 'q2')}
+            ${step(3, 'Введите логин Simbye ниже', 'Система войдёт за вас, найдёт ваши номера и запустит конвейер. Пароль хранится в зашифрованном виде.', '')}
+          </div>
+          <div class="sbf-grid2" style="margin-top:12px">
+            <div class="sbf-row"><label>Email от Simbye</label><input id="sbcEmail" type="email" placeholder="you@agency.com" autocomplete="off"></div>
+            <div class="sbf-row"><label>Пароль от Simbye</label><input id="sbcPass" type="password" placeholder="пароль" autocomplete="new-password"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-accent btn-sm" id="sbcConnect">${ic(I.link)}Подключить Simbye</button><span class="muted" style="font-size:11px">🔒 Пароль шифруется (AES-256) и используется только для входа в ваш Simbye.</span></div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-accent btn-sm" id="sbcConnect">${ic(I.link)}Подключить Simbye</button><span class="muted" style="font-size:11px">Пароль хранится в зашифрованном виде и используется только для входа в ваш Simbye.</span></div>
+        <div data-sbcpane="manual" style="display:none">
+          <div class="sbf-reco muted2">${ic(I.gear)}Если хотите всё делать сами со своего телефона. Номера и коды сюда автоматически не попадут — коды смотрите в панели Simbye вручную. Подключение к CRM — по QR в конце.</div>
+          <div class="sbf-guide">
+            ${step(1, 'Заведите аккаунт и купите номер в Simbye', 'Регистрация на simbye.com, «Numeri virtuali» → купите UK/USA номер. <a href="https://simbye.com" target="_blank" class="sbf-glink">Открыть Simbye ↗</a>', 'm1')}
+            ${step(2, 'Откройте ОБЫЧНЫЙ WhatsApp', 'На телефоне — <b>обычный WhatsApp, НЕ Business и НЕ клон</b> (клоны/Business часто не принимают код). Введите купленный номер.', 'm2')}
+            ${step(3, 'Заберите код из панели Simbye', 'Когда WhatsApp попросит SMS-код — откройте в Simbye «Ricarica / Inbox SMS» (или раздел номера) → скопируйте пришедший код → введите в WhatsApp.', 'm3')}
+            ${step(4, 'Включите двухшаговую проверку', 'WhatsApp → Настройки → Аккаунт → Двухшаговая проверка → задайте PIN и e-mail восстановления (чтобы номер не увели и не слетел).', 'm4')}
+            ${step(5, 'Подключите к CRM по QR', 'Вкладка «WhatsApp QR» → «Подключить свой (QR)» → в WhatsApp: Настройки → Связанные устройства → Привязка устройства → отсканируйте QR.', 'm5')}
+            ${step(6, 'Telegram — так же', 'Для Telegram: обычное приложение → номер → код из панели Simbye → облачный пароль (2FA) → вкладка «Telegram QR» → подключить по QR.', 'm6')}
+          </div>
+          <div class="sbf-reco" style="margin-top:12px">${ic(I.spark)}Хотите, чтобы коды приходили в CRM автоматически и без ручной возни? Переключитесь на «Быстро — через Simbye».</div>
+        </div>
       </div>` : '';
       wireSimbye(box, d, loadSimbyeFarm);
       return;

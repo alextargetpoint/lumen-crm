@@ -149,7 +149,8 @@ setInterval(() => {
         const has = (f && Array.isArray(f.accounts) && f.accounts.length) || (cfg && (cfg.url || cfg.token));
         if (!has && !process.env.LUMEN_SIMBYE_WORKER_URL) return; // ничего не настроено — пропускаем
         simbye.tick(db, store, { notifyOwner: (d, msg) => { try { engine.sendReport(d, msg); } catch (_) {} } })
-          .catch(e => console.error('[simbye.tick]', tid, e && e.message));
+          .catch(e => console.error('[simbye.tick]', tid, e && e.message))
+          .finally(() => { try { ensureFarmChannelNumbers(db); } catch (_) {} }); // после авто-детекта номеров — линковка в WA/TG
         autopilotReconcile(db).catch(e => console.error('[simbye.autopilot]', tid, e && e.message));
       });
     }
@@ -178,7 +179,8 @@ async function autopilotReconcile(db) {
       const connected = s && s.status === 'connected';
       if (connected) {
         const need = simbye.onConnected(db, acc, cfg.ch);
-        if (need) {
+        // персону применяем ТОЛЬКО у номеров, заведённых через ферму (autoManage) — чужие/готовые аккаунты не трогаем
+        if (need && acc.autoManage === true) {
           const p = simbye.personaFor(db, acc, idx);
           try { await cfg.api(db, 'POST', '/sessions/' + cfg.sid(acc.phone) + '/profile', cfg.profile(p)); const c = simbye.chan(acc, cfg.ch); c.personaPending = false; c.persona = p; } catch (_) {}
         }
@@ -190,6 +192,33 @@ async function autopilotReconcile(db) {
     idx++;
   }
   try { store.save(); } catch (_) {}
+}
+
+/* Связать номера фермы с воркерами WA/TG: чтобы QR-подключение, прогрев и детект «активен» работали.
+ * Каждый номер фермы (с телефоном) заводится в waGray.numbers и tgGray.numbers (digits-only, как в их роутах). */
+function ensureFarmChannelNumbers(db) {
+  const f = db.settings && db.settings.simbyeFarm;
+  if (!f || !Array.isArray(f.accounts)) return;
+  db.settings.waGray = db.settings.waGray || { numbers: [], warmup: { running: false, perDay: 16 } };
+  db.settings.waGray.numbers = db.settings.waGray.numbers || [];
+  db.settings.tgGray = db.settings.tgGray || { numbers: [] };
+  db.settings.tgGray.numbers = db.settings.tgGray.numbers || [];
+  const tpl = simbye.template(db);
+  let changed = false;
+  f.accounts.forEach((acc, i) => {
+    if (!acc.phone || (acc.provision && acc.provision.state !== 'received')) return;
+    const digits = String(acc.phone).replace(/[^0-9]/g, '');
+    if (!digits) return;
+    const label = ((acc.channels && acc.channels.wa && acc.channels.wa.persona && acc.channels.wa.persona.name)) || ('Simbye ' + (acc.country || '').toUpperCase());
+    if ((tpl.targets || {}).wa !== 0 && !db.settings.waGray.numbers.some(n => n.phone === digits)) {
+      db.settings.waGray.numbers.push({ phone: digits, label, roles: { send: true, call: false }, source: 'simbye', farmId: acc.id, addedAt: Date.now() }); changed = true;
+    }
+    if ((tpl.targets || {}).tg !== 0 && !db.settings.tgGray.numbers.some(n => n.phone === digits)) {
+      const p = simbye.personaFor(db, acc, i);
+      db.settings.tgGray.numbers.push({ phone: digits, label, persona: { name: p.name || '', avatar: p.avatar || '', about: p.bio || '', mode: 'qualifier', brokerId: null }, source: 'simbye', farmId: acc.id, addedAt: Date.now() }); changed = true;
+    }
+  });
+  if (changed) { try { store.save(); } catch (_) {} }
 }
 
 /* ---------- авторизация ---------- */
@@ -7460,6 +7489,7 @@ const server = http.createServer(async (req, res) => {
       if (!acc) return json(res, 404, { error: 'номер не в ферме' });
       const ch = (b.service === 'tg' || b.service === 'telegram') ? 'tg' : 'wa';
       const secrets = simbye.ensureSecrets(db, acc);
+      acc.autoManage = true; // клиент явно регистрирует через ферму → автопилот может вести профиль
       simbye.setState(db, acc, ch, 'awaiting_otp'); store.save();
       return json(res, 200, {
         ok: true, phone: acc.phone, service: ch,
@@ -7553,6 +7583,14 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, r);
       } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
+    /* продлить номер на 30 дней (ведёт на оплату Shopify — списание вручную) */
+    if (p === '/api/simbye/renew' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
+      if (!simbye.ready(db, store)) return json(res, 400, { error: 'Simbye-воркер не подключён.' });
+      const b = await readBody(req);
+      try { const r = await simbye.renew(db, store, b.phone, b.orderNo); return json(res, 200, r); }
+      catch (e) { return json(res, 200, { ok: false, error: e.message }); }
+    }
     /* залить/обновить сессию Simbye (storageState из живого Chrome владельца). Только владелец. */
     if (p === '/api/simbye/session' && req.method === 'POST') {
       const R = sessionRole(req); if (!R || R.role !== 'owner') return json(res, 403, { error: 'только владелец' });
@@ -7603,10 +7641,10 @@ const server = http.createServer(async (req, res) => {
       for (const n of (r.numbers || [])) {
         if (!n.phone) continue;
         let acc = f.accounts.find(a => a.phone === n.phone);
-        if (!acc) { acc = { id: 'sf_' + Math.random().toString(36).slice(2, 9), phone: n.phone, country: /\+44/.test(n.phone) ? 'uk' : (/\+1/.test(n.phone) ? 'usa' : ''), orderNo: n.orderNo || '', expiresAt: n.expiresAt || '', channels: {}, createdAt: Date.now() }; f.accounts.push(acc); added++; }
+        if (!acc) { acc = { id: 'sf_' + Math.random().toString(36).slice(2, 9), phone: n.phone, country: /\+44/.test(n.phone) ? 'uk' : (/\+1/.test(n.phone) ? 'usa' : ''), orderNo: n.orderNo || '', expiresAt: n.expiresAt || '', channels: {}, createdAt: Date.now(), autoManage: false }; f.accounts.push(acc); added++; }
         else { acc.expiresAt = n.expiresAt || acc.expiresAt; acc.orderNo = n.orderNo || acc.orderNo; updated++; }
       }
-      f.updatedAt = Date.now(); store.save();
+      f.updatedAt = Date.now(); ensureFarmChannelNumbers(db); store.save();
       return json(res, 200, { ok: true, added, updated, total: f.accounts.length });
     }
     /* удалить аккаунт из фермы (не трогает сам номер в Simbye) */

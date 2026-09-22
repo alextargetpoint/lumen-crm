@@ -8213,3 +8213,22 @@ body.client-view [data-team]{ display:none !important; }
 .sbf-s3>span{ flex:0 0 22px; height:22px; border-radius:50%; background:color-mix(in srgb,var(--accent) 16%,transparent); color:var(--accent); display:grid; place-items:center; font-size:12px; font-weight:700; }
 .sbf-s3>div{ font-size:12.5px; line-height:1.5; }
 .sbf-s3 .muted{ font-size:11px; }
+
+/* Ферма Simbye — действия канала, гайды подключения (2 варианта) */
+.sbf-ch-acts{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+.sbf-reco{ display:flex; gap:8px; align-items:flex-start; font-size:12px; line-height:1.55; padding:10px 12px; border-radius:10px; background:color-mix(in srgb,var(--accent) 9%,transparent); margin-bottom:12px; }
+.sbf-reco svg{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; color:var(--accent); }
+.sbf-reco.muted2{ background:var(--bg-2,#20222a); color:var(--ink-2); } .sbf-reco.muted2 svg{ color:var(--muted); }
+.sbf-guide{ display:grid; gap:12px; }
+.sbf-gstep{ display:flex; gap:12px; align-items:flex-start; }
+.sbf-gnum{ flex:0 0 26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; display:grid; place-items:center; font-size:12.5px; font-weight:700; }
+.sbf-gbody{ flex:1; min-width:0; }
+.sbf-gt{ font-size:13px; font-weight:650; margin-bottom:3px; }
+.sbf-gd{ font-size:12px; line-height:1.55; color:var(--ink-2); }
+.sbf-glink{ color:var(--accent); font-weight:600; white-space:nowrap; }
+.sbf-shot{ position:relative; margin-top:8px; border:1px dashed var(--stroke); border-radius:10px; min-height:54px; display:grid; place-items:center; overflow:hidden; background:var(--bg-2,#1c1e24); }
+.sbf-shot.has{ border-style:solid; min-height:0; }
+.sbf-shot img{ max-width:100%; display:block; }
+.sbf-shot-ph{ font-size:10.5px; color:var(--muted); padding:12px; text-align:center; }
+.sbf-shot.has .sbf-shot-ph{ display:none; }
+.sbf-buy-c{ justify-content:center; padding:14px; font-size:13px; }
