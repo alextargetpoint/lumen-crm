@@ -12294,7 +12294,7 @@ function wireSimbye(scope, d, reload) {
       if (r.ok && r.pending) {
         /* Вход асинхронный: капча решается на воркере 30-135с. Опрашиваем статус, не держим запрос. */
         const started = Date.now(); let out = null;
-        while (Date.now() - started < 165000) {
+        while (Date.now() - started < 200000) {
           await new Promise(res => setTimeout(res, 3000));
           let st; try { st = await api.get('/simbye/connect-status'); } catch (_) { continue; }
           if (st && st.state === 'done') { out = st; break; }
