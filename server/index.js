@@ -134,6 +134,7 @@ const playbook = require('./playbook');
 const academy = require('./academy'); /* Академия продаж (методология Ольги Синенко): курс + оценка звонка + советы */
 const billing = require('./billing');
 const simbye = require('./simbye'); /* ⭐ ферма номеров: скрейпер Simbye (OTP/детект/продление) + вотчдог/сигналы */
+const b2backup = require('./backup'); /* ⭐ офф-сайт бэкапы всех агентств в Backblaze B2 (защита от гибели тома) */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
@@ -13227,6 +13228,8 @@ server.listen(PORT, () => {
   setInterval(() => { try { store.backupAll('daily'); } catch (e) {} }, 24 * 3600e3);  /* суточный снимок (хранится 30, не выпиливается) */
   /* офф-сайт: если задан BACKUP_WEBHOOK_URL — раз в сутки шлём снимки наружу (защита от сбоя самого тома) */
   if (process.env.BACKUP_WEBHOOK_URL) setInterval(() => { try { offsiteBackup(); } catch (e) {} }, 24 * 3600e3);
+  /* ⭐ офф-сайт в Backblaze B2 (зашифрованный снимок всех агентств; вкл. переменными BACKUP_B2_*) */
+  try { b2backup.start(store); } catch (e) { console.warn('[b2backup] старт не удался:', e.message); }
   /* САМОЛЕЧЕНИЕ Telegram-бота: перепривязываем вебхук+меню к СТАБИЛЬНОМУ домену при каждом старте
      (иначе после смены временного туннеля/деплоя бот «не грузится» — вебхук/мини-апп смотрят на мёртвый URL). */
   /* фолбэк: если PUBLIC_BASE_URL не задан на Railway — берём известный прод-домен, иначе бот «не грузится»
