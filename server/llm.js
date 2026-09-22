@@ -528,7 +528,7 @@ ${draft ? 'ЧЕРНОВИК МЕНЕДЖЕРА (улучши, сохрани с�
    (транскрипт видео + сильные стороны из дерева креативов) и критериев лида. Design-time:
    вызывается по кнопке в конструкторе на примере реального лида — результат «вшивается» в шаг.
    position: 0 = первое касание, N>0 = follow-up без ответа (тон и цель другие). */
-async function composeChainStep(db, lead, step, agencyName, position, styleSamples) {
+async function composeChainStep(db, lead, step, agencyName, position, styleSamples, langOverride) {
   const geoName = (db.settings.geoNames || {})[lead.geo] || lead.geo || '';
   const ads = lead.ads || {};
   const adName = ads.adName || '';
@@ -536,7 +536,7 @@ async function composeChainStep(db, lead, step, agencyName, position, styleSampl
   const adPoints = (adRec && Array.isArray(adRec.points) && adRec.points.length) ? adRec.points : (Array.isArray(ads.points) ? ads.points : []);
   const adTranscript = (adRec && adRec.transcript && !/^\(без речи\)?$/i.test(adRec.transcript.trim())) ? String(adRec.transcript).slice(0, 2500) : '';
   const adNotes = (adRec && adRec.notes) ? String(adRec.notes).slice(0, 1500) : '';
-  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[lead.lang] || 'русском';
+  const LANG = { ru: 'русском', en: 'английском', es: 'испанском', ar: 'арабском', id: 'индонезийском', de: 'немецком', fr: 'французском', it: 'итальянском', tr: 'турецком', pt: 'португальском' }[(langOverride || lead.lang)] || 'русском';   /* язык цепочки перекрывает язык лида */
   const qualLines = [];
   const AXN = { purpose: 'цель', timeline: 'срок', budget: 'бюджет', type: 'тип объекта' };
   for (const a of Object.keys(AXN)) { const q = (lead.quals || {})[a]; if (q && q.value) qualLines.push(`${AXN[a]}: ${q.value}`); }

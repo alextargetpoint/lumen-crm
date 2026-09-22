@@ -1518,6 +1518,10 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .clib-pv-voice svg { width: 13px; height: 13px; margin-right: 3px; }
 .clib-pv-voice i { width: 2px; border-radius: 2px; background: color-mix(in srgb, #128C7E 55%, transparent); }
 .clib-pv-voice i:nth-child(2){height:7px} .clib-pv-voice i:nth-child(3){height:12px} .clib-pv-voice i:nth-child(4){height:8px} .clib-pv-voice i:nth-child(5){height:5px}
+.clib-more { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 7px; font-size: 10.5px; font-weight: 600; color: var(--accent); opacity: 0; transition: opacity .14s; }
+.clib-more svg { width: 12px; height: 12px; }
+.clib-card:hover .clib-more { opacity: .85; }
+.clib-pv-full { max-height: none !important; -webkit-mask-image: none !important; mask-image: none !important; }
 
 /* ── Реорганизованный редактор шага (se2) ── */
 .se2 { display: flex; flex-direction: column; gap: 12px; }

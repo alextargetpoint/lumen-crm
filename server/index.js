@@ -6932,6 +6932,7 @@ const server = http.createServer(async (req, res) => {
       if (b.active != null) seq.active = b.active;
       if (b.name) seq.name = String(b.name).slice(0, 80);
       if (b.geo) seq.geo = b.geo;
+      if (b.lang != null) seq.lang = ['', 'ru', 'en', 'es', 'ar', 'de', 'fr', 'it', 'tr', 'pt'].includes(b.lang) ? b.lang : '';   /* язык цепочки: '' = по лиду */
       /* ТАРГЕТИНГ: на какие лиды распространяется цепочка (мульти-фильтры + брокеры).
          Пустой массив = «любой»; brokers 'all' | список id. Санитизируем и держим seq.geo синхронным для обратной совместимости. */
       if (b.filters && typeof b.filters === 'object') {
@@ -6989,7 +6990,7 @@ const server = http.createServer(async (req, res) => {
       const styleKey = IS_BROKER ? ROLE.brokerId : 'owner';   /* стиль = у кого рука писала (acting user) */
       const styleSamples = getTouchStyle(db, styleKey);
       try {
-        const out = await llm.composeChainStep(db, sample, step, db.settings.agency.name, position, styleSamples);
+        const out = await llm.composeChainStep(db, sample, step, db.settings.agency.name, position, styleSamples, seq.lang || '');
         return json(res, 200, { message: out.message, variantB: out.variantB, hook: out.hook, styleCount: styleSamples.length, sample: { name: sample.name || '—', adName: (sample.ads && sample.ads.adName) || '', hasTranscript: !!withTr, matched: cand.length } });
       } catch (e) { return json(res, 500, { error: 'ИИ не справился: ' + e.message }); }
     }

@@ -6851,6 +6851,7 @@ PAGES.sequences = async (root) => {
           <span class="seq-own">${ownTag(seq)}</span>
           <input id="seqName" value="${esc(seq.name)}" style="flex:1;min-width:180px;font-weight:650" ${ro('')}>
           <button class="btn btn-sm seq-target-btn" id="seqTarget" ${ro('')} title="Кому идёт эта цепочка — гео, источник, канал, подрядчики, брокеры">${ic(I.target)}<span class="seq-target-val">${esc(targetingShort(seq))}</span>${ic(I.chevron || I.edit)}</button>
+          <select id="seqLang" class="se2-sel" ${ro('')} title="Язык цепочки: ИИ-тексты будут на этом языке (Авто — по языку лида)">${[['', 'Язык: авто (по лиду)'], ['ru', 'Русский'], ['en', 'English'], ['es', 'Español'], ['ar', 'العربية'], ['de', 'Deutsch'], ['fr', 'Français'], ['it', 'Italiano'], ['tr', 'Türkçe'], ['pt', 'Português']].map(([v, l]) => `<option value="${v}" ${(seq.lang || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
           <div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:12px">Активна</span>
             <label class="switch"><input type="checkbox" id="seqActive" ${seq.active ? 'checked' : ''} ${ro('')}><span class="tr"></span><span class="th"></span></label></div>
           <button class="btn btn-sm" id="seqFork" title="Скопировать в свою личную цепочку">${ic(I.copy || I.plus)}Форкнуть себе</button>
@@ -6939,10 +6940,21 @@ PAGES.sequences = async (root) => {
     return `<div class="clib-pv-chat">${bubbles || '<div class="clib-pv-msg"><p class="muted">—</p></div>'}</div>`;
   }
   function cardLibCardHtml(c) {
-    return `<div class="clib-card" data-card="${c.id}">
+    return `<div class="clib-card" data-card="${c.id}" title="${esc(c.title)} — нажмите, чтобы увидеть весь текст">
       <div class="clib-head"><span class="clib-ic">${ic(I[c.icon] || I.spark)}</span><div class="clib-b"><div class="clib-t">${esc(c.title)}</div><div class="clib-meta">${ic(I.clock)}${esc(c.timing)}${c.needsAsset ? ` · <em>+ ${esc(c.needsAsset)}</em>` : ''}</div></div><button class="clib-add" data-cardadd="${c.id}" title="Добавить в конец цепочки">${ic(I.plus)}</button></div>
       <div class="clib-pv">${cardPreview(c)}</div>
+      <div class="clib-more">${ic(I.eye)}весь текст</div>
     </div>`;
+  }
+  /* полный текст карточки в модалке (по клику) — превью в карточке обрезано, тут видно всё */
+  function openCardFull(c) {
+    modal({
+      title: c.title, sub: `${c.tag || ''}${c.timing ? ' · ' + c.timing : ''}${c.needsAsset ? ' · нужно прикрепить: ' + c.needsAsset : ''}`, wide: true,
+      body: `<div class="muted" style="font-size:12.5px;line-height:1.55;margin-bottom:14px">${esc(c.desc || '')}</div>
+        <div class="clib-pv clib-pv-full">${cardPreview(c)}</div>
+        <div class="muted" style="font-size:11px;margin-top:12px">${ic(I.spark)} Переменные ({name}, {creative}, {district}, {budget}…) подставятся под конкретного лида. Тексты и тайминг можно менять после добавления.</div>`,
+      actions: [{ label: 'Добавить в цепочку', cls: 'btn-accent', onClick: () => { closeModal(); addCard(c.id, seq.steps.length); } }, { label: 'Закрыть' }],
+    });
   }
   function fillVarsDemo(t) {
     return String(t || '')
@@ -7025,7 +7037,7 @@ PAGES.sequences = async (root) => {
           document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
           card.classList.remove('dragging'); if (ghost) ghost.remove();
           clearDrop();
-          if (!moved) return;                                   /* просто клик без перетаскивания — игнор (есть ＋) */
+          if (!moved) { const tg = ev.target; const onAdd = tg && tg.closest && tg.closest('.clib-add'); if (!onAdd) { const cc = CHAIN_CARDS.find(x => x.id === id); if (cc) openCardFull(cc); } return; }   /* клик без перетаскивания → весь текст */
           if (overFlow(ev.clientX, ev.clientY)) { const c = nearestConn(ev.clientY); addCard(id, c ? +(c.querySelector('.fl-add')?.dataset.addat ?? seq.steps.length) : seq.steps.length); }
         };
         document.addEventListener('pointermove', onMove);
@@ -7061,6 +7073,7 @@ PAGES.sequences = async (root) => {
   if (editable) {
     $('#seqName')?.addEventListener('change', (e) => save({ name: e.target.value }));
     $('#seqTarget')?.addEventListener('click', openSeqTargeting);
+    $('#seqLang')?.addEventListener('change', (e) => { seq.lang = e.target.value; save({ lang: e.target.value }); toast('Язык цепочки: ' + (e.target.options[e.target.selectedIndex].text), 'ИИ-тексты будут на этом языке', true); });
     $('#seqActive')?.addEventListener('change', (e) => { seq.active = e.target.checked; save({ active: e.target.checked }); });
     $('#seqDel')?.addEventListener('click', () => modal({
       title: 'Удалить цепочку?', sub: seq.name,
