@@ -6928,8 +6928,10 @@ PAGES.sequences = async (root) => {
         const cap = (s.text || '').trim() ? `<div class="clib-pv-para">${fillVarsDemo(s.text).split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>` : '';
         /* если у шага заготовленный ассет (creative.auto===false) — показываем ЕГО (PDF-подборка / видео-тур / фотовизитка), а не «креатив лида» */
         const prepared = s.creative && s.creative.auto === false;
-        const mediaLabel = prepared ? ('заготовленный материал: ' + (c.needsAsset || 'файл')) : 'креатив, по которому пришёл лид';
-        return `<div class="clib-pv-msg"><div class="clib-pv-media">${ic(prepared ? (I[c.icon] || I.doc) : I.play)}<span>${esc(mediaLabel)}</span></div>${cap}<span class="clib-pv-t">✓✓</span></div>`;
+        const kind = prepared ? 'prep' : 'lead';
+        const title = prepared ? (c.needsAsset ? c.needsAsset[0].toUpperCase() + c.needsAsset.slice(1) : 'Файл') : 'Креатив из объявления';
+        const sub = prepared ? 'заготовленный материал · прикрепите' : 'по которому пришёл лид · авто';
+        return `<div class="clib-pv-msg"><div class="clib-pv-media ${kind}"><span class="clib-pv-mi">${ic(prepared ? (I[c.icon] || I.doc) : I.play)}</span><div class="clib-pv-mt"><b>${esc(title)}</b><i>${esc(sub)}</i></div></div>${cap}<span class="clib-pv-t">✓✓</span></div>`;
       }
       if (s.channel === 'voice') return `<div class="clib-pv-msg"><div class="clib-pv-voice">${ic(I.mic)}<i></i><i></i><i></i><i></i>0:18</div><span class="clib-pv-t">✓✓</span></div>`;
       const t = s.text || s.prompt || '';

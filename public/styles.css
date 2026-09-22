@@ -1512,8 +1512,15 @@ code.pill { font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; backgro
 .clib-pv-msg p:last-of-type { margin-bottom: 0; }
 .clib-pv-para { margin-top: 5px; }
 .clib-pv-t { display: block; text-align: right; font-size: 8.5px; color: color-mix(in srgb, #128C7E 70%, var(--muted)); margin-top: 2px; letter-spacing: .02em; }
-.clib-pv-media { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; color: #0e7a67; background: color-mix(in srgb, #25D366 14%, transparent); border-radius: 8px; padding: 10px 9px; }
-.clib-pv-media svg { width: 13px; height: 13px; }
+.clib-pv-media { display: flex; align-items: center; gap: 9px; border-radius: 9px; padding: 9px 10px; overflow: hidden; }
+.clib-pv-media.lead { background: linear-gradient(135deg, color-mix(in srgb, #25D366 22%, transparent), color-mix(in srgb, #128C7E 14%, transparent)); }
+.clib-pv-media.prep { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), color-mix(in srgb, var(--accent) 7%, transparent)); }
+.clib-pv-mi { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: rgba(255,255,255,.55); color: #0e7a67; }
+.clib-pv-media.prep .clib-pv-mi { color: var(--accent); }
+.clib-pv-mi svg { width: 16px; height: 16px; }
+.clib-pv-mt { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.clib-pv-mt b { font-size: 11px; font-weight: 700; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clib-pv-mt i { font-style: normal; font-size: 9px; color: var(--muted); }
 .clib-pv-voice { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #0e7a67; font-weight: 600; }
 .clib-pv-voice svg { width: 13px; height: 13px; margin-right: 3px; }
 .clib-pv-voice i { width: 2px; border-radius: 2px; background: color-mix(in srgb, #128C7E 55%, transparent); }
