@@ -66,6 +66,10 @@ const control = require('./control');
 
 const PORT = process.env.PORT || 5077;
 const PUBLIC = path.join(__dirname, '..', 'public');
+/* ПЕРСИСТЕНТНОЕ хранилище загруженных креативов: public/ на Railway ЭФЕМЕРНА (стирается при каждом деплое),
+   а DATA_DIR лежит на volume (там же БД тенантов, она переживает деплои). Иначе видео 404 после редеплоя. */
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const CREATIVES_DIR = path.join(DATA_DIR, 'creatives');
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ico': 'image/x-icon',
   /* аудио/видео/документы — нужны для медиа-моста WhatsApp⇄Telegram (голосовые .oga и пр. Cloud API качает по ссылке и проверяет Content-Type) */
   '.oga': 'audio/ogg', '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.amr': 'audio/amr', '.wav': 'audio/wav',
@@ -9434,25 +9438,25 @@ ${SCR}
       const cleanTmp = () => { try { fs.unlinkSync(tmpIn); } catch (_) { } };
       if (over) { cleanTmp(); return json(res, 400, { error: 'файл до 500 МБ' }); }
       if (!size) { cleanTmp(); return json(res, 400, { error: 'пустой файл' }); }
-      fs.mkdirSync(path.join(PUBLIC, 'assets', 'creatives'), { recursive: true });
+      fs.mkdirSync(CREATIVES_DIR, { recursive: true });   /* ПЕРСИСТЕНТНО (volume), не public/ (эфемерна) */
       const stamp = `ad-${String(ad.adId).slice(-8)}-${crypto.randomBytes(3).toString('hex')}`;
-      const storeAs = (relName, type) => { ad.media = { type, url: '/assets/' + relName }; propagateAdByName(db, ad); store.save(); };
+      const storeAs = (fname, type) => { ad.media = { type, url: '/creatives/' + fname }; propagateAdByName(db, ad); store.save(); };
       const COMPRESS_OVER = 28e6;   /* видео крупнее ~28 МБ — жмём под ~24 МБ */
       const sizeMB = size / 1e6;
       /* транскодим В mp4 если: видео большое ИЛИ формат не mp4 (mov/m4v/mkv/… — иначе WhatsApp не проиграет по ссылке) */
       const needTranscode = isVideo && (size > COMPRESS_OVER || ext !== 'mp4');
       let out = { url: '', type: isVideo ? 'video' : 'image', compressed: false, inMB: +sizeMB.toFixed(1) };
       if (needTranscode && await ffmpegAvailable()) {
-        const rel = `creatives/${stamp}.mp4`; const outAbs = path.join(PUBLIC, 'assets', rel);
+        const fname = `${stamp}.mp4`; const outAbs = path.join(CREATIVES_DIR, fname);
         try {
           const targetMB = Math.min(24, Math.max(2, Math.ceil(sizeMB)));   /* не раздуваем короткие клипы */
           await compressVideoToMp4(tmpIn, outAbs, targetMB);
           const outSize = (() => { try { return fs.statSync(outAbs).size; } catch (_) { return 0; } })();
-          storeAs(rel, 'video'); out.url = ad.media.url; out.compressed = size > COMPRESS_OVER; out.outMB = +(outSize / 1e6).toFixed(1);
+          storeAs(fname, 'video'); out.url = ad.media.url; out.compressed = size > COMPRESS_OVER; out.outMB = +(outSize / 1e6).toFixed(1);
         } catch (e) {
           try { fs.unlinkSync(outAbs); } catch (_) { }
           /* фолбэк: mp4 ≤100МБ кладём как есть; прочие форматы без ffmpeg отдать нельзя (WA не проиграет) */
-          if (ext === 'mp4' && size <= 100e6) { const rel2 = `creatives/${stamp}.mp4`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel2)); storeAs(rel2, 'video'); out.url = ad.media.url; }
+          if (ext === 'mp4' && size <= 100e6) { const f2 = `${stamp}.mp4`; fs.copyFileSync(tmpIn, path.join(CREATIVES_DIR, f2)); storeAs(f2, 'video'); out.url = ad.media.url; }
           else { cleanTmp(); return json(res, 500, { error: 'не удалось обработать видео: ' + e.message + '. Попробуйте mp4 или ссылку.' }); }
         }
       } else if (isVideo && ext !== 'mp4') {
@@ -9460,7 +9464,7 @@ ${SCR}
       } else if (isVideo && size > 100e6) {
         cleanTmp(); return json(res, 400, { error: 'видео больше 100 МБ, а сжатие на сервере недоступно — сожмите вручную или загрузите ссылкой' });
       } else {
-        const rel = `creatives/${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(PUBLIC, 'assets', rel)); storeAs(rel, isVideo ? 'video' : 'image'); out.url = ad.media.url;
+        const fname = `${stamp}.${ext}`; fs.copyFileSync(tmpIn, path.join(CREATIVES_DIR, fname)); storeAs(fname, isVideo ? 'video' : 'image'); out.url = ad.media.url;
       }
       cleanTmp();
       return json(res, 200, { url: out.url, type: out.type, compressed: out.compressed, inMB: out.inMB, outMB: out.outMB });
@@ -12552,6 +12556,29 @@ ${isEdit ? `<script>window.PEDIT=${JSON.stringify({
     }
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'unknown endpoint' });
+
+    /* ---------------- креативы из ПЕРСИСТЕНТНОГО хранилища (переживают деплой) ---------------- */
+    /* публично (без сессии): их тянет и браузер в карточке, и серверы WhatsApp по ссылке. Range — для проигрывания видео. */
+    if (req.method === 'GET' && /^\/creatives\/[A-Za-z0-9._-]+$/.test(p)) {
+      const fp = path.join(CREATIVES_DIR, path.basename(p));
+      if (!fp.startsWith(CREATIVES_DIR) || !fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
+      const ext = path.extname(fp).toLowerCase();
+      const type = MIME[ext] || 'application/octet-stream';
+      const stat = fs.statSync(fp);
+      const range = req.headers.range;
+      if (range && /^bytes=\d*-\d*$/.test(range)) {
+        const [ss, ee] = range.replace('bytes=', '').split('-');
+        const start = ss ? parseInt(ss, 10) : 0; const end = ee ? parseInt(ee, 10) : stat.size - 1;
+        if (isNaN(start) || start >= stat.size) { res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }); res.end(); return; }
+        const e2 = Math.min(end, stat.size - 1);
+        res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${e2}/${stat.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': e2 - start + 1, 'Cache-Control': 'public, max-age=86400' });
+        fs.createReadStream(fp, { start, end: e2 }).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' });
+        fs.createReadStream(fp).pipe(res);
+      }
+      return;
+    }
 
     /* ---------------- статика ---------------- */
     let file = p === '/' ? '/index.html' : p === '/landing' ? '/landing.html' : p;

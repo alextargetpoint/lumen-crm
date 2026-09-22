@@ -5230,7 +5230,7 @@ function buildIntakeCard(l) {
   const HIDE = ['time_to_contact', 'contact', 'contact_time', 'time', 'when', 'preferred', 'preferred_contact'];
   const entries = Object.entries(cf).filter(([k, v]) => v != null && String(v).trim() && !HIDE.includes(k.toLowerCase()));
   const adBlock = adPathHtml(l);
-  const crea = (l.adCreative && l.adCreative.url) ? `<div class="lc-ik-crea">${l.adCreative.type === 'video' ? `<video src="${esc(l.adCreative.url)}" controls playsinline preload="metadata"></video>` : `<img src="${esc(l.adCreative.url)}" alt="креатив">`}<span class="lc-ik-crea-lbl">${ic(I.image)}Креатив объявления, на которое пришёл лид</span></div>` : '';
+  const crea = (l.adCreative && l.adCreative.url) ? `<div class="lc-ik-crea" data-creaview="${esc(l.adCreative.url)}" data-creatype="${esc(l.adCreative.type || 'image')}" title="Открыть креатив"><div class="lc-ik-crea-th">${l.adCreative.type === 'video' ? `<video src="${esc(l.adCreative.url)}#t=0.1" muted playsinline preload="metadata"></video><span class="lc-ik-crea-play">${ic(I.play)}</span>` : `<img src="${esc(l.adCreative.url)}" alt="">`}</div><span class="lc-ik-crea-lbl">${ic(I.image)}Креатив объявления · открыть</span></div>` : '';
   const plan = resolveContactPlan(l);
   const fromForm = ['meta_form', 'ctwa', 'landing', 'meta', 'google', 'tiktok', 'yandex', 'avito'].includes(l.source) || (l.tags || []).includes('интегратор');
   const sched = (l.scheduled || []).filter(s => s.status === 'pending');
@@ -5264,8 +5264,20 @@ function buildIntakeCard(l) {
     ${schedRow}
   </div>`;
 }
+/* попап-просмотр креатива с кастомным минималистичным плеером */
+function openCreativeView(url, type) {
+  if (!url) return;
+  modal({
+    title: 'Креатив объявления', wide: 'card', favicon: '',
+    body: `<div class="crea-view">${type === 'video'
+      ? `<video src="${esc(url)}" controls autoplay playsinline controlslist="nodownload" style="width:100%;max-height:74vh;border-radius:14px;background:#000;display:block"></video>`
+      : `<img src="${esc(url)}" alt="креатив" style="width:100%;border-radius:14px;display:block">`}</div>`,
+    actions: [{ label: 'Закрыть' }],
+  });
+}
 /* обработчики карточки заявки — общие для карточки лида и панели «Диалоги» (scope — контейнер, done — колбэк после изменения) */
 function wireIntakeCard(scope, l, done) {
+  if (scope) $$('[data-creaview]', scope).forEach(el2 => el2.addEventListener('click', () => openCreativeView(el2.dataset.creaview, el2.dataset.creatype)));
   if (!scope) return;
   $('[data-cprefemail]', scope)?.addEventListener('click', () => { const em = ((l.contacts || []).find(c => c.kind === 'email') || {}).value || l.email || ''; if (em) window.open('mailto:' + em, '_blank'); else toast('E-mail не найден', 'В карточке нет адреса', false); });
   $('[data-plancall]', scope)?.addEventListener('click', () => scheduleCall(l, done));
@@ -8873,7 +8885,7 @@ PAGES.ads = async (root) => {
      после fetch, без fade всего #content → экран не мигает (старый контент держится до новых данных). */
   $$('[data-anasub]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaSub = b.dataset.anasub; render._silent = true; render(); }));
   $$('[data-geogroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaGeoGroup = b.dataset.geogroup; render._silent = true; render(); }));
-  $$('[data-creaview]', root).forEach(el2 => el2.addEventListener('click', () => { const url = el2.dataset.creaview, ty = el2.dataset.creatype; modal({ title: 'Креатив объявления', wide: 'card', body: `<div class="crea-view">${ty === 'video' ? `<video src="${esc(url)}" controls autoplay playsinline style="width:100%;max-height:70vh;border-radius:12px;background:#000"></video>` : `<img src="${esc(url)}" alt="креатив" style="width:100%;border-radius:12px">`}</div>`, actions: [{ label: 'Закрыть' }] }); }));
+  $$('[data-creaview]', root).forEach(el2 => el2.addEventListener('click', () => openCreativeView(el2.dataset.creaview, el2.dataset.creatype)));
   $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render._silent = true; render(); }));
   $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
