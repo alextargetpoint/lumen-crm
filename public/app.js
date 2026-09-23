@@ -14996,38 +14996,35 @@ PAGES.billing = async (root) => {
       <div>
         <!-- эмулятор-калькулятор: расчёт на команду по рекомендациям -->
         ${(() => {
-          const rt = (u.rates || {});
-          const nWa = +rt.numWaQr || 9, nTg = +rt.numTg || 9, nCloud = +rt.numCloud || 3, nTel = +rt.numTel || 3;
           const brokers = Math.max(1, (STATE.brokers || []).filter(x => x.active !== false).length || 1);
-          /* WA QR и телефония — жёстко 1 номер/брокер; Telegram и Cloud API — своё количество (дефолт 3 и 2) */
-          const CHANS = [
-            { k: 'wa', lbl: 'WhatsApp (QR)', rate: nWa, mode: 'perBroker', on: true },
-            { k: 'tel', lbl: 'Телефония', rate: nTel, mode: 'perBroker', on: false },
-            { k: 'tg', lbl: 'Telegram', rate: nTg, mode: 'custom', def: 3, on: false },
-            { k: 'cloud', lbl: 'WhatsApp Cloud API', rate: nCloud, mode: 'custom', def: 2, on: false },
-          ];
-          return `<div class="glass card mb sim-card">
-          <div class="card-title">${ic(I.bolt)}Калькулятор на команду<span class="sub">прикиньте расходники по рекомендациям и пополните заранее</span></div>
+          const SEAT = 25, BYO = 10;   /* $/мес: место «под ключ» / аренда номера «на вашем железе» */
+          return `<div class="glass card mb sim-card" data-seat="${SEAT}" data-byo="${BYO}">
+          <div class="card-title">${ic(I.bolt)}Калькулятор мест<span class="sub">выберите формат и число брокеров — посчитаем аренду</span></div>
+          <div class="ed-toggle" style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">
+            <button type="button" class="ed-btn btn" data-ed="managed" style="flex:1;min-width:190px;text-align:left;padding:12px;border:2px solid var(--accent);border-radius:12px">🏭 <b>Под ключ</b><span style="display:block;font-size:11px;opacity:.7">всё на наших серверах · $${SEAT}/место</span></button>
+            <button type="button" class="ed-btn btn" data-ed="byo" style="flex:1;min-width:190px;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px">🔧 <b>На вашем железе</b><span style="display:block;font-size:11px;opacity:.7">ваши Android · $${BYO}/номер</span></button>
+          </div>
           <div class="sim-row">
-            <label class="sim-lbl">Брокеров</label>
+            <label class="sim-lbl" id="edUnitLbl">Брокеров (мест)</label>
             <div class="stepper"><button type="button" class="btn btn-sm" id="simMinus">−</button><span id="simBrokers">${brokers}</span><button type="button" class="btn btn-sm" id="simPlus">+</button></div>
-            <span class="muted" style="font-size:11px">WhatsApp QR и телефония — 1 номер на брокера</span>
+            <span class="muted" id="edUnitHint" style="font-size:11px">1 место = брокер = WhatsApp + Telegram, прогретые</span>
           </div>
-          <div class="sim-chans">
-            ${CHANS.map(c => `<div class="sim-chan-row" data-ch="${c.k}" data-rate="${c.rate}" data-mode="${c.mode}">
-              <label class="sim-chk"><input type="checkbox" class="sim-ch" ${c.on ? 'checked' : ''}><span>${c.lbl}</span></label>
-              <div class="sim-qty">${c.mode === 'perBroker'
-                ? `<span class="sim-qlock">= <b class="sim-q">${brokers}</b> · $${c.rate}/мес</span>`
-                : `<div class="stepper sim-step"><button type="button" class="sim-qm btn btn-sm">−</button><b class="sim-q">${c.def}</b><button type="button" class="sim-qp btn btn-sm">+</button></div><span class="muted" style="font-size:11px">× $${c.rate}/мес</span>`}</div>
-              <div class="sim-c"></div>
-            </div>`).join('')}
-          </div>
-          <div class="sim-out" id="simOut"></div>
+          <div class="sim-out" id="simOut" style="margin-top:12px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
             <button class="btn btn-accent btn-sm" id="simTopup">${ic(I.wallet || I.card)}Пополнить баланс под план</button>
-            <span class="muted" style="font-size:11px;align-self:center">затем купите номера во вкладках канала в «Номера»</span>
+            <span class="muted" style="font-size:11px;align-self:center" id="edCta">оплата криптой (USDT) · номера появятся во вкладке «Номера»</span>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:8px">Аренда номера = покупка на месяц. WhatsApp QR / Telegram — $9, Cloud API / телефония — $3. Метрируемое (ИИ, минуты) — сверх, по факту.</div>
+        </div>
+        <div class="glass card mb ed-facts">
+          <div class="card-title">${ic(I.spark)}Как устроена ферма профилей</div>
+          <div class="ed-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px">
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>📱 Максимум на телефоне</b><div class="muted" style="font-size:12px;margin-top:4px">До <b>3</b> аккаунтов на 1 Android без спец-настройки, до <b>5</b> — с рабочим профилем/клоном. Держим безопасный потолок: бан одного не заденет остальных.</div></div>
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🔥 Прогрев 10–14 дней</b><div class="muted" style="font-size:12px;margin-top:4px">Свежий номер сразу в бой нельзя — забанят. Прогреваем аккаунт под живого пользователя до выдачи.</div></div>
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🛡 1 UK-прокси на номер</b><div class="muted" style="font-size:12px;margin-top:4px">Каждый аккаунт выходит через свой стабильный IP — WhatsApp не видит «ферму».</div></div>
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🔒 Защита от угона</b><div class="muted" style="font-size:12px;margin-top:4px">2FA-PIN + резервная почта на каждом номере — увести аккаунт нельзя.</div></div>
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>♻️ Бан ≠ потеря лидов</b><div class="muted" style="font-size:12px;margin-top:4px">Вся переписка в CRM. При блокировке номер авто-заменяется из тёплого пула — диалоги продолжаются.</div></div>
+            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🏭 Два формата</b><div class="muted" style="font-size:12px;margin-top:4px"><b>Под ключ</b> — всё у нас, вы ничего не настраиваете. <b>На вашем железе</b> — ваши Android, мы даём номера + настройку.</div></div>
+          </div>
         </div>`;
         })()}
 
@@ -15142,36 +15139,34 @@ PAGES.billing = async (root) => {
 
   /* --- взаимодействие --- */
   const reload = async () => { await PAGES.billing(root); };
-  /* эмулятор-калькулятор на команду: WA QR + телефония = 1/брокер; Telegram + Cloud API = своё количество */
+  /* калькулятор мест: две редакции — «Под ключ» ($25/место) и «На вашем железе» ($10/номер) */
   (() => {
     const card = $('.sim-card', root); if (!card) return;
-    const CHN = { wa: 'WhatsApp (QR)', tg: 'Telegram', cloud: 'WhatsApp Cloud API', tel: 'Телефония' };
-    let monthly = 0;
+    const SEAT = +card.dataset.seat || 25, BYO = +card.dataset.byo || 10;
+    let ed = 'managed', monthly = 0;
     const brokersNow = () => Math.max(1, +($('#simBrokers', root).textContent) || 1);
     const recalc = () => {
-      const brokers = brokersNow();
-      const rows = []; let numbers = 0; monthly = 0;
-      $$('.sim-chan-row', root).forEach(row => {
-        const ck = row.querySelector('.sim-ch'); const rate = +row.dataset.rate; const mode = row.dataset.mode; const k = row.dataset.ch;
-        const qEl = row.querySelector('.sim-q');
-        let qty = mode === 'perBroker' ? brokers : Math.max(1, +qEl.textContent || 1);
-        if (mode === 'perBroker' && qEl) qEl.textContent = brokers;   /* синк с брокерами */
-        const cEl = row.querySelector('.sim-c');
-        if (!ck.checked) { if (cEl) cEl.textContent = ''; return; }
-        const cost = qty * rate; numbers += qty; monthly += cost;
-        if (cEl) cEl.textContent = moneyC(cost);
-        rows.push(`<div class="bc-line"><div class="bc-line-l"><b>${CHN[k]}</b><span>${qty} × $${rate}/мес</span></div><div class="bc-line-c">${moneyC(cost)}</div></div>`);
-      });
-      const out = $('#simOut', root);
-      out.innerHTML = rows.length ? `${rows.join('')}<div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда номеров / мес (${numbers} ${plural(numbers, 'номер', 'номера', 'номеров')})</span><b>${moneyC(monthly)}</b></div>` : `<div class="muted" style="font-size:12px;padding:8px 0">Отметьте хотя бы один канал.</div>`;
+      const n = brokersNow();
+      if (ed === 'managed') {
+        monthly = n * SEAT;
+        $('#simOut', root).innerHTML = `<div class="bc-line"><div class="bc-line-l"><b>${n} ${plural(n, 'место', 'места', 'мест')} под ключ</b><span>${n} × $${SEAT}/мес · WhatsApp+Telegram, прогрев, прокси, keep-alive</span></div><div class="bc-line-c">${moneyC(monthly)}</div></div><div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда / мес</span><b>${moneyC(monthly)}</b></div>`;
+      } else {
+        monthly = n * BYO;
+        const ph3 = Math.ceil(n / 3), ph5 = Math.ceil(n / 5);
+        $('#simOut', root).innerHTML = `<div class="bc-line"><div class="bc-line-l"><b>${n} ${plural(n, 'номер', 'номера', 'номеров')} на вашем железе</b><span>${n} × $${BYO}/мес · номер + настройка (WhatsApp+Telegram)</span></div><div class="bc-line-c">${moneyC(monthly)}</div></div><div class="bc-sum-row bc-forecast" style="margin-top:8px"><span>Аренда / мес</span><b>${moneyC(monthly)}</b></div><div class="muted" style="font-size:12px;margin-top:8px">Понадобится ваших Android: <b>${ph5}–${ph3}</b> (по 5 с настройкой / по 3 без). Поможем настроить.</div>`;
+      }
     };
+    $$('.ed-btn', root).forEach(b => b.addEventListener('click', () => {
+      ed = b.dataset.ed;
+      $$('.ed-btn', root).forEach(x => { x.style.border = '1px solid var(--line)'; });
+      b.style.border = '2px solid var(--accent)';
+      $('#edUnitLbl', root).textContent = ed === 'managed' ? 'Брокеров (мест)' : 'Номеров';
+      $('#edUnitHint', root).textContent = ed === 'managed' ? '1 место = брокер = WhatsApp + Telegram, прогретые' : '1 номер = WhatsApp + Telegram · до 3–5 на один Android';
+      recalc();
+    }));
     $('#simMinus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = Math.max(1, (+s.textContent) - 1); recalc(); });
     $('#simPlus', root)?.addEventListener('click', () => { const s = $('#simBrokers', root); s.textContent = (+s.textContent) + 1; recalc(); });
-    $$('.sim-ch', root).forEach(ck => ck.addEventListener('change', recalc));
-    /* счётчики количества для настраиваемых каналов (Telegram / Cloud API) */
-    $$('.sim-chan-row [data-mode="custom"] .sim-qm, .sim-chan-row .sim-qm', root).forEach(b => b.addEventListener('click', () => { const q = b.parentElement.querySelector('.sim-q'); q.textContent = Math.max(1, (+q.textContent) - 1); recalc(); }));
-    $$('.sim-chan-row .sim-qp', root).forEach(b => b.addEventListener('click', () => { const q = b.parentElement.querySelector('.sim-q'); q.textContent = (+q.textContent) + 1; recalc(); }));
-    $('#simTopup', root)?.addEventListener('click', () => { if (monthly < 5) { toast('Отметьте каналы', 'План пустой или меньше $5'); return; } openTopupCrypto({ purpose: 'consumables', presetAmount: Math.ceil(monthly) }); });
+    $('#simTopup', root)?.addEventListener('click', () => { if (monthly < 5) { toast('Мало', 'Минимум $5'); return; } openTopupCrypto({ purpose: 'consumables', presetAmount: Math.ceil(monthly) }); });
     recalc();
   })();
   /* симулятор метрируемых расходников по объёму лидов */
