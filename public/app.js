@@ -14943,11 +14943,29 @@ PAGES.billing = async (root) => {
     </div>`;
 
   root.innerHTML = `
+    <div class="glass card mb bill-buckets" style="padding:18px 20px">
+      <div class="card-title">${ic(I.wallet || I.card)}Из чего складываются расходы<span class="sub">три отдельные статьи — платятся по-разному</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden">
+        ${[
+          ['01', 'Платформа', 'Подписка за CRM — фиксированная плата за доступ, не зависит от объёма.', 'Оплата: карта, счёт или крипта', 'раздел «Тариф» ниже'],
+          ['02', 'Расходники', 'Аренда номеров + ИИ-обработка, минуты телефонии и транскрибация — по факту использования.', 'Предоплата криптой (USDT) на баланс', 'калькулятор и баланс ниже'],
+          ['03', 'WhatsApp Cloud API', 'Сообщения через официальный Cloud API тарифицирует Meta по разговорам.', 'Напрямую с вашей карты в Meta', 'не влияет на баланс'],
+        ].map(([n, name, what, pay, where], i) => `<div style="padding:16px 18px;${i < 2 ? 'border-right:1px solid var(--line);' : ''}position:relative">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:'Cormorant',Georgia,serif;font-size:26px;line-height:1;color:var(--accent);opacity:.55">${n}</span>
+            <b style="font-size:15px">${name}</b>
+          </div>
+          <div class="muted" style="font-size:12px;line-height:1.5;margin:8px 0 10px">${what}</div>
+          <div style="font-size:11.5px;font-weight:600;color:var(--ink-2,#57544e)">${pay}</div>
+          <div style="font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3,#8b8983);margin-top:3px">${where}</div>
+        </div>`).join('')}
+      </div>
+    </div>
     <div class="two-col">
       <div>
         <!-- статус подписки -->
         <div class="glass card mb bill-status">
-          <div class="card-title">${ic(I.card)}Ваша подписка</div>
+          <div class="card-title">${ic(I.card)}<span style="font-family:'Cormorant',Georgia,serif;font-size:12px;color:var(--accent);opacity:.6;margin-right:6px">01</span>Ваша подписка<span class="sub">платформа · фиксированная</span></div>
           <div class="bill-hero">
             <div>
               <div class="bh-plan">${q.name || '—'}</div>
@@ -15017,20 +15035,27 @@ PAGES.billing = async (root) => {
         </div>
         <div class="glass card mb ed-facts">
           <div class="card-title">${ic(I.spark)}Как устроена ферма профилей</div>
-          <div class="ed-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px">
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>📱 Максимум на телефоне</b><div class="muted" style="font-size:12px;margin-top:4px">До <b>3</b> аккаунтов на 1 Android без спец-настройки, до <b>5</b> — с рабочим профилем/клоном. Держим безопасный потолок: бан одного не заденет остальных.</div></div>
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🔥 Прогрев 10–14 дней</b><div class="muted" style="font-size:12px;margin-top:4px">Свежий номер сразу в бой нельзя — забанят. Прогреваем аккаунт под живого пользователя до выдачи.</div></div>
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🛡 1 UK-прокси на номер</b><div class="muted" style="font-size:12px;margin-top:4px">Каждый аккаунт выходит через свой стабильный IP — WhatsApp не видит «ферму».</div></div>
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🔒 Защита от угона</b><div class="muted" style="font-size:12px;margin-top:4px">2FA-PIN + резервная почта на каждом номере — увести аккаунт нельзя.</div></div>
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>♻️ Бан ≠ потеря лидов</b><div class="muted" style="font-size:12px;margin-top:4px">Вся переписка в CRM. При блокировке номер авто-заменяется из тёплого пула — диалоги продолжаются.</div></div>
-            <div style="border:1px solid var(--line);border-radius:12px;padding:12px"><b>🏭 Два формата</b><div class="muted" style="font-size:12px;margin-top:4px"><b>Под ключ</b> — всё у нас, вы ничего не настраиваете. <b>На вашем железе</b> — ваши Android, мы даём номера + настройку.</div></div>
+          <div class="ed-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px">
+            ${[
+              ['Ёмкость', 'Максимум на телефоне', 'До <b>3</b> аккаунтов на одном Android без спец-настройки, до <b>5</b> — с рабочим профилем. Держим безопасный потолок: блокировка одного не заденет остальных.'],
+              ['Прогрев', '10–14 дней перед выдачей', 'Свежий номер сразу в работу нельзя — заблокируют. Прогреваем аккаунт под живого пользователя до передачи вам.'],
+              ['Сеть', 'Отдельный UK-прокси', 'Каждый аккаунт выходит через собственный стабильный IP — платформа не видит «ферму».'],
+              ['Защита', 'Аккаунт закреплён за вами', 'Двухфакторный PIN и резервная почта на каждом номере — перехватить аккаунт невозможно.'],
+              ['Устойчивость', 'Блокировка ≠ потеря лидов', 'Вся переписка хранится в CRM. При блокировке номер автоматически заменяется из тёплого пула — диалоги продолжаются.'],
+              ['Форматы', 'Под ключ или на вашем железе', '<b>Под ключ</b> — всё на наших серверах, вы ничего не настраиваете. <b>На вашем железе</b> — ваши Android, мы предоставляем номера и настройку.'],
+            ].map(([cat, title, body]) => `<div style="border:1px solid var(--line);border-radius:14px;padding:16px;position:relative;overflow:hidden">
+              <div style="position:absolute;left:0;top:16px;bottom:16px;width:2px;border-radius:2px;background:var(--accent);opacity:.55"></div>
+              <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);opacity:.75;font-weight:600;margin-bottom:7px">${cat}</div>
+              <div style="font-weight:600;font-size:14px;line-height:1.3">${title}</div>
+              <div class="muted" style="font-size:12px;margin-top:6px;line-height:1.5">${body}</div>
+            </div>`).join('')}
           </div>
         </div>`;
         })()}
 
         <!-- баланс расходников (предоплата криптой) -->
         <div class="glass card mb bal-card">
-          <div class="card-title">${ic(I.wallet || I.card)}Баланс расходников<span class="sub">предоплата · пополнение только криптой (USDT)</span></div>
+          <div class="card-title">${ic(I.wallet || I.card)}<span style="font-family:'Cormorant',Georgia,serif;font-size:12px;color:var(--accent);opacity:.6;margin-right:6px">02</span>Баланс расходников<span class="sub">аренда номеров + ИИ/минуты · предоплата криптой (USDT)</span></div>
           <div class="bal-hero">
             <div class="bal-amt ${(B.balance || 0) > 0 ? 'pos' : ''}">${moneyC(B.balance || 0)}</div>
             <button class="btn btn-accent" id="topupCrypto">${ic(I.plus || I.bolt)}Пополнить криптой</button>
@@ -15083,7 +15108,7 @@ PAGES.billing = async (root) => {
 
           <!-- ГРУППА B: карта Meta (WhatsApp Cloud API) -->
           <div class="bc-group" style="margin-top:14px">
-            <div class="bc-group-h">${ic(I.card)}<span>Оплачивается <b>вашей картой в Meta</b> (WhatsApp Cloud API)</span></div>
+            <div class="bc-group-h">${ic(I.card)}<span style="font-family:'Cormorant',Georgia,serif;font-size:12px;color:var(--accent);opacity:.6;margin-right:4px">03</span><span>Оплачивается <b>вашей картой в Meta</b> (WhatsApp Cloud API)</span></div>
             <div class="bc-line">
               <div class="bc-line-l"><b>Сообщения WhatsApp Cloud API</b><span>тарифицирует Meta по разговорам</span></div>
               <div class="bc-line-c muted">не с баланса</div>
