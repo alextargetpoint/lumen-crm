@@ -14,7 +14,7 @@ const store = require('./store');
 
 /* дефолты юнит-экономики (доллары/мес на номер), обсуждено с основателем */
 const DEFAULTS = {
-  costs: { numberRent: 6, proxy: 2, infra: 1, idleKeepWarm: 6 }, /* $/мес: аренда номера, UK-прокси, облако; простой=тёплый */
+  costs: { numberRent: 7, proxy: 2, infra: 1, idleKeepWarm: 7 }, /* $/мес: аренда номера (Yesim UK month=$7; wholesale для объёма ниже), UK-прокси, облако; простой=тёплый */
   seatPrice: 25,        /* $/мес за место (managed-тариф) */
   capexPerPhone: 130,   /* $ разово за реф. Android */
   maxPerDevice: 5,      /* безопасный потолок аккаунтов на телефон */

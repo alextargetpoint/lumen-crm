@@ -40,13 +40,15 @@ async function esimAcquire(country) {
   country = (country || 'gb').toLowerCase();
   if (yesimReady()) {
     try {
-      /* params-ключи (country/service/subscription) подтвердим на whitelist-запросе */
-      const j = await yesimCall('purchase_number', { country, service: 'telegram' });
-      if (j.error) return { error: j.error };
-      const num = j.number || j.msisdn || (j.data && (j.data.number || j.data.msisdn));
-      const id = j.id || j.number_id || (j.data && (j.data.id || j.data.number_id));
+      /* ⚠️точный ключ country у purchase_number уточняется у Yesim (get_subscription_options берёт params.country,
+         а purchase_number на все варианты отвечал «Missing country» — финализируем при пополнении баланса).
+         Ответ покупки → data.did_number (он же ref для get_sms). */
+      const j = await yesimCall('purchase_number', { country: (country || 'gb').toUpperCase(), subscription_option: 'month' });
+      if (j.error || j.status === 'false') return { error: j.error || 'purchase failed' };
+      const d = j.data || j;
+      const num = d.did_number || d.number || d.msisdn;
       if (!num) return { error: 'yesim не вернул номер', raw: j };
-      return { phone: String(num).startsWith('+') ? String(num) : '+' + String(num), ref: String(id || ''), provider: 'yesim' };
+      return { phone: String(num).startsWith('+') ? String(num) : '+' + String(num), ref: String(num).replace(/^\+/, ''), provider: 'yesim' };
     } catch (e) { return { error: e.message }; }
   }
   const c = esimCfg();
@@ -64,12 +66,14 @@ async function esimOtp(ref) {
   if (!ref) return { manual: true };
   if (yesimReady()) {
     try {
-      const j = await yesimCall('get_sms', { number_id: ref, id: ref });
-      if (j.error) return { error: j.error };
-      const arr = Array.isArray(j) ? j : (j.sms || j.messages || (j.data && (j.data.sms || j.data.messages)) || []);
-      const texts = (Array.isArray(arr) ? arr : []).map(m => (m.text || m.message || m.body || m.sms || '')).join(' ');
-      const code = (texts.match(/\b(\d{4,8})\b/) || [])[1];
-      return code ? { code } : { pending: true };
+      /* подтверждено вживую: params.did_number → data.sms[].message ("Telegram code: 12345" / "Your WhatsApp code: 123-456") */
+      const j = await yesimCall('get_sms', { did_number: String(ref).replace(/^\+/, '') });
+      if (j.error || j.status === 'false') return { error: j.error || 'get_sms failed' };
+      const arr = (j.data && j.data.sms) || j.sms || [];
+      /* берём самое свежее сообщение */
+      const texts = (Array.isArray(arr) ? arr : []).map(m => (m.message || m.text || m.body || '')).join(' ');
+      const code = (texts.match(/code[:\s]*([\d-]{4,9})/i) || texts.match(/\b(\d{4,8})\b/) || [])[1];
+      return code ? { code: String(code).replace(/\D/g, '') } : { pending: true };
     } catch (e) { return { error: e.message }; }
   }
   const c = esimCfg();
