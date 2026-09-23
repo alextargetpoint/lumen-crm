@@ -136,6 +136,8 @@ const billing = require('./billing');
 const simbye = require('./simbye'); /* ⭐ ферма номеров: скрейпер Simbye (OTP/детект/продление) + вотчдог/сигналы */
 const b2backup = require('./backup'); /* ⭐ офф-сайт бэкапы всех агентств в Backblaze B2 (защита от гибели тома) */
 const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Telegram: устройства/номера/прокси/выдача агентствам + юнит-экономика */
+const farmProv = require('./farm-provision'); /* Р2: конвейер провижна (eSIM-адаптер + задания фарм-хост-агенту) */
+const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
@@ -5505,6 +5507,25 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/failover' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.failover(b.id); adminLog('farm.failover', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/wipe' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.wipeSlot(b.id, !!b.release); adminLog('farm.wipe', { id: b.id, release: !!b.release }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/settings' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const s = farmSvc.setSettings(b); return json(res, 200, { ok: true, settings: s }); }
+
+      /* Р2 — провижн */
+      if (p === '/api/admin/farm/provision-enqueue' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmProv.enqueue(b.deviceId, b.count, b.slot); adminLog('farm.prov.enqueue', { deviceId: b.deviceId, count: b.count }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/provision-acquire' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = await farmProv.stepAcquire(b.id); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/provision-status' && req.method === 'GET') { return json(res, 200, { ok: true, esimReady: farmProv.esimReady(), provider: farmProv.esimCfg().provider, jobs: farmProv.agentJobs() }); }
+      if (p === '/api/admin/farm/agent-jobs' && req.method === 'GET') { return json(res, 200, { ok: true, jobs: farmProv.agentJobs() }); }
+      if (p === '/api/admin/farm/agent-otp' && req.method === 'GET') { const ref = u.searchParams.get('ref') || ''; const r = await farmProv.esimOtp(ref); return json(res, 200, r); }
+      if (p === '/api/admin/farm/agent-report' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmProv.agentReport(b.id, b.patch || b); return json(res, r.error ? 400 : 200, r); }
+
+      /* Р3 — прогрев */
+      if (p === '/api/admin/farm/warmup-enroll' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmWarm.enroll(b.id); adminLog('farm.warm.enroll', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/warmup-tick' && req.method === 'POST') { const r = farmWarm.tick(); return json(res, 200, { ok: true, ...r }); }
+      if (p === '/api/admin/farm/warmup-summary' && req.method === 'GET') { return json(res, 200, { ok: true, ...farmWarm.summary() }); }
+
+      /* Р4 — шоп мест */
+      if (p === '/api/admin/farm/seat-order' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); if (!b.tid) return json(res, 400, { error: 'нужен tid агентства' }); const o = farmSvc.createSeatOrder(b.tid, b.seats, b.note); adminLog('farm.seat.order', { tid: b.tid, seats: b.seats }); return json(res, 200, { ok: true, order: o }); }
+      if (p === '/api/admin/farm/seat-fulfill' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.fulfillSeatOrder(b.orderId); adminLog('farm.seat.fulfill', { orderId: b.orderId }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/seat-orders' && req.method === 'GET') { return json(res, 200, { ok: true, orders: farmSvc.listSeatOrders(u.searchParams.get('tid') || null) }); }
+      if (p === '/api/admin/farm/agency-release' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.releaseAgency(b.tid); adminLog('farm.agency.release', { tid: b.tid }); return json(res, 200, r); }
       /* СКВОЗНАЯ ПРОВЕРКА офф-сайт бэкапа B2: снять→выгрузить→скачать обратно→расшифровать→сверить */
       if (p === '/api/admin/backup/verify' && (req.method === 'POST' || req.method === 'GET')) {
         const st = { enabled: b2backup.enabled(), bucket: b2backup.CFG.bucket, encrypted: !!b2backup.CFG.encKey };

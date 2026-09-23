@@ -30,6 +30,7 @@ function farm() {
   f.devices = f.devices || [];
   f.proxies = f.proxies || [];
   f.numbers = f.numbers || [];
+  f.seatOrders = f.seatOrders || [];
   f.log = f.log || [];
   return f;
 }
@@ -234,6 +235,48 @@ function seedReal() {
   return { ok: true, device: dev.id, numbers: f.numbers.length };
 }
 
+/* ---------- шоп мест (Р4): агентство арендует места помесячно ---------- */
+function poolReady() { return farm().numbers.filter(n => !n.agencyTid && n.wa.status === 'ready'); }
+
+function createSeatOrder(tid, seats, note) {
+  const f = farm();
+  seats = Math.max(1, +seats || 1);
+  const o = { id: nid('so'), tid, seats, status: 'pending', priceMo: f.settings.seatPrice * seats, createdAt: Date.now(), paidAt: null, allocated: [], autoRenew: true, note: note || '' };
+  f.seatOrders.unshift(o); flog('seat.order', { orderId: o.id, tid, seats }); persist();
+  return o;
+}
+function listSeatOrders(tid) { const f = farm(); return tid ? f.seatOrders.filter(o => o.tid === tid) : f.seatOrders; }
+
+/* оплатить/выполнить заказ: выделить N готовых номеров из пула и выдать агентству */
+function fulfillSeatOrder(orderId) {
+  const f = farm();
+  const o = f.seatOrders.find(x => x.id === orderId);
+  if (!o) return { error: 'заказ не найден' };
+  if (o.status === 'active') return { error: 'заказ уже выполнен' };
+  const ready = poolReady();
+  if (ready.length < o.seats) return { error: `в пуле только ${ready.length} готовых номеров из ${o.seats} — догрейте/добавьте` };
+  o.allocated = [];
+  for (let i = 0; i < o.seats; i++) {
+    const n = ready[i];
+    n.agencyTid = o.tid; n.assignedAt = Date.now();
+    if (n.wa.status === 'ready') n.wa.status = 'assigned';
+    if (n.tg.status === 'ready') n.tg.status = 'assigned';
+    o.allocated.push(n.id);
+  }
+  o.status = 'active'; o.paidAt = Date.now();
+  flog('seat.fulfill', { orderId, tid: o.tid, seats: o.seats }); persist();
+  return { ok: true, order: o };
+}
+
+/* оффбординг: агентство ушло — вернуть все его номера в пул */
+function releaseAgency(tid) {
+  const f = farm(); let n = 0;
+  for (const num of f.numbers) if (num.agencyTid === tid) { revoke(num.id); n++; }
+  f.seatOrders.forEach(o => { if (o.tid === tid && o.status === 'active') o.status = 'ended'; });
+  flog('seat.releaseAgency', { tid, freed: n }); persist();
+  return { ok: true, freed: n };
+}
+
 module.exports = {
   farm, economics, seedReal,
   addDevice, removeDevice,
@@ -241,4 +284,5 @@ module.exports = {
   addNumber, findNumber, updateNumber,
   assign, revoke, failover, wipeSlot,
   setSettings,
+  poolReady, createSeatOrder, listSeatOrders, fulfillSeatOrder, releaseAgency,
 };
