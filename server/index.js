@@ -135,6 +135,7 @@ const academy = require('./academy'); /* Академия продаж (мето
 const billing = require('./billing');
 const simbye = require('./simbye'); /* ⭐ ферма номеров: скрейпер Simbye (OTP/детект/продление) + вотчдог/сигналы */
 const b2backup = require('./backup'); /* ⭐ офф-сайт бэкапы всех агентств в Backblaze B2 (защита от гибели тома) */
+const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Telegram: устройства/номера/прокси/выдача агентствам + юнит-экономика */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
@@ -5484,6 +5485,26 @@ const server = http.createServer(async (req, res) => {
         return { tid, name: (d.settings.agency && d.settings.agency.name) || meta.name || tid, ownerEmail: meta.ownerEmail || (d.settings.auth && d.settings.auth.ownerEmail) || '', plan: meta.plan || 'trial', verified: meta.verified !== false, suspended: !!meta.suspended, onboarded: !!(d.settings.agency && d.settings.agency.onboarded), createdAt: meta.createdAt || 0, lastActivity, sleeping: lastActivity > 0 && (Date.now() - lastActivity) > 7 * 864e5, leads: (d.leads || []).length, brokers: (d.brokers || []).filter(b => b.active !== false).length, numbers: ((d.settings.waGray && d.settings.waGray.numbers) || []).length };
       });
       if (p === '/api/admin/tenants' && req.method === 'GET') return json(res, 200, { ok: true, tenants: store.listTenants().map(tenantStat), plans: PLANS });
+
+      /* ⭐ ФЕРМА НОМЕРОВ (WhatsApp + Telegram) — глобальный ресурс платформы */
+      if (p === '/api/admin/farm/state' && req.method === 'GET') {
+        const f = farmSvc.farm();
+        const agencies = store.listTenants().map(tid => { const s = tenantStat(tid); return { tid, name: s.name }; });
+        return json(res, 200, { ok: true, farm: f, econ: farmSvc.economics(), agencies });
+      }
+      if (p === '/api/admin/farm/seed' && req.method === 'POST') { const r = farmSvc.seedReal(); adminLog('farm.seed', r); return json(res, 200, { ok: true, ...r }); }
+      if (p === '/api/admin/farm/device' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const d = farmSvc.addDevice(b); adminLog('farm.device.add', { id: d.id }); return json(res, 200, { ok: true, device: d }); }
+      if (p === '/api/admin/farm/device-remove' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmSvc.removeDevice(b.id)); }
+      if (p === '/api/admin/farm/proxy' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const px = farmSvc.addProxy(b); return json(res, 200, { ok: true, proxy: px }); }
+      if (p === '/api/admin/farm/proxy-remove' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmSvc.removeProxy(b.id)); }
+      if (p === '/api/admin/farm/proxy-attach' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const n = farmSvc.attachProxy(b.numberId, b.proxyId); return json(res, 200, { ok: !!n, number: n }); }
+      if (p === '/api/admin/farm/number' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); if (!b.phone) return json(res, 400, { error: 'нужен номер' }); const n = farmSvc.addNumber(b); adminLog('farm.number.add', { id: n.id, phone: n.phone }); return json(res, 200, { ok: true, number: n }); }
+      if (p === '/api/admin/farm/number-update' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const n = farmSvc.updateNumber(b.id, b.patch || {}); return json(res, 200, { ok: !!n, number: n }); }
+      if (p === '/api/admin/farm/assign' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.assign(b.id, b.agencyTid, b.brokerId, b.displayName); adminLog('farm.assign', { id: b.id, tid: b.agencyTid }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/revoke' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.revoke(b.id); adminLog('farm.revoke', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/failover' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.failover(b.id); adminLog('farm.failover', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/wipe' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.wipeSlot(b.id, !!b.release); adminLog('farm.wipe', { id: b.id, release: !!b.release }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/settings' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const s = farmSvc.setSettings(b); return json(res, 200, { ok: true, settings: s }); }
       /* СКВОЗНАЯ ПРОВЕРКА офф-сайт бэкапа B2: снять→выгрузить→скачать обратно→расшифровать→сверить */
       if (p === '/api/admin/backup/verify' && (req.method === 'POST' || req.method === 'GET')) {
         const st = { enabled: b2backup.enabled(), bucket: b2backup.CFG.bucket, encrypted: !!b2backup.CFG.encKey };
