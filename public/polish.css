@@ -71,6 +71,14 @@ input:focus, textarea:focus, select:focus {
 /* ── ЗАГОЛОВКИ РАЗДЕЛОВ: чуть больше воздуха и характера ── */
 .page-title { letter-spacing: .005em; }
 
+/* ── АТЕЛЬЕ: крупные числа-герои — серифные (Cormorant), тихая роскошь ── */
+.bal-amt, .cff-v, .ovx-kc-v, .cnt {
+  font-family: 'Cormorant', Georgia, serif !important;
+  font-weight: 500; letter-spacing: .01em;
+}
+/* заголовки кастомных карточек — чуть теплее и с воздухом */
+.card-title { letter-spacing: .12em; }
+
 /* ── СМЕНА РАЗДЕЛА: мягкое проявление контента (тонко, не мешает ре-рендеру) ── */
 @media (prefers-reduced-motion: no-preference) {
   #app .page-title { animation: polFade .4s var(--pol-ease) both; }
