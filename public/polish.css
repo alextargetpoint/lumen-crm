@@ -8,7 +8,14 @@
   --pol-sh-2: 0 6px 18px rgba(20, 19, 17, .08), 0 16px 40px rgba(20, 19, 17, .10);
   --pol-accent-soft: color-mix(in srgb, var(--accent, #1a1815) 8%, transparent);
   --pol-accent-line: color-mix(in srgb, var(--accent, #1a1815) 16%, transparent);
+  /* ── фирменное шампань-золото «Ателье» (акценты, не заливка) ── */
+  --gold: #c9a25a;
+  --gold-soft: #d6c7a8;
+  --pol-gold-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --pol-gold-glow: 0 0 26px -10px color-mix(in srgb, var(--gold) 65%, transparent);
 }
+/* золотую тень карточек чуть теплее */
+.ov-w:hover, .ovx-kcard:hover { box-shadow: var(--pol-sh-2), 0 0 0 1px var(--pol-gold-line); }
 
 /* ── КАРТОЧКИ: глубина + мягкий подъём при наведении ── */
 .ov-w, .card, .glass, .ovx-kcard {
@@ -33,7 +40,9 @@
 .nav-item.active { background: color-mix(in srgb, var(--accent, #1a1815) 11%, transparent); }
 .nav-item.active::before {
   content: ''; position: absolute; left: 3px; top: 22%; bottom: 22%;
-  width: 3px; border-radius: 3px; background: var(--accent, #1a1815);
+  width: 3px; border-radius: 3px;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--gold) 60%, transparent);
   animation: polBar .32s var(--pol-ease) both;
 }
 @keyframes polBar { from { transform: scaleY(0); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
@@ -44,15 +53,19 @@
 }
 .btn:hover { transform: translateY(-1px); filter: brightness(1.03); }
 .btn:active { transform: translateY(0) scale(.975); }
-.btn:focus-visible { outline: 2px solid var(--pol-accent-line); outline-offset: 2px; }
-.btn-accent:hover { box-shadow: 0 6px 18px color-mix(in srgb, var(--accent, #1a1815) 28%, transparent); }
+.btn:focus-visible { outline: 2px solid var(--pol-gold-line); outline-offset: 2px; }
+.btn-accent:hover { box-shadow: 0 6px 18px color-mix(in srgb, var(--accent, #1a1815) 24%, transparent), var(--pol-gold-glow); }
+
+/* выделенные чипы/табы — тёплая золотая рамка вместо жёсткой чёрной */
+.chip-t.on, .bill-plan.on, .tab.on, [class*="chip"].on { border-color: var(--pol-gold-line) !important; }
 
 /* ── ПОЛЯ ВВОДА: плавный фокус с мягким кольцом ── */
 input, textarea, select {
   transition: border-color .2s var(--pol-ease), box-shadow .2s var(--pol-ease), background .2s var(--pol-ease);
 }
 input:focus, textarea:focus, select:focus {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #1a1815) 13%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent);
+  border-color: var(--pol-gold-line) !important;
 }
 
 /* ── ЗАГОЛОВКИ РАЗДЕЛОВ: чуть больше воздуха и характера ── */
