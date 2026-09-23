@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Cormorant:ital,wght@0,400;0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
 <style>
   /* ── светлое «Ателье»: порцелан + сериф + шампань-золото ── */
-  :root { --bg:#f3f1ec; --card:#faf9f5; --card-2:#fffdf9; --line:rgba(20,19,17,.12); --line-soft:rgba(20,19,17,.07); --ink:#141311; --ink-2:#57544e; --mut:#8b8983; --acc:#1a1815; --gold:#c9a25a; --gold-soft:#d6c7a8; --good:#3f9d5a; --bad:#c2544b; --shadow:0 1px 2px rgba(20,19,17,.04),0 8px 26px rgba(20,19,17,.07); --ease:cubic-bezier(.22,.61,.36,1); }
+  :root { --bg:#e8e4db; --card:#fffdf9; --card-2:#ffffff; --line:rgba(20,19,17,.17); --line-soft:rgba(20,19,17,.10); --ink:#141311; --ink-2:#4a4740; --mut:#6f6c65; --acc:#1a1815; --gold:#b8863c; --gold-soft:#c9a25a; --good:#2f8f4e; --bad:#bf4a41; --shadow:0 1px 2px rgba(20,19,17,.06),0 10px 30px -8px rgba(20,19,17,.14); --shadow-lg:0 2px 6px rgba(20,19,17,.08),0 24px 56px -18px rgba(20,19,17,.24); --ease:cubic-bezier(.22,.61,.36,1); }
   * { box-sizing:border-box; }
   body { margin:0; font-family:'Manrope',system-ui,sans-serif; background:radial-gradient(1100px 640px at 50% -8%,#fbfaf7,transparent),var(--bg); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
   a { color:var(--gold); }
@@ -53,6 +53,33 @@
   @keyframes secIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
   #campOut { margin-top:10px; font-size:12.5px; max-height:200px; overflow:auto; }
   ::-webkit-scrollbar { width:10px;height:10px } ::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--ink) 18%,transparent); border-radius:10px; border:2px solid transparent; background-clip:padding-box }
+  /* ── контраст + структура ── */
+  .card { box-shadow:var(--shadow-lg); }
+  .card > b:first-child { font-size:15px; letter-spacing:.02em; display:inline-block; }
+  tbody tr:nth-child(even) { background:color-mix(in srgb,var(--ink) 3.5%,transparent); }
+  tbody tr:hover { background:color-mix(in srgb,var(--gold) 9%,transparent); }
+  td { font-size:13.5px; } td b { font-weight:600; color:var(--ink); }
+  .num-cell { font-family:'Cormorant',Georgia,serif; font-size:19px; font-weight:500; }
+  /* панель инструментов */
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:16px 0 4px; }
+  .search { position:relative; flex:1; min-width:240px; }
+  .search input { margin:0; padding-left:36px; background:var(--card-2); height:40px; }
+  .search svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--mut); pointer-events:none; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { cursor:pointer; font-size:12px; font-weight:600; padding:8px 13px; border-radius:999px; border:1px solid var(--line); background:var(--card-2); color:var(--ink-2); transition:.16s var(--ease); white-space:nowrap; }
+  .chip:hover { border-color:color-mix(in srgb,var(--gold) 50%,transparent); transform:translateY(-1px); }
+  .chip.on { background:var(--acc); color:#fffdf9; border-color:var(--acc); }
+  .chip .c-n { opacity:.55; margin-left:5px; font-weight:500; }
+  .chip.on .c-n { opacity:.8; }
+  .sortsel { width:auto; margin:0; padding:8px 12px; height:40px; }
+  /* мини-сводка */
+  .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; margin:12px 0 16px; }
+  .sum-c { border:1px solid var(--line); border-radius:12px; padding:12px 15px; background:var(--card-2); position:relative; overflow:hidden; }
+  .sum-c::before { content:''; position:absolute; left:0; top:12px; bottom:12px; width:2px; border-radius:2px; background:var(--gold); opacity:.5; }
+  .sum-c b { font-family:'Cormorant',Georgia,serif; font-size:27px; display:block; line-height:1; padding-left:8px; }
+  .sum-c i { font-style:normal; font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); display:block; margin-top:6px; padding-left:8px; }
+  .th-sort { cursor:pointer; user-select:none; } .th-sort:hover { color:var(--ink); } .th-sort.act { color:var(--gold); }
+  .th-sort .caret { font-size:9px; opacity:.7; }
 </style>
 </head>
 <body>
@@ -92,8 +119,21 @@
   <div class="sect on" id="sect-tenants">
     <div class="card">
       <div class="row" style="justify-content:space-between"><b>Агентства на платформе</b><button class="ghost" id="reload">Обновить</button></div>
+      <div class="summary" id="tenSummary"></div>
+      <div class="toolbar">
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="tenSearch" placeholder="Поиск: агентство, e-mail, tid…" autocomplete="off"></div>
+        <select class="sortsel" id="tenSort">
+          <option value="activity">Сортировка: активность</option>
+          <option value="leads">по лидам</option>
+          <option value="brokers">по брокерам</option>
+          <option value="numbers">по номерам</option>
+          <option value="name">по названию</option>
+          <option value="created">по дате создания</option>
+        </select>
+      </div>
+      <div class="chips" id="tenChips" style="margin-bottom:12px"></div>
       <div style="overflow:auto"><table id="tbl"><thead><tr>
-        <th>Агентство</th><th>E-mail владельца</th><th>Тариф</th><th>Лиды</th><th>Брокеры</th><th>Номера</th><th>Статус</th><th></th>
+        <th>Агентство</th><th>E-mail владельца</th><th>Тариф</th><th>Лиды</th><th>Брокеры</th><th>Номера</th><th>Активность</th><th>Статус</th><th></th>
       </tr></thead><tbody id="tbody"></tbody></table></div>
     </div>
   </div>
@@ -778,28 +818,54 @@ document.querySelectorAll('input[name=ch]').forEach(r => r.addEventListener('cha
 }));
 
 let TENANTS = [];
+let TEN_FILTER = 'all', TEN_SORT = 'activity', TEN_Q = '', PLANS_N = {};
+const relTime = (t) => { if (!t) return '—'; const d = Date.now() - t; const day = 864e5; if (d < day) return 'сегодня'; const n = Math.floor(d / day); return n === 1 ? 'вчера' : n + ' дн назад'; };
+const planPrice = (t) => (PLANS_N[t.plan] && PLANS_N[t.plan].price) || 0;
+
 async function load() {
   const [st, list] = await Promise.all([api('/api/admin/stats'), api('/api/admin/tenants')]);
-  const plansN = list.plans || {};
+  PLANS_N = list.plans || {};
   $('#stats').innerHTML = [
     ['Агентств', st.tenants], ['Лидов всего', st.leads], ['Брокеров', st.brokers],
     ['Спящих (>7д)', st.sleeping || 0], ['Приостановлено', st.suspended], ['MRR (оценка)', '$' + (st.mrr || 0)],
   ].map(([k, v]) => `<div class="stat"><b>${v}</b><i>${k}</i></div>`).join('');
   TENANTS = list.tenants || [];
-  const planOpts = (cur) => Object.keys(plansN).map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(plansN[k].name)} ($${plansN[k].price})</option>`).join('');
-  $('#tbody').innerHTML = TENANTS.map(t => `<tr data-tid="${esc(t.tid)}">
+  renderTenants();
+  $('#campTargets').innerHTML = '<option value="all">Всем агентствам (' + TENANTS.length + ')</option>' + TENANTS.map(t => `<option value="${esc(t.tid)}">${esc(t.name)} · ${esc(t.ownerEmail || '')}</option>`).join('');
+}
+
+function renderTenants() {
+  const planOpts = (cur) => Object.keys(PLANS_N).map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(PLANS_N[k].name)} ($${PLANS_N[k].price})</option>`).join('');
+  const cnt = (f) => TENANTS.filter(f).length;
+  const mrr = TENANTS.filter(t => planPrice(t) > 0 && !t.suspended).reduce((s, t) => s + planPrice(t), 0);
+  const nums = TENANTS.reduce((s, t) => s + (t.numbers || 0), 0);
+  // сводка
+  $('#tenSummary').innerHTML = [
+    ['$' + mrr, 'MRR платящих'], [cnt(t => !t.suspended && t.onboarded), 'Активных'], [cnt(t => planPrice(t) === 0), 'На триале'],
+    [cnt(t => t.suspended), 'Приостановлено'], [cnt(t => t.sleeping), 'Спящих'], [nums, 'Номеров в работе'],
+  ].map(([v, k]) => `<div class="sum-c"><b>${v}</b><i>${k}</i></div>`).join('');
+  // чипы-фильтры со счётчиками
+  const F = [['all', 'Все', TENANTS.length], ['active', 'Активные', cnt(t => !t.suspended && t.onboarded)], ['new', 'Новые', cnt(t => !t.onboarded && !t.suspended)], ['sleeping', 'Спящие', cnt(t => t.sleeping)], ['suspended', 'Приостановленные', cnt(t => t.suspended)], ['paid', 'Платящие', cnt(t => planPrice(t) > 0)]];
+  $('#tenChips').innerHTML = F.map(([k, l, n]) => `<button class="chip ${TEN_FILTER === k ? 'on' : ''}" data-f="${k}">${l}<span class="c-n">${n}</span></button>`).join('');
+  // фильтр → поиск → сортировка
+  let rows = TENANTS.slice();
+  const FILT = { active: t => !t.suspended && t.onboarded, new: t => !t.onboarded && !t.suspended, sleeping: t => t.sleeping, suspended: t => t.suspended, paid: t => planPrice(t) > 0 };
+  if (FILT[TEN_FILTER]) rows = rows.filter(FILT[TEN_FILTER]);
+  if (TEN_Q) { const q = TEN_Q.toLowerCase(); rows = rows.filter(t => ((t.name || '') + ' ' + (t.ownerEmail || '') + ' ' + (t.tid || '')).toLowerCase().includes(q)); }
+  const S = { activity: (a, b) => (b.lastActivity || 0) - (a.lastActivity || 0), leads: (a, b) => b.leads - a.leads, brokers: (a, b) => b.brokers - a.brokers, numbers: (a, b) => b.numbers - a.numbers, name: (a, b) => (a.name || '').localeCompare(b.name || ''), created: (a, b) => (b.createdAt || 0) - (a.createdAt || 0) };
+  rows.sort(S[TEN_SORT] || S.activity);
+  $('#tbody').innerHTML = rows.map(t => `<tr data-tid="${esc(t.tid)}">
     <td><b>${esc(t.name)}</b>${t.verified ? '' : ' <span class="badge">не подтв.</span>'}</td>
     <td class="muted">${esc(t.ownerEmail || '—')}</td>
     <td><select class="mini plan">${planOpts(t.plan)}</select></td>
-    <td>${t.leads}</td><td>${t.brokers}</td><td>${t.numbers}</td>
+    <td class="num-cell">${t.leads}</td><td class="num-cell">${t.brokers}</td><td class="num-cell">${t.numbers}</td>
+    <td class="muted">${relTime(t.lastActivity)}</td>
     <td>${t.suspended ? '<span class="badge bad">приостановлен</span>' : (t.sleeping ? '<span class="badge">спит &gt;7д</span>' : '<span class="badge ok">активен</span>')}${t.onboarded ? '' : ' <span class="badge" title="не прошёл онбординг">новый</span>'}</td>
     <td class="row" style="gap:6px">
       <button class="ghost imp">Войти как</button>
       <button class="ghost susp">${t.suspended ? 'Включить' : 'Приостановить'}</button>
       ${t.tid === 'primary' ? '' : '<button class="danger del">Удалить</button>'}
-    </td></tr>`).join('') || '<tr><td colspan="8" class="muted">Пока нет агентств</td></tr>';
-  // цели рассылки
-  $('#campTargets').innerHTML = '<option value="all">Всем агентствам (' + TENANTS.length + ')</option>' + TENANTS.map(t => `<option value="${esc(t.tid)}">${esc(t.name)} · ${esc(t.ownerEmail || '')}</option>`).join('');
+    </td></tr>`).join('') || '<tr><td colspan="9" class="muted">Ничего не найдено по фильтру</td></tr>';
   wireRows();
 }
 function wireRows() {
@@ -812,6 +878,9 @@ function wireRows() {
   });
 }
 $('#reload').addEventListener('click', load);
+$('#tenSearch')?.addEventListener('input', (e) => { TEN_Q = e.target.value; renderTenants(); });
+$('#tenSort')?.addEventListener('change', (e) => { TEN_SORT = e.target.value; renderTenants(); });
+$('#tenChips')?.addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { TEN_FILTER = b.dataset.f; renderTenants(); } });
 
 // рассылка
 $('#campSend').addEventListener('click', async () => {
