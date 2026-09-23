@@ -138,6 +138,7 @@ const b2backup = require('./backup'); /* ⭐ офф-сайт бэкапы все
 const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Telegram: устройства/номера/прокси/выдача агентствам + юнит-экономика */
 const farmProv = require('./farm-provision'); /* Р2: конвейер провижна (eSIM-адаптер + задания фарм-хост-агенту) */
 const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
+const farmMail = require('./farm-email');     /* Р2+: email-адаптер для Telegram (catch-all + авто-код) */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
 const { MARKET } = require('./marketdata');
@@ -5339,9 +5340,17 @@ const server = http.createServer(async (req, res) => {
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
+    const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !viberInboundOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+
+    /* вебхук входящей почты фермы: Cloudflare Email Worker шлёт {to,subject,text,secret}; читаем код Telegram */
+    if (farmEmailOk) {
+      const b = await readBody(req).catch(() => ({}));
+      if (!process.env.FARM_EMAIL_SECRET || b.secret !== process.env.FARM_EMAIL_SECRET) return json(res, 403, { error: 'bad secret' });
+      return json(res, 200, farmMail.ingest(b.to, b.subject, b.text || b.body || ''));
+    }
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
     const ROLE = sessionRole(req);
@@ -5515,6 +5524,12 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/agent-jobs' && req.method === 'GET') { return json(res, 200, { ok: true, jobs: farmProv.agentJobs() }); }
       if (p === '/api/admin/farm/agent-otp' && req.method === 'GET') { const ref = u.searchParams.get('ref') || ''; const r = await farmProv.esimOtp(ref); return json(res, 200, r); }
       if (p === '/api/admin/farm/agent-report' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmProv.agentReport(b.id, b.patch || b); return json(res, r.error ? 400 : 200, r); }
+      /* Yesim: проверка связи/баланс (в ошибке вернёт наш IP — добавить в whitelist Yesim) */
+      if (p === '/api/admin/farm/yesim-test' && req.method === 'GET') { const bal = await farmProv.yesimBalance(); return json(res, 200, { ok: true, configured: farmProv.yesimReady(), balance: bal }); }
+      /* email-адаптер для Telegram: выдать адрес номеру / прочитать код */
+      if (p === '/api/admin/farm/agent-email' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmMail.allocate(b.numberId)); }
+      if (p === '/api/admin/farm/agent-email-code' && req.method === 'GET') { return json(res, 200, farmMail.readCode(u.searchParams.get('address') || '')); }
+      if (p === '/api/admin/farm/email-status' && req.method === 'GET') { return json(res, 200, { ok: true, ready: farmMail.ready(), domain: farmMail.domain() }); }
 
       /* Р3 — прогрев */
       if (p === '/api/admin/farm/warmup-enroll' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmWarm.enroll(b.id); adminLog('farm.warm.enroll', { id: b.id }); return json(res, r.error ? 400 : 200, r); }

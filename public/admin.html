@@ -309,6 +309,7 @@
         <button id="fpEnqueue">Заказать провижн</button>
         <button class="ghost" id="fpAcquire">Купить номера (eSIM)</button>
         <button class="ghost" id="fpTick">Тик прогрева</button>
+        <button class="ghost" id="fpYesim">Yesim: тест/баланс</button>
       </div>
       <div class="muted" id="farmWarm" style="font-size:12px;margin-top:8px"></div>
     </div>
@@ -898,6 +899,7 @@ $('#fpEnqueue').addEventListener('click', async () => { const r = await farmPost
 $('#fpAcquire').addEventListener('click', async () => { const pend = (FARM.farm.numbers || []).filter(n => n.prov && n.prov.step === 'acquire'); if (!pend.length) return alert('нет номеров в шаге «покупка»'); let ok = 0, man = 0; for (const n of pend) { const r = await farmPost('provision-acquire', { id: n.id }); if (r.manual) man++; else if (r.ok) ok++; } alert('Куплено: ' + ok + (man ? ' · ручных (нет eSIM-API): ' + man : '')); loadFarm(); });
 $('#fpTick').addEventListener('click', async () => { const r = await farmPost('warmup-tick', {}); alert('Прогрев: продвинуто ' + r.advanced + ', выпущено ' + r.graduated + ', действий ' + r.acted); loadFarm(); });
 $('#fsoCreate').addEventListener('click', async () => { const tid = $('#fsoAgency').value; if (!tid) return alert('нет агентства'); const r = await farmPost('seat-order', { tid, seats: $('#fsoSeats').value }); if (r.error) alert(r.error); loadFarm(); });
+$('#fpYesim').addEventListener('click', async () => { const y = await api('/api/admin/farm/yesim-test'); const em = await api('/api/admin/farm/email-status'); const b = y.balance || {}; alert('Yesim подключён: ' + (y.configured ? 'да' : 'НЕТ (нет токена)') + '\nОтвет: ' + JSON.stringify(b).slice(0, 300) + '\n\n(если тут «IP not whitelisted» — добавь показанный IP в панели Yesim)\n\nEmail для Telegram: ' + (em.ready ? em.domain : 'домен не задан (FARM_EMAIL_DOMAIN)')); });
 
 $('#sect-farm').addEventListener('click', async (ev) => {
   const d = ev.target.dataset; if (!d) return;
