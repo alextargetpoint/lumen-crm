@@ -1,0 +1,82 @@
+/* Lumen — слой полировки поверх styles.css (глубина + микровзаимодействия + motion).
+   Только визуальные улучшения, без изменения логики/разметки. Уважает prefers-reduced-motion.
+   Цель: поднять уже зрелую CRM до «живого премиума» консистентно на всех экранах. */
+
+:root {
+  --pol-ease: cubic-bezier(.22, .61, .36, 1);
+  --pol-sh-1: 0 1px 2px rgba(20, 19, 17, .045), 0 2px 8px rgba(20, 19, 17, .05);
+  --pol-sh-2: 0 6px 18px rgba(20, 19, 17, .08), 0 16px 40px rgba(20, 19, 17, .10);
+  --pol-accent-soft: color-mix(in srgb, var(--accent, #1a1815) 8%, transparent);
+  --pol-accent-line: color-mix(in srgb, var(--accent, #1a1815) 16%, transparent);
+}
+
+/* ── КАРТОЧКИ: глубина + мягкий подъём при наведении ── */
+.ov-w, .card, .glass, .ovx-kcard {
+  transition: transform .30s var(--pol-ease), box-shadow .30s var(--pol-ease), border-color .30s var(--pol-ease);
+}
+.ov-w { box-shadow: var(--pol-sh-1); }
+.ov-w:hover, .ovx-kcard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--pol-sh-2);
+}
+/* интерактивные карточки-строки задач/лидов — тонкий отклик */
+.qfab-act:hover, .ov-seq-node:hover, .ov-cmp-row:hover { transform: translateY(-1px); }
+
+/* ── НАВИГАЦИЯ: плавный hover + акцент-бар активного пункта ── */
+.nav-item, .nav-subitem {
+  position: relative;
+  border-radius: 10px;
+  transition: background .2s var(--pol-ease), color .2s var(--pol-ease), transform .14s var(--pol-ease);
+}
+.nav-item:hover, .nav-subitem:hover { background: var(--pol-accent-soft); }
+.nav-item:active, .nav-subitem:active { transform: scale(.985); }
+.nav-item.active { background: color-mix(in srgb, var(--accent, #1a1815) 11%, transparent); }
+.nav-item.active::before {
+  content: ''; position: absolute; left: 3px; top: 22%; bottom: 22%;
+  width: 3px; border-radius: 3px; background: var(--accent, #1a1815);
+  animation: polBar .32s var(--pol-ease) both;
+}
+@keyframes polBar { from { transform: scaleY(0); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
+
+/* ── КНОПКИ: подъём + отклик нажатия + фокус-кольцо ── */
+.btn {
+  transition: transform .14s var(--pol-ease), box-shadow .22s var(--pol-ease), filter .2s var(--pol-ease), background .2s var(--pol-ease);
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.03); }
+.btn:active { transform: translateY(0) scale(.975); }
+.btn:focus-visible { outline: 2px solid var(--pol-accent-line); outline-offset: 2px; }
+.btn-accent:hover { box-shadow: 0 6px 18px color-mix(in srgb, var(--accent, #1a1815) 28%, transparent); }
+
+/* ── ПОЛЯ ВВОДА: плавный фокус с мягким кольцом ── */
+input, textarea, select {
+  transition: border-color .2s var(--pol-ease), box-shadow .2s var(--pol-ease), background .2s var(--pol-ease);
+}
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #1a1815) 13%, transparent);
+}
+
+/* ── ЗАГОЛОВКИ РАЗДЕЛОВ: чуть больше воздуха и характера ── */
+.page-title { letter-spacing: .005em; }
+
+/* ── СМЕНА РАЗДЕЛА: мягкое проявление контента (тонко, не мешает ре-рендеру) ── */
+@media (prefers-reduced-motion: no-preference) {
+  #app .page-title { animation: polFade .4s var(--pol-ease) both; }
+}
+@keyframes polFade { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+
+/* ── СКРОЛЛБАР: тонкий, в палитре ── */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink, #141311) 22%, transparent) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink, #141311) 18%, transparent);
+  border-radius: 10px; border: 2px solid transparent; background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink, #141311) 34%, transparent); background-clip: padding-box; }
+
+/* ── УВАЖЕНИЕ К prefers-reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .ov-w, .ovx-kcard, .qfab-act, .ov-seq-node, .ov-cmp-row, .btn, .nav-item, .nav-subitem { transition: none !important; }
+  .ov-w:hover, .ovx-kcard:hover, .btn:hover, .qfab-act:hover, .ov-seq-node:hover, .ov-cmp-row:hover { transform: none !important; }
+  .nav-item.active::before, #app .page-title { animation: none !important; }
+}
