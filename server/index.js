@@ -10067,6 +10067,31 @@ ${SCR}
       return;
     }
 
+    /* ---------------- сравнение подрядчиков: расход/лиды/квал/CPL/CPQ бок-о-бок ---------------- */
+    if (p === '/api/ads/compare' && req.method === 'GET') {
+      for (const _l of (db.leads || [])) if (_l.ads) healAdNames(_l.ads);
+      const from = u.searchParams.get('from') || '', to = u.searchParams.get('to') || '';
+      const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
+      const idx = buildLeadAdIndex(db);
+      const cts = db.mpContractors || [];
+      const acctToCt = {}; for (const c of cts) for (const acc of (c.adAccounts || [])) acctToCt[metaads.acctId(acc)] = c.id;
+      const B = {};
+      const ensure = (id, name) => (B[id] = B[id] || { contractorId: id === '__none' ? null : id, name, spend: 0, leads: 0, quals: 0, ads: 0, qualMode: (cts.find(c => c.id === id) || {}).qualMode || 'peak' });
+      cts.forEach(c => ensure(c.id, c.name)); ensure('__none', 'Без подрядчика');
+      for (const ad of (db.ads || [])) {
+        const cid = acctToCt[metaads.acctId(ad.adAccountId)] || '__none';
+        const b = B[cid] || ensure('__none', 'Без подрядчика');
+        const rm = adRangeMetrics(ad, from, to);
+        const mine = (idx[String(ad.adId)] || []).filter(inR);
+        b.spend += rm.spend; b.ads++; b.leads += mine.length;
+        b.quals += mine.filter(l => everReachedQual(db, l, b.qualMode)).length;
+      }
+      const fin = (b) => ({ contractorId: b.contractorId, name: b.name, qualMode: b.qualMode, spend: Math.round(b.spend), ads: b.ads, leads: b.leads, quals: b.quals, cpl: b.leads ? Math.round(b.spend / b.leads) : 0, cpq: b.quals ? Math.round(b.spend / b.quals) : 0, qualRate: b.leads ? Math.round(b.quals / b.leads * 100) : 0 });
+      const rows = Object.values(B).filter(b => b.spend || b.leads || b.quals).map(fin).sort((a, b) => b.spend - a.spend);
+      const t = rows.reduce((a, b) => ({ spend: a.spend + b.spend, leads: a.leads + b.leads, quals: a.quals + b.quals }), { spend: 0, leads: 0, quals: 0 });
+      const ma = db.settings.metaAds || {};
+      return json(res, 200, { rows, totals: { spend: t.spend, leads: t.leads, quals: t.quals, cpl: t.leads ? Math.round(t.spend / t.leads) : 0, cpq: t.quals ? Math.round(t.spend / t.quals) : 0, qualRate: t.leads ? Math.round(t.quals / t.leads * 100) : 0 }, currency: { src: ma.sourceCurrency || '', disp: ma.displayCurrency || ma.sourceCurrency || '' } });
+    }
     /* ---------------- реклама: база объявлений + мэтчинг ---------------- */
     if (p === '/api/ads' && req.method === 'GET') {
       const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];

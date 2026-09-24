@@ -9150,6 +9150,7 @@ function restructureAdsTabs(root) {
   if (!root || root.querySelector('.adtabs')) return;
   const cardOf = (sel) => { const e = root.querySelector(sel); return e ? (e.closest('.glass.card') || e.closest('.glass') || e) : null; };
   const kpis = root.querySelector('.ad-kpis');
+  const cmpCardNode = (root.querySelector('#adCmpCard') && root.querySelector('#adCmpCard').children.length) ? root.querySelector('#adCmpCard') : null;
   const rangeBar = cardOf('#adRangeBar');
   const anaExtra = cardOf('#anaExtra');
   const tree = root.querySelector('.ct-wrap');
@@ -9167,7 +9168,7 @@ function restructureAdsTabs(root) {
   KEYS.forEach(k => { panels[k] = el(`<div class="adtab-panel" data-adtab="${k}" ${k === active ? '' : 'hidden'}></div>`); });
   const put = (node, k) => { if (node) panels[k].appendChild(node); };
   /* Аналитика · факт: диапазон дат + KPI + гео/качество/пересмотр/отчёт (то, что тянется из кабинета) */
-  put(rangeBar, 'analytics'); put(kpis, 'analytics'); put(anaExtra, 'analytics');
+  put(rangeBar, 'analytics'); put(kpis, 'analytics'); put(cmpCardNode, 'analytics'); put(anaExtra, 'analytics');
   /* Дерево креативов: дерево + каталог объявлений (сюда подгружаются креативы) */
   put(tree, 'creatives'); put(imp, 'creatives');
   /* Настройки рекламы: приём лидов (Albato) + кабинет Meta (API) + Meta CAPI + журнал приёма */
@@ -9192,6 +9193,23 @@ PAGES.ads = async (root) => {
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
+  const cmp = await api.get('/ads/compare' + rq).catch(() => ({ rows: [], totals: {} }));
+  const cmpCard = (cmp.rows && cmp.rows.length) ? (() => {
+    const _S = STATE.settings.metaAds || {}; const _src = (cmp.currency && cmp.currency.src) || _S.sourceCurrency || 'AED'; const _disp = (cmp.currency && cmp.currency.disp) || _S.displayCurrency || _src;
+    const cmpMoney = (n) => curSym(_disp) + Math.round(fxConv(n || 0, _src, _disp)).toLocaleString('ru-RU').replace(/,/g, ' ');
+    const best = cmp.rows.filter(r => r.quals > 0).sort((a, b) => a.cpq - b.cpq)[0];
+    const rowsH = cmp.rows.map(r => `<tr>
+      <td><b>${esc(r.name)}</b>${best && r.contractorId === best.contractorId && r.quals > 0 ? ' <span class="mini-badge ok">лучший CPQ</span>' : ''}<div class="muted" style="font-size:10px">${r.qualMode === 'current' ? 'квал: текущая стадия' : 'квал: по достигнутой стадии'}</div></td>
+      <td class="num"><b>${cmpMoney(r.spend)}</b></td><td class="num">${r.leads}</td><td class="num"><b>${r.quals}</b></td><td class="num">${r.qualRate}%</td>
+      <td class="num">${r.leads ? cmpMoney(r.cpl) : '—'}</td><td class="num">${r.quals ? cmpMoney(r.cpq) : '—'}</td></tr>`).join('');
+    const t = cmp.totals || {};
+    return coll('Сравнение подрядчиков — расход · лиды · квал · CPL · CPQ', `
+      <div class="muted" style="font-size:11px;margin-bottom:8px">За выбранный период. CPQ — цена квал-лида (по достигнутой стадии, если так настроено у подрядчика). «Лучший CPQ» — кто приводит квал дешевле.</div>
+      <div style="overflow-x:auto"><table class="tbl mp-cmp">
+        <thead><tr><th>Подрядчик</th><th class="num">Расход</th><th class="num">Лиды</th><th class="num">Квал</th><th class="num">%квал</th><th class="num">CPL</th><th class="num">CPQ</th></tr></thead>
+        <tbody>${rowsH}<tr style="border-top:2px solid var(--stroke,rgba(128,128,128,.3))"><td><b>Итого</b></td><td class="num"><b>${cmpMoney(t.spend)}</b></td><td class="num"><b>${t.leads || 0}</b></td><td class="num"><b>${t.quals || 0}</b></td><td class="num">${t.qualRate || 0}%</td><td class="num">${t.leads ? cmpMoney(t.cpl) : '—'}</td><td class="num">${t.quals ? cmpMoney(t.cpq) : '—'}</td></tr></tbody>
+      </table></div>`, { open: true, icon: I.bars, count: cmp.rows.length });
+  })() : '';
   root.innerHTML = `
     ${heroArt('assets/art/mega.png', `
       <div class="ha-title">${ic(I.bars)}Аналитика рекламы<span class="sub">факт из кабинетов Meta · дерево креативов · настройки</span></div>
@@ -9214,6 +9232,7 @@ PAGES.ads = async (root) => {
           </div>
         </div>
       </div>`; })()}
+    <div id="adCmpCard">${cmpCard}</div>
     ${(() => {
       const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;
       const cv = (a) => fxConv(a, src2, dc); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
