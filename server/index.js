@@ -3091,6 +3091,46 @@ function runBillingTick() {
 setInterval(runBillingTick, 6 * 60 * 60e3);   /* каждые 6 ч */
 setTimeout(runBillingTick, 15e3);             /* и вскоре после старта — чтобы гейты подтянулись сразу */
 
+/* ============ ПЕРЕДАЧА ФЕРМОВОГО НОМЕРА АГЕНТСТВУ (handover при покупке места) ============
+   Пометки agencyTid в реестре фермы мало: чтобы брокеры РЕАЛЬНО пользовались номером, нужно
+   (1) завести номер в каналы тенанта (waGray+tgGray) с привязкой брокера — тогда он виден в CRM
+   и участвует в выборе отправителя; (2) перенести ПРОГРЕТУЮ сессию воркера из неймспейса
+   прогрева (primary__<цифры>) в неймспейс агентства (<tid>__<цифры>) — тогда входящие
+   маршрутизируются агентству (роутинг по префиксу sid). Session-reassign — best-effort:
+   если сессии/воркера ещё нет, номер подключат по QR под неймспейсом агентства позже. */
+async function farmHandoverToTenant(num, agencyTid, brokerId, displayName) {
+  const digits = String((num && num.phone) || '').replace(/\D/g, '');
+  if (!digits || !agencyTid || agencyTid === store.PRIMARY) return;
+  const label = displayName || (num && num.displayName) || ('Ферма ' + digits.slice(-4));
+  store.runInTenant(agencyTid, () => {
+    const db = store.get();
+    db.settings.waGray = db.settings.waGray || { numbers: [], warmup: { running: false, perDay: 16 } };
+    db.settings.waGray.numbers = db.settings.waGray.numbers || [];
+    let w = db.settings.waGray.numbers.find(n => String(n.phone).replace(/\D/g, '') === digits);
+    if (!w) { w = { phone: digits, roles: { send: true, call: false }, source: 'farm', addedAt: Date.now() }; db.settings.waGray.numbers.push(w); }
+    w.label = label; w.farmId = num.id; w.brokerId = brokerId || w.brokerId || null;
+    db.settings.tgGray = db.settings.tgGray || { numbers: [] };
+    db.settings.tgGray.numbers = db.settings.tgGray.numbers || [];
+    let t = db.settings.tgGray.numbers.find(n => String(n.phone).replace(/\D/g, '') === digits);
+    if (!t) { t = { phone: digits, persona: { name: label, avatar: '', about: '', mode: 'qualifier', brokerId: brokerId || null }, source: 'farm', farmId: num.id, addedAt: Date.now() }; db.settings.tgGray.numbers.push(t); }
+    else { t.persona = t.persona || {}; t.persona.brokerId = brokerId || t.persona.brokerId || null; t.label = label; }
+    store.saveNow();
+  });
+  try { await store.runInTenant(store.PRIMARY, () => waGrayApi(store.get(), 'POST', '/sessions/' + store.PRIMARY + '__' + digits + '/reassign', { to: agencyTid + '__' + digits })); } catch (e) {}
+}
+/* возврат номера в пул: убрать из каналов бывшего тенанта + вернуть сессию в неймспейс прогрева */
+async function farmReclaimFromTenant(prevTid, phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits || !prevTid || prevTid === store.PRIMARY) return;
+  store.runInTenant(prevTid, () => {
+    const db = store.get();
+    if (db.settings.waGray && db.settings.waGray.numbers) db.settings.waGray.numbers = db.settings.waGray.numbers.filter(n => String(n.phone).replace(/\D/g, '') !== digits);
+    if (db.settings.tgGray && db.settings.tgGray.numbers) db.settings.tgGray.numbers = db.settings.tgGray.numbers.filter(n => String(n.phone).replace(/\D/g, '') !== digits);
+    store.saveNow();
+  });
+  try { await store.runInTenant(store.PRIMARY, () => waGrayApi(store.get(), 'POST', '/sessions/' + prevTid + '__' + digits + '/reassign', { to: store.PRIMARY + '__' + digits })); } catch (e) {}
+}
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -5601,10 +5641,10 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/proxy-attach' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const n = farmSvc.attachProxy(b.numberId, b.proxyId); return json(res, 200, { ok: !!n, number: n }); }
       if (p === '/api/admin/farm/number' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); if (!b.phone) return json(res, 400, { error: 'нужен номер' }); const n = farmSvc.addNumber(b); adminLog('farm.number.add', { id: n.id, phone: n.phone }); return json(res, 200, { ok: true, number: n }); }
       if (p === '/api/admin/farm/number-update' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const n = farmSvc.updateNumber(b.id, b.patch || {}); return json(res, 200, { ok: !!n, number: n }); }
-      if (p === '/api/admin/farm/assign' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.assign(b.id, b.agencyTid, b.brokerId, b.displayName); adminLog('farm.assign', { id: b.id, tid: b.agencyTid }); return json(res, r.error ? 400 : 200, r); }
-      if (p === '/api/admin/farm/revoke' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.revoke(b.id); adminLog('farm.revoke', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
-      if (p === '/api/admin/farm/failover' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.failover(b.id); adminLog('farm.failover', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
-      if (p === '/api/admin/farm/wipe' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.wipeSlot(b.id, !!b.release); adminLog('farm.wipe', { id: b.id, release: !!b.release }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/assign' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.assign(b.id, b.agencyTid, b.brokerId, b.displayName); if (!r.error && r.number) { await farmHandoverToTenant(r.number, b.agencyTid, b.brokerId, b.displayName); runBillingTick(); } adminLog('farm.assign', { id: b.id, tid: b.agencyTid }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/revoke' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const num0 = farmSvc.findNumber(b.id); const prevTid = num0 && num0.agencyTid, ph = num0 && num0.phone; const r = farmSvc.revoke(b.id); if (!r.error && prevTid) { await farmReclaimFromTenant(prevTid, ph); runBillingTick(); } adminLog('farm.revoke', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/failover' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const bad0 = farmSvc.findNumber(b.id); const badTid = bad0 && bad0.agencyTid, badBroker = bad0 && bad0.brokerId, badPhone = bad0 && bad0.phone; const r = farmSvc.failover(b.id); if (!r.error) { if (badTid && badPhone) await farmReclaimFromTenant(badTid, badPhone); if (r.replaced && badTid) await farmHandoverToTenant(r.replaced, badTid, badBroker, r.replaced.displayName); } adminLog('farm.failover', { id: b.id }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/wipe' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const num0 = farmSvc.findNumber(b.id); const prevTid = num0 && num0.agencyTid, ph = num0 && num0.phone; const r = farmSvc.wipeSlot(b.id, !!b.release); if (!r.error && prevTid) await farmReclaimFromTenant(prevTid, ph); adminLog('farm.wipe', { id: b.id, release: !!b.release }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/settings' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const s = farmSvc.setSettings(b); return json(res, 200, { ok: true, settings: s }); }
 
       /* ⭐ БАЛАНС / АВТО-ПРОДЛЕНИЕ АРЕНДЫ — панель основателя */
@@ -5634,9 +5674,9 @@ const server = http.createServer(async (req, res) => {
 
       /* Р4 — шоп мест */
       if (p === '/api/admin/farm/seat-order' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); if (!b.tid) return json(res, 400, { error: 'нужен tid агентства' }); const o = farmSvc.createSeatOrder(b.tid, b.seats, b.note); adminLog('farm.seat.order', { tid: b.tid, seats: b.seats }); return json(res, 200, { ok: true, order: o }); }
-      if (p === '/api/admin/farm/seat-fulfill' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.fulfillSeatOrder(b.orderId); adminLog('farm.seat.fulfill', { orderId: b.orderId }); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/seat-fulfill' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.fulfillSeatOrder(b.orderId); if (!r.error && r.order) { for (const nid of (r.order.allocated || [])) { const nn = farmSvc.findNumber(nid); if (nn) await farmHandoverToTenant(nn, r.order.tid, null, nn.displayName); } runBillingTick(); } adminLog('farm.seat.fulfill', { orderId: b.orderId }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/seat-orders' && req.method === 'GET') { return json(res, 200, { ok: true, orders: farmSvc.listSeatOrders(u.searchParams.get('tid') || null) }); }
-      if (p === '/api/admin/farm/agency-release' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.releaseAgency(b.tid); adminLog('farm.agency.release', { tid: b.tid }); return json(res, 200, r); }
+      if (p === '/api/admin/farm/agency-release' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const phones = farmSvc.farm().numbers.filter(n => n.agencyTid === b.tid).map(n => n.phone); const r = farmSvc.releaseAgency(b.tid); for (const ph of phones) await farmReclaimFromTenant(b.tid, ph); runBillingTick(); adminLog('farm.agency.release', { tid: b.tid }); return json(res, 200, r); }
       /* СКВОЗНАЯ ПРОВЕРКА офф-сайт бэкапа B2: снять→выгрузить→скачать обратно→расшифровать→сверить */
       if (p === '/api/admin/backup/verify' && (req.method === 'POST' || req.method === 'GET')) {
         const st = { enabled: b2backup.enabled(), bucket: b2backup.CFG.bucket, encrypted: !!b2backup.CFG.encKey };
