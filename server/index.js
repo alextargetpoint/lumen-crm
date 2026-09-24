@@ -5610,12 +5610,25 @@ const server = http.createServer(async (req, res) => {
       if (!ch.ok) return json(res, 402, { error: 'insufficient_balance', balance: ch.balance || 0, need: +(cost - (ch.balance || 0)).toFixed(2), cost });
       const bl = db.settings.billing; bl.numberOrders = bl.numberOrders || [];
       const order = { id: 'no_' + crypto.randomBytes(5).toString('hex'), edition, label, qty, price, cost, status: 'pending', at: Date.now() };
+      /* managed («под ключ») → заказ мест в ферме (founder выполнит из готового пула) */
+      if (edition === 'managed') { try { const so = farmSvc.createSeatOrder(store.currentTid(), qty, `Оплачено с баланса $${cost}`); order.seatOrderId = so.id; } catch (_) {} }
       bl.numberOrders.unshift(order); if (bl.numberOrders.length > 100) bl.numberOrders.length = 100;
-      /* сигнал платформе (founder провижнит по Yesim и назначает) */
+      /* сигнал платформе (для BYOD founder провижнит Yesim-номер и отдаёт агентству на QR) */
       try { const reg = store.getRegistry(); reg.numberOrders = reg.numberOrders || {}; reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } catch (_) {}
-      notify(db, { type: 'billing', level: 'success', title: 'Заказ номеров принят', text: `${qty}× «${label}» — списано $${cost} с баланса. Провижн запущен, номера появятся в разделе «Номера».`, email: false });
+      notify(db, { type: 'billing', level: 'success', title: 'Заказ номеров принят', text: `${qty}× «${label}» — списано $${cost} с баланса. ${edition === 'managed' ? 'Места выделяются из фермы' : 'Номера покупаем и настраиваем'} — появятся в разделе «Номера».`, email: false });
       store.save();
       return json(res, 200, { ok: true, balance: ch.balance, order });
+    }
+    /* мои заказы номеров (агентство видит статус) */
+    if (p === '/api/numbers/orders' && req.method === 'GET') {
+      if (!getSession(req)) return json(res, 401, { error: 'auth' });
+      const bl = db.settings.billing || {};
+      /* подтягиваем актуальный статус managed-заказов из фермы */
+      const orders = (bl.numberOrders || []).slice(0, 30).map(o => {
+        if (o.seatOrderId) { try { const so = (farmSvc.listSeatOrders(store.currentTid()) || []).find(x => x.id === o.seatOrderId); if (so) return Object.assign({}, o, { status: so.status === 'active' ? 'fulfilled' : o.status, allocated: (so.allocated || []).length }); } catch (_) {} }
+        return o;
+      });
+      return json(res, 200, { orders, balance: bl.balance || 0 });
     }
 
     /* ---------------- Центр уведомлений системы ---------------- */

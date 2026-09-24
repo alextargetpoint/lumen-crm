@@ -12782,6 +12782,7 @@ PAGES.numbers = async (root) => {
         <button class="btn btn-sm" onclick="openGuide('wanumbers')">${ic(I.doc)}Подробная инструкция</button>
         <span class="muted" style="font-size:11.5px">Один номер = WhatsApp и Telegram. Оплата криптой (USDT), аренда помесячно с продлением. Ниже — подключение по каналам.</span>
       </div>
+      <div id="numOrdersBox"></div>
     </div>
     <div id="simbyeFarm"></div>
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
@@ -13148,6 +13149,19 @@ PAGES.numbers = async (root) => {
   }
   window.__reloadTgGray = loadTgGray;
   loadTgGray();
+  /* мои заказы номеров (после «Докупить») — статус из фермы */
+  async function loadNumberOrders() {
+    const box = $('#numOrdersBox', root); if (!box) return;
+    let d = { orders: [] }; try { d = await api.get('/numbers/orders'); } catch (_) { box.innerHTML = ''; return; }
+    const orders = (d.orders || []).filter(o => (o.status !== 'fulfilled') || (Date.now() - (o.at || 0) < 7 * 864e5));
+    if (!orders.length) { box.innerHTML = ''; return; }
+    const st = (o) => (o.status === 'fulfilled' || o.status === 'active') ? '<span class="badge ok">выполнен</span>' : '<span class="badge warn">в обработке</span>';
+    box.innerHTML = `<div style="margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px">
+      <div class="lp-sec" style="margin:0 0 8px">Мои заказы номеров</div>
+      ${orders.map(o => `<div class="set-row"><div class="sp"><div class="sl">${o.qty}× «${esc(o.label || o.edition)}» · $${o.cost}/мес</div><div class="sd">${new Date(o.at).toLocaleDateString('ru-RU')} · ${st(o)}${o.allocated ? ` · выделено ${o.allocated}` : ''}</div></div></div>`).join('')}
+    </div>`;
+  }
+  loadNumberOrders();
 
   /* ── Ферма номеров: процессная цепочка над всеми вкладками + здоровье + сигналы ── */
   async function loadSimbyeFarm() {
