@@ -13037,10 +13037,6 @@ PAGES.numbers = async (root) => {
           <button class="btn btn-accent btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
           <span class="muted" style="font-size:11px">покупка номеров — в «Ферме номеров Simbye» вверху страницы</span>
         </div>
-        <div class="set-row" style="margin-top:12px"><div class="sp"><div class="sl">Прогрев между номерами</div><div class="sd">Плавный рамп (день0≈3 → +2/день до 20), рандом+джиттер, «сначала принимай» — чтобы аккаунты не отлетали. ⛔ Не рассылки.</div></div>
-          <label class="switch"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span></label></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-sm" id="tgWarmNow" ${d.ready ? '' : 'disabled'} title="Отправить обмен между номерами прямо сейчас (проверка)">${ic(I.bolt)}Прогреть сейчас</button><span id="tgWarmNowOut" class="muted" style="font-size:11px"></span></div>
-        <div id="tgWarmLive">${warmLiveHtml(d.warmup || {})}</div>
       </div>
       ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
         <div class="num-head"><div><div class="ph">${esc(n.username ? '@' + n.username : (n.realPhone ? '+' + n.realPhone : n.phone))}</div><div class="lb">Telegram · <b style="color:#229ED9">серый (MTProto)</b></div></div></div>
@@ -13054,7 +13050,14 @@ PAGES.numbers = async (root) => {
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
-      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет. Купите номер в «Ферме номеров Simbye» вверху страницы — он подхватится сюда и код придёт автоматически.</div>' : '')}`;
+      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет. Купите номер в «Ферме номеров Simbye» вверху страницы — он подхватится сюда и код придёт автоматически.</div>' : '')}${nums.length ? `<div class="glass card mb" style="margin-top:14px">
+      <div class="card-title">${ic(I.bolt)}Прогрев между номерами<span class="sub">авто-переписка между номерами с задержками</span></div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Плавный рамп (день0≈3 → +2/день до 20), рандом+джиттер, «сначала принимай» — чтобы аккаунты не отлетали. ⛔ Не рассылки.</div>
+      <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
+        <label class="switch"><input type="checkbox" id="tgWarm" ${d.warmup && d.warmup.running ? 'checked' : ''} ${d.ready ? '' : 'disabled'}><span class="tr"></span><span class="th"></span></label></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-sm" id="tgWarmNow" ${d.ready ? '' : 'disabled'} title="Отправить обмен между номерами прямо сейчас (проверка)">${ic(I.bolt)}Прогреть сейчас</button><span id="tgWarmNowOut" class="muted" style="font-size:11px"></span></div>
+      <div id="tgWarmLive">${warmLiveHtml(d.warmup || {})}</div>
+    </div>` : ''}`;
     $('#tgBuyBtn', box)?.addEventListener('click', () => openTgBuy());
     $('#tgConnBtn', box)?.addEventListener('click', () => openTgConnect());
     const refreshTgWarm = async () => { try { const d2 = await api.get('/tg/gray/list'); const lv = $('#tgWarmLive', box); if (lv) lv.innerHTML = warmLiveHtml(d2.warmup || {}); } catch (_) {} };
