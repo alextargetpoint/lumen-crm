@@ -7477,6 +7477,19 @@ function propCover(pr, big) {
     <span class="pc-star">${lumenMark()}</span><span>${esc(pr.area || pr.name)}</span></div>`;
 }
 
+/* умный поиск с опечатками: нормализация + токены + ограниченная правка (Левенштейн) */
+function _normSearch(s) { return String(s || '').toLowerCase().replace(/[^a-zа-я0-9 ]/gi, ' ').replace(/\s+/g, ' ').trim(); }
+function _lev(a, b) {
+  const m = a.length, n = b.length; if (Math.abs(m - n) > 3) return 9; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+function fuzzyIncludes(hay, needle) {
+  hay = _normSearch(hay); needle = _normSearch(needle); if (!needle) return true;
+  const words = hay.split(' ');
+  return needle.split(' ').every(tok => hay.includes(tok) || (tok.length >= 4 && words.some(w => _lev(w, tok) <= (tok.length > 6 ? 2 : 1))));
+}
 function loadLeaflet() {
   if (window.L) return Promise.resolve();
   if (window._leafletLoading) return window._leafletLoading;
@@ -7834,22 +7847,37 @@ PAGES.properties = async (root) => {
   }
 
   /* -------- список: богатые карточки -------- */
-  const geoF = PAGE_STATE.propGeo || '';
-  const marketF = PAGE_STATE.propMarket || '';
-  const q = (PAGE_STATE.propQ || '').toLowerCase().trim();
-  const pMin = +PAGE_STATE.propPriceMin || 0, pMax = +PAGE_STATE.propPriceMax || 0;
-  const bedsF = PAGE_STATE.propBeds || '';
-  const statusF = PAGE_STATE.propStatus || '';   /* '' | avail | sold */
+  const F = PAGE_STATE;
+  const geoF = F.propGeo || '', marketF = F.propMarket || '', q = (F.propQ || '').toLowerCase().trim();
+  const bedsF = F.propBeds || '', statusF = F.propStatus || '', typeF = F.propType || '', distF = F.propDistrict || '', devF = F.propDeveloper || '';
+  const pMin = +F.propPriceMin || 0, pMax = +F.propPriceMax || 0;
+  const aUnit = F.propAreaUnit || 'm2', toM2 = (v) => aUnit === 'sqft' ? v / 10.7639 : v;
+  const aMin = +F.propAreaMin ? toM2(+F.propAreaMin) : 0, aMax = +F.propAreaMax ? toM2(+F.propAreaMax) : 0;
+  const roiMin = parseFloat(F.propRoiMin) || 0, hFrom = +F.propHandFrom || 0, hTo = +F.propHandTo || 0;
+  const PTYPES = [{ k: 'apartment', label: 'Квартира', re: /apart|квартир|\d\s?br|bedroom|condo|кондо/i }, { k: 'studio', label: 'Студия', re: /studio|студи/i }, { k: 'villa', label: 'Вилла', re: /villa|вилл/i }, { k: 'townhouse', label: 'Таунхаус', re: /town\s?house|таунхаус/i }, { k: 'penthouse', label: 'Пентхаус', re: /penthouse|пентхаус/i }, { k: 'duplex', label: 'Дуплекс', re: /duplex|дуплекс/i }];
   const availOf = (pr) => { const u = pr.units || []; if (!u.length) return null; return u.some(x => x.status !== 'sold'); };
+  const numsOf = (s) => (String(s || '').match(/\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(',', '.')));
+  const areaM2 = (pr) => { const a = []; (pr.units || []).forEach(u => a.push(...numsOf(u.area))); a.push(...numsOf(pr.size)); return a.filter(x => x > 8 && x < 2000); };
+  const roiOf = (pr) => { const n = numsOf(pr.roi)[0]; return n || 0; };
+  const yearOf = (pr) => { const m2 = String(pr.handover || '').match(/20\d\d/); return m2 ? +m2[0] : 0; };
+  const distsAll = [...new Set(props.map(p => (p.area || '').trim()).filter(Boolean))].sort();
+  const devsAll = [...new Set(props.map(p => (p.developer || '').trim()).filter(d => d && d !== '—'))].sort();
   const matchAdv = (pr) => {
-    if (q && !((pr.name || '') + ' ' + (pr.area || '') + ' ' + (pr.developer || '')).toLowerCase().includes(q)) return false;
+    if (q && !fuzzyIncludes((pr.name || '') + ' ' + (pr.area || '') + ' ' + (pr.developer || '') + ' ' + (pr.type || ''), q)) return false;
     if (pMin && (pr.priceFrom || 0) < pMin) return false;
     if (pMax && pr.priceFrom && pr.priceFrom > pMax) return false;
     if (bedsF) { const t = (pr.type || '') + ' ' + (pr.beds || ''); if (!new RegExp('\\b' + bedsF, 'i').test(t) && String(pr.beds) !== bedsF) return false; }
+    if (typeF) { const T = PTYPES.find(x => x.k === typeF); if (T && !T.re.test((pr.type || '') + ' ' + (pr.name || '') + ' ' + (pr.units || []).map(u => u.plan).join(' '))) return false; }
+    if (distF && (pr.area || '').trim() !== distF) return false;
+    if (devF && (pr.developer || '').trim() !== devF) return false;
+    if (aMin || aMax) { const A = areaM2(pr); if (!A.length) return false; const mx = Math.max(...A); const mn = Math.min(...A); if (aMin && mx < aMin) return false; if (aMax && mn > aMax) return false; }
+    if (roiMin && roiOf(pr) < roiMin) return false;
+    if (hFrom || hTo) { const y = yearOf(pr); if (!y) return false; if (hFrom && y < hFrom) return false; if (hTo && y > hTo) return false; }
     if (statusF === 'avail' && availOf(pr) === false) return false;
     if (statusF === 'sold' && availOf(pr) !== false) return false;
     return true;
   };
+  const advCount = [typeF, distF, devF, bedsF, statusF, F.propPriceMin, F.propPriceMax, F.propAreaMin, F.propAreaMax, F.propRoiMin, F.propHandFrom, F.propHandTo].filter(Boolean).length;
   const folders = (await api.get('/folders')).filter(f => f.kind === 'prop');
   const folderF = PAGE_STATE.propFolder || '';
   const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
@@ -7861,18 +7889,28 @@ PAGES.properties = async (root) => {
       ${(() => { const mp = Math.min(...props.map(p2 => p2.priceFrom || Infinity)); return isFinite(mp) ? `<div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вход в рынок от <b>$${mp.toLocaleString('ru-RU')}</b> · первичка ${props.filter(p2 => p2.market === 'offplan').length} · вторичка ${props.filter(p2 => p2.market === 'secondary').length}</span></div>` : ''; })()}
     `, { v: 'mark', hue: '#C89B4B' })}
     <div class="filters">
-      <input id="prQ" placeholder="Поиск: проект / район / застройщик" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:200px;flex:1 1 200px">
+      <input id="prQ" placeholder="Поиск: проект / район / застройщик (с опечатками)" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:220px;flex:1 1 220px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
-      <select id="prBeds"><option value="">Любые спальни</option>${['Studio', '1', '2', '3', '4'].map(bx => `<option value="${bx}" ${bedsF === bx ? 'selected' : ''}>${bx === 'Studio' ? 'Студия' : bx + '+ спальни'}</option>`).join('')}</select>
-      <input id="prPMin" type="number" placeholder="Цена от $" value="${PAGE_STATE.propPriceMin || ''}" style="width:120px">
-      <input id="prPMax" type="number" placeholder="до $" value="${PAGE_STATE.propPriceMax || ''}" style="width:100px">
-      <select id="prStatus"><option value="">Всё наличие</option><option value="avail" ${statusF === 'avail' ? 'selected' : ''}>Есть в наличии</option><option value="sold" ${statusF === 'sold' ? 'selected' : ''}>Распродано</option></select>
-      ${(q || pMin || pMax || bedsF || statusF) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
+      <button class="btn btn-sm ${F.propFiltersOpen ? 'on-map' : ''}" id="prFiltBtn" title="Расширенный фильтр">${ic(I.gear || I.doc)}Фильтры${advCount ? ' · ' + advCount : ''}</button>
+      ${(q || advCount) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
+    </div>
+    <div id="prFiltPanel" class="glass card" style="${F.propFiltersOpen ? '' : 'display:none'};margin:0 0 12px;padding:14px 16px">
+      <div class="pf-grid">
+        <label class="pf-f"><span>Тип</span><select id="prType"><option value="">Любой</option>${PTYPES.map(t => `<option value="${t.k}" ${typeF === t.k ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
+        <label class="pf-f"><span>Спальни</span><select id="prBeds"><option value="">Любые</option>${['Studio', '1', '2', '3', '4', '5'].map(bx => `<option value="${bx}" ${bedsF === bx ? 'selected' : ''}>${bx === 'Studio' ? 'Студия' : bx + '+'}</option>`).join('')}</select></label>
+        <label class="pf-f"><span>Район</span><select id="prDist"><option value="">Все</option>${distsAll.map(d => `<option value="${esc(d)}" ${distF === d ? 'selected' : ''}>${esc(d.length > 40 ? d.slice(0, 40) + '…' : d)}</option>`).join('')}</select></label>
+        <label class="pf-f"><span>Застройщик</span><select id="prDev"><option value="">Все</option>${devsAll.map(d => `<option value="${esc(d)}" ${devF === d ? 'selected' : ''}>${esc(d.length > 30 ? d.slice(0, 30) + '…' : d)}</option>`).join('')}</select></label>
+        <label class="pf-f"><span>Наличие</span><select id="prStatus"><option value="">Всё</option><option value="avail" ${statusF === 'avail' ? 'selected' : ''}>Есть в наличии</option><option value="sold" ${statusF === 'sold' ? 'selected' : ''}>Распродано</option></select></label>
+        <label class="pf-f"><span>Цена, $</span><span class="pf-range"><input id="prPMin" type="number" placeholder="от" value="${F.propPriceMin || ''}"><input id="prPMax" type="number" placeholder="до" value="${F.propPriceMax || ''}"></span></label>
+        <label class="pf-f"><span>Площадь <button type="button" id="prAUnit" class="pf-unit">${aUnit === 'sqft' ? 'sqft' : 'm²'}</button></span><span class="pf-range"><input id="prAMin" type="number" placeholder="от" value="${F.propAreaMin || ''}"><input id="prAMax" type="number" placeholder="до" value="${F.propAreaMax || ''}"></span></label>
+        <label class="pf-f"><span>Доходность ROI, % от</span><input id="prRoi" type="number" placeholder="напр. 7" value="${F.propRoiMin || ''}"></label>
+        <label class="pf-f"><span>Сдача, год</span><span class="pf-range"><input id="prHFrom" type="number" placeholder="от" value="${F.propHandFrom || ''}"><input id="prHTo" type="number" placeholder="до" value="${F.propHandTo || ''}"></span></label>
+      </div>
     </div>
     <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px">
       <div class="pr-split">
@@ -7918,11 +7956,12 @@ PAGES.properties = async (root) => {
   $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
   /* расширенный фильтр (карта синхронизируется — initPropMap(list), а не всех props) */
   $('#prQ')?.addEventListener('input', (e) => { PAGE_STATE.propQ = e.target.value; clearTimeout(window._prQT); window._prQT = setTimeout(() => { PAGE_STATE._focusQ = true; render(); }, 400); });
-  $('#prBeds')?.addEventListener('change', (e) => { PAGE_STATE.propBeds = e.target.value; render(); });
-  $('#prPMin')?.addEventListener('change', (e) => { PAGE_STATE.propPriceMin = e.target.value; render(); });
-  $('#prPMax')?.addEventListener('change', (e) => { PAGE_STATE.propPriceMax = e.target.value; render(); });
-  $('#prStatus')?.addEventListener('change', (e) => { PAGE_STATE.propStatus = e.target.value; render(); });
-  $('#prReset')?.addEventListener('click', () => { PAGE_STATE.propQ = ''; PAGE_STATE.propPriceMin = ''; PAGE_STATE.propPriceMax = ''; PAGE_STATE.propBeds = ''; PAGE_STATE.propStatus = ''; render(); });
+  $('#prFiltBtn')?.addEventListener('click', () => { PAGE_STATE.propFiltersOpen = !PAGE_STATE.propFiltersOpen; render(); });
+  const wireF = (id, key) => { const el2 = $('#' + id); if (el2) el2.addEventListener('change', (e) => { PAGE_STATE[key] = e.target.value; render(); }); };
+  wireF('prType', 'propType'); wireF('prBeds', 'propBeds'); wireF('prDist', 'propDistrict'); wireF('prDev', 'propDeveloper'); wireF('prStatus', 'propStatus');
+  wireF('prPMin', 'propPriceMin'); wireF('prPMax', 'propPriceMax'); wireF('prAMin', 'propAreaMin'); wireF('prAMax', 'propAreaMax'); wireF('prRoi', 'propRoiMin'); wireF('prHFrom', 'propHandFrom'); wireF('prHTo', 'propHandTo');
+  $('#prAUnit')?.addEventListener('click', (e) => { e.preventDefault(); PAGE_STATE.propAreaUnit = (PAGE_STATE.propAreaUnit === 'sqft' ? 'm2' : 'sqft'); render(); });
+  $('#prReset')?.addEventListener('click', () => { ['propQ', 'propType', 'propBeds', 'propDistrict', 'propDeveloper', 'propStatus', 'propPriceMin', 'propPriceMax', 'propAreaMin', 'propAreaMax', 'propRoiMin', 'propHandFrom', 'propHandTo'].forEach(k => PAGE_STATE[k] = ''); render(); });
   if (PAGE_STATE._focusQ) { PAGE_STATE._focusQ = false; const qi = $('#prQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
   if (PAGE_STATE.propMap) initPropMap(list);
   $$('.prm-row', root).forEach(r => r.addEventListener('click', () => {
@@ -13715,6 +13754,69 @@ PAGES.numbers = async (root) => {
   $('#wuStop')?.addEventListener('click', async () => { await api.post('/warmup/stop', {}); if (window.WARMUP_POLL) { clearInterval(window.WARMUP_POLL); window.WARMUP_POLL = null; } toast('Прогрев остановлен', null, true); await loadState(); render(); });
 };
 
+/* ---------------- Библиотека WhatsApp-шаблонов (пресеты на модерацию Meta) ----------------
+   Фокус — пробуждение спящих лидов недвижимости. Все тексты Meta-совместимы: живой язык,
+   без КАПСА и спам-клише, 0-1 эмодзи, мягкий вопрос-CTA (opt-in дружелюбно), переменные
+   {name}/{geo}/{agency}/{broker}/{slot}. Реанимация = категория marketing (Meta отклоняет
+   ре-энгейджмент как utility); напоминания/подборка-готова — законный utility. */
+const WA_TPL_LIBRARY = [
+  { grp: 'Пробуждение · новые запуски', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Новые запуски · RU', body: '{name}, здравствуйте! Вы смотрели недвижимость в {geo}. Вышли новые проекты — на старте продаж цены ниже рынка. Прислать свежую подборку под ваш запрос?' },
+    { lang: 'en', name: 'New launches · EN', body: 'Hi {name}! You were looking at property in {geo}. New projects just launched at below-market entry prices. Want a fresh shortlist for your request?' },
+  ] },
+  { grp: 'Пробуждение · рассрочка 0%', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Рассрочка 0% · RU', body: '{name}, добрый день! По {geo} появились объекты с рассрочкой 0% на 2–3 года без переплаты. Актуально посмотреть варианты под ваш бюджет?' },
+    { lang: 'en', name: '0% payment plan · EN', body: 'Hi {name}! In {geo} there are now units with 0% payment plans over 2–3 years. Shall I send options within your budget?' },
+  ] },
+  { grp: 'Пробуждение · сдвиг рынка', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Сдвиг рынка · RU', body: '{name}, здравствуйте! Рынок {geo} заметно изменился с вашего последнего запроса. Подготовить короткий обзор, что сейчас выгодно?' },
+    { lang: 'en', name: 'Market shift · EN', body: 'Hi {name}! The {geo} market has shifted noticeably since your last enquiry. Want a short overview of what makes sense now?' },
+  ] },
+  { grp: 'Пробуждение · личный подбор брокера', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Подбор брокера · RU', body: '{name}, это {agency}. {broker} отобрал 3 объекта в {geo} специально под ваш запрос. Прислать их сюда одним сообщением?' },
+    { lang: 'en', name: 'Broker pick · EN', body: 'Hi {name}, this is {agency}. {broker} handpicked 3 properties in {geo} for your request. Send them here in one message?' },
+  ] },
+  { grp: 'Пробуждение · доходность/аренда', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Доходность · RU', body: '{name}, добрый день! По {geo} обновилась доходность от аренды — часть объектов сейчас окупается быстрее. Показать, что выгоднее под инвестицию?' },
+    { lang: 'en', name: 'Rental yield · EN', body: 'Hi {name}! Rental yields in {geo} have updated — some units now pay back faster. Want to see what performs best for investment?' },
+  ] },
+  { grp: 'Пробуждение · последние юниты', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Последние юниты · RU', body: '{name}, здравствуйте! В интересном вам {geo} в паре проектов остаются последние юниты. Проверить, есть ли то, что вам подойдёт?' },
+    { lang: 'en', name: 'Last units · EN', body: 'Hi {name}! A couple of projects in {geo} have their last units left. Want me to check if any fit what you were after?' },
+  ] },
+  { grp: 'Пробуждение · мягкий check-in', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Мягкий check-in · RU', body: '{name}, добрый день! Давно не общались — как ваши планы по недвижимости в {geo}? Если ещё в поиске, помогу освежить подборку.' },
+    { lang: 'en', name: 'Soft check-in · EN', body: 'Hi {name}! It has been a while — how are your property plans in {geo}? If you are still looking, I can refresh your shortlist.' },
+  ] },
+  { grp: 'Пробуждение · быстрый да/нет', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Ещё актуально? · RU', body: '{name}, здравствуйте! Коротко: ваш запрос по {geo} ещё актуален? Если да — пришлю свежие варианты сегодня.' },
+    { lang: 'en', name: 'Still relevant? · EN', body: 'Hi {name}! Quick one: is your {geo} property search still active? If yes, I will send fresh options today.' },
+  ] },
+  { grp: 'Пробуждение · условия застройщика', cat: 'marketing', items: [
+    { lang: 'ru', name: 'Условия застройщика · RU', body: '{name}, здравствуйте! Застройщики в {geo} обновили условия — появились скидки и удобные планы оплаты. Прислать актуальную подборку?' },
+    { lang: 'en', name: 'Developer terms · EN', body: 'Hi {name}! Developers in {geo} have updated their terms — new discounts and payment plans. Want the current shortlist?' },
+  ] },
+  { grp: 'Сервисные (utility — дешевле, быстрее модерация)', cat: 'utility', items: [
+    { lang: 'ru', name: 'Напоминание о созвоне · RU', body: '{name}, напоминаю: у вас созвон с {broker} по {geo} — {slot}. Всё в силе? Ответьте да/нет, подстроюсь под вас.' },
+    { lang: 'ru', name: 'Подборка готова · RU', body: '{name}, ваша подборка по {geo} готова. Удобно, если пришлю сюда сейчас коротким сообщением?' },
+    { lang: 'en', name: 'Call reminder · EN', body: 'Hi {name}, a reminder: your call with {broker} about {geo} is at {slot}. Still good? Reply yes/no and I will adjust.' },
+  ] },
+];
+function openTplLibrary(onAdd) {
+  const card = (it, cat) => `<div class="glass tpl-card" style="margin:0">
+    <div class="tpl-head"><div class="nm">${esc(it.name)}</div><span class="badge">${it.lang.toUpperCase()}</span><span class="badge ${cat === 'marketing' ? 'warn' : 'ok'}">${cat === 'marketing' ? 'marketing' : 'utility'}</span>
+      <button class="btn btn-sm btn-accent" style="margin-left:auto" data-tpladd='${esc(JSON.stringify({ name: it.name, lang: it.lang, body: it.body, category: cat }))}'>${ic(I.plus)}Добавить</button></div>
+    <div class="tpl-body">${esc(it.body)}</div></div>`;
+  const body = `<div class="lc-hint info" style="margin-bottom:12px"><span>${ic(I.shield)}Готовые Meta-совместимые шаблоны для пробуждения спящих лидов. «Добавить» → шаблон появится в списке, дальше отправите его на модерацию Meta кнопкой на карточке. Для marketing кнопка «Отписаться» добавится автоматически.</span></div>
+    ${WA_TPL_LIBRARY.map(g => `<div class="tpllib-grp"><div class="nav-label" style="padding-left:2px;margin:14px 0 8px">${esc(g.grp)}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px">${g.items.map(it => card(it, g.cat)).join('')}</div></div>`).join('')}`;
+  const bd = modal({ title: 'Библиотека шаблонов', sub: 'Пресеты под реанимацию спящих — добавьте и отправьте на модерацию', body, wide: true, actions: [{ label: 'Закрыть' }] });
+  $$('[data-tpladd]', bd).forEach(b => b.addEventListener('click', async () => {
+    let p; try { p = JSON.parse(b.dataset.tpladd); } catch (_) { return; }
+    b.disabled = true; b.textContent = 'Добавляю…';
+    try { await api.post('/templates', p); toast('Шаблон добавлен', 'Отправьте на модерацию Meta кнопкой на карточке', true); b.textContent = '✓ Добавлен'; if (onAdd) onAdd(); }
+    catch (e) { toast('Не вышло', e.message); b.disabled = false; b.textContent = 'Добавить'; }
+  }));
+}
 /* ---------------- ШАБЛОНЫ ---------------- */
 PAGES.templates = async (root) => {
   const st = await api.get('/state');

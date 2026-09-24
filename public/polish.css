@@ -155,7 +155,8 @@ input[type=number] { -moz-appearance: textfield; }
 .num-step-btns button { width: 18px; height: 13px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--stroke, #e5ddcf); background: var(--bg-2, #f6f2ea); color: var(--accent, #b8863c); border-radius: 4px; cursor: pointer; padding: 0; transition: background .12s, color .12s; }
 .num-step-btns button:hover { background: var(--accent, #b8863c); color: #fff; border-color: var(--accent, #b8863c); }
 .num-step-btns button svg { width: 9px; height: 9px; }
-.num-step-btns .num-up svg { transform: rotate(180deg); }
+.num-step-btns .num-up svg { transform: rotate(-90deg); }
+.num-step-btns .num-dn svg { transform: rotate(90deg); }
 .num-step-btns .num-up { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .num-step-btns .num-dn { border-top-left-radius: 0; border-top-right-radius: 0; }
 
@@ -183,8 +184,8 @@ input[type=number] { -moz-appearance: textfield; }
 .lg-nav { grid-row: 1; align-self: center; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
 .lg-nav:hover { background: var(--accent, #b8863c); border-color: var(--accent, #b8863c); }
 .lg-nav svg { width: 22px; height: 22px; }
-.lg-prev { grid-column: 1; } .lg-prev svg { transform: rotate(90deg); }
-.lg-next { grid-column: 3; } .lg-next svg { transform: rotate(-90deg); }
+.lg-prev { grid-column: 1; } .lg-prev svg { transform: rotate(180deg); }
+.lg-next { grid-column: 3; } .lg-next svg { transform: none; }
 .lg-close { position: absolute; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .lg-close:hover { background: rgba(255,255,255,.2); }
 .lg-close svg { width: 18px; height: 18px; }
@@ -210,3 +211,12 @@ input[type=number] { -moz-appearance: textfield; }
 .prm-row-l { font-size: 11px; color: var(--muted, #8a8378); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prm-row-p { font-size: 12.5px; color: var(--accent, #b8863c); font-weight: 700; margin-top: 2px; }
 .prm-stub, .prpop-stub { font-size: 9px; background: #efe7d6; color: #8a6d1f; padding: 1px 5px; border-radius: 5px; font-weight: 700; vertical-align: middle; }
+
+/* ---------- Расширенный фильтр объектов (сворачиваемая панель) ---------- */
+.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 14px; }
+.pf-f { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.pf-f > span { font-weight: 600; color: var(--muted, #8a8378); display: flex; align-items: center; gap: 6px; }
+.pf-range { display: flex; gap: 6px; }
+.pf-range input { width: 50%; min-width: 0; }
+.pf-unit { font-size: 10px; font-weight: 700; padding: 1px 6px; border: 1px solid var(--stroke, #e5ddcf); border-radius: 6px; background: var(--bg-2, #f6f2ea); color: var(--accent, #b8863c); cursor: pointer; }
+.pf-unit:hover { background: var(--accent, #b8863c); color: #fff; }
