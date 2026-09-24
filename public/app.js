@@ -7610,7 +7610,7 @@ PAGES.properties = async (root) => {
         </div>
 
         <div class="pds">
-          <div class="pds-hd"><span class="pds-ic">${ic(I.grid)}</span><div><b>Юниты</b><i>попадают таблицей в подборку и PDF</i></div></div>
+          <div class="pds-hd"><span class="pds-ic">${ic(I.grid)}</span><div><b>Юниты</b><i>попадают таблицей в подборку и PDF</i></div><span class="tb-spacer"></span><button class="btn btn-sm" id="uReconcile" title="Вставьте прайс/сообщение застройщика или файл — ИИ обновит наличие">${ic(I.spark)}Обновить наличие</button></div>
           <table class="tbl"><thead><tr><th>Планировка</th><th>Площадь</th><th>Этаж</th><th>Вид</th><th>Цена</th><th></th></tr></thead><tbody>
             ${(pr.units || []).map((u2, ix) => `<tr><td><b>${esc(u2.plan)}</b></td><td>${esc(u2.area)}</td><td>${esc(u2.floor)}</td><td>${esc(u2.view)}</td><td style="color:var(--accent);font-weight:700">${(u2.price || 0).toLocaleString('ru-RU')}</td><td><button class="btn-ghost" data-unitdel="${ix}">${ic(I.x)}</button></td></tr>`).join('')}
           </tbody></table>
@@ -7745,6 +7745,35 @@ PAGES.properties = async (root) => {
       render();
     });
     $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
+    $('#uReconcile').addEventListener('click', () => {
+      const md = modal({ title: 'Обновить наличие юнитов', sub: 'Вставьте прайс/сообщение застройщика (WhatsApp/Telegram) ИЛИ загрузите файл (Excel/CSV). ИИ сверит с текущими: новые добавит, пропавшие пометит проданными.', wide: true, body: `
+        <textarea id="recText" style="min-height:120px;font-size:12.5px" placeholder="Вставьте текст: «Проданы 701, 703, 710. В наличии: студия 45м² 4.7M, 2BR 62м² 12.2M…»"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <label class="btn btn-sm">${ic(I.doc)}Файл Excel/CSV<input type="file" id="recFile" accept=".xlsx,.xls,.csv,.txt" hidden></label>
+          <span id="recFileName" class="muted" style="font-size:11.5px"></span>
+          <span class="tb-spacer"></span>
+          <button class="btn btn-sm" id="recPrev">${ic(I.search || I.spark)}Проверить</button>
+        </div>
+        <div id="recOut" style="margin-top:12px"></div>`, actions: [{ label: 'Закрыть' }] });
+      let fileB64 = '', fileName = '';
+      $('#recFile', md).addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; fileName = f.name; $('#recFileName', md).textContent = f.name; const rd = new FileReader(); rd.onload = () => { fileB64 = String(rd.result).replace(/^data:[^,]*,/, ''); }; rd.readAsDataURL(f); });
+      const call = async (apply) => {
+        const body = { apply }; const txt = $('#recText', md).value.trim();
+        if (txt) body.text = txt; else if (fileB64) { body.fileB64 = fileB64; body.fileName = fileName; } else return toast('Вставьте текст или файл');
+        const out = $('#recOut', md); out.innerHTML = '<span class="muted" style="font-size:12px">ИИ разбирает…</span>';
+        try {
+          const r = await api.post('/properties/' + pr.id + '/reconcile-units', body);
+          if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; return; }
+          if (apply) { toast('Наличие обновлено', `+${r.added} доступно · ${r.sold} продано · всего доступно ${r.available}`, true); closeModal(); PAGES.properties(root); return; }
+          const smpA = (r.sample && r.sample.added || []).slice(0, 5).map(u => `${esc(u.type || u.plan || '')} ${esc(u.area || '')} ${u.price ? '· ' + (+u.price).toLocaleString('ru-RU') : ''}`).join('<br>');
+          const smpS = (r.sample && r.sample.sold || []).slice(0, 5).map(u => `${esc(u.unitNo || u.type || u.plan || '')} ${esc(u.floor || '')}`).join('<br>');
+          out.innerHTML = `<div class="rec-diff"><div><b style="color:var(--good,#6d8a4f)">+${r.added}</b> новых<br><span class="muted" style="font-size:11px">${smpA || '—'}</span></div><div><b style="color:var(--bad)">${r.sold}</b> продано/снято<br><span class="muted" style="font-size:11px">${smpS || '—'}</span></div><div><b>${r.kept}</b> без изменений</div></div>
+            <button class="btn btn-accent" id="recApply" style="width:100%;justify-content:center;margin-top:12px">Применить (${r.added} +, ${r.sold} продано)</button>`;
+          $('#recApply', md).addEventListener('click', () => call(true));
+        } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
+      };
+      $('#recPrev', md).addEventListener('click', () => call(false));
+    });
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
     $('#pdEnrich').addEventListener('click', async () => {
       const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание' };

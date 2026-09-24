@@ -158,3 +158,8 @@ input[type=number] { -moz-appearance: textfield; }
 .num-step-btns .num-up svg { transform: rotate(180deg); }
 .num-step-btns .num-up { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .num-step-btns .num-dn { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* ---------- Сверка наличия юнитов: превью diff ---------- */
+.rec-diff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.rec-diff > div { background: var(--bg-2, #f6f2ea); border: 1px solid var(--stroke, #e5ddcf); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; }
+.rec-diff b { font-size: 20px; }
