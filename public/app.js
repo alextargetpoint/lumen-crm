@@ -7482,11 +7482,21 @@ async function initPropMap(props) {
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
     const img = (p.images && p.images[0]) || '';
     const price = p.priceFrom ? 'от ' + fmt(p) : '';
-    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<button class="btn btn-sm btn-accent prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true });
+    const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
+    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}${p.stub ? ' <span class="prpop-stub">каталог</span>' : ''}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true });
     bounds.push([p.lat, p.lng]);
   });
   if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
-  map.on('popupopen', (e) => { const b = e.popup.getElement().querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propMap = false; render(); }); });
+  map.on('popupopen', (e) => {
+    const root2 = e.popup.getElement();
+    const b = root2.querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propMap = false; render(); });
+    const h = root2.querySelector('[data-prophydrate]');
+    if (h) h.addEventListener('click', async () => {
+      h.disabled = true; h.textContent = 'Тяну карточку…';
+      try { const r = await api.post('/properties/from-url', { url: h.dataset.src, full: true }); if (r.error) { toast('Не вышло', r.error); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; return; } toast('Карточка собрана', `${r.property.name} · фото ${r.imagesSaved}`, true); PAGE_STATE.propView = r.property.id; PAGE_STATE.propMap = false; render(); }
+      catch (err) { toast('Ошибка', err.message); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; }
+    });
+  });
   if (status) status.textContent = pts.length + ' из ' + latest.length + ' на карте' + (pts.length < latest.length ? ' · остальные без распознанной локации (укажите район в карточке)' : '');
   setTimeout(() => { try { map.invalidateSize(); } catch (_) {} }, 250);
 }
@@ -7507,7 +7517,7 @@ PAGES.properties = async (root) => {
       <option value="" disabled ${val ? '' : 'selected'}>${ph || '—'}</option>
       ${options.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}
       ${val && !options.includes(val) ? `<option selected>${esc(val)}</option>` : ''}
-      <option value="__custom">✏️ Своё значение…</option>
+      <option value="__custom">Своё значение…</option>
     </select>`;
     const gi = (field, val, ph, num) => `<input class="gi" data-f="${field}" ${num ? 'type="number"' : ''} value="${esc(val ?? '')}" placeholder="${ph || '—'}">`;
     const fmt = (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');

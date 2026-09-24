@@ -10728,6 +10728,12 @@ ${SCR}
       const b = await readBody(req); const url = String(b.url || '').trim();
       if (!/^https?:\/\//i.test(url)) return json(res, 400, { error: 'нужна ссылка http(s) на объект' });
       const absUrl = (u2) => { try { return new URL(u2, url).href; } catch (_) { return ''; } };
+      /* авто-детект дубля: готовая карточка с этой ссылкой уже есть → спрашиваем (обновить/копия),
+         НЕ тратя рендер+ИИ. Стаб из каталога дополняем тихо. force: 'update'|'new' — из подтверждения. */
+      { const dup0 = (db.properties || []).find(x => x.sourceUrl === url);
+        if (dup0 && !dup0.stub && b.force !== 'update' && b.force !== 'new') {
+          return json(res, 200, { exists: true, existingId: dup0.id, existingName: dup0.name, hydratedAt: dup0.hydratedAt || dup0.addedAt || null });
+        } }
       let html = '';
       try {
         const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
@@ -10799,8 +10805,23 @@ ${SCR}
         try { const rr = await fetch(fu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } }); if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer()); if (buf.length < 2000 || buf.length > 8e6) return null; const ex3 = ((fu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase(); const fn = 'plan_' + crypto.randomBytes(6).toString('hex') + ex3; fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf); return { label: 'Планировка', url: '/assets/props/' + fn }; } catch (_) { return null; }
       }))).filter(Boolean);
       if (layImgs.length) mapped.layouts = layImgs;
-      const pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now() }, mapped);
-      db.properties = db.properties || []; db.properties.push(pr); store.save();
+      db.properties = db.properties || [];
+      /* upsert по sourceUrl: подтягивание стаба/обновление — ОБНОВЛЯЕМ (не плодим дубль); force:'new' — копия */
+      const existing = b.force === 'new' ? null : db.properties.find(x => x.sourceUrl === url);
+      let pr;
+      if (existing) {
+        const wasStub = existing.stub; const keepGeo = { lat: existing.lat, lng: existing.lng };
+        Object.assign(existing, mapped, { stub: false, draft: false, hydratedAt: Date.now() });
+        if (existing.lat == null) { existing.lat = keepGeo.lat; existing.lng = keepGeo.lng; }
+        existing.history = existing.history || [];
+        existing.history.unshift({ at: Date.now(), action: wasStub ? 'Собрана полная карточка из каталога' : 'Обновлена свежими данными по ссылке' });
+        if (existing.history.length > 60) existing.history.length = 60;
+        pr = existing;
+      } else {
+        pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now(), history: [{ at: Date.now(), action: 'Импортирована по ссылке' }] }, mapped);
+        db.properties.push(pr);
+      }
+      store.save();
       return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length, units: (mapped.units || []).length, floorplans: (mapped.layouts || []).length });
     }
     /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
@@ -10849,6 +10870,39 @@ ${SCR}
       if (incoming.length && (!pr.priceFrom || Math.min(...incoming.filter(u => u.price).map(u => u.price)) < pr.priceFrom)) { const mn = Math.min(...incoming.filter(u => u.price).map(u => u.price)); if (mn && isFinite(mn)) pr.priceFrom = mn; }
       store.save();
       return json(res, 200, { ok: true, added: added.length, sold: sold.length, kept: kept.length, available: merged.filter(u => u.status === 'available').length });
+    }
+    /* ⭐ АГРЕГАЦИЯ КАТАЛОГА ПОРТАЛА: рендерим страницу каталога → ИИ достаёт список проектов
+       (имя+локация+сводка+ссылка) → создаём лёгкие СТАБЫ (на карте пинами, клик→подтянуть полную).
+       portal: housebook | resale | <любой catalogUrl>. */
+    if (p === '/api/properties/import-catalog' && req.method === 'POST') {
+      const b = await readBody(req);
+      const PORTALS = { housebook: 'https://th.housebook.deals/en/catalog', resale: 'https://resale-center.com/?view=search&search_view=list' };
+      const catUrl = String(b.catalogUrl || PORTALS[b.portal] || '').trim();
+      if (!/^https?:\/\//i.test(catUrl)) return json(res, 400, { error: 'нужен портал (housebook/resale) или catalogUrl' });
+      if (!renderReady()) return json(res, 400, { error: 'нужен RENDER_API_KEY для рендера каталога' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      const rp = await renderPage(catUrl);
+      if (!rp || !(rp.markdown || rp.html)) return json(res, 400, { error: 'каталог не отрендерился' });
+      let projects; try { projects = await llm.extractCatalog(rp.markdown || rp.html); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал каталог: ' + e.message }); }
+      const absU = (u2) => { try { return new URL(u2, catUrl).href; } catch (_) { return ''; } };
+      db.properties = db.properties || [];
+      let created = 0, skipped = 0;
+      for (const pj of (projects || []).slice(0, 80)) {
+        const nm = String(pj.name || '').trim(); if (nm.length < 3) { skipped++; continue; }
+        const src = absU(pj.url || '');
+        const dup = db.properties.find(x => (src && x.sourceUrl === src) || (x.name || '').toLowerCase().trim() === nm.toLowerCase());
+        if (dup) { skipped++; continue; }
+        db.properties.push({
+          id: store.nextId('pr'), name: nm.slice(0, 120), area: String(pj.area || '').slice(0, 80),
+          developer: '', market: 'offplan', type: String(pj.type || '').slice(0, 20), beds: 0,
+          priceFrom: +pj.priceFrom || 0, currency: (String(pj.currency || '').toUpperCase().match(/USD|EUR|AED|THB/) || ['USD'])[0],
+          geo: b.geo || 'phuket', tags: ['каталог'], materials: [], images: [], units: [], layouts: [], amenities: [],
+          sourceUrl: src || null, stub: true, catalogPortal: b.portal || 'custom', addedAt: Date.now(),
+        });
+        created++;
+      }
+      store.save();
+      return json(res, 200, { ok: true, created, skipped, total: (projects || []).length });
     }
     /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
        До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
