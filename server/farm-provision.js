@@ -99,6 +99,9 @@ function enqueue(deviceId, count, slot) {
   for (let i = 0; i < n; i++) {
     const num = farmSvc.addNumber({ phone: '', deviceId, slot: slot || 'island', waStatus: 'provisioning' });
     num.prov = { step: 'acquire', needsAgent: false, esimRef: '', lastError: '', at: Date.now() };
+    /* авто-привязка свободного UK-прокси (телефон и серверный компаньон ходят через один IP — анти-бан) */
+    const freePx = f.proxies.find(px => !px.assignedTo);
+    if (freePx) farmSvc.attachProxy(num.id, freePx.id);
     made.push(num.id);
   }
   farmSvc.farm().log.unshift({ at: Date.now(), action: 'prov.enqueue', deviceId, count: n });
@@ -128,7 +131,7 @@ function agentJobs() {
     .filter(n => n.prov && n.prov.needsAgent && n.deviceId && (n.wa.status === 'provisioning' || n.tg.status === 'provisioning' || n.prov.step === 'register-wa' || n.prov.step === 'register-tg'))
     .map(n => {
       const dev = f.devices.find(d => d.id === n.deviceId) || {};
-      return { id: n.id, phone: n.phone, serial: dev.serial, slot: n.slot, step: n.prov.step, esimRef: n.prov.esimRef || (n.esim && n.esim.ref) || '', twoFaPin: n.wa.twoFaPin || '', recoveryEmail: n.wa.recoveryEmail || '' };
+      return { id: n.id, phone: n.phone, serial: dev.serial, slot: n.slot, step: n.prov.step, esimRef: n.prov.esimRef || (n.esim && n.esim.ref) || '', twoFaPin: n.wa.twoFaPin || '', twoFaPassword: (n.tg && n.tg.twoFaPassword) || '', displayName: n.displayName || '' };
     });
 }
 
