@@ -38,10 +38,31 @@ function enroll(numberId) {
 function dayOf(n) { if (!n.warm || !n.warm.enrolledAt) return 0; return Math.floor((Date.now() - n.warm.enrolledAt) / DAY) + 1; }
 function targetToday(n) { const w = plan(); const d = Math.min(dayOf(n), w.days); return w.rampOut[d - 1] || 0; }
 
-/* хук реальной отправки (пока лог; подключим WA/GramJS-воркеры) */
+/* фразы прогрева — короткие, живые, разнообразные (номера пула переписываются между собой) */
+const WARM_PHRASES = [
+  'Привет! Как дела?', 'Добрый день 🙂', 'Спасибо большое!', 'Хорошо, договорились', 'Понял, спасибо',
+  'Доброе утро', 'Как погода у вас?', 'Отлично, до связи', 'Принял', 'Согласен', 'Ок, супер',
+  'Рад слышать', 'Всё в силе?', 'Да, конечно', 'Хорошего дня!', 'Спасибо, взаимно',
+];
+/* реальный отправитель: (fromPhone, toPhone, text) => Promise. Ставится из index.js (через WA-воркер). */
+let warmSender = null;
+function setWarmSender(fn) { warmSender = fn; }
+
+/* отправка дневной нормы: warming-номер пишет `count` сообщений пирами пула через воркер.
+   Fire-and-forget (не блокируем тик). Если отправитель не задан / номер не залинкован — молча 0. */
 function executeActions(n, count) {
-  /* TODO: дернуть воркер: n номер пишет случайным номерам пула + seed. Сейчас — фиксируем факт. */
-  return { sent: count, simulated: true };
+  const f = farmSvc.farm();
+  const peers = f.numbers.filter(x => x.id !== n.id && x.phone && ['warming', 'ready', 'assigned'].includes(x.wa.status));
+  if (!warmSender || !n.phone || !peers.length) return { sent: 0, simulated: true };
+  const base = (n.warm && n.warm.actionsDone) || 0;
+  let fired = 0;
+  for (let i = 0; i < count; i++) {
+    const peer = peers[(base + i) % peers.length];
+    const text = WARM_PHRASES[(base + i) % WARM_PHRASES.length];
+    try { const r = warmSender(n.phone, peer.phone, text); if (r && r.catch) r.catch(() => {}); fired++; }
+    catch (e) { break; }   /* воркер недоступен — прекращаем на сегодня */
+  }
+  return { sent: fired, simulated: !warmSender };
 }
 
 /* тик прогрева: продвинуть все warming-номера, выполнить дневную норму, завершить готовые */
@@ -86,4 +107,4 @@ function summary() {
   };
 }
 
-module.exports = { plan, enroll, tick, summary, dayOf, targetToday };
+module.exports = { plan, enroll, tick, summary, dayOf, targetToday, setWarmSender };

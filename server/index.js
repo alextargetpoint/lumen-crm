@@ -769,6 +769,30 @@ function buildLeadAdIndex(db) {
   return idx;
 }
 
+/* ⭐ Квал по «максимально достигнутой стадии» (high-water mark), а НЕ по текущей.
+   Для аналитики трафик-подрядчиков/кампаний/источников: лид, который был квалифицирован, а потом
+   отвалился (уснул/потерян/перестал отвечать), всё равно засчитывается как квал — иначе метрика
+   качества подрядчика тает по мере естественного отвала лидов. Сигналы durable (переживают откат
+   стадии, бэкфилл не нужен): текущая квал-стадия · пометка прохождения квала · передан брокеру ·
+   все 4 оси квалификации закрыты. НЕ применять к живому снимку воронки (там нужна текущая стадия). */
+function everReachedQual(db, l, mode) {
+  if (!l) return false;
+  const QUAL = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+  const inQualNow = QUAL.includes(l.stage);
+  if (mode === 'current') return inQualNow;                                  /* режим «снимок»: только текущая стадия */
+  if (inQualNow) return true;                                                /* сейчас в квале */
+  if (l.stagePeakQual) return true;                                          /* forward-пометка прохождения квала */
+  if (l.handoverAt) return true;                                             /* был передан брокеру = прошёл квал */
+  if (l.quals && ai.AXES.every(a => l.quals[a])) return true;               /* все 4 оси закрыты = был квалифицирован (durable) */
+  return false;
+}
+/* forward-пометка: как только лид входит в квал-стадию — ставим durable-флаг, переживающий откат */
+function markPeakQual(db, l) {
+  if (!l) return;
+  const Q = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
+  if (Q.includes(l.stage)) l.stagePeakQual = true;
+}
+
 /* метрики объявления за диапазон дат [from..to].
    С диапазоном — СТРОГО из посуточного ряда ad.daily (без ряда объявление в период не попадает,
    иначе стейл-тоталы старых объявлений задваивались бы в каждом периоде). Без диапазона — тоталы. */
@@ -3025,6 +3049,17 @@ async function metaAdsTick() {
     }
   } finally { metaAdsBusy = false; }
 }
+/* сквозной прогрев фермы: номер пула шлёт сообщения пирам через платформенный WA-воркер
+   (номер должен быть залинкован как сессия waGraySid(phone); иначе /send отдаст ошибку — тихо пропустим) */
+farmWarm.setWarmSender(async (fromPhone, toPhone, text) => {
+  return store.runInTenant(store.PRIMARY, () => {
+    const db = store.get();
+    return waGrayApi(db, 'POST', '/sessions/' + waGraySid(fromPhone) + '/send', { to: toPhone, text });
+  });
+});
+/* авто-тик прогрева: раз в час продвигаем все warming-номера (дневная норма + выпуск в ready) */
+setInterval(() => { try { store.runInTenant(store.PRIMARY, () => farmWarm.tick()); } catch (_) {} }, 60 * 60e3);
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -4176,7 +4211,7 @@ const server = http.createServer(async (req, res) => {
         const lead = db.leads.find(l => l.id === tam[1]); if (!canSee(lead)) return json(res, 403, { error: 'чужой лид' });
         const b = await readBody(req); const st = String(b.stage || '');
         if (!['new', 'touch', 'dialog', 'qualified', 'handover', 'viewing', 'deal', 'sleeping', 'lost'].includes(st)) return json(res, 400, { error: 'плохая стадия' });
-        if (lead.stage !== st) { lead.stage = st; capi.onStageChange(db, lead, st); ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: стадия изменена брокером из бота → ${st}` }); store.save(); }
+        if (lead.stage !== st) { lead.stage = st; markPeakQual(db, lead); capi.onStageChange(db, lead, st); ai.pushEvent(db, { type: 'stage', leadId: lead.id, text: `${lead.name}: стадия изменена брокером из бота → ${st}` }); store.save(); }
         return json(res, 200, { stage: lead.stage });
       }
       if ((tam = p.match(/^\/tgapp\/api\/lead\/([^/]+)\/note$/)) && req.method === 'POST') {
@@ -6071,7 +6106,7 @@ const server = http.createServer(async (req, res) => {
       if (IS_BROKER && ['delete', 'broker', 'vendor'].includes(action)) return json(res, 403, { error: 'недоступно для брокера' });
       let done = 0;
       for (const l of targets) {
-        if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); capi.onStageChange(db, l, l.stage); } done++; }
+        if (action === 'stage' && b.value) { if (l.stage !== String(b.value)) { l.stage = String(b.value); markPeakQual(db, l); capi.onStageChange(db, l, l.stage); } done++; }
         else if (action === 'archive') { l.stage = 'lost'; l.ai.enabled = false; done++; }
         else if (action === 'broker' && b.value) { const br = db.brokers.find(x => x.id === b.value); if (br) { if (l.broker && l.broker !== br.id) { const old = db.brokers.find(x => x.id === l.broker); if (old) old.load = Math.max(0, old.load - 1); } if (l.broker !== br.id) recordOwner(db, l, br.id, 'owner', 'массовое назначение'); l.broker = br.id; br.load = (br.load || 0) + 1; if (l.stage === 'qualified') { l.stage = 'handover'; capi.onStageChange(db, l, 'handover'); } if (!l.handoverAt) l.handoverAt = Date.now(); done++; } }
         else if (action === 'vendor') { /* массовое назначение подрядчика (b.value = contractorId или пусто = снять) */
@@ -6124,7 +6159,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PATCH') {
         const b = await readBody(req);
-        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; capi.onStageChange(db, lead, b.stage); }
+        if (b.stage && b.stage !== lead.stage) { lead.stage = b.stage; markPeakQual(db, lead); capi.onStageChange(db, lead, b.stage); }
         if (b.broker !== undefined) { const nb = b.broker || null; if (nb !== lead.broker) recordOwner(db, lead, nb, sessionRole(req) && sessionRole(req).role === 'broker' ? 'broker' : 'owner', 'ручное назначение'); lead.broker = nb; }
         if (b.geo) lead.geo = b.geo;
         if (b.ai) {
@@ -9574,7 +9609,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/contractors' && req.method === 'POST') {
       const b = await readBody(req);
       const normAccts = (arr) => (Array.isArray(arr) ? arr : []).map(x => metaads.acctId(x)).filter(Boolean).slice(0, 12);
-      const ct = { id: store.nextId('ct'), name: String(b.name || 'Подрядчик').slice(0, 80), channels: (Array.isArray(b.channels) ? b.channels : []).map(x => String(x).slice(0, 30)).slice(0, 12), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => String(x).slice(0, 30)).slice(0, 12), adAccounts: normAccts(b.adAccounts), contact: String(b.contact || '').slice(0, 200), note: String(b.note || '').slice(0, 500), createdAt: Date.now() };
+      const ct = { id: store.nextId('ct'), name: String(b.name || 'Подрядчик').slice(0, 80), channels: (Array.isArray(b.channels) ? b.channels : []).map(x => String(x).slice(0, 30)).slice(0, 12), geos: (Array.isArray(b.geos) ? b.geos : []).map(x => String(x).slice(0, 30)).slice(0, 12), adAccounts: normAccts(b.adAccounts), contact: String(b.contact || '').slice(0, 200), note: String(b.note || '').slice(0, 500), qualMode: b.qualMode === 'current' ? 'current' : 'peak', createdAt: Date.now() };
       db.mpContractors.unshift(ct); store.save();
       return json(res, 200, ct);
     }
@@ -9587,6 +9622,7 @@ const server = http.createServer(async (req, res) => {
       if (Array.isArray(b.adAccounts)) ct.adAccounts = b.adAccounts.map(x => metaads.acctId(x)).filter(Boolean).slice(0, 12);
       if (b.contact != null) ct.contact = String(b.contact).slice(0, 200);
       if (b.note != null) ct.note = String(b.note).slice(0, 500);
+      if (b.qualMode != null) ct.qualMode = b.qualMode === 'current' ? 'current' : 'peak';
       store.save();
       return json(res, 200, ct);
     }
@@ -9635,7 +9671,12 @@ const server = http.createServer(async (req, res) => {
       const crmLeadsGeo = (g) => (db.leads || []).filter(l => l.geo === g && inPer(l)).length;
       /* CRM-факт по ПОДРЯДЧИКУ (надёжно — по lead.vendorId, назначенному вручную/из вебхука ?vendor=) */
       const QSTAGES = (db.settings.qualStages && db.settings.qualStages.length) ? db.settings.qualStages : ['qualified', 'handover', 'viewing', 'deal'];
-      const crmByVendor = (cid) => { const arr = (db.leads || []).filter(l => (l.vendorId || null) === (cid === '__none' ? null : cid) && inPer(l)); return { leads: arr.length, quals: arr.filter(l => QSTAGES.includes(l.stage)).length }; };
+      const crmByVendor = (cid) => {
+        const arr = (db.leads || []).filter(l => (l.vendorId || null) === (cid === '__none' ? null : cid) && inPer(l));
+        const ct = (db.mpContractors || []).find(c => c.id === cid);
+        const mode = (ct && ct.qualMode) || 'peak';                          /* пер-подрядчик: peak (по достигнутой стадии, дефолт) | current (снимок) */
+        return { leads: arr.length, quals: arr.filter(l => everReachedQual(db, l, mode)).length, qualMode: mode };
+      };
 
       /* rollup */
       const overallCur = curOf(plans);
@@ -10038,7 +10079,7 @@ ${SCR}
         const mine = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
-        const qualified = mine.filter(l => QUAL.includes(l.stage)).length;
+        const qualified = mine.filter(l => everReachedQual(db, l)).length;   /* high-water: был квалифицирован, даже если сейчас отвалился */
         const deals = mine.filter(l => l.stage === 'deal').length;
         const rm = adRangeMetrics(ad, from, to);
         const spend = rm.spend;
@@ -10179,7 +10220,7 @@ ${SCR}
       for (const ad of db.ads) {
         const crmLeads = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leadsCRM = crmLeads.length;
-        const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
+        const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => everReachedQual(db, l)).length;
         const rm = adRangeMetrics(ad, from, to); const dR = dailyIn(ad.daily);
         const am = { spend: rm.spend, leads: rm.leadsMeta, leadsCRM, quals, clicks: rm.clicks, impr: rm.impr, daily: dR, dailyR: dR };
         const cn = ad.campaignName || '— без кампании';
@@ -10209,7 +10250,7 @@ ${SCR}
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
         .map(l => ({ id: l.id, name: l.name, phone: l.phone, stage: l.stage, geo: l.geo, createdAt: l.createdAt, broker: l.broker }));
       const breakdown = {}; for (const l of leads) breakdown[l.stage] = (breakdown[l.stage] || 0) + 1;
-      const quals = leads.filter(l => QUAL.includes(l.stage)).length;
+      const quals = leads.filter(l => everReachedQual(db, l)).length;
       return json(res, 200, { leads, total: leads.length, quals, breakdown, stageNames: namesCfg, qualStages: QUAL });
     }
     if (p === '/api/ads/leadanalytics' && req.method === 'GET') {
@@ -10222,7 +10263,7 @@ ${SCR}
       const campMap = db.settings.adCampaignMap || {}; const langMap = db.settings.adCampaignLangMap || {};
       const dirs = db.settings.adDirections || []; const dirName = (k) => (dirs.find(d => d.key === k) || {}).name || 'Прочее (вне плана)';
       const inR = (l) => { if (!from && !to) return true; const dd = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && dd < from) return false; if (to && dd > to) return false; return true; };
-      const isQual = (l) => QUAL.includes(l.stage);
+      const isQual = (l) => everReachedQual(db, l);   /* high-water mark для качества трафика */
       /* страна → флаг (ручная карта → ISO-2 → словарь имён → 🌐) */
       const FMAP = { 'UAE': '🇦🇪', 'United Arab Emirates': '🇦🇪', 'Эмираты': '🇦🇪', 'ОАЭ': '🇦🇪', 'Saudi Arabia': '🇸🇦', 'Саудовская Аравия': '🇸🇦', 'Russia': '🇷🇺', 'Россия': '🇷🇺', 'United Kingdom': '🇬🇧', 'Великобритания': '🇬🇧', 'United States': '🇺🇸', 'США': '🇺🇸', 'Canada': '🇨🇦', 'Канада': '🇨🇦', 'Australia': '🇦🇺', 'Австралия': '🇦🇺', 'Germany': '🇩🇪', 'Германия': '🇩🇪', 'France': '🇫🇷', 'Франция': '🇫🇷', 'Italy': '🇮🇹', 'Италия': '🇮🇹', 'Spain': '🇪🇸', 'Испания': '🇪🇸', 'Turkey': '🇹🇷', 'Турция': '🇹🇷', 'Thailand': '🇹🇭', 'Таиланд': '🇹🇭', 'Indonesia': '🇮🇩', 'Индонезия': '🇮🇩', 'India': '🇮🇳', 'Индия': '🇮🇳', 'Ukraine': '🇺🇦', 'Украина': '🇺🇦', 'Kazakhstan': '🇰🇿', 'Казахстан': '🇰🇿', 'Israel': '🇮🇱', 'Израиль': '🇮🇱', 'Qatar': '🇶🇦', 'Катар': '🇶🇦' };
       const N2I = { 'czechia': 'CZ', 'чехия': 'CZ', 'switzerland': 'CH', 'швейцария': 'CH', 'finland': 'FI', 'финляндия': 'FI', 'sweden': 'SE', 'швеция': 'SE', 'denmark': 'DK', 'дания': 'DK', 'netherlands': 'NL', 'нидерланды': 'NL', 'belgium': 'BE', 'бельгия': 'BE', 'austria': 'AT', 'австрия': 'AT', 'poland': 'PL', 'польша': 'PL', 'portugal': 'PT', 'португалия': 'PT', 'greece': 'GR', 'греция': 'GR', 'ireland': 'IE', 'ирландия': 'IE', 'cyprus': 'CY', 'кипр': 'CY', 'malta': 'MT', 'мальта': 'MT', 'armenia': 'AM', 'армения': 'AM', 'georgia': 'GE', 'грузия': 'GE', 'azerbaijan': 'AZ', 'азербайджан': 'AZ', 'uzbekistan': 'UZ', 'узбекистан': 'UZ', 'belarus': 'BY', 'беларусь': 'BY', 'lithuania': 'LT', 'литва': 'LT', 'latvia': 'LV', 'латвия': 'LV', 'estonia': 'EE', 'эстония': 'EE', 'norway': 'NO', 'норвегия': 'NO' };
