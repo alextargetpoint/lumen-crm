@@ -163,3 +163,14 @@ input[type=number] { -moz-appearance: textfield; }
 .rec-diff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .rec-diff > div { background: var(--bg-2, #f6f2ea); border: 1px solid var(--stroke, #e5ddcf); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; }
 .rec-diff b { font-size: 20px; }
+
+/* ---------- Журнал истории карточки объекта ---------- */
+.pd-hist { margin-top: 14px; border-top: 1px solid var(--stroke, #e5ddcf); padding-top: 10px; }
+.pd-hist > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted, #8a8378); display: flex; align-items: center; gap: 6px; list-style: none; }
+.pd-hist > summary::-webkit-details-marker { display: none; }
+.pd-hist > summary svg { width: 14px; height: 14px; }
+.pd-hist-list { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.pd-hist-row { display: flex; gap: 10px; font-size: 12px; align-items: baseline; }
+.pd-hist-at { color: var(--muted, #8a8378); white-space: nowrap; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.pd-hist-ac { color: var(--ink, #23201c); flex: 1; }
+.pd-hist-src { font-size: 11px; }

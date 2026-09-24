@@ -7619,6 +7619,8 @@ PAGES.properties = async (root) => {
             <input id="uFloor" placeholder="этаж" style="width:70px;flex:0 0 70px"><input id="uView" placeholder="вид" style="width:110px;flex:0 0 110px">
             <input id="uPrice" type="number" placeholder="цена"><button class="btn btn-sm" id="uAdd">${ic(I.plus)}</button>
           </div>
+          ${(pr.history && pr.history.length) ? `<details class="pd-hist"><summary>${ic(I.clock || I.doc)}Журнал карточки (${pr.history.length})</summary>
+            <div class="pd-hist-list">${pr.history.slice(0, 30).map(h => `<div class="pd-hist-row"><span class="pd-hist-at">${new Date(h.at).toLocaleDateString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><span class="pd-hist-ac">${esc(h.action || '')}</span>${(h.sources && h.sources.length) ? `<span class="pd-hist-src">${h.sources.slice(0, 3).map(s => `<a href="${esc(s.url)}" target="_blank" class="link">источник</a>`).join(' · ')}</span>` : ''}</div>`).join('')}</div></details>` : ''}
         </div>
 
         
