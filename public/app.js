@@ -7490,12 +7490,13 @@ async function initPropMap(props) {
   const el = document.getElementById('prMap'); const status = document.getElementById('prMapStatus');
   if (!el) return;
   try { await loadLeaflet(); } catch (e) { el.innerHTML = '<div class="muted" style="padding:24px;text-align:center">Карта не загрузилась (нет сети)</div>'; return; }
-  let latest = props;
+  const allow = new Set(props.map(p => p.id));   /* карта синхронна фильтру: только переданные объекты */
+  let items = props;
   const missing = props.filter(p => p.lat == null && (p.area || (p.district && p.district.name)) && !p.geoFail);
   if (missing.length && status) status.textContent = 'Определяю координаты объектов…';
   for (let i = 0; i < 6 && missing.length; i++) { try { const r = await api.post('/properties/geocode-missing', {}); if (!r.remaining) break; } catch (_) { break; } }
-  if (missing.length) latest = await api.get('/properties');
-  const pts = latest.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
+  if (missing.length) { const all = await api.get('/properties'); items = all.filter(p => allow.has(p.id)); }
+  const pts = items.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
   if (window._prMap) { try { window._prMap.remove(); } catch (_) {} window._prMap = null; }
   const center = pts.length ? [pts[0].lat, pts[0].lng] : [7.9, 98.35];
   const map = L.map(el, { scrollWheelZoom: true, attributionControl: false, zoomControl: true }).setView(center, pts.length ? 11 : 5);
@@ -7526,7 +7527,7 @@ async function initPropMap(props) {
       catch (err) { toast('Ошибка', err.message); h.disabled = false; h.textContent = 'Подтянуть полную карточку'; }
     });
   });
-  if (status) status.textContent = pts.length + ' из ' + latest.length + ' на карте' + (pts.length < latest.length ? ' · остальные без распознанной локации (укажите район в карточке)' : '');
+  if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
   setTimeout(() => { try { map.invalidateSize(); } catch (_) {} }, 250);
 }
 
@@ -7835,9 +7836,23 @@ PAGES.properties = async (root) => {
   /* -------- список: богатые карточки -------- */
   const geoF = PAGE_STATE.propGeo || '';
   const marketF = PAGE_STATE.propMarket || '';
+  const q = (PAGE_STATE.propQ || '').toLowerCase().trim();
+  const pMin = +PAGE_STATE.propPriceMin || 0, pMax = +PAGE_STATE.propPriceMax || 0;
+  const bedsF = PAGE_STATE.propBeds || '';
+  const statusF = PAGE_STATE.propStatus || '';   /* '' | avail | sold */
+  const availOf = (pr) => { const u = pr.units || []; if (!u.length) return null; return u.some(x => x.status !== 'sold'); };
+  const matchAdv = (pr) => {
+    if (q && !((pr.name || '') + ' ' + (pr.area || '') + ' ' + (pr.developer || '')).toLowerCase().includes(q)) return false;
+    if (pMin && (pr.priceFrom || 0) < pMin) return false;
+    if (pMax && pr.priceFrom && pr.priceFrom > pMax) return false;
+    if (bedsF) { const t = (pr.type || '') + ' ' + (pr.beds || ''); if (!new RegExp('\\b' + bedsF, 'i').test(t) && String(pr.beds) !== bedsF) return false; }
+    if (statusF === 'avail' && availOf(pr) === false) return false;
+    if (statusF === 'sold' && availOf(pr) !== false) return false;
+    return true;
+  };
   const folders = (await api.get('/folders')).filter(f => f.kind === 'prop');
   const folderF = PAGE_STATE.propFolder || '';
-  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF));
+  const list = props.filter(pr => (!geoF || pr.geo === geoF) && (!marketF || pr.market === marketF) && (!folderF || pr.folderId === folderF) && matchAdv(pr));
   const fmt = (pr) => (pr.currency === 'EUR' ? '€' : '$') + (pr.priceFrom || 0).toLocaleString('ru-RU');
   root.innerHTML = `
     ${heroArt('assets/art/tower.png', `
@@ -7846,8 +7861,14 @@ PAGES.properties = async (root) => {
       ${(() => { const mp = Math.min(...props.map(p2 => p2.priceFrom || Infinity)); return isFinite(mp) ? `<div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вход в рынок от <b>$${mp.toLocaleString('ru-RU')}</b> · первичка ${props.filter(p2 => p2.market === 'offplan').length} · вторичка ${props.filter(p2 => p2.market === 'secondary').length}</span></div>` : ''; })()}
     `, { v: 'mark', hue: '#C89B4B' })}
     <div class="filters">
+      <input id="prQ" placeholder="Поиск: проект / район / застройщик" value="${esc(PAGE_STATE.propQ || '')}" style="min-width:200px;flex:1 1 200px">
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
+      <select id="prBeds"><option value="">Любые спальни</option>${['Studio', '1', '2', '3', '4'].map(bx => `<option value="${bx}" ${bedsF === bx ? 'selected' : ''}>${bx === 'Studio' ? 'Студия' : bx + '+ спальни'}</option>`).join('')}</select>
+      <input id="prPMin" type="number" placeholder="Цена от $" value="${PAGE_STATE.propPriceMin || ''}" style="width:120px">
+      <input id="prPMax" type="number" placeholder="до $" value="${PAGE_STATE.propPriceMax || ''}" style="width:100px">
+      <select id="prStatus"><option value="">Всё наличие</option><option value="avail" ${statusF === 'avail' ? 'selected' : ''}>Есть в наличии</option><option value="sold" ${statusF === 'sold' ? 'selected' : ''}>Распродано</option></select>
+      ${(q || pMin || pMax || bedsF || statusF) ? '<button class="btn btn-sm" id="prReset">Сбросить</button>' : ''}
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
       <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
@@ -7895,7 +7916,15 @@ PAGES.properties = async (root) => {
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
   $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
-  if (PAGE_STATE.propMap) initPropMap(props);
+  /* расширенный фильтр (карта синхронизируется — initPropMap(list), а не всех props) */
+  $('#prQ')?.addEventListener('input', (e) => { PAGE_STATE.propQ = e.target.value; clearTimeout(window._prQT); window._prQT = setTimeout(() => { PAGE_STATE._focusQ = true; render(); }, 400); });
+  $('#prBeds')?.addEventListener('change', (e) => { PAGE_STATE.propBeds = e.target.value; render(); });
+  $('#prPMin')?.addEventListener('change', (e) => { PAGE_STATE.propPriceMin = e.target.value; render(); });
+  $('#prPMax')?.addEventListener('change', (e) => { PAGE_STATE.propPriceMax = e.target.value; render(); });
+  $('#prStatus')?.addEventListener('change', (e) => { PAGE_STATE.propStatus = e.target.value; render(); });
+  $('#prReset')?.addEventListener('click', () => { PAGE_STATE.propQ = ''; PAGE_STATE.propPriceMin = ''; PAGE_STATE.propPriceMax = ''; PAGE_STATE.propBeds = ''; PAGE_STATE.propStatus = ''; render(); });
+  if (PAGE_STATE._focusQ) { PAGE_STATE._focusQ = false; const qi = $('#prQ'); if (qi) { qi.focus(); const v = qi.value; qi.value = ''; qi.value = v; } }
+  if (PAGE_STATE.propMap) initPropMap(list);
   $$('.prm-row', root).forEach(r => r.addEventListener('click', () => {
     const id = r.dataset.prrow; const mk = window._prMarkers && window._prMarkers[id];
     if (mk && window._prMap) { window._prMap.setView([mk.lat, mk.lng], 14, { animate: true }); mk.mk.openPopup(); $$('.prm-row', root).forEach(x => x.classList.toggle('active', x === r)); }
