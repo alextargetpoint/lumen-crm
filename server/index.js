@@ -3212,6 +3212,30 @@ async function meetingBotTick() {
 }
 setInterval(() => { meetingBotTick().catch(() => {}); }, 10 * 60e3);
 
+/* ============ HEADLESS-РЕНДЕР СТРАНИЦ (для импорта объектов «по ссылке» с SPA/JS-сайтов) ============
+   У источников недвижимости нет API, а многие — SPA (Bubble/React) → обычный fetch отдаёт пустой
+   каркас. Провайдер рендера (Firecrawl по умолчанию) исполняет JS и возвращает готовый markdown+html.
+   Платформенный ключ env RENDER_API_KEY → работает для ВСЕХ агентств (SaaS, как Recall.ai). Нет
+   ключа → возвращает null, пайплайн падает на обычный fetch (server-rendered сайты и так работают). */
+function renderReady() { return !!process.env.RENDER_API_KEY; }
+async function renderPage(url) {
+  const key = process.env.RENDER_API_KEY || ''; if (!key) return null;
+  const provider = process.env.RENDER_PROVIDER || 'firecrawl';
+  try {
+    if (provider === 'firecrawl') {
+      const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, formats: ['markdown', 'html'], onlyMainContent: false, waitFor: 2500, timeout: 25000 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.success || !j.data) return null;
+      const d = j.data, md = d.metadata || {};
+      return { markdown: d.markdown || '', html: d.html || '', title: md.title || md.ogTitle || '', ogImage: md.ogImage || md['og:image'] || '' };
+    }
+  } catch (_) {}
+  return null;
+}
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -10685,12 +10709,24 @@ ${SCR}
       const ld = []; { const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi; let mm; while ((mm = re.exec(html))) { try { ld.push(JSON.parse(mm[1])); } catch (_) {} } }
       const imgs = new Set(); if (ogImg) { const a = absUrl(ogImg); if (a) imgs.add(a); }
       { const re = /<img[^>]+src=["']([^"']+)["']/gi; let mm; while ((mm = re.exec(html)) && imgs.size < 40) { const a = absUrl(mm[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !/logo|icon|sprite|avatar|placeholder|blank/i.test(a)) imgs.add(a); } }
-      const text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+      let text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+      /* SPA/JS-сайт → сырой HTML тонкий: рендерим через провайдера (если задан платформенный ключ) */
+      let renderMd = '';
+      if (renderReady() && (text.length < 1200 || imgs.size < 2)) {
+        const rp = await renderPage(url);
+        if (rp) {
+          renderMd = rp.markdown || '';
+          if (rp.ogImage) { const a = absUrl(rp.ogImage); if (a) imgs.add(a); }
+          if (rp.html) { const re2 = /<img[^>]+src=["']([^"']+)["']/gi; let m3; while ((m3 = re2.exec(rp.html)) && imgs.size < 40) { const a = absUrl(m3[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !/logo|icon|sprite|avatar|placeholder|blank/i.test(a)) imgs.add(a); } }
+          { const rem = /!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:jpe?g|png|webp)[^)\s]*)\)/gi; let m4; while ((m4 = rem.exec(renderMd)) && imgs.size < 40) { if (!/logo|icon|avatar/i.test(m4[1])) imgs.add(m4[1]); } }
+          if (renderMd && renderMd.length > text.length) text = renderMd;
+        }
+      }
       if (!b.full) {
-        return json(res, 200, { ok: true, preview: { title: ogTitle || (text.slice(0, 60)), image: [...imgs][0] || '', desc: (ogDesc || text.slice(0, 300)).slice(0, 300), imageCount: imgs.size } });
+        return json(res, 200, { ok: true, preview: { title: ogTitle || (text.slice(0, 60)), image: [...imgs][0] || '', desc: (ogDesc || text.slice(0, 300)).slice(0, 300), imageCount: imgs.size, rendered: !!renderMd } });
       }
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY) для разбора карточки' });
-      const context = 'OG-TITLE: ' + ogTitle + '\nOG-DESC: ' + ogDesc + '\nJSON-LD: ' + JSON.stringify(ld).slice(0, 3500) + '\nTEXT: ' + text.slice(0, 10000);
+      const context = 'OG-TITLE: ' + ogTitle + '\nOG-DESC: ' + ogDesc + '\nJSON-LD: ' + JSON.stringify(ld).slice(0, 3500) + '\nTEXT: ' + text.slice(0, 11000);
       let ext; try { ext = await llm.extractProperty(context, url); } catch (e) { return json(res, 400, { error: 'ИИ не смог разобрать страницу: ' + e.message }); }
       /* фото: приоритет — из ИИ, иначе из HTML; скачиваем и перезаливаем к нам */
       const srcImgs = ([...(Array.isArray(ext.images) ? ext.images : []), ...imgs].map(absUrl).filter(x => /^https?:/i.test(x)));
