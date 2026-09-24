@@ -12705,6 +12705,25 @@ PAGES.numbers = async (root) => {
       </div>`).join('')}
     `, { v: 'right', hue: '#23B383' })}
     <div class="muted" style="font-size:12px;line-height:1.5;margin:2px 0 12px">Каждый канал — на своей вкладке ниже: подключение и покупка номеров живут <b>внутри вкладки</b> нужного канала.</div>
+    <div class="glass card mb">
+      <div class="card-title">${ic(I.sim)}Номера: два формата подключения<span class="sub">WhatsApp + Telegram на одном номере (eSIM/Yesim)</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:4px">
+        <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--accent) 3%,var(--card))">
+          <div style="color:var(--accent);font-weight:700;font-size:11.5px;letter-spacing:.03em">ПОД КЛЮЧ</div>
+          <div style="font-size:23px;font-weight:800;margin:3px 0 1px">$25 <span style="font-size:12px;font-weight:500;color:var(--ink-3)">/ место · мес</span></div>
+          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Всё на нашем железе: номер, регистрация WA+TG, прогрев, прокси, keep-alive. Вы просто пользуетесь готовым рабочим местом — ничего не настраиваете.</div>
+        </div>
+        <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--accent) 3%,var(--card))">
+          <div style="color:var(--accent);font-weight:700;font-size:11.5px;letter-spacing:.03em">НА ВАШЕМ ЖЕЛЕЗЕ</div>
+          <div style="font-size:23px;font-weight:800;margin:3px 0 1px">$10 <span style="font-size:12px;font-weight:500;color:var(--ink-3)">/ номер · мес</span></div>
+          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Номер покупаем и настраиваем мы (Yesim), живёт на вашем Android — до 3 номеров на один телефон (до 5 с нашей настройкой). Подключаете по QR.</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-sm" onclick="openGuide('wanumbers')">${ic(I.doc)}Подробная инструкция</button>
+        <span class="muted" style="font-size:11.5px">Один номер = WhatsApp и Telegram. Оплата криптой (USDT), аренда помесячно с продлением. Ниже — подключение по каналам.</span>
+      </div>
+    </div>
     <div id="simbyeFarm"></div>
     <div class="seg-toggle" id="numTabs" style="margin-bottom:14px">
       <button class="seg-btn ${NUMTAB === 'gray' ? 'on' : ''}" data-numtab="gray">${ic(I.chat)}${t('WhatsApp QR', 'WhatsApp QR')} · ${grayNums.length}</button>
