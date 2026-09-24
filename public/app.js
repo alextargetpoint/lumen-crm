@@ -15840,6 +15840,10 @@ PAGES.settings = async (root) => {
             <div class="form-row"><label>Гео-пул номеров (авто-подбор)</label><textarea id="telPool" rows="3" placeholder="По одному номеру в строке: +39…, +971…, +66…\nСистема сама подставит номер СТРАНЫ клиента (local presence → выше отклик)">${esc(((s.telephony || {}).fromNumbers || []).map(x => typeof x === 'string' ? x : (x && x.number) || '').filter(Boolean).join('\n'))}</textarea></div>
             <div class="muted" style="font-size:11px;margin:-4px 0 4px">При звонке клиенту подставляется номер, совпадающий по коду страны (напр. лид +39 → звонок с итальянского номера). Нет совпадения — берётся «От» по умолчанию.</div>
           </div>
+          <div class="set-row" style="margin-top:10px;border-top:1px solid var(--line);padding-top:12px"><div class="sp"><div class="sl">Прогрев перед звонком (WhatsApp)</div><div class="sd">Перед набором лид получает сообщение «звоню сейчас» от бренда — видит знакомый локальный номер и берёт трубку. Снимает страх «звонит непонятный номер».</div></div>
+            <label class="switch"><input type="checkbox" id="telWarm" ${(s.telephony || {}).warmupBeforeCall !== false ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label></div>
+          <div class="form-row" id="telWarmTextRow" style="${(s.telephony || {}).warmupBeforeCall === false ? 'display:none' : ''}"><label>Текст прогрева <span class="muted" style="font-weight:400">(подстановки: {name}, {broker}, {agency})</span></label>
+            <textarea id="telWarmText" rows="2" placeholder="Здравствуйте, {name}! Это {broker} из {agency} — звоню вам сейчас, возьмите, пожалуйста, трубку 🙏">${esc((s.telephony || {}).warmupText || '')}</textarea></div>
           <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent" id="telSave" style="flex:1;justify-content:center">Сохранить</button><button class="btn" id="telTest" type="button">${ic(I.spark)}Проверить</button></div>
           <div class="tel-test-res" style="font-size:11.5px;margin-top:7px;min-height:0"></div>
           ${['twilio', 'telnyx'].includes((s.telephony || {}).provider) ? (() => {
@@ -16099,10 +16103,13 @@ PAGES.settings = async (root) => {
     if ($('#telConn')) { if (prov === 'twilio') t.accountSid = $('#telConn').value.trim(); else t.connId = $('#telConn').value.trim(); }
     if ($('#telFrom')) t.fromNumber = $('#telFrom').value.trim();
     if ($('#telPool')) t.fromNumbers = $('#telPool').value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 40);
+    if ($('#telWarm')) t.warmupBeforeCall = $('#telWarm').checked;
+    if ($('#telWarmText')) t.warmupText = $('#telWarmText').value.trim().slice(0, 400);
     await api.patch('/settings', { telephony: t });
     toast('Телефония сохранена', prov === 'twilio' ? 'Нажми «Проверить», затем купи номер ниже' : (prov === 'none' ? undefined : 'Настрой вебхук у провайдера'), true);
     loadState();
   });
+  $('#telWarm')?.addEventListener('change', (e) => { const r = $('#telWarmTextRow'); if (r) r.style.display = e.target.checked ? '' : 'none'; });
   /* Twilio: проверка ключей */
   $('#telTest')?.addEventListener('click', async () => {
     const res = root.querySelector('.tel-test-res'); res.innerHTML = '<span style="color:var(--ink-3)">Проверяю…</span>';
