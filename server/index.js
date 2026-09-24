@@ -769,6 +769,15 @@ function buildLeadAdIndex(db) {
   return idx;
 }
 
+/* ⭐ Deep-filter аналитики по подрядчику: только объявления его рекламных кабинетов (all/конкретный подрядчик) */
+function adsInScope(db, cid) {
+  if (!cid) return db.ads || [];
+  const ct = (db.mpContractors || []).find(c => c.id === cid);
+  const accts = new Set(((ct && ct.adAccounts) || []).map(a => metaads.acctId(a)));
+  if (!accts.size) return [];
+  return (db.ads || []).filter(a => accts.has(metaads.acctId(a.adAccountId)));
+}
+
 /* ⭐ Квал по «максимально достигнутой стадии» (high-water mark), а НЕ по текущей.
    Для аналитики трафик-подрядчиков/кампаний/источников: лид, который был квалифицирован, а потом
    отвалился (уснул/потерян/перестал отвечать), всё равно засчитывается как квал — иначе метрика
@@ -10100,7 +10109,7 @@ ${SCR}
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
       const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
-      const stats = db.ads.map(ad => {
+      const stats = adsInScope(db, u.searchParams.get('contractorId')).map(ad => {
         const mine = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
@@ -10242,7 +10251,8 @@ ${SCR}
       const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.dailyR || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
       const camps = {};
       const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
-      for (const ad of db.ads) {
+      const _ADS = adsInScope(db, u.searchParams.get('contractorId'));
+      for (const ad of _ADS) {
         const crmLeads = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leadsCRM = crmLeads.length;
         const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => everReachedQual(db, l)).length;
@@ -10261,7 +10271,7 @@ ${SCR}
       const tree = Object.values(camps).map(c => ({ ...c, adsets: Object.values(c.adsets), leads: c.m.leads })).sort((a, b) => b.m.spend - a.m.spend);
       const totals = mk(); for (const c of tree) { totals.spend += c.m.spend; totals.leads += c.m.leads; totals.leadsCRM += c.m.leadsCRM; totals.quals += c.m.quals; totals.clicks += c.m.clicks; totals.impr += c.m.impr; for (const p of (c.m.daily || [])) totals.dmap[p.d] = (totals.dmap[p.d] || 0) + p.spend; }
       finish(totals);
-      return json(res, 200, { tree, totals, totalAds: db.ads.length, withCreative: db.ads.filter(a => a.media && a.media.url).length, withPoints: db.ads.filter(a => a.points && a.points.length).length });
+      return json(res, 200, { tree, totals, totalAds: _ADS.length, withCreative: _ADS.filter(a => a.media && a.media.url).length, withPoints: _ADS.filter(a => a.points && a.points.length).length });
     }
     /* лиды CRM по узлу дерева (объявление/адсет/кампания) — для провала «сколько лидов → кто они + статусы» */
     if (p === '/api/ads/leads' && req.method === 'GET') {
@@ -10311,9 +10321,9 @@ ${SCR}
         return 'OTHER';
       };
       const dirOf = (l) => { const dk = campMap[l.ads && l.ads.campaignName]; return dk ? dirName(dk) : 'Прочее (вне плана)'; };
-      const leads = (db.leads || []).filter(inR);
+      const _cid = u.searchParams.get('contractorId'); const _scopeIds = _cid ? new Set(adsInScope(db, _cid).map(a => String(a.adId))) : null; const leads = (db.leads || []).filter(l => inR(l) && (!_cid || l.vendorId === _cid || (_scopeIds && _scopeIds.has(resolveLeadAdId(db, l)))));
       /* totalSpend за период */
-      let totalSpend = 0; for (const a of (db.ads || [])) totalSpend += (from || to) ? adRangeMetrics(a, from, to).spend : (a.spend || 0);
+      let totalSpend = 0; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) totalSpend += (from || to) ? adRangeMetrics(a, from, to).spend : (a.spend || 0);
       /* ── ГЕО ── */
       const byGroup = {}; let totCounted = 0;
       const LANG_TITLE = { RU: '🇷🇺 RU', EN: '🌐 EN', AR: '🇦🇪 AR', ES: '🇪🇸 ES', DE: '🇩🇪 DE', FR: '🇫🇷 FR', IT: '🇮🇹 IT', TR: '🇹🇷 TR', TH: '🇹🇭 TH', ID: '🇮🇩 ID', OTHER: '🌍 Без языка' };
@@ -10325,7 +10335,7 @@ ${SCR}
       const adsets = rankBy(l => l.ads && l.ads.adsetName);
       const creatives = rankBy(l => l.ads && (l.ads.adName || l.ads.name));
       /* превью креатива по имени объявления (что загружено в дерево) — цепляем к строкам рейтинга креативов */
-      const creaMedia = {}; for (const a of (db.ads || [])) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
+      const creaMedia = {}; for (const a of adsInScope(db, u.searchParams.get('contractorId'))) if (a.name && a.media && a.media.url && !creaMedia[a.name]) creaMedia[a.name] = { type: a.media.type || 'image', url: a.media.url };
       for (const dir of Object.keys(creatives)) for (const row of creatives[dir]) if (creaMedia[row.key]) row.media = creaMedia[row.key];
       const qleads = {}; for (const l of leads.filter(isQual).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const dir = dirOf(l); (qleads[dir] = qleads[dir] || []).push({ date: l.createdAt ? new Date(l.createdAt).toISOString().slice(5, 10) : '', name: l.name, country: canon(countryOf(l)), flag: flag(canon(countryOf(l))), status: namesCfg[l.stage] || l.stage, adset: (l.ads && l.ads.adsetName) || '—', ad: (l.ads && (l.ads.adName || l.ads.name)) || '—' }); }
       return json(res, 200, { geo: { mode: geoGroup, groups: geoGroups, totalCounted: totCounted }, quality: { campaigns, adsets, creatives, qleads }, totalSpend: Math.round(totalSpend), qualStages: QUAL, hasLeads: leads.length });

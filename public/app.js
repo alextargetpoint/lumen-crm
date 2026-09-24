@@ -9186,10 +9186,13 @@ function restructureAdsTabs(root) {
 PAGES.ads = async (root) => {
   await ensureFx();
   const rq = adRangeQS();
-  const d = await api.get('/ads' + rq);
-  const treeD = await api.get('/ads/tree' + rq).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
+  const adCid = PAGE_STATE.adsContractor || '';                                  /* deep-filter: '' = все подрядчики */
+  const ctSuf = adCid ? ((rq ? '&' : '?') + 'contractorId=' + encodeURIComponent(adCid)) : '';
+  const adContractors = await api.get('/contractors').catch(() => []);
+  const d = await api.get('/ads' + rq + ctSuf);
+  const treeD = await api.get('/ads/tree' + rq + ctSuf).catch(() => ({ tree: [], totalAds: 0, withCreative: 0, withPoints: 0 }));
   const geoGroupMode = PAGE_STATE.anaGeoGroup === 'direction' ? 'direction' : 'lang';
-  const la = await api.get('/ads/leadanalytics' + (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode).catch(() => ({ geo: { groups: [], mode: geoGroupMode }, quality: { adsets: {}, creatives: {}, qleads: {} }, totalSpend: 0, hasLeads: 0 }));
+  const la = await api.get('/ads/leadanalytics' + (rq ? rq + '&' : '?') + 'geoGroup=' + geoGroupMode + (adCid ? '&contractorId=' + encodeURIComponent(adCid) : '')).catch(() => ({ geo: { groups: [], mode: geoGroupMode }, quality: { adsets: {}, creatives: {}, qleads: {} }, totalSpend: 0, hasLeads: 0 }));
   const hookUrl = `${location.origin}/hooks/lead?key=${d.hooks.secret}`;
   const adLeads = d.ads.reduce((s2, a) => s2 + a.leads, 0);
   const topAd = d.ads.slice().sort((a, b) => b.leads - a.leads)[0];
@@ -9223,6 +9226,7 @@ PAGES.ads = async (root) => {
     `, { v: 'right', hue: '#E4813D' })}
     ${(() => { const r = PAGE_STATE.adRange || { preset: '30d' }; const dd = adRangeDates();
       return `<div class="glass card mb" id="adRangeBar">
+        ${adContractors.length ? `<div class="ad-ct-filter" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span class="muted" style="font-size:11.5px">Подрядчик:</span><select id="adCtFilter" style="min-width:190px"><option value="">Все подрядчики</option>${adContractors.map(c => `<option value="${esc(c.id)}" ${adCid === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>${adCid ? '<span class="mini-badge ai">аналитика только по этому подрядчику</span>' : ''}</div>` : ''}
         <div class="ad-range">
           <div class="ad-range-presets">${AD_RANGE_PRESETS.map(([k, n]) => `<button class="ad-range-b ${r.preset === k ? 'on' : ''}" data-adrange="${k}">${n}</button>`).join('')}</div>
           <div class="ad-range-custom">
@@ -9571,6 +9575,7 @@ PAGES.ads = async (root) => {
   $$('[data-geogroup]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.anaGeoGroup = b.dataset.geogroup; render._silent = true; render(); }));
   $$('[data-creaview]', root).forEach(el2 => el2.addEventListener('click', () => openCreativeView(el2.dataset.creaview, el2.dataset.creatype)));
   $$('[data-adrange]', root).forEach(b => b.addEventListener('click', () => { PAGE_STATE.adRange = { preset: b.dataset.adrange }; render._silent = true; render(); }));
+  $('#adCtFilter', root) && $('#adCtFilter', root).addEventListener('change', (e) => { PAGE_STATE.adsContractor = e.target.value || ''; render._silent = true; render(); });
   $('#adRangeApply', root) && $('#adRangeApply', root).addEventListener('click', () => { const from = $('#adRangeFrom', root)?.value || '', to = $('#adRangeTo', root)?.value || ''; if (!from && !to) { toast('Укажите период', 'Выберите даты «с» и «по»', false); return; } PAGE_STATE.adRange = { preset: 'custom', from, to }; render._silent = true; render(); });
   $('#anaReportCopy', root) && $('#anaReportCopy', root).addEventListener('click', () => { navigator.clipboard.writeText($('#anaReport', root).textContent); toast('Отчёт скопирован', null, true); });
   $$('[data-revlead]', root).forEach(r => r.addEventListener('click', () => { const id = r.dataset.revlead; if (id) openLeadModal(id); }));
