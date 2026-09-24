@@ -99,8 +99,9 @@ const RATE_DEFAULTS = {
   aiMsg: 0.002,      // проход ИИ на входящее сообщение (flash-lite), $
   telephonyMin: 0.02,// минута телефонии (DIDWW + запись), $
   sttMin: 0.006,     // минута транскрибации звонка (Whisper), $
-  numWaQr: 9,        // номер WhatsApp (QR/серый): аренда=покупка, $/мес
-  numTg: 9,          // номер Telegram: аренда=покупка, $/мес
+  numGray: 10,       // ⭐ОДИН серый Yesim-номер = WhatsApp + Telegram (аренда=покупка), $/мес
+  numWaQr: 10,       // (совместимость) серый номер аренда=покупка, $/мес
+  numTg: 10,         // (совместимость) Telegram идёт на ТОМ ЖЕ номере — отдельно не тарифицируется
   numCloud: 3,       // номер WhatsApp Cloud API (OTP, из движка Telnyx): $/мес
   numTel: 3,         // номер телефонии (Telnyx, звонки+запись): $/мес
 };
@@ -144,11 +145,17 @@ function usageEstimate(db) {
   const cloudNums = Object.values(((db.settings.telephony || {}).otpNumbers) || db.otpNumbers || {});
   const telNums   = (((db.settings.telephony || {}).fromNumbers) || []).filter(Boolean).map(n => (typeof n === 'string' ? {} : n));
   const sumPrice = (arr, fallback) => +arr.reduce((s, n) => s + (+((n && n.priceUsd) || fallback)), 0).toFixed(2);
+  /* ⭐Один серый Yesim-номер = WhatsApp + Telegram → считаем УНИКАЛЬНЫЕ номера ОДИН раз по $10
+     (раньше WA $9 + TG $9 двоило один и тот же номер). Union по реальному номеру/ключу. */
+  const grayPhones = new Set();
+  waQrNums.forEach(n => grayPhones.add(String((n && (n.realPhone || n.phone)) || '')));
+  tgNums.forEach(n => grayPhones.add(String((n && (n.realPhone || n.phone)) || '')));
+  grayPhones.delete('');
+  const grayCount = grayPhones.size;
   const rentals = [
-    { key: 'wa_qr', label: 'Номера WhatsApp (QR) · аренда=покупка', count: waQrNums.length,  rate: R.numWaQr, cost: sumPrice(waQrNums, R.numWaQr) },
-    { key: 'tg',    label: 'Номера Telegram · аренда=покупка',      count: tgNums.length,    rate: R.numTg,   cost: sumPrice(tgNums, R.numTg) },
-    { key: 'cloud', label: 'Номера WhatsApp Cloud API · аренда=покупка', count: cloudNums.length, rate: R.numCloud, cost: sumPrice(cloudNums, R.numCloud) },
-    { key: 'tel',   label: 'Номера телефонии · аренда=покупка',     count: telNums.length,   rate: R.numTel,  cost: sumPrice(telNums, R.numTel) },
+    { key: 'gray',  label: 'Номера WhatsApp + Telegram (Yesim) · аренда=покупка', count: grayCount, rate: R.numGray, cost: +(grayCount * R.numGray).toFixed(2) },
+    { key: 'cloud', label: 'Номера WhatsApp Cloud API (Telnyx) · аренда=покупка', count: cloudNums.length, rate: R.numCloud, cost: sumPrice(cloudNums, R.numCloud) },
+    { key: 'tel',   label: 'Номера телефонии (Telnyx) · аренда=покупка',     count: telNums.length,   rate: R.numTel,  cost: sumPrice(telNums, R.numTel) },
   ].filter(r => r.count > 0);
   const numbersCount = rentals.reduce((s, r) => s + r.count, 0);
   const numbersMonthly = +(rentals.reduce((s, r) => s + r.cost, 0)).toFixed(2);
