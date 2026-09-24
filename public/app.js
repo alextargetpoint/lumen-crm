@@ -7503,6 +7503,7 @@ function loadLeaflet() {
 async function initPropMap(props) {
   const el = document.getElementById('prMap'); const status = document.getElementById('prMapStatus');
   if (!el) return;
+  const fmt = (p) => (p.currency === 'EUR' ? '€' : p.currency === 'THB' ? '฿' : p.currency === 'AED' ? 'AED ' : '$') + (p.priceFrom || 0).toLocaleString('ru-RU');
   try { await loadLeaflet(); } catch (e) { el.innerHTML = '<div class="muted" style="padding:24px;text-align:center">Карта не загрузилась (нет сети)</div>'; return; }
   const allow = new Set(props.map(p => p.id));   /* карта синхронна фильтру: только переданные объекты */
   let items = props;
@@ -9465,37 +9466,105 @@ function crRenderReview(r) {
     ${mq ? `<div class="cr-block"><h4>${ic(I.spark)}Не задал важные вопросы</h4>${mq}</div>` : ''}
     ${scr ? `<div class="cr-block"><h4>${ic(I.flame)}Готовые фразы на следующий раз</h4>${scr}</div>` : ''}`;
 }
+/* Полный разбор в модалке + переход на карточку лида. */
+function crOpenReview(rec) {
+  if (!rec || !rec.review) return;
+  const acts = [{ label: 'Закрыть' }];
+  if (rec.leadId) acts.unshift({ label: 'Открыть карточку лида', cls: 'btn-accent', onClick: () => { openLeadModal(rec.leadId); } });
+  modal({
+    title: 'Разбор звонка' + (rec.leadName ? ' · ' + rec.leadName : ''),
+    sub: new Date(rec.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) + (rec.leadId ? '' : ' · без привязки к лиду'),
+    wide: 'card',
+    body: crRenderReview(rec.review) + (rec.excerpt ? `<div class="crx-excerpt"><b>Фрагмент транскрипта</b>${esc(rec.excerpt)}…</div>` : ''),
+    actions: acts,
+  });
+}
+/* Агрегаты по всем разборам — «ёмкая инфраструктура для руководителя». */
+function crAgg(hist) {
+  const n = hist.length;
+  if (!n) return null;
+  const avg = Math.round(hist.reduce((s, h) => s + (h.overall || 0), 0) / n);
+  const strong = hist.filter(h => h.overall >= 70).length;
+  const weak = hist.filter(h => h.overall < 45).length;
+  const ok = n - strong - weak;
+  // тренд: среднее последних 5 против предыдущих 5 (hist отсортирован новыми вперёд)
+  const last = hist.slice(0, 5), prev = hist.slice(5, 10);
+  const la = last.length ? last.reduce((s, h) => s + h.overall, 0) / last.length : 0;
+  const pa = prev.length ? prev.reduce((s, h) => s + h.overall, 0) / prev.length : la;
+  const trend = prev.length ? Math.round(la - pa) : 0;
+  // измерения: усредняем по label
+  const dimMap = {};
+  hist.forEach(h => (h.review && h.review.dims || []).forEach(d => { (dimMap[d.label] = dimMap[d.label] || []).push(d.score); }));
+  const dims = Object.entries(dimMap).map(([label, arr]) => ({ label, score: Math.round(arr.reduce((s, x) => s + x, 0) / arr.length), n: arr.length })).sort((a, b) => a.score - b.score);
+  // частые ошибки
+  const mistMap = {};
+  hist.forEach(h => (h.review && h.review.mistakes || []).forEach(m => { const k = (m.what || '').trim(); if (k) mistMap[k] = (mistMap[k] || 0) + 1; }));
+  const mistakes = Object.entries(mistMap).map(([what, c]) => ({ what, c })).sort((a, b) => b.c - a.c).slice(0, 5);
+  return { n, avg, strong, ok, weak, trend, dims, mistakes };
+}
 PAGES.callReview = async (root) => {
-  const hist = await api.get('/call-reviews').catch(() => []);
+  const [hist, leads] = await Promise.all([
+    api.get('/call-reviews').catch(() => []),
+    api.get('/leads').catch(() => []),
+  ]);
+  const reviewedLeadIds = new Set(hist.filter(h => h.leadId).map(h => h.leadId));
+  const pending = (leads || []).filter(l => (l.transcripts || []).length && !reviewedLeadIds.has(l.id)).slice(0, 12);
+  const A = crAgg(hist);
+  const dash = A ? `
+    <div class="crx-kpis">
+      <div class="crx-kpi glass"><span class="crx-k-l">Разборов</span><b class="crx-k-v">${A.n}</b><span class="crx-k-s">за последнее время</span></div>
+      <div class="crx-kpi glass"><span class="crx-k-l">Средний балл</span><b class="crx-k-v" style="color:${crBarColor(A.avg)}">${A.avg}<small>/100</small></b><span class="crx-k-s">${A.trend > 0 ? `<span style="color:#4ADE80">▲ +${A.trend}</span> к прошлой пятёрке` : A.trend < 0 ? `<span style="color:#F87171">▼ ${A.trend}</span> к прошлой пятёрке` : 'динамика ровная'}</span></div>
+      <div class="crx-kpi glass"><span class="crx-k-l">Качество звонков</span><div class="crx-split"><i class="s-ok" style="flex:${A.strong || 0.01}" title="Сильные (70+)"></i><i class="s-mid" style="flex:${A.ok || 0.01}" title="Средние (45–69)"></i><i class="s-bad" style="flex:${A.weak || 0.01}" title="Слабые (<45)"></i></div><span class="crx-k-s">${A.strong} сильных · ${A.ok} средних · ${A.weak} слабых</span></div>
+      <div class="crx-kpi glass"><span class="crx-k-l">Слабейшее измерение</span><b class="crx-k-v" style="font-size:19px;color:${crBarColor(A.dims[0] ? A.dims[0].score : 100)}">${A.dims[0] ? esc(A.dims[0].label) : '—'}</b><span class="crx-k-s">${A.dims[0] ? A.dims[0].score + '/100 в среднем — точка роста' : ''}</span></div>
+    </div>
+    <div class="crx-cols">
+      <div class="glass card crx-panel"><div class="crx-panel-hd">${ic(I.bars)}Средний балл по измерениям</div>${A.dims.slice().reverse().map(d => `<div class="cr-dim"><div class="cr-dim-top"><span>${esc(d.label)}</span><span style="color:${crBarColor(d.score)}">${d.score}</span></div><div class="cr-bar"><i style="width:${d.score}%;background:${crBarColor(d.score)}"></i></div></div>`).join('')}</div>
+      <div class="glass card crx-panel"><div class="crx-panel-hd">${ic(I.shield)}Частые ошибки на звонках</div>${A.mistakes.length ? A.mistakes.map(m => `<div class="crx-mistrow"><span class="crx-mcount">${m.c}×</span><span>${esc(m.what)}</span></div>`).join('') : '<div class="muted" style="font-size:13px">Повторяющихся ошибок пока не видно.</div>'}</div>
+    </div>` : '';
   root.innerHTML = `
     ${heroArt('assets/art/book.png', `
-      <div class="ha-title">${ic(I.phone)}Оценка звонка<span class="sub">ИИ-разбор по методологии Ольги Синенко</span></div>
-      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Вставьте транскрипт звонка или Zoom брокера с клиентом — ИИ оценит по 6 измерениям (открытие, квалификация, возражения, ценность/срочность, следующий шаг, тон), укажет ошибки и даст готовые скрипты.</span></div>
+      <div class="ha-title">${ic(I.phone)}Оценка звонка<span class="sub">ИИ-разбор + сводки по всем звонкам агентства</span></div>
+      <div class="ha-row" style="padding-left:0;margin-top:8px" data-ha><span class="nm2">Каждый звонок — по 6 измерениям (открытие, квалификация, возражения, ценность/срочность, следующий шаг, тон), с ошибками и готовыми скриптами. Ниже — сводная картина по всем разборам и переход в карточку лида.</span></div>
     `, { v: 'right', hue: '#B87E4B' })}
-    <div class="cr-wrap">
-      <div class="cr-input glass">
-        <div class="cr-hd">Транскрипт звонка</div>
-        <textarea id="crText" class="cr-ta" placeholder="Брокер: ...&#10;Клиент: ...&#10;&#10;Вставьте расшифровку разговора (реплики брокера и клиента)."></textarea>
+    ${dash}
+    ${coll(`${ic(I.plus)}Разобрать новый звонок`, `
+      <div class="cr-input">
+        ${pending.length ? `<div class="crx-pending"><span class="crx-pend-l">Ждут разбора (есть транскрипт):</span>${pending.map(l => `<button class="crx-pchip" data-crpend="${l.id}">${esc(l.name || 'лид')} <i>${(l.transcripts || []).length} зап.</i></button>`).join('')}</div>` : ''}
+        <textarea id="crText" class="cr-ta" placeholder="Брокер: ...&#10;Клиент: ...&#10;&#10;Вставьте расшифровку разговора — или выберите лида с транскриптом выше."></textarea>
         <div class="cr-actions"><button id="crRun" class="btn btn-accent">Оценить звонок</button><span id="crStatus" class="cr-status"></span></div>
       </div>
       <div id="crResult" class="cr-result"></div>
-      ${hist.length ? `<div class="cr-hist"><div class="cr-hist-hd">Последние разборы</div>${hist.map(h => `<button class="cr-hchip" data-crh="${h.id}"><b>${h.overall}</b> ${esc(h.leadName || 'звонок')} <i>${new Date(h.at).toLocaleDateString('ru-RU')}</i></button>`).join('')}</div>` : ''}
-    </div>`;
+    `, { open: !hist.length })}
+    <div class="crx-hist-hd">${ic(I.layers)}История разборов${hist.length ? ` <span class="muted">· ${hist.length}</span>` : ''}</div>
+    <div class="crx-grid">${hist.length ? hist.map(h => {
+      const topMist = (h.review && h.review.mistakes && h.review.mistakes[0]) ? h.review.mistakes[0].what : '';
+      const weakDim = (h.review && (h.review.dims || []).slice().sort((a, b) => a.score - b.score)[0]) || null;
+      return `<button class="crx-card glass" data-crh="${h.id}">
+        <div class="crx-card-top"><span class="crx-ring" style="--c:${crBarColor(h.overall)}">${h.overall}</span><div class="crx-card-h"><b>${esc(h.leadName || 'Звонок без лида')}</b><span>${new Date(h.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}${h.leadId ? ' · карточка лида →' : ''}</span></div></div>
+        ${h.review && h.review.verdict ? `<div class="crx-verdict">${esc(h.review.verdict)}</div>` : ''}
+        <div class="crx-card-tags">${weakDim ? `<span class="crx-tag" style="--c:${crBarColor(weakDim.score)}">${esc(weakDim.label)} ${weakDim.score}</span>` : ''}${topMist ? `<span class="crx-tag crx-tag-mist">✕ ${esc(topMist.slice(0, 42))}${topMist.length > 42 ? '…' : ''}</span>` : ''}</div>
+      </button>`;
+    }).join('') : '<div class="glass card empty" style="grid-column:1/-1">Пока нет разборов. Разверните «Разобрать новый звонок» выше — вставьте транскрипт или выберите лида.</div>'}</div>`;
   const resEl = $('#crResult', root), stEl = $('#crStatus', root);
-  $('#crRun', root).addEventListener('click', async () => {
-    const transcript = $('#crText', root).value.trim();
-    if (transcript.length < 40) { stEl.textContent = 'Вставьте транскрипт (хотя бы пару реплик)'; return; }
-    stEl.textContent = 'ИИ разбирает звонок…'; resEl.innerHTML = '';
+  const runReview = async (payload, statusMsg) => {
+    stEl.textContent = statusMsg || 'ИИ разбирает звонок…'; resEl.innerHTML = '';
     try {
-      const d = await api.post('/call-review', { transcript });
+      const d = await api.post('/call-review', payload);
       stEl.textContent = ''; resEl.innerHTML = crRenderReview(d.review);
       resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => render(), 1200);
     } catch (e) { stEl.textContent = 'Ошибка: ' + (e.message || 'не удалось'); }
+  };
+  $('#crRun', root).addEventListener('click', () => {
+    const transcript = $('#crText', root).value.trim();
+    if (transcript.length < 40) { stEl.textContent = 'Вставьте транскрипт (хотя бы пару реплик)'; return; }
+    runReview({ transcript });
   });
-  $$('[data-crh]', root).forEach(b => b.addEventListener('click', () => {
-    const rec = hist.find(h => h.id === b.dataset.crh);
-    if (rec && rec.review) { resEl.innerHTML = crRenderReview(rec.review); resEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  $$('[data-crpend]', root).forEach(b => b.addEventListener('click', () => {
+    const l = pending.find(x => x.id === b.dataset.crpend);
+    runReview({ leadId: b.dataset.crpend, label: l ? l.name : '' }, `Разбираю транскрипт: ${l ? esc(l.name) : 'лид'}…`);
   }));
+  $$('[data-crh]', root).forEach(b => b.addEventListener('click', () => crOpenReview(hist.find(h => h.id === b.dataset.crh))));
 };
 
 /* Упаковка страницы «Реклама» в вкладки: аналитика по рекламе / дерево креативов / приём лидов / Meta CAPI.
