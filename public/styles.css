@@ -7573,6 +7573,31 @@ html[data-night] { --logo-a: #C2D6FF; --logo-b: #6B93FF; --logo-c: #3A63E0; --ac
 /* в тёмных темах фото чуть притушено, чтобы не выбивалось */
 :root[data-night] .es-art .es-art-img { opacity: .8; }
 
+/* ===== Кастомный анимированный пустой стейт «Ленты» — вещание в эфир ===== */
+.fd-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 52px 24px 44px !important; overflow: hidden; position: relative; }
+.fd-empty::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%); pointer-events: none; }
+.fd-empty-stage { position: relative; width: 150px; height: 110px; display: grid; place-items: center; }
+/* один спокойный «эфирный» пульс — без навязчивого движения */
+.fe-ring { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); opacity: 0; animation: feRing 6s ease-out infinite; }
+.fe-ring:nth-child(2) { animation-delay: 2s; }
+.fe-ring:nth-child(3) { animation-delay: 4s; }
+@keyframes feRing { 0% { transform: scale(.7); opacity: .45; } 80% { opacity: .06; } 100% { transform: scale(2.3); opacity: 0; } }
+/* ядро = ненавязчивая метка, НЕ кнопка: плоский мягкий тон, акцентная иконка, без градиента/тени/пульса */
+.fe-core { position: relative; z-index: 2; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.fe-core svg { width: 21px; height: 21px; transform: translateX(1px); opacity: .9; }
+/* карточки почти статичны — очень медленный, едва заметный дрейф */
+.fe-card { position: absolute; z-index: 1; border-radius: 6px; background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line)); opacity: .45; animation: feDrift 7s ease-in-out infinite; }
+.fe-c1 { width: 32px; height: 20px; left: 2px; top: 52px; animation-delay: 0s; }
+.fe-c2 { width: 26px; height: 16px; right: 4px; top: 42px; animation-delay: 2.3s; }
+.fe-c3 { width: 22px; height: 14px; left: 30px; top: 76px; animation-delay: 4.6s; }
+@keyframes feDrift { 0%, 100% { transform: translateY(2px); opacity: .35; } 50% { transform: translateY(-3px); opacity: .6; } }
+.fd-empty-tx { text-align: center; display: flex; flex-direction: column; gap: 6px; max-width: 430px; }
+.fd-empty-tx b { font-size: 16px; font-weight: 750; color: var(--ink); }
+.fd-empty-tx span { font-size: 13px; color: var(--muted); line-height: 1.55; }
+:root[data-night] .fe-core { background: color-mix(in srgb, var(--accent) 20%, #0d1526); }
+:root[data-night] .fe-card { background: color-mix(in srgb, var(--accent) 16%, #0d1526); }
+@media (prefers-reduced-motion: reduce) { .fe-ring, .fe-card { animation: none; } .fe-ring:nth-child(2) { opacity: .12; transform: scale(1.5); } .fe-ring:nth-child(1), .fe-ring:nth-child(3) { opacity: 0; } }
+
 /* ═══ Lumen Glass — финальные примитивы (кнопки, таблицы, скролл) ═══ */
 /* Primary — тёмная navy-стеклянная (спека §12), как в референсе */
 :root[data-theme="emerald"] .btn-accent { background: linear-gradient(180deg,#17345F,#09182D); background-image: linear-gradient(180deg,#17345F,#09182D); border: 1px solid rgba(255,255,255,.08); color: #fff; box-shadow: 0 8px 24px rgba(11,31,60,.16), inset 0 1px 0 rgba(255,255,255,.12); }

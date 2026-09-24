@@ -5653,7 +5653,7 @@ const server = http.createServer(async (req, res) => {
        что и конструктор /p/:id/blocks — держатель editKey и так может редактировать блоки */
     const collEditKeyOk = /^\/api\/collections\/[^/]+\/(recompose|block)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
     /* Медиапланы: публичное утверждение/отклонение подрядчиком авторизуется тем же edit-ключом (?key=hooks.secret), что и /mp/:id */
-    const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill)$/.test(p) && u.searchParams.get('key') === db.settings.hooks.secret;
+    const mpApproveKeyOk = /^\/api\/mediaplans\/[^/]+\/(approve|reject|contractor-fill|comment)$/.test(p) && (u.searchParams.get('key') === db.settings.hooks.secret || !!u.searchParams.get('t'));
     /* Публичные роуты с собственной токен-авторизацией (проверяют Bearer внутри): вебхук серого WA-воркера и одноразовая миграция базы */
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
@@ -9976,6 +9976,30 @@ const server = http.createServer(async (req, res) => {
         note: String((ln && ln.note) || '').slice(0, 300),
       };
     });
+    /* Публичная ссылка медиаплана: УНИКАЛЬНЫЙ per-план токен (раньше в ссылку клали глобальный hooks.secret —
+       тот же, что для вебхуков → утечка секрета в каждую ссылку + один ключ на все планы). Токен генерим лениво,
+       старые ссылки с ?key=hooks.secret продолжают работать (обратная совместимость). */
+    const mpEnsureToken = (mp) => { if (!mp.pubToken) { mp.pubToken = crypto.randomBytes(16).toString('hex'); store.save(); } return mp.pubToken; };
+    const mpCredOk = (mp, u2, req2) => {
+      const t = u2.searchParams.get('t');
+      if (t && mp.pubToken && t === mp.pubToken) return true;                 /* уникальный токен плана */
+      if (u2.searchParams.get('key') === db.settings.hooks.secret) return true; /* legacy-ключ (старые ссылки) */
+      if (getSession(req2)) return true;                                       /* владелец из CRM */
+      return false;
+    };
+    /* авто-версия: снимок при каждом изменении подрядчиком/решении — «создать новую версию» без ручной кнопки */
+    const mpPushVersion = (mp, action, by) => {
+      if (!Array.isArray(mp.versions)) mp.versions = [];
+      const T = mpTotals(mp);
+      mp.versions.unshift({ id: 'mpv_' + crypto.randomBytes(4).toString('hex'), at: Date.now(), action, by: String(by || '').slice(0, 80), budgetPlan: T.budgetPlan, leadsPlan: T.leadsPlan, cplPlan: T.cplPlan, linesCount: (mp.lines || []).length, lines: JSON.parse(JSON.stringify(mp.lines || [])) });
+      mp.versions = mp.versions.slice(0, 12);
+    };
+    const mpAddComment = (mp, text, by, role) => {
+      if (!Array.isArray(mp.comments)) mp.comments = [];
+      const c = { id: 'mpc_' + crypto.randomBytes(4).toString('hex'), at: Date.now(), text: String(text || '').slice(0, 1200), by: String(by || 'Подрядчик').slice(0, 80), role: role === 'owner' ? 'owner' : 'contractor' };
+      mp.comments.push(c); mp.comments = mp.comments.slice(-100);
+      return c;
+    };
 
     /* — подрядчики трафика — */
     if (p === '/api/contractors' && req.method === 'GET') return json(res, 200, db.mpContractors);
@@ -10008,7 +10032,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/mediaplans' && req.method === 'GET') {
       return json(res, 200, db.mediaplans.map(mp => Object.assign({}, mp, {
         contractorName: (db.mpContractors.find(c => c.id === mp.contractorId) || {}).name || null,
-        totals: mpTotals(mp), editKey: editKeyFor(req),
+        totals: mpTotals(mp), editKey: editKeyFor(req), pubToken: mpEnsureToken(mp),
+        commentsCount: (mp.comments || []).length, versionsCount: (mp.versions || []).length,
       })));
     }
     /* ── Аналитика медиапланов (Фаза 2): многослойный план-факт по подрядчикам / каналам / гео / связкам ──
@@ -10124,9 +10149,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/mediaplans' && req.method === 'POST') {
       const b = await readBody(req);
-      const mp = { id: 'mp_' + crypto.randomBytes(6).toString('hex'), contractorId: b.contractorId || null,   /* непредсказуемый id (был последовательный store.nextId → перебор соседних медиапланов) */ title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null };
+      const mp = { id: 'mp_' + crypto.randomBytes(6).toString('hex'), contractorId: b.contractorId || null,   /* непредсказуемый id (был последовательный store.nextId → перебор соседних медиапланов) */ title: String(b.title || 'Медиаплан').slice(0, 120), period: { from: String((b.period && b.period.from) || '').slice(0, 10), to: String((b.period && b.period.to) || '').slice(0, 10) }, currency: ['USD', 'EUR', 'AED', 'RUB'].includes(b.currency) ? b.currency : 'USD', status: 'draft', lines: mpSanitizeLines(b.lines), note: String(b.note || '').slice(0, 1000), createdAt: Date.now(), sentAt: null, approvedAt: null, approvedBy: null, pubToken: crypto.randomBytes(16).toString('hex'), comments: [], versions: [] };
       db.mediaplans.unshift(mp); store.save();
-      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req) }));
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req), pubToken: mp.pubToken }));
     }
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'PATCH') {
       const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
@@ -10143,7 +10168,7 @@ const server = http.createServer(async (req, res) => {
         if (b.status === 'draft') { mp.approvedAt = null; mp.approvedBy = null; }
       }
       store.save();
-      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req) }));
+      return json(res, 200, Object.assign({}, mp, { totals: mpTotals(mp), editKey: editKeyFor(req), pubToken: mpEnsureToken(mp) }));
     }
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)$/)) && req.method === 'DELETE') {
       db.mediaplans = db.mediaplans.filter(x => x.id !== m[1]); store.save();
@@ -10151,26 +10176,40 @@ const server = http.createServer(async (req, res) => {
     }
     /* публичное утверждение / отклонение — edit-ключ ИЛИ сессия (allow-list выше: mpApproveKeyOk) */
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)\/(approve|reject)$/)) && req.method === 'POST') {
-      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
       const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      if (!mpCredOk(mp, u, req)) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       mp.status = m[2] === 'approve' ? 'approved' : 'rejected';
       mp.approvedAt = Date.now();
       mp.approvedBy = String(b.name || 'Подрядчик').slice(0, 80);
       mp.approvalComment = b.comment ? String(b.comment).slice(0, 500) : '';
+      if (b.comment) mpAddComment(mp, b.comment, mp.approvedBy, getSession(req) ? 'owner' : 'contractor');
+      mpPushVersion(mp, m[2] === 'approve' ? 'approved' : 'rejected', mp.approvedBy);
       store.save();
       return json(res, 200, { ok: true, status: mp.status, approvedBy: mp.approvedBy, approvedAt: mp.approvedAt });
+    }
+    /* тред комментариев к медиаплану (подрядчик по токену / владелец по сессии) */
+    if ((m = p.match(/^\/api\/mediaplans\/([^/]+)\/comment$/)) && req.method === 'POST') {
+      const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      if (!mpCredOk(mp, u, req)) return json(res, 403, { error: 'bad key' });
+      const b = await readBody(req);
+      const text = String(b.text || '').trim(); if (!text) return json(res, 400, { error: 'пустой комментарий' });
+      const c = mpAddComment(mp, text, b.name, getSession(req) ? 'owner' : 'contractor');
+      store.save();
+      return json(res, 200, { ok: true, comment: c, count: mp.comments.length });
     }
 
     /* подрядчик заполняет/меняет план по ссылке (self-fill) → строки подтягиваются в CRM агентства */
     if ((m = p.match(/^\/api\/mediaplans\/([^/]+)\/contractor-fill$/)) && req.method === 'POST') {
-      if (u.searchParams.get('key') !== db.settings.hooks.secret && !getSession(req)) return json(res, 403, { error: 'bad key' });
       const mp = db.mediaplans.find(x => x.id === m[1]); if (!mp) return json(res, 404, { error: 'not found' });
+      if (!mpCredOk(mp, u, req)) return json(res, 403, { error: 'bad key' });
       const b = await readBody(req);
       if (Array.isArray(b.lines)) mp.lines = mpSanitizeLines(b.lines);
       mp.contractorFilledAt = Date.now();
       mp.contractorFilledBy = String(b.name || 'Подрядчик').slice(0, 80);
+      if (b.comment) mpAddComment(mp, b.comment, mp.contractorFilledBy, getSession(req) ? 'owner' : 'contractor');
       if (mp.status === 'draft' || mp.status === 'sent') mp.status = 'sent';   /* заполнен подрядчиком, ждёт финального взгляда агентства */
+      mpPushVersion(mp, 'filled', mp.contractorFilledBy);
       store.save();
       return json(res, 200, { ok: true, lines: mp.lines.length, totals: mpTotals(mp) });
     }
@@ -10269,6 +10308,16 @@ const server = http.createServer(async (req, res) => {
         <textarea id="mpCm" placeholder="Комментарий (необязательно) — что скорректировать, вопросы…" style="margin-top:14px"></textarea>
         <div class="a-btns"><button class="ab approve" data-act="approve">✓ Утвердить план</button><button class="ab reject" data-act="reject">✕ Отклонить</button></div>
       </div>` : `<div class="ro-note">Документ только для просмотра. Решение по плану вносит подрядчик по своей ссылке.</div>`;
+      /* — обсуждение (тред) — виден всем, писать может владелец ссылки/сессии — */
+      const fmtDT = (ts) => new Date(ts).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const comments = mp.comments || [];
+      const cmtList = comments.length ? comments.map(c => `<div class="cmt ${c.role === 'owner' ? 'own' : ''}"><div class="cmt-h"><span class="cmt-av">${esc((c.by || (c.role === 'owner' ? 'А' : 'П')).trim().charAt(0).toUpperCase())}</span><b>${esc(c.by || (c.role === 'owner' ? AG : 'Подрядчик'))}</b><span class="cmt-role">${c.role === 'owner' ? 'агентство' : 'подрядчик'}</span><time>${fmtDT(c.at)}</time></div><div class="cmt-b">${esc(c.text)}</div></div>`).join('') : '<div class="cmt-empty">Пока нет комментариев. Задайте вопрос или предложите правку — переписка сохранится здесь и подтянется в CRM агентства.</div>';
+      const cmtCompose = opts.canEdit ? `<div class="cmt-compose"><textarea id="cmtText" placeholder="Комментарий к плану — вопрос, уточнение, предложение…"></textarea><button class="ab" id="cmtSend">Отправить комментарий</button></div>` : '';
+      const commentsHtml = `<div class="sec-l">Обсуждение${comments.length ? ` <span class="sec-c">${comments.length}</span>` : ''}</div><div class="cmts">${cmtList}</div>${cmtCompose}`;
+      /* — история версий (авто-снимки) — */
+      const verLabel = { filled: 'План заполнен / обновлён', approved: 'Медиаплан утверждён', rejected: 'Медиаплан отклонён' };
+      const versions = mp.versions || [];
+      const versionsHtml = versions.length ? `<div class="sec-l">История версий</div><div class="vers">${versions.map(v => `<div class="ver"><span class="ver-dot ${esc(v.action || '')}"></span><div class="ver-main"><b>${esc(verLabel[v.action] || 'Изменение')}</b><span class="ver-meta">${esc(v.by || '')}${v.by ? ' · ' : ''}${fmtDT(v.at)}</span></div><div class="ver-nums">${money(v.budgetPlan)} · ${v.leadsPlan || 0}&nbsp;лид.${v.cplPlan ? ` · CPL ${money(v.cplPlan)}` : ''} · ${v.linesCount || 0}&nbsp;стр.</div></div>`).join('')}</div>` : '';
       const SCR = opts.canEdit ? `<script>
 (function(){
   var acts=document.getElementById('acts');
@@ -10282,7 +10331,7 @@ const server = http.createServer(async (req, res) => {
     if(!lines.length){ alert('Заполните хотя бы одну строку'); return; }
     var name=prompt('Ваше имя (кто заполняет план):',''); if(name===null) return;
     var b=this; b.disabled=true; b.textContent='Сохраняю…';
-    try{ var r=await fetch('/api/mediaplans/${mp.id}/contractor-fill?key=${esc(opts.key)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lines:lines,name:name||'Подрядчик'})}); var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка'); location.reload(); }
+    try{ var r=await fetch('/api/mediaplans/${mp.id}/contractor-fill?${opts.cred}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lines:lines,name:name||'Подрядчик'})}); var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка'); location.reload(); }
     catch(err){ alert('Не удалось: '+err.message); b.disabled=false; b.textContent='Сохранить и отправить агентству'; }
   });
   acts.addEventListener('click',async function(e){
@@ -10292,10 +10341,19 @@ const server = http.createServer(async (req, res) => {
     if(name===null) return;
     b.disabled=true; b.textContent='…';
     try{
-      var r=await fetch('/api/mediaplans/${mp.id}/'+act+'?key=${esc(opts.key)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name||'Подрядчик',comment:cm})});
+      var r=await fetch('/api/mediaplans/${mp.id}/'+act+'?${opts.cred}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name||'Подрядчик',comment:cm})});
       var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка');
       location.reload();
     }catch(err){ alert('Не удалось: '+err.message); b.disabled=false; b.textContent=act==='approve'?'✓ Утвердить план':'✕ Отклонить'; }
+  });
+  var cmtSend=document.getElementById('cmtSend');
+  if(cmtSend) cmtSend.addEventListener('click',async function(){
+    var ta=document.getElementById('cmtText'); var text=(ta.value||'').trim();
+    if(!text){ ta.focus(); return; }
+    var nm=window.__mpName||prompt('Ваше имя:',''); if(nm===null) return; window.__mpName=nm;
+    var b=this; b.disabled=true; b.textContent='Отправляю…';
+    try{ var r=await fetch('/api/mediaplans/${mp.id}/comment?${opts.cred}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,name:nm||'Подрядчик'})}); var j=await r.json(); if(!r.ok) throw new Error(j.error||'ошибка'); location.reload(); }
+    catch(err){ alert('Не удалось: '+err.message); b.disabled=false; b.textContent='Отправить комментарий'; }
   });
 })();
 </${'script'}>` : '';
@@ -10305,16 +10363,16 @@ const server = http.createServer(async (req, res) => {
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--ink:#0F1B33;--ink2:#3D4A63;--mut:#7A8AA6;--line:#E3E9F2;--soft:#EEF2F8;--accent:#2563EB;--good:#12855F;--bad:#C0392B;--bg:#F4F7FB}
+:root{--ink:#28231C;--ink2:#4E463A;--mut:#8C8273;--line:#E7E0D2;--soft:#F1EADD;--accent:#2563EB;--good:#12855F;--bad:#C0392B;--bg:#EDE6D8;--warm:#FAF6EE}
 body{font-family:Manrope,-apple-system,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;padding:32px 18px;line-height:1.5}
-.doc{max-width:940px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px -40px rgba(16,43,92,.4);overflow:hidden}
+.doc{max-width:940px;margin:0 auto;background:#FCFAF5;border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px -40px rgba(56,46,28,.35);overflow:hidden}
 .hd{padding:34px 40px 26px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
 .hd .brand{display:flex;align-items:center;min-height:46px}
 .hd .sp{flex:1}
 .badge{padding:7px 15px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
 .kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:8px}
 .h1{font-family:Fraunces,serif;font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
-.meta{padding:22px 40px;display:flex;gap:34px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#FBFCFE,#fff)}
+.meta{padding:22px 40px;display:flex;gap:34px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--warm),#FCFAF5)}
 .meta .m{display:flex;flex-direction:column;gap:3px}
 .meta .m .l{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);font-weight:700}
 .meta .m .v{font-size:15px;font-weight:650;color:var(--ink)}
@@ -10325,13 +10383,13 @@ th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-tr
 th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
 td{padding:12px;border-bottom:1px solid var(--soft);vertical-align:top}
 td.accent{color:var(--accent);font-weight:700}
-td.fact{background:#FAFBFE}
+td.fact{background:var(--warm)}
 td.mut{color:var(--mut)}
 td.good{color:var(--good);font-weight:700}
 td.bad{color:var(--bad);font-weight:700}
 .bundle{color:var(--ink2);max-width:280px}
 .ln-note{display:block;font-size:11px;color:var(--mut);margin-top:3px}
-tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;font-size:14px;padding-top:14px;background:#FBFCFE}
+tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;font-size:14px;padding-top:14px;background:var(--warm)}
 .good{color:var(--good)}.bad{color:var(--bad)}
 .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
 .s-cell{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff}
@@ -10343,7 +10401,7 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
 .s-pct{font-size:11.5px;color:var(--mut);font-weight:700;margin-top:6px;display:inline-block}
 .s-arrow{color:var(--mut);margin:0 4px}
 .s-note{font-size:12px;font-weight:700;margin-top:8px;display:inline-block}
-.nofact{margin-top:14px;padding:15px 18px;border:1px dashed #C7D3E6;border-radius:12px;color:var(--mut);font-size:13px;background:#FBFCFE}
+.nofact{margin-top:14px;padding:15px 18px;border:1px dashed var(--line);border-radius:12px;color:var(--mut);font-size:13px;background:var(--warm)}
 .note{margin-top:22px;padding:16px 18px;background:var(--soft);border-radius:12px;font-size:13px;color:var(--ink2);line-height:1.6}
 .stamp{margin-top:26px;display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border-radius:14px}
 .stamp.approved{background:#E4F5EE;border:1px solid #C4E6D6}
@@ -10354,7 +10412,7 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
 .stamp b{font-size:15px;display:block}
 .stamp span{font-size:12.5px;color:var(--ink2)}
 .st-cm{margin-top:7px;font-style:italic;color:var(--ink2);font-size:13px}
-.acts{margin-top:28px;padding:22px 24px;border:1.5px solid #C3D6FA;border-radius:16px;background:linear-gradient(180deg,#F5F9FF,#fff)}
+.acts{margin-top:28px;padding:22px 24px;border:1.5px solid color-mix(in srgb,var(--accent) 30%,var(--line));border-radius:16px;background:linear-gradient(180deg,var(--warm),#FCFAF5)}
 .a-lbl{font-size:13px;font-weight:750;margin-bottom:12px}
 .acts textarea{width:100%;min-height:76px;border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-family:inherit;font-size:13.5px;resize:vertical;outline:none;color:var(--ink)}
 .acts textarea:focus{border-color:var(--accent)}
@@ -10369,7 +10427,37 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
 #fillTbl td{padding:6px 6px} .fr-del{border:none;background:none;color:var(--mut);cursor:pointer;font-size:15px;padding:4px 8px} .fr-del:hover{color:var(--bad)}
 .foot{padding:22px 40px;border-top:1px solid var(--line);font-size:12px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .tbl-wrap{overflow-x:auto}
-@media(max-width:640px){.hd,.meta,.body,.foot{padding-left:20px;padding-right:20px}.strip{grid-template-columns:1fr}.h1{font-size:24px}table{min-width:560px}}
+.sec-c{display:inline-block;font-size:11px;font-weight:800;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:20px;padding:1px 8px;vertical-align:middle;letter-spacing:0}
+/* обсуждение */
+.cmts{display:flex;flex-direction:column;gap:10px}
+.cmt{border:1px solid var(--line);border-radius:13px;padding:13px 15px;background:#FCFAF5}
+.cmt.own{background:color-mix(in srgb,var(--accent) 6%,#FCFAF5);border-color:color-mix(in srgb,var(--accent) 22%,var(--line))}
+.cmt-h{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.cmt-av{width:26px;height:26px;border-radius:50%;flex:0 0 26px;display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff;background:var(--mut)}
+.cmt.own .cmt-av{background:var(--accent)}
+.cmt-h b{font-size:13.5px;font-weight:700}
+.cmt-role{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:1px 8px}
+.cmt-h time{margin-left:auto;font-size:11.5px;color:var(--mut)}
+.cmt-b{font-size:13.5px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
+.cmt-empty{padding:16px 18px;border:1px dashed var(--line);border-radius:12px;color:var(--mut);font-size:13px;background:var(--warm)}
+.cmt-compose{margin-top:12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.cmt-compose textarea{flex:1;min-width:220px;min-height:60px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:13.5px;resize:vertical;outline:none;color:var(--ink);background:#FCFAF5}
+.cmt-compose textarea:focus{border-color:var(--accent)}
+.cmt-compose .ab{flex:0 0 auto;min-width:180px;background:var(--ink);color:#fff}
+/* история версий */
+.vers{position:relative;display:flex;flex-direction:column;gap:2px;padding-left:6px}
+.ver{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--soft)}
+.ver:last-child{border-bottom:none}
+.ver-dot{width:11px;height:11px;border-radius:50%;flex:0 0 11px;background:var(--mut);box-shadow:0 0 0 3px color-mix(in srgb,var(--mut) 20%,transparent)}
+.ver-dot.approved{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent)}
+.ver-dot.rejected{background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 22%,transparent)}
+.ver-dot.filled{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.ver-main{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ver-main b{font-size:13px;font-weight:700}
+.ver-meta{font-size:11.5px;color:var(--mut)}
+.ver-nums{margin-left:auto;font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+@media print{.cmt-compose{display:none}}
+@media(max-width:640px){.hd,.meta,.body,.foot{padding-left:20px;padding-right:20px}.strip{grid-template-columns:1fr}.h1{font-size:24px}table{min-width:560px}.ver-nums{font-size:11px}}
 @media print{body{background:#fff;padding:0}.doc{box-shadow:none;border:none;border-radius:0;max-width:100%}.acts,.ro-note{display:none}@page{size:A4;margin:14mm}}
 </style></head><body>
 <div class="doc">
@@ -10403,6 +10491,8 @@ tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:800;fo
     ${mp.note ? `<div class="note">${esc(mp.note)}</div>` : ''}
     ${stamp}
     ${actions}
+    ${versionsHtml}
+    ${commentsHtml}
   </div>
   <div class="foot"><span>${esc(AG)} · медиаплан</span><span>Сформировано ${new Date(mp.createdAt || Date.now()).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
 </div>
@@ -10414,9 +10504,15 @@ ${SCR}
     if ((m = p.match(/^\/mp\/(mp_[\w]+)$/)) && req.method === 'GET') {
       const mp = db.mediaplans.find(x => x.id === m[1]);
       if (!mp) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<h1>Медиаплан не найден</h1>'); return; }
-      const canEdit = u.searchParams.get('key') === db.settings.hooks.secret;
+      mpEnsureToken(mp);
+      const qt = u.searchParams.get('t');
+      const byToken = !!(qt && qt === mp.pubToken);
+      const byKey = u.searchParams.get('key') === db.settings.hooks.secret;
+      const canEdit = byToken || byKey || !!getSession(req);
+      /* учётка для внутренних fetch на странице: уникальный токен предпочтителен, legacy-ключ — фолбэк */
+      const cred = byToken ? ('t=' + mp.pubToken) : (byKey ? ('key=' + db.settings.hooks.secret) : ('t=' + mp.pubToken));
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-      res.end(renderMpDoc(db, mp, { canEdit, key: canEdit ? db.settings.hooks.secret : '', print: u.searchParams.get('print') === '1' }));
+      res.end(renderMpDoc(db, mp, { canEdit, cred, isOwner: !!getSession(req), print: u.searchParams.get('print') === '1' }));
       return;
     }
 
@@ -10783,10 +10879,10 @@ ${SCR}
       const absUrl = (u2) => { try { return new URL(u2, url).href; } catch (_) { return ''; } };
       /* авто-детект дубля: готовая карточка с этой ссылкой уже есть → спрашиваем (обновить/копия),
          НЕ тратя рендер+ИИ. Стаб из каталога дополняем тихо. force: 'update'|'new' — из подтверждения. */
-      { const dup0 = (db.properties || []).find(x => x.sourceUrl === url);
-        if (dup0 && !dup0.stub && b.force !== 'update' && b.force !== 'new') {
-          return json(res, 200, { exists: true, existingId: dup0.id, existingName: dup0.name, hydratedAt: dup0.hydratedAt || dup0.addedAt || null });
-        } }
+      const dup0 = (db.properties || []).find(x => x.sourceUrl === url);
+      if (dup0 && !dup0.stub && b.force !== 'update' && b.force !== 'new') {
+        return json(res, 200, { exists: true, existingId: dup0.id, existingName: dup0.name, existingStub: false, hydratedAt: dup0.hydratedAt || dup0.addedAt || null });
+      }
       let html = '';
       try {
         const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36', 'Accept-Language': 'ru,en' }, redirect: 'follow' });
@@ -10813,7 +10909,7 @@ ${SCR}
         }
       }
       if (!b.full) {
-        return json(res, 200, { ok: true, preview: { title: ogTitle || (text.slice(0, 60)), image: [...imgs][0] || '', desc: (ogDesc || text.slice(0, 300)).slice(0, 300), imageCount: imgs.size, rendered: !!renderMd } });
+        return json(res, 200, { ok: true, exists: !!dup0, existingId: dup0 ? dup0.id : null, existingName: dup0 ? dup0.name : null, existingStub: dup0 ? !!dup0.stub : false, preview: { title: ogTitle || (text.slice(0, 60)), image: [...imgs][0] || '', desc: (ogDesc || text.slice(0, 300)).slice(0, 300), imageCount: imgs.size, rendered: !!renderMd } });
       }
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY) для разбора карточки' });
       const context = 'OG-TITLE: ' + ogTitle + '\nOG-DESC: ' + ogDesc + '\nJSON-LD: ' + JSON.stringify(ld).slice(0, 3500) + '\nTEXT: ' + text.slice(0, 11000);
@@ -10892,6 +10988,9 @@ ${SCR}
         else if (k === 'districtBlurb') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.blurb = String(v).slice(0, 500); }
         else if (k === 'timings') { pr.district = pr.district || {}; pr.district.name = pr.district.name || pr.area || ''; pr.district.times = (Array.isArray(v) ? v : String(v).split('\n')).slice(0, 6).map(s => { const mm = String(s).match(/(\d+)\s*[|·:-]\s*(.+)/); return mm ? { min: +mm[1], place: mm[2].trim().slice(0, 60) } : { min: 0, place: String(s).slice(0, 60) }; }); }
         else if (k === 'rentalArgs') { pr.whyRent = (Array.isArray(v) ? v : String(v).split('\n')).slice(0, 4).map(x => String(x).slice(0, 300)); }
+        else if (k === 'amenities') { const add = (Array.isArray(v) ? v : String(v).split('\n')).map(x => String(x).trim().slice(0, 60)).filter(Boolean); pr.amenities = [...new Set([...(pr.amenities || []), ...add])].slice(0, 24); }
+        else if (k === 'investmentHighlights') { pr.investmentHighlights = (Array.isArray(v) ? v : String(v).split('\n')).map(x => String(x).trim().slice(0, 200)).filter(Boolean).slice(0, 8); }
+        else if (k === 'paymentPlan') { if (!pr.payment || pr.payment === '—') pr.payment = String(v).slice(0, 200); }
         else if (k === 'hookTitle') { pr.hookTitle = String(v).slice(0, 160); }
         else pr[k] = String(v).slice(0, 400);
         return true;
@@ -10912,24 +11011,49 @@ ${SCR}
       if (!(pr.whyRent && pr.whyRent.length)) gaps.push('аргументы для аренды'); if (!pr.description) gaps.push('описание');
       const want = b.want || (gaps.length ? gaps.join(', ') : '');
       const q = [pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', pr.area, want, 'недвижимость проект'].filter(Boolean).join(' ');
-      const sr = await webSearch(q, 6);
+      /* КОМПЛЕКСНО: глубже (8 источников) + собираем фото/видео из выдачи (media:true) */
+      const sr = await webSearch(q, 8, { media: true });
       if (!sr || !sr.text) return json(res, 400, { error: 'по проекту ничего не нашлось в открытых источниках' });
       let ext; try { ext = await llm.enrichProject(sr.text, pr.name, want); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал результаты: ' + e.message }); }
       /* предлагаем ПРИОРИТЕТНО пустые поля карточки (гэпы), потом остальные найденные */
-      const isEmpty = { developer: !pr.developer || pr.developer === '—', handover: !pr.handover, roi: !pr.roi, appreciation: !pr.appreciation, priceFrom: !pr.priceFrom, constructionProgress: !pr.constructionProgress, description: !pr.description, districtBlurb: !(pr.district && pr.district.blurb), timings: !(pr.district && pr.district.times && pr.district.times.length), rentalArgs: !(pr.whyRent && pr.whyRent.length), hookTitle: !pr.hookTitle };
+      const isEmpty = { developer: !pr.developer || pr.developer === '—', handover: !pr.handover, roi: !pr.roi, appreciation: !pr.appreciation, priceFrom: !pr.priceFrom, constructionProgress: !pr.constructionProgress, description: !pr.description, districtBlurb: !(pr.district && pr.district.blurb), timings: !(pr.district && pr.district.times && pr.district.times.length), rentalArgs: !(pr.whyRent && pr.whyRent.length), amenities: !(pr.amenities && pr.amenities.length), investmentHighlights: !(pr.investmentHighlights && pr.investmentHighlights.length), paymentPlan: !pr.payment || pr.payment === '—', hookTitle: !pr.hookTitle };
       const proposed = {}; const gapFields = [];
-      for (const k of ['handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'districtBlurb', 'timings', 'rentalArgs', 'description', 'developer', 'hookTitle']) {
+      for (const k of ['handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'districtBlurb', 'timings', 'rentalArgs', 'amenities', 'investmentHighlights', 'paymentPlan', 'description', 'developer', 'hookTitle']) {
         let v = ext[k]; if (v == null || (Array.isArray(v) && !v.length) || (!Array.isArray(v) && !String(v).trim()) || (k === 'priceFrom' && !+v)) continue;
-        proposed[k] = k === 'priceFrom' ? +v : (Array.isArray(v) ? v.slice(0, 6).map(String) : String(v).slice(0, 500));
+        proposed[k] = k === 'priceFrom' ? +v : (Array.isArray(v) ? v.slice(0, 8).map(String) : String(v).slice(0, 600));
         if (isEmpty[k]) gapFields.push(k);
       }
-      if (!b.apply) return json(res, 200, { ok: true, proposed, gapFields, confidence: ext.confidence || 'medium', sources: sr.sources });
+      /* медиа из открытых источников: новые фото (не дубли) + видео-рендеры */
+      const webImgs = (sr.images || []).filter(u => !(pr.images || []).includes(u));
+      const webVids = (sr.videos || []).filter(u => !(pr.videos || []).includes(u));
+      const media = { photos: webImgs.length, videos: webVids.length };
+      if (!b.apply) return json(res, 200, { ok: true, proposed, gapFields, confidence: ext.confidence || 'medium', sources: sr.sources, media });
       const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(proposed);
       const applied = fields.filter(k => mergeEnrich(k, proposed[k]));
-      pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + applied.join(', '), sources: (sr.sources || []).slice(0, 4) });
+      /* скачиваем свежие фото продающего качества (встроенный хи-рес фильтр), добираем карточку до ~16 */
+      let photosAdded = 0, videosAdded = 0, unitsAdded = 0;
+      if (b.media !== false && webImgs.length) {
+        const need = Math.max(6, 16 - (pr.images || []).length);
+        const dl = await Promise.all(webImgs.slice(0, 18).map(u => downloadImageToAsset(u).catch(() => null)));
+        const good = dl.filter(Boolean).sort((a, b2) => (b2.w * b2.h) - (a.w * a.h)).slice(0, need);
+        if (good.length) { pr.images = [...(pr.images || []), ...good.map(g => g.url)]; photosAdded = good.length; }
+      }
+      if (b.media !== false && webVids.length) { pr.videos = [...new Set([...(pr.videos || []), ...webVids])].slice(0, 12); videosAdded = webVids.length; }
+      /* юниты из открытых источников — ТОЛЬКО добавляем новые (из веба НЕ помечаем проданными: выдача неполна) */
+      if (b.units !== false && (pr.units || []).length < 3) {
+        try {
+          const ue = await llm.extractUnits(sr.text);
+          const sigU = (u) => [String(u.unitNo || '').toLowerCase().replace(/\s/g, ''), String(u.type || u.plan || '').toLowerCase(), String(u.floor || ''), String(u.area || u.size || '').replace(/\D/g, '')].filter(Boolean).join('|');
+          const cur = new Set((pr.units || []).map(sigU));
+          const fresh = (ue.units || []).filter(u => u && (u.type || u.unitNo) && !cur.has(sigU(u)));
+          if (fresh.length) { pr.units = [...(pr.units || []), ...fresh.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', source: 'web' }))].slice(0, 400); unitsAdded = fresh.length; pr.unitsUpdatedAt = Date.now(); }
+        } catch (_) {}
+      }
+      const parts = [...applied]; if (photosAdded) parts.push(photosAdded + ' фото'); if (videosAdded) parts.push(videosAdded + ' видео'); if (unitsAdded) parts.push(unitsAdded + ' юнитов');
+      pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + (parts.length ? parts.join(', ') : '—'), sources: (sr.sources || []).slice(0, 4) });
       if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
       store.save();
-      return json(res, 200, { ok: true, applied, property: pr, sources: sr.sources });
+      return json(res, 200, { ok: true, applied, photosAdded, videosAdded, unitsAdded, property: pr, sources: sr.sources });
     }
     /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
        diff с текущими: новые добавляются (в наличии), пропавшие → помечаются проданными (не трём —
@@ -10981,6 +11105,24 @@ ${SCR}
     /* ⭐ АГРЕГАЦИЯ КАТАЛОГА ПОРТАЛА: рендерим страницу каталога → ИИ достаёт список проектов
        (имя+локация+сводка+ссылка) → создаём лёгкие СТАБЫ (на карте пинами, клик→подтянуть полную).
        portal: housebook | resale | <любой catalogUrl>. */
+    /* Tier 3 поиска: не нашли в базе → ищем проект по названию в ОТКРЫТЫХ источниках.
+       Возвращаем кандидатов {name, area, developer, url, match} — юзер жмёт «Создать карточку» → from-url. */
+    if (p === '/api/properties/find-web' && req.method === 'POST') {
+      const b = await readBody(req).catch(() => ({}));
+      const query = String(b.query || '').trim();
+      if (query.length < 2) return json(res, 400, { error: 'слишком короткий запрос' });
+      if (!process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен RENDER_API_KEY (веб-поиск)' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      const geoHint = { dubai: 'Дубай ОАЭ', bali: 'Бали Индонезия', phuket: 'Пхукет Таиланд', thailand: 'Таиланд' }[b.geo] || '';
+      const sr = await webSearch([query, geoHint, 'недвижимость проект застройщик'].filter(Boolean).join(' '), 8);
+      if (!sr || !sr.text) return json(res, 200, { ok: true, candidates: [] });
+      let cands = []; try { cands = await llm.findProjects(sr.text, query); } catch (_) { cands = []; }
+      const seen = new Set();
+      cands = (cands || []).filter(c => c && c.name && !seen.has((c.url || c.name).toLowerCase()) && seen.add((c.url || c.name).toLowerCase()))
+        .map(c => ({ name: String(c.name).slice(0, 120), area: String(c.area || '').slice(0, 80), developer: String(c.developer || '').slice(0, 80), priceFrom: +c.priceFrom || 0, currency: c.currency || 'USD', url: /^https?:\/\//.test(c.url || '') ? c.url : '', match: ['high', 'medium', 'low'].includes(c.match) ? c.match : 'medium' }))
+        .slice(0, 8);
+      return json(res, 200, { ok: true, candidates: cands, sources: sr.sources });
+    }
     if (p === '/api/properties/import-catalog' && req.method === 'POST') {
       const b = await readBody(req);
       const PORTALS = { housebook: 'https://th.housebook.deals/en/catalog', resale: 'https://resale-center.com/?view=search&search_view=list' };

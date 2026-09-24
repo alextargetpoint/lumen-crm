@@ -3873,7 +3873,14 @@ PAGES.feed = async (root) => {
             <button class="btn btn-accent btn-sm" id="fdPublish">${ic(I.send)}Опубликовать</button>
           </div>
         </div>` : ''}
-        <div id="fdPosts">${posts.map(postCard).join('') || '<div class="glass card empty es-art es-feed"><span class="es-art-img"></span><span class="es-art-tx">Пока пусто. ' + (canPost ? 'Опубликуйте первую новость ↑' : 'Скоро здесь появятся новости агентства') + '</span></div>'}</div>
+        <div id="fdPosts">${posts.map(postCard).join('') || `<div class="glass card fd-empty">
+          <div class="fd-empty-stage" aria-hidden="true">
+            <span class="fe-ring"></span><span class="fe-ring"></span><span class="fe-ring"></span>
+            <span class="fe-card fe-c1"></span><span class="fe-card fe-c2"></span><span class="fe-card fe-c3"></span>
+            <span class="fe-core">${ic(I.send)}</span>
+          </div>
+          <div class="fd-empty-tx"><b>${canPost ? 'Лента агентства пока пуста' : 'Скоро здесь появятся новости'}</b><span>${canPost ? 'Опубликуйте первую новость — команда увидит её здесь и получит пуш в Telegram' : 'Здесь будут новости, материалы и поздравления команды'}</span></div>
+        </div>`}</div>
       </div>
       <div class="fd-side">
         <div class="glass card fd-board">
@@ -10726,14 +10733,16 @@ PAGES.mediaplan = async (root) => {
   $$('[data-mpopen]', root).forEach(b => b.addEventListener('click', () => openMpBuilder(plans.find(x => x.id === b.dataset.mpopen), contractors)));
   $$('[data-mpshare]', root).forEach(b => b.addEventListener('click', () => {
     const mp = plans.find(x => x.id === b.dataset.mpshare);
-    const url = `${location.origin}/mp/${mp.id}?key=${mp.editKey}`;
+    const cred = mp.pubToken ? `t=${mp.pubToken}` : `key=${mp.editKey}`;   /* уникальный токен плана (не глобальный секрет) */
+    const url = `${location.origin}/mp/${mp.id}?${cred}`;
     navigator.clipboard.writeText(url);
-    toast('Ссылка на медиаплан скопирована', 'Подрядчик откроет и утвердит план по этой ссылке', true);
+    toast('Ссылка на медиаплан скопирована', 'Уникальная ссылка подрядчика: заполнит, прокомментирует и утвердит план', true);
   }));
   $$('[data-mpsend]', root).forEach(b => b.addEventListener('click', async () => {
     const mp = plans.find(x => x.id === b.dataset.mpsend);
-    await api.patch('/mediaplans/' + mp.id, { status: 'sent' });
-    try { await navigator.clipboard.writeText(`${location.origin}/mp/${mp.id}?key=${mp.editKey}`); } catch (_) {}
+    const r = await api.patch('/mediaplans/' + mp.id, { status: 'sent' });
+    const cred = (r && r.pubToken) ? `t=${r.pubToken}` : (mp.pubToken ? `t=${mp.pubToken}` : `key=${mp.editKey}`);
+    try { await navigator.clipboard.writeText(`${location.origin}/mp/${mp.id}?${cred}`); } catch (_) {}
     toast('Отправлено подрядчику', 'Ссылка скопирована · статус «Отправлен» · ждём согласования', true);
     render();
   }));
