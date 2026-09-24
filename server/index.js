@@ -10776,6 +10776,25 @@ ${SCR}
       store.save();
       return json(res, 200, { ok: true, added: added.length, sold: sold.length, kept: kept.length, available: merged.filter(u => u.status === 'available').length });
     }
+    /* гео-кодинг объектов для карты: area → координаты (Nominatim/OSM, бесплатно), кэш на объекте.
+       До 10 за вызов (rate-limit OSM ~1/сек) — клиент дёргает, пока remaining>0. */
+    if (p === '/api/properties/geocode-missing' && req.method === 'POST') {
+      const GEO_LOC = { dubai: 'Dubai, United Arab Emirates', oman: 'Muscat, Oman', phuket: 'Phuket, Thailand', bali: 'Bali, Indonesia', spain: 'Spain', cyprus: 'Cyprus', turkey: 'Turkey', greece: 'Greece', pattaya: 'Pattaya, Thailand' };
+      const need = (db.properties || []).filter(pr => (pr.lat == null || pr.lng == null) && !pr.geoFail && (pr.area || pr.district && pr.district.name));
+      const batch = need.slice(0, 10); let done = 0;
+      for (const pr of batch) {
+        const q = [pr.area || (pr.district && pr.district.name), GEO_LOC[pr.geo] || pr.geo].filter(Boolean).join(', ');
+        try {
+          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'LumenCRM/1.0 (real-estate)', 'Accept-Language': 'en' } });
+          const j = await r.json().catch(() => ([]));
+          if (Array.isArray(j) && j[0]) { pr.lat = +j[0].lat; pr.lng = +j[0].lon; pr.geocodedAt = Date.now(); done++; }
+          else { pr.geoFail = true; }
+        } catch (_) { pr.geoFail = true; }
+        await new Promise(rs => setTimeout(rs, 1100));   /* уважаем rate-limit OSM */
+      }
+      store.save();
+      return json(res, 200, { ok: true, done, remaining: Math.max(0, need.length - batch.length) });
+    }
     if (p === '/api/properties/bulk' && req.method === 'POST') {
       const b = await readBody(req);
       const ids = Array.isArray(b.ids) ? b.ids : [];

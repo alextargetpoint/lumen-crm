@@ -7427,6 +7427,45 @@ function propCover(pr, big) {
     <span class="pc-star">${lumenMark()}</span><span>${esc(pr.area || pr.name)}</span></div>`;
 }
 
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (window._leafletLoading) return window._leafletLoading;
+  window._leafletLoading = new Promise((resolve, reject) => {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload = () => resolve(); s.onerror = () => reject(new Error('leaflet')); document.head.appendChild(s);
+  });
+  return window._leafletLoading;
+}
+async function initPropMap(props) {
+  const el = document.getElementById('prMap'); const status = document.getElementById('prMapStatus');
+  if (!el) return;
+  try { await loadLeaflet(); } catch (e) { el.innerHTML = '<div class="muted" style="padding:24px;text-align:center">Карта не загрузилась (нет сети)</div>'; return; }
+  let latest = props;
+  const missing = props.filter(p => p.lat == null && (p.area || (p.district && p.district.name)) && !p.geoFail);
+  if (missing.length && status) status.textContent = 'Определяю координаты объектов…';
+  for (let i = 0; i < 6 && missing.length; i++) { try { const r = await api.post('/properties/geocode-missing', {}); if (!r.remaining) break; } catch (_) { break; } }
+  if (missing.length) latest = await api.get('/properties');
+  const pts = latest.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
+  if (window._prMap) { try { window._prMap.remove(); } catch (_) {} window._prMap = null; }
+  const center = pts.length ? [pts[0].lat, pts[0].lng] : [7.9, 98.35];
+  const map = L.map(el, { scrollWheelZoom: true, attributionControl: false }).setView(center, pts.length ? 11 : 5);
+  window._prMap = map;
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+  const bounds = [];
+  pts.forEach(p => {
+    const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [20, 20], iconAnchor: [10, 10] });
+    const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
+    const img = (p.images && p.images[0]) || '';
+    const price = p.priceFrom ? 'от ' + fmt(p) : '';
+    mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"></div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<button class="btn btn-sm btn-accent prpop-open" data-propopen="${p.id}">Открыть карточку</button></div></div>`, { minWidth: 230, closeButton: true });
+    bounds.push([p.lat, p.lng]);
+  });
+  if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+  map.on('popupopen', (e) => { const b = e.popup.getElement().querySelector('[data-propopen]'); if (b) b.addEventListener('click', () => { PAGE_STATE.propView = b.dataset.propopen; PAGE_STATE.propMap = false; render(); }); });
+  if (status) status.textContent = pts.length + ' из ' + latest.length + ' на карте' + (pts.length < latest.length ? ' · остальные без распознанной локации (укажите район в карточке)' : '');
+  setTimeout(() => { try { map.invalidateSize(); } catch (_) {} }, 250);
+}
+
 PAGES.properties = async (root) => {
   const props = await api.get('/properties');
   const st = STATE.settings;
@@ -7695,10 +7734,12 @@ PAGES.properties = async (root) => {
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
+      <button class="btn btn-sm ${PAGE_STATE.propMap ? 'btn-accent' : ''}" id="prMapToggle">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? 'Список' : 'Карта'}</button>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>
-    <div class="shelf">
+    <div id="prMapWrap" style="${PAGE_STATE.propMap ? '' : 'display:none'};margin:0 0 14px"><div id="prMap" style="height:560px;border-radius:16px;overflow:hidden;border:1px solid var(--stroke);background:var(--bg-2)"></div><div id="prMapStatus" class="muted" style="font-size:11.5px;margin-top:6px"></div></div>
+    <div class="shelf" style="${PAGE_STATE.propMap ? 'display:none' : ''}">
       <div class="fold ${!folderF ? 'active' : ''}" data-fopen="">
         <span class="fold-ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" opacity=".16"/><path d="M3 7.2a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.1H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.5"/></svg></span><div class="fold-meta"><b>Все объекты</b><i>${props.length}</i></div>
       </div>
@@ -7712,8 +7753,8 @@ PAGES.properties = async (root) => {
       </div>`).join('')}
       <button class="fold fold-new" id="fNew">${ic(I.plus)}<span>Папка</span></button>
     </div>
-    <div class="muted" style="font-size:11px;margin:-6px 0 12px">Карточку — на папку · клик по папке — фильтр и подборка</div>
-    <div class="prop-grid">
+    <div class="muted" style="font-size:11px;margin:-6px 0 12px;${PAGE_STATE.propMap ? 'display:none' : ''}">Карточку — на папку · клик по папке — фильтр и подборка</div>
+    <div class="prop-grid" style="${PAGE_STATE.propMap ? 'display:none' : ''}">
       ${list.map(pr => `<div class="glass prop-card v2 ${selSet('properties').has(pr.id) ? 'sel' : ''}" data-pr="${pr.id}" data-id="${pr.id}" data-dragprop="${pr.id}">
         <span class="lc-check on-cover" data-check title="Выделить">${ic(I.check, 2)}</span>
         ${propCover(pr)}
@@ -7731,6 +7772,8 @@ PAGES.properties = async (root) => {
     </div>`;
   $('#prGeo').addEventListener('change', (e) => { PAGE_STATE.propGeo = e.target.value; render(); });
   $('#prMarket').addEventListener('change', (e) => { PAGE_STATE.propMarket = e.target.value; render(); });
+  $('#prMapToggle')?.addEventListener('click', () => { PAGE_STATE.propMap = !PAGE_STATE.propMap; render(); });
+  if (PAGE_STATE.propMap) initPropMap(props);
   PROP_FOLDERS = folders;
   wirePropSelect(root);
   $$('[data-fopen]', root).forEach(f => f.addEventListener('click', (e) => {
