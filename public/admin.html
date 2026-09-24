@@ -80,6 +80,36 @@
   .sum-c i { font-style:normal; font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); display:block; margin-top:6px; padding-left:8px; }
   .th-sort { cursor:pointer; user-select:none; } .th-sort:hover { color:var(--ink); } .th-sort.act { color:var(--gold); }
   .th-sort .caret { font-size:9px; opacity:.7; }
+  /* ── удобное боковое меню (десктоп): .tabs → вертикальный сайдбар ── */
+  @media (min-width:920px) {
+    #appView { display:grid; grid-template-columns:236px 1fr; gap:26px; align-items:start; max-width:1360px; }
+    #appView > .row:first-of-type { grid-column:1 / -1; margin-bottom:2px; }
+    #appView > .stats { grid-column:2; margin-top:0; }
+    #appView > .sect { grid-column:2; }
+    #appView > .tabs { grid-column:1; grid-row:2 / 9999; position:sticky; top:22px; display:flex; flex-direction:column; align-items:stretch; gap:3px; margin:22px 0 0; padding:10px; background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+    #appView > .tabs button { width:100%; text-align:left; justify-content:flex-start; border:0; border-radius:10px; padding:11px 15px; font-size:14px; font-weight:500; color:var(--ink-2); }
+    #appView > .tabs button:hover { background:color-mix(in srgb,var(--gold) 9%,transparent); transform:none; }
+    #appView > .tabs button.on { background:var(--acc); color:#fffdf9; }
+  }
+  /* ── кастомный Atelier-дропдаун (вместо нативного select) ── */
+  select[data-ate] { display:none !important; }
+  .ate-sel { position:relative; display:inline-flex; align-items:center; gap:10px; justify-content:space-between; cursor:pointer; background:var(--card-2); border:1px solid var(--line); border-radius:10px; padding:9px 13px; font:inherit; color:var(--ink); min-width:130px; transition:.16s var(--ease); margin-top:6px; }
+  .ate-sel:hover { border-color:color-mix(in srgb,var(--gold) 48%,transparent); }
+  .ate-sel:focus-visible { outline:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%,transparent); border-color:color-mix(in srgb,var(--gold) 48%,transparent); }
+  .ate-sel.mini { padding:6px 10px; min-width:118px; font-size:13px; margin-top:0; }
+  .ate-sel .cv { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ate-sel .cx { font-size:8px; opacity:.5; transition:transform .2s var(--ease); }
+  .ate-sel.open { border-color:color-mix(in srgb,var(--gold) 55%,transparent); }
+  .ate-sel.open .cx { transform:rotate(180deg); }
+  .ate-pop { position:fixed; z-index:9999; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow-lg); padding:6px; min-width:160px; max-height:320px; overflow:auto; animation:atePop .16s var(--ease) both; }
+  @keyframes atePop { from{opacity:0;transform:translateY(-6px) scale(.99)} to{opacity:1;transform:none} }
+  .ate-opt { padding:9px 12px; border-radius:8px; cursor:pointer; font-size:13.5px; color:var(--ink); display:flex; align-items:center; gap:8px; transition:.12s var(--ease); }
+  .ate-opt:hover { background:color-mix(in srgb,var(--gold) 11%,transparent); }
+  .ate-opt.sel { color:var(--gold); font-weight:600; }
+  .ate-opt.sel::after { content:'✓'; margin-left:auto; font-size:11px; }
+  /* ── Atelier-календарь (нативный date, окрашенный) ── */
+  input[type="date"], input[type="datetime-local"], input[type="month"] { color-scheme:light; accent-color:var(--gold); }
+  input[type="date"]::-webkit-calendar-picker-indicator, input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:sepia(1) saturate(4) hue-rotate(2deg) brightness(.85); opacity:.55; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -403,7 +433,45 @@ async function api(path, opts = {}) {
   if (r.status === 403 || r.status === 401) { show('login'); throw new Error('auth'); }
   return r.json();
 }
-function show(v) { $('#loginView').style.display = v === 'login' ? 'grid' : 'none'; $('#appView').style.display = v === 'app' ? 'block' : 'none'; }
+function show(v) { $('#loginView').style.display = v === 'login' ? 'grid' : 'none'; $('#appView').style.display = v === 'app' ? '' : 'none'; }
+
+/* ── Atelier-дропдаун: апгрейд нативных <select> в стилизованный список ── */
+let _atePop = null;
+function closeAtePop() { if (_atePop) { _atePop.remove(); _atePop = null; document.querySelectorAll('.ate-sel.open').forEach(b => b.classList.remove('open')); } }
+function openAtePop(sel, box, sync) {
+  if (_atePop) { closeAtePop(); return; }
+  box.classList.add('open');
+  const pop = document.createElement('div'); pop.className = 'ate-pop';
+  [...sel.options].forEach((o, i) => {
+    const it = document.createElement('div'); it.className = 'ate-opt' + (i === sel.selectedIndex ? ' sel' : ''); it.textContent = o.textContent;
+    it.addEventListener('click', (e) => { e.stopPropagation(); sel.selectedIndex = i; sel.dispatchEvent(new Event('change', { bubbles: true })); sync(); closeAtePop(); });
+    pop.appendChild(it);
+  });
+  document.body.appendChild(pop); _atePop = pop;
+  const r = box.getBoundingClientRect();
+  pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 6) + 'px'; pop.style.minWidth = r.width + 'px';
+  const pr = pop.getBoundingClientRect();
+  if (pr.right > innerWidth - 10) pop.style.left = Math.max(10, innerWidth - pr.width - 10) + 'px';
+  if (pr.bottom > innerHeight - 10) pop.style.top = Math.max(10, r.top - pr.height - 6) + 'px';
+}
+function enhanceSelects(root) {
+  (root || document).querySelectorAll('select:not([data-ate])').forEach(sel => {
+    sel.setAttribute('data-ate', '1');
+    const box = document.createElement('button'); box.type = 'button';
+    box.className = 'ate-sel' + (sel.classList.contains('mini') ? ' mini' : '');
+    const cv = document.createElement('span'); cv.className = 'cv';
+    const cx = document.createElement('span'); cx.className = 'cx'; cx.textContent = '▼';
+    box.appendChild(cv); box.appendChild(cx);
+    const sync = () => { const o = sel.options[sel.selectedIndex]; cv.textContent = o ? o.textContent : ''; };
+    sync();
+    sel.after(box);
+    box.addEventListener('click', (e) => { e.stopPropagation(); const wasOpen = box.classList.contains('open'); closeAtePop(); if (!wasOpen) openAtePop(sel, box, sync); });
+    sel.addEventListener('change', sync);
+  });
+}
+document.addEventListener('click', closeAtePop);
+window.addEventListener('resize', closeAtePop);
+document.addEventListener('scroll', closeAtePop, true);
 
 // вход
 async function doLogin() {
@@ -428,6 +496,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
   if (b.dataset.tab === 'invoices') { loadInvoices(); loadCryptoTopups(); loadCryptoKeys(); }
   if (b.dataset.tab === 'briefs') loadBriefs();
   if (b.dataset.tab === 'farm') loadFarm();
+  setTimeout(() => enhanceSelects(), 140);   /* Atelier-дропдауны на свежерендеренных селектах вкладки */
 }));
 
 // ── Анкеты подключения агентств ──
@@ -867,6 +936,7 @@ function renderTenants() {
       ${t.tid === 'primary' ? '' : '<button class="danger del">Удалить</button>'}
     </td></tr>`).join('') || '<tr><td colspan="9" class="muted">Ничего не найдено по фильтру</td></tr>';
   wireRows();
+  enhanceSelects();
 }
 function wireRows() {
   document.querySelectorAll('#tbody tr').forEach(tr => {
@@ -902,7 +972,7 @@ const WA_NEXT = ['none', 'provisioning', 'warming', 'ready', 'assigned', 'banned
 
 async function loadFarm() {
   try { FARM = await api('/api/admin/farm/state'); } catch (e) { return; }
-  renderFarmEcon(); renderFarmDevices(); renderFarmProxies(); renderFarmNumbers(); fillFarmForms(); loadFarmExtras();
+  renderFarmEcon(); renderFarmDevices(); renderFarmProxies(); renderFarmNumbers(); fillFarmForms(); loadFarmExtras(); enhanceSelects();
 }
 async function loadFarmExtras() {
   try {
