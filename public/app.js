@@ -7872,6 +7872,13 @@ PAGES.properties = async (root) => {
           <div class="form-row"><label>Ссылка на объект</label><input id="impUrl" placeholder="https://... страница объекта на сайте застройщика/агрегатора"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="impUrlPrev">${ic(I.search || I.spark)}Проверить</button><button class="btn btn-accent" id="impUrlGo">${ic(I.spark)}Подтянуть полностью карточку</button></div>
           <div id="impUrlOut" style="margin-top:12px"></div>
+          <div style="border-top:1px dashed var(--stroke);margin:18px 0 12px"></div>
+          <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:8px">Или залейте <b>весь каталог портала</b> разом — все проекты появятся на карте пинами (имя+локация+цена), клик по пину → «Подтянуть полную карточку».</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="impCatPortal"><option value="housebook">housebook.deals · Пхукет</option><option value="resale">resale-center.com</option></select>
+            <button class="btn btn-accent" id="impCatGo">${ic(I.building)}Импортировать каталог</button>
+          </div>
+          <div id="impCatOut" class="muted" style="font-size:12px;margin-top:8px"></div>
         </div>
         <div data-imppane="reelly" style="display:none">
           <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:10px"><b>Reelly.io</b> — база 500+ застройщиков ОАЭ (off-plan проекты: цены, планы оплаты, доступность, брошюры). Основной источник инвентаря новостроек для брокеров. Вставьте партнёрский ключ для живого синка — или загрузите демо-набор, чтобы увидеть, как импорт ложится в карточки.</div>
@@ -7920,15 +7927,32 @@ Danube Bayz,Danube,Business Bay,320000,USD,Q1 2027,studio,8.2%"></textarea>
           <div style="min-width:0"><div style="font-weight:600;margin-bottom:4px">${esc(pv.title || '—')}</div><div class="muted" style="font-size:11.5px;line-height:1.5">${esc(pv.desc || '')}</div><div class="muted" style="font-size:11px;margin-top:5px">Фото на странице: ${pv.imageCount || 0}. Нажмите «Подтянуть полностью» — ИИ соберёт карточку.</div></div></div>`;
       } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; }
     });
-    $('#impUrlGo', bd).addEventListener('click', async () => {
-      const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку');
-      const btn = $('#impUrlGo', bd); const out = $('#impUrlOut', bd);
+    const doImport = async (url, out, btn, force) => {
       btn.disabled = true; out.innerHTML = '<span class="muted" style="font-size:12px">ИИ разбирает страницу и перезаливает фото… (10-20 сек)</span>';
-      try { const r = await api.post('/properties/from-url', { url, full: true, ...defaults() });
+      try {
+        const r = await api.post('/properties/from-url', Object.assign({ url, full: true }, force ? { force } : {}, defaults()));
+        if (r.exists) {
+          out.innerHTML = `<div class="lc-hint info" style="font-size:12px"><span>Такой объект уже есть: <b>${esc(r.existingName || '')}</b>. Обновить свежими данными или создать копию?</span></div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-accent btn-sm" id="impUpd">Обновить</button><button class="btn btn-sm" id="impDup">Создать копию</button></div>`;
+          $('#impUpd', bd).addEventListener('click', () => doImport(url, out, btn, 'update'));
+          $('#impDup', bd).addEventListener('click', () => doImport(url, out, btn, 'new'));
+          btn.disabled = false; return;
+        }
         if (r.error) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
-        toast('Карточка создана', `${esc(r.property.name || 'Объект')} · фото: ${r.imagesSaved}`, true);
+        toast(force === 'update' ? 'Карточка обновлена' : 'Карточка создана', `${esc(r.property.name || 'Объект')} · фото ${r.imagesSaved}${r.units ? ' · юнитов ' + r.units : ''}`, true);
         closeModal(); PAGE_STATE.propView = r.property.id; render();
       } catch (e) { out.innerHTML = '<span style="color:var(--bad);font-size:12px">' + esc(e.message) + '</span>'; btn.disabled = false; }
+    };
+    $('#impUrlGo', bd).addEventListener('click', () => { const url = $('#impUrl', bd).value.trim(); if (!url) return toast('Вставьте ссылку'); doImport(url, $('#impUrlOut', bd), $('#impUrlGo', bd)); });
+    $('#impCatGo', bd).addEventListener('click', async () => {
+      const btn = $('#impCatGo', bd); const out = $('#impCatOut', bd);
+      btn.disabled = true; out.textContent = 'Рендерю каталог и собираю проекты… (до 30 сек)';
+      try {
+        const r = await api.post('/properties/import-catalog', { portal: $('#impCatPortal', bd).value, ...defaults() });
+        if (r.error) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error) + '</span>'; btn.disabled = false; return; }
+        toast('Каталог импортирован', `новых проектов: ${r.created}${r.skipped ? ' · пропущено ' + r.skipped : ''}`, true);
+        closeModal(); PAGE_STATE.propMap = true; render();
+      } catch (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; btn.disabled = false; }
     });
   });
 };
