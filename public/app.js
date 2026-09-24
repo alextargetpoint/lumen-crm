@@ -12770,12 +12770,12 @@ PAGES.numbers = async (root) => {
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--accent) 3%,var(--card))">
           <div style="color:var(--accent);font-weight:700;font-size:11.5px;letter-spacing:.03em">ПОД КЛЮЧ</div>
           <div style="font-size:23px;font-weight:800;margin:3px 0 1px">$25 <span style="font-size:12px;font-weight:500;color:var(--ink-3)">/ место · мес</span></div>
-          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Всё на нашем железе: номер, регистрация WA+TG, прогрев, прокси, keep-alive. Вы просто пользуетесь готовым рабочим местом — ничего не настраиваете.</div>
+          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Всё на нашем железе: номер, регистрация WA+TG, прогрев, прокси, keep-alive. Вы просто пользуетесь готовым рабочим местом — ничего не настраиваете.</div><button class="btn btn-sm btn-accent" style="margin-top:10px" onclick="openNumbersCheckout('managed')">Докупить места</button>
         </div>
         <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--accent) 3%,var(--card))">
           <div style="color:var(--accent);font-weight:700;font-size:11.5px;letter-spacing:.03em">НА ВАШЕМ ЖЕЛЕЗЕ</div>
           <div style="font-size:23px;font-weight:800;margin:3px 0 1px">$10 <span style="font-size:12px;font-weight:500;color:var(--ink-3)">/ номер · мес</span></div>
-          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Номер покупаем и настраиваем мы (Yesim), живёт на вашем Android — до 3 номеров на один телефон (до 5 с нашей настройкой). Подключаете по QR.</div>
+          <div class="muted" style="font-size:12px;line-height:1.55;margin-top:4px">Номер покупаем и настраиваем мы (Yesim), живёт на вашем Android — до 3 номеров на один телефон (до 5 с нашей настройкой). Подключаете по QR.</div><button class="btn btn-sm btn-accent" style="margin-top:10px" onclick="openNumbersCheckout('byod')">Докупить номера</button>
         </div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -12794,7 +12794,7 @@ PAGES.numbers = async (root) => {
     <div data-numpane="gray" style="${NUMTAB === 'gray' ? '' : 'display:none'}">
     <div class="glass card mb" style="border:1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke))">
       <div class="card-title">${ic(I.chat)}WhatsApp по QR<span class="sub">подключение своего номера (как WhatsApp Web)</span></div>
-      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Основная переписка с лидами — с личных номеров. Подключите свой по QR. <b>Покупка виртуальных номеров теперь в «Ферме номеров Simbye» вверху страницы</b> — там же авто-подхват SMS-кодов и весь конвейер.</div>
+      <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Основная переписка с лидами — с личных номеров. Подключите свой по QR. <b>Докупить номера</b> — кнопкой «Докупить» в карточке «Номера: два формата» вверху (оплата с баланса).</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-accent btn-sm" id="openGrayBtn">${ic(I.link)}Подключить свой (QR)</button>
       </div>
@@ -12809,7 +12809,7 @@ PAGES.numbers = async (root) => {
         <div class="m"><div class="v" style="color:var(--accent)">${ab * 5}</div><div class="k">потолок при 1-на-1</div></div>
       </div>
       ${need > 0 ? `<div class="lc-hint warn" style="margin-top:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> ${pl(need)} до «1 на брокера». Докупи/подключи — закроешь всех брокеров и поднимешь дневной потолок новых лидов до ${ab * 5}.</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button><span class="muted" style="font-size:11px;align-self:center">купить недостающие — в «Ферме номеров Simbye» вверху</span></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-sm" id="grayRecQR">${ic(I.link)}Подключить свой (QR)</button><span class="muted" style="font-size:11px;align-self:center">докупить — кнопкой «Докупить» вверху</span></div>` : `<div class="lc-hint" style="margin-top:10px"><span>${ic(I.check)}Номеров хватает на всех брокеров. Держи их в прогреве.</span></div>`}
     </div>`; })()}
     <div class="glass card mb">${coll('Гигиена канала', `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:8px">
         ${[['Inbound-first', 'Первым в идеале пишет клиент: CTWA-реклама и Lead Form дают согласие на диалог'],
@@ -13104,7 +13104,7 @@ PAGES.numbers = async (root) => {
     box.innerHTML = `
       <div class="glass card mb" style="border:1px solid color-mix(in srgb,var(--accent) 24%,var(--stroke))">
         <div class="card-title">${ic(I.send)}Telegram · личный аккаунт<span class="sub">точечные касания 1-к-1 · НЕ рассылки</span></div>
-        <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем виртуальный номер → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания.</div>
+        <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 12px">Покупаем виртуальный номер → авторизуем Telegram-аккаунт → прогреваем между собой → ведём <b>точечную</b> переписку. Как серый WhatsApp: <b>1 номер = 1 брокер</b>, не более <b>5 новых лидов/день</b> на номер. ⛔ Рассылки в Telegram запрещены (мгновенный бан) — только личные касания. На одном телефоне держите до <b>3–5 номеров</b> (WhatsApp+Telegram на одном номере; лимит задаёт WhatsApp).</div>
         <div class="num-meta" style="margin-bottom:12px">
           <div class="m"><div class="v">${ab}</div><div class="k">брокеров</div></div>
           <div class="m"><div class="v">${nums.length}</div><div class="k">TG-номеров</div></div>
@@ -13113,7 +13113,7 @@ PAGES.numbers = async (root) => {
         ${!d.ready ? `<div class="lc-hint warn" style="margin-bottom:10px"><span>${ic(I.shield)}TG-воркер не подключён. Кнопки покупки/подключения активируются, когда задеплоишь <b>lumen-tg-worker</b> (Railway) и зададишь env <code>LUMEN_TG_WORKER_URL</code>+<code>LUMEN_TG_WORKER_TOKEN</code>.</span></div>` : (need > 0 ? `<div class="lc-hint" style="margin-bottom:10px"><span>${ic(I.spark)}Не хватает <b>${need}</b> TG-номеров до «1 на брокера». Купи недостающие — закроешь всех.</span></div>` : '')}
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-accent btn-sm" id="tgConnBtn" ${d.ready ? '' : 'disabled'}>${ic(I.link)}Подключить свой номер</button>
-          <span class="muted" style="font-size:11px">покупка номеров — в «Ферме номеров Simbye» вверху страницы</span>
+          <span class="muted" style="font-size:11px">докупить номера — кнопкой «Докупить» вверху</span>
         </div>
       </div>
       ${nums.length ? `<div class="num-grid">${nums.map(n => { const conn = n.live && n.live.status === 'connected'; const p = n.persona || {}; return `<div class="glass num-card cloud-card" data-tg="${esc(n.phone)}" style="border-color:color-mix(in srgb,#229ED9 34%,var(--stroke))">
@@ -13128,7 +13128,7 @@ PAGES.numbers = async (root) => {
           <span class="tb-spacer"></span>
           <button class="btn-ghost" data-tgrm="${esc(n.phone)}" title="Убрать">${ic(I.x)}</button>
         </div>
-      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет. Купите номер в «Ферме номеров Simbye» вверху страницы — он подхватится сюда и код придёт автоматически.</div>' : '')}${nums.length ? `<div class="glass card mb" style="margin-top:14px">
+      </div>`; }).join('')}</div>` : (d.ready ? '<div class="muted" style="font-size:12px">TG-номеров пока нет. Докупите номер кнопкой «Докупить» вверху — он подхватится сюда и код придёт автоматически.</div>' : '')}${nums.length ? `<div class="glass card mb" style="margin-top:14px">
       <div class="card-title">${ic(I.bolt)}Прогрев между номерами<span class="sub">авто-переписка между номерами с задержками</span></div>
       <div class="muted" style="font-size:11.5px;line-height:1.5;margin:2px 0 10px">Плавный рамп (день0≈3 → +2/день до 20), рандом+джиттер, «сначала принимай» — чтобы аккаунты не отлетали. ⛔ Не рассылки.</div>
       <div class="set-row"><div class="sp"><div class="sl">Прогрев включён</div><div class="sd">Оркестрация авто-переписки с делеями + живой журнал</div></div>
@@ -13149,7 +13149,7 @@ PAGES.numbers = async (root) => {
   window.__reloadTgGray = loadTgGray;
   loadTgGray();
 
-  /* ── Ферма номеров Simbye: процессная цепочка над всеми вкладками + здоровье + сигналы ── */
+  /* ── Ферма номеров: процессная цепочка над всеми вкладками + здоровье + сигналы ── */
   async function loadSimbyeFarm() {
     const box = $('#simbyeFarm', root); if (!box) return;
     let d; try { d = await api.get('/simbye/farm'); } catch (e) { box.innerHTML = ''; return; }
@@ -13249,11 +13249,7 @@ PAGES.numbers = async (root) => {
 
     // 1) воркер не настроен оператором — платформенная настройка (только владелец)
     if (!d.ready) {
-      box.innerHTML = isOwner ? `<div class="glass card mb sbf-wrap">
-        <div class="card-title">${ic(I.sim)}Ферма номеров Simbye<span class="sub">инфраструктура фермы</span><span class="sbf-badge off">воркер не настроен</span></div>
-        <div class="muted" style="font-size:11.5px;line-height:1.6;margin:2px 0 10px">Это разовая настройка платформы: укажите адрес и токен воркера Simbye (обычно задаётся оператором через переменные окружения). После этого агентства подключают свой Simbye одной формой.</div>
-        ${sbfConnectFormHtml(d)}
-      </div>` : '';
+      box.innerHTML = '';   /* Simbye-ферма выведена: провижн Yesim в админке, на «Номерах» — карточка «два формата» + чекаут */
       wireSimbye(box, d, loadSimbyeFarm);
       return;
     }
@@ -13271,7 +13267,7 @@ PAGES.numbers = async (root) => {
 
     const tpl = d.template || {};
     box.innerHTML = `<div class="glass card mb sbf-wrap">
-      <div class="card-title">${ic(I.sim)}Ферма номеров Simbye<span class="sub">процесс каждого номера: покупка → регистрация → код → подключение → прогрев</span>
+      <div class="card-title">${ic(I.sim)}Ферма номеров<span class="sub">процесс каждого номера: покупка → регистрация → код → подключение → прогрев</span>
         ${isOwner ? `<label class="sbf-auto" title="Автопилот: сам двигает этапы, применяет персону, добивает до «активен»"><span>Автопилот</span><span class="switch"><input type="checkbox" id="sbfAuto" ${d.autopilot ? 'checked' : ''}><span class="tr"></span><span class="th"></span></span></label>` : ''}
         <span class="sbf-badge ${h && h.loggedIn && h.ok ? 'ok' : 'off'}">${h && h.loggedIn && h.ok ? 'сессия активна' : 'сессия недоступна'}</span></div>
       ${isOwner && d.budget ? `<div class="sbf-budget">${ic(I.shield)}Номеров: <b>${d.budget.used}</b>/${d.budget.maxNumbers} · сегодня куплено ${d.budget.buysToday}/${d.budget.maxBuysPerDay}${d.budget.guard && !d.budget.guard.ok ? ` · <span style="color:var(--warn)">${esc(d.budget.guard.reason)}</span>` : ''} · цель ${(tpl.targets || {}).wa || 0} WA + ${(tpl.targets || {}).tg || 0} TG на агентство</div>` : ''}
@@ -15417,6 +15413,54 @@ PAGES.billing = async (root) => {
 };
 
 /* ---------- Крипто-пополнение баланса (USDT TRC20/ERC20 → холодный кошелёк, авто-верификация) ---------- */
+/* Магазин номеров: докупить N номеров и оплатить С БАЛАНСА (или пополнить депозит) */
+window.openNumbersCheckout = async function (edition) {
+  let ed = edition === 'managed' ? 'managed' : 'byod';
+  let qty = 1;
+  let balance = 0; try { const t = await api.get('/billing/topups'); balance = t.balance || 0; } catch (_) {}
+  const priceOf = (e) => e === 'managed' ? 25 : 10;
+  const labelOf = (e) => e === 'managed' ? 'Под ключ' : 'На вашем железе';
+  const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const bd = modal({
+    title: 'Докупить номера', sub: 'WhatsApp + Telegram на одном номере · оплата с баланса', wide: true,
+    body: `
+      <div class="form-row"><label>Формат</label>
+        <div class="seg-toggle" id="ncEd" style="width:100%"><button type="button" class="seg-btn ${ed === 'managed' ? 'on' : ''}" data-ed="managed" style="flex:1">Под ключ · $25</button><button type="button" class="seg-btn ${ed === 'byod' ? 'on' : ''}" data-ed="byod" style="flex:1">На вашем железе · $10</button></div>
+        <div class="muted" id="ncEdDesc" style="font-size:11.5px;line-height:1.5;margin-top:6px"></div></div>
+      <div class="form-row"><label>Сколько номеров</label>
+        <div style="display:flex;align-items:center;gap:12px"><button type="button" class="btn btn-sm" id="ncMinus">−</button><b id="ncQty" style="font-size:22px;min-width:44px;text-align:center">1</b><button type="button" class="btn btn-sm" id="ncPlus">+</button></div></div>
+      <div style="border:1px solid var(--stroke);border-radius:12px;padding:14px 16px;margin-top:4px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="muted">К оплате / мес</span><b id="ncCost" style="font-size:22px">${money(10)}</b></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><span class="muted">Баланс расходников</span><b id="ncBal">${money(balance)}</b></div>
+        <div id="ncShort" class="lc-hint warn" style="margin-top:10px;display:none"><span></span></div>
+      </div>
+      <div id="ncOut" class="muted" style="font-size:12px;margin-top:8px"></div>`,
+    actions: [
+      { label: 'Оплатить с баланса', cls: 'btn-accent', onClick: async (b2) => {
+        const cost = priceOf(ed) * qty;
+        if (balance + 1e-9 < cost) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); return; }
+        const out = $('#ncOut', b2); if (out) out.textContent = 'Оформляю…';
+        try { await api.post('/numbers/order', { edition: ed, qty }); toast('Заказ принят', `${qty}× «${labelOf(ed)}» — списано ${money(cost)}. Номера появятся после провижна.`, true); closeModal(); render(); }
+        catch (e) { const msg = (e && e.message) || 'ошибка'; if (/insufficient/.test(msg)) { openTopupCrypto({ presetAmount: +(cost - balance).toFixed(2), onDone: () => window.openNumbersCheckout(ed) }); } else if (out) out.innerHTML = '<span style="color:var(--bad)">' + esc(msg) + '</span>'; }
+      } },
+      { label: 'Пополнить депозит', onClick: () => { openTopupCrypto({ onDone: () => window.openNumbersCheckout(ed) }); } },
+      { label: 'Отмена' },
+    ],
+  });
+  const recalc = () => {
+    const price = priceOf(ed), cost = price * qty;
+    const c = $('#ncCost', bd); if (c) c.textContent = money(cost);
+    const q = $('#ncQty', bd); if (q) q.textContent = qty;
+    const desc = $('#ncEdDesc', bd); if (desc) desc.innerHTML = ed === 'managed' ? 'Всё на нашем железе: номер, регистрация WA+TG, прогрев, прокси, keep-alive. Готовое рабочее место.' : 'Номер покупаем и настраиваем мы (Yesim), живёт на вашем Android (до 3–5 на телефон). Подключаете по QR по инструкции.';
+    const short = $('#ncShort', bd); const pay = bd.querySelector('.modal-actions .btn-accent') || bd.querySelector('.btn-accent');
+    if (balance + 1e-9 < cost) { if (short) { short.style.display = ''; short.querySelector('span').innerHTML = `${ic(I.spark)}Не хватает <b>${money(cost - balance)}</b> на балансе. Кнопка пополнит депозит и вернёт сюда.`; } if (pay) pay.textContent = 'Пополнить и оплатить'; }
+    else { if (short) short.style.display = 'none'; if (pay) pay.textContent = 'Оплатить с баланса'; }
+  };
+  $$('#ncEd .seg-btn', bd).forEach(b => b.addEventListener('click', () => { ed = b.dataset.ed; $$('#ncEd .seg-btn', bd).forEach(x => x.classList.toggle('on', x === b)); recalc(); }));
+  $('#ncMinus', bd)?.addEventListener('click', () => { qty = Math.max(1, qty - 1); recalc(); });
+  $('#ncPlus', bd)?.addEventListener('click', () => { qty = Math.min(200, qty + 1); recalc(); });
+  recalc();
+};
 function openTopupCrypto({ purpose = 'consumables', presetAmount = 0, onDone } = {}) {
   const isSub = purpose === 'subscription';
   const presets = [50, 100, 250, 500, 1000];

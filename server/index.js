@@ -5596,6 +5596,28 @@ const server = http.createServer(async (req, res) => {
       return json(res, 404, { error: 'not found' });
     }
 
+    /* ---------------- Магазин номеров: заказ N номеров с оплатой С БАЛАНСА ---------------- */
+    if (p === '/api/numbers/order' && req.method === 'POST') {
+      if (IS_BROKER) return json(res, 403, { error: 'недоступно для брокера' });
+      if (!db.settings.billing) db.settings.billing = billing.defBilling();
+      const b = await readBody(req);
+      const edition = b.edition === 'managed' ? 'managed' : 'byod';
+      const qty = Math.max(1, Math.min(200, Math.round(+b.qty || 0)));
+      const price = edition === 'managed' ? 25 : 10;              /* $25 под ключ · $10 на вашем железе */
+      const cost = price * qty;
+      const label = edition === 'managed' ? 'Под ключ' : 'На вашем железе';
+      const ch = billing.chargeBalance(db, cost, `Заказ номеров: ${qty}× ${label} ($${price}/мес)`);
+      if (!ch.ok) return json(res, 402, { error: 'insufficient_balance', balance: ch.balance || 0, need: +(cost - (ch.balance || 0)).toFixed(2), cost });
+      const bl = db.settings.billing; bl.numberOrders = bl.numberOrders || [];
+      const order = { id: 'no_' + crypto.randomBytes(5).toString('hex'), edition, label, qty, price, cost, status: 'pending', at: Date.now() };
+      bl.numberOrders.unshift(order); if (bl.numberOrders.length > 100) bl.numberOrders.length = 100;
+      /* сигнал платформе (founder провижнит по Yesim и назначает) */
+      try { const reg = store.getRegistry(); reg.numberOrders = reg.numberOrders || {}; reg.numberOrders[store.currentTid() + ':' + order.id] = Object.assign({ tid: store.currentTid() }, order); store.saveRegistry(); } catch (_) {}
+      notify(db, { type: 'billing', level: 'success', title: 'Заказ номеров принят', text: `${qty}× «${label}» — списано $${cost} с баланса. Провижн запущен, номера появятся в разделе «Номера».`, email: false });
+      store.save();
+      return json(res, 200, { ok: true, balance: ch.balance, order });
+    }
+
     /* ---------------- Центр уведомлений системы ---------------- */
     if (p.startsWith('/api/notifications')) {
       if (!getSession(req)) return json(res, 401, { error: 'auth required' });
