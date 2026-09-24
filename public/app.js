@@ -13261,19 +13261,7 @@ PAGES.numbers = async (root) => {
     if (!d.connected) {
       const shot = (id, cap) => `<div class="sbf-shot"><img src="/assets/simbye-guide/${id}.png" alt="${esc(cap)}" loading="lazy" onload="this.closest('.sbf-shot').classList.add('has')" onerror="this.remove()"><span class="sbf-shot-ph">${esc(cap)}</span></div>`;
       const step = (n, title, body, img) => `<div class="sbf-gstep"><div class="sbf-gnum">${n}</div><div class="sbf-gbody"><div class="sbf-gt">${title}</div><div class="sbf-gd">${body}</div>${img ? shot(img, 'скриншот шага ' + n) : ''}</div></div>`;
-      box.innerHTML = isOwner ? `<div class="glass card mb sbf-wrap">
-        <div class="card-title">${ic(I.sim)}Номера — через Yesim (API)<span class="sub">покупка по API с наценкой · без браузера-эмулятора</span></div>
-        <div class="muted" style="font-size:12px;line-height:1.6;margin:2px 0 12px">Раньше номера тянули через браузер-эмулятор Simbye (у него не было API). Теперь провайдер — <b>Yesim с прямым API</b>: платформа покупает номера программно, регистрирует WhatsApp + Telegram и прогревает через ферма-конвейер. Клиентам номера <b>назначаются</b>, а не покупаются ими вручную.</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
-          <div style="border:1px solid var(--stroke);border-radius:11px;padding:12px 14px"><div style="color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.03em">ПОД КЛЮЧ · $25 / место</div><div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">Номер + регистрация + прогрев + прокси + keep-alive на нашем железе. Провижн и выдача — в Панели основателя → Ферма.</div></div>
-          <div style="border:1px solid var(--stroke);border-radius:11px;padding:12px 14px"><div style="color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.03em">НА ВАШЕМ ЖЕЛЕЗЕ · $10 / номер</div><div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">Yesim-номер покупаем и настраиваем мы, агентство подключает по QR на свой Android (до 3 на телефон).</div></div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <a class="btn btn-accent btn-sm" href="/admin.html" target="_blank">${ic(I.sim)}Открыть Ферму (Панель основателя)</a>
-          <button class="btn btn-sm" onclick="openGuide('wanumbers')">${ic(I.doc)}Инструкция</button>
-          <span class="muted" style="font-size:11px">Управление фермой Yesim (покупка/прогрев/распределение) — в админ-панели.</span>
-        </div>
-      </div>` : '';
+      box.innerHTML = '';   /* модель показана верхней карточкой «два формата»; ферма Yesim — в админ-панели, тут не дублируем */
       wireSimbye(box, d, loadSimbyeFarm);
       return;
     }
