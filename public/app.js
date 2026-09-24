@@ -7448,9 +7448,12 @@ async function initPropMap(props) {
   const pts = latest.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
   if (window._prMap) { try { window._prMap.remove(); } catch (_) {} window._prMap = null; }
   const center = pts.length ? [pts[0].lat, pts[0].lng] : [7.9, 98.35];
-  const map = L.map(el, { scrollWheelZoom: true, attributionControl: false }).setView(center, pts.length ? 11 : 5);
+  const map = L.map(el, { scrollWheelZoom: true, attributionControl: false, zoomControl: true }).setView(center, pts.length ? 11 : 5);
   window._prMap = map;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+  /* бесплатные OSM-тайлы (без ключа) + CSS-фильтр «Ателье» на пане тайлов (см. polish.css .prmap-atelier) */
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', crossOrigin: true }).addTo(map);
+  el.classList.add('prmap-atelier');
+  if (!pts.length) { if (status) status.innerHTML = 'На карте пусто — <b>импортируйте объекты</b> (кнопка «Импорт» → «По ссылке»), и они появятся тут с превью.'; }
   const bounds = [];
   pts.forEach(p => {
     const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [20, 20], iconAnchor: [10, 10] });
@@ -7734,7 +7737,7 @@ PAGES.properties = async (root) => {
       <select id="prGeo"><option value="">Все направления</option>${st.agency.geos.map(g => `<option value="${g}" ${geoF === g ? 'selected' : ''}>${st.geoNames[g]}</option>`).join('')}</select>
       <select id="prMarket"><option value="">Первичка и вторичка</option><option value="offplan" ${marketF === 'offplan' ? 'selected' : ''}>Первичка</option><option value="secondary" ${marketF === 'secondary' ? 'selected' : ''}>Вторичка</option></select>
       <span class="muted" style="font-size:12px">${list.length} ${plural(list.length, 'объект', 'объекта', 'объектов')}</span>
-      <button class="btn btn-sm ${PAGE_STATE.propMap ? 'btn-accent' : ''}" id="prMapToggle">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? 'Список' : 'Карта'}</button>
+      <button class="btn btn-sm ${PAGE_STATE.propMap ? 'on-map' : ''}" id="prMapToggle" title="Показать объекты на карте">${ic(I.pin || I.building)}${PAGE_STATE.propMap ? '← Списком' : 'На карте'}</button>
       <button class="btn btn-sm" id="prImport">${ic(I.doc)}Импорт</button>
       <button class="btn btn-accent page-primary" id="prAdd">${ic(I.plus)}Объект</button>
     </div>

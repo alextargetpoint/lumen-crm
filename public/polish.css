@@ -134,3 +134,14 @@ input:focus, textarea:focus, select:focus {
 .prpop-l { font-size: 11.5px; color: #8a8378; margin-top: 3px; }
 .prpop-p { font-size: 14px; font-weight: 700; color: var(--accent, #b8863c); margin: 7px 0 9px; }
 .prpop-open { width: 100%; justify-content: center; }
+
+/* ---------- Карта объектов: стиль Ателье на бесплатных OSM-тайлах ---------- */
+.prmap-atelier .leaflet-tile-pane { filter: grayscale(.82) sepia(.14) brightness(1.05) contrast(.9) saturate(.85); }
+.prmap-atelier .leaflet-control-zoom a { background: #fffdf9; color: #6a5a2f; border: 1px solid #e5ddcf; font-weight: 700; }
+.prmap-atelier .leaflet-control-zoom a:hover { background: var(--accent, #b8863c); color: #fff; }
+.prpin { position: relative; }
+.prpin:hover .prpin-dot { transform: translate(-50%,-50%) scale(1.35); }
+.prpin-dot { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+/* сегмент-тумблер Список/Карта */
+#prMapToggle { border: 1px solid var(--stroke, #e5ddcf); font-weight: 600; }
+#prMapToggle.on-map { background: var(--accent, #b8863c); color: #fff; border-color: var(--accent, #b8863c); box-shadow: 0 4px 12px rgba(184,134,60,.28); }
