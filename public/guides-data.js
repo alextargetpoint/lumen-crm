@@ -16,6 +16,28 @@ const TG_SHOT_FIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦
 const TG_SHOT_BIND = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub out"><span class="cmd">/start 4F2K9</span></div><div class="tg-bub in"><span class="ok">✓ Готово.</span> Вы на связи как <b>Алексей</b>. Открываю пульт.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div></div></div>`;
 const TG_SHOT_MENU = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Lumen</b><small>bot</small></div></div><div class="tgph-body"><div class="tg-bub in">Пульт готов. Нажмите кнопку меню внизу — откроются чаты, лиды и задачи.</div><div class="tg-input">Сообщение…<span class="snd">➤</span></div><div class="tg-menu">💬 Чаты</div></div></div>`;
 const TG_SHOT_APP = `<div class="tgph"><div class="tgph-hd"><div class="av">💬</div><div><b>Чаты</b><small>мини-приложение Lumen</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a"></span><span class="m"><b>Марина К.</b><i>Актуальна 2-к в Marina?</i></span><span class="badge2">2</span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Иван С.</b><i>Спасибо, подумаю</i></span></div><div class="tgapp-row"><span class="a"></span><span class="m"><b>Дмитрий А.</b><i>Пришлите рассрочку</i></span><span class="badge2">1</span></div></div></div>`;
+/* Номера: схема-вилка (два формата) + телефон-мокапы. Все стили инлайновые — рендерятся одинаково в CRM и на /help, независимо от темы. */
+const NUM_DIAGRAM = `<div style="border:1px solid rgba(128,128,128,.22);border-radius:14px;padding:15px 15px 16px;background:rgba(128,128,128,.05);margin:2px 0 4px">
+  <div style="text-align:center;line-height:1.4"><div style="font-weight:700;font-size:14.5px">Один номер Lumen = WhatsApp + Telegram</div><div style="opacity:.7;font-size:11.5px;margin-top:2px">куплен через eSIM, зарегистрирован и прогрет</div></div>
+  <div style="text-align:center;opacity:.55;font-size:11px;margin:9px 0 2px;letter-spacing:.04em">↓ ДВА ФОРМАТА ПОДКЛЮЧЕНИЯ ↓</div>
+  <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+    <div style="flex:1 1 210px;border:1px solid rgba(128,128,128,.22);border-radius:12px;padding:13px 14px;background:rgba(128,128,128,.04)">
+      <div style="color:#c8a86a;font-weight:700;font-size:12.5px;letter-spacing:.02em">ПОД КЛЮЧ</div>
+      <div style="font-size:22px;font-weight:800;margin:3px 0 1px">$25 <span style="font-size:11.5px;font-weight:500;opacity:.65">/ место · мес</span></div>
+      <div style="font-size:12px;line-height:1.55;opacity:.85;margin-top:4px">Всё на нашем железе и серверах: номер, регистрация, прогрев, прокси, keep-alive. Вы просто пользуетесь.</div>
+      <div style="display:inline-block;margin-top:9px;font-size:10.5px;border:1px solid rgba(128,128,128,.3);border-radius:999px;padding:3px 9px;opacity:.85">ничего не настраиваете</div>
+    </div>
+    <div style="flex:1 1 210px;border:1px solid rgba(128,128,128,.22);border-radius:12px;padding:13px 14px;background:rgba(128,128,128,.04)">
+      <div style="color:#c8a86a;font-weight:700;font-size:12.5px;letter-spacing:.02em">НА ВАШЕМ ЖЕЛЕЗЕ</div>
+      <div style="font-size:22px;font-weight:800;margin:3px 0 1px">$10 <span style="font-size:11.5px;font-weight:500;opacity:.65">/ номер · мес</span></div>
+      <div style="font-size:12px;line-height:1.55;opacity:.85;margin-top:4px">Номер покупаем и настраиваем мы (eSIM), подключаете на свой Android. До 3 номеров на одном телефоне.</div>
+      <div style="display:inline-block;margin-top:9px;font-size:10.5px;border:1px solid rgba(128,128,128,.3);border-radius:999px;padding:3px 9px;opacity:.85">свой телефон · до 3 номеров</div>
+    </div>
+  </div>
+</div>`;
+const NUM_SHOT_LIST = `<div class="tgph"><div class="tgph-hd"><div class="av">✦</div><div><b>Номера</b><small>готовы «под ключ» · раздел в Lumen</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>+971 50 123 45 67</b><i>WhatsApp + Telegram · на связи</i></span><span class="badge2" style="background:#2fae60">✓</span></div><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>+34 600 11 22 33</b><i>WhatsApp + Telegram · на связи</i></span><span class="badge2" style="background:#2fae60">✓</span></div><div class="tgapp-row"><span class="a" style="background:#128C7E"></span><span class="m"><b>+971 55 987 65 43</b><i>прогрев · 2/3 дня</i></span></div></div></div>`;
+const NUM_SHOT_PHONES = `<div class="tgph"><div class="tgph-hd"><div class="av">📱</div><div><b>Ваш Android</b><small>до 3 номеров на одном телефоне</small></div></div><div class="tgph-body" style="gap:7px"><div class="tgapp-row"><span class="a" style="background:#25D366"></span><span class="m"><b>WhatsApp · номер 1</b><i>основной</i></span></div><div class="tgapp-row"><span class="a" style="background:#128C7E"></span><span class="m"><b>WhatsApp (клон) · номер 2</b><i>Dual Messenger</i></span></div><div class="tgapp-row"><span class="a" style="background:#0088cc"></span><span class="m"><b>Telegram · номера 1–3</b><i>аккаунты в одном приложении</i></span></div></div></div>`;
+const NUM_SHOT_QR = `<div class="tgph"><div class="tgph-hd"><div class="av">🔗</div><div><b>Привязка по QR</b><small>Связанные устройства</small></div></div><div class="tgph-body" style="align-items:center"><div style="width:132px;height:132px;border-radius:12px;background:repeating-conic-gradient(#111 0 25%, #fff 0 50%) 50%/22px 22px;border:6px solid #fff;box-shadow:0 6px 18px -8px rgba(0,0,0,.4);margin:8px auto 4px"></div><div class="tg-bub in">WhatsApp → Связанные устройства → Привязка устройства → наведите камеру на этот QR</div></div></div>`;
 const GUIDES = {
   tgsetup: {
     icon: 'chat', title: 'Telegram-бот: подключение', tagline: 'Пошагово, с экранами — за 3 минуты',
@@ -42,27 +64,32 @@ const GUIDES = {
     outro: 'Если брокер отвечает сам — ИИ по этому лиду отключается автоматически, чтобы не было двух голосов. Оформление бота наследует тему из Настройки → Оформление.',
   },
   wanumbers: {
-    icon: 'chat', title: 'WhatsApp-номера: свои, по QR', tagline: 'Базовый тариф — до 3 номеров, подключаете сами за 5 минут',
-    intro: 'На базовом тарифе вы используете <b>свои номера</b> — до <b>3 активных</b>. Номера вы заводите и держите на своём телефоне, а к Lumen подключаете по <b>QR-коду</b> (как WhatsApp Web) и ставите на <b>прогрев</b> перед рассылками. Покупка номеров через нас — на старших тарифах; здесь всё в ваших руках.',
+    icon: 'chat', title: 'Номера WhatsApp + Telegram', tagline: 'Два формата: «под ключ» на нашем железе или до 3 на вашем',
+    intro: 'Каждый номер Lumen — это сразу <b>WhatsApp и Telegram</b> на одном номере: мы покупаем его через eSIM, регистрируем и прогреваем. Подключить можно двумя способами: <b>«под ключ»</b> — всё держим у себя, вы просто пользуетесь; или <b>«на вашем железе»</b> — номера покупаем и настраиваем мы, а живут они на вашем Android (до 3 на один телефон). Оплата — криптовалютой (USDT) с предоплаченного баланса.',
+    diagram: NUM_DIAGRAM,
     sections: [
-      { badge: '1 · Где взять 3 активных номера', steps: [
-        ['Android — встроенное клонирование (без эмулятора)', 'Прямо на телефоне: <b>Samsung</b> — «Dual Messenger»; <b>Xiaomi/Redmi/POCO</b> — «Клонирование приложений»; <b>OnePlus/Oppo/Realme</b> — «Клонирование приложений / Parallel Apps»; <b>Huawei</b> — «Приложение-двойник». Получаете второй WhatsApp на другой номер, ничего не устанавливая.'],
-        ['Проверенные клонировщики (если встроенного нет)', 'Быстро создают ещё одну копию WhatsApp под отдельный номер: <b>Island</b>, <b>App Cloner</b>, <b>Parallel Space</b>, <b>Dual Space</b>. Правило: <b>1 клон = 1 номер</b> (так меньше риск бана).'],
-        ['iPhone — 2 аккаунта + Business', 'В самом WhatsApp добавьте <b>второй аккаунт</b> (Настройки → переключение аккаунтов), плюс отдельно поставьте <b>WhatsApp Business</b>. Итого до <b>3 активных</b> аккаунтов на одном iPhone.'],
-        ['Много номеров под команду — эмулятор на ПК', 'Когда номеров нужно больше и не хочется занимать телефон — Android-эмулятор на Windows/macOS (BlueStacks/LDPlayer), каждый инстанс = отдельный WhatsApp. Подробно — в полной инструкции «WhatsApp по QR».'],
-        ['Отдельные номера', 'Каждому аккаунту/клону — свой номер (SIM/eSIM/виртуальный, который принимает SMS для регистрации). Один номер = один аккаунт.'],
+      { badge: '1 · Формат «Под ключ» — $25 / место', shot: NUM_SHOT_LIST, steps: [
+        ['Ничего не настраиваете', 'Номер, регистрация WhatsApp + Telegram, прогрев, прокси и keep-alive — полностью на наших серверах. Вы получаете готовое рабочее место.'],
+        ['Выберите число мест', 'Настройки → Расходники → калькулятор мест → «Под ключ». Одно место = один брокер = прогретые WhatsApp + Telegram.'],
+        ['Оплатите и работайте', 'Оплата криптой (USDT) с баланса. Через короткое время номера появятся в разделе «Номера» уже со статусом «на связи» — можно вести переписку.'],
       ] },
-      { badge: '2 · Подключение по QR', steps: [
-        ['Откройте в Lumen', '<b>Настройки → WhatsApp (серый способ)</b> → «Добавить номер» → введите номер и метку.'],
-        ['Появится QR-код', 'В телефоне откройте нужный аккаунт WhatsApp → <b>Настройки → Связанные устройства → Привязка устройства</b> → наведите на QR в Lumen.'],
-        ['Готово', 'Номер подключён и виден в списке со статусом «на связи». Так же добавьте второй и третий.'],
+      { badge: '2 · Формат «На вашем железе» — $10 / номер', shot: NUM_SHOT_PHONES, steps: [
+        ['Номер и настройка — с нашей стороны', 'Мы покупаем номер через eSIM (Yesim) и настраиваем на нём WhatsApp + Telegram. Вам не нужно искать SIM или ловить SMS-коды.'],
+        ['До 3 номеров на один Android', 'Через встроенное клонирование держите на одном телефоне до 3 рабочих номеров: <b>Samsung</b> — «Dual Messenger»; <b>Xiaomi/Redmi/POCO</b> — «Клонирование приложений»; <b>OnePlus/Oppo/Realme</b> — «Parallel Apps». Правило: 1 клон = 1 номер. Поможем настроить.'],
+        ['Подключаете по QR', 'Готовый номер вы привязываете к своему устройству по QR (шаг 3). Дальше номер живёт на вашем телефоне, а вся переписка идёт через Lumen.'],
       ] },
-      { badge: '3 · Прогрев перед рассылкой', steps: [
-        ['Поставьте на прогрев', 'Свежий номер сразу в массовую рассылку — прямой путь к бану. Включите <b>прогрев</b>: номера постепенно переписываются между собой, растёт «живая» активность.'],
-        ['Дайте отлежаться', 'Несколько дней прогрева — и номер готов к рассылкам с минимальным риском блокировки.'],
+      { badge: '3 · Подключение по QR', shot: NUM_SHOT_QR, steps: [
+        ['Откройте в Lumen', 'Раздел «Номера» → нужный номер → кнопка «QR» (или Настройки → WhatsApp → «Добавить номер»).'],
+        ['WhatsApp', 'На телефоне: WhatsApp → Настройки → <b>Связанные устройства → Привязка устройства</b> → наведите камеру на QR в Lumen.'],
+        ['Telegram', 'Тот же номер в Telegram: Настройки → <b>Устройства → Подключить устройство</b> → отсканируйте QR. SMS при этом не нужен.'],
+        ['Готово', 'Номер в списке со статусом «на связи». Так же добавьте второй и третий.'],
+      ] },
+      { badge: '4 · Прогрев перед рассылкой', steps: [
+        ['Дайте номеру отлежаться', 'Свежий номер сразу в рассылку — прямой путь к бану. В формате «под ключ» прогрев идёт у нас автоматически; на своём железе включите <b>«Прогрев»</b> — номера аккуратно переписываются между собой.'],
+        ['3+ дня активности', 'Несколько дней прогрева — и номер готов к точечным касаниям 1-к-1 с минимальным риском блокировки.'],
       ] },
     ],
-    outro: 'Лимит базового тарифа — <b>3 номера</b>. Нужно больше номеров, официальная «белая» рассылка через WhatsApp Cloud API или покупка номеров прямо в дашборде — это старшие тарифы. Внимание: не рассылайте «в холодную» без прогрева и без согласия — это главный триггер бана номера.',
+    outro: 'Массовые «белые» рассылки — только через официальный <b>WhatsApp Cloud API</b> (отдельный гайд). С личных номеров рассылать «в холодную» нельзя — это главный триггер бана. Если баланс закончится, номера и доступ к перепискам приостанавливаются автоматически — это следствие неоплаты.',
   },
   calendar: {
     icon: 'cal', title: 'Синхронизация календаря', tagline: 'Чтобы клиентам не предлагали занятое время',
@@ -192,18 +219,18 @@ GUIDES.wacloud = {
   outro: 'Cloud API — единственный разрешённый способ массовых рассылок в WhatsApp. С личных номеров «в холодную» рассылать нельзя — это прямой путь к бану.',
 };
 GUIDES.tgchannel = {
-  icon: 'chat', title: 'Telegram как канал', tagline: 'Отдельный номер для переписки с клиентами',
-  intro: 'Помимо бота-пульта, Telegram подключается как полноценный канал общения с клиентами — на отдельный номер. Регистрируете аккаунт, подключаете по QR (как Telegram на новом устройстве) и работаете из CRM.',
+  icon: 'chat', title: 'Telegram как канал', tagline: 'Тот же номер, что и WhatsApp — переписка с клиентами в Telegram',
+  intro: 'Telegram работает как полноценный канал общения с клиентами <b>на том же номере, что и WhatsApp</b> — оба мессенджера идут на один номер Lumen. Номер берётся из выбранного формата («под ключ» или на вашем железе, см. гайд «Номера WhatsApp + Telegram») и подключается по QR, как Telegram на новом устройстве.',
   sections: [
-    { badge: 'Подключение по шагам', steps: [
-      ['Купите номер или свой', '«Купить номер для Telegram» (спишется с баланса) или «Подключить свой номер».'],
-      ['Регистрация аккаунта', 'На телефоне заведите Telegram на номер. Возможен двухслойный забор: код на email → иногда разовая плата ~$0.99 → SMS. На каждый номер — <b>уникальный email</b> (повтор почты = код не придёт).'],
-      ['Подключите по QR', '«Подключить свой номер» → QR. В Telegram: Настройки → Устройства → Подключить устройство → отсканируйте. SMS при этом не нужен.'],
+    { badge: 'Подключение по шагам', shot: NUM_SHOT_QR, steps: [
+      ['Номер — из вашего формата', 'Отдельно искать номер не нужно: это тот же номер WhatsApp + Telegram. В формате «под ключ» он уже готов; на своём железе номер покупаем и настраиваем мы через eSIM.'],
+      ['Регистрация аккаунта', 'Если номер новый, Telegram заводится на него при настройке. Возможен двухслойный забор кода: на email → иногда разовая плата ~$0.99 → SMS. На каждый номер — <b>уникальный email</b> (повтор почты = код не придёт).'],
+      ['Подключите по QR', 'В Telegram: Настройки → <b>Устройства → Подключить устройство</b> → отсканируйте QR из Lumen. SMS при этом не нужен.'],
       ['Профиль', 'Задайте имя, username, био (≤70 символов), аватар — синхронизируется в реальный аккаунт.'],
       ['Прогрев', 'Включите прогрев (≥2 номера) — аккуратная переписка между своими, чтобы аккаунт не «отлетел».'],
     ] },
   ],
-  outro: 'Это отдельный канал от Telegram-бота брокера: бот — это пульт для сотрудника, а этот номер — для переписки с клиентами.',
+  outro: 'Это канал для переписки с клиентами — отдельно от Telegram-бота брокера: бот — это карманный пульт сотрудника, а этот номер — для общения с клиентами.',
 };
 GUIDES.telephony = {
   icon: 'phone', title: 'Телефония и звонки', tagline: 'Звонки из карточки лида, запись и ИИ-резюме',
