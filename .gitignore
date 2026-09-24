@@ -19,3 +19,4 @@ data/
 
 # Local Netlify folder
 .netlify
+public/assets/props/prop_*
