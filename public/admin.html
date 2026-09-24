@@ -448,6 +448,14 @@
       </div>
     </div>
 
+    <!-- ⭐ Баланс агентств: авто-продление, гейт «держи баланс», алерты -->
+    <div class="card" id="farmBillingCard">
+      <b>Баланс и продления аренды</b>
+      <div class="muted" style="font-size:12px;margin:6px 0 4px">Кто не пополнил расходники — видно здесь. Клиенту (владельцу/маркетологу) показывается принудительная форма; вам сюда падают алерты. «Продлить» = вы подтвердили оплату.</div>
+      <div id="farmAlerts"></div>
+      <div style="overflow:auto;margin-top:10px"><table id="farmBillTbl"><thead><tr><th>Агентство</th><th>Номеров</th><th>$/мес</th><th>Продление</th><th>Статус</th><th></th></tr></thead><tbody id="farmBillBody"></tbody></table></div>
+    </div>
+
     <!-- Экономика (свёрнуто) -->
     <details class="card">
       <summary><b>Экономика — тариф и себестоимость ($/мес на номер)</b></summary>
@@ -1056,7 +1064,28 @@ async function loadFarmExtras() {
     $('#farmWarm').innerHTML = 'Прогрев (' + ws.count + '): ' + ((ws.warming || []).map(x => `${esc(x.phone || '—')} день ${x.day}/${x.of} (цель ${x.target})`).join(' · ') || '—');
     const so = await api('/api/admin/farm/seat-orders');
     renderFarmSeatOrders(so.orders || []);
+    const bill = await api('/api/admin/farm/billing');
+    renderFarmBilling(bill);
   } catch (e) {}
+}
+function renderFarmBilling(bill) {
+  bill = bill || {}; const ag = bill.agencies || [], al = bill.alerts || [];
+  const stLbl = { active: '<span style="color:#6d8a4f">● активна</span>', soon: '<span style="color:#8a6d1f">● скоро продление</span>', overdue: '<span style="color:#b3541e">● просрочка</span>', suspended: '<span style="color:#b02a2a">● приостановлено</span>', ended: '<span class="muted">завершена</span>' };
+  const kindLbl = { overdue: 'Просрочка', suspended: 'Приостановка', client_paid_claim: 'Клиент сообщил об оплате' };
+  $('#farmAlerts').innerHTML = al.length ? '<div style="display:flex;flex-direction:column;gap:6px;margin:8px 0">' + al.map(a =>
+    `<div style="display:flex;align-items:center;gap:8px;background:#fbe6d6;border:1px solid #f0cdb0;border-radius:9px;padding:8px 11px;font-size:12.5px">
+      <b style="color:#b3541e;white-space:nowrap">${kindLbl[a.kind] || a.kind}</b>
+      <span style="flex:1">${esc(agencyName(a.tid))} — ${esc(a.text)}</span>
+      ${a.kind === 'client_paid_claim' ? '<button data-billtopup="' + a.tid + '">Подтвердить оплату</button>' : ''}
+      <button class="ghost" data-alertack="${a.id}">Скрыть</button>
+    </div>`).join('') + '</div>' : '';
+  $('#farmBillBody').innerHTML = ag.map(a => {
+    const due = a.dueAt ? new Date(a.dueAt).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: '2-digit' }) : '—';
+    const dl = a.daysLeft != null ? (a.daysLeft >= 0 ? `через ${a.daysLeft} дн` : `просрочка ${-a.daysLeft} дн`) : '';
+    const st = (a.billing && a.billing.state) || (a.level === 'none' ? 'active' : a.level);
+    return `<tr><td>${esc(agencyName(a.tid))}</td><td>${a.numbers}</td><td>${money(a.amount)}</td><td>${due}<div class="muted" style="font-size:11px">${dl}</div></td><td>${stLbl[st] || st}${a.clientClaim ? ' <span style="color:#6d8a4f;font-size:11px">· заявил оплату</span>' : ''}</td>
+      <td><button data-billtopup="${a.tid}">Продлить +1 мес</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">Нет агентств с арендованными номерами</td></tr>';
 }
 function renderFarmSeatOrders(orders) {
   const stLbl = { pending: '⏳ ждёт оплаты', active: '✅ активен', ended: 'завершён' };
@@ -1150,6 +1179,8 @@ $('#sect-farm').addEventListener('click', async (ev) => {
   else if (d.warm) { if (await aConfirm('Поставить номер на прогрев (10-14 дней)?')) { const r = await farmPost('warmup-enroll', { id: d.warm }); if (r.error) await aAlert(r.error); loadFarm(); } }
   else if (d.sofill) { if (await aConfirm('Выполнить заказ: выделить готовые номера из пула агентству?')) { const r = await farmPost('seat-fulfill', { orderId: d.sofill }); if (r.error) await aAlert(r.error); else await aAlert('Выдано мест: ' + r.order.seats); loadFarm(); } }
   else if (d.agrelease) { if (await aConfirm('Оффбординг агентства: вернуть все его номера в тёплый пул?')) { const r = await farmPost('agency-release', { tid: d.agrelease }); await aAlert('Освобождено номеров: ' + (r.freed || 0)); loadFarm(); } }
+  else if (d.billtopup) { const m = await aPrompt('Подтвердить оплату — продлить аренду на сколько месяцев?', '1'); if (m !== null) { const r = await farmPost('topup', { tid: d.billtopup, months: +m || 1 }); if (r.error) await aAlert(r.error); else await aAlert('Продлено. Новая дата: ' + new Date(r.billing.dueAt).toLocaleDateString('ru')); loadFarm(); } }
+  else if (d.alertack) { await farmPost('alert-ack', { id: d.alertack }); loadFarm(); }
 });
 
 // автологин если сессия есть

@@ -3069,6 +3069,28 @@ farmWarm.setWarmSender(async (fromPhone, toPhone, text) => {
 /* авто-тик прогрева: раз в час продвигаем все warming-номера (дневная норма + выпуск в ready) */
 setInterval(() => { try { store.runInTenant(store.PRIMARY, () => farmWarm.tick()); } catch (_) {} }, 60 * 60e3);
 
+/* тик баланса фермы: пересчитать состояния аренды, записать гейт «держи баланс» в БД
+   каждого агентства (владелец/маркетолог увидит принуд. форму), поднять алерты основателю. */
+function runBillingTick() {
+  try {
+    const bt = farmSvc.billingTick();               /* farm() глобальна — контекст тенанта не нужен */
+    const gates = (bt && bt.gates) || {};
+    for (const tid of store.listTenants()) {
+      if (tid === store.PRIMARY) continue;
+      const g = gates[tid] || { active: false };
+      store.runInTenant(tid, () => {
+        const db = store.get();
+        const next = g.active
+          ? { active: true, level: g.level, daysLeft: g.daysLeft, amount: g.amount, dueAt: g.dueAt, graceEndsAt: g.graceEndsAt, numbers: g.numbers, claim: g.clientClaim || null }
+          : { active: false };
+        if (JSON.stringify(next) !== JSON.stringify(db.settings.billingGate || null)) { db.settings.billingGate = next; store.saveNow(); }
+      });
+    }
+  } catch (_) {}
+}
+setInterval(runBillingTick, 6 * 60 * 60e3);   /* каждые 6 ч */
+setTimeout(runBillingTick, 15e3);             /* и вскоре после старта — чтобы гейты подтянулись сразу */
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -5585,6 +5607,12 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/farm/wipe' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.wipeSlot(b.id, !!b.release); adminLog('farm.wipe', { id: b.id, release: !!b.release }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/settings' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const s = farmSvc.setSettings(b); return json(res, 200, { ok: true, settings: s }); }
 
+      /* ⭐ БАЛАНС / АВТО-ПРОДЛЕНИЕ АРЕНДЫ — панель основателя */
+      if (p === '/api/admin/farm/billing' && req.method === 'GET') { return json(res, 200, { ok: true, ...farmSvc.billingSummary() }); }
+      if (p === '/api/admin/farm/topup' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.topUp(b.tid, b.months); adminLog('farm.billing.topup', { tid: b.tid, months: b.months }); runBillingTick(); return json(res, r.error ? 400 : 200, r); }
+      if (p === '/api/admin/farm/billing-set' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmSvc.setBilling(b.tid, b.patch || b); runBillingTick(); return json(res, 200, r); }
+      if (p === '/api/admin/farm/alert-ack' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); return json(res, 200, farmSvc.ackAlert(b.id)); }
+
       /* Р2 — провижн */
       if (p === '/api/admin/farm/provision-enqueue' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = farmProv.enqueue(b.deviceId, b.count, b.slot); adminLog('farm.prov.enqueue', { deviceId: b.deviceId, count: b.count }); return json(res, r.error ? 400 : 200, r); }
       if (p === '/api/admin/farm/provision-acquire' && req.method === 'POST') { const b = await readBody(req).catch(() => ({})); const r = await farmProv.stepAcquire(b.id); return json(res, r.error ? 400 : 200, r); }
@@ -5949,6 +5977,14 @@ const server = http.createServer(async (req, res) => {
         analytics: analytics(db, (IS_BROKER && !(CAP && CAP.leads === 'all')) ? { onlyBroker: ROLE.brokerId } : {}),
         me: ROLE ? { role: ROLE.role, roleType: IS_BROKER ? (MEMBER.roleType || 'broker') : 'owner', brokerId: ROLE.brokerId, name: IS_BROKER ? (MEMBER.name || null) : null, preview: !!ROLE.previewOwner, feedPost: IS_BROKER ? (MEMBER.feedPost === true) : true, canControl: canControl(), hidePages: IS_BROKER ? [...new Set([...(ROLE_DEFAULT_HIDE[MEMBER.roleType] || []), ...(MEMBER.hidePages || [])])].filter(pg => !(pg === 'control' && isControlDelegate)) : [] } : null,
       }); return;
+    }
+    /* гейт баланса: клиент (владелец/маркетолог) сообщает основателю об оплате расходников */
+    if (p === '/api/billing/claim-paid' && req.method === 'POST') {
+      const R = sessionRole(req); if (!R) return json(res, 401, { error: 'auth' });
+      const rt = R.role === 'broker' ? ((db.brokers.find(b => b.id === R.brokerId) || {}).roleType || 'broker') : 'owner';
+      if (R.role === 'broker' && !['marketer', 'manager'].includes(rt)) return json(res, 403, { error: 'нет доступа' });
+      farmSvc.clientClaimPaid(store.currentTid());
+      return json(res, 200, { ok: true });
     }
     /* СОСТОЯНИЕ СИСТЕМЫ: реальный статус всех интеграций тенанта (в т.ч. ЖИВАЯ проверка вебхука бота) */
     if (p === '/api/health' && req.method === 'GET') {

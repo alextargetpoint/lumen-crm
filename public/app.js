@@ -2536,7 +2536,66 @@ async function loadState() {
     beepNew();
   }
   window._prevUnreadMsgs = um;
+  try { maybeBillingGate(); } catch (_) {}
 }
+
+/* ---------- Гейт баланса: продление аренды номеров (владелец/маркетолог, НЕ брокеры) ---------- */
+function maybeBillingGate() {
+  const g = STATE && STATE.settings && STATE.settings.billingGate;
+  const me = STATE && STATE.me;
+  if (!g || !g.active || !me) { closeBillingGate(); return; }
+  const allowed = me.role === 'owner' || me.role === 'master' || ['marketer', 'manager'].includes(me.roleType);
+  if (!allowed) return;                                   /* брокерам это уведомление не нужно */
+  const sig = g.level + ':' + g.dueAt;
+  if (g.level === 'soon' && window._billingSoonDismissed === sig) return;  /* мягкий скрыт на сессию */
+  if (window._billingGateSig === sig && document.getElementById('billingGate')) return;
+  window._billingGateSig = sig;
+  showBillingGate(g);
+}
+function closeBillingGate() { const b = document.getElementById('billingGate'); if (b) { b.classList.remove('show'); setTimeout(() => b.remove(), 180); } window._billingGateSig = null; }
+function showBillingGate(g) {
+  closeBillingGate();
+  const blocking = g.level === 'overdue' || g.level === 'suspended';
+  const due = new Date(g.dueAt).toLocaleDateString('ru', { day: 'numeric', month: 'long' });
+  const grace = g.graceEndsAt ? new Date(g.graceEndsAt).toLocaleDateString('ru', { day: 'numeric', month: 'long' }) : '';
+  const head = g.level === 'suspended' ? 'Аренда номеров приостановлена'
+    : g.level === 'overdue' ? 'Оплата аренды просрочена'
+    : `Продление аренды через ${g.daysLeft} ${plural(g.daysLeft, 'день', 'дня', 'дней')}`;
+  const lead = g.level === 'suspended'
+    ? `Расходники (${g.numbers} ${plural(g.numbers, 'номер', 'номера', 'номеров')}) не оплачены сверх грейс-периода. Чтобы не потерять номера и переписку клиентов — пополните баланс.`
+    : g.level === 'overdue'
+    ? `Оплата прошла срок (${due}). Сервис ещё работает в грейс-периоде${grace ? ` до <b>${grace}</b>` : ''}. Пополните баланс, иначе номера будут приостановлены.`
+    : `Аренда номеров продлевается <b>${due}</b>. Пополните баланс заранее, чтобы номера не отключились.`;
+  const bd = el(`<div class="modal-bd${blocking ? ' bg-block' : ''}" id="billingGate"><div class="modal glass" style="width:520px;max-width:92vw">
+    <div class="bg-badge bg-${g.level}">${g.level === 'suspended' ? 'Приостановлено' : g.level === 'overdue' ? 'Просрочка' : 'Скоро продление'}</div>
+    <h3 style="margin:2px 0 6px">${esc(head)}</h3>
+    <div class="m-sub" style="margin-bottom:14px">${lead}</div>
+    <div class="bg-amt"><div><div class="bg-amt-n">$${g.amount}<span>/мес</span></div><div class="bg-amt-l">${g.numbers} ${plural(g.numbers, 'номер', 'номера', 'номеров')} · WhatsApp + Telegram</div></div><div class="bg-amt-due"><div class="bg-amt-l">Дата продления</div><div class="bg-amt-d">${due}</div></div></div>
+    ${g.claim ? '<div class="bg-claim">Вы сообщили об оплате — ждём подтверждения. Обычно в течение дня.</div>' : ''}
+    <div class="m-actions" id="bgActs"></div>
+  </div></div>`);
+  const acts = bd.querySelector('#bgActs');
+  const payBtn = el('<button class="btn btn-accent">Пополнить баланс</button>');
+  payBtn.addEventListener('click', () => { closeBillingGate(); if (typeof go === 'function') go('billing'); });
+  acts.appendChild(payBtn);
+  if (!g.claim) {
+    const paidBtn = el('<button class="btn">Я уже оплатил</button>');
+    paidBtn.addEventListener('click', async () => {
+      try { await api.post('/billing/claim-paid', {}); toast('Спасибо', 'Основатель получил уведомление и подтвердит оплату', true); } catch (e) { toast('Не удалось', e.message); }
+      closeBillingGate();
+    });
+    acts.appendChild(paidBtn);
+  }
+  if (!blocking) {
+    const later = el('<button class="btn btn-ghost">Позже</button>');
+    later.addEventListener('click', () => { window._billingSoonDismissed = g.level + ':' + g.dueAt; closeBillingGate(); });
+    acts.appendChild(later);
+  }
+  if (!blocking) bd.addEventListener('mousedown', (e) => { if (e.target === bd) { window._billingSoonDismissed = g.level + ':' + g.dueAt; closeBillingGate(); } });
+  document.body.appendChild(bd);
+  requestAnimationFrame(() => bd.classList.add('show'));
+}
+
 /* короткий сигнал через WebAudio (без файла); тихо глохнет, если контекст заблокирован */
 function beepNew() {
   try {

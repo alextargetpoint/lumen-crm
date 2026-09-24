@@ -11,6 +11,7 @@
    Бан = теряем КАНАЛ, не данные (переписка в CRM). failover берёт тёплый номер из пула.  */
 
 const store = require('./store');
+const DAY = 864e5;
 
 /* дефолты юнит-экономики (доллары/мес на номер), обсуждено с основателем */
 const DEFAULTS = {
@@ -19,6 +20,9 @@ const DEFAULTS = {
   capexPerPhone: 130,   /* $ разово за реф. Android */
   maxPerDevice: 5,      /* безопасный потолок аккаунтов на телефон */
   phoneLifeMonths: 20,  /* срок службы телефона для амортизации */
+  cycleDays: 30,        /* биллинг-цикл аренды расходников (дней) */
+  graceDays: 3,         /* грейс после даты продления, пока сервис ещё жив */
+  remindDaysBefore: 5,  /* с какого дня ДО продления показывать мягкий гейт */
 };
 
 function farm() {
@@ -277,6 +281,114 @@ function releaseAgency(tid) {
   return { ok: true, freed: n };
 }
 
+/* ============ БАЛАНС / АВТО-ПРОДЛЕНИЕ АРЕНДЫ — гейт «держи баланс» ============
+   Каждое агентство арендует расходники (номера) помесячно. Раз в цикл нужно пополнять.
+   За remindDaysBefore до даты — мягкий гейт админ-субъекту/маркетологу (НЕ брокерам).
+   Просрочка → грейс graceDays (сервис ещё жив) → жёсткий гейт + алерт основателю.
+   Сверх грейса → «приостановлено» (блокирующий гейт) + алерт основателю.
+   Оплату подтверждает основатель (topUp) — модель офлайн/крипто, деньги идут ему. */
+
+function billingStore() { const f = farm(); f.billing = f.billing || {}; return f.billing; }
+function alertsStore() { const f = farm(); f.alerts = f.alerts || []; return f.alerts; }
+function agencyNumbers(tid) { return farm().numbers.filter(n => n.agencyTid === tid); }
+function agencyMonthly(tid) { return agencyNumbers(tid).length * farm().settings.seatPrice; }
+function billingTids() { return [...new Set(farm().numbers.filter(n => n.agencyTid).map(n => n.agencyTid))]; }
+
+function ensureBillingFor(tid) {
+  const f = farm(); const b = billingStore();
+  if (!b[tid]) b[tid] = { dueAt: Date.now() + f.settings.cycleDays * DAY, autoRenew: true, graceDays: f.settings.graceDays, state: 'active', lastPaidAt: Date.now(), suspendedAt: null, clientPaidClaimAt: null, startedAt: Date.now() };
+  if (b[tid].graceDays == null) b[tid].graceDays = f.settings.graceDays;
+  return b[tid];
+}
+
+/* основатель подтвердил оплату → продлить на N циклов */
+function topUp(tid, months) {
+  const f = farm(); const b = ensureBillingFor(tid); months = Math.max(1, +months || 1);
+  const base = Math.max(Date.now(), b.dueAt || 0);
+  b.dueAt = base + f.settings.cycleDays * DAY * months;
+  b.state = 'active'; b.lastPaidAt = Date.now(); b.suspendedAt = null; b.clientPaidClaimAt = null;
+  /* погасить непогашенные алерты по этому агентству */
+  alertsStore().forEach(a => { if (a.tid === tid && !a.ack && ['overdue', 'suspended', 'client_paid_claim'].includes(a.kind)) a.ack = true; });
+  flog('billing.topup', { tid, months, dueAt: b.dueAt }); persist();
+  return { ok: true, billing: b };
+}
+
+function setBilling(tid, patch) {
+  const b = ensureBillingFor(tid); patch = patch || {};
+  if (patch.dueAt != null) b.dueAt = +patch.dueAt;
+  if (patch.autoRenew != null) b.autoRenew = !!patch.autoRenew;
+  if (patch.graceDays != null) b.graceDays = Math.max(0, +patch.graceDays);
+  flog('billing.set', { tid }); persist();
+  return { ok: true, billing: b };
+}
+
+/* клиент (владелец/маркетолог) нажал «я оплатил» → уведомить основателя */
+function clientClaimPaid(tid) {
+  const b = ensureBillingFor(tid); b.clientPaidClaimAt = Date.now();
+  pushAlert('client_paid_claim', tid, 'Агентство сообщило об оплате расходников — подтвердите пополнение (Баланс → Продлить).'); persist();
+  return { ok: true };
+}
+
+function pushAlert(kind, tid, text) {
+  const a = alertsStore();
+  if (a.some(x => !x.ack && x.kind === kind && x.tid === tid)) return; /* дедуп непогашенных */
+  a.unshift({ id: nid('al'), at: Date.now(), kind, tid, text, ack: false });
+  if (a.length > 300) a.length = 300;
+}
+function ackAlert(id) { const a = alertsStore(); const x = a.find(y => y.id === id); if (x) x.ack = true; persist(); return { ok: true }; }
+
+/* уровень гейта для агентства (что показать клиенту) */
+function gateFor(tid) {
+  const f = farm(); const nums = agencyNumbers(tid);
+  if (!nums.length) return { active: false };
+  const b = ensureBillingFor(tid);
+  const now = Date.now();
+  const amount = nums.length * f.settings.seatPrice;
+  const daysLeft = Math.ceil((b.dueAt - now) / DAY);
+  const graceEndsAt = b.dueAt + (b.graceDays || 0) * DAY;
+  let level = 'none';
+  if (daysLeft > f.settings.remindDaysBefore) level = 'none';
+  else if (daysLeft >= 1) level = 'soon';        /* мягкий баннер */
+  else if (now < graceEndsAt) level = 'overdue';  /* жёсткий, но сервис в грейсе */
+  else level = 'suspended';                       /* блокирующий */
+  return { active: level !== 'none', level, daysLeft, amount, dueAt: b.dueAt, graceEndsAt, numbers: nums.length, autoRenew: b.autoRenew, clientClaim: b.clientPaidClaimAt || null };
+}
+
+/* тик биллинга: пересчитать состояния, поднять алерты основателю на переходах.
+   Возвращает gates[tid] — их index.js пишет в db.settings.billingGate каждого тенанта. */
+function billingTick() {
+  const out = { gates: {} };
+  const now = Date.now();
+  for (const tid of billingTids()) {
+    const b = ensureBillingFor(tid);
+    const g = gateFor(tid);
+    out.gates[tid] = g;
+    const prev = b.state;
+    b.state = g.level === 'none' ? 'active' : g.level;
+    b.suspendedAt = g.level === 'suspended' ? (b.suspendedAt || now) : null;
+    if (g.level === 'overdue' && prev !== 'overdue' && prev !== 'suspended')
+      pushAlert('overdue', tid, `Клиент не пополнил расходники — просрочка. ${g.amount}$/мес за ${g.numbers} номеров. Грейс до ${new Date(g.graceEndsAt).toLocaleDateString('ru')}.`);
+    if (g.level === 'suspended' && prev !== 'suspended')
+      pushAlert('suspended', tid, `Расходники не оплачены сверх грейса — доступ к номерам под угрозой. ${g.amount}$/мес за ${g.numbers} номеров.`);
+  }
+  /* агентства без номеров — пометить завершёнными (историю не трём) */
+  const live = billingTids();
+  const bs = billingStore();
+  for (const tid of Object.keys(bs)) if (!live.includes(tid) && bs[tid].state !== 'ended') bs[tid].state = 'ended';
+  persist();
+  return out;
+}
+
+/* сводка для панели основателя */
+function billingSummary() {
+  const f = farm();
+  return {
+    agencies: billingTids().map(tid => Object.assign({ tid }, gateFor(tid), { billing: ensureBillingFor(tid), monthly: agencyMonthly(tid) })),
+    alerts: alertsStore().filter(a => !a.ack).slice(0, 50),
+    settings: { cycleDays: f.settings.cycleDays, graceDays: f.settings.graceDays, remindDaysBefore: f.settings.remindDaysBefore, seatPrice: f.settings.seatPrice },
+  };
+}
+
 module.exports = {
   farm, economics, seedReal,
   addDevice, removeDevice,
@@ -285,4 +397,6 @@ module.exports = {
   assign, revoke, failover, wipeSlot,
   setSettings,
   poolReady, createSeatOrder, listSeatOrders, fulfillSeatOrder, releaseAgency,
+  /* баланс / гейт */
+  topUp, setBilling, billingTick, billingSummary, gateFor, ackAlert, clientClaimPaid, ensureBillingFor,
 };
