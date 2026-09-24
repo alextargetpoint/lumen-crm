@@ -7520,7 +7520,7 @@ async function initPropMap(props) {
   if (!pts.length) { if (status) status.innerHTML = 'На карте пусто — <b>импортируйте объекты</b> (кнопка «Импорт» → «По ссылке»), и они появятся тут с превью.'; }
   const bounds = []; window._prMarkers = {};
   pts.forEach(p => {
-    const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [20, 20], iconAnchor: [10, 10] });
+    const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-hit"></span><span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [34, 34], iconAnchor: [17, 17] });
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
     window._prMarkers[p.id] = { mk, lat: p.lat, lng: p.lng };
     const img = (p.images && p.images[0]) || '';
@@ -7541,7 +7541,7 @@ async function initPropMap(props) {
     });
   });
   if (status) status.textContent = pts.length + ' из ' + items.length + ' на карте' + (pts.length < items.length ? ' · остальные без распознанной локации' : '');
-  setTimeout(() => { try { map.invalidateSize(); } catch (_) {} }, 250);
+  [120, 350, 800].forEach(t => setTimeout(() => { try { map.invalidateSize(); if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 }); else if (bounds.length === 1) map.setView(bounds[0], 13); } catch (_) {} }, t));
 }
 
 PAGES.properties = async (root) => {
@@ -13833,7 +13833,7 @@ PAGES.templates = async (root) => {
         <span class="nm2">${k}<div class="sub2">${sub}</div></span><span class="sp2"></span><span class="val2">${v}</span>
       </div>`).join('')}
     `, { v: 'left', hue: '#64748B' })}
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px"><button class="btn btn-sm" id="syncTpl">${ic(I.refresh)}Синк статусов из Meta</button><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px"><button class="btn btn-sm" id="syncTpl">${ic(I.refresh)}Синк статусов из Meta</button><button class="btn btn-sm" id="tplLib">${ic(I.doc)}Библиотека</button><button class="btn btn-accent page-primary" id="newTpl">${ic(I.plus)}Новый шаблон</button></div>
     <div class="two-col">
       <div><div class="nav-label" style="padding-left:2px">Utility — сервисные (дешевле, быстрее модерация)</div>
         ${st.templates.filter(t => t.category === 'utility').map(t => tplCard(t, stBadge)).join('')}</div>
@@ -13861,6 +13861,7 @@ PAGES.templates = async (root) => {
     ],
   });
   $('#newTpl').addEventListener('click', () => openTplModal(null));
+  $('#tplLib', root)?.addEventListener('click', () => openTplLibrary(() => render()));
   $('#syncTpl', root)?.addEventListener('click', async (e) => { const b = e.currentTarget; b.disabled = true; try { const r = await api.post('/templates/sync-meta', {}); toast(r.ok ? 'Статусы обновлены' : 'Не вышло', r.ok ? ('синхронизировано: ' + r.synced) : (r.error || ''), r.ok); render(); } catch (er) { toast('Ошибка', er.message); b.disabled = false; } });
   $$('[data-tplmeta]', root).forEach(b => b.addEventListener('click', async () => {
     b.disabled = true; const o = b.innerHTML; b.textContent = 'Отправляю…';
