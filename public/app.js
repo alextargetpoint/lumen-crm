@@ -321,6 +321,28 @@ window.addEventListener('scroll', (e) => { if (CUR_POP && Date.now() - POP_GUARD
 window.addEventListener('resize', closePop);
 
 function enhanceControls(root) {
+  /* number-инпуты → кастомные стрелки в стиле Ателье (нативные ▲▼ уродливы, разнятся по браузерам) */
+  $$('input[type="number"]', root).forEach(inp => {
+    if (inp.dataset.stp || inp.closest('.num-step')) return;
+    inp.dataset.stp = '1';
+    const wrap = document.createElement('span'); wrap.className = 'num-step';
+    if (inp.style.width) { wrap.style.width = inp.style.width; inp.style.width = '100%'; }   /* узкие поля: ширину на обёртку */
+    else { wrap.style.display = 'block'; }                                                    /* полноширинные form-инпуты */
+    inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+    const btns = el(`<span class="num-step-btns"><button type="button" class="num-up" tabindex="-1" aria-label="+">${ic(I.chev, 2)}</button><button type="button" class="num-dn" tabindex="-1" aria-label="−">${ic(I.chev, 2)}</button></span>`);
+    wrap.appendChild(btns);
+    const step = parseFloat(inp.step) || 1;
+    const dec = (String(step).split('.')[1] || '').length;
+    const bump = (d) => {
+      let n = (parseFloat(inp.value) || 0) + d * step;
+      if (inp.min !== '' && n < +inp.min) n = +inp.min;
+      if (inp.max !== '' && n > +inp.max) n = +inp.max;
+      inp.value = dec ? n.toFixed(dec) : n;
+      inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    btns.querySelector('.num-up').addEventListener('click', () => bump(1));
+    btns.querySelector('.num-dn').addEventListener('click', () => bump(-1));
+  });
   /* селекты → стилизованный дропдаун (нативный остаётся хранителем значения) */
   $$('select', root).forEach(sel => {
     if (sel.dataset.enh || sel.closest('.cs')) return;

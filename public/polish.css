@@ -145,3 +145,16 @@ input:focus, textarea:focus, select:focus {
 /* сегмент-тумблер Список/Карта */
 #prMapToggle { border: 1px solid var(--stroke, #e5ddcf); font-weight: 600; }
 #prMapToggle.on-map { background: var(--accent, #b8863c); color: #fff; border-color: var(--accent, #b8863c); box-shadow: 0 4px 12px rgba(184,134,60,.28); }
+
+/* ---------- Кастомные стрелки number-инпутов (стиль Ателье, вся CRM) ---------- */
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+.num-step { position: relative; display: inline-block; }
+.num-step > input[type=number] { padding-right: 26px !important; width: 100%; }
+.num-step-btns { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 1px; z-index: 2; }
+.num-step-btns button { width: 18px; height: 13px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--stroke, #e5ddcf); background: var(--bg-2, #f6f2ea); color: var(--accent, #b8863c); border-radius: 4px; cursor: pointer; padding: 0; transition: background .12s, color .12s; }
+.num-step-btns button:hover { background: var(--accent, #b8863c); color: #fff; border-color: var(--accent, #b8863c); }
+.num-step-btns button svg { width: 9px; height: 9px; }
+.num-step-btns .num-up svg { transform: rotate(180deg); }
+.num-step-btns .num-up { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.num-step-btns .num-dn { border-top-left-radius: 0; border-top-right-radius: 0; }
