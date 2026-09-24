@@ -110,6 +110,20 @@
   /* ── Atelier-календарь (нативный date, окрашенный) ── */
   input[type="date"], input[type="datetime-local"], input[type="month"] { color-scheme:light; accent-color:var(--gold); }
   input[type="date"]::-webkit-calendar-picker-indicator, input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter:sepia(1) saturate(4) hue-rotate(2deg) brightness(.85); opacity:.55; cursor:pointer; }
+  /* ── Ферма: минималистичная сетка + сворачиваемые add-формы ── */
+  #sect-farm > .card, #sect-farm > .farm-2col, #sect-farm > details.card { margin-bottom:20px; }
+  .farm-2col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:900px) { .farm-2col { grid-template-columns:1fr; } }
+  details.addf { margin-top:12px; border-top:1px solid var(--line-soft); padding-top:10px; }
+  details.addf > summary, details.card > summary { cursor:pointer; list-style:none; }
+  details.addf > summary::-webkit-details-marker, details.card > summary::-webkit-details-marker { display:none; }
+  details.addf > summary { font-size:12.5px; color:var(--gold); font-weight:600; display:inline-flex; align-items:center; gap:7px; letter-spacing:.01em; }
+  details.addf > summary::before { content:'+'; font-size:15px; width:14px; text-align:center; }
+  details.addf[open] > summary::before { content:'–'; }
+  details.card { display:block; }
+  details.card > summary { display:flex; align-items:center; justify-content:space-between; }
+  details.card > summary::after { content:'▾'; font-size:11px; opacity:.5; transition:transform .2s var(--ease); }
+  details.card[open] > summary::after { transform:rotate(180deg); }
 </style>
 </head>
 <body>
@@ -337,81 +351,96 @@
 
   <!-- ⭐ ФЕРМА НОМЕРОВ -->
   <div class="sect" id="sect-farm">
+    <!-- Заголовок + экономика фермы -->
     <div class="card">
-      <div class="row" style="justify-content:space-between"><b>🚜 Ферма номеров — WhatsApp + Telegram</b>
+      <div class="row" style="justify-content:space-between"><b>Ферма номеров — WhatsApp + Telegram</b>
         <span><button class="ghost" id="farmReload">Обновить</button> <button class="ghost" id="farmSeed">Засеять реальными</button></span></div>
-      <div class="stats" id="farmEcon" style="margin-top:12px"></div>
-      <div class="muted" id="farmEcon2" style="margin-top:6px;font-size:12px"></div>
+      <div class="stats" id="farmEcon" style="margin-top:14px"></div>
+      <div class="muted" id="farmEcon2" style="margin-top:8px;font-size:12px"></div>
     </div>
 
+    <!-- Номера — ядро -->
     <div class="card">
-      <div class="row" style="justify-content:space-between"><b>📱 Устройства (Android)</b></div>
-      <div style="overflow:auto"><table id="farmDevTbl"><thead><tr><th>Название</th><th>Модель</th><th>ADB serial</th><th>Локация</th><th>Слоты</th><th></th></tr></thead><tbody id="farmDevBody"></tbody></table></div>
-      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
-        <input id="fdName" placeholder="Название (Honor пилот)" style="flex:1;min-width:120px">
-        <input id="fdModel" placeholder="Модель" style="flex:1;min-width:100px">
-        <input id="fdSerial" placeholder="ADB serial (192.168.x:port)" style="flex:1;min-width:140px">
-        <input id="fdLoc" placeholder="Локация" style="width:110px">
-        <input id="fdCap" type="number" placeholder="слотов (5)" style="width:90px">
-        <button id="fdAdd">Добавить</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="justify-content:space-between"><b>☎️ Номера (место = WA+TG)</b></div>
-      <div style="overflow:auto"><table id="farmNumTbl"><thead><tr>
+      <div class="row" style="justify-content:space-between"><b>Номера</b><span class="muted" style="font-size:12px">место = WhatsApp + Telegram на одном номере</span></div>
+      <div style="overflow:auto;margin-top:10px"><table id="farmNumTbl"><thead><tr>
         <th>Номер</th><th>Устройство/слот</th><th>WA</th><th>TG</th><th>Прокси</th><th>2FA</th><th>Агентство</th><th>Имя</th><th>Действия</th>
       </tr></thead><tbody id="farmNumBody"></tbody></table></div>
-      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
-        <input id="fnPhone" placeholder="+447520637167" style="flex:1;min-width:130px">
-        <select id="fnDevice" style="min-width:120px"></select>
-        <select id="fnSlot"><option value="main">main</option><option value="business">business</option><option value="island">island</option><option value="secureFolder">secureFolder</option><option value="dualMsg">dualMsg</option></select>
-        <select id="fnWa"><option value="none">WA:none</option><option value="provisioning">provisioning</option><option value="warming">warming</option><option value="ready">ready</option></select>
-        <input id="fnName" placeholder="имя профиля" style="width:110px">
-        <button id="fnAdd">Добавить номер</button>
+      <details class="addf"><summary>Добавить номер вручную</summary>
+        <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+          <input id="fnPhone" placeholder="+447520637167" style="flex:1;min-width:130px">
+          <select id="fnDevice" class="mini" style="min-width:120px"></select>
+          <select id="fnSlot" class="mini"><option value="main">main</option><option value="business">business</option><option value="island">island</option><option value="secureFolder">secureFolder</option><option value="dualMsg">dualMsg</option></select>
+          <select id="fnWa" class="mini"><option value="none">WA: none</option><option value="provisioning">provisioning</option><option value="warming">warming</option><option value="ready">ready</option></select>
+          <input id="fnName" placeholder="имя профиля" style="width:120px">
+          <button id="fnAdd">Добавить</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Устройства + Прокси -->
+    <div class="farm-2col">
+      <div class="card">
+        <b>Устройства</b><span class="muted" style="font-size:12px"> · Android-телефоны</span>
+        <div style="overflow:auto;margin-top:10px"><table id="farmDevTbl"><thead><tr><th>Название</th><th>Модель</th><th>ADB serial</th><th>Слоты</th><th></th></tr></thead><tbody id="farmDevBody"></tbody></table></div>
+        <details class="addf"><summary>Добавить устройство</summary>
+          <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+            <input id="fdName" placeholder="Название (Honor пилот)" style="flex:1;min-width:120px">
+            <input id="fdModel" placeholder="Модель" style="width:110px">
+            <input id="fdSerial" placeholder="ADB serial 192.168.x:port" style="flex:1;min-width:150px">
+            <input id="fdLoc" placeholder="Локация" style="width:110px">
+            <input id="fdCap" type="number" placeholder="слотов" style="width:90px">
+            <button id="fdAdd">Добавить</button>
+          </div>
+        </details>
+      </div>
+      <div class="card">
+        <b>UK-прокси</b><span class="muted" style="font-size:12px"> · по одному на номер</span>
+        <div style="overflow:auto;margin-top:10px"><table id="farmPxTbl"><thead><tr><th>Метка</th><th>Хост</th><th>Тип</th><th>$/мес</th><th>Привязан</th><th></th></tr></thead><tbody id="farmPxBody"></tbody></table></div>
+        <details class="addf"><summary>Добавить прокси</summary>
+          <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+            <input id="fxLabel" placeholder="метка" style="width:110px">
+            <input id="fxHost" placeholder="host:port или user:pass@host" style="flex:1;min-width:150px">
+            <input id="fxCountry" placeholder="gb" value="gb" style="width:56px">
+            <select id="fxType" class="mini"><option value="residential">residential</option><option value="mobile">mobile</option></select>
+            <input id="fxCost" type="number" placeholder="$/мес" style="width:80px">
+            <button id="fxAdd">Добавить</button>
+          </div>
+        </details>
       </div>
     </div>
 
-    <div class="card">
-      <b>🛡 UK-прокси (по одному на номер)</b>
-      <div style="overflow:auto"><table id="farmPxTbl"><thead><tr><th>Метка</th><th>Хост</th><th>Страна</th><th>Тип</th><th>$/мес</th><th>Привязан</th><th></th></tr></thead><tbody id="farmPxBody"></tbody></table></div>
-      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
-        <input id="fxLabel" placeholder="метка" style="width:110px">
-        <input id="fxHost" placeholder="host:port или user:pass@host" style="flex:1;min-width:160px">
-        <input id="fxCountry" placeholder="gb" value="gb" style="width:60px">
-        <select id="fxType"><option value="residential">residential</option><option value="mobile">mobile</option></select>
-        <input id="fxCost" type="number" placeholder="$/мес" style="width:80px">
-        <button id="fxAdd">Добавить</button>
+    <!-- Конвейер + Шоп -->
+    <div class="farm-2col">
+      <div class="card">
+        <b>Конвейер и прогрев</b>
+        <div class="muted" id="farmProvStatus" style="font-size:12px;margin:8px 0"></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <select id="fpDevice" class="mini" style="min-width:130px"></select>
+          <input id="fpCount" type="number" placeholder="сколько" value="3" style="width:88px">
+          <button id="fpEnqueue">Заказать провижн</button>
+        </div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button class="ghost" id="fpAcquire">Купить номера (eSIM)</button>
+          <button class="ghost" id="fpTick">Тик прогрева</button>
+          <button class="ghost" id="fpYesim">Yesim: баланс</button>
+        </div>
+        <div class="muted" id="farmWarm" style="font-size:12px;margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <b>Аренда мест агентствами</b>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+          <select id="fsoAgency" class="mini" style="min-width:150px"></select>
+          <input id="fsoSeats" type="number" placeholder="мест" value="5" style="width:80px">
+          <button id="fsoCreate">Создать заказ</button>
+        </div>
+        <div style="overflow:auto;margin-top:10px"><table id="farmSoTbl"><thead><tr><th>Агентство</th><th>Мест</th><th>$/мес</th><th>Статус</th><th></th></tr></thead><tbody id="farmSoBody"></tbody></table></div>
       </div>
     </div>
 
-    <div class="card">
-      <b>🏭 Конвейер провижна (Р2) + прогрев (Р3)</b>
-      <div class="muted" id="farmProvStatus" style="font-size:12px;margin:6px 0"></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">
-        <select id="fpDevice" style="min-width:130px"></select>
-        <input id="fpCount" type="number" placeholder="сколько" value="3" style="width:90px">
-        <button id="fpEnqueue">Заказать провижн</button>
-        <button class="ghost" id="fpAcquire">Купить номера (eSIM)</button>
-        <button class="ghost" id="fpTick">Тик прогрева</button>
-        <button class="ghost" id="fpYesim">Yesim: тест/баланс</button>
-      </div>
-      <div class="muted" id="farmWarm" style="font-size:12px;margin-top:8px"></div>
-    </div>
-
-    <div class="card">
-      <b>🛒 Шоп мест (Р4) — аренда агентствами</b>
-      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
-        <select id="fsoAgency" style="min-width:150px"></select>
-        <input id="fsoSeats" type="number" placeholder="мест" value="5" style="width:80px">
-        <button id="fsoCreate">Создать заказ</button>
-      </div>
-      <div style="overflow:auto;margin-top:8px"><table id="farmSoTbl"><thead><tr><th>Агентство</th><th>Мест</th><th>$/мес</th><th>Статус</th><th></th></tr></thead><tbody id="farmSoBody"></tbody></table></div>
-    </div>
-
-    <div class="card">
-      <b>⚙️ Экономика (тариф и себестоимость, $/мес на номер)</b>
-      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+    <!-- Экономика (свёрнуто) -->
+    <details class="card">
+      <summary><b>Экономика — тариф и себестоимость ($/мес на номер)</b></summary>
+      <div class="row" style="margin-top:14px;gap:12px;flex-wrap:wrap">
         <label class="muted">Место $<input id="fsSeat" type="number" style="width:70px"></label>
         <label class="muted">Аренда номера $<input id="fsRent" type="number" style="width:60px"></label>
         <label class="muted">Прокси $<input id="fsProxy" type="number" style="width:60px"></label>
@@ -421,7 +450,7 @@
         <label class="muted">Слотов/тел<input id="fsMax" type="number" style="width:60px"></label>
         <button id="fsSave">Сохранить</button>
       </div>
-    </div>
+    </details>
   </div>
 </div>
 
@@ -1008,14 +1037,14 @@ function agencyName(tid) { const a = (FARM.agencies || []).find(x => x.tid === t
 function renderFarmDevices() {
   $('#farmDevBody').innerHTML = (FARM.farm.devices || []).map(d => {
     const used = (FARM.farm.numbers || []).filter(n => n.deviceId === d.id).length;
-    return `<tr><td>${esc(d.name)}</td><td>${esc(d.model || '')}</td><td><code>${esc(d.serial || '')}</code></td><td>${esc(d.location || '')}</td><td>${used}/${d.capacity}</td><td><button class="ghost" data-devdel="${d.id}">✕</button></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="muted">Устройств нет</td></tr>';
+    return `<tr><td><b>${esc(d.name)}</b>${d.location ? '<div class="muted" style="font-size:11px">' + esc(d.location) + '</div>' : ''}</td><td>${esc(d.model || '')}</td><td><code>${esc(d.serial || '')}</code></td><td class="num-cell">${used}/${d.capacity}</td><td><button class="ghost" data-devdel="${d.id}">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="muted">Устройств нет</td></tr>';
 }
 function renderFarmProxies() {
   $('#farmPxBody').innerHTML = (FARM.farm.proxies || []).map(px => {
     const on = px.assignedTo ? ('→ ' + ((FARM.farm.numbers.find(n => n.id === px.assignedTo) || {}).phone || '?')) : '<span class="muted">свободен</span>';
-    return `<tr><td>${esc(px.label || '')}</td><td><code>${esc(px.host || '')}</code></td><td>${esc(px.country)}</td><td>${esc(px.type)}</td><td>${money(px.costMo)}</td><td>${on}</td><td><button class="ghost" data-pxdel="${px.id}">✕</button></td></tr>`;
-  }).join('') || '<tr><td colspan="7" class="muted">Прокси нет</td></tr>';
+    return `<tr><td><b>${esc(px.label || '')}</b> <span class="muted" style="font-size:10px">${esc(px.country || '')}</span></td><td><code>${esc(px.host || '')}</code></td><td>${esc(px.type)}</td><td class="num-cell">${money(px.costMo)}</td><td>${on}</td><td><button class="ghost" data-pxdel="${px.id}">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">Прокси нет</td></tr>';
 }
 const fbadge = (s) => { const col = { ready: 'var(--good,#3f9d5a)', assigned: '#3b82f6', warming: '#eab308', provisioning: '#eab308', banned: 'var(--bad,#d66)', none: 'var(--mut,#888)' }[s] || '#888'; return `<span style="color:${col}">${s}</span>`; };
 function renderFarmNumbers() {
