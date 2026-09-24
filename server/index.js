@@ -3265,6 +3265,25 @@ async function renderPage(url) {
   return null;
 }
 
+/* веб-поиск по открытым источникам (Firecrawl /search — тот же ключ RENDER_API_KEY).
+   Для обогащения карточек: чего нет на портале (срок сдачи, доходность, ход стройки) — ищем в вебе. */
+async function webSearch(query, limit) {
+  const key = process.env.RENDER_API_KEY || ''; if (!key || !query) return null;
+  try {
+    const r = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: limit || 5, scrapeOptions: { formats: ['markdown'] } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) return null;
+    const items = (j.data || []).slice(0, limit || 5);
+    return {
+      text: items.map(x => `## ${x.title || ''} (${x.url || ''})\n${String(x.markdown || x.description || '').slice(0, 3000)}`).join('\n\n').slice(0, 14000),
+      sources: items.map(x => ({ title: (x.title || '').slice(0, 120), url: x.url || '' })).filter(s => s.url),
+    };
+  } catch (_) { return null; }
+}
+
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
 /* ============ КРИПТО-ПОПОЛНЕНИЕ РАСХОДНИКОВ (USDT → холодный кошелёк, авто-верификация) ============
@@ -10823,6 +10842,40 @@ ${SCR}
       }
       store.save();
       return json(res, 200, { ok: true, property: pr, imagesSaved: saved.length, units: (mapped.units || []).length, floorplans: (mapped.layouts || []).length });
+    }
+    /* ⭐ ОБОГАЩЕНИЕ ИЗ ОТКРЫТЫХ ИСТОЧНИКОВ: чего нет на портале (срок сдачи, доходность, прирост,
+       ход стройки) — ищем в вебе по названию+застройщику. apply:false = предложение, apply:true = мёрж.
+       want — конкретный запрос («срок сдачи», «доходность»…). */
+    if ((m = p.match(/^\/api\/properties\/([^/]+)\/enrich$/)) && req.method === 'POST') {
+      const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
+      if (!process.env.RENDER_API_KEY) return json(res, 400, { error: 'нужен RENDER_API_KEY (веб-поиск)' });
+      if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа' });
+      const b = await readBody(req).catch(() => ({}));
+      /* быстрый мёрж уже предложенных значений (без повторного веб-поиска) */
+      if (b.apply && b.values && typeof b.values === 'object') {
+        const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(b.values);
+        const applied = [];
+        for (const k of fields) { const v = b.values[k]; if (v == null || v === '') continue; if (k === 'priceFrom') { if (+v) pr.priceFrom = +v; } else pr[k] = String(v).slice(0, 400); applied.push(k); }
+        pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + applied.join(', ') });
+        if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now(); store.save();
+        return json(res, 200, { ok: true, applied, property: pr });
+      }
+      const q = [pr.name, pr.developer && pr.developer !== '—' ? pr.developer : '', pr.area, b.want || 'срок сдачи цена доходность ход строительства', 'недвижимость проект'].filter(Boolean).join(' ');
+      const sr = await webSearch(q, 6);
+      if (!sr || !sr.text) return json(res, 400, { error: 'по проекту ничего не нашлось в открытых источниках' });
+      let ext; try { ext = await llm.enrichProject(sr.text, pr.name, b.want); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал результаты: ' + e.message }); }
+      const proposed = {};
+      for (const k of ['developer', 'handover', 'roi', 'appreciation', 'priceFrom', 'constructionProgress', 'description']) {
+        const v = ext[k]; if (v && String(v).trim() && !(k === 'priceFrom' && !+v)) proposed[k] = k === 'priceFrom' ? +v : String(v).slice(0, 400);
+      }
+      if (!b.apply) return json(res, 200, { ok: true, proposed, confidence: ext.confidence || 'medium', sources: sr.sources });
+      const fields = Array.isArray(b.fields) && b.fields.length ? b.fields : Object.keys(proposed);
+      const applied = [];
+      for (const k of fields) { if (proposed[k] == null) continue; if (k === 'priceFrom') { if (proposed[k]) pr.priceFrom = proposed[k]; } else pr[k] = proposed[k]; applied.push(k); }
+      pr.history = pr.history || []; pr.history.unshift({ at: Date.now(), action: 'Дополнено из открытых источников: ' + applied.join(', '), sources: (sr.sources || []).slice(0, 4) });
+      if (pr.history.length > 60) pr.history.length = 60; pr.enrichedAt = Date.now();
+      store.save();
+      return json(res, 200, { ok: true, applied, property: pr, sources: sr.sources });
     }
     /* ⭐ СВЕРКА НАЛИЧИЯ: вставляем свежий файл доступности застройщика → ИИ извлекает юниты →
        diff с текущими: новые добавляются (в наличии), пропавшие → помечаются проданными (не трём —

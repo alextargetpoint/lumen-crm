@@ -333,6 +333,19 @@ ${String(context).slice(0, 13000)}`;
   return j;
 }
 
+/* Обогащение карточки из веб-поиска: самая свежая инфа по проекту (срок сдачи, доходность,
+   прирост, ход строительства, цена). want — на чём сфокусироваться (опц.). */
+async function enrichProject(searchText, name, want) {
+  const prompt = `Из результатов веб-поиска по проекту недвижимости "${name}" извлеки САМУЮ СВЕЖУЮ достоверную информацию.${want ? ' Особенно нужно: ' + want + '.' : ''} Верни СТРОГО JSON:
+{"developer":"застройщик","handover":"срок сдачи","roi":"доходность % (rental yield)","appreciation":"прирост стоимости % к сдаче","priceFrom":число_или_0,"currency":"USD|EUR|THB|AED","constructionProgress":"ход строительства: % готовности или этап (напр. «60% готовности, Q2 2026»)","description":"1-2 свежих предложения о проекте","confidence":"high|medium|low"}
+Правила: бери только то, что подтверждается источниками; чего нет — "" или 0. НЕ выдумывай. При противоречиях — самое свежее. confidence — насколько уверен.
+РЕЗУЛЬТАТЫ ПОИСКА:
+${String(searchText).slice(0, 13000)}`;
+  const j = await callGemini(prompt, 30000, 1500);
+  if (!j || typeof j !== 'object') throw new Error('bad enrich');
+  return j;
+}
+
 /* Извлечь СПИСОК ПРОЕКТОВ из каталога портала (для авто-индекса: имя+локация+ссылка+сводка).
    markdown — рендер страницы каталога (со ссылками [name](url)). */
 async function extractCatalog(markdown) {
@@ -1286,6 +1299,6 @@ strengths — 1-3 сильные стороны звонка.
   };
 }
 
-module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractUnits, extractCatalog, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
+module.exports = { available, reply, summarize, transcribe, validateReply, rewrite, tidyNote, extractProperty, extractUnits, extractCatalog, enrichProject, composeDeck, humanize, mentalityBlock, screenCandidate, composeCollection, composeAgencyAbout, composeFirstTouch, composeChainStep, composePostCall, composeCarousel, classifyPhotos, highlightHeadings, composeLeadPsych, composeScripts, huntIdeas, composePost, extractLaunch, parseTask, reviewCall, CAROUSEL_TEMPLATES, CAROUSEL_ANGLES, SHOOT_FORMATS, REELS_FORMULAS, generateImage, structureVisionSticker, masterStickerPrompt, MB_TEXT_MODES, pickPersona, HEROES, hasImage: () => !!OKEY, MODEL,
   /* низкоуровневые вызовы для AI Design Engine (studio.js): текстовый и мультимодальный Gemini */
   callGemini, callGeminiVision, hasGemini: () => !!GKEY, hasOpenAI: () => !!OKEY };

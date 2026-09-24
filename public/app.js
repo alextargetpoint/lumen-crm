@@ -7536,6 +7536,7 @@ PAGES.properties = async (root) => {
               <button class="btn btn-sm pd2-ghost" id="prBack">← Все объекты</button>
               <span class="pd2-save">${ic(I.check)}правки сохраняются сами</span>
               <span class="tb-spacer"></span>
+              <button class="btn btn-sm pd2-ghost" id="pdEnrich" title="Найти свежую инфу (срок сдачи, доходность, ход стройки) в открытых источниках">${ic(I.spark)}Дополнить из сети</button>
               <button class="btn btn-sm btn-accent" id="pdToColl">${ic(I.layers)}В подборку</button>
               <button class="btn btn-sm pd2-ghost danger" id="pdDel">Удалить</button>
             </div>
@@ -7745,6 +7746,24 @@ PAGES.properties = async (root) => {
     });
     $$('[data-unitdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ units: pr.units.filter((_, ix) => ix !== +b.dataset.unitdel) }); render(); }));
     $('#pdToColl').addEventListener('click', () => { PAGE_STATE.collPreselect = pr.id; go('collections'); });
+    $('#pdEnrich').addEventListener('click', async () => {
+      const FLD = { developer: 'Застройщик', handover: 'Срок сдачи', roi: 'Доходность', appreciation: 'Прирост стоимости', priceFrom: 'Цена от', constructionProgress: 'Ход строительства', description: 'Описание' };
+      const md = modal({ title: 'Дополнить из открытых источников', sub: `Ищу свежую информацию по «${esc(pr.name)}» в вебе — срок сдачи, доходность, ход стройки…`, body: '<div id="enrOut" class="muted" style="font-size:13px;padding:8px 0">Ищу…</div>', actions: [{ label: 'Закрыть' }] });
+      try {
+        const r = await api.post('/properties/' + pr.id + '/enrich', { want: 'срок сдачи, доходность, прирост стоимости, ход строительства' });
+        if (r.error || !r.proposed || !Object.keys(r.proposed).length) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'Ничего не нашлось') + '</span>'; return; }
+        const rows = Object.entries(r.proposed).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}</div><div class="sd">${esc(String(v)).slice(0, 200)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
+        const src = (r.sources || []).slice(0, 4).map(s => `<a href="${esc(s.url)}" target="_blank" class="link" style="font-size:11px">${esc((s.title || s.url).slice(0, 40))}</a>`).join(' · ');
+        $('#enrOut', md).innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
+        $('#enrApply', md).addEventListener('click', async () => {
+          const fields = $$('.enr-ck', md).filter(c => c.checked).map(c => c.dataset.k);
+          if (!fields.length) return toast('Ничего не выбрано');
+          const rr = await api.post('/properties/' + pr.id + '/enrich', { apply: true, fields, values: r.proposed });
+          if (rr.error) return toast('Не вышло', rr.error);
+          toast('Карточка дополнена', 'Добавлено: ' + rr.applied.join(', '), true); closeModal(); PAGES.properties(root);
+        });
+      } catch (e) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(e.message) + '</span>'; }
+    });
     $('#pdDel').addEventListener('click', () => modal({
       title: 'Удалить объект?', sub: pr.name,
       actions: [{ label: 'Удалить', cls: 'btn-danger', onClick: async () => { await fetch('/api/properties/' + pr.id, { method: 'DELETE' }); PAGE_STATE.propView = null; render(); } }, { label: 'Отмена' }],
