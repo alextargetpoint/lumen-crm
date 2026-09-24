@@ -3217,6 +3217,34 @@ setInterval(() => { meetingBotTick().catch(() => {}); }, 10 * 60e3);
    каркас. Провайдер рендера (Firecrawl по умолчанию) исполняет JS и возвращает готовый markdown+html.
    Платформенный ключ env RENDER_API_KEY → работает для ВСЕХ агентств (SaaS, как Recall.ai). Нет
    ключа → возвращает null, пайплайн падает на обычный fetch (server-rendered сайты и так работают). */
+/* размеры картинки из бинарного заголовка (без библиотек): JPEG/PNG/WebP → {w,h} или null.
+   Нужно чтобы отсекать низкое разрешение при импорте (клиенту — только продающие фото). */
+function imgDimensions(buf) {
+  try {
+    if (!buf || buf.length < 24) return null;
+    /* PNG */
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    /* WebP (RIFF....WEBP) */
+    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) {
+      const f = buf.toString('ascii', 12, 16);
+      if (f === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3FFF, h: buf.readUInt16LE(28) & 0x3FFF };
+      if (f === 'VP8L') { const b = buf.readUInt32LE(21); return { w: (b & 0x3FFF) + 1, h: ((b >> 14) & 0x3FFF) + 1 }; }
+      if (f === 'VP8X') return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1 };
+      return null;
+    }
+    /* JPEG: ищем SOF0..SOF3 маркеры */
+    if (buf[0] === 0xFF && buf[1] === 0xD8) {
+      let o = 2;
+      while (o < buf.length - 9) {
+        if (buf[o] !== 0xFF) { o++; continue; }
+        const mk = buf[o + 1];
+        if (mk >= 0xC0 && mk <= 0xC3) return { h: buf.readUInt16BE(o + 5), w: buf.readUInt16BE(o + 7) };
+        o += 2 + buf.readUInt16BE(o + 2);
+      }
+    }
+  } catch (_) {}
+  return null;
+}
 function renderReady() { return !!process.env.RENDER_API_KEY; }
 async function renderPage(url) {
   const key = process.env.RENDER_API_KEY || ''; if (!key) return null;
@@ -10739,21 +10767,24 @@ ${SCR}
       }
       /* фото: приоритет — из ИИ, иначе из HTML; скачиваем и перезаливаем к нам */
       const srcImgs = ([...(Array.isArray(ext.images) ? ext.images : []), ...imgs].map(absUrl).filter(x => /^https?:/i.test(x)));
-      const uniq = [...new Set(srcImgs)].slice(0, 12);
-      const saved = [];
-      for (const iu of uniq) {
+      const uniq = [...new Set(srcImgs)].slice(0, 14);
+      fs.mkdirSync(path.join(PUBLIC, 'assets', 'props'), { recursive: true });
+      /* качаем ПАРАЛЛЕЛЬНО (быстро) + фильтр низкого разрешения + сортировка по разрешению (лучшее фото = обложка) */
+      const dl = await Promise.all(uniq.map(async (iu) => {
         try {
           const rr = await fetch(iu, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: url } });
-          if (!rr.ok) continue; const buf = Buffer.from(await rr.arrayBuffer());
-          if (buf.length < 3000 || buf.length > 8e6) continue;
+          if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer());
+          if (buf.length < 3000 || buf.length > 8e6) return null;
+          const dim = imgDimensions(buf);
+          if (dim && (Math.max(dim.w, dim.h) < 900 || Math.min(dim.w, dim.h) < 500)) return null;  /* мыльные превью — мимо */
           const ex2 = ((iu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase();
-          fs.mkdirSync(path.join(PUBLIC, 'assets', 'props'), { recursive: true });
           const fn = 'prop_' + crypto.randomBytes(6).toString('hex') + ex2;
-          fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf); saved.push('/assets/props/' + fn);
-        } catch (_) {}
-        if (saved.length >= 10) break;
-      }
-      const mapped = inventory.mapItem(Object.assign({}, ext, { image: uniq[0] || '', _src: 'url' }), { geo: b.geo || '', market: b.market || '' });
+          fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf);
+          return { url: '/assets/props/' + fn, area: dim ? dim.w * dim.h : 0 };
+        } catch (_) { return null; }
+      }));
+      const saved = dl.filter(Boolean).sort((a, b) => b.area - a.area).map(x => x.url).slice(0, 10);
+      const mapped = inventory.mapItem(Object.assign({}, ext, { image: saved[0] || uniq[0] || '', _src: 'url' }), { geo: b.geo || '', market: b.market || '' });
       mapped.images = saved.length ? saved : mapped.images;
       if (Array.isArray(ext.amenities) && ext.amenities.length) mapped.amenities = ext.amenities.slice(0, 20).map(String);
       const pr = Object.assign({ id: store.nextId('pr'), tags: ['по ссылке'], materials: [], sourceUrl: url, draft: true, addedAt: Date.now() }, mapped);
