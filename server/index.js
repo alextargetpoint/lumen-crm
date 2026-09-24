@@ -745,6 +745,30 @@ function matchAd(db, lead) {
   } else lead.ads.matched = false;
 }
 
+/* Атрибуция лида к объявлению для аналитики: сначала по числовому adId, затем ФОЛБЭК ПО ИМЕНАМ
+   (объявление → адсет+кампания → кампания). Интеграторы/Meta-формы (Albato и пр.) часто шлют ИМЕНА,
+   а не числовой id → adId=null и лид ни к чему не привязывался (Факт лиды/квалы = 0). Единичное
+   присвоение: лид → ровно одно объявление, чтобы тоталы не задваивались. */
+const _adNorm = s => String(s == null ? '' : s).trim().toLowerCase();
+function resolveLeadAdId(db, l) {
+  const a = l && l.ads; if (!a) return null;
+  if (a.adId) { const hit = db.ads.find(x => String(x.adId) === String(a.adId)); return hit ? String(hit.adId) : null; }
+  const an = _adNorm(a.adName), asn = _adNorm(a.adsetName), cn = _adNorm(a.campaignName);
+  if (!an && !asn && !cn) return null;
+  let cand = an ? db.ads.filter(x => _adNorm(x.name) === an) : [];
+  if (cand.length > 1 && (asn || cn)) { const c2 = cand.filter(x => (!asn || _adNorm(x.adsetName) === asn) && (!cn || _adNorm(x.campaignName) === cn)); if (c2.length) cand = c2; }
+  if (cand.length) return String(cand[0].adId);                                             /* совпало имя объявления */
+  if (asn) { const x = db.ads.find(y => _adNorm(y.adsetName) === asn && (!cn || _adNorm(y.campaignName) === cn)); if (x) return String(x.adId); }  /* адсет(+кампания) */
+  if (cn) { const x = db.ads.find(y => _adNorm(y.campaignName) === cn); if (x) return String(x.adId); }                                            /* кампания */
+  return null;
+}
+/* индекс adId → [leads] (единичное присвоение), строим один раз на запрос аналитики */
+function buildLeadAdIndex(db) {
+  const idx = {};
+  for (const l of (db.leads || [])) { const aid = resolveLeadAdId(db, l); if (aid) (idx[aid] = idx[aid] || []).push(l); }
+  return idx;
+}
+
 /* метрики объявления за диапазон дат [from..to].
    С диапазоном — СТРОГО из посуточного ряда ad.daily (без ряда объявление в период не попадает,
    иначе стейл-тоталы старых объявлений задваивались бы в каждом периоде). Без диапазона — тоталы. */
@@ -10009,8 +10033,9 @@ ${SCR}
       const inR = (l) => { if (!from && !to) return true; const d = l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : ''; if (from && d < from) return false; if (to && d > to) return false; return true; };
       const hasIn = (lid) => db.messages.some(x => x.leadId === lid && x.dir === 'in');
       const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
+      const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
       const stats = db.ads.map(ad => {
-        const mine = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId) && inR(l));
+        const mine = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leads = mine.length;
         const dialogs = mine.filter(l => hasIn(l.id) || ['dialog', ...QUAL].includes(l.stage)).length;
         const qualified = mine.filter(l => QUAL.includes(l.stage)).length;
@@ -10150,8 +10175,9 @@ ${SCR}
       const mk = () => ({ spend: 0, leads: 0, leadsCRM: 0, quals: 0, clicks: 0, impr: 0, dmap: {} });
       const add = (m, x) => { m.spend += x.spend; m.leads += x.leads; m.leadsCRM += x.leadsCRM; m.quals += x.quals; m.clicks += x.clicks; m.impr += x.impr; for (const p of (x.dailyR || [])) m.dmap[p.d] = (m.dmap[p.d] || 0) + (p.spend || 0); };
       const camps = {};
+      const _leadIdx = buildLeadAdIndex(db);                                    /* атрибуция по adId + фолбэк по именам */
       for (const ad of db.ads) {
-        const crmLeads = db.leads.filter(l => l.ads && String(l.ads.adId) === String(ad.adId) && inR(l));
+        const crmLeads = (_leadIdx[String(ad.adId)] || []).filter(inR);
         const leadsCRM = crmLeads.length;
         const quals = (ad.qualsFact != null && !from && !to) ? ad.qualsFact : crmLeads.filter(l => QUAL.includes(l.stage)).length;
         const rm = adRangeMetrics(ad, from, to); const dR = dailyIn(ad.daily);
