@@ -124,6 +124,17 @@
   details.card > summary { display:flex; align-items:center; justify-content:space-between; }
   details.card > summary::after { content:'▾'; font-size:11px; opacity:.5; transition:transform .2s var(--ease); }
   details.card[open] > summary::after { transform:rotate(180deg); }
+  /* ── Atelier-модалки (confirm/alert/prompt) ── */
+  .amodal-ov { position:fixed; inset:0; z-index:10000; background:rgba(20,19,17,.42); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); display:grid; place-items:center; padding:20px; animation:ovIn .18s var(--ease) both; }
+  @keyframes ovIn { from{opacity:0} to{opacity:1} }
+  .amodal { background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow-lg); width:440px; max-width:100%; padding:26px; animation:amIn .22s var(--ease) both; }
+  @keyframes amIn { from{opacity:0; transform:translateY(10px) scale(.985)} to{opacity:1; transform:none} }
+  .amodal-t { font-family:'Cormorant',Georgia,serif; font-size:25px; font-weight:600; letter-spacing:.01em; margin-bottom:8px; }
+  .amodal-b { font-size:14px; color:var(--ink-2); line-height:1.55; }
+  .amodal-inp { width:100%; margin-top:16px; }
+  .amodal-acts { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+  .amodal-acts button { min-width:104px; }
+  .amodal-ok.danger-solid { background:var(--bad); }
 </style>
 </head>
 <body>
@@ -502,6 +513,40 @@ document.addEventListener('click', closeAtePop);
 window.addEventListener('resize', closeAtePop);
 document.addEventListener('scroll', closeAtePop, true);
 
+/* ── Atelier-модалки вместо браузерных confirm/alert/prompt ── */
+function aModal({ kind, body, title, value, placeholder, danger }) {
+  return new Promise((resolve) => {
+    const isPrompt = kind === 'prompt', isConfirm = kind === 'confirm';
+    const esc2 = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const ov = document.createElement('div'); ov.className = 'amodal-ov';
+    ov.innerHTML = `<div class="amodal" role="dialog" aria-modal="true">
+      <div class="amodal-t">${esc2(title)}</div>
+      <div class="amodal-b">${esc2(body).replace(/\n/g, '<br>')}</div>
+      ${isPrompt ? `<input class="amodal-inp" type="text">` : ''}
+      <div class="amodal-acts">
+        ${(isConfirm || isPrompt) ? `<button type="button" class="ghost amodal-cancel">Отмена</button>` : ''}
+        <button type="button" class="amodal-ok${danger ? ' danger-solid' : ''}">${isPrompt ? 'ОК' : (isConfirm ? 'Подтвердить' : 'ОК')}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const inp = ov.querySelector('.amodal-inp');
+    if (inp) { inp.value = value || ''; if (placeholder) inp.placeholder = placeholder; setTimeout(() => { inp.focus(); inp.select && inp.select(); }, 40); }
+    const done = (v) => { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const cancelVal = isPrompt ? null : (isConfirm ? false : true);
+    ov.querySelector('.amodal-ok').addEventListener('click', () => done(isPrompt ? (inp ? inp.value : '') : true));
+    ov.querySelector('.amodal-cancel')?.addEventListener('click', () => done(cancelVal));
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) done(cancelVal); });
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); done(cancelVal); }
+      else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); done(isPrompt ? (inp ? inp.value : '') : true); }
+    };
+    document.addEventListener('keydown', onKey, true);
+  });
+}
+function aAlert(body, title) { return aModal({ kind: 'alert', body, title: title || 'Уведомление' }); }
+function aConfirm(body, title) { return aModal({ kind: 'confirm', body, title: title || 'Подтверждение' }); }
+function aPrompt(body, value, title) { return aModal({ kind: 'prompt', body, value, title: title || 'Ввод' }); }
+
 // вход
 async function doLogin() {
   $('#loginErr').textContent = '';
@@ -590,7 +635,7 @@ async function loadInvoices() {
     host.querySelectorAll('[data-confirm]').forEach(btn => btn.addEventListener('click', async () => {
       const [tid, invId] = btn.dataset.confirm.split('|');
       btn.disabled = true; btn.textContent = 'Подтверждаю…';
-      try { const rr = await api('/api/admin/invoice-confirm', { method: 'POST', body: JSON.stringify({ tid, invId }) }); if (rr.ok) loadInvoices(); else { btn.disabled = false; btn.textContent = 'Подтвердить оплату'; alert(rr.error || 'ошибка'); } }
+      try { const rr = await api('/api/admin/invoice-confirm', { method: 'POST', body: JSON.stringify({ tid, invId }) }); if (rr.ok) loadInvoices(); else { btn.disabled = false; btn.textContent = 'Подтвердить оплату'; await aAlert(rr.error || 'ошибка'); } }
       catch (e) { btn.disabled = false; btn.textContent = 'Подтвердить оплату'; }
     }));
   } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
@@ -617,7 +662,7 @@ document.addEventListener('click', async (e) => {
   const tronKey = $('#ckTron').value.trim(), etherscanKey = $('#ckEth').value.trim();
   e.target.disabled = true; e.target.textContent = 'Сохраняю…';
   try { await api('/api/admin/crypto-keys', { method: 'POST', body: JSON.stringify({ ...(tronKey ? { tronKey } : {}), ...(etherscanKey ? { etherscanKey } : {}) }) }); loadCryptoKeys(); }
-  catch (err) { alert(err.message); }
+  catch (err) { await aAlert(err.message); }
   e.target.disabled = false; e.target.textContent = 'Сохранить ключи';
 });
 
@@ -637,13 +682,13 @@ async function loadCryptoTopups() {
     </div>`).join('');
     host.querySelectorAll('[data-credit]').forEach(btn => btn.addEventListener('click', async () => {
       const [tid, topupId] = btn.dataset.credit.split('|');
-      if (!confirm('Зачислить ' + cryMoney(btn.dataset.amt) + '? Убедись, что платёж реально в блокчейне.')) return;
+      if (!await aConfirm('Зачислить ' + cryMoney(btn.dataset.amt) + '? Убедись, что платёж реально в блокчейне.')) return;
       btn.disabled = true; btn.textContent = 'Зачисляю…';
       try {
         const rr = await api('/api/admin/crypto-credit', { method: 'POST', body: JSON.stringify({ tid, topupId }) });
         if (rr.ok) { $('#cryOut').innerHTML = `<div style="color:var(--good,#3f9d5a)">✓ Зачислено ${cryMoney(rr.amount)} → ${rr.appliedTo === 'subscription' ? 'подписка активна' : 'баланс: ' + cryMoney(rr.balance)}</div>`; loadCryptoTopups(); }
-        else { btn.disabled = false; btn.textContent = 'Зачислить'; alert(rr.error || 'ошибка'); }
-      } catch (e) { btn.disabled = false; btn.textContent = 'Зачислить'; alert(e.message); }
+        else { btn.disabled = false; btn.textContent = 'Зачислить'; await aAlert(rr.error || 'ошибка'); }
+      } catch (e) { btn.disabled = false; btn.textContent = 'Зачислить'; await aAlert(e.message); }
     }));
   } catch (e) { host.innerHTML = '<span class="muted">Ошибка загрузки</span>'; }
 }
@@ -651,14 +696,14 @@ document.addEventListener('click', (e) => { if (e.target && e.target.id === 'cry
 document.addEventListener('click', async (e) => {
   if (!e.target || e.target.id !== 'mcCredit') return;
   const tid = $('#mcTid').value.trim(), amountUsd = +$('#mcAmt').value || 0, purpose = $('#mcPurpose').value, txid = $('#mcTx').value.trim();
-  if (!tid || !(amountUsd > 0)) { alert('Укажи тенант и сумму'); return; }
-  if (!confirm('Зачислить ' + cryMoney(amountUsd) + ' тенанту ' + tid + '?')) return;
+  if (!tid || !(amountUsd > 0)) { await aAlert('Укажи тенант и сумму'); return; }
+  if (!await aConfirm('Зачислить ' + cryMoney(amountUsd) + ' тенанту ' + tid + '?')) return;
   e.target.disabled = true; e.target.textContent = 'Зачисляю…';
   try {
     const rr = await api('/api/admin/crypto-credit', { method: 'POST', body: JSON.stringify({ tid, manual: { amountUsd, purpose, txid } }) });
     if (rr.ok) { $('#cryOut').innerHTML = `<div style="color:var(--good,#3f9d5a)">✓ Зачислено ${cryMoney(rr.amount)} → ${rr.appliedTo === 'subscription' ? 'подписка активна' : 'баланс: ' + cryMoney(rr.balance)}</div>`; loadCryptoTopups(); }
-    else alert(rr.error || 'ошибка');
-  } catch (err) { alert(err.message); }
+    else await aAlert(rr.error || 'ошибка');
+  } catch (err) { await aAlert(err.message); }
   e.target.disabled = false; e.target.textContent = 'Зачислить вручную';
 });
 
@@ -734,7 +779,7 @@ async function loadSupport() {
   document.querySelectorAll('.sup-send').forEach(btn=>btn.addEventListener('click', async ()=>{
     const inp=document.querySelector('.sup-reply[data-chat="'+btn.dataset.chat+'"]'); const text=inp.value.trim(); if(!text)return;
     const rr=await api('/api/admin/support/reply',{method:'POST',body:JSON.stringify({chatId:btn.dataset.chat,text})});
-    if(rr.ok){inp.value='';loadSupport();}else alert(rr.error||'не отправилось');
+    if(rr.ok){inp.value='';loadSupport();}else await aAlert(rr.error||'не отправилось');
   }));
 }
 document.getElementById('supReload')?.addEventListener('click', loadSupport);
@@ -902,7 +947,7 @@ async function loadSecurity() {
   }).join('') || '<tr><td colspan="5" class="muted">Тихо — сигналов нет</td></tr>';
 }
 document.getElementById('reloadSec')?.addEventListener('click', loadSecurity);
-document.getElementById('clearSec')?.addEventListener('click', async () => { if (confirm('Очистить журнал сигналов безопасности?')) { await api('/api/admin/security/clear', { method: 'POST' }); loadSecurity(); } });
+document.getElementById('clearSec')?.addEventListener('click', async () => { if (await aConfirm('Очистить журнал сигналов безопасности?')) { await api('/api/admin/security/clear', { method: 'POST' }); loadSecurity(); } });
 async function loadAudit() {
   const r = await api('/api/admin/audit');
   const fmt = (ts) => new Date(ts).toLocaleString('ru-RU');
@@ -972,8 +1017,8 @@ function wireRows() {
     const tid = tr.dataset.tid; if (!tid) return;
     tr.querySelector('.plan')?.addEventListener('change', async (e) => { await api('/api/admin/tenant/' + tid + '/plan', { method: 'POST', body: JSON.stringify({ plan: e.target.value }) }); load(); });
     tr.querySelector('.susp')?.addEventListener('click', async () => { const t = TENANTS.find(x => x.tid === tid); await api('/api/admin/tenant/' + tid + '/suspend', { method: 'POST', body: JSON.stringify({ suspended: !t.suspended }) }); load(); });
-    tr.querySelector('.del')?.addEventListener('click', async () => { if (!confirm('Удалить агентство из платформы? Данные (файл БД) останутся на диске как бэкап.')) return; await api('/api/admin/tenant/' + tid, { method: 'DELETE' }); load(); });
-    tr.querySelector('.imp')?.addEventListener('click', async () => { if (!confirm('Войти в кабинет этого агентства под супер-админом? (для поддержки/дебага). Выход — обычная кнопка «Выйти» в кабинете.')) return; await api('/api/admin/tenant/' + tid + '/impersonate', { method: 'POST' }); location.href = '/'; });
+    tr.querySelector('.del')?.addEventListener('click', async () => { if (!await aConfirm('Удалить агентство из платформы? Данные (файл БД) останутся на диске как бэкап.')) return; await api('/api/admin/tenant/' + tid, { method: 'DELETE' }); load(); });
+    tr.querySelector('.imp')?.addEventListener('click', async () => { if (!await aConfirm('Войти в кабинет этого агентства под супер-админом? (для поддержки/дебага). Выход — обычная кнопка «Выйти» в кабинете.')) return; await api('/api/admin/tenant/' + tid + '/impersonate', { method: 'POST' }); location.href = '/'; });
   });
 }
 $('#reload').addEventListener('click', load);
@@ -1071,40 +1116,40 @@ function fillFarmForms() {
 async function farmPost(path, body) { return api('/api/admin/farm/' + path, { method: 'POST', body: JSON.stringify(body || {}) }); }
 
 $('#farmReload').addEventListener('click', loadFarm);
-$('#farmSeed').addEventListener('click', async () => { const r = await farmPost('seed', {}); if (r.skipped) alert('Ферма уже не пустая'); loadFarm(); });
-$('#fdAdd').addEventListener('click', async () => { if (!$('#fdName').value) return alert('нужно название'); await farmPost('device', { name: $('#fdName').value, model: $('#fdModel').value, serial: $('#fdSerial').value, location: $('#fdLoc').value, capacity: $('#fdCap').value }); $('#fdName').value = $('#fdSerial').value = ''; loadFarm(); });
-$('#fnAdd').addEventListener('click', async () => { if (!$('#fnPhone').value) return alert('нужен номер'); await farmPost('number', { phone: $('#fnPhone').value, deviceId: $('#fnDevice').value, slot: $('#fnSlot').value, waStatus: $('#fnWa').value, displayName: $('#fnName').value }); $('#fnPhone').value = $('#fnName').value = ''; loadFarm(); });
-$('#fxAdd').addEventListener('click', async () => { if (!$('#fxHost').value) return alert('нужен хост'); await farmPost('proxy', { label: $('#fxLabel').value, host: $('#fxHost').value, country: $('#fxCountry').value, type: $('#fxType').value, costMo: $('#fxCost').value }); $('#fxLabel').value = $('#fxHost').value = ''; loadFarm(); });
+$('#farmSeed').addEventListener('click', async () => { const r = await farmPost('seed', {}); if (r.skipped) await aAlert('Ферма уже не пустая'); loadFarm(); });
+$('#fdAdd').addEventListener('click', async () => { if (!$('#fdName').value) return await aAlert('нужно название'); await farmPost('device', { name: $('#fdName').value, model: $('#fdModel').value, serial: $('#fdSerial').value, location: $('#fdLoc').value, capacity: $('#fdCap').value }); $('#fdName').value = $('#fdSerial').value = ''; loadFarm(); });
+$('#fnAdd').addEventListener('click', async () => { if (!$('#fnPhone').value) return await aAlert('нужен номер'); await farmPost('number', { phone: $('#fnPhone').value, deviceId: $('#fnDevice').value, slot: $('#fnSlot').value, waStatus: $('#fnWa').value, displayName: $('#fnName').value }); $('#fnPhone').value = $('#fnName').value = ''; loadFarm(); });
+$('#fxAdd').addEventListener('click', async () => { if (!$('#fxHost').value) return await aAlert('нужен хост'); await farmPost('proxy', { label: $('#fxLabel').value, host: $('#fxHost').value, country: $('#fxCountry').value, type: $('#fxType').value, costMo: $('#fxCost').value }); $('#fxLabel').value = $('#fxHost').value = ''; loadFarm(); });
 $('#fsSave').addEventListener('click', async () => { await farmPost('settings', { seatPrice: $('#fsSeat').value, capexPerPhone: $('#fsCapex').value, maxPerDevice: $('#fsMax').value, costs: { numberRent: $('#fsRent').value, proxy: $('#fsProxy').value, infra: $('#fsInfra').value, idleKeepWarm: $('#fsIdle').value } }); loadFarm(); });
 
 // Р2/Р3/Р4 кнопки
-$('#fpEnqueue').addEventListener('click', async () => { const r = await farmPost('provision-enqueue', { deviceId: $('#fpDevice').value, count: $('#fpCount').value, slot: 'island' }); if (r.error) alert(r.error); else alert('В очередь: ' + r.queued + ' номеров. Дальше «Купить номера» → запусти агента provision.cjs на Mac.'); loadFarm(); });
-$('#fpAcquire').addEventListener('click', async () => { const pend = (FARM.farm.numbers || []).filter(n => n.prov && n.prov.step === 'acquire'); if (!pend.length) return alert('нет номеров в шаге «покупка»'); let ok = 0, man = 0; for (const n of pend) { const r = await farmPost('provision-acquire', { id: n.id }); if (r.manual) man++; else if (r.ok) ok++; } alert('Куплено: ' + ok + (man ? ' · ручных (нет eSIM-API): ' + man : '')); loadFarm(); });
-$('#fpTick').addEventListener('click', async () => { const r = await farmPost('warmup-tick', {}); alert('Прогрев: продвинуто ' + r.advanced + ', выпущено ' + r.graduated + ', действий ' + r.acted); loadFarm(); });
-$('#fsoCreate').addEventListener('click', async () => { const tid = $('#fsoAgency').value; if (!tid) return alert('нет агентства'); const r = await farmPost('seat-order', { tid, seats: $('#fsoSeats').value }); if (r.error) alert(r.error); loadFarm(); });
-$('#fpYesim').addEventListener('click', async () => { const y = await api('/api/admin/farm/yesim-test'); const em = await api('/api/admin/farm/email-status'); const b = y.balance || {}; alert('Yesim подключён: ' + (y.configured ? 'да' : 'НЕТ (нет токена)') + '\nОтвет: ' + JSON.stringify(b).slice(0, 300) + '\n\n(если тут «IP not whitelisted» — добавь показанный IP в панели Yesim)\n\nEmail для Telegram: ' + (em.ready ? em.domain : 'домен не задан (FARM_EMAIL_DOMAIN)')); });
+$('#fpEnqueue').addEventListener('click', async () => { const r = await farmPost('provision-enqueue', { deviceId: $('#fpDevice').value, count: $('#fpCount').value, slot: 'island' }); if (r.error) await aAlert(r.error); else await aAlert('В очередь: ' + r.queued + ' номеров. Дальше «Купить номера» → запусти агента provision.cjs на Mac.'); loadFarm(); });
+$('#fpAcquire').addEventListener('click', async () => { const pend = (FARM.farm.numbers || []).filter(n => n.prov && n.prov.step === 'acquire'); if (!pend.length) return await aAlert('нет номеров в шаге «покупка»'); let ok = 0, man = 0; for (const n of pend) { const r = await farmPost('provision-acquire', { id: n.id }); if (r.manual) man++; else if (r.ok) ok++; } await aAlert('Куплено: ' + ok + (man ? ' · ручных (нет eSIM-API): ' + man : '')); loadFarm(); });
+$('#fpTick').addEventListener('click', async () => { const r = await farmPost('warmup-tick', {}); await aAlert('Прогрев: продвинуто ' + r.advanced + ', выпущено ' + r.graduated + ', действий ' + r.acted); loadFarm(); });
+$('#fsoCreate').addEventListener('click', async () => { const tid = $('#fsoAgency').value; if (!tid) return await aAlert('нет агентства'); const r = await farmPost('seat-order', { tid, seats: $('#fsoSeats').value }); if (r.error) await aAlert(r.error); loadFarm(); });
+$('#fpYesim').addEventListener('click', async () => { const y = await api('/api/admin/farm/yesim-test'); const em = await api('/api/admin/farm/email-status'); const b = y.balance || {}; await aAlert('Yesim подключён: ' + (y.configured ? 'да' : 'НЕТ (нет токена)') + '\nОтвет: ' + JSON.stringify(b).slice(0, 300) + '\n\n(если тут «IP not whitelisted» — добавь показанный IP в панели Yesim)\n\nEmail для Telegram: ' + (em.ready ? em.domain : 'домен не задан (FARM_EMAIL_DOMAIN)')); });
 
 $('#sect-farm').addEventListener('click', async (ev) => {
   const d = ev.target.dataset; if (!d) return;
-  if (d.devdel) { if (confirm('Удалить устройство?')) { const r = await farmPost('device-remove', { id: d.devdel }); if (r.error) alert(r.error); loadFarm(); } }
-  else if (d.pxdel) { const r = await farmPost('proxy-remove', { id: d.pxdel }); if (r.error) alert(r.error); loadFarm(); }
+  if (d.devdel) { if (await aConfirm('Удалить устройство?')) { const r = await farmPost('device-remove', { id: d.devdel }); if (r.error) await aAlert(r.error); loadFarm(); } }
+  else if (d.pxdel) { const r = await farmPost('proxy-remove', { id: d.pxdel }); if (r.error) await aAlert(r.error); loadFarm(); }
   else if (d.assign) {
     const list = (FARM.agencies || []).map((a, i) => i + ': ' + a.name).join('\n');
-    const pick = prompt('Кому выдать? Номер агентства:\n' + list); if (pick === null) return;
-    const ag = FARM.agencies[+pick]; if (!ag) return alert('нет такого');
-    const broker = prompt('ID/имя брокера (можно пусто):', '') || '';
-    const dn = prompt('Имя профиля на номере:', (FARM.farm.numbers.find(n => n.id === d.assign) || {}).displayName || '') || '';
-    const r = await farmPost('assign', { id: d.assign, agencyTid: ag.tid, brokerId: broker, displayName: dn }); if (r.error) alert(r.error); loadFarm();
+    const pick = await aPrompt('Кому выдать? Номер агентства:\n' + list); if (pick === null) return;
+    const ag = FARM.agencies[+pick]; if (!ag) return await aAlert('нет такого');
+    const broker = await aPrompt('ID/имя брокера (можно пусто):', '') || '';
+    const dn = await aPrompt('Имя профиля на номере:', (FARM.farm.numbers.find(n => n.id === d.assign) || {}).displayName || '') || '';
+    const r = await farmPost('assign', { id: d.assign, agencyTid: ag.tid, brokerId: broker, displayName: dn }); if (r.error) await aAlert(r.error); loadFarm();
   }
-  else if (d.revoke) { if (confirm('Отозвать у агентства? Уйдёт в тёплый пул.')) { await farmPost('revoke', { id: d.revoke }); loadFarm(); } }
-  else if (d.failover) { if (confirm('Пометить забаненным и заменить тёплым из пула?')) { const r = await farmPost('failover', { id: d.failover }); if (r.warn) alert(r.warn); else if (r.replaced) alert('Заменён на ' + r.replaced.phone); loadFarm(); } }
-  else if (d.wipe) { const rel = confirm('Вайп слота. OK = удалить номер совсем, Отмена = только освободить телефон.'); await farmPost('wipe', { id: d.wipe, release: rel }); loadFarm(); }
-  else if (d.wa) { const n = FARM.farm.numbers.find(x => x.id === d.wa); const nx = prompt('Статус WhatsApp (' + WA_NEXT.join(' / ') + '):', n.wa.status); if (nx && WA_NEXT.includes(nx)) { await farmPost('number-update', { id: d.wa, patch: { wa: { status: nx } } }); loadFarm(); } }
-  else if (d.twofa) { const pin = prompt('2FA-PIN (6 цифр):', ''); if (pin) { const em = prompt('Recovery email (закреп на нас):', '') || ''; await farmPost('number-update', { id: d.twofa, patch: { wa: { twoFaPin: pin, recoveryEmail: em } } }); loadFarm(); } }
-  else if (d.pxset) { const free = (FARM.farm.proxies || []).filter(px => !px.assignedTo || px.assignedTo === d.pxset); const list = free.map((px, i) => i + ': ' + (px.label || px.host)).join('\n') || '(свободных нет)'; const pick = prompt('Привязать прокси (номер):\n' + list); if (pick !== null) { const px = free[+pick]; if (px) { await farmPost('proxy-attach', { numberId: d.pxset, proxyId: px.id }); loadFarm(); } } }
-  else if (d.warm) { if (confirm('Поставить номер на прогрев (10-14 дней)?')) { const r = await farmPost('warmup-enroll', { id: d.warm }); if (r.error) alert(r.error); loadFarm(); } }
-  else if (d.sofill) { if (confirm('Выполнить заказ: выделить готовые номера из пула агентству?')) { const r = await farmPost('seat-fulfill', { orderId: d.sofill }); if (r.error) alert(r.error); else alert('Выдано мест: ' + r.order.seats); loadFarm(); } }
-  else if (d.agrelease) { if (confirm('Оффбординг агентства: вернуть все его номера в тёплый пул?')) { const r = await farmPost('agency-release', { tid: d.agrelease }); alert('Освобождено номеров: ' + (r.freed || 0)); loadFarm(); } }
+  else if (d.revoke) { if (await aConfirm('Отозвать у агентства? Уйдёт в тёплый пул.')) { await farmPost('revoke', { id: d.revoke }); loadFarm(); } }
+  else if (d.failover) { if (await aConfirm('Пометить забаненным и заменить тёплым из пула?')) { const r = await farmPost('failover', { id: d.failover }); if (r.warn) await aAlert(r.warn); else if (r.replaced) await aAlert('Заменён на ' + r.replaced.phone); loadFarm(); } }
+  else if (d.wipe) { const rel = await aConfirm('Вайп слота. OK = удалить номер совсем, Отмена = только освободить телефон.'); await farmPost('wipe', { id: d.wipe, release: rel }); loadFarm(); }
+  else if (d.wa) { const n = FARM.farm.numbers.find(x => x.id === d.wa); const nx = await aPrompt('Статус WhatsApp (' + WA_NEXT.join(' / ') + '):', n.wa.status); if (nx && WA_NEXT.includes(nx)) { await farmPost('number-update', { id: d.wa, patch: { wa: { status: nx } } }); loadFarm(); } }
+  else if (d.twofa) { const pin = await aPrompt('2FA-PIN (6 цифр):', ''); if (pin) { const em = await aPrompt('Recovery email (закреп на нас):', '') || ''; await farmPost('number-update', { id: d.twofa, patch: { wa: { twoFaPin: pin, recoveryEmail: em } } }); loadFarm(); } }
+  else if (d.pxset) { const free = (FARM.farm.proxies || []).filter(px => !px.assignedTo || px.assignedTo === d.pxset); const list = free.map((px, i) => i + ': ' + (px.label || px.host)).join('\n') || '(свободных нет)'; const pick = await aPrompt('Привязать прокси (номер):\n' + list); if (pick !== null) { const px = free[+pick]; if (px) { await farmPost('proxy-attach', { numberId: d.pxset, proxyId: px.id }); loadFarm(); } } }
+  else if (d.warm) { if (await aConfirm('Поставить номер на прогрев (10-14 дней)?')) { const r = await farmPost('warmup-enroll', { id: d.warm }); if (r.error) await aAlert(r.error); loadFarm(); } }
+  else if (d.sofill) { if (await aConfirm('Выполнить заказ: выделить готовые номера из пула агентству?')) { const r = await farmPost('seat-fulfill', { orderId: d.sofill }); if (r.error) await aAlert(r.error); else await aAlert('Выдано мест: ' + r.order.seats); loadFarm(); } }
+  else if (d.agrelease) { if (await aConfirm('Оффбординг агентства: вернуть все его номера в тёплый пул?')) { const r = await farmPost('agency-release', { tid: d.agrelease }); await aAlert('Освобождено номеров: ' + (r.freed || 0)); loadFarm(); } }
 });
 
 // автологин если сессия есть
