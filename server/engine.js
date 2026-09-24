@@ -811,6 +811,22 @@ function inbound(db, lead, text, opts = {}) {
   db.messages.push(m);
   lead.unread = (lead.unread || 0) + 1;   /* счётчик непрочитанных для брокера (сбрасывается при открытии карточки / ответе человека) */
   lead.lastInboundAt = m.at;
+  /* ⭐STICKY-БРОКЕР + умное перераспределение: лид ВСЕГДА возвращается к своему брокеру-владельцу
+     (переживает спящую базу и рассылку Cloud API). Если владелец недоступен (уволен/оффбординг/away
+     нет в списке) — переназначаем активному по pickBroker (гео/загрузка), чтобы лид не завис. Делаем
+     ДО уведомления ниже, чтобы алерт ушёл правильному брокеру. Новым лидам (broker=null) брокера даёт
+     квалификация/handover — их тут не трогаем. */
+  if (lead.broker) {
+    const owner = db.brokers.find(b => b.id === lead.broker);
+    if (!owner || owner.active === false) {
+      const cand = pickBroker(db, lead);
+      if (cand && cand.id !== lead.broker) {
+        control.recordOwner(db, lead, cand.id, 'auto', owner ? `владелец «${owner.name}» недоступен — переназначен на входящем` : 'владелец удалён — переназначен на входящем');
+        lead.broker = cand.id; cand.load = (cand.load || 0) + 1;
+        ai.pushEvent(db, { type: 'reassign', leadId: lead.id, text: `Лид ${lead.name} ответил, но брокер-владелец недоступен → передан ${cand.name}` });
+      }
+    }
+  }
   /* пересылка входящего клиента назначенному брокеру в Telegram (мост) — если подключён */
   if (module.exports.onInboundMessage) { try { const r = module.exports.onInboundMessage(db, lead, m); if (r && r.catch) r.catch(() => {}); } catch (_) {} }
   const wasWake = (lead.tags || []).includes('реанимация') && lead.stage === 'sleeping';
