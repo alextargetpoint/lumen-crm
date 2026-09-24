@@ -5212,13 +5212,16 @@ function openMeetingModal(lead, after) {
       <div class="form-row"><label>Тип</label><select id="mtKind">
         <option value="call">Созвон</option><option value="video">Видео-показ</option><option value="tour">Показ объекта</option>
       </select></div>
+      <div class="form-row" id="mtLinkRow" style="display:none"><label>Ссылка Zoom / Google Meet <span class="muted" style="font-weight:400">(необязательно)</span></label><input id="mtLink" placeholder="https://zoom.us/j/… или https://meet.google.com/…">
+        ${(STATE.settings.meetingBot && STATE.settings.meetingBot.ready) ? '<div class="muted" style="font-size:11px;margin-top:4px">Вставите ссылку Zoom/Meet — встречу автоматически запишем и расшифруем в карточку. Пусто — используем нашу видео-комнату (без записи).</div>' : '<div class="muted" style="font-size:11px;margin-top:4px">Пусто — используем нашу видео-комнату. (Авто-запись встреч подключается платформой.)</div>'}</div>
       <div class="form-row"><label>Эксперт</label><select id="mtBroker">${brokers.map(b => `<option value="${b.id}">${esc(b.name)} · ${STATE.settings.geoNames[b.geo]}</option>`).join('')}</select></div>
       <div class="form-row"><label>Заметка (видна только команде)</label><input id="mtNote" placeholder="например: подготовить 3 варианта под $172k"></div>
       <div class="set-row" style="margin-top:2px"><div class="sp"><div class="sl">Кнопка «Подключиться» на странице встречи</div><div class="sd">Выкл — на странице не будет кнопки подключения; эксперт сам пришлёт ссылку в переписке</div></div><label class="switch"><input type="checkbox" id="mtShowJoin" checked><span class="tr"></span><span class="th"></span></label></div>`,
     actions: [
       { label: 'Назначить и подтвердить в WA', cls: 'btn-accent', onClick: async (bd) => {
         const at = new Date($('#mtDate', bd).value + 'T' + $('#mtTime', bd).value).getTime();
-        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked });
+        const _lnk = ($('#mtLink', bd) && $('#mtLink', bd).value.trim()) || '';
+        await api.post('/meetings', { leadId: lead.id, brokerId: $('#mtBroker', bd).value, kind: $('#mtKind', bd).value, at, dur: +$('#mtDur', bd).value, note: $('#mtNote', bd).value, hideJoin: !($('#mtShowJoin', bd) || {}).checked, link: _lnk || undefined });
         toast('Встреча назначена', 'Подтверждение отправлено клиенту', true);
         if (after) after();
       } },
@@ -5228,6 +5231,8 @@ function openMeetingModal(lead, after) {
   /* живой калькулятор часовых поясов */
   const paintTz = () => { const h = $('#mtTzHint', md); if (h) h.innerHTML = tzHintHtml($('#mtDate', md).value, $('#mtTime', md).value, lead.tz, lead.geoName); };
   $('#mtDate', md).addEventListener('input', paintTz); $('#mtTime', md).addEventListener('input', paintTz); paintTz();
+  const syncLinkRow = () => { const r = $('#mtLinkRow', md); if (r) r.style.display = $('#mtKind', md).value === 'video' ? '' : 'none'; };
+  $('#mtKind', md)?.addEventListener('change', syncLinkRow); syncLinkRow();
 }
 
 

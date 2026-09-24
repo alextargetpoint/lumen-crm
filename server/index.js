@@ -138,6 +138,7 @@ const b2backup = require('./backup'); /* ⭐ офф-сайт бэкапы все
 const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Telegram: устройства/номера/прокси/выдача агентствам + юнит-экономика */
 const farmProv = require('./farm-provision'); /* Р2: конвейер провижна (eSIM-адаптер + задания фарм-хост-агенту) */
 const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
+const meetingBot = require('./meetingbot');   /* авто-запись+транскрипция Zoom/Meet встреч (Recall.ai) */
 const farmMail = require('./farm-email');     /* Р2+: email-адаптер для Telegram (catch-all + авто-код) */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
@@ -369,6 +370,7 @@ function ensureTenantDefaults(db) {
   if (!s.customFields) s.customFields = [];
   if (!s.stagesCfg) s.stagesCfg = { order: [], names: {}, custom: [], hidden: [] };
   if (!s.telephony) s.telephony = { provider: 'none', key: '', secret: '', note: '' };
+  if (!s.meetingBot) s.meetingBot = { enabled: true, provider: 'recall' };   /* авто-транскрипция Zoom/Meet: платформенный ключ (env), агентству настраивать нечего */
   if (!s.voice) s.voice = { provider: 'elevenlabs', key: '', voiceId: '' };
   if (!s.reports) s.reports = { channel: 'tg', tgChatId: '', daily: true, dailyAt: '09:00', weekly: true, monthly: true, instant: { hotView: true, qualified: true, aiOff: true, deal: true }, lastDaily: 0, lastWeekly: 0, lastMonthly: 0 };
   if (!s.reports.shareKey) s.reports.shareKey = crypto.randomBytes(10).toString('hex');
@@ -1334,6 +1336,7 @@ function publicSettings(db) {
   if (s.wa.token) { s.wa.tokenSet = true; delete s.wa.token; }
   if (s.wa.appSecret) { s.wa.appSecretSet = true; delete s.wa.appSecret; }
   if (s.telephony && s.telephony.key) { s.telephony.keySet = true; delete s.telephony.key; delete s.telephony.secret; }
+  { s.meetingBot = s.meetingBot || { enabled: true }; if (s.meetingBot.key) { s.meetingBot.keySet = true; delete s.meetingBot.key; } s.meetingBot.platform = !!process.env.RECALL_API_KEY; s.meetingBot.ready = meetingBot.ready(); }  /* авто-транскрипция встреч: платформенный ключ → агентству настраивать нечего */
   if (s.voice && s.voice.key) { s.voice.keySet = true; delete s.voice.key; }
   if (s.channels) {
     for (const k of ['tg', 'viber', 'email']) {
@@ -3164,6 +3167,50 @@ async function farmReclaimFromTenant(prevTid, phone) {
   });
   try { await store.runInTenant(store.PRIMARY, () => waGrayApi(store.get(), 'POST', '/sessions/' + prevTid + '__' + digits + '/reassign', { to: store.PRIMARY + '__' + digits })); } catch (e) {}
 }
+
+/* ============ АВТО-ТРАНСКРИПЦИЯ ВСТРЕЧ (Zoom/Meet/Teams) — meeting-бот (Recall.ai) ============
+   SaaS-модель: ОДИН платформенный ключ (env RECALL_API_KEY) → работает для ВСЕХ агентств
+   автоматически, настраивать ничего не надо. Бронь встречи с Zoom/Meet-ссылкой → бот сам
+   заходит → транскрипт+ИИ-резюме в карточку. Стоимость — расходник платформы. */
+async function maybeScheduleMeetingBot(db, mt) {
+  try {
+    if ((db.settings.meetingBot || {}).enabled === false) return;
+    if (!meetingBot.ready()) return;                                          /* нет платформенного ключа → тихо */
+    if (!mt || !mt.link || !meetingBot.isSupportedMeetingUrl(mt.link)) return; /* только Zoom/Meet/Teams (не Jitsi) */
+    const r = await meetingBot.scheduleBot(mt.link, mt.at, { meetingId: mt.id, leadId: mt.leadId, tid: store.currentTid() });
+    if (r.ok) { mt.botId = r.botId; mt.transcriptStatus = 'scheduled'; }
+    else { mt.transcriptStatus = 'error'; mt.transcriptError = String(r.error || '').slice(0, 140); }
+    store.save();
+  } catch (_) {}
+}
+async function ingestMeetingTranscript(db, mt) {
+  if (!mt || !mt.botId || mt.transcriptStatus === 'done') return false;
+  const r = await meetingBot.fetchTranscript(mt.botId);
+  if (!r.ok || !r.text) return false;
+  const lead = (db.leads || []).find(l => l.id === mt.leadId); if (!lead) return false;
+  lead.transcripts = lead.transcripts || [];
+  const kindRu = { call: 'Созвон', video: 'Видео-встреча', tour: 'Показ' }[mt.kind] || 'Встреча';
+  lead.transcripts.push({ id: store.nextId('tr'), at: Date.now(), label: kindRu + ' (авто-запись)', text: r.text.slice(0, 40000), audio: null, meetingId: mt.id });
+  mt.transcript = r.text.slice(0, 40000); mt.transcriptStatus = 'done'; mt.transcriptAt = Date.now();
+  ai.pushEvent(db, { type: 'meeting', leadId: lead.id, text: `Транскрипт встречи готов (${kindRu}) — в карточке лида` });
+  store.save();
+  if (llm.available()) { try { const sum = await llm.summarize(db, lead); if (sum) { lead.summary = sum; lead.summaryAt = Date.now(); store.save(); } } catch (_) {} }
+  return true;
+}
+/* поллинг-фолбэк: добрать транскрипты завершившихся встреч, если вебхук не пришёл */
+async function meetingBotTick() {
+  if (!meetingBot.ready()) return;
+  for (const tid of store.listTenants()) {
+    try {
+      await store.runInTenant(tid, async () => {
+        const db = store.get(); const now = Date.now();
+        const pend = (db.meetings || []).filter(mt => mt.botId && mt.transcriptStatus === 'scheduled' && (mt.at + (mt.dur || 60) * 60e3 + 3 * 60e3) < now);
+        for (const mt of pend.slice(0, 5)) await ingestMeetingTranscript(db, mt).catch(() => {});
+      });
+    } catch (_) {}
+  }
+}
+setInterval(() => { meetingBotTick().catch(() => {}); }, 10 * 60e3);
 
 setInterval(() => { metaAdsTick().catch(() => {}); }, 30 * 60e3);   /* каждые ~30 мин; фактический синк — по интервалу тенанта */
 
@@ -5505,15 +5552,39 @@ const server = http.createServer(async (req, res) => {
     const waGrayIncomingOk = p === '/api/wa/gray/incoming' && req.method === 'POST';
     const viberInboundOk = p === '/api/viber/inbound' && req.method === 'POST';   /* вебхук Infobip (входящие/статусы Viber) */
     const farmEmailOk = p === '/api/farm/email-inbound' && req.method === 'POST';  /* вебхук входящей почты фермы (Telegram-коды), секрет внутри */
+    const meetingBotOk = p === '/api/meeting-bot/webhook' && req.method === 'POST'; /* вебхук Recall.ai (транскрипт готов), секрет внутри */
     const importDbOk = p === '/api/admin/import-db' && req.method === 'POST' && !!process.env.MIGRATION_TOKEN;
     const adminApiOk = p.startsWith('/api/admin/') && isPlatformAdmin(req);   /* супер-админ платформы (над тенантами) */
-    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
+    if (p.startsWith('/api/') && !getSession(req) && !studioKeyOk && !collEditKeyOk && !mpApproveKeyOk && !waGrayIncomingOk && !viberInboundOk && !farmEmailOk && !meetingBotOk && !importDbOk && !adminApiOk) { secOnDeny(req, 401, p); return json(res, 401, { error: 'auth required' }); }
 
     /* вебхук входящей почты фермы: Cloudflare Email Worker шлёт {to,subject,text,secret}; читаем код Telegram */
     if (farmEmailOk) {
       const b = await readBody(req).catch(() => ({}));
       if (!process.env.FARM_EMAIL_SECRET || b.secret !== process.env.FARM_EMAIL_SECRET) return json(res, 403, { error: 'bad secret' });
       return json(res, 200, farmMail.ingest(b.to, b.subject, b.text || b.body || ''));
+    }
+    /* вебхук Recall.ai: транскрипт встречи готов → найти встречу по botId и втянуть в карточку.
+       Секрет = env MEETING_BOT_SECRET (в query ?secret= или теле .secret). Есть и поллинг-фолбэк. */
+    if (meetingBotOk) {
+      const b = await readBody(req).catch(() => ({}));
+      const secret = u.searchParams.get('secret') || b.secret || '';
+      if (process.env.MEETING_BOT_SECRET && secret !== process.env.MEETING_BOT_SECRET) return json(res, 403, { error: 'bad secret' });
+      const data = b.data || b;
+      const botId = data.bot_id || (data.bot && (data.bot.id || data.bot.bot_id)) || data.id || (b.bot && b.bot.id) || '';
+      const metaTid = (data.metadata && data.metadata.tid) || (data.bot && data.bot.metadata && data.bot.metadata.tid) || '';
+      if (!botId) return json(res, 200, { ok: true, skipped: 'no bot id' });
+      const tids = metaTid && store.listTenants().includes(metaTid) ? [metaTid] : store.listTenants();
+      for (const tid of tids) {
+        const done = await store.runInTenant(tid, async () => {
+          const tdb = store.get();
+          const mt = (tdb.meetings || []).find(x => x.botId === botId);
+          if (!mt) return false;
+          await ingestMeetingTranscript(tdb, mt).catch(() => {});
+          return true;
+        });
+        if (done) break;
+      }
+      return json(res, 200, { ok: true });
     }
 
     /* роль broker: только работа с лидами — админ-поверхности закрыты (анти-увод базы) */
@@ -8795,6 +8866,7 @@ const server = http.createServer(async (req, res) => {
       };
       db.meetings = db.meetings || [];
       db.meetings.push(mt);
+      await maybeScheduleMeetingBot(db, mt);   /* авто-бот на Zoom/Meet-ссылку → транскрипт в карточку */
       if (b.confirm !== false) {
         const kindRu = { call: 'созвон', video: 'видео-показ', tour: 'показ объекта' }[mt.kind] || 'встреча';
         const when = new Date(mt.at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
@@ -8807,6 +8879,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, mt);
     }
     if ((m = p.match(/^\/api\/meetings\/([^/]+)$/)) && req.method === 'DELETE') {
+      { const _mt = (db.meetings || []).find(x => x.id === m[1]); if (_mt && _mt.botId && _mt.transcriptStatus !== 'done') meetingBot.cancelBot(_mt.botId); }
       db.meetings = (db.meetings || []).filter(x => x.id !== m[1]); store.save();
       return json(res, 200, { ok: true });
     }
