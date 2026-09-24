@@ -6310,7 +6310,7 @@ async function renderChat(id, rebuild) {
     if (ta.value.trim()) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; }
     else ta.style.height = '42px';
   };
-  fixTa(); requestAnimationFrame(() => requestAnimationFrame(fixTa)); setTimeout(fixTa, 90); setTimeout(fixTa, 300);
+  fixTa(); requestAnimationFrame(() => requestAnimationFrame(fixTa)); [90, 300, 800, 1600, 2600].forEach(t => setTimeout(fixTa, t));
   $('#sendBtn').addEventListener('click', async () => {
     const t = $('#composerText').value.trim();
     if (!t) return;
