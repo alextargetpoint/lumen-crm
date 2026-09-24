@@ -121,7 +121,7 @@ input:focus, textarea:focus, select:focus {
 
 /* ---------- Карта объектов (Leaflet, стиль Ателье) ---------- */
 #prMap .leaflet-container { font-family: inherit; background: #eef0ea; }
-.prpin-hit { position: absolute; inset: 0; z-index: 3; cursor: pointer; }
+.prpin { cursor: pointer; }   /* весь 34×34 div иконки — хит-зона (dot/pulse = pointer-events:none) */
 .prpin-dot { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none; border-radius: 50%; background: var(--accent, #b8863c); border: 2.5px solid #fff; box-shadow: 0 2px 6px rgba(70, 55, 25, .45); z-index: 2; }
 .prpin-pulse { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent, #b8863c); opacity: .5; pointer-events: none; animation: prpinp 2.2s ease-out infinite; }
 @keyframes prpinp { 0% { transform: scale(1); opacity: .5; } 70% { transform: scale(3.2); opacity: 0; } 100% { opacity: 0; } }
