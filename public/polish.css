@@ -174,3 +174,23 @@ input[type=number] { -moz-appearance: textfield; }
 .pd-hist-at { color: var(--muted, #8a8378); white-space: nowrap; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .pd-hist-ac { color: var(--ink, #23201c); flex: 1; }
 .pd-hist-src { font-size: 11px; }
+
+/* ---------- Лайтбокс-галерея фото объекта ---------- */
+.lg-ov { position: fixed; inset: 0; z-index: 9999; background: rgba(22,20,17,.94); display: grid; grid-template-columns: 64px 1fr 64px; grid-template-rows: 1fr auto auto; gap: 8px; padding: 24px 16px 16px; animation: lgIn .18s ease; }
+@keyframes lgIn { from { opacity: 0 } to { opacity: 1 } }
+.lg-stage { grid-column: 2; grid-row: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.lg-img { max-width: 100%; max-height: 78vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); object-fit: contain; }
+.lg-nav { grid-row: 1; align-self: center; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
+.lg-nav:hover { background: var(--accent, #b8863c); border-color: var(--accent, #b8863c); }
+.lg-nav svg { width: 22px; height: 22px; }
+.lg-prev { grid-column: 1; } .lg-prev svg { transform: rotate(90deg); }
+.lg-next { grid-column: 3; } .lg-next svg { transform: rotate(-90deg); }
+.lg-close { position: absolute; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.lg-close:hover { background: rgba(255,255,255,.2); }
+.lg-close svg { width: 18px; height: 18px; }
+.lg-count { grid-column: 2; grid-row: 2; text-align: center; color: rgba(255,255,255,.75); font-size: 13px; font-variant-numeric: tabular-nums; }
+.lg-strip { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 8px; overflow-x: auto; padding: 6px 8px; scrollbar-width: thin; justify-content: safe center; }
+.lg-th { flex: 0 0 auto; width: 76px; height: 52px; border-radius: 8px; background-size: cover; background-position: center; cursor: pointer; opacity: .5; border: 2px solid transparent; transition: opacity .15s, border-color .15s; }
+.lg-th:hover { opacity: .85; }
+.lg-th.on { opacity: 1; border-color: var(--accent, #b8863c); }
+@media (max-width: 640px) { .lg-ov { grid-template-columns: 0 1fr 0; padding: 16px 4px 10px; } .lg-nav { position: absolute; z-index: 2; } .lg-prev { left: 8px; } .lg-next { right: 8px; } }

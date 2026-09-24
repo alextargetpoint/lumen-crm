@@ -1139,6 +1139,34 @@ window.lumenZoom = function (img) {
   document.body.appendChild(ov);
 };
 
+/* Лайтбокс-галерея: увеличение фото + перелистывание (стрелки/←→/свайп + лента миниатюр) */
+window.lumenGallery = function (images, start) {
+  images = (images || []).filter(Boolean); if (!images.length) return;
+  let i = Math.max(0, Math.min(+start || 0, images.length - 1));
+  const ov = document.createElement('div'); ov.className = 'lg-ov';
+  ov.innerHTML = `<button class="lg-close" aria-label="Закрыть">${ic(I.x, 2)}</button>
+    <button class="lg-nav lg-prev" aria-label="Назад">${ic(I.chev, 2)}</button>
+    <div class="lg-stage"><img class="lg-img" alt=""></div>
+    <button class="lg-nav lg-next" aria-label="Вперёд">${ic(I.chev, 2)}</button>
+    <div class="lg-count"></div>
+    <div class="lg-strip">${images.map((u, ix) => `<div class="lg-th" data-i="${ix}" style="background-image:url('${String(u).replace(/'/g, '')}')"></div>`).join('')}</div>`;
+  const imgEl = ov.querySelector('.lg-img'), cnt = ov.querySelector('.lg-count');
+  const show = () => { imgEl.src = images[i]; cnt.textContent = (i + 1) + ' / ' + images.length; ov.querySelectorAll('.lg-th').forEach((t, ix) => t.classList.toggle('on', ix === i)); const on = ov.querySelector('.lg-th.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); };
+  const go = (d) => { i = (i + d + images.length) % images.length; show(); };
+  const close = () => { ov.remove(); document.removeEventListener('keydown', key); };
+  const key = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); };
+  ov.querySelector('.lg-prev').addEventListener('click', e => { e.stopPropagation(); go(-1); });
+  ov.querySelector('.lg-next').addEventListener('click', e => { e.stopPropagation(); go(1); });
+  ov.querySelector('.lg-close').addEventListener('click', close);
+  ov.querySelectorAll('.lg-th').forEach(t => t.addEventListener('click', e => { e.stopPropagation(); i = +t.dataset.i; show(); }));
+  imgEl.addEventListener('click', e => e.stopPropagation());
+  ov.addEventListener('click', e => { if (e.target === ov || e.target.classList.contains('lg-stage')) close(); });
+  let sx = 0; ov.addEventListener('touchstart', e => sx = e.touches[0].clientX, { passive: true });
+  ov.addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); });
+  document.addEventListener('keydown', key);
+  document.body.appendChild(ov); show();
+};
+
 /* ---------- время ---------- */
 function ago(ts) {
   if (!ts) return '—';
@@ -7737,7 +7765,8 @@ PAGES.properties = async (root) => {
     chipAdder('tagAddInp', 'tagAddBtn', 'tags');
     chipAdder('amenAddInp', 'amenAddBtn', 'amenities');
     $('#pdImgAdd').addEventListener('click', async () => { const u = $('#pdImgUrl').value.trim(); if (!u) return; await upd({ images: [...(pr.images || []), u] }); render(); });
-    $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $$('[data-imgdel]', root).forEach(b => b.addEventListener('click', async (e) => { e.stopPropagation(); await upd({ images: pr.images.filter((_, ix) => ix !== +b.dataset.imgdel) }); render(); }));
+    $$('.pd-img', root).forEach((d, ix) => { d.style.cursor = 'zoom-in'; d.addEventListener('click', (e) => { if (e.target.closest('.pd-x')) return; lumenGallery(pr.images || [], ix); }); });
     $('#pdLayAdd').addEventListener('click', async () => { const u = $('#pdLayUrl').value.trim(); if (!u) return; await upd({ layouts: [...(pr.layouts || []), { label: $('#pdLayLabel').value || 'Планировка', url: u }] }); render(); });
     $$('[data-laydel]', root).forEach(b => b.addEventListener('click', async () => { await upd({ layouts: pr.layouts.filter((_, ix) => ix !== +b.dataset.laydel) }); render(); }));
     $('#pdMatAdd').addEventListener('click', async () => { const u = $('#pdMatUrl').value.trim(); if (!u) return; await upd({ materials: [...(pr.materials || []), { label: $('#pdMatLabel').value || 'Материал', url: u }] }); render(); });
