@@ -6574,9 +6574,10 @@ PAGES.qualifier = async (root) => {
       </div>
       <div class="glass card">
         <div class="card-title">${ic(I.gear)}Критерии по направлениям<span class="sub">порог бюджета и down-sell</span></div>
-        ${Object.keys(s.criteria).map((g, i) => {
-          const c = s.criteria[g];
-          return coll(`${s.geoNames[g]} <span class="badge" style="margin-left:6px">${c.currency}</span>`, `
+        ${(((s.agency && s.agency.geos && s.agency.geos.length) ? s.agency.geos : Object.keys(s.criteria))).map((g, i) => {
+          /* показываем только направления, с которыми работает агентство (s.agency.geos); новый рынок → дефолтная карточка (синхронизируется при добавлении гео в настройках) */
+          const c = s.criteria[g] || { currency: (g === 'spain' || g === 'europe' ? 'EUR' : 'USD'), budgetMin: 0, downsell: '', notes: '' };
+          return coll(`${s.geoNames[g] || g} <span class="badge" style="margin-left:6px">${c.currency}</span>`, `
             <div class="form-row" style="margin-top:10px"><label>Минимальный бюджет (${c.currency})</label><input data-crit="${g}" data-k="budgetMin" type="number" value="${c.budgetMin}"></div>
             <div class="form-row"><label>Down-sell при бюджете ниже порога</label><textarea data-crit="${g}" data-k="downsell">${esc(c.downsell)}</textarea></div>
             <div class="form-row"><label>Заметки регламента</label><input data-crit="${g}" data-k="notes" value="${esc(c.notes)}"></div>`,
@@ -8515,7 +8516,7 @@ PAGES.automations = async (root) => {
           ${swRow('Авто-передача при квалификации', '4 оси закрыты → лид сам уходит брокеру с саммари и слотом, без ручного клика', sw('autoHandover', a.autoHandover))}
           ${swRow('Расписание смен', 'График каждого брокера настраивается в разделе «Брокеры»', link('brokers', 'К брокерам'))}
         </div>
-        ${(() => { const r = a.rotation || {}; return `<div class="glass card mb">
+        ${(() => { const r = a.rotation || {}; return `<div class="glass card mb" data-ag="dist">
           <div class="card-title">${ic(I.refresh || I.spark)}Ротация непрожатых заявок<span class="sub">не ответил — уходит другому</span></div>
           <div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Если клиент молчит после N касаний ИЛИ X часов — заявка автоматически переназначается на следующего (по загрузке или на квалификатора), цепочка стартует заново. Исчерпаны ротации → лид уходит в «Спящие».</div>
           ${swRow('Включить авто-ротацию', 'Не даём «мёртвым» лидам застревать на одном человеке', `<label class="switch"><input type="checkbox" id="rotEnabled" ${r.enabled ? 'checked' : ''}><span class="tr"></span><span class="th"></span></label>`)}

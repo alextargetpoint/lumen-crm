@@ -124,11 +124,11 @@ body {
 .auto-seg .seg-b.on svg { color: var(--accent); }
 /* масонри-колонки вместо grid: короткие карточки НЕ оставляют вертикальных провалов до высоты
    соседней (была «странная высота между блоками» + скачки при переключении подвкладок). */
-.auto-grid { column-count: 2; column-gap: 16px; }
-.auto-grid > * { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; }
-.auto-grid > .card, .auto-grid > .glass { margin-bottom: 16px; display: block; width: 100%; }
-.auto-grid.solo { column-count: 1; max-width: 760px; }
-@media (max-width: 1000px) { .auto-grid, .auto-grid.solo { column-count: 1; } }
+/* grid вместо column-count: ровные ряды, одинаковый gap, карточки выровнены по верху (без «съезда» балансировки колонок) */
+.auto-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.auto-grid > .card, .auto-grid > .glass { margin-bottom: 0; width: 100%; }
+.auto-grid.solo { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+@media (max-width: 1000px) { .auto-grid, .auto-grid.solo { grid-template-columns: 1fr; } }
 html[data-night] .auto-seg { border-bottom-color: var(--stroke); }
 html[data-night] .auto-seg .seg-b { color: var(--ink-3); }
 html[data-night] .auto-seg .seg-b:hover { color: var(--ink); background: rgba(140, 165, 230, .1); }
