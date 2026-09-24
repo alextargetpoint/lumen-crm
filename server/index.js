@@ -2979,7 +2979,9 @@ async function warmupTick() {
         let live = {};
         try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
         /* сессия адресуется ключом пула (n.phone), а РЕАЛЬНЫЙ номер-получатель берём из live.phone (воркер узнаёт его после коннекта) */
-        const conn = (g.numbers || []).map(n => ({ n, real: (live[waGraySid(n.phone)] || {}).phone, status: (live[waGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
+        /* FIX: переподключённый по QR номер может не отдать live.phone сразу → фолбэк на сохранённый n.realPhone,
+           иначе вернувшийся номер молча выпадал из ротации прогрева (был реальный баг). */
+        const conn = (g.numbers || []).map(n => ({ n, real: (live[waGraySid(n.phone)] || {}).phone || n.realPhone || '', status: (live[waGraySid(n.phone)] || {}).status })).filter(x => x.status === 'connected' && /^\d{7,15}$/.test(String(x.real || '')));
         if (conn.length < 2) return;
         const i = Math.floor(Math.random() * conn.length);
         let k = Math.floor(Math.random() * conn.length); if (k === i) k = (k + 1) % conn.length;
@@ -2998,6 +3000,38 @@ async function warmupTick() {
   } finally { warmupBusy = false; }
 }
 setInterval(() => { warmupTick().catch(() => {}); }, 12 * 60e3);   /* каждые ~12 мин, cost-safe */
+
+/* ── Умный вотчер отвала серых WA-номеров: connected→не connected = алерт (в центр + Telegram владельцу),
+   не connected→connected = «вернулся». Чтобы отвалившийся номер не пропал молча (прогрев/касания встают). ── */
+let waDropWatchBusy = false;
+async function waDropWatch() {
+  if (waDropWatchBusy) return; waDropWatchBusy = true;
+  try {
+    for (const tid of store.listTenants()) {
+      await store.runInTenant(tid, async () => {
+        const db = store.get(); const g = db.settings.waGray;
+        if (!g || !(g.numbers || []).length || !waWorkerReady(db)) return;
+        let live = {}; try { const r = await waGrayApi(db, 'GET', '/sessions'); live = r.sessions || {}; } catch (e) { return; }
+        let changed = false;
+        for (const n of g.numbers) {
+          const s = live[waGraySid(n.phone)] || {};
+          const cur = s.status || 'none';
+          const prev = (n.live && n.live.status) || 'none';
+          const who = n.label || (n.realPhone ? '+' + n.realPhone : n.phone);
+          if (prev === 'connected' && cur !== 'connected') {
+            notify(db, { type: 'wa', level: 'critical', title: 'WhatsApp-номер отвалился', text: `Номер «${who}» больше не на связи. Срочно переподключите по QR в разделе «Номера» → WhatsApp QR — иначе прогрев и касания по нему встают.` });
+          } else if (prev !== 'connected' && prev !== 'none' && cur === 'connected') {
+            notify(db, { type: 'wa', level: 'success', title: 'WhatsApp-номер снова на связи', text: `Номер «${who}» переподключён — вернул в прогрев и касания.` });
+          }
+          n.live = Object.assign({}, n.live || {}, { status: cur, phone: s.phone || (n.live && n.live.phone) || null });
+          changed = true;
+        }
+        if (changed) store.save();
+      });
+    }
+  } finally { waDropWatchBusy = false; }
+}
+setInterval(() => { waDropWatch().catch(() => {}); }, 10 * 60e3);   /* каждые ~10 мин */
 
 /* ── Прогрев серого TELEGRAM (по best-practice схеме, чтобы аккаунты не отлетали) ──
    • Возрастной рамп лимита отправки на аккаунт: день0 ≈3 → +2/день → потолок (perDay|20).
