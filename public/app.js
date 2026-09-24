@@ -7530,9 +7530,9 @@ async function initPropMap(props) {
   const bounds = []; window._prMarkers = {};
   /* hover-intent: попап открывается по наведению и закрывается, когда курсор ушёл с пина
      (с задержкой — чтобы успеть перевести курсор В попап к кнопкам, не закрыв его) */
-  let _popT = null;
+  let _popT = null, _openMk = null;
   const clearPopT = () => { if (_popT) { clearTimeout(_popT); _popT = null; } };
-  const schedClose = () => { clearPopT(); _popT = setTimeout(() => { try { map.closePopup(); } catch (_) {} }, 280); };
+  const schedClose = () => { clearPopT(); _popT = setTimeout(() => { try { if (_openMk) _openMk.closePopup(); } catch (_) {} }, 280); };   /* mk.closePopup() закрывает, map.closePopup() — НЕТ (Leaflet-квирк) */
   pts.forEach(p => {
     const icon = L.divIcon({ className: 'prpin', html: '<span class="prpin-hit"></span><span class="prpin-dot"></span><span class="prpin-pulse"></span>', iconSize: [34, 34], iconAnchor: [17, 17] });
     const mk = L.marker([p.lat, p.lng], { icon }).addTo(map);
@@ -7552,8 +7552,8 @@ async function initPropMap(props) {
     const hook = p.hookTitle ? `<div class="prpop-hook">${esc(p.hookTitle)}</div>` : '';
     const stubBtn = p.stub && p.sourceUrl ? `<button class="btn btn-sm btn-accent prpop-hydrate" data-prophydrate="${p.id}" data-src="${esc(p.sourceUrl)}">Подтянуть полную карточку</button>` : '';
     mk.bindPopup(`<div class="prpop">${img ? `<div class="prpop-img" style="background-image:url('${esc(img)}')"><div class="prpop-imgsh"></div>${roiHtml}${p.stub ? '<span class="prpop-stub">каталог</span>' : ''}</div>` : ''}<div class="prpop-b"><div class="prpop-n">${esc(p.name)}</div><div class="prpop-l">${ic(I.pin || I.building, 2)}${esc(p.area || '')}${p.developer && p.developer !== '—' ? ' · ' + esc(p.developer) : ''}</div>${chipsHtml}${hook}${price ? `<div class="prpop-p">${esc(price)}</div>` : ''}<div class="prpop-acts">${stubBtn}<button class="btn btn-sm ${stubBtn ? '' : 'btn-accent'} prpop-open" data-propopen="${p.id}">${stubBtn ? 'Сводка' : 'Открыть карточку'}</button></div></div></div>`, { minWidth: 252, maxWidth: 296, closeButton: true, autoPan: true, autoPanPadding: [40, 70], className: 'prpop-wrap' });
-    mk.on('click', () => { clearPopT(); mk.openPopup(); });   /* клик — открыть (и не закрывать) */
-    mk.on('mouseover', () => { clearPopT(); mk.openPopup(); });   /* авто-открытие при наведении */
+    mk.on('click', () => { clearPopT(); _openMk = mk; mk.openPopup(); });   /* клик — открыть (и не закрывать) */
+    mk.on('mouseover', () => { clearPopT(); _openMk = mk; mk.openPopup(); });   /* авто-открытие при наведении */
     mk.on('mouseout', schedClose);   /* курсор ушёл с пина → закрыть предкарточку (с задержкой) */
     bounds.push([p.lat, p.lng]);
   });
