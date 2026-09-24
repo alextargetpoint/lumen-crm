@@ -8473,6 +8473,13 @@ body.client-view [data-team]{ display:none !important; }
 .ana-q-grp.exp .qx{ display:revert; }
 .q-more{ margin-top:9px; font-size:11.5px; font-weight:600; color:var(--accent); background:none; border:0; cursor:pointer; padding:4px 2px; letter-spacing:.01em; }
 .q-more:hover{ text-decoration:underline; }
+/* сворачиваемые карточки приёма лидов (Albato/кабинеты/CAPI) — минимализм: свёрнуто = видна только шапка */
+.card-title[data-fold]{ cursor:pointer; }
+.card-title[data-fold] .intake-chev{ margin-left:10px; background:none; border:0; cursor:pointer; color:var(--ink-3,#8a8a8a); display:inline-flex; align-items:center; padding:4px; transition:transform .2s ease; flex:0 0 auto; }
+.card-title[data-fold] .intake-chev:hover{ color:var(--accent); }
+.card-title[data-fold="1"] .intake-chev{ transform:rotate(-90deg); }
+.glass.card:has(> .card-title[data-fold="1"]) > :not(.card-title){ display:none !important; }
+.glass.card:has(> .card-title[data-fold="1"]){ padding-bottom:16px; }
 .ana-geo-gh, .ana-q-gh{ font-size:12.5px; font-weight:660; color:var(--ink); margin:0 0 9px; padding:0; border-bottom:0; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
 .ana-geo-gh .muted, .ana-q-gh .muted{ font-weight:500; font-size:10.8px; padding:2px 8px; border-radius:9px; background:var(--bg-2,#eef1f4); color:var(--ink-3); }
 
