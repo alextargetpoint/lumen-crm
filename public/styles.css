@@ -6258,6 +6258,47 @@ html[data-night] .ovm-scrim-aiLight { background: linear-gradient(160deg, rgba(3
 /* fix: constrain inline icons inside review block headers */
 .cr-block h4 svg,.cr-hd svg{width:15px;height:15px;flex:0 0 auto}
 
+/* ===== Оценка звонка — дашборд руководителя ===== */
+.crx-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:2px 0 16px}
+.crx-kpi{padding:15px 16px;border-radius:16px;display:flex;flex-direction:column;gap:5px;min-height:96px;justify-content:center}
+.crx-k-l{font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+.crx-k-v{font-size:30px;font-weight:800;line-height:1;color:var(--ink)}
+.crx-k-v small{font-size:14px;font-weight:600;color:var(--muted)}
+.crx-k-s{font-size:11.5px;color:var(--muted);line-height:1.4}
+.crx-split{display:flex;gap:3px;height:10px;border-radius:6px;overflow:hidden;margin:4px 0 2px}
+.crx-split i{display:block;border-radius:3px}
+.crx-split .s-ok{background:#4ADE80}.crx-split .s-mid{background:#F5B77E}.crx-split .s-bad{background:#F87171}
+.crx-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
+.crx-panel{padding:16px 18px}
+.crx-panel-hd{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.crx-panel-hd svg{width:15px;height:15px;flex:0 0 auto;color:var(--accent)}
+.crx-panel .cr-dim{margin-bottom:8px;background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.crx-mistrow{display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border-radius:10px;font-size:12.5px;line-height:1.45;margin-bottom:6px;background:color-mix(in srgb,#F59E5B 8%,transparent)}
+.crx-mcount{flex:0 0 auto;font-weight:800;color:#E08A3C;font-size:12px}
+.crx-pending{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.crx-pend-l{font-size:12px;font-weight:600;color:var(--muted);margin-right:2px}
+.crx-pchip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px dashed color-mix(in srgb,var(--accent) 40%,var(--line));background:color-mix(in srgb,var(--accent) 6%,transparent);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+.crx-pchip:hover{background:color-mix(in srgb,var(--accent) 14%,transparent);border-style:solid}
+.crx-pchip i{color:var(--muted);font-weight:500}
+.crx-hist-hd{font-size:14px;font-weight:700;margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.crx-hist-hd svg{width:16px;height:16px;flex:0 0 auto;color:var(--accent)}
+.crx-hist-hd .muted{font-weight:600}
+.crx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.crx-card{text-align:left;padding:15px 16px;border-radius:16px;cursor:pointer;display:flex;flex-direction:column;gap:10px;transition:.16s;border:1px solid var(--line)}
+.crx-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 14%,transparent);border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+.crx-card-top{display:flex;align-items:center;gap:13px}
+.crx-ring{flex:0 0 auto;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:17px;font-weight:800;color:var(--c);border:2.5px solid var(--c);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.crx-card-h{display:flex;flex-direction:column;gap:2px;min-width:0}
+.crx-card-h b{font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crx-card-h span{font-size:11.5px;color:var(--muted)}
+.crx-verdict{font-size:12.5px;line-height:1.45;color:var(--ink);opacity:.85;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crx-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.crx-tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.crx-tag-mist{--c:#E08A3C}
+.crx-excerpt{margin-top:14px;padding:12px 14px;border-radius:11px;background:color-mix(in srgb,var(--accent) 4%,transparent);border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--muted)}
+.crx-excerpt b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink);margin-bottom:6px;opacity:.7}
+@media(max-width:900px){.crx-kpis{grid-template-columns:repeat(2,1fr)}.crx-cols{grid-template-columns:1fr}}
+
 /* ===== Академия: «второй формат» — источник и глубокое чтение ===== */
 .ac-srcbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line,#2a3550)}
 .ac-srcbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;border:1px solid var(--blue-300)55;background:rgba(124,155,255,.1);color:var(--blue-300);font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;transition:.15s}
