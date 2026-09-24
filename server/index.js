@@ -6615,13 +6615,17 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: false, busy: true, error: 'Звонок уже идёт (' + lead.call.status + '). Дождитесь завершения.' });
       }
       lead.call = { status: 'dialing', cause: null, at: Date.now() }; store.save();   /* помечаем СРАЗУ — окно для дабл-тапа закрыто до прихода вебхука */
-      /* прогрев перед звонком: лид получает WA «звоню сейчас» → видит знакомый локальный номер и берёт трубку.
-         Best-effort — если WA-канал не готов, просто звоним без прогрева. */
+      /* прогрев перед звонком: лид получает WA «звоню сейчас с номера +X» → берёт трубку.
+         ⚠️ТОЛЬКО если переписка УЖЕ идёт (лид хоть раз нам писал) — холодного лида не «торбаним»
+         предупреждением, просто звоним. Best-effort: нет WA-канала → звоним без прогрева. */
       const _tel = db.settings.telephony || {};
-      if (_tel.warmupBeforeCall !== false && lead.phone) {
+      const _hasComms = (db.messages || []).some(mm => mm.leadId === lead.id && mm.dir === 'in');
+      if (_tel.warmupBeforeCall !== false && lead.phone && _hasComms) {
         const _brokerName = (db.brokers.find(x => x.id === lead.broker) || {}).name || (MEMBER && MEMBER.name) || (db.settings.agency && db.settings.agency.name) || '';
-        const _tpl = _tel.warmupText || 'Здравствуйте, {name}! Это {broker} из {agency} — звоню вам сейчас, возьмите, пожалуйста, трубку 🙏';
-        const _txt = _tpl.replace(/\{name\}/g, (lead.name || '').split(' ')[0] || 'здравствуйте').replace(/\{broker\}/g, _brokerName).replace(/\{agency\}/g, (db.settings.agency && db.settings.agency.name) || '');
+        const _caller = pickCallerId(_tel, lead.phone);
+        const _prefix = _caller ? '+' + countryCode(_caller) : '';
+        const _tpl = _tel.warmupText || 'Это {broker} из {agency} — звоню вам сейчас с номера {prefix}, возьмите, пожалуйста, трубку 🙏';
+        const _txt = _tpl.replace(/\{name\}/g, (lead.name || '').split(' ')[0] || '').replace(/\{broker\}/g, _brokerName).replace(/\{agency\}/g, (db.settings.agency && db.settings.agency.name) || '').replace(/\{prefix\}/g, _prefix).replace(/\{number\}/g, _caller || '').replace(/\s{2,}/g, ' ').trim();
         try { engine.send(db, lead, _txt, 'human', { channel: 'wa' }); } catch (_) {}
       }
       try { await initiateCall(db, lead, brokerPhone); return json(res, 200, { ok: true, from: brokerPhone, to: lead.phone || '' }); }
