@@ -10667,7 +10667,8 @@ function openTaxCfg(kind, onDone) {
 
 function openContractorEdit(ct, onDone) {
   const isNew = !ct;
-  ct = ct || { name: '', channels: [], geos: [], adAccounts: [], contact: '', note: '' };
+  ct = ct || { name: '', channels: [], geos: [], adAccounts: [], contact: '', note: '', qualMode: 'peak' };
+  const qm = ct.qualMode === 'current' ? 'current' : 'peak';
   const body = `
     <div class="form-row"><label>Название</label><input id="ceName" value="${esc(ct.name)}" placeholder="DXB Traffic Lab"></div>
     <div class="mp-b-top">
@@ -10676,11 +10677,19 @@ function openContractorEdit(ct, onDone) {
     </div>
     <div class="form-row"><label>Рекламные кабинеты подрядчика (Meta act_…, через запятую)</label><input id="ceAcct" value="${esc((ct.adAccounts || []).join(', '))}" placeholder="act_1234567890, act_9876543210"><div class="muted" style="font-size:10.5px;margin-top:3px;line-height:1.4">Привяжите кабинет(ы) этого подрядчика — тогда факт (расход/лиды) из синка кабинета автоматически сведётся по нему в аналитике «план-факт».</div></div>
     <div class="form-row"><label>Контакт</label><input id="ceContact" value="${esc(ct.contact || '')}" placeholder="@telegram · почта · телефон"></div>
-    <div class="form-row"><label>Заметка</label><textarea id="ceNote" style="min-height:54px" placeholder="Условия, ставки, специализация…">${esc(ct.note || '')}</textarea></div>`;
-  modal({ title: isNew ? 'Новый подрядчик' : 'Подрядчик', body, wide: true, actions: [
+    <div class="form-row"><label>Заметка</label><textarea id="ceNote" style="min-height:54px" placeholder="Условия, ставки, специализация…">${esc(ct.note || '')}</textarea></div>
+    <div class="form-row"><label>Как считать квал-лиды в аналитике подрядчика</label>
+      <div class="seg-toggle" id="ceQm" style="width:100%">
+        <button type="button" class="seg-btn ${qm !== 'current' ? 'on' : ''}" data-qm="peak" style="flex:1">По достигнутой стадии</button>
+        <button type="button" class="seg-btn ${qm === 'current' ? 'on' : ''}" data-qm="current" style="flex:1">Только текущая стадия</button>
+      </div>
+      <div class="lc-hint info" style="margin-top:8px;font-size:11px;line-height:1.55"><span>${ic(I.spark)}<b>Рекомендуется «по достигнутой стадии».</b> Квалифицированный лид со временем естественно отваливается — засыпает, перестаёт отвечать. По маркетингу его качество уже подтверждено, поэтому он должен <b>оставаться</b> в квалах подрядчика (иначе метрика качества трафика тает по мере отвала лидов и подрядчик выглядит хуже, чем привёл). Режим <b>«только текущая стадия»</b> считает лишь тех, кто в квале прямо сейчас — снимок воронки, а не итог по трафику.</span></div>
+    </div>`;
+  const bd = modal({ title: isNew ? 'Новый подрядчик' : 'Подрядчик', body, wide: true, actions: [
     { label: isNew ? 'Создать' : 'Сохранить', cls: 'btn-accent', onClick: async (bd) => {
       const name = $('#ceName', bd).value.trim(); if (!name) { toast('Укажите название'); return false; }
-      const payload = { name, channels: $('#ceCh', bd).value.split(',').map(s => s.trim()).filter(Boolean), geos: $('#ceGeo', bd).value.split(',').map(s => s.trim()).filter(Boolean), adAccounts: $('#ceAcct', bd).value.split(/[,\s]+/).map(s => s.trim()).filter(Boolean), contact: $('#ceContact', bd).value.trim(), note: $('#ceNote', bd).value.trim() };
+      const qmSel = ($('#ceQm .seg-btn.on', bd) || {}).dataset ? $('#ceQm .seg-btn.on', bd).dataset.qm : 'peak';
+      const payload = { name, channels: $('#ceCh', bd).value.split(',').map(s => s.trim()).filter(Boolean), geos: $('#ceGeo', bd).value.split(',').map(s => s.trim()).filter(Boolean), adAccounts: $('#ceAcct', bd).value.split(/[,\s]+/).map(s => s.trim()).filter(Boolean), contact: $('#ceContact', bd).value.trim(), note: $('#ceNote', bd).value.trim(), qualMode: qmSel };
       const saved = isNew ? await api.post('/contractors', payload) : await api.patch('/contractors/' + ct.id, payload);
       toast(isNew ? 'Подрядчик добавлен' : 'Сохранено', null, true);
       if (onDone) onDone(saved);
@@ -10688,6 +10697,7 @@ function openContractorEdit(ct, onDone) {
     } },
     { label: 'Отмена' },
   ] });
+  $$('#ceQm .seg-btn', bd).forEach(b => b.addEventListener('click', () => { $$('#ceQm .seg-btn', bd).forEach(x => x.classList.remove('on')); b.classList.add('on'); }));
 }
 
 /* ---------------- КОММЕНТАРИИ под рекламой (comment-to-lead) ---------------- */
