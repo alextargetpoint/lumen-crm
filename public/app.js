@@ -7873,13 +7873,14 @@ PAGES.properties = async (root) => {
         const r = await api.post('/properties/' + pr.id + '/enrich', {});   /* пусто → сервер сам берёт все гэпы карточки (комплексно) */
         const hasFields = r.proposed && Object.keys(r.proposed).length;
         const media = r.media || { photos: 0, videos: 0 };
-        if (r.error || (!hasFields && !media.photos && !media.videos)) { $('#enrOut', md).innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'Ничего не нашлось') + '</span>'; return; }
+        const out = $('#enrOut', md); out.classList.remove('enr-loading'); out.style.display = 'block';   /* убрать flex загрузки — иначе строки лягут В РЯД по горизонтали */
+        if (r.error || (!hasFields && !media.photos && !media.videos)) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error || 'Ничего не нашлось') + '</span>'; return; }
         const fmtV = (v) => Array.isArray(v) ? v.join(' · ') : String(v);
         const gap = new Set(r.gapFields || []);
         const rows = Object.entries(r.proposed || {}).sort((a, b) => (gap.has(b[0]) ? 1 : 0) - (gap.has(a[0]) ? 1 : 0)).map(([k, v]) => `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">${FLD[k] || k}${gap.has(k) ? ' <span class="enr-gap">пусто в карточке</span>' : ''}</div><div class="sd">${esc(fmtV(v)).slice(0, 240)}</div></div><input type="checkbox" class="enr-ck" data-k="${k}" checked style="width:20px;height:20px"></label>`).join('');
         const mediaRow = (media.photos || media.videos) ? `<label class="set-row" style="cursor:pointer"><div class="sp"><div class="sl">Медиа из сети ${ic(I.image || I.camera || I.eye, 2)}</div><div class="sd">${media.photos ? media.photos + ' фото (хай-рес)' : ''}${media.photos && media.videos ? ' · ' : ''}${media.videos ? media.videos + ' видео-рендеров' : ''}</div></div><input type="checkbox" id="enrMedia" checked style="width:20px;height:20px"></label>` : '';
         const src = (r.sources || []).slice(0, 4).map(s => `<a href="${esc(s.url)}" target="_blank" class="link" style="font-size:11px">${esc((s.title || s.url).slice(0, 40))}</a>`).join(' · ');
-        $('#enrOut', md).innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}${mediaRow}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
+        out.innerHTML = `<div style="font-size:12px;margin-bottom:8px">Найдено (уверенность: <b>${esc(r.confidence || 'medium')}</b>). Отметьте, что добавить:</div>${rows}${mediaRow}<div class="muted" style="font-size:11px;margin-top:10px">Источники: ${src || '—'}</div><button class="btn btn-accent" id="enrApply" style="width:100%;justify-content:center;margin-top:12px">Добавить выбранное в карточку</button>`;
         $('#enrApply', md).addEventListener('click', async (ev) => {
           const fields = $$('.enr-ck', md).filter(c => c.checked).map(c => c.dataset.k);
           const withMedia = !!($('#enrMedia', md) && $('#enrMedia', md).checked);
