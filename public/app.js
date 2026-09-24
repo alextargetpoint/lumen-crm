@@ -13262,31 +13262,16 @@ PAGES.numbers = async (root) => {
       const shot = (id, cap) => `<div class="sbf-shot"><img src="/assets/simbye-guide/${id}.png" alt="${esc(cap)}" loading="lazy" onload="this.closest('.sbf-shot').classList.add('has')" onerror="this.remove()"><span class="sbf-shot-ph">${esc(cap)}</span></div>`;
       const step = (n, title, body, img) => `<div class="sbf-gstep"><div class="sbf-gnum">${n}</div><div class="sbf-gbody"><div class="sbf-gt">${title}</div><div class="sbf-gd">${body}</div>${img ? shot(img, 'скриншот шага ' + n) : ''}</div></div>`;
       box.innerHTML = isOwner ? `<div class="glass card mb sbf-wrap">
-        <div class="card-title">${ic(I.sim)}Подключите номера Simbye<span class="sub">реальные не-VoIP номера (UK/USA, без KYC) для WhatsApp/Telegram</span><span class="sbf-badge off">не подключено</span></div>
-        <div class="seg-toggle" id="sbcTabs" style="margin:6px 0 14px">
-          <button class="seg-btn on" data-sbctab="quick">${ic(I.spark)}Быстро — через Simbye</button>
-          <button class="seg-btn" data-sbctab="manual">${ic(I.gear)}Вручную — сам на телефоне</button>
+        <div class="card-title">${ic(I.sim)}Номера — через Yesim (API)<span class="sub">покупка по API с наценкой · без браузера-эмулятора</span></div>
+        <div class="muted" style="font-size:12px;line-height:1.6;margin:2px 0 12px">Раньше номера тянули через браузер-эмулятор Simbye (у него не было API). Теперь провайдер — <b>Yesim с прямым API</b>: платформа покупает номера программно, регистрирует WhatsApp + Telegram и прогревает через ферма-конвейер. Клиентам номера <b>назначаются</b>, а не покупаются ими вручную.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
+          <div style="border:1px solid var(--stroke);border-radius:11px;padding:12px 14px"><div style="color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.03em">ПОД КЛЮЧ · $25 / место</div><div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">Номер + регистрация + прогрев + прокси + keep-alive на нашем железе. Провижн и выдача — в Панели основателя → Ферма.</div></div>
+          <div style="border:1px solid var(--stroke);border-radius:11px;padding:12px 14px"><div style="color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.03em">НА ВАШЕМ ЖЕЛЕЗЕ · $10 / номер</div><div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">Yesim-номер покупаем и настраиваем мы, агентство подключает по QR на свой Android (до 3 на телефон).</div></div>
         </div>
-        <div data-sbcpane="quick">
-          <div class="sbf-reco">${ic(I.check)}<b>Рекомендуем.</b> Вы один раз входите в Simbye прямо здесь, во встроенном окне (сами проходите вход и капчу — ~30 секунд). Дальше система сама забирает номера и SMS-коды и ведёт их по всем шагам. Сессия сохраняется — повторно вводить ничего не нужно.</div>
-          <div class="sbf-guide">
-            ${step(1, 'Зарегистрируйтесь в Simbye', 'Откройте регистрацию и заведите аккаунт <b>по email + паролю</b>. Внизу сайта можно переключить язык на <b>«Русский»</b>. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть регистрацию Simbye ↗</a>', 'q1')}
-            ${step(2, 'Купите номер', 'В Simbye: <b>«Виртуальные номера»</b> → UK (9,95€/30дн) или USA → оплатите картой/PayPal/Apple Pay. Или позже — кнопкой «Купить номер» здесь.', 'q2')}
-            ${step(3, 'Войдите через встроенное окно — один раз', 'Нажмите кнопку ниже: прямо здесь откроется окно входа Simbye. Введите email+пароль, пройдите капчу (обычно один клик) — и всё. Мы сохраним сессию и дальше сделаем всё сами: номера, коды, конвейер. Пароль остаётся в окне Simbye — мы храним только сессию.', '')}
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px"><button class="btn btn-accent" id="sbcRemote">${ic(I.link)}Войти в Simbye (встроенное окно)</button><span class="muted" style="font-size:11px">🔒 Один раз — дальше автоматически. Пароль остаётся в окне Simbye, мы храним только сессию.</span></div>
-        </div>
-        <div data-sbcpane="manual" style="display:none">
-          <div class="sbf-reco muted2">${ic(I.gear)}Если хотите всё делать сами со своего телефона. Номера и коды сюда автоматически не попадут — коды смотрите в панели Simbye вручную. Подключение к CRM — по QR в конце.</div>
-          <div class="sbf-guide">
-            ${step(1, 'Заведите аккаунт и купите номер в Simbye', 'Регистрация на simbye.com (внизу выберите язык <b>«Русский»</b>), раздел <b>«Виртуальные номера»</b> → купите UK/USA номер. <a href="https://simbye.com/ru/account/register" target="_blank" class="sbf-glink">Открыть Simbye ↗</a>', 'm1')}
-            ${step(2, 'Откройте ОБЫЧНЫЙ WhatsApp', 'На телефоне — <b>обычный WhatsApp, НЕ Business и НЕ клон</b> (клоны/Business часто не принимают код). Введите купленный номер.', 'm2')}
-            ${step(3, 'Заберите код из панели Simbye', 'Когда WhatsApp попросит SMS-код — откройте в Simbye <b>«Пополнение / Входящие SMS»</b> (или раздел номера) → скопируйте пришедший код → введите в WhatsApp.', 'm3')}
-            ${step(4, 'Включите двухшаговую проверку', 'WhatsApp → Настройки → Аккаунт → Двухшаговая проверка → задайте PIN и e-mail восстановления (чтобы номер не увели и не слетел).', 'm4')}
-            ${step(5, 'Подключите к CRM по QR', 'Вкладка «WhatsApp QR» → «Подключить свой (QR)» → в WhatsApp: Настройки → Связанные устройства → Привязка устройства → отсканируйте QR.', 'm5')}
-            ${step(6, 'Telegram — так же', 'Для Telegram: обычное приложение → номер → код из панели Simbye → облачный пароль (2FA) → вкладка «Telegram QR» → подключить по QR.', 'm6')}
-          </div>
-          <div class="sbf-reco" style="margin-top:12px">${ic(I.spark)}Хотите, чтобы коды приходили в CRM автоматически и без ручной возни? Переключитесь на «Быстро — через Simbye».</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <a class="btn btn-accent btn-sm" href="/admin.html" target="_blank">${ic(I.sim)}Открыть Ферму (Панель основателя)</a>
+          <button class="btn btn-sm" onclick="openGuide('wanumbers')">${ic(I.doc)}Инструкция</button>
+          <span class="muted" style="font-size:11px">Управление фермой Yesim (покупка/прогрев/распределение) — в админ-панели.</span>
         </div>
       </div>` : '';
       wireSimbye(box, d, loadSimbyeFarm);
