@@ -139,6 +139,7 @@ const farmSvc = require('./farm'); /* ⭐ ферма номеров WhatsApp+Tel
 const farmProv = require('./farm-provision'); /* Р2: конвейер провижна (eSIM-адаптер + задания фарм-хост-агенту) */
 const farmWarm = require('./farm-warmup');    /* Р3: движок прогрева номеров (расписание + тик) */
 const meetingBot = require('./meetingbot');   /* авто-запись+транскрипция Zoom/Meet встреч (Recall.ai) */
+let XLSX = null; try { XLSX = require('xlsx'); } catch (_) {}   /* парс Excel-прайсов застройщиков (наличие юнитов) */
 const farmMail = require('./farm-email');     /* Р2+: email-адаптер для Telegram (catch-all + авто-код) */
 const invoicepdf = require('./invoicepdf');
 const helpcenter = require('./help'); /* публичный справочник /help (server-render из общего guides-data.js) */
@@ -10737,7 +10738,8 @@ ${SCR}
       const ld = []; { const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi; let mm; while ((mm = re.exec(html))) { try { ld.push(JSON.parse(mm[1])); } catch (_) {} } }
       const badImg = (s) => /favicon|logo|icon|sprite|avatar|placeholder|blank|banner|header|footer|\.svg(\?|$)/i.test(String(s || ''));
       const imgs = new Set(); if (ogImg && !badImg(ogImg)) { const a = absUrl(ogImg); if (a) imgs.add(a); }
-      { const re = /<img[^>]+src=["']([^"']+)["']/gi; let mm; while ((mm = re.exec(html)) && imgs.size < 40) { const a = absUrl(mm[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !badImg(a)) imgs.add(a); } }
+      /* надёжный экстрактор (og/img/srcset/background/data-src/JSON-LD + фильтр мусора) */
+      scrapeImagesFromHtml(html, url).forEach(u => { if (imgs.size < 40 && /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !badImg(u)) imgs.add(u); });
       let text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
       /* SPA/JS-сайт → сырой HTML тонкий: рендерим через провайдера (если задан платформенный ключ) */
       let renderMd = '';
@@ -10746,7 +10748,7 @@ ${SCR}
         if (rp) {
           renderMd = rp.markdown || '';
           if (rp.ogImage) { const a = absUrl(rp.ogImage); if (a) imgs.add(a); }
-          if (rp.html) { const re2 = /<img[^>]+src=["']([^"']+)["']/gi; let m3; while ((m3 = re2.exec(rp.html)) && imgs.size < 40) { const a = absUrl(m3[1]); if (a && /\.(jpe?g|png|webp)(\?|$)/i.test(a) && !badImg(a)) imgs.add(a); } }
+          if (rp.html) scrapeImagesFromHtml(rp.html, url).forEach(u => { if (imgs.size < 40 && /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !badImg(u)) imgs.add(u); });
           { const rem = /!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:jpe?g|png|webp)[^)\s]*)\)/gi; let m4; while ((m4 = rem.exec(renderMd)) && imgs.size < 40) { if (!badImg(m4[1])) imgs.add(m4[1]); } }
           if (renderMd && renderMd.length > text.length) text = renderMd;
         }
@@ -10776,7 +10778,7 @@ ${SCR}
           if (!rr.ok) return null; const buf = Buffer.from(await rr.arrayBuffer());
           if (buf.length < 3000 || buf.length > 8e6) return null;
           const dim = imgDimensions(buf);
-          if (dim && (Math.max(dim.w, dim.h) < 900 || Math.min(dim.w, dim.h) < 500)) return null;  /* мыльные превью — мимо */
+          if (dim && (Math.max(dim.w, dim.h) < 700 || Math.min(dim.w, dim.h) < 380)) return null;  /* только настоящие превью-миниатюры — мимо */
           const ex2 = ((iu.split('?')[0].match(/\.(jpe?g|png|webp)$/i) || ['.jpg'])[0]).toLowerCase();
           const fn = 'prop_' + crypto.randomBytes(6).toString('hex') + ex2;
           fs.writeFileSync(path.join(PUBLIC, 'assets', 'props', fn), buf);
@@ -10796,10 +10798,32 @@ ${SCR}
        история). apply:false = превью diff, apply:true = применить. */
     if ((m = p.match(/^\/api\/properties\/([^/]+)\/reconcile-units$/)) && req.method === 'POST') {
       const pr = db.properties.find(x => x.id === m[1]); if (!pr) return json(res, 404, { error: 'not found' });
-      const b = await readBody(req); const text = String(b.text || '').trim();
-      if (!text) return json(res, 400, { error: 'вставьте содержимое файла доступности застройщика' });
+      const b = await readBody(req); let text = String(b.text || '').trim();
+      /* файл застройщика (Excel/CSV/текст) → в текст: Excel парсим SheetJS (все листы → CSV), ИИ разберёт кросс-таблицу */
+      if (!text && b.fileB64) {
+        try {
+          const buf = Buffer.from(String(b.fileB64).replace(/^data:[^,]*,/, ''), 'base64');
+          const nm = String(b.fileName || '').toLowerCase();
+          if (/\.(xlsx|xls)$/.test(nm) && XLSX) {
+            const wb = XLSX.read(buf, { type: 'buffer' });
+            text = wb.SheetNames.map(sn => '### ' + sn + '\n' + XLSX.utils.sheet_to_csv(wb.Sheets[sn])).join('\n\n').slice(0, 40000);
+          } else { text = buf.toString('utf8').slice(0, 40000); }
+        } catch (e) { return json(res, 400, { error: 'не разобрал файл: ' + e.message }); }
+      }
+      if (!text) return json(res, 400, { error: 'вставьте текст или файл доступности застройщика' });
       if (!llm.available()) return json(res, 400, { error: 'нет ИИ-ключа (GEMINI_API_KEY)' });
-      let units; try { units = await llm.extractUnits(text); } catch (e) { return json(res, 400, { error: 'ИИ не разобрал файл: ' + e.message }); }
+      /* большие прайсы застройщиков = сотни юнитов → ИИ обрезает JSON. Чанкаем по ~5000 симв,
+         извлекаем параллельно, мёржим (частичный успех лучше полного провала). */
+      let units;
+      try {
+        if (text.length <= 5200) { units = await llm.extractUnits(text); }
+        else {
+          const chunks = []; for (let i = 0; i < text.length && chunks.length < 16; i += 5000) chunks.push(text.slice(i, i + 5000));
+          const parts = await Promise.all(chunks.map(c => llm.extractUnits(c).catch(() => [])));
+          units = parts.flat();
+        }
+      } catch (e) { return json(res, 400, { error: 'ИИ не разобрал файл: ' + e.message }); }
+      if (!units.length) return json(res, 400, { error: 'в файле не распознались юниты (проверьте, что это прайс-лист с юнитами)' });
       const sig = (u) => [String(u.unitNo || '').toLowerCase().replace(/\s/g, ''), String(u.type || '').toLowerCase(), String(u.floor || ''), String(u.area || u.size || '').replace(/\D/g, '')].filter(Boolean).join('|');
       pr.units = pr.units || []; const cur = pr.units;
       const incoming = units.map(u => ({ unitNo: String(u.unitNo || '').slice(0, 20), type: String(u.type || '').slice(0, 20), beds: +u.beds || 0, area: String(u.size || u.area || '').slice(0, 20), floor: String(u.floor || '').slice(0, 15), price: +u.price || 0, view: String(u.view || '').slice(0, 40), status: 'available', updatedAt: Date.now() }));
