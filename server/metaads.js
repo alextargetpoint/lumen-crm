@@ -128,9 +128,20 @@ async function syncInsights(db, deps, { acct, days } = {}) {
     if (!ad.name) ad.name = A.name || ad.adId;
     ad.adsetName = A.adset || ad.adsetName;
     ad.campaignName = A.camp || ad.campaignName;
-    ad.spend = Math.round(A.spend); ad.impressions = A.impr; ad.clicks = A.clicks; ad.leadsMeta = A.leads;
     ad.messaging = A.msg; if (A.objective) ad.objective = A.objective; ad.campaignType = campaignTypeOf(A.objective, A.camp, A.msg);
-    ad.daily = Object.entries(A.daily).sort((a, b) => a[0] < b[0] ? -1 : 1).map(([d, v]) => ({ d, spend: +(+v.spend).toFixed(2), leads: v.leads, clicks: v.clicks, impr: v.impr })).slice(-30);
+    /* ⚠️МЁРЖ посуточных данных по ДАТЕ, а не перезапись: окно синка скользит вперёд, но старые дни
+       НЕ должны теряться (иначе на след. день total за 30д «затирается» коротким окном). Дни из нового
+       окна перекрывают одноимённые (свежий факт от Meta), дни вне окна — сохраняются. Храним до 120 дней. */
+    const byDate = {};
+    for (const p of (Array.isArray(ad.daily) ? ad.daily : [])) if (p && p.d) byDate[p.d] = p;
+    for (const [d, v] of Object.entries(A.daily)) byDate[d] = { d, spend: +(+v.spend).toFixed(2), leads: v.leads, clicks: v.clicks, impr: v.impr };
+    const merged = Object.values(byDate).sort((a, b) => a.d < b.d ? -1 : 1).slice(-120);
+    ad.daily = merged;
+    /* тоталы объявления = сумма по СОХРАНЁННЫМ дням (консистентно, не зависит от окна синка) */
+    ad.spend = Math.round(merged.reduce((s, p) => s + (p.spend || 0), 0));
+    ad.impressions = merged.reduce((s, p) => s + (p.impr || 0), 0);
+    ad.clicks = merged.reduce((s, p) => s + (p.clicks || 0), 0);
+    ad.leadsMeta = merged.reduce((s, p) => s + (p.leads || 0), 0);
     ad.spendSource = 'meta_api'; ad.adAccountId = id; ad.syncedAt = Date.now();
   }
   /* креативы (превью) — одним запросом; заполняем media только если у объявления его ещё нет */

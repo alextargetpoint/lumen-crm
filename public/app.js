@@ -9204,7 +9204,18 @@ PAGES.ads = async (root) => {
     ${(() => {
       const S2 = STATE.settings.metaAds || {}; const src2 = S2.sourceCurrency || (S2.accounts && S2.accounts[0] && S2.accounts[0].currency) || 'AED'; const dc = S2.displayCurrency || src2;
       const cv = (a) => fxConv(a, src2, dc); const cm = (n) => curSym(dc) + Math.round(cv(n || 0)).toLocaleString('ru-RU').replace(/,/g, ' ');
-      const md = (d.ads || []).reduce((a, x) => { a.spend += x.spend || 0; a.leadsMeta += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.clicks += x.clicks || 0; a.impr += x.impressions || 0; a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0)); return a; }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
+      /* ⚠️Метрики Meta (потрачено/лиды/клики/показы) считаем из ПОСУТОЧНЫХ данных за ВЫБРАННЫЙ период —
+         иначе показывали сумму окна синка независимо от выбранных «30 дней» и расходились с кабинетом.
+         Квалы — из CRM (qualsFact), они не посуточные → берём тотал по объявлению. */
+      const _rng = (typeof adRangeDates === 'function') ? adRangeDates() : {}; const _rf = _rng.from || '', _rt = _rng.to || '';
+      const _inRng = (dt) => (!_rf || dt >= _rf) && (!_rt || dt <= _rt);
+      const md = (d.ads || []).reduce((a, x) => {
+        const dly = Array.isArray(x.daily) ? x.daily.filter(p => p && p.d && _inRng(p.d)) : [];
+        if (dly.length) { for (const p of dly) { a.spend += p.spend || 0; a.leadsMeta += p.leads || 0; a.clicks += p.clicks || 0; a.impr += p.impr || 0; } }
+        else { a.spend += x.spend || 0; a.leadsMeta += (x.leadsMeta != null ? x.leadsMeta : (x.leads || 0)); a.clicks += x.clicks || 0; a.impr += x.impressions || 0; }   /* фолбэк: нет daily → тотал */
+        a.quals += (x.qualsFact != null ? x.qualsFact : (x.qualified || 0));
+        return a;
+      }, { spend: 0, leadsMeta: 0, clicks: 0, impr: 0, quals: 0 });
       const tile = (lbl, val, sub, accent) => `<div class="ad-tile${accent ? ' accent' : ''}"><div class="at-lbl">${lbl}</div><div class="at-val">${val}</div><div class="at-sub">${sub || ''}</div></div>`;
       return `<div class="ad-kpis">
         ${tile('Потрачено', cm(md.spend), `${(d.ads || []).length} объявл`)}
